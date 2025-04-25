@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"math/big"
 
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenoutput"
-	"github.com/lightsparkdev/spark-go/so/ent/tokentransaction"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/ent/schema"
+	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
+	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 )
 
 // FetchTokenInputs fetches the transaction whose token transaction hashes

@@ -75,7 +75,7 @@ const file_mock_proto_rawDesc = "" +
 	"\x1bCleanUpPreimageShareRequest\x12!\n" +
 	"\fpayment_hash\x18\x01 \x01(\fR\vpaymentHash2e\n" +
 	"\vMockService\x12V\n" +
-	"\x17clean_up_preimage_share\x12!.mock.CleanUpPreimageShareRequest\x1a\x16.google.protobuf.Empty\"\x00B.Z,github.com/lightsparkdev/spark-go/proto/mockb\x06proto3"
+	"\x17clean_up_preimage_share\x12!.mock.CleanUpPreimageShareRequest\x1a\x16.google.protobuf.Empty\"\x00B+Z)github.com/lightsparkdev/spark/proto/mockb\x06proto3"
 
 var (
 	file_mock_proto_rawDescOnce sync.Once

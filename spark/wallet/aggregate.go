@@ -12,12 +12,12 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go"
-	"github.com/lightsparkdev/spark-go/common"
-	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
-	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so/objects"
+	"github.com/lightsparkdev/spark"
+	"github.com/lightsparkdev/spark/common"
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
+	pbfrost "github.com/lightsparkdev/spark/proto/frost"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/objects"
 )
 
 // AggregateTreeNodes aggregates the tree nodes and returns the new node.

@@ -11,8 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/lightsparkdev/spark-go/so/ent/predicate"
-	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
+	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/signingnonce"
 )
 
 // SigningNonceUpdate is the builder for updating SigningNonce entities.

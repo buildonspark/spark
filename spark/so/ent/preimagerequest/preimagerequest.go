@@ -9,7 +9,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark/so/ent/schema"
 )
 
 const (

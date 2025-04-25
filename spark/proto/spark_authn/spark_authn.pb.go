@@ -400,7 +400,7 @@ const file_spark_authn_proto_rawDesc = "" +
 	"\x14expiration_timestamp\x18\x02 \x01(\x03R\x13expirationTimestamp2\xcc\x01\n" +
 	"\x11SparkAuthnService\x12V\n" +
 	"\rget_challenge\x12 .spark_authn.GetChallengeRequest\x1a!.spark_authn.GetChallengeResponse\"\x00\x12_\n" +
-	"\x10verify_challenge\x12#.spark_authn.VerifyChallengeRequest\x1a$.spark_authn.VerifyChallengeResponse\"\x00B5Z3github.com/lightsparkdev/spark-go/proto/spark_authnb\x06proto3"
+	"\x10verify_challenge\x12#.spark_authn.VerifyChallengeRequest\x1a$.spark_authn.VerifyChallengeResponse\"\x00B2Z0github.com/lightsparkdev/spark/proto/spark_authnb\x06proto3"
 
 var (
 	file_spark_authn_proto_rawDescOnce sync.Once

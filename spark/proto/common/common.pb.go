@@ -243,7 +243,7 @@ const file_common_proto_rawDesc = "" +
 	"\tAGGREGATE\x10\x02\x12\v\n" +
 	"\aREFRESH\x10\x03\x12\n" +
 	"\n" +
-	"\x06EXTEND\x10\x04B0Z.github.com/lightsparkdev/spark-go/proto/commonb\x06proto3"
+	"\x06EXTEND\x10\x04B-Z+github.com/lightsparkdev/spark/proto/commonb\x06proto3"
 
 var (
 	file_common_proto_rawDescOnce sync.Once

@@ -10,8 +10,8 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/blockheight"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark/so/ent/blockheight"
+	"github.com/lightsparkdev/spark/so/ent/schema"
 )
 
 // BlockHeight is the model entity for the BlockHeight schema.

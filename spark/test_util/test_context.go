@@ -4,8 +4,8 @@ import (
 	"context"
 
 	_ "github.com/lib/pq" // postgres driver
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
 )
 
 // TestContext returns a context with a database client that can be used for testing.

@@ -2,7 +2,7 @@
 
 package runtime
 
-// The schema-stitching logic is generated in github.com/lightsparkdev/spark-go/so/ent/runtime.go
+// The schema-stitching logic is generated in github.com/lightsparkdev/spark/so/ent/runtime.go
 
 const (
 	Version = "v0.14.3"                                         // Version of ent codegen.

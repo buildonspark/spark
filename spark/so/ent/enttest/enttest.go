@@ -5,12 +5,12 @@ package enttest
 import (
 	"context"
 
-	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark/so/ent"
 	// required by schema hooks.
-	_ "github.com/lightsparkdev/spark-go/so/ent/runtime"
+	_ "github.com/lightsparkdev/spark/so/ent/runtime"
 
 	"entgo.io/ent/dialect/sql/schema"
-	"github.com/lightsparkdev/spark-go/so/ent/migrate"
+	"github.com/lightsparkdev/spark/so/ent/migrate"
 )
 
 type (

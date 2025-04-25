@@ -19,10 +19,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so/middleware"
-	"github.com/lightsparkdev/spark-go/so/utils"
+	"github.com/lightsparkdev/spark/common"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/middleware"
+	"github.com/lightsparkdev/spark/so/utils"
 	"gopkg.in/yaml.v3"
 )
 

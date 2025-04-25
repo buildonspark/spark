@@ -8,7 +8,7 @@ package lrc20
 
 import (
 	_ "github.com/envoyproxy/protoc-gen-validate/validate"
-	spark "github.com/lightsparkdev/spark-go/proto/spark"
+	spark "github.com/lightsparkdev/spark/proto/spark"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -710,7 +710,7 @@ const file_lrc20_proto_rawDesc = "" +
 	"GetSparkTx\x12\x19.rpc.v1.GetSparkTxRequest\x1a\x1a.rpc.v1.GetSparkTxResponse\x12E\n" +
 	"\rVerifySparkTx\x12\x1c.rpc.v1.VerifySparkTxRequest\x1a\x16.google.protobuf.Empty\x12G\n" +
 	"\fFreezeTokens\x12\x1a.spark.FreezeTokensRequest\x1a\x1b.spark.FreezeTokensResponse\x12a\n" +
-	"\x14ListWithdrawnOutputs\x12#.rpc.v1.ListWithdrawnOutputsRequest\x1a$.rpc.v1.ListWithdrawnOutputsResponseB/Z-github.com/lightsparkdev/spark-go/proto/lrc20b\x06proto3"
+	"\x14ListWithdrawnOutputs\x12#.rpc.v1.ListWithdrawnOutputsRequest\x1a$.rpc.v1.ListWithdrawnOutputsResponseB,Z*github.com/lightsparkdev/spark/proto/lrc20b\x06proto3"
 
 var (
 	file_lrc20_proto_rawDescOnce sync.Once

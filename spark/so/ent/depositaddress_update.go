@@ -12,8 +12,8 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
-	"github.com/lightsparkdev/spark-go/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark/so/ent/predicate"
 )
 
 // DepositAddressUpdate is the builder for updating DepositAddress entities.

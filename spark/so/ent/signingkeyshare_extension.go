@@ -8,15 +8,15 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go"
-	"github.com/lightsparkdev/spark-go/common"
-	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
-	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
-	"github.com/lightsparkdev/spark-go/so/logging"
+	"github.com/lightsparkdev/spark"
+	"github.com/lightsparkdev/spark/common"
+	pbdkg "github.com/lightsparkdev/spark/proto/dkg"
+	pbfrost "github.com/lightsparkdev/spark/proto/frost"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent/schema"
+	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/logging"
 )
 
 // TweakKeyShare tweaks the given keyshare with the given tweak, updates the keyshare in the database and returns the updated keyshare.

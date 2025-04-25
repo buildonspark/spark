@@ -11,9 +11,9 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
-	"github.com/lightsparkdev/spark-go/so/ent/treenode"
-	"github.com/lightsparkdev/spark-go/so/ent/usersignedtransaction"
+	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
 )
 
 // UserSignedTransactionCreate is the builder for creating a UserSignedTransaction entity.

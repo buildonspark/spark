@@ -4,11 +4,11 @@ import (
 	"context"
 	"sync"
 
-	"github.com/lightsparkdev/spark-go/common"
-	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
-	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
-	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
-	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark/common"
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
+	pbdkg "github.com/lightsparkdev/spark/proto/dkg"
+	pbfrost "github.com/lightsparkdev/spark/proto/frost"
+	"github.com/lightsparkdev/spark/so"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 )

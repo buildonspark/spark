@@ -12,9 +12,9 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/cooperativeexit"
-	"github.com/lightsparkdev/spark-go/so/ent/predicate"
-	"github.com/lightsparkdev/spark-go/so/ent/transfer"
+	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
+	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/transfer"
 )
 
 // CooperativeExitUpdate is the builder for updating CooperativeExit entities.

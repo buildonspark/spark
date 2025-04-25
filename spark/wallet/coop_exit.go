@@ -11,10 +11,10 @@ import (
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/lightsparkdev/spark-go"
-	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so/objects"
+	"github.com/lightsparkdev/spark"
+	"github.com/lightsparkdev/spark/common"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/objects"
 )
 
 // Leaf to represent input for GetConnectorRefundSignatures.

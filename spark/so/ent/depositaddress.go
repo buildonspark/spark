@@ -10,8 +10,8 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
-	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 )
 
 // DepositAddress is the model entity for the DepositAddress schema.

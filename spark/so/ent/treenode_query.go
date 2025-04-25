@@ -14,10 +14,10 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/predicate"
-	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
-	"github.com/lightsparkdev/spark-go/so/ent/tree"
-	"github.com/lightsparkdev/spark-go/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/ent/tree"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
 )
 
 // TreeNodeQuery is the builder for querying TreeNode entities.

@@ -7,7 +7,7 @@
 package dkg
 
 import (
-	common "github.com/lightsparkdev/spark-go/proto/common"
+	common "github.com/lightsparkdev/spark/proto/common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -588,7 +588,7 @@ const file_dkg_proto_rawDesc = "" +
 	"\finitiate_dkg\x12\x17.dkg.InitiateDkgRequest\x1a\x18.dkg.InitiateDkgResponse\"\x00\x12L\n" +
 	"\x0fround1_packages\x12\x1a.dkg.Round1PackagesRequest\x1a\x1b.dkg.Round1PackagesResponse\"\x00\x12O\n" +
 	"\x10round1_signature\x12\x1b.dkg.Round1SignatureRequest\x1a\x1c.dkg.Round1SignatureResponse\"\x00\x12L\n" +
-	"\x0fround2_packages\x12\x1a.dkg.Round2PackagesRequest\x1a\x1b.dkg.Round2PackagesResponse\"\x00B-Z+github.com/lightsparkdev/spark-go/proto/dkgb\x06proto3"
+	"\x0fround2_packages\x12\x1a.dkg.Round2PackagesRequest\x1a\x1b.dkg.Round2PackagesResponse\"\x00B*Z(github.com/lightsparkdev/spark/proto/dkgb\x06proto3"
 
 var (
 	file_dkg_proto_rawDescOnce sync.Once

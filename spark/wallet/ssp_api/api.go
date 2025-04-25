@@ -11,7 +11,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/common"
+	"github.com/lightsparkdev/spark/common"
 )
 
 type SparkServiceAPI struct {

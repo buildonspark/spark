@@ -13,8 +13,8 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/blockheight"
-	"github.com/lightsparkdev/spark-go/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/blockheight"
+	"github.com/lightsparkdev/spark/so/ent/predicate"
 )
 
 // BlockHeightQuery is the builder for querying BlockHeight entities.

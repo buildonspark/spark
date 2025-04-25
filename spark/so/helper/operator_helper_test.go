@@ -3,8 +3,8 @@ package helper_test
 import (
 	"testing"
 
-	"github.com/lightsparkdev/spark-go/so/helper"
-	testutil "github.com/lightsparkdev/spark-go/test_util"
+	"github.com/lightsparkdev/spark/so/helper"
+	testutil "github.com/lightsparkdev/spark/test_util"
 )
 
 func TestOperatorSelectionAll(t *testing.T) {

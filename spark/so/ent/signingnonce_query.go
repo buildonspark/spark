@@ -13,8 +13,8 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/predicate"
-	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
+	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/signingnonce"
 )
 
 // SigningNonceQuery is the builder for querying SigningNonce entities.

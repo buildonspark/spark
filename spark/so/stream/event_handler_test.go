@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"

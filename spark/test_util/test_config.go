@@ -6,9 +6,9 @@ import (
 	"os"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/lightsparkdev/spark-go/common"
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/wallet"
+	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/wallet"
 )
 
 const (

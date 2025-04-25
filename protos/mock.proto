@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package mock;
 
-option go_package = "github.com/lightsparkdev/spark-go/proto/mock";
+option go_package = "github.com/lightsparkdev/spark/proto/mock";
 import "google/protobuf/empty.proto";
 
 service MockService {

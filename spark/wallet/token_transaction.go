@@ -12,11 +12,11 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-	"github.com/lightsparkdev/spark-go/common"
-	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/utils"
+	"github.com/lightsparkdev/spark/common"
+	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/utils"
 )
 
 // KeyshareWithOperatorIndex holds a keyshare and its corresponding operator index.

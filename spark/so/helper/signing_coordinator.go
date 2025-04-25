@@ -6,15 +6,15 @@ import (
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/common"
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/logging"
-	"github.com/lightsparkdev/spark-go/so/objects"
+	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/logging"
+	"github.com/lightsparkdev/spark/so/objects"
 
-	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
-	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
-	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
+	pbspark "github.com/lightsparkdev/spark/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 )
 
 // SigningResult is the result of a signing job.

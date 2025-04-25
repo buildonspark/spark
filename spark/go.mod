@@ -1,4 +1,4 @@
-module github.com/lightsparkdev/spark-go
+module github.com/lightsparkdev/spark
 
 go 1.23.0
 
@@ -153,4 +153,4 @@ require (
 	google.golang.org/protobuf v1.36.5
 )
 
-replace github.com/lightsparkdev/spark-go/ => ./
+replace github.com/lightsparkdev/spark/ => ./

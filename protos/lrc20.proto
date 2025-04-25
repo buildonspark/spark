@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package rpc.v1;
 
-option go_package = "github.com/lightsparkdev/spark-go/proto/lrc20";
+option go_package = "github.com/lightsparkdev/spark/proto/lrc20";
 import "google/protobuf/empty.proto";
 import "validate/validate.proto";
 import "spark.proto";

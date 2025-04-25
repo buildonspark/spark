@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-	"github.com/lightsparkdev/spark-go/common"
-	pbauthn "github.com/lightsparkdev/spark-go/proto/spark_authn"
+	"github.com/lightsparkdev/spark/common"
+	pbauthn "github.com/lightsparkdev/spark/proto/spark_authn"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"

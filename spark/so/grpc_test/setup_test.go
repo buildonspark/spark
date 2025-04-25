@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lightsparkdev/spark-go/so/dkg"
-	testutil "github.com/lightsparkdev/spark-go/test_util"
+	"github.com/lightsparkdev/spark/so/dkg"
+	testutil "github.com/lightsparkdev/spark/test_util"
 )
 
 const (

@@ -18,7 +18,7 @@ import (
 
 	"google.golang.org/protobuf/types/known/anypb"
 
-	spark "github.com/lightsparkdev/spark-go/proto/spark"
+	spark "github.com/lightsparkdev/spark/proto/spark"
 )
 
 // ensure the imports are used

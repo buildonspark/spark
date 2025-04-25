@@ -11,8 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
-	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 )
 
 // DepositAddressCreate is the builder for creating a DepositAddress entity.

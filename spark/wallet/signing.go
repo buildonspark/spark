@@ -2,7 +2,7 @@ package wallet
 
 import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
+	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 )
 
 // CreateUserKeyPackage creates a user frost signing key package from a signing private key.

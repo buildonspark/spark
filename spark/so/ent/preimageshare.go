@@ -10,8 +10,8 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
-	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
+	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 )
 
 // PreimageShare is the model entity for the PreimageShare schema.

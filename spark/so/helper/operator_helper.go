@@ -7,8 +7,8 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/logging"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/logging"
 )
 
 // OperatorSelectionOption is the option for selecting operators.

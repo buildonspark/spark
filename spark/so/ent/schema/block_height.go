@@ -5,7 +5,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/schema/field"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 )
 
 // Network is the network type.

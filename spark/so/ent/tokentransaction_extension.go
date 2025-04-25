@@ -6,13 +6,13 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenoutput"
-	"github.com/lightsparkdev/spark-go/so/ent/tokentransaction"
-	"github.com/lightsparkdev/spark-go/so/logging"
-	"github.com/lightsparkdev/spark-go/so/utils"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent/schema"
+	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
+	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	"github.com/lightsparkdev/spark/so/logging"
+	"github.com/lightsparkdev/spark/so/utils"
 )
 
 func GetTokenTransactionMapFromList(transactions []*TokenTransaction) (map[string]*TokenTransaction, error) {

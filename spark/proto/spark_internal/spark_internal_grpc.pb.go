@@ -8,7 +8,7 @@ package spark_internal
 
 import (
 	context "context"
-	spark "github.com/lightsparkdev/spark-go/proto/spark"
+	spark "github.com/lightsparkdev/spark/proto/spark"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"

@@ -8,10 +8,10 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/common"
-	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark/common"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
 )
 
 // InternalTreeCreationHandler is a handler for internal tree creation operations.

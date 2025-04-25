@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"

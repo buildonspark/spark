@@ -172,7 +172,7 @@ const file_spark_authn_internal_proto_rawDesc = "" +
 	"\x10ProtectedSession\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\x05R\aversion\x12.\n" +
 	"\asession\x18\x02 \x01(\v2\x14.spark_authn.SessionR\asession\x12\x12\n" +
-	"\x04hmac\x18\x03 \x01(\fR\x04hmacB>Z<github.com/lightsparkdev/spark-go/proto/spark_authn_internalb\x06proto3"
+	"\x04hmac\x18\x03 \x01(\fR\x04hmacB;Z9github.com/lightsparkdev/spark/proto/spark_authn_internalb\x06proto3"
 
 var (
 	file_spark_authn_internal_proto_rawDescOnce sync.Once

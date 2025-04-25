@@ -10,8 +10,8 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/cooperativeexit"
-	"github.com/lightsparkdev/spark-go/so/ent/transfer"
+	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
+	"github.com/lightsparkdev/spark/so/ent/transfer"
 )
 
 // CooperativeExit is the model entity for the CooperativeExit schema.

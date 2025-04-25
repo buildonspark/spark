@@ -8,8 +8,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/lightsparkdev/spark-go/so/ent/blockheight"
-	"github.com/lightsparkdev/spark-go/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/blockheight"
+	"github.com/lightsparkdev/spark/so/ent/predicate"
 )
 
 // BlockHeightDelete is the builder for deleting a BlockHeight entity.

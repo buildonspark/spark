@@ -5,8 +5,8 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto/spark_tree"
+	"github.com/lightsparkdev/spark/common"
+	pb "github.com/lightsparkdev/spark/proto/spark_tree"
 )
 
 func TestGetLeafDenominationCounts(t *testing.T) {

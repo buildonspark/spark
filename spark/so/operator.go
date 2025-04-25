@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so/utils"
+	"github.com/lightsparkdev/spark/common"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/utils"
 	"google.golang.org/grpc"
 )
 

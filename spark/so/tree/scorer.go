@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pb "github.com/lightsparkdev/spark-go/proto/spark_tree"
-	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/ent/treenode"
-	"github.com/lightsparkdev/spark-go/so/logging"
+	pb "github.com/lightsparkdev/spark/proto/spark_tree"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/schema"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/logging"
 )
 
 // PolarityScoreDepth is the depth of the tree to consider for the polarity score.

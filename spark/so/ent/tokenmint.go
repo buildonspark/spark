@@ -10,7 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
+	"github.com/lightsparkdev/spark/so/ent/tokenmint"
 )
 
 // TokenMint is the model entity for the TokenMint schema.

@@ -11,9 +11,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/lightsparkdev/spark-go/so/ent/predicate"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/schema"
+	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 )
 
 // SigningKeyshareUpdate is the builder for updating SigningKeyshare entities.

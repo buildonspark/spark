@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	secretsharing "github.com/lightsparkdev/spark-go/common/secret_sharing"
+	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 )
 
 func TestSecretSharing(t *testing.T) {

@@ -3,10 +3,10 @@ package grpc
 import (
 	"context"
 
-	pb "github.com/lightsparkdev/spark-go/proto/spark_tree"
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent"
-	tree "github.com/lightsparkdev/spark-go/so/tree"
+	pb "github.com/lightsparkdev/spark/proto/spark_tree"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
+	tree "github.com/lightsparkdev/spark/so/tree"
 )
 
 // SparkTreeServer is the grpc server for the Spark protocol.

@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 	"google.golang.org/protobuf/proto"
 )
 

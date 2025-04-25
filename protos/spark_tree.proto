@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package spark;
 
-option go_package = "github.com/lightsparkdev/spark-go/proto/spark_tree";
+option go_package = "github.com/lightsparkdev/spark/proto/spark_tree";
 import "spark.proto";
 
 service SparkTreeService {

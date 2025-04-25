@@ -5,9 +5,9 @@ import (
 	"sync"
 
 	"github.com/google/uuid"
-	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
-	pbdkg "github.com/lightsparkdev/spark-go/proto/dkg"
-	"github.com/lightsparkdev/spark-go/so"
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
+	pbdkg "github.com/lightsparkdev/spark/proto/dkg"
+	"github.com/lightsparkdev/spark/so"
 )
 
 // GenerateKeys runs the DKG protocol to generate the keys.

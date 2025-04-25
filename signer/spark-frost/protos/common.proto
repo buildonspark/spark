@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package common;
 
-option go_package = "github.com/lightsparkdev/spark-go/proto/common";
+option go_package = "github.com/lightsparkdev/spark/proto/common";
 
 /*
  * A map from a string to a bytes. It's a workaround to have map arrays in proto.

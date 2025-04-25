@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/lightsparkdev/spark-go/common"
-	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
-	"github.com/lightsparkdev/spark-go/proto/spark"
-	testutil "github.com/lightsparkdev/spark-go/test_util"
-	"github.com/lightsparkdev/spark-go/wallet"
+	"github.com/lightsparkdev/spark/common"
+	pbmock "github.com/lightsparkdev/spark/proto/mock"
+	"github.com/lightsparkdev/spark/proto/spark"
+	testutil "github.com/lightsparkdev/spark/test_util"
+	"github.com/lightsparkdev/spark/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

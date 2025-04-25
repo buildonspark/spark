@@ -5,14 +5,14 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/ent/signingkeyshare"
-	"github.com/lightsparkdev/spark-go/so/ent/treenode"
+	"github.com/lightsparkdev/spark/common"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark/so/ent/schema"
+	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
 )
 
 // TreeQueryHandler handles queries related to tree nodes.

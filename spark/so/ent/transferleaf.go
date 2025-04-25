@@ -10,9 +10,9 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/transfer"
-	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
-	"github.com/lightsparkdev/spark-go/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/ent/transfer"
+	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
 )
 
 // TransferLeaf is the model entity for the TransferLeaf schema.

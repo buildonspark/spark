@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark/so/ent"
 )
 
 // The BlockHeightFunc type is an adapter to allow the use of ordinary

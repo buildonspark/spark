@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenfreeze"
-	"github.com/lightsparkdev/spark-go/so/logging"
+	"github.com/lightsparkdev/spark/so/ent/schema"
+	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
+	"github.com/lightsparkdev/spark/so/logging"
 )
 
 func GetActiveFreezes(ctx context.Context, ownerPublicKeys [][]byte, tokenPublicKey []byte) ([]*TokenFreeze, error) {

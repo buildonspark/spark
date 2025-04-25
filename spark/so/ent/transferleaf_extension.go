@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 )
 
 // MarshalProto converts a Transfer to a spark protobuf Transfer.

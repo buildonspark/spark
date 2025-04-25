@@ -11,11 +11,11 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
-	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/ent/transfer"
-	"github.com/lightsparkdev/spark-go/so/ent/usersignedtransaction"
+	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
+	"github.com/lightsparkdev/spark/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark/so/ent/schema"
+	"github.com/lightsparkdev/spark/so/ent/transfer"
+	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
 )
 
 // PreimageRequestCreate is the builder for creating a PreimageRequest entity.

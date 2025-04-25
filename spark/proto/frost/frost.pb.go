@@ -7,7 +7,7 @@
 package frost
 
 import (
-	common "github.com/lightsparkdev/spark-go/proto/common"
+	common "github.com/lightsparkdev/spark/proto/common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -1418,7 +1418,7 @@ const file_frost_proto_rawDesc = "" +
 	"\n" +
 	"sign_frost\x12\x17.frost.SignFrostRequest\x1a\x18.frost.SignFrostResponse\"\x00\x12P\n" +
 	"\x0faggregate_frost\x12\x1c.frost.AggregateFrostRequest\x1a\x1d.frost.AggregateFrostResponse\"\x00\x12Z\n" +
-	"\x18validate_signature_share\x12$.frost.ValidateSignatureShareRequest\x1a\x16.google.protobuf.Empty\"\x00B/Z-github.com/lightsparkdev/spark-go/proto/frostb\x06proto3"
+	"\x18validate_signature_share\x12$.frost.ValidateSignatureShareRequest\x1a\x16.google.protobuf.Empty\"\x00B,Z*github.com/lightsparkdev/spark/proto/frostb\x06proto3"
 
 var (
 	file_frost_proto_rawDescOnce sync.Once

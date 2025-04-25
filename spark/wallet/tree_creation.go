@@ -12,11 +12,11 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go"
-	"github.com/lightsparkdev/spark-go/common"
-	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so/objects"
+	"github.com/lightsparkdev/spark"
+	"github.com/lightsparkdev/spark/common"
+	pbfrost "github.com/lightsparkdev/spark/proto/frost"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/objects"
 )
 
 // DepositAddressTree is a tree of deposit addresses.

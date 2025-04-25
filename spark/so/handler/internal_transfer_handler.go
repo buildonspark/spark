@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/schema"
 )
 
 // InternalTransferHandler is the transfer handler for so internal

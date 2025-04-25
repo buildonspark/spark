@@ -12,10 +12,10 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/predicate"
-	"github.com/lightsparkdev/spark-go/so/ent/transfer"
-	"github.com/lightsparkdev/spark-go/so/ent/transferleaf"
-	"github.com/lightsparkdev/spark-go/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/transfer"
+	"github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
 )
 
 // TransferLeafUpdate is the builder for updating TransferLeaf entities.

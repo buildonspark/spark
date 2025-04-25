@@ -24,7 +24,7 @@ linters:
       exclude-functions:
         - (*google.golang.org/grpc.ClientConn).Close
         - (*database/sql.DB).Close
-        - (*github.com/lightsparkdev/spark-go/so/ent.Client).Close
+        - (*github.com/lightsparkdev/spark/so/ent.Client).Close
 formatters:
   enable:
     - gofumpt

@@ -8,7 +8,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so"
+	"github.com/lightsparkdev/spark/so"
 )
 
 func round1PackageHash(maps []map[string][]byte) []byte {

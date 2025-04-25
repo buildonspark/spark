@@ -10,9 +10,9 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
-	"github.com/lightsparkdev/spark-go/so/ent/tokentransaction"
+	"github.com/lightsparkdev/spark/so/ent/schema"
+	"github.com/lightsparkdev/spark/so/ent/tokenmint"
+	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 )
 
 // TokenTransaction is the model entity for the TokenTransaction schema.

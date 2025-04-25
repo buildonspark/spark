@@ -14,10 +14,10 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/predicate"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenleaf"
-	"github.com/lightsparkdev/spark-go/so/ent/tokenmint"
-	"github.com/lightsparkdev/spark-go/so/ent/tokentransactionreceipt"
+	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/tokenleaf"
+	"github.com/lightsparkdev/spark/so/ent/tokenmint"
+	"github.com/lightsparkdev/spark/so/ent/tokentransactionreceipt"
 )
 
 // TokenTransactionReceiptQuery is the builder for querying TokenTransactionReceipt entities.

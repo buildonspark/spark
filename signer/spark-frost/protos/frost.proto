@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package frost;
 
-option go_package = "github.com/lightsparkdev/spark-go/proto/frost";
+option go_package = "github.com/lightsparkdev/spark/proto/frost";
 import "google/protobuf/empty.proto";
 import "common.proto";
 

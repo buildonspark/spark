@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package spark_authn;
 
-option go_package = "github.com/lightsparkdev/spark-go/proto/spark_authn";
+option go_package = "github.com/lightsparkdev/spark/proto/spark_authn";
 
 service SparkAuthnService {
     // Request a new authentication challenge for a public key

@@ -11,8 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
-	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
+	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 )
 
 // PreimageShareCreate is the builder for creating a PreimageShare entity.

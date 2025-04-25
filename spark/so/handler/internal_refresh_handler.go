@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/schema"
 )
 
 // InternalRefreshTimelockHandler is the refresh timelock handler for so internal.

@@ -6,8 +6,8 @@ import (
 	"math/big"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	"github.com/lightsparkdev/spark/common"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 )
 
 // Polynomial is a polynomial used for secret sharing.

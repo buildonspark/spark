@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/ent/schema"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

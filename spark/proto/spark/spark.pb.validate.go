@@ -18,7 +18,7 @@ import (
 
 	"google.golang.org/protobuf/types/known/anypb"
 
-	common "github.com/lightsparkdev/spark-go/proto/common"
+	common "github.com/lightsparkdev/spark/proto/common"
 )
 
 // ensure the imports are used

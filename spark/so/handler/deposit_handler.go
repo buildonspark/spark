@@ -8,17 +8,17 @@ import (
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/authz"
-	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/ent/depositaddress"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/helper"
-	"github.com/lightsparkdev/spark-go/so/logging"
-	"github.com/lightsparkdev/spark-go/so/objects"
+	"github.com/lightsparkdev/spark/common"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/authz"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark/so/ent/schema"
+	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/logging"
+	"github.com/lightsparkdev/spark/so/objects"
 )
 
 // The DepositHandler is responsible for handling deposit related requests.

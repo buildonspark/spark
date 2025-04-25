@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package spark;
 
-option go_package = "github.com/lightsparkdev/spark-go/proto/spark";
+option go_package = "github.com/lightsparkdev/spark/proto/spark";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
 import "validate/validate.proto";

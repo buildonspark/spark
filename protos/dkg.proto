@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package dkg;
 
-option go_package = "github.com/lightsparkdev/spark-go/proto/dkg";
+option go_package = "github.com/lightsparkdev/spark/proto/dkg";
 
 import "common.proto";
 import "google/protobuf/empty.proto";

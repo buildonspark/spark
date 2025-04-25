@@ -4,12 +4,12 @@ import (
 	"context"
 	"time"
 
-	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/ent/transfer"
-	"github.com/lightsparkdev/spark-go/so/handler"
+	pbspark "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/schema"
+	"github.com/lightsparkdev/spark/so/ent/transfer"
+	"github.com/lightsparkdev/spark/so/handler"
 )
 
 // Task is a task that is scheduled to run.

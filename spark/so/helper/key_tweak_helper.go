@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark/common"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/ent"
 )
 
 func TweakLeafKey(ctx context.Context, leaf *ent.TreeNode, req *pb.SendLeafKeyTweak, updatedRefundTx []byte) error {

@@ -3,13 +3,13 @@ package grpc
 import (
 	"context"
 
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/errors"
-	"github.com/lightsparkdev/spark-go/so/handler"
-	"github.com/lightsparkdev/spark-go/so/lrc20"
-	events "github.com/lightsparkdev/spark-go/so/stream"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/errors"
+	"github.com/lightsparkdev/spark/so/handler"
+	"github.com/lightsparkdev/spark/so/lrc20"
+	events "github.com/lightsparkdev/spark/so/stream"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 

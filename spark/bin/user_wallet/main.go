@@ -11,9 +11,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/common"
-	testutil "github.com/lightsparkdev/spark-go/test_util"
-	"github.com/lightsparkdev/spark-go/wallet"
+	"github.com/lightsparkdev/spark/common"
+	testutil "github.com/lightsparkdev/spark/test_util"
+	"github.com/lightsparkdev/spark/wallet"
 	"github.com/tyler-smith/go-bip32"
 )
 

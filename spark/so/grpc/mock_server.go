@@ -3,13 +3,13 @@ package grpc
 import (
 	"context"
 
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
 
-	pbmock "github.com/lightsparkdev/spark-go/proto/mock"
-	"github.com/lightsparkdev/spark-go/so/ent/preimagerequest"
-	"github.com/lightsparkdev/spark-go/so/ent/preimageshare"
-	"github.com/lightsparkdev/spark-go/so/ent/usersignedtransaction"
+	pbmock "github.com/lightsparkdev/spark/proto/mock"
+	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
+	"github.com/lightsparkdev/spark/so/ent/preimageshare"
+	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 

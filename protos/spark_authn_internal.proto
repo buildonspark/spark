@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package spark_authn;
 
-option go_package = "github.com/lightsparkdev/spark-go/proto/spark_authn_internal";
+option go_package = "github.com/lightsparkdev/spark/proto/spark_authn_internal";
 
 // Protected information about a session
 message Session {

@@ -5,14 +5,14 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
-	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/authz"
-	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
-	"github.com/lightsparkdev/spark-go/so/helper"
-	"github.com/lightsparkdev/spark-go/so/logging"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/authz"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/schema"
+	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/logging"
 )
 
 // CooperativeExitHandler tracks transfers

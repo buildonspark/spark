@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
-	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
+	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 )
 
 // SigningNonce is the private part of a signing nonce.

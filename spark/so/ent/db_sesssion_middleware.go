@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/lightsparkdev/spark-go/so/logging"
+	"github.com/lightsparkdev/spark/so/logging"
 	"google.golang.org/grpc"
 )
 

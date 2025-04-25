@@ -12,8 +12,8 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	"github.com/lightsparkdev/spark/common"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 )
 
 // MaxTokenOutputs defines the maximum number of input or token outputs allowed in a token transaction.

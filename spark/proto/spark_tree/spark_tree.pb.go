@@ -7,7 +7,7 @@
 package spark_tree
 
 import (
-	spark "github.com/lightsparkdev/spark-go/proto/spark"
+	spark "github.com/lightsparkdev/spark/proto/spark"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -429,7 +429,7 @@ const file_spark_tree_proto_rawDesc = "" +
 	"\x10SparkTreeService\x12s\n" +
 	"\x1cget_leaf_denomination_counts\x12'.spark.GetLeafDenominationCountsRequest\x1a(.spark.GetLeafDenominationCountsResponse\"\x00\x12o\n" +
 	"\x1apropose_tree_denominations\x12&.spark.ProposeTreeDenominationsRequest\x1a'.spark.ProposeTreeDenominationsResponse\"\x00\x12S\n" +
-	"\x15fetch_polarity_scores\x12 .spark.FetchPolarityScoreRequest\x1a\x14.spark.PolarityScore\"\x000\x01B4Z2github.com/lightsparkdev/spark-go/proto/spark_treeb\x06proto3"
+	"\x15fetch_polarity_scores\x12 .spark.FetchPolarityScoreRequest\x1a\x14.spark.PolarityScore\"\x000\x01B1Z/github.com/lightsparkdev/spark/proto/spark_treeb\x06proto3"
 
 var (
 	file_spark_tree_proto_rawDescOnce sync.Once

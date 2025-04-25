@@ -5,8 +5,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	"github.com/lightsparkdev/spark/common"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 )
 
 func QueryUserSignedRefunds(ctx context.Context, config *Config, paymentHash []byte) ([]*pb.UserSignedRefund, error) {

@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark-go/common"
-	pbspark "github.com/lightsparkdev/spark-go/proto/spark"
-	pbinternal "github.com/lightsparkdev/spark-go/proto/spark_internal"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	"github.com/lightsparkdev/spark/common"
+	pbspark "github.com/lightsparkdev/spark/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
+	"github.com/lightsparkdev/spark/so/ent/schema"
 )
 
 // MarshalSparkProto converts a TreeNode to a spark protobuf TreeNode.

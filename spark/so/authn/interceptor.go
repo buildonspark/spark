@@ -9,8 +9,8 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/lightsparkdev/spark-go/so/authninternal"
-	"github.com/lightsparkdev/spark-go/so/logging"
+	"github.com/lightsparkdev/spark/so/authninternal"
+	"github.com/lightsparkdev/spark/so/logging"
 )
 
 // contextKey is a custom type for context keys to avoid collisions

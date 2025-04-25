@@ -8,7 +8,7 @@ package spark
 
 import (
 	_ "github.com/envoyproxy/protoc-gen-validate/validate"
-	common "github.com/lightsparkdev/spark-go/proto/common"
+	common "github.com/lightsparkdev/spark/proto/common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -7810,7 +7810,7 @@ const file_spark_proto_rawDesc = "" +
 	"\x1fcancel_signed_token_transaction\x12*.spark.CancelSignedTokenTransactionRequest\x1a\x16.google.protobuf.Empty\"\x00\x12Z\n" +
 	"\x18return_lightning_payment\x12$.spark.ReturnLightningPaymentRequest\x1a\x16.google.protobuf.Empty\"\x00\x12y\n" +
 	"\x1equery_unused_deposit_addresses\x12).spark.QueryUnusedDepositAddressesRequest\x1a*.spark.QueryUnusedDepositAddressesResponse\"\x00\x12\\\n" +
-	"\x13subscribe_to_events\x12\x1f.spark.SubscribeToEventsRequest\x1a .spark.SubscribeToEventsResponse\"\x000\x01B/Z-github.com/lightsparkdev/spark-go/proto/sparkb\x06proto3"
+	"\x13subscribe_to_events\x12\x1f.spark.SubscribeToEventsRequest\x1a .spark.SubscribeToEventsResponse\"\x000\x01B,Z*github.com/lightsparkdev/spark/proto/sparkb\x06proto3"
 
 var (
 	file_spark_proto_rawDescOnce sync.Once

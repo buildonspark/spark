@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lightsparkdev/spark-go/so/authn"
+	"github.com/lightsparkdev/spark/so/authn"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

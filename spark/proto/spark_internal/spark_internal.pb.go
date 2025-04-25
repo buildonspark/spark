@@ -7,8 +7,8 @@
 package spark_internal
 
 import (
-	common "github.com/lightsparkdev/spark-go/proto/common"
-	spark "github.com/lightsparkdev/spark-go/proto/spark"
+	common "github.com/lightsparkdev/spark/proto/common"
+	spark "github.com/lightsparkdev/spark/proto/spark"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -1757,7 +1757,7 @@ const file_spark_internal_proto_rawDesc = "" +
 	" start_token_transaction_internal\x124.spark_internal.StartTokenTransactionInternalRequest\x1a\x16.google.protobuf.Empty\"\x00\x12I\n" +
 	"\x0fcancel_transfer\x12\x1c.spark.CancelTransferRequest\x1a\x16.google.protobuf.Empty\"\x00\x12u\n" +
 	"\"initiate_settle_receiver_key_tweak\x125.spark_internal.InitiateSettleReceiverKeyTweakRequest\x1a\x16.google.protobuf.Empty\"\x00\x12d\n" +
-	"\x19settle_receiver_key_tweak\x12-.spark_internal.SettleReceiverKeyTweakRequest\x1a\x16.google.protobuf.Empty\"\x00B8Z6github.com/lightsparkdev/spark-go/proto/spark_internalb\x06proto3"
+	"\x19settle_receiver_key_tweak\x12-.spark_internal.SettleReceiverKeyTweakRequest\x1a\x16.google.protobuf.Empty\"\x00B5Z3github.com/lightsparkdev/spark/proto/spark_internalb\x06proto3"
 
 var (
 	file_spark_internal_proto_rawDescOnce sync.Once

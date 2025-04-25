@@ -3,9 +3,9 @@ package ent
 import (
 	"context"
 
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent/signingnonce"
-	"github.com/lightsparkdev/spark-go/so/objects"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent/signingnonce"
+	"github.com/lightsparkdev/spark/so/objects"
 )
 
 // StoreSigningNonce stores the given signing nonce and commitment in the database.

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package spark_internal;
 
-option go_package = "github.com/lightsparkdev/spark-go/proto/spark_internal";
+option go_package = "github.com/lightsparkdev/spark/proto/spark_internal";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 import "common.proto";

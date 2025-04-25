@@ -8,7 +8,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/lightsparkdev/spark-go/common"
+	"github.com/lightsparkdev/spark/common"
 )
 
 func ephemeralAnchorOutput() *wire.TxOut {

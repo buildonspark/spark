@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	pb "github.com/lightsparkdev/spark-go/proto/spark_authn_internal"
+	pb "github.com/lightsparkdev/spark/proto/spark_authn_internal"
 	"google.golang.org/protobuf/proto"
 )
 

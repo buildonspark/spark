@@ -3,8 +3,8 @@ package wallet
 import (
 	"context"
 
-	"github.com/lightsparkdev/spark-go/common"
-	pb "github.com/lightsparkdev/spark-go/proto/spark"
+	"github.com/lightsparkdev/spark/common"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 )
 
 func SubscribeToEvents(ctx context.Context, config *Config) (pb.SparkService_SubscribeToEventsClient, error) {

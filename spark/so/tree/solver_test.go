@@ -5,7 +5,7 @@ import (
 	"log"
 	"testing"
 
-	pb "github.com/lightsparkdev/spark-go/proto/spark_tree"
+	pb "github.com/lightsparkdev/spark/proto/spark_tree"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	pbcommon "github.com/lightsparkdev/spark-go/proto/common"
-	pbfrost "github.com/lightsparkdev/spark-go/proto/frost"
-	"github.com/lightsparkdev/spark-go/so"
-	"github.com/lightsparkdev/spark-go/so/ent"
-	"github.com/lightsparkdev/spark-go/so/ent/schema"
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
+	pbfrost "github.com/lightsparkdev/spark/proto/frost"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/schema"
 	"google.golang.org/grpc"
 
 	// Import the sqlite driver
