@@ -2,8 +2,6 @@ package grpctest
 
 import (
 	"context"
-	"fmt"
-	"sync"
 	"testing"
 	"time"
 
@@ -562,35 +560,22 @@ func TestDoubleClaimTransfer(t *testing.T) {
 	}
 	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
 
-	errCount := 0
-	wg := sync.WaitGroup{}
-	for range 2 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			_, err = wallet.ClaimTransfer(
-				receiverCtx,
-				receiverTransfer,
-				receiverConfig,
-				leavesToClaim[:],
-			)
-			if err != nil {
-				fmt.Println("Error: ", err)
-				errCount++
-			}
-		}()
-	}
-	wg.Wait()
+	// First claim should succeed
+	res, err := wallet.ClaimTransfer(
+		receiverCtx,
+		receiverTransfer,
+		receiverConfig,
+		leavesToClaim[:],
+	)
+	require.NoError(t, err, "failed to ClaimTransfer")
+	require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
 
-	fmt.Println("Error count: ", errCount)
-	if errCount == 2 {
-		res, err := wallet.ClaimTransfer(
-			receiverCtx,
-			receiverTransfer,
-			receiverConfig,
-			leavesToClaim[:],
-		)
-		require.NoError(t, err, "failed to ClaimTransfer")
-		require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
-	}
+	// Second claim attempt should fail with appropriate error
+	_, err = wallet.ClaimTransfer(
+		receiverCtx,
+		receiverTransfer,
+		receiverConfig,
+		leavesToClaim[:],
+	)
+	require.Error(t, err, "second claim should fail")
 }
