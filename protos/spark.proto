@@ -760,7 +760,8 @@ message InitiatePreimageSwapRequest {
     Reason reason = 3;
     StartUserSignedTransferRequest transfer = 4;
     bytes receiver_identity_public_key = 5;
-    uint64 fee_sats = 6;
+    // fee_sats is only needed if the reason is REASON_SEND.
+    optional uint64 fee_sats = 6;
 }
 
 message InitiatePreimageSwapResponse {

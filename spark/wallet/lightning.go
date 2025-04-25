@@ -107,8 +107,10 @@ func SwapNodesForPreimage(
 		amountSats = uint64(bolt11.MSatoshi / 1000)
 	}
 	reason := pb.InitiatePreimageSwapRequest_REASON_SEND
+	pbFeeSats := &feeSats
 	if isInboundPayment {
 		reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
+		pbFeeSats = nil
 	}
 	response, err := client.InitiatePreimageSwap(tmpCtx, &pb.InitiatePreimageSwapRequest{
 		PaymentHash: paymentHash,
@@ -127,7 +129,7 @@ func SwapNodesForPreimage(
 			ExpiryTime:                timestamppb.New(time.Now().Add(2 * time.Minute)),
 		},
 		ReceiverIdentityPublicKey: receiverIdentityPubkeyBytes,
-		FeeSats:                   feeSats,
+		FeeSats:                   pbFeeSats,
 	})
 	if err != nil {
 		return nil, err

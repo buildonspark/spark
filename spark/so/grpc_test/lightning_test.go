@@ -105,8 +105,8 @@ func TestReceiveLightningPayment(t *testing.T) {
 	// SSP creates a node of 12345 sats
 	sspLeafPrivKey, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err)
-	feeSats := uint64(2)
-	nodeToSend, err := testutil.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12343)
+	feeSats := uint64(0)
+	nodeToSend, err := testutil.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
 	require.NoError(t, err)
 
 	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
@@ -374,8 +374,8 @@ func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
 	// SSP creates a node of 12345 sats
 	sspLeafPrivKey, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err)
-	feeSats := uint64(2)
-	nodeToSend, err := testutil.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12343)
+	feeSats := uint64(0)
+	nodeToSend, err := testutil.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
 	require.NoError(t, err)
 
 	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()

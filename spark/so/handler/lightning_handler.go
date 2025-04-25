@@ -313,8 +313,6 @@ func (h *LightningHandler) validateGetPreimageRequest(
 	switch reason {
 	case pb.InitiatePreimageSwapRequest_REASON_SEND:
 		totalAmount -= feeSats
-	case pb.InitiatePreimageSwapRequest_REASON_RECEIVE:
-		totalAmount += feeSats
 	}
 	if totalAmount != amount.ValueSats {
 		return fmt.Errorf("invalid amount, expected %d, got %d", amount.ValueSats, totalAmount)
@@ -384,6 +382,13 @@ func (h *LightningHandler) storeUserSignedTransactions(
 
 // GetPreimageShare gets the preimage share for the given payment hash.
 func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.InitiatePreimageSwapRequest) ([]byte, error) {
+	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE && req.FeeSats != nil && *req.FeeSats != 0 {
+		return nil, fmt.Errorf("fee is not allowed for receive preimage swap")
+	}
+	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_SEND && req.FeeSats == nil {
+		return nil, fmt.Errorf("fee is required for send preimage swap")
+	}
+
 	var preimageShare *ent.PreimageShare
 	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		db := ent.GetDbFromContext(ctx)
@@ -411,13 +416,18 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		}
 	}
 
+	feeSats := uint64(0)
+	if req.FeeSats != nil {
+		feeSats = *req.FeeSats
+	}
+
 	err := h.validateGetPreimageRequest(
 		ctx,
 		req.PaymentHash,
 		req.Transfer.LeavesToSend,
 		invoiceAmount,
 		req.ReceiverIdentityPublicKey,
-		req.FeeSats,
+		feeSats,
 		req.Reason,
 	)
 	if err != nil {
@@ -480,6 +490,13 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("receiver identity public key is required")
 	}
 
+	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE && req.FeeSats != nil && *req.FeeSats != 0 {
+		return nil, fmt.Errorf("fee is not allowed for receive preimage swap")
+	}
+	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_SEND && req.FeeSats == nil {
+		return nil, fmt.Errorf("fee is required for send preimage swap")
+	}
+
 	logger := logging.GetLoggerFromContext(ctx)
 
 	var preimageShare *ent.PreimageShare
@@ -508,13 +525,19 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 			},
 		}
 	}
+
+	feeSats := uint64(0)
+	if req.FeeSats != nil {
+		feeSats = *req.FeeSats
+	}
+
 	err := h.validateGetPreimageRequest(
 		ctx,
 		req.PaymentHash,
 		req.Transfer.LeavesToSend,
 		invoiceAmount,
 		req.ReceiverIdentityPublicKey,
-		req.FeeSats,
+		feeSats,
 		req.Reason,
 	)
 	if err != nil {
