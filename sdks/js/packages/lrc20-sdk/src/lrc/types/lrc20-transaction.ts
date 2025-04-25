@@ -76,7 +76,32 @@ export class TokenPubkeyAnnouncement {
     public decimal: number,
     public maxSupply: bigint,
     public isFreezable: boolean,
-  ) {}
+  ) {
+    const MAX_NAME_SIZE = 17;
+    const MIN_NAME_SIZE = 3;
+    const MAX_SYMBOL_SIZE = 6;
+    const MIN_SYMBOL_SIZE = 3;
+
+    const nameBytes = Buffer.from(name, "utf-8").length;
+    if (nameBytes < MIN_NAME_SIZE || nameBytes > MAX_NAME_SIZE) {
+      throw new Error(
+        `Byte length of token name is out of range: ${nameBytes}, must be between ${MIN_NAME_SIZE} and ${MAX_NAME_SIZE}`,
+      );
+    }
+
+    const symbolBytes = Buffer.from(symbol, "utf-8").length;
+    if (symbolBytes < MIN_SYMBOL_SIZE || symbolBytes > MAX_SYMBOL_SIZE) {
+      throw new Error(
+        `Byte length of token ticker is out of range: ${symbolBytes}, must be between ${MIN_SYMBOL_SIZE} and ${MAX_SYMBOL_SIZE}`,
+      );
+    }
+    this.tokenPubkey = tokenPubkey;
+    this.name = name;
+    this.symbol = symbol;
+    this.decimal = decimal;
+    this.maxSupply = maxSupply;
+    this.isFreezable = isFreezable;
+  }
 
   public static fromTokenPubkeyAnnouncementDto(announcement: TokenPubkeyAnnouncementDto): TokenPubkeyAnnouncement {
     let { token_pubkey, name, symbol, decimal, max_supply, is_freezable } = announcement;
@@ -94,17 +119,34 @@ export class TokenPubkeyAnnouncement {
     const decimalBytes: Buffer = Buffer.alloc(1, this.decimal);
 
     const isFreezableBytes: Buffer = Buffer.alloc(1, this.isFreezable ? 1 : 0);
-    let maxSupplyBytes = Buffer.from(this.maxSupply.toString(16), "hex");
-    if (maxSupplyBytes.length < 16) {
-      maxSupplyBytes = Buffer.concat([Buffer.alloc(16 - maxSupplyBytes.length, 0), maxSupplyBytes]);
+    const maxSupplyBytes = Buffer.alloc(16);
+    let value = this.maxSupply;
+
+    for (let i = 15; i >= 0; i--) {
+      maxSupplyBytes[i] = Number(value & BigInt(0xff));
+      value = value >> BigInt(8);
     }
+
+    const verifyValue = BigInt("0x" + maxSupplyBytes.toString("hex"));
+    if (verifyValue !== this.maxSupply) {
+      console.error("Value mismatch:", {
+        original: this.maxSupply.toString(),
+        encoded: verifyValue.toString(),
+        buffer: maxSupplyBytes.toString("hex"),
+      });
+
+      throw new Error(`MaxSupply value corruption: ${this.maxSupply} became ${verifyValue}`);
+    }
+
+    const nameBytes = Buffer.from(this.name, "utf-8");
+    const symbolBytes = Buffer.from(this.symbol, "utf-8");
 
     return Buffer.concat([
       this.tokenPubkey.inner,
-      Buffer.alloc(1, this.name.length),
-      Buffer.from(this.name, "utf-8"),
-      Buffer.alloc(1, this.symbol.length),
-      Buffer.from(this.symbol, "utf-8"),
+      Buffer.from([nameBytes.length]),
+      nameBytes,
+      Buffer.from([symbolBytes.length]),
+      symbolBytes,
       decimalBytes,
       maxSupplyBytes,
       isFreezableBytes,

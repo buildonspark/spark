@@ -60,7 +60,8 @@
     "clean": "rm -rf dist",
     "depcheck": "depcheck --ignores=buffer,ts-proto,jest,ts-jest,stream",
     "package:checks": "yarn depcheck && yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
-    "test": "echo \"Error: no tests yet\"",
+    "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand --detectOpenHandles --forceExit",
+    "test": "yarn test-cmd src/tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "lint-fix": "npm run lint-ts-fix && npm run lint-js-fix && npm run lint-json-fix",
     "lint-ts-fix": "prettier --write \"./**/*.ts\"",
@@ -88,6 +89,7 @@
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.4",
+    "@jest/globals": "^29.7.0",
     "@swc/core": "^1.7.6",
     "@types/node": "^22.13.2",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
@@ -98,6 +100,7 @@
     "madge": "^8.0.0",
     "prettier": "^3.5.1",
     "publint": "^0.3.9",
+    "ts-jest": "^29.2.5",
     "tsc-alias": "^1.8.10",
     "tsup": "^8.4.0",
     "typescript": "^5.7.3"
