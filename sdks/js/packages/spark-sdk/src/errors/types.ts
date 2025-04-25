@@ -30,8 +30,7 @@ export class NetworkError extends SparkSDKError {
 }
 
 /**
- * ValidationError should be used for any errors related to data validation,
- * such as invalid input parameters, malformed data, or failed cryptographic verifications.
+ * ValidationError should be used for any errors related to data validation in regards to the user's input,
  * This includes:
  * - Invalid signatures
  * - Malformed addresses
@@ -55,6 +54,30 @@ export class ValidationError extends SparkSDKError {
       index?: number;
       treeLength?: number;
       addressNodesLength?: number;
+    } = {},
+    originalError?: Error,
+  ) {
+    super(message, context, originalError);
+  }
+}
+
+/**
+ * InternalValidationError should be used for any errors related to internal data validation
+ * that is not related to the user's input.
+ * This includes:
+ * - Invalid SO responses
+ */
+export class InternalValidationError extends SparkSDKError {
+  constructor(
+    message: string,
+    context: {
+      finalTransaction?: unknown;
+      partialTransaction?: unknown;
+      outputIndex?: number;
+      expectedValue?: unknown;
+      actualValue?: unknown;
+      keyshareInfo?: unknown;
+      signingOperators?: unknown;
     } = {},
     originalError?: Error,
   ) {

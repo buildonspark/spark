@@ -174,6 +174,8 @@ export type ConfigOptions = MayHaveLrc20WalletApiConfig &
     readonly electrsUrl?: string;
     readonly lrc20ApiConfig?: LRC20WalletApiConfig;
     readonly sspClientOptions?: SspClientOptions;
+    readonly expectedWithdrawBondSats?: number;
+    readonly expectedWithdrawRelativeBlockLocktime?: number;
   };
 
 const DEV_PUBKEYS = [
@@ -202,6 +204,8 @@ const BASE_CONFIG: Required<ConfigOptions> = {
   signingOperators: getLocalSigningOperators(),
   useTokenTransactionSchnorrSignatures: true,
   electrsUrl: getElectrsUrl("LOCAL"),
+  expectedWithdrawBondSats: 1000000,
+  expectedWithdrawRelativeBlockLocktime: 1000,
   lrc20ApiConfig: {
     electrsUrl: getElectrsUrl("LOCAL"),
     lrc20NodeUrl: getLrc20NodeUrl("LOCAL"),
@@ -237,6 +241,8 @@ export const REGTEST_WALLET_CONFIG: Required<ConfigOptions> = {
     lrc20NodeUrl: getLrc20NodeUrl("REGTEST"),
     electrsCredentials: ELECTRS_CREDENTIALS,
   },
+  expectedWithdrawBondSats: 1000000,
+  expectedWithdrawRelativeBlockLocktime: 1000,
   sspClientOptions: {
     baseUrl: getSspUrl("REGTEST"),
     identityPublicKey: getSspIdentityPublicKey("REGTEST"),
@@ -253,6 +259,8 @@ export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
     electrsUrl: getElectrsUrl("MAINNET"),
     lrc20NodeUrl: getLrc20NodeUrl("MAINNET"),
   },
+  expectedWithdrawBondSats: 1000000,
+  expectedWithdrawRelativeBlockLocktime: 1000,
   sspClientOptions: {
     baseUrl: getSspUrl("MAINNET"),
     identityPublicKey: getSspIdentityPublicKey("MAINNET"),

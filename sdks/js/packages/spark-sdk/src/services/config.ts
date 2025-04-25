@@ -77,6 +77,14 @@ export class WalletConfigService
     return this.config.coodinatorIdentifier;
   }
 
+  public getExpectedWithdrawBondSats(): number {
+    return this.config.expectedWithdrawBondSats;
+  }
+
+  public getExpectedWithdrawRelativeBlockLocktime(): number {
+    return this.config.expectedWithdrawRelativeBlockLocktime;
+  }
+
   public getSspNetwork(): BitcoinNetwork {
     if (this.config.network === "MAINNET") {
       return BitcoinNetwork.MAINNET;

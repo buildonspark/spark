@@ -21,6 +21,7 @@ import {
   recoverPrivateKeyFromKeyshares,
 } from "../utils/token-keyshares.js";
 import { calculateAvailableTokenAmount } from "../utils/token-transactions.js";
+import { validateTokenTransaction } from "../utils/token-transaction-validation.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
 import {
@@ -198,30 +199,23 @@ export class TokenTransactionService {
       } as SparkCallOptions,
     );
 
-    // Validate keyshare configuration
-    if (
-      startResponse.keyshareInfo?.ownerIdentifiers.length !==
-      Object.keys(signingOperators).length
-    ) {
-      throw new ValidationError("Invalid keyshare configuration", {
-        field: "ownerIdentifiers",
-        value: startResponse.keyshareInfo?.ownerIdentifiers.length,
-        expected: Object.keys(signingOperators).length,
-      });
+    if (!startResponse.finalTokenTransaction) {
+      throw new Error("Final token transaction missing in start response");
+    }
+    if (!startResponse.keyshareInfo) {
+      throw new Error("Keyshare info missing in start response");
     }
 
-    for (const identifier of startResponse.keyshareInfo?.ownerIdentifiers ||
-      []) {
-      if (!signingOperators[identifier]) {
-        throw new ValidationError("Invalid keyshare operator", {
-          field: "ownerIdentifiers",
-          value: identifier,
-          expected: "Valid operator identifier",
-        });
-      }
-    }
+    validateTokenTransaction(
+      startResponse.finalTokenTransaction,
+      tokenTransaction,
+      signingOperators,
+      startResponse.keyshareInfo,
+      this.config.getExpectedWithdrawBondSats(),
+      this.config.getExpectedWithdrawRelativeBlockLocktime(),
+    );
 
-    const finalTokenTransaction = startResponse.finalTokenTransaction!;
+    const finalTokenTransaction = startResponse.finalTokenTransaction;
     const finalTokenTransactionHash = hashTokenTransaction(
       finalTokenTransaction,
       false,
