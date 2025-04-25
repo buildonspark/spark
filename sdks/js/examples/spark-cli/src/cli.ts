@@ -53,8 +53,6 @@ const walletMnemonic =
   "cctypical stereo dose party penalty decline neglect feel harvest abstract stage winter";
 
 async function runCLI() {
-  // Get network from command line args
-  const network = process.argv.includes("mainnet") ? "MAINNET" : "REGTEST";
   let wallet: IssuerSparkWallet | undefined;
 
   const rl = readline.createInterface({
@@ -67,7 +65,7 @@ async function runCLI() {
   });
   const helpMessage = `
   Available commands:
-  initwallet [mnemonic | seed]                                        - Create a new wallet from a mnemonic or seed. If no mnemonic or seed is provided, a new mnemonic will be generated.
+  initwallet [mnemonic | seed] [network]                              - Create a new wallet from a mnemonic or seed. If no mnemonic or seed is provided, a new mnemonic will be generated. Network can be MAINNET, TESTNET, SIGNET, REGTEST, or LOCAL (default: REGTEST).
   getbalance                                                          - Get the wallet's balance
   getdepositaddress                                                   - Get an address to deposit funds from L1 to Spark
   getsparkaddress                                                     - Get the wallet's spark address
@@ -337,9 +335,54 @@ async function runCLI() {
         if (wallet) {
           wallet.cleanupConnections();
         }
-        const mnemonicOrSeed = args.join(" ");
+
+        // If there's only one argument and it's a network name, treat it as network
+        if (
+          args.length === 1 &&
+          args[0]
+            .toUpperCase()
+            .match(/^(MAINNET|TESTNET|SIGNET|REGTEST|LOCAL)$/)
+        ) {
+          const options: ConfigOptions = {
+            network: args[0].toUpperCase() as
+              | "MAINNET"
+              | "TESTNET"
+              | "SIGNET"
+              | "REGTEST"
+              | "LOCAL",
+          };
+          const { wallet: newWallet, mnemonic: newMnemonic } =
+            await IssuerSparkWallet.initialize({
+              mnemonicOrSeed: "",
+              options,
+            });
+          wallet = newWallet;
+          console.log("Mnemonic:", newMnemonic);
+          console.log("Network:", options.network);
+          break;
+        }
+
+        // Otherwise, treat first argument as mnemonic/seed if it's not a network name
+        const mnemonicOrSeed =
+          args.length > 0 &&
+          !args[0]
+            .toUpperCase()
+            .match(/^(MAINNET|TESTNET|SIGNET|REGTEST|LOCAL)$/)
+            ? args[0]
+            : "";
+        const networkArg = args.find((arg) =>
+          arg.toUpperCase().match(/^(MAINNET|TESTNET|SIGNET|REGTEST|LOCAL)$/),
+        );
+
         const options: ConfigOptions = {
-          network: "REGTEST",
+          network: networkArg
+            ? (networkArg.toUpperCase() as
+                | "MAINNET"
+                | "TESTNET"
+                | "SIGNET"
+                | "REGTEST"
+                | "LOCAL")
+            : "REGTEST",
         };
         const { wallet: newWallet, mnemonic: newMnemonic } =
           await IssuerSparkWallet.initialize({
@@ -348,6 +391,7 @@ async function runCLI() {
           });
         wallet = newWallet;
         console.log("Mnemonic:", newMnemonic);
+        console.log("Network:", options.network);
         wallet.on("deposit:updated", (depositId: string, balance: number) => {
           console.log(
             `Deposit ${depositId} marked as available. New balance: ${balance}`,
