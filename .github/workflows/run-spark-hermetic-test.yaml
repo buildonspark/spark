@@ -1,4 +1,4 @@
-name: "Spark Hermetic Tests"
+name: "Spark Hermetic Test Runner"
 
 on:
   workflow_call:
@@ -59,6 +59,11 @@ jobs:
 
       - name: Install ZMQ dependencies
         run: sudo apt-get update && sudo apt-get install -y libzmq3-dev
+
+      - name: "vmstat"
+        run: |
+          mkdir logs
+          vmstat --wide --unit M --timestamp 5 > logs/vmstat.txt &
 
       - name: "Install Helm"
         run: |
@@ -195,15 +200,19 @@ jobs:
         run: |
           set +e
           mkdir -p logs/k8s
-          kubectl get pods -A > logs/k8s/pods.txt
-          kubectl describe nodes > logs/k8s/nodes.txt
-          kubectl describe -A statefulset > logs/k8s/statefulset.txt
+          kubectl api-resources --verbs=list -o name | while read TYPE; do
+              kubectl describe $TYPE -A >logs/k8s/$TYPE.txt
+          done
+
+          pkill vmstat
           source ./scripts/collect-container-logs.sh
           collect_logs "spark" "spark" "operator" "signer" "atlas"
           collect_logs "lrc20" "yuvd" "yuvd" "sea"
           collect_logs "bitcoin" "bitcoind" "bitcoind"
           collect_logs "bitcoin" "electrs" "electrs"
           collect_logs "bitcoin" "mempool" "backend" "frontend"
+          kubectl -n bitcoin cp regtest-bitcoind-0:data logs/bitcoind
+
 
       - name: "Upload log artifacts"
         if: always()
