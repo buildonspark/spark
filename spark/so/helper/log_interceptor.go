@@ -3,6 +3,7 @@ package helper
 import (
 	"context"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,7 +14,12 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func LogInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+func LogInterceptor(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+	// Ignore health check requests, these are noisy and we don't care about logging them.
+	if strings.HasPrefix(info.FullMethod, "/grpc.health.v1.Health") {
+		return handler(ctx, req)
+	}
+
 	requestID := uuid.New().String()
 
 	var ip string
