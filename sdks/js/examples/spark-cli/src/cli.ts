@@ -82,7 +82,7 @@ async function runCLI() {
   createinvoice <amount> <memo>                                       - Create a new lightning invoice
   payinvoice <invoice> <maxFeeSats>                                   - Pay a lightning invoice
   sendtransfer <amount> <receiverSparkAddress>                        - Send a spark transfer
-  withdraw <amount> <onchainAddress>                                  - Withdraw funds to an L1 address
+  withdraw <amount> <onchainAddress> <exitSpeed(FAST|MEDIUM|SLOW)>    - Withdraw funds to an L1 address
   coopfee <amount> <withdrawalAddress>                                - Get a fee estimate for a cooperative exit
   lightningsendfee <invoice>                                          - Get a fee estimate for a lightning send
   lightningreceivefee <amount>                                        - Get a fee estimate for a lightning receive
