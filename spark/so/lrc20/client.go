@@ -11,12 +11,12 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/logging"
 	pblrc20 "github.com/lightsparkdev/spark/proto/lrc20"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
-	"github.com/lightsparkdev/spark/so/logging"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 )

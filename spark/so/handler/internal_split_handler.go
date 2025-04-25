@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/logging"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/schema"
-	"github.com/lightsparkdev/spark/so/logging"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 

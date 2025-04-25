@@ -5,12 +5,12 @@ import (
 	"encoding/hex"
 	"log/slog"
 
+	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark_tree"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/schema"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
-	"github.com/lightsparkdev/spark/so/logging"
 )
 
 // DenominationMaxPow is the maximum power of 2 for leaf denominations.

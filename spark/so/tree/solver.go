@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"math/bits"
 
+	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark_tree"
-	"github.com/lightsparkdev/spark/so/logging"
 )
 
 // chunkIntoPowersOf2 splits a list of numbers into chunks of size at most maxChunkSize,

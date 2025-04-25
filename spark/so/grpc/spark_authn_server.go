@@ -12,9 +12,9 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark_authn"
 	"github.com/lightsparkdev/spark/so/authninternal"
-	"github.com/lightsparkdev/spark/so/logging"
 	"github.com/patrickmn/go-cache"
 	"google.golang.org/protobuf/proto"
 )

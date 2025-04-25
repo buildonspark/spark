@@ -7,9 +7,9 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/logging"
 	"github.com/lightsparkdev/spark/so/objects"
 
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
