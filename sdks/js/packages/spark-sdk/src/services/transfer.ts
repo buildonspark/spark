@@ -765,7 +765,6 @@ export class TransferService extends BaseTransferService {
             leavesToReceive,
           });
         } catch (error) {
-          console.log(operator.address);
           errors.push(
             new NetworkError(
               "Failed to claim transfer tweak keys",
@@ -1154,7 +1153,7 @@ export class TransferService extends BaseTransferService {
 
     const refundSequence = refundTx.getInput(0).sequence || 0;
     const newNodeOutPoint: TransactionInput = {
-      txid: hexToBytes(nodeTx.id),
+      txid: hexToBytes(getTxId(nodeTx)),
       index: 0,
     };
 

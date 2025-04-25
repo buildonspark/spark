@@ -345,6 +345,17 @@ async function runCLI() {
           });
         wallet = newWallet;
         console.log("Mnemonic:", newMnemonic);
+        wallet.on("deposit:updated", (depositId: string, balance: number) => {
+          console.log(
+            `Deposit ${depositId} marked as available. New balance: ${balance}`,
+          );
+        });
+
+        wallet.on("transfer:claimed", (transferId: string, balance: number) => {
+          console.log(
+            `Transfer ${transferId} claimed. New balance: ${balance}`,
+          );
+        });
         break;
       case "getbalance":
         if (!wallet) {

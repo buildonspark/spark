@@ -3,6 +3,7 @@ import { ILrc20ConnectionManager } from "@buildonspark/lrc20-sdk/grpc/types";
 import {
   bytesToHex,
   bytesToNumberBE,
+  equalBytes,
   hexToBytes,
 } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
@@ -84,6 +85,7 @@ import {
 import { getNextTransactionSequence } from "./utils/transaction.js";
 
 import { LRCWallet } from "@buildonspark/lrc20-sdk";
+import EventEmitter from "events";
 import {
   decodeSparkAddress,
   encodeSparkAddress,
@@ -139,12 +141,19 @@ export interface SparkWalletProps {
   options?: ConfigOptions;
 }
 
+export interface SparkWalletEvents {
+  /** Emitted when an incoming transfer is successfully claimed. Includes the transfer ID and new total balance. */
+  "transfer:claimed": (transferId: string, updatedBalance: number) => void;
+  /** Emitted when a deposit is marked as available. Includes the deposit ID and new total balance. */
+  "deposit:updated": (depositId: string, updatedBalance: number) => void;
+}
+
 /**
  * The SparkWallet class is the primary interface for interacting with the Spark network.
  * It provides methods for creating and managing wallets, handling deposits, executing transfers,
  * and interacting with the Lightning Network.
  */
-export class SparkWallet {
+export class SparkWallet extends EventEmitter {
   protected config: WalletConfigService;
 
   protected connectionManager: ConnectionManager;
@@ -176,6 +185,8 @@ export class SparkWallet {
     new Map();
 
   protected constructor(options?: ConfigOptions, signer?: SparkSigner) {
+    super();
+
     this.config = new WalletConfigService(options, signer);
     this.connectionManager = new ConnectionManager(this.config);
     this.lrc20ConnectionManager = createLrc20ConnectionManager(
@@ -256,22 +267,44 @@ export class SparkWallet {
               // Let requestLeavesSwap handle claiming counter swap transfers
               data.event.transfer.transfer.type !== TransferType.COUNTER_SWAP
             ) {
-              await this.claimTransfer(data.event.transfer.transfer);
+              const transfer = await this.claimTransfer(
+                data.event.transfer.transfer,
+              );
+
+              const { senderIdentityPublicKey, receiverIdentityPublicKey } =
+                data.event.transfer.transfer;
+
+              // Lets not emit if this is a self transfer. Most likely a self transfer from extending nodes
+              // Once we fix where this flow isn't necessary, we can remove this check
+              if (
+                transfer &&
+                !equalBytes(senderIdentityPublicKey, receiverIdentityPublicKey)
+              ) {
+                this.emit(
+                  "transfer:claimed",
+                  data.event.transfer.transfer.id,
+                  (await this.getBalance()).balance,
+                );
+              }
             } else if (
               data.event?.$case === "deposit" &&
               data.event.deposit.deposit
             ) {
               const deposit = data.event.deposit.deposit;
-              if (deposit.status === "AVAILABLE") {
-                const signingKey = await this.config.signer.generatePublicKey(
-                  sha256(hexToBytes(deposit.id)),
-                );
-                const newLeaf = await this.transferService.extendTimelock(
-                  deposit[0],
-                  signingKey,
-                );
-                await this.transferDepositToSelf(newLeaf.nodes, signingKey);
-              }
+              const signingKey = await this.config.signer.generatePublicKey(
+                sha256(deposit.id),
+              );
+
+              const newLeaf = await this.transferService.extendTimelock(
+                deposit,
+                signingKey,
+              );
+              await this.transferDepositToSelf(newLeaf.nodes, signingKey);
+              this.emit(
+                "deposit:updated",
+                deposit.id,
+                (await this.getBalance()).balance + BigInt(deposit.value),
+              );
             }
           } catch (error) {
             console.error("Error processing event", error);
@@ -892,7 +925,11 @@ export class SparkWallet {
           signingPubKey,
         );
 
-        await this.transferDepositToSelf(nodes, signingPubKey);
+        for (const n of nodes) {
+          if (n.status === "AVAILABLE") {
+            await this.transferDepositToSelf([n], signingPubKey);
+          }
+        }
       }
     }
   }
@@ -2111,5 +2148,27 @@ export class SparkWallet {
     this.streamController?.abort();
     this.streamController = null;
     await this.connectionManager.closeConnections();
+  }
+
+  // Events
+  public on<K extends keyof SparkWalletEvents>(
+    event: K,
+    listener: SparkWalletEvents[K],
+  ): this {
+    return super.on(event, listener);
+  }
+
+  public once<K extends keyof SparkWalletEvents>(
+    event: K,
+    listener: SparkWalletEvents[K],
+  ): this {
+    return super.once(event, listener);
+  }
+
+  public off<K extends keyof SparkWalletEvents>(
+    event: K,
+    listener: SparkWalletEvents[K],
+  ): this {
+    return super.off(event, listener);
   }
 }
