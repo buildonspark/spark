@@ -140,11 +140,13 @@ func TestMultipleSubscriptions(t *testing.T) {
 
 	events1 := make(chan *pb.SubscribeToEventsResponse, 1)
 	go func() {
-		event, err := stream1.Recv()
-		if err != nil {
-			return
+		for {
+			event, err := stream1.Recv()
+			if err != nil {
+				return
+			}
+			events1 <- event
 		}
-		events1 <- event
 	}()
 
 	stream2, err := wallet.SubscribeToEvents(context.Background(), receiverConfig)
@@ -152,11 +154,13 @@ func TestMultipleSubscriptions(t *testing.T) {
 
 	events2 := make(chan *pb.SubscribeToEventsResponse, 1)
 	go func() {
-		event, err := stream2.Recv()
-		if err != nil {
-			return
+		for {
+			event, err := stream2.Recv()
+			if err != nil {
+				return
+			}
+			events2 <- event
 		}
-		events2 <- event
 	}()
 
 	leafPrivKey, err := secp256k1.GeneratePrivateKey()
