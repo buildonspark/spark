@@ -22,14 +22,15 @@ import (
 
 func setupUsers(t *testing.T, amountSats int64) (*wallet.Config, *wallet.Config, wallet.LeafKeyTweak) {
 	config, err := testutil.TestWalletConfig()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	sspConfig, err := testutil.TestWalletConfig()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	leafPrivKey, err := secp256k1.GeneratePrivateKey()
-	assert.NoError(t, err)
+	require.NoError(t, err)
+
 	rootNode, err := testutil.CreateNewTree(config, faucet, leafPrivKey, amountSats)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	transferNode := wallet.LeafKeyTweak{
 		Leaf:              rootNode,

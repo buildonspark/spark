@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	DepositTimeout      = 10 * time.Second
+	DepositTimeout      = 30 * time.Second
 	DepositPollInterval = 100 * time.Millisecond
 )
 
