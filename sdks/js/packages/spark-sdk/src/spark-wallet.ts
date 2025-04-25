@@ -1569,15 +1569,18 @@ export class SparkWallet extends EventEmitter {
         });
       }
 
-      if (maxFeeSats * 1000 < feeEstimate.feeEstimate.originalValue) {
+      const estimatedFeeSats = Math.ceil(
+        feeEstimate.feeEstimate.originalValue / 1000,
+      );
+      if (maxFeeSats < estimatedFeeSats) {
         throw new ValidationError("maxFeeSats does not cover fee estimate", {
           field: "maxFeeSats",
           value: maxFeeSats,
-          expected: `${Math.ceil(feeEstimate.feeEstimate.originalValue / 1000)} sats`,
+          expected: `${estimatedFeeSats} sats`,
         });
       }
 
-      const totalAmount = amountSats + maxFeeSats;
+      const totalAmount = amountSats + estimatedFeeSats;
 
       const internalBalance = this.getInternalBalance();
       if (totalAmount > internalBalance) {
