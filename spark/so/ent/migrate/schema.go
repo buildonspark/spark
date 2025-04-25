@@ -306,8 +306,8 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "issuer_public_key", Type: field.TypeBytes},
-		{Name: "wallet_provided_timestamp", Type: field.TypeUint64, Unique: true},
-		{Name: "issuer_signature", Type: field.TypeBytes, Unique: true},
+		{Name: "wallet_provided_timestamp", Type: field.TypeUint64},
+		{Name: "issuer_signature", Type: field.TypeBytes},
 		{Name: "operator_specific_issuer_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
 	}
 	// TokenMintsTable holds the schema information for the "token_mints" table.

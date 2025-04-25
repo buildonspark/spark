@@ -20,8 +20,8 @@ func (TokenMint) Mixin() []ent.Mixin {
 func (TokenMint) Fields() []ent.Field {
 	return []ent.Field{
 		field.Bytes("issuer_public_key").NotEmpty().Immutable(),
-		field.Uint64("wallet_provided_timestamp").Immutable().Unique(),
-		field.Bytes("issuer_signature").NotEmpty().Immutable().Unique(),
+		field.Uint64("wallet_provided_timestamp").Immutable(),
+		field.Bytes("issuer_signature").NotEmpty().Immutable(),
 		field.Bytes("operator_specific_issuer_signature").Optional().Unique(),
 	}
 }
