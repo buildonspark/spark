@@ -29,7 +29,7 @@ type SendSparkSignatureRequest struct {
 	FinalTokenTransaction      *spark.TokenTransaction                 `protobuf:"bytes,1,opt,name=final_token_transaction,json=finalTokenTransaction,proto3" json:"final_token_transaction,omitempty"`
 	OperatorSpecificSignatures []*spark.OperatorSpecificOwnerSignature `protobuf:"bytes,2,rep,name=operator_specific_signatures,json=operatorSpecificSignatures,proto3" json:"operator_specific_signatures,omitempty"`
 	OperatorSignatureData      *SparkOperatorSignatureData             `protobuf:"bytes,3,opt,name=operator_signature_data,json=operatorSignatureData,proto3" json:"operator_signature_data,omitempty"`
-	RevocationSecrets          []*RevocationSecretWithIndex            `protobuf:"bytes,4,rep,name=revocation_secrets,json=revocationSecrets,proto3" json:"revocation_secrets,omitempty"`
+	RevocationSecrets          []*spark.RevocationSecretWithIndex      `protobuf:"bytes,4,rep,name=revocation_secrets,json=revocationSecrets,proto3" json:"revocation_secrets,omitempty"`
 	unknownFields              protoimpl.UnknownFields
 	sizeCache                  protoimpl.SizeCache
 }
@@ -85,61 +85,9 @@ func (x *SendSparkSignatureRequest) GetOperatorSignatureData() *SparkOperatorSig
 	return nil
 }
 
-func (x *SendSparkSignatureRequest) GetRevocationSecrets() []*RevocationSecretWithIndex {
+func (x *SendSparkSignatureRequest) GetRevocationSecrets() []*spark.RevocationSecretWithIndex {
 	if x != nil {
 		return x.RevocationSecrets
-	}
-	return nil
-}
-
-type RevocationSecretWithIndex struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	InputIndex       uint32                 `protobuf:"varint,1,opt,name=input_index,json=inputIndex,proto3" json:"input_index,omitempty"`
-	RevocationSecret []byte                 `protobuf:"bytes,2,opt,name=revocation_secret,json=revocationSecret,proto3" json:"revocation_secret,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
-}
-
-func (x *RevocationSecretWithIndex) Reset() {
-	*x = RevocationSecretWithIndex{}
-	mi := &file_lrc20_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RevocationSecretWithIndex) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RevocationSecretWithIndex) ProtoMessage() {}
-
-func (x *RevocationSecretWithIndex) ProtoReflect() protoreflect.Message {
-	mi := &file_lrc20_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RevocationSecretWithIndex.ProtoReflect.Descriptor instead.
-func (*RevocationSecretWithIndex) Descriptor() ([]byte, []int) {
-	return file_lrc20_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *RevocationSecretWithIndex) GetInputIndex() uint32 {
-	if x != nil {
-		return x.InputIndex
-	}
-	return 0
-}
-
-func (x *RevocationSecretWithIndex) GetRevocationSecret() []byte {
-	if x != nil {
-		return x.RevocationSecret
 	}
 	return nil
 }
@@ -154,7 +102,7 @@ type SparkOperatorSignatureData struct {
 
 func (x *SparkOperatorSignatureData) Reset() {
 	*x = SparkOperatorSignatureData{}
-	mi := &file_lrc20_proto_msgTypes[2]
+	mi := &file_lrc20_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -166,7 +114,7 @@ func (x *SparkOperatorSignatureData) String() string {
 func (*SparkOperatorSignatureData) ProtoMessage() {}
 
 func (x *SparkOperatorSignatureData) ProtoReflect() protoreflect.Message {
-	mi := &file_lrc20_proto_msgTypes[2]
+	mi := &file_lrc20_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -179,7 +127,7 @@ func (x *SparkOperatorSignatureData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SparkOperatorSignatureData.ProtoReflect.Descriptor instead.
 func (*SparkOperatorSignatureData) Descriptor() ([]byte, []int) {
-	return file_lrc20_proto_rawDescGZIP(), []int{2}
+	return file_lrc20_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *SparkOperatorSignatureData) GetSparkOperatorSignature() []byte {
@@ -206,7 +154,7 @@ type SparkSignatureOutputData struct {
 
 func (x *SparkSignatureOutputData) Reset() {
 	*x = SparkSignatureOutputData{}
-	mi := &file_lrc20_proto_msgTypes[3]
+	mi := &file_lrc20_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -218,7 +166,7 @@ func (x *SparkSignatureOutputData) String() string {
 func (*SparkSignatureOutputData) ProtoMessage() {}
 
 func (x *SparkSignatureOutputData) ProtoReflect() protoreflect.Message {
-	mi := &file_lrc20_proto_msgTypes[3]
+	mi := &file_lrc20_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -231,7 +179,7 @@ func (x *SparkSignatureOutputData) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SparkSignatureOutputData.ProtoReflect.Descriptor instead.
 func (*SparkSignatureOutputData) Descriptor() ([]byte, []int) {
-	return file_lrc20_proto_rawDescGZIP(), []int{3}
+	return file_lrc20_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SparkSignatureOutputData) GetSpentOutputIndex() uint32 {
@@ -257,7 +205,7 @@ type GetSparkTxRequest struct {
 
 func (x *GetSparkTxRequest) Reset() {
 	*x = GetSparkTxRequest{}
-	mi := &file_lrc20_proto_msgTypes[4]
+	mi := &file_lrc20_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -269,7 +217,7 @@ func (x *GetSparkTxRequest) String() string {
 func (*GetSparkTxRequest) ProtoMessage() {}
 
 func (x *GetSparkTxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lrc20_proto_msgTypes[4]
+	mi := &file_lrc20_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -282,7 +230,7 @@ func (x *GetSparkTxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSparkTxRequest.ProtoReflect.Descriptor instead.
 func (*GetSparkTxRequest) Descriptor() ([]byte, []int) {
-	return file_lrc20_proto_rawDescGZIP(), []int{4}
+	return file_lrc20_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GetSparkTxRequest) GetFinalTokenTransactionHash() []byte {
@@ -301,7 +249,7 @@ type VerifySparkTxRequest struct {
 
 func (x *VerifySparkTxRequest) Reset() {
 	*x = VerifySparkTxRequest{}
-	mi := &file_lrc20_proto_msgTypes[5]
+	mi := &file_lrc20_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -313,7 +261,7 @@ func (x *VerifySparkTxRequest) String() string {
 func (*VerifySparkTxRequest) ProtoMessage() {}
 
 func (x *VerifySparkTxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lrc20_proto_msgTypes[5]
+	mi := &file_lrc20_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -326,7 +274,7 @@ func (x *VerifySparkTxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use VerifySparkTxRequest.ProtoReflect.Descriptor instead.
 func (*VerifySparkTxRequest) Descriptor() ([]byte, []int) {
-	return file_lrc20_proto_rawDescGZIP(), []int{5}
+	return file_lrc20_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *VerifySparkTxRequest) GetFinalTokenTransaction() *spark.TokenTransaction {
@@ -346,7 +294,7 @@ type ListSparkTxsRequest struct {
 
 func (x *ListSparkTxsRequest) Reset() {
 	*x = ListSparkTxsRequest{}
-	mi := &file_lrc20_proto_msgTypes[6]
+	mi := &file_lrc20_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -358,7 +306,7 @@ func (x *ListSparkTxsRequest) String() string {
 func (*ListSparkTxsRequest) ProtoMessage() {}
 
 func (x *ListSparkTxsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lrc20_proto_msgTypes[6]
+	mi := &file_lrc20_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -371,7 +319,7 @@ func (x *ListSparkTxsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSparkTxsRequest.ProtoReflect.Descriptor instead.
 func (*ListSparkTxsRequest) Descriptor() ([]byte, []int) {
-	return file_lrc20_proto_rawDescGZIP(), []int{6}
+	return file_lrc20_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ListSparkTxsRequest) GetPageToken() []byte {
@@ -398,7 +346,7 @@ type ListSparkTxsResponse struct {
 
 func (x *ListSparkTxsResponse) Reset() {
 	*x = ListSparkTxsResponse{}
-	mi := &file_lrc20_proto_msgTypes[7]
+	mi := &file_lrc20_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -410,7 +358,7 @@ func (x *ListSparkTxsResponse) String() string {
 func (*ListSparkTxsResponse) ProtoMessage() {}
 
 func (x *ListSparkTxsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lrc20_proto_msgTypes[7]
+	mi := &file_lrc20_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -423,7 +371,7 @@ func (x *ListSparkTxsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSparkTxsResponse.ProtoReflect.Descriptor instead.
 func (*ListSparkTxsResponse) Descriptor() ([]byte, []int) {
-	return file_lrc20_proto_rawDescGZIP(), []int{7}
+	return file_lrc20_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListSparkTxsResponse) GetTokenTransactions() []*TokenTransactionResponse {
@@ -449,7 +397,7 @@ type GetSparkTxResponse struct {
 
 func (x *GetSparkTxResponse) Reset() {
 	*x = GetSparkTxResponse{}
-	mi := &file_lrc20_proto_msgTypes[8]
+	mi := &file_lrc20_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -461,7 +409,7 @@ func (x *GetSparkTxResponse) String() string {
 func (*GetSparkTxResponse) ProtoMessage() {}
 
 func (x *GetSparkTxResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lrc20_proto_msgTypes[8]
+	mi := &file_lrc20_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -474,7 +422,7 @@ func (x *GetSparkTxResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSparkTxResponse.ProtoReflect.Descriptor instead.
 func (*GetSparkTxResponse) Descriptor() ([]byte, []int) {
-	return file_lrc20_proto_rawDescGZIP(), []int{8}
+	return file_lrc20_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetSparkTxResponse) GetFinalTokenTransaction() *spark.TokenTransaction {
@@ -494,7 +442,7 @@ type TokenTransactionResponse struct {
 
 func (x *TokenTransactionResponse) Reset() {
 	*x = TokenTransactionResponse{}
-	mi := &file_lrc20_proto_msgTypes[9]
+	mi := &file_lrc20_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -506,7 +454,7 @@ func (x *TokenTransactionResponse) String() string {
 func (*TokenTransactionResponse) ProtoMessage() {}
 
 func (x *TokenTransactionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lrc20_proto_msgTypes[9]
+	mi := &file_lrc20_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -519,7 +467,7 @@ func (x *TokenTransactionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TokenTransactionResponse.ProtoReflect.Descriptor instead.
 func (*TokenTransactionResponse) Descriptor() ([]byte, []int) {
-	return file_lrc20_proto_rawDescGZIP(), []int{9}
+	return file_lrc20_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *TokenTransactionResponse) GetFinalized() bool {
@@ -547,7 +495,7 @@ type ListWithdrawnOutputsRequest struct {
 
 func (x *ListWithdrawnOutputsRequest) Reset() {
 	*x = ListWithdrawnOutputsRequest{}
-	mi := &file_lrc20_proto_msgTypes[10]
+	mi := &file_lrc20_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -559,7 +507,7 @@ func (x *ListWithdrawnOutputsRequest) String() string {
 func (*ListWithdrawnOutputsRequest) ProtoMessage() {}
 
 func (x *ListWithdrawnOutputsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lrc20_proto_msgTypes[10]
+	mi := &file_lrc20_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -572,7 +520,7 @@ func (x *ListWithdrawnOutputsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWithdrawnOutputsRequest.ProtoReflect.Descriptor instead.
 func (*ListWithdrawnOutputsRequest) Descriptor() ([]byte, []int) {
-	return file_lrc20_proto_rawDescGZIP(), []int{10}
+	return file_lrc20_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListWithdrawnOutputsRequest) GetBlockhash() []byte {
@@ -606,7 +554,7 @@ type ListWithdrawnOutputsResponse struct {
 
 func (x *ListWithdrawnOutputsResponse) Reset() {
 	*x = ListWithdrawnOutputsResponse{}
-	mi := &file_lrc20_proto_msgTypes[11]
+	mi := &file_lrc20_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -618,7 +566,7 @@ func (x *ListWithdrawnOutputsResponse) String() string {
 func (*ListWithdrawnOutputsResponse) ProtoMessage() {}
 
 func (x *ListWithdrawnOutputsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lrc20_proto_msgTypes[11]
+	mi := &file_lrc20_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -631,7 +579,7 @@ func (x *ListWithdrawnOutputsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListWithdrawnOutputsResponse.ProtoReflect.Descriptor instead.
 func (*ListWithdrawnOutputsResponse) Descriptor() ([]byte, []int) {
-	return file_lrc20_proto_rawDescGZIP(), []int{11}
+	return file_lrc20_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListWithdrawnOutputsResponse) GetOutputs() []*spark.TokenOutput {
@@ -652,16 +600,12 @@ var File_lrc20_proto protoreflect.FileDescriptor
 
 const file_lrc20_proto_rawDesc = "" +
 	"\n" +
-	"\vlrc20.proto\x12\x06rpc.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x17validate/validate.proto\x1a\vspark.proto\"\x83\x03\n" +
+	"\vlrc20.proto\x12\x06rpc.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x17validate/validate.proto\x1a\vspark.proto\"\x82\x03\n" +
 	"\x19SendSparkSignatureRequest\x12O\n" +
 	"\x17final_token_transaction\x18\x01 \x01(\v2\x17.spark.TokenTransactionR\x15finalTokenTransaction\x12g\n" +
 	"\x1coperator_specific_signatures\x18\x02 \x03(\v2%.spark.OperatorSpecificOwnerSignatureR\x1aoperatorSpecificSignatures\x12Z\n" +
-	"\x17operator_signature_data\x18\x03 \x01(\v2\".rpc.v1.SparkOperatorSignatureDataR\x15operatorSignatureData\x12P\n" +
-	"\x12revocation_secrets\x18\x04 \x03(\v2!.rpc.v1.RevocationSecretWithIndexR\x11revocationSecrets\"r\n" +
-	"\x19RevocationSecretWithIndex\x12\x1f\n" +
-	"\vinput_index\x18\x01 \x01(\rR\n" +
-	"inputIndex\x124\n" +
-	"\x11revocation_secret\x18\x02 \x01(\fB\a\xfaB\x04z\x02h R\x10revocationSecret\"\xab\x01\n" +
+	"\x17operator_signature_data\x18\x03 \x01(\v2\".rpc.v1.SparkOperatorSignatureDataR\x15operatorSignatureData\x12O\n" +
+	"\x12revocation_secrets\x18\x04 \x03(\v2 .spark.RevocationSecretWithIndexR\x11revocationSecrets\"\xab\x01\n" +
 	"\x1aSparkOperatorSignatureData\x12C\n" +
 	"\x18spark_operator_signature\x18\x01 \x01(\fB\t\xfaB\x06z\x04\x10@\x18IR\x16sparkOperatorSignature\x12H\n" +
 	"\x1coperator_identity_public_key\x18\x02 \x01(\fB\a\xfaB\x04z\x02h!R\x19operatorIdentityPublicKey\"\x9e\x01\n" +
@@ -724,49 +668,49 @@ func file_lrc20_proto_rawDescGZIP() []byte {
 	return file_lrc20_proto_rawDescData
 }
 
-var file_lrc20_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_lrc20_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_lrc20_proto_goTypes = []any{
 	(*SendSparkSignatureRequest)(nil),            // 0: rpc.v1.SendSparkSignatureRequest
-	(*RevocationSecretWithIndex)(nil),            // 1: rpc.v1.RevocationSecretWithIndex
-	(*SparkOperatorSignatureData)(nil),           // 2: rpc.v1.SparkOperatorSignatureData
-	(*SparkSignatureOutputData)(nil),             // 3: rpc.v1.SparkSignatureOutputData
-	(*GetSparkTxRequest)(nil),                    // 4: rpc.v1.GetSparkTxRequest
-	(*VerifySparkTxRequest)(nil),                 // 5: rpc.v1.VerifySparkTxRequest
-	(*ListSparkTxsRequest)(nil),                  // 6: rpc.v1.ListSparkTxsRequest
-	(*ListSparkTxsResponse)(nil),                 // 7: rpc.v1.ListSparkTxsResponse
-	(*GetSparkTxResponse)(nil),                   // 8: rpc.v1.GetSparkTxResponse
-	(*TokenTransactionResponse)(nil),             // 9: rpc.v1.TokenTransactionResponse
-	(*ListWithdrawnOutputsRequest)(nil),          // 10: rpc.v1.ListWithdrawnOutputsRequest
-	(*ListWithdrawnOutputsResponse)(nil),         // 11: rpc.v1.ListWithdrawnOutputsResponse
-	(*spark.TokenTransaction)(nil),               // 12: spark.TokenTransaction
-	(*spark.OperatorSpecificOwnerSignature)(nil), // 13: spark.OperatorSpecificOwnerSignature
+	(*SparkOperatorSignatureData)(nil),           // 1: rpc.v1.SparkOperatorSignatureData
+	(*SparkSignatureOutputData)(nil),             // 2: rpc.v1.SparkSignatureOutputData
+	(*GetSparkTxRequest)(nil),                    // 3: rpc.v1.GetSparkTxRequest
+	(*VerifySparkTxRequest)(nil),                 // 4: rpc.v1.VerifySparkTxRequest
+	(*ListSparkTxsRequest)(nil),                  // 5: rpc.v1.ListSparkTxsRequest
+	(*ListSparkTxsResponse)(nil),                 // 6: rpc.v1.ListSparkTxsResponse
+	(*GetSparkTxResponse)(nil),                   // 7: rpc.v1.GetSparkTxResponse
+	(*TokenTransactionResponse)(nil),             // 8: rpc.v1.TokenTransactionResponse
+	(*ListWithdrawnOutputsRequest)(nil),          // 9: rpc.v1.ListWithdrawnOutputsRequest
+	(*ListWithdrawnOutputsResponse)(nil),         // 10: rpc.v1.ListWithdrawnOutputsResponse
+	(*spark.TokenTransaction)(nil),               // 11: spark.TokenTransaction
+	(*spark.OperatorSpecificOwnerSignature)(nil), // 12: spark.OperatorSpecificOwnerSignature
+	(*spark.RevocationSecretWithIndex)(nil),      // 13: spark.RevocationSecretWithIndex
 	(*spark.TokenOutput)(nil),                    // 14: spark.TokenOutput
 	(*spark.FreezeTokensRequest)(nil),            // 15: spark.FreezeTokensRequest
 	(*emptypb.Empty)(nil),                        // 16: google.protobuf.Empty
 	(*spark.FreezeTokensResponse)(nil),           // 17: spark.FreezeTokensResponse
 }
 var file_lrc20_proto_depIdxs = []int32{
-	12, // 0: rpc.v1.SendSparkSignatureRequest.final_token_transaction:type_name -> spark.TokenTransaction
-	13, // 1: rpc.v1.SendSparkSignatureRequest.operator_specific_signatures:type_name -> spark.OperatorSpecificOwnerSignature
-	2,  // 2: rpc.v1.SendSparkSignatureRequest.operator_signature_data:type_name -> rpc.v1.SparkOperatorSignatureData
-	1,  // 3: rpc.v1.SendSparkSignatureRequest.revocation_secrets:type_name -> rpc.v1.RevocationSecretWithIndex
-	12, // 4: rpc.v1.VerifySparkTxRequest.final_token_transaction:type_name -> spark.TokenTransaction
-	9,  // 5: rpc.v1.ListSparkTxsResponse.token_transactions:type_name -> rpc.v1.TokenTransactionResponse
-	12, // 6: rpc.v1.GetSparkTxResponse.final_token_transaction:type_name -> spark.TokenTransaction
-	12, // 7: rpc.v1.TokenTransactionResponse.final_token_transaction:type_name -> spark.TokenTransaction
+	11, // 0: rpc.v1.SendSparkSignatureRequest.final_token_transaction:type_name -> spark.TokenTransaction
+	12, // 1: rpc.v1.SendSparkSignatureRequest.operator_specific_signatures:type_name -> spark.OperatorSpecificOwnerSignature
+	1,  // 2: rpc.v1.SendSparkSignatureRequest.operator_signature_data:type_name -> rpc.v1.SparkOperatorSignatureData
+	13, // 3: rpc.v1.SendSparkSignatureRequest.revocation_secrets:type_name -> spark.RevocationSecretWithIndex
+	11, // 4: rpc.v1.VerifySparkTxRequest.final_token_transaction:type_name -> spark.TokenTransaction
+	8,  // 5: rpc.v1.ListSparkTxsResponse.token_transactions:type_name -> rpc.v1.TokenTransactionResponse
+	11, // 6: rpc.v1.GetSparkTxResponse.final_token_transaction:type_name -> spark.TokenTransaction
+	11, // 7: rpc.v1.TokenTransactionResponse.final_token_transaction:type_name -> spark.TokenTransaction
 	14, // 8: rpc.v1.ListWithdrawnOutputsResponse.outputs:type_name -> spark.TokenOutput
 	0,  // 9: rpc.v1.SparkService.SendSparkSignature:input_type -> rpc.v1.SendSparkSignatureRequest
-	6,  // 10: rpc.v1.SparkService.ListSparkTxs:input_type -> rpc.v1.ListSparkTxsRequest
-	4,  // 11: rpc.v1.SparkService.GetSparkTx:input_type -> rpc.v1.GetSparkTxRequest
-	5,  // 12: rpc.v1.SparkService.VerifySparkTx:input_type -> rpc.v1.VerifySparkTxRequest
+	5,  // 10: rpc.v1.SparkService.ListSparkTxs:input_type -> rpc.v1.ListSparkTxsRequest
+	3,  // 11: rpc.v1.SparkService.GetSparkTx:input_type -> rpc.v1.GetSparkTxRequest
+	4,  // 12: rpc.v1.SparkService.VerifySparkTx:input_type -> rpc.v1.VerifySparkTxRequest
 	15, // 13: rpc.v1.SparkService.FreezeTokens:input_type -> spark.FreezeTokensRequest
-	10, // 14: rpc.v1.SparkService.ListWithdrawnOutputs:input_type -> rpc.v1.ListWithdrawnOutputsRequest
+	9,  // 14: rpc.v1.SparkService.ListWithdrawnOutputs:input_type -> rpc.v1.ListWithdrawnOutputsRequest
 	16, // 15: rpc.v1.SparkService.SendSparkSignature:output_type -> google.protobuf.Empty
-	7,  // 16: rpc.v1.SparkService.ListSparkTxs:output_type -> rpc.v1.ListSparkTxsResponse
-	8,  // 17: rpc.v1.SparkService.GetSparkTx:output_type -> rpc.v1.GetSparkTxResponse
+	6,  // 16: rpc.v1.SparkService.ListSparkTxs:output_type -> rpc.v1.ListSparkTxsResponse
+	7,  // 17: rpc.v1.SparkService.GetSparkTx:output_type -> rpc.v1.GetSparkTxResponse
 	16, // 18: rpc.v1.SparkService.VerifySparkTx:output_type -> google.protobuf.Empty
 	17, // 19: rpc.v1.SparkService.FreezeTokens:output_type -> spark.FreezeTokensResponse
-	11, // 20: rpc.v1.SparkService.ListWithdrawnOutputs:output_type -> rpc.v1.ListWithdrawnOutputsResponse
+	10, // 20: rpc.v1.SparkService.ListWithdrawnOutputs:output_type -> rpc.v1.ListWithdrawnOutputsResponse
 	15, // [15:21] is the sub-list for method output_type
 	9,  // [9:15] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
@@ -779,18 +723,18 @@ func file_lrc20_proto_init() {
 	if File_lrc20_proto != nil {
 		return
 	}
-	file_lrc20_proto_msgTypes[3].OneofWrappers = []any{}
+	file_lrc20_proto_msgTypes[2].OneofWrappers = []any{}
+	file_lrc20_proto_msgTypes[5].OneofWrappers = []any{}
 	file_lrc20_proto_msgTypes[6].OneofWrappers = []any{}
-	file_lrc20_proto_msgTypes[7].OneofWrappers = []any{}
+	file_lrc20_proto_msgTypes[9].OneofWrappers = []any{}
 	file_lrc20_proto_msgTypes[10].OneofWrappers = []any{}
-	file_lrc20_proto_msgTypes[11].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_lrc20_proto_rawDesc), len(file_lrc20_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

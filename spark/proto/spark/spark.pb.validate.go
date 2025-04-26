@@ -3596,6 +3596,121 @@ var _ interface {
 	ErrorName() string
 } = TokenTransactionWithStatusValidationError{}
 
+// Validate checks the field values on SignatureWithIndex with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SignatureWithIndex) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SignatureWithIndex with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SignatureWithIndexMultiError, or nil if none found.
+func (m *SignatureWithIndex) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SignatureWithIndex) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if l := len(m.GetSignature()); l < 64 || l > 73 {
+		err := SignatureWithIndexValidationError{
+			field:  "Signature",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for InputIndex
+
+	if len(errors) > 0 {
+		return SignatureWithIndexMultiError(errors)
+	}
+
+	return nil
+}
+
+// SignatureWithIndexMultiError is an error wrapping multiple validation errors
+// returned by SignatureWithIndex.ValidateAll() if the designated constraints
+// aren't met.
+type SignatureWithIndexMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SignatureWithIndexMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SignatureWithIndexMultiError) AllErrors() []error { return m }
+
+// SignatureWithIndexValidationError is the validation error returned by
+// SignatureWithIndex.Validate if the designated constraints aren't met.
+type SignatureWithIndexValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SignatureWithIndexValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SignatureWithIndexValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SignatureWithIndexValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SignatureWithIndexValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SignatureWithIndexValidationError) ErrorName() string {
+	return "SignatureWithIndexValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SignatureWithIndexValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSignatureWithIndex.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SignatureWithIndexValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SignatureWithIndexValidationError{}
+
 // Validate checks the field values on TokenTransactionSignatures with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -3621,15 +3736,33 @@ func (m *TokenTransactionSignatures) validate(all bool) error {
 	for idx, item := range m.GetOwnerSignatures() {
 		_, _ = idx, item
 
-		if l := len(item); l < 64 || l > 73 {
-			err := TokenTransactionSignaturesValidationError{
-				field:  fmt.Sprintf("OwnerSignatures[%v]", idx),
-				reason: "value length must be between 64 and 73 bytes, inclusive",
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, TokenTransactionSignaturesValidationError{
+						field:  fmt.Sprintf("OwnerSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, TokenTransactionSignaturesValidationError{
+						field:  fmt.Sprintf("OwnerSignatures[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
 			}
-			if !all {
-				return err
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return TokenTransactionSignaturesValidationError{
+					field:  fmt.Sprintf("OwnerSignatures[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
 			}
-			errors = append(errors, err)
 		}
 
 	}
@@ -4202,26 +4335,33 @@ func (m *OperatorSpecificOwnerSignature) validate(all bool) error {
 
 	var errors []error
 
-	if len(m.GetOwnerPublicKey()) != 33 {
-		err := OperatorSpecificOwnerSignatureValidationError{
-			field:  "OwnerPublicKey",
-			reason: "value length must be 33 bytes",
+	if all {
+		switch v := interface{}(m.GetOwnerSignature()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, OperatorSpecificOwnerSignatureValidationError{
+					field:  "OwnerSignature",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, OperatorSpecificOwnerSignatureValidationError{
+					field:  "OwnerSignature",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
 		}
-		if !all {
-			return err
+	} else if v, ok := interface{}(m.GetOwnerSignature()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return OperatorSpecificOwnerSignatureValidationError{
+				field:  "OwnerSignature",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
 		}
-		errors = append(errors, err)
-	}
-
-	if l := len(m.GetOwnerSignature()); l < 64 || l > 73 {
-		err := OperatorSpecificOwnerSignatureValidationError{
-			field:  "OwnerSignature",
-			reason: "value length must be between 64 and 73 bytes, inclusive",
-		}
-		if !all {
-			return err
-		}
-		errors = append(errors, err)
 	}
 
 	if all {
@@ -4511,6 +4651,121 @@ var _ interface {
 	ErrorName() string
 } = SignTokenTransactionRequestValidationError{}
 
+// Validate checks the field values on KeyshareWithIndex with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *KeyshareWithIndex) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on KeyshareWithIndex with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// KeyshareWithIndexMultiError, or nil if none found.
+func (m *KeyshareWithIndex) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *KeyshareWithIndex) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for InputIndex
+
+	if len(m.GetKeyshare()) != 32 {
+		err := KeyshareWithIndexValidationError{
+			field:  "Keyshare",
+			reason: "value length must be 32 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return KeyshareWithIndexMultiError(errors)
+	}
+
+	return nil
+}
+
+// KeyshareWithIndexMultiError is an error wrapping multiple validation errors
+// returned by KeyshareWithIndex.ValidateAll() if the designated constraints
+// aren't met.
+type KeyshareWithIndexMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m KeyshareWithIndexMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m KeyshareWithIndexMultiError) AllErrors() []error { return m }
+
+// KeyshareWithIndexValidationError is the validation error returned by
+// KeyshareWithIndex.Validate if the designated constraints aren't met.
+type KeyshareWithIndexValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e KeyshareWithIndexValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e KeyshareWithIndexValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e KeyshareWithIndexValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e KeyshareWithIndexValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e KeyshareWithIndexValidationError) ErrorName() string {
+	return "KeyshareWithIndexValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e KeyshareWithIndexValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sKeyshareWithIndex.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = KeyshareWithIndexValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = KeyshareWithIndexValidationError{}
+
 // Validate checks the field values on SignTokenTransactionResponse with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -4544,18 +4799,36 @@ func (m *SignTokenTransactionResponse) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
-	for idx, item := range m.GetTokenTransactionRevocationKeyshares() {
+	for idx, item := range m.GetRevocationKeyshares() {
 		_, _ = idx, item
 
-		if len(item) != 32 {
-			err := SignTokenTransactionResponseValidationError{
-				field:  fmt.Sprintf("TokenTransactionRevocationKeyshares[%v]", idx),
-				reason: "value length must be 32 bytes",
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, SignTokenTransactionResponseValidationError{
+						field:  fmt.Sprintf("RevocationKeyshares[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, SignTokenTransactionResponseValidationError{
+						field:  fmt.Sprintf("RevocationKeyshares[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
 			}
-			if !all {
-				return err
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return SignTokenTransactionResponseValidationError{
+					field:  fmt.Sprintf("RevocationKeyshares[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
 			}
-			errors = append(errors, err)
 		}
 
 	}
@@ -4641,6 +4914,121 @@ var _ interface {
 	ErrorName() string
 } = SignTokenTransactionResponseValidationError{}
 
+// Validate checks the field values on RevocationSecretWithIndex with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RevocationSecretWithIndex) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RevocationSecretWithIndex with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RevocationSecretWithIndexMultiError, or nil if none found.
+func (m *RevocationSecretWithIndex) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RevocationSecretWithIndex) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for InputIndex
+
+	if len(m.GetRevocationSecret()) != 32 {
+		err := RevocationSecretWithIndexValidationError{
+			field:  "RevocationSecret",
+			reason: "value length must be 32 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return RevocationSecretWithIndexMultiError(errors)
+	}
+
+	return nil
+}
+
+// RevocationSecretWithIndexMultiError is an error wrapping multiple validation
+// errors returned by RevocationSecretWithIndex.ValidateAll() if the
+// designated constraints aren't met.
+type RevocationSecretWithIndexMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RevocationSecretWithIndexMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RevocationSecretWithIndexMultiError) AllErrors() []error { return m }
+
+// RevocationSecretWithIndexValidationError is the validation error returned by
+// RevocationSecretWithIndex.Validate if the designated constraints aren't met.
+type RevocationSecretWithIndexValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RevocationSecretWithIndexValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RevocationSecretWithIndexValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RevocationSecretWithIndexValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RevocationSecretWithIndexValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RevocationSecretWithIndexValidationError) ErrorName() string {
+	return "RevocationSecretWithIndexValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RevocationSecretWithIndexValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRevocationSecretWithIndex.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RevocationSecretWithIndexValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RevocationSecretWithIndexValidationError{}
+
 // Validate checks the field values on FinalizeTokenTransactionRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -4692,18 +5080,36 @@ func (m *FinalizeTokenTransactionRequest) validate(all bool) error {
 		}
 	}
 
-	for idx, item := range m.GetOutputToSpendRevocationSecrets() {
+	for idx, item := range m.GetRevocationSecrets() {
 		_, _ = idx, item
 
-		if len(item) != 32 {
-			err := FinalizeTokenTransactionRequestValidationError{
-				field:  fmt.Sprintf("OutputToSpendRevocationSecrets[%v]", idx),
-				reason: "value length must be 32 bytes",
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, FinalizeTokenTransactionRequestValidationError{
+						field:  fmt.Sprintf("RevocationSecrets[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, FinalizeTokenTransactionRequestValidationError{
+						field:  fmt.Sprintf("RevocationSecrets[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
 			}
-			if !all {
-				return err
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return FinalizeTokenTransactionRequestValidationError{
+					field:  fmt.Sprintf("RevocationSecrets[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
 			}
-			errors = append(errors, err)
 		}
 
 	}

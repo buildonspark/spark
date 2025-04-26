@@ -26,12 +26,13 @@ func GetTokenTransactionMapFromList(transactions []*TokenTransaction) (map[strin
 	return tokenTransactionMap, nil
 }
 
+// Ordered fields are ordered according to the order of the input in the token transaction proto.
 func CreateStartedTransactionEntities(
 	ctx context.Context,
 	tokenTransaction *pb.TokenTransaction,
 	tokenTransactionSignatures *pb.TokenTransactionSignatures,
-	outputRevocationKeyshareIDs []string,
-	outputToSpendEnts []*TokenOutput,
+	orderedOutputToCreateRevocationKeyshareIDs []string,
+	orderedOutputToSpendEnts []*TokenOutput,
 	coordinatorPublicKey []byte,
 ) (*TokenTransaction, error) {
 	logger := logging.GetLoggerFromContext(ctx)
@@ -57,7 +58,7 @@ func CreateStartedTransactionEntities(
 	if tokenTransaction.GetMintInput() != nil {
 		tokenMintEnt, err = db.TokenMint.Create().
 			SetIssuerPublicKey(tokenTransaction.GetMintInput().GetIssuerPublicKey()).
-			SetIssuerSignature(tokenTransactionSignatures.GetOwnerSignatures()[0]).
+			SetIssuerSignature(tokenTransactionSignatures.GetOwnerSignatures()[0].Signature).
 			SetWalletProvidedTimestamp(tokenTransaction.GetMintInput().GetIssuerProvidedTimestamp()).
 			Save(ctx)
 		if err != nil {
@@ -80,19 +81,19 @@ func CreateStartedTransactionEntities(
 
 	if tokenTransaction.GetTransferInput() != nil {
 		ownershipSignatures := tokenTransactionSignatures.GetOwnerSignatures()
-		if len(ownershipSignatures) != len(outputToSpendEnts) {
+		if len(ownershipSignatures) != len(orderedOutputToSpendEnts) {
 			return nil, fmt.Errorf(
 				"number of signatures %d doesn't match number of outputs to spend %d",
 				len(ownershipSignatures),
-				len(outputToSpendEnts),
+				len(orderedOutputToSpendEnts),
 			)
 		}
 
-		for outputIndex, outputToSpendEnt := range outputToSpendEnts {
+		for outputIndex, outputToSpendEnt := range orderedOutputToSpendEnts {
 			_, err = db.TokenOutput.UpdateOne(outputToSpendEnt).
 				SetStatus(schema.TokenOutputStatusSpentStarted).
 				SetOutputSpentTokenTransactionID(tokenTransactionEnt.ID).
-				SetSpentOwnershipSignature(ownershipSignatures[outputIndex]).
+				SetSpentOwnershipSignature(ownershipSignatures[outputIndex].Signature).
 				SetSpentTransactionInputVout(int32(outputIndex)).
 				Save(ctx)
 			if err != nil {
@@ -103,7 +104,7 @@ func CreateStartedTransactionEntities(
 
 	outputEnts := make([]*TokenOutputCreate, 0, len(tokenTransaction.TokenOutputs))
 	for outputIndex, output := range tokenTransaction.TokenOutputs {
-		revocationUUID, err := uuid.Parse(outputRevocationKeyshareIDs[outputIndex])
+		revocationUUID, err := uuid.Parse(orderedOutputToCreateRevocationKeyshareIDs[outputIndex])
 		if err != nil {
 			return nil, err
 		}
@@ -225,7 +226,7 @@ func UpdateSignedTransaction(
 func UpdateFinalizedTransaction(
 	ctx context.Context,
 	tokenTransactionEnt *TokenTransaction,
-	revocationKeys [][]byte,
+	revocationSecrets []*pb.RevocationSecretWithIndex,
 ) error {
 	// Update the token transaction with the operator signature and new status
 	_, err := GetDbFromContext(ctx).TokenTransaction.UpdateOne(tokenTransactionEnt).
@@ -239,10 +240,10 @@ func UpdateFinalizedTransaction(
 	if len(spentLeaves) == 0 {
 		return fmt.Errorf("no spent outputs found for transaction. cannot finalize")
 	}
-	if len(revocationKeys) != len(spentLeaves) {
+	if len(revocationSecrets) != len(spentLeaves) {
 		return fmt.Errorf(
 			"number of revocation keys (%d) does not match number of spent outputs (%d)",
-			len(revocationKeys),
+			len(revocationSecrets),
 			len(spentLeaves),
 		)
 	}
@@ -251,7 +252,7 @@ func UpdateFinalizedTransaction(
 		inputIndex := outputToSpendEnt.SpentTransactionInputVout
 		_, err := GetDbFromContext(ctx).TokenOutput.UpdateOne(outputToSpendEnt).
 			SetStatus(schema.TokenOutputStatusSpentFinalized).
-			SetSpentRevocationSecret(revocationKeys[inputIndex]).
+			SetSpentRevocationSecret(revocationSecrets[inputIndex].RevocationSecret).
 			Save(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to update spent output to signed: %w", err)

@@ -22,12 +22,7 @@ message SendSparkSignatureRequest {
   repeated spark.OperatorSpecificOwnerSignature operator_specific_signatures = 2;
   SparkOperatorSignatureData operator_signature_data = 3;
 
-  repeated RevocationSecretWithIndex revocation_secrets = 4;
-}
-
-message RevocationSecretWithIndex {
-  uint32 input_index = 1;
-  bytes revocation_secret = 2  [(validate.rules).bytes.len = 32];
+  repeated spark.RevocationSecretWithIndex revocation_secrets = 4;
 }
 
 message SparkOperatorSignatureData {

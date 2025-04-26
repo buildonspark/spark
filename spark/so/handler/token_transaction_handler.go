@@ -74,6 +74,12 @@ const (
 	errFailedToConnectToOperatorForCancel = "failed to connect to operator %s"
 	errFailedToQueryOperatorForCancel     = "failed to execute query with operator %s"
 	errFailedToExecuteWithAllOperators    = "failed to execute query with all operators"
+	errInputIndexOutOfRange               = "input index %d out of range (0-%d)"
+	errInvalidOwnerSignature              = "invalid owner signature for output"
+	errInvalidIssuerSignature             = "invalid issuer signature for mint"
+	errFailedToHashRevocationKeyshares    = "failed to hash revocation keyshares payload"
+	errTransactionHashMismatch            = "transaction hash in payload (%x) does not match actual transaction hash (%x)"
+	errOperatorPublicKeyMismatch          = "operator identity public key in payload (%x) does not match this SO's identity public key (%x)"
 )
 
 // The TokenTransactionHandler is responsible for handling token transaction requests to spend and create outputs.
@@ -260,15 +266,6 @@ func validateInputs(outputs []*ent.TokenOutput, expectedStatus schema.TokenOutpu
 	return invalidOutputs
 }
 
-// validateOperatorSpecificSignatures validates the signatures in the request against the transaction hash
-// and verifies that the number of signatures matches the expected count based on transaction type
-func validateOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecificSignatures []*pb.OperatorSpecificOwnerSignature, tokenTransaction *ent.TokenTransaction) error {
-	if len(tokenTransaction.Edges.SpentOutput) > 0 {
-		return validateTransferOperatorSpecificSignatures(identityPublicKey, operatorSpecificSignatures, tokenTransaction)
-	}
-	return validateMintOperatorSpecificSignatures(identityPublicKey, operatorSpecificSignatures, tokenTransaction)
-}
-
 // validateTransferOperatorSpecificSignatures validates signatures for transfer transactions
 func validateTransferOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecificSignatures []*pb.OperatorSpecificOwnerSignature, tokenTransaction *ent.TokenTransaction) error {
 	if len(operatorSpecificSignatures) != len(tokenTransaction.Edges.SpentOutput) {
@@ -277,24 +274,66 @@ func validateTransferOperatorSpecificSignatures(identityPublicKey []byte, operat
 				len(tokenTransaction.Edges.SpentOutput), len(operatorSpecificSignatures)),
 			tokenTransaction, nil)
 	}
+	numInputs := len(tokenTransaction.Edges.SpentOutput)
+	signaturesByIndex := make([]*pb.OperatorSpecificOwnerSignature, numInputs)
 
-	spentOutputs := make([]*ent.TokenOutput, len(tokenTransaction.Edges.SpentOutput))
+	// Sort signatures according to index position
+	for _, sig := range operatorSpecificSignatures {
+		index := int(sig.OwnerSignature.InputIndex)
+		if index < 0 || index >= numInputs {
+			return formatErrorWithTransactionEnt(
+				fmt.Sprintf(errInputIndexOutOfRange, index, numInputs-1),
+				tokenTransaction, nil)
+		}
+
+		if signaturesByIndex[index] != nil {
+			return formatErrorWithTransactionEnt(
+				fmt.Sprintf("duplicate signature for input index %d", index),
+				tokenTransaction, nil)
+		}
+
+		signaturesByIndex[index] = sig
+	}
+
+	for i := 0; i < numInputs; i++ {
+		if signaturesByIndex[i] == nil {
+			return formatErrorWithTransactionEnt(
+				fmt.Sprintf("missing signature for input index %d", i),
+				tokenTransaction, nil)
+		}
+	}
+
+	// Sort spent outputs by their index
+	spentOutputs := make([]*ent.TokenOutput, numInputs)
 	copy(spentOutputs, tokenTransaction.Edges.SpentOutput)
 	sort.Slice(spentOutputs, func(i, j int) bool {
 		return spentOutputs[i].SpentTransactionInputVout < spentOutputs[j].SpentTransactionInputVout
 	})
 
-	for i, outputSig := range operatorSpecificSignatures {
-		spentOutput := spentOutputs[i]
-		if !bytes.Equal(outputSig.OwnerPublicKey, spentOutput.OwnerPublicKey) {
-			return formatErrorWithTransactionEnt(
-				fmt.Sprintf("owner public key mismatch for input %d: signature has %x but database record has %x",
-					i, outputSig.OwnerPublicKey, spentOutput.OwnerPublicKey),
-				tokenTransaction, nil)
+	// Validate each signature against its corresponding output
+	for i, sig := range signaturesByIndex {
+		payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(sig.Payload)
+		if err != nil {
+			return fmt.Errorf("%s: %w", errFailedToHashRevocationKeyshares, err)
 		}
 
-		if err := validateSignaturePayload(identityPublicKey, outputSig, tokenTransaction); err != nil {
-			return formatErrorWithTransactionEnt("signature payload validation failed", tokenTransaction, err)
+		if !bytes.Equal(sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash) {
+			return fmt.Errorf(errTransactionHashMismatch,
+				sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash)
+		}
+
+		if !bytes.Equal(sig.Payload.OperatorIdentityPublicKey, identityPublicKey) {
+			return fmt.Errorf(errOperatorPublicKeyMismatch,
+				sig.Payload.OperatorIdentityPublicKey, identityPublicKey)
+		}
+
+		output := spentOutputs[i]
+		if err := utils.ValidateOwnershipSignature(
+			sig.OwnerSignature.Signature,
+			payloadHash,
+			output.OwnerPublicKey,
+		); err != nil {
+			return formatErrorWithTransactionEnt(errInvalidOwnerSignature, tokenTransaction, err)
 		}
 	}
 
@@ -316,48 +355,45 @@ func validateMintOperatorSpecificSignatures(identityPublicKey []byte, operatorSp
 			tokenTransaction, nil)
 	}
 
-	if !bytes.Equal(operatorSpecificSignatures[0].OwnerPublicKey, tokenTransaction.Edges.Mint.IssuerPublicKey) {
-		return formatErrorWithTransactionEnt(
-			fmt.Sprintf("owner public key in signature (%x) does not match issuer public key in mint (%x)",
-				operatorSpecificSignatures[0].OwnerPublicKey, tokenTransaction.Edges.Mint.IssuerPublicKey),
-			tokenTransaction, nil)
+	sig := operatorSpecificSignatures[0]
+
+	// Validate the signature payload
+	payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(sig.Payload)
+	if err != nil {
+		return fmt.Errorf("%s: %w", errFailedToHashRevocationKeyshares, err)
 	}
 
-	if err := validateSignaturePayload(identityPublicKey, operatorSpecificSignatures[0], tokenTransaction); err != nil {
-		return formatErrorWithTransactionEnt("signature payload validation failed", tokenTransaction, err)
+	if !bytes.Equal(sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash) {
+		return fmt.Errorf(errTransactionHashMismatch,
+			sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash)
+	}
+
+	if len(sig.Payload.OperatorIdentityPublicKey) > 0 {
+		if !bytes.Equal(sig.Payload.OperatorIdentityPublicKey, identityPublicKey) {
+			return fmt.Errorf(errOperatorPublicKeyMismatch,
+				sig.Payload.OperatorIdentityPublicKey, identityPublicKey)
+		}
+	}
+
+	// Validate the signature using the issuer public key from the database
+	if err := utils.ValidateOwnershipSignature(
+		sig.OwnerSignature.Signature,
+		payloadHash,
+		tokenTransaction.Edges.Mint.IssuerPublicKey,
+	); err != nil {
+		return formatErrorWithTransactionEnt(errInvalidIssuerSignature, tokenTransaction, err)
 	}
 
 	return nil
 }
 
-// validateSignaturePayload validates the payload and signature of an operator-specific signature
-func validateSignaturePayload(identityPublicKey []byte, outputSig *pb.OperatorSpecificOwnerSignature, tokenTransaction *ent.TokenTransaction) error {
-	payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(outputSig.Payload)
-	if err != nil {
-		return fmt.Errorf("failed to hash revocation keyshares payload: %w", err)
+// validateOperatorSpecificSignatures validates the signatures in the request against the transaction hash
+// and verifies that the number of signatures matches the expected count based on transaction type
+func validateOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecificSignatures []*pb.OperatorSpecificOwnerSignature, tokenTransaction *ent.TokenTransaction) error {
+	if len(tokenTransaction.Edges.SpentOutput) > 0 {
+		return validateTransferOperatorSpecificSignatures(identityPublicKey, operatorSpecificSignatures, tokenTransaction)
 	}
-
-	if !bytes.Equal(outputSig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash) {
-		return fmt.Errorf("transaction hash in payload (%x) does not match actual transaction hash (%x)",
-			outputSig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash)
-	}
-
-	if len(outputSig.Payload.OperatorIdentityPublicKey) > 0 {
-		if !bytes.Equal(outputSig.Payload.OperatorIdentityPublicKey, identityPublicKey) {
-			return fmt.Errorf("operator identity public key in payload (%x) does not match this SO's identity public key (%x)",
-				outputSig.Payload.OperatorIdentityPublicKey, identityPublicKey)
-		}
-	}
-
-	if err := utils.ValidateOwnershipSignature(
-		outputSig.OwnerSignature,
-		payloadHash,
-		outputSig.OwnerPublicKey,
-	); err != nil {
-		return fmt.Errorf("invalid owner signature for output: %w", err)
-	}
-
-	return nil
+	return validateMintOperatorSpecificSignatures(identityPublicKey, operatorSpecificSignatures, tokenTransaction)
 }
 
 // SignTokenTransaction signs the token transaction with the operators private key.
@@ -431,11 +467,17 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 	identityPrivateKey := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey)
 	operatorSignature := ecdsa.Sign(identityPrivateKey, finalTokenTransactionHash)
 
-	operatorSpecificSignature := make([][]byte, len(req.OperatorSpecificSignatures))
-	for i, sig := range req.OperatorSpecificSignatures {
-		operatorSpecificSignature[i] = sig.OwnerSignature
+	// Order the signatures according to their index before updating the DB.
+	operatorSpecificSignatureMap := make(map[int][]byte, len(req.OperatorSpecificSignatures))
+	for _, sig := range req.OperatorSpecificSignatures {
+		inputIndex := int(sig.OwnerSignature.InputIndex)
+		operatorSpecificSignatureMap[inputIndex] = sig.OwnerSignature.Signature
 	}
-	err = ent.UpdateSignedTransaction(ctx, tokenTransaction, operatorSpecificSignature, operatorSignature.Serialize())
+	operatorSpecificSignatures := make([][]byte, len(operatorSpecificSignatureMap))
+	for i := 0; i < len(operatorSpecificSignatureMap); i++ {
+		operatorSpecificSignatures[i] = operatorSpecificSignatureMap[i]
+	}
+	err = ent.UpdateSignedTransaction(ctx, tokenTransaction, operatorSpecificSignatures, operatorSignature.Serialize())
 	if err != nil {
 		return nil, formatErrorWithTransactionEnt(fmt.Sprintf(errFailedToUpdateOutputs, "signing"), tokenTransaction, err)
 	}
@@ -446,14 +488,19 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 	}
 
 	keyshares := make([]*ent.SigningKeyshare, len(tokenTransaction.Edges.SpentOutput))
+	revocationKeyshares := make([]*pb.KeyshareWithIndex, len(tokenTransaction.Edges.SpentOutput))
 	for _, output := range tokenTransaction.Edges.SpentOutput {
 		keyshare, err := output.QueryRevocationKeyshare().Only(ctx)
 		if err != nil {
 			logger.Info("Failed to get keyshare for output", "error", err)
 			return nil, err
 		}
-		// Use the vout index to order the keyshares
-		keyshares[output.SpentTransactionInputVout] = keyshare
+		index := output.SpentTransactionInputVout
+		keyshares[index] = keyshare
+		revocationKeyshares[index] = &pb.KeyshareWithIndex{
+			InputIndex: uint32(index),
+			Keyshare:   keyshare.SecretShare,
+		}
 
 		// Validate that the keyshare's public key is as expected.
 		if !bytes.Equal(keyshare.PublicKey, output.WithdrawRevocationCommitment) {
@@ -463,11 +510,6 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 				output.WithdrawRevocationCommitment,
 			)
 		}
-	}
-
-	revocationKeyshares := make([][]byte, len(keyshares))
-	for i, keyshare := range keyshares {
-		revocationKeyshares[i] = keyshare.SecretShare
 	}
 
 	sparkSigReq := &pblrc20.SendSparkSignatureRequest{
@@ -483,8 +525,8 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 	}
 
 	return &pb.SignTokenTransactionResponse{
-		SparkOperatorSignature:              operatorSignature.Serialize(),
-		TokenTransactionRevocationKeyshares: revocationKeyshares,
+		SparkOperatorSignature: operatorSignature.Serialize(),
+		RevocationKeyshares:    revocationKeyshares,
 	}, nil
 }
 
@@ -580,8 +622,8 @@ func (o TokenTransactionHandler) regenerateSigningResponseForDuplicateRequest(
 	}
 	logWithTransactionEnt(ctx, "Returning stored signature in response to repeat Sign() call", tokenTransaction, slog.LevelDebug)
 	return &pb.SignTokenTransactionResponse{
-		SparkOperatorSignature:              tokenTransaction.OperatorSignature,
-		TokenTransactionRevocationKeyshares: revocationKeyshares,
+		SparkOperatorSignature: tokenTransaction.OperatorSignature,
+		RevocationKeyshares:    revocationKeyshares,
 	}, nil
 }
 
@@ -618,29 +660,56 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 		return nil, formatErrorWithTransactionEnt(fmt.Sprintf("%s: %s", errInvalidOutputs, strings.Join(invalidOutputs, "; ")), tokenTransaction, nil)
 	}
 
-	revocationPrivateKeys := make([]*secp256k1.PrivateKey, len(req.OutputToSpendRevocationSecrets))
-	for i, revocationSecret := range req.OutputToSpendRevocationSecrets {
+	if len(tokenTransaction.Edges.SpentOutput) != len(req.RevocationSecrets) {
+		return nil, formatErrorWithTransactionEnt(
+			fmt.Sprintf("number of revocation keys (%d) does not match number of spent outputs (%d)",
+				len(req.RevocationSecrets),
+				len(tokenTransaction.Edges.SpentOutput)),
+			tokenTransaction, nil)
+	}
+	revocationSecretMap := make(map[int][]byte)
+	for _, revocationSecret := range req.RevocationSecrets {
+		revocationSecretMap[int(revocationSecret.InputIndex)] = revocationSecret.RevocationSecret
+	}
+	// Validate that we have exactly one revocation secret for each input index
+	// and that they form a contiguous sequence from 0 to len(tokenTransaction.Edges.SpentOutput)-1
+	for i := 0; i < len(tokenTransaction.Edges.SpentOutput); i++ {
+		if _, exists := revocationSecretMap[i]; !exists {
+			return nil, formatErrorWithTransactionEnt(
+				fmt.Sprintf("missing revocation secret for input index %d", i),
+				tokenTransaction, nil)
+		}
+	}
+
+	revocationSecrets := make([]*secp256k1.PrivateKey, len(revocationSecretMap))
+	revocationCommitements := make([][]byte, len(revocationSecretMap))
+
+	spentOutputs := make([]*ent.TokenOutput, len(tokenTransaction.Edges.SpentOutput))
+	copy(spentOutputs, tokenTransaction.Edges.SpentOutput)
+	sort.Slice(spentOutputs, func(i, j int) bool {
+		return spentOutputs[i].SpentTransactionInputVout < spentOutputs[j].SpentTransactionInputVout
+	})
+
+	// Match each output with its corresponding revocation secret
+	for i, output := range spentOutputs {
+		index := int(output.SpentTransactionInputVout)
+		revocationSecret, exists := revocationSecretMap[index]
+		if !exists {
+			return nil, formatErrorWithTransactionEnt(
+				fmt.Sprintf("missing revocation secret for input at index %d", index),
+				tokenTransaction, nil)
+		}
+
 		revocationPrivateKey, err := common.PrivateKeyFromBytes(revocationSecret)
 		if err != nil {
 			return nil, formatErrorWithTransactionEnt(errFailedToParseRevocationPrivateKey, tokenTransaction, err)
 		}
 
-		revocationPrivateKeys[i] = revocationPrivateKey
+		revocationSecrets[i] = revocationPrivateKey
+		revocationCommitements[i] = output.WithdrawRevocationCommitment
 	}
 
-	// Extract revocation commitments from spent outputs.
-	revocationPublicKeys := make([][]byte, len(tokenTransaction.Edges.SpentOutput))
-	if (len(tokenTransaction.Edges.SpentOutput)) != len(req.OutputToSpendRevocationSecrets) {
-		return nil, formatErrorWithTransactionEnt(
-			fmt.Sprintf("number of revocation keys (%d) does not match number of spent outputs (%d)",
-				len(req.OutputToSpendRevocationSecrets),
-				len(tokenTransaction.Edges.SpentOutput)),
-			tokenTransaction, nil)
-	}
-	for _, output := range tokenTransaction.Edges.SpentOutput {
-		revocationPublicKeys[output.SpentTransactionInputVout] = output.WithdrawRevocationCommitment
-	}
-	err = utils.ValidateRevocationKeys(revocationPrivateKeys, revocationPublicKeys)
+	err = utils.ValidateRevocationKeys(revocationSecrets, revocationCommitements)
 	if err != nil {
 		return nil, formatErrorWithTransactionEnt(errFailedToValidateRevocationKeys, tokenTransaction, err)
 	}
@@ -651,13 +720,13 @@ func (o TokenTransactionHandler) FinalizeTokenTransaction(
 		req.FinalTokenTransaction,
 		tokenTransaction.OperatorSignature,
 		identityPrivateKey,
-		req.OutputToSpendRevocationSecrets,
+		req.RevocationSecrets,
 	))
 	if err != nil {
 		return nil, formatErrorWithTransactionEnt(errFailedToSendToLRC20Node, tokenTransaction, err)
 	}
 
-	err = ent.UpdateFinalizedTransaction(ctx, tokenTransaction, req.OutputToSpendRevocationSecrets)
+	err = ent.UpdateFinalizedTransaction(ctx, tokenTransaction, req.RevocationSecrets)
 	if err != nil {
 		return nil, formatErrorWithTransactionEnt(fmt.Sprintf(errFailedToUpdateOutputs, "finalizing"), tokenTransaction, err)
 	}
@@ -981,18 +1050,15 @@ func (o TokenTransactionHandler) CancelSignedTokenTransaction(
 	return &emptypb.Empty{}, nil
 }
 
-func (o TokenTransactionHandler) getRevocationKeysharesForTokenTransaction(ctx context.Context, tokenTransaction *ent.TokenTransaction) ([][]byte, error) {
-	keyshares := make([]*ent.SigningKeyshare, len(tokenTransaction.Edges.SpentOutput))
-	for _, output := range tokenTransaction.Edges.SpentOutput {
+// getRevocationKeysharesForTokenTransaction retrieves the revocation keyshares for a token transaction
+func (o TokenTransactionHandler) getRevocationKeysharesForTokenTransaction(ctx context.Context, tokenTransaction *ent.TokenTransaction) ([]*pb.KeyshareWithIndex, error) {
+	spentOutputs := tokenTransaction.Edges.SpentOutput
+	revocationKeyshares := make([]*pb.KeyshareWithIndex, len(spentOutputs))
+	for i, output := range spentOutputs {
 		keyshare, err := output.QueryRevocationKeyshare().Only(ctx)
 		if err != nil {
-			return nil, formatErrorWithTransactionEnt(
-				fmt.Sprintf("%s %s", errFailedToGetKeyshareForOutput, output.ID),
-				tokenTransaction, err)
+			return nil, formatErrorWithTransactionEnt(errFailedToGetKeyshareForOutput, tokenTransaction, err)
 		}
-		// Use the vout index to order the keyshares
-		keyshares[output.SpentTransactionInputVout] = keyshare
-
 		// Validate that the keyshare's public key is as expected.
 		if !bytes.Equal(keyshare.PublicKey, output.WithdrawRevocationCommitment) {
 			return nil, formatErrorWithTransactionEnt(
@@ -1000,27 +1066,24 @@ func (o TokenTransactionHandler) getRevocationKeysharesForTokenTransaction(ctx c
 					errRevocationKeyMismatch, keyshare.PublicKey, output.WithdrawRevocationCommitment),
 				tokenTransaction, nil)
 		}
-	}
 
-	revocationKeyshares := make([][]byte, len(keyshares))
-	for i, keyshare := range keyshares {
-		revocationKeyshares[i] = keyshare.SecretShare
+		revocationKeyshares[i] = &pb.KeyshareWithIndex{
+			InputIndex: uint32(output.SpentTransactionInputVout),
+			Keyshare:   keyshare.SecretShare,
+		}
 	}
+	// Sort spent output keyshares by their index to ensure a consistent response
+	sort.Slice(revocationKeyshares, func(i, j int) bool {
+		return revocationKeyshares[i].InputIndex < revocationKeyshares[j].InputIndex
+	})
+
 	return revocationKeyshares, nil
 }
 
-func (o TokenTransactionHandler) buildLrc20SendSignaturesRequest(finalTokenTransaction *pb.TokenTransaction, operatorSignature []byte, identityPrivateKey *secp256k1.PrivateKey, outputToSpendRevocationSecrets [][]byte) *pblrc20.SendSparkSignatureRequest {
+func (o TokenTransactionHandler) buildLrc20SendSignaturesRequest(finalTokenTransaction *pb.TokenTransaction, operatorSignature []byte, identityPrivateKey *secp256k1.PrivateKey, revocationSecrets []*pb.RevocationSecretWithIndex) *pblrc20.SendSparkSignatureRequest {
 	operatorSignatureData := &pblrc20.SparkOperatorSignatureData{
 		SparkOperatorSignature:    operatorSignature,
 		OperatorIdentityPublicKey: identityPrivateKey.PubKey().SerializeCompressed(),
-	}
-
-	var revocationSecrets []*pblrc20.RevocationSecretWithIndex
-	for i, revocationSecret := range outputToSpendRevocationSecrets {
-		revocationSecrets = append(revocationSecrets, &pblrc20.RevocationSecretWithIndex{
-			RevocationSecret: revocationSecret,
-			InputIndex:       uint32(i),
-		})
 	}
 
 	return &pblrc20.SendSparkSignatureRequest{

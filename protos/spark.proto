@@ -362,12 +362,18 @@ message TokenTransactionWithStatus {
     TokenTransactionStatus status = 2;
 }
 
+message SignatureWithIndex {
+    // This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
+    bytes signature = 1 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+    // The index of the TTXO associated with this signature.
+    uint32 input_index = 2;
+}
+
 message TokenTransactionSignatures {
       // Filled by signing the partial token transaction hash with the owner/issuer private key.
       // For mint transactions this will be one signature for the input issuer_public_key
       // For transfer transactions this will be one for each output for the output owner_public_key
-      // This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
-      repeated bytes owner_signatures = 1 [(validate.rules).repeated.items.bytes.min_len = 64, (validate.rules).repeated.items.bytes.max_len = 73];
+      repeated SignatureWithIndex owner_signatures = 1;
 }
 
 message StartTokenTransactionRequest {
@@ -394,10 +400,8 @@ message OperatorSpecificTokenTransactionSignablePayload {
 // This message allows the sender of a output being spent to provide final evidence
 // that it owns a output to an SO when requesting signing and release of the  revocation keyshare.  
 message OperatorSpecificOwnerSignature {
-    bytes owner_public_key = 1 [(validate.rules).bytes.len = 33];
-    // This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
-    bytes owner_signature = 2 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
-    OperatorSpecificTokenTransactionSignablePayload payload = 3;
+    SignatureWithIndex owner_signature = 1;
+    OperatorSpecificTokenTransactionSignablePayload payload = 2;
 }
 
 message SignTokenTransactionRequest {
@@ -406,16 +410,28 @@ message SignTokenTransactionRequest {
     bytes identity_public_key = 3 [(validate.rules).bytes.len = 33];
 }
 
+message KeyshareWithIndex {
+    // The index of the input TTXO associated with this keyshare.
+    uint32 input_index = 1;
+    bytes keyshare = 2 [(validate.rules).bytes.len = 32];
+}
+
 message SignTokenTransactionResponse {
     bytes spark_operator_signature = 1 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
-    repeated bytes token_transaction_revocation_keyshares = 2 [(validate.rules).repeated.items.bytes.len = 32];
+    repeated KeyshareWithIndex revocation_keyshares = 2;
+}
+
+message RevocationSecretWithIndex {
+    // The index of the input TTXO associated with this secret.
+    uint32 input_index = 1;
+    bytes revocation_secret = 2 [(validate.rules).bytes.len = 32];
 }
 
 message FinalizeTokenTransactionRequest {
     TokenTransaction final_token_transaction = 1;
     // List of ordered revocation secrets that map 1:1 with leaves being spent in the
     // token transaction.
-    repeated bytes output_to_spend_revocation_secrets = 2 [(validate.rules).repeated.items.bytes.len = 32];
+    repeated RevocationSecretWithIndex revocation_secrets = 2;
     bytes identity_public_key = 3 [(validate.rules).bytes.len = 33];
 }
 

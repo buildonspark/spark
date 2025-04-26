@@ -15,7 +15,7 @@ import (
 // FetchTokenInputs fetches the transaction whose token transaction hashes
 // match the PrevTokenTransactionHash of each output, then loads the created outputs for those transactions,
 // and finally maps each input to the created output in the DB.
-// Return the outputs in the same order they were specified in the input object.
+// Return the TTXOs in the same order they were specified in the input object.
 func FetchTokenInputs(ctx context.Context, outputsToSpend []*pb.TokenOutputToSpend) ([]*TokenOutput, error) {
 	// Gather all distinct prev transaction hashes
 	var distinctTxHashes [][]byte

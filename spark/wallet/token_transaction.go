@@ -7,6 +7,7 @@ import (
 	"log"
 	"math/big"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -21,8 +22,8 @@ import (
 
 // KeyshareWithOperatorIndex holds a keyshare and its corresponding operator index.
 type KeyshareWithOperatorIndex struct {
-	Keyshare []byte
-	Index    uint64
+	Keyshare      *pb.KeyshareWithIndex
+	OperatorIndex uint64
 }
 
 // OperatorSignatures maps operator identifiers to their signatures returned as part of the SignTokenTransaction() call.
@@ -38,6 +39,7 @@ func StartTokenTransaction(
 	config *Config,
 	tokenTransaction *pb.TokenTransaction,
 	ownerPrivateKeys []*secp256k1.PrivateKey,
+	startSignatureIndexOrder []uint32,
 ) (*pb.StartTokenTransactionResponse, []byte, []byte, error) {
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
@@ -68,21 +70,56 @@ func StartTokenTransaction(
 	}
 
 	// Gather owner (issuer or output) signatures
-	var ownerSignatures [][]byte
+	var ownerSignaturesWithIndex []*pb.SignatureWithIndex
 	if tokenTransaction.GetMintInput() != nil {
 		signingPrivKeySecp := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey.Serialize())
 		sig, err := createTokenTransactionSignature(config, signingPrivKeySecp, partialTokenTransactionHash)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to create signature: %v", err)
 		}
-		ownerSignatures = append(ownerSignatures, sig)
+		sigWithIndex := &pb.SignatureWithIndex{
+			InputIndex: 0,
+			Signature:  sig,
+		}
+		ownerSignaturesWithIndex = append(ownerSignaturesWithIndex, sigWithIndex)
 	} else if tokenTransaction.GetTransferInput() != nil {
-		for i := range ownerPrivateKeys {
-			sig, err := createTokenTransactionSignature(config, ownerPrivateKeys[i], partialTokenTransactionHash)
+		signaturesByIndex := make(map[uint32]*pb.SignatureWithIndex)
+
+		// If startSignatureIndexOrder is provided and has the correct length, use it to order signatures
+		if len(startSignatureIndexOrder) > 0 && len(startSignatureIndexOrder) != len(ownerPrivateKeys) {
+			return nil, nil, nil, fmt.Errorf("startSignatureIndexOrder length (%d) does not match ownerPrivateKeys length (%d)",
+				len(startSignatureIndexOrder), len(ownerPrivateKeys))
+		}
+		for i, privKey := range ownerPrivateKeys {
+			sig, err := createTokenTransactionSignature(config, privKey, partialTokenTransactionHash)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to create signature: %v", err)
 			}
-			ownerSignatures = append(ownerSignatures, sig)
+			sigWithIndex := &pb.SignatureWithIndex{
+				InputIndex: uint32(i),
+				Signature:  sig,
+			}
+			signaturesByIndex[uint32(i)] = sigWithIndex
+		}
+
+		// If using custom order, ensure we have all required indices
+		if len(startSignatureIndexOrder) > 0 {
+			for _, idx := range startSignatureIndexOrder {
+				if _, exists := signaturesByIndex[idx]; !exists {
+					return nil, nil, nil, fmt.Errorf("missing signature for required input index %d", idx)
+				}
+			}
+		}
+
+		// If signatureOrder is provided, use it to determine position in the array
+		if len(startSignatureIndexOrder) > 0 {
+			for _, idx := range startSignatureIndexOrder {
+				ownerSignaturesWithIndex = append(ownerSignaturesWithIndex, signaturesByIndex[idx])
+			}
+		} else {
+			for i := range ownerPrivateKeys {
+				ownerSignaturesWithIndex = append(ownerSignaturesWithIndex, signaturesByIndex[uint32(i)])
+			}
 		}
 	}
 
@@ -90,7 +127,7 @@ func StartTokenTransaction(
 		IdentityPublicKey:       config.IdentityPublicKey(),
 		PartialTokenTransaction: tokenTransaction,
 		TokenTransactionSignatures: &pb.TokenTransactionSignatures{
-			OwnerSignatures: ownerSignatures,
+			OwnerSignatures: ownerSignaturesWithIndex,
 		},
 	})
 	if err != nil {
@@ -128,7 +165,7 @@ func createOperatorSpecificSignature(
 	config *Config,
 	operatorPublicKey SerializedPublicKey,
 	privKey *secp256k1.PrivateKey,
-	ownerPublicKey SerializedPublicKey,
+	inputIndex uint32,
 	finalTxHash []byte,
 ) (*pb.OperatorSpecificOwnerSignature, error) {
 	payload := &pb.OperatorSpecificTokenTransactionSignablePayload{
@@ -146,9 +183,11 @@ func createOperatorSpecificSignature(
 	}
 
 	return &pb.OperatorSpecificOwnerSignature{
-		OwnerPublicKey: ownerPublicKey,
-		OwnerSignature: sig,
-		Payload:        payload,
+		OwnerSignature: &pb.SignatureWithIndex{
+			InputIndex: inputIndex,
+			Signature:  sig,
+		},
+		Payload: payload,
 	}, nil
 }
 
@@ -200,7 +239,7 @@ func SignTokenTransaction(
 	finalTxHash []byte,
 	operatorIdentityPublicKeys []SerializedPublicKey,
 	ownerPrivateKeys []*secp256k1.PrivateKey,
-	ownerPublicKeys []SerializedPublicKey,
+	signatureOrder []uint32,
 ) ([][]*KeyshareWithOperatorIndex, OperatorSignatures, error) {
 	operatorSignaturesMap := make(OperatorSignatures)
 	outputRevocationKeyshares := make([][]*KeyshareWithOperatorIndex, len(finalTx.GetTransferInput().GetOutputsToSpend()))
@@ -208,6 +247,12 @@ func SignTokenTransaction(
 	operatorsToContact, selectedPubKeys, err := getOperatorsToContact(config, operatorIdentityPublicKeys)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// Validate signatureOrder if provided
+	if len(signatureOrder) > 0 && len(signatureOrder) != len(ownerPrivateKeys) {
+		return nil, nil, fmt.Errorf("signatureOrder length (%d) does not match ownerPrivateKeys length (%d)",
+			len(signatureOrder), len(ownerPrivateKeys))
 	}
 
 	for operatorIndex, operator := range operatorsToContact {
@@ -225,19 +270,27 @@ func SignTokenTransaction(
 		operatorCtx := ContextWithToken(ctx, operatorToken)
 		operatorClient := pb.NewSparkServiceClient(operatorConn)
 
-		var operatorSpecificSignatures []*pb.OperatorSpecificOwnerSignature
-		for i := range ownerPublicKeys {
+		operatorSpecificSignatures := make([]*pb.OperatorSpecificOwnerSignature, len(ownerPrivateKeys))
+		for i, privKey := range ownerPrivateKeys {
+			inputIndex := uint32(i)
+
 			sig, err := createOperatorSpecificSignature(
 				config,
 				selectedPubKeys[operatorIndex],
-				ownerPrivateKeys[i],
-				ownerPublicKeys[i],
+				privKey,
+				inputIndex,
 				finalTxHash,
 			)
 			if err != nil {
 				return nil, nil, err
 			}
-			operatorSpecificSignatures = append(operatorSpecificSignatures, sig)
+
+			// If signatureOrder is provided, use it to determine position in the array
+			if len(signatureOrder) > 0 {
+				operatorSpecificSignatures[signatureOrder[i]] = sig
+			} else {
+				operatorSpecificSignatures[i] = sig
+			}
 		}
 
 		signTokenTransactionResponse, err := operatorClient.SignTokenTransaction(operatorCtx, &pb.SignTokenTransactionRequest{
@@ -256,16 +309,49 @@ func SignTokenTransaction(
 		}
 
 		// Store output keyshares if transfer
-		for outputIndex, keyshare := range signTokenTransactionResponse.TokenTransactionRevocationKeyshares {
-			outputRevocationKeyshares[outputIndex] = append(
-				outputRevocationKeyshares[outputIndex],
+		for _, keyshare := range signTokenTransactionResponse.RevocationKeyshares {
+			outputRevocationKeyshares[keyshare.InputIndex] = append(
+				outputRevocationKeyshares[keyshare.InputIndex],
 				&KeyshareWithOperatorIndex{
-					Keyshare: keyshare,
-					Index:    parseHexIdentifierToUint64(operator.Identifier),
+					Keyshare:      keyshare,
+					OperatorIndex: parseHexIdentifierToUint64(operator.Identifier),
 				},
 			)
 		}
 		operatorSignaturesMap[operator.Identifier] = operatorSig
+	}
+
+	// Validate that we have enough keyshares for each output and no duplicates
+	for i, outputKeyshares := range outputRevocationKeyshares {
+		if len(outputKeyshares) < len(finalTx.GetTransferInput().GetOutputsToSpend()) {
+			// Determine which keyshares are missing
+			expectedInputs := int(config.Threshold)
+			presentIndices := make(map[uint64]bool)
+			for _, keyshare := range outputKeyshares {
+				presentIndices[keyshare.OperatorIndex] = true
+			}
+
+			var missingIndices []string
+			for j := 0; j < expectedInputs; j++ {
+				if !presentIndices[uint64(j)] {
+					missingIndices = append(missingIndices, fmt.Sprintf("%d", j))
+				}
+			}
+
+			return nil, nil, fmt.Errorf(
+				"insufficient keyshares for output %d: got %d, need %d (missing indices: %s)",
+				i, len(outputKeyshares), config.Threshold,
+				strings.Join(missingIndices, ", "),
+			)
+		}
+
+		seenIndices := make(map[uint64]bool)
+		for _, keyshare := range outputKeyshares {
+			if seenIndices[keyshare.OperatorIndex] {
+				return nil, nil, fmt.Errorf("duplicate operator index %d for output %d", keyshare.OperatorIndex, i)
+			}
+			seenIndices[keyshare.OperatorIndex] = true
+		}
 	}
 
 	return outputRevocationKeyshares, operatorSignaturesMap, nil
@@ -279,32 +365,17 @@ func FinalizeTokenTransaction(
 	finalTx *pb.TokenTransaction,
 	outputRevocationKeyshares [][]*KeyshareWithOperatorIndex,
 	outputToSpendRevocationCommitments []SerializedPublicKey,
-	startResponse *pb.StartTokenTransactionResponse,
 ) error {
 	// Recover secrets from keyshares
 	outputRecoveredSecrets := make([]*secp256k1.PrivateKey, len(finalTx.GetTransferInput().GetOutputsToSpend()))
 	for i, outputKeyshares := range outputRevocationKeyshares {
-		// Ensure we have enough shares
-		if len(outputKeyshares) < int(startResponse.KeyshareInfo.Threshold) {
-			return fmt.Errorf(
-				"insufficient keyshares for output %d: got %d, need %d",
-				i, len(outputKeyshares), startResponse.KeyshareInfo.Threshold,
-			)
-		}
-		seenIndices := make(map[uint64]bool)
-		for _, keyshare := range outputKeyshares {
-			if seenIndices[keyshare.Index] {
-				return fmt.Errorf("duplicate operator index %d for output %d", keyshare.Index, i)
-			}
-			seenIndices[keyshare.Index] = true
-		}
 		shares := make([]*secretsharing.SecretShare, len(outputKeyshares))
-		for j, keyshareWithIndex := range outputKeyshares {
+		for j, keyshareWithOperatorIndex := range outputKeyshares {
 			shares[j] = &secretsharing.SecretShare{
 				FieldModulus: secp256k1.S256().N,
-				Threshold:    int(startResponse.KeyshareInfo.Threshold),
-				Index:        big.NewInt(int64(keyshareWithIndex.Index)),
-				Share:        new(big.Int).SetBytes(keyshareWithIndex.Keyshare),
+				Threshold:    int(config.Threshold),
+				Index:        big.NewInt(int64(keyshareWithOperatorIndex.OperatorIndex)),
+				Share:        new(big.Int).SetBytes(keyshareWithOperatorIndex.Keyshare.Keyshare),
 			}
 		}
 		recoveredKey, err := secretsharing.RecoverSecret(shares)
@@ -325,9 +396,12 @@ func FinalizeTokenTransaction(
 		return fmt.Errorf("invalid revocation keys: %w", err)
 	}
 
-	outputToSpendRevocationSecrets := make([][]byte, len(outputRecoveredSecrets))
+	revocationSecrets := make([]*pb.RevocationSecretWithIndex, len(outputRecoveredSecrets))
 	for i, privKey := range outputRecoveredSecrets {
-		outputToSpendRevocationSecrets[i] = privKey.Serialize()
+		revocationSecrets[i] = &pb.RevocationSecretWithIndex{
+			InputIndex:       uint32(i),
+			RevocationSecret: privKey.Serialize(),
+		}
 	}
 
 	// For each operator, finalize the transaction
@@ -347,9 +421,9 @@ func FinalizeTokenTransaction(
 		operatorClient := pb.NewSparkServiceClient(operatorConn)
 
 		_, err = operatorClient.FinalizeTokenTransaction(operatorCtx, &pb.FinalizeTokenTransactionRequest{
-			FinalTokenTransaction:          startResponse.FinalTokenTransaction,
-			OutputToSpendRevocationSecrets: outputToSpendRevocationSecrets,
-			IdentityPublicKey:              config.IdentityPublicKey(),
+			FinalTokenTransaction: finalTx,
+			RevocationSecrets:     revocationSecrets,
+			IdentityPublicKey:     config.IdentityPublicKey(),
 		})
 		if err != nil {
 			log.Printf("Error while finalizing token transaction with operator %s: %v", operator.Identifier, err)
@@ -375,16 +449,11 @@ func BroadcastTokenTransaction(
 		config,
 		tokenTransaction,
 		ownerPrivateKeys,
+		nil,
 	)
 	if err != nil {
 		return nil, err
 	}
-	ownerPublicKeys := make([]SerializedPublicKey, len(ownerPrivateKeys))
-	for i, privKey := range ownerPrivateKeys {
-		pubKeyBytes := privKey.PubKey().SerializeCompressed()
-		ownerPublicKeys[i] = SerializedPublicKey(pubKeyBytes)
-	}
-
 	// 2) Sign token transaction
 	outputRevocationKeyshares, _, err := SignTokenTransaction(
 		ctx,
@@ -393,7 +462,7 @@ func BroadcastTokenTransaction(
 		finalTxHash,
 		nil, // Specify nil to designate that all operators should be contacted.
 		ownerPrivateKeys,
-		ownerPublicKeys,
+		nil,
 	)
 	if err != nil {
 		return nil, err
@@ -407,7 +476,6 @@ func BroadcastTokenTransaction(
 			startResp.FinalTokenTransaction,
 			outputRevocationKeyshares,
 			outputToSpendRevocationCommitments,
-			startResp,
 		)
 		if err != nil {
 			return nil, err

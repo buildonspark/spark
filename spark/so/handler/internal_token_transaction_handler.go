@@ -127,7 +127,7 @@ func ValidateMintSignature(
 		return fmt.Errorf("failed to hash token transaction: %w", err)
 	}
 
-	err = utils.ValidateOwnershipSignature(tokenTransactionSignatures.GetOwnerSignatures()[0], partialTokenTransactionHash, tokenTransaction.GetMintInput().GetIssuerPublicKey())
+	err = utils.ValidateOwnershipSignature(tokenTransactionSignatures.GetOwnerSignatures()[0].Signature, partialTokenTransactionHash, tokenTransaction.GetMintInput().GetIssuerPublicKey())
 	if err != nil {
 		return fmt.Errorf("invalid issuer signature: %w", err)
 	}
@@ -140,11 +140,6 @@ func ValidateTokenTransactionUsingPreviousTransactionData(
 	tokenTransactionSignatures *pb.TokenTransactionSignatures,
 	outputToSpendEnts []*ent.TokenOutput,
 ) error {
-	// Validate that the correct number of signatures were provided
-	if len(tokenTransactionSignatures.GetOwnerSignatures()) != len(outputToSpendEnts) {
-		return fmt.Errorf("number of signatures must match number of ownership public keys")
-	}
-
 	// Validate that all token public keys in outputs to spend match the outputs.
 	// Ok to just check against the first output because output token public key uniformity
 	// is checked in the main ValidateTokenTransaction() call.
@@ -168,7 +163,6 @@ func ValidateTokenTransactionUsingPreviousTransactionData(
 			}
 		}
 	}
-
 	// Validate token conservation in inputs + outputs.
 	totalInputAmount := new(big.Int)
 	for _, outputEnt := range outputToSpendEnts {
@@ -191,18 +185,35 @@ func ValidateTokenTransactionUsingPreviousTransactionData(
 		return fmt.Errorf("failed to hash token transaction: %w", err)
 	}
 
-	for i, ownershipSignature := range tokenTransactionSignatures.GetOwnerSignatures() {
-		if ownershipSignature == nil {
+	ownerSignaturesByIndex := make(map[uint32]*pb.SignatureWithIndex)
+	for _, sig := range tokenTransactionSignatures.GetOwnerSignatures() {
+		if sig == nil {
 			return fmt.Errorf("ownership signature cannot be nil")
 		}
+		ownerSignaturesByIndex[sig.InputIndex] = sig
+	}
 
-		err = utils.ValidateOwnershipSignature(ownershipSignature, partialTokenTransactionHash, outputToSpendEnts[i].OwnerPublicKey)
+	if len(tokenTransactionSignatures.GetOwnerSignatures()) != len(tokenTransaction.GetTransferInput().GetOutputsToSpend()) {
+		return fmt.Errorf("number of signatures must match number of outputs to spend")
+	}
+
+	for i := range tokenTransaction.GetTransferInput().GetOutputsToSpend() {
+		index := uint32(i)
+		ownershipSignature, exists := ownerSignaturesByIndex[index]
+		if !exists {
+			return fmt.Errorf("missing owner signature for input index %d, indexes must be contiguous", index)
+		}
+
+		// Get the corresponding output entity (they are ordered outside of this block when they are fetched)
+		outputEnt := outputToSpendEnts[i]
+		if outputEnt == nil {
+			return fmt.Errorf("could not find output entity for output to spend at index %d", i)
+		}
+
+		err = utils.ValidateOwnershipSignature(ownershipSignature.Signature, partialTokenTransactionHash, outputEnt.OwnerPublicKey)
 		if err != nil {
 			return fmt.Errorf("invalid ownership signature for output %d: %w", i, err)
 		}
-	}
-
-	for i, outputEnt := range outputToSpendEnts {
 		err := validateOutputIsSpendable(i, outputEnt)
 		if err != nil {
 			return err
