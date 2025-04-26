@@ -419,43 +419,6 @@ export const createSparkRouter = (
   );
 
   /**
-   * Get lightning receive fee estimate
-   * @route GET /lightning/receive-fee-estimate
-   * @param {string} amountSats - The amount to get the fee estimate for in satoshis
-   * @returns {Promise<{
-   *   data: {
-   *     feeEstimate: {
-   *       originalValue: number
-   *       originalUnit: string
-   *       preferredCurrencyUnit: string
-   *       preferredCurrencyValueRounded: number
-   *       preferredCurrencyValueApprox: number
-   *     }
-   *   }
-   * }>}
-   */
-  router.get(
-    "/lightning/receive-fee-estimate",
-    checkWalletInitialized,
-    async (req, res) => {
-      const wallet = getWallet();
-      try {
-        const { amountSats } = req.query as { amountSats: string };
-        const feeEstimate = await wallet!.getLightningReceiveFeeEstimate({
-          amountSats: Number(amountSats),
-        });
-        res.json({
-          data: { feeEstimate },
-        });
-      } catch (error) {
-        console.error(error);
-        const errorMsg = isError(error) ? error.message : "Unknown error";
-        res.status(500).json({ error: errorMsg });
-      }
-    }
-  );
-
-  /**
    * Get lightning receive request by Lightspark ID.
    * @route GET /lightning/receive-request
    * @param {string} id - The ID of the lightning receive request

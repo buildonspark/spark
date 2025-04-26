@@ -2,24 +2,24 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import Entity from './Entity.js';
-import {SwapLeafFromJson} from './SwapLeaf.js';
+import {TransferFromJson} from './Transfer.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import LightningSendRequestStatus from './LightningSendRequestStatus.js';
+import { Query, isObject } from '@lightsparkdev/core';
+import {InvoiceToJson} from './Invoice.js';
+import {InvoiceFromJson} from './Invoice.js';
+import {SwapLeafFromJson} from './SwapLeaf.js';
+import CoopExitRequest from './CoopExitRequest.js';
 import LightningSendRequest from './LightningSendRequest.js';
 import LightningReceiveRequest from './LightningReceiveRequest.js';
 import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
+import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
+import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
+import { LightsparkException } from '@lightsparkdev/core';
+import LightningSendRequestStatus from './LightningSendRequestStatus.js';
+import {SwapLeafToJson} from './SwapLeaf.js';
 import {CurrencyAmountToJson} from './CurrencyAmount.js';
 import BitcoinNetwork from './BitcoinNetwork.js';
 import LeavesSwapRequest from './LeavesSwapRequest.js';
-import {InvoiceToJson} from './Invoice.js';
-import { LightsparkException } from '@lightsparkdev/core';
-import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
-import CoopExitRequest from './CoopExitRequest.js';
-import {TransferFromJson} from './Transfer.js';
-import {InvoiceFromJson} from './Invoice.js';
-import { Query, isObject } from '@lightsparkdev/core';
-import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
-import {SwapLeafToJson} from './SwapLeaf.js';
 
 
 interface UserRequest {
@@ -88,7 +88,6 @@ typename: "LeavesSwapRequest",            outboundTransfer: (!!obj["leaves_swap_
             updatedAt: obj["lightning_receive_request_updated_at"],
             network: BitcoinNetwork[obj["lightning_receive_request_network"]] ?? BitcoinNetwork.FUTURE_VALUE,
             invoice: InvoiceFromJson(obj["lightning_receive_request_invoice"]),
-            fee: CurrencyAmountFromJson(obj["lightning_receive_request_fee"]),
             status: LightningReceiveRequestStatus[obj["lightning_receive_request_status"]] ?? LightningReceiveRequestStatus.FUTURE_VALUE,
 typename: "LightningReceiveRequest",            transfer: (!!obj["lightning_receive_request_transfer"] ? TransferFromJson(obj["lightning_receive_request_transfer"]) : undefined),
 
@@ -154,7 +153,6 @@ lightning_receive_request_created_at: lightningReceiveRequest.createdAt,
 lightning_receive_request_updated_at: lightningReceiveRequest.updatedAt,
 lightning_receive_request_network: lightningReceiveRequest.network,
 lightning_receive_request_invoice: InvoiceToJson(lightningReceiveRequest.invoice),
-lightning_receive_request_fee: CurrencyAmountToJson(lightningReceiveRequest.fee),
 lightning_receive_request_status: lightningReceiveRequest.status,
 lightning_receive_request_transfer: (lightningReceiveRequest.transfer ? lightningReceiveRequest.transfer.toJson() : undefined),
 
@@ -299,14 +297,6 @@ fragment UserRequestFragment on UserRequest {
             invoice_created_at: created_at
             invoice_expires_at: expires_at
             invoice_memo: memo
-        }
-        lightning_receive_request_fee: fee {
-            __typename
-            currency_amount_original_value: original_value
-            currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         lightning_receive_request_status: status
         lightning_receive_request_transfer: transfer {

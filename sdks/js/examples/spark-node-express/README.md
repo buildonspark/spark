@@ -266,21 +266,6 @@ POST /issuer-wallet/lightning/pay-invoice
 
 ---
 
-### Get Lightning Receive Fee Estimate
-
-Get a fee estimate for receiving Lightning payments.
-
-```http
-GET /spark-wallet/lightning/receive-fee-estimate?amountSats=number
-GET /issuer-wallet/lightning/receive-fee-estimate?amountSats=number
-```
-
-**Query Parameters:**
-
-- `amountSats` (required Number): The amount to get the fee estimate for in satoshis
-
----
-
 ### Get Lighting Receive Request
 
 Get a Lightning receive request by ID.

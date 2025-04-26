@@ -27,7 +27,6 @@ import {
   ExitSpeed,
   LeavesSwapFeeEstimateOutput,
   LeavesSwapRequest,
-  LightningReceiveFeeEstimateOutput,
   LightningReceiveRequest,
   LightningSendFeeEstimateInput,
   LightningSendFeeEstimateOutput,
@@ -1715,38 +1714,6 @@ export class SparkWallet extends EventEmitter {
 
       return sspResponse;
     });
-  }
-
-  /**
-   * Gets fee estimate for receiving Lightning payments.
-   *
-   * @param {Object} params - Input parameters for fee estimation
-   * @param {number} params.amountSats - Amount in satoshis
-   * @returns {Promise<LightningReceiveFeeEstimateOutput | null>} Fee estimate for receiving Lightning payments
-   */
-  public async getLightningReceiveFeeEstimate({
-    amountSats,
-  }: {
-    amountSats: number;
-  }): Promise<LightningReceiveFeeEstimateOutput | null> {
-    if (!this.sspClient) {
-      throw new ConfigurationError("SSP client not initialized", {
-        configKey: "sspClient",
-      });
-    }
-
-    const network = this.config.getSspNetwork();
-
-    const feeEstimate = await this.sspClient.getLightningReceiveFeeEstimate(
-      amountSats,
-      network,
-    );
-
-    if (!feeEstimate) {
-      throw new Error("Failed to get lightning receive fee estimate");
-    }
-
-    return feeEstimate;
   }
 
   /**

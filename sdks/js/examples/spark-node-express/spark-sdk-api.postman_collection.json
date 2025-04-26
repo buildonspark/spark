@@ -144,26 +144,7 @@
           },
           "response": []
         },
-        {
-          "name": "Get Lighting Receive Fee Estimate",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "localhost:4000/spark-wallet/lightning/receive-fee-estimate?amountSats=100",
-              "host": ["localhost"],
-              "port": "4000",
-              "path": ["spark-wallet", "lightning", "receive-fee-estimate"],
-              "query": [
-                {
-                  "key": "amountSats",
-                  "value": "100"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
+
         {
           "name": "Create Lightning Invoice",
           "request": {

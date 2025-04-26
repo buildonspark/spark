@@ -28,8 +28,6 @@ export {
   getLeavesSwapRequestQuery,
   default as LeavesSwapRequest,
 } from "./LeavesSwapRequest.js";
-export { default as LightningReceiveFeeEstimateInput } from "./LightningReceiveFeeEstimateInput.js";
-export { default as LightningReceiveFeeEstimateOutput } from "./LightningReceiveFeeEstimateOutput.js";
 export {
   getLightningReceiveRequestQuery,
   default as LightningReceiveRequest,

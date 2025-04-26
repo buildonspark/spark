@@ -172,14 +172,6 @@ query FetchSparkWalletUserToUserRequestsConnection($entity_id: ID!, $first: Int,
                             invoice_expires_at: expires_at
                             invoice_memo: memo
                         }
-                        lightning_receive_request_fee: fee {
-                            __typename
-                            currency_amount_original_value: original_value
-                            currency_amount_original_unit: original_unit
-                            currency_amount_preferred_currency_unit: preferred_currency_unit
-                            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-                            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
-                        }
                         lightning_receive_request_status: status
                         lightning_receive_request_transfer: transfer {
                             __typename

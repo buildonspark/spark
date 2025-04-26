@@ -23,7 +23,6 @@ import CoopExitRequest, {
 } from "./objects/CoopExitRequest.js";
 import { GetChallengeOutputFromJson } from "./objects/GetChallengeOutput.js";
 import {
-  BitcoinNetwork,
   CompleteCoopExitInput,
   CompleteLeavesSwapInput,
   CoopExitFeeEstimatesInput,
@@ -40,9 +39,6 @@ import { LeavesSwapFeeEstimateOutputFromJson } from "./objects/LeavesSwapFeeEsti
 import LeavesSwapRequest, {
   LeavesSwapRequestFromJson,
 } from "./objects/LeavesSwapRequest.js";
-import LightningReceiveFeeEstimateOutput, {
-  LightningReceiveFeeEstimateOutputFromJson,
-} from "./objects/LightningReceiveFeeEstimateOutput.js";
 import LightningReceiveRequest, {
   LightningReceiveRequestFromJson,
 } from "./objects/LightningReceiveRequest.js";
@@ -55,7 +51,6 @@ import VerifyChallengeOutput, {
 } from "./objects/VerifyChallengeOutput.js";
 import { CoopExitFeeEstimate } from "./queries/CoopExitFeeEstimate.js";
 import { LeavesSwapFeeEstimate } from "./queries/LeavesSwapFeeEstimate.js";
-import { LightningReceiveFeeEstimate } from "./queries/LightningReceiveFeeEstimate.js";
 import { LightningSendFeeEstimate } from "./queries/LightningSendFeeEstimate.js";
 import { UserRequest } from "./queries/UserRequest.js";
 
@@ -156,24 +151,6 @@ export default class SspClient {
       constructObject: (response: { leaves_swap_fee_estimate: any }) => {
         return LeavesSwapFeeEstimateOutputFromJson(
           response.leaves_swap_fee_estimate,
-        );
-      },
-    });
-  }
-
-  async getLightningReceiveFeeEstimate(
-    amountSats: number,
-    network: BitcoinNetwork,
-  ): Promise<LightningReceiveFeeEstimateOutput | null> {
-    return await this.executeRawQuery({
-      queryPayload: LightningReceiveFeeEstimate,
-      variables: {
-        amount_sats: amountSats,
-        network: network,
-      },
-      constructObject: (response: { lightning_receive_fee_estimate: any }) => {
-        return LightningReceiveFeeEstimateOutputFromJson(
-          response.lightning_receive_fee_estimate,
         );
       },
     });

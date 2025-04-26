@@ -2,9 +2,9 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import Connection from './Connection.js';
+import {UserRequestFromJson} from './UserRequest.js';
 import {PageInfoFromJson} from './PageInfo.js';
 import {PageInfoToJson} from './PageInfo.js';
-import {UserRequestFromJson} from './UserRequest.js';
 import {UserRequestToJson} from './UserRequest.js';
 import UserRequest from './UserRequest.js';
 import PageInfo from './PageInfo.js';

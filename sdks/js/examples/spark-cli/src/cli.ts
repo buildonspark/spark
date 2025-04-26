@@ -537,17 +537,6 @@ async function runCLI() {
         console.log(fee);
         break;
       }
-      case "lightningreceivefee": {
-        if (!wallet) {
-          console.log("Please initialize a wallet first");
-          break;
-        }
-        const fee = await wallet.getLightningReceiveFeeEstimate({
-          amountSats: parseInt(args[0]),
-        });
-        console.log(fee);
-        break;
-      }
       case "gettokenl1address": {
         if (!wallet) {
           console.log("Please initialize a wallet first");

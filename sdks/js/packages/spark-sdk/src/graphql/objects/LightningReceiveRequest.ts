@@ -3,17 +3,14 @@
 
 import UserRequest from './UserRequest.js';
 import Entity from './Entity.js';
-import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import CurrencyAmount from './CurrencyAmount.js';
-import Transfer from './Transfer.js';
-import Invoice from './Invoice.js';
-import {CurrencyAmountToJson} from './CurrencyAmount.js';
-import BitcoinNetwork from './BitcoinNetwork.js';
+import {TransferFromJson} from './Transfer.js';
+import { Query, isObject } from '@lightsparkdev/core';
 import {InvoiceToJson} from './Invoice.js';
 import {InvoiceFromJson} from './Invoice.js';
+import Transfer from './Transfer.js';
 import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
-import { Query, isObject } from '@lightsparkdev/core';
-import {TransferFromJson} from './Transfer.js';
+import Invoice from './Invoice.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
 
 
 interface LightningReceiveRequest {
@@ -37,9 +34,6 @@ network: BitcoinNetwork;
     /** The lightning invoice generated to receive lightning payment. **/
 invoice: Invoice;
 
-    /** The fee charged for receiving the lightning invoice. **/
-fee: CurrencyAmount;
-
     /** The status of the request. **/
 status: LightningReceiveRequestStatus;
 
@@ -61,7 +55,6 @@ export const LightningReceiveRequestFromJson = (obj: any): LightningReceiveReque
         updatedAt: obj["lightning_receive_request_updated_at"],
         network: BitcoinNetwork[obj["lightning_receive_request_network"]] ?? BitcoinNetwork.FUTURE_VALUE,
         invoice: InvoiceFromJson(obj["lightning_receive_request_invoice"]),
-        fee: CurrencyAmountFromJson(obj["lightning_receive_request_fee"]),
         status: LightningReceiveRequestStatus[obj["lightning_receive_request_status"]] ?? LightningReceiveRequestStatus.FUTURE_VALUE,
 typename: "LightningReceiveRequest",        transfer: (!!obj["lightning_receive_request_transfer"] ? TransferFromJson(obj["lightning_receive_request_transfer"]) : undefined),
 
@@ -75,7 +68,6 @@ lightning_receive_request_created_at: obj.createdAt,
 lightning_receive_request_updated_at: obj.updatedAt,
 lightning_receive_request_network: obj.network,
 lightning_receive_request_invoice: InvoiceToJson(obj.invoice),
-lightning_receive_request_fee: CurrencyAmountToJson(obj.fee),
 lightning_receive_request_status: obj.status,
 lightning_receive_request_transfer: (obj.transfer ? obj.transfer.toJson() : undefined),
 
@@ -107,14 +99,6 @@ fragment LightningReceiveRequestFragment on LightningReceiveRequest {
         invoice_created_at: created_at
         invoice_expires_at: expires_at
         invoice_memo: memo
-    }
-    lightning_receive_request_fee: fee {
-        __typename
-        currency_amount_original_value: original_value
-        currency_amount_original_unit: original_unit
-        currency_amount_preferred_currency_unit: preferred_currency_unit
-        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
     lightning_receive_request_status: status
     lightning_receive_request_transfer: transfer {

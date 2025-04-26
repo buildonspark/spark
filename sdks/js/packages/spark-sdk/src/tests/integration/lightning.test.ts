@@ -41,13 +41,7 @@ const fakeInvoiceCreator = async (): Promise<LightningReceiveRequest> => {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     network: BitcoinNetwork.REGTEST,
-    fee: {
-      originalValue: 1000,
-      originalUnit: CurrencyUnit.SATOSHI,
-      preferredCurrencyUnit: CurrencyUnit.SATOSHI,
-      preferredCurrencyValueRounded: 1000,
-      preferredCurrencyValueApprox: 1000,
-    },
+
     status: LightningReceiveRequestStatus.INVOICE_CREATED,
     typename: "LightningReceiveRequest",
     invoice: {
