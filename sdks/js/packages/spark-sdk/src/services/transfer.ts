@@ -24,6 +24,7 @@ import {
   LeafRefundTxSigningResult,
   NodeSignatures,
   QueryTransfersResponse,
+  SecretProof,
   SendLeafKeyTweak,
   SigningJob,
   Transfer,
@@ -425,10 +426,18 @@ export class TransferService extends BaseTransferService {
   }
 
   async claimTransfer(transfer: Transfer, leaves: LeafKeyTweak[]) {
-    if (transfer.status === TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED) {
-      await this.claimTransferTweakKeys(transfer, leaves);
+    let proofMap: Map<string, Uint8Array[]> | undefined;
+    if (
+      transfer.status === TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED ||
+      transfer.status === TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED
+    ) {
+      proofMap = await this.claimTransferTweakKeys(transfer, leaves);
     }
-    const signatures = await this.claimTransferSignRefunds(transfer, leaves);
+    const signatures = await this.claimTransferSignRefunds(
+      transfer,
+      leaves,
+      proofMap,
+    );
 
     return await this.finalizeNodeSignatures(signatures);
   }
@@ -599,7 +608,6 @@ export class TransferService extends BaseTransferService {
     signingResults: LeafRefundTxSigningResult[];
   }> {
     const transferId = crypto.randomUUID();
-
     const leafDataMap = new Map<string, LeafRefundSigningData>();
     for (const leaf of leaves) {
       const signingNonceCommitment =
@@ -739,8 +747,12 @@ export class TransferService extends BaseTransferService {
     return signingJobs;
   }
 
-  async claimTransferTweakKeys(transfer: Transfer, leaves: LeafKeyTweak[]) {
-    const leavesTweaksMap = await this.prepareClaimLeavesKeyTweaks(leaves);
+  async claimTransferTweakKeys(
+    transfer: Transfer,
+    leaves: LeafKeyTweak[],
+  ): Promise<Map<string, Uint8Array[]>> {
+    const { leafDataMap: leavesTweaksMap, proofMap } =
+      await this.prepareClaimLeavesKeyTweaks(leaves);
 
     const errors: Error[] = [];
 
@@ -790,14 +802,21 @@ export class TransferService extends BaseTransferService {
         method: "POST",
       });
     }
+
+    return proofMap;
   }
 
-  private async prepareClaimLeavesKeyTweaks(
-    leaves: LeafKeyTweak[],
-  ): Promise<Map<string, ClaimLeafKeyTweak[]>> {
+  private async prepareClaimLeavesKeyTweaks(leaves: LeafKeyTweak[]): Promise<{
+    leafDataMap: Map<string, ClaimLeafKeyTweak[]>;
+    proofMap: Map<string, Uint8Array[]>;
+  }> {
     const leafDataMap = new Map<string, ClaimLeafKeyTweak[]>();
+    const proofMap = new Map<string, Uint8Array[]>();
     for (const leaf of leaves) {
-      const leafData = await this.prepareClaimLeafKeyTweaks(leaf);
+      const { leafKeyTweaks: leafData, proofs } =
+        await this.prepareClaimLeafKeyTweaks(leaf);
+      proofMap.set(leaf.leaf.id, proofs);
+
       for (const [identifier, leafTweak] of leafData) {
         leafDataMap.set(identifier, [
           ...(leafDataMap.get(identifier) || []),
@@ -805,12 +824,13 @@ export class TransferService extends BaseTransferService {
         ]);
       }
     }
-    return leafDataMap;
+    return { leafDataMap, proofMap };
   }
 
-  private async prepareClaimLeafKeyTweaks(
-    leaf: LeafKeyTweak,
-  ): Promise<Map<string, ClaimLeafKeyTweak>> {
+  private async prepareClaimLeafKeyTweaks(leaf: LeafKeyTweak): Promise<{
+    leafKeyTweaks: Map<string, ClaimLeafKeyTweak>;
+    proofs: Uint8Array[];
+  }> {
     const signingOperators = this.config.getSigningOperators();
 
     const pubKeyTweak =
@@ -857,12 +877,20 @@ export class TransferService extends BaseTransferService {
       });
     }
 
-    return leafTweaksMap;
+    if (!shares[0]?.proofs) {
+      throw new ValidationError("Proofs not found", {
+        field: "proofs",
+        value: shares[0]?.proofs,
+      }) as SparkSDKError;
+    }
+
+    return { leafKeyTweaks: leafTweaksMap, proofs: shares[0].proofs };
   }
 
   async claimTransferSignRefunds(
     transfer: Transfer,
     leafKeys: LeafKeyTweak[],
+    proofMap?: Map<string, Uint8Array[]>,
   ): Promise<NodeSignatures[]> {
     const leafDataMap: Map<string, LeafRefundSigningData> = new Map();
     for (const leafKey of leafKeys) {
@@ -887,11 +915,21 @@ export class TransferService extends BaseTransferService {
       this.config.getCoordinatorAddress(),
     );
     let resp: ClaimTransferSignRefundsResponse;
+
+    const secretProofMap: { [key: string]: SecretProof } = {};
+    if (proofMap) {
+      for (const [leafId, proof] of proofMap.entries()) {
+        secretProofMap[leafId] = {
+          proofs: proof,
+        };
+      }
+    }
     try {
       resp = await sparkClient.claim_transfer_sign_refunds({
         transferId: transfer.id,
         ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
         signingJobs,
+        keyTweakProofs: secretProofMap,
       });
     } catch (error) {
       throw new Error(`Error claiming transfer sign refunds: ${error}`);
