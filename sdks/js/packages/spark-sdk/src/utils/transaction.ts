@@ -1,8 +1,8 @@
 import { Transaction } from "@scure/btc-signer";
 import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";
+import { ValidationError } from "../errors/types.js";
 import { getP2TRScriptFromPublicKey } from "./bitcoin.js";
 import { Network } from "./network.js";
-import { ValidationError } from "../errors/types.js";
 
 const TIME_LOCK_INTERVAL = 100;
 
@@ -30,6 +30,10 @@ export function createRefundTx(
   return newRefundTx;
 }
 
+export function getTransactionSequence(currSequence?: number): number {
+  return (currSequence || 0) & 0xffff;
+}
+
 export function getNextTransactionSequence(
   currSequence?: number,
   forRefresh?: boolean,
@@ -37,7 +41,7 @@ export function getNextTransactionSequence(
   nextSequence: number;
   needRefresh: boolean;
 } {
-  const currentTimelock = (currSequence || 0) & 0xffff;
+  const currentTimelock = getTransactionSequence(currSequence);
   const nextTimelock = currentTimelock - TIME_LOCK_INTERVAL;
   if (forRefresh && nextTimelock <= 100 && currentTimelock > 0) {
     return {

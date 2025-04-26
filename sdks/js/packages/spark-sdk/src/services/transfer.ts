@@ -18,8 +18,8 @@ import { SignatureIntent } from "../proto/common.js";
 import {
   ClaimLeafKeyTweak,
   ClaimTransferSignRefundsResponse,
-  FinalizeTransferResponse,
   CounterLeafSwapResponse,
+  FinalizeTransferResponse,
   LeafRefundTxSigningJob,
   LeafRefundTxSigningResult,
   NodeSignatures,
@@ -43,6 +43,7 @@ import {
   createRefundTx,
   getEphemeralAnchorOutput,
   getNextTransactionSequence,
+  getTransactionSequence,
 } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
@@ -686,6 +687,7 @@ export class TransferService extends BaseTransferService {
   private prepareRefundSoSigningJobs(
     leaves: LeafKeyTweak[],
     leafDataMap: Map<string, LeafRefundSigningData>,
+    isForClaim?: boolean,
   ): LeafRefundTxSigningJob[] {
     const signingJobs: LeafRefundTxSigningJob[] = [];
     for (const leaf of leaves) {
@@ -701,9 +703,11 @@ export class TransferService extends BaseTransferService {
       };
 
       const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
-      const { nextSequence } = getNextTransactionSequence(
-        currRefundTx.getInput(0).sequence,
-      );
+      const nextSequence = isForClaim
+        ? getTransactionSequence(currRefundTx.getInput(0).sequence)
+        : getNextTransactionSequence(currRefundTx.getInput(0).sequence)
+            .nextSequence;
+
       const amountSats = currRefundTx.getOutput(0).amount;
       if (amountSats === undefined) {
         throw new Error("Amount not found in signRefunds");
@@ -873,7 +877,11 @@ export class TransferService extends BaseTransferService {
       });
     }
 
-    const signingJobs = this.prepareRefundSoSigningJobs(leafKeys, leafDataMap);
+    const signingJobs = this.prepareRefundSoSigningJobs(
+      leafKeys,
+      leafDataMap,
+      true,
+    );
 
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
