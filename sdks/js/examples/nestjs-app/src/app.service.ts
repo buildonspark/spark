@@ -1,21 +1,22 @@
-import { SparkWallet } from '@buildonspark/spark-sdk';
-import { createDummyTx } from '@buildonspark/spark-sdk';
-import { Injectable } from '@nestjs/common';
+import { createDummyTx, SparkWallet } from "@buildonspark/spark-sdk";
+import { Injectable } from "@nestjs/common";
 
 @Injectable()
 export class AppService {
   getHello(): string {
-    return 'Hello World!';
+    return "Hello World!";
   }
 
   async createSparkWallet(): Promise<string> {
     const { wallet } = await SparkWallet.initialize({
-      mnemonicOrSeed: "rhythm twist merry sense brave code canoe police produce orbit slice melt",
+      mnemonicOrSeed:
+        "rhythm twist merry sense brave code canoe police produce orbit slice melt",
       options: {
         network: "REGTEST",
       },
     });
     const identityPublicKey = await wallet.getIdentityPublicKey();
+    await wallet.cleanupConnections();
     return `Spark Wallet Identity Public Key: ${identityPublicKey}`;
   }
 
