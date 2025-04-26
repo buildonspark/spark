@@ -38,6 +38,7 @@ import {
   DepositAddressQueryResult,
   OutputWithPreviousTransactionData,
   QueryTransfersResponse,
+  SubscribeToEventsResponse,
   TokenTransactionWithStatus,
   Transfer,
   TransferStatus,
@@ -145,7 +146,18 @@ export interface SparkWalletEvents {
   /** Emitted when an incoming transfer is successfully claimed. Includes the transfer ID and new total balance. */
   "transfer:claimed": (transferId: string, updatedBalance: number) => void;
   /** Emitted when a deposit is marked as available. Includes the deposit ID and new total balance. */
-  "deposit:updated": (depositId: string, updatedBalance: number) => void;
+  "deposit:confirmed": (depositId: string, updatedBalance: number) => void;
+  /** Emitted when the stream is connected */
+  "stream:connected": () => void;
+  /** Emitted when the stream disconnects and fails to reconnect after max attempts */
+  "stream:disconnected": (reason: string) => void;
+  /** Emitted when attempting to reconnect the stream */
+  "stream:reconnecting": (
+    attempt: number,
+    maxAttempts: number,
+    delayMs: number,
+    error: string,
+  ) => void;
 }
 
 /**
@@ -235,83 +247,146 @@ export class SparkWallet extends EventEmitter {
     this.sspClient = new SspClient(this.config);
     await this.connectionManager.createClients();
 
-    await this.setupBackgroundStream();
-    // We can do this in the background
-    this.claimTransfers();
+    this.setupBackgroundStream();
 
     await this.syncWallet();
   }
 
+  private async handleStreamEvent({ event }: SubscribeToEventsResponse) {
+    try {
+      if (
+        event?.$case === "transfer" &&
+        event.transfer.transfer &&
+        event.transfer.transfer.type !== TransferType.COUNTER_SWAP
+      ) {
+        const transfer = await this.claimTransfer(event.transfer.transfer);
+        const { senderIdentityPublicKey, receiverIdentityPublicKey } =
+          event.transfer.transfer;
+
+        if (
+          transfer &&
+          !equalBytes(senderIdentityPublicKey, receiverIdentityPublicKey)
+        ) {
+          this.emit(
+            "transfer:claimed",
+            event.transfer.transfer.id,
+            (await this.getBalance()).balance,
+          );
+        }
+      } else if (event?.$case === "deposit" && event.deposit.deposit) {
+        const deposit = event.deposit.deposit;
+        const signingKey = await this.config.signer.generatePublicKey(
+          sha256(deposit.id),
+        );
+
+        const newLeaf = await this.transferService.extendTimelock(
+          deposit,
+          signingKey,
+        );
+        await this.transferDepositToSelf(newLeaf.nodes, signingKey);
+        this.emit(
+          "deposit:updated",
+          deposit.id,
+          (await this.getBalance()).balance + BigInt(deposit.value),
+        );
+      }
+    } catch (error) {
+      console.error("Error processing event", error);
+    }
+  }
+
   protected async setupBackgroundStream() {
-    const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-    );
+    const MAX_RETRIES = 10;
+    const INITIAL_DELAY = 1000;
+    const MAX_DELAY = 60000;
 
     this.streamController = new AbortController();
-    const stream = sparkClient.subscribe_to_events(
-      {
-        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
-      },
-      {
-        signal: this.streamController.signal,
-      },
-    );
 
-    (async () => {
+    const delay = (ms: number, signal?: AbortSignal): Promise<boolean> => {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => resolve(true), ms);
+        if (signal) {
+          signal.addEventListener("abort", () => {
+            clearTimeout(timer);
+            resolve(false);
+          });
+        }
+      });
+    };
+
+    let retryCount = 0;
+    while (retryCount <= MAX_RETRIES) {
       try {
-        for await (const data of stream) {
-          try {
+        const sparkClient = await this.connectionManager.createSparkClient(
+          this.config.getCoordinatorAddress(),
+        );
+
+        const stream = sparkClient.subscribe_to_events(
+          {
+            identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+          },
+          {
+            signal: this.streamController?.signal,
+          },
+        );
+        this.emit("stream:connected");
+
+        retryCount = 0;
+
+        const claimedTransfersIds = await this.claimTransfers();
+
+        try {
+          for await (const data of stream) {
             if (
               data.event?.$case === "transfer" &&
               data.event.transfer.transfer &&
-              // Let requestLeavesSwap handle claiming counter swap transfers
-              data.event.transfer.transfer.type !== TransferType.COUNTER_SWAP
+              claimedTransfersIds.includes(data.event.transfer.transfer.id)
             ) {
-              const transfer = data.event.transfer.transfer;
-              // Lets not claim if this is a self transfer. Most likely a self transfer from extending nodes
-              // Once we fix where this flow isn't necessary, we can remove this check
-              if (
-                !equalBytes(
-                  transfer.senderIdentityPublicKey,
-                  transfer.receiverIdentityPublicKey,
-                )
-              ) {
-                await this.claimTransfer(transfer);
-
-                this.emit(
-                  "transfer:claimed",
-                  data.event.transfer.transfer.id,
-                  (await this.getBalance()).balance,
-                );
-              }
-            } else if (
-              data.event?.$case === "deposit" &&
-              data.event.deposit.deposit
-            ) {
-              const deposit = data.event.deposit.deposit;
-              const signingKey = await this.config.signer.generatePublicKey(
-                sha256(deposit.id),
-              );
-
-              const newLeaf = await this.transferService.extendTimelock(
-                deposit,
-                signingKey,
-              );
-              await this.transferDepositToSelf(newLeaf.nodes, signingKey);
-              this.emit(
-                "deposit:updated",
-                deposit.id,
-                this.getInternalBalance(),
-              );
+              continue;
             }
-          } catch (error) {
-            console.error("Error processing event", error);
+            await this.handleStreamEvent(data);
           }
+        } catch (error) {
+          throw error;
         }
       } catch (error) {
-        console.error("Event stream closed", error);
+        if (this.streamController?.signal.aborted) {
+          break;
+        }
+
+        const backoffDelay = Math.min(
+          INITIAL_DELAY * Math.pow(2, retryCount),
+          MAX_DELAY,
+        );
+
+        if (retryCount < MAX_RETRIES) {
+          retryCount++;
+          this.emit(
+            "stream:reconnecting",
+            retryCount,
+            MAX_RETRIES,
+            backoffDelay,
+            error instanceof Error ? error.message : String(error),
+          );
+          try {
+            const completed = await delay(
+              backoffDelay,
+              this.streamController?.signal,
+            );
+            if (!completed) {
+              break;
+            }
+          } catch (error) {
+            if (this.streamController?.signal.aborted) {
+              break;
+            }
+          }
+        } else {
+          this.emit("stream:disconnected", "Max reconnection attempts reached");
+          break;
+        }
       }
-    })();
+    }
   }
 
   private async getLeaves(): Promise<TreeNode[]> {
@@ -511,7 +586,6 @@ export class SparkWallet extends EventEmitter {
   protected async initWallet(
     mnemonicOrSeed?: Uint8Array | string,
   ): Promise<InitWalletResponse | undefined> {
-    const returnMnemonic = !mnemonicOrSeed;
     let mnemonic: string | undefined;
     if (!mnemonicOrSeed) {
       mnemonic = await this.config.signer.generateMnemonic();
@@ -1386,12 +1460,12 @@ export class SparkWallet extends EventEmitter {
   /**
    * Claims all pending transfers.
    *
-   * @returns {Promise<boolean>} True if any transfers were claimed
+   * @returns {Promise<string[]>} True if any transfers were claimed
    * @private
    */
-  private async claimTransfers(type?: TransferType): Promise<boolean> {
+  private async claimTransfers(type?: TransferType): Promise<string[]> {
     const transfers = await this.transferService.queryPendingTransfers();
-    let claimed = false;
+    const claimedTransfersIds: string[] = [];
     for (const transfer of transfers.transfers) {
       if (type && transfer.type !== type) {
         continue;
@@ -1407,9 +1481,9 @@ export class SparkWallet extends EventEmitter {
         continue;
       }
       await this.claimTransfer(transfer);
-      claimed = true;
+      claimedTransfersIds.push(transfer.id);
     }
-    return claimed;
+    return claimedTransfersIds;
   }
 
   /**
@@ -2165,7 +2239,6 @@ export class SparkWallet extends EventEmitter {
 
   public async cleanupConnections() {
     this.streamController?.abort();
-    this.streamController = null;
     await this.connectionManager.closeConnections();
   }
 }

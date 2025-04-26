@@ -53,6 +53,7 @@ export class ConnectionManager {
         client.client.close?.(),
       ),
     );
+    this.clients.clear();
   }
 
   async createMockClient(address: string): Promise<
@@ -227,15 +228,6 @@ export class ConnectionManager {
               .set("Authorization", `Bearer ${newAuthToken}`)
               .set("User-Agent", "spark-js-sdk"),
           });
-        } else if (
-          error.message?.includes("The operation has been aborted") &&
-          error.name === "AbortError" &&
-          call.method.responseStream
-        ) {
-          // Silently handle stream aborts that were triggered by our AbortController
-          // Other types of stream interruptions (network, server-side, etc.) will still throw.
-          // We also only handle this for streaming calls, not unary calls.
-          return;
         }
         throw error;
       }
@@ -276,15 +268,6 @@ export class ConnectionManager {
               .set("Content-Type", "application/grpc-web+proto")
               .set("User-Agent", "spark-js-sdk"),
           });
-        } else if (
-          error.message?.includes("The operation has been aborted") &&
-          error.name === "AbortError" &&
-          call.method.responseStream
-        ) {
-          // Silently handle stream aborts that were triggered by our AbortController
-          // Other types of stream interruptions (network, server-side, etc.) will still throw.
-          // We also only handle this for streaming calls, not unary calls.
-          return;
         }
         throw error;
       }

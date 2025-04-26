@@ -354,7 +354,7 @@ async function runCLI() {
         wallet = newWallet;
         console.log("Mnemonic:", newMnemonic);
         console.log("Network:", options.network);
-        wallet.on("deposit:updated", (depositId: string, balance: number) => {
+        wallet.on("deposit:confirmed", (depositId: string, balance: number) => {
           console.log(
             `Deposit ${depositId} marked as available. New balance: ${balance}`,
           );
@@ -365,6 +365,30 @@ async function runCLI() {
             `Transfer ${transferId} claimed. New balance: ${balance}`,
           );
         });
+        wallet.on("stream:connected", () => {
+          console.log("Stream connected");
+        });
+        wallet.on(
+          "stream:reconnecting",
+          (
+            attempt: number,
+            maxAttempts: number,
+            delayMs: number,
+            error: string,
+          ) => {
+            console.log(
+              "Stream reconnecting",
+              attempt,
+              maxAttempts,
+              delayMs,
+              error,
+            );
+          },
+        );
+        wallet.on("stream:disconnected", (reason: string) => {
+          console.log("Stream disconnected", reason);
+        });
+
         break;
       case "getbalance":
         if (!wallet) {
