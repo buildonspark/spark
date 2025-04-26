@@ -304,13 +304,22 @@ export class SparkWallet extends EventEmitter {
     this.streamController = new AbortController();
 
     const delay = (ms: number, signal?: AbortSignal): Promise<boolean> => {
-      return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => resolve(true), ms);
+      return new Promise((resolve) => {
+        const timer = setTimeout(() => {
+          if (signal) {
+            signal.removeEventListener("abort", onAbort);
+          }
+          resolve(true);
+        }, ms);
+
+        function onAbort() {
+          clearTimeout(timer);
+          resolve(false);
+          signal?.removeEventListener("abort", onAbort);
+        }
+
         if (signal) {
-          signal.addEventListener("abort", () => {
-            clearTimeout(timer);
-            resolve(false);
-          });
+          signal.addEventListener("abort", onAbort);
         }
       });
     };
