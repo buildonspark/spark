@@ -258,14 +258,16 @@ export class SparkWallet extends EventEmitter {
         event.transfer.transfer &&
         event.transfer.transfer.type !== TransferType.COUNTER_SWAP
       ) {
-        const transfer = await this.claimTransfer(event.transfer.transfer);
         const { senderIdentityPublicKey, receiverIdentityPublicKey } =
           event.transfer.transfer;
 
+        // Don't claim if this is a self transfer, that's handled elsewhere
         if (
-          transfer &&
+          event.transfer.transfer &&
           !equalBytes(senderIdentityPublicKey, receiverIdentityPublicKey)
         ) {
+          await this.claimTransfer(event.transfer.transfer);
+
           this.emit(
             "transfer:claimed",
             event.transfer.transfer.id,
