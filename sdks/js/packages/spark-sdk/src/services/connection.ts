@@ -71,12 +71,6 @@ export class ConnectionManager {
     try {
       if (isNode) {
         const { ChannelCredentials } = await import("nice-grpc");
-        const insecureCredentials =
-          this.config.getNetwork() === Network.LOCAL && !isHermeticTest()
-            ? ChannelCredentials.createInsecure()
-            : ChannelCredentials.createSsl(null, null, null, {
-                rejectUnauthorized: false,
-              });
         if (certPath) {
           try {
             // Dynamic import for Node.js only
@@ -86,11 +80,21 @@ export class ConnectionManager {
           } catch (error) {
             console.error("Error reading certificate:", error);
             // Fallback to insecure for development
-            return createChannel(address, insecureCredentials);
+            return createChannel(
+              address,
+              ChannelCredentials.createSsl(null, null, null, {
+                rejectUnauthorized: false,
+              }),
+            );
           }
         } else {
           // No cert provided, use insecure SSL for development
-          return createChannel(address, insecureCredentials);
+          return createChannel(
+            address,
+            ChannelCredentials.createSsl(null, null, null, {
+              rejectUnauthorized: false,
+            }),
+          );
         }
       } else {
         // Browser environment - nice-grpc-web handles TLS automatically
@@ -118,7 +122,6 @@ export class ConnectionManager {
     if (this.clients.has(address)) {
       return this.clients.get(address)!.client;
     }
-
     const authToken = await this.authenticate(address);
     const channel = await this.createChannelWithTLS(address, certPath);
 
