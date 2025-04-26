@@ -7,6 +7,7 @@ import {
   getP2TRScriptFromPublicKey,
   Network,
 } from "@buildonspark/spark-sdk/utils";
+import { TokenTransactionStatus } from "@buildonspark/spark-sdk/proto/spark";
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { hex } from "@scure/base";
@@ -42,6 +43,7 @@ const commands = [
   "getissuertokenactivity",
   "announcetoken",
   "nontrustydeposit",
+  "querytokentransactions",
   "help",
   "exit",
   "quit",
@@ -671,6 +673,89 @@ async function runCLI() {
             isFreezable: isFreezable.toLowerCase() === "true",
           });
           console.log("Token Announcement Transaction ID:", result);
+          break;
+        }
+        case "querytokentransactions": {
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          if (args.length > 2) {
+            console.log(
+              "Usage: querytokentransactions [tokenPublicKey] [tokenTransactionHash]",
+            );
+            break;
+          }
+
+          try {
+            let tokenPublicKeys: string[];
+            if (args.length === 0) {
+              // If no token public key is provided, use the wallet's own public key
+              const publicKey = await wallet.getIdentityPublicKey();
+              tokenPublicKeys = [publicKey];
+            } else {
+              tokenPublicKeys = [args[0]];
+            }
+
+            const tokenTransactionHashes = args[1] ? [args[1]] : undefined;
+
+            const transactions = await wallet.queryTokenTransactions(
+              tokenPublicKeys,
+              tokenTransactionHashes,
+            );
+            console.log("\nToken Transactions:");
+            for (const tx of transactions) {
+              console.log("\nTransaction Details:");
+              console.log(`  Status: ${TokenTransactionStatus[tx.status]}`);
+
+              if (tx.tokenTransaction?.tokenInputs) {
+                const input = tx.tokenTransaction.tokenInputs;
+                if (input.$case === "mintInput") {
+                  console.log("  Type: Mint");
+                  console.log(
+                    `  Issuer Public Key: ${hex.encode(input.mintInput.issuerPublicKey)}`,
+                  );
+                  console.log(
+                    `  Timestamp: ${new Date(input.mintInput.issuerProvidedTimestamp * 1000).toISOString()}`,
+                  );
+                } else if (input.$case === "transferInput") {
+                  console.log("  Type: Transfer");
+                  console.log(
+                    `  Outputs to Spend: ${input.transferInput.outputsToSpend.length}`,
+                  );
+                }
+              }
+
+              if (tx.tokenTransaction?.tokenOutputs) {
+                console.log("\n  Outputs:");
+                for (const output of tx.tokenTransaction.tokenOutputs) {
+                  console.log(
+                    `    Owner Public Key: ${hex.encode(output.ownerPublicKey)}`,
+                  );
+                  console.log(
+                    `    Token Public Key: ${hex.encode(output.tokenPublicKey)}`,
+                  );
+                  console.log(
+                    `    Token Amount: ${hex.encode(output.tokenAmount)}`,
+                  );
+                  if (output.withdrawBondSats !== undefined) {
+                    console.log(
+                      `    Withdraw Bond Sats: ${output.withdrawBondSats}`,
+                    );
+                  }
+                  if (output.withdrawRelativeBlockLocktime !== undefined) {
+                    console.log(
+                      `    Withdraw Relative Block Locktime: ${output.withdrawRelativeBlockLocktime}`,
+                    );
+                  }
+                  console.log("    ---");
+                }
+              }
+              console.log("----------------------------------------");
+            }
+          } catch (error) {
+            console.error("Error querying token transactions:", error);
+          }
           break;
         }
       }
