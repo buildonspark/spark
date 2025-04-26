@@ -34,7 +34,7 @@ const (
 	// Amount for first (and only) created output in transfer transaction
 	TestTransferOutput1Amount = 33333
 	// Configured at SO level. We validate in the tests to ensure these are populated correctly.
-	WithdrawalBondSatsInConfig              = 1000000
+	WithdrawalBondSatsInConfig              = 10000
 	WithdrawalRelativeBlockLocktimeInConfig = 1000
 )
 
