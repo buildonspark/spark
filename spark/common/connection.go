@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/logging"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -50,6 +52,28 @@ func CreateRetryPolicy(config RetryPolicyConfig) string {
 		config.BackoffMultiplier, strings.Join(config.RetryableStatusCodes, "\", \""))
 }
 
+func LoggingUnaryClientInterceptor(
+	ctx context.Context,
+	method string,
+	req, reply any,
+	cc *grpc.ClientConn,
+	invoker grpc.UnaryInvoker,
+	opts ...grpc.CallOption,
+) error {
+	start := time.Now()
+	err := invoker(ctx, method, req, reply, cc, opts...)
+	duration := time.Since(start)
+
+	logger := logging.GetLoggerFromContext(ctx)
+
+	if err != nil {
+		logger.Error("gRPC client request failed", "grpc_client_method", method, "grpc_client_duration", duration.Seconds(), "error", err)
+	} else {
+		logger.Info("gRPC client request succeeded", "grpc_client_method", method, "grpc_client_duration", duration.Seconds())
+	}
+	return err
+}
+
 // NewGRPCConnection creates a new gRPC connection to the given address. If certPath is nil, it
 // will create a connection without TLS.
 func NewGRPCConnection(address string, certPath *string, retryPolicy *RetryPolicyConfig) (*grpc.ClientConn, error) {
@@ -67,6 +91,7 @@ func NewGRPCConnectionWithCert(address string, certPath string, retryPolicy *Ret
 
 	clientOpts := []grpc.DialOption{
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+		grpc.WithUnaryInterceptor(LoggingUnaryClientInterceptor),
 	}
 
 	if retryPolicy != nil {
@@ -113,6 +138,7 @@ func NewGRPCConnectionWithCert(address string, certPath string, retryPolicy *Ret
 func NewGRPCConnectionWithoutTLS(address string, retryPolicy *RetryPolicyConfig) (*grpc.ClientConn, error) {
 	clientOpts := []grpc.DialOption{
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+		grpc.WithUnaryInterceptor(LoggingUnaryClientInterceptor),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
 

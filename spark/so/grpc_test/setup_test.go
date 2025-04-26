@@ -2,7 +2,7 @@ package grpctest
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"testing"
 	"time"
@@ -18,25 +18,24 @@ const (
 var faucet *testutil.Faucet
 
 func TestMain(m *testing.M) {
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelWarn})))
 	// Setup
 	client, err := testutil.NewRegtestClient()
 	if err != nil {
-		log.Printf("Error creating regtest client: %v", err)
+		slog.Error("Error creating regtest client", "error", err)
 		os.Exit(1)
 	}
 	faucet = testutil.GetFaucetInstance(client)
 
 	if shouldRunDKG() {
 		if err := setupDKG(); err != nil {
-			log.Printf("DKG setup encountered errors: %v", err)
-			log.Printf("Tests may fail")
+			slog.Error("DKG setup encountered errors, tests may fail", "error", err)
 		} else {
-			log.Printf("DKG setup completed successfully")
+			slog.Info("DKG setup completed successfully")
 		}
 	} else {
-		log.Printf("DKG not run for test setup. Set %s=true to run DKG if tests fail, "+
-			"run scripts/run-development-dkg.sh, or re-run tests as they may work on retry",
-			EnvRunDKG)
+		slog.Warn("DKG not run for test setup. Set RUN_DKG=true to run DKG if tests fail, " +
+			"run scripts/run-development-dkg.sh, or re-run tests as they may work on retry")
 	}
 
 	// Run tests
