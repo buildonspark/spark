@@ -284,11 +284,11 @@ export class SparkWallet extends EventEmitter {
           deposit,
           signingKey,
         );
-        await this.transferDepositToSelf(newLeaf.nodes, signingKey);
+        await this.transferLeavesToSelf(newLeaf.nodes, signingKey);
         this.emit(
-          "deposit:updated",
+          "deposit:confirmed",
           deposit.id,
-          (await this.getBalance()).balance + BigInt(deposit.value),
+          (await this.getBalance()).balance,
         );
       }
     } catch (error) {
@@ -1008,6 +1008,7 @@ export class SparkWallet extends EventEmitter {
       vout,
     });
 
+    const resultingNodes: TreeNode[] = [];
     for (const node of res.nodes) {
       if (node.status === "AVAILABLE") {
         const { nodes } = await this.transferService.extendTimelock(
@@ -1017,14 +1018,21 @@ export class SparkWallet extends EventEmitter {
 
         for (const n of nodes) {
           if (n.status === "AVAILABLE") {
-            const transfer = await this.transferDepositToSelf(
+            const transfer = await this.transferLeavesToSelf(
               [n],
               signingPubKey,
             );
+            resultingNodes.push(...transfer);
+          } else {
+            resultingNodes.push(n);
           }
         }
+      } else {
+        resultingNodes.push(node);
       }
     }
+
+    return resultingNodes;
   }
 
   /**
@@ -1132,7 +1140,10 @@ export class SparkWallet extends EventEmitter {
         }
       }
       if (!depositAddress) {
-        return [];
+        throw new ValidationError("Deposit address has already been used", {
+          field: "depositAddress",
+          value: depositAddress,
+        });
       }
 
       let signingPubKey: Uint8Array;
@@ -1221,7 +1232,7 @@ export class SparkWallet extends EventEmitter {
    * @returns {Promise<TreeNode[] | undefined>} The nodes resulting from the transfer
    * @private
    */
-  private async transferDepositToSelf(
+  private async transferLeavesToSelf(
     leaves: TreeNode[],
     signingPubKey: Uint8Array,
   ): Promise<TreeNode[]> {
@@ -1344,7 +1355,7 @@ export class SparkWallet extends EventEmitter {
         signingPubKey,
       );
       this.leaves = this.leaves.filter((leaf) => leaf.id !== node.id);
-      const newNodes = await this.transferDepositToSelf(nodes, signingPubKey);
+      const newNodes = await this.transferLeavesToSelf(nodes, signingPubKey);
       resultNodes.push(...newNodes);
     }
 
