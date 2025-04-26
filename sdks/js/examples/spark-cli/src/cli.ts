@@ -26,7 +26,6 @@ const commands = [
   "withdraw",
   "coopfee",
   "lightningsendfee",
-  "lightningreceivefee",
   "getlightningsendrequest",
   "getlightningreceiverequest",
   "getcoopexitrequest",
@@ -85,7 +84,6 @@ async function runCLI() {
   withdraw <amount> <onchainAddress> <exitSpeed(FAST|MEDIUM|SLOW)>    - Withdraw funds to an L1 address
   coopfee <amount> <withdrawalAddress>                                - Get a fee estimate for a cooperative exit
   lightningsendfee <invoice>                                          - Get a fee estimate for a lightning send
-  lightningreceivefee <amount>                                        - Get a fee estimate for a lightning receive
   getlightningsendrequest <requestId>                                 - Get a lightning send request by ID
   getlightningreceiverequest <requestId>                              - Get a lightning receive request by ID
   getcoopexitrequest <requestId>                                      - Get a coop exit request by ID

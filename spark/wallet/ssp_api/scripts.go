@@ -17,23 +17,6 @@ query GetCoopExitFeeEstimate(
 }
 `
 
-const GetLightningReceiveFeeEstimateQuery = `
-query GetLightningReceiveFeeEstimate(
-  $network: BitcoinNetwork!
-  $amount_sats: Long!
-) {
-  lightning_receive_fee_estimate(input: {
-    network: $network
-    amount_sats: $amount_sats
-  }) {
-    fee_estimate {
-      original_value
-      original_unit
-    }
-  }
-}
-`
-
 const GetLightningSendFeeEstimateQuery = `
 query GetLightningSendFeeEstimate(
   $encoded_invoice: String!
