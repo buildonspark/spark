@@ -87,7 +87,7 @@ export class IssuerSparkWallet extends SparkWallet {
       tokenSymbol: info.announcement!.symbol,
       tokenDecimals: Number(bytesToNumberBE(info.announcement!.decimal)),
       isFreezable: info.announcement!.isFreezable,
-      maxSupply: bytesToNumberBE(info.totalSupply),
+      maxSupply: bytesToNumberBE(info.announcement!.maxSupply),
     };
   }
 

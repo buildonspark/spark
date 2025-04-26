@@ -920,7 +920,7 @@ export class SparkWallet extends EventEmitter {
       tokenName: info.announcement!.name,
       tokenSymbol: info.announcement!.symbol,
       tokenDecimals: Number(bytesToNumberBE(info.announcement!.decimal)),
-      maxSupply: bytesToNumberBE(info.totalSupply),
+      maxSupply: bytesToNumberBE(info.announcement!.maxSupply),
     }));
   }
 

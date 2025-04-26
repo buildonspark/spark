@@ -77,7 +77,7 @@ describe("token integration test", () => {
     expect(publicKeyInfo?.tokenName).toEqual("TestToken1");
     expect(publicKeyInfo?.tokenSymbol).toEqual("TT1");
     expect(publicKeyInfo?.tokenDecimals).toEqual(0);
-    expect(publicKeyInfo?.maxSupply).toEqual(0);
+    expect(publicKeyInfo?.maxSupply).toEqual(0n);
     expect(publicKeyInfo?.isFreezable).toEqual(false);
 
     // Compare the public key using bytesToHex
