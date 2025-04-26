@@ -607,9 +607,22 @@ export class SparkWallet extends EventEmitter {
 
     const network = this.config.getNetwork();
     // TODO: remove this once we move it back to the signer
-    const masterPrivateKey = getMasterHDKeyFromSeed(seed).privateKey!;
+    if (typeof seed === "string") {
+      seed = hexToBytes(seed);
+    }
+
+    const hdkey = getMasterHDKeyFromSeed(seed);
+
+    if (!hdkey.privateKey || !hdkey.publicKey) {
+      throw new ValidationError("Failed to derive keys from seed", {
+        field: "hdkey",
+        value: seed,
+      });
+    }
+    const accountType = network === Network.REGTEST ? 0 : 1;
+    const identityKey = hdkey.derive(`m/8797555'/${accountType}'/0'`);
     this.lrc20Wallet = new LRCWallet(
-      bytesToHex(masterPrivateKey),
+      bytesToHex(identityKey.privateKey!),
       LRC_WALLET_NETWORK[network],
       LRC_WALLET_NETWORK_TYPE[network],
       this.config.lrc20ApiConfig,
@@ -2112,7 +2125,7 @@ export class SparkWallet extends EventEmitter {
 
   public async getTokenL1Address(): Promise<string> {
     return getP2WPKHAddressFromPublicKey(
-      await this.config.signer.getMasterPublicKey(),
+      await this.config.signer.getIdentityPublicKey(),
       this.config.getNetwork(),
     );
   }
