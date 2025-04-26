@@ -5027,10 +5027,9 @@ type InitiatePreimageSwapRequest struct {
 	Reason                    InitiatePreimageSwapRequest_Reason `protobuf:"varint,3,opt,name=reason,proto3,enum=spark.InitiatePreimageSwapRequest_Reason" json:"reason,omitempty"`
 	Transfer                  *StartUserSignedTransferRequest    `protobuf:"bytes,4,opt,name=transfer,proto3" json:"transfer,omitempty"`
 	ReceiverIdentityPublicKey []byte                             `protobuf:"bytes,5,opt,name=receiver_identity_public_key,json=receiverIdentityPublicKey,proto3" json:"receiver_identity_public_key,omitempty"`
-	// fee_sats is only needed if the reason is REASON_SEND.
-	FeeSats       *uint64 `protobuf:"varint,6,opt,name=fee_sats,json=feeSats,proto3,oneof" json:"fee_sats,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	FeeSats                   uint64                             `protobuf:"varint,6,opt,name=fee_sats,json=feeSats,proto3" json:"fee_sats,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *InitiatePreimageSwapRequest) Reset() {
@@ -5099,8 +5098,8 @@ func (x *InitiatePreimageSwapRequest) GetReceiverIdentityPublicKey() []byte {
 }
 
 func (x *InitiatePreimageSwapRequest) GetFeeSats() uint64 {
-	if x != nil && x.FeeSats != nil {
-		return *x.FeeSats
+	if x != nil {
+		return x.FeeSats
 	}
 	return 0
 }
@@ -7597,18 +7596,17 @@ const file_spark_proto_rawDesc = "" +
 	"\rInvoiceAmount\x12\x1d\n" +
 	"\n" +
 	"value_sats\x18\x01 \x01(\x04R\tvalueSats\x12K\n" +
-	"\x14invoice_amount_proof\x18\x02 \x01(\v2\x19.spark.InvoiceAmountProofR\x12invoiceAmountProof\"\xa0\x03\n" +
+	"\x14invoice_amount_proof\x18\x02 \x01(\v2\x19.spark.InvoiceAmountProofR\x12invoiceAmountProof\"\x8e\x03\n" +
 	"\x1bInitiatePreimageSwapRequest\x12!\n" +
 	"\fpayment_hash\x18\x01 \x01(\fR\vpaymentHash\x12;\n" +
 	"\x0einvoice_amount\x18\x02 \x01(\v2\x14.spark.InvoiceAmountR\rinvoiceAmount\x12A\n" +
 	"\x06reason\x18\x03 \x01(\x0e2).spark.InitiatePreimageSwapRequest.ReasonR\x06reason\x12A\n" +
 	"\btransfer\x18\x04 \x01(\v2%.spark.StartUserSignedTransferRequestR\btransfer\x12?\n" +
-	"\x1creceiver_identity_public_key\x18\x05 \x01(\fR\x19receiverIdentityPublicKey\x12\x1e\n" +
-	"\bfee_sats\x18\x06 \x01(\x04H\x00R\afeeSats\x88\x01\x01\"-\n" +
+	"\x1creceiver_identity_public_key\x18\x05 \x01(\fR\x19receiverIdentityPublicKey\x12\x19\n" +
+	"\bfee_sats\x18\x06 \x01(\x04R\afeeSats\"-\n" +
 	"\x06Reason\x12\x0f\n" +
 	"\vREASON_SEND\x10\x00\x12\x12\n" +
-	"\x0eREASON_RECEIVE\x10\x01B\v\n" +
-	"\t_fee_sats\"g\n" +
+	"\x0eREASON_RECEIVE\x10\x01\"g\n" +
 	"\x1cInitiatePreimageSwapResponse\x12\x1a\n" +
 	"\bpreimage\x18\x01 \x01(\fR\bpreimage\x12+\n" +
 	"\btransfer\x18\x02 \x01(\v2\x0f.spark.TransferR\btransfer\"2\n" +
@@ -8209,7 +8207,6 @@ func file_spark_proto_init() {
 		(*TransferFilter_SenderIdentityPublicKey)(nil),
 		(*TransferFilter_SenderOrReceiverIdentityPublicKey)(nil),
 	}
-	file_spark_proto_msgTypes[74].OneofWrappers = []any{}
 	file_spark_proto_msgTypes[88].OneofWrappers = []any{
 		(*PrepareTreeAddressRequest_ParentNodeOutput)(nil),
 		(*PrepareTreeAddressRequest_OnChainUtxo)(nil),

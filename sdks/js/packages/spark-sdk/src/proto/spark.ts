@@ -952,8 +952,7 @@ export interface InitiatePreimageSwapRequest {
   reason: InitiatePreimageSwapRequest_Reason;
   transfer: StartUserSignedTransferRequest | undefined;
   receiverIdentityPublicKey: Uint8Array;
-  /** fee_sats is only needed if the reason is REASON_SEND. */
-  feeSats?: number | undefined;
+  feeSats: number;
 }
 
 export enum InitiatePreimageSwapRequest_Reason {
@@ -9595,7 +9594,7 @@ function createBaseInitiatePreimageSwapRequest(): InitiatePreimageSwapRequest {
     reason: 0,
     transfer: undefined,
     receiverIdentityPublicKey: new Uint8Array(0),
-    feeSats: undefined,
+    feeSats: 0,
   };
 }
 
@@ -9616,7 +9615,7 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
     if (message.receiverIdentityPublicKey.length !== 0) {
       writer.uint32(42).bytes(message.receiverIdentityPublicKey);
     }
-    if (message.feeSats !== undefined) {
+    if (message.feeSats !== 0) {
       writer.uint32(48).uint64(message.feeSats);
     }
     return writer;
@@ -9695,7 +9694,7 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
       receiverIdentityPublicKey: isSet(object.receiverIdentityPublicKey)
         ? bytesFromBase64(object.receiverIdentityPublicKey)
         : new Uint8Array(0),
-      feeSats: isSet(object.feeSats) ? globalThis.Number(object.feeSats) : undefined,
+      feeSats: isSet(object.feeSats) ? globalThis.Number(object.feeSats) : 0,
     };
   },
 
@@ -9716,7 +9715,7 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
     if (message.receiverIdentityPublicKey.length !== 0) {
       obj.receiverIdentityPublicKey = base64FromBytes(message.receiverIdentityPublicKey);
     }
-    if (message.feeSats !== undefined) {
+    if (message.feeSats !== 0) {
       obj.feeSats = Math.round(message.feeSats);
     }
     return obj;
@@ -9736,7 +9735,7 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
       ? StartUserSignedTransferRequest.fromPartial(object.transfer)
       : undefined;
     message.receiverIdentityPublicKey = object.receiverIdentityPublicKey ?? new Uint8Array(0);
-    message.feeSats = object.feeSats ?? undefined;
+    message.feeSats = object.feeSats ?? 0;
     return message;
   },
 };

@@ -10816,9 +10816,7 @@ func (m *InitiatePreimageSwapRequest) validate(all bool) error {
 
 	// no validation rules for ReceiverIdentityPublicKey
 
-	if m.FeeSats != nil {
-		// no validation rules for FeeSats
-	}
+	// no validation rules for FeeSats
 
 	if len(errors) > 0 {
 		return InitiatePreimageSwapRequestMultiError(errors)
