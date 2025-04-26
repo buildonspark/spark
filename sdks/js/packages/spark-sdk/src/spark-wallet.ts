@@ -1687,7 +1687,7 @@ export class SparkWallet extends EventEmitter {
         paymentHash: hexToBytes(paymentHash),
         isInboundPayment: false,
         invoiceString: invoice,
-        feeSats: maxFeeSats,
+        feeSats: estimatedFeeSats,
       });
 
       if (!swapResponse.transfer) {
