@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
@@ -59,7 +60,7 @@ func validateLeafRefundTxOutput(refundTx *wire.MsgTx, receiverIdentityPublicKey 
 func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, leafOutPoint *wire.OutPoint, expectedInputCount uint32) error {
 	newTimeLock := refundTx.TxIn[0].Sequence & 0xFFFF
 	oldTimeLock := oldSequence & 0xFFFF
-	if newTimeLock >= oldTimeLock {
+	if newTimeLock+spark.TimeLockInterval > oldTimeLock {
 		return fmt.Errorf("time lock on the new refund tx %d must be less than the old one %d", newTimeLock, oldTimeLock)
 	}
 	if len(refundTx.TxIn) != int(expectedInputCount) {
