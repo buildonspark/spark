@@ -12,6 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func skipConnectedEvent(t *testing.T, stream pb.SparkService_SubscribeToEventsClient) {
+	event, err := stream.Recv()
+	require.NoError(t, err)
+	require.NotNil(t, event.GetConnected())
+}
+
 func TestEventHandlerTransferNotification(t *testing.T) {
 	senderConfig, err := testutil.TestWalletConfig()
 	require.NoError(t, err)
@@ -29,6 +35,7 @@ func TestEventHandlerTransferNotification(t *testing.T) {
 	defer cancel()
 
 	go func() {
+		skipConnectedEvent(t, stream)
 		for {
 			select {
 			case <-ctx.Done():
@@ -105,6 +112,8 @@ func TestEventHandlerDepositNotification(t *testing.T) {
 
 	events := make(chan *pb.SubscribeToEventsResponse, 1)
 	go func() {
+		skipConnectedEvent(t, stream)
+
 		for {
 			event, err := stream.Recv()
 			require.NoError(t, err)
@@ -140,6 +149,8 @@ func TestMultipleSubscriptions(t *testing.T) {
 
 	events1 := make(chan *pb.SubscribeToEventsResponse, 1)
 	go func() {
+		skipConnectedEvent(t, stream1)
+
 		for {
 			event, err := stream1.Recv()
 			if err != nil {
@@ -154,6 +165,8 @@ func TestMultipleSubscriptions(t *testing.T) {
 
 	events2 := make(chan *pb.SubscribeToEventsResponse, 1)
 	go func() {
+		skipConnectedEvent(t, stream2)
+
 		for {
 			event, err := stream2.Recv()
 			if err != nil {

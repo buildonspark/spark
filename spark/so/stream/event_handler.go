@@ -100,6 +100,16 @@ func SubscribeToEvents(identityPublicKey []byte, st pb.SparkService_SubscribeToE
 		return err
 	}
 
+	connectedEvent := &pb.SubscribeToEventsResponse{
+		Event: &pb.SubscribeToEventsResponse_Connected{
+			Connected: &pb.ConnectedEvent{},
+		},
+	}
+
+	if err := streamRouter.NotifyUser(identityPublicKey, connectedEvent); err != nil {
+		return err
+	}
+
 	<-st.Context().Done()
 	return nil
 }

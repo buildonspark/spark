@@ -79,8 +79,11 @@ message SubscribeToEventsResponse {
     oneof event {
         TransferEvent transfer = 1;
         DepositEvent deposit = 2;
+        ConnectedEvent connected = 3;
     }
 }
+
+message ConnectedEvent { }
 
 message TransferEvent {
     Transfer transfer = 10;
