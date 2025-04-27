@@ -6,9 +6,18 @@ ENV GOARCH=$TARGETARCH
 
 RUN apt-get update && apt-get install -y libzmq3-dev wget && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Copy only go.mod and go.sum first to leverage Docker layer caching
+COPY spark/go.mod spark/go.sum spark/
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    cd spark && go mod download
+
 COPY spark spark
 
-RUN cd spark && go install -v bin/operator/main.go
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    cd spark && go install -v bin/operator/main.go
+
 RUN if [ -e /go/bin/${TARGETOS}_${TARGETARCH} ]; then mv /go/bin/${TARGETOS}_${TARGETARCH}/* /go/bin/; fi
 
 # Healthcheck
@@ -16,18 +25,37 @@ RUN GRPC_HEALTH_PROBE_VERSION=v0.4.13 && \
     wget -qO/bin/grpc_health_probe https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/${GRPC_HEALTH_PROBE_VERSION}/grpc_health_probe-${TARGETOS}-${TARGETARCH} && \
     chmod +x /bin/grpc_health_probe
 
-FROM --platform=$BUILDPLATFORM rust:1.84-slim-bookworm AS builder-rust
 
+# (1) create rust env with cargo chef crate
+FROM --platform=$BUILDPLATFORM rust:1.84-slim-bookworm AS chef
+WORKDIR /signer
+RUN cargo install cargo-chef
+
+# (2) generate recipe file to prepare dependencies build
+FROM chef AS planner-rust
+WORKDIR /signer
+COPY signer/. ./
+RUN cargo chef prepare --recipe-path recipe.json
+
+# (3) build dependencies
+FROM chef AS cacher-rust
+COPY --from=planner-rust /signer/recipe.json recipe.json
+WORKDIR /signer
+RUN cargo chef cook --release --recipe-path recipe.json
+
+# (4) build app
+FROM chef AS builder-rust
+COPY protos protos
+WORKDIR /signer
+COPY signer/. ./
+COPY --from=cacher-rust /signer/target target
+COPY --from=cacher-rust /usr/local/cargo /usr/local/cargo
 ARG TARGETOS TARGETARCH
 RUN echo "$TARGETARCH" | sed 's,arm,aarch,;s,amd,x86_,' > /tmp/arch
-
 RUN apt-get update && apt-get install -y protobuf-compiler "gcc-$(tr _ - < /tmp/arch)-linux-gnu" "g++-$(tr _ - < /tmp/arch)-linux-gnu" && apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN rustup target add "$(cat /tmp/arch)-unknown-${TARGETOS}-gnu"
+RUN cargo build --target "$(cat /tmp/arch)-unknown-${TARGETOS}-gnu" --release
 
-COPY protos protos
-COPY signer signer
-
-RUN cd signer && cargo build --target "$(cat /tmp/arch)-unknown-${TARGETOS}-gnu" --release
 
 FROM --platform=$BUILDPLATFORM arigaio/atlas:0.31.0 AS atlas
 
