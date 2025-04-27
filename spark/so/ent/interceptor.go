@@ -16,6 +16,8 @@ func DatabaseStatsInterceptor(threshold time.Duration) ent.Interceptor {
 			result, err := next.Query(ctx, query)
 			duration := time.Since(start)
 
+			logging.ObserveQuery(ctx, reflect.TypeOf(query).Elem().Name(), duration)
+
 			if duration > threshold {
 				logger := logging.GetLoggerFromContext(ctx)
 				logger.Warn("[SLOW QUERY]", "ent", reflect.TypeOf(query).Elem().Name(), "duration", duration.String())

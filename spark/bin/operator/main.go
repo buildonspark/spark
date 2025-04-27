@@ -56,6 +56,7 @@ import (
 type args struct {
 	LogLevel                   string
 	LogJSON                    bool
+	LogRequestStats            bool
 	ConfigFilePath             string
 	Index                      uint64
 	IdentityPrivateKeyFilePath string
@@ -107,6 +108,7 @@ func loadArgs() (*args, error) {
 	// Define flags
 	flag.StringVar(&args.LogLevel, "log-level", "debug", "Logging level: debug|info|warn|error")
 	flag.BoolVar(&args.LogJSON, "log-json", false, "Output logs in JSON format")
+	flag.BoolVar(&args.LogRequestStats, "log-request-stats", false, "Log request stats (requires log-json)")
 	flag.StringVar(&args.ConfigFilePath, "config", "so_config.yaml", "Path to config file")
 	flag.Uint64Var(&args.Index, "index", 0, "Index value")
 	flag.StringVar(&args.IdentityPrivateKeyFilePath, "key", "", "Identity private key")
@@ -321,7 +323,7 @@ func main() {
 	serverOpts := []grpc.ServerOption{
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
-			helper.LogInterceptor,
+			helper.LogInterceptor(args.LogJSON && args.LogRequestStats),
 			sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
 			ent.DbSessionMiddleware(dbClient),
 			authn.NewAuthnInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
