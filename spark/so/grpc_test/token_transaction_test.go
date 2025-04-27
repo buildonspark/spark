@@ -228,7 +228,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 	// Validate withdrawal params match config
 	for i, output := range finalIssueTokenTransaction.TokenOutputs {
 		if output.GetWithdrawBondSats() != WithdrawalBondSatsInConfig {
-			t.Errorf("output %d: expected withdrawal bond sats 1000000, got %d", i, output.GetWithdrawBondSats())
+			t.Errorf("output %d: expected withdrawal bond sats 10000, got %d", i, output.GetWithdrawBondSats())
 		}
 		if output.GetWithdrawRelativeBlockLocktime() != uint64(WithdrawalRelativeBlockLocktimeInConfig) {
 			t.Errorf("output %d: expected withdrawal relative block locktime 1000, got %d", i, output.GetWithdrawRelativeBlockLocktime())
