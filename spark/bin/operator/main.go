@@ -35,6 +35,7 @@ import (
 	"github.com/lightsparkdev/spark/so/chain"
 	"github.com/lightsparkdev/spark/so/dkg"
 	"github.com/lightsparkdev/spark/so/ent"
+	_ "github.com/lightsparkdev/spark/so/ent/runtime"
 	sparkgrpc "github.com/lightsparkdev/spark/so/grpc"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/lrc20"
@@ -243,6 +244,7 @@ func main() {
 
 	dialectDriver := entsql.NewDriver(dbDriver, entsql.Conn{ExecQuerier: db})
 	dbClient := ent.NewClient(ent.Driver(dialectDriver))
+	dbClient.Intercept(ent.DatabaseStatsInterceptor(10 * time.Second))
 	defer dbClient.Close()
 
 	if dbDriver == "sqlite3" {
