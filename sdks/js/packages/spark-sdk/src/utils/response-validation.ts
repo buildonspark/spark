@@ -1,8 +1,6 @@
 import { NetworkError } from "../errors/index.js";
 
-export function validateResponses<T>(
-  responses: PromiseSettledResult<T>[],
-): T[] {
+export function collectResponses<T>(responses: PromiseSettledResult<T>[]): T[] {
   // Get successful responses
   const successfulResponses = responses
     .filter(
@@ -11,20 +9,21 @@ export function validateResponses<T>(
     )
     .map((result) => result.value);
 
-  // If no successful responses, throw with all errors
-  if (successfulResponses.length === 0) {
-    const errors = responses
-      .filter(
-        (result): result is PromiseRejectedResult =>
-          result.status === "rejected",
-      )
-      .map((result) => result.reason)
-      .join("\n");
+  // Get failed responses
+  const failedResponses = responses.filter(
+    (result): result is PromiseRejectedResult => result.status === "rejected",
+  );
 
-    throw new NetworkError("All requests failed", {
-      errorCount: responses.length,
-      errors,
-    });
+  if (failedResponses.length > 0) {
+    const errors = failedResponses.map((result) => result.reason).join("\n");
+
+    throw new NetworkError(
+      `${failedResponses.length} out of ${responses.length} requests failed, please try again`,
+      {
+        errorCount: failedResponses.length,
+        errors,
+      },
+    );
   }
 
   return successfulResponses;

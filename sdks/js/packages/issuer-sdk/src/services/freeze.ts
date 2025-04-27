@@ -4,7 +4,7 @@ import {
   FreezeTokensPayload,
   FreezeTokensResponse,
 } from "@buildonspark/spark-sdk/proto/spark";
-import { validateResponses } from "@buildonspark/spark-sdk/utils";
+import { collectResponses } from "@buildonspark/spark-sdk/utils";
 import { hashFreezeTokensPayload } from "../utils/token-hashing.js";
 
 export class TokenFreezeService {
@@ -72,7 +72,7 @@ export class TokenFreezeService {
       }),
     );
 
-    const successfulResponses = validateResponses(freezeResponses);
+    const successfulResponses = collectResponses(freezeResponses);
 
     return successfulResponses[0].response;
   }

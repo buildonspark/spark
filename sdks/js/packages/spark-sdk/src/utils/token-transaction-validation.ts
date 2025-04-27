@@ -16,16 +16,17 @@ export function validateTokenTransaction(
   finalTokenTransaction: TokenTransaction,
   partialTokenTransaction: TokenTransaction,
   signingOperators: Record<string, any>,
-  keyshareInfo: { ownerIdentifiers: string[] },
+  keyshareInfo: { ownerIdentifiers: string[]; threshold: number },
   expectedWithdrawBondSats: number,
   expectedWithdrawRelativeBlockLocktime: number,
+  expectedThreshold: number,
 ) {
   if (finalTokenTransaction.network !== partialTokenTransaction.network) {
     throw new InternalValidationError(
       "Network mismatch in response token transaction",
       {
-        finalTransaction: finalTokenTransaction.network,
-        partialTransaction: partialTokenTransaction.network,
+        value: finalTokenTransaction.network,
+        expected: partialTokenTransaction.network,
       },
     );
   }
@@ -34,7 +35,7 @@ export function validateTokenTransaction(
     throw new InternalValidationError(
       "Token inputs missing in final transaction",
       {
-        finalTransaction: finalTokenTransaction,
+        value: finalTokenTransaction,
       },
     );
   }
@@ -43,7 +44,7 @@ export function validateTokenTransaction(
     throw new InternalValidationError(
       "Token inputs missing in partial transaction",
       {
-        partialTransaction: partialTokenTransaction,
+        value: partialTokenTransaction,
       },
     );
   }
@@ -55,8 +56,8 @@ export function validateTokenTransaction(
     throw new InternalValidationError(
       `Transaction type mismatch: final transaction has ${finalTokenTransaction.tokenInputs.$case}, partial transaction has ${partialTokenTransaction.tokenInputs.$case}`,
       {
-        finalTransaction: finalTokenTransaction.tokenInputs.$case,
-        partialTransaction: partialTokenTransaction.tokenInputs.$case,
+        value: finalTokenTransaction.tokenInputs.$case,
+        expected: partialTokenTransaction.tokenInputs.$case,
       },
     );
   }
@@ -68,9 +69,8 @@ export function validateTokenTransaction(
     throw new InternalValidationError(
       "Spark operator identity public keys count mismatch",
       {
-        finalTransaction:
-          finalTokenTransaction.sparkOperatorIdentityPublicKeys.length,
-        partialTransaction:
+        value: finalTokenTransaction.sparkOperatorIdentityPublicKeys.length,
+        expected:
           partialTokenTransaction.sparkOperatorIdentityPublicKeys.length,
       },
     );
@@ -92,8 +92,8 @@ export function validateTokenTransaction(
       throw new InternalValidationError(
         "Issuer public key mismatch in mint input",
         {
-          finalTransaction: finalMintInput.issuerPublicKey.toString(),
-          partialTransaction: partialMintInput.issuerPublicKey.toString(),
+          value: finalMintInput.issuerPublicKey.toString(),
+          expected: partialMintInput.issuerPublicKey.toString(),
         },
       );
     }
@@ -112,8 +112,8 @@ export function validateTokenTransaction(
       throw new InternalValidationError(
         "Outputs to spend count mismatch in transfer input",
         {
-          finalTransaction: finalTransferInput.outputsToSpend.length,
-          partialTransaction: partialTransferInput.outputsToSpend.length,
+          value: finalTransferInput.outputsToSpend.length,
+          expected: partialTransferInput.outputsToSpend.length,
         },
       );
     }
@@ -131,7 +131,7 @@ export function validateTokenTransaction(
           "Token output to spend missing in final transaction",
           {
             outputIndex: i,
-            finalTransaction: finalOutput,
+            value: finalOutput,
           },
         );
       }
@@ -141,7 +141,7 @@ export function validateTokenTransaction(
           "Token output to spend missing in partial transaction",
           {
             outputIndex: i,
-            partialTransaction: partialOutput,
+            value: partialOutput,
           },
         );
       }
@@ -156,9 +156,8 @@ export function validateTokenTransaction(
           "Previous token transaction hash mismatch in transfer input",
           {
             outputIndex: i,
-            finalTransaction: finalOutput.prevTokenTransactionHash.toString(),
-            partialTransaction:
-              partialOutput.prevTokenTransactionHash.toString(),
+            value: finalOutput.prevTokenTransactionHash.toString(),
+            expected: partialOutput.prevTokenTransactionHash.toString(),
           },
         );
       }
@@ -171,8 +170,8 @@ export function validateTokenTransaction(
           "Previous token transaction vout mismatch in transfer input",
           {
             outputIndex: i,
-            finalTransaction: finalOutput.prevTokenTransactionVout,
-            partialTransaction: partialOutput.prevTokenTransactionVout,
+            value: finalOutput.prevTokenTransactionVout,
+            expected: partialOutput.prevTokenTransactionVout,
           },
         );
       }
@@ -184,8 +183,8 @@ export function validateTokenTransaction(
     partialTokenTransaction.tokenOutputs.length
   ) {
     throw new InternalValidationError("Token outputs count mismatch", {
-      finalTransaction: finalTokenTransaction.tokenOutputs.length,
-      partialTransaction: partialTokenTransaction.tokenOutputs.length,
+      value: finalTokenTransaction.tokenOutputs.length,
+      expected: partialTokenTransaction.tokenOutputs.length,
     });
   }
 
@@ -198,7 +197,7 @@ export function validateTokenTransaction(
         "Token output missing in final transaction",
         {
           outputIndex: i,
-          finalTransaction: finalOutput,
+          value: finalOutput,
         },
       );
     }
@@ -208,7 +207,7 @@ export function validateTokenTransaction(
         "Token output missing in partial transaction",
         {
           outputIndex: i,
-          partialTransaction: partialOutput,
+          value: partialOutput,
         },
       );
     }
@@ -223,8 +222,8 @@ export function validateTokenTransaction(
         "Owner public key mismatch in token output",
         {
           outputIndex: i,
-          finalTransaction: finalOutput.ownerPublicKey.toString(),
-          partialTransaction: partialOutput.ownerPublicKey.toString(),
+          value: finalOutput.ownerPublicKey.toString(),
+          expected: partialOutput.ownerPublicKey.toString(),
         },
       );
     }
@@ -239,8 +238,8 @@ export function validateTokenTransaction(
         "Token public key mismatch in token output",
         {
           outputIndex: i,
-          finalTransaction: finalOutput.tokenPublicKey.toString(),
-          partialTransaction: partialOutput.tokenPublicKey.toString(),
+          value: finalOutput.tokenPublicKey.toString(),
+          expected: partialOutput.tokenPublicKey.toString(),
         },
       );
     }
@@ -252,8 +251,8 @@ export function validateTokenTransaction(
         "Token amount mismatch in token output",
         {
           outputIndex: i,
-          finalTransaction: finalOutput.tokenAmount.toString(),
-          partialTransaction: partialOutput.tokenAmount.toString(),
+          value: finalOutput.tokenAmount.toString(),
+          expected: partialOutput.tokenAmount.toString(),
         },
       );
     }
@@ -264,8 +263,8 @@ export function validateTokenTransaction(
           "Withdraw bond sats mismatch in token output",
           {
             outputIndex: i,
-            finalTransaction: finalOutput.withdrawBondSats,
-            expectedValue: expectedWithdrawBondSats,
+            value: finalOutput.withdrawBondSats,
+            expected: expectedWithdrawBondSats,
           },
         );
       }
@@ -280,11 +279,19 @@ export function validateTokenTransaction(
           "Withdraw relative block locktime mismatch in token output",
           {
             outputIndex: i,
-            finalTransaction: finalOutput.withdrawRelativeBlockLocktime,
-            expectedValue: expectedWithdrawRelativeBlockLocktime,
+            value: finalOutput.withdrawRelativeBlockLocktime,
+            expected: expectedWithdrawRelativeBlockLocktime,
           },
         );
       }
+    }
+
+    if (keyshareInfo.threshold !== expectedThreshold) {
+      throw new InternalValidationError("Threshold mismatch", {
+        field: "threshold",
+        value: keyshareInfo.threshold,
+        expected: expectedThreshold,
+      });
     }
   }
 

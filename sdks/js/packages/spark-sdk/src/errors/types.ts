@@ -71,11 +71,10 @@ export class InternalValidationError extends SparkSDKError {
   constructor(
     message: string,
     context: {
-      finalTransaction?: unknown;
-      partialTransaction?: unknown;
+      field?: string;
+      value?: unknown;
+      expected?: unknown;
       outputIndex?: number;
-      expectedValue?: unknown;
-      actualValue?: unknown;
       keyshareInfo?: unknown;
       signingOperators?: unknown;
     } = {},

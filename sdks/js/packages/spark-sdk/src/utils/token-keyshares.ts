@@ -10,7 +10,7 @@ export interface KeyshareWithOperatorIndex {
   keyshare: Uint8Array;
 }
 
-export function recoverPrivateKeyFromKeyshares(
+export function recoverRevocationSecretFromKeyshares(
   keyshares: KeyshareWithOperatorIndex[],
   threshold: number,
 ): Uint8Array {
@@ -23,9 +23,6 @@ export function recoverPrivateKeyFromKeyshares(
     proofs: [],
   }));
 
-  // Recover the secret
-  const recoveredKey = recoverSecret(shares);
-
-  // Convert to bytes
-  return bigIntToPrivateKey(recoveredKey);
+  const recoveredSecret = recoverSecret(shares);
+  return bigIntToPrivateKey(recoveredSecret);
 }

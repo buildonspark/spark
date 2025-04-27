@@ -9,16 +9,18 @@ import {
   OperatorSpecificTokenTransactionSignablePayload,
   OperatorSpecificOwnerSignature,
   TokenTransaction,
+  StartTokenTransactionResponse,
+  SignTokenTransactionResponse,
 } from "../proto/spark.js";
 import { SparkCallOptions } from "../types/grpc.js";
-import { validateResponses } from "../utils/response-validation.js";
+import { collectResponses } from "../utils/response-validation.js";
 import {
   hashOperatorSpecificTokenTransactionSignablePayload,
   hashTokenTransaction,
 } from "../utils/token-hashing.js";
 import {
   KeyshareWithOperatorIndex,
-  recoverPrivateKeyFromKeyshares,
+  recoverRevocationSecretFromKeyshares,
 } from "../utils/token-keyshares.js";
 import { calculateAvailableTokenAmount } from "../utils/token-transactions.js";
 import { validateTokenTransaction } from "../utils/token-transaction-validation.js";
@@ -28,7 +30,9 @@ import {
   ValidationError,
   NetworkError,
   AuthenticationError,
+  InternalValidationError,
 } from "../errors/types.js";
+import { SigningOperator } from "./wallet-config.js";
 
 export class TokenTransactionService {
   protected readonly config: WalletConfigService;
@@ -118,13 +122,137 @@ export class TokenTransactionService {
   public async broadcastTokenTransaction(
     tokenTransaction: TokenTransaction,
     outputsToSpendSigningPublicKeys?: Uint8Array[],
-    outputsToSpendRevocationPublicKeys?: Uint8Array[],
+    outputsToSpendCommitments?: Uint8Array[],
   ): Promise<string> {
+    const signingOperators = this.config.getSigningOperators();
+
+    const { finalTokenTransaction, finalTokenTransactionHash, threshold } =
+      await this.startTokenTransaction(
+        tokenTransaction,
+        signingOperators,
+        outputsToSpendSigningPublicKeys,
+        outputsToSpendCommitments,
+      );
+
+    const { successfulSignatures } = await this.signTokenTransaction(
+      finalTokenTransaction,
+      finalTokenTransactionHash,
+      signingOperators,
+    );
+
+    if (finalTokenTransaction.tokenInputs!.$case === "transferInput") {
+      const outputsToSpend =
+        finalTokenTransaction.tokenInputs!.transferInput.outputsToSpend;
+
+      const errors: ValidationError[] = [];
+      const revocationSecrets: Uint8Array[] = [];
+
+      for (
+        let outputIndex = 0;
+        outputIndex < outputsToSpend.length;
+        outputIndex++
+      ) {
+        // For each output, collect keyshares from all SOs that responded successfully
+        const outputKeyshares = successfulSignatures.map(
+          ({ identifier, response }) => ({
+            index: parseInt(identifier, 16),
+            keyshare: response.tokenTransactionRevocationKeyshares[outputIndex],
+          }),
+        );
+
+        if (outputKeyshares.length < threshold) {
+          errors.push(
+            new ValidationError("Insufficient keyshares", {
+              field: "outputKeyshares",
+              value: outputKeyshares.length,
+              expected: threshold,
+              index: outputIndex,
+            }),
+          );
+        }
+
+        // Check for duplicate operator indices
+        const seenIndices = new Set<number>();
+        for (const { index } of outputKeyshares) {
+          if (seenIndices.has(index)) {
+            errors.push(
+              new ValidationError("Duplicate operator index", {
+                field: "outputKeyshares",
+                value: index,
+                expected: "Unique operator index",
+                index: outputIndex,
+              }),
+            );
+          }
+          seenIndices.add(index);
+        }
+
+        const revocationSecret = recoverRevocationSecretFromKeyshares(
+          outputKeyshares as KeyshareWithOperatorIndex[],
+          threshold,
+        );
+        const derivedRevocationCommitment = secp256k1.getPublicKey(
+          revocationSecret,
+          true,
+        );
+
+        if (
+          !outputsToSpendCommitments ||
+          !outputsToSpendCommitments[outputIndex] ||
+          !derivedRevocationCommitment.every(
+            (byte, i) => byte === outputsToSpendCommitments[outputIndex]![i],
+          )
+        ) {
+          errors.push(
+            new InternalValidationError(
+              "Revocation commitment verification failed",
+              {
+                field: "revocationCommitment",
+                value: derivedRevocationCommitment,
+                expected: bytesToHex(outputsToSpendCommitments![outputIndex]!),
+                outputIndex: outputIndex,
+              },
+            ),
+          );
+        }
+
+        revocationSecrets.push(revocationSecret);
+      }
+
+      if (errors.length > 0) {
+        throw new ValidationError(
+          "Multiple validation errors occurred across outputs",
+          {
+            field: "outputValidation",
+            value: errors,
+          },
+        );
+      }
+
+      // Finalize the token transaction with the keyshares
+      await this.finalizeTokenTransaction(
+        finalTokenTransaction,
+        revocationSecrets,
+        threshold,
+      );
+    }
+
+    return bytesToHex(finalTokenTransactionHash);
+  }
+
+  private async startTokenTransaction(
+    tokenTransaction: TokenTransaction,
+    signingOperators: Record<string, SigningOperator>,
+    outputsToSpendSigningPublicKeys?: Uint8Array[],
+    outputsToSpendCommitments?: Uint8Array[],
+  ): Promise<{
+    finalTokenTransaction: TokenTransaction;
+    finalTokenTransactionHash: Uint8Array;
+    threshold: number;
+  }> {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
-
-    const signingOperators = this.config.getSigningOperators();
 
     const partialTokenTransactionHash = hashTokenTransaction(
       tokenTransaction,
@@ -152,15 +280,12 @@ export class TokenTransactionService {
     } else if (tokenTransaction.tokenInputs!.$case === "transferInput") {
       const transferInput = tokenTransaction.tokenInputs!.transferInput;
 
-      if (
-        !outputsToSpendSigningPublicKeys ||
-        !outputsToSpendRevocationPublicKeys
-      ) {
+      if (!outputsToSpendSigningPublicKeys || !outputsToSpendCommitments) {
         throw new ValidationError("Invalid transfer input", {
           field: "outputsToSpend",
           value: {
             signingPublicKeys: outputsToSpendSigningPublicKeys,
-            revocationPublicKeys: outputsToSpendRevocationPublicKeys,
+            revocationPublicKeys: outputsToSpendCommitments,
           },
           expected: "Non-null signing and revocation public keys",
         });
@@ -213,6 +338,7 @@ export class TokenTransactionService {
       startResponse.keyshareInfo,
       this.config.getExpectedWithdrawBondSats(),
       this.config.getExpectedWithdrawRelativeBlockLocktime(),
+      this.config.getThreshold(),
     );
 
     const finalTokenTransaction = startResponse.finalTokenTransaction;
@@ -221,6 +347,24 @@ export class TokenTransactionService {
       false,
     );
 
+    return {
+      finalTokenTransaction,
+      finalTokenTransactionHash,
+      threshold: startResponse.keyshareInfo!.threshold,
+    };
+  }
+
+  private async signTokenTransaction(
+    finalTokenTransaction: TokenTransaction,
+    finalTokenTransactionHash: Uint8Array,
+    signingOperators: Record<string, SigningOperator>,
+  ): Promise<{
+    successfulSignatures: {
+      index: number;
+      identifier: string;
+      response: SignTokenTransactionResponse;
+    }[];
+  }> {
     // Submit sign_token_transaction to all SOs in parallel and track their indices
     const soSignatures = await Promise.allSettled(
       Object.entries(signingOperators).map(
@@ -242,9 +386,9 @@ export class TokenTransactionService {
           const operatorSpecificSignatures: OperatorSpecificOwnerSignature[] =
             [];
 
-          if (tokenTransaction.tokenInputs!.$case === "mintInput") {
+          if (finalTokenTransaction.tokenInputs!.$case === "mintInput") {
             const issuerPublicKey =
-              tokenTransaction.tokenInputs!.mintInput.issuerPublicKey;
+              finalTokenTransaction.tokenInputs!.mintInput.issuerPublicKey;
             if (!issuerPublicKey) {
               throw new ValidationError("Invalid mint input", {
                 field: "issuerPublicKey",
@@ -265,8 +409,9 @@ export class TokenTransactionService {
             });
           }
 
-          if (tokenTransaction.tokenInputs!.$case === "transferInput") {
-            const transferInput = tokenTransaction.tokenInputs!.transferInput;
+          if (finalTokenTransaction.tokenInputs!.$case === "transferInput") {
+            const transferInput =
+              finalTokenTransaction.tokenInputs!.transferInput;
             for (let i = 0; i < transferInput.outputsToSpend.length; i++) {
               let ownerSignature: Uint8Array;
               if (this.config.shouldSignTokenTransactionsWithSchnorr()) {
@@ -322,89 +467,11 @@ export class TokenTransactionService {
       ),
     );
 
-    const threshold = startResponse.keyshareInfo.threshold;
-    const successfulSignatures = validateResponses(soSignatures);
+    const successfulSignatures = collectResponses(soSignatures);
 
-    if (tokenTransaction.tokenInputs!.$case === "transferInput") {
-      const outputsToSpend =
-        tokenTransaction.tokenInputs!.transferInput.outputsToSpend;
-
-      let revocationKeys: Uint8Array[] = [];
-
-      for (
-        let outputIndex = 0;
-        outputIndex < outputsToSpend.length;
-        outputIndex++
-      ) {
-        // For each output, collect keyshares from all SOs that responded successfully
-        const outputKeyshares = successfulSignatures.map(
-          ({ identifier, response }) => ({
-            index: parseInt(identifier, 16),
-            keyshare: response.tokenTransactionRevocationKeyshares[outputIndex],
-          }),
-        );
-
-        if (outputKeyshares.length < threshold) {
-          throw new ValidationError("Insufficient keyshares", {
-            field: "outputKeyshares",
-            value: outputKeyshares.length,
-            expected: threshold,
-            index: outputIndex,
-          });
-        }
-
-        // Check for duplicate operator indices
-        const seenIndices = new Set<number>();
-        for (const { index } of outputKeyshares) {
-          if (seenIndices.has(index)) {
-            throw new ValidationError("Duplicate operator index", {
-              field: "outputKeyshares",
-              value: index,
-              expected: "Unique operator index",
-              index: outputIndex,
-            });
-          }
-          seenIndices.add(index);
-        }
-
-        const recoveredPrivateKey = recoverPrivateKeyFromKeyshares(
-          outputKeyshares as KeyshareWithOperatorIndex[],
-          threshold,
-        );
-        const recoveredPublicKey = secp256k1.getPublicKey(
-          recoveredPrivateKey,
-          true,
-        );
-
-        if (
-          !outputsToSpendRevocationPublicKeys ||
-          !outputsToSpendRevocationPublicKeys[outputIndex] ||
-          !recoveredPublicKey.every(
-            (byte, i) =>
-              byte === outputsToSpendRevocationPublicKeys[outputIndex]![i],
-          )
-        ) {
-          throw new ValidationError("Invalid revocation key", {
-            field: "recoveredPublicKey",
-            value: bytesToHex(recoveredPublicKey),
-            index: outputIndex,
-          });
-        }
-
-        revocationKeys.push(recoveredPrivateKey);
-      }
-
-      // Finalize the token transaction with the keyshares
-      await this.finalizeTokenTransaction(
-        finalTokenTransaction,
-        revocationKeys,
-        threshold,
-      );
-    }
-
-    return bytesToHex(
-      hashTokenTransaction(startResponse.finalTokenTransaction!),
-    );
+    return {
+      successfulSignatures,
+    };
   }
 
   public async finalizeTokenTransaction(
@@ -452,7 +519,7 @@ export class TokenTransactionService {
       }),
     );
 
-    validateResponses(soResponses);
+    collectResponses(soResponses);
 
     return finalTokenTransaction;
   }
