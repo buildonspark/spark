@@ -4,10 +4,11 @@ import {
   recoverSecret,
   VerifiableSecretShare,
 } from "./secret-sharing.js";
+import { KeyshareWithIndex } from "../proto/spark.js";
 
 export interface KeyshareWithOperatorIndex {
-  index: number;
-  keyshare: Uint8Array;
+  operatorIndex: number;
+  keyshare: KeyshareWithIndex;
 }
 
 export function recoverRevocationSecretFromKeyshares(
@@ -18,8 +19,10 @@ export function recoverRevocationSecretFromKeyshares(
   const shares: VerifiableSecretShare[] = keyshares.map((keyshare) => ({
     fieldModulus: BigInt("0x" + secp256k1.CURVE.n.toString(16)), // secp256k1 curve order
     threshold,
-    index: BigInt(keyshare.index),
-    share: BigInt("0x" + Buffer.from(keyshare.keyshare).toString("hex")),
+    index: BigInt(keyshare.operatorIndex),
+    share: BigInt(
+      "0x" + Buffer.from(keyshare.keyshare.keyshare).toString("hex"),
+    ),
     proofs: [],
   }));
 

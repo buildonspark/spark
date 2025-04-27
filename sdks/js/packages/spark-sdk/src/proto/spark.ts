@@ -533,14 +533,20 @@ export interface TokenTransactionWithStatus {
   status: TokenTransactionStatus;
 }
 
+export interface SignatureWithIndex {
+  /** This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes. */
+  signature: Uint8Array;
+  /** The index of the TTXO associated with this signature. */
+  inputIndex: number;
+}
+
 export interface TokenTransactionSignatures {
   /**
    * Filled by signing the partial token transaction hash with the owner/issuer private key.
    * For mint transactions this will be one signature for the input issuer_public_key
    * For transfer transactions this will be one for each output for the output owner_public_key
-   * This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
    */
-  ownerSignatures: Uint8Array[];
+  ownerSignatures: SignatureWithIndex[];
 }
 
 export interface StartTokenTransactionRequest {
@@ -577,9 +583,7 @@ export interface OperatorSpecificTokenTransactionSignablePayload {
  * that it owns a output to an SO when requesting signing and release of the  revocation keyshare.
  */
 export interface OperatorSpecificOwnerSignature {
-  ownerPublicKey: Uint8Array;
-  /** This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes. */
-  ownerSignature: Uint8Array;
+  ownerSignature: SignatureWithIndex | undefined;
   payload: OperatorSpecificTokenTransactionSignablePayload | undefined;
 }
 
@@ -589,9 +593,21 @@ export interface SignTokenTransactionRequest {
   identityPublicKey: Uint8Array;
 }
 
+export interface KeyshareWithIndex {
+  /** The index of the input TTXO associated with this keyshare. */
+  inputIndex: number;
+  keyshare: Uint8Array;
+}
+
 export interface SignTokenTransactionResponse {
   sparkOperatorSignature: Uint8Array;
-  tokenTransactionRevocationKeyshares: Uint8Array[];
+  revocationKeyshares: KeyshareWithIndex[];
+}
+
+export interface RevocationSecretWithIndex {
+  /** The index of the input TTXO associated with this secret. */
+  inputIndex: number;
+  revocationSecret: Uint8Array;
 }
 
 export interface FinalizeTokenTransactionRequest {
@@ -602,7 +618,7 @@ export interface FinalizeTokenTransactionRequest {
    * List of ordered revocation secrets that map 1:1 with leaves being spent in the
    * token transaction.
    */
-  outputToSpendRevocationSecrets: Uint8Array[];
+  revocationSecrets: RevocationSecretWithIndex[];
   identityPublicKey: Uint8Array;
 }
 
@@ -4047,6 +4063,82 @@ export const TokenTransactionWithStatus: MessageFns<TokenTransactionWithStatus> 
   },
 };
 
+function createBaseSignatureWithIndex(): SignatureWithIndex {
+  return { signature: new Uint8Array(0), inputIndex: 0 };
+}
+
+export const SignatureWithIndex: MessageFns<SignatureWithIndex> = {
+  encode(message: SignatureWithIndex, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.signature.length !== 0) {
+      writer.uint32(10).bytes(message.signature);
+    }
+    if (message.inputIndex !== 0) {
+      writer.uint32(16).uint32(message.inputIndex);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SignatureWithIndex {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSignatureWithIndex();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.signature = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.inputIndex = reader.uint32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SignatureWithIndex {
+    return {
+      signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0),
+      inputIndex: isSet(object.inputIndex) ? globalThis.Number(object.inputIndex) : 0,
+    };
+  },
+
+  toJSON(message: SignatureWithIndex): unknown {
+    const obj: any = {};
+    if (message.signature.length !== 0) {
+      obj.signature = base64FromBytes(message.signature);
+    }
+    if (message.inputIndex !== 0) {
+      obj.inputIndex = Math.round(message.inputIndex);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SignatureWithIndex>): SignatureWithIndex {
+    return SignatureWithIndex.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SignatureWithIndex>): SignatureWithIndex {
+    const message = createBaseSignatureWithIndex();
+    message.signature = object.signature ?? new Uint8Array(0);
+    message.inputIndex = object.inputIndex ?? 0;
+    return message;
+  },
+};
+
 function createBaseTokenTransactionSignatures(): TokenTransactionSignatures {
   return { ownerSignatures: [] };
 }
@@ -4054,7 +4146,7 @@ function createBaseTokenTransactionSignatures(): TokenTransactionSignatures {
 export const TokenTransactionSignatures: MessageFns<TokenTransactionSignatures> = {
   encode(message: TokenTransactionSignatures, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.ownerSignatures) {
-      writer.uint32(10).bytes(v!);
+      SignatureWithIndex.encode(v!, writer.uint32(10).fork()).join();
     }
     return writer;
   },
@@ -4071,7 +4163,7 @@ export const TokenTransactionSignatures: MessageFns<TokenTransactionSignatures> 
             break;
           }
 
-          message.ownerSignatures.push(reader.bytes());
+          message.ownerSignatures.push(SignatureWithIndex.decode(reader, reader.uint32()));
           continue;
         }
       }
@@ -4086,7 +4178,7 @@ export const TokenTransactionSignatures: MessageFns<TokenTransactionSignatures> 
   fromJSON(object: any): TokenTransactionSignatures {
     return {
       ownerSignatures: globalThis.Array.isArray(object?.ownerSignatures)
-        ? object.ownerSignatures.map((e: any) => bytesFromBase64(e))
+        ? object.ownerSignatures.map((e: any) => SignatureWithIndex.fromJSON(e))
         : [],
     };
   },
@@ -4094,7 +4186,7 @@ export const TokenTransactionSignatures: MessageFns<TokenTransactionSignatures> 
   toJSON(message: TokenTransactionSignatures): unknown {
     const obj: any = {};
     if (message.ownerSignatures?.length) {
-      obj.ownerSignatures = message.ownerSignatures.map((e) => base64FromBytes(e));
+      obj.ownerSignatures = message.ownerSignatures.map((e) => SignatureWithIndex.toJSON(e));
     }
     return obj;
   },
@@ -4104,7 +4196,7 @@ export const TokenTransactionSignatures: MessageFns<TokenTransactionSignatures> 
   },
   fromPartial(object: DeepPartial<TokenTransactionSignatures>): TokenTransactionSignatures {
     const message = createBaseTokenTransactionSignatures();
-    message.ownerSignatures = object.ownerSignatures?.map((e) => e) || [];
+    message.ownerSignatures = object.ownerSignatures?.map((e) => SignatureWithIndex.fromPartial(e)) || [];
     return message;
   },
 };
@@ -4390,19 +4482,16 @@ export const OperatorSpecificTokenTransactionSignablePayload: MessageFns<
 };
 
 function createBaseOperatorSpecificOwnerSignature(): OperatorSpecificOwnerSignature {
-  return { ownerPublicKey: new Uint8Array(0), ownerSignature: new Uint8Array(0), payload: undefined };
+  return { ownerSignature: undefined, payload: undefined };
 }
 
 export const OperatorSpecificOwnerSignature: MessageFns<OperatorSpecificOwnerSignature> = {
   encode(message: OperatorSpecificOwnerSignature, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.ownerPublicKey.length !== 0) {
-      writer.uint32(10).bytes(message.ownerPublicKey);
-    }
-    if (message.ownerSignature.length !== 0) {
-      writer.uint32(18).bytes(message.ownerSignature);
+    if (message.ownerSignature !== undefined) {
+      SignatureWithIndex.encode(message.ownerSignature, writer.uint32(10).fork()).join();
     }
     if (message.payload !== undefined) {
-      OperatorSpecificTokenTransactionSignablePayload.encode(message.payload, writer.uint32(26).fork()).join();
+      OperatorSpecificTokenTransactionSignablePayload.encode(message.payload, writer.uint32(18).fork()).join();
     }
     return writer;
   },
@@ -4419,19 +4508,11 @@ export const OperatorSpecificOwnerSignature: MessageFns<OperatorSpecificOwnerSig
             break;
           }
 
-          message.ownerPublicKey = reader.bytes();
+          message.ownerSignature = SignatureWithIndex.decode(reader, reader.uint32());
           continue;
         }
         case 2: {
           if (tag !== 18) {
-            break;
-          }
-
-          message.ownerSignature = reader.bytes();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
             break;
           }
 
@@ -4449,8 +4530,7 @@ export const OperatorSpecificOwnerSignature: MessageFns<OperatorSpecificOwnerSig
 
   fromJSON(object: any): OperatorSpecificOwnerSignature {
     return {
-      ownerPublicKey: isSet(object.ownerPublicKey) ? bytesFromBase64(object.ownerPublicKey) : new Uint8Array(0),
-      ownerSignature: isSet(object.ownerSignature) ? bytesFromBase64(object.ownerSignature) : new Uint8Array(0),
+      ownerSignature: isSet(object.ownerSignature) ? SignatureWithIndex.fromJSON(object.ownerSignature) : undefined,
       payload: isSet(object.payload)
         ? OperatorSpecificTokenTransactionSignablePayload.fromJSON(object.payload)
         : undefined,
@@ -4459,11 +4539,8 @@ export const OperatorSpecificOwnerSignature: MessageFns<OperatorSpecificOwnerSig
 
   toJSON(message: OperatorSpecificOwnerSignature): unknown {
     const obj: any = {};
-    if (message.ownerPublicKey.length !== 0) {
-      obj.ownerPublicKey = base64FromBytes(message.ownerPublicKey);
-    }
-    if (message.ownerSignature.length !== 0) {
-      obj.ownerSignature = base64FromBytes(message.ownerSignature);
+    if (message.ownerSignature !== undefined) {
+      obj.ownerSignature = SignatureWithIndex.toJSON(message.ownerSignature);
     }
     if (message.payload !== undefined) {
       obj.payload = OperatorSpecificTokenTransactionSignablePayload.toJSON(message.payload);
@@ -4476,8 +4553,9 @@ export const OperatorSpecificOwnerSignature: MessageFns<OperatorSpecificOwnerSig
   },
   fromPartial(object: DeepPartial<OperatorSpecificOwnerSignature>): OperatorSpecificOwnerSignature {
     const message = createBaseOperatorSpecificOwnerSignature();
-    message.ownerPublicKey = object.ownerPublicKey ?? new Uint8Array(0);
-    message.ownerSignature = object.ownerSignature ?? new Uint8Array(0);
+    message.ownerSignature = (object.ownerSignature !== undefined && object.ownerSignature !== null)
+      ? SignatureWithIndex.fromPartial(object.ownerSignature)
+      : undefined;
     message.payload = (object.payload !== undefined && object.payload !== null)
       ? OperatorSpecificTokenTransactionSignablePayload.fromPartial(object.payload)
       : undefined;
@@ -4589,8 +4667,84 @@ export const SignTokenTransactionRequest: MessageFns<SignTokenTransactionRequest
   },
 };
 
+function createBaseKeyshareWithIndex(): KeyshareWithIndex {
+  return { inputIndex: 0, keyshare: new Uint8Array(0) };
+}
+
+export const KeyshareWithIndex: MessageFns<KeyshareWithIndex> = {
+  encode(message: KeyshareWithIndex, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.inputIndex !== 0) {
+      writer.uint32(8).uint32(message.inputIndex);
+    }
+    if (message.keyshare.length !== 0) {
+      writer.uint32(18).bytes(message.keyshare);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): KeyshareWithIndex {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseKeyshareWithIndex();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.inputIndex = reader.uint32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.keyshare = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): KeyshareWithIndex {
+    return {
+      inputIndex: isSet(object.inputIndex) ? globalThis.Number(object.inputIndex) : 0,
+      keyshare: isSet(object.keyshare) ? bytesFromBase64(object.keyshare) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: KeyshareWithIndex): unknown {
+    const obj: any = {};
+    if (message.inputIndex !== 0) {
+      obj.inputIndex = Math.round(message.inputIndex);
+    }
+    if (message.keyshare.length !== 0) {
+      obj.keyshare = base64FromBytes(message.keyshare);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<KeyshareWithIndex>): KeyshareWithIndex {
+    return KeyshareWithIndex.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<KeyshareWithIndex>): KeyshareWithIndex {
+    const message = createBaseKeyshareWithIndex();
+    message.inputIndex = object.inputIndex ?? 0;
+    message.keyshare = object.keyshare ?? new Uint8Array(0);
+    return message;
+  },
+};
+
 function createBaseSignTokenTransactionResponse(): SignTokenTransactionResponse {
-  return { sparkOperatorSignature: new Uint8Array(0), tokenTransactionRevocationKeyshares: [] };
+  return { sparkOperatorSignature: new Uint8Array(0), revocationKeyshares: [] };
 }
 
 export const SignTokenTransactionResponse: MessageFns<SignTokenTransactionResponse> = {
@@ -4598,8 +4752,8 @@ export const SignTokenTransactionResponse: MessageFns<SignTokenTransactionRespon
     if (message.sparkOperatorSignature.length !== 0) {
       writer.uint32(10).bytes(message.sparkOperatorSignature);
     }
-    for (const v of message.tokenTransactionRevocationKeyshares) {
-      writer.uint32(18).bytes(v!);
+    for (const v of message.revocationKeyshares) {
+      KeyshareWithIndex.encode(v!, writer.uint32(18).fork()).join();
     }
     return writer;
   },
@@ -4624,7 +4778,7 @@ export const SignTokenTransactionResponse: MessageFns<SignTokenTransactionRespon
             break;
           }
 
-          message.tokenTransactionRevocationKeyshares.push(reader.bytes());
+          message.revocationKeyshares.push(KeyshareWithIndex.decode(reader, reader.uint32()));
           continue;
         }
       }
@@ -4641,8 +4795,8 @@ export const SignTokenTransactionResponse: MessageFns<SignTokenTransactionRespon
       sparkOperatorSignature: isSet(object.sparkOperatorSignature)
         ? bytesFromBase64(object.sparkOperatorSignature)
         : new Uint8Array(0),
-      tokenTransactionRevocationKeyshares: globalThis.Array.isArray(object?.tokenTransactionRevocationKeyshares)
-        ? object.tokenTransactionRevocationKeyshares.map((e: any) => bytesFromBase64(e))
+      revocationKeyshares: globalThis.Array.isArray(object?.revocationKeyshares)
+        ? object.revocationKeyshares.map((e: any) => KeyshareWithIndex.fromJSON(e))
         : [],
     };
   },
@@ -4652,10 +4806,8 @@ export const SignTokenTransactionResponse: MessageFns<SignTokenTransactionRespon
     if (message.sparkOperatorSignature.length !== 0) {
       obj.sparkOperatorSignature = base64FromBytes(message.sparkOperatorSignature);
     }
-    if (message.tokenTransactionRevocationKeyshares?.length) {
-      obj.tokenTransactionRevocationKeyshares = message.tokenTransactionRevocationKeyshares.map((e) =>
-        base64FromBytes(e)
-      );
+    if (message.revocationKeyshares?.length) {
+      obj.revocationKeyshares = message.revocationKeyshares.map((e) => KeyshareWithIndex.toJSON(e));
     }
     return obj;
   },
@@ -4666,13 +4818,89 @@ export const SignTokenTransactionResponse: MessageFns<SignTokenTransactionRespon
   fromPartial(object: DeepPartial<SignTokenTransactionResponse>): SignTokenTransactionResponse {
     const message = createBaseSignTokenTransactionResponse();
     message.sparkOperatorSignature = object.sparkOperatorSignature ?? new Uint8Array(0);
-    message.tokenTransactionRevocationKeyshares = object.tokenTransactionRevocationKeyshares?.map((e) => e) || [];
+    message.revocationKeyshares = object.revocationKeyshares?.map((e) => KeyshareWithIndex.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseRevocationSecretWithIndex(): RevocationSecretWithIndex {
+  return { inputIndex: 0, revocationSecret: new Uint8Array(0) };
+}
+
+export const RevocationSecretWithIndex: MessageFns<RevocationSecretWithIndex> = {
+  encode(message: RevocationSecretWithIndex, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.inputIndex !== 0) {
+      writer.uint32(8).uint32(message.inputIndex);
+    }
+    if (message.revocationSecret.length !== 0) {
+      writer.uint32(18).bytes(message.revocationSecret);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RevocationSecretWithIndex {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRevocationSecretWithIndex();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.inputIndex = reader.uint32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.revocationSecret = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RevocationSecretWithIndex {
+    return {
+      inputIndex: isSet(object.inputIndex) ? globalThis.Number(object.inputIndex) : 0,
+      revocationSecret: isSet(object.revocationSecret) ? bytesFromBase64(object.revocationSecret) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: RevocationSecretWithIndex): unknown {
+    const obj: any = {};
+    if (message.inputIndex !== 0) {
+      obj.inputIndex = Math.round(message.inputIndex);
+    }
+    if (message.revocationSecret.length !== 0) {
+      obj.revocationSecret = base64FromBytes(message.revocationSecret);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RevocationSecretWithIndex>): RevocationSecretWithIndex {
+    return RevocationSecretWithIndex.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RevocationSecretWithIndex>): RevocationSecretWithIndex {
+    const message = createBaseRevocationSecretWithIndex();
+    message.inputIndex = object.inputIndex ?? 0;
+    message.revocationSecret = object.revocationSecret ?? new Uint8Array(0);
     return message;
   },
 };
 
 function createBaseFinalizeTokenTransactionRequest(): FinalizeTokenTransactionRequest {
-  return { finalTokenTransaction: undefined, outputToSpendRevocationSecrets: [], identityPublicKey: new Uint8Array(0) };
+  return { finalTokenTransaction: undefined, revocationSecrets: [], identityPublicKey: new Uint8Array(0) };
 }
 
 export const FinalizeTokenTransactionRequest: MessageFns<FinalizeTokenTransactionRequest> = {
@@ -4680,8 +4908,8 @@ export const FinalizeTokenTransactionRequest: MessageFns<FinalizeTokenTransactio
     if (message.finalTokenTransaction !== undefined) {
       TokenTransaction.encode(message.finalTokenTransaction, writer.uint32(10).fork()).join();
     }
-    for (const v of message.outputToSpendRevocationSecrets) {
-      writer.uint32(18).bytes(v!);
+    for (const v of message.revocationSecrets) {
+      RevocationSecretWithIndex.encode(v!, writer.uint32(18).fork()).join();
     }
     if (message.identityPublicKey.length !== 0) {
       writer.uint32(26).bytes(message.identityPublicKey);
@@ -4709,7 +4937,7 @@ export const FinalizeTokenTransactionRequest: MessageFns<FinalizeTokenTransactio
             break;
           }
 
-          message.outputToSpendRevocationSecrets.push(reader.bytes());
+          message.revocationSecrets.push(RevocationSecretWithIndex.decode(reader, reader.uint32()));
           continue;
         }
         case 3: {
@@ -4734,8 +4962,8 @@ export const FinalizeTokenTransactionRequest: MessageFns<FinalizeTokenTransactio
       finalTokenTransaction: isSet(object.finalTokenTransaction)
         ? TokenTransaction.fromJSON(object.finalTokenTransaction)
         : undefined,
-      outputToSpendRevocationSecrets: globalThis.Array.isArray(object?.outputToSpendRevocationSecrets)
-        ? object.outputToSpendRevocationSecrets.map((e: any) => bytesFromBase64(e))
+      revocationSecrets: globalThis.Array.isArray(object?.revocationSecrets)
+        ? object.revocationSecrets.map((e: any) => RevocationSecretWithIndex.fromJSON(e))
         : [],
       identityPublicKey: isSet(object.identityPublicKey)
         ? bytesFromBase64(object.identityPublicKey)
@@ -4748,8 +4976,8 @@ export const FinalizeTokenTransactionRequest: MessageFns<FinalizeTokenTransactio
     if (message.finalTokenTransaction !== undefined) {
       obj.finalTokenTransaction = TokenTransaction.toJSON(message.finalTokenTransaction);
     }
-    if (message.outputToSpendRevocationSecrets?.length) {
-      obj.outputToSpendRevocationSecrets = message.outputToSpendRevocationSecrets.map((e) => base64FromBytes(e));
+    if (message.revocationSecrets?.length) {
+      obj.revocationSecrets = message.revocationSecrets.map((e) => RevocationSecretWithIndex.toJSON(e));
     }
     if (message.identityPublicKey.length !== 0) {
       obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
@@ -4766,7 +4994,7 @@ export const FinalizeTokenTransactionRequest: MessageFns<FinalizeTokenTransactio
       (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
         ? TokenTransaction.fromPartial(object.finalTokenTransaction)
         : undefined;
-    message.outputToSpendRevocationSecrets = object.outputToSpendRevocationSecrets?.map((e) => e) || [];
+    message.revocationSecrets = object.revocationSecrets?.map((e) => RevocationSecretWithIndex.fromPartial(e)) || [];
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
     return message;
   },

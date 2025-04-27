@@ -11,6 +11,8 @@ import {
   TokenTransaction,
   StartTokenTransactionResponse,
   SignTokenTransactionResponse,
+  SignatureWithIndex,
+  RevocationSecretWithIndex,
 } from "../proto/spark.js";
 import { SparkCallOptions } from "../types/grpc.js";
 import { collectResponses } from "../utils/response-validation.js";
@@ -29,7 +31,6 @@ import { ConnectionManager } from "./connection.js";
 import {
   ValidationError,
   NetworkError,
-  AuthenticationError,
   InternalValidationError,
 } from "../errors/types.js";
 import { SigningOperator } from "./wallet-config.js";
@@ -145,7 +146,7 @@ export class TokenTransactionService {
         finalTokenTransaction.tokenInputs!.transferInput.outputsToSpend;
 
       const errors: ValidationError[] = [];
-      const revocationSecrets: Uint8Array[] = [];
+      const revocationSecrets: RevocationSecretWithIndex[] = [];
 
       for (
         let outputIndex = 0;
@@ -153,12 +154,11 @@ export class TokenTransactionService {
         outputIndex++
       ) {
         // For each output, collect keyshares from all SOs that responded successfully
-        const outputKeyshares = successfulSignatures.map(
-          ({ identifier, response }) => ({
-            index: parseInt(identifier, 16),
-            keyshare: response.tokenTransactionRevocationKeyshares[outputIndex],
-          }),
-        );
+        const outputKeyshares: KeyshareWithOperatorIndex[] =
+          successfulSignatures.map(({ identifier, response }) => ({
+            operatorIndex: parseInt(identifier, 16),
+            keyshare: response.revocationKeyshares[outputIndex]!,
+          }));
 
         if (outputKeyshares.length < threshold) {
           errors.push(
@@ -173,18 +173,18 @@ export class TokenTransactionService {
 
         // Check for duplicate operator indices
         const seenIndices = new Set<number>();
-        for (const { index } of outputKeyshares) {
-          if (seenIndices.has(index)) {
+        for (const { operatorIndex } of outputKeyshares) {
+          if (seenIndices.has(operatorIndex)) {
             errors.push(
               new ValidationError("Duplicate operator index", {
                 field: "outputKeyshares",
-                value: index,
+                value: operatorIndex,
                 expected: "Unique operator index",
                 index: outputIndex,
               }),
             );
           }
-          seenIndices.add(index);
+          seenIndices.add(operatorIndex);
         }
 
         const revocationSecret = recoverRevocationSecretFromKeyshares(
@@ -216,7 +216,10 @@ export class TokenTransactionService {
           );
         }
 
-        revocationSecrets.push(revocationSecret);
+        revocationSecrets.push({
+          inputIndex: outputIndex,
+          revocationSecret,
+        });
       }
 
       if (errors.length > 0) {
@@ -259,7 +262,7 @@ export class TokenTransactionService {
       true,
     );
 
-    const ownerSignatures: Uint8Array[] = [];
+    const ownerSignaturesWithIndex: SignatureWithIndex[] = [];
     if (tokenTransaction.tokenInputs!.$case === "mintInput") {
       const issuerPublicKey =
         tokenTransaction.tokenInputs!.mintInput.issuerPublicKey;
@@ -276,10 +279,11 @@ export class TokenTransactionService {
         issuerPublicKey,
       );
 
-      ownerSignatures.push(ownerSignature);
+      ownerSignaturesWithIndex.push({
+        signature: ownerSignature,
+        inputIndex: 0,
+      });
     } else if (tokenTransaction.tokenInputs!.$case === "transferInput") {
-      const transferInput = tokenTransaction.tokenInputs!.transferInput;
-
       if (!outputsToSpendSigningPublicKeys || !outputsToSpendCommitments) {
         throw new ValidationError("Invalid transfer input", {
           field: "outputsToSpend",
@@ -291,8 +295,7 @@ export class TokenTransactionService {
         });
       }
 
-      for (let i = 0; i < transferInput.outputsToSpend.length; i++) {
-        const key = outputsToSpendSigningPublicKeys![i];
+      outputsToSpendSigningPublicKeys.forEach(async (key, i) => {
         if (!key) {
           throw new ValidationError("Invalid signing key", {
             field: "outputsToSpendSigningPublicKeys",
@@ -305,8 +308,11 @@ export class TokenTransactionService {
           key,
         );
 
-        ownerSignatures.push(ownerSignature);
-      }
+        ownerSignaturesWithIndex.push({
+          signature: ownerSignature,
+          inputIndex: i,
+        });
+      });
     }
 
     // Start the token transaction
@@ -315,7 +321,7 @@ export class TokenTransactionService {
         identityPublicKey: await this.config.signer.getIdentityPublicKey(),
         partialTokenTransaction: tokenTransaction,
         tokenTransactionSignatures: {
-          ownerSignatures: ownerSignatures,
+          ownerSignatures: ownerSignaturesWithIndex,
         },
       },
       {
@@ -383,9 +389,7 @@ export class TokenTransactionService {
           const payloadHash =
             await hashOperatorSpecificTokenTransactionSignablePayload(payload);
 
-          const operatorSpecificSignatures: OperatorSpecificOwnerSignature[] =
-            [];
-
+          let operatorSpecificSignatures: OperatorSpecificOwnerSignature[] = [];
           if (finalTokenTransaction.tokenInputs!.$case === "mintInput") {
             const issuerPublicKey =
               finalTokenTransaction.tokenInputs!.mintInput.issuerPublicKey;
@@ -403,8 +407,10 @@ export class TokenTransactionService {
             );
 
             operatorSpecificSignatures.push({
-              ownerPublicKey: issuerPublicKey,
-              ownerSignature: ownerSignature,
+              ownerSignature: {
+                signature: ownerSignature,
+                inputIndex: 0,
+              },
               payload: payload,
             });
           }
@@ -427,9 +433,11 @@ export class TokenTransactionService {
               }
 
               operatorSpecificSignatures.push({
-                ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
-                ownerSignature: ownerSignature,
-                payload: payload,
+                ownerSignature: {
+                  signature: ownerSignature,
+                  inputIndex: i,
+                },
+                payload,
               });
             }
           }
@@ -476,7 +484,7 @@ export class TokenTransactionService {
 
   public async finalizeTokenTransaction(
     finalTokenTransaction: TokenTransaction,
-    outputToSpendRevocationSecrets: Uint8Array[],
+    revocationSecrets: RevocationSecretWithIndex[],
     threshold: number,
   ): Promise<TokenTransaction> {
     const signingOperators = this.config.getSigningOperators();
@@ -492,7 +500,7 @@ export class TokenTransactionService {
           const response = await internalSparkClient.finalize_token_transaction(
             {
               finalTokenTransaction,
-              outputToSpendRevocationSecrets,
+              revocationSecrets,
               identityPublicKey,
             },
             {
