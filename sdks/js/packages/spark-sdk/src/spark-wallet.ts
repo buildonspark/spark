@@ -98,7 +98,7 @@ import { getMasterHDKeyFromSeed } from "./utils/index.js";
 const crypto = getCrypto();
 
 // Add this constant at the file level
-const MAX_TOKEN_LEAVES = 100;
+const MAX_TOKEN_OUTPUTS = 100;
 
 export type CreateLightningInvoiceParams = {
   amountSats: number;
@@ -592,7 +592,7 @@ export class SparkWallet extends EventEmitter {
    * @returns {Promise<Object>} Object containing:
    *   - mnemonic: The mnemonic if one was generated (undefined for raw seed)
    *   - balance: The wallet's initial balance in satoshis
-   *   - tokenBalance: Map of token balances and leaf counts
+   *   - tokenBalance: Map of token balances
    * @private
    */
   protected async initWallet(
@@ -2082,7 +2082,7 @@ export class SparkWallet extends EventEmitter {
 
     await this.syncTokenOutputs();
     if (!this.tokenOuputs.has(tokenPublicKey)) {
-      throw new Error("No token leaves with the given tokenPublicKey");
+      throw new Error("No TTXOs with the given tokenPublicKey");
     }
 
     const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
@@ -2096,14 +2096,14 @@ export class SparkWallet extends EventEmitter {
           tokenPublicKeyBytes,
         )
       ) {
-        throw new Error("One or more selected leaves are not available");
+        throw new Error("One or more selected TTXOs are not available");
       }
     } else {
       selectedOutputs = this.selectTokenOutputs(tokenPublicKey, tokenAmount);
     }
 
-    if (selectedOutputs!.length > MAX_TOKEN_LEAVES) {
-      throw new Error("Too many leaves selected");
+    if (selectedOutputs!.length > MAX_TOKEN_OUTPUTS) {
+      throw new Error("Too many TTXOs selected");
     }
 
     const tokenTransaction =
@@ -2155,11 +2155,11 @@ export class SparkWallet extends EventEmitter {
   }
 
   /**
-   * Selects token leaves for a transfer.
+   * Selects TTXOs for a transfer.
    *
    * @param {string} tokenPublicKey - The public key of the token
-   * @param {bigint} tokenAmount - The amount of tokens to select leaves for
-   * @returns {OutputWithPreviousTransactionData[]} The selected leaves
+   * @param {bigint} tokenAmount - The amount of tokens to select TTXOs for
+   * @returns {OutputWithPreviousTransactionData[]} The selected TTXOs
    * @private
    */
   private selectTokenOutputs(
