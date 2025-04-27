@@ -27,7 +27,7 @@
 
    Normally you will be able to see this output:
    ```
-   ➜  ~ ~/github/ops/minikube/setup.sh
+   ➜  ~ ~/ws/spark/minikube/setup.sh
        minikube
        type: Control Plane
        host: Stopped
@@ -54,5 +54,3 @@
 ## Troubleshooting
 
 To query state inside a minikube node you can use `kubectl` or terminal UI tool [k9s](https://k9scli.io/).
-
-
