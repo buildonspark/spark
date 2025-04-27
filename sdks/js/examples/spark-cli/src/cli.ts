@@ -665,13 +665,13 @@ async function runCLI() {
           }
           const [tokenName, tokenTicker, decimals, maxSupply, isFreezable] =
             args;
-          const result = await wallet.announceTokenL1({
+          const result = await wallet.announceTokenL1(
             tokenName,
             tokenTicker,
-            decimals: parseInt(decimals),
-            maxSupply: BigInt(maxSupply),
-            isFreezable: isFreezable.toLowerCase() === "true",
-          });
+            parseInt(decimals),
+            BigInt(maxSupply),
+            isFreezable.toLowerCase() === "true",
+          );
           console.log("Token Announcement Transaction ID:", result);
           break;
         }

@@ -53,13 +53,13 @@ describe("token integration test", () => {
     await new Promise((resolve) => setTimeout(resolve, 5000));
 
     try {
-      const response = await wallet.announceTokenL1({
-        tokenName: "TestToken1",
-        tokenTicker: "TT1",
-        decimals: 0,
-        maxSupply: 0n,
-        isFreezable: false,
-      });
+      const response = await wallet.announceTokenL1(
+        "TestToken1",
+        "TT1",
+        0,
+        0n,
+        false,
+      );
       console.log("Announce token response:", response);
     } catch (error: any) {
       console.error("Error when announcing token on L1:", error);

@@ -190,14 +190,14 @@ export class IssuerSparkWallet extends SparkWallet {
     throw new Error("Not implemented");
   }
 
-  public async announceTokenL1({
-    tokenName,
-    tokenTicker,
-    decimals,
-    maxSupply,
-    isFreezable,
-    feeRateSatsPerVb = 2.0,
-  }): Promise<string> {
+  public async announceTokenL1(
+    tokenName: string,
+    tokenTicker: string,
+    decimals: number,
+    maxSupply: bigint,
+    isFreezable: boolean,
+    feeRateSatsPerVb: number = 2.0,
+  ): Promise<string> {
     await this.lrc20Wallet!.syncWallet();
 
     const tokenPublicKey = new TokenPubkey(this.lrc20Wallet!.pubkey);

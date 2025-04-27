@@ -345,14 +345,14 @@ router.post(
         isFreezable: boolean;
         feeRateSatsPerVb: number | undefined;
       };
-      const announcementTx = await wallet!.announceTokenL1({
+      const announcementTx = await wallet!.announceTokenL1(
         tokenName,
         tokenTicker,
-        decimals: Number(decimals),
-        maxSupply: BigInt(maxSupply),
+        Number(decimals),
+        BigInt(maxSupply),
         isFreezable,
         feeRateSatsPerVb,
-      });
+      );
       res.json({
         data: { announcementTx },
       });
