@@ -339,14 +339,16 @@ export class SparkWallet extends EventEmitter {
             signal: this.streamController?.signal,
           },
         );
-        this.emit("stream:connected");
-
-        retryCount = 0;
 
         const claimedTransfersIds = await this.claimTransfers();
 
         try {
           for await (const data of stream) {
+            if (data.event?.$case === "connected") {
+              this.emit("stream:connected");
+              retryCount = 0;
+            }
+
             if (
               data.event?.$case === "transfer" &&
               data.event.transfer.transfer &&

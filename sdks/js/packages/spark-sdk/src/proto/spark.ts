@@ -229,7 +229,13 @@ export interface SubscribeToEventsRequest {
 }
 
 export interface SubscribeToEventsResponse {
-  event?: { $case: "transfer"; transfer: TransferEvent } | { $case: "deposit"; deposit: DepositEvent } | undefined;
+  event?: { $case: "transfer"; transfer: TransferEvent } | { $case: "deposit"; deposit: DepositEvent } | {
+    $case: "connected";
+    connected: ConnectedEvent;
+  } | undefined;
+}
+
+export interface ConnectedEvent {
 }
 
 export interface TransferEvent {
@@ -1304,6 +1310,9 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
       case "deposit":
         DepositEvent.encode(message.event.deposit, writer.uint32(18).fork()).join();
         break;
+      case "connected":
+        ConnectedEvent.encode(message.event.connected, writer.uint32(26).fork()).join();
+        break;
     }
     return writer;
   },
@@ -1331,6 +1340,14 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
           message.event = { $case: "deposit", deposit: DepositEvent.decode(reader, reader.uint32()) };
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.event = { $case: "connected", connected: ConnectedEvent.decode(reader, reader.uint32()) };
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1346,6 +1363,8 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
         ? { $case: "transfer", transfer: TransferEvent.fromJSON(object.transfer) }
         : isSet(object.deposit)
         ? { $case: "deposit", deposit: DepositEvent.fromJSON(object.deposit) }
+        : isSet(object.connected)
+        ? { $case: "connected", connected: ConnectedEvent.fromJSON(object.connected) }
         : undefined,
     };
   },
@@ -1356,6 +1375,8 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
       obj.transfer = TransferEvent.toJSON(message.event.transfer);
     } else if (message.event?.$case === "deposit") {
       obj.deposit = DepositEvent.toJSON(message.event.deposit);
+    } else if (message.event?.$case === "connected") {
+      obj.connected = ConnectedEvent.toJSON(message.event.connected);
     }
     return obj;
   },
@@ -1378,7 +1399,56 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
         }
         break;
       }
+      case "connected": {
+        if (object.event?.connected !== undefined && object.event?.connected !== null) {
+          message.event = { $case: "connected", connected: ConnectedEvent.fromPartial(object.event.connected) };
+        }
+        break;
+      }
     }
+    return message;
+  },
+};
+
+function createBaseConnectedEvent(): ConnectedEvent {
+  return {};
+}
+
+export const ConnectedEvent: MessageFns<ConnectedEvent> = {
+  encode(_: ConnectedEvent, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ConnectedEvent {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseConnectedEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): ConnectedEvent {
+    return {};
+  },
+
+  toJSON(_: ConnectedEvent): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<ConnectedEvent>): ConnectedEvent {
+    return ConnectedEvent.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<ConnectedEvent>): ConnectedEvent {
+    const message = createBaseConnectedEvent();
     return message;
   },
 };
