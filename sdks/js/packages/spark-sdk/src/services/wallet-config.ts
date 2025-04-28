@@ -113,7 +113,7 @@ export function getLrc20NodeUrl(network: NetworkType): string {
     case "MAINNET":
       return isProduction
         ? URL_CONFIG.MAINNET.PROD.LRC20_NODE
-        : URL_CONFIG.MAINNET.PROD.LRC20_NODE;
+        : URL_CONFIG.MAINNET.DEV.LRC20_NODE;
     default:
       return URL_CONFIG.LOCAL.LRC20_NODE;
   }
