@@ -1956,19 +1956,53 @@ export class SparkWallet extends EventEmitter {
       }));
     }
 
+    const feeEstimate = await this.sspClient?.getCoopExitFeeEstimate({
+      leafExternalIds: leavesToSend.map((leaf) => leaf.id),
+      withdrawalAddress: onchainAddress,
+    });
+
+    if (feeEstimate) {
+      let fee: number | undefined;
+      switch (exitSpeed) {
+        case ExitSpeed.FAST:
+          fee =
+            (feeEstimate.speedFast?.l1BroadcastFee.originalValue || 0) +
+            (feeEstimate.speedFast?.userFee.originalValue || 0);
+          break;
+        case ExitSpeed.MEDIUM:
+          fee =
+            (feeEstimate.speedMedium?.l1BroadcastFee.originalValue || 0) +
+            (feeEstimate.speedMedium?.userFee.originalValue || 0);
+          break;
+        case ExitSpeed.SLOW:
+          fee =
+            (feeEstimate.speedSlow?.l1BroadcastFee.originalValue || 0) +
+            (feeEstimate.speedSlow?.userFee.originalValue || 0);
+          break;
+        default:
+          throw new ValidationError("Invalid exit speed", {
+            field: "exitSpeed",
+            value: exitSpeed,
+            expected: "FAST, MEDIUM, or SLOW",
+          });
+      }
+
+      if (
+        fee !== undefined &&
+        fee > leavesToSend.reduce((acc, leaf) => acc + leaf.value, 0)
+      ) {
+        throw new ValidationError(
+          "The fee for the withdrawal is greater than the target amount",
+          {
+            field: "fee",
+            value: fee,
+            expected: "less than or equal to the target amount",
+          },
+        );
+      }
+    }
     await this.checkRefreshTimelockNodes(leavesToSend);
     leavesToSend = await this.checkExtendTimeLockNodes(leavesToSend);
-
-    if (leavesToSend.reduce((acc, leaf) => acc + leaf.value, 0) < 10000) {
-      throw new ValidationError(
-        "The minimum amount for a withdrawal is 10000 sats",
-        {
-          field: "totalAmount",
-          value: leavesToSend.reduce((acc, leaf) => acc + leaf.value, 0),
-          expected: ">= 10000",
-        },
-      );
-    }
 
     const leafKeyTweaks = await Promise.all(
       leavesToSend.map(async (leaf) => ({
@@ -2064,10 +2098,12 @@ export class SparkWallet extends EventEmitter {
     await this.checkRefreshTimelockNodes(leaves);
     leaves = await this.checkExtendTimeLockNodes(leaves);
 
-    return await this.sspClient.getCoopExitFeeEstimate({
+    const feeEstimate = await this.sspClient.getCoopExitFeeEstimate({
       leafExternalIds: leaves.map((leaf) => leaf.id),
       withdrawalAddress,
     });
+
+    return feeEstimate;
   }
 
   // ***** Token Flow *****
