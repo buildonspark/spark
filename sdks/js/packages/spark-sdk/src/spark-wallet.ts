@@ -1,5 +1,6 @@
 import { createLrc20ConnectionManager } from "@buildonspark/lrc20-sdk/grpc";
 import { ILrc20ConnectionManager } from "@buildonspark/lrc20-sdk/grpc/types";
+import { mapCurrencyAmount } from "@lightsparkdev/core";
 import {
   bytesToHex,
   bytesToNumberBE,
@@ -20,6 +21,7 @@ import {
   RPCError,
   ValidationError,
 } from "./errors/types.js";
+
 import SspClient from "./graphql/client.js";
 import {
   BitcoinNetwork,
@@ -1748,18 +1750,15 @@ export class SparkWallet extends EventEmitter {
         });
       }
 
-      const estimatedFeeSats = Math.ceil(
-        feeEstimate.feeEstimate.originalValue / 1000,
-      );
-      if (maxFeeSats < estimatedFeeSats) {
+      if (maxFeeSats < feeEstimate) {
         throw new ValidationError("maxFeeSats does not cover fee estimate", {
           field: "maxFeeSats",
           value: maxFeeSats,
-          expected: `${estimatedFeeSats} sats`,
+          expected: `${feeEstimate} sats`,
         });
       }
 
-      const totalAmount = amountSats + estimatedFeeSats;
+      const totalAmount = amountSats + feeEstimate;
 
       const internalBalance = this.getInternalBalance();
       if (totalAmount > internalBalance) {
@@ -1793,7 +1792,7 @@ export class SparkWallet extends EventEmitter {
         paymentHash: hexToBytes(paymentHash),
         isInboundPayment: false,
         invoiceString: invoice,
-        feeSats: estimatedFeeSats,
+        feeSats: feeEstimate,
       });
 
       if (!swapResponse.transfer) {
@@ -1830,7 +1829,7 @@ export class SparkWallet extends EventEmitter {
    */
   public async getLightningSendFeeEstimate({
     encodedInvoice,
-  }: LightningSendFeeEstimateInput): Promise<LightningSendFeeEstimateOutput | null> {
+  }: LightningSendFeeEstimateInput): Promise<number> {
     if (!this.sspClient) {
       throw new ConfigurationError("SSP client not initialized", {
         configKey: "sspClient",
@@ -1843,7 +1842,8 @@ export class SparkWallet extends EventEmitter {
     if (!feeEstimate) {
       throw new Error("Failed to get lightning send fee estimate");
     }
-    return feeEstimate;
+    const satsFeeEstimate = mapCurrencyAmount(feeEstimate.feeEstimate);
+    return Math.ceil(satsFeeEstimate.sats);
   }
 
   // ***** Tree Creation Flow *****
