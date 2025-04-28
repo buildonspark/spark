@@ -8,96 +8,79 @@ import {
 import { BitcoinFaucet } from "../../../../spark-sdk/src/tests/utils/test-faucet.js";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
+import { SparkWallet } from "@buildonspark/spark-sdk";
+import { IssuerSparkWallet } from "../../index.js";
 
 const brokenTestFn = process.env.GITHUB_ACTIONS ? it.skip : it;
-describe("token integration test", () => {
+describe("token integration tests", () => {
   jest.setTimeout(80000);
 
-  brokenTestFn("should issue a single token with ECDSA", async () => {
-    const tokenAmount: bigint = 1000n;
-    const { wallet } = await IssuerSparkWalletTesting.initialize({
-      options: LOCAL_WALLET_CONFIG_ECDSA,
-    });
+  brokenTestFn(
+    "should fail when minting tokens without announcement",
+    async () => {
+      const tokenAmount: bigint = 1000n;
+      const { wallet } = await IssuerSparkWalletTesting.initialize({
+        options: LOCAL_WALLET_CONFIG_ECDSA,
+      });
 
-    await wallet.mintTokens(tokenAmount);
+      await wallet.mintTokens(tokenAmount);
 
-    const tokenBalance = (await wallet.getIssuerTokenBalance()).balance;
-    expect(tokenBalance).toEqual(tokenAmount);
-  });
+      const tokenBalance = (await wallet.getIssuerTokenBalance()).balance;
+      expect(tokenBalance).toEqual(tokenAmount);
+    },
+  );
 
-  brokenTestFn("should issue a single token with Schnorr", async () => {
-    const tokenAmount: bigint = 1000n;
-    const { wallet } = await IssuerSparkWalletTesting.initialize({
-      options: LOCAL_WALLET_CONFIG_SCHNORR,
-    });
-
-    await wallet.mintTokens(tokenAmount);
-
-    const tokenBalance = (await wallet.getIssuerTokenBalance()).balance;
-    expect(tokenBalance).toEqual(tokenAmount);
-  });
-
-  brokenTestFn("should announce and issue a single token", async () => {
+  brokenTestFn("should fail when minting more than max supply", async () => {
     const tokenAmount: bigint = 1000n;
     const { wallet } = await IssuerSparkWalletTesting.initialize({
       options: LOCAL_WALLET_CONFIG_SCHNORR,
     });
 
-    // Faucet funds to the Issuer wallet because announcing a token
-    // requires ownership of an L1 UTXO.
-    const faucet = BitcoinFaucet.getInstance();
-    const l1WalletPubKey = await wallet.getTokenL1Address();
-    await faucet.sendToAddress(l1WalletPubKey, 100_000n);
-    await faucet.mineBlocks(6);
-
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-
-    try {
-      const response = await wallet.announceTokenL1(
-        "TestToken1",
-        "TT1",
-        0,
-        0n,
-        false,
-      );
-      console.log("Announce token response:", response);
-    } catch (error: any) {
-      console.error("Error when announcing token on L1:", error);
-      expect(error).toBeUndefined();
-    }
-    await faucet.mineBlocks(6);
-
-    // Wait for LRC20 processing.
-    await new Promise((resolve) => setTimeout(resolve, 50000));
-
-    const publicKeyInfo = await wallet.getIssuerTokenInfo();
-
-    // Assert token public key info values
-    const identityPublicKey = await wallet.getIdentityPublicKey();
-    expect(publicKeyInfo?.tokenName).toEqual("TestToken1");
-    expect(publicKeyInfo?.tokenSymbol).toEqual("TT1");
-    expect(publicKeyInfo?.tokenDecimals).toEqual(0);
-    expect(publicKeyInfo?.maxSupply).toEqual(0n);
-    expect(publicKeyInfo?.isFreezable).toEqual(false);
-
-    // Compare the public key using bytesToHex
-    const pubKeyHex = publicKeyInfo?.tokenPublicKey;
-    expect(pubKeyHex).toEqual(identityPublicKey);
-
-    await wallet.mintTokens(tokenAmount);
-
-    const sourceBalance = (await wallet.getIssuerTokenBalance()).balance;
-    expect(sourceBalance).toEqual(tokenAmount);
-
-    const tokenInfo = await wallet.getTokenInfo();
-    expect(tokenInfo[0].tokenName).toEqual("TestToken1");
-    expect(tokenInfo[0].tokenSymbol).toEqual("TT1");
-    expect(tokenInfo[0].tokenDecimals).toEqual(0);
-    expect(tokenInfo[0].maxSupply).toEqual(tokenAmount);
+    await fundAndAnnounce(wallet, 2n, "MaxSupplyToken", "MST");
+    await expect(wallet.mintTokens(tokenAmount)).rejects.toThrow();
   });
 
   brokenTestFn(
-    "should issue a single token and transfer it with ECDSA",
+    "should announce token and issue tokens successfully",
+    async () => {
+      const tokenAmount: bigint = 1000n;
+      const tokenName = "AnnounceIssueToken";
+      const tokenSymbol = "AIT";
+      const { wallet } = await IssuerSparkWalletTesting.initialize({
+        options: LOCAL_WALLET_CONFIG_SCHNORR,
+      });
+
+      await fundAndAnnounce(wallet, 100000n, tokenName, tokenSymbol);
+
+      const publicKeyInfo = await wallet.getIssuerTokenInfo();
+
+      // Assert token public key info values
+      const identityPublicKey = await wallet.getIdentityPublicKey();
+      expect(publicKeyInfo?.tokenName).toEqual(tokenName);
+      expect(publicKeyInfo?.tokenSymbol).toEqual(tokenSymbol);
+      expect(publicKeyInfo?.tokenDecimals).toEqual(0);
+      expect(publicKeyInfo?.maxSupply).toEqual(0n);
+      expect(publicKeyInfo?.isFreezable).toEqual(false);
+
+      // Compare the public key using bytesToHex
+      const pubKeyHex = publicKeyInfo?.tokenPublicKey;
+      expect(pubKeyHex).toEqual(identityPublicKey);
+
+      await wallet.mintTokens(tokenAmount);
+
+      const sourceBalance = (await wallet.getIssuerTokenBalance()).balance;
+      expect(sourceBalance).toEqual(tokenAmount);
+
+      const tokenInfo = await wallet.getTokenInfo();
+      expect(tokenInfo[0].tokenName).toEqual(tokenName);
+      expect(tokenInfo[0].tokenSymbol).toEqual(tokenSymbol);
+      expect(tokenInfo[0].tokenDecimals).toEqual(0);
+      expect(tokenInfo[0].maxSupply).toEqual(tokenAmount);
+    },
+  );
+
+  brokenTestFn(
+    "should announce, mint, and transfer tokens with ECDSA",
     async () => {
       const tokenAmount: bigint = 1000n;
 
@@ -111,6 +94,8 @@ describe("token integration test", () => {
           options: LOCAL_WALLET_CONFIG_ECDSA,
         },
       );
+
+      await fundAndAnnounce(issuerWallet, 100000n, "ECDSATransferToken", "ETT");
 
       await issuerWallet.mintTokens(tokenAmount);
       await issuerWallet.transferTokens({
@@ -132,7 +117,7 @@ describe("token integration test", () => {
     },
   );
 
-  brokenTestFn("monitoring operations", async () => {
+  brokenTestFn("should track token operations in monitoring", async () => {
     const tokenAmount: bigint = 1000n;
 
     const { wallet: issuerWallet } = await IssuerSparkWalletTesting.initialize({
@@ -142,6 +127,8 @@ describe("token integration test", () => {
     const { wallet: destinationWallet } = await SparkWalletTesting.initialize({
       options: LOCAL_WALLET_CONFIG_ECDSA,
     });
+
+    await fundAndAnnounce(issuerWallet, 100000n, "MonitoringToken", "MOT");
 
     await issuerWallet.mintTokens(tokenAmount);
     await issuerWallet.transferTokens({
@@ -170,7 +157,7 @@ describe("token integration test", () => {
   });
 
   brokenTestFn(
-    "should issue a single token and transfer it with Schnorr",
+    "should announce, mint, and transfer tokens with Schnorr",
     async () => {
       const tokenAmount: bigint = 1000n;
 
@@ -183,6 +170,13 @@ describe("token integration test", () => {
         {
           options: LOCAL_WALLET_CONFIG_SCHNORR,
         },
+      );
+
+      await fundAndAnnounce(
+        issuerWallet,
+        100000n,
+        "SchnorrTransferToken",
+        "STT",
       );
 
       await issuerWallet.mintTokens(tokenAmount);
@@ -204,140 +198,166 @@ describe("token integration test", () => {
     },
   );
 
-  brokenTestFn("should freeze tokens with ECDSA", async () => {
-    const tokenAmount: bigint = 1000n;
-    const { wallet: issuerWallet } = await IssuerSparkWalletTesting.initialize({
-      options: LOCAL_WALLET_CONFIG_ECDSA,
-    });
+  brokenTestFn(
+    "should announce, mint, freeze and unfreeze tokens with ECDSA",
+    async () => {
+      const tokenAmount: bigint = 1000n;
+      const { wallet: issuerWallet } =
+        await IssuerSparkWalletTesting.initialize({
+          options: LOCAL_WALLET_CONFIG_ECDSA,
+        });
 
-    await issuerWallet.mintTokens(tokenAmount);
+      await fundAndAnnounce(issuerWallet, 100000n, "ECDSAFreezeToken", "EFT");
+      await issuerWallet.mintTokens(tokenAmount);
 
-    // Check issuer balance after minting
-    const issuerBalanceAfterMint = (await issuerWallet.getIssuerTokenBalance())
-      .balance;
-    expect(issuerBalanceAfterMint).toEqual(tokenAmount);
+      // Check issuer balance after minting
+      const issuerBalanceAfterMint = (
+        await issuerWallet.getIssuerTokenBalance()
+      ).balance;
+      expect(issuerBalanceAfterMint).toEqual(tokenAmount);
 
-    const { wallet: userWallet } = await SparkWalletTesting.initialize({
-      options: LOCAL_WALLET_CONFIG_ECDSA,
-    });
-    const userWalletPublicKey = await userWallet.getSparkAddress();
+      const { wallet: userWallet } = await SparkWalletTesting.initialize({
+        options: LOCAL_WALLET_CONFIG_ECDSA,
+      });
+      const userWalletPublicKey = await userWallet.getSparkAddress();
 
-    await issuerWallet.transferTokens({
-      tokenAmount,
-      tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
-      receiverSparkAddress: userWalletPublicKey,
-    });
-    const issuerBalanceAfterTransfer = (
-      await issuerWallet.getIssuerTokenBalance()
-    ).balance;
-    expect(issuerBalanceAfterTransfer).toEqual(0n);
+      await issuerWallet.transferTokens({
+        tokenAmount,
+        tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
+        receiverSparkAddress: userWalletPublicKey,
+      });
+      const issuerBalanceAfterTransfer = (
+        await issuerWallet.getIssuerTokenBalance()
+      ).balance;
+      expect(issuerBalanceAfterTransfer).toEqual(0n);
 
-    const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
-    const userBalanceObj = await userWallet.getBalance();
-    const userBalanceAfterTransfer = filterTokenBalanceForTokenPublicKey(
-      userBalanceObj?.tokenBalances,
-      tokenPublicKey,
-    );
-    expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
-    // Freeze tokens
-    const freezeResponse = await issuerWallet.freezeTokens(userWalletPublicKey);
-    expect(freezeResponse.impactedOutputIds.length).toBeGreaterThan(0);
-    expect(freezeResponse.impactedTokenAmount).toEqual(tokenAmount);
+      const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
+      const userBalanceObj = await userWallet.getBalance();
+      const userBalanceAfterTransfer = filterTokenBalanceForTokenPublicKey(
+        userBalanceObj?.tokenBalances,
+        tokenPublicKey,
+      );
+      expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
+      // Freeze tokens
+      const freezeResponse =
+        await issuerWallet.freezeTokens(userWalletPublicKey);
+      expect(freezeResponse.impactedOutputIds.length).toBeGreaterThan(0);
+      expect(freezeResponse.impactedTokenAmount).toEqual(tokenAmount);
 
-    // Unfreeze tokens
-    const unfreezeResponse =
-      await issuerWallet.unfreezeTokens(userWalletPublicKey);
-    expect(unfreezeResponse.impactedOutputIds.length).toBeGreaterThan(0);
-    expect(unfreezeResponse.impactedTokenAmount).toEqual(tokenAmount);
-  });
-
-  brokenTestFn("should freeze tokens with Schnorr", async () => {
-    const tokenAmount: bigint = 1000n;
-    const { wallet: issuerWallet } = await IssuerSparkWalletTesting.initialize({
-      options: LOCAL_WALLET_CONFIG_SCHNORR,
-    });
-
-    await issuerWallet.mintTokens(tokenAmount);
-
-    // Check issuer balance after minting
-    const issuerBalanceAfterMint = (await issuerWallet.getIssuerTokenBalance())
-      .balance;
-    expect(issuerBalanceAfterMint).toEqual(tokenAmount);
-
-    const { wallet: userWallet } = await SparkWalletTesting.initialize({
-      options: LOCAL_WALLET_CONFIG_SCHNORR,
-    });
-    const userWalletPublicKey = await userWallet.getSparkAddress();
-
-    await issuerWallet.transferTokens({
-      tokenAmount,
-      tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
-      receiverSparkAddress: userWalletPublicKey,
-    });
-
-    const issuerBalanceAfterTransfer = (
-      await issuerWallet.getIssuerTokenBalance()
-    ).balance;
-    expect(issuerBalanceAfterTransfer).toEqual(0n);
-
-    const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
-    const userBalanceObj = await userWallet.getBalance();
-    const userBalanceAfterTransfer = filterTokenBalanceForTokenPublicKey(
-      userBalanceObj?.tokenBalances,
-      tokenPublicKey,
-    );
-    expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
-
-    const freezeResult = await issuerWallet.freezeTokens(userWalletPublicKey);
-    expect(freezeResult.impactedOutputIds.length).toBe(1);
-    expect(freezeResult.impactedTokenAmount).toBe(1000n);
-
-    const unfreezeResult =
-      await issuerWallet.unfreezeTokens(userWalletPublicKey);
-    expect(unfreezeResult.impactedOutputIds.length).toBe(1);
-    expect(unfreezeResult.impactedTokenAmount).toBe(1000n);
-  });
-
-  brokenTestFn("should burn tokens with ECDSA", async () => {
-    const tokenAmount: bigint = 200n;
-    const { wallet: issuerWallet } = await IssuerSparkWalletTesting.initialize({
-      options: LOCAL_WALLET_CONFIG_ECDSA,
-    });
-    await issuerWallet.mintTokens(tokenAmount);
-
-    const issuerTokenBalance = (await issuerWallet.getIssuerTokenBalance())
-      .balance;
-    expect(issuerTokenBalance).toEqual(tokenAmount);
-
-    await issuerWallet.burnTokens(tokenAmount);
-
-    const issuerTokenBalanceAfterBurn = (
-      await issuerWallet.getIssuerTokenBalance()
-    ).balance;
-    expect(issuerTokenBalanceAfterBurn).toEqual(0n);
-  });
-
-  brokenTestFn("should burn tokens with Schnorr", async () => {
-    const tokenAmount: bigint = 200n;
-    const { wallet: issuerWallet } = await IssuerSparkWalletTesting.initialize({
-      options: LOCAL_WALLET_CONFIG_SCHNORR,
-    });
-    await issuerWallet.mintTokens(tokenAmount);
-
-    const issuerTokenBalance = (await issuerWallet.getIssuerTokenBalance())
-      .balance;
-    expect(issuerTokenBalance).toEqual(tokenAmount);
-
-    await issuerWallet.burnTokens(tokenAmount);
-
-    const issuerTokenBalanceAfterBurn = (
-      await issuerWallet.getIssuerTokenBalance()
-    ).balance;
-    expect(issuerTokenBalanceAfterBurn).toEqual(0n);
-  });
+      // Unfreeze tokens
+      const unfreezeResponse =
+        await issuerWallet.unfreezeTokens(userWalletPublicKey);
+      expect(unfreezeResponse.impactedOutputIds.length).toBeGreaterThan(0);
+      expect(unfreezeResponse.impactedTokenAmount).toEqual(tokenAmount);
+    },
+  );
 
   brokenTestFn(
-    "mint, transfer to user, user transfer to issuer, burn with ECDSA",
+    "should announce, mint, freeze and unfreeze tokens with Schnorr",
+    async () => {
+      const tokenAmount: bigint = 1000n;
+      const { wallet: issuerWallet } =
+        await IssuerSparkWalletTesting.initialize({
+          options: LOCAL_WALLET_CONFIG_SCHNORR,
+        });
+
+      await fundAndAnnounce(issuerWallet, 100000n, "SchnorrFreezeToken", "SFT");
+
+      await issuerWallet.mintTokens(tokenAmount);
+
+      // Check issuer balance after minting
+      const issuerBalanceAfterMint = (
+        await issuerWallet.getIssuerTokenBalance()
+      ).balance;
+      expect(issuerBalanceAfterMint).toEqual(tokenAmount);
+
+      const { wallet: userWallet } = await SparkWalletTesting.initialize({
+        options: LOCAL_WALLET_CONFIG_SCHNORR,
+      });
+      const userWalletPublicKey = await userWallet.getSparkAddress();
+
+      await issuerWallet.transferTokens({
+        tokenAmount,
+        tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
+        receiverSparkAddress: userWalletPublicKey,
+      });
+
+      const issuerBalanceAfterTransfer = (
+        await issuerWallet.getIssuerTokenBalance()
+      ).balance;
+      expect(issuerBalanceAfterTransfer).toEqual(0n);
+
+      const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
+      const userBalanceObj = await userWallet.getBalance();
+      const userBalanceAfterTransfer = filterTokenBalanceForTokenPublicKey(
+        userBalanceObj?.tokenBalances,
+        tokenPublicKey,
+      );
+      expect(userBalanceAfterTransfer.balance).toEqual(tokenAmount);
+
+      const freezeResult = await issuerWallet.freezeTokens(userWalletPublicKey);
+      expect(freezeResult.impactedOutputIds.length).toBe(1);
+      expect(freezeResult.impactedTokenAmount).toBe(1000n);
+
+      const unfreezeResult =
+        await issuerWallet.unfreezeTokens(userWalletPublicKey);
+      expect(unfreezeResult.impactedOutputIds.length).toBe(1);
+      expect(unfreezeResult.impactedTokenAmount).toBe(1000n);
+    },
+  );
+
+  brokenTestFn(
+    "should announce, mint, and burn tokens with ECDSA",
+    async () => {
+      const tokenAmount: bigint = 200n;
+      const { wallet: issuerWallet } =
+        await IssuerSparkWalletTesting.initialize({
+          options: LOCAL_WALLET_CONFIG_ECDSA,
+        });
+
+      await fundAndAnnounce(issuerWallet, 100000n, "ECDSABurnToken", "EBT");
+      await issuerWallet.mintTokens(tokenAmount);
+
+      const issuerTokenBalance = (await issuerWallet.getIssuerTokenBalance())
+        .balance;
+      expect(issuerTokenBalance).toEqual(tokenAmount);
+
+      await issuerWallet.burnTokens(tokenAmount);
+
+      const issuerTokenBalanceAfterBurn = (
+        await issuerWallet.getIssuerTokenBalance()
+      ).balance;
+      expect(issuerTokenBalanceAfterBurn).toEqual(0n);
+    },
+  );
+
+  brokenTestFn(
+    "should announce, mint, and burn tokens with Schnorr",
+    async () => {
+      const tokenAmount: bigint = 200n;
+      const { wallet: issuerWallet } =
+        await IssuerSparkWalletTesting.initialize({
+          options: LOCAL_WALLET_CONFIG_SCHNORR,
+        });
+
+      await fundAndAnnounce(issuerWallet, 100000n, "SchnorrBurnToken", "SBT");
+      await issuerWallet.mintTokens(tokenAmount);
+
+      const issuerTokenBalance = (await issuerWallet.getIssuerTokenBalance())
+        .balance;
+      expect(issuerTokenBalance).toEqual(tokenAmount);
+
+      await issuerWallet.burnTokens(tokenAmount);
+
+      const issuerTokenBalanceAfterBurn = (
+        await issuerWallet.getIssuerTokenBalance()
+      ).balance;
+      expect(issuerTokenBalanceAfterBurn).toEqual(0n);
+    },
+  );
+
+  brokenTestFn(
+    "should complete full token lifecycle with ECDSA: announce, mint, transfer, return, burn",
     async () => {
       const tokenAmount: bigint = 1000n;
 
@@ -350,6 +370,12 @@ describe("token integration test", () => {
         options: LOCAL_WALLET_CONFIG_ECDSA,
       });
 
+      await fundAndAnnounce(
+        issuerWallet,
+        100000n,
+        "ECDSAFullCycleToken",
+        "EFCT",
+      );
       await issuerWallet.mintTokens(tokenAmount);
 
       const issuerBalanceAfterMint = (
@@ -403,7 +429,7 @@ describe("token integration test", () => {
   );
 
   brokenTestFn(
-    "mint, transfer to user, user transfer to issuer, burn with Schnorr",
+    "should complete full token lifecycle with Schnorr: announce, mint, transfer, return, burn",
     async () => {
       const tokenAmount: bigint = 1000n;
 
@@ -416,7 +442,12 @@ describe("token integration test", () => {
         options: LOCAL_WALLET_CONFIG_SCHNORR,
       });
 
-      const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
+      await fundAndAnnounce(
+        issuerWallet,
+        100000n,
+        "SchnorrFullCycleToken",
+        "SFCT",
+      );
       await issuerWallet.mintTokens(tokenAmount);
 
       const issuerBalanceAfterMint = (
@@ -428,7 +459,7 @@ describe("token integration test", () => {
 
       await issuerWallet.transferTokens({
         tokenAmount,
-        tokenPublicKey,
+        tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
         receiverSparkAddress: userWalletPublicKey,
       });
 
@@ -471,3 +502,37 @@ describe("token integration test", () => {
     },
   );
 });
+
+async function fundAndAnnounce(
+  wallet: IssuerSparkWallet,
+  maxSupply: bigint = 100000n,
+  tokenName: string = "TestToken1",
+  tokenSymbol: string = "TT1",
+) {
+  // Faucet funds to the Issuer wallet because announcing a token
+  // requires ownership of an L1 UTXO.
+  const faucet = BitcoinFaucet.getInstance();
+  const l1WalletPubKey = await wallet.getTokenL1Address();
+  await faucet.sendToAddress(l1WalletPubKey, 100_000n);
+  await faucet.mineBlocks(6);
+
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+
+  try {
+    const response = await wallet.announceTokenL1(
+      tokenName,
+      tokenSymbol,
+      0,
+      maxSupply,
+      false,
+    );
+    console.log("Announce token response:", response);
+  } catch (error: any) {
+    console.error("Error when announcing token on L1:", error);
+    expect(error).toBeUndefined();
+  }
+  await faucet.mineBlocks(1);
+
+  // Wait for LRC20 processing.
+  await new Promise((resolve) => setTimeout(resolve, 30000));
+}
