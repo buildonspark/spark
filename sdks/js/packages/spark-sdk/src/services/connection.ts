@@ -19,7 +19,7 @@ import {
   SparkAuthnServiceDefinition,
 } from "../proto/spark_authn.js";
 import { isHermeticTest } from "../tests/test-util.js";
-import { SparkCallOptions } from "../types/grpc.js";
+import { RetryOptions, SparkCallOptions } from "../types/grpc.js";
 import { Network } from "../utils/network.js";
 import { WalletConfigService } from "./config.js";
 
@@ -129,6 +129,7 @@ export class ConnectionManager {
     const client = this.createGrpcClient<SparkServiceClient>(
       SparkServiceDefinition,
       channel,
+      true,
       authMiddleware,
     );
 
@@ -192,6 +193,7 @@ export class ConnectionManager {
     return this.createGrpcClient<SparkAuthnServiceClient>(
       SparkAuthnServiceDefinition,
       channel,
+      false,
     );
   }
 
@@ -280,18 +282,24 @@ export class ConnectionManager {
   private createGrpcClient<T>(
     defintion: SparkAuthnServiceDefinition | SparkServiceDefinition,
     channel: Channel,
+    withRetries: boolean,
     middleware?: any,
   ): T & { close?: () => void } {
-    let clientFactory = createClientFactory().use(retryMiddleware);
+    let clientFactory = createClientFactory();
+    let options: RetryOptions = {};
+    if (withRetries) {
+      clientFactory = clientFactory.use(retryMiddleware);
+      options = {
+        retry: true,
+        retryMaxAttempts: 3,
+      };
+    }
     if (middleware) {
       clientFactory = clientFactory.use(middleware);
     }
 
     const client = clientFactory.create(defintion, channel, {
-      "*": {
-        retry: true,
-        retryMaxAttempts: 3,
-      },
+      "*": options,
     }) as T;
     return {
       ...client,
