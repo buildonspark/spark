@@ -278,3 +278,13 @@ func VerifySignature(signedTx *wire.MsgTx, vin int, prevOutput *wire.TxOut) erro
 	}
 	return nil
 }
+
+// NetworkFromTokenTransaction extracts the Network from a TokenTransaction.
+// It determines the network by examining the transaction's network field.
+func NetworkFromTokenTransaction(tx *pb.TokenTransaction) (Network, error) {
+	if tx == nil {
+		return Unspecified, fmt.Errorf("token transaction cannot be nil")
+	}
+
+	return NetworkFromProtoNetwork(tx.Network)
+}

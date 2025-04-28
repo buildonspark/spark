@@ -32,7 +32,7 @@ type connPool struct {
 	allConns map[*grpc.ClientConn]struct{} // Track all connections for cleanup
 	config   *so.Config
 	maxSize  int
-	network  string
+	network  common.Network
 	logger   *slog.Logger
 
 	// Health check related fields
@@ -42,16 +42,18 @@ type connPool struct {
 }
 
 // newConnPool creates a new connection pool with improved performance characteristics
-func newConnPool(config *so.Config) (*connPool, error) {
+func newConnPool(config *so.Config, network common.Network) (*connPool, error) {
 	logger := slog.Default()
-	network := common.Regtest.String()
-
-	// Validate network support
-	if !slices.Contains(config.SupportedNetworks, common.Regtest) {
-		return nil, fmt.Errorf("regtest network not supported by this operator")
+	networkStr := network.String()
+	if !slices.Contains(config.SupportedNetworks, network) {
+		return nil, fmt.Errorf("%s network not supported by this operator", networkStr)
+	}
+	lrc20Config, ok := config.Lrc20Configs[networkStr]
+	if !ok {
+		return nil, fmt.Errorf("no LRC20 configuration found for network %s", networkStr)
 	}
 
-	size := int(config.Lrc20Configs[network].GRPCPoolSize)
+	size := int(lrc20Config.GRPCPoolSize)
 	if size <= 0 {
 		size = 5 // Set a reasonable default if config is invalid
 	}
@@ -69,10 +71,10 @@ func newConnPool(config *so.Config) (*connPool, error) {
 
 	// Initialize the pool with connections
 	for i := 0; i < size; i++ {
-		conn, err := createConnection(config)
+		conn, err := createConnection(config, network)
 		if err != nil {
 			// Log the error but continue trying to create more connections
-			logger.Warn("failed to create initial connection", "error", err, "index", i)
+			logger.Warn("failed to create initial connection", "error", err, "index", i, "network", networkStr)
 			continue
 		}
 
@@ -86,7 +88,7 @@ func newConnPool(config *so.Config) (*connPool, error) {
 
 	// Check if we have at least one valid connection
 	if len(pool.allConns) == 0 {
-		return nil, fmt.Errorf("failed to initialize connection pool: could not create any valid connections")
+		return nil, fmt.Errorf("failed to initialize connection pool: could not create any valid connections for network %s", networkStr)
 	}
 
 	// Start health check goroutine
@@ -140,7 +142,7 @@ func (p *connPool) performHealthCheck() {
 				conn.Close()
 
 				// Create a new connection to replace the bad one
-				newConn, err := createConnection(p.config)
+				newConn, err := createConnection(p.config, p.network)
 				if err != nil {
 					p.logger.Error("failed to create replacement connection", "error", err)
 				} else {
@@ -178,7 +180,7 @@ func (p *connPool) getConn(ctx context.Context) (*grpc.ClientConn, error) {
 	default:
 		// No connection immediately available, try to create a new one
 		// This happens outside the critical section
-		conn, err := createConnection(p.config)
+		conn, err := createConnection(p.config, p.network)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new connection: %w", err)
 		}
@@ -233,7 +235,7 @@ func (p *connPool) returnConn(conn *grpc.ClientConn) {
 		conn.Close()
 
 		// Try to create a replacement
-		newConn, err := createConnection(p.config)
+		newConn, err := createConnection(p.config, p.network)
 		if err != nil {
 			p.logger.Error("failed to create replacement connection", "error", err)
 			return
@@ -294,13 +296,17 @@ func (p *connPool) Close() error {
 }
 
 // createConnection creates a new gRPC connection with retry policy
-func createConnection(config *so.Config) (*grpc.ClientConn, error) {
-	network := common.Regtest.String()
-	if !slices.Contains(config.SupportedNetworks, common.Regtest) {
-		return nil, fmt.Errorf("regtest network not supported by this operator")
+func createConnection(config *so.Config, network common.Network) (*grpc.ClientConn, error) {
+	if !slices.Contains(config.SupportedNetworks, network) {
+		return nil, fmt.Errorf("%s network not supported by this operator", network)
 	}
 
-	lrc20Config := config.Lrc20Configs[network]
+	networkStr := network.String()
+	lrc20Config, ok := config.Lrc20Configs[networkStr]
+	if !ok {
+		return nil, fmt.Errorf("no LRC20 configuration found for network %s", networkStr)
+	}
+
 	retryConfig := common.RetryPolicyConfig{
 		MaxAttempts:          12,
 		InitialBackoff:       1 * time.Second,
@@ -319,37 +325,57 @@ func createConnection(config *so.Config) (*grpc.ClientConn, error) {
 // Client provides methods for interacting with the LRC20 node with built-in retries
 type Client struct {
 	config *so.Config
-	pool   *connPool
+	pools  map[string]*connPool // Map of network name to connection pool
 }
 
-// NewClient creates a new LRC20 client with a connection pool
+// NewClient creates a new LRC20 client with connection pools for each supported network
 func NewClient(config *so.Config) (*Client, error) {
-	pool, err := newConnPool(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create connection pool: %w", err)
+	pools := make(map[string]*connPool)
+
+	// Create a connection pool for each supported network that has an LRC20 config
+	for _, network := range config.SupportedNetworks {
+		networkStr := network.String()
+		if _, ok := config.Lrc20Configs[networkStr]; ok {
+			pool, err := newConnPool(config, network)
+			if err != nil {
+				// Log the error but continue with other networks
+				slog.Warn("failed to create connection pool for network",
+					"network", networkStr, "error", err)
+				continue
+			}
+			pools[networkStr] = pool
+		}
+	}
+
+	if len(pools) == 0 {
+		return nil, fmt.Errorf("failed to create any valid connection pools for supported networks")
 	}
 
 	return &Client{
 		config: config,
-		pool:   pool,
+		pools:  pools,
 	}, nil
 }
 
 // executeLrc20Call handles common LRC20 RPC call pattern with proper connection management
-func (c *Client) executeLrc20Call(ctx context.Context, operation func(client pblrc20.SparkServiceClient) error) error {
-	network := common.Regtest.String()
+func (c *Client) executeLrc20Call(ctx context.Context, network common.Network, operation func(client pblrc20.SparkServiceClient) error) error {
+	networkStr := network.String()
 	if c.shouldSkipLrc20Call(ctx, network) {
 		return nil
 	}
+	pool, ok := c.pools[networkStr]
+	if !ok {
+		return fmt.Errorf("no connection pool available for network %s", networkStr)
+	}
 
 	// Use the context for timeout when getting connection
-	conn, err := c.pool.getConn(ctx)
+	conn, err := pool.getConn(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get connection from pool: %w", err)
+		return fmt.Errorf("failed to get connection from pool for network %s: %w", networkStr, err)
 	}
 
 	// Always return the connection, whether the operation succeeds or fails
-	defer c.pool.returnConn(conn)
+	defer pool.returnConn(conn)
 
 	client := pblrc20.NewSparkServiceClient(conn)
 	return operation(client)
@@ -360,7 +386,11 @@ func (c *Client) SendSparkSignature(
 	ctx context.Context,
 	req *pblrc20.SendSparkSignatureRequest,
 ) error {
-	return c.executeLrc20Call(ctx, func(client pblrc20.SparkServiceClient) error {
+	network, err := common.NetworkFromTokenTransaction(req.FinalTokenTransaction)
+	if err != nil {
+		return fmt.Errorf("failed to determine network from token transaction: %w", err)
+	}
+	return c.executeLrc20Call(ctx, network, func(client pblrc20.SparkServiceClient) error {
 		_, err := client.SendSparkSignature(ctx, req)
 		return err
 	})
@@ -371,7 +401,9 @@ func (c *Client) FreezeTokens(
 	ctx context.Context,
 	req *pb.FreezeTokensRequest,
 ) error {
-	return c.executeLrc20Call(ctx, func(client pblrc20.SparkServiceClient) error {
+	// TODO: Unhardcode network for Freeze operations.
+	network := common.Mainnet
+	return c.executeLrc20Call(ctx, network, func(client pblrc20.SparkServiceClient) error {
 		_, err := client.FreezeTokens(ctx, req)
 		return err
 	})
@@ -382,7 +414,11 @@ func (c *Client) VerifySparkTx(
 	ctx context.Context,
 	tokenTransaction *pb.TokenTransaction,
 ) error {
-	return c.executeLrc20Call(ctx, func(client pblrc20.SparkServiceClient) error {
+	network, err := common.NetworkFromTokenTransaction(tokenTransaction)
+	if err != nil {
+		return fmt.Errorf("failed to determine network from token transaction: %w", err)
+	}
+	return c.executeLrc20Call(ctx, network, func(client pblrc20.SparkServiceClient) error {
 		_, err := client.VerifySparkTx(ctx, &pblrc20.VerifySparkTxRequest{
 			FinalTokenTransaction: tokenTransaction,
 		})
@@ -395,11 +431,12 @@ func (c *Client) VerifySparkTx(
 }
 
 // shouldSkipLrc20Call checks if LRC20 RPCs are disabled for the given network
-func (c *Client) shouldSkipLrc20Call(ctx context.Context, network string) bool {
+func (c *Client) shouldSkipLrc20Call(ctx context.Context, network common.Network) bool {
 	logger := logging.GetLoggerFromContext(ctx)
+	networkStr := network.String()
 
-	if lrc20Config, ok := c.config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
-		logger.Info("Skipping LRC20 node call due to DisableRpcs flag")
+	if lrc20Config, ok := c.config.Lrc20Configs[networkStr]; ok && lrc20Config.DisableRpcs {
+		logger.Info("Skipping LRC20 node call due to DisableRpcs flag", "network", networkStr)
 		return true
 	}
 	return false
@@ -410,33 +447,39 @@ func (c *Client) shouldSkipLrc20Call(ctx context.Context, network string) bool {
 // when requested by wallets / external parties (which also allows for updating balance).
 func (c *Client) MarkWithdrawnTokenOutputs(
 	ctx context.Context,
-	_ common.Network,
+	network common.Network,
 	dbTx *ent.Tx,
 	blockHash *chainhash.Hash,
 ) error {
 	logger := logging.GetLoggerFromContext(ctx)
-	network := common.Regtest.String()
-	if lrc20Config, ok := c.config.Lrc20Configs[network]; ok && lrc20Config.DisableRpcs {
-		logger.Info("Skipping LRC20 node call due to DisableRpcs flag")
+	networkStr := network.String()
+	if lrc20Config, ok := c.config.Lrc20Configs[networkStr]; ok && lrc20Config.DisableRpcs {
+		logger.Info("Skipping LRC20 node call due to DisableRpcs flag", "network", networkStr)
 		return nil
 	}
-	if lrc20Config, ok := c.config.Lrc20Configs[network]; ok && lrc20Config.DisableL1 {
-		logger.Info("Skipping LRC20 node call due to DisableL1 flag")
+	if lrc20Config, ok := c.config.Lrc20Configs[networkStr]; ok && lrc20Config.DisableL1 {
+		logger.Info("Skipping LRC20 node call due to DisableL1 flag", "network", networkStr)
 		return nil
+	}
+
+	// Get the connection pool for this network
+	pool, ok := c.pools[networkStr]
+	if !ok {
+		return fmt.Errorf("no connection pool available for network %s", networkStr)
 	}
 
 	allOutputs := []*pb.TokenOutput{}
 
 	pageResponse, err := func(ctx context.Context) (*pblrc20.ListWithdrawnOutputsResponse, error) {
-		conn, err := c.pool.getConn(ctx)
+		conn, err := pool.getConn(ctx)
 		if err != nil {
 			return nil, err
 		}
-		defer c.pool.returnConn(conn)
+		defer pool.returnConn(conn)
 
 		client := pblrc20.NewSparkServiceClient(conn)
 
-		pageSize := uint32(c.config.Lrc20Configs[network].GRPCPageSize)
+		pageSize := uint32(c.config.Lrc20Configs[networkStr].GRPCPageSize)
 		pageResponse, err := client.ListWithdrawnOutputs(ctx, &pblrc20.ListWithdrawnOutputsRequest{
 			// TODO(DL-99): Fetch just for the latest blockhash instead of all withdrawn outputs.
 			// TODO(DL-98): Add support for pagination.
@@ -445,13 +488,13 @@ func (c *Client) MarkWithdrawnTokenOutputs(
 		return pageResponse, err
 	}(ctx)
 	if err != nil {
-		return fmt.Errorf("error fetching withdrawn outputs: %w", err)
+		return fmt.Errorf("error fetching withdrawn outputs for network %s: %w", networkStr, err)
 	}
 
 	// Add the current page of results to our collection
 	allOutputs = append(allOutputs, pageResponse.Outputs...)
 
-	logger.Info("Completed fetching all withdrawn outputs", "total", len(allOutputs))
+	logger.Info("Completed fetching all withdrawn outputs", "network", networkStr, "total", len(allOutputs))
 
 	// Mark each output as withdrawn in the database
 	if len(allOutputs) > 0 {
@@ -480,6 +523,7 @@ func (c *Client) MarkWithdrawnTokenOutputs(
 			}
 
 			logger.Debug("Successfully marked token outputs as withdrawn",
+				"network", networkStr,
 				"count", len(outputIDs))
 		}
 	}
@@ -535,10 +579,14 @@ func (c *Client) UnmarkWithdrawnTokenOutputs(
 	return nil
 }
 
-// Close closes the client and its connection pool
+// Close closes the client and all its connection pools
 func (c *Client) Close() error {
-	if c.pool != nil {
-		return c.pool.Close()
+	var lastErr error
+	for network, pool := range c.pools {
+		if err := pool.Close(); err != nil {
+			lastErr = err
+			slog.Error("Error closing connection pool", "network", network, "error", err)
+		}
 	}
-	return nil
+	return lastErr
 }
