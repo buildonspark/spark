@@ -58,6 +58,7 @@ jobs:
       test_type: "go"
     secrets:
       HELM_PASSWORD: ${{ secrets.HELM_PASSWORD }}
+      AWS_ACCOUNT_ID_DEV: ${{ secrets.AWS_ACCOUNT_ID_DEV }}
     permissions:
       id-token: write
       contents: write
@@ -71,6 +72,7 @@ jobs:
       test_type: "js"
     secrets:
       HELM_PASSWORD: ${{ secrets.HELM_PASSWORD }}
+      AWS_ACCOUNT_ID_DEV: ${{ secrets.AWS_ACCOUNT_ID_DEV }}
     permissions:
       id-token: write
       contents: write
