@@ -8,15 +8,25 @@ import (
 
 type dbStatsContextKey string
 
+type serviceStatsContextKey string
+
 const dbStatsKey = dbStatsContextKey("dbStats")
+
+const serviceStatsKey = serviceStatsContextKey("serviceStats")
 
 type dbStats struct {
 	queryCount    int
 	queryDuration time.Duration
 }
 
+type serviceStats struct {
+	serviceRequestCount    int
+	serviceRequestDuration time.Duration
+}
+
 func InitTable(ctx context.Context) context.Context {
-	return context.WithValue(ctx, dbStatsKey, make(map[string]*dbStats))
+	ctx = context.WithValue(ctx, dbStatsKey, make(map[string]*dbStats))
+	return context.WithValue(ctx, serviceStatsKey, make(map[string]*serviceStats))
 }
 
 func ObserveQuery(ctx context.Context, table string, duration time.Duration) {
@@ -33,15 +43,43 @@ func ObserveQuery(ctx context.Context, table string, duration time.Duration) {
 	stats[table].queryDuration += duration
 }
 
-func LogTable(ctx context.Context, duration time.Duration) {
-	ctxDbStats, ok := ctx.Value(dbStatsKey).(map[string]*dbStats)
+func ObserveServiceCall(ctx context.Context, method string, duration time.Duration) {
+	stats, ok := ctx.Value(serviceStatsKey).(map[string]*serviceStats)
 	if !ok {
 		return
 	}
 
+	if _, exists := stats[method]; !exists {
+		stats[method] = new(serviceStats)
+	}
+
+	stats[method].serviceRequestCount++
+	stats[method].serviceRequestDuration += duration
+}
+
+func LogTable(ctx context.Context, duration time.Duration) {
 	result := make(map[string]any)
+	fillDbStats(ctx, result)
+	fillServiceStats(ctx, result)
+
 	result["_table"] = "spark-requests"
 	result["duration"] = duration.Seconds()
+
+	logger := GetLoggerFromContext(ctx)
+
+	attrs := make([]slog.Attr, 0, len(result))
+	for key, value := range result {
+		attrs = append(attrs, slog.Any(key, value))
+	}
+
+	logger.LogAttrs(context.Background(), slog.LevelInfo, "", attrs...)
+}
+
+func fillDbStats(ctx context.Context, result map[string]any) {
+	ctxDbStats, ok := ctx.Value(dbStatsKey).(map[string]*dbStats)
+	if !ok {
+		return
+	}
 
 	totals := dbStats{}
 
@@ -55,13 +93,24 @@ func LogTable(ctx context.Context, duration time.Duration) {
 
 	result["database.select.queries"] = totals.queryCount
 	result["database.select.duration"] = totals.queryDuration.Seconds()
+}
 
-	logger := GetLoggerFromContext(ctx)
-
-	attrs := make([]slog.Attr, 0, len(result))
-	for key, value := range result {
-		attrs = append(attrs, slog.Any(key, value))
+func fillServiceStats(ctx context.Context, result map[string]any) {
+	ctxServiceStats, ok := ctx.Value(serviceStatsKey).(map[string]*serviceStats)
+	if !ok {
+		return
 	}
 
-	logger.LogAttrs(context.Background(), slog.LevelInfo, "", attrs...)
+	totals := serviceStats{}
+
+	for service, stats := range ctxServiceStats {
+		result["service."+service+".requests"] = stats.serviceRequestCount
+		result["service."+service+".duration"] = stats.serviceRequestDuration.Seconds()
+
+		totals.serviceRequestCount += stats.serviceRequestCount
+		totals.serviceRequestDuration += stats.serviceRequestDuration
+	}
+
+	result["service.requests"] = totals.serviceRequestCount
+	result["service.duration"] = totals.serviceRequestDuration.Seconds()
 }

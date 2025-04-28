@@ -65,6 +65,7 @@ func LoggingUnaryClientInterceptor(
 	duration := time.Since(start)
 
 	logger := logging.GetLoggerFromContext(ctx)
+	logging.ObserveServiceCall(ctx, method, duration)
 
 	if err != nil {
 		logger.Error("gRPC client request failed", "grpc_client_method", method, "grpc_client_duration", duration.Seconds(), "error", err)
