@@ -17,7 +17,7 @@ import {
   TxInput,
   Receipt,
 } from "../types/index.ts";
-import { findNotFirstUsingFind, reverseBuffer, toEvenParity, PARITY, toXOnly } from "../utils/index.ts";
+import { findNotFirstUsingFind, reverseBuffer, toEvenParity, PARITY, toXOnly, DUST_AMOUNT } from "../utils/index.ts";
 import { Psbt, Payment, payments, networks, Transaction, address, script, opcodes, type Network } from "bitcoinjs-lib";
 import * as varuint from "varuint-bitcoin";
 import { privateNegate } from "@bitcoinerlab/secp256k1";
@@ -127,7 +127,12 @@ export class TransactionBuilder {
       privateKeys,
     );
 
-    this.constructPsbtFromInsAndOuts(psbt, [...inputs], [...outputs, changeOutputConstructed], privateKeys, sequence);
+    const constructedOutputs = [...outputs];
+    if (changeOutputConstructed.satoshis > DUST_AMOUNT) {
+      constructedOutputs.push(changeOutputConstructed);
+    }
+
+    this.constructPsbtFromInsAndOuts(psbt, [...inputs], constructedOutputs, privateKeys, sequence);
 
     return psbt.extractTransaction();
   }
@@ -273,13 +278,13 @@ export class TransactionBuilder {
     const inputsSum = this.sumSatoshis(inputs);
     const outputsSum = this.sumSatoshis(outputs);
 
-    const change = inputsSum - outputsSum - changeOutput.satoshis - fee;
+    const change = inputsSum - outputsSum - fee;
 
     if (change < 0) {
       throw new Error("Not enough satoshis to pay fees");
     }
 
-    changeOutput.satoshis = changeOutput.satoshis + change;
+    changeOutput.satoshis = change;
     return changeOutput;
   }
 

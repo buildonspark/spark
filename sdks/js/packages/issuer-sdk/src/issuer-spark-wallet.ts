@@ -217,7 +217,7 @@ export class IssuerSparkWallet extends SparkWallet {
     decimals: number,
     maxSupply: bigint,
     isFreezable: boolean,
-    feeRateSatsPerVb: number = 2.0,
+    feeRateSatsPerVb: number = 4.0,
   ): Promise<string> {
     await this.lrc20Wallet!.syncWallet();
 
