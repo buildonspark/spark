@@ -86,10 +86,13 @@ async function runCLI() {
     switch (network) {
       case "MAINNET":
         config = MAINNET_WALLET_CONFIG;
+        break;
       case "REGTEST":
         config = REGTEST_WALLET_CONFIG;
+        break;
       default:
         config = LOCAL_WALLET_CONFIG;
+        break;
     }
   }
 
