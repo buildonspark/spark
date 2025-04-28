@@ -1918,17 +1918,6 @@ export class SparkWallet extends EventEmitter {
     exitSpeed: ExitSpeed;
     amountSats?: number;
   }) {
-    if (amountSats && amountSats < 10000) {
-      throw new ValidationError(
-        "The minimum amount for a withdrawal is 10000 sats",
-        {
-          field: "amountSats",
-          value: amountSats,
-          expected: ">= 10000",
-        },
-      );
-    }
-
     return await this.withLeaves(async () => {
       return await this.coopExit(onchainAddress, exitSpeed, amountSats);
     });
@@ -2080,17 +2069,6 @@ export class SparkWallet extends EventEmitter {
       throw new ConfigurationError("SSP client not initialized", {
         configKey: "sspClient",
       });
-    }
-
-    if (amountSats < 10000) {
-      throw new ValidationError(
-        "The minimum amount for a withdrawal is 10000 sats",
-        {
-          field: "amountSats",
-          value: amountSats,
-          expected: ">= 10000",
-        },
-      );
     }
 
     let leaves = await this.selectLeaves(amountSats);
