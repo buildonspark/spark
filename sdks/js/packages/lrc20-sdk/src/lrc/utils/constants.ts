@@ -10,7 +10,7 @@ export const network = networks.regtest;
 export const TOKEN_AMOUNT_SIZE = 32;
 export const BLINDING_FACTOR_SIZE = 16;
 export const MIN_DUST_AMOUNT = 1000;
-export const DUST_AMOUNT = 300;
+export const DUST_AMOUNT = 354;
 
 export const PARITY = Buffer.from([2]);
 export const EMPTY_TOKEN_PUBKEY = Buffer.from(Array(33).fill(2));

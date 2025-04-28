@@ -1410,11 +1410,11 @@ export class LRCWallet {
   }
 
   private createReceiptBtcChangeOutput(): ReceiptOutput {
-    return ReceiptOutput.createFromRaw(this.addressInnerKey, 1000, new Receipt(new TokenAmount(0n), new TokenPubkey()));
+    return ReceiptOutput.createFromRaw(this.addressInnerKey, DUST_AMOUNT, new Receipt(new TokenAmount(0n), new TokenPubkey()));
   }
 
   private createRawBtcChangeOutput(): BitcoinOutput {
-    return new BitcoinOutput(this.keyPair.publicKey, 1000);
+    return new BitcoinOutput(this.keyPair.publicKey, DUST_AMOUNT);
   }
 
   private createOutputProofs(outputs: TxOutput[], index = 0): Map<number, ReceiptProof> {
