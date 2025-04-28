@@ -1,7 +1,12 @@
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { getLatestDepositTxId } from "@buildonspark/spark-sdk";
 import { TokenTransactionStatus } from "@buildonspark/spark-sdk/proto/spark";
-import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
+import {
+  ConfigOptions,
+  LOCAL_WALLET_CONFIG,
+  MAINNET_WALLET_CONFIG,
+  REGTEST_WALLET_CONFIG,
+} from "@buildonspark/spark-sdk/services/wallet-config";
 import { ExitSpeed } from "@buildonspark/spark-sdk/types";
 import {
   getNetwork,
@@ -13,6 +18,7 @@ import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { hex } from "@scure/base";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import readline from "readline";
+import fs from "fs";
 
 const commands = [
   "initwallet",
@@ -61,6 +67,32 @@ async function runCLI() {
     if (envNetwork === "LOCAL") return "LOCAL";
     return "REGTEST"; // default
   })();
+
+  const configFile = process.env.CONFIG_FILE;
+  let config: ConfigOptions = {};
+  if (configFile) {
+    try {
+      const data = fs.readFileSync(configFile, "utf8");
+      config = JSON.parse(data);
+      if (config.network !== network) {
+        console.error("Network mismatch in config file");
+        return;
+      }
+    } catch (err) {
+      console.error("Error reading config file:", err);
+      return;
+    }
+  } else {
+    switch (network) {
+      case "MAINNET":
+        config = MAINNET_WALLET_CONFIG;
+      case "REGTEST":
+        config = REGTEST_WALLET_CONFIG;
+      default:
+        config = LOCAL_WALLET_CONFIG;
+    }
+  }
+
   let wallet: IssuerSparkWallet | undefined;
 
   const rl = readline.createInterface({
@@ -131,7 +163,7 @@ async function runCLI() {
           console.log(helpMessage);
           break;
         case "nontrustydeposit":
-          if (process.env.NODE_ENV === "production" || network !== "REGTEST") {
+          if (process.env.NODE_ENV !== "development" || network !== "REGTEST") {
             console.log(
               "This command is only available in the development environment and on the REGTEST network",
             );
@@ -166,7 +198,7 @@ async function runCLI() {
           try {
             // Fetch transactions for the address
             const response = await fetch(
-              `https://regtest-mempool.dev.dev.sparkinfra.net/api/address/${sourceAddress}/txs`,
+              `${config.electrsUrl}/address/${sourceAddress}/txs`,
               {
                 headers: {
                   Authorization:
@@ -255,21 +287,16 @@ async function runCLI() {
             const signedTxHex = hex.encode(tx.extract());
 
             // Broadcast the signed transaction
-            const broadcastResponse = await fetch(
-              "https://regtest-mempool.dev.dev.sparkinfra.net/api/tx",
-              {
-                method: "POST",
-                headers: {
-                  Authorization:
-                    "Basic " +
-                    Buffer.from("spark-sdk:mCMk1JqlBNtetUNy").toString(
-                      "base64",
-                    ),
-                  "Content-Type": "text/plain",
-                },
-                body: signedTxHex,
+            const broadcastResponse = await fetch(`${config.electrsUrl}/tx`, {
+              method: "POST",
+              headers: {
+                Authorization:
+                  "Basic " +
+                  Buffer.from("spark-sdk:mCMk1JqlBNtetUNy").toString("base64"),
+                "Content-Type": "text/plain",
               },
-            );
+              body: signedTxHex,
+            });
 
             if (!broadcastResponse.ok) {
               const error = await broadcastResponse.text();
@@ -348,7 +375,8 @@ async function runCLI() {
             wallet.cleanupConnections();
           }
           const mnemonicOrSeed = args.join(" ");
-          const options: ConfigOptions = {
+          let options: ConfigOptions = {
+            ...config,
             network,
           };
           const { wallet: newWallet, mnemonic: newMnemonic } =

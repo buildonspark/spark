@@ -22,6 +22,8 @@ import {
   loadMnemonic,
   saveMnemonic,
 } from "../utils/utils.js";
+import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
+import fs from "fs";
 
 const SPARK_MNEMONIC_PATH = ".spark-mnemonic";
 
@@ -41,6 +43,23 @@ export const createSparkRouter = (
 
   let walletInstance: SparkWallet | IssuerSparkWallet | undefined = undefined;
 
+  const parseConfig = (): ConfigOptions => {
+      const configFile = process.env.CONFIG_FILE;
+      let config: ConfigOptions = {};
+      if (configFile) {
+        try {
+          const data = fs.readFileSync(configFile, "utf8");
+          config = JSON.parse(data);
+          if (config.network !== BITCOIN_NETWORK) {
+            console.error("Network mismatch in config file");
+          }
+        } catch (err) {
+          console.error("Error reading config file:", err);
+        }
+      }
+      return config;
+  }
+
   const initWallet = async (mnemonicOrSeed: string) => {
     let res:
       | {
@@ -52,6 +71,7 @@ export const createSparkRouter = (
       res = await walletClass.initialize({
         mnemonicOrSeed: mnemonicOrSeed,
         options: {
+          ...parseConfig(),
           network: BITCOIN_NETWORK,
         },
       });

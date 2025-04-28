@@ -5,8 +5,10 @@
   "description": "Spark CLI",
   "main": "index.js",
   "scripts": {
-    "cli": "NODE_ENV=development tsx src/cli.ts",
-    "cli:prod": "NODE_ENV=production tsx src/cli.ts",
+    "cli": "NODE_ENV=production NETWORK=regtest tsx src/cli.ts",
+    "cli:mainnet": "NODE_ENV=production NETWORK=mainnet tsx src/cli.ts",
+    "cli:dev": "NODE_ENV=development NETWORK=regtest CONFIG_FILE=../../dev-regtest-config.json tsx src/cli.ts",
+    "cli:dev:mainnet": "NODE_ENV=development NETWORK=mainnet CONFIG_FILE=../../dev-mainnet-config.json tsx src/cli.ts",
     "clean": "rm -rf dist",
     "format:fix": "prettier src --write",
     "format": "prettier src --check",

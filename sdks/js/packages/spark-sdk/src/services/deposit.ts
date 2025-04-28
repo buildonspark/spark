@@ -25,6 +25,7 @@ import {
   NetworkError,
   AuthenticationError,
 } from "../errors/types.js";
+import { hexToBytes } from "@noble/hashes/utils";
 
 type ValidateDepositAddressParams = {
   address: Address;
@@ -110,7 +111,7 @@ export class DepositService {
         continue;
       }
 
-      const operatorPubkey = operator.identityPublicKey;
+      const operatorPubkey = hexToBytes(operator.identityPublicKey);
       const operatorSig =
         address.depositAddressProof.addressSignatures[operator.identifier];
       if (!operatorSig) {

@@ -34,6 +34,7 @@ import {
   InternalValidationError,
 } from "../errors/types.js";
 import { SigningOperator } from "./wallet-config.js";
+import { hexToBytes } from "@noble/hashes/utils";
 
 export class TokenTransactionService {
   protected readonly config: WalletConfigService;
@@ -114,7 +115,7 @@ export class TokenTransactionService {
     for (const [_, operator] of Object.entries(
       this.config.getSigningOperators(),
     )) {
-      operatorKeys.push(operator.identityPublicKey);
+      operatorKeys.push(hexToBytes(operator.identityPublicKey));
     }
 
     return operatorKeys;
@@ -383,7 +384,7 @@ export class TokenTransactionService {
           // Create operator-specific payload with operator's identity public key
           const payload: OperatorSpecificTokenTransactionSignablePayload = {
             finalTokenTransactionHash: finalTokenTransactionHash,
-            operatorIdentityPublicKey: operator.identityPublicKey,
+            operatorIdentityPublicKey: hexToBytes(operator.identityPublicKey),
           };
 
           const payloadHash =

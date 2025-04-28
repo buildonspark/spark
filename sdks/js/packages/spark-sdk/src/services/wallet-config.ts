@@ -10,16 +10,12 @@ import {
 import { isHermeticTest } from "../tests/test-util.js";
 import { NetworkType } from "../utils/network.js";
 
-const isProduction = process.env.NODE_ENV === "production";
-
 const SSP_IDENTITY_PUBLIC_KEYS = {
   LOCAL: "028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4",
   REGTEST: {
-    DEV: "028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4",
     PROD: "022bf283544b16c0622daecb79422007d167eca6ce9f0c98c0c49833b1f7170bfe",
   },
   MAINNET: {
-    DEV: "02e0b8d42c5d3b5fe4c5beb6ea796ab3bc8aaf28a3d3195407482c67e0b58228a5",
     PROD: "023e33e2920326f64ea31058d44777442d97d7d5cbfcf54e3060bc1695e5261c93",
   },
 };
@@ -32,12 +28,6 @@ const URL_CONFIG = {
     LRC20_NODE: "http://127.0.0.1:18332",
   },
   REGTEST: {
-    DEV: {
-      SSP: "https://api.dev.dev.sparkinfra.net",
-      ELECTRS: "https://regtest-mempool.dev.dev.sparkinfra.net/api",
-      LRC20: "https://regtest.lrc20.dev.dev.sparkinfra.net:443",
-      LRC20_NODE: "https://regtest.lrc20.dev.dev.sparkinfra.net",
-    },
     PROD: {
       SSP: "https://api.lightspark.com",
       ELECTRS: "https://regtest-mempool.us-west-2.sparkinfra.net/api",
@@ -46,12 +36,6 @@ const URL_CONFIG = {
     },
   },
   MAINNET: {
-    DEV: {
-      SSP: "https://api.dev.dev.sparkinfra.net",
-      ELECTRS: "https://mempool.space/api",
-      LRC20: "https://mainnet.lrc20.dev.dev.sparkinfra.net:443",
-      LRC20_NODE: "https://mainnet.lrc20.dev.dev.sparkinfra.net",
-    },
     PROD: {
       SSP: "https://api.lightspark.com",
       ELECTRS: "https://mempool.space/api",
@@ -73,13 +57,9 @@ export function getElectrsUrl(network: NetworkType): string {
         ? "http://mempool.minikube.local/api"
         : URL_CONFIG.LOCAL.ELECTRS;
     case "REGTEST":
-      return isProduction
-        ? URL_CONFIG.REGTEST.PROD.ELECTRS
-        : URL_CONFIG.REGTEST.DEV.ELECTRS;
+      return URL_CONFIG.REGTEST.PROD.ELECTRS;
     case "MAINNET":
-      return isProduction
-        ? URL_CONFIG.MAINNET.PROD.ELECTRS
-        : URL_CONFIG.MAINNET.DEV.ELECTRS;
+      return URL_CONFIG.MAINNET.PROD.ELECTRS;
     default:
       return URL_CONFIG.LOCAL.ELECTRS;
   }
@@ -90,13 +70,9 @@ export function getLrc20Url(network: NetworkType): string {
     case "LOCAL":
       return URL_CONFIG.LOCAL.LRC20;
     case "REGTEST":
-      return isProduction
-        ? URL_CONFIG.REGTEST.PROD.LRC20
-        : URL_CONFIG.REGTEST.DEV.LRC20;
+      return URL_CONFIG.REGTEST.PROD.LRC20;
     case "MAINNET":
-      return isProduction
-        ? URL_CONFIG.MAINNET.PROD.LRC20
-        : URL_CONFIG.MAINNET.DEV.LRC20;
+      return URL_CONFIG.MAINNET.PROD.LRC20;
     default:
       return URL_CONFIG.LOCAL.LRC20;
   }
@@ -107,13 +83,9 @@ export function getLrc20NodeUrl(network: NetworkType): string {
     case "LOCAL":
       return URL_CONFIG.LOCAL.LRC20_NODE;
     case "REGTEST":
-      return isProduction
-        ? URL_CONFIG.REGTEST.PROD.LRC20_NODE
-        : URL_CONFIG.REGTEST.DEV.LRC20_NODE;
+      return URL_CONFIG.REGTEST.PROD.LRC20_NODE;
     case "MAINNET":
-      return isProduction
-        ? URL_CONFIG.MAINNET.PROD.LRC20_NODE
-        : URL_CONFIG.MAINNET.DEV.LRC20_NODE;
+      return URL_CONFIG.MAINNET.PROD.LRC20_NODE;
     default:
       return URL_CONFIG.LOCAL.LRC20_NODE;
   }
@@ -124,13 +96,9 @@ export function getSspIdentityPublicKey(network: NetworkType): string {
     case "LOCAL":
       return SSP_IDENTITY_PUBLIC_KEYS.LOCAL;
     case "REGTEST":
-      return isProduction
-        ? SSP_IDENTITY_PUBLIC_KEYS.REGTEST.PROD
-        : SSP_IDENTITY_PUBLIC_KEYS.REGTEST.DEV;
+      return SSP_IDENTITY_PUBLIC_KEYS.REGTEST.PROD;
     case "MAINNET":
-      return isProduction
-        ? SSP_IDENTITY_PUBLIC_KEYS.MAINNET.PROD
-        : SSP_IDENTITY_PUBLIC_KEYS.MAINNET.DEV;
+      return SSP_IDENTITY_PUBLIC_KEYS.MAINNET.PROD;
     default:
       return SSP_IDENTITY_PUBLIC_KEYS.LOCAL;
   }
@@ -143,13 +111,9 @@ export function getSspUrl(network: NetworkType): string {
         ? "http://app.minikube.local"
         : URL_CONFIG.LOCAL.SSP;
     case "REGTEST":
-      return isProduction
-        ? URL_CONFIG.REGTEST.PROD.SSP
-        : URL_CONFIG.REGTEST.DEV.SSP;
+      return URL_CONFIG.REGTEST.PROD.SSP;
     case "MAINNET":
-      return isProduction
-        ? URL_CONFIG.MAINNET.PROD.SSP
-        : URL_CONFIG.MAINNET.DEV.SSP;
+      return URL_CONFIG.MAINNET.PROD.SSP;
     default:
       return URL_CONFIG.LOCAL.SSP;
   }
@@ -159,7 +123,7 @@ export type SigningOperator = {
   readonly id: number;
   readonly identifier: string;
   readonly address: string;
-  readonly identityPublicKey: Uint8Array;
+  readonly identityPublicKey: string;
 };
 
 export type ConfigOptions = MayHaveLrc20WalletApiConfig &
@@ -234,7 +198,7 @@ export const REGTEST_WALLET_CONFIG: Required<ConfigOptions> = {
   ...BASE_CONFIG,
   network: "REGTEST",
   lrc20Address: getLrc20Url("REGTEST"),
-  signingOperators: getRegtestSigningOperators(),
+  signingOperators: getSigningOperators(),
   electrsUrl: getElectrsUrl("REGTEST"),
   lrc20ApiConfig: {
     electrsUrl: getElectrsUrl("REGTEST"),
@@ -253,7 +217,7 @@ export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
   ...BASE_CONFIG,
   network: "MAINNET",
   lrc20Address: getLrc20Url("MAINNET"),
-  signingOperators: getRegtestSigningOperators(),
+  signingOperators: getSigningOperators(),
   electrsUrl: getElectrsUrl("MAINNET"),
   lrc20ApiConfig: {
     electrsUrl: getElectrsUrl("MAINNET"),
@@ -267,58 +231,28 @@ export const MAINNET_WALLET_CONFIG: Required<ConfigOptions> = {
   },
 };
 
-export function getRegtestSigningOperators(): Record<string, SigningOperator> {
-  return isProduction ? getProdSigningOperators() : getDevSigningOperators();
-}
-
-function getDevSigningOperators(): Record<string, SigningOperator> {
-  return {
-    "0000000000000000000000000000000000000000000000000000000000000001": {
-      id: 0,
-      identifier:
-        "0000000000000000000000000000000000000000000000000000000000000001",
-      address: "https://0.spark.dev.dev.sparkinfra.net",
-      identityPublicKey: hexToBytes(DEV_PUBKEYS[0]!),
-    },
-    "0000000000000000000000000000000000000000000000000000000000000002": {
-      id: 1,
-      identifier:
-        "0000000000000000000000000000000000000000000000000000000000000002",
-      address: "https://1.spark.dev.dev.sparkinfra.net",
-      identityPublicKey: hexToBytes(DEV_PUBKEYS[1]!),
-    },
-    "0000000000000000000000000000000000000000000000000000000000000003": {
-      id: 2,
-      identifier:
-        "0000000000000000000000000000000000000000000000000000000000000003",
-      address: "https://2.spark.dev.dev.sparkinfra.net",
-      identityPublicKey: hexToBytes(DEV_PUBKEYS[2]!),
-    },
-  };
-}
-
-function getProdSigningOperators(): Record<string, SigningOperator> {
+function getSigningOperators(): Record<string, SigningOperator> {
   return {
     "0000000000000000000000000000000000000000000000000000000000000001": {
       id: 0,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000001",
       address: "https://0.spark.lightspark.com",
-      identityPublicKey: hexToBytes(PROD_PUBKEYS[0]!),
+      identityPublicKey: PROD_PUBKEYS[0]!,
     },
     "0000000000000000000000000000000000000000000000000000000000000002": {
       id: 1,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000002",
       address: "https://1.spark.lightspark.com",
-      identityPublicKey: hexToBytes(PROD_PUBKEYS[1]!),
+      identityPublicKey: PROD_PUBKEYS[1]!,
     },
     "0000000000000000000000000000000000000000000000000000000000000003": {
       id: 2,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000003",
       address: "https://2.spark.flashnet.xyz",
-      identityPublicKey: hexToBytes(PROD_PUBKEYS[2]!),
+      identityPublicKey: PROD_PUBKEYS[2]!,
     },
   };
 }
@@ -332,43 +266,41 @@ export function getLocalSigningOperators(): Record<string, SigningOperator> {
     "02c05c88cc8fc181b1ba30006df6a4b0597de6490e24514fbdd0266d2b9cd3d0ba",
   ];
 
-  const pubkeyBytesArray = pubkeys.map((pubkey) => hexToBytes(pubkey));
-
   return {
     "0000000000000000000000000000000000000000000000000000000000000001": {
       id: 0,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000001",
       address: "https://localhost:8535",
-      identityPublicKey: pubkeyBytesArray[0]!,
+      identityPublicKey: pubkeys[0]!,
     },
     "0000000000000000000000000000000000000000000000000000000000000002": {
       id: 1,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000002",
       address: "https://localhost:8536",
-      identityPublicKey: pubkeyBytesArray[1]!,
+      identityPublicKey: pubkeys[1]!,
     },
     "0000000000000000000000000000000000000000000000000000000000000003": {
       id: 2,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000003",
       address: "https://localhost:8537",
-      identityPublicKey: pubkeyBytesArray[2]!,
+      identityPublicKey: pubkeys[2]!,
     },
     "0000000000000000000000000000000000000000000000000000000000000004": {
       id: 3,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000004",
       address: "https://localhost:8538",
-      identityPublicKey: pubkeyBytesArray[3]!,
+      identityPublicKey: pubkeys[3]!,
     },
     "0000000000000000000000000000000000000000000000000000000000000005": {
       id: 4,
       identifier:
         "0000000000000000000000000000000000000000000000000000000000000005",
       address: "https://localhost:8539",
-      identityPublicKey: pubkeyBytesArray[4]!,
+      identityPublicKey: pubkeys[4]!,
     },
   };
 }

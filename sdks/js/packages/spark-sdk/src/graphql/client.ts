@@ -68,9 +68,6 @@ export interface HasSspClientOptions {
   readonly sspClientOptions: SspClientOptions;
 }
 
-const isProduction = process.env.NODE_ENV === "production";
-const SPARK_SCHEMA_VERSION = isProduction ? "2025-03-19" : "rc";
-
 export default class SspClient {
   private readonly requester: Requester;
 

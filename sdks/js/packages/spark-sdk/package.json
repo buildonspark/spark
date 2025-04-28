@@ -68,8 +68,8 @@
     "url": false
   },
   "scripts": {
-    "build": "NODE_ENV=development yarn tsc && tsup",
-    "build:prod": "NODE_ENV=production yarn tsc && tsup",
+    "build": "NODE_ENV=production yarn tsc && tsup",
+    "build:dev": "NODE_ENV=development yarn tsc && tsup",
     "build:watch": "yarn build --watch --clean=false",
     "clean": "rm -rf dist",
     "circular-deps": "madge --circular --extensions ts,tsx src",

@@ -7,6 +7,7 @@ import {
 import { collectResponses } from "@buildonspark/spark-sdk/utils";
 import { hashFreezeTokensPayload } from "../utils/token-hashing.js";
 import { NetworkError } from "@buildonspark/spark-sdk";
+import { hexToBytes } from "@noble/curves/abstract/utils";
 
 export class TokenFreezeService {
   private readonly config: WalletConfigService;
@@ -53,7 +54,7 @@ export class TokenFreezeService {
           tokenPublicKey,
           shouldUnfreeze,
           issuerProvidedTimestamp,
-          operatorIdentityPublicKey: operator.identityPublicKey,
+          operatorIdentityPublicKey: hexToBytes(operator.identityPublicKey),
         };
 
         const hashedPayload: Uint8Array =

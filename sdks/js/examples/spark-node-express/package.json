@@ -6,8 +6,8 @@
   "private": true,
   "scripts": {
     "build": "tsc",
-    "start": "NODE_ENV=development NODE_OPTIONS=\"--loader ts-node/esm\" nodemon src/index.ts",
-    "start:prod": "NODE_ENV=production NODE_OPTIONS=\"--loader ts-node/esm\" nodemon src/index.ts",
+    "start": "NODE_ENV=production NODE_OPTIONS=\"--loader ts-node/esm\" nodemon src/index.ts",
+    "start:dev": "NODE_ENV=development CONFIG_FILE=../../dev-regtest-config.json NODE_OPTIONS=\"--loader ts-node/esm\" nodemon src/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [],
