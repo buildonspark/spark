@@ -126,7 +126,7 @@ export default class SspClient {
               endpoint: "graphql",
               reason: error.message,
             },
-            authError instanceof Error ? authError : undefined,
+            authError as Error,
           );
         }
       }
@@ -135,7 +135,7 @@ export default class SspClient {
         {
           method: "POST",
         },
-        error instanceof Error ? error : undefined,
+        error as Error,
       );
     }
   }

@@ -110,7 +110,7 @@ export class ConnectionManager {
           errorCount: 1,
           errors: error instanceof Error ? error.message : String(error),
         },
-        error instanceof Error ? error : undefined,
+        error as Error,
       );
     }
   }

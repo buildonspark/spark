@@ -155,7 +155,7 @@ export class DepositService {
           errorCount: 1,
           errors: error instanceof Error ? error.message : String(error),
         },
-        error instanceof Error ? error : undefined,
+        error as Error,
       );
     }
 
@@ -277,7 +277,7 @@ export class DepositService {
           errorCount: 1,
           errors: error instanceof Error ? error.message : String(error),
         },
-        error instanceof Error ? error : undefined,
+        error as Error,
       );
     }
 
@@ -401,7 +401,7 @@ export class DepositService {
           errorCount: 1,
           errors: error instanceof Error ? error.message : String(error),
         },
-        error instanceof Error ? error : undefined,
+        error as Error,
       );
     }
 

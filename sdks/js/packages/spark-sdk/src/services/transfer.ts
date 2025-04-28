@@ -174,9 +174,13 @@ export class BaseTransferService {
         leavesToSend,
       });
     } catch (error) {
-      throw new NetworkError("Failed to finalize transfer", {
-        method: "POST",
-      });
+      throw new NetworkError(
+        "Failed to finalize transfer",
+        {
+          method: "POST",
+        },
+        error as Error,
+      );
     }
 
     if (!updatedTransfer) {
@@ -787,7 +791,7 @@ export class TransferService extends BaseTransferService {
               {
                 method: "POST",
               },
-              error instanceof Error ? error : undefined,
+              error as Error,
             ) as SparkSDKError,
           );
           return;
@@ -798,9 +802,15 @@ export class TransferService extends BaseTransferService {
     await Promise.all(promises);
 
     if (errors.length > 0) {
-      throw new NetworkError("Failed to claim transfer tweak keys", {
-        method: "POST",
-      });
+      throw new NetworkError(
+        "Failed to claim transfer tweak keys",
+        {
+          method: "POST",
+          errorCount: errors.length,
+          errors: errors.map((e) => e.message).join(", "),
+        },
+        errors[0],
+      );
     }
 
     return proofMap;
@@ -972,7 +982,7 @@ export class TransferService extends BaseTransferService {
         {
           method: "POST",
         },
-        error instanceof Error ? error : undefined,
+        error as Error,
       );
     }
   }

@@ -46,7 +46,7 @@ export function encodeSparkAddress(
         field: "publicKey",
         value: payload.identityPublicKey,
       },
-      error instanceof Error ? error : undefined,
+      error as Error,
     );
   }
 }
@@ -82,7 +82,7 @@ export function decodeSparkAddress(
         field: "address",
         value: address,
       },
-      error instanceof Error ? error : undefined,
+      error as Error,
     );
   }
 }
@@ -113,7 +113,7 @@ export function isValidSparkAddress(address: string) {
         field: "address",
         value: address,
       },
-      error instanceof Error ? error : undefined,
+      error as Error,
     );
   }
 }
@@ -129,7 +129,7 @@ function isValidPublicKey(publicKey: string) {
         field: "publicKey",
         value: publicKey,
       },
-      error instanceof Error ? error : undefined,
+      error as Error,
     );
   }
 }

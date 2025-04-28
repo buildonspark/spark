@@ -217,7 +217,7 @@ export class TreeCreationService {
           operation: "finalize_node_signatures",
           nodeSignaturesCount: nodeSignatures.length,
         },
-        error instanceof Error ? error : undefined,
+        error as Error,
       );
     }
 

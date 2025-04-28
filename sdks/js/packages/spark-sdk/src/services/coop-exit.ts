@@ -194,7 +194,7 @@ export class CoopExitService extends BaseTransferService {
         exitId: crypto.randomUUID(),
         exitTxid: exitTxId,
       });
-    } catch (error: unknown) {
+    } catch (error) {
       throw new NetworkError(
         "Failed to initiate cooperative exit",
         {
@@ -202,7 +202,7 @@ export class CoopExitService extends BaseTransferService {
           errorCount: 1,
           errors: error instanceof Error ? error.message : String(error),
         },
-        error instanceof Error ? error : undefined,
+        error as Error,
       );
     }
 

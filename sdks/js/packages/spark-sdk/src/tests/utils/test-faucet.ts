@@ -317,7 +317,7 @@ export class BitcoinFaucet {
           method,
           params,
         },
-        error instanceof Error ? error : undefined,
+        error as Error,
       );
     }
   }
