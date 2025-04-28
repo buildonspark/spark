@@ -189,21 +189,39 @@ operator_cmd+=(
 "${operator_cmd[@]}" &
 
 # Deploy LRC20 nodes
-helm install \
-    --timeout "$HELM_INSTALL_TIMEOUT" \
-    --namespace lrc20 \
-    --set replicas="$LRC20_REPLICAS" \
-    --set config.network="regtest" \
-    --set image.tag="$LRC20_TAG" \
-    --set config.database_url="postgresql://postgres@postgres.default:5432/lrc20_\${INDEX}" \
-    --set config.extra.bnode.url="http://regtest-bitcoind.bitcoin:8332" \
-    --set ingress.enabled=true \
-    --set ingress.domain=lrc20.minikube.local \
-    --set storage.class="standard" \
-    --set imagePullSecret="ecr" \
-    --set config.extra.indexer.confirmations_number=1 \
-    regtest \
-    "$HELM_REPO_PREFIX"/yuvd &
+lrc20_cmd=(
+    helm install
+    --timeout "$HELM_INSTALL_TIMEOUT"
+    --namespace lrc20
+    --set replicas="$LRC20_REPLICAS"
+    --set config.network="regtest"
+    --set image.tag="$LRC20_TAG"
+    --set config.database_url="postgresql://postgres@postgres.default:5432/lrc20_\${INDEX}"
+    --set config.extra.bnode.url="http://regtest-bitcoind.bitcoin:8332"
+    --set ingress.enabled=true
+    --set ingress.domain=lrc20.minikube.local
+    --set storage.class="standard"
+    --set imagePullSecret="ecr"
+    --set config.extra.indexer.confirmations_number=1
+)
+
+if [ -n "$LRC20_REPO" ]; then
+    lrc20_cmd+=(
+        --set image.repository="$LRC20_REPO"
+        --set image.pullPolicy=Never
+    )
+fi
+
+if [ -n "$LRC20_TAG" ]; then
+    lrc20_cmd+=(--set "image.tag=$LRC20_TAG")
+fi
+
+lrc20_cmd+=(
+    regtest
+    "$HELM_REPO_PREFIX"/yuvd
+)
+
+"${lrc20_cmd[@]}" &
 
 check_service_readiness() {
     local namespace=$1
