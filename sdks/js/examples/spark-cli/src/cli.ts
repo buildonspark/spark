@@ -76,6 +76,7 @@ async function runCLI() {
   initwallet [mnemonic | seed]                                        - Create a new wallet from a mnemonic or seed. If no mnemonic or seed is provided, a new mnemonic will be generated.
   getbalance                                                          - Get the wallet's balance
   getdepositaddress                                                   - Get an address to deposit funds from L1 to Spark
+  identity                                                            - Get the wallet's identity public key
   getsparkaddress                                                     - Get the wallet's spark address
   getlatesttx <address>                                               - Get the latest deposit transaction id for an address
   claimdeposit <txid>                                                 - Claim any pending deposits to the wallet
@@ -643,8 +644,10 @@ async function runCLI() {
             console.log("Please initialize a wallet first");
             break;
           }
-
           const result = await wallet.getIssuerTokenActivity();
+          if (!result.transactions || result.transactions.length === 0) {
+            console.log("No transactions found");
+          }
           for (const transaction of result.transactions) {
             console.log(
               `Token Activity - case: ${transaction.transaction?.$case} | operation type: ${transaction.transaction?.$case === "spark" ? transaction.transaction?.spark.operationType : transaction.transaction?.onChain.operationType}`,
