@@ -93,6 +93,12 @@ import {
 } from "./address/index.js";
 import { SparkSigner } from "./signer/signer.js";
 import { BitcoinFaucet } from "./tests/utils/test-faucet.js";
+import {
+  mapTransferToWalletTransfer,
+  mapTreeNodeToWalletLeaf,
+  WalletLeaf,
+  WalletTransfer,
+} from "./types/sdk-types.js";
 import { getCrypto } from "./utils/crypto.js";
 import { getMasterHDKeyFromSeed } from "./utils/index.js";
 const crypto = getCrypto();
@@ -903,8 +909,23 @@ export class SparkWallet extends EventEmitter {
   public async getTransfers(
     limit: number = 20,
     offset: number = 0,
-  ): Promise<QueryTransfersResponse> {
-    return await this.transferService.queryAllTransfers(limit, offset);
+  ): Promise<{
+    transfers: WalletTransfer[];
+    offset: number;
+  }> {
+    const transfers = await this.transferService.queryAllTransfers(
+      limit,
+      offset,
+    );
+    const identityPublicKey = bytesToHex(
+      await this.config.signer.getIdentityPublicKey(),
+    );
+    return {
+      transfers: transfers.transfers.map((transfer) =>
+        mapTransferToWalletTransfer(transfer, identityPublicKey),
+      ),
+      offset: transfers.offset,
+    };
   }
 
   public async getTokenInfo(): Promise<TokenInfo[]> {
@@ -1065,9 +1086,9 @@ export class SparkWallet extends EventEmitter {
    * Claims a deposit to the wallet.
    * Note that if you used advancedDeposit, you don't need to call this function.
    * @param {string} txid - The transaction ID of the deposit
-   * @returns {Promise<TreeNode[] | undefined>} The nodes resulting from the deposit
+   * @returns {Promise<WalletLeaf[] | undefined>} The nodes resulting from the deposit
    */
-  public async claimDeposit(txid: string) {
+  public async claimDeposit(txid: string): Promise<WalletLeaf[]> {
     if (!txid) {
       throw new ValidationError("Transaction ID cannot be empty", {
         field: "txid",
@@ -1178,7 +1199,7 @@ export class SparkWallet extends EventEmitter {
 
     this.mutexes.delete(txid);
 
-    return nodes;
+    return nodes.map(mapTreeNodeToWalletLeaf);
   }
 
   /**
@@ -1278,9 +1299,12 @@ export class SparkWallet extends EventEmitter {
    * @param {TransferParams} params - Parameters for the transfer
    * @param {string} params.receiverSparkAddress - The recipient's Spark address
    * @param {number} params.amountSats - Amount to send in satoshis
-   * @returns {Promise<Transfer>} The completed transfer details
+   * @returns {Promise<WalletTransfer>} The completed transfer details
    */
-  public async transfer({ amountSats, receiverSparkAddress }: TransferParams) {
+  public async transfer({
+    amountSats,
+    receiverSparkAddress,
+  }: TransferParams): Promise<WalletTransfer> {
     if (!receiverSparkAddress) {
       throw new ValidationError("Receiver Spark address cannot be empty", {
         field: "receiverSparkAddress",
@@ -1332,7 +1356,10 @@ export class SparkWallet extends EventEmitter {
       if (isSelfTransfer) {
         await this.claimTransfer(transfer);
       }
-      return transfer;
+      return mapTransferToWalletTransfer(
+        transfer,
+        bytesToHex(await this.config.signer.getIdentityPublicKey()),
+      );
     });
   }
 
@@ -1966,7 +1993,7 @@ export class SparkWallet extends EventEmitter {
    * @param {string} params.withdrawalAddress - The Bitcoin address where the funds should be sent
    * @returns {Promise<CoopExitFeeEstimatesOutput | null>} Fee estimate for the withdrawal
    */
-  public async getCoopExitFeeEstimate({
+  public async getWithdrawalFeeEstimate({
     amountSats,
     withdrawalAddress,
   }: {

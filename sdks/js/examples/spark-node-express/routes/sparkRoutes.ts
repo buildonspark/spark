@@ -3,6 +3,7 @@ import { SparkWallet, type TokenInfo } from "@buildonspark/spark-sdk";
 import { Transfer } from "@buildonspark/spark-sdk/proto/spark";
 import {
   ExitSpeed,
+  WalletTransfer,
   type CoopExitRequest,
   type LightningReceiveRequest,
   type LightningSendRequest,
@@ -249,8 +250,8 @@ export const createSparkRouter = (
         Number(limit),
         Number(offset)
       );
-      const transferResponse = transfers.transfers.map((transfer: Transfer) =>
-        formatTransferResponse(transfer)
+      const transferResponse = transfers.transfers.map(
+        (transfer: WalletTransfer) => formatTransferResponse(transfer)
       );
       res.json({
         data: {
@@ -720,7 +721,7 @@ export const createSparkRouter = (
           amountSats: string;
           withdrawalAddress: string;
         };
-        const feeEstimate = await wallet!.getCoopExitFeeEstimate({
+        const feeEstimate = await wallet!.getWithdrawalFeeEstimate({
           amountSats: Number(amountSats),
           withdrawalAddress,
         });

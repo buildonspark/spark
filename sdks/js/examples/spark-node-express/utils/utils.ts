@@ -1,5 +1,9 @@
+import { Transfer } from "@buildonspark/spark-sdk/proto/spark";
+import {
+  WalletTransfer,
+  WalletTransferLeaf,
+} from "@buildonspark/spark-sdk/types";
 import { promises as fs } from "fs";
-import { Transfer, TransferLeaf } from "@buildonspark/spark-sdk/proto/spark";
 /**
  * Saves a mnemonic to a file
  * @param {string} path - The path to save the mnemonic
@@ -51,23 +55,20 @@ const NETWORK_MAP = {
  * @param {Transfer} transfer - The transfer object from SDK
  * @returns {Object} Formatted transfer response
  */
-export function formatTransferResponse(transfer: Transfer) {
+export function formatTransferResponse(transfer: WalletTransfer) {
   if (!transfer) return null;
   try {
     return {
       id: transfer.id,
       senderIdentityPublicKey: transfer.senderIdentityPublicKey,
       receiverIdentityPublicKey: transfer.receiverIdentityPublicKey,
-      status:
-        TRANSFER_STATUS_MAP[
-          transfer.status as keyof typeof TRANSFER_STATUS_MAP
-        ] ?? "UNKNOWN",
+      status: transfer.status,
       amount: transfer.totalValue,
       expiryTime: transfer.expiryTime
         ? new Date(transfer.expiryTime).toISOString()
         : null,
       leaves:
-        transfer.leaves?.map((leaf: TransferLeaf) => ({
+        transfer.leaves?.map((leaf: WalletTransferLeaf) => ({
           leaf: {
             id: leaf.leaf?.id,
             treeId: leaf.leaf?.treeId,
@@ -84,9 +85,7 @@ export function formatTransferResponse(transfer: Transfer) {
               threshold: Number(leaf.leaf?.signingKeyshare?.threshold),
             },
             status: leaf.leaf?.status,
-            network:
-              NETWORK_MAP[leaf.leaf?.network as keyof typeof NETWORK_MAP] ??
-              "UNKNOWN",
+            network: leaf.leaf?.network,
           },
           secretCipher: leaf.secretCipher,
           signature: leaf.signature,

@@ -1,5 +1,4 @@
-import { Transfer } from "@buildonspark/spark-sdk/proto/spark";
-import { bytesToHex } from "@noble/hashes/utils";
+import { WalletTransfer } from "@buildonspark/spark-sdk/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CardForm from "../../components/CardForm";
@@ -36,16 +35,16 @@ export default function Transactions() {
     if (!transfersQuery.data) return { transactions: [], hasMore: false };
 
     const transactions = transfersQuery.data.transfers.map(
-      (transfer: Transfer) => {
+      (transfer: WalletTransfer) => {
         const txType: "send" | "receive" =
-          bytesToHex(transfer.receiverIdentityPublicKey) === sparkAddress
+          transfer.receiverIdentityPublicKey === sparkAddress
             ? "receive"
             : "send";
 
         const counterparty =
           txType === "send"
-            ? bytesToHex(transfer.receiverIdentityPublicKey)
-            : bytesToHex(transfer.senderIdentityPublicKey);
+            ? transfer.receiverIdentityPublicKey
+            : transfer.senderIdentityPublicKey;
 
         return {
           id: transfer.id,

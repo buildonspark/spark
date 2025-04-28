@@ -1,5 +1,4 @@
-import { Transfer } from "@buildonspark/spark-sdk/proto/spark";
-import { bytesToHex } from "@noble/hashes/utils";
+import { WalletTransfer } from "@buildonspark/spark-sdk/types";
 import NumberFlow, { NumberFlowGroup } from "@number-flow/react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -152,9 +151,9 @@ export default function Wallet() {
             </div>
           </div>
           {transfersQuery?.data?.transfers?.map(
-            (transfer: Transfer, index: number) => {
+            (transfer: WalletTransfer, index: number) => {
               if (index >= 3) return null;
-              const receiver = bytesToHex(transfer.receiverIdentityPublicKey);
+              const receiver = transfer.receiverIdentityPublicKey;
               if (receiver === pubkey) {
                 return (
                   <TransactionDetailRow
@@ -162,9 +161,7 @@ export default function Wallet() {
                     transactionType="receive"
                     asset={PERMANENT_CURRENCIES.get("BTC")!}
                     assetAmount={transfer.totalValue}
-                    counterparty={bytesToHex(
-                      transfer.receiverIdentityPublicKey,
-                    )}
+                    counterparty={receiver}
                   />
                 );
               } else {
@@ -174,7 +171,7 @@ export default function Wallet() {
                     transactionType="send"
                     asset={PERMANENT_CURRENCIES.get("BTC")!}
                     assetAmount={transfer.totalValue}
-                    counterparty={bytesToHex(transfer.senderIdentityPublicKey)}
+                    counterparty={transfer.senderIdentityPublicKey}
                   />
                 );
               }

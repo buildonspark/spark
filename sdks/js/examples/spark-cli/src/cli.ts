@@ -1,5 +1,6 @@
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { getLatestDepositTxId } from "@buildonspark/spark-sdk";
+import { TokenTransactionStatus } from "@buildonspark/spark-sdk/proto/spark";
 import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
 import { ExitSpeed } from "@buildonspark/spark-sdk/types";
 import {
@@ -7,7 +8,6 @@ import {
   getP2TRScriptFromPublicKey,
   Network,
 } from "@buildonspark/spark-sdk/utils";
-import { TokenTransactionStatus } from "@buildonspark/spark-sdk/proto/spark";
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { hex } from "@scure/base";
@@ -528,7 +528,7 @@ async function runCLI() {
             console.log("Please initialize a wallet first");
             break;
           }
-          const fee = await wallet.getCoopExitFeeEstimate({
+          const fee = await wallet.getWithdrawalFeeEstimate({
             amountSats: parseInt(args[0]),
             withdrawalAddress: args[1],
           });

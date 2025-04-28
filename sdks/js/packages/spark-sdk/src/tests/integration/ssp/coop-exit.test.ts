@@ -33,7 +33,7 @@ describe("SSP coop exit integration", () => {
 
     const withdrawalAddress = await faucet.getNewAddress();
 
-    const feeEstimate = await userWallet.getCoopExitFeeEstimate({
+    const feeEstimate = await userWallet.getWithdrawalFeeEstimate({
       amountSats: Number(DEPOSIT_AMOUNT),
       withdrawalAddress,
     });
