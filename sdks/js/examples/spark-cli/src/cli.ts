@@ -25,7 +25,7 @@ const commands = [
   "payinvoice",
   "sendtransfer",
   "withdraw",
-  "coopfee",
+  "withdrawalfee",
   "lightningsendfee",
   "getlightningsendrequest",
   "getlightningreceiverequest",
@@ -85,7 +85,7 @@ async function runCLI() {
   payinvoice <invoice> <maxFeeSats>                                   - Pay a lightning invoice
   sendtransfer <amount> <receiverSparkAddress>                        - Send a spark transfer
   withdraw <amount> <onchainAddress> <exitSpeed(FAST|MEDIUM|SLOW)>    - Withdraw funds to an L1 address
-  coopfee <amount> <withdrawalAddress>                                - Get a fee estimate for a cooperative exit
+  withdrawalfee <amount> <withdrawalAddress>                          - Get a fee estimate for a withdrawal (cooperative exit)
   lightningsendfee <invoice>                                          - Get a fee estimate for a lightning send
   getlightningsendrequest <requestId>                                 - Get a lightning send request by ID
   getlightningreceiverequest <requestId>                              - Get a lightning receive request by ID
@@ -524,7 +524,7 @@ async function runCLI() {
           });
           console.log(withdrawal);
           break;
-        case "coopfee": {
+        case "withdrawalfee": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
             break;
