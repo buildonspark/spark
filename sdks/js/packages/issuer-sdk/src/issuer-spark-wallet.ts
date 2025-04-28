@@ -3,7 +3,11 @@ import {
   ListAllTokenTransactionsCursor,
   OperationType,
 } from "@buildonspark/lrc20-sdk/proto/rpc/v1/types";
-import { SparkWallet, SparkWalletProps } from "@buildonspark/spark-sdk";
+import {
+  NetworkError,
+  SparkWallet,
+  SparkWalletProps,
+} from "@buildonspark/spark-sdk";
 import {
   decodeSparkAddress,
   encodeSparkAddress,
@@ -19,6 +23,7 @@ import { TokenFreezeService } from "./services/freeze.js";
 import { IssuerTokenTransactionService } from "./services/token-transactions.js";
 import { GetTokenActivityResponse, TokenDistribution } from "./types.js";
 import { convertTokenActivityToHexEncoded } from "./utils/type-mappers.js";
+import { NotImplementedError } from "@buildonspark/spark-sdk";
 
 const BURN_ADDRESS = "02".repeat(33);
 
@@ -76,19 +81,27 @@ export class IssuerSparkWallet extends SparkWallet {
   public async getIssuerTokenInfo(): Promise<IssuerTokenInfo | null> {
     const lrc20Client = await this.lrc20ConnectionManager.createLrc20Client();
 
-    const tokenInfo = await lrc20Client.getTokenPubkeyInfo({
-      publicKeys: [hexToBytes(await super.getIdentityPublicKey())],
-    });
+    try {
+      const tokenInfo = await lrc20Client.getTokenPubkeyInfo({
+        publicKeys: [hexToBytes(await super.getIdentityPublicKey())],
+      });
 
-    const info = tokenInfo.tokenPubkeyInfos[0];
-    return {
-      tokenPublicKey: bytesToHex(info.announcement!.publicKey!.publicKey),
-      tokenName: info.announcement!.name,
-      tokenSymbol: info.announcement!.symbol,
-      tokenDecimals: Number(bytesToNumberBE(info.announcement!.decimal)),
-      isFreezable: info.announcement!.isFreezable,
-      maxSupply: bytesToNumberBE(info.announcement!.maxSupply),
-    };
+      const info = tokenInfo.tokenPubkeyInfos[0];
+      return {
+        tokenPublicKey: bytesToHex(info.announcement!.publicKey!.publicKey),
+        tokenName: info.announcement!.name,
+        tokenSymbol: info.announcement!.symbol,
+        tokenDecimals: Number(bytesToNumberBE(info.announcement!.decimal)),
+        isFreezable: info.announcement!.isFreezable,
+        maxSupply: bytesToNumberBE(info.announcement!.maxSupply),
+      };
+    } catch (error) {
+      throw new NetworkError("Failed to get token info", {
+        operation: "getIssuerTokenInfo",
+        errorCount: 1,
+        errors: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   public async mintTokens(tokenAmount: bigint): Promise<string> {
@@ -174,20 +187,28 @@ export class IssuerSparkWallet extends SparkWallet {
   ): Promise<GetTokenActivityResponse> {
     const lrc20Client = await this.lrc20ConnectionManager.createLrc20Client();
 
-    const transactions = await lrc20Client.listTransactions({
-      tokenPublicKey: hexToBytes(await super.getIdentityPublicKey()),
-      cursor,
-      pageSize,
-      beforeTimestamp,
-      afterTimestamp,
-      operationTypes,
-    });
+    try {
+      const transactions = await lrc20Client.listTransactions({
+        tokenPublicKey: hexToBytes(await super.getIdentityPublicKey()),
+        cursor,
+        pageSize,
+        beforeTimestamp,
+        afterTimestamp,
+        operationTypes,
+      });
 
-    return convertTokenActivityToHexEncoded(transactions);
+      return convertTokenActivityToHexEncoded(transactions);
+    } catch (error) {
+      throw new NetworkError("Failed to get token activity", {
+        operation: "listTransactions",
+        errorCount: 1,
+        errors: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   public async getIssuerTokenDistribution(): Promise<TokenDistribution> {
-    throw new Error("Not implemented");
+    throw new NotImplementedError("Token distribution is not yet supported");
   }
 
   public async announceTokenL1(
@@ -211,13 +232,24 @@ export class IssuerSparkWallet extends SparkWallet {
       isFreezable,
     );
 
-    const tx = await this.lrc20Wallet!.prepareAnnouncement(
-      announcement,
-      feeRateSatsPerVb,
-    );
+    try {
+      const tx = await this.lrc20Wallet!.prepareAnnouncement(
+        announcement,
+        feeRateSatsPerVb,
+      );
 
-    return await this.lrc20Wallet!.broadcastRawBtcTransaction(
-      tx.bitcoin_tx.toHex(),
-    );
+      return await this.lrc20Wallet!.broadcastRawBtcTransaction(
+        tx.bitcoin_tx.toHex(),
+      );
+    } catch (error) {
+      throw new NetworkError(
+        "Failed to broadcast announcement transaction on L1",
+        {
+          operation: "broadcastRawBtcTransaction",
+          errorCount: 1,
+          errors: error instanceof Error ? error.message : String(error),
+        },
+      );
+    }
   }
 }

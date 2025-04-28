@@ -1,16 +1,8 @@
 import {
   ListAllTokenTransactionsResponse,
   TokenPubkeyInfo,
-  Lrc20Protos,
 } from "@buildonspark/lrc20-sdk";
-import {
-  GetTokenActivityResponse,
-  TokenPubKeyInfoResponse,
-  OperationType,
-  OnChainTransactionStatus,
-  SparkTransactionStatus,
-  LayerType,
-} from "../types.js";
+import { GetTokenActivityResponse, TokenPubKeyInfoResponse } from "../types.js";
 import { bytesToHex, bytesToNumberBE } from "@noble/curves/abstract/utils";
 import {
   mapOperationType,

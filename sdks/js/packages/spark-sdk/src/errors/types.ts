@@ -151,3 +151,16 @@ export class ConfigurationError extends SparkSDKError {
     super(message, context, originalError);
   }
 }
+
+/***
+ * NotImplementedError should be used for any errors related to features that are not yet implemented.
+ */
+export class NotImplementedError extends SparkSDKError {
+  constructor(
+    message: string,
+    context?: Record<string, unknown>,
+    originalError?: Error,
+  ) {
+    super(message, context, originalError);
+  }
+}

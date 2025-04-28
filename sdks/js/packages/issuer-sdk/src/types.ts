@@ -1,5 +1,3 @@
-import { Lrc20Protos } from "@buildonspark/lrc20-sdk";
-
 // String enums to replace numeric enums
 export enum LayerType {
   L1 = "L1",

@@ -6,6 +6,7 @@ import {
 } from "@buildonspark/spark-sdk/proto/spark";
 import { collectResponses } from "@buildonspark/spark-sdk/utils";
 import { hashFreezeTokensPayload } from "../utils/token-hashing.js";
+import { NetworkError } from "@buildonspark/spark-sdk";
 
 export class TokenFreezeService {
   private readonly config: WalletConfigService;
@@ -61,14 +62,27 @@ export class TokenFreezeService {
         const issuerSignature =
           await this.config.signer.signMessageWithIdentityKey(hashedPayload);
 
-        const response = await internalSparkClient.freeze_tokens({
-          freezeTokensPayload,
-          issuerSignature,
-        });
-        return {
-          identifier,
-          response,
-        };
+        try {
+          const response = await internalSparkClient.freeze_tokens({
+            freezeTokensPayload,
+            issuerSignature,
+          });
+
+          return {
+            identifier,
+            response,
+          };
+        } catch (error) {
+          throw new NetworkError(
+            "Failed to send a freeze/unfreeze operation",
+            {
+              operation: "freeze_tokens",
+              errorCount: 1,
+              errors: error instanceof Error ? error.message : String(error),
+            },
+            error instanceof Error ? error : undefined,
+          );
+        }
       }),
     );
 
