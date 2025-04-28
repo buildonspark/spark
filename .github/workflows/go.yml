@@ -126,7 +126,7 @@ jobs:
       - name: "Configure AWS credentials"
         uses: "aws-actions/configure-aws-credentials@v1"
         with:
-          role-to-assume: "arn:aws:iam::674966927423:role/github-actions-spark"
+          role-to-assume: "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_DEV }}:role/github-actions-spark"
           aws-region: "us-west-2"
       - name: "Log into ECR"
         id: ecr-login
@@ -280,7 +280,7 @@ jobs:
       - name: "Configure AWS credentials"
         uses: "aws-actions/configure-aws-credentials@v1"
         with:
-          role-to-assume: "arn:aws:iam::674966927423:role/github-actions-spark"
+          role-to-assume: "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_DEV }}:role/github-actions-spark"
           aws-region: "us-west-2"
       - name: "Configure Kubernetes cluster"
         run: "aws --region us-west-2 eks update-kubeconfig --name dev"
