@@ -16,6 +16,7 @@ import { Mutex } from "async-mutex";
 import { decode } from "light-bolt11-decoder";
 import {
   ConfigurationError,
+  NetworkError,
   RPCError,
   ValidationError,
 } from "./errors/types.js";
@@ -272,13 +273,7 @@ export class SparkWallet extends EventEmitter {
           event.transfer.transfer &&
           !equalBytes(senderIdentityPublicKey, receiverIdentityPublicKey)
         ) {
-          await this.claimTransfer(event.transfer.transfer);
-
-          this.emit(
-            "transfer:claimed",
-            event.transfer.transfer.id,
-            (await this.getBalance()).balance,
-          );
+          await this.claimTransfer(event.transfer.transfer, true);
         }
       } else if (event?.$case === "deposit" && event.deposit.deposit) {
         const deposit = event.deposit.deposit;
@@ -1482,42 +1477,89 @@ export class SparkWallet extends EventEmitter {
    * @param {Transfer} transfer - The transfer to claim
    * @returns {Promise<Object>} The claim result
    */
-  private async claimTransfer(transfer: Transfer) {
-    let result = await this.claimTransferMutex.runExclusive(async () => {
-      const leafPubKeyMap =
-        await this.transferService.verifyPendingTransfer(transfer);
+  private async claimTransfer(
+    transfer: Transfer,
+    emit: boolean = false,
+    retryCount: number = 0,
+  ) {
+    const MAX_RETRIES = 5;
+    const BASE_DELAY_MS = 1000;
+    const MAX_DELAY_MS = 10000;
 
-      let leavesToClaim: LeafKeyTweak[] = [];
+    if (retryCount > 0) {
+      const delayMs = Math.min(
+        BASE_DELAY_MS * Math.pow(2, retryCount - 1),
+        MAX_DELAY_MS,
+      );
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    try {
+      let result = await this.claimTransferMutex.runExclusive(async () => {
+        const leafPubKeyMap =
+          await this.transferService.verifyPendingTransfer(transfer);
 
-      for (const leaf of transfer.leaves) {
-        if (leaf.leaf) {
-          const leafPubKey = leafPubKeyMap.get(leaf.leaf.id);
-          if (leafPubKey) {
-            leavesToClaim.push({
-              leaf: leaf.leaf,
-              signingPubKey: leafPubKey,
-              newSigningPubKey: await this.config.signer.generatePublicKey(
-                sha256(leaf.leaf.id),
-              ),
-            });
+        let leavesToClaim: LeafKeyTweak[] = [];
+
+        for (const leaf of transfer.leaves) {
+          if (leaf.leaf) {
+            const leafPubKey = leafPubKeyMap.get(leaf.leaf.id);
+            if (leafPubKey) {
+              leavesToClaim.push({
+                leaf: leaf.leaf,
+                signingPubKey: leafPubKey,
+                newSigningPubKey: await this.config.signer.generatePublicKey(
+                  sha256(leaf.leaf.id),
+                ),
+              });
+            }
           }
         }
+
+        const response = await this.transferService.claimTransfer(
+          transfer,
+          leavesToClaim,
+        );
+
+        this.leaves.push(...response.nodes);
+
+        if (emit) {
+          this.emit(
+            "transfer:claimed",
+            transfer.id,
+            (await this.getBalance()).balance,
+          );
+        }
+
+        return response.nodes;
+      });
+
+      await this.checkRefreshTimelockNodes(result);
+      result = await this.checkExtendTimeLockNodes(result);
+
+      return result;
+    } catch (error) {
+      if (
+        retryCount < MAX_RETRIES &&
+        error instanceof NetworkError &&
+        error.message === "Failed to claim transfer tweak keys"
+      ) {
+        console.error("Failed to claim transfer, retrying...", error);
+        this.claimTransfer(transfer, emit, retryCount + 1);
+        return [];
+      } else if (retryCount > 0) {
+        console.error("Failed to claim transfer", error);
+        return [];
+      } else {
+        throw new NetworkError(
+          "Failed to claim transfer",
+          {
+            operation: "claimTransfer",
+            errors: error instanceof Error ? error.message : String(error),
+          },
+          error instanceof Error ? error : undefined,
+        );
       }
-
-      const response = await this.transferService.claimTransfer(
-        transfer,
-        leavesToClaim,
-      );
-
-      this.leaves.push(...response.nodes);
-
-      return response.nodes;
-    });
-
-    await this.checkRefreshTimelockNodes(result);
-    result = await this.checkExtendTimeLockNodes(result);
-
-    return result;
+    }
   }
 
   /**
