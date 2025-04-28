@@ -24,7 +24,7 @@ jobs:
       - name: "Configure AWS credentials (dev)"
         uses: "aws-actions/configure-aws-credentials@v4"
         with:
-          role-to-assume: "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_DEV }}:role/github-actions-spark"
+          role-to-assume: "arn:aws:iam::674966927423:role/github-actions-spark"
           aws-region: "us-west-2"
       - name: "Log into ECR (dev)"
         id: ecr-dev
@@ -32,7 +32,7 @@ jobs:
       - name: "Configure AWS credentials (prod)"
         uses: "aws-actions/configure-aws-credentials@v4"
         with:
-          role-to-assume: "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_PROD }}:role/github-actions-spark"
+          role-to-assume: "arn:aws:iam::405785876631:role/github-actions-spark"
           aws-region: "us-west-2"
       - name: "Log into ECR (prod)"
         id: ecr-prod
