@@ -1,5 +1,13 @@
 # @buildonspark/spark-sdk
 
+## 0.1.10
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.38
+
 ## 0.1.9
 
 ### Patch Changes
