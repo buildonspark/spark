@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package common;
+
+option go_package = "github.com/lightsparkdev/spark/proto/common";
+
+/*
+ * A map from a string to a bytes. It's a workaround to have map arrays in proto.
+ */
+message PackageMap {
+    map<string, bytes> packages = 1;
+}
+
+/*
+ * A commitment for frost signing.
+ * It's a pair of public keys (points) in secp256k1 curve.
+ */
+ message SigningCommitment {
+    // The public key for hiding. 33 bytes.
+    bytes hiding = 1;
+
+    // The public key for binding. 33 bytes.
+    bytes binding = 2;
+}
+
+message SigningResult {
+    bytes signature_share = 1;
+}
+
+enum SignatureIntent {
+    CREATION = 0;
+    TRANSFER = 1;
+    AGGREGATE = 2;
+    REFRESH = 3;
+    EXTEND = 4;
+}

@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package spark_authn;
+
+option go_package = "github.com/lightsparkdev/spark/proto/spark_authn_internal";
+
+// Protected information about a session
+message Session {
+    // Protocol version
+    int32 version = 1;
+
+    // When the session expires (UTC Unix seconds)
+    int64 expiration_timestamp = 2;
+
+    // Random nonce for uniqueness
+    bytes nonce = 3;
+
+    // Public key this session is valid for
+    bytes public_key = 4;
+}
+
+// ProtectedSession wraps Session with integrity protection
+message ProtectedSession {
+    // Version of the protection scheme
+    int32 version = 1;
+
+    // The session data
+    Session session = 2;
+
+    // HMAC of the session data
+    bytes hmac = 3;
+}

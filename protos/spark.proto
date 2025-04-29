@@ -1,0 +1,999 @@
+syntax = "proto3";
+
+package spark;
+
+option go_package = "github.com/lightsparkdev/spark/proto/spark";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+import "validate/validate.proto";
+import "common.proto";
+
+service SparkService {
+    rpc generate_deposit_address(GenerateDepositAddressRequest) returns (GenerateDepositAddressResponse) {}
+    rpc start_deposit_tree_creation(StartDepositTreeCreationRequest) returns (StartDepositTreeCreationResponse) {}
+    // This is deprecated, please use start_deposit_tree_creation instead.
+    rpc start_tree_creation(StartTreeCreationRequest) returns (StartTreeCreationResponse) {
+        option deprecated = true;
+    }
+    rpc finalize_node_signatures(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
+
+    rpc start_transfer(StartTransferRequest) returns (StartTransferResponse) {}
+    rpc finalize_transfer(FinalizeTransferRequest) returns (FinalizeTransferResponse) {}
+    rpc cancel_transfer(CancelTransferRequest) returns (CancelTransferResponse) {}
+
+    rpc query_pending_transfers(TransferFilter) returns (QueryTransfersResponse) {}
+    rpc query_all_transfers(TransferFilter) returns (QueryTransfersResponse) {}
+    rpc claim_transfer_tweak_keys(ClaimTransferTweakKeysRequest) returns (google.protobuf.Empty) {}
+    rpc claim_transfer_sign_refunds(ClaimTransferSignRefundsRequest) returns (ClaimTransferSignRefundsResponse) {}
+    rpc aggregate_nodes(AggregateNodesRequest) returns (AggregateNodesResponse) {}
+    rpc store_preimage_share(StorePreimageShareRequest) returns (google.protobuf.Empty) {}
+    rpc get_signing_commitments(GetSigningCommitmentsRequest) returns (GetSigningCommitmentsResponse) {}
+    rpc cooperative_exit(CooperativeExitRequest) returns (CooperativeExitResponse) {}
+    rpc initiate_preimage_swap(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
+    rpc provide_preimage(ProvidePreimageRequest) returns (ProvidePreimageResponse) {}
+    // This is the exact same as start_transfer, but expresses to the SO
+    // this transfer is specifically for a leaf swap.
+    rpc start_leaf_swap(StartTransferRequest) returns (StartTransferResponse) {}
+    // This is deprecated, please use counter_leaf_swap instead.
+    rpc leaf_swap(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {
+        option deprecated = true;
+    }
+    // This is the exact same as start_leaf_swap, but signs with
+    // an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
+    rpc counter_leaf_swap(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {}
+    rpc refresh_timelock(RefreshTimelockRequest) returns (RefreshTimelockResponse) {}
+    rpc extend_leaf(ExtendLeafRequest) returns (ExtendLeafResponse) {}
+
+    rpc prepare_tree_address(PrepareTreeAddressRequest) returns (PrepareTreeAddressResponse) {}
+    rpc create_tree(CreateTreeRequest) returns (CreateTreeResponse) {}
+    rpc get_signing_operator_list(google.protobuf.Empty) returns (GetSigningOperatorListResponse) {}
+
+    rpc query_nodes(QueryNodesRequest) returns (QueryNodesResponse) {}
+
+    rpc query_balance(QueryBalanceRequest) returns (QueryBalanceResponse) {}
+
+    rpc query_user_signed_refunds(QueryUserSignedRefundsRequest) returns (QueryUserSignedRefundsResponse) {}
+
+    // Token RPCs
+    rpc start_token_transaction(StartTokenTransactionRequest) returns (StartTokenTransactionResponse) {}
+    rpc sign_token_transaction(SignTokenTransactionRequest) returns (SignTokenTransactionResponse) {}
+    rpc finalize_token_transaction(FinalizeTokenTransactionRequest) returns (google.protobuf.Empty) {}
+    rpc freeze_tokens(FreezeTokensRequest) returns (FreezeTokensResponse) {}
+    rpc query_token_outputs(QueryTokenOutputsRequest) returns (QueryTokenOutputsResponse) {}
+    rpc query_token_transactions(QueryTokenTransactionsRequest) returns (QueryTokenTransactionsResponse) {}
+    rpc cancel_signed_token_transaction(CancelSignedTokenTransactionRequest) returns (google.protobuf.Empty) {}
+
+    rpc return_lightning_payment(ReturnLightningPaymentRequest) returns (google.protobuf.Empty) {}
+
+
+    rpc query_unused_deposit_addresses(QueryUnusedDepositAddressesRequest) returns (QueryUnusedDepositAddressesResponse) {}
+
+    rpc subscribe_to_events(SubscribeToEventsRequest) returns (stream SubscribeToEventsResponse) {} 
+}
+
+message SubscribeToEventsRequest {
+    bytes identity_public_key = 10;
+}
+
+message SubscribeToEventsResponse {
+    oneof event {
+        TransferEvent transfer = 1;
+        DepositEvent deposit = 2;
+        ConnectedEvent connected = 3;
+    }
+}
+
+message ConnectedEvent { }
+
+message TransferEvent {
+    Transfer transfer = 10;
+}
+
+message DepositEvent {
+    TreeNode deposit = 10;
+}
+
+/**
+ * Network is the network type of the bitcoin network.
+ */
+enum Network {
+    UNSPECIFIED = 0;
+    MAINNET = 1;
+    REGTEST = 2;
+    TESTNET = 3;
+    SIGNET = 4;
+}
+
+/**
+ * DepositAddressProof is the proof of possession of the deposit address.
+ * When a user wants to generate a deposit address, they are sending their public key to the SE,
+ * and the SE will respond with an address of user's public key + SE's public key.
+ *
+ * In the trusty deposit flow, user will need to know that this address is valid, and no single SE
+ * can generate this address.
+ *
+ * The SE will need to sign the address with their identity keys, and have a proof of possession of
+ * the signing key piece that the SE holds.
+ */
+message DepositAddressProof {
+    // The signatures of the address by the SE's identity keys.
+    map<string, bytes> address_signatures = 1;
+    // The proof of possession of the signing key piece by the SE.
+    bytes proof_of_possession_signature = 2;
+}
+
+/**
+ * GenerateDepositAddressRequest is the request to generate a deposit address.
+ * The user will send their public key to the SE, and the SE will respond with an address of user's
+ * public key + SE's public key.
+ */
+message GenerateDepositAddressRequest {
+    // The signing public key of the user.
+    bytes signing_public_key = 1;
+    // The identity public key of the user.
+    bytes identity_public_key = 2;
+    // The network of the bitcoin network.
+    Network network = 3 [(validate.rules).enum = {not_in: [0]}];
+    // The UUID to use for the created TreeNode
+    optional string leaf_id = 4 [(validate.rules).string.uuid = true];
+    // Generate static deposit address
+    optional bool is_static = 5;
+}
+
+/**
+ * Address is the address of the user's public key + SE's public key.
+ */
+message Address {
+    // The p2tr address of the user's public key + SE's public key.
+    string address = 1;
+    // The verifying key of the address, which is user's public key + SE's public key.
+    bytes verifying_key = 2;
+    // The proof of possession of the address by the SE.
+    DepositAddressProof deposit_address_proof = 3;
+    // Is it a static deposit address
+    bool is_static = 5;
+}
+
+/**
+ * GenerateDepositAddressResponse is the response to the request to generate a deposit address.
+ */
+message GenerateDepositAddressResponse {
+    Address deposit_address = 1;
+}
+
+/**
+ * UTXO represents a utxo on the bitcoin network.
+ * The UTXO is used to create a tree on Spark, it can also be an off-chain utxo so that the user
+ * can create the tree first and the broadcast the transaction.
+ */
+message UTXO {
+    // The raw transaction of the utxo.
+    bytes raw_tx = 1;
+    // The vout of the raw transaction for the utxo, which will be used to create the tree.
+    uint32 vout = 2;
+    // The network of the bitcoin network.
+    Network network = 3 [(validate.rules).enum = {not_in: [0]}];
+}
+
+/**
+ * NodeOutput represents a node on the tree.
+ * This is similar to a UTXO, which is used to create a subtree on Spark. But instead of using
+ * a utxo, a existing node on the tree is used as the utxo.
+ */
+message NodeOutput {
+    // The id of the node.
+    string node_id = 1;
+    // The vout of the raw transaction for the node, which will be used to create the tree.
+    uint32 vout = 2;
+}
+
+/**
+ * SigningJob is the job for signing a transaction.
+ * The signing job is used to sign a bitcoin transaction using Spark FROST.
+ */
+message SigningJob {
+    // The signing public key of the user.
+    bytes signing_public_key = 1;
+    // The unsigned raw transaction to be signed.
+    bytes raw_tx = 2;
+    // The signing nonce commitment of the user.
+    common.SigningCommitment signing_nonce_commitment = 3;
+}
+
+/**
+ * SigningKeyshare is the keyshare information of the SE keyshare group.
+ */
+message SigningKeyshare {
+    // The identifiers of the owners of the keyshare.
+    repeated string owner_identifiers = 1;
+    // The threshold of the keyshare.
+    uint32 threshold = 2;
+}
+
+/**
+ * SigningResult is the result of the signing job from the SE keyshare group.
+ * It contains all the information for user to sign their part. After user signs, the signature
+ * can be aggregated to form the final signature.
+ */
+message SigningResult {
+    // The public keys of the SE keyshare group.
+    map<string, bytes> public_keys = 1;
+    // The signing nonce commitments of the SE keyshare group.
+    map<string, common.SigningCommitment> signing_nonce_commitments = 2;
+    // The signature shares of the SE keyshare group.
+    map<string, bytes> signature_shares = 3;
+    // The keyshare information of the SE keyshare group.
+    SigningKeyshare signing_keyshare = 4;
+}
+
+/**
+ * NodeSignatureShares is the signature shares for a node on the tree.
+ * For each tree node, the verifying key stays the same for both transactions.
+ */
+message NodeSignatureShares {
+    // The id of the node.
+    string node_id = 1;
+    // The signing result of the node's transaction. This transaction is to pay to self.
+    SigningResult node_tx_signing_result = 2;
+    // The signing result of the node's refund transaction. This transaction is to pay to the user.
+    SigningResult refund_tx_signing_result = 3;
+    // The verifying key of the node.
+    bytes verifying_key = 4;
+}
+
+/**
+ * NodeSignatures is the final signatures for a node on the tree.
+ * It contains the signature for the node's transaction and refund transaction.
+ */
+message NodeSignatures {
+    // The id of the node.
+    string node_id = 1;
+    // The final signature of the node's transaction. This transaction is to pay to self.
+    bytes node_tx_signature = 2;
+    // The final signature of the node's refund transaction. This transaction is to pay to the user.
+    bytes refund_tx_signature = 3;
+}
+
+/**
+ * StartTreeCreationRequest is the request to start the tree creation for a tree root node.
+ */
+message StartTreeCreationRequest {
+    // The identity public key of the user.
+    bytes identity_public_key = 1;
+    // The on-chain utxo to be used to be spent by the root node.
+    UTXO on_chain_utxo = 2;
+    // The signing job for the root node's transaction.
+    SigningJob root_tx_signing_job = 3;
+    // The signing job for the root node's refund transaction.
+    SigningJob refund_tx_signing_job = 4;
+}
+
+/**
+ * StartTreeCreationResponse is the response to the request to start the tree creation for a tree root node.
+ */
+message StartTreeCreationResponse {
+    // The id of the tree.
+    string tree_id = 1;
+    // The signature shares for the root node.
+    NodeSignatureShares root_node_signature_shares = 2;
+}
+
+/**
+ * StartDepositTreeCreationRequest is the request to start the tree creation for a tree root node.
+ */
+message StartDepositTreeCreationRequest {
+    // The identity public key of the user.
+    bytes identity_public_key = 1;
+    // The on-chain utxo to be used to be spent by the root node.
+    UTXO on_chain_utxo = 2;
+    // The signing job for the root node's transaction.
+    SigningJob root_tx_signing_job = 3;
+    // The signing job for the root node's refund transaction.
+    SigningJob refund_tx_signing_job = 4;
+}
+
+/**
+ * StartDepositTreeCreationResponse is the response to the request to start the tree creation for a tree root node.
+ */
+message StartDepositTreeCreationResponse {
+    // The id of the tree.
+    string tree_id = 1;
+    // The signature shares for the root node.
+    NodeSignatureShares root_node_signature_shares = 2;
+}
+
+// This proto is constructed by the wallet to specify leaves it wants to spend as
+// part of the token transaction.
+message TokenOutputToSpend {
+    bytes prev_token_transaction_hash = 1 [(validate.rules).bytes.len = 32];
+    uint32 prev_token_transaction_vout = 2; 
+}
+
+message TokenTransferInput {
+    repeated TokenOutputToSpend outputs_to_spend = 1;
+}
+
+message TokenMintInput {
+    bytes issuer_public_key = 1 [(validate.rules).bytes.len = 33];
+    // Issuer provided timestamp of when the transaction was signed/constructed. 
+    // Helps provide idempotency and ensures that each mint input signature is unique 
+    // as long as multiple mint signatures are not happening at the same time. Also gives a 
+    // potentially useful data point for when the issuer authorized from their 
+    // perspective.  Note that we have no way of proving this is accurate.
+    // TODO: Consider whether implementing generic idempotency controls and/or a 
+    // random nonce would be favorable to populating this field.
+    uint64 issuer_provided_timestamp = 2;
+}
+
+// This proto is constructed by the wallet to specify outputs it wants to create
+// as part of a token transaction. Output id and revocation public key should remain unfilled
+// so that the SE can fill them as part of the StartTokenTransaction() call.
+message TokenOutput {
+    optional string id = 1 [(validate.rules).string.uuid = true];
+    bytes owner_public_key = 2 [(validate.rules).bytes.len = 33];
+    optional bytes revocation_commitment = 3 [(validate.rules).bytes.len = 33];
+    optional uint64 withdraw_bond_sats = 4;
+    optional uint64 withdraw_relative_block_locktime = 5;
+    bytes token_public_key = 6 [(validate.rules).bytes.len = 33];
+    bytes token_amount = 7 [(validate.rules).bytes.len = 16];  // Decoded uint128
+}
+
+// This proto is constructed by the wallet and is the core transaction data structure.
+// This proto is deterministically hashed to generate the token_transaction_hash that 
+// is cooperatively signed by the SO group to confirm a token transaction.
+message TokenTransaction {    
+    // For mint transactions issuer_public_key will be specified without any outputs_to_spend.
+    // For transfer transactions the token amount in the input leaves must match the token amount in the output leaves.
+    oneof token_inputs {
+        TokenMintInput mint_input = 1;
+        TokenTransferInput transfer_input = 2;
+    }
+    repeated TokenOutput token_outputs = 3;
+    repeated bytes spark_operator_identity_public_keys = 4 [(validate.rules).repeated.items.bytes.len = 33];
+    Network network = 10 [(validate.rules).enum = {not_in: [0]}];
+}
+
+
+enum TokenTransactionStatus {
+    TOKEN_TRANSACTION_STARTED = 0; 
+    TOKEN_TRANSACTION_SIGNED = 1; 
+    TOKEN_TRANSACTION_FINALIZED = 2;
+}
+
+message TokenTransactionWithStatus {
+    TokenTransaction token_transaction = 1;
+    TokenTransactionStatus status = 2;
+}
+
+message SignatureWithIndex {
+    // This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
+    bytes signature = 1 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+    // The index of the TTXO associated with this signature.
+    uint32 input_index = 2;
+}
+
+message TokenTransactionSignatures {
+      // Filled by signing the partial token transaction hash with the owner/issuer private key.
+      // For mint transactions this will be one signature for the input issuer_public_key
+      // For transfer transactions this will be one for each output for the output owner_public_key
+      repeated SignatureWithIndex owner_signatures = 1;
+}
+
+message StartTokenTransactionRequest {
+    bytes identity_public_key = 1 [(validate.rules).bytes.len = 33];
+    TokenTransaction partial_token_transaction = 2;
+    // List of ecdsa signatures authorizing movement of tokens from the token input.
+    TokenTransactionSignatures token_transaction_signatures = 3;
+}
+
+message StartTokenTransactionResponse {
+    // This is the same token transaction sent by the wallet with output revocation public keys 
+    // filled. This is the final transaction that is published and gossiped among LRC20 nodes.
+    TokenTransaction final_token_transaction = 1;
+    // Information for fetching and resolving the revocation keyshare on a transfer operation.
+    // Contains the threshold of keyshares needed and the SO owners of those keyshares.
+    SigningKeyshare keyshare_info = 2;
+}
+
+message OperatorSpecificTokenTransactionSignablePayload {
+    bytes final_token_transaction_hash = 1 [(validate.rules).bytes.len = 32];
+    bytes operator_identity_public_key = 2 [(validate.rules).bytes.len = 33];
+}
+
+// This message allows the sender of a output being spent to provide final evidence
+// that it owns a output to an SO when requesting signing and release of the  revocation keyshare.  
+message OperatorSpecificOwnerSignature {
+    SignatureWithIndex owner_signature = 1;
+    OperatorSpecificTokenTransactionSignablePayload payload = 2;
+}
+
+message SignTokenTransactionRequest {
+    TokenTransaction final_token_transaction = 1;
+    repeated OperatorSpecificOwnerSignature operator_specific_signatures = 2;
+    bytes identity_public_key = 3 [(validate.rules).bytes.len = 33];
+}
+
+message KeyshareWithIndex {
+    // The index of the input TTXO associated with this keyshare.
+    uint32 input_index = 1;
+    bytes keyshare = 2 [(validate.rules).bytes.len = 32];
+}
+
+message SignTokenTransactionResponse {
+    bytes spark_operator_signature = 1 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+    repeated KeyshareWithIndex revocation_keyshares = 2;
+}
+
+message RevocationSecretWithIndex {
+    // The index of the input TTXO associated with this secret.
+    uint32 input_index = 1;
+    bytes revocation_secret = 2 [(validate.rules).bytes.len = 32];
+}
+
+message FinalizeTokenTransactionRequest {
+    TokenTransaction final_token_transaction = 1;
+    // List of ordered revocation secrets that map 1:1 with leaves being spent in the
+    // token transaction.
+    repeated RevocationSecretWithIndex revocation_secrets = 2;
+    bytes identity_public_key = 3 [(validate.rules).bytes.len = 33];
+}
+
+message FreezeTokensPayload {
+    bytes owner_public_key = 1 [(validate.rules).bytes.len = 33];
+    bytes token_public_key = 2 [(validate.rules).bytes.len = 33];
+    uint64 issuer_provided_timestamp = 3;
+    bytes operator_identity_public_key = 4 [(validate.rules).bytes.len = 33];
+    // Set to false when requesting a freeze.
+    bool should_unfreeze = 5;  
+}
+
+message FreezeTokensRequest {
+    FreezeTokensPayload freeze_tokens_payload = 1;
+    // This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
+    bytes issuer_signature = 2 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+}
+
+message FreezeTokensResponse {
+    repeated string impacted_output_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
+    bytes impacted_token_amount = 2;  // Decoded uint128
+}
+
+message QueryTokenOutputsRequest {
+    repeated bytes owner_public_keys = 1 [(validate.rules).repeated.items.bytes.len = 33];
+    // Optionally provide token public keys. If not set return leaves for all tokens.
+    repeated bytes token_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
+}
+
+// Request constraints are combined using an AND relation.
+message QueryTokenTransactionsRequest {
+    // Returns transactions that have one of these output ids in the input or output. 
+    repeated string output_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
+    // Returns transactions that have this owner public key as the sender or receiver in one or more of the input/output leaves.
+    repeated bytes owner_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
+    // Returns transactions that related to this token public key.
+    repeated bytes token_public_keys = 3 [(validate.rules).repeated.items.bytes.len = 33];
+    // Returns transactions that match the provided transaction hashes.
+    repeated bytes token_transaction_hashes = 4 [(validate.rules).repeated.items.bytes.len = 32];
+    int64 limit = 5;
+    int64 offset = 6;
+}
+
+message QueryTokenTransactionsResponse {
+    repeated TokenTransactionWithStatus token_transactions_with_status = 1;
+    int64 offset = 2;
+}
+
+message OutputWithPreviousTransactionData {
+    TokenOutput output = 1;
+	bytes previous_transaction_hash = 2 [(validate.rules).bytes.len = 32];
+	uint32 previous_transaction_vout = 3;
+}
+
+message QueryTokenOutputsResponse {
+    repeated OutputWithPreviousTransactionData outputs_with_previous_transaction_data = 1;
+}
+
+message CancelSignedTokenTransactionRequest {
+    TokenTransaction final_token_transaction = 1;
+    bytes sender_identity_public_key = 2 [(validate.rules).bytes.len = 33];
+}
+
+/**
+ * TreeNode represents a node on the tree.
+ */
+message TreeNode {
+    // The id of the node.
+    string id = 1;
+    // The id of the tree for this node .
+    string tree_id = 2;
+    // The value that this node holds.
+    uint64 value = 3;
+    // The id of the parent node.
+    optional string parent_node_id = 4;
+    // The transaction of the node, this transaction is to pay to the same address as the node.
+    bytes node_tx = 5;
+    // The refund transaction of the node, this transaction is to pay to the user.
+    bytes refund_tx = 6;
+    // This vout is the vout to spend the previous transaction, which is in the parent node.
+    uint32 vout = 7;
+    // The verifying public key of the node.
+    bytes verifying_public_key = 8;
+    // The identity public key of the owner of the node.
+    bytes owner_identity_public_key = 9;
+    // The signing keyshare information of the node on the SE side.
+    SigningKeyshare signing_keyshare = 10;
+    // The status of the node.
+    string status = 11;
+    // The network of the node.
+    Network network = 12;
+}
+
+/**
+ * FinalizeNodeSignaturesRequest is the request to finalize the signatures for a node.
+ */
+message FinalizeNodeSignaturesRequest {
+    // The intent of the signature.
+    common.SignatureIntent intent = 1;
+    // The signatures for the node.
+    repeated NodeSignatures node_signatures = 2;
+}
+
+/**
+ * FinalizeNodeSignaturesResponse is the response to the request to finalize the signatures for a node.
+ */
+message FinalizeNodeSignaturesResponse {
+    // The nodes that are finalized.
+    repeated TreeNode nodes = 1;
+}
+
+/**
+ * SecretShare is a secret share of a secret, using Feldman VSS.
+ * The secret share is in the field of secp256k1 scalar field.
+ */
+message SecretShare {
+    // The secret share.
+    bytes secret_share = 1;
+    // The proofs for the secret share. They are the compressed public keys in secp256k1 curve.
+    // proofs[0] is the public key of the secret, while proofs[1..n] are the public key of the polynomial.
+    repeated bytes proofs = 2;
+}
+
+/**
+ * SecretProof is the proof for a secret share using Feldman VSS.
+ * The proof is the compressed public keys in secp256k1 curve.
+ */
+message SecretProof {
+    // The proofs for the secret share.
+    // proofs[0] is the public key of the secret, while proofs[1..n] are the public key of the polynomial.
+    repeated bytes proofs = 1;
+}
+
+message LeafRefundTxSigningJob {
+    string leaf_id = 1;
+    SigningJob refund_tx_signing_job = 2;
+}
+
+message UserSignedTxSigningJob {
+    string leaf_id = 1;
+    bytes signing_public_key = 2;
+    bytes raw_tx = 3;
+    common.SigningCommitment signing_nonce_commitment = 4;
+    bytes user_signature = 5;
+    SigningCommitments signing_commitments = 6;
+}
+
+message LeafRefundTxSigningResult {
+    string leaf_id = 1;
+    SigningResult refund_tx_signing_result = 2;
+    bytes verifying_key = 3;
+}
+
+message StartUserSignedTransferRequest {
+    string transfer_id = 1;
+    bytes owner_identity_public_key = 2;
+    repeated UserSignedTxSigningJob leaves_to_send = 3;
+    bytes receiver_identity_public_key = 4;
+    google.protobuf.Timestamp expiry_time = 5;
+}
+
+
+message StartTransferRequest {
+    string transfer_id = 1;
+    bytes owner_identity_public_key = 2;
+    repeated LeafRefundTxSigningJob leaves_to_send = 3;
+    bytes receiver_identity_public_key = 4;
+    google.protobuf.Timestamp expiry_time = 5;
+    map<string, SecretProof> key_tweak_proofs = 6;
+}
+message StartTransferResponse {
+    Transfer transfer = 1;
+    repeated LeafRefundTxSigningResult signing_results = 2;
+}
+
+message SendLeafKeyTweak {
+    string leaf_id = 1;
+    SecretShare secret_share_tweak = 2;
+    map<string, bytes> pubkey_shares_tweak = 3;
+    bytes secret_cipher = 4;
+    // Signature over Sha256(leaf_id||transfer_id||secret_cipher)
+    bytes signature = 5;
+    bytes refund_signature = 6;
+}
+
+message FinalizeTransferRequest {
+    string transfer_id = 1;
+    bytes owner_identity_public_key = 2;
+    repeated SendLeafKeyTweak leaves_to_send = 3;
+}
+
+message FinalizeTransferResponse {
+    Transfer transfer = 1;
+}
+
+enum TransferStatus {
+    TRANSFER_STATUS_SENDER_INITIATED = 0; 
+    TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING = 1;
+    TRANSFER_STATUS_SENDER_KEY_TWEAKED = 2;
+    TRANSFER_STATUS_RECEIVER_KEY_TWEAKED = 3;
+    TRANSFER_STATUSR_RECEIVER_REFUND_SIGNED = 4;
+    TRANSFER_STATUS_COMPLETED = 5;
+    TRANSFER_STATUS_EXPIRED = 6;
+    TRANSFER_STATUS_RETURNED = 7;
+}
+
+enum TransferType {
+    PREIMAGE_SWAP = 0;
+    COOPERATIVE_EXIT = 1;
+    TRANSFER = 2;
+    SWAP = 30;
+    COUNTER_SWAP = 40;
+}
+
+message Transfer {
+    string id = 1;
+    bytes sender_identity_public_key = 2;
+    bytes receiver_identity_public_key = 3;
+    TransferStatus status = 4;
+    uint64 total_value = 5;
+    google.protobuf.Timestamp expiry_time = 6;
+    repeated TransferLeaf leaves = 7;
+    google.protobuf.Timestamp created_time = 8;
+    google.protobuf.Timestamp updated_time = 9;
+    TransferType type = 10;
+}
+
+message TransferLeaf {
+    TreeNode leaf = 1;
+    bytes secret_cipher = 2;
+    bytes signature = 3;
+    bytes intermediate_refund_tx = 4;
+}
+
+
+message TransferFilter {
+    oneof participant {
+        bytes receiver_identity_public_key = 1;
+        bytes sender_identity_public_key = 2;
+        // This will include transfers where this public key is the sender or receiver.
+        bytes sender_or_receiver_identity_public_key = 60;
+    }
+    repeated string transfer_ids = 3;
+    int64 limit = 40;
+    int64 offset = 50;
+    repeated TransferType types = 70;
+}
+
+message QueryTransfersResponse {
+    repeated Transfer transfers = 1;
+    int64 offset = 2;
+}
+
+message ClaimLeafKeyTweak {
+    string leaf_id = 1;
+    SecretShare secret_share_tweak = 2;
+    map<string, bytes> pubkey_shares_tweak = 3;
+}
+
+message ClaimTransferTweakKeysRequest {
+    string transfer_id = 1;
+    bytes owner_identity_public_key = 2;
+    repeated ClaimLeafKeyTweak leaves_to_receive = 3;
+}
+
+message ClaimTransferSignRefundsRequest {
+    string transfer_id = 1;
+    bytes owner_identity_public_key = 2;
+    repeated LeafRefundTxSigningJob signing_jobs = 3;
+    map<string, SecretProof> key_tweak_proofs = 4;
+}
+
+message ClaimTransferSignRefundsResponse {
+    repeated LeafRefundTxSigningResult signing_results = 1;
+}
+
+message AggregateNodesRequest {
+    repeated string node_ids = 1;
+    SigningJob signing_job = 2;
+    // Serves as a temporary identity public key, this should be get from auth process.
+    bytes owner_identity_public_key = 3;
+}
+
+message AggregateNodesResponse {
+    SigningResult aggregate_signature = 1;
+    bytes verifying_key = 2;
+    bytes parent_node_tx = 3;
+    uint32 parent_node_vout = 4;
+}
+
+message StorePreimageShareRequest {
+    bytes payment_hash = 1;
+    SecretShare preimage_share = 2;
+    uint32 threshold = 3;
+    string invoice_string = 4;
+    bytes user_identity_public_key = 5;
+}
+
+message RequestedSigningCommitments {
+    map<string, common.SigningCommitment> signing_nonce_commitments = 1;
+}
+
+message GetSigningCommitmentsRequest {
+    repeated string node_ids = 1;
+}
+
+message GetSigningCommitmentsResponse {
+    repeated RequestedSigningCommitments signing_commitments = 1;
+}
+
+message SigningCommitments {
+    map<string, common.SigningCommitment> signing_commitments = 1;
+}
+
+message UserSignedRefund {
+    string node_id = 1;
+    bytes refund_tx = 2;
+    bytes user_signature = 3;
+    SigningCommitments signing_commitments = 4;
+    common.SigningCommitment user_signature_commitment = 5;
+    Network network = 6 [(validate.rules).enum = {not_in: [0]}];
+}
+
+message InvoiceAmountProof {
+    string bolt11_invoice = 1;
+}
+
+message InvoiceAmount {
+    uint64 value_sats = 1;
+    InvoiceAmountProof invoice_amount_proof = 2;
+}
+
+message InitiatePreimageSwapRequest {
+    bytes payment_hash = 1;
+    InvoiceAmount invoice_amount = 2;
+    enum Reason {
+        // The associated lightning service is sending the payment.
+        REASON_SEND = 0;
+        // The associated lightning service is receiving the payment.
+        REASON_RECEIVE = 1;
+    }
+    Reason reason = 3;
+    StartUserSignedTransferRequest transfer = 4;
+    bytes receiver_identity_public_key = 5;
+    uint64 fee_sats = 6;
+}
+
+message InitiatePreimageSwapResponse {
+    bytes preimage = 1;
+    Transfer transfer = 2;
+}
+
+message OutPoint {
+    bytes txid = 1;
+    uint32 vout = 2;
+}
+
+message CooperativeExitRequest {
+    StartTransferRequest transfer = 1;
+    string exit_id = 2;
+    bytes exit_txid = 3;
+}
+
+message CooperativeExitResponse {
+    Transfer transfer = 1;
+    repeated LeafRefundTxSigningResult signing_results = 2;
+}
+
+message CounterLeafSwapRequest {
+    StartTransferRequest transfer = 1;
+    string swap_id = 2;
+    bytes adaptor_public_key = 3;
+}
+
+message CounterLeafSwapResponse {
+    Transfer transfer = 1;
+    repeated LeafRefundTxSigningResult signing_results = 2;
+}
+
+message RefreshTimelockRequest {
+    string leaf_id = 1;
+    bytes owner_identity_public_key = 2;
+    repeated SigningJob signing_jobs = 3;
+}
+
+message RefreshTimelockSigningResult {
+    SigningResult signing_result = 1;
+    bytes verifying_key = 2; // Should maybe just be a part of SigningResult?
+}
+
+message RefreshTimelockResponse {
+    repeated RefreshTimelockSigningResult signing_results = 1;
+}
+
+message ExtendLeafRequest {
+    string leaf_id = 1;
+    bytes owner_identity_public_key = 2;
+    SigningJob node_tx_signing_job = 3;
+    SigningJob refund_tx_signing_job = 4;
+}
+
+message ExtendLeafSigningResult {
+    SigningResult signing_result = 1;
+    bytes verifying_key = 2;
+}
+
+message ExtendLeafResponse {
+    string leaf_id = 1;
+    ExtendLeafSigningResult node_tx_signing_result = 2;
+    ExtendLeafSigningResult refund_tx_signing_result = 3;
+}
+
+message AddressRequestNode {
+    bytes user_public_key = 1;
+    repeated AddressRequestNode children = 2;
+}
+
+message PrepareTreeAddressRequest {
+    oneof source {
+        NodeOutput parent_node_output = 1;
+        UTXO on_chain_utxo = 2;
+    }
+    // The tx on this node is to spend the source's utxo.
+    // The user's public key should already be registered with the SE for the root node.
+    AddressRequestNode node = 3;
+    bytes user_identity_public_key = 4;
+}
+
+message AddressNode {
+    Address address = 1;
+    repeated AddressNode children = 2;
+}
+
+message PrepareTreeAddressResponse {
+    AddressNode node = 1;
+}
+
+message CreationNode {
+    // This is the tx that spends the parent node's output.
+    SigningJob node_tx_signing_job = 1;
+    // The refund tx can only exist if there's no children.
+    SigningJob refund_tx_signing_job = 2;
+
+    // The children will spend the output of the node's tx. Vout is the index of the child.
+    repeated CreationNode children = 3;
+}
+
+message CreateTreeRequest {
+    oneof source {
+        NodeOutput parent_node_output = 1;
+        UTXO on_chain_utxo = 2;
+    }
+    // The node should contain the tx that spends the source's utxo.
+    CreationNode node = 3;
+    
+    // The owner of the tree.
+    bytes user_identity_public_key = 4;
+}
+
+message CreationResponseNode {
+    string node_id = 1;
+    SigningResult node_tx_signing_result = 2;
+    SigningResult refund_tx_signing_result = 3; 
+    repeated CreationResponseNode children = 4;
+}
+
+message CreateTreeResponse {
+    CreationResponseNode node = 1;
+}
+
+message SigningOperatorInfo {
+    uint64 index = 1;
+    string identifier = 2;
+    bytes public_key = 3;
+    string address = 4;
+}
+
+message GetSigningOperatorListResponse {
+    map<string, SigningOperatorInfo> signing_operators = 1;
+}
+
+message QueryUserSignedRefundsRequest {
+    bytes payment_hash = 1;
+    bytes identity_public_key = 2;
+}
+
+message QueryUserSignedRefundsResponse {
+    repeated UserSignedRefund user_signed_refunds = 1;
+}
+
+message ProvidePreimageRequest {
+    bytes payment_hash = 1;
+    bytes preimage = 2;
+    bytes identity_public_key = 3;
+}
+
+message ProvidePreimageResponse {
+    Transfer transfer = 1;
+}
+
+message ReturnLightningPaymentRequest {
+    bytes payment_hash = 1;
+    bytes user_identity_public_key = 2;
+}
+
+
+message TreeNodeIds {
+    repeated string node_ids = 1;
+}
+
+message QueryNodesRequest {
+    oneof source {
+        bytes owner_identity_pubkey = 1;
+        TreeNodeIds node_ids = 2;
+    }
+    bool include_parents = 3;
+}
+
+message QueryNodesResponse {
+    map<string, TreeNode> nodes = 1;
+}
+
+message CancelTransferRequest {
+    string transfer_id = 1;
+    bytes sender_identity_public_key = 2;
+}
+
+message CancelTransferResponse {
+    Transfer transfer = 1;
+}
+
+/**
+ * Returns a list of addresses that can be used in express deposit flow.
+ * Excludes static deposit addresses.
+**/
+message QueryUnusedDepositAddressesRequest {
+    bytes identity_public_key = 1;
+}
+
+message DepositAddressQueryResult {
+    string deposit_address = 1;
+    bytes user_signing_public_key = 2;
+    bytes verifying_public_key = 3;
+    optional string leaf_id = 4 [(validate.rules).string.uuid = true];
+}
+
+message QueryUnusedDepositAddressesResponse {
+    repeated DepositAddressQueryResult deposit_addresses = 1;
+}
+
+message QueryBalanceRequest {
+    bytes identity_public_key = 1;
+}
+
+message QueryBalanceResponse {
+    uint64 balance = 1;
+    map<string, uint64> node_balances = 2;
+}
+
+message SparkAddress {
+    bytes identity_public_key = 1;
+}

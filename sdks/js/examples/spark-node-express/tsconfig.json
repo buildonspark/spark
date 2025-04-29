@@ -1,0 +1,27 @@
+{
+  "ts-node": {
+    "files": true,
+    "experimentalResolver": true,
+    "esm": true,
+    "transpileOnly": true,
+    "compilerOptions": {
+      "module": "nodenext"
+    }
+  },
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "module": "nodenext",
+    "target": "esnext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true,
+    "outDir": "./dist",
+    "rootDir": "./"
+  },
+  "include": ["src/**/*", "routes/**/*", "utils/**/*"],
+  "exclude": ["node_modules", "dist", "**/*.spec.ts"]
+}

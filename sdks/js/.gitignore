@@ -1,0 +1,23 @@
+# Dependency directory
+node_modules/*
+**/node_modules/*
+
+.npmrc
+
+# https://yarnpkg.com/getting-started/qa#which-files-should-be-gitignored
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+dist
+
+# Turbo
+.turbo
+
+# Dev configs
+dev-regtest-config.json
+dev-mainnet-config.json

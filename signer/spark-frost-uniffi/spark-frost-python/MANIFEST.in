@@ -1,0 +1,3 @@
+include ./src/spark_frost/libuniffi_spark_frost.dylib
+include ./src/spark_frost/uniffi_spark_frost.dll
+include ./src/spark_frost/libuniffi_spark_frost.so

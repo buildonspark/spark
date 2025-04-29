@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package spark_authn;
+
+option go_package = "github.com/lightsparkdev/spark/proto/spark_authn";
+
+service SparkAuthnService {
+    // Request a new authentication challenge for a public key
+    rpc get_challenge(GetChallengeRequest) returns (GetChallengeResponse) {}
+
+    // Verify a signed challenge and return a session token
+    rpc verify_challenge(VerifyChallengeRequest) returns (VerifyChallengeResponse) {}
+}
+
+// Challenge represents the core challenge data
+message Challenge {
+    // Protocol version for backward compatibility
+    int32 version = 1;
+
+    // Timestamp when challenge was issued (UTC Unix seconds)
+    int64 timestamp = 2;
+
+    // Random nonce to prevent replay attacks (32 bytes)
+    bytes nonce = 3;
+
+    // The public key this challenge is intended for (uncompressed secp256k1 public key)
+    bytes public_key = 4;
+}
+
+// ProtectedChallenge wraps a Challenge with a server HMAC
+message ProtectedChallenge {
+    // Protocol version for backward compatibility
+    int32 version = 1;
+
+    // The core challenge data
+    Challenge challenge = 2;
+
+    // Server's HMAC of the Challenge
+    bytes server_hmac = 3;
+}
+
+// Request to initiate an authentication challenge
+message GetChallengeRequest {
+    // Client's public key (uncompressed secp256k1 public key)
+    bytes public_key = 1;
+}
+
+// Response containing the protected challenge
+message GetChallengeResponse {
+    // The protected challenge from the server
+    ProtectedChallenge protected_challenge = 1;
+}
+
+// Request to verify a signed challenge
+message VerifyChallengeRequest {
+    // The protected challenge from the server
+    ProtectedChallenge protected_challenge = 1;
+
+    // Client's secp256k1 signature of the Challenge
+    bytes signature = 2;
+
+    // Client's public key (uncompressed secp256k1 public key)
+    bytes public_key = 3;
+}
+
+// Response after successful authentication
+message VerifyChallengeResponse {
+    // Session token for subsequent API calls
+    string session_token = 1;
+
+    // Token expiration timestamp (UTC Unix seconds)
+    int64 expiration_timestamp = 2;
+}

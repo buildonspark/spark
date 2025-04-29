@@ -1,0 +1,66 @@
+[tools.atlas]
+version = "0.32.0"
+backend = "aqua:ariga/atlas"
+
+[tools.atlas.checksums]
+"atlas-darwin-arm64-v0.32.0" = "sha256:a8fb30231d80e2962b121dcbb073fff063a2104b11bb6c1d0f67477db3b728c8"
+
+[tools.go]
+version = "1.23.2"
+backend = "core:go"
+
+[tools.go.checksums]
+"go1.23.2.darwin-arm64.tar.gz" = "sha256:d87031194fe3e01abdcaf3c7302148ade97a7add6eac3fec26765bcb3207b80f"
+
+[tools.golangci-lint]
+version = "2.0.2"
+backend = "aqua:golangci/golangci-lint"
+
+[tools.golangci-lint.checksums]
+"golangci-lint-2.0.2-darwin-arm64.tar.gz" = "sha256:664550e7954f5f4451aae99b4f7382c1a47039c66f39ca605f5d9af1a0d32b49"
+
+[tools.gotestsum]
+version = "1.12.0"
+backend = "aqua:gotestyourself/gotestsum"
+
+[tools.gotestsum.checksums]
+"gotestsum_1.12.0_darwin_arm64.tar.gz" = "sha256:c5ffdc9054644c4db365de2197a12d21eff48b88a9ad20e3e0c29346802d0b41"
+
+[tools.node]
+version = "20.19.0"
+backend = "core:node"
+
+[tools.node.checksums]
+"node-v20.19.0-darwin-arm64.tar.gz" = "sha256:c016cd1975a264a29dc1b07c6fbe60d5df0a0c2beb4113c0450e3d998d1a0d9c"
+
+[tools.protoc]
+version = "29.3"
+backend = "aqua:protocolbuffers/protobuf/protoc"
+
+[tools.protoc.checksums]
+"protoc-29.3-osx-aarch_64.zip" = "sha256:2b8a3403cd097f95f3ba656e14b76c732b6b26d7f183330b11e36ef2bc028765"
+
+[tools.protoc-gen-go]
+version = "1.36.6"
+backend = "aqua:protocolbuffers/protobuf-go/protoc-gen-go"
+
+[tools.protoc-gen-go.checksums]
+"protoc-gen-go.v1.36.6.darwin.arm64.tar.gz" = "sha256:5ce4eff9b9d083ba28b98ccadf4bdb21ed226ddf31f976a4a4e6d37a351719e3"
+
+[tools.protoc-gen-go-grpc]
+version = "1.5.1"
+backend = "aqua:grpc/grpc-go/protoc-gen-go-grpc"
+
+[tools.protoc-gen-go-grpc.checksums]
+"protoc-gen-go-grpc.v1.5.1.darwin.arm64.tar.gz" = "sha256:d6083feb51dcfe59f26793e99ef01ef5eac68b64294ec2546711f614ac5878f3"
+
+[tools.protoc-gen-validate]
+version = "1.2.1"
+backend = "aqua:bufbuild/protoc-gen-validate"
+
+[tools.protoc-gen-validate.checksums]
+"protoc-gen-validate_1.2.1_darwin_arm64.tar.gz" = "sha256:44dfd7778a49febdfb088dacee835b5d649218b5277bdd7c98e2a1f8eb328b34"
+
+[tools.rust]
+version = "1.85.0"
+backend = "core:rust"

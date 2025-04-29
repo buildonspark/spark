@@ -1,0 +1,34 @@
+{
+  "name": "@buildonspark/spark-cli",
+  "version": "0.0.19",
+  "private": true,
+  "description": "Spark CLI",
+  "main": "index.js",
+  "scripts": {
+    "cli": "NODE_ENV=production NETWORK=regtest tsx src/cli.ts",
+    "cli:mainnet": "NODE_ENV=production NETWORK=mainnet tsx src/cli.ts",
+    "cli:dev": "NODE_ENV=development NETWORK=regtest CONFIG_FILE=../../dev-regtest-config.json tsx src/cli.ts",
+    "cli:dev:mainnet": "NODE_ENV=development NETWORK=mainnet CONFIG_FILE=../../dev-mainnet-config.json tsx src/cli.ts",
+    "clean": "rm -rf dist",
+    "format:fix": "prettier src --write",
+    "format": "prettier src --check",
+    "build": "tsc",
+    "types": "tsc"
+  },
+  "type": "module",
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.13.2",
+    "prettier": "^3.5.1",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@buildonspark/issuer-sdk": "^0.0.41",
+    "@buildonspark/spark-sdk": "^0.1.10",
+    "tsx": "^4.19.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

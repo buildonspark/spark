@@ -1,0 +1,39 @@
+[package]
+name = "spark-frost-uniffi"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wasm-bindgen = { version = "0.2.95", features = ["serde", "serde_json"] }
+serde = { workspace = true }
+gloo-utils = "0.2.0"
+spark-frost = { path = "../spark-frost" }
+frost-secp256k1-tr = { workspace = true }
+hex = { workspace = true }
+uuid = { workspace = true }
+ecies = { workspace = true }
+uniffi = "0.28.3"
+bitcoin = "0.32.5"
+serde-wasm-bindgen = "0.6.5"
+
+[build-dependencies]
+uniffi = { version = "0.28.3", features = [ "build" ] }
+
+[features]
+default = ["uniffi/cli"]
+
+[lib]
+crate-type = ["cdylib", "staticlib"]
+name = "spark_frost"
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
+
+[target.wasm32-unknown-unknown]
+rustflags = [
+    "-C",
+    "target-feature=+atomics,+bulk-memory,+mutable-globals",
+    "-C",
+    "link-arg=--max-memory=4294967296",
+]
