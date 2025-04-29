@@ -85,10 +85,14 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 	for _, leaf := range req.Leaves {
 		leafRefundMap[leaf.LeafId] = leaf.RawRefundTx
 	}
-	_, _, err := h.createTransfer(
+	transferType, err := ent.TransferTypeSchema(req.Type)
+	if err != nil {
+		return err
+	}
+	_, _, err = h.createTransfer(
 		ctx,
 		req.TransferId,
-		schema.TransferTypeTransfer,
+		transferType,
 		req.ExpiryTime.AsTime(),
 		req.SenderIdentityPublicKey,
 		req.ReceiverIdentityPublicKey,

@@ -78,7 +78,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		return nil, err
 	}
 
-	err = h.syncTransferInit(ctx, req)
+	err = h.syncTransferInit(ctx, req, transferType)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func (h *TransferHandler) CounterLeafSwap(ctx context.Context, req *pb.CounterLe
 	return &pb.CounterLeafSwapResponse{Transfer: startTransferResponse.Transfer, SigningResults: startTransferResponse.SigningResults}, nil
 }
 
-func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartTransferRequest) error {
+func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartTransferRequest, transferType schema.TransferType) error {
 	leaves := make([]*pbinternal.InitiateTransferLeaf, 0)
 	for _, leaf := range req.LeavesToSend {
 		leaves = append(leaves, &pbinternal.InitiateTransferLeaf{
@@ -112,17 +112,22 @@ func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartTra
 			RawRefundTx: leaf.RefundTxSigningJob.RawTx,
 		})
 	}
+	transferTypeProto, err := ent.TransferTypeProto(transferType)
+	if err != nil {
+		return fmt.Errorf("unable to get transfer type proto: %v", err)
+	}
 	initTransferRequest := &pbinternal.InitiateTransferRequest{
 		TransferId:                req.TransferId,
 		SenderIdentityPublicKey:   req.OwnerIdentityPublicKey,
 		ReceiverIdentityPublicKey: req.ReceiverIdentityPublicKey,
 		ExpiryTime:                req.ExpiryTime,
 		Leaves:                    leaves,
+		Type:                      *transferTypeProto,
 	}
 	selection := helper.OperatorSelection{
 		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
-	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			return nil, err

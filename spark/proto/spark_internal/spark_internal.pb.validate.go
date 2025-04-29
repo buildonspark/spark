@@ -2745,6 +2745,8 @@ func (m *InitiateTransferRequest) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for Type
+
 	if len(errors) > 0 {
 		return InitiateTransferRequestMultiError(errors)
 	}

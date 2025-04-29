@@ -184,6 +184,7 @@ message InitiateTransferRequest {
     google.protobuf.Timestamp expiry_time = 4;
     repeated InitiateTransferLeaf leaves = 5;
     map<string, spark.SecretProof> sender_key_tweak_proofs = 6;
+    spark.TransferType type = 7;
 }
 
 message InitiateCooperativeExitRequest {
