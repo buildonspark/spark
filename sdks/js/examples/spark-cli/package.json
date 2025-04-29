@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "cli": "NODE_ENV=production NETWORK=regtest tsx src/cli.ts",
-    "cli:local":  "NODE_ENV=development NETWORK=LOCAL tsx src/cli.ts",
+    "cli:local":  "NODE_ENV=development NETWORK=local tsx src/cli.ts",
     "cli:mainnet": "NODE_ENV=production NETWORK=mainnet tsx src/cli.ts",
     "cli:dev": "NODE_ENV=development NETWORK=regtest CONFIG_FILE=../../dev-regtest-config.json tsx src/cli.ts",
     "cli:dev:mainnet": "NODE_ENV=development NETWORK=mainnet CONFIG_FILE=../../dev-mainnet-config.json tsx src/cli.ts",
