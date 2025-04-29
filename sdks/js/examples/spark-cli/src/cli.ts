@@ -456,6 +456,9 @@ async function runCLI() {
             break;
           }
           const depositAddress = await wallet.getSingleUseDepositAddress();
+          console.log(
+            "WARNING: This is a single-use address, DO NOT deposit more than once or you will lose funds!",
+          );
           console.log(depositAddress);
           break;
         case "identity":
