@@ -88,6 +88,7 @@ jobs:
         uses: "medyagh/setup-minikube@master"
         with:
           memory: "4G"
+          addons: ingress
           start-args: >
             --extra-config=apiserver.service-node-port-range=1024-65535
             --extra-config=kubelet.container-log-max-size=50Mi
@@ -107,6 +108,7 @@ jobs:
           BRIDGE="$(docker network ls | grep minikube | awk '{print $1}')"
           sudo resolvectl dns "br-$BRIDGE" "$MINIKUBE_IP"
           sudo resolvectl domain "br-$BRIDGE" "~minikube.local"
+          echo "$MINIKUBE_IP mempool.minikube.local" | sudo tee -a /etc/hosts
 
       - name: "Deploy basic services"
         run: "./scripts/minikube-deploy-basic-services.sh"
@@ -127,7 +129,24 @@ jobs:
         run: |
           ../scripts/run-development-dkg.sh
 
+      - name: Enable Corepack
+        working-directory: sdks/js
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+          cache-dependency-path: sdks/js/yarn.lock
+
       # GO TESTS
+      - name: Announce static issuer token
+        if: inputs.test_type == 'go'
+        env:
+          HERMETIC_TEST: "true"
+        run: ./scripts/announce-static-issuer-token.sh
+
       - name: Install gotestsum
         uses: jaxxstorm/action-install-gh-release@v1
         with:
@@ -166,19 +185,6 @@ jobs:
           test-results: "test_results/grpc-test.json"
 
       # JS TESTS
-      - name: Enable Corepack
-        if: inputs.test_type == 'js'
-        working-directory: sdks/js
-        run: corepack enable
-
-      - name: Setup Node.js
-        if: inputs.test_type == 'js'
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "yarn"
-          cache-dependency-path: sdks/js/yarn.lock
-
       - name: Install dependencies
         if: inputs.test_type == 'js'
         working-directory: sdks/js

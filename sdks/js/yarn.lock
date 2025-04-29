@@ -754,6 +754,21 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@buildonspark/spark-token-cli@workspace:examples/spark-token-cli":
+  version: 0.0.0-use.local
+  resolution: "@buildonspark/spark-token-cli@workspace:examples/spark-token-cli"
+  dependencies:
+    "@buildonspark/issuer-sdk": "npm:^0.0.41"
+    "@types/node": "npm:^22.13.2"
+    node-fetch: "npm:^3.3.2"
+    prettier: "npm:^3.5.1"
+    tsx: "npm:^4.19.3"
+    typescript: "npm:^5.7.3"
+  bin:
+    announce-token: announce-token.ts
+  languageName: unknown
+  linkType: soft
+
 "@buildonspark/spark-vite-app@workspace:examples/spark-vite-app":
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-vite-app@workspace:examples/spark-vite-app"

@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "node16",
+    "moduleResolution": "node16",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "rootDir": ".",
+    "declaration": true,
+    "noEmit": true,
+    "forceConsistentCasingInFileNames": true,
+    /* Allow implicit any due to generated files. TODO look into resolving
+         implicit any for generated files or move them out of the type checks */
+    "noImplicitAny": false
+  },
+  "include": ["*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

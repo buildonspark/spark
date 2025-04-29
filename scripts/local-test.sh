@@ -153,6 +153,9 @@ cleanup_k8s
 setup_port_forward default pod/postgres-0 15432 5432
 
 touch "$HERMETIC_TEST_FILE"
+if [ "$RESET_DBS" = "true" ]; then
+    "$(dirname "$0")/announce-static-issuer-token.sh"
+fi
 
 "$(dirname "$0")/run-local-signer-container.sh" &
 "$(dirname "$0")/export-minikube-ca.sh"
