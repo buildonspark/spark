@@ -4,8 +4,8 @@
 
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
 import {CurrencyAmountToJson} from './CurrencyAmount.js';
-import BitcoinNetwork from './BitcoinNetwork.js';
 import CurrencyAmount from './CurrencyAmount.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
 
 
 interface Invoice {

@@ -2,24 +2,24 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import Entity from './Entity.js';
-import {TransferFromJson} from './Transfer.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import { Query, isObject } from '@lightsparkdev/core';
-import {InvoiceToJson} from './Invoice.js';
-import {InvoiceFromJson} from './Invoice.js';
-import {SwapLeafFromJson} from './SwapLeaf.js';
-import CoopExitRequest from './CoopExitRequest.js';
-import LightningSendRequest from './LightningSendRequest.js';
-import LightningReceiveRequest from './LightningReceiveRequest.js';
-import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
-import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
-import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
-import { LightsparkException } from '@lightsparkdev/core';
 import LightningSendRequestStatus from './LightningSendRequestStatus.js';
 import {SwapLeafToJson} from './SwapLeaf.js';
+import LightningReceiveRequest from './LightningReceiveRequest.js';
+import {SwapLeafFromJson} from './SwapLeaf.js';
+import {InvoiceFromJson} from './Invoice.js';
+import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
+import {TransferFromJson} from './Transfer.js';
 import {CurrencyAmountToJson} from './CurrencyAmount.js';
-import BitcoinNetwork from './BitcoinNetwork.js';
+import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
 import LeavesSwapRequest from './LeavesSwapRequest.js';
+import LightningSendRequest from './LightningSendRequest.js';
+import CoopExitRequest from './CoopExitRequest.js';
+import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
+import {InvoiceToJson} from './Invoice.js';
+import { LightsparkException } from '@lightsparkdev/core';
+import { Query, isObject } from '@lightsparkdev/core';
+import BitcoinNetwork from './BitcoinNetwork.js';
 
 
 interface UserRequest {

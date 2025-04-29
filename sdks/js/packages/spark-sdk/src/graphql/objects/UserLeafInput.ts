@@ -16,7 +16,6 @@ export const UserLeafInputFromJson = (obj: any): UserLeafInput => {
     adaptor_added_signature: obj["user_leaf_input_adaptor_added_signature"],
   } as UserLeafInput;
 };
-
 export const UserLeafInputToJson = (obj: UserLeafInput): any => {
   return {
     user_leaf_input_leaf_id: obj.leaf_id,

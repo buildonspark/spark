@@ -3,16 +3,16 @@
 
 import UserRequest from './UserRequest.js';
 import Entity from './Entity.js';
-import {TransferFromJson} from './Transfer.js';
 import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import { Query, isObject } from '@lightsparkdev/core';
-import Transfer from './Transfer.js';
-import {SwapLeafFromJson} from './SwapLeaf.js';
-import CurrencyAmount from './CurrencyAmount.js';
 import SwapLeaf from './SwapLeaf.js';
-import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
 import {SwapLeafToJson} from './SwapLeaf.js';
+import {SwapLeafFromJson} from './SwapLeaf.js';
+import Transfer from './Transfer.js';
+import {TransferFromJson} from './Transfer.js';
 import {CurrencyAmountToJson} from './CurrencyAmount.js';
+import CurrencyAmount from './CurrencyAmount.js';
+import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
+import { Query, isObject } from '@lightsparkdev/core';
 import BitcoinNetwork from './BitcoinNetwork.js';
 
 
