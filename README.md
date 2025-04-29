@@ -1,5 +1,7 @@
 # Spark
 
+![spark](https://github.com/user-attachments/assets/f3d71a04-4027-42f2-b02a-e7a06616e33a)
+
 ## [mise](https://mise.jdx.dev/)
 
 To install all of our protobuf, rust, and go toolchains install [mise](https://mise.jdx.dev/getting-started.html), then run:
