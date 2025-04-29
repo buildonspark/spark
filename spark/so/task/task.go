@@ -30,7 +30,7 @@ func AllTasks() []Task {
 			},
 		},
 		{
-			Duration: 10 * time.Minute,
+			Duration: 1 * time.Minute,
 			Task: func(config *so.Config, db *ent.Client) error {
 				return DBTransactionTask(context.Background(), config, db, func(ctx context.Context, config *so.Config) error {
 					h := handler.NewTransferHandler(config)
