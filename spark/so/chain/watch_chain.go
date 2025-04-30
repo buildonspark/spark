@@ -403,6 +403,7 @@ func handleBlock(
 
 	confirmedDeposits, err := dbTx.DepositAddress.Query().
 		Where(depositaddress.ConfirmationHeightIsNil()).
+		Where(depositaddress.IsStaticEQ(false)).
 		Where(depositaddress.AddressIn(debitedAddresses...)).
 		All(ctx)
 	if err != nil {
