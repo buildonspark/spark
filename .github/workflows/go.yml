@@ -246,12 +246,12 @@ jobs:
             FAILED=1
           fi
 
-          # if [[ ${{ needs.trigger-hermetic.result }} != "skipped" ]] && \
-          #    [[ ${{ needs.trigger-hermetic.result }} != "success" ]] && \
-          #    [[ ${{ needs.trigger-hermetic.result }} != "cancelled" ]]; then
-          #   FAILURES+="- Hermetic tests failed\n"
-          #   FAILED=1
-          # fi
+          if [[ ${{ needs.trigger-hermetic.result }} != "skipped" ]] && \
+             [[ ${{ needs.trigger-hermetic.result }} != "success" ]] && \
+             [[ ${{ needs.trigger-hermetic.result }} != "cancelled" ]]; then
+            FAILURES+="- Hermetic tests failed\n"
+            FAILED=1
+          fi
 
           # if [[ ${{ needs.trigger-ssp-hermetic.result }} != "skipped" ]] && \
           #    [[ ${{ needs.trigger-ssp-hermetic.result }} != "success" ]] && \
