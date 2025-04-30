@@ -272,8 +272,13 @@ func main() {
 	defer lrc20Client.Close() //nolint:errcheck
 
 	for network, bitcoindConfig := range config.BitcoindConfigs {
+		chainWatcherCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
+
 		go func() {
-			err := chain.WatchChain(dbClient,
+			err := chain.WatchChain(
+				chainWatcherCtx,
+				dbClient,
 				lrc20Client,
 				bitcoindConfig,
 			)

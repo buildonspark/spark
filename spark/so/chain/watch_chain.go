@@ -207,6 +207,7 @@ func RPCClientConfig(cfg so.BitcoindConfig) rpcclient.ConnConfig {
 }
 
 func WatchChain(
+	ctx context.Context,
 	dbClient *ent.Client,
 	lrc20Client *lrc20.Client,
 	bitcoindConfig so.BitcoindConfig,
@@ -262,6 +263,9 @@ func WatchChain(
 		case err := <-errChan:
 			logger.Error("Error receiving ZMQ message", "error", err)
 			return err
+		case <-ctx.Done():
+			logger.Info("Context done, stopping chain watcher")
+			return nil
 		case <-newBlockNotification:
 		case <-time.After(pollInterval(network)):
 		}
