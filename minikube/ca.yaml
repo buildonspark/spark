@@ -1,0 +1,121 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned
+  namespace: cert-manager
+spec:
+  selfSigned: {}
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ca
+  namespace: cert-manager
+spec:
+  duration: 87600h
+  subject:
+    organizations:
+      - Spark
+  commonName: minikube
+  isCA: true
+  usages:
+    - cert sign
+  secretName: ca-tls
+  privateKey:
+    algorithm: ECDSA
+    size: 521
+  issuerRef:
+    name: selfsigned
+    kind: ClusterIssuer
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ca
+  namespace: cert-manager
+spec:
+  ca:
+    secretName: ca-tls
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: internal
+  namespace: cert-manager
+spec:
+  duration: 87600h
+  subject:
+    organizations:
+      - Spark
+  commonName: minikube
+  isCA: true
+  usages:
+    - cert sign
+  secretName: internal-tls
+  privateKey:
+    algorithm: ECDSA
+    size: 384
+    encoding: PKCS8
+  issuerRef:
+    name: selfsigned
+    kind: ClusterIssuer
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: internal
+  namespace: cert-manager
+spec:
+  ca:
+    secretName: internal-tls
+
+---
+
+apiVersion: trust.cert-manager.io/v1alpha1
+kind: Bundle
+metadata:
+    name: cluster-ca
+spec:
+  sources:
+    - secret:
+        name: ca-tls
+        key: ca.crt
+    - secret:
+        name: internal-tls
+        key: ca.crt
+  target:
+    configMap:
+      key: ca.crt
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ingress
+  namespace: kube-system
+spec:
+  duration: 8760h
+  subject:
+    organizations:
+      - Spark
+  commonName: "ingress.minikube.local"
+  secretName: ingress-tls
+  usages:
+    - server auth
+  dnsNames:
+    - "*.minikube.local"
+    - "*.lrc20.minikube.local"
+    - "*.spark.minikube.local"
+    - "*.yuvd.minikube.local"
+  issuerRef:
+    name: ca
+    kind: ClusterIssuer

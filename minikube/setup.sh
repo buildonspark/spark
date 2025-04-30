@@ -36,9 +36,11 @@ fi
 
 helm repo add jetstack https://charts.jetstack.io
 helm repo update
-
 helm upgrade --install --namespace cert-manager --wait --create-namespace --set crds.enabled=true cert-manager jetstack/cert-manager
 sleep 10
+helm uninstall --ignore-not-found --namespace cert-manager cert-manager-trust
+helm upgrade --install --namespace cert-manager --wait trust-manager jetstack/trust-manager
+kubectl apply -f "$(dirname "$0")/ca.yaml"
 
 echo "kube-system/ingress-tls" | minikube addons configure ingress || true
 minikube addons enable ingress
