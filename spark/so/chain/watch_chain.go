@@ -354,6 +354,12 @@ func TxFromRPCTx(txs btcjson.TxRawResult) (wire.MsgTx, error) {
 	return tx, nil
 }
 
+type AddressDepositUtxo struct {
+	tx     *wire.MsgTx
+	amount uint64
+	idx    uint32
+}
+
 func handleBlock(
 	ctx context.Context,
 	lrc20Client *lrc20.Client,
@@ -374,14 +380,16 @@ func handleBlock(
 	}
 	confirmedTxHashSet := make(map[[32]byte]bool)
 	debitedAddresses := make([]string, 0)
+	addressToUtxoMap := make(map[string]AddressDepositUtxo)
 	for _, tx := range txs {
-		for _, txOut := range tx.TxOut {
+		for idx, txOut := range tx.TxOut {
 			_, addresses, _, err := txscript.ExtractPkScriptAddrs(txOut.PkScript, networkParams)
 			if err != nil {
 				return err
 			}
 			for _, address := range addresses {
 				debitedAddresses = append(debitedAddresses, address.EncodeAddress())
+				addressToUtxoMap[address.EncodeAddress()] = AddressDepositUtxo{&tx, uint64(txOut.Value), uint32(idx)}
 			}
 		}
 		txid := tx.TxHash()
@@ -402,6 +410,35 @@ func handleBlock(
 		err = handleCoopExitConfirmation(ctx, coopExit, blockHeight)
 		if err != nil {
 			return fmt.Errorf("failed to handle coop exit confirmation: %v", err)
+		}
+	}
+
+	// Handle static deposits
+	staticDepositAddresses, err := dbTx.DepositAddress.Query().
+		Where(depositaddress.IsStaticEQ(true)).
+		Where(depositaddress.AddressIn(debitedAddresses...)).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, address := range staticDepositAddresses {
+		if utxo, ok := addressToUtxoMap[address.Address]; ok {
+			txidBytes, err := hex.DecodeString(utxo.tx.TxID())
+			if err != nil {
+				return fmt.Errorf("unable to decode txid for a new utxo: %v", err)
+			}
+			_, err = dbTx.Utxo.Create().
+				SetTxid(txidBytes).
+				SetVout(uint32(utxo.idx)).
+				SetAmount(utxo.amount).
+				SetNetwork(common.SchemaNetwork(network)).
+				SetBlockHeight(blockHeight).
+				SetDepositAddress(address).
+				Save(ctx)
+			if err != nil {
+				return fmt.Errorf("unable to store a new utxo: %v", err)
+			}
 		}
 	}
 

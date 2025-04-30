@@ -680,6 +680,39 @@ var (
 			},
 		},
 	}
+	// UtxosColumns holds the columns for the "utxos" table.
+	UtxosColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "block_height", Type: field.TypeInt64},
+		{Name: "txid", Type: field.TypeBytes},
+		{Name: "vout", Type: field.TypeUint32},
+		{Name: "amount", Type: field.TypeUint64},
+		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "deposit_address_utxo", Type: field.TypeUUID},
+	}
+	// UtxosTable holds the schema information for the "utxos" table.
+	UtxosTable = &schema.Table{
+		Name:       "utxos",
+		Columns:    UtxosColumns,
+		PrimaryKey: []*schema.Column{UtxosColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "utxos_deposit_addresses_utxo",
+				Columns:    []*schema.Column{UtxosColumns[8]},
+				RefColumns: []*schema.Column{DepositAddressesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "utxo_network_txid_vout",
+				Unique:  true,
+				Columns: []*schema.Column{UtxosColumns[7], UtxosColumns[4], UtxosColumns[5]},
+			},
+		},
+	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		BlockHeightsTable,
@@ -700,6 +733,7 @@ var (
 		TreesTable,
 		TreeNodesTable,
 		UserSignedTransactionsTable,
+		UtxosTable,
 	}
 )
 
@@ -724,4 +758,5 @@ func init() {
 	TreeNodesTable.ForeignKeys[2].RefTable = SigningKeysharesTable
 	UserSignedTransactionsTable.ForeignKeys[0].RefTable = TreeNodesTable
 	UserSignedTransactionsTable.ForeignKeys[1].RefTable = PreimageRequestsTable
+	UtxosTable.ForeignKeys[0].RefTable = DepositAddressesTable
 }

@@ -32,6 +32,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
+	"github.com/lightsparkdev/spark/so/ent/utxo"
 )
 
 const (
@@ -61,6 +62,7 @@ const (
 	TypeTree                    = "Tree"
 	TypeTreeNode                = "TreeNode"
 	TypeUserSignedTransaction   = "UserSignedTransaction"
+	TypeUtxo                    = "Utxo"
 )
 
 // BlockHeightMutation represents an operation that mutates the BlockHeight nodes in the graph.
@@ -1232,6 +1234,9 @@ type DepositAddressMutation struct {
 	clearedFields           map[string]struct{}
 	signing_keyshare        *uuid.UUID
 	clearedsigning_keyshare bool
+	utxo                    map[uuid.UUID]struct{}
+	removedutxo             map[uuid.UUID]struct{}
+	clearedutxo             bool
 	done                    bool
 	oldValue                func(context.Context) (*DepositAddress, error)
 	predicates              []predicate.DepositAddress
@@ -1764,6 +1769,60 @@ func (m *DepositAddressMutation) ResetSigningKeyshare() {
 	m.clearedsigning_keyshare = false
 }
 
+// AddUtxoIDs adds the "utxo" edge to the Utxo entity by ids.
+func (m *DepositAddressMutation) AddUtxoIDs(ids ...uuid.UUID) {
+	if m.utxo == nil {
+		m.utxo = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.utxo[ids[i]] = struct{}{}
+	}
+}
+
+// ClearUtxo clears the "utxo" edge to the Utxo entity.
+func (m *DepositAddressMutation) ClearUtxo() {
+	m.clearedutxo = true
+}
+
+// UtxoCleared reports if the "utxo" edge to the Utxo entity was cleared.
+func (m *DepositAddressMutation) UtxoCleared() bool {
+	return m.clearedutxo
+}
+
+// RemoveUtxoIDs removes the "utxo" edge to the Utxo entity by IDs.
+func (m *DepositAddressMutation) RemoveUtxoIDs(ids ...uuid.UUID) {
+	if m.removedutxo == nil {
+		m.removedutxo = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.utxo, ids[i])
+		m.removedutxo[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedUtxo returns the removed IDs of the "utxo" edge to the Utxo entity.
+func (m *DepositAddressMutation) RemovedUtxoIDs() (ids []uuid.UUID) {
+	for id := range m.removedutxo {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// UtxoIDs returns the "utxo" edge IDs in the mutation.
+func (m *DepositAddressMutation) UtxoIDs() (ids []uuid.UUID) {
+	for id := range m.utxo {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetUtxo resets all changes to the "utxo" edge.
+func (m *DepositAddressMutation) ResetUtxo() {
+	m.utxo = nil
+	m.clearedutxo = false
+	m.removedutxo = nil
+}
+
 // Where appends a list predicates to the DepositAddressMutation builder.
 func (m *DepositAddressMutation) Where(ps ...predicate.DepositAddress) {
 	m.predicates = append(m.predicates, ps...)
@@ -2069,9 +2128,12 @@ func (m *DepositAddressMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *DepositAddressMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.signing_keyshare != nil {
 		edges = append(edges, depositaddress.EdgeSigningKeyshare)
+	}
+	if m.utxo != nil {
+		edges = append(edges, depositaddress.EdgeUtxo)
 	}
 	return edges
 }
@@ -2084,27 +2146,47 @@ func (m *DepositAddressMutation) AddedIDs(name string) []ent.Value {
 		if id := m.signing_keyshare; id != nil {
 			return []ent.Value{*id}
 		}
+	case depositaddress.EdgeUtxo:
+		ids := make([]ent.Value, 0, len(m.utxo))
+		for id := range m.utxo {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *DepositAddressMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
+	if m.removedutxo != nil {
+		edges = append(edges, depositaddress.EdgeUtxo)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *DepositAddressMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case depositaddress.EdgeUtxo:
+		ids := make([]ent.Value, 0, len(m.removedutxo))
+		for id := range m.removedutxo {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *DepositAddressMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.clearedsigning_keyshare {
 		edges = append(edges, depositaddress.EdgeSigningKeyshare)
+	}
+	if m.clearedutxo {
+		edges = append(edges, depositaddress.EdgeUtxo)
 	}
 	return edges
 }
@@ -2115,6 +2197,8 @@ func (m *DepositAddressMutation) EdgeCleared(name string) bool {
 	switch name {
 	case depositaddress.EdgeSigningKeyshare:
 		return m.clearedsigning_keyshare
+	case depositaddress.EdgeUtxo:
+		return m.clearedutxo
 	}
 	return false
 }
@@ -2136,6 +2220,9 @@ func (m *DepositAddressMutation) ResetEdge(name string) error {
 	switch name {
 	case depositaddress.EdgeSigningKeyshare:
 		m.ResetSigningKeyshare()
+		return nil
+	case depositaddress.EdgeUtxo:
+		m.ResetUtxo()
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress edge %s", name)
@@ -16382,4 +16469,829 @@ func (m *UserSignedTransactionMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown UserSignedTransaction edge %s", name)
+}
+
+// UtxoMutation represents an operation that mutates the Utxo nodes in the graph.
+type UtxoMutation struct {
+	config
+	op                     Op
+	typ                    string
+	id                     *uuid.UUID
+	create_time            *time.Time
+	update_time            *time.Time
+	block_height           *int64
+	addblock_height        *int64
+	txid                   *[]byte
+	vout                   *uint32
+	addvout                *int32
+	amount                 *uint64
+	addamount              *int64
+	network                *schema.Network
+	clearedFields          map[string]struct{}
+	deposit_address        *uuid.UUID
+	cleareddeposit_address bool
+	done                   bool
+	oldValue               func(context.Context) (*Utxo, error)
+	predicates             []predicate.Utxo
+}
+
+var _ ent.Mutation = (*UtxoMutation)(nil)
+
+// utxoOption allows management of the mutation configuration using functional options.
+type utxoOption func(*UtxoMutation)
+
+// newUtxoMutation creates new mutation for the Utxo entity.
+func newUtxoMutation(c config, op Op, opts ...utxoOption) *UtxoMutation {
+	m := &UtxoMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeUtxo,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withUtxoID sets the ID field of the mutation.
+func withUtxoID(id uuid.UUID) utxoOption {
+	return func(m *UtxoMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *Utxo
+		)
+		m.oldValue = func(ctx context.Context) (*Utxo, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().Utxo.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withUtxo sets the old Utxo of the mutation.
+func withUtxo(node *Utxo) utxoOption {
+	return func(m *UtxoMutation) {
+		m.oldValue = func(context.Context) (*Utxo, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m UtxoMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m UtxoMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of Utxo entities.
+func (m *UtxoMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *UtxoMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *UtxoMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().Utxo.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *UtxoMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *UtxoMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *UtxoMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *UtxoMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *UtxoMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *UtxoMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetBlockHeight sets the "block_height" field.
+func (m *UtxoMutation) SetBlockHeight(i int64) {
+	m.block_height = &i
+	m.addblock_height = nil
+}
+
+// BlockHeight returns the value of the "block_height" field in the mutation.
+func (m *UtxoMutation) BlockHeight() (r int64, exists bool) {
+	v := m.block_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBlockHeight returns the old "block_height" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldBlockHeight(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBlockHeight is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBlockHeight requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBlockHeight: %w", err)
+	}
+	return oldValue.BlockHeight, nil
+}
+
+// AddBlockHeight adds i to the "block_height" field.
+func (m *UtxoMutation) AddBlockHeight(i int64) {
+	if m.addblock_height != nil {
+		*m.addblock_height += i
+	} else {
+		m.addblock_height = &i
+	}
+}
+
+// AddedBlockHeight returns the value that was added to the "block_height" field in this mutation.
+func (m *UtxoMutation) AddedBlockHeight() (r int64, exists bool) {
+	v := m.addblock_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetBlockHeight resets all changes to the "block_height" field.
+func (m *UtxoMutation) ResetBlockHeight() {
+	m.block_height = nil
+	m.addblock_height = nil
+}
+
+// SetTxid sets the "txid" field.
+func (m *UtxoMutation) SetTxid(b []byte) {
+	m.txid = &b
+}
+
+// Txid returns the value of the "txid" field in the mutation.
+func (m *UtxoMutation) Txid() (r []byte, exists bool) {
+	v := m.txid
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTxid returns the old "txid" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldTxid(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTxid is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTxid requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTxid: %w", err)
+	}
+	return oldValue.Txid, nil
+}
+
+// ResetTxid resets all changes to the "txid" field.
+func (m *UtxoMutation) ResetTxid() {
+	m.txid = nil
+}
+
+// SetVout sets the "vout" field.
+func (m *UtxoMutation) SetVout(u uint32) {
+	m.vout = &u
+	m.addvout = nil
+}
+
+// Vout returns the value of the "vout" field in the mutation.
+func (m *UtxoMutation) Vout() (r uint32, exists bool) {
+	v := m.vout
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVout returns the old "vout" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldVout(ctx context.Context) (v uint32, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVout is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVout requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVout: %w", err)
+	}
+	return oldValue.Vout, nil
+}
+
+// AddVout adds u to the "vout" field.
+func (m *UtxoMutation) AddVout(u int32) {
+	if m.addvout != nil {
+		*m.addvout += u
+	} else {
+		m.addvout = &u
+	}
+}
+
+// AddedVout returns the value that was added to the "vout" field in this mutation.
+func (m *UtxoMutation) AddedVout() (r int32, exists bool) {
+	v := m.addvout
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVout resets all changes to the "vout" field.
+func (m *UtxoMutation) ResetVout() {
+	m.vout = nil
+	m.addvout = nil
+}
+
+// SetAmount sets the "amount" field.
+func (m *UtxoMutation) SetAmount(u uint64) {
+	m.amount = &u
+	m.addamount = nil
+}
+
+// Amount returns the value of the "amount" field in the mutation.
+func (m *UtxoMutation) Amount() (r uint64, exists bool) {
+	v := m.amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAmount returns the old "amount" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldAmount(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAmount: %w", err)
+	}
+	return oldValue.Amount, nil
+}
+
+// AddAmount adds u to the "amount" field.
+func (m *UtxoMutation) AddAmount(u int64) {
+	if m.addamount != nil {
+		*m.addamount += u
+	} else {
+		m.addamount = &u
+	}
+}
+
+// AddedAmount returns the value that was added to the "amount" field in this mutation.
+func (m *UtxoMutation) AddedAmount() (r int64, exists bool) {
+	v := m.addamount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAmount resets all changes to the "amount" field.
+func (m *UtxoMutation) ResetAmount() {
+	m.amount = nil
+	m.addamount = nil
+}
+
+// SetNetwork sets the "network" field.
+func (m *UtxoMutation) SetNetwork(s schema.Network) {
+	m.network = &s
+}
+
+// Network returns the value of the "network" field in the mutation.
+func (m *UtxoMutation) Network() (r schema.Network, exists bool) {
+	v := m.network
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNetwork returns the old "network" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldNetwork(ctx context.Context) (v schema.Network, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNetwork requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNetwork: %w", err)
+	}
+	return oldValue.Network, nil
+}
+
+// ResetNetwork resets all changes to the "network" field.
+func (m *UtxoMutation) ResetNetwork() {
+	m.network = nil
+}
+
+// SetDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by id.
+func (m *UtxoMutation) SetDepositAddressID(id uuid.UUID) {
+	m.deposit_address = &id
+}
+
+// ClearDepositAddress clears the "deposit_address" edge to the DepositAddress entity.
+func (m *UtxoMutation) ClearDepositAddress() {
+	m.cleareddeposit_address = true
+}
+
+// DepositAddressCleared reports if the "deposit_address" edge to the DepositAddress entity was cleared.
+func (m *UtxoMutation) DepositAddressCleared() bool {
+	return m.cleareddeposit_address
+}
+
+// DepositAddressID returns the "deposit_address" edge ID in the mutation.
+func (m *UtxoMutation) DepositAddressID() (id uuid.UUID, exists bool) {
+	if m.deposit_address != nil {
+		return *m.deposit_address, true
+	}
+	return
+}
+
+// DepositAddressIDs returns the "deposit_address" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// DepositAddressID instead. It exists only for internal usage by the builders.
+func (m *UtxoMutation) DepositAddressIDs() (ids []uuid.UUID) {
+	if id := m.deposit_address; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetDepositAddress resets all changes to the "deposit_address" edge.
+func (m *UtxoMutation) ResetDepositAddress() {
+	m.deposit_address = nil
+	m.cleareddeposit_address = false
+}
+
+// Where appends a list predicates to the UtxoMutation builder.
+func (m *UtxoMutation) Where(ps ...predicate.Utxo) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the UtxoMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *UtxoMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.Utxo, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *UtxoMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *UtxoMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (Utxo).
+func (m *UtxoMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *UtxoMutation) Fields() []string {
+	fields := make([]string, 0, 7)
+	if m.create_time != nil {
+		fields = append(fields, utxo.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, utxo.FieldUpdateTime)
+	}
+	if m.block_height != nil {
+		fields = append(fields, utxo.FieldBlockHeight)
+	}
+	if m.txid != nil {
+		fields = append(fields, utxo.FieldTxid)
+	}
+	if m.vout != nil {
+		fields = append(fields, utxo.FieldVout)
+	}
+	if m.amount != nil {
+		fields = append(fields, utxo.FieldAmount)
+	}
+	if m.network != nil {
+		fields = append(fields, utxo.FieldNetwork)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *UtxoMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case utxo.FieldCreateTime:
+		return m.CreateTime()
+	case utxo.FieldUpdateTime:
+		return m.UpdateTime()
+	case utxo.FieldBlockHeight:
+		return m.BlockHeight()
+	case utxo.FieldTxid:
+		return m.Txid()
+	case utxo.FieldVout:
+		return m.Vout()
+	case utxo.FieldAmount:
+		return m.Amount()
+	case utxo.FieldNetwork:
+		return m.Network()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *UtxoMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case utxo.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case utxo.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case utxo.FieldBlockHeight:
+		return m.OldBlockHeight(ctx)
+	case utxo.FieldTxid:
+		return m.OldTxid(ctx)
+	case utxo.FieldVout:
+		return m.OldVout(ctx)
+	case utxo.FieldAmount:
+		return m.OldAmount(ctx)
+	case utxo.FieldNetwork:
+		return m.OldNetwork(ctx)
+	}
+	return nil, fmt.Errorf("unknown Utxo field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *UtxoMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case utxo.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case utxo.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case utxo.FieldBlockHeight:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBlockHeight(v)
+		return nil
+	case utxo.FieldTxid:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTxid(v)
+		return nil
+	case utxo.FieldVout:
+		v, ok := value.(uint32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVout(v)
+		return nil
+	case utxo.FieldAmount:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAmount(v)
+		return nil
+	case utxo.FieldNetwork:
+		v, ok := value.(schema.Network)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNetwork(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Utxo field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *UtxoMutation) AddedFields() []string {
+	var fields []string
+	if m.addblock_height != nil {
+		fields = append(fields, utxo.FieldBlockHeight)
+	}
+	if m.addvout != nil {
+		fields = append(fields, utxo.FieldVout)
+	}
+	if m.addamount != nil {
+		fields = append(fields, utxo.FieldAmount)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *UtxoMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case utxo.FieldBlockHeight:
+		return m.AddedBlockHeight()
+	case utxo.FieldVout:
+		return m.AddedVout()
+	case utxo.FieldAmount:
+		return m.AddedAmount()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *UtxoMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case utxo.FieldBlockHeight:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBlockHeight(v)
+		return nil
+	case utxo.FieldVout:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVout(v)
+		return nil
+	case utxo.FieldAmount:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAmount(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Utxo numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *UtxoMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *UtxoMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *UtxoMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown Utxo nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *UtxoMutation) ResetField(name string) error {
+	switch name {
+	case utxo.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case utxo.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case utxo.FieldBlockHeight:
+		m.ResetBlockHeight()
+		return nil
+	case utxo.FieldTxid:
+		m.ResetTxid()
+		return nil
+	case utxo.FieldVout:
+		m.ResetVout()
+		return nil
+	case utxo.FieldAmount:
+		m.ResetAmount()
+		return nil
+	case utxo.FieldNetwork:
+		m.ResetNetwork()
+		return nil
+	}
+	return fmt.Errorf("unknown Utxo field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *UtxoMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.deposit_address != nil {
+		edges = append(edges, utxo.EdgeDepositAddress)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *UtxoMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case utxo.EdgeDepositAddress:
+		if id := m.deposit_address; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *UtxoMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *UtxoMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *UtxoMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.cleareddeposit_address {
+		edges = append(edges, utxo.EdgeDepositAddress)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *UtxoMutation) EdgeCleared(name string) bool {
+	switch name {
+	case utxo.EdgeDepositAddress:
+		return m.cleareddeposit_address
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *UtxoMutation) ClearEdge(name string) error {
+	switch name {
+	case utxo.EdgeDepositAddress:
+		m.ClearDepositAddress()
+		return nil
+	}
+	return fmt.Errorf("unknown Utxo unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *UtxoMutation) ResetEdge(name string) error {
+	switch name {
+	case utxo.EdgeDepositAddress:
+		m.ResetDepositAddress()
+		return nil
+	}
+	return fmt.Errorf("unknown Utxo edge %s", name)
 }
