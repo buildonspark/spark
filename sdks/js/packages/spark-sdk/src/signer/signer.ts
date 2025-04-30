@@ -10,6 +10,7 @@ import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { sha256 } from "@scure/btc-signer/utils";
 import * as ecies from "eciesjs";
+import { ConfigurationError, ValidationError } from "../errors/types.js";
 import { TreeNode } from "../proto/spark.js";
 import { generateAdaptorFromSignature } from "../utils/adaptor-signature.js";
 import { getMasterHDKeyFromSeed, subtractPrivateKeys } from "../utils/keys.js";
@@ -26,7 +27,6 @@ import {
 } from "../utils/signing.js";
 import { aggregateFrost, signFrost } from "../utils/wasm.js";
 import { KeyPackage } from "../wasm/spark_bindings.js";
-import { ValidationError, ConfigurationError } from "../errors/types.js";
 
 export type SigningNonce = {
   binding: Uint8Array;
@@ -107,6 +107,10 @@ interface SparkSigner {
     message: Uint8Array,
     compact?: boolean,
   ): Promise<Uint8Array>;
+  validateMessageWithIdentityKey(
+    message: Uint8Array,
+    signature: Uint8Array,
+  ): Promise<boolean>;
 
   encryptLeafPrivateKeyEcies(
     receiverPublicKey: Uint8Array,
@@ -558,6 +562,19 @@ class DefaultSparkSigner implements SparkSigner {
     }
 
     return this.masterKey.publicKey;
+  }
+
+  async validateMessageWithIdentityKey(
+    message: Uint8Array,
+    signature: Uint8Array,
+  ): Promise<boolean> {
+    if (!this.identityKey?.publicKey) {
+      throw new ConfigurationError("Identity key not initialized", {
+        configKey: "identityKey",
+      });
+    }
+
+    return secp256k1.verify(signature, message, this.identityKey.publicKey);
   }
 }
 export { DefaultSparkSigner };

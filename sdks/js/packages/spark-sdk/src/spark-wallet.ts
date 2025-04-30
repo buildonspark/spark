@@ -2258,18 +2258,38 @@ export class SparkWallet extends EventEmitter {
   /**
    * Signs a message with the identity key.
    *
-   * @param {string} message - Unhashed message to sign
+   * @param {string} message - The message to sign
    * @param {boolean} [compact] - Whether to use compact encoding. If false, the message will be encoded as DER.
    * @returns {Promise<string>} The signed message
    */
-  public async signMessage(
+  public async signMessageWithIdentityKey(
     message: string,
     compact?: boolean,
   ): Promise<string> {
     const hash = sha256(message);
-    return bytesToHex(
-      await this.config.signer.signMessageWithIdentityKey(hash, compact),
+    const signature = await this.config.signer.signMessageWithIdentityKey(
+      hash,
+      compact,
     );
+    return bytesToHex(signature);
+  }
+
+  /**
+   * Validates a message with the identity key.
+   *
+   * @param {string} message - The original message that was signed
+   * @param {string | Uint8Array} signature - Signature to validate
+   * @returns {Promise<boolean>} Whether the message is valid
+   */
+  public async validateMessageWithIdentityKey(
+    message: string,
+    signature: string | Uint8Array,
+  ): Promise<boolean> {
+    const hash = sha256(message);
+    if (typeof signature === "string") {
+      signature = hexToBytes(signature);
+    }
+    return this.config.signer.validateMessageWithIdentityKey(hash, signature);
   }
 
   /**
