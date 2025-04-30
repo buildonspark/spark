@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
-	"os"
 	"slices"
 	"time"
 
@@ -246,14 +245,12 @@ func WatchChain(
 	logger.Info("Listening for block notifications via ZMQ endpoint", "endpoint", bitcoindConfig.ZmqPubRawBlock)
 
 	newBlockNotification := make(chan struct{})
+	errChan := make(chan error)
 	go func() {
 		for {
 			_, err := subscriber.RecvMessage(0)
 			if err != nil {
-				// TODO(mhr): Bubble this up through a channel so we can properly shut down the server rather
-				// than `os.Exit(1)`.
-				logger.Error("Failed to receive message", "error", err)
-				os.Exit(1)
+				errChan <- err
 			}
 			newBlockNotification <- struct{}{}
 		}
@@ -262,6 +259,9 @@ func WatchChain(
 	// TODO: we should consider alerting on errors within this loop
 	for {
 		select {
+		case err := <-errChan:
+			logger.Error("Error receiving ZMQ message", "error", err)
+			return err
 		case <-newBlockNotification:
 		case <-time.After(pollInterval(network)):
 		}
