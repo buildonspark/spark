@@ -2,7 +2,6 @@ import {
   LRC20WalletApiConfig,
   MayHaveLrc20WalletApiConfig,
 } from "@buildonspark/lrc20-sdk";
-import { hexToBytes } from "@noble/curves/abstract/utils";
 import {
   MayHaveSspClientOptions,
   SspClientOptions,
@@ -119,6 +118,13 @@ export function getSspUrl(network: NetworkType): string {
   }
 }
 
+export function getSspSchemaEndpoint(network: NetworkType): string | undefined {
+  switch (network) {
+    case "LOCAL":
+      return "graphql/spark/rc";
+  }
+  return;
+}
 export type SigningOperator = {
   readonly id: number;
   readonly identifier: string;
@@ -178,6 +184,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
   sspClientOptions: {
     baseUrl: getSspUrl("LOCAL"),
     identityPublicKey: getSspIdentityPublicKey("LOCAL"),
+    schemaEndpoint: getSspSchemaEndpoint("LOCAL"),
   },
 };
 
