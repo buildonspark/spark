@@ -13,9 +13,8 @@ export async function getLatestDepositTxId(
     network === BitcoinNetwork.REGTEST
       ? getElectrsUrl("REGTEST")
       : getElectrsUrl("MAINNET");
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
+  const headers: Record<string, string> = {};
+
 
   if (network === BitcoinNetwork.REGTEST) {
     const auth = btoa(
