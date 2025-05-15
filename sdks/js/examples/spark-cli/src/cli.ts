@@ -19,6 +19,7 @@ import { hex } from "@scure/base";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import readline from "readline";
 import fs from "fs";
+import { read } from 'read';
 
 const commands = [
   "initwallet",
@@ -54,10 +55,6 @@ const commands = [
   "exit",
   "quit",
 ];
-
-// Initialize Spark Wallet
-const walletMnemonic =
-  "cctypical stereo dose party penalty decline neglect feel harvest abstract stage winter";
 
 async function runCLI() {
   // Get network from environment variable
@@ -96,7 +93,65 @@ async function runCLI() {
     }
   }
 
-  let wallet: IssuerSparkWallet | undefined;
+  const mnemonicOrSeed = await read({
+      prompt: "Enter mnemonic or seed (leave empty to generate a new one): ",
+      replace: "*",
+      silent: true,
+    });
+  let options: ConfigOptions = {
+    ...config,
+    network,
+  };
+  const { wallet: newWallet, mnemonic: newMnemonic } =
+    await IssuerSparkWallet.initialize({
+      mnemonicOrSeed,
+      options,
+    });
+  const wallet = newWallet;
+  if (!mnemonicOrSeed) {
+    console.log("Mnemonic:", newMnemonic);
+  }
+  console.log("Network:", options.network);
+  wallet.on(
+    "deposit:confirmed",
+    (depositId: string, balance: number) => {
+      console.log(
+        `Deposit ${depositId} marked as available. New balance: ${balance}`,
+      );
+    },
+  );
+
+  wallet.on(
+    "transfer:claimed",
+    (transferId: string, balance: number) => {
+      console.log(
+        `Transfer ${transferId} claimed. New balance: ${balance}`,
+      );
+    },
+  );
+  wallet.on("stream:connected", () => {
+    console.log("Stream connected");
+  });
+  wallet.on(
+    "stream:reconnecting",
+    (
+      attempt: number,
+      maxAttempts: number,
+      delayMs: number,
+      error: string,
+    ) => {
+      console.log(
+        "Stream reconnecting",
+        attempt,
+        maxAttempts,
+        delayMs,
+        error,
+      );
+    },
+  );
+  wallet.on("stream:disconnected", (reason: string) => {
+    console.log("Stream disconnected", reason);
+  });
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -108,7 +163,6 @@ async function runCLI() {
   });
   const helpMessage = `
   Available commands:
-  initwallet [mnemonic | seed]                                        - Create a new wallet from a mnemonic or seed. If no mnemonic or seed is provided, a new mnemonic will be generated.
   getbalance                                                          - Get the wallet's balance
   getdepositaddress                                                   - Get an address to deposit funds from L1 to Spark
   identity                                                            - Get the wallet's identity public key
@@ -372,65 +426,6 @@ async function runCLI() {
           }
           const coopExitRequest = await wallet.getCoopExitRequest(args[0]);
           console.log(coopExitRequest);
-          break;
-        case "initwallet":
-          if (wallet) {
-            wallet.cleanupConnections();
-          }
-          const mnemonicOrSeed = args.join(" ");
-          let options: ConfigOptions = {
-            ...config,
-            network,
-          };
-          const { wallet: newWallet, mnemonic: newMnemonic } =
-            await IssuerSparkWallet.initialize({
-              mnemonicOrSeed,
-              options,
-            });
-          wallet = newWallet;
-          console.log("Mnemonic:", newMnemonic);
-          console.log("Network:", options.network);
-          wallet.on(
-            "deposit:confirmed",
-            (depositId: string, balance: number) => {
-              console.log(
-                `Deposit ${depositId} marked as available. New balance: ${balance}`,
-              );
-            },
-          );
-
-          wallet.on(
-            "transfer:claimed",
-            (transferId: string, balance: number) => {
-              console.log(
-                `Transfer ${transferId} claimed. New balance: ${balance}`,
-              );
-            },
-          );
-          wallet.on("stream:connected", () => {
-            console.log("Stream connected");
-          });
-          wallet.on(
-            "stream:reconnecting",
-            (
-              attempt: number,
-              maxAttempts: number,
-              delayMs: number,
-              error: string,
-            ) => {
-              console.log(
-                "Stream reconnecting",
-                attempt,
-                maxAttempts,
-                delayMs,
-                error,
-              );
-            },
-          );
-          wallet.on("stream:disconnected", (reason: string) => {
-            console.log("Stream disconnected", reason);
-          });
-
           break;
         case "getbalance":
           if (!wallet) {
