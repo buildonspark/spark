@@ -5,4 +5,4 @@ edition = "2021"
 
 [dependencies]
 lightspark = "0.10.1"
-tokio = { version = "1.43.0", features = ["full"] }
+tokio = { version = "1.43.1", features = ["full"] }
