@@ -20,7 +20,6 @@ import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import readline from "readline";
 import fs from "fs";
 import { read } from 'read';
-import { Writable } from "stream";
 
 const commands = [
   "initwallet",
