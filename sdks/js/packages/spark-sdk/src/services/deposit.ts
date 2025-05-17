@@ -1,7 +1,9 @@
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
+import { hexToBytes } from "@noble/hashes/utils";
 import * as btc from "@scure/btc-signer";
 import { p2tr, Transaction } from "@scure/btc-signer";
 import { equalBytes, sha256 } from "@scure/btc-signer/utils";
+import { NetworkError, ValidationError } from "../errors/types.js";
 import { SignatureIntent } from "../proto/common.js";
 import {
   Address,
@@ -17,15 +19,8 @@ import {
 import { subtractPublicKeys } from "../utils/keys.js";
 import { getNetwork } from "../utils/network.js";
 import { proofOfPossessionMessageHashForDepositAddress } from "../utils/proof.js";
-import { createWasmSigningCommitment } from "../utils/signing.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
-import {
-  ValidationError,
-  NetworkError,
-  AuthenticationError,
-} from "../errors/types.js";
-import { hexToBytes } from "@noble/hashes/utils";
 
 type ValidateDepositAddressParams = {
   address: Address;
@@ -256,7 +251,7 @@ export class DepositService {
         identityPublicKey: await this.config.signer.getIdentityPublicKey(),
         onChainUtxo: {
           vout: vout,
-          rawTx: depositTx.toBytes(),
+          rawTx: depositTx.toBytes(true),
           network: this.config.getNetworkProto(),
         },
         rootTxSigningJob: {
@@ -360,7 +355,7 @@ export class DepositService {
       statechainCommitments:
         treeResp.rootNodeSignatureShares.nodeTxSigningResult
           .signingNonceCommitments,
-      selfCommitment: createWasmSigningCommitment(rootNonceCommitment),
+      selfCommitment: rootNonceCommitment,
       publicKey: signingPubKey,
       selfSignature: rootSignature!,
       adaptorPubKey: new Uint8Array(),
@@ -376,7 +371,7 @@ export class DepositService {
       statechainCommitments:
         treeResp.rootNodeSignatureShares.refundTxSigningResult
           .signingNonceCommitments,
-      selfCommitment: createWasmSigningCommitment(refundNonceCommitment),
+      selfCommitment: refundNonceCommitment,
       publicKey: signingPubKey,
       selfSignature: refundSignature,
       adaptorPubKey: new Uint8Array(),

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/lightsparkdev/spark/so/dkg"
 	testutil "github.com/lightsparkdev/spark/test_util"
 )
@@ -37,6 +38,7 @@ func TestMain(m *testing.M) {
 		slog.Warn("DKG not run for test setup. Set RUN_DKG=true to run DKG if tests fail, " +
 			"run scripts/run-development-dkg.sh, or re-run tests as they may work on retry")
 	}
+	btcjson.MustRegisterCmd("submitpackage", (*SubmitPackageCmd)(nil), btcjson.UsageFlag(0))
 
 	// Run tests
 	code := m.Run()

@@ -225,6 +225,30 @@ func (f UserSignedTransactionFunc) Mutate(ctx context.Context, m ent.Mutation) (
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UserSignedTransactionMutation", m)
 }
 
+// The UtxoFunc type is an adapter to allow the use of ordinary
+// function as Utxo mutator.
+type UtxoFunc func(context.Context, *ent.UtxoMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f UtxoFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.UtxoMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UtxoMutation", m)
+}
+
+// The UtxoSwapFunc type is an adapter to allow the use of ordinary
+// function as UtxoSwap mutator.
+type UtxoSwapFunc func(context.Context, *ent.UtxoSwapMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f UtxoSwapFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.UtxoSwapMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.UtxoSwapMutation", m)
+}
+
 // Condition is a hook condition function.
 type Condition func(context.Context, ent.Mutation) bool
 

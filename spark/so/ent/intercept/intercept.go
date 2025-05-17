@@ -27,6 +27,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
+	"github.com/lightsparkdev/spark/so/ent/utxo"
+	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 )
 
 // The Query interface represents an operation that queries a graph.
@@ -571,6 +573,60 @@ func (f TraverseUserSignedTransaction) Traverse(ctx context.Context, q ent.Query
 	return fmt.Errorf("unexpected query type %T. expect *ent.UserSignedTransactionQuery", q)
 }
 
+// The UtxoFunc type is an adapter to allow the use of ordinary function as a Querier.
+type UtxoFunc func(context.Context, *ent.UtxoQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f UtxoFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.UtxoQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.UtxoQuery", q)
+}
+
+// The TraverseUtxo type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseUtxo func(context.Context, *ent.UtxoQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseUtxo) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseUtxo) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.UtxoQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.UtxoQuery", q)
+}
+
+// The UtxoSwapFunc type is an adapter to allow the use of ordinary function as a Querier.
+type UtxoSwapFunc func(context.Context, *ent.UtxoSwapQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f UtxoSwapFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.UtxoSwapQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.UtxoSwapQuery", q)
+}
+
+// The TraverseUtxoSwap type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseUtxoSwap func(context.Context, *ent.UtxoSwapQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseUtxoSwap) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseUtxoSwap) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.UtxoSwapQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.UtxoSwapQuery", q)
+}
+
 // NewQuery returns the generic Query interface for the given typed query.
 func NewQuery(q ent.Query) (Query, error) {
 	switch q := q.(type) {
@@ -610,6 +666,10 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.TreeNodeQuery, predicate.TreeNode, treenode.OrderOption]{typ: ent.TypeTreeNode, tq: q}, nil
 	case *ent.UserSignedTransactionQuery:
 		return &query[*ent.UserSignedTransactionQuery, predicate.UserSignedTransaction, usersignedtransaction.OrderOption]{typ: ent.TypeUserSignedTransaction, tq: q}, nil
+	case *ent.UtxoQuery:
+		return &query[*ent.UtxoQuery, predicate.Utxo, utxo.OrderOption]{typ: ent.TypeUtxo, tq: q}, nil
+	case *ent.UtxoSwapQuery:
+		return &query[*ent.UtxoSwapQuery, predicate.UtxoSwap, utxoswap.OrderOption]{typ: ent.TypeUtxoSwap, tq: q}, nil
 	default:
 		return nil, fmt.Errorf("unknown query type %T", q)
 	}

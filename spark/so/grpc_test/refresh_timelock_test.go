@@ -28,7 +28,7 @@ func TestRefreshTimelock(t *testing.T) {
 	signingKey := secp256k1.PrivKeyFromBytes(signingKeyBytes)
 
 	// Decrement timelock on refundTx
-	err = wallet.RefreshTimelockRefundTx(
+	_, err = wallet.RefreshTimelockRefundTx(
 		context.Background(),
 		senderConfig,
 		node,

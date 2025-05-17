@@ -100,6 +100,40 @@ func (tnc *TreeNodeCreate) SetRawRefundTx(b []byte) *TreeNodeCreate {
 	return tnc
 }
 
+// SetNodeConfirmationHeight sets the "node_confirmation_height" field.
+func (tnc *TreeNodeCreate) SetNodeConfirmationHeight(u uint64) *TreeNodeCreate {
+	tnc.mutation.SetNodeConfirmationHeight(u)
+	return tnc
+}
+
+// SetNillableNodeConfirmationHeight sets the "node_confirmation_height" field if the given value is not nil.
+func (tnc *TreeNodeCreate) SetNillableNodeConfirmationHeight(u *uint64) *TreeNodeCreate {
+	if u != nil {
+		tnc.SetNodeConfirmationHeight(*u)
+	}
+	return tnc
+}
+
+// SetRefundConfirmationHeight sets the "refund_confirmation_height" field.
+func (tnc *TreeNodeCreate) SetRefundConfirmationHeight(u uint64) *TreeNodeCreate {
+	tnc.mutation.SetRefundConfirmationHeight(u)
+	return tnc
+}
+
+// SetNillableRefundConfirmationHeight sets the "refund_confirmation_height" field if the given value is not nil.
+func (tnc *TreeNodeCreate) SetNillableRefundConfirmationHeight(u *uint64) *TreeNodeCreate {
+	if u != nil {
+		tnc.SetRefundConfirmationHeight(*u)
+	}
+	return tnc
+}
+
+// SetDirectRefundTx sets the "direct_refund_tx" field.
+func (tnc *TreeNodeCreate) SetDirectRefundTx(b []byte) *TreeNodeCreate {
+	tnc.mutation.SetDirectRefundTx(b)
+	return tnc
+}
+
 // SetID sets the "id" field.
 func (tnc *TreeNodeCreate) SetID(u uuid.UUID) *TreeNodeCreate {
 	tnc.mutation.SetID(u)
@@ -353,6 +387,18 @@ func (tnc *TreeNodeCreate) createSpec() (*TreeNode, *sqlgraph.CreateSpec) {
 	if value, ok := tnc.mutation.RawRefundTx(); ok {
 		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
 		_node.RawRefundTx = value
+	}
+	if value, ok := tnc.mutation.NodeConfirmationHeight(); ok {
+		_spec.SetField(treenode.FieldNodeConfirmationHeight, field.TypeUint64, value)
+		_node.NodeConfirmationHeight = value
+	}
+	if value, ok := tnc.mutation.RefundConfirmationHeight(); ok {
+		_spec.SetField(treenode.FieldRefundConfirmationHeight, field.TypeUint64, value)
+		_node.RefundConfirmationHeight = value
+	}
+	if value, ok := tnc.mutation.DirectRefundTx(); ok {
+		_spec.SetField(treenode.FieldDirectRefundTx, field.TypeBytes, value)
+		_node.DirectRefundTx = value
 	}
 	if nodes := tnc.mutation.TreeIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

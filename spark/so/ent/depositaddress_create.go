@@ -13,6 +13,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/ent/utxo"
+	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 )
 
 // DepositAddressCreate is the builder for creating a DepositAddress entity.
@@ -147,6 +149,36 @@ func (dac *DepositAddressCreate) SetSigningKeyshareID(id uuid.UUID) *DepositAddr
 // SetSigningKeyshare sets the "signing_keyshare" edge to the SigningKeyshare entity.
 func (dac *DepositAddressCreate) SetSigningKeyshare(s *SigningKeyshare) *DepositAddressCreate {
 	return dac.SetSigningKeyshareID(s.ID)
+}
+
+// AddUtxoIDs adds the "utxo" edge to the Utxo entity by IDs.
+func (dac *DepositAddressCreate) AddUtxoIDs(ids ...uuid.UUID) *DepositAddressCreate {
+	dac.mutation.AddUtxoIDs(ids...)
+	return dac
+}
+
+// AddUtxo adds the "utxo" edges to the Utxo entity.
+func (dac *DepositAddressCreate) AddUtxo(u ...*Utxo) *DepositAddressCreate {
+	ids := make([]uuid.UUID, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return dac.AddUtxoIDs(ids...)
+}
+
+// AddUtxoswapIDs adds the "utxoswaps" edge to the UtxoSwap entity by IDs.
+func (dac *DepositAddressCreate) AddUtxoswapIDs(ids ...uuid.UUID) *DepositAddressCreate {
+	dac.mutation.AddUtxoswapIDs(ids...)
+	return dac
+}
+
+// AddUtxoswaps adds the "utxoswaps" edges to the UtxoSwap entity.
+func (dac *DepositAddressCreate) AddUtxoswaps(u ...*UtxoSwap) *DepositAddressCreate {
+	ids := make([]uuid.UUID, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return dac.AddUtxoswapIDs(ids...)
 }
 
 // Mutation returns the DepositAddressMutation object of the builder.
@@ -326,6 +358,38 @@ func (dac *DepositAddressCreate) createSpec() (*DepositAddress, *sqlgraph.Create
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.deposit_address_signing_keyshare = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := dac.mutation.UtxoIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   depositaddress.UtxoTable,
+			Columns: []string{depositaddress.UtxoColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := dac.mutation.UtxoswapsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   depositaddress.UtxoswapsTable,
+			Columns: []string{depositaddress.UtxoswapsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxoswap.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

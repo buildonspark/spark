@@ -15,6 +15,7 @@ import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import { Mutex } from "async-mutex";
 import { decode } from "light-bolt11-decoder";
+import { uuidv7 } from "uuidv7";
 import {
   ConfigurationError,
   NetworkError,
@@ -32,7 +33,6 @@ import {
   LeavesSwapRequest,
   LightningReceiveRequest,
   LightningSendFeeEstimateInput,
-  LightningSendFeeEstimateOutput,
   LightningSendRequest,
   UserLeafInput,
 } from "./graphql/objects/index.js";
@@ -94,6 +94,7 @@ import {
   encodeSparkAddress,
   SparkAddressFormat,
 } from "./address/index.js";
+import { isReactNative } from "./constants.js";
 import { SparkSigner } from "./signer/signer.js";
 import { BitcoinFaucet } from "./tests/utils/test-faucet.js";
 import {
@@ -143,9 +144,9 @@ export type TokenInfo = {
 export type InitWalletResponse = {
   mnemonic?: string | undefined;
 };
-
 export interface SparkWalletProps {
   mnemonicOrSeed?: Uint8Array | string;
+  accountNumber?: number;
   signer?: SparkSigner;
   options?: ConfigOptions;
 }
@@ -204,6 +205,9 @@ export class SparkWallet extends EventEmitter {
   protected tokenOuputs: Map<string, OutputWithPreviousTransactionData[]> =
     new Map();
 
+  // Add this property near the top of the class with other private properties
+  private claimTransfersInterval: NodeJS.Timeout | null = null;
+
   protected constructor(options?: ConfigOptions, signer?: SparkSigner) {
     super();
 
@@ -240,11 +244,12 @@ export class SparkWallet extends EventEmitter {
 
   public static async initialize({
     mnemonicOrSeed,
+    accountNumber,
     signer,
     options,
   }: SparkWalletProps) {
     const wallet = new SparkWallet(options, signer);
-    const initResponse = await wallet.initWallet(mnemonicOrSeed);
+    const initResponse = await wallet.initWallet(mnemonicOrSeed, accountNumber);
     return {
       wallet,
       ...initResponse,
@@ -255,7 +260,11 @@ export class SparkWallet extends EventEmitter {
     this.sspClient = new SspClient(this.config);
     await this.connectionManager.createClients();
 
-    this.setupBackgroundStream();
+    if (isReactNative) {
+      this.startPeriodicClaimTransfers();
+    } else {
+      this.setupBackgroundStream();
+    }
 
     await this.syncWallet();
   }
@@ -600,7 +609,19 @@ export class SparkWallet extends EventEmitter {
    */
   protected async initWallet(
     mnemonicOrSeed?: Uint8Array | string,
+    accountNumber?: number,
   ): Promise<InitWalletResponse | undefined> {
+    if (accountNumber === 0 || accountNumber === 1) {
+      // Reserved values for the case where no account number is provided
+      throw new ValidationError(
+        "If an account number is provided, it must not be be 0 or 1",
+        {
+          field: "accountNumber",
+          value: accountNumber,
+          expected: "values that do not equal 0 or 1",
+        },
+      );
+    }
     let mnemonic: string | undefined;
     if (!mnemonicOrSeed) {
       mnemonic = await this.config.signer.generateMnemonic();
@@ -618,8 +639,7 @@ export class SparkWallet extends EventEmitter {
         seed = hexToBytes(mnemonicOrSeed);
       }
     }
-
-    await this.initWalletFromSeed(seed);
+    await this.initWalletFromSeed(seed, accountNumber);
 
     const network = this.config.getNetwork();
     // TODO: remove this once we move it back to the signer
@@ -635,8 +655,10 @@ export class SparkWallet extends EventEmitter {
         value: seed,
       });
     }
-    const accountType = network === Network.REGTEST ? 0 : 1;
-    const identityKey = hdkey.derive(`m/8797555'/${accountType}'/0'`);
+    const accountNetwork = network === Network.REGTEST ? 0 : 1;
+    const identityKey = hdkey.derive(
+      `m/8797555'/${accountNumber ?? accountNetwork}'/0'`, // When an accountNumber is not provided, set a value based on the network
+    );
     this.lrc20Wallet = new LRCWallet(
       bytesToHex(identityKey.privateKey!),
       LRC_WALLET_NETWORK[network],
@@ -656,11 +678,15 @@ export class SparkWallet extends EventEmitter {
    * @returns {Promise<string>} The identity public key
    * @private
    */
-  private async initWalletFromSeed(seed: Uint8Array | string) {
+  private async initWalletFromSeed(
+    seed: Uint8Array | string,
+    accountNumber?: number,
+  ) {
     const identityPublicKey =
       await this.config.signer.createSparkWalletFromSeed(
         seed,
         this.config.getNetwork(),
+        accountNumber,
       );
     await this.initializeWallet();
 
@@ -715,7 +741,19 @@ export class SparkWallet extends EventEmitter {
       throw new Error("targetAmount must be positive");
     }
 
-    await this.claimTransfers();
+    if (targetAmount && !Number.isSafeInteger(targetAmount)) {
+      throw new ValidationError("targetAmount must be less than 2^53", {
+        field: "targetAmount",
+        value: targetAmount,
+        expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
+      });
+    }
+
+    try {
+      await this.claimTransfers();
+    } catch (e) {
+      console.warn("Unabled to claim transfers.");
+    }
 
     let leavesToSwap: TreeNode[];
     if (targetAmount && leaves && leaves.length > 0) {
@@ -814,7 +852,7 @@ export class SparkWallet extends EventEmitter {
         ),
         // TODO: Request fee from SSP
         feeSats: 0,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: uuidv7(),
       });
 
       if (!request) {
@@ -925,7 +963,14 @@ export class SparkWallet extends EventEmitter {
     };
   }
 
+  /**
+   * Gets the held token info for the wallet.
+   *
+   * @deprecated The information is returned in getBalance
+   */
   public async getTokenInfo(): Promise<TokenInfo[]> {
+    console.warn("getTokenInfo is deprecated. Use getBalance instead.");
+
     await this.syncTokenOutputs();
 
     const lrc20Client = await this.lrc20ConnectionManager.createLrc20Client();
@@ -951,27 +996,63 @@ export class SparkWallet extends EventEmitter {
    *
    * @returns {Promise<Object>} Object containing:
    *   - balance: The wallet's current balance in satoshis
-   *   - tokenBalances: Map of token public keys to token balances
+   *   - tokenBalances: Map of token public keys to token balances and token info
    */
   public async getBalance(): Promise<{
     balance: bigint;
-    tokenBalances: Map<string, { balance: bigint }>;
+    tokenBalances: Map<string, { balance: bigint; tokenInfo: TokenInfo }>;
   }> {
     this.leaves = await this.getLeaves();
     await this.syncTokenOutputs();
 
-    const tokenBalances = new Map<string, { balance: bigint }>();
+    let tokenBalances: Map<string, { balance: bigint; tokenInfo: TokenInfo }>;
 
-    for (const [tokenPublicKey, leaves] of this.tokenOuputs.entries()) {
-      tokenBalances.set(tokenPublicKey, {
-        balance: calculateAvailableTokenAmount(leaves),
-      });
+    if (this.tokenOuputs.size !== 0) {
+      tokenBalances = await this.getTokenBalance();
+    } else {
+      tokenBalances = new Map<
+        string,
+        { balance: bigint; tokenInfo: TokenInfo }
+      >();
     }
 
     return {
       balance: BigInt(this.getInternalBalance()),
       tokenBalances,
     };
+  }
+
+  private async getTokenBalance(): Promise<
+    Map<string, { balance: bigint; tokenInfo: TokenInfo }>
+  > {
+    const lrc20Client = await this.lrc20ConnectionManager.createLrc20Client();
+
+    // Get token info for all tokens
+    const tokenInfo = await lrc20Client.getTokenPubkeyInfo({
+      publicKeys: Array.from(this.tokenOuputs.keys()).map(hexToBytes),
+    });
+
+    const result = new Map<string, { balance: bigint; tokenInfo: TokenInfo }>();
+
+    for (const info of tokenInfo.tokenPubkeyInfos) {
+      const tokenPublicKey = bytesToHex(
+        info.announcement!.publicKey!.publicKey,
+      );
+      const leaves = this.tokenOuputs.get(tokenPublicKey);
+
+      result.set(tokenPublicKey, {
+        balance: leaves ? calculateAvailableTokenAmount(leaves) : BigInt(0),
+        tokenInfo: {
+          tokenPublicKey,
+          tokenName: info.announcement!.name,
+          tokenSymbol: info.announcement!.symbol,
+          tokenDecimals: Number(bytesToNumberBE(info.announcement!.decimal)),
+          maxSupply: bytesToNumberBE(info.announcement!.maxSupply),
+        },
+      });
+    }
+
+    return result;
   }
 
   private getInternalBalance(): number {
@@ -1000,7 +1081,7 @@ export class SparkWallet extends EventEmitter {
    * @private
    */
   private async generateDepositAddress(): Promise<string> {
-    const leafId = crypto.randomUUID();
+    const leafId = uuidv7();
     const signingPubkey = await this.config.signer.generatePublicKey(
       sha256(leafId),
     );
@@ -1030,6 +1111,14 @@ export class SparkWallet extends EventEmitter {
     depositTx,
     vout,
   }: DepositParams) {
+    if (!Number.isSafeInteger(vout)) {
+      throw new ValidationError("vout must be less than 2^53", {
+        field: "vout",
+        value: vout,
+        expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
+      });
+    }
+
     const res = await this.depositService!.createTreeRoot({
       signingPubKey,
       verifyingKey,
@@ -1308,6 +1397,14 @@ export class SparkWallet extends EventEmitter {
       });
     }
 
+    if (!Number.isSafeInteger(amountSats)) {
+      throw new ValidationError("Sats amount must be less than 2^53", {
+        field: "amountSats",
+        value: amountSats,
+        expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
+      });
+    }
+
     if (amountSats <= 0) {
       throw new ValidationError("Amount must be greater than 0", {
         field: "amountSats",
@@ -1353,6 +1450,7 @@ export class SparkWallet extends EventEmitter {
       if (isSelfTransfer) {
         await this.claimTransfer(transfer);
       }
+
       return mapTransferToWalletTransfer(
         transfer,
         bytesToHex(await this.config.signer.getIdentityPublicKey()),
@@ -1540,11 +1638,7 @@ export class SparkWallet extends EventEmitter {
 
       return result;
     } catch (error) {
-      if (
-        retryCount < MAX_RETRIES &&
-        error instanceof NetworkError &&
-        error.message === "Failed to claim transfer tweak keys"
-      ) {
+      if (retryCount < MAX_RETRIES) {
         console.error("Failed to claim transfer, retrying...", error);
         this.claimTransfer(transfer, emit, retryCount + 1);
         return [];
@@ -1567,12 +1661,15 @@ export class SparkWallet extends EventEmitter {
   /**
    * Claims all pending transfers.
    *
-   * @returns {Promise<string[]>} True if any transfers were claimed
+   * @returns {Promise<string[]>} Array of successfully claimed transfer IDs
    * @private
    */
-  private async claimTransfers(type?: TransferType): Promise<string[]> {
+  private async claimTransfers(
+    type?: TransferType,
+    emit?: boolean,
+  ): Promise<string[]> {
     const transfers = await this.transferService.queryPendingTransfers();
-    const claimedTransfersIds: string[] = [];
+    const promises: Promise<string | null>[] = [];
     for (const transfer of transfers.transfers) {
       if (type && transfer.type !== type) {
         continue;
@@ -1587,10 +1684,21 @@ export class SparkWallet extends EventEmitter {
       ) {
         continue;
       }
-      await this.claimTransfer(transfer);
-      claimedTransfersIds.push(transfer.id);
+      promises.push(
+        this.claimTransfer(transfer, emit)
+          .then(() => transfer.id)
+          .catch((error) => {
+            console.warn(`Failed to claim transfer ${transfer.id}:`, error);
+            return null;
+          }),
+      );
     }
-    return claimedTransfersIds;
+    const results = await Promise.allSettled(promises);
+    return results
+      .filter(
+        (result) => result.status === "fulfilled" && result.value !== null,
+      )
+      .map((result) => (result as PromiseFulfilledResult<string>).value);
   }
 
   /**
@@ -1643,6 +1751,22 @@ export class SparkWallet extends EventEmitter {
         field: "amountSats",
         value: amountSats,
         expected: "non-negative number",
+      });
+    }
+
+    if (!Number.isSafeInteger(amountSats)) {
+      throw new ValidationError("Sats amount must be less than 2^53", {
+        field: "amountSats",
+        value: amountSats,
+        expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
+      });
+    }
+
+    if (!Number.isSafeInteger(expirySeconds)) {
+      throw new ValidationError("Expiration time must be less than 2^53", {
+        field: "expirySeconds",
+        value: expirySeconds,
+        expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
       });
     }
 
@@ -1742,14 +1866,6 @@ export class SparkWallet extends EventEmitter {
         encodedInvoice: invoice,
       });
 
-      if (!feeEstimate) {
-        throw new ValidationError("Failed to get lightning send fee estimate", {
-          field: "feeEstimate",
-          value: feeEstimate,
-          expected: "non-null",
-        });
-      }
-
       if (maxFeeSats < feeEstimate) {
         throw new ValidationError("maxFeeSats does not cover fee estimate", {
           field: "maxFeeSats",
@@ -1825,7 +1941,7 @@ export class SparkWallet extends EventEmitter {
    * Gets fee estimate for sending Lightning payments.
    *
    * @param {LightningSendFeeEstimateInput} params - Input parameters for fee estimation
-   * @returns {Promise<LightningSendFeeEstimateOutput | null>} Fee estimate for sending Lightning payments
+   * @returns {Promise<number>} Fee estimate for sending Lightning payments
    */
   public async getLightningSendFeeEstimate({
     encodedInvoice,
@@ -1918,6 +2034,13 @@ export class SparkWallet extends EventEmitter {
     exitSpeed: ExitSpeed;
     amountSats?: number;
   }) {
+    if (!Number.isSafeInteger(amountSats)) {
+      throw new ValidationError("Sats amount must be less than 2^53", {
+        field: "amountSats",
+        value: amountSats,
+        expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
+      });
+    }
     return await this.withLeaves(async () => {
       return await this.coopExit(onchainAddress, exitSpeed, amountSats);
     });
@@ -1936,6 +2059,14 @@ export class SparkWallet extends EventEmitter {
     exitSpeed: ExitSpeed,
     targetAmountSats?: number,
   ) {
+    if (!Number.isSafeInteger(targetAmountSats)) {
+      throw new ValidationError("Sats amount must be less than 2^53", {
+        field: "targetAmountSats",
+        value: targetAmountSats,
+        expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
+      });
+    }
+
     let leavesToSend: TreeNode[] = [];
     if (targetAmountSats) {
       leavesToSend = await this.selectLeaves(targetAmountSats);
@@ -2006,7 +2137,7 @@ export class SparkWallet extends EventEmitter {
     const coopExitRequest = await this.sspClient?.requestCoopExit({
       leafExternalIds: leavesToSend.map((leaf) => leaf.id),
       withdrawalAddress: onchainAddress,
-      idempotencyKey: crypto.randomUUID(),
+      idempotencyKey: uuidv7(),
       exitSpeed,
     });
 
@@ -2071,6 +2202,14 @@ export class SparkWallet extends EventEmitter {
       });
     }
 
+    if (!Number.isSafeInteger(amountSats)) {
+      throw new ValidationError("Sats amount must be less than 2^53", {
+        field: "amountSats",
+        value: amountSats,
+        expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
+      });
+    }
+
     let leaves = await this.selectLeaves(amountSats);
 
     await this.checkRefreshTimelockNodes(leaves);
@@ -2095,10 +2234,9 @@ export class SparkWallet extends EventEmitter {
   protected async syncTokenOutputs() {
     this.tokenOuputs.clear();
 
-    const trackedPublicKeys = await this.config.signer.getTrackedPublicKeys();
     const unsortedTokenOutputs =
       await this.tokenTransactionService.fetchOwnedTokenOutputs(
-        [...trackedPublicKeys, await this.config.signer.getIdentityPublicKey()],
+        [await this.config.signer.getIdentityPublicKey()],
         [],
       );
 
@@ -2258,18 +2396,38 @@ export class SparkWallet extends EventEmitter {
   /**
    * Signs a message with the identity key.
    *
-   * @param {string} message - Unhashed message to sign
+   * @param {string} message - The message to sign
    * @param {boolean} [compact] - Whether to use compact encoding. If false, the message will be encoded as DER.
    * @returns {Promise<string>} The signed message
    */
-  public async signMessage(
+  public async signMessageWithIdentityKey(
     message: string,
     compact?: boolean,
   ): Promise<string> {
     const hash = sha256(message);
-    return bytesToHex(
-      await this.config.signer.signMessageWithIdentityKey(hash, compact),
+    const signature = await this.config.signer.signMessageWithIdentityKey(
+      hash,
+      compact,
     );
+    return bytesToHex(signature);
+  }
+
+  /**
+   * Validates a message with the identity key.
+   *
+   * @param {string} message - The original message that was signed
+   * @param {string | Uint8Array} signature - Signature to validate
+   * @returns {Promise<boolean>} Whether the message is valid
+   */
+  public async validateMessageWithIdentityKey(
+    message: string,
+    signature: string | Uint8Array,
+  ): Promise<boolean> {
+    const hash = sha256(message);
+    if (typeof signature === "string") {
+      signature = hexToBytes(signature);
+    }
+    return this.config.signer.validateMessageWithIdentityKey(hash, signature);
   }
 
   /**
@@ -2324,8 +2482,35 @@ export class SparkWallet extends EventEmitter {
     return await this.sspClient.getCoopExitRequest(id);
   }
 
-  public async cleanupConnections() {
+  private cleanup() {
+    if (this.claimTransfersInterval) {
+      clearInterval(this.claimTransfersInterval);
+      this.claimTransfersInterval = null;
+    }
     this.streamController?.abort();
+    this.removeAllListeners();
+  }
+
+  public async cleanupConnections() {
+    this.cleanup();
     await this.connectionManager.closeConnections();
+  }
+
+  // Add this new method to start periodic claiming
+  private startPeriodicClaimTransfers() {
+    // Clear any existing interval first
+    if (this.claimTransfersInterval) {
+      clearInterval(this.claimTransfersInterval);
+    }
+
+    // Set up new interval to claim transfers every 5 seconds
+    // @ts-ignore
+    this.claimTransfersInterval = setInterval(async () => {
+      try {
+        await this.claimTransfers(undefined, true);
+      } catch (error) {
+        console.error("Error in periodic transfer claiming:", error);
+      }
+    }, 10000);
   }
 }

@@ -3,7 +3,10 @@ package logging
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
+
+	"google.golang.org/grpc/status"
 )
 
 type dbStatsContextKey string
@@ -14,9 +17,19 @@ const dbStatsKey = dbStatsContextKey("dbStats")
 
 const serviceStatsKey = serviceStatsContextKey("serviceStats")
 
+type dbStatsMap struct {
+	stats map[string]*dbStats
+	mu    sync.Mutex
+}
+
 type dbStats struct {
 	queryCount    int
 	queryDuration time.Duration
+}
+
+type serviceStatsMap struct {
+	stats map[string]*serviceStats
+	mu    sync.Mutex
 }
 
 type serviceStats struct {
@@ -25,45 +38,66 @@ type serviceStats struct {
 }
 
 func InitTable(ctx context.Context) context.Context {
-	ctx = context.WithValue(ctx, dbStatsKey, make(map[string]*dbStats))
-	return context.WithValue(ctx, serviceStatsKey, make(map[string]*serviceStats))
+	ctx = context.WithValue(ctx, dbStatsKey, &dbStatsMap{
+		stats: make(map[string]*dbStats),
+		mu:    sync.Mutex{},
+	})
+	return context.WithValue(ctx, serviceStatsKey, &serviceStatsMap{
+		stats: make(map[string]*serviceStats),
+		mu:    sync.Mutex{},
+	})
 }
 
 func ObserveQuery(ctx context.Context, table string, duration time.Duration) {
-	stats, ok := ctx.Value(dbStatsKey).(map[string]*dbStats)
+	statsMap, ok := ctx.Value(dbStatsKey).(*dbStatsMap)
 	if !ok {
 		return
 	}
+	statsMap.mu.Lock()
+	defer statsMap.mu.Unlock()
 
-	if _, exists := stats[table]; !exists {
-		stats[table] = new(dbStats)
+	if _, exists := statsMap.stats[table]; !exists {
+		statsMap.stats[table] = new(dbStats)
 	}
 
-	stats[table].queryCount++
-	stats[table].queryDuration += duration
+	statsMap.stats[table].queryCount++
+	statsMap.stats[table].queryDuration += duration
 }
 
 func ObserveServiceCall(ctx context.Context, method string, duration time.Duration) {
-	stats, ok := ctx.Value(serviceStatsKey).(map[string]*serviceStats)
+	statsMap, ok := ctx.Value(serviceStatsKey).(*serviceStatsMap)
 	if !ok {
 		return
 	}
+	statsMap.mu.Lock()
+	defer statsMap.mu.Unlock()
 
-	if _, exists := stats[method]; !exists {
-		stats[method] = new(serviceStats)
+	if _, exists := statsMap.stats[method]; !exists {
+		statsMap.stats[method] = new(serviceStats)
 	}
 
-	stats[method].serviceRequestCount++
-	stats[method].serviceRequestDuration += duration
+	statsMap.stats[method].serviceRequestCount++
+	statsMap.stats[method].serviceRequestDuration += duration
 }
 
-func LogTable(ctx context.Context, duration time.Duration) {
+func LogTable(ctx context.Context, duration time.Duration, err error) {
 	result := make(map[string]any)
 	fillDbStats(ctx, result)
 	fillServiceStats(ctx, result)
 
 	result["_table"] = "spark-requests"
 	result["duration"] = duration.Seconds()
+
+	if err != nil {
+		st, ok := status.FromError(err)
+		if ok {
+			result["error.code"] = st.Code().String()
+			result["error.message"] = st.Message()
+		} else {
+			result["error.code"] = "Unknown"
+			result["error.message"] = err.Error()
+		}
+	}
 
 	logger := GetLoggerFromContext(ctx)
 
@@ -76,14 +110,14 @@ func LogTable(ctx context.Context, duration time.Duration) {
 }
 
 func fillDbStats(ctx context.Context, result map[string]any) {
-	ctxDbStats, ok := ctx.Value(dbStatsKey).(map[string]*dbStats)
+	ctxDbStats, ok := ctx.Value(dbStatsKey).(*dbStatsMap)
 	if !ok {
 		return
 	}
 
 	totals := dbStats{}
 
-	for table, stats := range ctxDbStats {
+	for table, stats := range ctxDbStats.stats {
 		result["database.select."+table+".queries"] = stats.queryCount
 		result["database.select."+table+".duration"] = stats.queryDuration.Seconds()
 
@@ -96,14 +130,14 @@ func fillDbStats(ctx context.Context, result map[string]any) {
 }
 
 func fillServiceStats(ctx context.Context, result map[string]any) {
-	ctxServiceStats, ok := ctx.Value(serviceStatsKey).(map[string]*serviceStats)
+	ctxServiceStats, ok := ctx.Value(serviceStatsKey).(*serviceStatsMap)
 	if !ok {
 		return
 	}
 
 	totals := serviceStats{}
 
-	for service, stats := range ctxServiceStats {
+	for service, stats := range ctxServiceStats.stats {
 		result["service."+service+".requests"] = stats.serviceRequestCount
 		result["service."+service+".duration"] = stats.serviceRequestDuration.Seconds()
 

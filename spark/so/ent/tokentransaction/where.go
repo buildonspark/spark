@@ -82,6 +82,11 @@ func OperatorSignature(v []byte) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldEQ(FieldOperatorSignature, v))
 }
 
+// ExpiryTime applies equality check predicate on the "expiry_time" field. It's identical to ExpiryTimeEQ.
+func ExpiryTime(v time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldEQ(FieldExpiryTime, v))
+}
+
 // CoordinatorPublicKey applies equality check predicate on the "coordinator_public_key" field. It's identical to CoordinatorPublicKeyEQ.
 func CoordinatorPublicKey(v []byte) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldEQ(FieldCoordinatorPublicKey, v))
@@ -335,6 +340,56 @@ func StatusIsNil() predicate.TokenTransaction {
 // StatusNotNil applies the NotNil predicate on the "status" field.
 func StatusNotNil() predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldNotNull(FieldStatus))
+}
+
+// ExpiryTimeEQ applies the EQ predicate on the "expiry_time" field.
+func ExpiryTimeEQ(v time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldEQ(FieldExpiryTime, v))
+}
+
+// ExpiryTimeNEQ applies the NEQ predicate on the "expiry_time" field.
+func ExpiryTimeNEQ(v time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldNEQ(FieldExpiryTime, v))
+}
+
+// ExpiryTimeIn applies the In predicate on the "expiry_time" field.
+func ExpiryTimeIn(vs ...time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldIn(FieldExpiryTime, vs...))
+}
+
+// ExpiryTimeNotIn applies the NotIn predicate on the "expiry_time" field.
+func ExpiryTimeNotIn(vs ...time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldNotIn(FieldExpiryTime, vs...))
+}
+
+// ExpiryTimeGT applies the GT predicate on the "expiry_time" field.
+func ExpiryTimeGT(v time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldGT(FieldExpiryTime, v))
+}
+
+// ExpiryTimeGTE applies the GTE predicate on the "expiry_time" field.
+func ExpiryTimeGTE(v time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldGTE(FieldExpiryTime, v))
+}
+
+// ExpiryTimeLT applies the LT predicate on the "expiry_time" field.
+func ExpiryTimeLT(v time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldLT(FieldExpiryTime, v))
+}
+
+// ExpiryTimeLTE applies the LTE predicate on the "expiry_time" field.
+func ExpiryTimeLTE(v time.Time) predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldLTE(FieldExpiryTime, v))
+}
+
+// ExpiryTimeIsNil applies the IsNil predicate on the "expiry_time" field.
+func ExpiryTimeIsNil() predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldIsNull(FieldExpiryTime))
+}
+
+// ExpiryTimeNotNil applies the NotNil predicate on the "expiry_time" field.
+func ExpiryTimeNotNil() predicate.TokenTransaction {
+	return predicate.TokenTransaction(sql.FieldNotNull(FieldExpiryTime))
 }
 
 // CoordinatorPublicKeyEQ applies the EQ predicate on the "coordinator_public_key" field.

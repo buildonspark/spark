@@ -534,6 +534,52 @@ func HasSigningKeyshareWith(preds ...predicate.SigningKeyshare) predicate.Deposi
 	})
 }
 
+// HasUtxo applies the HasEdge predicate on the "utxo" edge.
+func HasUtxo() predicate.DepositAddress {
+	return predicate.DepositAddress(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, UtxoTable, UtxoColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasUtxoWith applies the HasEdge predicate on the "utxo" edge with a given conditions (other predicates).
+func HasUtxoWith(preds ...predicate.Utxo) predicate.DepositAddress {
+	return predicate.DepositAddress(func(s *sql.Selector) {
+		step := newUtxoStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasUtxoswaps applies the HasEdge predicate on the "utxoswaps" edge.
+func HasUtxoswaps() predicate.DepositAddress {
+	return predicate.DepositAddress(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, UtxoswapsTable, UtxoswapsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasUtxoswapsWith applies the HasEdge predicate on the "utxoswaps" edge with a given conditions (other predicates).
+func HasUtxoswapsWith(preds ...predicate.UtxoSwap) predicate.DepositAddress {
+	return predicate.DepositAddress(func(s *sql.Selector) {
+		step := newUtxoswapsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.DepositAddress) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.AndPredicates(predicates...))

@@ -12,17 +12,22 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	entsql "entgo.io/ent/dialect/sql"
+	"golang.org/x/sync/errgroup"
 
+	"github.com/XSAM/otelsql"
 	"github.com/go-co-op/gocron/v2"
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/lib/pq"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/logging"
 	pbdkg "github.com/lightsparkdev/spark/proto/dkg"
 	pbmock "github.com/lightsparkdev/spark/proto/mock"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
@@ -36,6 +41,7 @@ import (
 	"github.com/lightsparkdev/spark/so/dkg"
 	"github.com/lightsparkdev/spark/so/ent"
 	_ "github.com/lightsparkdev/spark/so/ent/runtime"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	sparkgrpc "github.com/lightsparkdev/spark/so/grpc"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/lrc20"
@@ -46,6 +52,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
 	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -228,10 +235,40 @@ func main() {
 		log.Fatalf("Failed to create config: %v", err)
 	}
 
-	ctx := context.Background()
+	sigCtx, done := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer done()
+
+	errGrp, errCtx := errgroup.WithContext(sigCtx)
+
+	// OBSERVABILITY
+	promExporter, err := otelprom.New()
+	if err != nil {
+		log.Fatalf("Failed to create prometheus exporter: %v", err)
+	}
+	meterProvider := metric.NewMeterProvider(metric.WithReader(promExporter))
+	otel.SetMeterProvider(meterProvider)
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+	if config.Tracing.Enabled {
+		shutdown, err := common.ConfigureTracing(errCtx, config.Tracing)
+		if err != nil {
+			log.Fatalf("Failed to configure tracing: %v", err)
+		}
+		defer func() {
+			shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
+			defer shutdownRelease()
+
+			slog.Info("Shutting down tracer provider")
+			if err := shutdown(shutdownCtx); err != nil {
+				slog.Error("Error shutting down tracer provider", "error", err)
+			} else {
+				slog.Info("Tracer provider shut down")
+			}
+		}()
+	}
 
 	dbDriver := config.DatabaseDriver()
-	connector, err := so.NewDBConnector(config.DatabasePath, config.AWS)
+	connector, err := so.NewDBConnector(errCtx, config.DatabasePath, config.AWS)
 	if err != nil {
 		log.Fatalf("Failed to create db connector: %v", err)
 	}
@@ -241,7 +278,7 @@ func main() {
 	if dbDriver == "postgres" {
 		db = stdlib.OpenDBFromPool(connector.Pool())
 	} else {
-		db = sql.OpenDB(connector)
+		db = otelsql.OpenDB(connector, otelsql.WithSpanOptions(so.OtelSQLSpanOptions))
 	}
 
 	dialectDriver := entsql.NewDriver(dbDriver, entsql.Conn{ExecQuerier: db})
@@ -251,10 +288,10 @@ func main() {
 
 	if dbDriver == "sqlite3" {
 		sqliteDb, _ := sql.Open("sqlite3", config.DatabasePath)
-		if _, err := sqliteDb.ExecContext(ctx, "PRAGMA journal_mode=WAL;"); err != nil {
+		if _, err := sqliteDb.ExecContext(errCtx, "PRAGMA journal_mode=WAL;"); err != nil {
 			log.Fatalf("Failed to set journal_mode: %v", err)
 		}
-		if _, err := sqliteDb.ExecContext(ctx, "PRAGMA busy_timeout=5000;"); err != nil {
+		if _, err := sqliteDb.ExecContext(errCtx, "PRAGMA busy_timeout=5000;"); err != nil {
 			log.Fatalf("Failed to set busy_timeout: %v", err)
 		}
 		sqliteDb.Close()
@@ -265,51 +302,74 @@ func main() {
 		log.Fatalf("Failed to create frost client: %v", err)
 	}
 
-	lrc20Client, err := lrc20.NewClient(config)
+	lrc20Client, err := lrc20.NewClient(
+		config,
+		slog.Default().With("component", "lrc20_client"),
+	)
 	if err != nil {
 		log.Fatalf("Failed to create LRC20 client: %v", err)
 	}
 	defer lrc20Client.Close() //nolint:errcheck
 
 	for network, bitcoindConfig := range config.BitcoindConfigs {
-		go func() {
-			err := chain.WatchChain(dbClient,
+		errGrp.Go(func() error {
+			chainCtx, chainCancel := context.WithCancel(errCtx)
+			defer chainCancel()
+
+			logger := slog.Default().With("component", "chainwatcher", "network", network)
+			chainCtx = logging.Inject(chainCtx, logger)
+
+			err := chain.WatchChain(
+				chainCtx,
+				dbClient,
 				lrc20Client,
 				bitcoindConfig,
 			)
 			if err != nil {
-				log.Fatalf("Failed to watch %s chain: %v", network, err)
+				logger.Error("Error in chain watcher", "error", err)
+				return err
 			}
-		}()
-		slog.Info("Watching chain", "network", network)
+
+			if errCtx.Err() == nil {
+				// This technically isn't an error, but raise it as one because our chain watcher should never
+				// stop unless we explicitly tell it to when shutting down!
+				return fmt.Errorf("chain watcher stopped unexpectedly")
+			}
+
+			return nil
+		})
 	}
 
 	if !args.RunningLocally {
-		slog.Info("Starting scheduler")
-		s, err := gocron.NewScheduler()
+		cronCtx, cronCancel := context.WithCancel(errCtx)
+		defer cronCancel()
+
+		logger := slog.Default().With("component", "cron")
+		cronCtx = logging.Inject(cronCtx, logger)
+
+		logger.Info("Starting scheduler")
+		scheduler, err := gocron.NewScheduler(
+			gocron.WithGlobalJobOptions(gocron.WithContext(cronCtx)),
+			gocron.WithLogger(logger),
+		)
 		if err != nil {
 			log.Fatalf("Failed to create scheduler: %v", err)
 		}
 		for _, task := range task.AllTasks() {
-			_, err := s.NewJob(gocron.DurationJob(task.Duration), gocron.NewTask(task.Task, config, dbClient))
+
+			err := task.Schedule(scheduler, config, dbClient)
 			if err != nil {
 				log.Fatalf("Failed to create job: %v", err)
 			}
 		}
-		s.Start()
+		scheduler.Start()
+		defer scheduler.Shutdown() //nolint:errcheck
 	}
 
 	sessionTokenCreatorVerifier, err := authninternal.NewSessionTokenCreatorVerifier(config.IdentityPrivateKey, nil)
 	if err != nil {
 		log.Fatalf("Failed to create token verifier: %v", err)
 	}
-
-	promExporter, err := otelprom.New()
-	if err != nil {
-		log.Fatalf("Failed to create prometheus exporter: %v", err)
-	}
-	meterProvider := metric.NewMeterProvider(metric.WithReader(promExporter))
-	otel.SetMeterProvider(meterProvider)
 
 	var rateLimiter *middleware.RateLimiter
 	if config.RateLimiter.Enabled {
@@ -323,6 +383,7 @@ func main() {
 	serverOpts := []grpc.ServerOption{
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
+			sparkerrors.ErrorInterceptor(),
 			helper.LogInterceptor(args.LogJSON && args.LogRequestStats),
 			sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
 			ent.DbSessionMiddleware(dbClient),
@@ -385,6 +446,7 @@ func main() {
 	if args.RunningLocally {
 		mockServer := sparkgrpc.NewMockServer(config)
 		pbmock.RegisterMockServiceServer(grpcServer, mockServer)
+		go runDKGOnStartup(errCtx, dbClient, config)
 	}
 
 	authnServer, err := sparkgrpc.NewAuthnServer(sparkgrpc.AuthnServerConfig{
@@ -400,8 +462,6 @@ func main() {
 	healthService := health.NewServer()
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthService)
 	healthService.SetServingStatus("spark-operator", grpc_health_v1.HealthCheckResponse_SERVING)
-
-	go runDKGOnStartup(dbClient, config)
 
 	wrappedGrpc := grpcweb.WrapServer(grpcServer,
 		grpcweb.WithOriginFunc(func(_ string) bool {
@@ -423,33 +483,85 @@ func main() {
 		wrappedGrpc.ServeHTTP(w, r)
 	}))
 
+	var server *http.Server
 	if tlsConfig != nil {
-		server := &http.Server{
+		server = &http.Server{
 			Addr:      fmt.Sprintf(":%d", args.Port),
 			Handler:   mux,
 			TLSConfig: tlsConfig,
 		}
 
-		slog.Info(fmt.Sprintf("Serving on port %d (TLS)", args.Port))
-		if err := server.ListenAndServeTLS(args.ServerCertPath, args.ServerKeyPath); err != nil {
-			log.Fatalf("Failed to serve: %v", err)
-		}
-	} else {
-		lis, err := net.Listen("tcp", fmt.Sprintf(":%d", args.Port))
-		if err != nil {
-			log.Fatalf("Failed to listen: %v", err)
-		}
+		errGrp.Go(func() error {
+			slog.Info(fmt.Sprintf("Serving on port %d (TLS)", args.Port))
+			if err := server.ListenAndServeTLS(args.ServerCertPath, args.ServerKeyPath); !errors.Is(err, http.ErrServerClosed) {
+				slog.Error("Failed to serve", "error", err)
+				return err
+			}
 
-		slog.Info(fmt.Sprintf("Serving on port %d (non-TLS)", args.Port))
-		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("Failed to serve: %v", err)
+			if errCtx.Err() == nil {
+				// This technically isn't an error, but raise it as one because our gRPC server should never
+				// stop unless we explicitly tell it to when shutting down!
+				return fmt.Errorf("gRPC server stopped unexpectedly")
+			}
+
+			return nil
+		})
+	} else {
+		errGrp.Go(func() error {
+			lis, err := net.Listen("tcp", fmt.Sprintf(":%d", args.Port))
+			if err != nil {
+				slog.Error("Failed to listen to TCP socket", "error", err)
+				return err
+			}
+
+			slog.Info(fmt.Sprintf("Serving on port %d (non-TLS)", args.Port))
+			if err := grpcServer.Serve(lis); !errors.Is(err, grpc.ErrServerStopped) {
+				slog.Error("Failed to serve", "error", err)
+				return err
+			}
+
+			if errCtx.Err() == nil {
+				// This technically isn't an error, but raise it as one because our gRPC server should never
+				// stop unless we explicitly tell it to when shutting down!
+				return fmt.Errorf("gRPC server stopped unexpectedly")
+			}
+
+			return nil
+		})
+	}
+
+	// Now we wait... for something to fail.
+	<-errCtx.Done()
+
+	if sigCtx.Err() != nil {
+		slog.Info("Received shutdown signal, shutting down gracefully...")
+	} else {
+		slog.Error("Shutting down due to error...")
+	}
+
+	slog.Info("Stopping gRPC server...")
+	grpcServer.GracefulStop()
+	slog.Info("gRPC server stopped")
+	if server != nil {
+		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownRelease()
+
+		slog.Info("Stopping HTTP server...")
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			slog.Error("HTTP server failed to shutdown gracefully", "error", err)
+		} else {
+			slog.Info("HTTP server stopped")
 		}
+	}
+
+	if err := errGrp.Wait(); err != nil {
+		slog.Error("Shutdown due to error", "error", err)
 	}
 }
 
-func runDKGOnStartup(dbClient *ent.Client, config *so.Config) {
+func runDKGOnStartup(ctx context.Context, dbClient *ent.Client, config *so.Config) {
 	time.Sleep(5 * time.Second)
-	err := ent.RunDKGIfNeeded(dbClient, config)
+	err := ent.RunDKGIfNeeded(ctx, dbClient, config)
 	if err != nil {
 		slog.Error("Failed to run DKG", "error", err)
 	}

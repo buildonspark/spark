@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/logging"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
@@ -40,11 +41,22 @@ func LogInterceptor(enableStats bool) grpc.UnaryServerInterceptor {
 			}
 		}
 
+		var otelTraceID string
+		span := trace.SpanFromContext(ctx)
+		if span != nil {
+			sc := span.SpanContext()
+			if sc.HasTraceID() {
+				otelTraceID = sc.TraceID().String()
+			}
+		}
+
 		logger := slog.Default().With(
 			"request_id", requestID,
 			"method", info.FullMethod,
 			"caller_ip", ip,
 			"x_amzn_trace_id", traceID,
+			"otel_trace_id", otelTraceID,
+			"component", "grpc",
 		)
 
 		ctx = logging.Inject(ctx, logger)
@@ -60,7 +72,7 @@ func LogInterceptor(enableStats bool) grpc.UnaryServerInterceptor {
 		duration := time.Since(startTime)
 
 		if enableStats {
-			logging.LogTable(ctx, duration)
+			logging.LogTable(ctx, duration, err)
 		}
 
 		if err != nil {

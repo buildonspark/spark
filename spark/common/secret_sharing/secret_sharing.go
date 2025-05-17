@@ -173,7 +173,7 @@ func SplitSecret(secret *big.Int, fieldModulus *big.Int, threshold int, numberOf
 
 // SplitSecretWithProofs splits a secret into a set of shares with proofs.
 func SplitSecretWithProofs(secret *big.Int, fieldModulus *big.Int, threshold int, numberOfShares int) ([]*VerifiableSecretShare, error) {
-	polynomial, err := generatePolynomialForSecretSharing(fieldModulus, secret, threshold-1)
+	polynomial, err := generatePolynomialForSecretSharing(fieldModulus, secret, threshold)
 	if err != nil {
 		return nil, err
 	}

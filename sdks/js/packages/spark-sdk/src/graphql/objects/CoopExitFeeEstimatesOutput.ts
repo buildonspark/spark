@@ -3,8 +3,8 @@
 
 
 import CoopExitFeeEstimate from './CoopExitFeeEstimate.js';
-import {CoopExitFeeEstimateToJson} from './CoopExitFeeEstimate.js';
 import {CoopExitFeeEstimateFromJson} from './CoopExitFeeEstimate.js';
+import {CoopExitFeeEstimateToJson} from './CoopExitFeeEstimate.js';
 
 
 interface CoopExitFeeEstimatesOutput {

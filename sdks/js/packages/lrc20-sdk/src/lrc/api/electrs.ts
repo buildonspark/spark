@@ -1,5 +1,6 @@
-import { basicAuth, BasicAuth } from "./index.ts";
 import { ElectrsTransaction, BitcoinUtxo, BitcoinUtxoDto, BitcoinUtxoSpentStatus } from "../types/index.ts";
+import { basicAuth, BasicAuth } from "./basicAuth.ts";
+
 export class ElectrsApi {
   private readonly electrsUrl: string;
   private readonly auth: BasicAuth | null;

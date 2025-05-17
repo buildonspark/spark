@@ -666,7 +666,39 @@ func (h *TreeCreationHandler) CreateTree(ctx context.Context, req *pb.CreateTree
 		return nil, err
 	}
 
+	err = h.updateParentNodeStatus(ctx, req.GetParentNodeOutput())
+	if err != nil {
+		return nil, err
+	}
+
 	return &pb.CreateTreeResponse{
 		Node: node,
 	}, nil
+}
+
+func (h *TreeCreationHandler) updateParentNodeStatus(ctx context.Context, parentNodeOutput *pb.NodeOutput) error {
+	if parentNodeOutput == nil {
+		return nil
+	}
+
+	parentNodeID, err := uuid.Parse(parentNodeOutput.NodeId)
+	if err != nil {
+		return err
+	}
+
+	db := ent.GetDbFromContext(ctx)
+	parentNode, err := db.TreeNode.Get(ctx, parentNodeID)
+	if err != nil {
+		return err
+	}
+
+	if parentNode.Status != schema.TreeNodeStatusAvailable {
+		return nil
+	}
+
+	err = db.TreeNode.UpdateOneID(parentNodeID).SetStatus(schema.TreeNodeStatusSplitted).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to update status of parent node: %v", err)
+	}
+	return nil
 }

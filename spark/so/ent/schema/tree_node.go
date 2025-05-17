@@ -69,6 +69,9 @@ func (TreeNode) Fields() []ent.Field {
 		field.Bytes("raw_tx").NotEmpty(),
 		field.Int16("vout"),
 		field.Bytes("raw_refund_tx").Optional(),
+		field.Uint64("node_confirmation_height").Optional(),
+		field.Uint64("refund_confirmation_height").Optional(),
+		field.Bytes("direct_refund_tx").Optional(),
 	}
 }
 
@@ -95,5 +98,8 @@ func (TreeNode) Indexes() []ent.Index {
 		index.Edges("signing_keyshare"),
 		index.Fields("owner_identity_pubkey"),
 		index.Fields("owner_identity_pubkey", "status"),
+		index.Fields("node_confirmation_height"),
+		index.Fields("refund_confirmation_height"),
+		index.Fields("update_time"),
 	}
 }

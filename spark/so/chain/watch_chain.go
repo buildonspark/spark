@@ -5,8 +5,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"log/slog"
-	"os"
 	"slices"
 	"time"
 
@@ -29,33 +27,9 @@ import (
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/lrc20"
 	events "github.com/lightsparkdev/spark/so/stream"
-	"github.com/pebbe/zmq4"
+	"github.com/lightsparkdev/spark/so/watchtower"
 	"google.golang.org/protobuf/proto"
 )
-
-func initZmq(endpoint string) (*zmq4.Context, *zmq4.Socket, error) {
-	zmqCtx, err := zmq4.NewContext()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create ZMQ context: %v", err)
-	}
-
-	subscriber, err := zmqCtx.NewSocket(zmq4.SUB)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create ZMQ socket: %v", err)
-	}
-
-	err = subscriber.Connect(endpoint)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to connect to ZMQ endpoint: %v", err)
-	}
-
-	err = subscriber.SetSubscribe("rawblock")
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to set ZMQ subscription: %v", err)
-	}
-
-	return zmqCtx, subscriber, nil
-}
 
 func pollInterval(network common.Network) time.Duration {
 	switch network {
@@ -139,12 +113,14 @@ func findDifference(currChainTip, newChainTip Tip, client *rpcclient.Client) (Di
 }
 
 func scanChainUpdates(
+	ctx context.Context,
 	dbClient *ent.Client,
 	bitcoinClient *rpcclient.Client,
 	lrc20Client *lrc20.Client,
 	network common.Network,
 ) error {
-	logger := slog.Default().With("method", "watch_chain.scanChainUpdates", "network", network.String())
+	logger := logging.GetLoggerFromContext(ctx)
+
 	latestBlockHeight, err := bitcoinClient.GetBlockCount()
 	if err != nil {
 		return fmt.Errorf("failed to get block count: %v", err)
@@ -155,7 +131,6 @@ func scanChainUpdates(
 	}
 	latestChainTip := NewTip(latestBlockHeight, *latestBlockHash)
 
-	ctx := context.Background()
 	entNetwork := common.SchemaNetwork(network)
 	dbBlockHeight, err := dbClient.BlockHeight.Query().
 		Where(blockheight.NetworkEQ(entNetwork)).
@@ -208,11 +183,13 @@ func RPCClientConfig(cfg so.BitcoindConfig) rpcclient.ConnConfig {
 }
 
 func WatchChain(
+	ctx context.Context,
 	dbClient *ent.Client,
 	lrc20Client *lrc20.Client,
 	bitcoindConfig so.BitcoindConfig,
 ) error {
-	logger := slog.Default().With("method", "watch_chain.WatchChain")
+	logger := logging.GetLoggerFromContext(ctx)
+
 	network, err := common.NetworkFromString(bitcoindConfig.Network)
 	if err != nil {
 		return err
@@ -223,45 +200,37 @@ func WatchChain(
 		return err
 	}
 
-	err = scanChainUpdates(dbClient, bitcoinClient, lrc20Client, network)
+	err = scanChainUpdates(ctx, dbClient, bitcoinClient, lrc20Client, network)
 	if err != nil {
 		return fmt.Errorf("failed to scan chain updates: %v", err)
 	}
 
-	zmqCtx, subscriber, err := initZmq(bitcoindConfig.ZmqPubRawBlock)
+	zmqSubscriber, err := NewZmqSubscriber()
 	if err != nil {
 		return err
 	}
+
 	defer func() {
-		err := zmqCtx.Term()
+		err := zmqSubscriber.Close()
 		if err != nil {
-			logger.Error("Failed to terminate ZMQ context", "error", err)
-		}
-		err = subscriber.Close()
-		if err != nil {
-			logger.Error("Failed to close ZMQ subscriber", "error", err)
+			logger.Warn("Failed to close ZMQ subscriber", "error", err)
 		}
 	}()
 
-	logger.Info("Listening for block notifications via ZMQ endpoint", "endpoint", bitcoindConfig.ZmqPubRawBlock)
-
-	newBlockNotification := make(chan struct{})
-	go func() {
-		for {
-			_, err := subscriber.RecvMessage(0)
-			if err != nil {
-				// TODO(mhr): Bubble this up through a channel so we can properly shut down the server rather
-				// than `os.Exit(1)`.
-				logger.Error("Failed to receive message", "error", err)
-				os.Exit(1)
-			}
-			newBlockNotification <- struct{}{}
-		}
-	}()
+	newBlockNotification, errChan, err := zmqSubscriber.Subscribe(ctx, bitcoindConfig.ZmqPubRawBlock, "rawblock")
+	if err != nil {
+		return err
+	}
 
 	// TODO: we should consider alerting on errors within this loop
 	for {
 		select {
+		case err := <-errChan:
+			logger.Error("Error receiving ZMQ message", "error", err)
+			return err
+		case <-ctx.Done():
+			logger.Info("Context done, stopping chain watcher")
+			return nil
 		case <-newBlockNotification:
 		case <-time.After(pollInterval(network)):
 		}
@@ -269,7 +238,7 @@ func WatchChain(
 		// we need to query bitcoind for the height anyway. We just
 		// treat it as a notification that a new block appeared.
 
-		err = scanChainUpdates(dbClient, bitcoinClient, lrc20Client, network)
+		err = scanChainUpdates(ctx, dbClient, bitcoinClient, lrc20Client, network)
 		if err != nil {
 			logger.Error("Failed to scan chain updates", "error", err)
 		}
@@ -289,7 +258,8 @@ func connectBlocks(
 	chainTips []Tip,
 	network common.Network,
 ) error {
-	logger := slog.Default().With("method", "watch_chain.connectBlocks").With("network", network.String())
+	logger := logging.GetLoggerFromContext(ctx)
+
 	for _, chainTip := range chainTips {
 		blockHash, err := bitcoinClient.GetBlockHash(chainTip.Height)
 		if err != nil {
@@ -315,6 +285,7 @@ func connectBlocks(
 		err = handleBlock(ctx,
 			lrc20Client,
 			dbTx,
+			bitcoinClient,
 			txs,
 			chainTip.Height,
 			blockHash,
@@ -350,16 +321,24 @@ func TxFromRPCTx(txs btcjson.TxRawResult) (wire.MsgTx, error) {
 	return tx, nil
 }
 
+type AddressDepositUtxo struct {
+	tx     *wire.MsgTx
+	amount uint64
+	idx    uint32
+}
+
 func handleBlock(
 	ctx context.Context,
 	lrc20Client *lrc20.Client,
 	dbTx *ent.Tx,
+	bitcoinClient *rpcclient.Client,
 	txs []wire.MsgTx,
 	blockHeight int64,
 	blockHash *chainhash.Hash,
 	network common.Network,
 ) error {
-	logger := slog.Default().With("method", "watch_chain.handleBlock")
+	logger := logging.GetLoggerFromContext(ctx)
+
 	networkParams := common.NetworkParams(network)
 	_, err := dbTx.BlockHeight.Update().
 		SetHeight(blockHeight).
@@ -368,20 +347,91 @@ func handleBlock(
 	if err != nil {
 		return err
 	}
+
 	confirmedTxHashSet := make(map[[32]byte]bool)
 	debitedAddresses := make([]string, 0)
+	addressToUtxoMap := make(map[string]AddressDepositUtxo)
 	for _, tx := range txs {
-		for _, txOut := range tx.TxOut {
+		for idx, txOut := range tx.TxOut {
 			_, addresses, _, err := txscript.ExtractPkScriptAddrs(txOut.PkScript, networkParams)
 			if err != nil {
 				return err
 			}
 			for _, address := range addresses {
 				debitedAddresses = append(debitedAddresses, address.EncodeAddress())
+				addressToUtxoMap[address.EncodeAddress()] = AddressDepositUtxo{&tx, uint64(txOut.Value), uint32(idx)}
 			}
 		}
 		txid := tx.TxHash()
 		confirmedTxHashSet[txid] = true
+	}
+
+	// Fetch nodes with a confirmed parent and unconfirmed node/refund TX
+	nodes, err := dbTx.TreeNode.Query().
+		Where(
+			treenode.Or(
+				// Root nodes that need node confirmation or refund confirmation
+				treenode.And(
+					treenode.Not(treenode.HasParent()),
+					treenode.Or(
+						treenode.NodeConfirmationHeightIsNil(),
+						treenode.RefundConfirmationHeightIsNil(),
+					),
+				),
+				// Child nodes with confirmed parent that need node confirmation
+				treenode.And(
+					treenode.HasParentWith(treenode.NodeConfirmationHeightNotNil()),
+					treenode.NodeConfirmationHeightIsNil(),
+				),
+				// Nodes with confirmed node tx and refund tx that need refund confirmation
+				treenode.And(
+					treenode.NodeConfirmationHeightNotNil(),
+					treenode.RefundConfirmationHeightIsNil(),
+				),
+			),
+		).
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query nodes: %v", err)
+	}
+
+	for _, node := range nodes {
+		tx, err := common.TxFromRawTxBytes(node.RawTx)
+		if err != nil {
+			return fmt.Errorf("failed to parse node tx: %v", err)
+		}
+
+		txid := tx.TxHash()
+		if confirmedTxHashSet[txid] {
+			_, err = dbTx.TreeNode.UpdateOne(node).
+				SetNodeConfirmationHeight(uint64(blockHeight)).
+				Save(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to update node status: %v", err)
+			}
+		}
+
+		if len(node.RawRefundTx) > 0 {
+			refundTx, err := common.TxFromRawTxBytes(node.RawRefundTx)
+			if err != nil {
+				return fmt.Errorf("failed to parse node tx: %v", err)
+			}
+
+			refundTxid := refundTx.TxHash()
+			if confirmedTxHashSet[refundTxid] {
+				_, err = dbTx.TreeNode.UpdateOne(node).
+					SetRefundConfirmationHeight(uint64(blockHeight)).
+					Save(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to update node status: %v", err)
+				}
+			}
+		}
+
+		// Check if node or refund TX timelock has expired
+		if err := watchtower.CheckExpiredTimeLocks(ctx, bitcoinClient, node, blockHeight); err != nil {
+			logger.Error("Failed to check expired time locks", "error", err)
+		}
 	}
 
 	// TODO: expire pending coop exits after some time so this doesn't become too large
@@ -401,8 +451,40 @@ func handleBlock(
 		}
 	}
 
+	// Handle static deposits
+	staticDepositAddresses, err := dbTx.DepositAddress.Query().
+		Where(depositaddress.IsStaticEQ(true)).
+		Where(depositaddress.AddressIn(debitedAddresses...)).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, address := range staticDepositAddresses {
+		if utxo, ok := addressToUtxoMap[address.Address]; ok {
+			txidBytes, err := hex.DecodeString(utxo.tx.TxID())
+			if err != nil {
+				return fmt.Errorf("unable to decode txid for a new utxo: %v", err)
+			}
+			_, err = dbTx.Utxo.Create().
+				SetTxid(txidBytes).
+				SetVout(uint32(utxo.idx)).
+				SetAmount(utxo.amount).
+				SetPkScript(utxo.tx.TxOut[utxo.idx].PkScript).
+				SetNetwork(common.SchemaNetwork(network)).
+				SetBlockHeight(blockHeight).
+				SetDepositAddress(address).
+				Save(ctx)
+			if err != nil {
+				return fmt.Errorf("unable to store a new utxo: %v", err)
+			}
+			logger.Debug("Stored an L1 utxo to a static deposit address", "address", address.Address, "txid", hex.EncodeToString(txidBytes), "amount", utxo.amount)
+		}
+	}
+
 	confirmedDeposits, err := dbTx.DepositAddress.Query().
 		Where(depositaddress.ConfirmationHeightIsNil()).
+		Where(depositaddress.IsStaticEQ(false)).
 		Where(depositaddress.AddressIn(debitedAddresses...)).
 		All(ctx)
 	if err != nil {
@@ -410,8 +492,14 @@ func handleBlock(
 	}
 	for _, deposit := range confirmedDeposits {
 		// TODO: only unlock if deposit reaches X confirmations
+		utxo, ok := addressToUtxoMap[deposit.Address]
+		if !ok {
+			logger.Info("UTXO not found for deposit address", "address", deposit.Address)
+			continue
+		}
 		_, err = dbTx.DepositAddress.UpdateOne(deposit).
 			SetConfirmationHeight(blockHeight).
+			SetConfirmationTxid(utxo.tx.TxHash().String()).
 			Save(ctx)
 		if err != nil {
 			return err

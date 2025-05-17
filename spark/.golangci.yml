@@ -3,6 +3,8 @@ linters:
   enable:
     - depguard
     - revive
+    - staticcheck
+    - exhaustive
   exclusions:
     generated: lax
     presets:
@@ -25,6 +27,11 @@ linters:
         - (*google.golang.org/grpc.ClientConn).Close
         - (*database/sql.DB).Close
         - (*github.com/lightsparkdev/spark/so/ent.Client).Close
+    staticcheck:
+      checks:
+        - "-SA1019"
+    exhaustive:
+      default-signifies-exhaustive: true
 formatters:
   enable:
     - gofumpt

@@ -39,8 +39,7 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 	}
 
 	var transfer *ent.Transfer
-	switch req.Intent {
-	case pbcommon.SignatureIntent_TRANSFER:
+	if req.Intent == pbcommon.SignatureIntent_TRANSFER {
 		var err error
 		transfer, err = o.verifyAndUpdateTransfer(ctx, req)
 		if err != nil {
@@ -233,7 +232,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 			if len(treeNodeParentTx.TxOut) <= int(node.Vout) {
 				return nil, nil, fmt.Errorf("vout out of bounds")
 			}
-			err = common.VerifySignature(treeNodeTx, 0, treeNodeParentTx.TxOut[node.Vout])
+			err = common.VerifySignatureSingleInput(treeNodeTx, 0, treeNodeParentTx.TxOut[node.Vout])
 			if err != nil {
 				return nil, nil, fmt.Errorf("unable to verify node tx signature: %v", err)
 			}
@@ -259,7 +258,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		if len(treeNodeTx.TxOut) <= 0 {
 			return nil, nil, fmt.Errorf("vout out of bounds")
 		}
-		err = common.VerifySignature(refundTx, 0, treeNodeTx.TxOut[0])
+		err = common.VerifySignatureSingleInput(refundTx, 0, treeNodeTx.TxOut[0])
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to verify refund tx signature: %v", err)
 		}

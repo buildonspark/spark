@@ -32,6 +32,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
+	"github.com/lightsparkdev/spark/so/ent/utxo"
+	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 )
 
 const (
@@ -61,6 +63,8 @@ const (
 	TypeTree                    = "Tree"
 	TypeTreeNode                = "TreeNode"
 	TypeUserSignedTransaction   = "UserSignedTransaction"
+	TypeUtxo                    = "Utxo"
+	TypeUtxoSwap                = "UtxoSwap"
 )
 
 // BlockHeightMutation represents an operation that mutates the BlockHeight nodes in the graph.
@@ -1232,6 +1236,12 @@ type DepositAddressMutation struct {
 	clearedFields           map[string]struct{}
 	signing_keyshare        *uuid.UUID
 	clearedsigning_keyshare bool
+	utxo                    map[uuid.UUID]struct{}
+	removedutxo             map[uuid.UUID]struct{}
+	clearedutxo             bool
+	utxoswaps               map[uuid.UUID]struct{}
+	removedutxoswaps        map[uuid.UUID]struct{}
+	clearedutxoswaps        bool
 	done                    bool
 	oldValue                func(context.Context) (*DepositAddress, error)
 	predicates              []predicate.DepositAddress
@@ -1764,6 +1774,114 @@ func (m *DepositAddressMutation) ResetSigningKeyshare() {
 	m.clearedsigning_keyshare = false
 }
 
+// AddUtxoIDs adds the "utxo" edge to the Utxo entity by ids.
+func (m *DepositAddressMutation) AddUtxoIDs(ids ...uuid.UUID) {
+	if m.utxo == nil {
+		m.utxo = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.utxo[ids[i]] = struct{}{}
+	}
+}
+
+// ClearUtxo clears the "utxo" edge to the Utxo entity.
+func (m *DepositAddressMutation) ClearUtxo() {
+	m.clearedutxo = true
+}
+
+// UtxoCleared reports if the "utxo" edge to the Utxo entity was cleared.
+func (m *DepositAddressMutation) UtxoCleared() bool {
+	return m.clearedutxo
+}
+
+// RemoveUtxoIDs removes the "utxo" edge to the Utxo entity by IDs.
+func (m *DepositAddressMutation) RemoveUtxoIDs(ids ...uuid.UUID) {
+	if m.removedutxo == nil {
+		m.removedutxo = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.utxo, ids[i])
+		m.removedutxo[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedUtxo returns the removed IDs of the "utxo" edge to the Utxo entity.
+func (m *DepositAddressMutation) RemovedUtxoIDs() (ids []uuid.UUID) {
+	for id := range m.removedutxo {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// UtxoIDs returns the "utxo" edge IDs in the mutation.
+func (m *DepositAddressMutation) UtxoIDs() (ids []uuid.UUID) {
+	for id := range m.utxo {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetUtxo resets all changes to the "utxo" edge.
+func (m *DepositAddressMutation) ResetUtxo() {
+	m.utxo = nil
+	m.clearedutxo = false
+	m.removedutxo = nil
+}
+
+// AddUtxoswapIDs adds the "utxoswaps" edge to the UtxoSwap entity by ids.
+func (m *DepositAddressMutation) AddUtxoswapIDs(ids ...uuid.UUID) {
+	if m.utxoswaps == nil {
+		m.utxoswaps = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.utxoswaps[ids[i]] = struct{}{}
+	}
+}
+
+// ClearUtxoswaps clears the "utxoswaps" edge to the UtxoSwap entity.
+func (m *DepositAddressMutation) ClearUtxoswaps() {
+	m.clearedutxoswaps = true
+}
+
+// UtxoswapsCleared reports if the "utxoswaps" edge to the UtxoSwap entity was cleared.
+func (m *DepositAddressMutation) UtxoswapsCleared() bool {
+	return m.clearedutxoswaps
+}
+
+// RemoveUtxoswapIDs removes the "utxoswaps" edge to the UtxoSwap entity by IDs.
+func (m *DepositAddressMutation) RemoveUtxoswapIDs(ids ...uuid.UUID) {
+	if m.removedutxoswaps == nil {
+		m.removedutxoswaps = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.utxoswaps, ids[i])
+		m.removedutxoswaps[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedUtxoswaps returns the removed IDs of the "utxoswaps" edge to the UtxoSwap entity.
+func (m *DepositAddressMutation) RemovedUtxoswapsIDs() (ids []uuid.UUID) {
+	for id := range m.removedutxoswaps {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// UtxoswapsIDs returns the "utxoswaps" edge IDs in the mutation.
+func (m *DepositAddressMutation) UtxoswapsIDs() (ids []uuid.UUID) {
+	for id := range m.utxoswaps {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetUtxoswaps resets all changes to the "utxoswaps" edge.
+func (m *DepositAddressMutation) ResetUtxoswaps() {
+	m.utxoswaps = nil
+	m.clearedutxoswaps = false
+	m.removedutxoswaps = nil
+}
+
 // Where appends a list predicates to the DepositAddressMutation builder.
 func (m *DepositAddressMutation) Where(ps ...predicate.DepositAddress) {
 	m.predicates = append(m.predicates, ps...)
@@ -2069,9 +2187,15 @@ func (m *DepositAddressMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *DepositAddressMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
 	if m.signing_keyshare != nil {
 		edges = append(edges, depositaddress.EdgeSigningKeyshare)
+	}
+	if m.utxo != nil {
+		edges = append(edges, depositaddress.EdgeUtxo)
+	}
+	if m.utxoswaps != nil {
+		edges = append(edges, depositaddress.EdgeUtxoswaps)
 	}
 	return edges
 }
@@ -2084,27 +2208,65 @@ func (m *DepositAddressMutation) AddedIDs(name string) []ent.Value {
 		if id := m.signing_keyshare; id != nil {
 			return []ent.Value{*id}
 		}
+	case depositaddress.EdgeUtxo:
+		ids := make([]ent.Value, 0, len(m.utxo))
+		for id := range m.utxo {
+			ids = append(ids, id)
+		}
+		return ids
+	case depositaddress.EdgeUtxoswaps:
+		ids := make([]ent.Value, 0, len(m.utxoswaps))
+		for id := range m.utxoswaps {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *DepositAddressMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
+	if m.removedutxo != nil {
+		edges = append(edges, depositaddress.EdgeUtxo)
+	}
+	if m.removedutxoswaps != nil {
+		edges = append(edges, depositaddress.EdgeUtxoswaps)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *DepositAddressMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case depositaddress.EdgeUtxo:
+		ids := make([]ent.Value, 0, len(m.removedutxo))
+		for id := range m.removedutxo {
+			ids = append(ids, id)
+		}
+		return ids
+	case depositaddress.EdgeUtxoswaps:
+		ids := make([]ent.Value, 0, len(m.removedutxoswaps))
+		for id := range m.removedutxoswaps {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *DepositAddressMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
 	if m.clearedsigning_keyshare {
 		edges = append(edges, depositaddress.EdgeSigningKeyshare)
+	}
+	if m.clearedutxo {
+		edges = append(edges, depositaddress.EdgeUtxo)
+	}
+	if m.clearedutxoswaps {
+		edges = append(edges, depositaddress.EdgeUtxoswaps)
 	}
 	return edges
 }
@@ -2115,6 +2277,10 @@ func (m *DepositAddressMutation) EdgeCleared(name string) bool {
 	switch name {
 	case depositaddress.EdgeSigningKeyshare:
 		return m.clearedsigning_keyshare
+	case depositaddress.EdgeUtxo:
+		return m.clearedutxo
+	case depositaddress.EdgeUtxoswaps:
+		return m.clearedutxoswaps
 	}
 	return false
 }
@@ -2136,6 +2302,12 @@ func (m *DepositAddressMutation) ResetEdge(name string) error {
 	switch name {
 	case depositaddress.EdgeSigningKeyshare:
 		m.ResetSigningKeyshare()
+		return nil
+	case depositaddress.EdgeUtxo:
+		m.ResetUtxo()
+		return nil
+	case depositaddress.EdgeUtxoswaps:
+		m.ResetUtxoswaps()
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress edge %s", name)
@@ -9913,6 +10085,7 @@ type TokenTransactionMutation struct {
 	finalized_token_transaction_hash *[]byte
 	operator_signature               *[]byte
 	status                           *schema.TokenTransactionStatus
+	expiry_time                      *time.Time
 	coordinator_public_key           *[]byte
 	clearedFields                    map[string]struct{}
 	spent_output                     map[uuid.UUID]struct{}
@@ -10274,6 +10447,55 @@ func (m *TokenTransactionMutation) ResetStatus() {
 	delete(m.clearedFields, tokentransaction.FieldStatus)
 }
 
+// SetExpiryTime sets the "expiry_time" field.
+func (m *TokenTransactionMutation) SetExpiryTime(t time.Time) {
+	m.expiry_time = &t
+}
+
+// ExpiryTime returns the value of the "expiry_time" field in the mutation.
+func (m *TokenTransactionMutation) ExpiryTime() (r time.Time, exists bool) {
+	v := m.expiry_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiryTime returns the old "expiry_time" field's value of the TokenTransaction entity.
+// If the TokenTransaction object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenTransactionMutation) OldExpiryTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiryTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiryTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiryTime: %w", err)
+	}
+	return oldValue.ExpiryTime, nil
+}
+
+// ClearExpiryTime clears the value of the "expiry_time" field.
+func (m *TokenTransactionMutation) ClearExpiryTime() {
+	m.expiry_time = nil
+	m.clearedFields[tokentransaction.FieldExpiryTime] = struct{}{}
+}
+
+// ExpiryTimeCleared returns if the "expiry_time" field was cleared in this mutation.
+func (m *TokenTransactionMutation) ExpiryTimeCleared() bool {
+	_, ok := m.clearedFields[tokentransaction.FieldExpiryTime]
+	return ok
+}
+
+// ResetExpiryTime resets all changes to the "expiry_time" field.
+func (m *TokenTransactionMutation) ResetExpiryTime() {
+	m.expiry_time = nil
+	delete(m.clearedFields, tokentransaction.FieldExpiryTime)
+}
+
 // SetCoordinatorPublicKey sets the "coordinator_public_key" field.
 func (m *TokenTransactionMutation) SetCoordinatorPublicKey(b []byte) {
 	m.coordinator_public_key = &b
@@ -10504,7 +10726,7 @@ func (m *TokenTransactionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenTransactionMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 8)
 	if m.create_time != nil {
 		fields = append(fields, tokentransaction.FieldCreateTime)
 	}
@@ -10522,6 +10744,9 @@ func (m *TokenTransactionMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, tokentransaction.FieldStatus)
+	}
+	if m.expiry_time != nil {
+		fields = append(fields, tokentransaction.FieldExpiryTime)
 	}
 	if m.coordinator_public_key != nil {
 		fields = append(fields, tokentransaction.FieldCoordinatorPublicKey)
@@ -10546,6 +10771,8 @@ func (m *TokenTransactionMutation) Field(name string) (ent.Value, bool) {
 		return m.OperatorSignature()
 	case tokentransaction.FieldStatus:
 		return m.Status()
+	case tokentransaction.FieldExpiryTime:
+		return m.ExpiryTime()
 	case tokentransaction.FieldCoordinatorPublicKey:
 		return m.CoordinatorPublicKey()
 	}
@@ -10569,6 +10796,8 @@ func (m *TokenTransactionMutation) OldField(ctx context.Context, name string) (e
 		return m.OldOperatorSignature(ctx)
 	case tokentransaction.FieldStatus:
 		return m.OldStatus(ctx)
+	case tokentransaction.FieldExpiryTime:
+		return m.OldExpiryTime(ctx)
 	case tokentransaction.FieldCoordinatorPublicKey:
 		return m.OldCoordinatorPublicKey(ctx)
 	}
@@ -10622,6 +10851,13 @@ func (m *TokenTransactionMutation) SetField(name string, value ent.Value) error 
 		}
 		m.SetStatus(v)
 		return nil
+	case tokentransaction.FieldExpiryTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiryTime(v)
+		return nil
 	case tokentransaction.FieldCoordinatorPublicKey:
 		v, ok := value.([]byte)
 		if !ok {
@@ -10665,6 +10901,9 @@ func (m *TokenTransactionMutation) ClearedFields() []string {
 	if m.FieldCleared(tokentransaction.FieldStatus) {
 		fields = append(fields, tokentransaction.FieldStatus)
 	}
+	if m.FieldCleared(tokentransaction.FieldExpiryTime) {
+		fields = append(fields, tokentransaction.FieldExpiryTime)
+	}
 	if m.FieldCleared(tokentransaction.FieldCoordinatorPublicKey) {
 		fields = append(fields, tokentransaction.FieldCoordinatorPublicKey)
 	}
@@ -10687,6 +10926,9 @@ func (m *TokenTransactionMutation) ClearField(name string) error {
 		return nil
 	case tokentransaction.FieldStatus:
 		m.ClearStatus()
+		return nil
+	case tokentransaction.FieldExpiryTime:
+		m.ClearExpiryTime()
 		return nil
 	case tokentransaction.FieldCoordinatorPublicKey:
 		m.ClearCoordinatorPublicKey()
@@ -10716,6 +10958,9 @@ func (m *TokenTransactionMutation) ResetField(name string) error {
 		return nil
 	case tokentransaction.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case tokentransaction.FieldExpiryTime:
+		m.ResetExpiryTime()
 		return nil
 	case tokentransaction.FieldCoordinatorPublicKey:
 		m.ResetCoordinatorPublicKey()
@@ -14480,34 +14725,39 @@ func (m *TreeMutation) ResetEdge(name string) error {
 // TreeNodeMutation represents an operation that mutates the TreeNode nodes in the graph.
 type TreeNodeMutation struct {
 	config
-	op                      Op
-	typ                     string
-	id                      *uuid.UUID
-	create_time             *time.Time
-	update_time             *time.Time
-	value                   *uint64
-	addvalue                *int64
-	status                  *schema.TreeNodeStatus
-	verifying_pubkey        *[]byte
-	owner_identity_pubkey   *[]byte
-	owner_signing_pubkey    *[]byte
-	raw_tx                  *[]byte
-	vout                    *int16
-	addvout                 *int16
-	raw_refund_tx           *[]byte
-	clearedFields           map[string]struct{}
-	tree                    *uuid.UUID
-	clearedtree             bool
-	parent                  *uuid.UUID
-	clearedparent           bool
-	signing_keyshare        *uuid.UUID
-	clearedsigning_keyshare bool
-	children                map[uuid.UUID]struct{}
-	removedchildren         map[uuid.UUID]struct{}
-	clearedchildren         bool
-	done                    bool
-	oldValue                func(context.Context) (*TreeNode, error)
-	predicates              []predicate.TreeNode
+	op                            Op
+	typ                           string
+	id                            *uuid.UUID
+	create_time                   *time.Time
+	update_time                   *time.Time
+	value                         *uint64
+	addvalue                      *int64
+	status                        *schema.TreeNodeStatus
+	verifying_pubkey              *[]byte
+	owner_identity_pubkey         *[]byte
+	owner_signing_pubkey          *[]byte
+	raw_tx                        *[]byte
+	vout                          *int16
+	addvout                       *int16
+	raw_refund_tx                 *[]byte
+	node_confirmation_height      *uint64
+	addnode_confirmation_height   *int64
+	refund_confirmation_height    *uint64
+	addrefund_confirmation_height *int64
+	direct_refund_tx              *[]byte
+	clearedFields                 map[string]struct{}
+	tree                          *uuid.UUID
+	clearedtree                   bool
+	parent                        *uuid.UUID
+	clearedparent                 bool
+	signing_keyshare              *uuid.UUID
+	clearedsigning_keyshare       bool
+	children                      map[uuid.UUID]struct{}
+	removedchildren               map[uuid.UUID]struct{}
+	clearedchildren               bool
+	done                          bool
+	oldValue                      func(context.Context) (*TreeNode, error)
+	predicates                    []predicate.TreeNode
 }
 
 var _ ent.Mutation = (*TreeNodeMutation)(nil)
@@ -15027,6 +15277,195 @@ func (m *TreeNodeMutation) ResetRawRefundTx() {
 	delete(m.clearedFields, treenode.FieldRawRefundTx)
 }
 
+// SetNodeConfirmationHeight sets the "node_confirmation_height" field.
+func (m *TreeNodeMutation) SetNodeConfirmationHeight(u uint64) {
+	m.node_confirmation_height = &u
+	m.addnode_confirmation_height = nil
+}
+
+// NodeConfirmationHeight returns the value of the "node_confirmation_height" field in the mutation.
+func (m *TreeNodeMutation) NodeConfirmationHeight() (r uint64, exists bool) {
+	v := m.node_confirmation_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNodeConfirmationHeight returns the old "node_confirmation_height" field's value of the TreeNode entity.
+// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeNodeMutation) OldNodeConfirmationHeight(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNodeConfirmationHeight is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNodeConfirmationHeight requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNodeConfirmationHeight: %w", err)
+	}
+	return oldValue.NodeConfirmationHeight, nil
+}
+
+// AddNodeConfirmationHeight adds u to the "node_confirmation_height" field.
+func (m *TreeNodeMutation) AddNodeConfirmationHeight(u int64) {
+	if m.addnode_confirmation_height != nil {
+		*m.addnode_confirmation_height += u
+	} else {
+		m.addnode_confirmation_height = &u
+	}
+}
+
+// AddedNodeConfirmationHeight returns the value that was added to the "node_confirmation_height" field in this mutation.
+func (m *TreeNodeMutation) AddedNodeConfirmationHeight() (r int64, exists bool) {
+	v := m.addnode_confirmation_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearNodeConfirmationHeight clears the value of the "node_confirmation_height" field.
+func (m *TreeNodeMutation) ClearNodeConfirmationHeight() {
+	m.node_confirmation_height = nil
+	m.addnode_confirmation_height = nil
+	m.clearedFields[treenode.FieldNodeConfirmationHeight] = struct{}{}
+}
+
+// NodeConfirmationHeightCleared returns if the "node_confirmation_height" field was cleared in this mutation.
+func (m *TreeNodeMutation) NodeConfirmationHeightCleared() bool {
+	_, ok := m.clearedFields[treenode.FieldNodeConfirmationHeight]
+	return ok
+}
+
+// ResetNodeConfirmationHeight resets all changes to the "node_confirmation_height" field.
+func (m *TreeNodeMutation) ResetNodeConfirmationHeight() {
+	m.node_confirmation_height = nil
+	m.addnode_confirmation_height = nil
+	delete(m.clearedFields, treenode.FieldNodeConfirmationHeight)
+}
+
+// SetRefundConfirmationHeight sets the "refund_confirmation_height" field.
+func (m *TreeNodeMutation) SetRefundConfirmationHeight(u uint64) {
+	m.refund_confirmation_height = &u
+	m.addrefund_confirmation_height = nil
+}
+
+// RefundConfirmationHeight returns the value of the "refund_confirmation_height" field in the mutation.
+func (m *TreeNodeMutation) RefundConfirmationHeight() (r uint64, exists bool) {
+	v := m.refund_confirmation_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRefundConfirmationHeight returns the old "refund_confirmation_height" field's value of the TreeNode entity.
+// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeNodeMutation) OldRefundConfirmationHeight(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRefundConfirmationHeight is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRefundConfirmationHeight requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRefundConfirmationHeight: %w", err)
+	}
+	return oldValue.RefundConfirmationHeight, nil
+}
+
+// AddRefundConfirmationHeight adds u to the "refund_confirmation_height" field.
+func (m *TreeNodeMutation) AddRefundConfirmationHeight(u int64) {
+	if m.addrefund_confirmation_height != nil {
+		*m.addrefund_confirmation_height += u
+	} else {
+		m.addrefund_confirmation_height = &u
+	}
+}
+
+// AddedRefundConfirmationHeight returns the value that was added to the "refund_confirmation_height" field in this mutation.
+func (m *TreeNodeMutation) AddedRefundConfirmationHeight() (r int64, exists bool) {
+	v := m.addrefund_confirmation_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearRefundConfirmationHeight clears the value of the "refund_confirmation_height" field.
+func (m *TreeNodeMutation) ClearRefundConfirmationHeight() {
+	m.refund_confirmation_height = nil
+	m.addrefund_confirmation_height = nil
+	m.clearedFields[treenode.FieldRefundConfirmationHeight] = struct{}{}
+}
+
+// RefundConfirmationHeightCleared returns if the "refund_confirmation_height" field was cleared in this mutation.
+func (m *TreeNodeMutation) RefundConfirmationHeightCleared() bool {
+	_, ok := m.clearedFields[treenode.FieldRefundConfirmationHeight]
+	return ok
+}
+
+// ResetRefundConfirmationHeight resets all changes to the "refund_confirmation_height" field.
+func (m *TreeNodeMutation) ResetRefundConfirmationHeight() {
+	m.refund_confirmation_height = nil
+	m.addrefund_confirmation_height = nil
+	delete(m.clearedFields, treenode.FieldRefundConfirmationHeight)
+}
+
+// SetDirectRefundTx sets the "direct_refund_tx" field.
+func (m *TreeNodeMutation) SetDirectRefundTx(b []byte) {
+	m.direct_refund_tx = &b
+}
+
+// DirectRefundTx returns the value of the "direct_refund_tx" field in the mutation.
+func (m *TreeNodeMutation) DirectRefundTx() (r []byte, exists bool) {
+	v := m.direct_refund_tx
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDirectRefundTx returns the old "direct_refund_tx" field's value of the TreeNode entity.
+// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeNodeMutation) OldDirectRefundTx(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDirectRefundTx is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDirectRefundTx requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDirectRefundTx: %w", err)
+	}
+	return oldValue.DirectRefundTx, nil
+}
+
+// ClearDirectRefundTx clears the value of the "direct_refund_tx" field.
+func (m *TreeNodeMutation) ClearDirectRefundTx() {
+	m.direct_refund_tx = nil
+	m.clearedFields[treenode.FieldDirectRefundTx] = struct{}{}
+}
+
+// DirectRefundTxCleared returns if the "direct_refund_tx" field was cleared in this mutation.
+func (m *TreeNodeMutation) DirectRefundTxCleared() bool {
+	_, ok := m.clearedFields[treenode.FieldDirectRefundTx]
+	return ok
+}
+
+// ResetDirectRefundTx resets all changes to the "direct_refund_tx" field.
+func (m *TreeNodeMutation) ResetDirectRefundTx() {
+	m.direct_refund_tx = nil
+	delete(m.clearedFields, treenode.FieldDirectRefundTx)
+}
+
 // SetTreeID sets the "tree" edge to the Tree entity by id.
 func (m *TreeNodeMutation) SetTreeID(id uuid.UUID) {
 	m.tree = &id
@@ -15232,7 +15671,7 @@ func (m *TreeNodeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TreeNodeMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 13)
 	if m.create_time != nil {
 		fields = append(fields, treenode.FieldCreateTime)
 	}
@@ -15263,6 +15702,15 @@ func (m *TreeNodeMutation) Fields() []string {
 	if m.raw_refund_tx != nil {
 		fields = append(fields, treenode.FieldRawRefundTx)
 	}
+	if m.node_confirmation_height != nil {
+		fields = append(fields, treenode.FieldNodeConfirmationHeight)
+	}
+	if m.refund_confirmation_height != nil {
+		fields = append(fields, treenode.FieldRefundConfirmationHeight)
+	}
+	if m.direct_refund_tx != nil {
+		fields = append(fields, treenode.FieldDirectRefundTx)
+	}
 	return fields
 }
 
@@ -15291,6 +15739,12 @@ func (m *TreeNodeMutation) Field(name string) (ent.Value, bool) {
 		return m.Vout()
 	case treenode.FieldRawRefundTx:
 		return m.RawRefundTx()
+	case treenode.FieldNodeConfirmationHeight:
+		return m.NodeConfirmationHeight()
+	case treenode.FieldRefundConfirmationHeight:
+		return m.RefundConfirmationHeight()
+	case treenode.FieldDirectRefundTx:
+		return m.DirectRefundTx()
 	}
 	return nil, false
 }
@@ -15320,6 +15774,12 @@ func (m *TreeNodeMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldVout(ctx)
 	case treenode.FieldRawRefundTx:
 		return m.OldRawRefundTx(ctx)
+	case treenode.FieldNodeConfirmationHeight:
+		return m.OldNodeConfirmationHeight(ctx)
+	case treenode.FieldRefundConfirmationHeight:
+		return m.OldRefundConfirmationHeight(ctx)
+	case treenode.FieldDirectRefundTx:
+		return m.OldDirectRefundTx(ctx)
 	}
 	return nil, fmt.Errorf("unknown TreeNode field %s", name)
 }
@@ -15399,6 +15859,27 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetRawRefundTx(v)
 		return nil
+	case treenode.FieldNodeConfirmationHeight:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNodeConfirmationHeight(v)
+		return nil
+	case treenode.FieldRefundConfirmationHeight:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRefundConfirmationHeight(v)
+		return nil
+	case treenode.FieldDirectRefundTx:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDirectRefundTx(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TreeNode field %s", name)
 }
@@ -15413,6 +15894,12 @@ func (m *TreeNodeMutation) AddedFields() []string {
 	if m.addvout != nil {
 		fields = append(fields, treenode.FieldVout)
 	}
+	if m.addnode_confirmation_height != nil {
+		fields = append(fields, treenode.FieldNodeConfirmationHeight)
+	}
+	if m.addrefund_confirmation_height != nil {
+		fields = append(fields, treenode.FieldRefundConfirmationHeight)
+	}
 	return fields
 }
 
@@ -15425,6 +15912,10 @@ func (m *TreeNodeMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedValue()
 	case treenode.FieldVout:
 		return m.AddedVout()
+	case treenode.FieldNodeConfirmationHeight:
+		return m.AddedNodeConfirmationHeight()
+	case treenode.FieldRefundConfirmationHeight:
+		return m.AddedRefundConfirmationHeight()
 	}
 	return nil, false
 }
@@ -15448,6 +15939,20 @@ func (m *TreeNodeMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddVout(v)
 		return nil
+	case treenode.FieldNodeConfirmationHeight:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddNodeConfirmationHeight(v)
+		return nil
+	case treenode.FieldRefundConfirmationHeight:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRefundConfirmationHeight(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TreeNode numeric field %s", name)
 }
@@ -15458,6 +15963,15 @@ func (m *TreeNodeMutation) ClearedFields() []string {
 	var fields []string
 	if m.FieldCleared(treenode.FieldRawRefundTx) {
 		fields = append(fields, treenode.FieldRawRefundTx)
+	}
+	if m.FieldCleared(treenode.FieldNodeConfirmationHeight) {
+		fields = append(fields, treenode.FieldNodeConfirmationHeight)
+	}
+	if m.FieldCleared(treenode.FieldRefundConfirmationHeight) {
+		fields = append(fields, treenode.FieldRefundConfirmationHeight)
+	}
+	if m.FieldCleared(treenode.FieldDirectRefundTx) {
+		fields = append(fields, treenode.FieldDirectRefundTx)
 	}
 	return fields
 }
@@ -15475,6 +15989,15 @@ func (m *TreeNodeMutation) ClearField(name string) error {
 	switch name {
 	case treenode.FieldRawRefundTx:
 		m.ClearRawRefundTx()
+		return nil
+	case treenode.FieldNodeConfirmationHeight:
+		m.ClearNodeConfirmationHeight()
+		return nil
+	case treenode.FieldRefundConfirmationHeight:
+		m.ClearRefundConfirmationHeight()
+		return nil
+	case treenode.FieldDirectRefundTx:
+		m.ClearDirectRefundTx()
 		return nil
 	}
 	return fmt.Errorf("unknown TreeNode nullable field %s", name)
@@ -15513,6 +16036,15 @@ func (m *TreeNodeMutation) ResetField(name string) error {
 		return nil
 	case treenode.FieldRawRefundTx:
 		m.ResetRawRefundTx()
+		return nil
+	case treenode.FieldNodeConfirmationHeight:
+		m.ResetNodeConfirmationHeight()
+		return nil
+	case treenode.FieldRefundConfirmationHeight:
+		m.ResetRefundConfirmationHeight()
+		return nil
+	case treenode.FieldDirectRefundTx:
+		m.ResetDirectRefundTx()
 		return nil
 	}
 	return fmt.Errorf("unknown TreeNode field %s", name)
@@ -16382,4 +16914,2015 @@ func (m *UserSignedTransactionMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown UserSignedTransaction edge %s", name)
+}
+
+// UtxoMutation represents an operation that mutates the Utxo nodes in the graph.
+type UtxoMutation struct {
+	config
+	op                     Op
+	typ                    string
+	id                     *uuid.UUID
+	create_time            *time.Time
+	update_time            *time.Time
+	block_height           *int64
+	addblock_height        *int64
+	txid                   *[]byte
+	vout                   *uint32
+	addvout                *int32
+	amount                 *uint64
+	addamount              *int64
+	network                *schema.Network
+	pk_script              *[]byte
+	clearedFields          map[string]struct{}
+	deposit_address        *uuid.UUID
+	cleareddeposit_address bool
+	done                   bool
+	oldValue               func(context.Context) (*Utxo, error)
+	predicates             []predicate.Utxo
+}
+
+var _ ent.Mutation = (*UtxoMutation)(nil)
+
+// utxoOption allows management of the mutation configuration using functional options.
+type utxoOption func(*UtxoMutation)
+
+// newUtxoMutation creates new mutation for the Utxo entity.
+func newUtxoMutation(c config, op Op, opts ...utxoOption) *UtxoMutation {
+	m := &UtxoMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeUtxo,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withUtxoID sets the ID field of the mutation.
+func withUtxoID(id uuid.UUID) utxoOption {
+	return func(m *UtxoMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *Utxo
+		)
+		m.oldValue = func(ctx context.Context) (*Utxo, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().Utxo.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withUtxo sets the old Utxo of the mutation.
+func withUtxo(node *Utxo) utxoOption {
+	return func(m *UtxoMutation) {
+		m.oldValue = func(context.Context) (*Utxo, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m UtxoMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m UtxoMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of Utxo entities.
+func (m *UtxoMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *UtxoMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *UtxoMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().Utxo.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *UtxoMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *UtxoMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *UtxoMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *UtxoMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *UtxoMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *UtxoMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetBlockHeight sets the "block_height" field.
+func (m *UtxoMutation) SetBlockHeight(i int64) {
+	m.block_height = &i
+	m.addblock_height = nil
+}
+
+// BlockHeight returns the value of the "block_height" field in the mutation.
+func (m *UtxoMutation) BlockHeight() (r int64, exists bool) {
+	v := m.block_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBlockHeight returns the old "block_height" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldBlockHeight(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBlockHeight is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBlockHeight requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBlockHeight: %w", err)
+	}
+	return oldValue.BlockHeight, nil
+}
+
+// AddBlockHeight adds i to the "block_height" field.
+func (m *UtxoMutation) AddBlockHeight(i int64) {
+	if m.addblock_height != nil {
+		*m.addblock_height += i
+	} else {
+		m.addblock_height = &i
+	}
+}
+
+// AddedBlockHeight returns the value that was added to the "block_height" field in this mutation.
+func (m *UtxoMutation) AddedBlockHeight() (r int64, exists bool) {
+	v := m.addblock_height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetBlockHeight resets all changes to the "block_height" field.
+func (m *UtxoMutation) ResetBlockHeight() {
+	m.block_height = nil
+	m.addblock_height = nil
+}
+
+// SetTxid sets the "txid" field.
+func (m *UtxoMutation) SetTxid(b []byte) {
+	m.txid = &b
+}
+
+// Txid returns the value of the "txid" field in the mutation.
+func (m *UtxoMutation) Txid() (r []byte, exists bool) {
+	v := m.txid
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTxid returns the old "txid" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldTxid(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTxid is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTxid requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTxid: %w", err)
+	}
+	return oldValue.Txid, nil
+}
+
+// ResetTxid resets all changes to the "txid" field.
+func (m *UtxoMutation) ResetTxid() {
+	m.txid = nil
+}
+
+// SetVout sets the "vout" field.
+func (m *UtxoMutation) SetVout(u uint32) {
+	m.vout = &u
+	m.addvout = nil
+}
+
+// Vout returns the value of the "vout" field in the mutation.
+func (m *UtxoMutation) Vout() (r uint32, exists bool) {
+	v := m.vout
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVout returns the old "vout" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldVout(ctx context.Context) (v uint32, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVout is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVout requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVout: %w", err)
+	}
+	return oldValue.Vout, nil
+}
+
+// AddVout adds u to the "vout" field.
+func (m *UtxoMutation) AddVout(u int32) {
+	if m.addvout != nil {
+		*m.addvout += u
+	} else {
+		m.addvout = &u
+	}
+}
+
+// AddedVout returns the value that was added to the "vout" field in this mutation.
+func (m *UtxoMutation) AddedVout() (r int32, exists bool) {
+	v := m.addvout
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVout resets all changes to the "vout" field.
+func (m *UtxoMutation) ResetVout() {
+	m.vout = nil
+	m.addvout = nil
+}
+
+// SetAmount sets the "amount" field.
+func (m *UtxoMutation) SetAmount(u uint64) {
+	m.amount = &u
+	m.addamount = nil
+}
+
+// Amount returns the value of the "amount" field in the mutation.
+func (m *UtxoMutation) Amount() (r uint64, exists bool) {
+	v := m.amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAmount returns the old "amount" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldAmount(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAmount: %w", err)
+	}
+	return oldValue.Amount, nil
+}
+
+// AddAmount adds u to the "amount" field.
+func (m *UtxoMutation) AddAmount(u int64) {
+	if m.addamount != nil {
+		*m.addamount += u
+	} else {
+		m.addamount = &u
+	}
+}
+
+// AddedAmount returns the value that was added to the "amount" field in this mutation.
+func (m *UtxoMutation) AddedAmount() (r int64, exists bool) {
+	v := m.addamount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAmount resets all changes to the "amount" field.
+func (m *UtxoMutation) ResetAmount() {
+	m.amount = nil
+	m.addamount = nil
+}
+
+// SetNetwork sets the "network" field.
+func (m *UtxoMutation) SetNetwork(s schema.Network) {
+	m.network = &s
+}
+
+// Network returns the value of the "network" field in the mutation.
+func (m *UtxoMutation) Network() (r schema.Network, exists bool) {
+	v := m.network
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNetwork returns the old "network" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldNetwork(ctx context.Context) (v schema.Network, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNetwork requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNetwork: %w", err)
+	}
+	return oldValue.Network, nil
+}
+
+// ResetNetwork resets all changes to the "network" field.
+func (m *UtxoMutation) ResetNetwork() {
+	m.network = nil
+}
+
+// SetPkScript sets the "pk_script" field.
+func (m *UtxoMutation) SetPkScript(b []byte) {
+	m.pk_script = &b
+}
+
+// PkScript returns the value of the "pk_script" field in the mutation.
+func (m *UtxoMutation) PkScript() (r []byte, exists bool) {
+	v := m.pk_script
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPkScript returns the old "pk_script" field's value of the Utxo entity.
+// If the Utxo object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoMutation) OldPkScript(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPkScript is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPkScript requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPkScript: %w", err)
+	}
+	return oldValue.PkScript, nil
+}
+
+// ResetPkScript resets all changes to the "pk_script" field.
+func (m *UtxoMutation) ResetPkScript() {
+	m.pk_script = nil
+}
+
+// SetDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by id.
+func (m *UtxoMutation) SetDepositAddressID(id uuid.UUID) {
+	m.deposit_address = &id
+}
+
+// ClearDepositAddress clears the "deposit_address" edge to the DepositAddress entity.
+func (m *UtxoMutation) ClearDepositAddress() {
+	m.cleareddeposit_address = true
+}
+
+// DepositAddressCleared reports if the "deposit_address" edge to the DepositAddress entity was cleared.
+func (m *UtxoMutation) DepositAddressCleared() bool {
+	return m.cleareddeposit_address
+}
+
+// DepositAddressID returns the "deposit_address" edge ID in the mutation.
+func (m *UtxoMutation) DepositAddressID() (id uuid.UUID, exists bool) {
+	if m.deposit_address != nil {
+		return *m.deposit_address, true
+	}
+	return
+}
+
+// DepositAddressIDs returns the "deposit_address" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// DepositAddressID instead. It exists only for internal usage by the builders.
+func (m *UtxoMutation) DepositAddressIDs() (ids []uuid.UUID) {
+	if id := m.deposit_address; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetDepositAddress resets all changes to the "deposit_address" edge.
+func (m *UtxoMutation) ResetDepositAddress() {
+	m.deposit_address = nil
+	m.cleareddeposit_address = false
+}
+
+// Where appends a list predicates to the UtxoMutation builder.
+func (m *UtxoMutation) Where(ps ...predicate.Utxo) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the UtxoMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *UtxoMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.Utxo, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *UtxoMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *UtxoMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (Utxo).
+func (m *UtxoMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *UtxoMutation) Fields() []string {
+	fields := make([]string, 0, 8)
+	if m.create_time != nil {
+		fields = append(fields, utxo.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, utxo.FieldUpdateTime)
+	}
+	if m.block_height != nil {
+		fields = append(fields, utxo.FieldBlockHeight)
+	}
+	if m.txid != nil {
+		fields = append(fields, utxo.FieldTxid)
+	}
+	if m.vout != nil {
+		fields = append(fields, utxo.FieldVout)
+	}
+	if m.amount != nil {
+		fields = append(fields, utxo.FieldAmount)
+	}
+	if m.network != nil {
+		fields = append(fields, utxo.FieldNetwork)
+	}
+	if m.pk_script != nil {
+		fields = append(fields, utxo.FieldPkScript)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *UtxoMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case utxo.FieldCreateTime:
+		return m.CreateTime()
+	case utxo.FieldUpdateTime:
+		return m.UpdateTime()
+	case utxo.FieldBlockHeight:
+		return m.BlockHeight()
+	case utxo.FieldTxid:
+		return m.Txid()
+	case utxo.FieldVout:
+		return m.Vout()
+	case utxo.FieldAmount:
+		return m.Amount()
+	case utxo.FieldNetwork:
+		return m.Network()
+	case utxo.FieldPkScript:
+		return m.PkScript()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *UtxoMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case utxo.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case utxo.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case utxo.FieldBlockHeight:
+		return m.OldBlockHeight(ctx)
+	case utxo.FieldTxid:
+		return m.OldTxid(ctx)
+	case utxo.FieldVout:
+		return m.OldVout(ctx)
+	case utxo.FieldAmount:
+		return m.OldAmount(ctx)
+	case utxo.FieldNetwork:
+		return m.OldNetwork(ctx)
+	case utxo.FieldPkScript:
+		return m.OldPkScript(ctx)
+	}
+	return nil, fmt.Errorf("unknown Utxo field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *UtxoMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case utxo.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case utxo.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case utxo.FieldBlockHeight:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBlockHeight(v)
+		return nil
+	case utxo.FieldTxid:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTxid(v)
+		return nil
+	case utxo.FieldVout:
+		v, ok := value.(uint32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVout(v)
+		return nil
+	case utxo.FieldAmount:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAmount(v)
+		return nil
+	case utxo.FieldNetwork:
+		v, ok := value.(schema.Network)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNetwork(v)
+		return nil
+	case utxo.FieldPkScript:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPkScript(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Utxo field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *UtxoMutation) AddedFields() []string {
+	var fields []string
+	if m.addblock_height != nil {
+		fields = append(fields, utxo.FieldBlockHeight)
+	}
+	if m.addvout != nil {
+		fields = append(fields, utxo.FieldVout)
+	}
+	if m.addamount != nil {
+		fields = append(fields, utxo.FieldAmount)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *UtxoMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case utxo.FieldBlockHeight:
+		return m.AddedBlockHeight()
+	case utxo.FieldVout:
+		return m.AddedVout()
+	case utxo.FieldAmount:
+		return m.AddedAmount()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *UtxoMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case utxo.FieldBlockHeight:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddBlockHeight(v)
+		return nil
+	case utxo.FieldVout:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVout(v)
+		return nil
+	case utxo.FieldAmount:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAmount(v)
+		return nil
+	}
+	return fmt.Errorf("unknown Utxo numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *UtxoMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *UtxoMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *UtxoMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown Utxo nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *UtxoMutation) ResetField(name string) error {
+	switch name {
+	case utxo.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case utxo.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case utxo.FieldBlockHeight:
+		m.ResetBlockHeight()
+		return nil
+	case utxo.FieldTxid:
+		m.ResetTxid()
+		return nil
+	case utxo.FieldVout:
+		m.ResetVout()
+		return nil
+	case utxo.FieldAmount:
+		m.ResetAmount()
+		return nil
+	case utxo.FieldNetwork:
+		m.ResetNetwork()
+		return nil
+	case utxo.FieldPkScript:
+		m.ResetPkScript()
+		return nil
+	}
+	return fmt.Errorf("unknown Utxo field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *UtxoMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.deposit_address != nil {
+		edges = append(edges, utxo.EdgeDepositAddress)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *UtxoMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case utxo.EdgeDepositAddress:
+		if id := m.deposit_address; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *UtxoMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *UtxoMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *UtxoMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.cleareddeposit_address {
+		edges = append(edges, utxo.EdgeDepositAddress)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *UtxoMutation) EdgeCleared(name string) bool {
+	switch name {
+	case utxo.EdgeDepositAddress:
+		return m.cleareddeposit_address
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *UtxoMutation) ClearEdge(name string) error {
+	switch name {
+	case utxo.EdgeDepositAddress:
+		m.ClearDepositAddress()
+		return nil
+	}
+	return fmt.Errorf("unknown Utxo unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *UtxoMutation) ResetEdge(name string) error {
+	switch name {
+	case utxo.EdgeDepositAddress:
+		m.ResetDepositAddress()
+		return nil
+	}
+	return fmt.Errorf("unknown Utxo edge %s", name)
+}
+
+// UtxoSwapMutation represents an operation that mutates the UtxoSwap nodes in the graph.
+type UtxoSwapMutation struct {
+	config
+	op                       Op
+	typ                      string
+	id                       *uuid.UUID
+	create_time              *time.Time
+	update_time              *time.Time
+	status                   *schema.UtxoSwapStatus
+	request_type             *schema.UtxoSwapRequestType
+	credit_amount_sats       *uint64
+	addcredit_amount_sats    *int64
+	max_fee_sats             *uint64
+	addmax_fee_sats          *int64
+	ssp_signature            *[]byte
+	ssp_identity_public_key  *[]byte
+	user_signature           *[]byte
+	user_identity_public_key *[]byte
+	clearedFields            map[string]struct{}
+	utxo                     *uuid.UUID
+	clearedutxo              bool
+	transfer                 *uuid.UUID
+	clearedtransfer          bool
+	done                     bool
+	oldValue                 func(context.Context) (*UtxoSwap, error)
+	predicates               []predicate.UtxoSwap
+}
+
+var _ ent.Mutation = (*UtxoSwapMutation)(nil)
+
+// utxoswapOption allows management of the mutation configuration using functional options.
+type utxoswapOption func(*UtxoSwapMutation)
+
+// newUtxoSwapMutation creates new mutation for the UtxoSwap entity.
+func newUtxoSwapMutation(c config, op Op, opts ...utxoswapOption) *UtxoSwapMutation {
+	m := &UtxoSwapMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeUtxoSwap,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withUtxoSwapID sets the ID field of the mutation.
+func withUtxoSwapID(id uuid.UUID) utxoswapOption {
+	return func(m *UtxoSwapMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *UtxoSwap
+		)
+		m.oldValue = func(ctx context.Context) (*UtxoSwap, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().UtxoSwap.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withUtxoSwap sets the old UtxoSwap of the mutation.
+func withUtxoSwap(node *UtxoSwap) utxoswapOption {
+	return func(m *UtxoSwapMutation) {
+		m.oldValue = func(context.Context) (*UtxoSwap, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m UtxoSwapMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m UtxoSwapMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of UtxoSwap entities.
+func (m *UtxoSwapMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *UtxoSwapMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *UtxoSwapMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().UtxoSwap.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *UtxoSwapMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *UtxoSwapMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the UtxoSwap entity.
+// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoSwapMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *UtxoSwapMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *UtxoSwapMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *UtxoSwapMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the UtxoSwap entity.
+// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoSwapMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *UtxoSwapMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *UtxoSwapMutation) SetStatus(sss schema.UtxoSwapStatus) {
+	m.status = &sss
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *UtxoSwapMutation) Status() (r schema.UtxoSwapStatus, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the UtxoSwap entity.
+// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoSwapMutation) OldStatus(ctx context.Context) (v schema.UtxoSwapStatus, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *UtxoSwapMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetRequestType sets the "request_type" field.
+func (m *UtxoSwapMutation) SetRequestType(ssrt schema.UtxoSwapRequestType) {
+	m.request_type = &ssrt
+}
+
+// RequestType returns the value of the "request_type" field in the mutation.
+func (m *UtxoSwapMutation) RequestType() (r schema.UtxoSwapRequestType, exists bool) {
+	v := m.request_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestType returns the old "request_type" field's value of the UtxoSwap entity.
+// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoSwapMutation) OldRequestType(ctx context.Context) (v schema.UtxoSwapRequestType, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestType: %w", err)
+	}
+	return oldValue.RequestType, nil
+}
+
+// ResetRequestType resets all changes to the "request_type" field.
+func (m *UtxoSwapMutation) ResetRequestType() {
+	m.request_type = nil
+}
+
+// SetCreditAmountSats sets the "credit_amount_sats" field.
+func (m *UtxoSwapMutation) SetCreditAmountSats(u uint64) {
+	m.credit_amount_sats = &u
+	m.addcredit_amount_sats = nil
+}
+
+// CreditAmountSats returns the value of the "credit_amount_sats" field in the mutation.
+func (m *UtxoSwapMutation) CreditAmountSats() (r uint64, exists bool) {
+	v := m.credit_amount_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreditAmountSats returns the old "credit_amount_sats" field's value of the UtxoSwap entity.
+// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoSwapMutation) OldCreditAmountSats(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreditAmountSats is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreditAmountSats requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreditAmountSats: %w", err)
+	}
+	return oldValue.CreditAmountSats, nil
+}
+
+// AddCreditAmountSats adds u to the "credit_amount_sats" field.
+func (m *UtxoSwapMutation) AddCreditAmountSats(u int64) {
+	if m.addcredit_amount_sats != nil {
+		*m.addcredit_amount_sats += u
+	} else {
+		m.addcredit_amount_sats = &u
+	}
+}
+
+// AddedCreditAmountSats returns the value that was added to the "credit_amount_sats" field in this mutation.
+func (m *UtxoSwapMutation) AddedCreditAmountSats() (r int64, exists bool) {
+	v := m.addcredit_amount_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearCreditAmountSats clears the value of the "credit_amount_sats" field.
+func (m *UtxoSwapMutation) ClearCreditAmountSats() {
+	m.credit_amount_sats = nil
+	m.addcredit_amount_sats = nil
+	m.clearedFields[utxoswap.FieldCreditAmountSats] = struct{}{}
+}
+
+// CreditAmountSatsCleared returns if the "credit_amount_sats" field was cleared in this mutation.
+func (m *UtxoSwapMutation) CreditAmountSatsCleared() bool {
+	_, ok := m.clearedFields[utxoswap.FieldCreditAmountSats]
+	return ok
+}
+
+// ResetCreditAmountSats resets all changes to the "credit_amount_sats" field.
+func (m *UtxoSwapMutation) ResetCreditAmountSats() {
+	m.credit_amount_sats = nil
+	m.addcredit_amount_sats = nil
+	delete(m.clearedFields, utxoswap.FieldCreditAmountSats)
+}
+
+// SetMaxFeeSats sets the "max_fee_sats" field.
+func (m *UtxoSwapMutation) SetMaxFeeSats(u uint64) {
+	m.max_fee_sats = &u
+	m.addmax_fee_sats = nil
+}
+
+// MaxFeeSats returns the value of the "max_fee_sats" field in the mutation.
+func (m *UtxoSwapMutation) MaxFeeSats() (r uint64, exists bool) {
+	v := m.max_fee_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMaxFeeSats returns the old "max_fee_sats" field's value of the UtxoSwap entity.
+// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoSwapMutation) OldMaxFeeSats(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMaxFeeSats is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMaxFeeSats requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMaxFeeSats: %w", err)
+	}
+	return oldValue.MaxFeeSats, nil
+}
+
+// AddMaxFeeSats adds u to the "max_fee_sats" field.
+func (m *UtxoSwapMutation) AddMaxFeeSats(u int64) {
+	if m.addmax_fee_sats != nil {
+		*m.addmax_fee_sats += u
+	} else {
+		m.addmax_fee_sats = &u
+	}
+}
+
+// AddedMaxFeeSats returns the value that was added to the "max_fee_sats" field in this mutation.
+func (m *UtxoSwapMutation) AddedMaxFeeSats() (r int64, exists bool) {
+	v := m.addmax_fee_sats
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearMaxFeeSats clears the value of the "max_fee_sats" field.
+func (m *UtxoSwapMutation) ClearMaxFeeSats() {
+	m.max_fee_sats = nil
+	m.addmax_fee_sats = nil
+	m.clearedFields[utxoswap.FieldMaxFeeSats] = struct{}{}
+}
+
+// MaxFeeSatsCleared returns if the "max_fee_sats" field was cleared in this mutation.
+func (m *UtxoSwapMutation) MaxFeeSatsCleared() bool {
+	_, ok := m.clearedFields[utxoswap.FieldMaxFeeSats]
+	return ok
+}
+
+// ResetMaxFeeSats resets all changes to the "max_fee_sats" field.
+func (m *UtxoSwapMutation) ResetMaxFeeSats() {
+	m.max_fee_sats = nil
+	m.addmax_fee_sats = nil
+	delete(m.clearedFields, utxoswap.FieldMaxFeeSats)
+}
+
+// SetSspSignature sets the "ssp_signature" field.
+func (m *UtxoSwapMutation) SetSspSignature(b []byte) {
+	m.ssp_signature = &b
+}
+
+// SspSignature returns the value of the "ssp_signature" field in the mutation.
+func (m *UtxoSwapMutation) SspSignature() (r []byte, exists bool) {
+	v := m.ssp_signature
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSspSignature returns the old "ssp_signature" field's value of the UtxoSwap entity.
+// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoSwapMutation) OldSspSignature(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSspSignature is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSspSignature requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSspSignature: %w", err)
+	}
+	return oldValue.SspSignature, nil
+}
+
+// ClearSspSignature clears the value of the "ssp_signature" field.
+func (m *UtxoSwapMutation) ClearSspSignature() {
+	m.ssp_signature = nil
+	m.clearedFields[utxoswap.FieldSspSignature] = struct{}{}
+}
+
+// SspSignatureCleared returns if the "ssp_signature" field was cleared in this mutation.
+func (m *UtxoSwapMutation) SspSignatureCleared() bool {
+	_, ok := m.clearedFields[utxoswap.FieldSspSignature]
+	return ok
+}
+
+// ResetSspSignature resets all changes to the "ssp_signature" field.
+func (m *UtxoSwapMutation) ResetSspSignature() {
+	m.ssp_signature = nil
+	delete(m.clearedFields, utxoswap.FieldSspSignature)
+}
+
+// SetSspIdentityPublicKey sets the "ssp_identity_public_key" field.
+func (m *UtxoSwapMutation) SetSspIdentityPublicKey(b []byte) {
+	m.ssp_identity_public_key = &b
+}
+
+// SspIdentityPublicKey returns the value of the "ssp_identity_public_key" field in the mutation.
+func (m *UtxoSwapMutation) SspIdentityPublicKey() (r []byte, exists bool) {
+	v := m.ssp_identity_public_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSspIdentityPublicKey returns the old "ssp_identity_public_key" field's value of the UtxoSwap entity.
+// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoSwapMutation) OldSspIdentityPublicKey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSspIdentityPublicKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSspIdentityPublicKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSspIdentityPublicKey: %w", err)
+	}
+	return oldValue.SspIdentityPublicKey, nil
+}
+
+// ClearSspIdentityPublicKey clears the value of the "ssp_identity_public_key" field.
+func (m *UtxoSwapMutation) ClearSspIdentityPublicKey() {
+	m.ssp_identity_public_key = nil
+	m.clearedFields[utxoswap.FieldSspIdentityPublicKey] = struct{}{}
+}
+
+// SspIdentityPublicKeyCleared returns if the "ssp_identity_public_key" field was cleared in this mutation.
+func (m *UtxoSwapMutation) SspIdentityPublicKeyCleared() bool {
+	_, ok := m.clearedFields[utxoswap.FieldSspIdentityPublicKey]
+	return ok
+}
+
+// ResetSspIdentityPublicKey resets all changes to the "ssp_identity_public_key" field.
+func (m *UtxoSwapMutation) ResetSspIdentityPublicKey() {
+	m.ssp_identity_public_key = nil
+	delete(m.clearedFields, utxoswap.FieldSspIdentityPublicKey)
+}
+
+// SetUserSignature sets the "user_signature" field.
+func (m *UtxoSwapMutation) SetUserSignature(b []byte) {
+	m.user_signature = &b
+}
+
+// UserSignature returns the value of the "user_signature" field in the mutation.
+func (m *UtxoSwapMutation) UserSignature() (r []byte, exists bool) {
+	v := m.user_signature
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserSignature returns the old "user_signature" field's value of the UtxoSwap entity.
+// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoSwapMutation) OldUserSignature(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserSignature is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserSignature requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserSignature: %w", err)
+	}
+	return oldValue.UserSignature, nil
+}
+
+// ClearUserSignature clears the value of the "user_signature" field.
+func (m *UtxoSwapMutation) ClearUserSignature() {
+	m.user_signature = nil
+	m.clearedFields[utxoswap.FieldUserSignature] = struct{}{}
+}
+
+// UserSignatureCleared returns if the "user_signature" field was cleared in this mutation.
+func (m *UtxoSwapMutation) UserSignatureCleared() bool {
+	_, ok := m.clearedFields[utxoswap.FieldUserSignature]
+	return ok
+}
+
+// ResetUserSignature resets all changes to the "user_signature" field.
+func (m *UtxoSwapMutation) ResetUserSignature() {
+	m.user_signature = nil
+	delete(m.clearedFields, utxoswap.FieldUserSignature)
+}
+
+// SetUserIdentityPublicKey sets the "user_identity_public_key" field.
+func (m *UtxoSwapMutation) SetUserIdentityPublicKey(b []byte) {
+	m.user_identity_public_key = &b
+}
+
+// UserIdentityPublicKey returns the value of the "user_identity_public_key" field in the mutation.
+func (m *UtxoSwapMutation) UserIdentityPublicKey() (r []byte, exists bool) {
+	v := m.user_identity_public_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUserIdentityPublicKey returns the old "user_identity_public_key" field's value of the UtxoSwap entity.
+// If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UtxoSwapMutation) OldUserIdentityPublicKey(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUserIdentityPublicKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUserIdentityPublicKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUserIdentityPublicKey: %w", err)
+	}
+	return oldValue.UserIdentityPublicKey, nil
+}
+
+// ClearUserIdentityPublicKey clears the value of the "user_identity_public_key" field.
+func (m *UtxoSwapMutation) ClearUserIdentityPublicKey() {
+	m.user_identity_public_key = nil
+	m.clearedFields[utxoswap.FieldUserIdentityPublicKey] = struct{}{}
+}
+
+// UserIdentityPublicKeyCleared returns if the "user_identity_public_key" field was cleared in this mutation.
+func (m *UtxoSwapMutation) UserIdentityPublicKeyCleared() bool {
+	_, ok := m.clearedFields[utxoswap.FieldUserIdentityPublicKey]
+	return ok
+}
+
+// ResetUserIdentityPublicKey resets all changes to the "user_identity_public_key" field.
+func (m *UtxoSwapMutation) ResetUserIdentityPublicKey() {
+	m.user_identity_public_key = nil
+	delete(m.clearedFields, utxoswap.FieldUserIdentityPublicKey)
+}
+
+// SetUtxoID sets the "utxo" edge to the Utxo entity by id.
+func (m *UtxoSwapMutation) SetUtxoID(id uuid.UUID) {
+	m.utxo = &id
+}
+
+// ClearUtxo clears the "utxo" edge to the Utxo entity.
+func (m *UtxoSwapMutation) ClearUtxo() {
+	m.clearedutxo = true
+}
+
+// UtxoCleared reports if the "utxo" edge to the Utxo entity was cleared.
+func (m *UtxoSwapMutation) UtxoCleared() bool {
+	return m.clearedutxo
+}
+
+// UtxoID returns the "utxo" edge ID in the mutation.
+func (m *UtxoSwapMutation) UtxoID() (id uuid.UUID, exists bool) {
+	if m.utxo != nil {
+		return *m.utxo, true
+	}
+	return
+}
+
+// UtxoIDs returns the "utxo" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// UtxoID instead. It exists only for internal usage by the builders.
+func (m *UtxoSwapMutation) UtxoIDs() (ids []uuid.UUID) {
+	if id := m.utxo; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetUtxo resets all changes to the "utxo" edge.
+func (m *UtxoSwapMutation) ResetUtxo() {
+	m.utxo = nil
+	m.clearedutxo = false
+}
+
+// SetTransferID sets the "transfer" edge to the Transfer entity by id.
+func (m *UtxoSwapMutation) SetTransferID(id uuid.UUID) {
+	m.transfer = &id
+}
+
+// ClearTransfer clears the "transfer" edge to the Transfer entity.
+func (m *UtxoSwapMutation) ClearTransfer() {
+	m.clearedtransfer = true
+}
+
+// TransferCleared reports if the "transfer" edge to the Transfer entity was cleared.
+func (m *UtxoSwapMutation) TransferCleared() bool {
+	return m.clearedtransfer
+}
+
+// TransferID returns the "transfer" edge ID in the mutation.
+func (m *UtxoSwapMutation) TransferID() (id uuid.UUID, exists bool) {
+	if m.transfer != nil {
+		return *m.transfer, true
+	}
+	return
+}
+
+// TransferIDs returns the "transfer" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// TransferID instead. It exists only for internal usage by the builders.
+func (m *UtxoSwapMutation) TransferIDs() (ids []uuid.UUID) {
+	if id := m.transfer; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetTransfer resets all changes to the "transfer" edge.
+func (m *UtxoSwapMutation) ResetTransfer() {
+	m.transfer = nil
+	m.clearedtransfer = false
+}
+
+// Where appends a list predicates to the UtxoSwapMutation builder.
+func (m *UtxoSwapMutation) Where(ps ...predicate.UtxoSwap) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the UtxoSwapMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *UtxoSwapMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.UtxoSwap, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *UtxoSwapMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *UtxoSwapMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (UtxoSwap).
+func (m *UtxoSwapMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *UtxoSwapMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.create_time != nil {
+		fields = append(fields, utxoswap.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, utxoswap.FieldUpdateTime)
+	}
+	if m.status != nil {
+		fields = append(fields, utxoswap.FieldStatus)
+	}
+	if m.request_type != nil {
+		fields = append(fields, utxoswap.FieldRequestType)
+	}
+	if m.credit_amount_sats != nil {
+		fields = append(fields, utxoswap.FieldCreditAmountSats)
+	}
+	if m.max_fee_sats != nil {
+		fields = append(fields, utxoswap.FieldMaxFeeSats)
+	}
+	if m.ssp_signature != nil {
+		fields = append(fields, utxoswap.FieldSspSignature)
+	}
+	if m.ssp_identity_public_key != nil {
+		fields = append(fields, utxoswap.FieldSspIdentityPublicKey)
+	}
+	if m.user_signature != nil {
+		fields = append(fields, utxoswap.FieldUserSignature)
+	}
+	if m.user_identity_public_key != nil {
+		fields = append(fields, utxoswap.FieldUserIdentityPublicKey)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *UtxoSwapMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case utxoswap.FieldCreateTime:
+		return m.CreateTime()
+	case utxoswap.FieldUpdateTime:
+		return m.UpdateTime()
+	case utxoswap.FieldStatus:
+		return m.Status()
+	case utxoswap.FieldRequestType:
+		return m.RequestType()
+	case utxoswap.FieldCreditAmountSats:
+		return m.CreditAmountSats()
+	case utxoswap.FieldMaxFeeSats:
+		return m.MaxFeeSats()
+	case utxoswap.FieldSspSignature:
+		return m.SspSignature()
+	case utxoswap.FieldSspIdentityPublicKey:
+		return m.SspIdentityPublicKey()
+	case utxoswap.FieldUserSignature:
+		return m.UserSignature()
+	case utxoswap.FieldUserIdentityPublicKey:
+		return m.UserIdentityPublicKey()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *UtxoSwapMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case utxoswap.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case utxoswap.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case utxoswap.FieldStatus:
+		return m.OldStatus(ctx)
+	case utxoswap.FieldRequestType:
+		return m.OldRequestType(ctx)
+	case utxoswap.FieldCreditAmountSats:
+		return m.OldCreditAmountSats(ctx)
+	case utxoswap.FieldMaxFeeSats:
+		return m.OldMaxFeeSats(ctx)
+	case utxoswap.FieldSspSignature:
+		return m.OldSspSignature(ctx)
+	case utxoswap.FieldSspIdentityPublicKey:
+		return m.OldSspIdentityPublicKey(ctx)
+	case utxoswap.FieldUserSignature:
+		return m.OldUserSignature(ctx)
+	case utxoswap.FieldUserIdentityPublicKey:
+		return m.OldUserIdentityPublicKey(ctx)
+	}
+	return nil, fmt.Errorf("unknown UtxoSwap field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *UtxoSwapMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case utxoswap.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case utxoswap.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case utxoswap.FieldStatus:
+		v, ok := value.(schema.UtxoSwapStatus)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case utxoswap.FieldRequestType:
+		v, ok := value.(schema.UtxoSwapRequestType)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestType(v)
+		return nil
+	case utxoswap.FieldCreditAmountSats:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreditAmountSats(v)
+		return nil
+	case utxoswap.FieldMaxFeeSats:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMaxFeeSats(v)
+		return nil
+	case utxoswap.FieldSspSignature:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSspSignature(v)
+		return nil
+	case utxoswap.FieldSspIdentityPublicKey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSspIdentityPublicKey(v)
+		return nil
+	case utxoswap.FieldUserSignature:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserSignature(v)
+		return nil
+	case utxoswap.FieldUserIdentityPublicKey:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUserIdentityPublicKey(v)
+		return nil
+	}
+	return fmt.Errorf("unknown UtxoSwap field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *UtxoSwapMutation) AddedFields() []string {
+	var fields []string
+	if m.addcredit_amount_sats != nil {
+		fields = append(fields, utxoswap.FieldCreditAmountSats)
+	}
+	if m.addmax_fee_sats != nil {
+		fields = append(fields, utxoswap.FieldMaxFeeSats)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *UtxoSwapMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case utxoswap.FieldCreditAmountSats:
+		return m.AddedCreditAmountSats()
+	case utxoswap.FieldMaxFeeSats:
+		return m.AddedMaxFeeSats()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *UtxoSwapMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case utxoswap.FieldCreditAmountSats:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCreditAmountSats(v)
+		return nil
+	case utxoswap.FieldMaxFeeSats:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddMaxFeeSats(v)
+		return nil
+	}
+	return fmt.Errorf("unknown UtxoSwap numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *UtxoSwapMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(utxoswap.FieldCreditAmountSats) {
+		fields = append(fields, utxoswap.FieldCreditAmountSats)
+	}
+	if m.FieldCleared(utxoswap.FieldMaxFeeSats) {
+		fields = append(fields, utxoswap.FieldMaxFeeSats)
+	}
+	if m.FieldCleared(utxoswap.FieldSspSignature) {
+		fields = append(fields, utxoswap.FieldSspSignature)
+	}
+	if m.FieldCleared(utxoswap.FieldSspIdentityPublicKey) {
+		fields = append(fields, utxoswap.FieldSspIdentityPublicKey)
+	}
+	if m.FieldCleared(utxoswap.FieldUserSignature) {
+		fields = append(fields, utxoswap.FieldUserSignature)
+	}
+	if m.FieldCleared(utxoswap.FieldUserIdentityPublicKey) {
+		fields = append(fields, utxoswap.FieldUserIdentityPublicKey)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *UtxoSwapMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *UtxoSwapMutation) ClearField(name string) error {
+	switch name {
+	case utxoswap.FieldCreditAmountSats:
+		m.ClearCreditAmountSats()
+		return nil
+	case utxoswap.FieldMaxFeeSats:
+		m.ClearMaxFeeSats()
+		return nil
+	case utxoswap.FieldSspSignature:
+		m.ClearSspSignature()
+		return nil
+	case utxoswap.FieldSspIdentityPublicKey:
+		m.ClearSspIdentityPublicKey()
+		return nil
+	case utxoswap.FieldUserSignature:
+		m.ClearUserSignature()
+		return nil
+	case utxoswap.FieldUserIdentityPublicKey:
+		m.ClearUserIdentityPublicKey()
+		return nil
+	}
+	return fmt.Errorf("unknown UtxoSwap nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *UtxoSwapMutation) ResetField(name string) error {
+	switch name {
+	case utxoswap.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case utxoswap.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case utxoswap.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case utxoswap.FieldRequestType:
+		m.ResetRequestType()
+		return nil
+	case utxoswap.FieldCreditAmountSats:
+		m.ResetCreditAmountSats()
+		return nil
+	case utxoswap.FieldMaxFeeSats:
+		m.ResetMaxFeeSats()
+		return nil
+	case utxoswap.FieldSspSignature:
+		m.ResetSspSignature()
+		return nil
+	case utxoswap.FieldSspIdentityPublicKey:
+		m.ResetSspIdentityPublicKey()
+		return nil
+	case utxoswap.FieldUserSignature:
+		m.ResetUserSignature()
+		return nil
+	case utxoswap.FieldUserIdentityPublicKey:
+		m.ResetUserIdentityPublicKey()
+		return nil
+	}
+	return fmt.Errorf("unknown UtxoSwap field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *UtxoSwapMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.utxo != nil {
+		edges = append(edges, utxoswap.EdgeUtxo)
+	}
+	if m.transfer != nil {
+		edges = append(edges, utxoswap.EdgeTransfer)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *UtxoSwapMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case utxoswap.EdgeUtxo:
+		if id := m.utxo; id != nil {
+			return []ent.Value{*id}
+		}
+	case utxoswap.EdgeTransfer:
+		if id := m.transfer; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *UtxoSwapMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *UtxoSwapMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *UtxoSwapMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedutxo {
+		edges = append(edges, utxoswap.EdgeUtxo)
+	}
+	if m.clearedtransfer {
+		edges = append(edges, utxoswap.EdgeTransfer)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *UtxoSwapMutation) EdgeCleared(name string) bool {
+	switch name {
+	case utxoswap.EdgeUtxo:
+		return m.clearedutxo
+	case utxoswap.EdgeTransfer:
+		return m.clearedtransfer
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *UtxoSwapMutation) ClearEdge(name string) error {
+	switch name {
+	case utxoswap.EdgeUtxo:
+		m.ClearUtxo()
+		return nil
+	case utxoswap.EdgeTransfer:
+		m.ClearTransfer()
+		return nil
+	}
+	return fmt.Errorf("unknown UtxoSwap unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *UtxoSwapMutation) ResetEdge(name string) error {
+	switch name {
+	case utxoswap.EdgeUtxo:
+		m.ResetUtxo()
+		return nil
+	case utxoswap.EdgeTransfer:
+		m.ResetTransfer()
+		return nil
+	}
+	return fmt.Errorf("unknown UtxoSwap edge %s", name)
 }

@@ -69,6 +69,11 @@ service SparkService {
     rpc query_unused_deposit_addresses(QueryUnusedDepositAddressesRequest) returns (QueryUnusedDepositAddressesResponse) {}
 
     rpc subscribe_to_events(SubscribeToEventsRequest) returns (stream SubscribeToEventsResponse) {} 
+
+    // Claim a deposit to a static address from SSP side
+    rpc initiate_utxo_swap(InitiateUtxoSwapRequest) returns (InitiateUtxoSwapResponse) {}
+
+    rpc exit_single_node_trees(ExitSingleNodeTreesRequest) returns (ExitSingleNodeTreesResponse) {}
 }
 
 message SubscribeToEventsRequest {
@@ -167,12 +172,14 @@ message GenerateDepositAddressResponse {
  * can create the tree first and the broadcast the transaction.
  */
 message UTXO {
-    // The raw transaction of the utxo.
+    // The raw transaction of the utxo (optional).
     bytes raw_tx = 1;
-    // The vout of the raw transaction for the utxo, which will be used to create the tree.
+    // The vout of the raw transaction for the utxo, which will be used to create the tree. Required.
     uint32 vout = 2;
-    // The network of the bitcoin network.
+    // The network of the bitcoin network. Required.
     Network network = 3 [(validate.rules).enum = {not_in: [0]}];
+    // Transaction ID. Required, but older code may not provide it.
+    bytes txid = 4;
 }
 
 /**
@@ -358,6 +365,10 @@ enum TokenTransactionStatus {
     TOKEN_TRANSACTION_STARTED = 0; 
     TOKEN_TRANSACTION_SIGNED = 1; 
     TOKEN_TRANSACTION_FINALIZED = 2;
+    TOKEN_TRANSACTION_STARTED_CANCELLED = 3;
+    TOKEN_TRANSACTION_SIGNED_CANCELLED = 4;
+
+    TOKEN_TRANSACTION_UNKNOWN = 10;
 }
 
 message TokenTransactionWithStatus {
@@ -600,14 +611,35 @@ message StartUserSignedTransferRequest {
 message StartTransferRequest {
     string transfer_id = 1;
     bytes owner_identity_public_key = 2;
-    repeated LeafRefundTxSigningJob leaves_to_send = 3;
+    repeated LeafRefundTxSigningJob leaves_to_send = 3 [deprecated = true];
     bytes receiver_identity_public_key = 4;
     google.protobuf.Timestamp expiry_time = 5;
-    map<string, SecretProof> key_tweak_proofs = 6;
+    map<string, SecretProof> key_tweak_proofs = 6 [deprecated = true];
+    // If this field is set, the leaves_to_send and key_tweak_proofs will be ignored.
+    TransferPackage transfer_package = 7;
 }
+
 message StartTransferResponse {
     Transfer transfer = 1;
     repeated LeafRefundTxSigningResult signing_results = 2;
+}
+
+/**
+ * TransferPackage is a package of leaves to send and key tweaks to send.
+ * This is in the improved send transfer flow where the sender can send the transfer in one call to
+ * the coordinator SO.
+ */
+message TransferPackage {
+    // The leaves to send, with user signed refunds and signing package.
+    repeated UserSignedTxSigningJob leaves_to_send = 1;
+    // The map of SO identifier to ciphertext of SendLeafTweaks.
+    map<string, bytes> key_tweak_package = 2;
+    // The signature of user to prove that the key_tweak_package is not tampered.
+    bytes user_signature = 3;
+}
+
+message SendLeafKeyTweaks {
+    repeated SendLeafKeyTweak leaves_to_send = 1;
 }
 
 message SendLeafKeyTweak {
@@ -639,12 +671,16 @@ enum TransferStatus {
     TRANSFER_STATUS_COMPLETED = 5;
     TRANSFER_STATUS_EXPIRED = 6;
     TRANSFER_STATUS_RETURNED = 7;
+    TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR = 8;
+    TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED = 9;
+    TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED = 10;
 }
 
 enum TransferType {
     PREIMAGE_SWAP = 0;
     COOPERATIVE_EXIT = 1;
     TRANSFER = 2;
+    UTXO_SWAP = 3;
     SWAP = 30;
     COUNTER_SWAP = 40;
 }
@@ -951,10 +987,13 @@ message QueryNodesRequest {
         TreeNodeIds node_ids = 2;
     }
     bool include_parents = 3;
+    int64 limit = 4;
+    int64 offset = 5;
 }
 
 message QueryNodesResponse {
     map<string, TreeNode> nodes = 1;
+    int64 offset = 2;
 }
 
 message CancelTransferRequest {
@@ -996,4 +1035,53 @@ message QueryBalanceResponse {
 
 message SparkAddress {
     bytes identity_public_key = 1;
+}
+
+/**
+ * Static deposit address flow messages
+ *
+**/
+enum UtxoSwapRequestType {
+  Fixed = 0;
+  MaxFee = 1;
+}
+
+message InitiateUtxoSwapRequest {
+    UTXO on_chain_utxo = 1;
+    UtxoSwapRequestType request_type = 2;
+    oneof amount {
+        uint64 credit_amount_sats = 3;
+        uint64 max_fee_sats = 4;
+    }
+    bytes ssp_signature = 5;
+    bytes user_signature = 6;
+    StartUserSignedTransferRequest transfer = 7;
+    SigningJob spend_tx_signing_job = 8;
+}
+
+message InitiateUtxoSwapResponse {
+    SigningResult spend_tx_signing_result = 1;
+    Transfer transfer = 2;
+    DepositAddressQueryResult deposit_address = 3;
+}
+
+
+message ExitSingleNodeTreeSigningJob {
+    string tree_id = 1;
+    SigningJob signing_job = 2;
+}
+
+message ExitSingleNodeTreeSigningResult {
+    string tree_id = 1;
+    SigningResult signing_result = 2;
+    bytes verifying_key = 3;
+}
+
+message ExitSingleNodeTreesRequest {
+    bytes owner_identity_public_key = 1;
+    repeated ExitSingleNodeTreeSigningJob signing_jobs = 2;
+}
+
+message ExitSingleNodeTreesResponse {
+    repeated ExitSingleNodeTreeSigningResult signing_results = 1;
 }

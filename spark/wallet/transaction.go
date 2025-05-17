@@ -11,20 +11,20 @@ import (
 	"github.com/lightsparkdev/spark/common"
 )
 
-func ephemeralAnchorOutput() *wire.TxOut {
-	return wire.NewTxOut(0, []byte{txscript.OP_TRUE})
+func EphemeralAnchorOutput() *wire.TxOut {
+	return wire.NewTxOut(0, []byte{txscript.OP_TRUE, 0x02, 0x4e, 0x73})
 }
 
 func createRootTx(
 	depositOutPoint *wire.OutPoint,
 	depositTxOut *wire.TxOut,
 ) *wire.MsgTx {
-	rootTx := wire.NewMsgTx(2)
+	rootTx := wire.NewMsgTx(3)
 	rootTx.AddTxIn(wire.NewTxIn(depositOutPoint, nil, nil))
 	// We currently send the full value to the same address
 	// TODO: 0 fee will only be okay once we add ephemeral anchor outputs
 	rootTx.AddTxOut(depositTxOut)
-	rootTx.AddTxOut(ephemeralAnchorOutput())
+	rootTx.AddTxOut(EphemeralAnchorOutput())
 	return rootTx
 }
 
@@ -32,12 +32,12 @@ func createSplitTx(
 	parentOutPoint *wire.OutPoint,
 	childTxOuts []*wire.TxOut,
 ) *wire.MsgTx {
-	splitTx := wire.NewMsgTx(2)
+	splitTx := wire.NewMsgTx(3)
 	splitTx.AddTxIn(wire.NewTxIn(parentOutPoint, nil, nil))
 	for _, txOut := range childTxOuts {
 		splitTx.AddTxOut(txOut)
 	}
-	splitTx.AddTxOut(ephemeralAnchorOutput())
+	splitTx.AddTxOut(EphemeralAnchorOutput())
 	return splitTx
 }
 
@@ -48,10 +48,10 @@ func createNodeTx(
 	parentOutPoint *wire.OutPoint,
 	txOut *wire.TxOut,
 ) *wire.MsgTx {
-	newNodeTx := wire.NewMsgTx(2)
+	newNodeTx := wire.NewMsgTx(3)
 	newNodeTx.AddTxIn(wire.NewTxIn(parentOutPoint, nil, nil))
 	newNodeTx.AddTxOut(txOut)
-	newNodeTx.AddTxOut(ephemeralAnchorOutput())
+	newNodeTx.AddTxOut(EphemeralAnchorOutput())
 	return newNodeTx
 }
 
@@ -66,7 +66,7 @@ func createLeafNodeTx(
 	parentOutPoint *wire.OutPoint,
 	txOut *wire.TxOut,
 ) *wire.MsgTx {
-	newLeafTx := wire.NewMsgTx(2)
+	newLeafTx := wire.NewMsgTx(3)
 	newLeafTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: *parentOutPoint,
 		SignatureScript:  nil,
@@ -74,18 +74,20 @@ func createLeafNodeTx(
 		Sequence:         sequence,
 	})
 	newLeafTx.AddTxOut(txOut)
-	newLeafTx.AddTxOut(ephemeralAnchorOutput())
+	newLeafTx.AddTxOut(EphemeralAnchorOutput())
 	return newLeafTx
 }
 
-func createRefundTx(
+func createRefundTxs(
 	sequence uint32,
 	nodeOutPoint *wire.OutPoint,
 	amountSats int64,
 	receivingPubkey *secp256k1.PublicKey,
-) (*wire.MsgTx, error) {
-	newRefundTx := wire.NewMsgTx(2)
-	newRefundTx.AddTxIn(&wire.TxIn{
+	shouldCalculateFee bool,
+) (*wire.MsgTx, *wire.MsgTx, error) {
+	// Create CPFP-friendly refund tx (with ephemeral anchor, no fee)
+	cpfpRefundTx := wire.NewMsgTx(3)
+	cpfpRefundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: *nodeOutPoint,
 		SignatureScript:  nil,
 		Witness:          nil,
@@ -94,12 +96,32 @@ func createRefundTx(
 
 	refundPkScript, err := common.P2TRScriptFromPubKey(receivingPubkey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create refund pkscript: %v", err)
+		return nil, nil, fmt.Errorf("failed to create refund pkscript: %v", err)
 	}
-	newRefundTx.AddTxOut(wire.NewTxOut(amountSats, refundPkScript))
-	newRefundTx.AddTxOut(ephemeralAnchorOutput())
+	cpfpRefundTx.AddTxOut(wire.NewTxOut(amountSats, refundPkScript))
+	cpfpRefundTx.AddTxOut(EphemeralAnchorOutput())
 
-	return newRefundTx, nil
+	// Create direct refund tx (with fee, no anchor)
+	directRefundTx := wire.NewMsgTx(3)
+	directRefundTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: *nodeOutPoint,
+		SignatureScript:  nil,
+		Witness:          nil,
+		Sequence:         sequence,
+	})
+
+	outputAmount := amountSats
+	if shouldCalculateFee {
+		estimatedTxSize := int64(123)
+		satsPerVbyte := int64(5)
+		feeSats := estimatedTxSize * satsPerVbyte
+		if amountSats > feeSats {
+			outputAmount = amountSats - feeSats
+		}
+	}
+	directRefundTx.AddTxOut(wire.NewTxOut(outputAmount, refundPkScript))
+
+	return cpfpRefundTx, directRefundTx, nil
 }
 
 func createConnectorRefundTransaction(
@@ -109,7 +131,7 @@ func createConnectorRefundTransaction(
 	amountSats int64,
 	receiverPubKey *secp256k1.PublicKey,
 ) (*wire.MsgTx, error) {
-	refundTx := wire.NewMsgTx(2)
+	refundTx := wire.NewMsgTx(3)
 	refundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: *nodeOutPoint,
 		SignatureScript:  nil,
@@ -122,6 +144,6 @@ func createConnectorRefundTransaction(
 		return nil, fmt.Errorf("failed to create receiver script: %v", err)
 	}
 	refundTx.AddTxOut(wire.NewTxOut(amountSats, receiverScript))
-	refundTx.AddTxOut(ephemeralAnchorOutput())
+	refundTx.AddTxOut(EphemeralAnchorOutput())
 	return refundTx, nil
 }

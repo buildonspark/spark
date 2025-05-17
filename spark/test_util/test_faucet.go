@@ -15,6 +15,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/wallet"
 )
 
 var (
@@ -236,7 +237,7 @@ func (f *Faucet) Refill() error {
 		if err != nil {
 			return err
 		}
-		fundingTx = wire.NewMsgTx(2)
+		fundingTx = wire.NewMsgTx(3)
 		txBytes, err := hex.DecodeString(block.Tx[0].Hex)
 		if err != nil {
 			return err
@@ -254,7 +255,7 @@ func (f *Faucet) Refill() error {
 		}
 	}
 
-	splitTx := wire.NewMsgTx(2)
+	splitTx := wire.NewMsgTx(3)
 	var fundingOutPoint *wire.OutPoint
 	if selectedUTXO != nil {
 		txHash, err := chainhash.NewHashFromStr(selectedUTXO.TxID)
@@ -330,7 +331,7 @@ func SignFaucetCoin(unsignedTx *wire.MsgTx, spendingTxOut *wire.TxOut, key *secp
 	fakeTapscriptRootHash := []byte{}
 	sig, err := txscript.RawTxInTaprootSignature(
 		unsignedTx, sighashes, 0, spendingTxOut.Value, spendingTxOut.PkScript,
-		fakeTapscriptRootHash, txscript.SigHashDefault, key,
+		fakeTapscriptRootHash, txscript.SigHashAll, key,
 	)
 	if err != nil {
 		return nil, err
@@ -351,10 +352,53 @@ func SignFaucetCoin(unsignedTx *wire.MsgTx, spendingTxOut *wire.TxOut, key *secp
 		return nil, err
 	}
 
-	err = common.VerifySignature(signedTx, 0, spendingTxOut)
+	err = common.VerifySignatureSingleInput(signedTx, 0, spendingTxOut)
 	if err != nil {
 		return nil, err
 	}
 
 	return signedTx, nil
+}
+
+func SignFaucetCoinFeeBump(anchorOutPoint *wire.OutPoint, coin FaucetCoin, outputScript []byte) (*wire.MsgTx, error) {
+	feeBumpTx := wire.NewMsgTx(3)
+	feeBumpTx.AddTxIn(wire.NewTxIn(coin.OutPoint, nil, nil))
+	feeBumpTx.AddTxIn(wire.NewTxIn(anchorOutPoint, nil, nil))
+	feeBumpTx.AddTxOut(wire.NewTxOut(coin.TxOut.Value*90/100, outputScript))
+
+	prevOuts := make(map[wire.OutPoint]*wire.TxOut)
+	prevOuts[*coin.OutPoint] = coin.TxOut
+	prevOuts[*anchorOutPoint] = wallet.EphemeralAnchorOutput()
+	prevOutputFetcher := txscript.NewMultiPrevOutFetcher(prevOuts)
+	sighashes := txscript.NewTxSigHashes(feeBumpTx, prevOutputFetcher)
+	fakeTapscriptRootHash := []byte{}
+	sig, err := txscript.RawTxInTaprootSignature(
+		feeBumpTx, sighashes, 0, coin.TxOut.Value, coin.TxOut.PkScript,
+		fakeTapscriptRootHash, txscript.SigHashDefault, coin.Key,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign fee bump tx: %w", err)
+	}
+
+	var signedTxBuf bytes.Buffer
+	err = feeBumpTx.Serialize(&signedTxBuf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize fee bump tx: %w", err)
+	}
+
+	signedTxBytes, err := common.UpdateTxWithSignature(signedTxBuf.Bytes(), 0, sig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update fee bump tx with signature: %w", err)
+	}
+	signedFeeBumpTx, err := common.TxFromRawTxBytes(signedTxBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse fee bump tx: %w", err)
+	}
+
+	err = common.VerifySignatureMultiInput(signedFeeBumpTx, prevOutputFetcher)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify fee bump tx: %w", err)
+	}
+
+	return signedFeeBumpTx, nil
 }

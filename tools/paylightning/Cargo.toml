@@ -1,8 +1,0 @@
-[package]
-name = "paylightning"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-lightspark = "0.10.1"
-tokio = { version = "1.43.0", features = ["full"] }

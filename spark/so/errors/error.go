@@ -80,3 +80,7 @@ func InvalidUserInputErrorf(format string, args ...any) error {
 func FailedPreconditionErrorf(format string, args ...any) error {
 	return newGRPCError(codes.FailedPrecondition, fmt.Errorf(format, args...))
 }
+
+func NotFoundErrorf(format string, args ...any) error {
+	return newGRPCError(codes.NotFound, fmt.Errorf(format, args...))
+}

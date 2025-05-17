@@ -35,6 +35,10 @@ const (
 	FieldIsStatic = "is_static"
 	// EdgeSigningKeyshare holds the string denoting the signing_keyshare edge name in mutations.
 	EdgeSigningKeyshare = "signing_keyshare"
+	// EdgeUtxo holds the string denoting the utxo edge name in mutations.
+	EdgeUtxo = "utxo"
+	// EdgeUtxoswaps holds the string denoting the utxoswaps edge name in mutations.
+	EdgeUtxoswaps = "utxoswaps"
 	// Table holds the table name of the depositaddress in the database.
 	Table = "deposit_addresses"
 	// SigningKeyshareTable is the table that holds the signing_keyshare relation/edge.
@@ -44,6 +48,20 @@ const (
 	SigningKeyshareInverseTable = "signing_keyshares"
 	// SigningKeyshareColumn is the table column denoting the signing_keyshare relation/edge.
 	SigningKeyshareColumn = "deposit_address_signing_keyshare"
+	// UtxoTable is the table that holds the utxo relation/edge.
+	UtxoTable = "utxos"
+	// UtxoInverseTable is the table name for the Utxo entity.
+	// It exists in this package in order to avoid circular dependency with the "utxo" package.
+	UtxoInverseTable = "utxos"
+	// UtxoColumn is the table column denoting the utxo relation/edge.
+	UtxoColumn = "deposit_address_utxo"
+	// UtxoswapsTable is the table that holds the utxoswaps relation/edge.
+	UtxoswapsTable = "utxo_swaps"
+	// UtxoswapsInverseTable is the table name for the UtxoSwap entity.
+	// It exists in this package in order to avoid circular dependency with the "utxoswap" package.
+	UtxoswapsInverseTable = "utxo_swaps"
+	// UtxoswapsColumn is the table column denoting the utxoswaps relation/edge.
+	UtxoswapsColumn = "deposit_address_utxoswaps"
 )
 
 // Columns holds all SQL columns for depositaddress fields.
@@ -149,10 +167,52 @@ func BySigningKeyshareField(field string, opts ...sql.OrderTermOption) OrderOpti
 		sqlgraph.OrderByNeighborTerms(s, newSigningKeyshareStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByUtxoCount orders the results by utxo count.
+func ByUtxoCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newUtxoStep(), opts...)
+	}
+}
+
+// ByUtxo orders the results by utxo terms.
+func ByUtxo(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newUtxoStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByUtxoswapsCount orders the results by utxoswaps count.
+func ByUtxoswapsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newUtxoswapsStep(), opts...)
+	}
+}
+
+// ByUtxoswaps orders the results by utxoswaps terms.
+func ByUtxoswaps(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newUtxoswapsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newSigningKeyshareStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(SigningKeyshareInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, false, SigningKeyshareTable, SigningKeyshareColumn),
+	)
+}
+func newUtxoStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(UtxoInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, UtxoTable, UtxoColumn),
+	)
+}
+func newUtxoswapsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(UtxoswapsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, UtxoswapsTable, UtxoswapsColumn),
 	)
 }

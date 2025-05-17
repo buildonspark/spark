@@ -3,14 +3,14 @@
 
 import UserRequest from './UserRequest.js';
 import Entity from './Entity.js';
-import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import Transfer from './Transfer.js';
 import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
-import {TransferFromJson} from './Transfer.js';
-import {CurrencyAmountToJson} from './CurrencyAmount.js';
 import CurrencyAmount from './CurrencyAmount.js';
-import { Query, isObject } from '@lightsparkdev/core';
+import {CurrencyAmountFromJson} from './CurrencyAmount.js';
+import {TransferFromJson} from './Transfer.js';
 import BitcoinNetwork from './BitcoinNetwork.js';
+import { Query, isObject } from '@lightsparkdev/core';
+import type Transfer from './Transfer.js';
+import {CurrencyAmountToJson} from './CurrencyAmount.js';
 
 
 interface CoopExitRequest {
@@ -46,6 +46,9 @@ expiresAt: string;
     /** The raw connector transaction. **/
 rawConnectorTransaction: string;
 
+    /** The raw coop exit L1 transaction. **/
+rawCoopExitTransaction: string;
+
     /** The transaction id of the coop exit transaction. **/
 coopExitTxid: string;
 
@@ -70,6 +73,7 @@ export const CoopExitRequestFromJson = (obj: any): CoopExitRequest => {
         status: SparkCoopExitRequestStatus[obj["coop_exit_request_status"]] ?? SparkCoopExitRequestStatus.FUTURE_VALUE,
         expiresAt: obj["coop_exit_request_expires_at"],
         rawConnectorTransaction: obj["coop_exit_request_raw_connector_transaction"],
+        rawCoopExitTransaction: obj["coop_exit_request_raw_coop_exit_transaction"],
         coopExitTxid: obj["coop_exit_request_coop_exit_txid"],
 typename: "CoopExitRequest",        transfer: (!!obj["coop_exit_request_transfer"] ? TransferFromJson(obj["coop_exit_request_transfer"]) : undefined),
 
@@ -86,6 +90,7 @@ coop_exit_request_fee: CurrencyAmountToJson(obj.fee),
 coop_exit_request_status: obj.status,
 coop_exit_request_expires_at: obj.expiresAt,
 coop_exit_request_raw_connector_transaction: obj.rawConnectorTransaction,
+coop_exit_request_raw_coop_exit_transaction: obj.rawCoopExitTransaction,
 coop_exit_request_coop_exit_txid: obj.coopExitTxid,
 coop_exit_request_transfer: (obj.transfer ? obj.transfer.toJson() : undefined),
 
@@ -112,6 +117,7 @@ fragment CoopExitRequestFragment on CoopExitRequest {
     coop_exit_request_status: status
     coop_exit_request_expires_at: expires_at
     coop_exit_request_raw_connector_transaction: raw_connector_transaction
+    coop_exit_request_raw_coop_exit_transaction: raw_coop_exit_transaction
     coop_exit_request_coop_exit_txid: coop_exit_txid
     coop_exit_request_transfer: transfer {
         __typename

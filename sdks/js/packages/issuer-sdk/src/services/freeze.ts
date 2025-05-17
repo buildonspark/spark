@@ -75,7 +75,7 @@ export class TokenFreezeService {
           };
         } catch (error) {
           throw new NetworkError(
-            "Failed to send a freeze/unfreeze operation",
+            `Failed to send a freeze/unfreeze operation for token: ${tokenPublicKey.toString()} at operator: ${operator.address}`,
             {
               operation: "freeze_tokens",
               errorCount: 1,

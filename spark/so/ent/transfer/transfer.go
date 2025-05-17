@@ -90,7 +90,7 @@ var (
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schema.TransferStatus) error {
 	switch s {
-	case "SENDER_INITIATED", "SENDER_KEY_TWEAK_PENDING", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED", "RETURNED":
+	case "SENDER_INITIATED", "SENDER_INITIATED_COORDINATOR", "SENDER_KEY_TWEAK_PENDING", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED", "RETURNED", "RECEIVER_KEY_TWEAK_APPLIED":
 		return nil
 	default:
 		return fmt.Errorf("transfer: invalid enum value for status field: %q", s)
@@ -100,7 +100,7 @@ func StatusValidator(s schema.TransferStatus) error {
 // TypeValidator is a validator for the "type" field enum values. It is called by the builders before save.
 func TypeValidator(_type schema.TransferType) error {
 	switch _type {
-	case "PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP":
+	case "PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP", "UTXO_SWAP":
 		return nil
 	default:
 		return fmt.Errorf("transfer: invalid enum value for type field: %q", _type)

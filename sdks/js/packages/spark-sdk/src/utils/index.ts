@@ -9,4 +9,3 @@ export * from "./secret-sharing.js";
 export * from "./signing.js";
 export * from "./token-transactions.js";
 export * from "./transaction.js";
-export * from "./wasm.js";

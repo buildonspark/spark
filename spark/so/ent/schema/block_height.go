@@ -30,8 +30,9 @@ func (n Network) MarshalProto() (pb.Network, error) {
 		return pb.Network_TESTNET, nil
 	case NetworkSignet:
 		return pb.Network_SIGNET, nil
+	default:
+		return pb.Network_UNSPECIFIED, fmt.Errorf("unknown network: %s", n)
 	}
-	return pb.Network_UNSPECIFIED, fmt.Errorf("unknown network: %s", n)
 }
 
 // UnmarshalProto converts a spark protobuf Network to a Network.

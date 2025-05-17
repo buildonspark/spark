@@ -321,7 +321,7 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED_STARTED", "CREATED_SIGNED", "CREATED_SIGNED_CANCELLED", "CREATED_FINALIZED", "SPENT_STARTED", "SPENT_SIGNED", "SPENT_FINALIZED"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED_STARTED", "CREATED_STARTED_CANCELLED", "CREATED_SIGNED", "CREATED_SIGNED_CANCELLED", "CREATED_FINALIZED", "SPENT_STARTED", "SPENT_SIGNED", "SPENT_FINALIZED"}},
 		{Name: "owner_public_key", Type: field.TypeBytes},
 		{Name: "withdraw_bond_sats", Type: field.TypeUint64},
 		{Name: "withdraw_relative_block_locktime", Type: field.TypeUint64},
@@ -385,7 +385,8 @@ var (
 		{Name: "partial_token_transaction_hash", Type: field.TypeBytes},
 		{Name: "finalized_token_transaction_hash", Type: field.TypeBytes, Unique: true},
 		{Name: "operator_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
-		{Name: "status", Type: field.TypeEnum, Nullable: true, Enums: []string{"STARTED", "SIGNED", "SIGNED_CANCELLED", "FINALIZED"}},
+		{Name: "status", Type: field.TypeEnum, Nullable: true, Enums: []string{"STARTED", "STARTED_CANCELLED", "SIGNED", "SIGNED_CANCELLED", "FINALIZED"}},
+		{Name: "expiry_time", Type: field.TypeTime, Nullable: true},
 		{Name: "coordinator_public_key", Type: field.TypeBytes, Nullable: true},
 		{Name: "token_transaction_mint", Type: field.TypeUUID, Nullable: true},
 	}
@@ -397,7 +398,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "token_transactions_token_mints_mint",
-				Columns:    []*schema.Column{TokenTransactionsColumns[8]},
+				Columns:    []*schema.Column{TokenTransactionsColumns[9]},
 				RefColumns: []*schema.Column{TokenMintsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -423,7 +424,7 @@ var (
 		{Name: "partial_token_transaction_hash", Type: field.TypeBytes},
 		{Name: "finalized_token_transaction_hash", Type: field.TypeBytes, Unique: true},
 		{Name: "operator_signature", Type: field.TypeBytes, Unique: true, Nullable: true},
-		{Name: "status", Type: field.TypeEnum, Nullable: true, Enums: []string{"STARTED", "SIGNED", "SIGNED_CANCELLED", "FINALIZED"}},
+		{Name: "status", Type: field.TypeEnum, Nullable: true, Enums: []string{"STARTED", "STARTED_CANCELLED", "SIGNED", "SIGNED_CANCELLED", "FINALIZED"}},
 		{Name: "token_transaction_receipt_mint", Type: field.TypeUUID, Nullable: true},
 	}
 	// TokenTransactionReceiptsTable holds the schema information for the "token_transaction_receipts" table.
@@ -455,8 +456,8 @@ var (
 		{Name: "sender_identity_pubkey", Type: field.TypeBytes},
 		{Name: "receiver_identity_pubkey", Type: field.TypeBytes},
 		{Name: "total_value", Type: field.TypeUint64},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"SENDER_INITIATED", "SENDER_KEY_TWEAK_PENDING", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED", "RETURNED"}},
-		{Name: "type", Type: field.TypeEnum, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"SENDER_INITIATED", "SENDER_INITIATED_COORDINATOR", "SENDER_KEY_TWEAK_PENDING", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED", "RETURNED", "RECEIVER_KEY_TWEAK_APPLIED"}},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP", "UTXO_SWAP"}},
 		{Name: "expiry_time", Type: field.TypeTime},
 		{Name: "completion_time", Type: field.TypeTime, Nullable: true},
 	}
@@ -591,6 +592,9 @@ var (
 		{Name: "raw_tx", Type: field.TypeBytes},
 		{Name: "vout", Type: field.TypeInt16},
 		{Name: "raw_refund_tx", Type: field.TypeBytes, Nullable: true},
+		{Name: "node_confirmation_height", Type: field.TypeUint64, Nullable: true},
+		{Name: "refund_confirmation_height", Type: field.TypeUint64, Nullable: true},
+		{Name: "direct_refund_tx", Type: field.TypeBytes, Nullable: true},
 		{Name: "tree_node_tree", Type: field.TypeUUID},
 		{Name: "tree_node_parent", Type: field.TypeUUID, Nullable: true},
 		{Name: "tree_node_signing_keyshare", Type: field.TypeUUID},
@@ -603,19 +607,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "tree_nodes_trees_tree",
-				Columns:    []*schema.Column{TreeNodesColumns[11]},
+				Columns:    []*schema.Column{TreeNodesColumns[14]},
 				RefColumns: []*schema.Column{TreesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "tree_nodes_tree_nodes_parent",
-				Columns:    []*schema.Column{TreeNodesColumns[12]},
+				Columns:    []*schema.Column{TreeNodesColumns[15]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "tree_nodes_signing_keyshares_signing_keyshare",
-				Columns:    []*schema.Column{TreeNodesColumns[13]},
+				Columns:    []*schema.Column{TreeNodesColumns[16]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -624,17 +628,17 @@ var (
 			{
 				Name:    "treenode_tree_node_parent",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[12]},
+				Columns: []*schema.Column{TreeNodesColumns[15]},
 			},
 			{
 				Name:    "treenode_tree_node_tree",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[11]},
+				Columns: []*schema.Column{TreeNodesColumns[14]},
 			},
 			{
 				Name:    "treenode_tree_node_signing_keyshare",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[13]},
+				Columns: []*schema.Column{TreeNodesColumns[16]},
 			},
 			{
 				Name:    "treenode_owner_identity_pubkey",
@@ -645,6 +649,21 @@ var (
 				Name:    "treenode_owner_identity_pubkey_status",
 				Unique:  false,
 				Columns: []*schema.Column{TreeNodesColumns[6], TreeNodesColumns[4]},
+			},
+			{
+				Name:    "treenode_node_confirmation_height",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[11]},
+			},
+			{
+				Name:    "treenode_refund_confirmation_height",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[12]},
+			},
+			{
+				Name:    "treenode_update_time",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[2]},
 			},
 		},
 	}
@@ -680,6 +699,90 @@ var (
 			},
 		},
 	}
+	// UtxosColumns holds the columns for the "utxos" table.
+	UtxosColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "block_height", Type: field.TypeInt64},
+		{Name: "txid", Type: field.TypeBytes},
+		{Name: "vout", Type: field.TypeUint32},
+		{Name: "amount", Type: field.TypeUint64},
+		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "pk_script", Type: field.TypeBytes},
+		{Name: "deposit_address_utxo", Type: field.TypeUUID},
+	}
+	// UtxosTable holds the schema information for the "utxos" table.
+	UtxosTable = &schema.Table{
+		Name:       "utxos",
+		Columns:    UtxosColumns,
+		PrimaryKey: []*schema.Column{UtxosColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "utxos_deposit_addresses_utxo",
+				Columns:    []*schema.Column{UtxosColumns[9]},
+				RefColumns: []*schema.Column{DepositAddressesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "utxo_network_txid_vout",
+				Unique:  true,
+				Columns: []*schema.Column{UtxosColumns[7], UtxosColumns[4], UtxosColumns[5]},
+			},
+		},
+	}
+	// UtxoSwapsColumns holds the columns for the "utxo_swaps" table.
+	UtxoSwapsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED", "CANCELLED"}},
+		{Name: "request_type", Type: field.TypeEnum, Enums: []string{"FIXED_AMOUNT", "MAX_FEE"}},
+		{Name: "credit_amount_sats", Type: field.TypeUint64, Nullable: true},
+		{Name: "max_fee_sats", Type: field.TypeUint64, Nullable: true},
+		{Name: "ssp_signature", Type: field.TypeBytes, Nullable: true},
+		{Name: "ssp_identity_public_key", Type: field.TypeBytes, Nullable: true},
+		{Name: "user_signature", Type: field.TypeBytes, Nullable: true},
+		{Name: "user_identity_public_key", Type: field.TypeBytes, Nullable: true},
+		{Name: "deposit_address_utxoswaps", Type: field.TypeUUID, Nullable: true},
+		{Name: "utxo_swap_utxo", Type: field.TypeUUID},
+		{Name: "utxo_swap_transfer", Type: field.TypeUUID, Nullable: true},
+	}
+	// UtxoSwapsTable holds the schema information for the "utxo_swaps" table.
+	UtxoSwapsTable = &schema.Table{
+		Name:       "utxo_swaps",
+		Columns:    UtxoSwapsColumns,
+		PrimaryKey: []*schema.Column{UtxoSwapsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "utxo_swaps_deposit_addresses_utxoswaps",
+				Columns:    []*schema.Column{UtxoSwapsColumns[11]},
+				RefColumns: []*schema.Column{DepositAddressesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "utxo_swaps_utxos_utxo",
+				Columns:    []*schema.Column{UtxoSwapsColumns[12]},
+				RefColumns: []*schema.Column{UtxosColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "utxo_swaps_transfers_transfer",
+				Columns:    []*schema.Column{UtxoSwapsColumns[13]},
+				RefColumns: []*schema.Column{TransfersColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "utxoswap_utxo_swap_utxo",
+				Unique:  true,
+				Columns: []*schema.Column{UtxoSwapsColumns[12]},
+			},
+		},
+	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		BlockHeightsTable,
@@ -700,6 +803,8 @@ var (
 		TreesTable,
 		TreeNodesTable,
 		UserSignedTransactionsTable,
+		UtxosTable,
+		UtxoSwapsTable,
 	}
 )
 
@@ -724,4 +829,8 @@ func init() {
 	TreeNodesTable.ForeignKeys[2].RefTable = SigningKeysharesTable
 	UserSignedTransactionsTable.ForeignKeys[0].RefTable = TreeNodesTable
 	UserSignedTransactionsTable.ForeignKeys[1].RefTable = PreimageRequestsTable
+	UtxosTable.ForeignKeys[0].RefTable = DepositAddressesTable
+	UtxoSwapsTable.ForeignKeys[0].RefTable = DepositAddressesTable
+	UtxoSwapsTable.ForeignKeys[1].RefTable = UtxosTable
+	UtxoSwapsTable.ForeignKeys[2].RefTable = TransfersTable
 }

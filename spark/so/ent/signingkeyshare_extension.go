@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log/slog"
 
 	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
@@ -21,6 +20,9 @@ import (
 
 // TweakKeyShare tweaks the given keyshare with the given tweak, updates the keyshare in the database and returns the updated keyshare.
 func (keyshare *SigningKeyshare) TweakKeyShare(ctx context.Context, shareTweak []byte, pubkeyTweak []byte, pubkeySharesTweak map[string][]byte) (*SigningKeyshare, error) {
+	ctx, span := tracer.Start(ctx, "SigningKeyshare.TweakKeyShare")
+	defer span.End()
+
 	tweakPriv, _ := secp256k1.PrivKeyFromBytes(shareTweak)
 	tweakBytes := tweakPriv.Serialize()
 
@@ -64,6 +66,9 @@ func (keyshare *SigningKeyshare) MarshalProto() *pb.SigningKeyshare {
 
 // GetUnusedSigningKeyshares returns the available keyshares for the given coordinator index.
 func GetUnusedSigningKeyshares(ctx context.Context, dbClient *Client, config *so.Config, keyshareCount int) ([]*SigningKeyshare, error) {
+	ctx, span := tracer.Start(ctx, "SigningKeyshare.GetUnusedSigningKeyshares")
+	defer span.End()
+
 	logger := logging.GetLoggerFromContext(ctx)
 
 	tx, err := dbClient.Tx(ctx)
@@ -88,12 +93,6 @@ func GetUnusedSigningKeyshares(ctx context.Context, dbClient *Client, config *so
 	}
 
 	if len(signingKeyshares) < keyshareCount {
-		go func() {
-			err := RunDKG(context.Background(), config)
-			if err != nil {
-				slog.Error("Error running DKG", "error", err)
-			}
-		}()
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
 			logger.Error("Failed to rollback transaction", "error", rollbackErr)
 		}
@@ -125,6 +124,9 @@ func GetUnusedSigningKeyshares(ctx context.Context, dbClient *Client, config *so
 // MarkSigningKeysharesAsUsed marks the given keyshares as used. If any of the keyshares are not
 // found or not available, it returns an error.
 func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UUID) (map[uuid.UUID]*SigningKeyshare, error) {
+	ctx, span := tracer.Start(ctx, "SigningKeyshare.MarkSigningKeysharesAsUsed")
+	defer span.End()
+
 	logger := logging.GetLoggerFromContext(ctx)
 	db := GetDbFromContext(ctx)
 	logger.Info("Marking keyshares as used: %v", "keyshare_ids", ids)
@@ -157,6 +159,9 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UU
 
 // GetKeyPackage returns the key package for the given keyshare ID.
 func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID) (*pbfrost.KeyPackage, error) {
+	ctx, span := tracer.Start(ctx, "SigningKeyshare.GetKeyPackage")
+	defer span.End()
+
 	keyshare, err := GetDbFromContext(ctx).SigningKeyshare.Get(ctx, keyshareID)
 	if err != nil {
 		return nil, err
@@ -175,6 +180,9 @@ func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID)
 
 // GetKeyPackages returns the key packages for the given keyshare IDs.
 func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID) (map[uuid.UUID]*pbfrost.KeyPackage, error) {
+	ctx, span := tracer.Start(ctx, "SigningKeyshare.GetKeyPackages")
+	defer span.End()
+
 	keyshares, err := GetDbFromContext(ctx).SigningKeyshare.Query().Where(
 		signingkeyshare.IDIn(keyshareIDs...),
 	).All(ctx)
@@ -199,6 +207,9 @@ func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.U
 // GetKeyPackagesArray returns the keyshares for the given keyshare IDs.
 // The order of the keyshares in the result is the same as the order of the keyshare IDs.
 func GetKeyPackagesArray(ctx context.Context, keyshareIDs []uuid.UUID) ([]*SigningKeyshare, error) {
+	ctx, span := tracer.Start(ctx, "SigningKeyshare.GetKeyPackagesArray")
+	defer span.End()
+
 	keysharesMap, err := GetSigningKeysharesMap(ctx, keyshareIDs)
 	if err != nil {
 		return nil, err
@@ -215,6 +226,9 @@ func GetKeyPackagesArray(ctx context.Context, keyshareIDs []uuid.UUID) ([]*Signi
 // GetSigningKeysharesMap returns the keyshares for the given keyshare IDs.
 // The order of the keyshares in the result is the same as the order of the keyshare IDs.
 func GetSigningKeysharesMap(ctx context.Context, keyshareIDs []uuid.UUID) (map[uuid.UUID]*SigningKeyshare, error) {
+	ctx, span := tracer.Start(ctx, "SigningKeyshare.GetSigningKeysharesMap")
+	defer span.End()
+
 	keyshares, err := GetDbFromContext(ctx).SigningKeyshare.Query().Where(
 		signingkeyshare.IDIn(keyshareIDs...),
 	).All(ctx)
@@ -263,6 +277,9 @@ func sumOfSigningKeyshares(keyshares []*SigningKeyshare) (*SigningKeyshare, erro
 // CalculateAndStoreLastKey calculates the last key from the given keyshares and stores it in the database.
 // The target = sum(keyshares) + last_key
 func CalculateAndStoreLastKey(ctx context.Context, _ *so.Config, target *SigningKeyshare, keyshares []*SigningKeyshare, id uuid.UUID) (*SigningKeyshare, error) {
+	ctx, span := tracer.Start(ctx, "SigningKeyshare.CalculateAndStoreLastKey")
+	defer span.End()
+
 	logger := logging.GetLoggerFromContext(ctx)
 
 	if len(keyshares) == 0 {
@@ -333,6 +350,9 @@ func CalculateAndStoreLastKey(ctx context.Context, _ *so.Config, target *Signing
 
 // AggregateKeyshares aggregates the given keyshares and updates the keyshare in the database.
 func AggregateKeyshares(ctx context.Context, _ *so.Config, keyshares []*SigningKeyshare, updateKeyshareID uuid.UUID) (*SigningKeyshare, error) {
+	ctx, span := tracer.Start(ctx, "SigningKeyshare.AggregateKeyshares")
+	defer span.End()
+
 	sumKeyshare, err := sumOfSigningKeyshares(keyshares)
 	if err != nil {
 		return nil, err
@@ -352,12 +372,15 @@ func AggregateKeyshares(ctx context.Context, _ *so.Config, keyshares []*SigningK
 }
 
 // RunDKGIfNeeded checks if the keyshare count is below the threshold and runs DKG if needed.
-func RunDKGIfNeeded(db *Client, config *so.Config) error {
+func RunDKGIfNeeded(ctx context.Context, db *Client, config *so.Config) error {
+	ctx, span := tracer.Start(ctx, "SigningKeyshare.RunDKGIfNeeded")
+	defer span.End()
+
 	count, err := db.SigningKeyshare.Query().Where(
 		signingkeyshare.StatusEQ(schema.KeyshareStatusAvailable),
 		signingkeyshare.CoordinatorIndexEQ(config.Index),
 		signingkeyshare.IDGT(uuid.MustParse("01954639-8d50-7e47-b3f0-ddb307fab7c2")),
-	).Count(context.Background())
+	).Count(ctx)
 	if err != nil {
 		return err
 	}
@@ -368,10 +391,13 @@ func RunDKGIfNeeded(db *Client, config *so.Config) error {
 		return nil
 	}
 
-	return RunDKG(context.Background(), config)
+	return RunDKG(ctx, config)
 }
 
 func RunDKG(ctx context.Context, config *so.Config) error {
+	ctx, span := tracer.Start(ctx, "SigningKeyshare.RunDKG")
+	defer span.End()
+
 	logger := logging.GetLoggerFromContext(ctx)
 
 	connection, err := common.NewGRPCConnection(

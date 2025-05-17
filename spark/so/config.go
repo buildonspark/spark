@@ -11,11 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/XSAM/otelsql"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/exaring/otelpgx"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -23,6 +25,7 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/middleware"
 	"github.com/lightsparkdev/spark/so/utils"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"gopkg.in/yaml.v3"
 )
 
@@ -68,6 +71,11 @@ type Config struct {
 	ReturnDetailedPanicErrors bool
 	// RateLimiter is the configuration for the rate limiter
 	RateLimiter RateLimiterConfig
+	// Tracing configuration
+	Tracing common.TracingConfig
+	// TokenTransactionExpiryDuration is the duration after which started token transactions expire
+	// after which the tx will be cancelled and the input TTXOs will be reset to a spendable state.
+	TokenTransactionExpiryDuration time.Duration
 }
 
 // DatabaseDriver returns the database driver based on the database path.
@@ -78,12 +86,14 @@ func (c *Config) DatabaseDriver() string {
 	return "sqlite3"
 }
 
-// NodesConfig is a map of bitcoind and lrc20 configs per network.
-type NodesConfig struct {
+// OperatorConfig contains the configuration for a signing operator.
+type OperatorConfig struct {
 	// Bitcoind is a map of bitcoind configurations per network.
 	Bitcoind map[string]BitcoindConfig `yaml:"bitcoind"`
 	// Lrc20 is a map of addresses of lrc20 nodes per network
 	Lrc20 map[string]Lrc20Config `yaml:"lrc20"`
+	// Tracing is the configuration for tracing
+	Tracing common.TracingConfig `yaml:"tracing"`
 }
 
 // BitcoindConfig is the configuration for a bitcoind node.
@@ -169,8 +179,8 @@ func NewConfig(
 		return nil, err
 	}
 
-	var nodes NodesConfig
-	if err := yaml.Unmarshal(data, &nodes); err != nil {
+	var operatorConfig OperatorConfig
+	if err := yaml.Unmarshal(data, &operatorConfig); err != nil {
 		return nil, err
 	}
 
@@ -191,8 +201,8 @@ func NewConfig(
 		authzEnforced:             authzEnforced,
 		DKGCoordinatorAddress:     dkgCoordinatorAddress,
 		SupportedNetworks:         supportedNetworks,
-		BitcoindConfigs:           nodes.Bitcoind,
-		Lrc20Configs:              nodes.Lrc20,
+		BitcoindConfigs:           operatorConfig.Bitcoind,
+		Lrc20Configs:              operatorConfig.Lrc20,
 		AWS:                       aws,
 		ServerCertPath:            serverCertPath,
 		ServerKeyPath:             serverKeyPath,
@@ -200,6 +210,7 @@ func NewConfig(
 		RunDirectory:              runDirectory,
 		ReturnDetailedPanicErrors: returnDetailedPanicErrors,
 		RateLimiter:               rateLimiter,
+		Tracing:                   operatorConfig.Tracing,
 	}, nil
 }
 
@@ -255,6 +266,11 @@ func NewRDSAuthToken(ctx context.Context, uri *url.URL) (string, error) {
 	return token, nil
 }
 
+var OtelSQLSpanOptions = otelsql.SpanOptions{
+	OmitConnResetSession: true,
+	OmitConnPrepare:      true,
+}
+
 type DBConnector struct {
 	baseURI *url.URL
 	AWS     bool
@@ -262,16 +278,21 @@ type DBConnector struct {
 	pool    *pgxpool.Pool
 }
 
-func NewDBConnector(urlStr string, aws bool) (*DBConnector, error) {
+func NewDBConnector(ctx context.Context, urlStr string, aws bool) (*DBConnector, error) {
 	uri, err := url.Parse(urlStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse database path: %w", err)
 	}
 
+	otelWrappedDriver := otelsql.WrapDriver(stdlib.GetDefaultDriver(),
+		otelsql.WithAttributes(semconv.DBSystemPostgreSQL),
+		otelsql.WithSpanOptions(OtelSQLSpanOptions),
+	)
+
 	connector := &DBConnector{
 		baseURI: uri,
 		AWS:     aws,
-		driver:  stdlib.GetDefaultDriver(),
+		driver:  otelWrappedDriver,
 	}
 
 	// Only create pool for PostgreSQL
@@ -280,6 +301,7 @@ func NewDBConnector(urlStr string, aws bool) (*DBConnector, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse pool config: %w", err)
 		}
+		config.ConnConfig.Tracer = otelpgx.NewTracer()
 
 		// Add pool configuration
 		config.MaxConns = 50
@@ -296,7 +318,7 @@ func NewDBConnector(urlStr string, aws bool) (*DBConnector, error) {
 			}
 		}
 
-		pool, err := pgxpool.NewWithConfig(context.Background(), config)
+		pool, err := pgxpool.NewWithConfig(ctx, config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create connection pool: %w", err)
 		}

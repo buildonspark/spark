@@ -1,5 +1,86 @@
 # @buildonspark/spark-sdk
 
+## 0.1.20
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.46
+
+## 0.1.19
+
+### Patch Changes
+
+- React Native support
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.45
+
+## 0.1.18
+
+### Patch Changes
+
+- - Polyfill crypto for React Native support
+
+## 0.1.17
+
+### Patch Changes
+
+- - Removed the nice-grpc-web alias from bundling configuration
+  - Refactored ConnectionManager and gRPC client code in src/services/connection.ts to support Node vs Web channels uniformly
+  - Changed rawTx serialization to toBytes(true) for script sig in DepositService
+  - Moved isHermeticTest helper from src/tests/test-util.ts to src/tests/isHermeticTest.ts
+  - Wrapped claimTransfers in SparkWallet (src/spark-wallet.ts) with a try/catch, improved retry logic, and updated return type to an array of claimed-ID strings
+  - Updated utils in src/utils/bitcoin.ts and src/utils/network.ts to use the new serialization methods and constants paths
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.44
+
+## 0.1.16
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.43
+
+## 0.1.15
+
+### Patch Changes
+
+- - Fixed secret splitting by passing threshold (instead of threshold - 1) to the polynomial generator.
+
+## 0.1.14
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.42
+
+## 0.1.13
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.41
+
+## 0.1.12
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.40
+
+## 0.1.11
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.39
+
 ## 0.1.10
 
 ### Patch Changes

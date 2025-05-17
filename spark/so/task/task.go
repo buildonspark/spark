@@ -4,6 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/go-co-op/gocron/v2"
+	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/logging"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -14,32 +17,37 @@ import (
 
 // Task is a task that is scheduled to run.
 type Task struct {
+	// Name is the human-readable name of the task.
+	Name string
 	// Duration is the duration between each run of the task.
 	Duration time.Duration
 	// Task is the function that is run when the task is scheduled.
-	Task func(*so.Config, *ent.Client) error
+	Task func(context.Context, *so.Config, *ent.Client) error
 }
 
 // AllTasks returns all the tasks that are scheduled to run.
 func AllTasks() []Task {
 	return []Task{
 		{
+			Name:     "dkg",
 			Duration: 10 * time.Second,
-			Task: func(config *so.Config, db *ent.Client) error {
-				return ent.RunDKGIfNeeded(db, config)
+			Task: func(ctx context.Context, config *so.Config, db *ent.Client) error {
+				return ent.RunDKGIfNeeded(ctx, db, config)
 			},
 		},
 		{
-			Duration: 10 * time.Minute,
-			Task: func(config *so.Config, db *ent.Client) error {
-				return DBTransactionTask(context.Background(), config, db, func(ctx context.Context, config *so.Config) error {
+			Name:     "cancel_expired_transfers",
+			Duration: 1 * time.Minute,
+			Task: func(ctx context.Context, config *so.Config, db *ent.Client) error {
+				return DBTransactionTask(ctx, config, db, func(ctx context.Context, config *so.Config) error {
+					logger := logging.GetLoggerFromContext(ctx)
 					h := handler.NewTransferHandler(config)
 
-					time := time.Now()
 					query := db.Transfer.Query().Where(
 						transfer.And(
 							transfer.StatusIn(schema.TransferStatusSenderInitiated, schema.TransferStatusSenderKeyTweakPending),
-							transfer.ExpiryTimeLT(time),
+							transfer.ExpiryTimeLT(time.Now()),
+							transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
 						),
 					)
 
@@ -54,7 +62,7 @@ func AllTasks() []Task {
 							TransferId:              transfer.ID.String(),
 						}, handler.CancelTransferIntentTask)
 						if err != nil {
-							return err
+							logger.Error("failed to cancel transfer", "error", err)
 						}
 					}
 
@@ -62,6 +70,36 @@ func AllTasks() []Task {
 				})
 			},
 		},
+	}
+}
+
+func (t *Task) Schedule(scheduler gocron.Scheduler, config *so.Config, db *ent.Client) error {
+	_, err := scheduler.NewJob(
+		gocron.DurationJob(t.Duration),
+		gocron.NewTask(t.createWrappedTask(), config, db),
+		gocron.WithName(t.Name),
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (t *Task) createWrappedTask() func(context.Context, *so.Config, *ent.Client) error {
+	return func(ctx context.Context, config *so.Config, db *ent.Client) error {
+		logger := logging.GetLoggerFromContext(ctx).
+			With("task.name", t.Name).
+			With("task.id", uuid.New().String())
+
+		ctx = logging.Inject(ctx, logger)
+
+		err := t.Task(ctx, config, db)
+		if err != nil {
+			logger.Error("Task failed!", "error", err)
+		}
+
+		return err
 	}
 }
 

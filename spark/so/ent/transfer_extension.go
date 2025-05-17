@@ -64,6 +64,12 @@ func (t *Transfer) getProtoStatus() (*pb.TransferStatus, error) {
 		return pb.TransferStatus_TRANSFER_STATUS_EXPIRED.Enum(), nil
 	case schema.TransferStatusReturned:
 		return pb.TransferStatus_TRANSFER_STATUS_RETURNED.Enum(), nil
+	case schema.TransferStatusSenderInitiatedCoordinator:
+		return pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR.Enum(), nil
+	case schema.TransferStatusReceiverKeyTweakLocked:
+		return pb.TransferStatus_TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED.Enum(), nil
+	case schema.TransferStatusReceiverKeyTweakApplied:
+		return pb.TransferStatus_TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED.Enum(), nil
 	}
 	return nil, fmt.Errorf("unknown transfer status %s", t.Status)
 }
@@ -80,6 +86,8 @@ func TransferTypeProto(transferType schema.TransferType) (*pb.TransferType, erro
 		return pb.TransferType_SWAP.Enum(), nil
 	case schema.TransferTypeCounterSwap:
 		return pb.TransferType_COUNTER_SWAP.Enum(), nil
+	case schema.TransferTypeUtxoSwap:
+		return pb.TransferType_UTXO_SWAP.Enum(), nil
 	}
 	return nil, fmt.Errorf("unknown transfer type %s", transferType)
 }
@@ -96,6 +104,8 @@ func TransferTypeSchema(transferType pb.TransferType) (schema.TransferType, erro
 		return schema.TransferTypeSwap, nil
 	case pb.TransferType_COUNTER_SWAP:
 		return schema.TransferTypeCounterSwap, nil
+	case pb.TransferType_UTXO_SWAP:
+		return schema.TransferTypeUtxoSwap, nil
 	}
 	return "", fmt.Errorf("unknown transfer type %s", transferType)
 }

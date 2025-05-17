@@ -37,6 +37,12 @@ const (
 	FieldVout = "vout"
 	// FieldRawRefundTx holds the string denoting the raw_refund_tx field in the database.
 	FieldRawRefundTx = "raw_refund_tx"
+	// FieldNodeConfirmationHeight holds the string denoting the node_confirmation_height field in the database.
+	FieldNodeConfirmationHeight = "node_confirmation_height"
+	// FieldRefundConfirmationHeight holds the string denoting the refund_confirmation_height field in the database.
+	FieldRefundConfirmationHeight = "refund_confirmation_height"
+	// FieldDirectRefundTx holds the string denoting the direct_refund_tx field in the database.
+	FieldDirectRefundTx = "direct_refund_tx"
 	// EdgeTree holds the string denoting the tree edge name in mutations.
 	EdgeTree = "tree"
 	// EdgeParent holds the string denoting the parent edge name in mutations.
@@ -84,6 +90,9 @@ var Columns = []string{
 	FieldRawTx,
 	FieldVout,
 	FieldRawRefundTx,
+	FieldNodeConfirmationHeight,
+	FieldRefundConfirmationHeight,
+	FieldDirectRefundTx,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "tree_nodes"
@@ -169,6 +178,16 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 // ByVout orders the results by the vout field.
 func ByVout(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldVout, opts...).ToFunc()
+}
+
+// ByNodeConfirmationHeight orders the results by the node_confirmation_height field.
+func ByNodeConfirmationHeight(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNodeConfirmationHeight, opts...).ToFunc()
+}
+
+// ByRefundConfirmationHeight orders the results by the refund_confirmation_height field.
+func ByRefundConfirmationHeight(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRefundConfirmationHeight, opts...).ToFunc()
 }
 
 // ByTreeField orders the results by tree field.

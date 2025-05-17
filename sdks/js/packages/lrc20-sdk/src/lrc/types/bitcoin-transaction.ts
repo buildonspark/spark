@@ -1,6 +1,6 @@
 import { Transaction } from "bitcoinjs-lib";
-import { reverseBuffer } from "../utils/index.ts";
 import { plainToInstance } from "class-transformer";
+import { reverseBuffer } from "../utils/buffer.ts";
 
 export class BitcoinTransactionDto {
   constructor(

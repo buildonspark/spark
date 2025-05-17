@@ -13,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/schema"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 )
 
 // TreeQueryHandler handles queries related to tree nodes.
@@ -30,12 +31,31 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 	db := ent.GetDbFromContext(ctx)
 
 	query := db.TreeNode.Query()
+	limit := int(req.GetLimit())
+	offset := int(req.GetOffset())
+
 	switch req.Source.(type) {
 	case *pb.QueryNodesRequest_OwnerIdentityPubkey:
+		if limit < 0 || offset < 0 {
+			return nil, fmt.Errorf("expect non-negative offset and limit")
+		}
 		query = query.
 			Where(treenode.StatusNotIn(schema.TreeNodeStatusCreating, schema.TreeNodeStatusSplitted)).
-			Where(treenode.OwnerIdentityPubkey(req.GetOwnerIdentityPubkey()))
+			Where(treenode.OwnerIdentityPubkey(req.GetOwnerIdentityPubkey())).
+			Order(ent.Desc(enttreenode.FieldUpdateTime))
+
+		if limit > 0 {
+			if limit > 100 {
+				limit = 100
+			}
+			query = query.Offset(offset).Limit(limit)
+		} else {
+			offset = -1
+		}
+
 	case *pb.QueryNodesRequest_NodeIds:
+		offset = -1
+
 		nodeIDs := make([]uuid.UUID, len(req.GetNodeIds().NodeIds))
 		for _, nodeID := range req.GetNodeIds().NodeIds {
 			nodeUUID, err := uuid.Parse(nodeID)
@@ -66,9 +86,17 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		}
 	}
 
-	return &pb.QueryNodesResponse{
+	response := &pb.QueryNodesResponse{
 		Nodes: protoNodeMap,
-	}, nil
+	}
+	if offset != -1 {
+		nextOffset := -1
+		if len(nodes) == limit {
+			nextOffset = offset + len(nodes)
+		}
+		response.Offset = int64(nextOffset)
+	}
+	return response, nil
 }
 
 func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanceRequest) (*pb.QueryBalanceResponse, error) {
@@ -124,8 +152,7 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 		// whereas express deposit addresses can be used only once
 		Where(depositaddress.IsStatic(false)).
 		Order(ent.Desc(depositaddress.FieldID)).
-		WithSigningKeyshare().
-		Limit(10)
+		WithSigningKeyshare()
 
 	depositAddresses, err := query.All(ctx)
 	if err != nil {

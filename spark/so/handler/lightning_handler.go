@@ -310,8 +310,7 @@ func (h *LightningHandler) validateGetPreimageRequest(
 		}
 		totalAmount += uint64(refundTx.TxOut[0].Value)
 	}
-	switch reason {
-	case pb.InitiatePreimageSwapRequest_REASON_SEND:
+	if reason == pb.InitiatePreimageSwapRequest_REASON_SEND {
 		totalAmount -= feeSats
 	}
 	if totalAmount != amount.ValueSats {
@@ -441,6 +440,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		req.Transfer.ReceiverIdentityPublicKey,
 		leafRefundMap,
 		nil,
+		TransferRoleCoordinator,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer: %v", err)
@@ -543,6 +543,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		req.Transfer.ReceiverIdentityPublicKey,
 		leafRefundMap,
 		nil,
+		TransferRoleCoordinator,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer: %v", err)
@@ -610,7 +611,12 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("unable to recover secret: %v", err)
 	}
 
-	hash := sha256.Sum256(secret.Bytes())
+	secretBytes := secret.Bytes()
+	if len(secretBytes) < 32 {
+		secretBytes = append(make([]byte, 32-len(secretBytes)), secretBytes...)
+	}
+
+	hash := sha256.Sum256(secretBytes)
 	if !bytes.Equal(hash[:], req.PaymentHash) {
 		baseHandler := NewBaseTransferHandler(h.config)
 		_, err := baseHandler.CancelTransfer(ctx, &pb.CancelTransferRequest{
@@ -651,7 +657,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("unable to update preimage request status: %v", err)
 	}
 
-	return &pb.InitiatePreimageSwapResponse{Preimage: secret.Bytes(), Transfer: transferProto}, nil
+	return &pb.InitiatePreimageSwapResponse{Preimage: secretBytes, Transfer: transferProto}, nil
 }
 
 // UpdatePreimageRequest updates the preimage request.

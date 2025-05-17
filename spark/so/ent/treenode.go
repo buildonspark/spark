@@ -41,6 +41,12 @@ type TreeNode struct {
 	Vout int16 `json:"vout,omitempty"`
 	// RawRefundTx holds the value of the "raw_refund_tx" field.
 	RawRefundTx []byte `json:"raw_refund_tx,omitempty"`
+	// NodeConfirmationHeight holds the value of the "node_confirmation_height" field.
+	NodeConfirmationHeight uint64 `json:"node_confirmation_height,omitempty"`
+	// RefundConfirmationHeight holds the value of the "refund_confirmation_height" field.
+	RefundConfirmationHeight uint64 `json:"refund_confirmation_height,omitempty"`
+	// DirectRefundTx holds the value of the "direct_refund_tx" field.
+	DirectRefundTx []byte `json:"direct_refund_tx,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TreeNodeQuery when eager-loading is set.
 	Edges                      TreeNodeEdges `json:"edges"`
@@ -112,9 +118,9 @@ func (*TreeNode) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case treenode.FieldVerifyingPubkey, treenode.FieldOwnerIdentityPubkey, treenode.FieldOwnerSigningPubkey, treenode.FieldRawTx, treenode.FieldRawRefundTx:
+		case treenode.FieldVerifyingPubkey, treenode.FieldOwnerIdentityPubkey, treenode.FieldOwnerSigningPubkey, treenode.FieldRawTx, treenode.FieldRawRefundTx, treenode.FieldDirectRefundTx:
 			values[i] = new([]byte)
-		case treenode.FieldValue, treenode.FieldVout:
+		case treenode.FieldValue, treenode.FieldVout, treenode.FieldNodeConfirmationHeight, treenode.FieldRefundConfirmationHeight:
 			values[i] = new(sql.NullInt64)
 		case treenode.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -208,6 +214,24 @@ func (tn *TreeNode) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field raw_refund_tx", values[i])
 			} else if value != nil {
 				tn.RawRefundTx = *value
+			}
+		case treenode.FieldNodeConfirmationHeight:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field node_confirmation_height", values[i])
+			} else if value.Valid {
+				tn.NodeConfirmationHeight = uint64(value.Int64)
+			}
+		case treenode.FieldRefundConfirmationHeight:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field refund_confirmation_height", values[i])
+			} else if value.Valid {
+				tn.RefundConfirmationHeight = uint64(value.Int64)
+			}
+		case treenode.FieldDirectRefundTx:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field direct_refund_tx", values[i])
+			} else if value != nil {
+				tn.DirectRefundTx = *value
 			}
 		case treenode.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -315,6 +339,15 @@ func (tn *TreeNode) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("raw_refund_tx=")
 	builder.WriteString(fmt.Sprintf("%v", tn.RawRefundTx))
+	builder.WriteString(", ")
+	builder.WriteString("node_confirmation_height=")
+	builder.WriteString(fmt.Sprintf("%v", tn.NodeConfirmationHeight))
+	builder.WriteString(", ")
+	builder.WriteString("refund_confirmation_height=")
+	builder.WriteString(fmt.Sprintf("%v", tn.RefundConfirmationHeight))
+	builder.WriteString(", ")
+	builder.WriteString("direct_refund_tx=")
+	builder.WriteString(fmt.Sprintf("%v", tn.DirectRefundTx))
 	builder.WriteByte(')')
 	return builder.String()
 }

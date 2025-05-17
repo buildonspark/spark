@@ -40,9 +40,12 @@ const (
 	SparkInternalService_InitiateCooperativeExit_FullMethodName        = "/spark_internal.SparkInternalService/initiate_cooperative_exit"
 	SparkInternalService_ReturnLightningPayment_FullMethodName         = "/spark_internal.SparkInternalService/return_lightning_payment"
 	SparkInternalService_StartTokenTransactionInternal_FullMethodName  = "/spark_internal.SparkInternalService/start_token_transaction_internal"
+	SparkInternalService_QueryTokenOutputsInternal_FullMethodName      = "/spark_internal.SparkInternalService/query_token_outputs_internal"
 	SparkInternalService_CancelTransfer_FullMethodName                 = "/spark_internal.SparkInternalService/cancel_transfer"
 	SparkInternalService_InitiateSettleReceiverKeyTweak_FullMethodName = "/spark_internal.SparkInternalService/initiate_settle_receiver_key_tweak"
 	SparkInternalService_SettleReceiverKeyTweak_FullMethodName         = "/spark_internal.SparkInternalService/settle_receiver_key_tweak"
+	SparkInternalService_SettleSenderKeyTweak_FullMethodName           = "/spark_internal.SparkInternalService/settle_sender_key_tweak"
+	SparkInternalService_CreateUtxoSwap_FullMethodName                 = "/spark_internal.SparkInternalService/create_utxo_swap"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -68,9 +71,13 @@ type SparkInternalServiceClient interface {
 	InitiateCooperativeExit(ctx context.Context, in *InitiateCooperativeExitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ReturnLightningPayment(ctx context.Context, in *spark.ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	StartTokenTransactionInternal(ctx context.Context, in *StartTokenTransactionInternalRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	QueryTokenOutputsInternal(ctx context.Context, in *spark.QueryTokenOutputsRequest, opts ...grpc.CallOption) (*spark.QueryTokenOutputsResponse, error)
 	CancelTransfer(ctx context.Context, in *spark.CancelTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiateSettleReceiverKeyTweak(ctx context.Context, in *InitiateSettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SettleReceiverKeyTweak(ctx context.Context, in *SettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	SettleSenderKeyTweak(ctx context.Context, in *SettleSenderKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Create UTXO swap record to claim UTXO by SSP in the static deposit flow
+	CreateUtxoSwap(ctx context.Context, in *spark.InitiateUtxoSwapRequest, opts ...grpc.CallOption) (*CreateUtxoSwapResponse, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -271,6 +278,16 @@ func (c *sparkInternalServiceClient) StartTokenTransactionInternal(ctx context.C
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) QueryTokenOutputsInternal(ctx context.Context, in *spark.QueryTokenOutputsRequest, opts ...grpc.CallOption) (*spark.QueryTokenOutputsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(spark.QueryTokenOutputsResponse)
+	err := c.cc.Invoke(ctx, SparkInternalService_QueryTokenOutputsInternal_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkInternalServiceClient) CancelTransfer(ctx context.Context, in *spark.CancelTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -301,6 +318,26 @@ func (c *sparkInternalServiceClient) SettleReceiverKeyTweak(ctx context.Context,
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) SettleSenderKeyTweak(ctx context.Context, in *SettleSenderKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_SettleSenderKeyTweak_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkInternalServiceClient) CreateUtxoSwap(ctx context.Context, in *spark.InitiateUtxoSwapRequest, opts ...grpc.CallOption) (*CreateUtxoSwapResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateUtxoSwapResponse)
+	err := c.cc.Invoke(ctx, SparkInternalService_CreateUtxoSwap_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkInternalServiceServer is the server API for SparkInternalService service.
 // All implementations must embed UnimplementedSparkInternalServiceServer
 // for forward compatibility.
@@ -324,9 +361,13 @@ type SparkInternalServiceServer interface {
 	InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error)
 	ReturnLightningPayment(context.Context, *spark.ReturnLightningPaymentRequest) (*emptypb.Empty, error)
 	StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*emptypb.Empty, error)
+	QueryTokenOutputsInternal(context.Context, *spark.QueryTokenOutputsRequest) (*spark.QueryTokenOutputsResponse, error)
 	CancelTransfer(context.Context, *spark.CancelTransferRequest) (*emptypb.Empty, error)
 	InitiateSettleReceiverKeyTweak(context.Context, *InitiateSettleReceiverKeyTweakRequest) (*emptypb.Empty, error)
 	SettleReceiverKeyTweak(context.Context, *SettleReceiverKeyTweakRequest) (*emptypb.Empty, error)
+	SettleSenderKeyTweak(context.Context, *SettleSenderKeyTweakRequest) (*emptypb.Empty, error)
+	// Create UTXO swap record to claim UTXO by SSP in the static deposit flow
+	CreateUtxoSwap(context.Context, *spark.InitiateUtxoSwapRequest) (*CreateUtxoSwapResponse, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -394,6 +435,9 @@ func (UnimplementedSparkInternalServiceServer) ReturnLightningPayment(context.Co
 func (UnimplementedSparkInternalServiceServer) StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartTokenTransactionInternal not implemented")
 }
+func (UnimplementedSparkInternalServiceServer) QueryTokenOutputsInternal(context.Context, *spark.QueryTokenOutputsRequest) (*spark.QueryTokenOutputsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryTokenOutputsInternal not implemented")
+}
 func (UnimplementedSparkInternalServiceServer) CancelTransfer(context.Context, *spark.CancelTransferRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CancelTransfer not implemented")
 }
@@ -402,6 +446,12 @@ func (UnimplementedSparkInternalServiceServer) InitiateSettleReceiverKeyTweak(co
 }
 func (UnimplementedSparkInternalServiceServer) SettleReceiverKeyTweak(context.Context, *SettleReceiverKeyTweakRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SettleReceiverKeyTweak not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) SettleSenderKeyTweak(context.Context, *SettleSenderKeyTweakRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SettleSenderKeyTweak not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) CreateUtxoSwap(context.Context, *spark.InitiateUtxoSwapRequest) (*CreateUtxoSwapResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateUtxoSwap not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -766,6 +816,24 @@ func _SparkInternalService_StartTokenTransactionInternal_Handler(srv interface{}
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_QueryTokenOutputsInternal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(spark.QueryTokenOutputsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).QueryTokenOutputsInternal(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_QueryTokenOutputsInternal_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).QueryTokenOutputsInternal(ctx, req.(*spark.QueryTokenOutputsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkInternalService_CancelTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(spark.CancelTransferRequest)
 	if err := dec(in); err != nil {
@@ -816,6 +884,42 @@ func _SparkInternalService_SettleReceiverKeyTweak_Handler(srv interface{}, ctx c
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkInternalServiceServer).SettleReceiverKeyTweak(ctx, req.(*SettleReceiverKeyTweakRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkInternalService_SettleSenderKeyTweak_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SettleSenderKeyTweakRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).SettleSenderKeyTweak(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_SettleSenderKeyTweak_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).SettleSenderKeyTweak(ctx, req.(*SettleSenderKeyTweakRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkInternalService_CreateUtxoSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(spark.InitiateUtxoSwapRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).CreateUtxoSwap(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_CreateUtxoSwap_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).CreateUtxoSwap(ctx, req.(*spark.InitiateUtxoSwapRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -904,6 +1008,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SparkInternalService_StartTokenTransactionInternal_Handler,
 		},
 		{
+			MethodName: "query_token_outputs_internal",
+			Handler:    _SparkInternalService_QueryTokenOutputsInternal_Handler,
+		},
+		{
 			MethodName: "cancel_transfer",
 			Handler:    _SparkInternalService_CancelTransfer_Handler,
 		},
@@ -914,6 +1022,14 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "settle_receiver_key_tweak",
 			Handler:    _SparkInternalService_SettleReceiverKeyTweak_Handler,
+		},
+		{
+			MethodName: "settle_sender_key_tweak",
+			Handler:    _SparkInternalService_SettleSenderKeyTweak_Handler,
+		},
+		{
+			MethodName: "create_utxo_swap",
+			Handler:    _SparkInternalService_CreateUtxoSwap_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -16,7 +16,6 @@ export function collectResponses<T>(responses: PromiseSettledResult<T>[]): T[] {
 
   if (failedResponses.length > 0) {
     const errors = failedResponses.map((result) => result.reason).join("\n");
-
     throw new NetworkError(
       `${failedResponses.length} out of ${responses.length} requests failed, please try again`,
       {

@@ -63,6 +63,40 @@ func TestTreeQuery(t *testing.T) {
 		require.Len(t, resp.Nodes, 6)
 	})
 
+	t.Run("query with paginations", func(t *testing.T) {
+		nodeIDs := make([]string, 0, 2)
+		req := &pb.QueryNodesRequest{
+			Source:         &pb.QueryNodesRequest_OwnerIdentityPubkey{OwnerIdentityPubkey: leafNode.OwnerIdentityPublicKey},
+			IncludeParents: false,
+		}
+		resp, err := client.QueryNodes(ctx, req)
+		require.NoError(t, err)
+		require.Len(t, resp.Nodes, 2)
+		require.Equal(t, int(resp.Offset), 0)
+		for id := range resp.Nodes {
+			nodeIDs = append(nodeIDs, id)
+		}
+
+		req.Limit = 1
+		resp, err = client.QueryNodes(ctx, req)
+		require.NoError(t, err)
+		require.Len(t, resp.Nodes, 1)
+		require.Equal(t, int(resp.Offset), 1)
+		for id := range resp.Nodes {
+			require.Equal(t, id, nodeIDs[0])
+		}
+
+		req.Limit = 2
+		req.Offset = resp.Offset
+		resp, err = client.QueryNodes(ctx, req)
+		require.NoError(t, err)
+		require.Len(t, resp.Nodes, 1)
+		require.Equal(t, int(resp.Offset), -1)
+		for id := range resp.Nodes {
+			require.Equal(t, id, nodeIDs[1])
+		}
+	})
+
 	t.Run("query by node id without parents", func(t *testing.T) {
 		req := &pb.QueryNodesRequest{
 			Source:         &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{leafNode.Id}}},

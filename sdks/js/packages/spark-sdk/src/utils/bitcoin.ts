@@ -8,8 +8,8 @@ import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import * as btc from "@scure/btc-signer";
 import { TransactionOutput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
-import { getNetwork, Network } from "./network.js";
 import { ValidationError } from "../errors/index.js";
+import { getNetwork, Network } from "./network.js";
 
 // const t = tapTweak(pubKey, h); // t = int_from_bytes(tagged_hash("TapTweak", pubkey + h)
 // const P = u.lift_x(u.bytesToNumberBE(pubKey)); // P = lift_x(int_from_bytes(pubkey))
@@ -187,9 +187,9 @@ export function getSigHashFromTx(
 }
 
 export function getTxId(tx: btc.Transaction): string {
-  return bytesToHex(sha256(sha256(tx.unsignedTx)).reverse());
+  return bytesToHex(sha256(sha256(tx.toBytes(true))).reverse());
 }
 
 export function getTxIdNoReverse(tx: btc.Transaction): string {
-  return bytesToHex(sha256(sha256(tx.unsignedTx)));
+  return bytesToHex(sha256(sha256(tx.toBytes(true))));
 }

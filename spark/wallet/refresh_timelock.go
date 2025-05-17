@@ -38,7 +38,7 @@ func RefreshTimelockRefundTx(
 	config *Config,
 	leaf *pb.TreeNode,
 	signingPrivKey *secp256k1.PrivateKey,
-) error {
+) (*pb.TreeNode, error) {
 	// New refund tx is just the old refund tx with a
 	// decremented sequence number. Practically,
 	// user's probably wouldn't do this, and is here
@@ -49,27 +49,27 @@ func RefreshTimelockRefundTx(
 	// be integrated into the aggregation process).
 	newRefundTx, err := common.TxFromRawTxBytes(leaf.RefundTx)
 	if err != nil {
-		return fmt.Errorf("failed to parse refund tx: %v", err)
+		return nil, fmt.Errorf("failed to parse refund tx: %v", err)
 	}
 	currSequence := newRefundTx.TxIn[0].Sequence
 	newRefundTx.TxIn[0].Sequence, err = spark.NextSequence(currSequence)
 	if err != nil {
-		return fmt.Errorf("failed to increment sequence: %v", err)
+		return nil, fmt.Errorf("failed to increment sequence: %v", err)
 	}
 
 	var newRefundTxBuf bytes.Buffer
 	err = newRefundTx.Serialize(&newRefundTxBuf)
 	if err != nil {
-		return fmt.Errorf("failed to serialize new refund tx: %v", err)
+		return nil, fmt.Errorf("failed to serialize new refund tx: %v", err)
 	}
 
 	nonce, err := objects.RandomSigningNonce()
 	if err != nil {
-		return fmt.Errorf("failed to generate nonce: %v", err)
+		return nil, fmt.Errorf("failed to generate nonce: %v", err)
 	}
 	nonceCommitmentProto, err := nonce.SigningCommitment().MarshalProto()
 	if err != nil {
-		return fmt.Errorf("failed to marshal nonce commitment: %v", err)
+		return nil, fmt.Errorf("failed to marshal nonce commitment: %v", err)
 	}
 	signingJobs := make([]*pb.SigningJob, 0)
 	signingJobs = append(signingJobs, &pb.SigningJob{
@@ -83,13 +83,13 @@ func RefreshTimelockRefundTx(
 	// Connect and call GRPC
 	sparkConn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
-		return fmt.Errorf("failed to create grpc connection: %v", err)
+		return nil, fmt.Errorf("failed to create grpc connection: %v", err)
 	}
 	defer sparkConn.Close()
 
 	token, err := AuthenticateWithConnection(ctx, config, sparkConn)
 	if err != nil {
-		return fmt.Errorf("failed to authenticate with server: %v", err)
+		return nil, fmt.Errorf("failed to authenticate with server: %v", err)
 	}
 	authCtx := ContextWithToken(ctx, token)
 
@@ -100,11 +100,11 @@ func RefreshTimelockRefundTx(
 		SigningJobs:            signingJobs,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to refresh timelock: %v", err)
+		return nil, fmt.Errorf("failed to refresh timelock: %v", err)
 	}
 
 	if len(signingJobs) != len(response.SigningResults) {
-		return fmt.Errorf("number of signing jobs and signing results do not match: %v != %v", len(signingJobs), len(response.SigningResults))
+		return nil, fmt.Errorf("number of signing jobs and signing results do not match: %v != %v", len(signingJobs), len(response.SigningResults))
 	}
 
 	// Sign and aggregate
@@ -116,24 +116,24 @@ func RefreshTimelockRefundTx(
 		signingJob := signingJobs[i]
 		refundTx, err := common.TxFromRawTxBytes(signingJob.RawTx)
 		if err != nil {
-			return fmt.Errorf("failed to parse refund tx: %v", err)
+			return nil, fmt.Errorf("failed to parse refund tx: %v", err)
 		}
 		nodeTx, err := common.TxFromRawTxBytes(leaf.NodeTx)
 		if err != nil {
-			return fmt.Errorf("failed to parse node tx: %v", err)
+			return nil, fmt.Errorf("failed to parse node tx: %v", err)
 		}
 		refundTxSighash, err := common.SigHashFromTx(refundTx, 0, nodeTx.TxOut[0])
 		if err != nil {
-			return fmt.Errorf("failed to calculate sighash: %v", err)
+			return nil, fmt.Errorf("failed to calculate sighash: %v", err)
 		}
 
 		signingNonce, err := nonce.MarshalProto()
 		if err != nil {
-			return fmt.Errorf("failed to marshal nonce: %v", err)
+			return nil, fmt.Errorf("failed to marshal nonce: %v", err)
 		}
 		signingNonceCommitment, err := nonce.SigningCommitment().MarshalProto()
 		if err != nil {
-			return fmt.Errorf("failed to marshal nonce commitment: %v", err)
+			return nil, fmt.Errorf("failed to marshal nonce commitment: %v", err)
 		}
 		userKeyPackage := CreateUserKeyPackage(signingPrivKey.Serialize())
 
@@ -170,7 +170,7 @@ func RefreshTimelockRefundTx(
 		Role:        pbfrost.SigningRole_USER,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	nodeSignatures := []*pb.NodeSignatures{}
@@ -179,7 +179,7 @@ func RefreshTimelockRefundTx(
 		request.UserSignatureShare = userSignature.SignatureShare
 		response, err := frostClient.AggregateFrost(context.Background(), request)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		nodeSignatures = append(nodeSignatures, &pb.NodeSignatures{
 			NodeId:            jobToNodeIDMap[jobID],
@@ -187,15 +187,15 @@ func RefreshTimelockRefundTx(
 		})
 	}
 
-	_, err = sparkClient.FinalizeNodeSignatures(authCtx, &pb.FinalizeNodeSignaturesRequest{
+	resp, err := sparkClient.FinalizeNodeSignatures(authCtx, &pb.FinalizeNodeSignaturesRequest{
 		Intent:         pbcommon.SignatureIntent_REFRESH,
 		NodeSignatures: nodeSignatures,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to finalize node signatures: %v", err)
+		return nil, fmt.Errorf("failed to finalize node signatures: %v", err)
 	}
 
-	return nil
+	return resp.Nodes[0], nil
 }
 
 func signingJobFromTx(
@@ -481,7 +481,7 @@ func ExtendTimelock(
 	// (signing pubkey is used here as the destination for convenience,
 	// though normally it should just be the same output as the refund tx)
 	newRefundOutPoint := wire.OutPoint{Hash: newNodeTx.TxHash(), Index: 0}
-	newRefundTx, err := createRefundTx(spark.InitialSequence(), &newRefundOutPoint, refundTx.TxOut[0].Value, signingPrivKey.PubKey())
+	cpfpRefundTx, _, err := createRefundTxs(spark.InitialSequence(), &newRefundOutPoint, refundTx.TxOut[0].Value, signingPrivKey.PubKey(), false)
 	if err != nil {
 		return fmt.Errorf("failed to create refund tx: %v", err)
 	}
@@ -491,7 +491,7 @@ func ExtendTimelock(
 	if err != nil {
 		return fmt.Errorf("failed to create signing job: %v", err)
 	}
-	newRefundSigningJob, newRefundNonce, err := signingJobFromTx(newRefundTx, signingPrivKey)
+	newRefundSigningJob, newRefundNonce, err := signingJobFromTx(cpfpRefundTx, signingPrivKey)
 	if err != nil {
 		return fmt.Errorf("failed to create signing job: %v", err)
 	}
@@ -525,7 +525,7 @@ func ExtendTimelock(
 	if err != nil {
 		return fmt.Errorf("failed to create node frost signing job: %v", err)
 	}
-	newRefundSignFrostJob, newRefundAggFrostJob, err := createFrostJobsFromTx(newRefundTx, newNodeTx.TxOut[0], newRefundNonce, signingPrivKey, response.RefundTxSigningResult)
+	newRefundSignFrostJob, newRefundAggFrostJob, err := createFrostJobsFromTx(cpfpRefundTx, newNodeTx.TxOut[0], newRefundNonce, signingPrivKey, response.RefundTxSigningResult)
 	if err != nil {
 		return fmt.Errorf("failed to create refund frost signing job: %v", err)
 	}

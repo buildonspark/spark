@@ -287,11 +287,17 @@ export function validateTokenTransaction(
     }
 
     if (keyshareInfo.threshold !== expectedThreshold) {
-      throw new InternalValidationError("Threshold mismatch", {
-        field: "threshold",
-        value: keyshareInfo.threshold,
-        expected: expectedThreshold,
-      });
+      throw new InternalValidationError(
+        "Threshold mismatch: expected " +
+          expectedThreshold +
+          " but got " +
+          keyshareInfo.threshold,
+        {
+          field: "threshold",
+          value: keyshareInfo.threshold,
+          expected: expectedThreshold,
+        },
+      );
     }
   }
 

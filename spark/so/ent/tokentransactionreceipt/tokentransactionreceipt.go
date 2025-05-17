@@ -110,7 +110,7 @@ var (
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schema.TokenTransactionStatus) error {
 	switch s {
-	case "STARTED", "SIGNED", "SIGNED_CANCELLED", "FINALIZED":
+	case "STARTED", "STARTED_CANCELLED", "SIGNED", "SIGNED_CANCELLED", "FINALIZED":
 		return nil
 	default:
 		return fmt.Errorf("tokentransactionreceipt: invalid enum value for status field: %q", s)

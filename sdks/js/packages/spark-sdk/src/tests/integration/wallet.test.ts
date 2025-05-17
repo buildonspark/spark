@@ -26,6 +26,52 @@ describe("wallet", () => {
     }
   }, 30000);
 
+  it("should initialize wallets with different identity keys for different account numbers with the same mnemonic", async () => {
+    const seedOrMnemonics =
+      "wear cattle behind affair parade error luxury profit just rate arch cigar";
+
+    const networks: NetworkType[] = ["LOCAL"];
+
+    const { wallet: accountTen } = await SparkWalletTesting.initialize({
+      mnemonicOrSeed: seedOrMnemonics,
+      accountNumber: 10,
+      options: {
+        network: "LOCAL",
+      },
+    });
+    const { wallet: accountEleven } = await SparkWalletTesting.initialize({
+      mnemonicOrSeed: seedOrMnemonics,
+      accountNumber: 11,
+      options: {
+        network: "LOCAL",
+      },
+    });
+
+    const accountTenIdentityKey = await accountTen.getIdentityPublicKey();
+    const accountElevenIdentityKey = await accountEleven.getIdentityPublicKey();
+    expect(accountTenIdentityKey).not.toEqual(accountElevenIdentityKey);
+
+    // Should throw for reserved account numbers
+    await expect(
+      SparkWalletTesting.initialize({
+        mnemonicOrSeed: seedOrMnemonics,
+        accountNumber: 0,
+        options: {
+          network: "LOCAL",
+        },
+      }),
+    ).rejects.toThrow();
+    await expect(
+      SparkWalletTesting.initialize({
+        mnemonicOrSeed: seedOrMnemonics,
+        accountNumber: 1,
+        options: {
+          network: "LOCAL",
+        },
+      }),
+    ).rejects.toThrow();
+  });
+
   it("should not initialize a wallet with an invalid seed or mnemonic", async () => {
     const seedOrMnemonics = [
       "wear cattle behind affair parade error luxury profit just rate arch",

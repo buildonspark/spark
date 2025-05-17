@@ -1,11 +1,10 @@
 // @ts-nocheck
 import { describe, expect, it } from "@jest/globals";
 import { bytesToHex } from "@noble/curves/abstract/utils";
+import { ValidationError } from "../../errors/types.js";
 import { getTxFromRawTxBytes, getTxId } from "../../utils/bitcoin.js";
 import { Network } from "../../utils/network.js";
-import { createDummyTx } from "../../utils/wasm.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
-import { ValidationError } from "../../errors/types.js";
 
 describe("Tree Creation", () => {
   it.skip("test tree creation address generation", async () => {

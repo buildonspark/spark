@@ -290,14 +290,14 @@ func buildCreationNodesFromTree(
 				}
 				currentElement.creationNode.NodeTxSigningJob = signingJob
 
-				refundTx, err := createRefundTx(spark.InitialSequence(),
+				cpfpRefundTx, _, err := createRefundTxs(spark.InitialSequence(),
 					&wire.OutPoint{Hash: tx.TxHash(), Index: 0},
-					tx.TxOut[0].Value, pubkey)
+					tx.TxOut[0].Value, pubkey, true)
 				if err != nil {
 					return nil, nil, err
 				}
 				var refundTxBuf bytes.Buffer
-				err = refundTx.Serialize(&refundTxBuf)
+				err = cpfpRefundTx.Serialize(&refundTxBuf)
 				if err != nil {
 					return nil, nil, err
 				}

@@ -16,6 +16,15 @@ func Inject(ctx context.Context, logger *slog.Logger) context.Context {
 	return context.WithValue(ctx, loggerKey, logger)
 }
 
+func WithIdentityPubkey(ctx context.Context, pubkey []byte) context.Context {
+	if pubkey == nil {
+		return ctx
+	}
+
+	logger := GetLoggerFromContext(ctx).With("identity_public_key", Pubkey{Pubkey: pubkey})
+	return Inject(ctx, logger)
+}
+
 // Get an instance of slog.Logger from the current context. If no logger is found, returns a
 // default logger.
 func GetLoggerFromContext(ctx context.Context) *slog.Logger {

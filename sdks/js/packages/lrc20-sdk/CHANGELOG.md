@@ -1,5 +1,54 @@
 # @buildonspark/lrc20-sdk
 
+## 0.0.46
+
+### Patch Changes
+
+- Fixes
+
+## 0.0.45
+
+### Patch Changes
+
+- React Native support
+
+## 0.0.44
+
+### Patch Changes
+
+- - Refactored gRPC client implementation in src/lrc/api/grpc/index.ts with unified Node vs Web support and removal of the old nice-grpc-web.ts
+  - Removed the nice-grpc-web alias from bundling configuration
+
+## 0.0.43
+
+### Patch Changes
+
+- Fixes
+
+## 0.0.42
+
+### Patch Changes
+
+- Fixes
+
+## 0.0.41
+
+### Patch Changes
+
+- Fixes
+
+## 0.0.40
+
+### Patch Changes
+
+- Fixes
+
+## 0.0.39
+
+### Patch Changes
+
+- Fixes
+
 ## 0.0.38
 
 ### Patch Changes

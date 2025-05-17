@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"testing"
 
 	_ "github.com/lib/pq" // postgres driver
 	"github.com/lightsparkdev/spark/so"
@@ -24,4 +25,11 @@ func TestContext(config *so.Config) (context.Context, *ent.Client, error) {
 	}
 
 	return context.WithValue(ctx, ent.TxKey, tx), dbClient, nil
+}
+
+func OnErrFatal(t *testing.T, err error) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
 }

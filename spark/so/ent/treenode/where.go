@@ -102,6 +102,21 @@ func RawRefundTx(v []byte) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldRawRefundTx, v))
 }
 
+// NodeConfirmationHeight applies equality check predicate on the "node_confirmation_height" field. It's identical to NodeConfirmationHeightEQ.
+func NodeConfirmationHeight(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldNodeConfirmationHeight, v))
+}
+
+// RefundConfirmationHeight applies equality check predicate on the "refund_confirmation_height" field. It's identical to RefundConfirmationHeightEQ.
+func RefundConfirmationHeight(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldRefundConfirmationHeight, v))
+}
+
+// DirectRefundTx applies equality check predicate on the "direct_refund_tx" field. It's identical to DirectRefundTxEQ.
+func DirectRefundTx(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldDirectRefundTx, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldCreateTime, v))
@@ -500,6 +515,156 @@ func RawRefundTxIsNil() predicate.TreeNode {
 // RawRefundTxNotNil applies the NotNil predicate on the "raw_refund_tx" field.
 func RawRefundTxNotNil() predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldNotNull(FieldRawRefundTx))
+}
+
+// NodeConfirmationHeightEQ applies the EQ predicate on the "node_confirmation_height" field.
+func NodeConfirmationHeightEQ(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldNodeConfirmationHeight, v))
+}
+
+// NodeConfirmationHeightNEQ applies the NEQ predicate on the "node_confirmation_height" field.
+func NodeConfirmationHeightNEQ(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldNodeConfirmationHeight, v))
+}
+
+// NodeConfirmationHeightIn applies the In predicate on the "node_confirmation_height" field.
+func NodeConfirmationHeightIn(vs ...uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldNodeConfirmationHeight, vs...))
+}
+
+// NodeConfirmationHeightNotIn applies the NotIn predicate on the "node_confirmation_height" field.
+func NodeConfirmationHeightNotIn(vs ...uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldNodeConfirmationHeight, vs...))
+}
+
+// NodeConfirmationHeightGT applies the GT predicate on the "node_confirmation_height" field.
+func NodeConfirmationHeightGT(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGT(FieldNodeConfirmationHeight, v))
+}
+
+// NodeConfirmationHeightGTE applies the GTE predicate on the "node_confirmation_height" field.
+func NodeConfirmationHeightGTE(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGTE(FieldNodeConfirmationHeight, v))
+}
+
+// NodeConfirmationHeightLT applies the LT predicate on the "node_confirmation_height" field.
+func NodeConfirmationHeightLT(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLT(FieldNodeConfirmationHeight, v))
+}
+
+// NodeConfirmationHeightLTE applies the LTE predicate on the "node_confirmation_height" field.
+func NodeConfirmationHeightLTE(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLTE(FieldNodeConfirmationHeight, v))
+}
+
+// NodeConfirmationHeightIsNil applies the IsNil predicate on the "node_confirmation_height" field.
+func NodeConfirmationHeightIsNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIsNull(FieldNodeConfirmationHeight))
+}
+
+// NodeConfirmationHeightNotNil applies the NotNil predicate on the "node_confirmation_height" field.
+func NodeConfirmationHeightNotNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotNull(FieldNodeConfirmationHeight))
+}
+
+// RefundConfirmationHeightEQ applies the EQ predicate on the "refund_confirmation_height" field.
+func RefundConfirmationHeightEQ(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldRefundConfirmationHeight, v))
+}
+
+// RefundConfirmationHeightNEQ applies the NEQ predicate on the "refund_confirmation_height" field.
+func RefundConfirmationHeightNEQ(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldRefundConfirmationHeight, v))
+}
+
+// RefundConfirmationHeightIn applies the In predicate on the "refund_confirmation_height" field.
+func RefundConfirmationHeightIn(vs ...uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldRefundConfirmationHeight, vs...))
+}
+
+// RefundConfirmationHeightNotIn applies the NotIn predicate on the "refund_confirmation_height" field.
+func RefundConfirmationHeightNotIn(vs ...uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldRefundConfirmationHeight, vs...))
+}
+
+// RefundConfirmationHeightGT applies the GT predicate on the "refund_confirmation_height" field.
+func RefundConfirmationHeightGT(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGT(FieldRefundConfirmationHeight, v))
+}
+
+// RefundConfirmationHeightGTE applies the GTE predicate on the "refund_confirmation_height" field.
+func RefundConfirmationHeightGTE(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGTE(FieldRefundConfirmationHeight, v))
+}
+
+// RefundConfirmationHeightLT applies the LT predicate on the "refund_confirmation_height" field.
+func RefundConfirmationHeightLT(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLT(FieldRefundConfirmationHeight, v))
+}
+
+// RefundConfirmationHeightLTE applies the LTE predicate on the "refund_confirmation_height" field.
+func RefundConfirmationHeightLTE(v uint64) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLTE(FieldRefundConfirmationHeight, v))
+}
+
+// RefundConfirmationHeightIsNil applies the IsNil predicate on the "refund_confirmation_height" field.
+func RefundConfirmationHeightIsNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIsNull(FieldRefundConfirmationHeight))
+}
+
+// RefundConfirmationHeightNotNil applies the NotNil predicate on the "refund_confirmation_height" field.
+func RefundConfirmationHeightNotNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotNull(FieldRefundConfirmationHeight))
+}
+
+// DirectRefundTxEQ applies the EQ predicate on the "direct_refund_tx" field.
+func DirectRefundTxEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldDirectRefundTx, v))
+}
+
+// DirectRefundTxNEQ applies the NEQ predicate on the "direct_refund_tx" field.
+func DirectRefundTxNEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldDirectRefundTx, v))
+}
+
+// DirectRefundTxIn applies the In predicate on the "direct_refund_tx" field.
+func DirectRefundTxIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldDirectRefundTx, vs...))
+}
+
+// DirectRefundTxNotIn applies the NotIn predicate on the "direct_refund_tx" field.
+func DirectRefundTxNotIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldDirectRefundTx, vs...))
+}
+
+// DirectRefundTxGT applies the GT predicate on the "direct_refund_tx" field.
+func DirectRefundTxGT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGT(FieldDirectRefundTx, v))
+}
+
+// DirectRefundTxGTE applies the GTE predicate on the "direct_refund_tx" field.
+func DirectRefundTxGTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGTE(FieldDirectRefundTx, v))
+}
+
+// DirectRefundTxLT applies the LT predicate on the "direct_refund_tx" field.
+func DirectRefundTxLT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLT(FieldDirectRefundTx, v))
+}
+
+// DirectRefundTxLTE applies the LTE predicate on the "direct_refund_tx" field.
+func DirectRefundTxLTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLTE(FieldDirectRefundTx, v))
+}
+
+// DirectRefundTxIsNil applies the IsNil predicate on the "direct_refund_tx" field.
+func DirectRefundTxIsNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIsNull(FieldDirectRefundTx))
+}
+
+// DirectRefundTxNotNil applies the NotNil predicate on the "direct_refund_tx" field.
+func DirectRefundTxNotNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotNull(FieldDirectRefundTx))
 }
 
 // HasTree applies the HasEdge predicate on the "tree" edge.

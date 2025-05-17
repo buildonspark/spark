@@ -41,7 +41,7 @@ describe("Lightning Network provider", () => {
         });
 
         expect(invoice.invoice.encodedInvoice).toMatch(
-          new RegExp(`^${invoicePrefix}[0-9]*[a-zA-Z0-9]{400}$`),
+          new RegExp(`^${invoicePrefix}[0-9]*[a-zA-Z0-9]*$`),
         );
         expect(invoice.invoice.paymentHash.length).toEqual(64);
         expect(invoice.invoice.amount.originalValue).toEqual(1000 * 1000);

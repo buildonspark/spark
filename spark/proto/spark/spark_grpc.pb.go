@@ -58,6 +58,8 @@ const (
 	SparkService_ReturnLightningPayment_FullMethodName       = "/spark.SparkService/return_lightning_payment"
 	SparkService_QueryUnusedDepositAddresses_FullMethodName  = "/spark.SparkService/query_unused_deposit_addresses"
 	SparkService_SubscribeToEvents_FullMethodName            = "/spark.SparkService/subscribe_to_events"
+	SparkService_InitiateUtxoSwap_FullMethodName             = "/spark.SparkService/initiate_utxo_swap"
+	SparkService_ExitSingleNodeTrees_FullMethodName          = "/spark.SparkService/exit_single_node_trees"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -111,6 +113,9 @@ type SparkServiceClient interface {
 	ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	QueryUnusedDepositAddresses(ctx context.Context, in *QueryUnusedDepositAddressesRequest, opts ...grpc.CallOption) (*QueryUnusedDepositAddressesResponse, error)
 	SubscribeToEvents(ctx context.Context, in *SubscribeToEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SubscribeToEventsResponse], error)
+	// Claim a deposit to a static address from SSP side
+	InitiateUtxoSwap(ctx context.Context, in *InitiateUtxoSwapRequest, opts ...grpc.CallOption) (*InitiateUtxoSwapResponse, error)
+	ExitSingleNodeTrees(ctx context.Context, in *ExitSingleNodeTreesRequest, opts ...grpc.CallOption) (*ExitSingleNodeTreesResponse, error)
 }
 
 type sparkServiceClient struct {
@@ -512,6 +517,26 @@ func (c *sparkServiceClient) SubscribeToEvents(ctx context.Context, in *Subscrib
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type SparkService_SubscribeToEventsClient = grpc.ServerStreamingClient[SubscribeToEventsResponse]
 
+func (c *sparkServiceClient) InitiateUtxoSwap(ctx context.Context, in *InitiateUtxoSwapRequest, opts ...grpc.CallOption) (*InitiateUtxoSwapResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InitiateUtxoSwapResponse)
+	err := c.cc.Invoke(ctx, SparkService_InitiateUtxoSwap_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) ExitSingleNodeTrees(ctx context.Context, in *ExitSingleNodeTreesRequest, opts ...grpc.CallOption) (*ExitSingleNodeTreesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExitSingleNodeTreesResponse)
+	err := c.cc.Invoke(ctx, SparkService_ExitSingleNodeTrees_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
@@ -563,6 +588,9 @@ type SparkServiceServer interface {
 	ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error)
 	QueryUnusedDepositAddresses(context.Context, *QueryUnusedDepositAddressesRequest) (*QueryUnusedDepositAddressesResponse, error)
 	SubscribeToEvents(*SubscribeToEventsRequest, grpc.ServerStreamingServer[SubscribeToEventsResponse]) error
+	// Claim a deposit to a static address from SSP side
+	InitiateUtxoSwap(context.Context, *InitiateUtxoSwapRequest) (*InitiateUtxoSwapResponse, error)
+	ExitSingleNodeTrees(context.Context, *ExitSingleNodeTreesRequest) (*ExitSingleNodeTreesResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -686,6 +714,12 @@ func (UnimplementedSparkServiceServer) QueryUnusedDepositAddresses(context.Conte
 }
 func (UnimplementedSparkServiceServer) SubscribeToEvents(*SubscribeToEventsRequest, grpc.ServerStreamingServer[SubscribeToEventsResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method SubscribeToEvents not implemented")
+}
+func (UnimplementedSparkServiceServer) InitiateUtxoSwap(context.Context, *InitiateUtxoSwapRequest) (*InitiateUtxoSwapResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InitiateUtxoSwap not implemented")
+}
+func (UnimplementedSparkServiceServer) ExitSingleNodeTrees(context.Context, *ExitSingleNodeTreesRequest) (*ExitSingleNodeTreesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ExitSingleNodeTrees not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -1385,6 +1419,42 @@ func _SparkService_SubscribeToEvents_Handler(srv interface{}, stream grpc.Server
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type SparkService_SubscribeToEventsServer = grpc.ServerStreamingServer[SubscribeToEventsResponse]
 
+func _SparkService_InitiateUtxoSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitiateUtxoSwapRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).InitiateUtxoSwap(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_InitiateUtxoSwap_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).InitiateUtxoSwap(ctx, req.(*InitiateUtxoSwapRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_ExitSingleNodeTrees_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExitSingleNodeTreesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).ExitSingleNodeTrees(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_ExitSingleNodeTrees_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).ExitSingleNodeTrees(ctx, req.(*ExitSingleNodeTreesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1539,6 +1609,14 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "query_unused_deposit_addresses",
 			Handler:    _SparkService_QueryUnusedDepositAddresses_Handler,
+		},
+		{
+			MethodName: "initiate_utxo_swap",
+			Handler:    _SparkService_InitiateUtxoSwap_Handler,
+		},
+		{
+			MethodName: "exit_single_node_trees",
+			Handler:    _SparkService_ExitSingleNodeTrees_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

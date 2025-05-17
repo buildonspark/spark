@@ -34,6 +34,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
+	"github.com/lightsparkdev/spark/so/ent/utxo"
+	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 )
 
 // Client is the client that holds all ent builders.
@@ -77,6 +79,10 @@ type Client struct {
 	TreeNode *TreeNodeClient
 	// UserSignedTransaction is the client for interacting with the UserSignedTransaction builders.
 	UserSignedTransaction *UserSignedTransactionClient
+	// Utxo is the client for interacting with the Utxo builders.
+	Utxo *UtxoClient
+	// UtxoSwap is the client for interacting with the UtxoSwap builders.
+	UtxoSwap *UtxoSwapClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -106,6 +112,8 @@ func (c *Client) init() {
 	c.Tree = NewTreeClient(c.config)
 	c.TreeNode = NewTreeNodeClient(c.config)
 	c.UserSignedTransaction = NewUserSignedTransactionClient(c.config)
+	c.Utxo = NewUtxoClient(c.config)
+	c.UtxoSwap = NewUtxoSwapClient(c.config)
 }
 
 type (
@@ -216,6 +224,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Tree:                    NewTreeClient(cfg),
 		TreeNode:                NewTreeNodeClient(cfg),
 		UserSignedTransaction:   NewUserSignedTransactionClient(cfg),
+		Utxo:                    NewUtxoClient(cfg),
+		UtxoSwap:                NewUtxoSwapClient(cfg),
 	}, nil
 }
 
@@ -253,6 +263,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Tree:                    NewTreeClient(cfg),
 		TreeNode:                NewTreeNodeClient(cfg),
 		UserSignedTransaction:   NewUserSignedTransactionClient(cfg),
+		Utxo:                    NewUtxoClient(cfg),
+		UtxoSwap:                NewUtxoSwapClient(cfg),
 	}, nil
 }
 
@@ -286,6 +298,7 @@ func (c *Client) Use(hooks ...Hook) {
 		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.TokenFreeze, c.TokenLeaf,
 		c.TokenMint, c.TokenOutput, c.TokenTransaction, c.TokenTransactionReceipt,
 		c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode, c.UserSignedTransaction,
+		c.Utxo, c.UtxoSwap,
 	} {
 		n.Use(hooks...)
 	}
@@ -299,6 +312,7 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.TokenFreeze, c.TokenLeaf,
 		c.TokenMint, c.TokenOutput, c.TokenTransaction, c.TokenTransactionReceipt,
 		c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode, c.UserSignedTransaction,
+		c.Utxo, c.UtxoSwap,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -343,6 +357,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.TreeNode.mutate(ctx, m)
 	case *UserSignedTransactionMutation:
 		return c.UserSignedTransaction.mutate(ctx, m)
+	case *UtxoMutation:
+		return c.Utxo.mutate(ctx, m)
+	case *UtxoSwapMutation:
+		return c.UtxoSwap.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
@@ -747,6 +765,38 @@ func (c *DepositAddressClient) QuerySigningKeyshare(da *DepositAddress) *Signing
 			sqlgraph.From(depositaddress.Table, depositaddress.FieldID, id),
 			sqlgraph.To(signingkeyshare.Table, signingkeyshare.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, depositaddress.SigningKeyshareTable, depositaddress.SigningKeyshareColumn),
+		)
+		fromV = sqlgraph.Neighbors(da.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUtxo queries the utxo edge of a DepositAddress.
+func (c *DepositAddressClient) QueryUtxo(da *DepositAddress) *UtxoQuery {
+	query := (&UtxoClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := da.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(depositaddress.Table, depositaddress.FieldID, id),
+			sqlgraph.To(utxo.Table, utxo.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, depositaddress.UtxoTable, depositaddress.UtxoColumn),
+		)
+		fromV = sqlgraph.Neighbors(da.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUtxoswaps queries the utxoswaps edge of a DepositAddress.
+func (c *DepositAddressClient) QueryUtxoswaps(da *DepositAddress) *UtxoSwapQuery {
+	query := (&UtxoSwapClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := da.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(depositaddress.Table, depositaddress.FieldID, id),
+			sqlgraph.To(utxoswap.Table, utxoswap.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, depositaddress.UtxoswapsTable, depositaddress.UtxoswapsColumn),
 		)
 		fromV = sqlgraph.Neighbors(da.driver.Dialect(), step)
 		return fromV, nil
@@ -3238,18 +3288,332 @@ func (c *UserSignedTransactionClient) mutate(ctx context.Context, m *UserSignedT
 	}
 }
 
+// UtxoClient is a client for the Utxo schema.
+type UtxoClient struct {
+	config
+}
+
+// NewUtxoClient returns a client for the Utxo from the given config.
+func NewUtxoClient(c config) *UtxoClient {
+	return &UtxoClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `utxo.Hooks(f(g(h())))`.
+func (c *UtxoClient) Use(hooks ...Hook) {
+	c.hooks.Utxo = append(c.hooks.Utxo, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `utxo.Intercept(f(g(h())))`.
+func (c *UtxoClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Utxo = append(c.inters.Utxo, interceptors...)
+}
+
+// Create returns a builder for creating a Utxo entity.
+func (c *UtxoClient) Create() *UtxoCreate {
+	mutation := newUtxoMutation(c.config, OpCreate)
+	return &UtxoCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Utxo entities.
+func (c *UtxoClient) CreateBulk(builders ...*UtxoCreate) *UtxoCreateBulk {
+	return &UtxoCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *UtxoClient) MapCreateBulk(slice any, setFunc func(*UtxoCreate, int)) *UtxoCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &UtxoCreateBulk{err: fmt.Errorf("calling to UtxoClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*UtxoCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &UtxoCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Utxo.
+func (c *UtxoClient) Update() *UtxoUpdate {
+	mutation := newUtxoMutation(c.config, OpUpdate)
+	return &UtxoUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *UtxoClient) UpdateOne(u *Utxo) *UtxoUpdateOne {
+	mutation := newUtxoMutation(c.config, OpUpdateOne, withUtxo(u))
+	return &UtxoUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *UtxoClient) UpdateOneID(id uuid.UUID) *UtxoUpdateOne {
+	mutation := newUtxoMutation(c.config, OpUpdateOne, withUtxoID(id))
+	return &UtxoUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Utxo.
+func (c *UtxoClient) Delete() *UtxoDelete {
+	mutation := newUtxoMutation(c.config, OpDelete)
+	return &UtxoDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *UtxoClient) DeleteOne(u *Utxo) *UtxoDeleteOne {
+	return c.DeleteOneID(u.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *UtxoClient) DeleteOneID(id uuid.UUID) *UtxoDeleteOne {
+	builder := c.Delete().Where(utxo.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &UtxoDeleteOne{builder}
+}
+
+// Query returns a query builder for Utxo.
+func (c *UtxoClient) Query() *UtxoQuery {
+	return &UtxoQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeUtxo},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Utxo entity by its id.
+func (c *UtxoClient) Get(ctx context.Context, id uuid.UUID) (*Utxo, error) {
+	return c.Query().Where(utxo.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *UtxoClient) GetX(ctx context.Context, id uuid.UUID) *Utxo {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryDepositAddress queries the deposit_address edge of a Utxo.
+func (c *UtxoClient) QueryDepositAddress(u *Utxo) *DepositAddressQuery {
+	query := (&DepositAddressClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := u.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(utxo.Table, utxo.FieldID, id),
+			sqlgraph.To(depositaddress.Table, depositaddress.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, utxo.DepositAddressTable, utxo.DepositAddressColumn),
+		)
+		fromV = sqlgraph.Neighbors(u.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *UtxoClient) Hooks() []Hook {
+	return c.hooks.Utxo
+}
+
+// Interceptors returns the client interceptors.
+func (c *UtxoClient) Interceptors() []Interceptor {
+	return c.inters.Utxo
+}
+
+func (c *UtxoClient) mutate(ctx context.Context, m *UtxoMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&UtxoCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&UtxoUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&UtxoUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&UtxoDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Utxo mutation op: %q", m.Op())
+	}
+}
+
+// UtxoSwapClient is a client for the UtxoSwap schema.
+type UtxoSwapClient struct {
+	config
+}
+
+// NewUtxoSwapClient returns a client for the UtxoSwap from the given config.
+func NewUtxoSwapClient(c config) *UtxoSwapClient {
+	return &UtxoSwapClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `utxoswap.Hooks(f(g(h())))`.
+func (c *UtxoSwapClient) Use(hooks ...Hook) {
+	c.hooks.UtxoSwap = append(c.hooks.UtxoSwap, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `utxoswap.Intercept(f(g(h())))`.
+func (c *UtxoSwapClient) Intercept(interceptors ...Interceptor) {
+	c.inters.UtxoSwap = append(c.inters.UtxoSwap, interceptors...)
+}
+
+// Create returns a builder for creating a UtxoSwap entity.
+func (c *UtxoSwapClient) Create() *UtxoSwapCreate {
+	mutation := newUtxoSwapMutation(c.config, OpCreate)
+	return &UtxoSwapCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of UtxoSwap entities.
+func (c *UtxoSwapClient) CreateBulk(builders ...*UtxoSwapCreate) *UtxoSwapCreateBulk {
+	return &UtxoSwapCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *UtxoSwapClient) MapCreateBulk(slice any, setFunc func(*UtxoSwapCreate, int)) *UtxoSwapCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &UtxoSwapCreateBulk{err: fmt.Errorf("calling to UtxoSwapClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*UtxoSwapCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &UtxoSwapCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for UtxoSwap.
+func (c *UtxoSwapClient) Update() *UtxoSwapUpdate {
+	mutation := newUtxoSwapMutation(c.config, OpUpdate)
+	return &UtxoSwapUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *UtxoSwapClient) UpdateOne(us *UtxoSwap) *UtxoSwapUpdateOne {
+	mutation := newUtxoSwapMutation(c.config, OpUpdateOne, withUtxoSwap(us))
+	return &UtxoSwapUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *UtxoSwapClient) UpdateOneID(id uuid.UUID) *UtxoSwapUpdateOne {
+	mutation := newUtxoSwapMutation(c.config, OpUpdateOne, withUtxoSwapID(id))
+	return &UtxoSwapUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for UtxoSwap.
+func (c *UtxoSwapClient) Delete() *UtxoSwapDelete {
+	mutation := newUtxoSwapMutation(c.config, OpDelete)
+	return &UtxoSwapDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *UtxoSwapClient) DeleteOne(us *UtxoSwap) *UtxoSwapDeleteOne {
+	return c.DeleteOneID(us.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *UtxoSwapClient) DeleteOneID(id uuid.UUID) *UtxoSwapDeleteOne {
+	builder := c.Delete().Where(utxoswap.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &UtxoSwapDeleteOne{builder}
+}
+
+// Query returns a query builder for UtxoSwap.
+func (c *UtxoSwapClient) Query() *UtxoSwapQuery {
+	return &UtxoSwapQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeUtxoSwap},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a UtxoSwap entity by its id.
+func (c *UtxoSwapClient) Get(ctx context.Context, id uuid.UUID) (*UtxoSwap, error) {
+	return c.Query().Where(utxoswap.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *UtxoSwapClient) GetX(ctx context.Context, id uuid.UUID) *UtxoSwap {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryUtxo queries the utxo edge of a UtxoSwap.
+func (c *UtxoSwapClient) QueryUtxo(us *UtxoSwap) *UtxoQuery {
+	query := (&UtxoClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := us.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(utxoswap.Table, utxoswap.FieldID, id),
+			sqlgraph.To(utxo.Table, utxo.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, utxoswap.UtxoTable, utxoswap.UtxoColumn),
+		)
+		fromV = sqlgraph.Neighbors(us.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryTransfer queries the transfer edge of a UtxoSwap.
+func (c *UtxoSwapClient) QueryTransfer(us *UtxoSwap) *TransferQuery {
+	query := (&TransferClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := us.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(utxoswap.Table, utxoswap.FieldID, id),
+			sqlgraph.To(transfer.Table, transfer.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, utxoswap.TransferTable, utxoswap.TransferColumn),
+		)
+		fromV = sqlgraph.Neighbors(us.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *UtxoSwapClient) Hooks() []Hook {
+	return c.hooks.UtxoSwap
+}
+
+// Interceptors returns the client interceptors.
+func (c *UtxoSwapClient) Interceptors() []Interceptor {
+	return c.inters.UtxoSwap
+}
+
+func (c *UtxoSwapClient) mutate(ctx context.Context, m *UtxoSwapMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&UtxoSwapCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&UtxoSwapUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&UtxoSwapUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&UtxoSwapDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown UtxoSwap mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
 		BlockHeight, CooperativeExit, DepositAddress, PreimageRequest, PreimageShare,
 		SigningKeyshare, SigningNonce, TokenFreeze, TokenLeaf, TokenMint, TokenOutput,
 		TokenTransaction, TokenTransactionReceipt, Transfer, TransferLeaf, Tree,
-		TreeNode, UserSignedTransaction []ent.Hook
+		TreeNode, UserSignedTransaction, Utxo, UtxoSwap []ent.Hook
 	}
 	inters struct {
 		BlockHeight, CooperativeExit, DepositAddress, PreimageRequest, PreimageShare,
 		SigningKeyshare, SigningNonce, TokenFreeze, TokenLeaf, TokenMint, TokenOutput,
 		TokenTransaction, TokenTransactionReceipt, Transfer, TransferLeaf, Tree,
-		TreeNode, UserSignedTransaction []ent.Interceptor
+		TreeNode, UserSignedTransaction, Utxo, UtxoSwap []ent.Interceptor
 	}
 )

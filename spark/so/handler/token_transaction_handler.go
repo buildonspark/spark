@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -387,6 +388,20 @@ func validateMintOperatorSpecificSignatures(identityPublicKey []byte, operatorSp
 	return nil
 }
 
+func validateTokenTransactionForSigning(tokenTransactionProto *pb.TokenTransaction, tokenTransactionEnt *ent.TokenTransaction) error {
+	if tokenTransactionEnt.Status != schema.TokenTransactionStatusStarted &&
+		tokenTransactionEnt.Status != schema.TokenTransactionStatusSigned {
+		return fmt.Errorf("signing failed because transaction is not in correct state, expected %s or %s, current status: %s", schema.TokenTransactionStatusStarted, schema.TokenTransactionStatusSigned, tokenTransactionEnt.Status)
+	}
+	if len(tokenTransactionProto.GetTransferInput().GetOutputsToSpend()) != len(tokenTransactionEnt.Edges.SpentOutput) {
+		return fmt.Errorf("signing failed because transaction is no longer mapped to spent TTXOs. Expected %d TTXOs, found %d. TTXOs were likely remapped to a more recent started transaction", len(tokenTransactionProto.GetTransferInput().GetOutputsToSpend()), len(tokenTransactionEnt.Edges.SpentOutput))
+	}
+	if !tokenTransactionEnt.ExpiryTime.IsZero() && time.Now().After(tokenTransactionEnt.ExpiryTime) {
+		return fmt.Errorf("signing failed because token transaction %s has expired at %s", tokenTransactionEnt.ID, tokenTransactionEnt.ExpiryTime.Format(time.RFC3339))
+	}
+	return nil
+}
+
 // validateOperatorSpecificSignatures validates the signatures in the request against the transaction hash
 // and verifies that the number of signatures matches the expected count based on transaction type
 func validateOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecificSignatures []*pb.OperatorSpecificOwnerSignature, tokenTransaction *ent.TokenTransaction) error {
@@ -418,6 +433,9 @@ func (o TokenTransactionHandler) SignTokenTransaction(
 	tokenTransaction, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", errFailedToFetchTransaction, err)
+	}
+	if err := validateTokenTransactionForSigning(req.FinalTokenTransaction, tokenTransaction); err != nil {
+		return nil, formatErrorWithTransactionEnt(err.Error(), tokenTransaction, err)
 	}
 
 	if err := validateOperatorSpecificSignatures(config.IdentityPublicKey(), req.OperatorSpecificSignatures, tokenTransaction); err != nil {
@@ -882,20 +900,7 @@ func (o TokenTransactionHandler) QueryTokenTransactions(ctx context.Context, con
 	transactionsWithStatus := make([]*pb.TokenTransactionWithStatus, 0, len(transactions))
 	for _, transaction := range transactions {
 		// Determine transaction status based on output statuses.
-		status := pb.TokenTransactionStatus_TOKEN_TRANSACTION_STARTED
-
-		// Check spent outputs status
-		spentOutputStatuses := make(map[schema.TokenOutputStatus]int)
-
-		for _, output := range transaction.Edges.SpentOutput {
-			// Verify that this spent output is actually associated with this transaction.
-			if output.Edges.OutputSpentTokenTransaction == nil ||
-				output.Edges.OutputSpentTokenTransaction.ID != transaction.ID {
-				logWithTransactionEnt(ctx, "Warning: Spent output not properly associated with transaction", transaction, slog.LevelInfo)
-				continue
-			}
-			spentOutputStatuses[output.Status]++
-		}
+		status := convertTokenTransactionStatus(transaction.Status)
 
 		// Reconstruct the token transaction from the ent data.
 		transactionProto, err := transaction.MarshalProto(config)
@@ -927,36 +932,64 @@ func (o TokenTransactionHandler) QueryTokenTransactions(ctx context.Context, con
 
 func (o TokenTransactionHandler) QueryTokenOutputs(
 	ctx context.Context,
+	config *so.Config,
 	req *pb.QueryTokenOutputsRequest,
 ) (*pb.QueryTokenOutputsResponse, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
-	outputs, err := ent.GetOwnedTokenOutputs(ctx, req.OwnerPublicKeys, req.TokenPublicKeys)
+	allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+	responses, err := helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection,
+		func(ctx context.Context, operator *so.SigningOperator) (map[string]*pb.OutputWithPreviousTransactionData, error) {
+			conn, err := operator.NewGRPCConnection()
+			if err != nil {
+				return nil, fmt.Errorf("failed to connect to operator %s: %w", operator.Identifier, err)
+			}
+			defer conn.Close()
+
+			client := pbinternal.NewSparkInternalServiceClient(conn)
+			availableOutputs, err := client.QueryTokenOutputsInternal(ctx, req)
+			if err != nil {
+				return nil, fmt.Errorf("failed to query token outputs from operator %s: %w", operator.Identifier, err)
+			}
+			spendableOutputMap := make(map[string]*pb.OutputWithPreviousTransactionData)
+			for _, output := range availableOutputs.OutputsWithPreviousTransactionData {
+				spendableOutputMap[*output.Output.Id] = output
+			}
+			return spendableOutputMap, nil
+		},
+	)
 	if err != nil {
-		logger.Info(errFailedToGetOwnedOutputStats, "error", err)
-		return nil, fmt.Errorf("%s: %w", errFailedToGetOwnedOutputStats, err)
+		logger.Info("failed to query token outputs from operators", "error", err)
+		return nil, fmt.Errorf("failed to query token outputs from operators: %w", err)
 	}
 
-	outputsWithPrevTxData := make([]*pb.OutputWithPreviousTransactionData, len(outputs))
-	for i, output := range outputs {
-		idStr := output.ID.String()
-		outputsWithPrevTxData[i] = &pb.OutputWithPreviousTransactionData{
-			Output: &pb.TokenOutput{
-				Id:                            &idStr,
-				OwnerPublicKey:                output.OwnerPublicKey,
-				RevocationCommitment:          output.WithdrawRevocationCommitment,
-				WithdrawBondSats:              &output.WithdrawBondSats,
-				WithdrawRelativeBlockLocktime: &output.WithdrawRelativeBlockLocktime,
-				TokenPublicKey:                output.TokenPublicKey,
-				TokenAmount:                   output.TokenAmount,
-			},
-			PreviousTransactionHash: output.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash,
-			PreviousTransactionVout: uint32(output.CreatedTransactionOutputVout),
+	// Only return token outputs to the wallet that ALL SOs agree are spendable.
+	//
+	// If a TTXO is partially signed, the spending transaction will be cancelled once it expires to return the TTXO to the wallet.
+	spendableOutputs := make([]*pb.OutputWithPreviousTransactionData, 0)
+	countSpendableOperatorsForOutputID := make(map[string]int)
+
+	requiredSpendableOperators := len(config.GetSigningOperatorList())
+	for _, spendableOutputMap := range responses {
+		for outputID, spendableOutput := range spendableOutputMap {
+			countSpendableOperatorsForOutputID[outputID]++
+			if countSpendableOperatorsForOutputID[outputID] == requiredSpendableOperators {
+				spendableOutputs = append(spendableOutputs, spendableOutput)
+			}
+		}
+	}
+
+	for outputID, countSpendableOperators := range countSpendableOperatorsForOutputID {
+		if countSpendableOperators < requiredSpendableOperators {
+			logger.Warn("token output not spendable in all operators",
+				"outputID", outputID,
+				"countSpendableOperators", countSpendableOperators,
+			)
 		}
 	}
 
 	return &pb.QueryTokenOutputsResponse{
-		OutputsWithPreviousTransactionData: outputsWithPrevTxData,
+		OutputsWithPreviousTransactionData: spendableOutputs,
 	}, nil
 }
 
@@ -1026,7 +1059,14 @@ func (o TokenTransactionHandler) CancelSignedTokenTransaction(
 			if txWithStatus.Status == pb.TokenTransactionStatus_TOKEN_TRANSACTION_FINALIZED {
 				return nil, formatErrorWithTransactionEnt("transaction has already been finalized by at least one operator, cannot cancel", tokenTransaction, nil)
 			}
-			if txWithStatus.Status == pb.TokenTransactionStatus_TOKEN_TRANSACTION_SIGNED {
+			if txWithStatus.Status == pb.TokenTransactionStatus_TOKEN_TRANSACTION_SIGNED ||
+				// Check for this just in case. Its unlikely, but it is theoretically possible for a race condition where
+				// the transaction is signed by the final operator needed for threshold just as the transaction is cancelled by a
+				// different operator. In this event, the operators that didn't cancel yet should not cancel to avoid a fully
+				// signed transaction being cancelled in all SOs.
+				// TODO(DL-140): Better handle this race condition, likely by allowing SIGNED_CANCELLED to transition into FINALIZED
+				// if a revocation secret is provided (which proves that all SOs have signed)
+				txWithStatus.Status == pb.TokenTransactionStatus_TOKEN_TRANSACTION_SIGNED_CANCELLED {
 				signedCount++
 			}
 		}
@@ -1122,4 +1162,22 @@ func formatErrorWithTransactionProto(msg string, tokenTransaction *pb.TokenTrans
 	return fmt.Errorf("%s (transaction: %s)",
 		msg,
 		tokenTransaction.String())
+}
+
+// convertTokenTransactionStatus converts from schema.TokenTransactionStatus to pb.TokenTransactionStatus
+func convertTokenTransactionStatus(status schema.TokenTransactionStatus) pb.TokenTransactionStatus {
+	switch status {
+	case schema.TokenTransactionStatusStarted:
+		return pb.TokenTransactionStatus_TOKEN_TRANSACTION_STARTED
+	case schema.TokenTransactionStatusStartedCancelled:
+		return pb.TokenTransactionStatus_TOKEN_TRANSACTION_STARTED_CANCELLED
+	case schema.TokenTransactionStatusSigned:
+		return pb.TokenTransactionStatus_TOKEN_TRANSACTION_SIGNED
+	case schema.TokenTransactionStatusSignedCancelled:
+		return pb.TokenTransactionStatus_TOKEN_TRANSACTION_SIGNED_CANCELLED
+	case schema.TokenTransactionStatusFinalized:
+		return pb.TokenTransactionStatus_TOKEN_TRANSACTION_FINALIZED
+	default:
+		return pb.TokenTransactionStatus_TOKEN_TRANSACTION_UNKNOWN
+	}
 }

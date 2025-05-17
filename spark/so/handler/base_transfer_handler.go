@@ -8,10 +8,12 @@ import (
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
-	"github.com/lightsparkdev/spark/common/logging"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -25,6 +27,17 @@ import (
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"google.golang.org/protobuf/proto"
+)
+
+type TransferRole int
+
+const (
+	// TransferRoleCoordinator is the role of the coordinator in a transfer.
+	// The coordinator is reponsible to make sure that the transfer key tweak is applied to all other participants,
+	// if the participants agree to the key tweak.
+	TransferRoleCoordinator TransferRole = iota
+	// TransferRoleParticipant is the role of a participant in a transfer.
+	TransferRoleParticipant
 )
 
 // BaseTransferHandler is the base transfer handler that is shared for internal and external transfer handlers.
@@ -108,7 +121,8 @@ func (h *BaseTransferHandler) createTransfer(
 	senderIdentityPublicKey []byte,
 	receiverIdentityPublicKey []byte,
 	leafRefundMap map[string][]byte,
-	senderKeyTweakProofs map[string]*pbspark.SecretProof,
+	leafTweakMap map[string]*pb.SendLeafKeyTweak,
+	role TransferRole,
 ) (*ent.Transfer, map[string]*ent.TreeNode, error) {
 	transferUUID, err := uuid.Parse(transferID)
 	if err != nil {
@@ -119,12 +133,23 @@ func (h *BaseTransferHandler) createTransfer(
 		return nil, nil, fmt.Errorf("invalid expiry_time %s: %v", expiryTime.String(), err)
 	}
 
+	var status schema.TransferStatus
+	if len(leafTweakMap) > 0 {
+		if role == TransferRoleCoordinator {
+			status = schema.TransferStatusSenderInitiatedCoordinator
+		} else {
+			status = schema.TransferStatusSenderKeyTweakPending
+		}
+	} else {
+		status = schema.TransferStatusSenderInitiated
+	}
+
 	db := ent.GetDbFromContext(ctx)
 	transfer, err := db.Transfer.Create().
 		SetID(transferUUID).
 		SetSenderIdentityPubkey(senderIdentityPublicKey).
 		SetReceiverIdentityPubkey(receiverIdentityPublicKey).
-		SetStatus(schema.TransferStatusSenderInitiated).
+		SetStatus(status).
 		SetTotalValue(0).
 		SetExpiryTime(expiryTime).
 		SetType(transferType).
@@ -147,12 +172,16 @@ func (h *BaseTransferHandler) createTransfer(
 		err = h.validateCooperativeExitLeaves(ctx, transfer, leaves, leafRefundMap, receiverIdentityPublicKey)
 	case schema.TransferTypeTransfer:
 		err = h.validateTransferLeaves(ctx, transfer, leaves, leafRefundMap, receiverIdentityPublicKey)
+	case schema.TransferTypeUtxoSwap:
+		err = h.validateUtxoSwapLeaves(ctx, transfer, leaves, leafRefundMap, receiverIdentityPublicKey)
+	case schema.TransferTypePreimageSwap, schema.TransferTypeSwap, schema.TransferTypeCounterSwap:
+		// do nothing
 	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to validate transfer leaves: %v", err)
 	}
 
-	err = createTransferLeaves(ctx, db, transfer, leaves, leafRefundMap, senderKeyTweakProofs)
+	err = createTransferLeaves(ctx, db, transfer, leaves, leafRefundMap, leafTweakMap)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create transfer leaves: %v", err)
 	}
@@ -217,6 +246,21 @@ func (h *BaseTransferHandler) validateCooperativeExitLeaves(ctx context.Context,
 	return nil
 }
 
+func (h *BaseTransferHandler) validateUtxoSwapLeaves(ctx context.Context, transfer *ent.Transfer, leaves []*ent.TreeNode, leafRefundMap map[string][]byte, receiverIdentityPublicKey []byte) error {
+	for _, leaf := range leaves {
+		rawRefundTx := leafRefundMap[leaf.ID.String()]
+		err := validateSendLeafRefundTx(leaf, rawRefundTx, receiverIdentityPublicKey, 1)
+		if err != nil {
+			return fmt.Errorf("unable to validate refund tx for leaf %s: %v", leaf.ID, err)
+		}
+		err = h.leafAvailableToTransfer(ctx, leaf, transfer)
+		if err != nil {
+			return fmt.Errorf("unable to validate leaf %s: %v", leaf.ID, err)
+		}
+	}
+	return nil
+}
+
 func (h *BaseTransferHandler) validateTransferLeaves(ctx context.Context, transfer *ent.Transfer, leaves []*ent.TreeNode, leafRefundMap map[string][]byte, receiverIdentityPublicKey []byte) error {
 	for _, leaf := range leaves {
 		rawRefundTx := leafRefundMap[leaf.ID.String()]
@@ -268,7 +312,7 @@ func createTransferLeaves(
 	transfer *ent.Transfer,
 	leaves []*ent.TreeNode,
 	leafRefundMap map[string][]byte,
-	senderKeyTweakProofs map[string]*pbspark.SecretProof,
+	leafTweakMap map[string]*pb.SendLeafKeyTweak,
 ) error {
 	for _, leaf := range leaves {
 		rawRefundTx := leafRefundMap[leaf.ID.String()]
@@ -277,14 +321,15 @@ func createTransferLeaves(
 			SetLeaf(leaf).
 			SetPreviousRefundTx(leaf.RawRefundTx).
 			SetIntermediateRefundTx(rawRefundTx)
-
-		if senderKeyTweakProofs != nil {
-			proof := senderKeyTweakProofs[leaf.ID.String()]
-			proofBytes, err := proto.Marshal(proof)
-			if err != nil {
-				return fmt.Errorf("unable to marshal sender key tweak proof: %v", err)
+		if leafTweakMap != nil {
+			leafTweak, ok := leafTweakMap[leaf.ID.String()]
+			if ok {
+				leafTweakBinary, err := proto.Marshal(leafTweak)
+				if err != nil {
+					return fmt.Errorf("unable to marshal leaf tweak: %v", err)
+				}
+				mutator = mutator.SetKeyTweak(leafTweakBinary)
 			}
-			mutator = mutator.SetSenderKeyTweakProof(proofBytes)
 		}
 		_, err := mutator.Save(ctx)
 		if err != nil {
@@ -295,15 +340,20 @@ func createTransferLeaves(
 }
 
 func setTotalTransferValue(ctx context.Context, db *ent.Tx, transfer *ent.Transfer, leaves []*ent.TreeNode) error {
-	totalAmount := uint64(0)
-	for _, leaf := range leaves {
-		totalAmount += leaf.Value
-	}
+	totalAmount := getTotalTransferValue(leaves)
 	_, err := db.Transfer.UpdateOne(transfer).SetTotalValue(totalAmount).Save(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to update transfer total value: %v", err)
 	}
 	return nil
+}
+
+func getTotalTransferValue(leaves []*ent.TreeNode) uint64 {
+	totalAmount := uint64(0)
+	for _, leaf := range leaves {
+		totalAmount += leaf.Value
+	}
+	return totalAmount
 }
 
 func lockLeaves(ctx context.Context, db *ent.Tx, leaves []*ent.TreeNode) ([]*ent.TreeNode, error) {
@@ -335,11 +385,30 @@ func (h *BaseTransferHandler) CancelTransfer(
 		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.SenderIdentityPublicKey); err != nil {
 			return nil, err
 		}
+		operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+		_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+			conn, err := operator.NewGRPCConnection()
+			if err != nil {
+				return nil, err
+			}
+			defer conn.Close()
+
+			client := pbinternal.NewSparkInternalServiceClient(conn)
+			_, err = client.CancelTransfer(ctx, req)
+			if err != nil {
+				return nil, fmt.Errorf("unable to cancel transfer: %v", err)
+			}
+			return nil, nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("unable to cancel transfer: %v", err)
+		}
 	}
 
 	transfer, err := h.loadTransfer(ctx, req.TransferId)
 	if err != nil {
-		return nil, fmt.Errorf("unable to load transfer %s: %v", req.TransferId, err)
+		// If we cannot find the transfer, don't fail the request.
+		return nil, nil
 	}
 	if !bytes.Equal(transfer.SenderIdentityPubkey, req.SenderIdentityPublicKey) {
 		return nil, fmt.Errorf("only sender is eligible to cancel the transfer %s", req.TransferId)
@@ -368,28 +437,6 @@ func (h *BaseTransferHandler) CancelTransfer(
 	err = h.cancelTransferCancelRequest(ctx, transfer)
 	if err != nil {
 		return nil, fmt.Errorf("unable to cancel associated request: %v", err)
-	}
-
-	if intent != CancelTransferIntentInternal {
-		operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-		_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-			conn, err := operator.NewGRPCConnection()
-			if err != nil {
-				return nil, err
-			}
-			defer conn.Close()
-
-			client := pbinternal.NewSparkInternalServiceClient(conn)
-			_, err = client.CancelTransfer(ctx, req)
-			if err != nil {
-				return nil, fmt.Errorf("unable to cancel transfer: %v", err)
-			}
-			return nil, nil
-		})
-		if err != nil {
-			logger := logging.GetLoggerFromContext(ctx)
-			logger.Error("unable to execute task with all operators", "error", err)
-		}
 	}
 
 	return &pbspark.CancelTransferResponse{}, nil
@@ -455,4 +502,95 @@ func (h *BaseTransferHandler) loadTransferWithoutUpdate(ctx context.Context, tra
 		return nil, fmt.Errorf("unable to find transfer %s: %v", transferID, err)
 	}
 	return transfer, nil
+}
+
+// validateTransferPackage validates the transfer package, to ensure the key tweaks are valid.
+func (h *BaseTransferHandler) validateTransferPackage(_ context.Context, transferID string, req *pb.TransferPackage, senderIdentityPublicKey []byte) (map[string]*pb.SendLeafKeyTweak, error) {
+	// If the transfer package is nil, we don't need to validate it.
+	if req == nil {
+		return nil, nil
+	}
+
+	// Decrypt the key tweaks
+	leafTweaksCipherText := req.KeyTweakPackage[h.config.Identifier]
+	if leafTweaksCipherText == nil {
+		return nil, fmt.Errorf("no key tweaks found for SO %s", h.config.Identifier)
+	}
+
+	decryptionPrivateKey := eciesgo.NewPrivateKeyFromBytes(h.config.IdentityPrivateKey)
+	leafTweaksBinary, err := eciesgo.Decrypt(decryptionPrivateKey, leafTweaksCipherText)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt key tweaks: %v", err)
+	}
+
+	leafTweaks := &pb.SendLeafKeyTweaks{}
+	err = proto.Unmarshal(leafTweaksBinary, leafTweaks)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal key tweaks: %v", err)
+	}
+
+	leafTweaksMap := make(map[string]*pb.SendLeafKeyTweak)
+	for _, leafTweak := range leafTweaks.LeavesToSend {
+		leafTweaksMap[leafTweak.LeafId] = leafTweak
+	}
+
+	transferIDUUID, err := uuid.Parse(transferID)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", transferID, err)
+	}
+	payloadToVerify := common.GetTransferPackageSigningPayload(transferIDUUID, req)
+
+	signature, err := ecdsa.ParseDERSignature(req.UserSignature)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse user signature: %v", err)
+	}
+	userPublicKey, err := secp256k1.ParsePubKey(senderIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse user public key: %v", err)
+	}
+	valid := signature.Verify(payloadToVerify, userPublicKey)
+	if !valid {
+		return nil, fmt.Errorf("invalid signature")
+	}
+
+	// TODO:(LPT-309) Validate the key tweaks is correct using VSS and each leaf is tweaked.
+
+	return leafTweaksMap, nil
+}
+
+func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfer *ent.Transfer) error {
+	if transfer.Status == schema.TransferStatusSenderKeyTweaked {
+		return nil
+	}
+	if transfer.Status != schema.TransferStatusSenderKeyTweakPending && transfer.Status != schema.TransferStatusSenderInitiatedCoordinator {
+		return fmt.Errorf("transfer %s is not in sender key tweak pending status", transfer.ID.String())
+	}
+	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get transfer leaves: %v", err)
+	}
+	for _, leaf := range transferLeaves {
+		keyTweak := &pb.SendLeafKeyTweak{}
+		err := proto.Unmarshal(leaf.KeyTweak, keyTweak)
+		if err != nil {
+			return fmt.Errorf("unable to unmarshal key tweak: %v", err)
+		}
+		treeNode, err := leaf.QueryLeaf().Only(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to get tree node: %v", err)
+		}
+		err = helper.TweakLeafKey(ctx, treeNode, keyTweak, nil)
+		if err != nil {
+			return fmt.Errorf("unable to tweak leaf key: %v", err)
+		}
+		_, err = leaf.Update().SetKeyTweak(nil).Save(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to update leaf key tweak: %v", err)
+		}
+	}
+	_, err = transfer.Update().SetStatus(schema.TransferStatusSenderKeyTweaked).Save(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to update transfer status: %v", err)
+	}
+	return nil
 }

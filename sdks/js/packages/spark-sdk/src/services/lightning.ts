@@ -7,6 +7,7 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import { decode } from "light-bolt11-decoder";
+import { uuidv7 } from "uuidv7";
 import { NetworkError, ValidationError } from "../errors/types.js";
 import LightningReceiveRequest from "../graphql/objects/LightningReceiveRequest.js";
 import {
@@ -198,7 +199,7 @@ export class LightningService {
       receiverIdentityPubkey,
     );
 
-    const transferId = crypto.randomUUID();
+    const transferId = uuidv7();
     let bolt11String = "";
     let amountSats: number = 0;
     if (invoiceString) {

@@ -3,9 +3,11 @@ package handler
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
@@ -18,6 +20,10 @@ import (
 	"github.com/lightsparkdev/spark/so/lrc20"
 	"github.com/lightsparkdev/spark/so/utils"
 	"google.golang.org/protobuf/types/known/emptypb"
+)
+
+const (
+	DefaultTokenTransactionExpiryDuration = 60 * time.Second
 )
 
 // InternalTokenTransactionHandler is the deposit handler for so internal
@@ -33,7 +39,22 @@ func NewInternalTokenTransactionHandler(config *so.Config, client *lrc20.Client)
 
 func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx context.Context, config *so.Config, req *pbinternal.StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("Starting token transaction", "keyshare_ids", req.KeyshareIds)
+	partialTransactionHash, err := utils.HashTokenTransaction(req.FinalTokenTransaction, true)
+	if err != nil {
+		logger.Error("Failed to compute partial transaction hash", "error", err)
+		return nil, fmt.Errorf("failed to compute transaction hash: %w", err)
+	}
+	// Compute expiry time at the start to ensure later delays in this function (eg. due to DB locks)
+	// do not impact the expiry value.
+	// If the token transaction expiry duration is not set in the config, use the default value
+	expiryDuration := config.TokenTransactionExpiryDuration
+	if expiryDuration == 0 {
+		expiryDuration = DefaultTokenTransactionExpiryDuration
+		logger.Info("TokenTransactionExpiryDuration not set, using default value", "default_duration", DefaultTokenTransactionExpiryDuration)
+	}
+	transactionExpiryTime := time.Now().Add(expiryDuration)
+	logger.Info("Starting token transaction", "partial_transaction_hash", hex.EncodeToString(partialTransactionHash), "keyshare_ids", req.KeyshareIds, "expiry_time", transactionExpiryTime.String())
+
 	keyshareUUIDs := make([]uuid.UUID, len(req.KeyshareIds))
 	// Ensure that the coordinator SO did not pass duplicate keyshare UUIDs for different outputs.
 	seenUUIDs := make(map[uuid.UUID]bool)
@@ -83,7 +104,7 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 	var outputToSpendEnts []*ent.TokenOutput
 	if req.FinalTokenTransaction.GetTransferInput() != nil {
 		// Get the leaves to spend from the database.
-		outputToSpendEnts, err = ent.FetchTokenInputs(ctx, req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend())
+		outputToSpendEnts, err = ent.FetchAndLockTokenInputs(ctx, req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend())
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch outputs to spend: %w", err)
 		}
@@ -105,7 +126,7 @@ func (h *InternalTokenTransactionHandler) StartTokenTransactionInternal(ctx cont
 	}
 	logger.Info("Token transaction verified with LRC20 node")
 	// Save the token transaction, created output ents, and update the outputs to spend.
-	_, err = ent.CreateStartedTransactionEntities(ctx, req.FinalTokenTransaction, req.TokenTransactionSignatures, req.KeyshareIds, outputToSpendEnts, req.CoordinatorPublicKey)
+	_, err = ent.CreateStartedTransactionEntities(ctx, req.FinalTokenTransaction, req.TokenTransactionSignatures, req.KeyshareIds, outputToSpendEnts, req.CoordinatorPublicKey, transactionExpiryTime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save token transaction and output ents: %w", err)
 	}
@@ -133,6 +154,38 @@ func ValidateMintSignature(
 	}
 
 	return nil
+}
+
+func (h *InternalTokenTransactionHandler) QueryTokenOutputsInternal(
+	ctx context.Context,
+	req *pb.QueryTokenOutputsRequest,
+) (*pb.QueryTokenOutputsResponse, error) {
+	logger := logging.GetLoggerFromContext(ctx)
+	outputs, err := ent.GetOwnedTokenOutputs(ctx, req.OwnerPublicKeys, req.TokenPublicKeys)
+	if err != nil {
+		logger.Info(errFailedToGetOwnedOutputStats, "error", err)
+		return nil, fmt.Errorf("%s: %w", errFailedToGetOwnedOutputStats, err)
+	}
+	ownedTokenOutputs := make([]*pb.OutputWithPreviousTransactionData, 0)
+	for _, output := range outputs {
+		idStr := output.ID.String()
+		ownedTokenOutputs = append(ownedTokenOutputs, &pb.OutputWithPreviousTransactionData{
+			Output: &pb.TokenOutput{
+				Id:                            &idStr,
+				OwnerPublicKey:                output.OwnerPublicKey,
+				RevocationCommitment:          output.WithdrawRevocationCommitment,
+				WithdrawBondSats:              &output.WithdrawBondSats,
+				WithdrawRelativeBlockLocktime: &output.WithdrawRelativeBlockLocktime,
+				TokenPublicKey:                output.TokenPublicKey,
+				TokenAmount:                   output.TokenAmount,
+			},
+			PreviousTransactionHash: output.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash,
+			PreviousTransactionVout: uint32(output.CreatedTransactionOutputVout),
+		})
+	}
+	return &pb.QueryTokenOutputsResponse{
+		OutputsWithPreviousTransactionData: ownedTokenOutputs,
+	}, nil
 }
 
 func ValidateTokenTransactionUsingPreviousTransactionData(
@@ -227,7 +280,7 @@ func ValidateTokenTransactionUsingPreviousTransactionData(
 // 1. The output has an appropriate status (Created+Finalized or already marked as SpentStarted)
 // 2. The output hasn't been withdrawn already
 func validateOutputIsSpendable(index int, output *ent.TokenOutput) error {
-	if !isValidOutputStatus(output.Status) {
+	if !isSpendableOutputStatus(output.Status) {
 		return fmt.Errorf("output %d cannot be spent: invalid status %s (must be CreatedFinalized or SpentStarted)",
 			index, output.Status)
 	}
@@ -239,8 +292,8 @@ func validateOutputIsSpendable(index int, output *ent.TokenOutput) error {
 	return nil
 }
 
-// isValidOutputStatus checks if a output's status allows it to be spent.
-func isValidOutputStatus(status schema.TokenOutputStatus) bool {
+// isSpendableOutputStatus checks if a output's status allows it to be spent.
+func isSpendableOutputStatus(status schema.TokenOutputStatus) bool {
 	return status == schema.TokenOutputStatusCreatedFinalized ||
 		status == schema.TokenOutputStatusSpentStarted
 }

@@ -1,0 +1,31 @@
+{
+  "name": "@buildonspark/spark-token-cli",
+  "version": "0.0.10",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "announce-token": "announce-token.ts"
+  },
+  "scripts": {
+    "announce-token": "tsx announce-token.ts",
+    "build": "tsc",
+    "types": "tsc",
+    "format:fix": "prettier . --write",
+    "format": "prettier . --check"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.13.2",
+    "prettier": "^3.5.1",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@buildonspark/issuer-sdk": "^0.0.51",
+    "node-fetch": "^3.3.2",
+    "tsx": "^4.19.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

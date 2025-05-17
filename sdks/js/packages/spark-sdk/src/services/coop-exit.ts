@@ -1,5 +1,7 @@
 import { Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
+import { uuidv7 } from "uuidv7";
+import { NetworkError, ValidationError } from "../errors/types.js";
 import {
   CooperativeExitResponse,
   LeafRefundTxSigningJob,
@@ -10,6 +12,7 @@ import {
   getTxFromRawTxBytes,
 } from "../utils/bitcoin.js";
 import { getCrypto } from "../utils/crypto.js";
+import { Network } from "../utils/network.js";
 import { getNextTransactionSequence } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
@@ -18,8 +21,6 @@ import {
   LeafKeyTweak,
   LeafRefundSigningData,
 } from "./transfer.js";
-import { ValidationError, NetworkError } from "../errors/types.js";
-import { Network } from "../utils/network.js";
 
 const crypto = getCrypto();
 
@@ -181,17 +182,17 @@ export class CoopExitService extends BaseTransferService {
     try {
       response = await sparkClient.cooperative_exit({
         transfer: {
-          transferId: crypto.randomUUID(),
+          transferId: uuidv7(),
           leavesToSend: signingJobs,
           ownerIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
           receiverIdentityPublicKey: receiverPubKey,
           expiryTime:
             this.config.getNetwork() == Network.MAINNET
-              ? new Date(Date.now() + 6 * 60 * 60 * 1000 + 5 * 60 * 1000)
-              : new Date(Date.now() + 5 * 60 * 1000), // 6 hours 5 min for mainnet, 5 min otherwise
+              ? new Date(Date.now() + 2 * 24 * 60 * 60 * 1000 + 5 * 60 * 1000)
+              : new Date(Date.now() + 5 * 60 * 1000), // 48 hours 5 min for mainnet, 5 min otherwise
         },
-        exitId: crypto.randomUUID(),
+        exitId: uuidv7(),
         exitTxid: exitTxId,
       });
     } catch (error) {

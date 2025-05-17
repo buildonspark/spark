@@ -285,6 +285,9 @@ func (ttu *TokenTransactionUpdate) sqlSave(ctx context.Context) (n int, err erro
 	if ttu.mutation.StatusCleared() {
 		_spec.ClearField(tokentransaction.FieldStatus, field.TypeEnum)
 	}
+	if ttu.mutation.ExpiryTimeCleared() {
+		_spec.ClearField(tokentransaction.FieldExpiryTime, field.TypeTime)
+	}
 	if value, ok := ttu.mutation.CoordinatorPublicKey(); ok {
 		_spec.SetField(tokentransaction.FieldCoordinatorPublicKey, field.TypeBytes, value)
 	}
@@ -712,6 +715,9 @@ func (ttuo *TokenTransactionUpdateOne) sqlSave(ctx context.Context) (_node *Toke
 	}
 	if ttuo.mutation.StatusCleared() {
 		_spec.ClearField(tokentransaction.FieldStatus, field.TypeEnum)
+	}
+	if ttuo.mutation.ExpiryTimeCleared() {
+		_spec.ClearField(tokentransaction.FieldExpiryTime, field.TypeTime)
 	}
 	if value, ok := ttuo.mutation.CoordinatorPublicKey(); ok {
 		_spec.SetField(tokentransaction.FieldCoordinatorPublicKey, field.TypeBytes, value)

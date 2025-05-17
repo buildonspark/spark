@@ -2,24 +2,24 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import Entity from './Entity.js';
-import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import LightningSendRequestStatus from './LightningSendRequestStatus.js';
-import {SwapLeafToJson} from './SwapLeaf.js';
-import LightningReceiveRequest from './LightningReceiveRequest.js';
+import type CoopExitRequest from './CoopExitRequest.js';
 import {SwapLeafFromJson} from './SwapLeaf.js';
-import {InvoiceFromJson} from './Invoice.js';
 import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
-import {TransferFromJson} from './Transfer.js';
-import {CurrencyAmountToJson} from './CurrencyAmount.js';
+import {InvoiceFromJson} from './Invoice.js';
 import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
-import LeavesSwapRequest from './LeavesSwapRequest.js';
-import LightningSendRequest from './LightningSendRequest.js';
-import CoopExitRequest from './CoopExitRequest.js';
+import {CurrencyAmountFromJson} from './CurrencyAmount.js';
+import {TransferFromJson} from './Transfer.js';
+import LightningSendRequestStatus from './LightningSendRequestStatus.js';
 import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
-import {InvoiceToJson} from './Invoice.js';
-import { LightsparkException } from '@lightsparkdev/core';
-import { Query, isObject } from '@lightsparkdev/core';
+import type LightningReceiveRequest from './LightningReceiveRequest.js';
 import BitcoinNetwork from './BitcoinNetwork.js';
+import {SwapLeafToJson} from './SwapLeaf.js';
+import { Query, isObject } from '@lightsparkdev/core';
+import type LightningSendRequest from './LightningSendRequest.js';
+import { LightsparkException } from '@lightsparkdev/core';
+import {InvoiceToJson} from './Invoice.js';
+import type LeavesSwapRequest from './LeavesSwapRequest.js';
+import {CurrencyAmountToJson} from './CurrencyAmount.js';
 
 
 interface UserRequest {
@@ -59,6 +59,7 @@ export const UserRequestFromJson = (obj: any): UserRequest => {
             status: SparkCoopExitRequestStatus[obj["coop_exit_request_status"]] ?? SparkCoopExitRequestStatus.FUTURE_VALUE,
             expiresAt: obj["coop_exit_request_expires_at"],
             rawConnectorTransaction: obj["coop_exit_request_raw_connector_transaction"],
+            rawCoopExitTransaction: obj["coop_exit_request_raw_coop_exit_transaction"],
             coopExitTxid: obj["coop_exit_request_coop_exit_txid"],
 typename: "CoopExitRequest",            transfer: (!!obj["coop_exit_request_transfer"] ? TransferFromJson(obj["coop_exit_request_transfer"]) : undefined),
 
@@ -90,6 +91,7 @@ typename: "LeavesSwapRequest",            outboundTransfer: (!!obj["leaves_swap_
             invoice: InvoiceFromJson(obj["lightning_receive_request_invoice"]),
             status: LightningReceiveRequestStatus[obj["lightning_receive_request_status"]] ?? LightningReceiveRequestStatus.FUTURE_VALUE,
 typename: "LightningReceiveRequest",            transfer: (!!obj["lightning_receive_request_transfer"] ? TransferFromJson(obj["lightning_receive_request_transfer"]) : undefined),
+            paymentPreimage: obj["lightning_receive_request_payment_preimage"],
 
         } as LightningReceiveRequest;
 
@@ -122,6 +124,7 @@ coop_exit_request_fee: CurrencyAmountToJson(coopExitRequest.fee),
 coop_exit_request_status: coopExitRequest.status,
 coop_exit_request_expires_at: coopExitRequest.expiresAt,
 coop_exit_request_raw_connector_transaction: coopExitRequest.rawConnectorTransaction,
+coop_exit_request_raw_coop_exit_transaction: coopExitRequest.rawCoopExitTransaction,
 coop_exit_request_coop_exit_txid: coopExitRequest.coopExitTxid,
 coop_exit_request_transfer: (coopExitRequest.transfer ? coopExitRequest.transfer.toJson() : undefined),
 
@@ -155,6 +158,7 @@ lightning_receive_request_network: lightningReceiveRequest.network,
 lightning_receive_request_invoice: InvoiceToJson(lightningReceiveRequest.invoice),
 lightning_receive_request_status: lightningReceiveRequest.status,
 lightning_receive_request_transfer: (lightningReceiveRequest.transfer ? lightningReceiveRequest.transfer.toJson() : undefined),
+lightning_receive_request_payment_preimage: lightningReceiveRequest.paymentPreimage,
 
         }
 
@@ -198,6 +202,7 @@ fragment UserRequestFragment on UserRequest {
         coop_exit_request_status: status
         coop_exit_request_expires_at: expires_at
         coop_exit_request_raw_connector_transaction: raw_connector_transaction
+        coop_exit_request_raw_coop_exit_transaction: raw_coop_exit_transaction
         coop_exit_request_coop_exit_txid: coop_exit_txid
         coop_exit_request_transfer: transfer {
             __typename
@@ -311,6 +316,7 @@ fragment UserRequestFragment on UserRequest {
             }
             transfer_spark_id: spark_id
         }
+        lightning_receive_request_payment_preimage: payment_preimage
     }
     ... on LightningSendRequest {
         __typename

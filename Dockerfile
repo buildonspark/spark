@@ -1,10 +1,13 @@
 FROM --platform=$BUILDPLATFORM golang:1.23-bookworm AS builder-go
 
 ARG TARGETOS TARGETARCH
+ARG DEBUG=0
 ENV GOOS=$TARGETOS
 ENV GOARCH=$TARGETARCH
 
 RUN apt-get update && apt-get install -y libzmq3-dev wget && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
 # Copy only go.mod and go.sum first to leverage Docker layer caching
 COPY spark/go.mod spark/go.sum spark/
@@ -16,7 +19,11 @@ COPY spark spark
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    cd spark && go install -v bin/operator/main.go
+    if [ "$DEBUG" = "1" ]; then \
+      cd spark && go build -gcflags="all=-N -l" -o /go/bin/spark-operator bin/operator/main.go ; \
+    else \
+      cd spark && go build -o /go/bin/spark-operator bin/operator/main.go ; \
+    fi
 
 RUN if [ -e /go/bin/${TARGETOS}_${TARGETARCH} ]; then mv /go/bin/${TARGETOS}_${TARGETARCH}/* /go/bin/; fi
 
@@ -69,11 +76,15 @@ RUN apt-get update && apt-get -y install libzmq5 ca-certificates gettext-base &&
 EXPOSE 9735 10009
 ENTRYPOINT ["spark-operator"]
 
+ARG DEBUG=0
 COPY --from=atlas /atlas /usr/local/bin/atlas
-COPY --from=builder-go /go/bin/main /usr/local/bin/spark-operator
+COPY --from=builder-go /go/bin/spark-operator /usr/local/bin/spark-operator
+COPY --from=builder-go /go/bin/dlv /usr/local/bin/dlv
 COPY --from=builder-go /bin/grpc_health_probe /usr/local/bin/grpc_health_probe
 COPY --from=builder-rust /signer/target/*/release/spark-frost-signer /usr/local/bin/spark-frost-signer
 COPY spark/so/ent/migrate/migrations /opt/spark/migrations
+
+RUN if [ "$DEBUG" = "0" ]; then rm -f /usr/local/bin/dlv; fi
 
 # Install security updates
 RUN apt-get update && apt-get -y upgrade && apt-get clean && rm -rf /var/lib/apt/lists

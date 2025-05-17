@@ -48,6 +48,10 @@ type Tx struct {
 	TreeNode *TreeNodeClient
 	// UserSignedTransaction is the client for interacting with the UserSignedTransaction builders.
 	UserSignedTransaction *UserSignedTransactionClient
+	// Utxo is the client for interacting with the Utxo builders.
+	Utxo *UtxoClient
+	// UtxoSwap is the client for interacting with the UtxoSwap builders.
+	UtxoSwap *UtxoSwapClient
 
 	// lazily loaded.
 	client     *Client
@@ -197,6 +201,8 @@ func (tx *Tx) init() {
 	tx.Tree = NewTreeClient(tx.config)
 	tx.TreeNode = NewTreeNodeClient(tx.config)
 	tx.UserSignedTransaction = NewUserSignedTransactionClient(tx.config)
+	tx.Utxo = NewUtxoClient(tx.config)
+	tx.UtxoSwap = NewUtxoSwapClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.

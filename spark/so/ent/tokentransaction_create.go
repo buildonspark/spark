@@ -84,6 +84,20 @@ func (ttc *TokenTransactionCreate) SetNillableStatus(sts *schema.TokenTransactio
 	return ttc
 }
 
+// SetExpiryTime sets the "expiry_time" field.
+func (ttc *TokenTransactionCreate) SetExpiryTime(t time.Time) *TokenTransactionCreate {
+	ttc.mutation.SetExpiryTime(t)
+	return ttc
+}
+
+// SetNillableExpiryTime sets the "expiry_time" field if the given value is not nil.
+func (ttc *TokenTransactionCreate) SetNillableExpiryTime(t *time.Time) *TokenTransactionCreate {
+	if t != nil {
+		ttc.SetExpiryTime(*t)
+	}
+	return ttc
+}
+
 // SetCoordinatorPublicKey sets the "coordinator_public_key" field.
 func (ttc *TokenTransactionCreate) SetCoordinatorPublicKey(b []byte) *TokenTransactionCreate {
 	ttc.mutation.SetCoordinatorPublicKey(b)
@@ -289,6 +303,10 @@ func (ttc *TokenTransactionCreate) createSpec() (*TokenTransaction, *sqlgraph.Cr
 	if value, ok := ttc.mutation.Status(); ok {
 		_spec.SetField(tokentransaction.FieldStatus, field.TypeEnum, value)
 		_node.Status = value
+	}
+	if value, ok := ttc.mutation.ExpiryTime(); ok {
+		_spec.SetField(tokentransaction.FieldExpiryTime, field.TypeTime, value)
+		_node.ExpiryTime = value
 	}
 	if value, ok := ttc.mutation.CoordinatorPublicKey(); ok {
 		_spec.SetField(tokentransaction.FieldCoordinatorPublicKey, field.TypeBytes, value)

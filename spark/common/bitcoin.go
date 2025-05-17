@@ -33,7 +33,7 @@ const (
 
 func (n Network) String() string {
 	switch n {
-	case Mainnet:
+	case Mainnet, Unspecified:
 		return "mainnet"
 	case Regtest:
 		return "regtest"
@@ -86,6 +86,8 @@ func NetworkFromSchemaNetwork(schemaNetwork schema.Network) (Network, error) {
 		return Testnet, nil
 	case schema.NetworkSignet:
 		return Signet, nil
+	case schema.NetworkUnspecified:
+		return Unspecified, fmt.Errorf("invalid network")
 	default:
 		return Unspecified, fmt.Errorf("invalid network")
 	}
@@ -118,6 +120,21 @@ func ProtoNetworkFromNetwork(network Network) (pb.Network, error) {
 		return pb.Network_SIGNET, nil
 	default:
 		return pb.Network_MAINNET, fmt.Errorf("invalid network")
+	}
+}
+
+func SchemaNetworkFromProtoNetwork(protoNetwork pb.Network) (schema.Network, error) {
+	switch protoNetwork {
+	case pb.Network_MAINNET:
+		return schema.NetworkMainnet, nil
+	case pb.Network_REGTEST:
+		return schema.NetworkRegtest, nil
+	case pb.Network_TESTNET:
+		return schema.NetworkTestnet, nil
+	case pb.Network_SIGNET:
+		return schema.NetworkSignet, nil
+	default:
+		return schema.NetworkUnspecified, fmt.Errorf("invalid network")
 	}
 }
 
@@ -231,6 +248,14 @@ func TxFromRawTxBytes(rawTxBytes []byte) (*wire.MsgTx, error) {
 	return &tx, nil
 }
 
+func SerializeTx(tx *wire.MsgTx) ([]byte, error) {
+	buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
+	if err := tx.Serialize(buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 // SigHashFromTx returns sighash from a tx.
 func SigHashFromTx(tx *wire.MsgTx, inputIndex int, prevOutput *wire.TxOut) ([]byte, error) {
 	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(
@@ -261,20 +286,41 @@ func UpdateTxWithSignature(rawTxBytes []byte, vin int, signature []byte) ([]byte
 	return buf.Bytes(), nil
 }
 
-// VerifySignature verifies that a signed transaction's input
+// VerifySignatureSingleInput verifies that a signed transaction's input
 // properly spends the prevOutput provided.
-func VerifySignature(signedTx *wire.MsgTx, vin int, prevOutput *wire.TxOut) error {
+func VerifySignatureSingleInput(signedTx *wire.MsgTx, vin int, prevOutput *wire.TxOut) error {
 	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(
 		prevOutput.PkScript, prevOutput.Value,
 	)
 	hashCache := txscript.NewTxSigHashes(signedTx, prevOutputFetcher)
-	vm, err := txscript.NewEngine(prevOutput.PkScript, signedTx, vin, txscript.StandardVerifyFlags,
+	// We skip erroring on witness version because btcd is behind bitcoin core on v3 transactions
+	verifyFlags := txscript.StandardVerifyFlags & ^txscript.ScriptVerifyDiscourageUpgradeableWitnessProgram
+	vm, err := txscript.NewEngine(prevOutput.PkScript, signedTx, vin, verifyFlags,
 		nil, hashCache, prevOutput.Value, prevOutputFetcher)
 	if err != nil {
 		return err
 	}
 	if err := vm.Execute(); err != nil {
 		return err
+	}
+	return nil
+}
+
+func VerifySignatureMultiInput(signedTx *wire.MsgTx, prevOutputFetcher txscript.PrevOutputFetcher) error {
+	hashCache := txscript.NewTxSigHashes(signedTx, prevOutputFetcher)
+	for vin, txIn := range signedTx.TxIn {
+		txOut := prevOutputFetcher.FetchPrevOutput(txIn.PreviousOutPoint)
+		// We skip erroring on witness version because btcd is behind bitcoin core on v3 transactions
+		verifyFlags := txscript.StandardVerifyFlags & ^txscript.ScriptVerifyDiscourageUpgradeableWitnessProgram & ^txscript.ScriptVerifyCleanStack
+		vm, err := txscript.NewEngine(txOut.PkScript, signedTx, vin, verifyFlags,
+			nil, hashCache, txOut.Value, prevOutputFetcher)
+		if err != nil {
+			return err
+		}
+		// We allow witness version errors because btcd is behind bitcoin core on v3 transactions
+		if err := vm.Execute(); err != nil {
+			return fmt.Errorf("failed to verify signature on input %d: %v", vin, err)
+		}
 	}
 	return nil
 }

@@ -9,6 +9,7 @@ import { Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { sha256 } from "@scure/btc-signer/utils";
 import * as ecies from "eciesjs";
+import { uuidv7 } from "uuidv7";
 import {
   NetworkError,
   SparkSDKError,
@@ -503,14 +504,17 @@ export class TransferService extends BaseTransferService {
       if (!leaf.leaf) {
         throw new Error("Leaf is undefined");
       }
+
       const encoder = new TextEncoder();
       const leafIdBytes = encoder.encode(leaf.leaf.id);
       const transferIdBytes = encoder.encode(transfer.id);
+
       const payload = new Uint8Array([
         ...leafIdBytes,
         ...transferIdBytes,
         ...leaf.secretCipher,
       ]);
+
       const payloadHash = sha256(payload);
       if (
         !secp256k1.verify(
@@ -611,7 +615,7 @@ export class TransferService extends BaseTransferService {
     leafDataMap: Map<string, LeafRefundSigningData>;
     signingResults: LeafRefundTxSigningResult[];
   }> {
-    const transferId = crypto.randomUUID();
+    const transferId = uuidv7();
     const leafDataMap = new Map<string, LeafRefundSigningData>();
     for (const leaf of leaves) {
       const signingNonceCommitment =
@@ -647,7 +651,7 @@ export class TransferService extends BaseTransferService {
             receiverIdentityPublicKey: receiverIdentityPubkey,
             expiryTime: expiryTime,
           },
-          swapId: crypto.randomUUID(),
+          swapId: uuidv7(),
           adaptorPublicKey: adaptorPubKey || new Uint8Array(),
         });
       } else if (forSwap) {

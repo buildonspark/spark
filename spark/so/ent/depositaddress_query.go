@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 
@@ -16,6 +17,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/ent/utxo"
+	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 )
 
 // DepositAddressQuery is the builder for querying DepositAddress entities.
@@ -26,6 +29,8 @@ type DepositAddressQuery struct {
 	inters              []Interceptor
 	predicates          []predicate.DepositAddress
 	withSigningKeyshare *SigningKeyshareQuery
+	withUtxo            *UtxoQuery
+	withUtxoswaps       *UtxoSwapQuery
 	withFKs             bool
 	modifiers           []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
@@ -79,6 +84,50 @@ func (daq *DepositAddressQuery) QuerySigningKeyshare() *SigningKeyshareQuery {
 			sqlgraph.From(depositaddress.Table, depositaddress.FieldID, selector),
 			sqlgraph.To(signingkeyshare.Table, signingkeyshare.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, depositaddress.SigningKeyshareTable, depositaddress.SigningKeyshareColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(daq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryUtxo chains the current query on the "utxo" edge.
+func (daq *DepositAddressQuery) QueryUtxo() *UtxoQuery {
+	query := (&UtxoClient{config: daq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := daq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := daq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(depositaddress.Table, depositaddress.FieldID, selector),
+			sqlgraph.To(utxo.Table, utxo.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, depositaddress.UtxoTable, depositaddress.UtxoColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(daq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryUtxoswaps chains the current query on the "utxoswaps" edge.
+func (daq *DepositAddressQuery) QueryUtxoswaps() *UtxoSwapQuery {
+	query := (&UtxoSwapClient{config: daq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := daq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := daq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(depositaddress.Table, depositaddress.FieldID, selector),
+			sqlgraph.To(utxoswap.Table, utxoswap.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, depositaddress.UtxoswapsTable, depositaddress.UtxoswapsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(daq.driver.Dialect(), step)
 		return fromU, nil
@@ -279,6 +328,8 @@ func (daq *DepositAddressQuery) Clone() *DepositAddressQuery {
 		inters:              append([]Interceptor{}, daq.inters...),
 		predicates:          append([]predicate.DepositAddress{}, daq.predicates...),
 		withSigningKeyshare: daq.withSigningKeyshare.Clone(),
+		withUtxo:            daq.withUtxo.Clone(),
+		withUtxoswaps:       daq.withUtxoswaps.Clone(),
 		// clone intermediate query.
 		sql:  daq.sql.Clone(),
 		path: daq.path,
@@ -293,6 +344,28 @@ func (daq *DepositAddressQuery) WithSigningKeyshare(opts ...func(*SigningKeyshar
 		opt(query)
 	}
 	daq.withSigningKeyshare = query
+	return daq
+}
+
+// WithUtxo tells the query-builder to eager-load the nodes that are connected to
+// the "utxo" edge. The optional arguments are used to configure the query builder of the edge.
+func (daq *DepositAddressQuery) WithUtxo(opts ...func(*UtxoQuery)) *DepositAddressQuery {
+	query := (&UtxoClient{config: daq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	daq.withUtxo = query
+	return daq
+}
+
+// WithUtxoswaps tells the query-builder to eager-load the nodes that are connected to
+// the "utxoswaps" edge. The optional arguments are used to configure the query builder of the edge.
+func (daq *DepositAddressQuery) WithUtxoswaps(opts ...func(*UtxoSwapQuery)) *DepositAddressQuery {
+	query := (&UtxoSwapClient{config: daq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	daq.withUtxoswaps = query
 	return daq
 }
 
@@ -375,8 +448,10 @@ func (daq *DepositAddressQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 		nodes       = []*DepositAddress{}
 		withFKs     = daq.withFKs
 		_spec       = daq.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [3]bool{
 			daq.withSigningKeyshare != nil,
+			daq.withUtxo != nil,
+			daq.withUtxoswaps != nil,
 		}
 	)
 	if daq.withSigningKeyshare != nil {
@@ -412,6 +487,20 @@ func (daq *DepositAddressQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 			return nil, err
 		}
 	}
+	if query := daq.withUtxo; query != nil {
+		if err := daq.loadUtxo(ctx, query, nodes,
+			func(n *DepositAddress) { n.Edges.Utxo = []*Utxo{} },
+			func(n *DepositAddress, e *Utxo) { n.Edges.Utxo = append(n.Edges.Utxo, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := daq.withUtxoswaps; query != nil {
+		if err := daq.loadUtxoswaps(ctx, query, nodes,
+			func(n *DepositAddress) { n.Edges.Utxoswaps = []*UtxoSwap{} },
+			func(n *DepositAddress, e *UtxoSwap) { n.Edges.Utxoswaps = append(n.Edges.Utxoswaps, e) }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
 }
 
@@ -444,6 +533,68 @@ func (daq *DepositAddressQuery) loadSigningKeyshare(ctx context.Context, query *
 		for i := range nodes {
 			assign(nodes[i], n)
 		}
+	}
+	return nil
+}
+func (daq *DepositAddressQuery) loadUtxo(ctx context.Context, query *UtxoQuery, nodes []*DepositAddress, init func(*DepositAddress), assign func(*DepositAddress, *Utxo)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*DepositAddress)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	query.Where(predicate.Utxo(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(depositaddress.UtxoColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.deposit_address_utxo
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "deposit_address_utxo" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "deposit_address_utxo" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (daq *DepositAddressQuery) loadUtxoswaps(ctx context.Context, query *UtxoSwapQuery, nodes []*DepositAddress, init func(*DepositAddress), assign func(*DepositAddress, *UtxoSwap)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*DepositAddress)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	query.Where(predicate.UtxoSwap(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(depositaddress.UtxoswapsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.deposit_address_utxoswaps
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "deposit_address_utxoswaps" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "deposit_address_utxoswaps" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
 	}
 	return nil
 }

@@ -2,8 +2,7 @@ export { BitcoinTransactionDto } from "./bitcoin-transaction.ts";
 export type { BtcMetadata } from "./bitcoin-transaction.ts";
 export { BitcoinUtxo, Lrc20Utxo, BitcoinUtxoStatus, BitcoinUtxoSpentStatus } from "./bitcoin-utxo.ts";
 export type { BitcoinUtxoDto, BitcoinUtxoStatusDto, Lrc20UtxoDto, BitcoinTxOut, ScriptPubKey } from "./bitcoin-utxo.ts";
-export { TokenPubkey, TokenPubkeyInfo } from "./token-pubkey.ts";
-export type { TokenPubkeyInfoDto } from "./token-pubkey.ts";
+export { TokenPubkey } from "./token-pubkey.ts";
 export { TxInput, BitcoinInput, ReceiptInput, MultisigReceiptInput } from "./input.ts";
 export { TokenAmount } from "./token-amount.ts";
 export {
@@ -73,6 +72,7 @@ export {
   Lrc20TransactionDto,
   Lrc20TransactionTypeDto,
   Lrc20TransactionParser,
+  TokenPubkeyInfo,
 } from "./lrc20-transaction.ts";
 export type {
   Lrc20TransactionType,
@@ -93,5 +93,6 @@ export type {
   FreezeAnnouncementDto,
   PubkeyFreezeAnnouncementDto,
   TransferOwnershipAnnouncementDto,
+  TokenPubkeyInfoDto,
 } from "./lrc20-transaction.ts";
 export type { SparkExitMetadata } from "./spark.ts";

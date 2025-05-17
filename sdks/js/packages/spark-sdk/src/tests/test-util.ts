@@ -1,7 +1,7 @@
-import { isNode } from "@lightsparkdev/core";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
-import fs from "fs";
+import { uuidv7 } from "uuidv7";
+import { RPCError } from "../errors/types.js";
 import { TreeNode } from "../proto/spark.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection.js";
@@ -15,24 +15,8 @@ import { getCrypto } from "../utils/crypto.js";
 import { getNetwork, Network } from "../utils/network.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
-import { ValidationError, RPCError } from "../errors/types.js";
 
 const crypto = getCrypto();
-
-/**
- * Checks if the current environment is a hermetic test environment.
- * A hermetic test environment is identified by either:
- * 1. The existence of a marker file at /tmp/spark_hermetic
- * 2. The HERMETIC_TEST environment variable being set to "true"
- *
- * @returns {boolean} True if running in a hermetic test environment, false otherwise
- */
-export function isHermeticTest() {
-  return (
-    (isNode && (fs?.existsSync?.("/tmp/spark_hermetic") ?? false)) ||
-    process.env.HERMETIC_TEST === "true"
-  );
-}
 
 export function getTestWalletConfig() {
   const identityPrivateKey = secp256k1.utils.randomPrivateKey();
@@ -65,7 +49,7 @@ export async function createNewTree(
   const connectionManager = new ConnectionManager(configService);
   const depositService = new DepositService(configService, connectionManager);
 
-  const leafId = crypto.randomUUID();
+  const leafId = uuidv7();
   const depositResp = await depositService.generateDepositAddress({
     signingPubkey: pubKey,
     leafId,

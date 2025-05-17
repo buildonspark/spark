@@ -13,6 +13,8 @@ type TransferStatus string
 const (
 	// TransferStatusSenderInitiated is the status of a transfer that has been initiated by sender.
 	TransferStatusSenderInitiated TransferStatus = "SENDER_INITIATED"
+	// TransferStatusSenderInitiatedCoordinator is the status of a transfer that has been initiated by sender directly to the coordinator.
+	TransferStatusSenderInitiatedCoordinator TransferStatus = "SENDER_INITIATED_COORDINATOR"
 	// TransferStatusSenderKeyTweakPending is the status of a transfer that has been initiated by sender but the key tweak is pending.
 	TransferStatusSenderKeyTweakPending TransferStatus = "SENDER_KEY_TWEAK_PENDING"
 	// TransferStatusSenderKeyTweaked is the status of a transfer that sender has tweaked the key.
@@ -21,6 +23,8 @@ const (
 	TransferStatusReceiverKeyTweaked TransferStatus = "RECEIVER_KEY_TWEAKED"
 	// TransferStatusReceiverKeyTweakLocked is the status of transfer where key has been tweaked and locked.
 	TransferStatusReceiverKeyTweakLocked TransferStatus = "RECEIVER_KEY_TWEAK_LOCKED"
+	// TransferStatusReceiverKeyTweakApplied is the status of transfer where key has been tweaked and applied.
+	TransferStatusReceiverKeyTweakApplied TransferStatus = "RECEIVER_KEY_TWEAK_APPLIED"
 	// TransferStatusReceiverRefundSigned is the status of transfer where refund transaction has been signed.
 	TransferStatusReceiverRefundSigned TransferStatus = "RECEIVER_REFUND_SIGNED"
 	// TransferStatusCompleted is the status of transfer that has completed.
@@ -35,6 +39,7 @@ const (
 func (TransferStatus) Values() []string {
 	return []string{
 		string(TransferStatusSenderInitiated),
+		string(TransferStatusSenderInitiatedCoordinator),
 		string(TransferStatusSenderKeyTweakPending),
 		string(TransferStatusSenderKeyTweaked),
 		string(TransferStatusReceiverKeyTweaked),
@@ -43,6 +48,7 @@ func (TransferStatus) Values() []string {
 		string(TransferStatusCompleted),
 		string(TransferStatusExpired),
 		string(TransferStatusReturned),
+		string(TransferStatusReceiverKeyTweakApplied),
 	}
 }
 
@@ -60,6 +66,8 @@ const (
 	TransferTypeSwap TransferType = "SWAP"
 	// TransferTypeCounterSwap is the type of transfer that is the other side of a swap.
 	TransferTypeCounterSwap TransferType = "COUNTER_SWAP"
+	// TransferTypeUtxoSwap is the type of transfer that is a swap of an utxos for leaves.
+	TransferTypeUtxoSwap TransferType = "UTXO_SWAP"
 )
 
 // Values returns the values of the transfer type.
@@ -70,6 +78,7 @@ func (TransferType) Values() []string {
 		string(TransferTypeTransfer),
 		string(TransferTypeSwap),
 		string(TransferTypeCounterSwap),
+		string(TransferTypeUtxoSwap),
 	}
 }
 

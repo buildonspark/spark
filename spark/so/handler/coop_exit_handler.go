@@ -49,7 +49,8 @@ func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.Co
 		req.Transfer.OwnerIdentityPublicKey,
 		req.Transfer.ReceiverIdentityPublicKey,
 		leafRefundMap,
-		req.Transfer.KeyTweakProofs,
+		nil,
+		TransferRoleCoordinator,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transfer: %v", err)
@@ -80,7 +81,7 @@ func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.Co
 		return nil, fmt.Errorf("failed to marshal transfer: %v", err)
 	}
 
-	signingResults, err := signRefunds(ctx, h.config, req.Transfer.LeavesToSend, leafMap, nil)
+	signingResults, err := signRefunds(ctx, h.config, req.Transfer, leafMap, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign refund transactions: %v", err)
 	}

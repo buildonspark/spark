@@ -12,6 +12,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/proto/spark"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 	testutil "github.com/lightsparkdev/spark/test_util"
 	"github.com/lightsparkdev/spark/wallet"
 	"github.com/stretchr/testify/assert"
@@ -281,6 +282,46 @@ func TestCancelTransfer(t *testing.T) {
 		leavesToClaim[:],
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
+}
+
+func TestCancelTransferAfterTweak(t *testing.T) {
+	// Sender initiates transfer
+	senderConfig, err := testutil.TestWalletConfig()
+	require.NoError(t, err, "failed to create sender wallet config")
+
+	leafPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create node signing private key")
+	rootNode, err := testutil.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
+	require.NoError(t, err, "failed to create new tree")
+
+	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create new node signing private key")
+
+	receiverPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create receiver private key")
+
+	transferNode := wallet.LeafKeyTweak{
+		Leaf:              rootNode,
+		SigningPrivKey:    leafPrivKey.Serialize(),
+		NewSigningPrivKey: newLeafPrivKey.Serialize(),
+	}
+	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+	expiryDuration := 1 * time.Second
+	senderTransfer, err := wallet.SendTransfer(
+		context.Background(),
+		senderConfig,
+		leavesToTransfer[:],
+		receiverPrivKey.PubKey().SerializeCompressed(),
+		time.Now().Add(expiryDuration),
+	)
+	require.NoError(t, err, "failed to transfer tree node")
+
+	// Make sure transfers can't be cancelled after key tweak even after
+	// expiration
+	time.Sleep(expiryDuration)
+
+	_, err = wallet.CancelTransfer(context.Background(), senderConfig, senderTransfer)
+	require.Error(t, err, "expected to fail but didn't")
 }
 
 func TestQueryTransfers(t *testing.T) {
@@ -593,4 +634,78 @@ func TestDoubleClaimTransfer(t *testing.T) {
 		require.NoError(t, err, "failed to ClaimTransfer")
 		require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
 	}
+}
+
+func TestTransferWithPreTweakedPackage(t *testing.T) {
+	// Sender initiates transfer
+	senderConfig, err := testutil.TestWalletConfig()
+	require.NoError(t, err, "failed to create sender wallet config")
+
+	leafPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create node signing private key")
+	rootNode, err := testutil.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
+	require.NoError(t, err, "failed to create new tree")
+
+	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create new node signing private key")
+
+	receiverPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create receiver private key")
+
+	transferNode := wallet.LeafKeyTweak{
+		Leaf:              rootNode,
+		SigningPrivKey:    leafPrivKey.Serialize(),
+		NewSigningPrivKey: newLeafPrivKey.Serialize(),
+	}
+	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+
+	conn, err := common.NewGRPCConnectionWithTestTLS(senderConfig.CoodinatorAddress(), nil)
+	require.NoError(t, err, "failed to create grpc connection")
+	defer conn.Close()
+
+	client := pb.NewSparkServiceClient(conn)
+
+	authToken, err := wallet.AuthenticateWithServer(context.Background(), senderConfig)
+	require.NoError(t, err, "failed to authenticate sender")
+	senderCtx := wallet.ContextWithToken(context.Background(), authToken)
+
+	senderTransfer, err := wallet.SendTransferWithKeyTweaks(
+		senderCtx,
+		senderConfig,
+		client,
+		leavesToTransfer[:],
+		receiverPrivKey.PubKey().SerializeCompressed(),
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err, "failed to send transfer")
+
+	// Receiver queries pending transfer
+	receiverConfig, err := testutil.TestWalletConfigWithIdentityKey(*receiverPrivKey)
+	require.NoError(t, err, "failed to create wallet config")
+	receiverToken, err := wallet.AuthenticateWithServer(context.Background(), receiverConfig)
+	require.NoError(t, err, "failed to authenticate receiver")
+	receiverCtx := wallet.ContextWithToken(context.Background(), receiverToken)
+	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Equal(t, 1, len(pendingTransfer.Transfers))
+	receiverTransfer := pendingTransfer.Transfers[0]
+	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+	require.Equal(t, receiverTransfer.Type, spark.TransferType_TRANSFER)
+
+	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create new node signing private key")
+	claimingNode := wallet.LeafKeyTweak{
+		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey.Serialize(),
+		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
+	}
+	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	res, err := wallet.ClaimTransfer(
+		receiverCtx,
+		receiverTransfer,
+		receiverConfig,
+		leavesToClaim[:],
+	)
+	require.NoError(t, err, "failed to ClaimTransfer")
+	require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
 }

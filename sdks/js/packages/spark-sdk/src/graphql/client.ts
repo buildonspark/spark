@@ -22,7 +22,7 @@ import CoopExitRequest, {
   CoopExitRequestFromJson,
 } from "./objects/CoopExitRequest.js";
 import { GetChallengeOutputFromJson } from "./objects/GetChallengeOutput.js";
-import {
+import type {
   CompleteCoopExitInput,
   CompleteLeavesSwapInput,
   CoopExitFeeEstimatesInput,

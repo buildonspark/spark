@@ -4,13 +4,13 @@
 import UserRequest from './UserRequest.js';
 import Entity from './Entity.js';
 import {InvoiceFromJson} from './Invoice.js';
-import Transfer from './Transfer.js';
-import {TransferFromJson} from './Transfer.js';
 import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
 import Invoice from './Invoice.js';
-import {InvoiceToJson} from './Invoice.js';
-import { Query, isObject } from '@lightsparkdev/core';
+import {TransferFromJson} from './Transfer.js';
 import BitcoinNetwork from './BitcoinNetwork.js';
+import { Query, isObject } from '@lightsparkdev/core';
+import {InvoiceToJson} from './Invoice.js';
+import Transfer from './Transfer.js';
 
 
 interface LightningReceiveRequest {
@@ -43,6 +43,9 @@ typename: string;
     /** The leaves transfer after lightning payment was received. **/
 transfer?: Transfer | undefined;
 
+    /** The payment preimage of the invoice if retrieved from SE. **/
+paymentPreimage?: string | undefined;
+
 
 
 
@@ -57,6 +60,7 @@ export const LightningReceiveRequestFromJson = (obj: any): LightningReceiveReque
         invoice: InvoiceFromJson(obj["lightning_receive_request_invoice"]),
         status: LightningReceiveRequestStatus[obj["lightning_receive_request_status"]] ?? LightningReceiveRequestStatus.FUTURE_VALUE,
 typename: "LightningReceiveRequest",        transfer: (!!obj["lightning_receive_request_transfer"] ? TransferFromJson(obj["lightning_receive_request_transfer"]) : undefined),
+        paymentPreimage: obj["lightning_receive_request_payment_preimage"],
 
         } as LightningReceiveRequest;
 
@@ -70,6 +74,7 @@ lightning_receive_request_network: obj.network,
 lightning_receive_request_invoice: InvoiceToJson(obj.invoice),
 lightning_receive_request_status: obj.status,
 lightning_receive_request_transfer: (obj.transfer ? obj.transfer.toJson() : undefined),
+lightning_receive_request_payment_preimage: obj.paymentPreimage,
 
         }
 
@@ -113,6 +118,7 @@ fragment LightningReceiveRequestFragment on LightningReceiveRequest {
         }
         transfer_spark_id: spark_id
     }
+    lightning_receive_request_payment_preimage: payment_preimage
 }`;
 
 

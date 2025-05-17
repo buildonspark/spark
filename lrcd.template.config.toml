@@ -32,6 +32,7 @@ max_confirmation_time = { secs = 86400, nanos = 0 }
 max_restart_attempts = 100
 restart_interval = { secs = 30, nanos = 0 }
 confirmations_number = 1
+enforce_announcements = true
 
 [controller]
 max_inv_size = 100

@@ -18,7 +18,7 @@ func CreateTestP2TRTransaction(p2trAddress string, amountSats int64) (*wire.MsgT
 		return nil, fmt.Errorf("error creating output: %v", err)
 	}
 	outputs := []*wire.TxOut{txOut}
-	return createTestTransaction(inputs, outputs), nil
+	return CreateTestTransaction(inputs, outputs), nil
 }
 
 // CreateTestDepositTransaction creates a test deposit transaction spending
@@ -30,7 +30,22 @@ func CreateTestDepositTransaction(outPoint *wire.OutPoint, p2trAddress string, a
 		return nil, fmt.Errorf("error creating output: %v", err)
 	}
 	outputs := []*wire.TxOut{txOut}
-	return createTestTransaction(inputs, outputs), nil
+	return CreateTestTransaction(inputs, outputs), nil
+}
+
+// CreateTestDepositTransactionManyOutputs creates a test deposit transaction spending
+// the given outpoint to the given P2TR addresses with the given amount.
+func CreateTestDepositTransactionManyOutputs(outPoint *wire.OutPoint, p2trAddresses []string, amountSats int64) (*wire.MsgTx, error) {
+	inputs := []*wire.TxIn{wire.NewTxIn(outPoint, nil, [][]byte{})}
+	outputs := make([]*wire.TxOut, 0)
+	for _, p2trAddress := range p2trAddresses {
+		txOut, err := createP2TROutput(p2trAddress, amountSats)
+		if err != nil {
+			return nil, fmt.Errorf("error creating output: %v", err)
+		}
+		outputs = append(outputs, txOut)
+	}
+	return CreateTestTransaction(inputs, outputs), nil
 }
 
 // CreateTestCoopExitTransaction creates a test coop exit transaction with a dummy input and two outputs.
@@ -50,7 +65,7 @@ func CreateTestCoopExitTransaction(
 		return nil, fmt.Errorf("error creating output: %v", err)
 	}
 	outputs := []*wire.TxOut{userOutput, intermediateOutput}
-	return createTestTransaction(inputs, outputs), nil
+	return CreateTestTransaction(inputs, outputs), nil
 }
 
 // CreateTestConnectorTransaction creates a tx that
@@ -71,11 +86,11 @@ func CreateTestConnectorTransaction(
 		}
 		outputs = append(outputs, connectorOutput)
 	}
-	return createTestTransaction(inputs, outputs), nil
+	return CreateTestTransaction(inputs, outputs), nil
 }
 
-func createTestTransaction(inputs []*wire.TxIn, outputs []*wire.TxOut) *wire.MsgTx {
-	tx := wire.NewMsgTx(2)
+func CreateTestTransaction(inputs []*wire.TxIn, outputs []*wire.TxOut) *wire.MsgTx {
+	tx := wire.NewMsgTx(3)
 	for _, in := range inputs {
 		tx.AddTxIn(in)
 	}

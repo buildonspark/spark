@@ -1,0 +1,36 @@
+pre-commit:
+  jobs:
+    - name: golang
+      glob: "spark/**"
+      root: "spark/"
+      group:
+        parallel: true
+        jobs:
+          - name: golangci-lint
+            run: golangci-lint run
+          - name: gotestsum
+            run: gotestsum --format testname $(go list ./... | grep -v -E "so/grpc_test|so/tree")
+    - name: frost
+      glob: "signer/**"
+      root: "signer/"
+      group:
+        parallel: true
+        jobs:
+          - name: cargo fmt
+            run: cargo fmt --all --check
+          - name: cargo clippy
+            run: cargo clippy --workspace --all-targets --locked -- -D warnings
+    - name: js
+      glob: "sdks/js/**"
+      root: "sdks/js"
+      group:
+        piped: true
+        jobs:
+          - name: yarn install
+            run: yarn install --frozen-lockfile
+          - name: yarn build
+            run: yarn run build
+          - name: yarn format
+            run: yarn run format
+          - name: yarn test
+            run: yarn run test

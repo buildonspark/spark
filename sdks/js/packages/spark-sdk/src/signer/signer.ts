@@ -5,12 +5,14 @@ import {
 } from "@noble/curves/abstract/utils";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { HDKey } from "@scure/bip32";
-import * as bip39 from "@scure/bip39";
-import { generateMnemonic } from "@scure/bip39";
+import { generateMnemonic, mnemonicToSeed } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { sha256 } from "@scure/btc-signer/utils";
 import * as ecies from "eciesjs";
+import { isReactNative } from "../constants.js";
+import { ConfigurationError, ValidationError } from "../errors/types.js";
 import { TreeNode } from "../proto/spark.js";
+import { IKeyPackage, ISigningCommitment } from "../spark_bindings/types.js";
 import { generateAdaptorFromSignature } from "../utils/adaptor-signature.js";
 import { getMasterHDKeyFromSeed, subtractPrivateKeys } from "../utils/keys.js";
 import { Network } from "../utils/network.js";
@@ -19,14 +21,21 @@ import {
   VerifiableSecretShare,
 } from "../utils/secret-sharing.js";
 import {
-  createWasmSigningCommitment,
-  createWasmSigningNonce,
   getRandomSigningNonce,
   getSigningCommitmentFromNonce,
 } from "../utils/signing.js";
-import { aggregateFrost, signFrost } from "../utils/wasm.js";
-import { KeyPackage } from "../wasm/spark_bindings.js";
-import { ValidationError, ConfigurationError } from "../errors/types.js";
+
+let sparkFrostModule: any = undefined;
+const getSparkFrostModule = async () => {
+  if (isReactNative) {
+    return undefined;
+  }
+  if (!sparkFrostModule) {
+    // Use dynamic import
+    sparkFrostModule = await import("../spark_bindings/wasm/index.js");
+  }
+  return sparkFrostModule;
+};
 
 export type SigningNonce = {
   binding: Uint8Array;
@@ -43,8 +52,8 @@ export type SignFrostParams = {
   privateAsPubKey: Uint8Array;
   publicKey: Uint8Array;
   verifyingKey: Uint8Array;
-  selfCommitment: SigningCommitment;
-  statechainCommitments?: { [key: string]: SigningCommitment } | undefined;
+  selfCommitment: ISigningCommitment;
+  statechainCommitments?: { [key: string]: ISigningCommitment } | undefined;
   adaptorPubKey?: Uint8Array | undefined;
 };
 
@@ -73,6 +82,7 @@ interface SparkSigner {
   createSparkWalletFromSeed(
     seed: Uint8Array | string,
     network: Network,
+    accountNumber?: number,
   ): Promise<string>;
 
   restoreSigningKeysFromLeafs(leafs: TreeNode[]): Promise<void>;
@@ -107,6 +117,10 @@ interface SparkSigner {
     message: Uint8Array,
     compact?: boolean,
   ): Promise<Uint8Array>;
+  validateMessageWithIdentityKey(
+    message: Uint8Array,
+    signature: Uint8Array,
+  ): Promise<boolean>;
 
   encryptLeafPrivateKeyEcies(
     receiverPublicKey: Uint8Array,
@@ -133,9 +147,9 @@ class DefaultSparkSigner implements SparkSigner {
   private depositKey: HDKey | null = null;
 
   // <hex, hex>
-  private publicKeyToPrivateKeyMap: Map<string, string> = new Map();
+  protected publicKeyToPrivateKeyMap: Map<string, string> = new Map();
 
-  private commitmentToNonceMap: Map<SigningCommitment, SigningNonce> =
+  protected commitmentToNonceMap: Map<SigningCommitment, SigningNonce> =
     new Map();
 
   private deriveSigningKey(hash: Uint8Array): Uint8Array {
@@ -240,7 +254,7 @@ class DefaultSparkSigner implements SparkSigner {
   }
 
   async mnemonicToSeed(mnemonic: string): Promise<Uint8Array> {
-    return await bip39.mnemonicToSeed(mnemonic);
+    return await mnemonicToSeed(mnemonic);
   }
 
   async getTrackedPublicKeys(): Promise<Uint8Array[]> {
@@ -268,8 +282,8 @@ class DefaultSparkSigner implements SparkSigner {
     }
 
     const publicKey = secp256k1.getPublicKey(newPrivateKey);
-
     const pubKeyHex = bytesToHex(publicKey);
+
     const privKeyHex = bytesToHex(newPrivateKey);
     this.publicKeyToPrivateKeyMap.set(pubKeyHex, privKeyHex);
 
@@ -339,6 +353,12 @@ class DefaultSparkSigner implements SparkSigner {
     statechainCommitments,
     adaptorPubKey,
   }: SignFrostParams): Promise<Uint8Array> {
+    const SparkFrost = await getSparkFrostModule();
+    if (!SparkFrost) {
+      throw new ValidationError("SparkFrost module not found", {
+        field: "SparkFrost",
+      });
+    }
     const privateAsPubKeyHex = bytesToHex(privateAsPubKey);
     const signingPrivateKey =
       this.publicKeyToPrivateKeyMap.get(privateAsPubKeyHex);
@@ -356,17 +376,17 @@ class DefaultSparkSigner implements SparkSigner {
       });
     }
 
-    const keyPackage = new KeyPackage(
-      hexToBytes(signingPrivateKey),
-      publicKey,
-      verifyingKey,
-    );
+    const keyPackage: IKeyPackage = {
+      secretKey: hexToBytes(signingPrivateKey),
+      publicKey: publicKey,
+      verifyingKey: verifyingKey,
+    };
 
-    return signFrost({
-      msg: message,
+    return SparkFrost.signFrost({
+      message,
       keyPackage,
-      nonce: createWasmSigningNonce(nonce),
-      selfCommitment: createWasmSigningCommitment(selfCommitment),
+      nonce,
+      selfCommitment,
       statechainCommitments,
       adaptorPubKey,
     });
@@ -383,13 +403,19 @@ class DefaultSparkSigner implements SparkSigner {
     statechainSignatures,
     statechainPublicKeys,
   }: AggregateFrostParams): Promise<Uint8Array> {
-    return aggregateFrost({
-      msg: message,
+    const SparkFrost = await getSparkFrostModule();
+    if (!SparkFrost) {
+      throw new ValidationError("SparkFrost module not found", {
+        field: "SparkFrost",
+      });
+    }
+    return SparkFrost.aggregateFrost({
+      message,
       statechainSignatures,
       statechainPublicKeys,
       verifyingKey,
       statechainCommitments,
-      selfCommitment: createWasmSigningCommitment(selfCommitment),
+      selfCommitment,
       selfPublicKey: publicKey,
       selfSignature,
       adaptorPubKey,
@@ -399,7 +425,19 @@ class DefaultSparkSigner implements SparkSigner {
   async createSparkWalletFromSeed(
     seed: Uint8Array | string,
     network: Network,
+    accountNumber?: number,
   ): Promise<string> {
+    if (accountNumber === 0 || accountNumber === 1) {
+      // Reserved values for the case where no account number is provided
+      throw new ValidationError(
+        "If an account number is provided, it must not be be 0 or 1",
+        {
+          field: "accountNumber",
+          value: accountNumber,
+          expected: "values that do not equal 0 or 1",
+        },
+      );
+    }
     if (typeof seed === "string") {
       seed = hexToBytes(seed);
     }
@@ -413,10 +451,16 @@ class DefaultSparkSigner implements SparkSigner {
       });
     }
 
-    const accountType = network === Network.REGTEST ? 0 : 1;
-    const identityKey = hdkey.derive(`m/8797555'/${accountType}'/0'`);
-    const signingKey = hdkey.derive(`m/8797555'/${accountType}'/1'`);
-    const depositKey = hdkey.derive(`m/8797555'/${accountType}'/2'`);
+    const accountNetwork = network === Network.REGTEST ? 0 : 1; // When an accountNumber is not provided, set a value based on the network
+    const identityKey = hdkey.derive(
+      `m/8797555'/${accountNumber ?? accountNetwork}'/0'`,
+    );
+    const signingKey = hdkey.derive(
+      `m/8797555'/${accountNumber ?? accountNetwork}'/1'`,
+    );
+    const depositKey = hdkey.derive(
+      `m/8797555'/${accountNumber ?? accountNetwork}'/2'`,
+    );
 
     if (
       !identityKey.privateKey ||
@@ -447,7 +491,6 @@ class DefaultSparkSigner implements SparkSigner {
       bytesToHex(depositKey.publicKey),
       bytesToHex(depositKey.privateKey),
     );
-
     return bytesToHex(identityKey.publicKey);
   }
 
@@ -558,6 +601,19 @@ class DefaultSparkSigner implements SparkSigner {
     }
 
     return this.masterKey.publicKey;
+  }
+
+  async validateMessageWithIdentityKey(
+    message: Uint8Array,
+    signature: Uint8Array,
+  ): Promise<boolean> {
+    if (!this.identityKey?.publicKey) {
+      throw new ConfigurationError("Identity key not initialized", {
+        configKey: "identityKey",
+      });
+    }
+
+    return secp256k1.verify(signature, message, this.identityKey.publicKey);
   }
 }
 export { DefaultSparkSigner };

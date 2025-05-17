@@ -103,6 +103,72 @@ func (tnu *TreeNodeUpdate) ClearRawRefundTx() *TreeNodeUpdate {
 	return tnu
 }
 
+// SetNodeConfirmationHeight sets the "node_confirmation_height" field.
+func (tnu *TreeNodeUpdate) SetNodeConfirmationHeight(u uint64) *TreeNodeUpdate {
+	tnu.mutation.ResetNodeConfirmationHeight()
+	tnu.mutation.SetNodeConfirmationHeight(u)
+	return tnu
+}
+
+// SetNillableNodeConfirmationHeight sets the "node_confirmation_height" field if the given value is not nil.
+func (tnu *TreeNodeUpdate) SetNillableNodeConfirmationHeight(u *uint64) *TreeNodeUpdate {
+	if u != nil {
+		tnu.SetNodeConfirmationHeight(*u)
+	}
+	return tnu
+}
+
+// AddNodeConfirmationHeight adds u to the "node_confirmation_height" field.
+func (tnu *TreeNodeUpdate) AddNodeConfirmationHeight(u int64) *TreeNodeUpdate {
+	tnu.mutation.AddNodeConfirmationHeight(u)
+	return tnu
+}
+
+// ClearNodeConfirmationHeight clears the value of the "node_confirmation_height" field.
+func (tnu *TreeNodeUpdate) ClearNodeConfirmationHeight() *TreeNodeUpdate {
+	tnu.mutation.ClearNodeConfirmationHeight()
+	return tnu
+}
+
+// SetRefundConfirmationHeight sets the "refund_confirmation_height" field.
+func (tnu *TreeNodeUpdate) SetRefundConfirmationHeight(u uint64) *TreeNodeUpdate {
+	tnu.mutation.ResetRefundConfirmationHeight()
+	tnu.mutation.SetRefundConfirmationHeight(u)
+	return tnu
+}
+
+// SetNillableRefundConfirmationHeight sets the "refund_confirmation_height" field if the given value is not nil.
+func (tnu *TreeNodeUpdate) SetNillableRefundConfirmationHeight(u *uint64) *TreeNodeUpdate {
+	if u != nil {
+		tnu.SetRefundConfirmationHeight(*u)
+	}
+	return tnu
+}
+
+// AddRefundConfirmationHeight adds u to the "refund_confirmation_height" field.
+func (tnu *TreeNodeUpdate) AddRefundConfirmationHeight(u int64) *TreeNodeUpdate {
+	tnu.mutation.AddRefundConfirmationHeight(u)
+	return tnu
+}
+
+// ClearRefundConfirmationHeight clears the value of the "refund_confirmation_height" field.
+func (tnu *TreeNodeUpdate) ClearRefundConfirmationHeight() *TreeNodeUpdate {
+	tnu.mutation.ClearRefundConfirmationHeight()
+	return tnu
+}
+
+// SetDirectRefundTx sets the "direct_refund_tx" field.
+func (tnu *TreeNodeUpdate) SetDirectRefundTx(b []byte) *TreeNodeUpdate {
+	tnu.mutation.SetDirectRefundTx(b)
+	return tnu
+}
+
+// ClearDirectRefundTx clears the value of the "direct_refund_tx" field.
+func (tnu *TreeNodeUpdate) ClearDirectRefundTx() *TreeNodeUpdate {
+	tnu.mutation.ClearDirectRefundTx()
+	return tnu
+}
+
 // SetTreeID sets the "tree" edge to the Tree entity by ID.
 func (tnu *TreeNodeUpdate) SetTreeID(id uuid.UUID) *TreeNodeUpdate {
 	tnu.mutation.SetTreeID(id)
@@ -308,6 +374,30 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if tnu.mutation.RawRefundTxCleared() {
 		_spec.ClearField(treenode.FieldRawRefundTx, field.TypeBytes)
+	}
+	if value, ok := tnu.mutation.NodeConfirmationHeight(); ok {
+		_spec.SetField(treenode.FieldNodeConfirmationHeight, field.TypeUint64, value)
+	}
+	if value, ok := tnu.mutation.AddedNodeConfirmationHeight(); ok {
+		_spec.AddField(treenode.FieldNodeConfirmationHeight, field.TypeUint64, value)
+	}
+	if tnu.mutation.NodeConfirmationHeightCleared() {
+		_spec.ClearField(treenode.FieldNodeConfirmationHeight, field.TypeUint64)
+	}
+	if value, ok := tnu.mutation.RefundConfirmationHeight(); ok {
+		_spec.SetField(treenode.FieldRefundConfirmationHeight, field.TypeUint64, value)
+	}
+	if value, ok := tnu.mutation.AddedRefundConfirmationHeight(); ok {
+		_spec.AddField(treenode.FieldRefundConfirmationHeight, field.TypeUint64, value)
+	}
+	if tnu.mutation.RefundConfirmationHeightCleared() {
+		_spec.ClearField(treenode.FieldRefundConfirmationHeight, field.TypeUint64)
+	}
+	if value, ok := tnu.mutation.DirectRefundTx(); ok {
+		_spec.SetField(treenode.FieldDirectRefundTx, field.TypeBytes, value)
+	}
+	if tnu.mutation.DirectRefundTxCleared() {
+		_spec.ClearField(treenode.FieldDirectRefundTx, field.TypeBytes)
 	}
 	if tnu.mutation.TreeCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -529,6 +619,72 @@ func (tnuo *TreeNodeUpdateOne) SetRawRefundTx(b []byte) *TreeNodeUpdateOne {
 // ClearRawRefundTx clears the value of the "raw_refund_tx" field.
 func (tnuo *TreeNodeUpdateOne) ClearRawRefundTx() *TreeNodeUpdateOne {
 	tnuo.mutation.ClearRawRefundTx()
+	return tnuo
+}
+
+// SetNodeConfirmationHeight sets the "node_confirmation_height" field.
+func (tnuo *TreeNodeUpdateOne) SetNodeConfirmationHeight(u uint64) *TreeNodeUpdateOne {
+	tnuo.mutation.ResetNodeConfirmationHeight()
+	tnuo.mutation.SetNodeConfirmationHeight(u)
+	return tnuo
+}
+
+// SetNillableNodeConfirmationHeight sets the "node_confirmation_height" field if the given value is not nil.
+func (tnuo *TreeNodeUpdateOne) SetNillableNodeConfirmationHeight(u *uint64) *TreeNodeUpdateOne {
+	if u != nil {
+		tnuo.SetNodeConfirmationHeight(*u)
+	}
+	return tnuo
+}
+
+// AddNodeConfirmationHeight adds u to the "node_confirmation_height" field.
+func (tnuo *TreeNodeUpdateOne) AddNodeConfirmationHeight(u int64) *TreeNodeUpdateOne {
+	tnuo.mutation.AddNodeConfirmationHeight(u)
+	return tnuo
+}
+
+// ClearNodeConfirmationHeight clears the value of the "node_confirmation_height" field.
+func (tnuo *TreeNodeUpdateOne) ClearNodeConfirmationHeight() *TreeNodeUpdateOne {
+	tnuo.mutation.ClearNodeConfirmationHeight()
+	return tnuo
+}
+
+// SetRefundConfirmationHeight sets the "refund_confirmation_height" field.
+func (tnuo *TreeNodeUpdateOne) SetRefundConfirmationHeight(u uint64) *TreeNodeUpdateOne {
+	tnuo.mutation.ResetRefundConfirmationHeight()
+	tnuo.mutation.SetRefundConfirmationHeight(u)
+	return tnuo
+}
+
+// SetNillableRefundConfirmationHeight sets the "refund_confirmation_height" field if the given value is not nil.
+func (tnuo *TreeNodeUpdateOne) SetNillableRefundConfirmationHeight(u *uint64) *TreeNodeUpdateOne {
+	if u != nil {
+		tnuo.SetRefundConfirmationHeight(*u)
+	}
+	return tnuo
+}
+
+// AddRefundConfirmationHeight adds u to the "refund_confirmation_height" field.
+func (tnuo *TreeNodeUpdateOne) AddRefundConfirmationHeight(u int64) *TreeNodeUpdateOne {
+	tnuo.mutation.AddRefundConfirmationHeight(u)
+	return tnuo
+}
+
+// ClearRefundConfirmationHeight clears the value of the "refund_confirmation_height" field.
+func (tnuo *TreeNodeUpdateOne) ClearRefundConfirmationHeight() *TreeNodeUpdateOne {
+	tnuo.mutation.ClearRefundConfirmationHeight()
+	return tnuo
+}
+
+// SetDirectRefundTx sets the "direct_refund_tx" field.
+func (tnuo *TreeNodeUpdateOne) SetDirectRefundTx(b []byte) *TreeNodeUpdateOne {
+	tnuo.mutation.SetDirectRefundTx(b)
+	return tnuo
+}
+
+// ClearDirectRefundTx clears the value of the "direct_refund_tx" field.
+func (tnuo *TreeNodeUpdateOne) ClearDirectRefundTx() *TreeNodeUpdateOne {
+	tnuo.mutation.ClearDirectRefundTx()
 	return tnuo
 }
 
@@ -767,6 +923,30 @@ func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, er
 	}
 	if tnuo.mutation.RawRefundTxCleared() {
 		_spec.ClearField(treenode.FieldRawRefundTx, field.TypeBytes)
+	}
+	if value, ok := tnuo.mutation.NodeConfirmationHeight(); ok {
+		_spec.SetField(treenode.FieldNodeConfirmationHeight, field.TypeUint64, value)
+	}
+	if value, ok := tnuo.mutation.AddedNodeConfirmationHeight(); ok {
+		_spec.AddField(treenode.FieldNodeConfirmationHeight, field.TypeUint64, value)
+	}
+	if tnuo.mutation.NodeConfirmationHeightCleared() {
+		_spec.ClearField(treenode.FieldNodeConfirmationHeight, field.TypeUint64)
+	}
+	if value, ok := tnuo.mutation.RefundConfirmationHeight(); ok {
+		_spec.SetField(treenode.FieldRefundConfirmationHeight, field.TypeUint64, value)
+	}
+	if value, ok := tnuo.mutation.AddedRefundConfirmationHeight(); ok {
+		_spec.AddField(treenode.FieldRefundConfirmationHeight, field.TypeUint64, value)
+	}
+	if tnuo.mutation.RefundConfirmationHeightCleared() {
+		_spec.ClearField(treenode.FieldRefundConfirmationHeight, field.TypeUint64)
+	}
+	if value, ok := tnuo.mutation.DirectRefundTx(); ok {
+		_spec.SetField(treenode.FieldDirectRefundTx, field.TypeBytes, value)
+	}
+	if tnuo.mutation.DirectRefundTxCleared() {
+		_spec.ClearField(treenode.FieldDirectRefundTx, field.TypeBytes)
 	}
 	if tnuo.mutation.TreeCleared() {
 		edge := &sqlgraph.EdgeSpec{

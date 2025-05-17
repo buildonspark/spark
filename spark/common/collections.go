@@ -31,6 +31,21 @@ func MapOfArrayToArrayOfMap[K comparable, V any](mapOfArray map[K][]V) []map[K]V
 	return results
 }
 
+// ArrayOfMapToArrayOfMap converts an array of maps of K to V to a map of K to an array of V.
+//
+// Example:
+// ArrayOfMapToArrayOfMap([]map[string]int{{"a": 1, "b": 3}, {"a": 2, "b": 4}})
+// Returns: map[string][]int{"a": {1, 2}, "b": {3, 4}}
+func ArrayOfMapToMapOfArray[K comparable, V any](arrayOfMap []map[K]V) map[K][]V {
+	results := make(map[K][]V)
+	for _, m := range arrayOfMap {
+		for k, v := range m {
+			results[k] = append(results[k], v)
+		}
+	}
+	return results
+}
+
 // SwapMapKeys swaps the keys of a map of maps.
 //
 // Example:

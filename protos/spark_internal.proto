@@ -41,10 +41,16 @@ service SparkInternalService {
 
     rpc start_token_transaction_internal(StartTokenTransactionInternalRequest) returns (google.protobuf.Empty) {}
 
+    rpc query_token_outputs_internal(spark.QueryTokenOutputsRequest) returns (spark.QueryTokenOutputsResponse) {}
+
     rpc cancel_transfer(spark.CancelTransferRequest) returns (google.protobuf.Empty) {}
 
     rpc initiate_settle_receiver_key_tweak(InitiateSettleReceiverKeyTweakRequest) returns (google.protobuf.Empty) {}
     rpc settle_receiver_key_tweak(SettleReceiverKeyTweakRequest) returns (google.protobuf.Empty) {}
+    rpc settle_sender_key_tweak(SettleSenderKeyTweakRequest) returns (google.protobuf.Empty) {}
+
+    // Create UTXO swap record to claim UTXO by SSP in the static deposit flow
+    rpc create_utxo_swap(spark.InitiateUtxoSwapRequest) returns (CreateUtxoSwapResponse) {}
 }
 
 message MarkKeysharesAsUsedRequest {
@@ -185,6 +191,7 @@ message InitiateTransferRequest {
     repeated InitiateTransferLeaf leaves = 5;
     map<string, spark.SecretProof> sender_key_tweak_proofs = 6;
     spark.TransferType type = 7;
+    spark.TransferPackage transfer_package = 8;
 }
 
 message InitiateCooperativeExitRequest {
@@ -216,7 +223,23 @@ message InitiateSettleReceiverKeyTweakRequest {
     map<string, spark.SecretProof> key_tweak_proofs = 2;
 }
 
+enum SettleKeyTweakAction {
+    NONE = 0;
+    COMMIT = 1;
+    ROLLBACK = 2;
+}
+
 message SettleReceiverKeyTweakRequest {
     string transfer_id = 1;
     bool tweak_key = 2;
+}
+
+message SettleSenderKeyTweakRequest {
+    string transfer_id = 1;
+    SettleKeyTweakAction action = 2;
+}
+
+message CreateUtxoSwapResponse {
+    string UtxoDepositAddress = 1;
+    spark.Transfer transfer = 2;
 }

@@ -1,9 +1,9 @@
-import { Channel, createClientFactory, createChannel } from 'nice-grpc';
-import { retryMiddleware } from 'nice-grpc-client-middleware-retry';
-import { SparkServiceClient, SparkServiceDefinition } from '../../../proto/rpc/v1/service.js';
-import * as fs from 'fs';
-import { Lrc20ConnectionManager } from './types.ts';
-import { isNode } from '@lightsparkdev/core';
+import { isNode } from "@lightsparkdev/core";
+import type { Channel, ClientFactory } from "nice-grpc";
+import { retryMiddleware, RetryOptions } from "nice-grpc-client-middleware-retry";
+import type { Channel as ChannelWeb, ClientFactory as ClientFactoryWeb } from "nice-grpc-web";
+import { SparkServiceClient, SparkServiceDefinition } from "../../../proto/rpc/v1/service.js";
+import { Lrc20ConnectionManager } from "./types.ts";
 
 // Node-specific implementation of ConnectionManager functionality
 class NodeLrc20ConnectionManager extends Lrc20ConnectionManager {
@@ -17,7 +17,9 @@ class NodeLrc20ConnectionManager extends Lrc20ConnectionManager {
   private async createChannelWithTLS(address: string, certPath?: string) {
     try {
       if (isNode) {
-        const { ChannelCredentials } = await import("nice-grpc");
+        const grpcModule = await import("nice-grpc");
+        const { ChannelCredentials, createChannel } = "default" in grpcModule ? grpcModule.default : grpcModule;
+
         if (certPath) {
           try {
             // Dynamic import for Node.js only
@@ -45,6 +47,8 @@ class NodeLrc20ConnectionManager extends Lrc20ConnectionManager {
         }
       } else {
         // Browser environment - nice-grpc-web handles TLS automatically
+        const grpcModule = await import("nice-grpc-web");
+        const { createChannel } = "default" in grpcModule ? grpcModule.default : grpcModule;
         return createChannel(address);
       }
     } catch (error) {
@@ -59,29 +63,67 @@ class NodeLrc20ConnectionManager extends Lrc20ConnectionManager {
     }
 
     const channel = await this.createChannelWithTLS(this.lrc20ApiUrl);
-    const client = this.createGrpcClient<SparkServiceClient>(SparkServiceDefinition, channel);
+    const client = await this.createGrpcClient<SparkServiceClient>(SparkServiceDefinition, channel, true);
     this.lrc20Client = client;
     return client;
   }
 
-  private createGrpcClient<T>(
-    definition: typeof SparkServiceDefinition,
-    channel: Channel,
+  private async createGrpcClient<T>(
+    defintion: SparkServiceDefinition,
+    channel: Channel | ChannelWeb,
+    withRetries: boolean,
     middleware?: any,
-  ): T & { close?: () => void } {
-    const clientFactory = createClientFactory().use(retryMiddleware);
-    if (middleware) {
-      clientFactory.use(middleware);
-    }
+  ): Promise<T & { close?: () => void }> {
+    let clientFactory: ClientFactory | ClientFactoryWeb;
 
-    const client = clientFactory.create(definition, channel, {
-      "*": { retry: true, retryMaxAttempts: 3 }
-    }) as T;
-    
-    return {
-      ...client,
-      close: channel.close?.bind(channel)
+    const retryOptions = {
+      retry: true,
+      retryMaxAttempts: 3,
     };
+    let options: RetryOptions = {};
+    const isNodeChannel = "close" in channel;
+
+    if (isNode && isNodeChannel) {
+      const grpcModule = await import("nice-grpc");
+      const { createClientFactory } = "default" in grpcModule ? grpcModule.default : grpcModule;
+
+      clientFactory = createClientFactory();
+      if (withRetries) {
+        options = retryOptions;
+        clientFactory = clientFactory.use(retryMiddleware);
+      }
+      if (middleware) {
+        clientFactory = clientFactory.use(middleware);
+      }
+      const client = clientFactory.create(defintion, channel, {
+        "*": options,
+      }) as T;
+      return {
+        ...client,
+        close: channel.close.bind(channel),
+      };
+    } else if (!isNodeChannel) {
+      const grpcModule = await import("nice-grpc-web");
+      const { createClientFactory } = "default" in grpcModule ? grpcModule.default : grpcModule;
+
+      clientFactory = createClientFactory();
+      if (withRetries) {
+        options = retryOptions;
+        clientFactory = clientFactory.use(retryMiddleware);
+      }
+      if (middleware) {
+        clientFactory = clientFactory.use(middleware);
+      }
+      const client = clientFactory.create(defintion, channel, {
+        "*": options,
+      }) as T;
+      return {
+        ...client,
+        close: undefined,
+      };
+    } else {
+      throw new Error("Channel does not have close in NodeJS environment");
+    }
   }
 }
 

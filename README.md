@@ -1,7 +1,5 @@
 # Spark
 
-![spark](https://github.com/user-attachments/assets/f3d71a04-4027-42f2-b02a-e7a06616e33a)
-
 ## [mise](https://mise.jdx.dev/)
 
 To install all of our protobuf, rust, and go toolchains install [mise](https://mise.jdx.dev/getting-started.html), then run:
@@ -11,6 +9,27 @@ mise install
 ```
 
 **Recommended**: Add [mise shell integration](https://mise.jdx.dev/getting-started.html#activate-mise) so that the mise environment will automatically activate when you are this repo, giving you access to all executables and environment variables. Otherwise you will need will need to either manually `mise activate [SHELL]` or run all commands with the `mise exec` prefix.
+
+## pkg-config
+
+We use `pkg-config` in the build process.
+One way to install it is through brew:
+```
+brew install pkgconf
+```
+
+## [lefthook](https://lefthook.dev/) (optional)
+
+Lefthook gives us an easy way to declare pre-commit hooks (as well as other git hooks) so you're
+not pushing up PRs that immediately fail in CI.
+
+You can either install it through `mise` (above, recommended) or brew:
+```
+brew install lefthook
+```
+
+Once it's installed, run `lefthook install` to install the git hooks, which will automatically run
+when you did `git commit`. You can also run the hooks manually with `lefthook run pre-commit`.
 
 ## Generate proto files
 
@@ -101,6 +120,24 @@ go test $(go list ./... | grep -v -E "so/grpc_test|so/tree")
 
 The E2E test environment can be run locally in minikube via `./scripts/local-test.sh` for hermetic testing (recommended) or run locally via `./run-everything.sh`.
 
+#### Hermetic/Minikube Setup (`./scripts/local-test.sh`)
+
+##### minikube
+
+Please run: `spark/minikube/setup.sh`, then `./scripts/local-test.sh`. If want to make local code changes visible in minikube, you'll need to
+
+```
+# 1. Build the image
+./scripts/build-to-minikube.sh
+# OR
+mise build-to-minikube
+
+# 2. Run minikube with the local image
+./scripts/local-test.sh --dev-spark
+# OR
+mise run-minikube
+```
+
 #### Local Setup (`./run-everything.sh`)
 ```
 brew install tmux
@@ -137,24 +174,6 @@ host    all       all   127.0.0.1/32 trust
 host    all       all   ::1/128      trust
 ```
 
-#### Hermetic/Minikube Setup (`./scripts/local-test.sh`)
-
-##### minikube
-
-See: [spark/minikube/README.md](https://github.com/lightsparkdev/spark/blob/main/minikube/README.md)
-
-Please run: `spark/minikube/setup.sh`, then `./scripts/local-test.sh`. If want to make local code changes visible in minikube, you'll need to
-
-```
-# 1. Build the image
-./scripts/build-to-minikube.sh
-# OR
-mise build-so-dev-image
-
-# 2. Run minikube with the local image
-./scripts/local-test.sh --dev-spark
-```
-
 ### Running tests
 
 Golang integration tests are in the spark/so/grpc_test folder.
@@ -163,37 +182,38 @@ JS SDK integration tests are across the different JS packages, but can be run to
 In the root folder, run:
 
 ```
-# Local environment
-./run-everything.sh
-```
-
-OR
-
-```
 # Hermetic/Minikube environment
 #
 # Usage:
-#   ./scripts/local-test.sh [--dev-spark] [--keep-data]
+#   ./scripts/local-test.sh [--dev-spark] [--dev-lrc20] [--no-spark-debug] [--keep-data]
 #
 # Options:
-#   --dev-spark         - Sets USE_DEV_SPARK=true to use the locally built dev spark image
+#   --dev-spark         - Sets USE_DEV_SPARK=true and SPARK_DEBUG=true to use the locally built dev spark image and enable headless dlv debugging. Requires the image to be built with the debug flag (which is the default from build-to-minikube.sh).
 #   --dev-lrc20         - Sets USE_DEV_LRC20=true to use the locally built dev lrc20 image
+#   --no-spark-debug    - Sets USE_DEV_SPARK=true and SPARK_DEBUG=false to configure the local dev spark container to run without headless dlv debugger. If you are using a local "production" image, you must use this flag.
 #   --keep-data         - Sets RESET_DBS=false to preserve existing test data (databases and blockchain)
 #
 # Environment Variables:
 #   RESET_DBS           - Whether to reset operator databases and bitcoin blockchain (default: true)
 #   USE_DEV_SPARK       - Whether to use the dev spark image built into minikube (default: false)
 #   USE_DEV_LRC20       - Whether to use the dev lrc20 image built into minikube (default: false)
+#   SPARK_DEBUG         - Whether to configure spark to run with headless dlv debugger. If you are using a local "production" image, this must be set to false. (default: false)
 #   SPARK_TAG           - Image tag to use for both Spark operator and signer (default: latest)
 #   LRC20_TAG           - Image tag to use for LRC20 (default: latest)
 #   USE_LIGHTSPARK_HELM_REPO - Whether to fetch helm charts from remote repo (default: false)
 #   OPS_DIR             - Path to the Lightspark ops repository which contains helm charts (auto-detected if not set)
-#   LRC20_REPLICAS      - The number of LRC20 replicas to deploy (default: 3)
+#   LRC20_REPLICAS      - The number of LRC20 replicas to deploy (default: 1)
 
 ./scripts/local-test.sh
 
 # CTR-C when done to remove shut down port forwarding
 ```
+OR
+```
+# Local environment
+./run-everything.sh
+```
+
 
 then run your tests
 

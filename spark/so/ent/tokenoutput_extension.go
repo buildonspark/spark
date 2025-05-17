@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/google/uuid"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/ent/schema"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
@@ -16,7 +17,7 @@ import (
 // match the PrevTokenTransactionHash of each output, then loads the created outputs for those transactions,
 // and finally maps each input to the created output in the DB.
 // Return the TTXOs in the same order they were specified in the input object.
-func FetchTokenInputs(ctx context.Context, outputsToSpend []*pb.TokenOutputToSpend) ([]*TokenOutput, error) {
+func FetchAndLockTokenInputs(ctx context.Context, outputsToSpend []*pb.TokenOutputToSpend) ([]*TokenOutput, error) {
 	// Gather all distinct prev transaction hashes
 	var distinctTxHashes [][]byte
 	txHashMap := make(map[string]bool)
@@ -33,6 +34,7 @@ func FetchTokenInputs(ctx context.Context, outputsToSpend []*pb.TokenOutputToSpe
 	transactions, err := GetDbFromContext(ctx).TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHashIn(distinctTxHashes...)).
 		WithCreatedOutput().
+		ForUpdate().
 		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch matching transaction and outputs: %w", err)
@@ -66,6 +68,41 @@ func FetchTokenInputs(ctx context.Context, outputsToSpend []*pb.TokenOutputToSpe
 		}
 
 		outputToSpendEnts[i] = foundOutput
+	}
+
+	outputIDs := make([]uuid.UUID, len(outputToSpendEnts))
+	for i, output := range outputToSpendEnts {
+		outputIDs[i] = output.ID
+	}
+
+	// Lock the outputs for update to prevent concurrent spending.  This refetch is necessary because
+	// the above query on the token transactions table is not capable of locking the outputs during the join
+	// conducted in the initial query via `WithCreatedOutput()`.
+	lockedOutputs, err := GetDbFromContext(ctx).TokenOutput.Query().
+		Where(tokenoutput.IDIn(outputIDs...)).
+		ForUpdate().
+		All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to lock outputs for update: %w", err)
+	}
+
+	lockedOutputMap := make(map[uuid.UUID]*TokenOutput)
+	for _, output := range lockedOutputs {
+		lockedOutputMap[output.ID] = output
+	}
+
+	for i, output := range outputToSpendEnts {
+		lockedOutput, ok := lockedOutputMap[output.ID]
+		if !ok {
+			return nil, fmt.Errorf("unable to lock output prior to spending for ID %s", output.ID)
+		}
+
+		if lockedOutput.Status != output.Status {
+			return nil, fmt.Errorf("output state changed between fetching and locking prior to spending for ID %s", output.ID)
+		}
+
+		// Replace unlocked outputs with locked outputs.
+		outputToSpendEnts[i] = lockedOutput
 	}
 
 	return outputToSpendEnts, nil

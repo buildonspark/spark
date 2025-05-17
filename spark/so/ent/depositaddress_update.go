@@ -14,6 +14,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/utxo"
+	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 )
 
 // DepositAddressUpdate is the builder for updating DepositAddress entities.
@@ -116,9 +118,81 @@ func (dau *DepositAddressUpdate) SetNillableIsStatic(b *bool) *DepositAddressUpd
 	return dau
 }
 
+// AddUtxoIDs adds the "utxo" edge to the Utxo entity by IDs.
+func (dau *DepositAddressUpdate) AddUtxoIDs(ids ...uuid.UUID) *DepositAddressUpdate {
+	dau.mutation.AddUtxoIDs(ids...)
+	return dau
+}
+
+// AddUtxo adds the "utxo" edges to the Utxo entity.
+func (dau *DepositAddressUpdate) AddUtxo(u ...*Utxo) *DepositAddressUpdate {
+	ids := make([]uuid.UUID, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return dau.AddUtxoIDs(ids...)
+}
+
+// AddUtxoswapIDs adds the "utxoswaps" edge to the UtxoSwap entity by IDs.
+func (dau *DepositAddressUpdate) AddUtxoswapIDs(ids ...uuid.UUID) *DepositAddressUpdate {
+	dau.mutation.AddUtxoswapIDs(ids...)
+	return dau
+}
+
+// AddUtxoswaps adds the "utxoswaps" edges to the UtxoSwap entity.
+func (dau *DepositAddressUpdate) AddUtxoswaps(u ...*UtxoSwap) *DepositAddressUpdate {
+	ids := make([]uuid.UUID, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return dau.AddUtxoswapIDs(ids...)
+}
+
 // Mutation returns the DepositAddressMutation object of the builder.
 func (dau *DepositAddressUpdate) Mutation() *DepositAddressMutation {
 	return dau.mutation
+}
+
+// ClearUtxo clears all "utxo" edges to the Utxo entity.
+func (dau *DepositAddressUpdate) ClearUtxo() *DepositAddressUpdate {
+	dau.mutation.ClearUtxo()
+	return dau
+}
+
+// RemoveUtxoIDs removes the "utxo" edge to Utxo entities by IDs.
+func (dau *DepositAddressUpdate) RemoveUtxoIDs(ids ...uuid.UUID) *DepositAddressUpdate {
+	dau.mutation.RemoveUtxoIDs(ids...)
+	return dau
+}
+
+// RemoveUtxo removes "utxo" edges to Utxo entities.
+func (dau *DepositAddressUpdate) RemoveUtxo(u ...*Utxo) *DepositAddressUpdate {
+	ids := make([]uuid.UUID, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return dau.RemoveUtxoIDs(ids...)
+}
+
+// ClearUtxoswaps clears all "utxoswaps" edges to the UtxoSwap entity.
+func (dau *DepositAddressUpdate) ClearUtxoswaps() *DepositAddressUpdate {
+	dau.mutation.ClearUtxoswaps()
+	return dau
+}
+
+// RemoveUtxoswapIDs removes the "utxoswaps" edge to UtxoSwap entities by IDs.
+func (dau *DepositAddressUpdate) RemoveUtxoswapIDs(ids ...uuid.UUID) *DepositAddressUpdate {
+	dau.mutation.RemoveUtxoswapIDs(ids...)
+	return dau
+}
+
+// RemoveUtxoswaps removes "utxoswaps" edges to UtxoSwap entities.
+func (dau *DepositAddressUpdate) RemoveUtxoswaps(u ...*UtxoSwap) *DepositAddressUpdate {
+	ids := make([]uuid.UUID, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return dau.RemoveUtxoswapIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -203,6 +277,96 @@ func (dau *DepositAddressUpdate) sqlSave(ctx context.Context) (n int, err error)
 	}
 	if value, ok := dau.mutation.IsStatic(); ok {
 		_spec.SetField(depositaddress.FieldIsStatic, field.TypeBool, value)
+	}
+	if dau.mutation.UtxoCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   depositaddress.UtxoTable,
+			Columns: []string{depositaddress.UtxoColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := dau.mutation.RemovedUtxoIDs(); len(nodes) > 0 && !dau.mutation.UtxoCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   depositaddress.UtxoTable,
+			Columns: []string{depositaddress.UtxoColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := dau.mutation.UtxoIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   depositaddress.UtxoTable,
+			Columns: []string{depositaddress.UtxoColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if dau.mutation.UtxoswapsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   depositaddress.UtxoswapsTable,
+			Columns: []string{depositaddress.UtxoswapsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxoswap.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := dau.mutation.RemovedUtxoswapsIDs(); len(nodes) > 0 && !dau.mutation.UtxoswapsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   depositaddress.UtxoswapsTable,
+			Columns: []string{depositaddress.UtxoswapsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxoswap.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := dau.mutation.UtxoswapsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   depositaddress.UtxoswapsTable,
+			Columns: []string{depositaddress.UtxoswapsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxoswap.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if n, err = sqlgraph.UpdateNodes(ctx, dau.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -311,9 +475,81 @@ func (dauo *DepositAddressUpdateOne) SetNillableIsStatic(b *bool) *DepositAddres
 	return dauo
 }
 
+// AddUtxoIDs adds the "utxo" edge to the Utxo entity by IDs.
+func (dauo *DepositAddressUpdateOne) AddUtxoIDs(ids ...uuid.UUID) *DepositAddressUpdateOne {
+	dauo.mutation.AddUtxoIDs(ids...)
+	return dauo
+}
+
+// AddUtxo adds the "utxo" edges to the Utxo entity.
+func (dauo *DepositAddressUpdateOne) AddUtxo(u ...*Utxo) *DepositAddressUpdateOne {
+	ids := make([]uuid.UUID, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return dauo.AddUtxoIDs(ids...)
+}
+
+// AddUtxoswapIDs adds the "utxoswaps" edge to the UtxoSwap entity by IDs.
+func (dauo *DepositAddressUpdateOne) AddUtxoswapIDs(ids ...uuid.UUID) *DepositAddressUpdateOne {
+	dauo.mutation.AddUtxoswapIDs(ids...)
+	return dauo
+}
+
+// AddUtxoswaps adds the "utxoswaps" edges to the UtxoSwap entity.
+func (dauo *DepositAddressUpdateOne) AddUtxoswaps(u ...*UtxoSwap) *DepositAddressUpdateOne {
+	ids := make([]uuid.UUID, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return dauo.AddUtxoswapIDs(ids...)
+}
+
 // Mutation returns the DepositAddressMutation object of the builder.
 func (dauo *DepositAddressUpdateOne) Mutation() *DepositAddressMutation {
 	return dauo.mutation
+}
+
+// ClearUtxo clears all "utxo" edges to the Utxo entity.
+func (dauo *DepositAddressUpdateOne) ClearUtxo() *DepositAddressUpdateOne {
+	dauo.mutation.ClearUtxo()
+	return dauo
+}
+
+// RemoveUtxoIDs removes the "utxo" edge to Utxo entities by IDs.
+func (dauo *DepositAddressUpdateOne) RemoveUtxoIDs(ids ...uuid.UUID) *DepositAddressUpdateOne {
+	dauo.mutation.RemoveUtxoIDs(ids...)
+	return dauo
+}
+
+// RemoveUtxo removes "utxo" edges to Utxo entities.
+func (dauo *DepositAddressUpdateOne) RemoveUtxo(u ...*Utxo) *DepositAddressUpdateOne {
+	ids := make([]uuid.UUID, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return dauo.RemoveUtxoIDs(ids...)
+}
+
+// ClearUtxoswaps clears all "utxoswaps" edges to the UtxoSwap entity.
+func (dauo *DepositAddressUpdateOne) ClearUtxoswaps() *DepositAddressUpdateOne {
+	dauo.mutation.ClearUtxoswaps()
+	return dauo
+}
+
+// RemoveUtxoswapIDs removes the "utxoswaps" edge to UtxoSwap entities by IDs.
+func (dauo *DepositAddressUpdateOne) RemoveUtxoswapIDs(ids ...uuid.UUID) *DepositAddressUpdateOne {
+	dauo.mutation.RemoveUtxoswapIDs(ids...)
+	return dauo
+}
+
+// RemoveUtxoswaps removes "utxoswaps" edges to UtxoSwap entities.
+func (dauo *DepositAddressUpdateOne) RemoveUtxoswaps(u ...*UtxoSwap) *DepositAddressUpdateOne {
+	ids := make([]uuid.UUID, len(u))
+	for i := range u {
+		ids[i] = u[i].ID
+	}
+	return dauo.RemoveUtxoswapIDs(ids...)
 }
 
 // Where appends a list predicates to the DepositAddressUpdate builder.
@@ -428,6 +664,96 @@ func (dauo *DepositAddressUpdateOne) sqlSave(ctx context.Context) (_node *Deposi
 	}
 	if value, ok := dauo.mutation.IsStatic(); ok {
 		_spec.SetField(depositaddress.FieldIsStatic, field.TypeBool, value)
+	}
+	if dauo.mutation.UtxoCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   depositaddress.UtxoTable,
+			Columns: []string{depositaddress.UtxoColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := dauo.mutation.RemovedUtxoIDs(); len(nodes) > 0 && !dauo.mutation.UtxoCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   depositaddress.UtxoTable,
+			Columns: []string{depositaddress.UtxoColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := dauo.mutation.UtxoIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   depositaddress.UtxoTable,
+			Columns: []string{depositaddress.UtxoColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxo.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if dauo.mutation.UtxoswapsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   depositaddress.UtxoswapsTable,
+			Columns: []string{depositaddress.UtxoswapsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxoswap.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := dauo.mutation.RemovedUtxoswapsIDs(); len(nodes) > 0 && !dauo.mutation.UtxoswapsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   depositaddress.UtxoswapsTable,
+			Columns: []string{depositaddress.UtxoswapsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxoswap.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := dauo.mutation.UtxoswapsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   depositaddress.UtxoswapsTable,
+			Columns: []string{depositaddress.UtxoswapsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(utxoswap.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &DepositAddress{config: dauo.config}
 	_spec.Assign = _node.assignValues

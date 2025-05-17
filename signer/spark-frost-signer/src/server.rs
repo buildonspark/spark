@@ -69,7 +69,7 @@ impl FrostService for FrostServer {
 
         let mut dkg_state = self.dkg_state.lock().unwrap();
 
-        if dkg_state.state.get(&req.request_id).is_some() {
+        if dkg_state.state.contains_key(&req.request_id) {
             return Err(Status::internal("DKG state is not None"));
         }
 
@@ -227,8 +227,8 @@ impl FrostService for FrostServer {
         request: Request<FrostNonceRequest>,
     ) -> Result<Response<FrostNonceResponse>, Status> {
         tracing::info!("Received frost nonce request");
-        let response = spark_frost::signing::frost_nonce(&request.get_ref())
-            .map_err(|e| Status::internal(e))?;
+        let response =
+            spark_frost::signing::frost_nonce(request.get_ref()).map_err(Status::internal)?;
         Ok(Response::new(response))
     }
 
@@ -237,8 +237,8 @@ impl FrostService for FrostServer {
         request: Request<SignFrostRequest>,
     ) -> Result<Response<SignFrostResponse>, Status> {
         tracing::info!("Received frost sign request");
-        let response = spark_frost::signing::sign_frost(&request.get_ref())
-            .map_err(|e| Status::internal(e))?;
+        let response =
+            spark_frost::signing::sign_frost(request.get_ref()).map_err(Status::internal)?;
         Ok(Response::new(response))
     }
 
@@ -247,8 +247,8 @@ impl FrostService for FrostServer {
         request: Request<AggregateFrostRequest>,
     ) -> Result<Response<AggregateFrostResponse>, Status> {
         tracing::info!("Received frost aggregate request");
-        let response = spark_frost::signing::aggregate_frost(&request.get_ref())
-            .map_err(|e| Status::internal(e))?;
+        let response =
+            spark_frost::signing::aggregate_frost(request.get_ref()).map_err(Status::internal)?;
         Ok(Response::new(response))
     }
 
@@ -257,8 +257,8 @@ impl FrostService for FrostServer {
         request: Request<ValidateSignatureShareRequest>,
     ) -> Result<Response<()>, Status> {
         tracing::info!("Received frost validate signature share request");
-        spark_frost::signing::validate_signature_share(&request.get_ref())
-            .map_err(|e| Status::internal(e))
+        spark_frost::signing::validate_signature_share(request.get_ref())
+            .map_err(Status::internal)
             .map(|_| Response::new(()))
     }
 }

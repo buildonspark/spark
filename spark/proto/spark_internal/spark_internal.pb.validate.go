@@ -2747,6 +2747,35 @@ func (m *InitiateTransferRequest) validate(all bool) error {
 
 	// no validation rules for Type
 
+	if all {
+		switch v := interface{}(m.GetTransferPackage()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, InitiateTransferRequestValidationError{
+					field:  "TransferPackage",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, InitiateTransferRequestValidationError{
+					field:  "TransferPackage",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTransferPackage()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return InitiateTransferRequestValidationError{
+				field:  "TransferPackage",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
 	if len(errors) > 0 {
 		return InitiateTransferRequestMultiError(errors)
 	}
@@ -3630,3 +3659,243 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = SettleReceiverKeyTweakRequestValidationError{}
+
+// Validate checks the field values on SettleSenderKeyTweakRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SettleSenderKeyTweakRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SettleSenderKeyTweakRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SettleSenderKeyTweakRequestMultiError, or nil if none found.
+func (m *SettleSenderKeyTweakRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SettleSenderKeyTweakRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for TransferId
+
+	// no validation rules for Action
+
+	if len(errors) > 0 {
+		return SettleSenderKeyTweakRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// SettleSenderKeyTweakRequestMultiError is an error wrapping multiple
+// validation errors returned by SettleSenderKeyTweakRequest.ValidateAll() if
+// the designated constraints aren't met.
+type SettleSenderKeyTweakRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SettleSenderKeyTweakRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SettleSenderKeyTweakRequestMultiError) AllErrors() []error { return m }
+
+// SettleSenderKeyTweakRequestValidationError is the validation error returned
+// by SettleSenderKeyTweakRequest.Validate if the designated constraints
+// aren't met.
+type SettleSenderKeyTweakRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SettleSenderKeyTweakRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SettleSenderKeyTweakRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SettleSenderKeyTweakRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SettleSenderKeyTweakRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SettleSenderKeyTweakRequestValidationError) ErrorName() string {
+	return "SettleSenderKeyTweakRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SettleSenderKeyTweakRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSettleSenderKeyTweakRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SettleSenderKeyTweakRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SettleSenderKeyTweakRequestValidationError{}
+
+// Validate checks the field values on CreateUtxoSwapResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *CreateUtxoSwapResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CreateUtxoSwapResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// CreateUtxoSwapResponseMultiError, or nil if none found.
+func (m *CreateUtxoSwapResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CreateUtxoSwapResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for UtxoDepositAddress
+
+	if all {
+		switch v := interface{}(m.GetTransfer()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CreateUtxoSwapResponseValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CreateUtxoSwapResponseValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTransfer()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CreateUtxoSwapResponseValidationError{
+				field:  "Transfer",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return CreateUtxoSwapResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// CreateUtxoSwapResponseMultiError is an error wrapping multiple validation
+// errors returned by CreateUtxoSwapResponse.ValidateAll() if the designated
+// constraints aren't met.
+type CreateUtxoSwapResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CreateUtxoSwapResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CreateUtxoSwapResponseMultiError) AllErrors() []error { return m }
+
+// CreateUtxoSwapResponseValidationError is the validation error returned by
+// CreateUtxoSwapResponse.Validate if the designated constraints aren't met.
+type CreateUtxoSwapResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CreateUtxoSwapResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CreateUtxoSwapResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CreateUtxoSwapResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CreateUtxoSwapResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CreateUtxoSwapResponseValidationError) ErrorName() string {
+	return "CreateUtxoSwapResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CreateUtxoSwapResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCreateUtxoSwapResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CreateUtxoSwapResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CreateUtxoSwapResponseValidationError{}

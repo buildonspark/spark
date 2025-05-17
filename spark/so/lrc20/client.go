@@ -42,8 +42,7 @@ type connPool struct {
 }
 
 // newConnPool creates a new connection pool with improved performance characteristics
-func newConnPool(config *so.Config, network common.Network) (*connPool, error) {
-	logger := slog.Default()
+func newConnPool(config *so.Config, network common.Network, logger *slog.Logger) (*connPool, error) {
 	networkStr := network.String()
 	if !slices.Contains(config.SupportedNetworks, network) {
 		return nil, fmt.Errorf("%s network not supported by this operator", networkStr)
@@ -123,7 +122,7 @@ func (p *connPool) performHealthCheck() {
 		return
 	}
 
-	p.logger.Debug("performing health check on idle connections", "count", checkCount)
+	p.logger.Debug("Performing health check on idle connections", "count", checkCount)
 
 	for i := 0; i < checkCount; i++ {
 		// Get a connection from the pool
@@ -326,20 +325,21 @@ func createConnection(config *so.Config, network common.Network) (*grpc.ClientCo
 type Client struct {
 	config *so.Config
 	pools  map[string]*connPool // Map of network name to connection pool
+	logger *slog.Logger
 }
 
 // NewClient creates a new LRC20 client with connection pools for each supported network
-func NewClient(config *so.Config) (*Client, error) {
+func NewClient(config *so.Config, logger *slog.Logger) (*Client, error) {
 	pools := make(map[string]*connPool)
 
 	// Create a connection pool for each supported network that has an LRC20 config
 	for _, network := range config.SupportedNetworks {
 		networkStr := network.String()
 		if _, ok := config.Lrc20Configs[networkStr]; ok {
-			pool, err := newConnPool(config, network)
+			pool, err := newConnPool(config, network, logger.With("network", networkStr))
 			if err != nil {
 				// Log the error but continue with other networks
-				slog.Warn("failed to create connection pool for network",
+				logger.Warn("Failed to create connection pool for network",
 					"network", networkStr, "error", err)
 				continue
 			}
@@ -354,6 +354,7 @@ func NewClient(config *so.Config) (*Client, error) {
 	return &Client{
 		config: config,
 		pools:  pools,
+		logger: logger,
 	}, nil
 }
 
@@ -454,11 +455,11 @@ func (c *Client) MarkWithdrawnTokenOutputs(
 	logger := logging.GetLoggerFromContext(ctx)
 	networkStr := network.String()
 	if lrc20Config, ok := c.config.Lrc20Configs[networkStr]; ok && lrc20Config.DisableRpcs {
-		logger.Info("Skipping LRC20 node call due to DisableRpcs flag", "network", networkStr)
+		logger.Info("Skipping LRC20 node call due to DisableRpcs flag")
 		return nil
 	}
 	if lrc20Config, ok := c.config.Lrc20Configs[networkStr]; ok && lrc20Config.DisableL1 {
-		logger.Info("Skipping LRC20 node call due to DisableL1 flag", "network", networkStr)
+		logger.Info("Skipping LRC20 node call due to DisableL1 flag")
 		return nil
 	}
 
@@ -585,7 +586,7 @@ func (c *Client) Close() error {
 	for network, pool := range c.pools {
 		if err := pool.Close(); err != nil {
 			lastErr = err
-			slog.Error("Error closing connection pool", "network", network, "error", err)
+			c.logger.Error("Error closing connection pool", "network", network, "error", err)
 		}
 	}
 	return lastErr

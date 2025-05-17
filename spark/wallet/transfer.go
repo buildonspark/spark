@@ -22,6 +22,7 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/objects"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -51,6 +52,133 @@ func SendTransfer(
 	return transfer, nil
 }
 
+func SendTransferWithKeyTweaks(
+	ctx context.Context,
+	config *Config,
+	client pb.SparkServiceClient,
+	leaves []LeafKeyTweak,
+	receiverIdentityPubkey []byte,
+	expiryTime time.Time,
+) (*pb.Transfer, error) {
+	transferID, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate transfer id: %v", err)
+	}
+	keyTweakInputMap, err := prepareSendTransferKeyTweaks(config, transferID.String(), receiverIdentityPubkey, leaves, map[string][]byte{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare transfer data: %v", err)
+	}
+
+	transferPackage, err := prepareTransferPackage(ctx, config, client, transferID, keyTweakInputMap, leaves, receiverIdentityPubkey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prepare transfer data: %v", err)
+	}
+
+	resp, err := client.StartTransfer(ctx, &pb.StartTransferRequest{
+		TransferId:                transferID.String(),
+		OwnerIdentityPublicKey:    config.IdentityPublicKey(),
+		ReceiverIdentityPublicKey: receiverIdentityPubkey,
+		ExpiryTime:                timestamppb.New(expiryTime),
+		TransferPackage:           transferPackage,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transfer: %v", err)
+	}
+
+	return resp.Transfer, nil
+}
+
+func prepareTransferPackage(
+	ctx context.Context,
+	config *Config,
+	client pb.SparkServiceClient,
+	transferID uuid.UUID,
+	keyTweakInputMap *map[string][]*pb.SendLeafKeyTweak,
+	leaves []LeafKeyTweak,
+	receiverIdentityPubkeyBytes []byte,
+) (*pb.TransferPackage, error) {
+	// Fetch signing commitments.
+	nodes := make([]string, 0, len(leaves))
+	for _, leaf := range leaves {
+		nodes = append(nodes, leaf.Leaf.Id)
+	}
+	signingCommitments, err := client.GetSigningCommitments(ctx, &pb.GetSigningCommitmentsRequest{
+		NodeIds: nodes,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing commitments: %v", err)
+	}
+
+	// Sign user refund.
+	signerConn, err := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer signerConn.Close()
+
+	receiverIdentityPubkey, err := secp256k1.ParsePubKey(receiverIdentityPubkeyBytes)
+	if err != nil {
+		return nil, err
+	}
+	signingJobs, refundTxs, userCommitments, err := prepareFrostSigningJobsForUserSignedRefund(leaves, signingCommitments.SigningCommitments, receiverIdentityPubkey)
+	if err != nil {
+		return nil, err
+	}
+
+	signerClient := pbfrost.NewFrostServiceClient(signerConn)
+	signingResults, err := signerClient.SignFrost(ctx, &pbfrost.SignFrostRequest{
+		SigningJobs: signingJobs,
+		Role:        pbfrost.SigningRole_USER,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	leafSigningJobs, err := prepareLeafSigningJobs(
+		leaves,
+		refundTxs,
+		signingResults.Results,
+		userCommitments,
+		signingCommitments.SigningCommitments,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Encrypt key tweaks.
+	encryptedKeyTweaks := make(map[string][]byte)
+	for identifier, keyTweaks := range *keyTweakInputMap {
+		protoToEncrypt := pb.SendLeafKeyTweaks{
+			LeavesToSend: keyTweaks,
+		}
+		protoToEncryptBinary, err := proto.Marshal(&protoToEncrypt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal proto to encrypt: %v", err)
+		}
+		encryptionKeyBytes := config.SigningOperators[identifier].IdentityPublicKey
+		encryptionKey, err := eciesgo.NewPublicKeyFromBytes(encryptionKeyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse encryption key: %v", err)
+		}
+		encryptedProto, err := eciesgo.Encrypt(encryptionKey, protoToEncryptBinary)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encrypt proto: %v", err)
+		}
+		encryptedKeyTweaks[identifier] = encryptedProto
+	}
+
+	transferPackage := &pb.TransferPackage{
+		LeavesToSend:    leafSigningJobs,
+		KeyTweakPackage: encryptedKeyTweaks,
+	}
+
+	transferPackageSigningPayload := common.GetTransferPackageSigningPayload(transferID, transferPackage)
+	signature := ecdsa.Sign(&config.IdentityPrivateKey, transferPackageSigningPayload)
+	transferPackage.UserSignature = signature.Serialize()
+
+	return transferPackage, nil
+}
+
 func SendTransferTweakKey(
 	ctx context.Context,
 	config *Config,
@@ -58,7 +186,7 @@ func SendTransferTweakKey(
 	leaves []LeafKeyTweak,
 	refundSignatureMap map[string][]byte,
 ) (*pb.Transfer, error) {
-	keyTweakInputMap, err := prepareSendTransferKeyTweaks(config, transfer, leaves, refundSignatureMap)
+	keyTweakInputMap, err := prepareSendTransferKeyTweaks(config, transfer.Id, transfer.ReceiverIdentityPublicKey, leaves, refundSignatureMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare transfer data: %v", err)
 	}
@@ -253,15 +381,15 @@ func compareTransfers(transfer1, transfer2 *pb.Transfer) bool {
 		len(transfer1.Leaves) == len(transfer2.Leaves)
 }
 
-func prepareSendTransferKeyTweaks(config *Config, transfer *pb.Transfer, leaves []LeafKeyTweak, refundSignatureMap map[string][]byte) (*map[string][]*pb.SendLeafKeyTweak, error) {
-	receiverEciesPubKey, err := eciesgo.NewPublicKeyFromBytes(transfer.ReceiverIdentityPublicKey)
+func prepareSendTransferKeyTweaks(config *Config, transferID string, receiverIdentityPubkey []byte, leaves []LeafKeyTweak, refundSignatureMap map[string][]byte) (*map[string][]*pb.SendLeafKeyTweak, error) {
+	receiverEciesPubKey, err := eciesgo.NewPublicKeyFromBytes(receiverIdentityPubkey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse receiver public key: %v", err)
 	}
 
 	leavesTweaksMap := make(map[string][]*pb.SendLeafKeyTweak)
 	for _, leaf := range leaves {
-		leafTweaksMap, err := prepareSingleSendTransferKeyTweak(config, transfer.Id, leaf, receiverEciesPubKey, refundSignatureMap[leaf.Leaf.Id])
+		leafTweaksMap, err := prepareSingleSendTransferKeyTweak(config, transferID, leaf, receiverEciesPubKey, refundSignatureMap[leaf.Leaf.Id])
 		if err != nil {
 			return nil, fmt.Errorf("failed to prepare single leaf transfer: %v", err)
 		}
@@ -741,13 +869,13 @@ func prepareRefundSoSigningJobs(
 		if err != nil {
 			return nil, fmt.Errorf("failed to get next sequence: %v", err)
 		}
-		refundTx, err := createRefundTx(nextSequence, &nodeOutPoint, amountSats, receivingPubkey)
+		cpfpRefundTx, _, err := createRefundTxs(nextSequence, &nodeOutPoint, amountSats, receivingPubkey, false)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create refund tx: %v", err)
 		}
-		refundSigningData.RefundTx = refundTx
+		refundSigningData.RefundTx = cpfpRefundTx
 		var refundBuf bytes.Buffer
-		err = refundTx.Serialize(&refundBuf)
+		err = cpfpRefundTx.Serialize(&refundBuf)
 		if err != nil {
 			return nil, fmt.Errorf("failed to serialize refund tx: %v", err)
 		}

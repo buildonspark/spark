@@ -29,6 +29,8 @@ const (
 	FieldOperatorSignature = "operator_signature"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldExpiryTime holds the string denoting the expiry_time field in the database.
+	FieldExpiryTime = "expiry_time"
 	// FieldCoordinatorPublicKey holds the string denoting the coordinator_public_key field in the database.
 	FieldCoordinatorPublicKey = "coordinator_public_key"
 	// EdgeSpentOutput holds the string denoting the spent_output edge name in mutations.
@@ -71,6 +73,7 @@ var Columns = []string{
 	FieldFinalizedTokenTransactionHash,
 	FieldOperatorSignature,
 	FieldStatus,
+	FieldExpiryTime,
 	FieldCoordinatorPublicKey,
 }
 
@@ -113,7 +116,7 @@ var (
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schema.TokenTransactionStatus) error {
 	switch s {
-	case "STARTED", "SIGNED", "SIGNED_CANCELLED", "FINALIZED":
+	case "STARTED", "STARTED_CANCELLED", "SIGNED", "SIGNED_CANCELLED", "FINALIZED":
 		return nil
 	default:
 		return fmt.Errorf("tokentransaction: invalid enum value for status field: %q", s)
@@ -141,6 +144,11 @@ func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByExpiryTime orders the results by the expiry_time field.
+func ByExpiryTime(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExpiryTime, opts...).ToFunc()
 }
 
 // BySpentOutputCount orders the results by spent_output count.

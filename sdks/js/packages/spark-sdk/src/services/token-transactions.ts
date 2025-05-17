@@ -296,7 +296,7 @@ export class TokenTransactionService {
         });
       }
 
-      outputsToSpendSigningPublicKeys.forEach(async (key, i) => {
+      for (const [i, key] of outputsToSpendSigningPublicKeys.entries()) {
         if (!key) {
           throw new ValidationError("Invalid signing key", {
             field: "outputsToSpendSigningPublicKeys",
@@ -313,9 +313,8 @@ export class TokenTransactionService {
           signature: ownerSignature,
           inputIndex: i,
         });
-      });
+      }
     }
-
     // Start the token transaction
     const startResponse = await sparkClient.start_token_transaction(
       {
@@ -327,6 +326,7 @@ export class TokenTransactionService {
       },
       {
         retry: true,
+        retryableStatuses: ["UNKNOWN", "UNAVAILABLE", "CANCELLED"],
         retryMaxAttempts: 3,
       } as SparkCallOptions,
     );
@@ -452,6 +452,7 @@ export class TokenTransactionService {
               },
               {
                 retry: true,
+                retryableStatuses: ["UNKNOWN", "UNAVAILABLE", "CANCELLED"],
                 retryMaxAttempts: 3,
               } as SparkCallOptions,
             );
@@ -506,6 +507,7 @@ export class TokenTransactionService {
             },
             {
               retry: true,
+              retryableStatuses: ["UNKNOWN", "UNAVAILABLE", "CANCELLED"],
               retryMaxAttempts: 3,
             } as SparkCallOptions,
           );

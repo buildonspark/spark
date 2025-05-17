@@ -1,4 +1,4 @@
-import { BLINDING_FACTOR_SIZE, TOKEN_AMOUNT_SIZE } from "../utils/index.ts";
+import { BLINDING_FACTOR_SIZE, TOKEN_AMOUNT_SIZE } from "../utils/constants.ts";
 
 export class TokenAmount {
   amount: bigint;

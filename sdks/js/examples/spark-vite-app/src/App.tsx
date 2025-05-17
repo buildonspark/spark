@@ -1,4 +1,4 @@
-import { createDummyTx, SparkWallet } from "@buildonspark/spark-sdk";
+import { SparkWallet } from "@buildonspark/spark-sdk";
 import { useState } from "react";
 
 function App() {
@@ -40,17 +40,17 @@ function App() {
     setBalance(Number(balance.balance));
   };
 
-  const dummyTx = createDummyTx({
-    address: "bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te",
-    amountSats: 65536n,
-  });
+  // const dummyTx = createDummyTx({
+  //   address: "bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te",
+  //   amountSats: 65536n,
+  // });
 
   return (
     <div className="App">
       <h1>Vite + React + Spark SDK</h1>
       <div className="card">
         <p>Test transaction ID</p>
-        <p>{dummyTx.txid}</p>
+        {/* <p>{dummyTx.txid}</p> */}
         <button onClick={initializeSpark}>Initialize Spark Client</button>
         <p>
           {sparkWallet

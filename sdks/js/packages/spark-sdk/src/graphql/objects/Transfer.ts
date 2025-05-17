@@ -1,7 +1,7 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import autoBind from "../../auto-bind.js";
-import LightsparkClient from "../client.js";
+import type LightsparkClient from "../client.js";
 import CurrencyAmount, {
   CurrencyAmountFromJson,
   CurrencyAmountToJson,

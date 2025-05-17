@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/go-playground/assert/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -138,6 +139,15 @@ func TestVerifySignature(t *testing.T) {
 	signedDebitTx, err := TxFromRawTxBytes(signedDebitTxBytes)
 	require.NoError(t, err)
 
-	err = VerifySignature(signedDebitTx, 0, creditTx.TxOut[0])
+	err = VerifySignatureSingleInput(signedDebitTx, 0, creditTx.TxOut[0])
 	require.NoError(t, err, "signature verification failed: %v", err)
+}
+
+func TestSerializeTx(t *testing.T) {
+	txString := "0200000000010109c67bcd9d9276e8cf6213eb1b75dc029633df65f7cfb204004156876ff4acb60000000000ffffffff01905f0100000000002251208df27e8cea291091c22bc4ae6e5a8e9d3b9b4905f08bcebb499ab752374cfa3201407713a006ee2db39cc2eca2c83a9d41b6b18c8116dda3306c588f1cbc37fd681da26bf09db67cc297581269a3e8da1b00df7abb12ac8716d2c86f22e3dfc0cc1c00000000"
+	tx, err := TxFromRawTxHex(txString)
+	require.NoError(t, err)
+	serializedTx, err := SerializeTx(tx)
+	require.NoError(t, err)
+	assert.Equal(t, txString, hex.EncodeToString(serializedTx))
 }

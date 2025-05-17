@@ -1,6 +1,7 @@
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { SparkWallet, type TokenInfo } from "@buildonspark/spark-sdk";
 import { Transfer } from "@buildonspark/spark-sdk/proto/spark";
+import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
 import {
   ExitSpeed,
   WalletTransfer,
@@ -16,14 +17,13 @@ import {
   type Request,
   type Response,
 } from "express";
+import fs from "fs";
 import { BITCOIN_NETWORK } from "../src/index.js";
 import {
   formatTransferResponse,
   loadMnemonic,
   saveMnemonic,
 } from "../utils/utils.js";
-import { ConfigOptions } from "@buildonspark/spark-sdk/services/wallet-config";
-import fs from "fs";
 
 const SPARK_MNEMONIC_PATH = ".spark-mnemonic";
 
@@ -44,21 +44,21 @@ export const createSparkRouter = (
   let walletInstance: SparkWallet | IssuerSparkWallet | undefined = undefined;
 
   const parseConfig = (): ConfigOptions => {
-      const configFile = process.env.CONFIG_FILE;
-      let config: ConfigOptions = {};
-      if (configFile) {
-        try {
-          const data = fs.readFileSync(configFile, "utf8");
-          config = JSON.parse(data);
-          if (config.network !== BITCOIN_NETWORK) {
-            console.error("Network mismatch in config file");
-          }
-        } catch (err) {
-          console.error("Error reading config file:", err);
+    const configFile = process.env.CONFIG_FILE;
+    let config: ConfigOptions = {};
+    if (configFile) {
+      try {
+        const data = fs.readFileSync(configFile, "utf8");
+        config = JSON.parse(data);
+        if (config.network !== BITCOIN_NETWORK) {
+          console.error("Network mismatch in config file");
         }
+      } catch (err) {
+        console.error("Error reading config file:", err);
       }
-      return config;
-  }
+    }
+    return config;
+  };
 
   const initWallet = async (mnemonicOrSeed: string) => {
     let res:
@@ -312,7 +312,7 @@ export const createSparkRouter = (
           message: string;
           compactEncoding: boolean;
         };
-        const signedMessage = await wallet!.signMessage(
+        const signedMessage = await wallet!.signMessageWithIdentityKey(
           message,
           compactEncoding
         );

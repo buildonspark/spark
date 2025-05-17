@@ -3,6 +3,7 @@ atlas = "0.32.0"
 go = "1.23.2"
 golangci-lint = "2.0.2"
 gotestsum = "1.12.0"
+lefthook = "latest"
 node = "20.19.0"
 protoc = "29.3"
 protoc-gen-go = "1.36.6"
@@ -16,8 +17,11 @@ MISE_NODE_COREPACK = true
 [tasks]
 build-to-minikube = { dir = "{{config_root}}", run = 'scripts/build-to-minikube.sh' }
 run-minikube = { dir = "{{config_root}}", run = 'scripts/local-test.sh' }
-spark-cli = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build && cd examples/spark-cli && yarn build && yarn run cli' }
-spark-cli-prod = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build && cd examples/spark-cli && yarn build && yarn run cli:prod' }
+spark-cli-local = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build && cd examples/spark-cli && yarn build && yarn run cli:local' }
+spark-cli-regtest = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build && cd examples/spark-cli && yarn build && yarn run cli' }
+spark-cli-mainnet = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build && cd examples/spark-cli && yarn build && yarn run cli:mainnet' }
+spark-cli-dev = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build && cd examples/spark-cli && yarn build && yarn run cli:dev' }
+spark-cli-dev-mainnet = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build && cd examples/spark-cli && yarn build && yarn run cli:dev:mainnet' }
 test-go = { dir = "{{config_root}}/spark", run = 'mise test' }
 test-grpc = { dir = "{{config_root}}/spark", run = 'mise test-grpc' }
 test-js = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test' }

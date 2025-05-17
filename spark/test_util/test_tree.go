@@ -63,7 +63,7 @@ func CreateNewTree(config *wallet.Config, faucet *Faucet, privKey *secp256k1.Pri
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
 	leafID := uuid.New().String()
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, &leafID)
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, &leafID, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate deposit address: %v", err)
 	}
@@ -143,7 +143,7 @@ func CreateNewTreeWithLevels(config *wallet.Config, faucet *Faucet, privKey *sec
 	userPubKeyBytes := userPubKey.SerializeCompressed()
 
 	leafID := uuid.New().String()
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, &leafID)
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, &leafID, false)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate deposit address: %v", err)
 	}

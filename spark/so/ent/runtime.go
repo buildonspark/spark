@@ -25,6 +25,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
+	"github.com/lightsparkdev/spark/so/ent/utxo"
+	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -529,4 +531,46 @@ func init() {
 	usersignedtransactionDescID := usersignedtransactionMixinFields0[0].Descriptor()
 	// usersignedtransaction.DefaultID holds the default value on creation for the id field.
 	usersignedtransaction.DefaultID = usersignedtransactionDescID.Default.(func() uuid.UUID)
+	utxoMixin := schema.Utxo{}.Mixin()
+	utxoMixinFields0 := utxoMixin[0].Fields()
+	_ = utxoMixinFields0
+	utxoFields := schema.Utxo{}.Fields()
+	_ = utxoFields
+	// utxoDescCreateTime is the schema descriptor for create_time field.
+	utxoDescCreateTime := utxoMixinFields0[1].Descriptor()
+	// utxo.DefaultCreateTime holds the default value on creation for the create_time field.
+	utxo.DefaultCreateTime = utxoDescCreateTime.Default.(func() time.Time)
+	// utxoDescUpdateTime is the schema descriptor for update_time field.
+	utxoDescUpdateTime := utxoMixinFields0[2].Descriptor()
+	// utxo.DefaultUpdateTime holds the default value on creation for the update_time field.
+	utxo.DefaultUpdateTime = utxoDescUpdateTime.Default.(func() time.Time)
+	// utxo.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	utxo.UpdateDefaultUpdateTime = utxoDescUpdateTime.UpdateDefault.(func() time.Time)
+	// utxoDescTxid is the schema descriptor for txid field.
+	utxoDescTxid := utxoFields[1].Descriptor()
+	// utxo.TxidValidator is a validator for the "txid" field. It is called by the builders before save.
+	utxo.TxidValidator = utxoDescTxid.Validators[0].(func([]byte) error)
+	// utxoDescID is the schema descriptor for id field.
+	utxoDescID := utxoMixinFields0[0].Descriptor()
+	// utxo.DefaultID holds the default value on creation for the id field.
+	utxo.DefaultID = utxoDescID.Default.(func() uuid.UUID)
+	utxoswapMixin := schema.UtxoSwap{}.Mixin()
+	utxoswapMixinFields0 := utxoswapMixin[0].Fields()
+	_ = utxoswapMixinFields0
+	utxoswapFields := schema.UtxoSwap{}.Fields()
+	_ = utxoswapFields
+	// utxoswapDescCreateTime is the schema descriptor for create_time field.
+	utxoswapDescCreateTime := utxoswapMixinFields0[1].Descriptor()
+	// utxoswap.DefaultCreateTime holds the default value on creation for the create_time field.
+	utxoswap.DefaultCreateTime = utxoswapDescCreateTime.Default.(func() time.Time)
+	// utxoswapDescUpdateTime is the schema descriptor for update_time field.
+	utxoswapDescUpdateTime := utxoswapMixinFields0[2].Descriptor()
+	// utxoswap.DefaultUpdateTime holds the default value on creation for the update_time field.
+	utxoswap.DefaultUpdateTime = utxoswapDescUpdateTime.Default.(func() time.Time)
+	// utxoswap.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	utxoswap.UpdateDefaultUpdateTime = utxoswapDescUpdateTime.UpdateDefault.(func() time.Time)
+	// utxoswapDescID is the schema descriptor for id field.
+	utxoswapDescID := utxoswapMixinFields0[0].Descriptor()
+	// utxoswap.DefaultID holds the default value on creation for the id field.
+	utxoswap.DefaultID = utxoswapDescID.Default.(func() uuid.UUID)
 }

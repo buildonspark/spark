@@ -64,13 +64,13 @@ func AggregateTreeNodes(
 		return nil, fmt.Errorf("failed to get next sequence: %v", err)
 	}
 	parentOutPoint := wire.OutPoint{Hash: parentTx.TxHash(), Index: uint32(parentNode.Vout)}
-	newRefundTx, err := createRefundTx(sequence, &parentOutPoint,
-		parentTx.TxOut[parentNode.Vout].Value, aggregatedSigningPublicKey)
+	cpfpRefundTx, _, err := createRefundTxs(sequence, &parentOutPoint,
+		parentTx.TxOut[parentNode.Vout].Value, aggregatedSigningPublicKey, false)
 	if err != nil {
 		return nil, err
 	}
 	var refundBuf bytes.Buffer
-	err = newRefundTx.Serialize(&refundBuf)
+	err = cpfpRefundTx.Serialize(&refundBuf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize refund tx: %v", err)
 	}
@@ -107,7 +107,7 @@ func AggregateTreeNodes(
 	}
 
 	userKeyPackage := CreateUserKeyPackage(aggregatedSigningKey)
-	refundSighash, err := common.SigHashFromTx(newRefundTx, 0, parentTx.TxOut[parentNode.Vout])
+	refundSighash, err := common.SigHashFromTx(cpfpRefundTx, 0, parentTx.TxOut[parentNode.Vout])
 	if err != nil {
 		return nil, err
 	}

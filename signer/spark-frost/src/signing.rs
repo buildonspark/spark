@@ -81,7 +81,7 @@ pub fn frost_build_signin_package(
 pub fn frost_signature_shares_from_proto(
     shares: &HashMap<String, Vec<u8>>,
     user_identifier: Identifier,
-    user_signature_share: &Vec<u8>,
+    user_signature_share: &[u8],
 ) -> Result<BTreeMap<Identifier, SignatureShare>, String> {
     let mut shares_map = shares
         .iter()
@@ -93,7 +93,7 @@ pub fn frost_signature_shares_from_proto(
         })
         .collect::<Result<BTreeMap<_, _>, String>>()?;
 
-    if user_signature_share.len() > 0 {
+    if !user_signature_share.is_empty() {
         shares_map.insert(
             user_identifier,
             SignatureShare::deserialize(user_signature_share).map_err(|e| e.to_string())?,
@@ -117,7 +117,7 @@ pub fn frost_public_package_from_proto(
         })
         .collect::<Result<BTreeMap<_, _>, String>>()?;
 
-    if user_public_key.len() > 0 {
+    if !user_public_key.is_empty() {
         final_shares.insert(
             user_identifier,
             VerifyingShare::deserialize(user_public_key.as_slice()).map_err(|e| e.to_string())?,
@@ -142,9 +142,7 @@ pub fn frost_key_package_from_proto(
             .public_shares
             .get(&key_package.identifier)
             .ok_or("Verifying share is not found")?
-            .as_slice()
-            .try_into()
-            .map_err(|_| "Verifying share is not 33 bytes")?,
+            .as_slice(),
     )
     .map_err(|e| e.to_string())?;
 
@@ -189,7 +187,7 @@ pub fn frost_nonce(req: &FrostNonceRequest) -> Result<FrostNonceResponse, String
 
         let rng = &mut rand::thread_rng();
         let (nonce, commitment) =
-            frost_secp256k1_tr::round1::commit(&key_package.signing_share(), rng);
+            frost_secp256k1_tr::round1::commit(key_package.signing_share(), rng);
 
         let pb_nonce = SigningNonce {
             hiding: nonce.hiding().serialize().to_vec(),
@@ -230,21 +228,18 @@ pub fn sign_frost(req: &SignFrostRequest) -> Result<SignFrostResponse, String> {
 
         tracing::debug!("User commitments: {:?}", job.user_commitments);
 
-        match &job.user_commitments {
-            Some(c) => {
-                let user_commitments = frost_commitments_from_proto(c)
-                    .map_err(|e| format!("Failed to parse user commitments: {:?}", e))?;
-                commitments.insert(user_identifier, user_commitments);
-                signing_participants_groups.push(BTreeSet::from([user_identifier]));
-            }
-            None => {}
+        if let Some(c) = &job.user_commitments {
+            let user_commitments = frost_commitments_from_proto(c)
+                .map_err(|e| format!("Failed to parse user commitments: {:?}", e))?;
+            commitments.insert(user_identifier, user_commitments);
+            signing_participants_groups.push(BTreeSet::from([user_identifier]));
         };
         tracing::debug!("There are {} commitments", commitments.len());
 
         let nonce = match &job.nonce {
             Some(nonce) => frost_nonce_from_proto(nonce)
                 .map_err(|e| format!("Failed to parse nonce: {:?}", e))?,
-            None => return Err(format!("Nonce is required")),
+            None => return Err("Nonce is required".to_string()),
         };
 
         let verifying_key = verifying_key_from_bytes(job.verifying_key.clone())
@@ -253,7 +248,7 @@ pub fn sign_frost(req: &SignFrostRequest) -> Result<SignFrostResponse, String> {
         let identifier_override = match req.role {
             0 => None,
             1 => Some(user_identifier),
-            _ => return Err(format!("Invalid signing role")),
+            _ => return Err("Invalid signing role".to_string()),
         };
 
         let key_package = match &job.key_package {
@@ -264,7 +259,7 @@ pub fn sign_frost(req: &SignFrostRequest) -> Result<SignFrostResponse, String> {
                 req.role,
             )
             .map_err(|e| format!("Failed to parse key package: {:?}", e))?,
-            None => return Err(format!("Key package is required")),
+            None => return Err("Key package is required".to_string()),
         };
 
         let signing_package = frost_build_signin_package(
@@ -310,13 +305,10 @@ pub fn aggregate_frost(req: &AggregateFrostRequest) -> Result<AggregateFrostResp
     let user_identifier =
         Identifier::derive("user".as_bytes()).expect("Failed to derive user identifier");
 
-    match &req.user_commitments {
-        Some(c) => {
-            let user_commitments = frost_commitments_from_proto(c)
-                .map_err(|e| format!("Failed to parse user commitments: {:?}", e))?;
-            commitments.insert(user_identifier, user_commitments);
-        }
-        None => {}
+    if let Some(c) = &req.user_commitments {
+        let user_commitments = frost_commitments_from_proto(c)
+            .map_err(|e| format!("Failed to parse user commitments: {:?}", e))?;
+        commitments.insert(user_identifier, user_commitments);
     };
 
     let verifying_key = verifying_key_from_bytes(req.verifying_key.clone())
@@ -372,7 +364,7 @@ pub fn validate_signature_share(req: &ValidateSignatureShareRequest) -> Result<(
         0 => hex_string_to_identifier(&req.identifier)
             .map_err(|e| format!("Failed to parse identifier: {:?}", e))?,
         1 => Identifier::derive("user".as_bytes()).expect("Failed to derive user identifier"),
-        _ => return Err(format!("Invalid signing role")),
+        _ => return Err("Invalid signing role".to_string()),
     };
 
     let signature_share = SignatureShare::deserialize(req.signature_share.as_slice())
@@ -425,21 +417,21 @@ pub fn validate_signature_share(req: &ValidateSignatureShareRequest) -> Result<(
     let verifying_share = match req.role {
         0 => result_tweaked.verifying_share(),
         1 => result_even_y.verifying_share(),
-        _ => return Err(format!("Invalid signing role")),
+        _ => return Err("Invalid signing role".to_string()),
     };
 
     let verify_identifier = match req.role {
         0 => identifier,
         1 => user_identifier,
-        _ => return Err(format!("Invalid signing role")),
+        _ => return Err("Invalid signing role".to_string()),
     };
 
     frost_secp256k1_tr::verify_signature_share(
         verify_identifier,
-        &verifying_share,
+        verifying_share,
         &signature_share,
         &signing_package,
-        &result_tweaked.verifying_key(),
+        result_tweaked.verifying_key(),
     )
     .map_err(|e| format!("Failed to verify signature share: {:?}", e))?;
 

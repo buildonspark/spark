@@ -12,6 +12,7 @@ import {
   getNetwork,
   getP2TRScriptFromPublicKey,
   Network,
+  NetworkType,
 } from "@buildonspark/spark-sdk/utils";
 import { hexToBytes } from "@noble/curves/abstract/utils";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
@@ -19,6 +20,7 @@ import { hex } from "@scure/base";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import readline from "readline";
 import fs from "fs";
+import { decodeSparkAddress } from "@buildonspark/spark-sdk/address";
 
 const commands = [
   "initwallet",
@@ -113,6 +115,7 @@ async function runCLI() {
   getdepositaddress                                                   - Get an address to deposit funds from L1 to Spark
   identity                                                            - Get the wallet's identity public key
   getsparkaddress                                                     - Get the wallet's spark address
+  decodesparkaddress <sparkAddress> <network(MAINNET|REGTEST|SIGNET|TESTNET|LOCAL))> - Decode a spark address to get the identity public key
   getlatesttx <address>                                               - Get the latest deposit transaction id for an address
   claimdeposit <txid>                                                 - Claim any pending deposits to the wallet
   gettransfers [limit] [offset]                                       - Get a list of transfers
@@ -377,60 +380,77 @@ async function runCLI() {
           if (wallet) {
             wallet.cleanupConnections();
           }
-          const mnemonicOrSeed = args.join(" ");
+          let mnemonicOrSeed;
+          let accountNumber;
+          if (args.length == 13) {
+            mnemonicOrSeed = args.slice(0, -1).join(" ");
+            accountNumber = parseInt(args[args.length - 1]);
+          } else if (args.length == 12) {
+            mnemonicOrSeed = args.join(" ");
+          } else if (args.length !== 0) {
+            console.log(
+              "Invalid number of arguments - usage: initwallet [mnemonic | seed] [accountNumber (optional)]",
+            );
+            break;
+          }
           let options: ConfigOptions = {
             ...config,
             network,
           };
-          const { wallet: newWallet, mnemonic: newMnemonic } =
-            await IssuerSparkWallet.initialize({
-              mnemonicOrSeed,
-              options,
+          try {
+            const { wallet: newWallet, mnemonic: newMnemonic } =
+              await IssuerSparkWallet.initialize({
+                mnemonicOrSeed,
+                options,
+                accountNumber,
+              });
+            wallet = newWallet;
+            console.log("Mnemonic:", newMnemonic);
+            console.log("Network:", options.network);
+            wallet.on(
+              "deposit:confirmed",
+              (depositId: string, balance: number) => {
+                console.log(
+                  `Deposit ${depositId} marked as available. New balance: ${balance}`,
+                );
+              },
+            );
+
+            wallet.on(
+              "transfer:claimed",
+              (transferId: string, balance: number) => {
+                console.log(
+                  `Transfer ${transferId} claimed. New balance: ${balance}`,
+                );
+              },
+            );
+            wallet.on("stream:connected", () => {
+              console.log("Stream connected");
             });
-          wallet = newWallet;
-          console.log("Mnemonic:", newMnemonic);
-          console.log("Network:", options.network);
-          wallet.on(
-            "deposit:confirmed",
-            (depositId: string, balance: number) => {
-              console.log(
-                `Deposit ${depositId} marked as available. New balance: ${balance}`,
-              );
-            },
-          );
-
-          wallet.on(
-            "transfer:claimed",
-            (transferId: string, balance: number) => {
-              console.log(
-                `Transfer ${transferId} claimed. New balance: ${balance}`,
-              );
-            },
-          );
-          wallet.on("stream:connected", () => {
-            console.log("Stream connected");
-          });
-          wallet.on(
-            "stream:reconnecting",
-            (
-              attempt: number,
-              maxAttempts: number,
-              delayMs: number,
-              error: string,
-            ) => {
-              console.log(
-                "Stream reconnecting",
-                attempt,
-                maxAttempts,
-                delayMs,
-                error,
-              );
-            },
-          );
-          wallet.on("stream:disconnected", (reason: string) => {
-            console.log("Stream disconnected", reason);
-          });
-
+            wallet.on(
+              "stream:reconnecting",
+              (
+                attempt: number,
+                maxAttempts: number,
+                delayMs: number,
+                error: string,
+              ) => {
+                console.log(
+                  "Stream reconnecting",
+                  attempt,
+                  maxAttempts,
+                  delayMs,
+                  error,
+                );
+              },
+            );
+            wallet.on("stream:disconnected", (reason: string) => {
+              console.log("Stream disconnected", reason);
+            });
+          } catch (error: any) {
+            console.error("Error initializing wallet:", error);
+            break;
+          }
           break;
         case "getbalance":
           if (!wallet) {
@@ -476,6 +496,20 @@ async function runCLI() {
           }
           const sparkAddress = await wallet.getSparkAddress();
           console.log(sparkAddress);
+          break;
+        case "decodesparkaddress":
+          if (args.length !== 2) {
+            console.log(
+              "Usage: decodesparkaddress <sparkAddress> <network> (mainnet, regtest, testnet, signet, local)",
+            );
+            break;
+          }
+
+          const decodedAddress = decodeSparkAddress(
+            args[0],
+            args[1].toUpperCase() as NetworkType,
+          );
+          console.log(decodedAddress);
           break;
         case "createinvoice":
           if (!wallet) {
@@ -554,7 +588,7 @@ async function runCLI() {
           const withdrawal = await wallet.withdraw({
             amountSats: parseInt(args[0]),
             onchainAddress: args[1],
-            exitSpeed: args[2] as ExitSpeed,
+            exitSpeed: args[2].toUpperCase() as ExitSpeed,
           });
           console.log(withdrawal);
           break;

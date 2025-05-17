@@ -16,6 +16,9 @@ type TokenTransactionStatus string
 
 const (
 	TokenTransactionStatusStarted TokenTransactionStatus = "STARTED"
+	// TokenTransactionStatusSigned is the status if a transaction was started but then cancelled due to a threshold of the
+	// signatures not being acquired.
+	TokenTransactionStatusStartedCancelled TokenTransactionStatus = "STARTED_CANCELLED"
 	// TokenTransactionStatusSigned is the status after a transaction has been signed by this operator.
 	TokenTransactionStatusSigned TokenTransactionStatus = "SIGNED"
 	// TokenTransactionStatusSigned is the status if a transaction was signed but then cancelled due to a threshold of the
@@ -28,6 +31,7 @@ const (
 func (TokenTransactionStatus) Values() []string {
 	return []string{
 		string(TokenTransactionStatusStarted),
+		string(TokenTransactionStatusStartedCancelled),
 		string(TokenTransactionStatusSigned),
 		string(TokenTransactionStatusSignedCancelled),
 		string(TokenTransactionStatusFinalized),
@@ -46,6 +50,7 @@ func (TokenTransaction) Fields() []ent.Field {
 		field.Bytes("finalized_token_transaction_hash").NotEmpty().Unique(),
 		field.Bytes("operator_signature").Optional().Unique(),
 		field.Enum("status").GoType(TokenTransactionStatus("")).Optional(),
+		field.Time("expiry_time").Optional().Immutable(),
 		field.Bytes("coordinator_public_key").Optional(),
 	}
 }

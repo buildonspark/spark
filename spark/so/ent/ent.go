@@ -30,6 +30,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
+	"github.com/lightsparkdev/spark/so/ent/utxo"
+	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 )
 
 // ent aliases to avoid import conflicts in user's code.
@@ -108,6 +110,8 @@ func checkColumn(table, column string) error {
 			tree.Table:                    tree.ValidColumn,
 			treenode.Table:                treenode.ValidColumn,
 			usersignedtransaction.Table:   usersignedtransaction.ValidColumn,
+			utxo.Table:                    utxo.ValidColumn,
+			utxoswap.Table:                utxoswap.ValidColumn,
 		})
 	})
 	return columnCheck(table, column)

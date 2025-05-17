@@ -1,5 +1,91 @@
 # @buildonspark/issuer-sdk
 
+## 0.0.51
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.46
+  - @buildonspark/spark-sdk@0.1.20
+
+## 0.0.50
+
+### Patch Changes
+
+- React Native support
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.45
+  - @buildonspark/spark-sdk@0.1.19
+
+## 0.0.49
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.1.18
+
+## 0.0.48
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.44
+  - @buildonspark/spark-sdk@0.1.17
+
+## 0.0.47
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.43
+  - @buildonspark/spark-sdk@0.1.16
+
+## 0.0.46
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.1.15
+
+## 0.0.45
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.42
+  - @buildonspark/spark-sdk@0.1.14
+
+## 0.0.44
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.41
+  - @buildonspark/spark-sdk@0.1.13
+
+## 0.0.43
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.40
+  - @buildonspark/spark-sdk@0.1.12
+
+## 0.0.42
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.39
+  - @buildonspark/spark-sdk@0.1.11
+
 ## 0.0.41
 
 ### Patch Changes

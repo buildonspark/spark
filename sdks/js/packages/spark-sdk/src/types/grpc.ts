@@ -1,4 +1,4 @@
-import { CallOptions } from "nice-grpc";
+import { type CallOptions } from "nice-grpc-common";
 
 export interface RetryOptions {
   retry?: boolean;

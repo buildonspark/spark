@@ -2,10 +2,10 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 
-import {CurrencyAmountFromJson} from './CurrencyAmount.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
 import {CurrencyAmountToJson} from './CurrencyAmount.js';
 import CurrencyAmount from './CurrencyAmount.js';
-import BitcoinNetwork from './BitcoinNetwork.js';
+import {CurrencyAmountFromJson} from './CurrencyAmount.js';
 
 
 interface Invoice {

@@ -324,3 +324,19 @@ func (s *SparkInternalServer) SettleReceiverKeyTweak(ctx context.Context, req *p
 	transferHandler := handler.NewTransferHandler(s.config)
 	return errors.WrapWithGRPCError(&emptypb.Empty{}, transferHandler.SettleReceiverKeyTweak(ctx, req))
 }
+
+func (s *SparkInternalServer) SettleSenderKeyTweak(ctx context.Context, req *pb.SettleSenderKeyTweakRequest) (*emptypb.Empty, error) {
+	transferHandler := handler.NewInternalTransferHandler(s.config)
+	return errors.WrapWithGRPCError(&emptypb.Empty{}, transferHandler.SettleSenderKeyTweak(ctx, req))
+}
+
+// Register a utxo swap in all SEs so they can not be called concurrently to spend the same utxo
+func (s *SparkInternalServer) CreateUtxoSwap(ctx context.Context, req *pbspark.InitiateUtxoSwapRequest) (*pb.CreateUtxoSwapResponse, error) {
+	depositHandler := handler.NewInternalDepositHandler(s.config)
+	return errors.WrapWithGRPCError(depositHandler.CreateUtxoSwap(ctx, s.config, req))
+}
+
+func (s *SparkInternalServer) QueryTokenOutputsInternal(ctx context.Context, req *pbspark.QueryTokenOutputsRequest) (*pbspark.QueryTokenOutputsResponse, error) {
+	tokenTransactionHandler := handler.NewInternalTokenTransactionHandler(s.config, s.lrc20Client)
+	return errors.WrapWithGRPCError(tokenTransactionHandler.QueryTokenOutputsInternal(ctx, req))
+}

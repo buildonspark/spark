@@ -2,13 +2,12 @@ import {
   LRC20WalletApiConfig,
   MayHaveLrc20WalletApiConfig,
 } from "@buildonspark/lrc20-sdk";
-import { hexToBytes } from "@noble/curves/abstract/utils";
 import {
   MayHaveSspClientOptions,
   SspClientOptions,
 } from "../graphql/client.js";
-import { isHermeticTest } from "../tests/test-util.js";
 import { NetworkType } from "../utils/network.js";
+import { isHermeticTest } from "../tests/isHermeticTest.js";
 
 const SSP_IDENTITY_PUBLIC_KEYS = {
   LOCAL: "028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4",
@@ -119,6 +118,13 @@ export function getSspUrl(network: NetworkType): string {
   }
 }
 
+export function getSspSchemaEndpoint(network: NetworkType): string | undefined {
+  switch (network) {
+    case "LOCAL":
+      return "graphql/spark/rc";
+  }
+  return;
+}
 export type SigningOperator = {
   readonly id: number;
   readonly identifier: string;
@@ -178,6 +184,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
   sspClientOptions: {
     baseUrl: getSspUrl("LOCAL"),
     identityPublicKey: getSspIdentityPublicKey("LOCAL"),
+    schemaEndpoint: getSspSchemaEndpoint("LOCAL"),
   },
 };
 
@@ -186,12 +193,14 @@ export const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {
 };
 
 export const LOCAL_WALLET_CONFIG_SCHNORR: Required<ConfigOptions> = {
-  ...BASE_CONFIG,
+  ...LOCAL_WALLET_CONFIG,
+  threshold: 3, // 3 for issuance tests.
 };
 
 export const LOCAL_WALLET_CONFIG_ECDSA: Required<ConfigOptions> = {
-  ...BASE_CONFIG,
+  ...LOCAL_WALLET_CONFIG,
   useTokenTransactionSchnorrSignatures: false,
+  threshold: 3, // 3 for issuance tests.
 };
 
 export const REGTEST_WALLET_CONFIG: Required<ConfigOptions> = {

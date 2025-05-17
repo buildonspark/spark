@@ -9,7 +9,6 @@ export default defineConfig({
     "src/lrc/utils/index.ts",
     "src/lrc/wallet/index.ts",
     "src/proto/rpc/v1/types.ts",
-    "src/nice-grpc-web.ts",
   ],
   format: ["cjs", "esm"],
   inject: ['./buffer.js'],

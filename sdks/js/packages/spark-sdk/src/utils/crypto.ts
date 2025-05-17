@@ -8,13 +8,5 @@ export const getCrypto = (): Crypto => {
         ? global.crypto
         : nodeCrypto;
 
-  // Add randomUUID if it doesn't exist
-  if (!cryptoImpl?.randomUUID && nodeCrypto.randomUUID) {
-    cryptoImpl = {
-      ...cryptoImpl,
-      randomUUID: nodeCrypto.randomUUID,
-    };
-  }
-
   return cryptoImpl as Crypto;
 };

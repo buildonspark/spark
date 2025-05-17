@@ -59,3 +59,9 @@ type TreeNode func(*sql.Selector)
 
 // UserSignedTransaction is the predicate function for usersignedtransaction builders.
 type UserSignedTransaction func(*sql.Selector)
+
+// Utxo is the predicate function for utxo builders.
+type Utxo func(*sql.Selector)
+
+// UtxoSwap is the predicate function for utxoswap builders.
+type UtxoSwap func(*sql.Selector)

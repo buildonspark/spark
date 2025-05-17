@@ -21,7 +21,7 @@ describe('AppController', () => {
 
     it('should create a spark wallet', async () => {
       const response = await appController.createSparkWallet();
-      expect(response).toBe("Spark Wallet Identity Public Key: 03b1a0b08d13db8befda7e13f3f8843393723121b2115cf26d02c84ec4f5839c71");
+      expect(response).toBe("Spark Wallet Identity Public Key: 02a81f113befc188d45030511e5a4c9d9f83a515b0f594d3f8d53b1989109d85d5");
     });
 
     it('should be able to call wasm function', async () => {

@@ -2,9 +2,9 @@ import * as bitcoin from "bitcoinjs-lib";
 import { plainToInstance } from "class-transformer";
 import { ECPairInterface } from "ecpair";
 import { privateNegate, privateAdd, pointMultiply, pointAdd } from "@bitcoinerlab/secp256k1";
-import { PARITY, G, EMPTY_TOKEN_PUBKEY } from "../utils/index.ts";
 import { TokenPubkey } from "./token-pubkey.ts";
 import { TokenAmount } from "./token-amount.ts";
+import { EMPTY_TOKEN_PUBKEY, G, PARITY } from "../utils/constants.ts";
 
 export class ReceiptDto {
   constructor(

@@ -48,9 +48,13 @@ type DepositAddress struct {
 type DepositAddressEdges struct {
 	// SigningKeyshare holds the value of the signing_keyshare edge.
 	SigningKeyshare *SigningKeyshare `json:"signing_keyshare,omitempty"`
+	// Utxo holds the value of the utxo edge.
+	Utxo []*Utxo `json:"utxo,omitempty"`
+	// Utxoswaps holds the value of the utxoswaps edge.
+	Utxoswaps []*UtxoSwap `json:"utxoswaps,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [3]bool
 }
 
 // SigningKeyshareOrErr returns the SigningKeyshare value or an error if the edge
@@ -62,6 +66,24 @@ func (e DepositAddressEdges) SigningKeyshareOrErr() (*SigningKeyshare, error) {
 		return nil, &NotFoundError{label: signingkeyshare.Label}
 	}
 	return nil, &NotLoadedError{edge: "signing_keyshare"}
+}
+
+// UtxoOrErr returns the Utxo value or an error if the edge
+// was not loaded in eager-loading.
+func (e DepositAddressEdges) UtxoOrErr() ([]*Utxo, error) {
+	if e.loadedTypes[1] {
+		return e.Utxo, nil
+	}
+	return nil, &NotLoadedError{edge: "utxo"}
+}
+
+// UtxoswapsOrErr returns the Utxoswaps value or an error if the edge
+// was not loaded in eager-loading.
+func (e DepositAddressEdges) UtxoswapsOrErr() ([]*UtxoSwap, error) {
+	if e.loadedTypes[2] {
+		return e.Utxoswaps, nil
+	}
+	return nil, &NotLoadedError{edge: "utxoswaps"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -181,6 +203,16 @@ func (da *DepositAddress) Value(name string) (ent.Value, error) {
 // QuerySigningKeyshare queries the "signing_keyshare" edge of the DepositAddress entity.
 func (da *DepositAddress) QuerySigningKeyshare() *SigningKeyshareQuery {
 	return NewDepositAddressClient(da.config).QuerySigningKeyshare(da)
+}
+
+// QueryUtxo queries the "utxo" edge of the DepositAddress entity.
+func (da *DepositAddress) QueryUtxo() *UtxoQuery {
+	return NewDepositAddressClient(da.config).QueryUtxo(da)
+}
+
+// QueryUtxoswaps queries the "utxoswaps" edge of the DepositAddress entity.
+func (da *DepositAddress) QueryUtxoswaps() *UtxoSwapQuery {
+	return NewDepositAddressClient(da.config).QueryUtxoswaps(da)
 }
 
 // Update returns a builder for updating this DepositAddress.

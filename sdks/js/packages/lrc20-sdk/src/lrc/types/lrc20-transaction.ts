@@ -85,14 +85,14 @@ export class TokenPubkeyAnnouncement {
     const nameBytes = Buffer.from(name, "utf-8").length;
     if (nameBytes < MIN_NAME_SIZE || nameBytes > MAX_NAME_SIZE) {
       throw new Error(
-        `Byte length of token name is out of range: ${nameBytes}, must be between ${MIN_NAME_SIZE} and ${MAX_NAME_SIZE}`,
+        `Byte length of token name: ${name} is out of range. ${nameBytes}, must be between ${MIN_NAME_SIZE} and ${MAX_NAME_SIZE}`,
       );
     }
 
     const symbolBytes = Buffer.from(symbol, "utf-8").length;
     if (symbolBytes < MIN_SYMBOL_SIZE || symbolBytes > MAX_SYMBOL_SIZE) {
       throw new Error(
-        `Byte length of token ticker is out of range: ${symbolBytes}, must be between ${MIN_SYMBOL_SIZE} and ${MAX_SYMBOL_SIZE}`,
+        `Byte length of token ticker: ${symbol} is out of range. ${symbolBytes}, must be between ${MIN_SYMBOL_SIZE} and ${MAX_SYMBOL_SIZE}`,
       );
     }
     this.tokenPubkey = tokenPubkey;
@@ -646,4 +646,23 @@ export function parseAnnouncementData(txData: any): AnnouncementData {
   }
 
   return txData;
+}
+
+export class TokenPubkeyInfo {
+  constructor(
+    public announcement: TokenPubkeyAnnouncement | null,
+    public totalSupply: bigint,
+  ) {}
+
+  public static fromTokenPubkeyInfoDto(info: TokenPubkeyInfoDto): TokenPubkeyInfo {
+    const announcement = info.announcement
+      ? TokenPubkeyAnnouncement.fromTokenPubkeyAnnouncementDto(info.announcement)
+      : null;
+    return new TokenPubkeyInfo(announcement, info.total_supply);
+  }
+}
+
+export interface TokenPubkeyInfoDto {
+  announcement: TokenPubkeyAnnouncementDto | null;
+  total_supply: bigint;
 }

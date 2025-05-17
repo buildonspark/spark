@@ -21,6 +21,8 @@ const (
 	OperatorSelectionOptionExcludeSelf
 	// OperatorSelectionOptionThreshold selects a random subset of operators with the given threshold.
 	OperatorSelectionOptionThreshold
+	// OperatorSelectionOptionPreSelected selects a pre-selected list of operators.
+	OperatorSelectionOptionPreSelected
 )
 
 // OperatorSelection is the selection of operators.
@@ -35,6 +37,17 @@ type OperatorSelection struct {
 	operatorList *[]*so.SigningOperator
 }
 
+func NewPreSelectedOperatorSelection(config *so.Config, operatorIDs []string) *OperatorSelection {
+	operators := make([]*so.SigningOperator, 0, len(operatorIDs))
+	for _, id := range operatorIDs {
+		operators = append(operators, config.SigningOperatorMap[id])
+	}
+	return &OperatorSelection{
+		Option:       OperatorSelectionOptionPreSelected,
+		operatorList: &operators,
+	}
+}
+
 // OperatorCount returns the number of operators based on the option.
 func (o OperatorSelection) OperatorCount(config *so.Config) int {
 	switch o.Option {
@@ -44,6 +57,8 @@ func (o OperatorSelection) OperatorCount(config *so.Config) int {
 		return len(config.SigningOperatorMap) - 1
 	case OperatorSelectionOptionThreshold:
 		return o.Threshold
+	case OperatorSelectionOptionPreSelected:
+		return len(*o.operatorList)
 	}
 
 	return 0
@@ -92,6 +107,7 @@ func (o *OperatorSelection) OperatorList(config *so.Config) ([]*so.SigningOperat
 			operators = append(operators, config.SigningOperatorMap[index])
 		}
 		o.operatorList = &operators
+	case OperatorSelectionOptionPreSelected:
 	}
 
 	if o.operatorList == nil {

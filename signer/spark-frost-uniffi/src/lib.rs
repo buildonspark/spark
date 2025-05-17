@@ -1,3 +1,5 @@
+// Uniffi generates code with bad comments for some reason...
+#![allow(clippy::empty_line_after_doc_comments)]
 uniffi::include_scaffolding!("spark_frost");
 
 use std::io::Write;
@@ -16,7 +18,6 @@ use bitcoin::{
 use ecies::{decrypt, encrypt};
 use frost_secp256k1_tr::Identifier;
 use serde::{Deserialize, Serialize};
-use serde_wasm_bindgen;
 use wasm_bindgen::prelude::*;
 
 /// A uniffi library for the Spark Frost signing protocol on client side.
@@ -41,9 +42,9 @@ impl std::fmt::Display for Error {
     }
 }
 
-impl Into<JsValue> for Error {
-    fn into(self) -> JsValue {
-        JsValue::from_str(&format!("{}", self))
+impl From<Error> for JsValue {
+    fn from(val: Error) -> Self {
+        JsValue::from_str(&format!("{}", val))
     }
 }
 
@@ -64,11 +65,11 @@ impl SigningNonce {
     }
 }
 
-impl Into<spark_frost::proto::frost::SigningNonce> for SigningNonce {
-    fn into(self) -> spark_frost::proto::frost::SigningNonce {
+impl From<SigningNonce> for spark_frost::proto::frost::SigningNonce {
+    fn from(val: SigningNonce) -> Self {
         spark_frost::proto::frost::SigningNonce {
-            hiding: self.hiding,
-            binding: self.binding,
+            hiding: val.hiding,
+            binding: val.binding,
         }
     }
 }
@@ -99,11 +100,11 @@ impl SigningCommitment {
     }
 }
 
-impl Into<spark_frost::proto::common::SigningCommitment> for SigningCommitment {
-    fn into(self) -> spark_frost::proto::common::SigningCommitment {
+impl From<SigningCommitment> for spark_frost::proto::common::SigningCommitment {
+    fn from(val: SigningCommitment) -> Self {
         spark_frost::proto::common::SigningCommitment {
-            hiding: self.hiding,
-            binding: self.binding,
+            hiding: val.hiding,
+            binding: val.binding,
         }
     }
 }
@@ -158,19 +159,19 @@ impl KeyPackage {
     }
 }
 
-impl Into<spark_frost::proto::frost::KeyPackage> for KeyPackage {
-    fn into(self) -> spark_frost::proto::frost::KeyPackage {
+impl From<KeyPackage> for spark_frost::proto::frost::KeyPackage {
+    fn from(val: KeyPackage) -> Self {
         let user_identifier =
             Identifier::derive("user".as_bytes()).expect("Failed to derive user identifier");
         let user_identifier_string = hex::encode(user_identifier.to_scalar().to_bytes());
         spark_frost::proto::frost::KeyPackage {
             identifier: user_identifier_string.clone(),
-            secret_share: self.secret_key.clone(),
+            secret_share: val.secret_key.clone(),
             public_shares: HashMap::from([(
                 user_identifier_string.clone(),
-                self.public_key.clone(),
+                val.public_key.clone(),
             )]),
-            public_key: self.verifying_key.clone(),
+            public_key: val.verifying_key.clone(),
             min_signers: 1,
         }
     }
@@ -182,7 +183,7 @@ pub fn frost_nonce(key_package: KeyPackage) -> Result<NonceResult, Error> {
     let request = spark_frost::proto::frost::FrostNonceRequest {
         key_packages: vec![key_package_proto],
     };
-    let response = spark_frost::signing::frost_nonce(&request).map_err(|e| Error::Spark(e))?;
+    let response = spark_frost::signing::frost_nonce(&request).map_err(Error::Spark)?;
     let nonce = response
         .results
         .first()
@@ -214,13 +215,13 @@ pub fn sign_frost(
             .into_iter()
             .map(|(k, v)| (k, v.into()))
             .collect(),
-        adaptor_public_key: adaptor_public_key.unwrap_or(vec![]),
+        adaptor_public_key: adaptor_public_key.unwrap_or_default(),
     };
     let request = spark_frost::proto::frost::SignFrostRequest {
         signing_jobs: vec![signing_job],
         role: spark_frost::proto::frost::SigningRole::User.into(),
     };
-    let response = spark_frost::signing::sign_frost(&request).map_err(|e| Error::Spark(e))?;
+    let response = spark_frost::signing::sign_frost(&request).map_err(Error::Spark)?;
     let result = response
         .results
         .iter()
@@ -254,6 +255,7 @@ pub fn wasm_sign_frost(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn aggregate_frost(
     msg: Vec<u8>,
     statechain_commitments: HashMap<String, SigningCommitment>,
@@ -284,7 +286,7 @@ pub fn aggregate_frost(
             .collect(),
         verifying_key: verifying_key.clone(),
         user_signature_share: self_signature.clone(),
-        adaptor_public_key: adaptor_public_key.unwrap_or(vec![]),
+        adaptor_public_key: adaptor_public_key.unwrap_or_default(),
     };
     let response =
         spark_frost::signing::aggregate_frost(&request).map_err(|e| Error::Spark(e.to_string()))?; // Convert the error to String first
@@ -306,9 +308,9 @@ pub fn validate_signature_share(
         message: msg,
         identifier: identifier_string,
         role: spark_frost::proto::frost::SigningRole::User.into(),
-        signature_share: signature_share,
-        public_share: public_share,
-        verifying_key: verifying_key,
+        signature_share,
+        public_share,
+        verifying_key,
         user_commitments: Some(self_commitment.into()),
         commitments: statechain_commitments
             .into_iter()
@@ -319,6 +321,7 @@ pub fn validate_signature_share(
 }
 
 #[wasm_bindgen]
+#[allow(clippy::too_many_arguments)]
 pub fn wasm_aggregate_frost(
     msg: Vec<u8>,
     statechain_commitments: JsValue,
