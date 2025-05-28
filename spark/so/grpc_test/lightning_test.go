@@ -179,6 +179,60 @@ func TestReceiveLightningPayment(t *testing.T) {
 	require.NoError(t, err, "failed to ClaimTransfer")
 }
 
+func TestReceiveLightningPaymentCannotCancelAfterPreimageReveal(t *testing.T) {
+	// Create user and ssp configs
+	userConfig, err := testutil.TestWalletConfig()
+	require.NoError(t, err)
+
+	sspConfig, err := testutil.TestWalletConfig()
+	require.NoError(t, err)
+
+	// User creates an invoice
+	preimage, paymentHash := testPreimageHash(t)
+	fakeInvoiceCreator := NewFakeLightningInvoiceCreator()
+
+	defer cleanUp(t, userConfig, paymentHash)
+
+	invoice, _, err := wallet.CreateLightningInvoiceWithPreimage(context.Background(), userConfig, fakeInvoiceCreator, 100, "test", preimage)
+	require.NoError(t, err)
+	assert.NotNil(t, invoice)
+
+	// SSP creates a node of 12345 sats
+	sspLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err)
+	feeSats := uint64(0)
+	nodeToSend, err := testutil.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
+	require.NoError(t, err)
+
+	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err)
+
+	leaves := []wallet.LeafKeyTweak{}
+	leaves = append(leaves, wallet.LeafKeyTweak{
+		Leaf:              nodeToSend,
+		SigningPrivKey:    sspLeafPrivKey.Serialize(),
+		NewSigningPrivKey: newLeafPrivKey.Serialize(),
+	})
+
+	response, err := wallet.SwapNodesForPreimage(
+		context.Background(),
+		sspConfig,
+		leaves,
+		userConfig.IdentityPublicKey(),
+		paymentHash[:],
+		nil,
+		feeSats,
+		true,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, response.Preimage, preimage[:])
+
+	_, err = wallet.CancelTransfer(context.Background(), sspConfig, response.Transfer)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "FailedPrecondition")
+	assert.Contains(t, err.Error(), "Cannot cancel an invoice whose preimage has already been revealed")
+}
+
 func TestSendLightningPayment(t *testing.T) {
 	// Create user and ssp configs
 	userConfig, err := testutil.TestWalletConfig()
@@ -235,7 +289,7 @@ func TestSendLightningPayment(t *testing.T) {
 		require.NoError(t, err)
 		totalValue += value
 	}
-	assert.Equal(t, totalValue, int64(12345+feeSats))
+	assert.Equal(t, totalValue, int64(12345+feeSats-common.DefaultFeeSats))
 
 	receiverTransfer, err := wallet.ProvidePreimage(context.Background(), sspConfig, preimage[:])
 	require.NoError(t, err)
@@ -322,7 +376,7 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 		require.NoError(t, err)
 		totalValue += value
 	}
-	assert.Equal(t, totalValue, int64(12345+feeSats))
+	assert.Equal(t, totalValue, int64(12345+feeSats-common.DefaultFeeSats))
 
 	err = wallet.ReturnLightningPayment(context.Background(), sspConfig, paymentHash[:])
 	require.NoError(t, err)
@@ -478,7 +532,7 @@ func TestSendLightningPaymentTwice(t *testing.T) {
 		require.NoError(t, err)
 		totalValue += value
 	}
-	assert.Equal(t, totalValue, int64(12345+feeSats))
+	assert.Equal(t, totalValue, int64(12345+feeSats-common.DefaultFeeSats))
 
 	receiverTransfer, err := wallet.ProvidePreimage(context.Background(), sspConfig, preimage[:])
 	require.NoError(t, err)

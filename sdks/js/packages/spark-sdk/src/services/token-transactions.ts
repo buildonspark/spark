@@ -24,7 +24,10 @@ import {
   KeyshareWithOperatorIndex,
   recoverRevocationSecretFromKeyshares,
 } from "../utils/token-keyshares.js";
-import { calculateAvailableTokenAmount } from "../utils/token-transactions.js";
+import {
+  calculateAvailableTokenAmount,
+  checkIfSelectedOutputsAreAvailable,
+} from "../utils/token-transactions.js";
 import { validateTokenTransaction } from "../utils/token-transaction-validation.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
@@ -35,6 +38,9 @@ import {
 } from "../errors/types.js";
 import { SigningOperator } from "./wallet-config.js";
 import { hexToBytes } from "@noble/hashes/utils";
+import { decodeSparkAddress } from "../address/index.js";
+
+const MAX_TOKEN_OUTPUTS = 100;
 
 export class TokenTransactionService {
   protected readonly config: WalletConfigService;
@@ -48,66 +54,138 @@ export class TokenTransactionService {
     this.connectionManager = connectionManager;
   }
 
+  public async tokenTransfer(
+    tokenOutputs: Map<string, OutputWithPreviousTransactionData[]>,
+    receiverOutputs: {
+      tokenPublicKey: string;
+      tokenAmount: bigint;
+      receiverSparkAddress: string;
+    }[],
+    selectedOutputs?: OutputWithPreviousTransactionData[],
+  ): Promise<string> {
+    if (receiverOutputs.length === 0) {
+      throw new ValidationError("No receiver outputs provided", {
+        field: "receiverOutputs",
+        value: receiverOutputs,
+        expected: "Non-empty array",
+      });
+    }
+
+    const totalTokenAmount = receiverOutputs.reduce(
+      (sum, transfer) => sum + transfer.tokenAmount,
+      0n,
+    );
+
+    let outputsToUse: OutputWithPreviousTransactionData[];
+
+    if (selectedOutputs) {
+      outputsToUse = selectedOutputs;
+
+      if (
+        !checkIfSelectedOutputsAreAvailable(
+          outputsToUse,
+          tokenOutputs,
+          hexToBytes(receiverOutputs[0]!!.tokenPublicKey),
+        )
+      ) {
+        throw new ValidationError(
+          "One or more selected TTXOs are not available",
+          {
+            field: "selectedOutputs",
+            value: selectedOutputs,
+            expected: "Available TTXOs",
+          },
+        );
+      }
+    } else {
+      outputsToUse = this.selectTokenOutputs(
+        tokenOutputs.get(receiverOutputs[0]!!.tokenPublicKey)!!,
+        totalTokenAmount,
+      );
+    }
+
+    if (outputsToUse.length > MAX_TOKEN_OUTPUTS) {
+      throw new ValidationError(
+        `Cannot transfer more than ${MAX_TOKEN_OUTPUTS} TTXOs in a single transaction (${outputsToUse.length} selected)`,
+        {
+          field: "outputsToUse",
+          value: outputsToUse.length,
+          expected: `Less than or equal to ${MAX_TOKEN_OUTPUTS}`,
+        },
+      );
+    }
+
+    const tokenOutputData = receiverOutputs.map((transfer) => {
+      const receiverAddress = decodeSparkAddress(
+        transfer.receiverSparkAddress,
+        this.config.getNetworkType(),
+      );
+      return {
+        receiverSparkAddress: hexToBytes(receiverAddress),
+        tokenPublicKey: hexToBytes(transfer.tokenPublicKey),
+        tokenAmount: transfer.tokenAmount,
+      };
+    });
+
+    const tokenTransaction = await this.constructTransferTokenTransaction(
+      outputsToUse,
+      tokenOutputData,
+    );
+
+    const txId = await this.broadcastTokenTransaction(
+      tokenTransaction,
+      outputsToUse.map((output) => output.output!.ownerPublicKey),
+      outputsToUse.map((output) => output.output!.revocationCommitment!),
+    );
+
+    return txId;
+  }
+
   public async constructTransferTokenTransaction(
     selectedOutputs: OutputWithPreviousTransactionData[],
-    receiverSparkAddress: Uint8Array,
-    tokenPublicKey: Uint8Array,
-    tokenAmount: bigint,
+    tokenOutputData: Array<{
+      receiverSparkAddress: Uint8Array;
+      tokenPublicKey: Uint8Array;
+      tokenAmount: bigint;
+    }>,
   ): Promise<TokenTransaction> {
-    let availableTokenAmount = calculateAvailableTokenAmount(selectedOutputs);
+    const availableTokenAmount = calculateAvailableTokenAmount(selectedOutputs);
+    const totalRequestedAmount = tokenOutputData.reduce(
+      (sum, output) => sum + output.tokenAmount,
+      0n,
+    );
 
-    if (availableTokenAmount === tokenAmount) {
-      return {
-        network: this.config.getNetworkProto(),
-        tokenInputs: {
-          $case: "transferInput",
-          transferInput: {
-            outputsToSpend: selectedOutputs.map((output) => ({
-              prevTokenTransactionHash: output.previousTransactionHash,
-              prevTokenTransactionVout: output.previousTransactionVout,
-            })),
-          },
-        },
-        tokenOutputs: [
-          {
-            ownerPublicKey: receiverSparkAddress,
-            tokenPublicKey: tokenPublicKey,
-            tokenAmount: numberToBytesBE(tokenAmount, 16),
-          },
-        ],
-        sparkOperatorIdentityPublicKeys:
-          this.collectOperatorIdentityPublicKeys(),
-      };
-    } else {
-      const tokenAmountDifference = availableTokenAmount - tokenAmount;
+    const tokenOutputs = tokenOutputData.map((output) => ({
+      ownerPublicKey: output.receiverSparkAddress,
+      tokenPublicKey: output.tokenPublicKey,
+      tokenAmount: numberToBytesBE(output.tokenAmount, 16),
+    }));
 
-      return {
-        network: this.config.getNetworkProto(),
-        tokenInputs: {
-          $case: "transferInput",
-          transferInput: {
-            outputsToSpend: selectedOutputs.map((output) => ({
-              prevTokenTransactionHash: output.previousTransactionHash,
-              prevTokenTransactionVout: output.previousTransactionVout,
-            })),
-          },
-        },
-        tokenOutputs: [
-          {
-            ownerPublicKey: receiverSparkAddress,
-            tokenPublicKey: tokenPublicKey,
-            tokenAmount: numberToBytesBE(tokenAmount, 16),
-          },
-          {
-            ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
-            tokenPublicKey: tokenPublicKey,
-            tokenAmount: numberToBytesBE(tokenAmountDifference, 16),
-          },
-        ],
-        sparkOperatorIdentityPublicKeys:
-          this.collectOperatorIdentityPublicKeys(),
-      };
+    if (availableTokenAmount > totalRequestedAmount) {
+      const changeAmount = availableTokenAmount - totalRequestedAmount;
+      const firstTokenPublicKey = tokenOutputData[0]!!.tokenPublicKey;
+
+      tokenOutputs.push({
+        ownerPublicKey: await this.config.signer.getIdentityPublicKey(),
+        tokenPublicKey: firstTokenPublicKey,
+        tokenAmount: numberToBytesBE(changeAmount, 16),
+      });
     }
+
+    return {
+      network: this.config.getNetworkProto(),
+      tokenInputs: {
+        $case: "transferInput",
+        transferInput: {
+          outputsToSpend: selectedOutputs.map((output) => ({
+            prevTokenTransactionHash: output.previousTransactionHash,
+            prevTokenTransactionVout: output.previousTransactionVout,
+          })),
+        },
+      },
+      tokenOutputs,
+      sparkOperatorIdentityPublicKeys: this.collectOperatorIdentityPublicKeys(),
+    };
   }
 
   public collectOperatorIdentityPublicKeys(): Uint8Array[] {
@@ -326,7 +404,7 @@ export class TokenTransactionService {
       },
       {
         retry: true,
-        retryableStatuses: ["UNKNOWN", "UNAVAILABLE", "CANCELLED"],
+        retryableStatuses: ["UNKNOWN", "UNAVAILABLE", "CANCELLED", "INTERNAL"],
         retryMaxAttempts: 3,
       } as SparkCallOptions,
     );
@@ -452,7 +530,12 @@ export class TokenTransactionService {
               },
               {
                 retry: true,
-                retryableStatuses: ["UNKNOWN", "UNAVAILABLE", "CANCELLED"],
+                retryableStatuses: [
+                  "UNKNOWN",
+                  "UNAVAILABLE",
+                  "CANCELLED",
+                  "INTERNAL",
+                ],
                 retryMaxAttempts: 3,
               } as SparkCallOptions,
             );
@@ -507,7 +590,12 @@ export class TokenTransactionService {
             },
             {
               retry: true,
-              retryableStatuses: ["UNKNOWN", "UNAVAILABLE", "CANCELLED"],
+              retryableStatuses: [
+                "UNKNOWN",
+                "UNAVAILABLE",
+                "CANCELLED",
+                "INTERNAL",
+              ],
               retryMaxAttempts: 3,
             } as SparkCallOptions,
           );
@@ -547,6 +635,7 @@ export class TokenTransactionService {
       const result = await sparkClient.query_token_outputs({
         ownerPublicKeys,
         tokenPublicKeys,
+        network: this.config.getNetworkProto(),
       });
 
       return result.outputsWithPreviousTransactionData;

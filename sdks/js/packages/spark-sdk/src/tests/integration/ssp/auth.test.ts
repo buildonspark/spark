@@ -36,15 +36,12 @@ describe("SSP Auth Test", () => {
         wallet.createLightningInvoice({
           amountSats: 1000,
         }),
-      ).rejects.toThrow(
-        new AuthenticationError(
-          "Failed to authenticate after unauthorized response",
-          {
-            endpoint: "graphql",
-            reason: "User is not authenticated",
-          },
-        ),
-      );
+      ).rejects.toMatchObject({
+        name: AuthenticationError.name,
+        context: expect.objectContaining({
+          endpoint: "graphql",
+        }),
+      });
     } finally {
       SspClient.prototype.authenticate = originalAuthenticate;
     }

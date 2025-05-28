@@ -86,7 +86,7 @@ func (s *EventRouter) NotifyUser(identityPublicKey []byte, message *pb.Subscribe
 					address = peer.Addr.String()
 				}
 
-				return fmt.Errorf("error sending message to stream for (network: %s, address: %s): %v", network, address, err)
+				return fmt.Errorf("error sending message to stream for (network: %s, address: %s): %w", network, address, err)
 			}
 		}
 	}

@@ -379,7 +379,14 @@ export class BitcoinFaucet {
     const txHex = bytesToHex(signedTx.extract());
     await this.broadcastTx(txHex);
 
-    await this.generateToAddress(1, address);
+    const randomKey = secp256k1.utils.randomPrivateKey();
+    const randomPubKey = secp256k1.getPublicKey(randomKey);
+    const randomAddress = getP2TRAddressFromPublicKey(
+      randomPubKey,
+      Network.LOCAL,
+    );
+
+    await this.generateToAddress(1, randomAddress);
 
     return signedTx;
   }

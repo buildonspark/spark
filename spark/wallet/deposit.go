@@ -152,8 +152,13 @@ func QueryUnusedDepositAddresses(
 	}
 	defer sparkConn.Close()
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get proto network: %w", err)
+	}
 	return sparkClient.QueryUnusedDepositAddresses(ctx, &pb.QueryUnusedDepositAddressesRequest{
 		IdentityPublicKey: config.IdentityPublicKey(),
+		Network:           network,
 	})
 }
 
@@ -199,7 +204,7 @@ func CreateTreeRoot(
 	}
 
 	// Create refund tx
-	cpfpRefundTx, _, err := createRefundTxs(
+	_, cpfpRefundTx, err := createRefundTxs(
 		spark.InitialSequence(),
 		&wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
 		rootTx.TxOut[0].Value,
@@ -358,6 +363,7 @@ func ClaimStaticDeposit(
 	userIdentityPubkey *secp256k1.PublicKey,
 	sspConn *grpc.ClientConn,
 	prevTxOut *wire.TxOut,
+	signingCommitments []*pb.RequestedSigningCommitments,
 ) (*wire.MsgTx, *pb.Transfer, error) {
 	var spendTxBytes bytes.Buffer
 	err := spendTx.Serialize(&spendTxBytes)
@@ -409,19 +415,9 @@ func ClaimStaticDeposit(
 		return nil, nil, fmt.Errorf("failed to generate transfer id: %v", err)
 	}
 
-	nodeIDs := make([]string, len(leavesToTransfer))
-	for i, leaf := range leavesToTransfer {
-		nodeIDs[i] = leaf.Leaf.Id
-	}
-	signingCommitments, err := sparkClient.GetSigningCommitments(ctx, &pb.GetSigningCommitmentsRequest{
-		NodeIds: nodeIDs,
-	})
-	if err != nil {
-		return nil, nil, err
-	}
 	signingJobs, refundTxs, userCommitments, err := prepareFrostSigningJobsForUserSignedRefund(
 		leavesToTransfer,
-		signingCommitments.SigningCommitments,
+		signingCommitments,
 		userIdentityPubkey,
 	)
 	if err != nil {
@@ -446,7 +442,7 @@ func ClaimStaticDeposit(
 		refundTxs,
 		signingResults.Results,
 		userCommitments,
-		signingCommitments.SigningCommitments,
+		signingCommitments,
 	)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to prepare leaf signing jobs: %v", err)
@@ -548,7 +544,7 @@ func ClaimStaticDeposit(
 		return nil, nil, fmt.Errorf("failed to aggregate frost: %v", err)
 	}
 
-	// Step 9: Verify signature using go lib.
+	// Verify signature using go lib.
 	sig, err := schnorr.ParseSignature(signatureResult.Signature)
 	if err != nil {
 		return nil, nil, err
@@ -575,4 +571,184 @@ func ClaimStaticDeposit(
 	}
 
 	return spendTx, transferToAliceKeysTweaked, nil
+}
+
+func RefundStaticDeposit(
+	ctx context.Context,
+	config *Config,
+	network common.Network,
+	spendTx *wire.MsgTx,
+	depositAddressSecretKey *secp256k1.PrivateKey,
+	userSignature []byte,
+	userIdentityPubkey *secp256k1.PublicKey,
+	prevTxOut *wire.TxOut,
+	aliceConn *grpc.ClientConn,
+) (*wire.MsgTx, error) {
+	var spendTxBytes bytes.Buffer
+	err := spendTx.Serialize(&spendTxBytes)
+	if err != nil {
+		return nil, err
+	}
+	spendTxSighash, err := common.SigHashFromTx(
+		spendTx,
+		0,
+		prevTxOut,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sighash: %v", err)
+	}
+
+	hidingPriv, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		return nil, err
+	}
+	bindingPriv, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		return nil, err
+	}
+	hidingPubBytes := hidingPriv.PubKey().SerializeCompressed()
+	bindingPubBytes := bindingPriv.PubKey().SerializeCompressed()
+	spendTxNonceCommitment, err := objects.NewSigningCommitment(bindingPubBytes, hidingPubBytes)
+	if err != nil {
+		return nil, err
+	}
+	spendTxNonceCommitmentProto, err := spendTxNonceCommitment.MarshalProto()
+	if err != nil {
+		return nil, err
+	}
+
+	signingJob := &pb.SigningJob{
+		RawTx:                  spendTxBytes.Bytes(),
+		SigningPublicKey:       depositAddressSecretKey.PubKey().SerializeCompressed(),
+		SigningNonceCommitment: spendTxNonceCommitmentProto,
+	}
+
+	protoNetwork, err := common.ProtoNetworkFromNetwork(network)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get proto network: %v", err)
+	}
+	depositTxID, err := hex.DecodeString(spendTx.TxIn[0].PreviousOutPoint.Hash.String())
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode deposit txid: %v", err)
+	}
+
+	// *********************************************************************************
+	// Initiate Utxo Swap
+	// *********************************************************************************
+	sparkClient := pb.NewSparkServiceClient(aliceConn)
+	transferID, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate transfer id: %v", err)
+	}
+	swapResponse, err := sparkClient.InitiateUtxoSwap(ctx, &pb.InitiateUtxoSwapRequest{
+		OnChainUtxo: &pb.UTXO{
+			Txid:    depositTxID,
+			Vout:    spendTx.TxIn[0].PreviousOutPoint.Index,
+			Network: protoNetwork,
+		},
+		RequestType:   pb.UtxoSwapRequestType_Refund,
+		Amount:        &pb.InitiateUtxoSwapRequest_CreditAmountSats{CreditAmountSats: 0},
+		UserSignature: userSignature,
+		SspSignature:  []byte{},
+		Transfer: &pb.StartUserSignedTransferRequest{
+			TransferId:                transferID.String(),
+			OwnerIdentityPublicKey:    config.IdentityPublicKey(),
+			ReceiverIdentityPublicKey: userIdentityPubkey.SerializeCompressed(),
+			LeavesToSend:              nil,
+			ExpiryTime:                timestamppb.New(time.Now().Add(2 * time.Minute)),
+		},
+		SpendTxSigningJob: signingJob,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initiate utxo swap: %v", err)
+	}
+
+	// *********************************************************************************
+	// Sign the spend tx
+	// *********************************************************************************
+	frostUserIdentifier := "0000000000000000000000000000000000000000000000000000000000000063"
+	userKeyPackage := pbfrost.KeyPackage{
+		Identifier:  frostUserIdentifier,
+		SecretShare: depositAddressSecretKey.Serialize(),
+		PublicShares: map[string][]byte{
+			frostUserIdentifier: depositAddressSecretKey.PubKey().SerializeCompressed(),
+		},
+		PublicKey:  swapResponse.DepositAddress.VerifyingPublicKey,
+		MinSigners: 1,
+	}
+	userNonce, err := objects.NewSigningNonce(bindingPriv.Serialize(), hidingPriv.Serialize())
+	if err != nil {
+		return nil, err
+	}
+	userNonceProto, err := userNonce.MarshalProto()
+	if err != nil {
+		return nil, err
+	}
+	userCommitmentProto, err := userNonce.SigningCommitment().MarshalProto()
+	if err != nil {
+		return nil, err
+	}
+	operatorCommitments := swapResponse.SpendTxSigningResult.SigningNonceCommitments
+
+	userSigningJobs := make([]*pbfrost.FrostSigningJob, 0)
+	userJobID := uuid.NewString()
+	userSigningJobs = append(userSigningJobs, &pbfrost.FrostSigningJob{
+		JobId:           userJobID,
+		Message:         spendTxSighash,
+		KeyPackage:      &userKeyPackage,
+		VerifyingKey:    swapResponse.DepositAddress.VerifyingPublicKey,
+		Nonce:           userNonceProto,
+		Commitments:     operatorCommitments,
+		UserCommitments: userCommitmentProto,
+	})
+
+	frostConn, err := common.NewGRPCConnectionWithoutTLS(config.FrostSignerAddress, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to frost signer: %v", err)
+	}
+	defer frostConn.Close()
+
+	frostClient := pbfrost.NewFrostServiceClient(frostConn)
+
+	userSignatures, err := frostClient.SignFrost(context.Background(), &pbfrost.SignFrostRequest{
+		SigningJobs: userSigningJobs,
+		Role:        pbfrost.SigningRole_USER,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign frost: %v", err)
+	}
+
+	signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
+		Message:            spendTxSighash,
+		SignatureShares:    swapResponse.SpendTxSigningResult.SignatureShares,
+		PublicShares:       swapResponse.SpendTxSigningResult.PublicKeys,
+		VerifyingKey:       swapResponse.DepositAddress.VerifyingPublicKey,
+		Commitments:        operatorCommitments,
+		UserCommitments:    userCommitmentProto,
+		UserPublicKey:      depositAddressSecretKey.PubKey().SerializeCompressed(),
+		UserSignatureShare: userSignatures.Results[userJobID].SignatureShare,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate frost: %v", err)
+	}
+
+	// Verify signature using go lib.
+	sig, err := schnorr.ParseSignature(signatureResult.Signature)
+	if err != nil {
+		return nil, err
+	}
+
+	pubKey, err := btcec.ParsePubKey(swapResponse.DepositAddress.VerifyingPublicKey)
+	if err != nil {
+		return nil, err
+	}
+	taprootKey := txscript.ComputeTaprootKeyNoScript(pubKey)
+
+	verified := sig.Verify(spendTxSighash[:], taprootKey)
+	if !verified {
+		return nil, fmt.Errorf("signature verification failed")
+	}
+	spendTx.TxIn[0].Witness = wire.TxWitness{signatureResult.Signature}
+
+	return spendTx, nil
 }

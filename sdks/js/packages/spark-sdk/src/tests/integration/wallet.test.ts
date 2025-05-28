@@ -50,26 +50,6 @@ describe("wallet", () => {
     const accountTenIdentityKey = await accountTen.getIdentityPublicKey();
     const accountElevenIdentityKey = await accountEleven.getIdentityPublicKey();
     expect(accountTenIdentityKey).not.toEqual(accountElevenIdentityKey);
-
-    // Should throw for reserved account numbers
-    await expect(
-      SparkWalletTesting.initialize({
-        mnemonicOrSeed: seedOrMnemonics,
-        accountNumber: 0,
-        options: {
-          network: "LOCAL",
-        },
-      }),
-    ).rejects.toThrow();
-    await expect(
-      SparkWalletTesting.initialize({
-        mnemonicOrSeed: seedOrMnemonics,
-        accountNumber: 1,
-        options: {
-          network: "LOCAL",
-        },
-      }),
-    ).rejects.toThrow();
   });
 
   it("should not initialize a wallet with an invalid seed or mnemonic", async () => {

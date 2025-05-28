@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/schema"
+	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/objects"
 )
@@ -39,7 +40,11 @@ func (h *ExtendLeafHandler) ExtendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 	}
 
 	db := ent.GetDbFromContext(ctx)
-	leaf, err := db.TreeNode.Get(ctx, leafUUID)
+	leaf, err := db.TreeNode.
+		Query().
+		Where(enttreenode.ID(leafUUID)).
+		ForUpdate().
+		Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get leaf node: %w", err)
 	}
@@ -80,10 +85,10 @@ func (h *ExtendLeafHandler) ExtendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 		return nil, fmt.Errorf("new node tx must spend old node tx, expected %s:%d, got %s:%d", refundOutPoint.Hash, refundOutPoint.Index, newNodeOutPoint.Hash, newNodeOutPoint.Index)
 	}
 
-	if uint64(newNodeTx.TxOut[0].Value) != leaf.Value {
+	if uint64(newNodeTx.TxOut[0].Value) > leaf.Value {
 		return nil, fmt.Errorf("new node tx output value must match leaf value, expected %d, got %d", leaf.Value, newNodeTx.TxOut[0].Value)
 	}
-	if uint64(refundTx.TxOut[0].Value) != leaf.Value {
+	if uint64(refundTx.TxOut[0].Value) > leaf.Value {
 		return nil, fmt.Errorf("refund tx output value must match leaf value, expected %d, got %d", leaf.Value, refundTx.TxOut[0].Value)
 	}
 

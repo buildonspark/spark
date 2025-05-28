@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/logging"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -43,50 +44,50 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 		var err error
 		transfer, err = o.verifyAndUpdateTransfer(ctx, req)
 		if err != nil {
-			return nil, fmt.Errorf("failed to verify and update transfer: %v", err)
+			return nil, fmt.Errorf("failed to verify and update transfer for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 		}
 	}
 
 	db := ent.GetDbFromContext(ctx)
 	firstNodeID, err := uuid.Parse(req.NodeSignatures[0].NodeId)
 	if err != nil {
-		return nil, fmt.Errorf("invalid node id: %v", err)
+		return nil, fmt.Errorf("invalid node id in request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 	}
 	firstNode, err := db.TreeNode.Get(ctx, firstNodeID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get first node: %v", err)
+		return nil, fmt.Errorf("failed to get first node for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 	}
 	tree, err := firstNode.QueryTree().Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get tree: %v", err)
+		return nil, fmt.Errorf("failed to get tree for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 	}
 	network, err := common.NetworkFromSchemaNetwork(tree.Network)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get network: %v", err)
+		return nil, fmt.Errorf("failed to get network for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 	}
 
 	if tree.Status != schema.TreeStatusAvailable {
 		for _, nodeSignatures := range req.NodeSignatures {
 			nodeID, err := uuid.Parse(nodeSignatures.NodeId)
 			if err != nil {
-				return nil, fmt.Errorf("invalid node id: %v", err)
+				return nil, fmt.Errorf("invalid node id in request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 			}
 			node, err := db.TreeNode.Get(ctx, nodeID)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get node: %v", err)
+				return nil, fmt.Errorf("failed to get node for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 			}
 			signingKeyshare, err := node.QuerySigningKeyshare().Only(ctx)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get signing keyshare: %v", err)
+				return nil, fmt.Errorf("failed to get signing keyshare: %w", err)
 			}
 			address, err := db.DepositAddress.Query().Where(depositaddress.HasSigningKeyshareWith(signingkeyshare.IDEQ(signingKeyshare.ID))).Only(ctx)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get deposit address: %v", err)
+				return nil, fmt.Errorf("failed to get deposit address: %w", err)
 			}
 			if address.ConfirmationHeight != 0 {
 				_, err = tree.Update().SetStatus(schema.TreeStatusAvailable).Save(ctx)
 				if err != nil {
-					return nil, fmt.Errorf("failed to update tree: %v", err)
+					return nil, fmt.Errorf("failed to update tree: %w", err)
 				}
 				break
 			}
@@ -98,7 +99,7 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 	for _, nodeSignatures := range req.NodeSignatures {
 		node, internalNode, err := o.updateNode(ctx, nodeSignatures, req.Intent)
 		if err != nil {
-			return nil, fmt.Errorf("failed to update node: %v", err)
+			return nil, fmt.Errorf("failed to update node for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 		}
 		nodes = append(nodes, node)
 		internalNodes = append(internalNodes, internalNode)
@@ -108,7 +109,7 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, o.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := operator.NewGRPCConnection()
 		if err != nil {
-			return nil, fmt.Errorf("failed to connect to %s: %v", operator.Address, err)
+			return nil, fmt.Errorf("failed to connect to %s: %w", operator.Address, err)
 		}
 		defer conn.Close()
 
@@ -131,7 +132,7 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 		case pbcommon.SignatureIntent_REFRESH:
 			_, err = client.FinalizeRefreshTimelock(ctx, &pbinternal.FinalizeRefreshTimelockRequest{Nodes: internalNodes})
 			if err != nil {
-				return nil, fmt.Errorf("finalize refresh failed: %v", err)
+				return nil, fmt.Errorf("finalize refresh failed for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 			}
 			return nil, nil
 		case pbcommon.SignatureIntent_EXTEND:
@@ -140,7 +141,7 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 			}
 			_, err = client.FinalizeExtendLeaf(ctx, &pbinternal.FinalizeExtendLeafRequest{Node: internalNodes[0]})
 			if err != nil {
-				return nil, fmt.Errorf("finalize extend failed: %v", err)
+				return nil, fmt.Errorf("finalize extend failed for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 			}
 			return nil, nil
 		}
@@ -159,7 +160,7 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 	for _, nodeSignatures := range req.NodeSignatures {
 		leafID, err := uuid.Parse(nodeSignatures.NodeId)
 		if err != nil {
-			return nil, fmt.Errorf("invalid node id: %v", err)
+			return nil, fmt.Errorf("invalid node id in request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 		}
 		leafTransfer, err := db.Transfer.Query().
 			Where(
@@ -172,7 +173,7 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 			).
 			Only(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find pending transfer for leaf %s: %v", leafID.String(), err)
+			return nil, fmt.Errorf("failed to find pending transfer for leaf %s: %w", leafID.String(), err)
 		}
 		if transfer == nil {
 			transfer = leafTransfer
@@ -182,7 +183,7 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 	}
 	numTransferLeaves, err := transfer.QueryTransferLeaves().Count(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the number of transfer leaves for transfer %s: %v", transfer.ID.String(), err)
+		return nil, fmt.Errorf("failed to get the number of transfer leaves for transfer %s: %w", transfer.ID.String(), err)
 	}
 	if len(req.NodeSignatures) != numTransferLeaves {
 		return nil, fmt.Errorf("missing signatures for transfer %s", transfer.ID.String())
@@ -190,7 +191,7 @@ func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, 
 
 	transfer, err = transfer.Update().SetStatus(schema.TransferStatusCompleted).SetCompletionTime(time.Now()).Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update transfer %s: %v", transfer.ID.String(), err)
+		return nil, fmt.Errorf("failed to update transfer %s: %w", transfer.ID.String(), err)
 	}
 	return transfer, nil
 }
@@ -200,41 +201,41 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 
 	nodeID, err := uuid.Parse(nodeSignatures.NodeId)
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid node id: %v", err)
+		return nil, nil, fmt.Errorf("invalid node id in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 	}
 
 	// Read the tree node
 	node, err := db.TreeNode.Get(ctx, nodeID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get node: %v", err)
+		return nil, nil, fmt.Errorf("failed to get node in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 	}
 	if node == nil {
-		return nil, nil, fmt.Errorf("node not found")
+		return nil, nil, fmt.Errorf("node not found in %s", logging.FormatProto("node_signatures", nodeSignatures))
 	}
 
 	var nodeTxBytes []byte
 	if intent == pbcommon.SignatureIntent_CREATION || ((intent == pbcommon.SignatureIntent_REFRESH || intent == pbcommon.SignatureIntent_EXTEND) && nodeSignatures.NodeTxSignature != nil) {
 		nodeTxBytes, err = common.UpdateTxWithSignature(node.RawTx, 0, nodeSignatures.NodeTxSignature)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to update tx with signature: %v", err)
+			return nil, nil, fmt.Errorf("failed to update tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 		}
 		// Node may not have parent if it is the root node
 		nodeParent, err := node.QueryParent().Only(ctx)
 		if err == nil && nodeParent != nil {
 			treeNodeTx, err := common.TxFromRawTxBytes(nodeTxBytes)
 			if err != nil {
-				return nil, nil, fmt.Errorf("unable to deserialize node tx: %v", err)
+				return nil, nil, fmt.Errorf("unable to deserialize node tx: %w", err)
 			}
 			treeNodeParentTx, err := common.TxFromRawTxBytes(nodeParent.RawTx)
 			if err != nil {
-				return nil, nil, fmt.Errorf("unable to deserialize parent tx: %v", err)
+				return nil, nil, fmt.Errorf("unable to deserialize parent tx: %w", err)
 			}
 			if len(treeNodeParentTx.TxOut) <= int(node.Vout) {
 				return nil, nil, fmt.Errorf("vout out of bounds")
 			}
 			err = common.VerifySignatureSingleInput(treeNodeTx, 0, treeNodeParentTx.TxOut[node.Vout])
 			if err != nil {
-				return nil, nil, fmt.Errorf("unable to verify node tx signature: %v", err)
+				return nil, nil, fmt.Errorf("unable to verify node tx signature: %w", err)
 			}
 		}
 	} else {
@@ -244,23 +245,23 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	if len(nodeSignatures.RefundTxSignature) > 0 {
 		refundTxBytes, err = common.UpdateTxWithSignature(node.RawRefundTx, 0, nodeSignatures.RefundTxSignature)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to update refund tx with signature: %v", err)
+			return nil, nil, fmt.Errorf("failed to update refund tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 		}
 
 		refundTx, err := common.TxFromRawTxBytes(refundTxBytes)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to deserialize refund tx: %v", err)
+			return nil, nil, fmt.Errorf("unable to deserialize refund tx %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 		}
 		treeNodeTx, err := common.TxFromRawTxBytes(nodeTxBytes)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to deserialize leaf tx: %v", err)
+			return nil, nil, fmt.Errorf("unable to deserialize leaf tx: %w", err)
 		}
 		if len(treeNodeTx.TxOut) <= 0 {
 			return nil, nil, fmt.Errorf("vout out of bounds")
 		}
 		err = common.VerifySignatureSingleInput(refundTx, 0, treeNodeTx.TxOut[0])
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to verify refund tx signature: %v", err)
+			return nil, nil, fmt.Errorf("unable to verify refund tx signature: %w", err)
 		}
 	} else {
 		refundTxBytes = node.RawRefundTx
@@ -268,7 +269,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 
 	tree, err := node.QueryTree().Only(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get tree: %v", err)
+		return nil, nil, fmt.Errorf("failed to get tree: %w", err)
 	}
 
 	// Update the tree node
@@ -284,16 +285,16 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	}
 	node, err = nodeMutator.Save(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to update node: %v", err)
+		return nil, nil, fmt.Errorf("failed to update node: %w", err)
 	}
 
 	nodeSparkProto, err := node.MarshalSparkProto(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to marshal node %s on spark: %v", node.ID.String(), err)
+		return nil, nil, fmt.Errorf("unable to marshal node %s on spark: %w", node.ID.String(), err)
 	}
 	internalNode, err := node.MarshalInternalProto(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to marshal node %s on internal: %v", node.ID.String(), err)
+		return nil, nil, fmt.Errorf("unable to marshal node %s on internal: %w", node.ID.String(), err)
 	}
 	return nodeSparkProto, internalNode, nil
 }

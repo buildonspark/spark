@@ -6,8 +6,10 @@ import { TransactionInput } from "@scure/btc-signer/psbt";
 import { equalBytes, sha256 } from "@scure/btc-signer/utils";
 import { WalletConfigService } from "../../services/config.js";
 import { ConnectionManager } from "../../services/connection.js";
+import { SigningService } from "../../services/signing.js";
 import { CoopExitService } from "../../services/coop-exit.js";
-import { LeafKeyTweak, TransferService } from "../../services/transfer.js";
+import { TransferService } from "../../services/transfer.js";
+import type { LeafKeyTweak } from "../../services/transfer.js";
 import { ConfigOptions } from "../../services/wallet-config.js";
 import {
   getP2TRAddressFromPublicKey,
@@ -45,9 +47,11 @@ describe("coop exit", () => {
         userWallet.getSigner(),
       );
       const connectionManager = new ConnectionManager(configService);
+      const signingService = new SigningService(configService);
       const coopExitService = new CoopExitService(
         configService,
         connectionManager,
+        signingService,
       );
 
       const leafPubKey = await userWallet
@@ -71,9 +75,11 @@ describe("coop exit", () => {
         sspWallet.getSigner(),
       );
       const sspConnectionManager = new ConnectionManager(sspConfigService);
+      const sspSigningService = new SigningService(sspConfigService);
       const sspTransferService = new TransferService(
         sspConfigService,
         sspConnectionManager,
+        sspSigningService,
       );
 
       const sspIntermediateAddressScript = getP2TRScriptFromPublicKey(

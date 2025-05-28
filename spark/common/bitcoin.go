@@ -31,6 +31,15 @@ const (
 	Signet Network = 40
 )
 
+const (
+	// Estimated transaction size in bytes for fee calculation
+	estimatedTxSize = uint64(191)
+	// Default fee rate in satoshis per vbyte
+	defaultSatsPerVbyte = uint64(5)
+	// Default fee in satoshis (estimatedTxSize * defaultSatsPerVbyte)
+	DefaultFeeSats = estimatedTxSize * defaultSatsPerVbyte
+)
+
 func (n Network) String() string {
 	switch n {
 	case Mainnet, Unspecified:
@@ -264,6 +273,17 @@ func SigHashFromTx(tx *wire.MsgTx, inputIndex int, prevOutput *wire.TxOut) ([]by
 	sighashes := txscript.NewTxSigHashes(tx, prevOutputFetcher)
 
 	sigHash, err := txscript.CalcTaprootSignatureHash(sighashes, txscript.SigHashDefault, tx, inputIndex, prevOutputFetcher)
+	if err != nil {
+		return nil, err
+	}
+	return sigHash, nil
+}
+
+func SigHashFromMultiPrevOutTx(tx *wire.MsgTx, inputIndex int, prevOutputs map[wire.OutPoint]*wire.TxOut) ([]byte, error) {
+	prevOutFetcher := txscript.NewMultiPrevOutFetcher(prevOutputs)
+	sighashes := txscript.NewTxSigHashes(tx, prevOutFetcher)
+
+	sigHash, err := txscript.CalcTaprootSignatureHash(sighashes, txscript.SigHashDefault, tx, inputIndex, prevOutFetcher)
 	if err != nil {
 		return nil, err
 	}

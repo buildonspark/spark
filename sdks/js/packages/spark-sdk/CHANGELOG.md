@@ -1,5 +1,56 @@
 # @buildonspark/spark-sdk
 
+## 0.1.27
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.50
+
+## 0.1.26
+
+### Patch Changes
+
+- - Export ReactNativeSigner as DefaultSparkSigner from /native
+
+## 0.1.25
+
+### Patch Changes
+
+- - Only import @opentelemetry in NodeJS
+
+## 0.1.24
+
+### Patch Changes
+
+- - Add tracer
+  - Token transfer with multiple outputs
+
+## 0.1.23
+
+### Patch Changes
+
+- Use browser module override for nice-grpc
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.49
+
+## 0.1.22
+
+### Patch Changes
+
+- Update homepage URL
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.48
+
+## 0.1.21
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.47
+
 ## 0.1.20
 
 ### Patch Changes

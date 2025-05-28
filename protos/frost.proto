@@ -32,7 +32,7 @@ message EchoResponse {
  *
  * This request is sent to the server to start the Distributed Key Generation
  * protocol. This will be a batch request, so the server will generate the
- * keys for all participants in the batch.  
+ * keys for all participants in the batch.
  *
  */
 message DkgRound1Request {
@@ -68,7 +68,7 @@ message DkgRound1Response {
 /*
  * Distributed Key Generation Round 2 Request
  *
- * This request is sent to the server for the round 2 of DKG protocol. 
+ * This request is sent to the server for the round 2 of DKG protocol.
  * This will be a batch request.
  */
 message DkgRound2Request {
@@ -112,7 +112,7 @@ message DkgRound3Request {
 message KeyPackage {
     // The identifier of the participant.
     string identifier = 1;
-    
+
     // The secret share for the participant.
     bytes secret_share = 2;
 

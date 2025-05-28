@@ -205,9 +205,13 @@ func TestTreeCreationWithMultiLevels(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	sparkClient := pb.NewSparkServiceClient(conn)
+
+	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	assert.NoError(t, err)
 	response, err := sparkClient.QueryNodes(ctx, &pb.QueryNodesRequest{
 		Source:         &pb.QueryNodesRequest_OwnerIdentityPubkey{OwnerIdentityPubkey: config.IdentityPublicKey()},
 		IncludeParents: true,
+		Network:        network,
 	})
 	assert.NoError(t, err)
 	assert.Greater(t, len(response.Nodes), 0)

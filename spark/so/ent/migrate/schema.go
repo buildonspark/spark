@@ -3,6 +3,7 @@
 package migrate
 
 import (
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/dialect/sql/schema"
 	"entgo.io/ent/schema/field"
 )
@@ -542,7 +543,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"PENDING", "AVAILABLE"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"PENDING", "AVAILABLE", "EXITED"}},
 		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
 		{Name: "base_txid", Type: field.TypeBytes},
 		{Name: "vout", Type: field.TypeInt16},
@@ -585,7 +586,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "value", Type: field.TypeUint64},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATING", "AVAILABLE", "FROZEN_BY_ISSUER", "TRANSFER_LOCKED", "SPLIT_LOCKED", "SPLITTED", "AGGREGATED", "ON_CHAIN", "AGGREGATE_LOCK"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATING", "AVAILABLE", "FROZEN_BY_ISSUER", "TRANSFER_LOCKED", "SPLIT_LOCKED", "SPLITTED", "AGGREGATED", "ON_CHAIN", "AGGREGATE_LOCK", "EXITED", "INVESTIGATION", "LOST", "REIMBURSED"}},
 		{Name: "verifying_pubkey", Type: field.TypeBytes},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
 		{Name: "owner_signing_pubkey", Type: field.TypeBytes},
@@ -738,14 +739,15 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED", "CANCELLED"}},
-		{Name: "request_type", Type: field.TypeEnum, Enums: []string{"FIXED_AMOUNT", "MAX_FEE"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATED", "COMPLETED", "CANCELLED"}},
+		{Name: "request_type", Type: field.TypeEnum, Enums: []string{"FIXED_AMOUNT", "MAX_FEE", "REFUND"}},
 		{Name: "credit_amount_sats", Type: field.TypeUint64, Nullable: true},
 		{Name: "max_fee_sats", Type: field.TypeUint64, Nullable: true},
 		{Name: "ssp_signature", Type: field.TypeBytes, Nullable: true},
 		{Name: "ssp_identity_public_key", Type: field.TypeBytes, Nullable: true},
 		{Name: "user_signature", Type: field.TypeBytes, Nullable: true},
 		{Name: "user_identity_public_key", Type: field.TypeBytes, Nullable: true},
+		{Name: "coordinator_identity_public_key", Type: field.TypeBytes},
 		{Name: "deposit_address_utxoswaps", Type: field.TypeUUID, Nullable: true},
 		{Name: "utxo_swap_utxo", Type: field.TypeUUID},
 		{Name: "utxo_swap_transfer", Type: field.TypeUUID, Nullable: true},
@@ -758,19 +760,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "utxo_swaps_deposit_addresses_utxoswaps",
-				Columns:    []*schema.Column{UtxoSwapsColumns[11]},
+				Columns:    []*schema.Column{UtxoSwapsColumns[12]},
 				RefColumns: []*schema.Column{DepositAddressesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "utxo_swaps_utxos_utxo",
-				Columns:    []*schema.Column{UtxoSwapsColumns[12]},
+				Columns:    []*schema.Column{UtxoSwapsColumns[13]},
 				RefColumns: []*schema.Column{UtxosColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "utxo_swaps_transfers_transfer",
-				Columns:    []*schema.Column{UtxoSwapsColumns[13]},
+				Columns:    []*schema.Column{UtxoSwapsColumns[14]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -779,7 +781,10 @@ var (
 			{
 				Name:    "utxoswap_utxo_swap_utxo",
 				Unique:  true,
-				Columns: []*schema.Column{UtxoSwapsColumns[12]},
+				Columns: []*schema.Column{UtxoSwapsColumns[13]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status != 'CANCELLED'",
+				},
 			},
 		},
 	}

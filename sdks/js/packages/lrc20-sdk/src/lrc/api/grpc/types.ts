@@ -1,5 +1,5 @@
 // Only define the interface/types here
-import type { SparkServiceClient } from '../../../proto/rpc/v1/service.ts';
+import type { SparkServiceClient } from "../../../proto/rpc/v1/service.ts";
 
 // Define the interface for type checking
 export interface ILrc20ConnectionManager {

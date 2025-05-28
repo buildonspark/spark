@@ -106,7 +106,7 @@ var (
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schema.TreeStatus) error {
 	switch s {
-	case "PENDING", "AVAILABLE":
+	case "PENDING", "AVAILABLE", "EXITED":
 		return nil
 	default:
 		return fmt.Errorf("tree: invalid enum value for status field: %q", s)

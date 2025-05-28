@@ -53,7 +53,7 @@ func prepareFrostSigningJobsForUserSignedRefund(
 			return nil, nil, nil, fmt.Errorf("failed to get next sequence: %v", err)
 		}
 		amountSats := nodeTx.TxOut[0].Value
-		cpfpRefundTx, _, err := createRefundTxs(nextSequence, &nodeOutPoint, amountSats, receiverIdentityPubkey, false)
+		_, cpfpRefundTx, err := createRefundTxs(nextSequence, &nodeOutPoint, amountSats, receiverIdentityPubkey, false)
 		if err != nil {
 			return nil, nil, nil, err
 		}

@@ -22,6 +22,8 @@ import (
 type SigningResult struct {
 	// JobID is the ID of the signing job.
 	JobID string
+	// Message is the message that was signed.
+	Message []byte
 	// SignatureShares is the signature shares from all operators.
 	SignatureShares map[string][]byte
 	// SigningCommitments is the signing commitments from all operators.
@@ -319,6 +321,7 @@ func prepareResults(
 
 		results[i] = &SigningResult{
 			JobID:                    job.JobID,
+			Message:                  job.Message,
 			SignatureShares:          round2[job.JobID],
 			SigningCommitments:       round1Array[i],
 			PublicKeys:               publicShares,

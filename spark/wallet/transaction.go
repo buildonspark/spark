@@ -15,16 +15,24 @@ func EphemeralAnchorOutput() *wire.TxOut {
 	return wire.NewTxOut(0, []byte{txscript.OP_TRUE, 0x02, 0x4e, 0x73})
 }
 
+// maybeApplyFee subtracts the default fee from the amount if it's greater than the fee.
+// Returns the original amount if it's less than or equal to the fee.
+func maybeApplyFee(amount int64) int64 {
+	if amount > int64(common.DefaultFeeSats) {
+		return amount - int64(common.DefaultFeeSats)
+	}
+	return amount
+}
+
 func createRootTx(
 	depositOutPoint *wire.OutPoint,
 	depositTxOut *wire.TxOut,
 ) *wire.MsgTx {
 	rootTx := wire.NewMsgTx(3)
 	rootTx.AddTxIn(wire.NewTxIn(depositOutPoint, nil, nil))
-	// We currently send the full value to the same address
-	// TODO: 0 fee will only be okay once we add ephemeral anchor outputs
-	rootTx.AddTxOut(depositTxOut)
-	rootTx.AddTxOut(EphemeralAnchorOutput())
+
+	// Create new output with fee-adjusted amount
+	rootTx.AddTxOut(wire.NewTxOut(maybeApplyFee(depositTxOut.Value), depositTxOut.PkScript))
 	return rootTx
 }
 
@@ -34,10 +42,27 @@ func createSplitTx(
 ) *wire.MsgTx {
 	splitTx := wire.NewMsgTx(3)
 	splitTx.AddTxIn(wire.NewTxIn(parentOutPoint, nil, nil))
+
+	// Adjust output amounts to account for fee
+	totalOutputAmount := int64(0)
 	for _, txOut := range childTxOuts {
-		splitTx.AddTxOut(txOut)
+		totalOutputAmount += txOut.Value
 	}
-	splitTx.AddTxOut(EphemeralAnchorOutput())
+
+	if totalOutputAmount > int64(common.DefaultFeeSats) {
+		// Distribute fee proportionally across outputs
+		feeRatio := float64(common.DefaultFeeSats) / float64(totalOutputAmount)
+		for _, txOut := range childTxOuts {
+			adjustedAmount := int64(float64(txOut.Value) * (1 - feeRatio))
+			splitTx.AddTxOut(wire.NewTxOut(adjustedAmount, txOut.PkScript))
+		}
+	} else {
+		// If fee is larger than total output, just pass through original amounts
+		for _, txOut := range childTxOuts {
+			splitTx.AddTxOut(txOut)
+		}
+	}
+
 	return splitTx
 }
 
@@ -50,8 +75,8 @@ func createNodeTx(
 ) *wire.MsgTx {
 	newNodeTx := wire.NewMsgTx(3)
 	newNodeTx.AddTxIn(wire.NewTxIn(parentOutPoint, nil, nil))
-	newNodeTx.AddTxOut(txOut)
-	newNodeTx.AddTxOut(EphemeralAnchorOutput())
+
+	newNodeTx.AddTxOut(wire.NewTxOut(maybeApplyFee(txOut.Value), txOut.PkScript))
 	return newNodeTx
 }
 
@@ -65,6 +90,7 @@ func createLeafNodeTx(
 	sequence uint32,
 	parentOutPoint *wire.OutPoint,
 	txOut *wire.TxOut,
+	shouldCalculateFee bool,
 ) *wire.MsgTx {
 	newLeafTx := wire.NewMsgTx(3)
 	newLeafTx.AddTxIn(&wire.TxIn{
@@ -73,8 +99,13 @@ func createLeafNodeTx(
 		Witness:          nil,
 		Sequence:         sequence,
 	})
-	newLeafTx.AddTxOut(txOut)
-	newLeafTx.AddTxOut(EphemeralAnchorOutput())
+	amountSats := txOut.Value
+	outputAmount := amountSats
+	if shouldCalculateFee {
+		outputAmount = maybeApplyFee(amountSats)
+	}
+	newLeafTx.AddTxOut(wire.NewTxOut(outputAmount, txOut.PkScript))
+
 	return newLeafTx
 }
 
@@ -112,12 +143,7 @@ func createRefundTxs(
 
 	outputAmount := amountSats
 	if shouldCalculateFee {
-		estimatedTxSize := int64(123)
-		satsPerVbyte := int64(5)
-		feeSats := estimatedTxSize * satsPerVbyte
-		if amountSats > feeSats {
-			outputAmount = amountSats - feeSats
-		}
+		outputAmount = maybeApplyFee(amountSats)
 	}
 	directRefundTx.AddTxOut(wire.NewTxOut(outputAmount, refundPkScript))
 
@@ -144,6 +170,5 @@ func createConnectorRefundTransaction(
 		return nil, fmt.Errorf("failed to create receiver script: %v", err)
 	}
 	refundTx.AddTxOut(wire.NewTxOut(amountSats, receiverScript))
-	refundTx.AddTxOut(EphemeralAnchorOutput())
 	return refundTx, nil
 }

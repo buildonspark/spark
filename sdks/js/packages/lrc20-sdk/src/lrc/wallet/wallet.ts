@@ -5,7 +5,7 @@ import {
   Psbt,
   script,
   Transaction,
-  type Network as BitcoinJsNetwork
+  type Network as BitcoinJsNetwork,
 } from "bitcoinjs-lib";
 import { plainToInstance } from "class-transformer";
 import { ECPairInterface } from "ecpair";
@@ -1410,7 +1410,11 @@ export class LRCWallet {
   }
 
   private createReceiptBtcChangeOutput(): ReceiptOutput {
-    return ReceiptOutput.createFromRaw(this.addressInnerKey, DUST_AMOUNT, new Receipt(new TokenAmount(0n), new TokenPubkey()));
+    return ReceiptOutput.createFromRaw(
+      this.addressInnerKey,
+      DUST_AMOUNT,
+      new Receipt(new TokenAmount(0n), new TokenPubkey()),
+    );
   }
 
   private createRawBtcChangeOutput(): BitcoinOutput {

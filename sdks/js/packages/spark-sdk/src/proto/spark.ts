@@ -69,6 +69,9 @@ export enum TokenTransactionStatus {
   TOKEN_TRANSACTION_STARTED = 0,
   TOKEN_TRANSACTION_SIGNED = 1,
   TOKEN_TRANSACTION_FINALIZED = 2,
+  TOKEN_TRANSACTION_STARTED_CANCELLED = 3,
+  TOKEN_TRANSACTION_SIGNED_CANCELLED = 4,
+  TOKEN_TRANSACTION_UNKNOWN = 10,
   UNRECOGNIZED = -1,
 }
 
@@ -83,6 +86,15 @@ export function tokenTransactionStatusFromJSON(object: any): TokenTransactionSta
     case 2:
     case "TOKEN_TRANSACTION_FINALIZED":
       return TokenTransactionStatus.TOKEN_TRANSACTION_FINALIZED;
+    case 3:
+    case "TOKEN_TRANSACTION_STARTED_CANCELLED":
+      return TokenTransactionStatus.TOKEN_TRANSACTION_STARTED_CANCELLED;
+    case 4:
+    case "TOKEN_TRANSACTION_SIGNED_CANCELLED":
+      return TokenTransactionStatus.TOKEN_TRANSACTION_SIGNED_CANCELLED;
+    case 10:
+    case "TOKEN_TRANSACTION_UNKNOWN":
+      return TokenTransactionStatus.TOKEN_TRANSACTION_UNKNOWN;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -98,6 +110,12 @@ export function tokenTransactionStatusToJSON(object: TokenTransactionStatus): st
       return "TOKEN_TRANSACTION_SIGNED";
     case TokenTransactionStatus.TOKEN_TRANSACTION_FINALIZED:
       return "TOKEN_TRANSACTION_FINALIZED";
+    case TokenTransactionStatus.TOKEN_TRANSACTION_STARTED_CANCELLED:
+      return "TOKEN_TRANSACTION_STARTED_CANCELLED";
+    case TokenTransactionStatus.TOKEN_TRANSACTION_SIGNED_CANCELLED:
+      return "TOKEN_TRANSACTION_SIGNED_CANCELLED";
+    case TokenTransactionStatus.TOKEN_TRANSACTION_UNKNOWN:
+      return "TOKEN_TRANSACTION_UNKNOWN";
     case TokenTransactionStatus.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -113,6 +131,9 @@ export enum TransferStatus {
   TRANSFER_STATUS_COMPLETED = 5,
   TRANSFER_STATUS_EXPIRED = 6,
   TRANSFER_STATUS_RETURNED = 7,
+  TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR = 8,
+  TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED = 9,
+  TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED = 10,
   UNRECOGNIZED = -1,
 }
 
@@ -142,6 +163,15 @@ export function transferStatusFromJSON(object: any): TransferStatus {
     case 7:
     case "TRANSFER_STATUS_RETURNED":
       return TransferStatus.TRANSFER_STATUS_RETURNED;
+    case 8:
+    case "TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR":
+      return TransferStatus.TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR;
+    case 9:
+    case "TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED":
+      return TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED;
+    case 10:
+    case "TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED":
+      return TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -167,6 +197,12 @@ export function transferStatusToJSON(object: TransferStatus): string {
       return "TRANSFER_STATUS_EXPIRED";
     case TransferStatus.TRANSFER_STATUS_RETURNED:
       return "TRANSFER_STATUS_RETURNED";
+    case TransferStatus.TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR:
+      return "TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR";
+    case TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED:
+      return "TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED";
+    case TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED:
+      return "TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED";
     case TransferStatus.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -177,6 +213,7 @@ export enum TransferType {
   PREIMAGE_SWAP = 0,
   COOPERATIVE_EXIT = 1,
   TRANSFER = 2,
+  UTXO_SWAP = 3,
   SWAP = 30,
   COUNTER_SWAP = 40,
   UNRECOGNIZED = -1,
@@ -193,6 +230,9 @@ export function transferTypeFromJSON(object: any): TransferType {
     case 2:
     case "TRANSFER":
       return TransferType.TRANSFER;
+    case 3:
+    case "UTXO_SWAP":
+      return TransferType.UTXO_SWAP;
     case 30:
     case "SWAP":
       return TransferType.SWAP;
@@ -214,11 +254,53 @@ export function transferTypeToJSON(object: TransferType): string {
       return "COOPERATIVE_EXIT";
     case TransferType.TRANSFER:
       return "TRANSFER";
+    case TransferType.UTXO_SWAP:
+      return "UTXO_SWAP";
     case TransferType.SWAP:
       return "SWAP";
     case TransferType.COUNTER_SWAP:
       return "COUNTER_SWAP";
     case TransferType.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+/** Static deposit address flow messages */
+export enum UtxoSwapRequestType {
+  Fixed = 0,
+  MaxFee = 1,
+  Refund = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function utxoSwapRequestTypeFromJSON(object: any): UtxoSwapRequestType {
+  switch (object) {
+    case 0:
+    case "Fixed":
+      return UtxoSwapRequestType.Fixed;
+    case 1:
+    case "MaxFee":
+      return UtxoSwapRequestType.MaxFee;
+    case 2:
+    case "Refund":
+      return UtxoSwapRequestType.Refund;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return UtxoSwapRequestType.UNRECOGNIZED;
+  }
+}
+
+export function utxoSwapRequestTypeToJSON(object: UtxoSwapRequestType): string {
+  switch (object) {
+    case UtxoSwapRequestType.Fixed:
+      return "Fixed";
+    case UtxoSwapRequestType.MaxFee:
+      return "MaxFee";
+    case UtxoSwapRequestType.Refund:
+      return "Refund";
+    case UtxoSwapRequestType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
@@ -314,12 +396,14 @@ export interface GenerateDepositAddressResponse {
  * can create the tree first and the broadcast the transaction.
  */
 export interface UTXO {
-  /** The raw transaction of the utxo. */
+  /** The raw transaction of the utxo (optional). */
   rawTx: Uint8Array;
-  /** The vout of the raw transaction for the utxo, which will be used to create the tree. */
+  /** The vout of the raw transaction for the utxo, which will be used to create the tree. Required. */
   vout: number;
-  /** The network of the bitcoin network. */
+  /** The network of the bitcoin network. Required. */
   network: Network;
+  /** Transaction ID. Required, but older code may not provide it. */
+  txid: Uint8Array;
 }
 
 /**
@@ -528,9 +612,19 @@ export interface TokenTransaction {
   network: Network;
 }
 
+export interface SpentTokenOutputMetadata {
+  outputId: string;
+  revocationSecret: Uint8Array;
+}
+
+export interface TokenTransactionConfirmationMetadata {
+  spentTokenOutputsMetadata: SpentTokenOutputMetadata[];
+}
+
 export interface TokenTransactionWithStatus {
   tokenTransaction: TokenTransaction | undefined;
   status: TokenTransactionStatus;
+  confirmationMetadata: TokenTransactionConfirmationMetadata | undefined;
 }
 
 export interface SignatureWithIndex {
@@ -649,6 +743,8 @@ export interface QueryTokenOutputsRequest {
   ownerPublicKeys: Uint8Array[];
   /** Optionally provide token public keys. If not set return leaves for all tokens. */
   tokenPublicKeys: Uint8Array[];
+  /** defaults to mainnet when no network is provided. */
+  network: Network;
 }
 
 /** Request constraints are combined using an AND relation. */
@@ -678,11 +774,6 @@ export interface OutputWithPreviousTransactionData {
 
 export interface QueryTokenOutputsResponse {
   outputsWithPreviousTransactionData: OutputWithPreviousTransactionData[];
-}
-
-export interface CancelSignedTokenTransactionRequest {
-  finalTokenTransaction: TokenTransaction | undefined;
-  senderIdentityPublicKey: Uint8Array;
 }
 
 /** TreeNode represents a node on the tree. */
@@ -788,10 +879,16 @@ export interface StartUserSignedTransferRequest {
 export interface StartTransferRequest {
   transferId: string;
   ownerIdentityPublicKey: Uint8Array;
+  /** @deprecated */
   leavesToSend: LeafRefundTxSigningJob[];
   receiverIdentityPublicKey: Uint8Array;
-  expiryTime: Date | undefined;
+  expiryTime:
+    | Date
+    | undefined;
+  /** @deprecated */
   keyTweakProofs: { [key: string]: SecretProof };
+  /** If this field is set, the leaves_to_send and key_tweak_proofs will be ignored. */
+  transferPackage: TransferPackage | undefined;
 }
 
 export interface StartTransferRequest_KeyTweakProofsEntry {
@@ -802,6 +899,29 @@ export interface StartTransferRequest_KeyTweakProofsEntry {
 export interface StartTransferResponse {
   transfer: Transfer | undefined;
   signingResults: LeafRefundTxSigningResult[];
+}
+
+/**
+ * TransferPackage is a package of leaves to send and key tweaks to send.
+ * This is in the improved send transfer flow where the sender can send the transfer in one call to
+ * the coordinator SO.
+ */
+export interface TransferPackage {
+  /** The leaves to send, with user signed refunds and signing package. */
+  leavesToSend: UserSignedTxSigningJob[];
+  /** The map of SO identifier to ciphertext of SendLeafTweaks. */
+  keyTweakPackage: { [key: string]: Uint8Array };
+  /** The signature of user to prove that the key_tweak_package is not tampered. */
+  userSignature: Uint8Array;
+}
+
+export interface TransferPackage_KeyTweakPackageEntry {
+  key: string;
+  value: Uint8Array;
+}
+
+export interface SendLeafKeyTweaks {
+  leavesToSend: SendLeafKeyTweak[];
 }
 
 export interface SendLeafKeyTweak {
@@ -860,6 +980,8 @@ export interface TransferFilter {
   limit: number;
   offset: number;
   types: TransferType[];
+  /** defaults to mainnet when no network is provided. */
+  network: Network;
 }
 
 export interface QueryTransfersResponse {
@@ -888,12 +1010,6 @@ export interface ClaimTransferSignRefundsRequest {
   transferId: string;
   ownerIdentityPublicKey: Uint8Array;
   signingJobs: LeafRefundTxSigningJob[];
-  keyTweakProofs: { [key: string]: SecretProof };
-}
-
-export interface ClaimTransferSignRefundsRequest_KeyTweakProofsEntry {
-  key: string;
-  value: SecretProof | undefined;
 }
 
 export interface ClaimTransferSignRefundsResponse {
@@ -1194,10 +1310,15 @@ export interface QueryNodesRequest {
     nodeIds: TreeNodeIds;
   } | undefined;
   includeParents: boolean;
+  limit: number;
+  offset: number;
+  /** defaults to mainnet when no network is provided. Does not check network when querying by node_ids */
+  network: Network;
 }
 
 export interface QueryNodesResponse {
   nodes: { [key: string]: TreeNode };
+  offset: number;
 }
 
 export interface QueryNodesResponse_NodesEntry {
@@ -1220,6 +1341,8 @@ export interface CancelTransferResponse {
  */
 export interface QueryUnusedDepositAddressesRequest {
   identityPublicKey: Uint8Array;
+  /** defaults to mainnet when no network is provided. */
+  network: Network;
 }
 
 export interface DepositAddressQueryResult {
@@ -1235,6 +1358,8 @@ export interface QueryUnusedDepositAddressesResponse {
 
 export interface QueryBalanceRequest {
   identityPublicKey: Uint8Array;
+  /** defaults to mainnet when no network is provided. */
+  network: Network;
 }
 
 export interface QueryBalanceResponse {
@@ -1249,6 +1374,59 @@ export interface QueryBalanceResponse_NodeBalancesEntry {
 
 export interface SparkAddress {
   identityPublicKey: Uint8Array;
+}
+
+export interface InitiateUtxoSwapRequest {
+  onChainUtxo: UTXO | undefined;
+  requestType: UtxoSwapRequestType;
+  amount?:
+    | { $case: "creditAmountSats"; creditAmountSats: number }
+    | { $case: "maxFeeSats"; maxFeeSats: number }
+    | undefined;
+  sspSignature: Uint8Array;
+  userSignature: Uint8Array;
+  transfer: StartUserSignedTransferRequest | undefined;
+  spendTxSigningJob: SigningJob | undefined;
+}
+
+export interface InitiateUtxoSwapResponse {
+  spendTxSigningResult: SigningResult | undefined;
+  transfer: Transfer | undefined;
+  depositAddress: DepositAddressQueryResult | undefined;
+}
+
+export interface ExitingTree {
+  treeId: string;
+  userSigningCommitment: SigningCommitment | undefined;
+  vin: number;
+}
+
+export interface ExitSingleNodeTreeSigningResult {
+  treeId: string;
+  signingResult: SigningResult | undefined;
+  verifyingKey: Uint8Array;
+}
+
+export interface BitcoinTransactionOutput {
+  value: number;
+  pkScript: Uint8Array;
+}
+
+export interface ExitSingleNodeTreesRequest {
+  ownerIdentityPublicKey: Uint8Array;
+  exitingTrees: ExitingTree[];
+  rawTx: Uint8Array;
+  previousOutputs: BitcoinTransactionOutput[];
+}
+
+export interface ExitSingleNodeTreesResponse {
+  signingResults: ExitSingleNodeTreeSigningResult[];
+}
+
+export interface InvestigateLeavesRequest {
+  leafIds: string[];
+  ownerIdentityPublicKey: Uint8Array;
+  transferId: string;
 }
 
 function createBaseSubscribeToEventsRequest(): SubscribeToEventsRequest {
@@ -2072,7 +2250,7 @@ export const GenerateDepositAddressResponse: MessageFns<GenerateDepositAddressRe
 };
 
 function createBaseUTXO(): UTXO {
-  return { rawTx: new Uint8Array(0), vout: 0, network: 0 };
+  return { rawTx: new Uint8Array(0), vout: 0, network: 0, txid: new Uint8Array(0) };
 }
 
 export const UTXO: MessageFns<UTXO> = {
@@ -2085,6 +2263,9 @@ export const UTXO: MessageFns<UTXO> = {
     }
     if (message.network !== 0) {
       writer.uint32(24).int32(message.network);
+    }
+    if (message.txid.length !== 0) {
+      writer.uint32(34).bytes(message.txid);
     }
     return writer;
   },
@@ -2120,6 +2301,14 @@ export const UTXO: MessageFns<UTXO> = {
           message.network = reader.int32() as any;
           continue;
         }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.txid = reader.bytes();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2134,6 +2323,7 @@ export const UTXO: MessageFns<UTXO> = {
       rawTx: isSet(object.rawTx) ? bytesFromBase64(object.rawTx) : new Uint8Array(0),
       vout: isSet(object.vout) ? globalThis.Number(object.vout) : 0,
       network: isSet(object.network) ? networkFromJSON(object.network) : 0,
+      txid: isSet(object.txid) ? bytesFromBase64(object.txid) : new Uint8Array(0),
     };
   },
 
@@ -2148,6 +2338,9 @@ export const UTXO: MessageFns<UTXO> = {
     if (message.network !== 0) {
       obj.network = networkToJSON(message.network);
     }
+    if (message.txid.length !== 0) {
+      obj.txid = base64FromBytes(message.txid);
+    }
     return obj;
   },
 
@@ -2159,6 +2352,7 @@ export const UTXO: MessageFns<UTXO> = {
     message.rawTx = object.rawTx ?? new Uint8Array(0);
     message.vout = object.vout ?? 0;
     message.network = object.network ?? 0;
+    message.txid = object.txid ?? new Uint8Array(0);
     return message;
   },
 };
@@ -3985,8 +4179,147 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
   },
 };
 
+function createBaseSpentTokenOutputMetadata(): SpentTokenOutputMetadata {
+  return { outputId: "", revocationSecret: new Uint8Array(0) };
+}
+
+export const SpentTokenOutputMetadata: MessageFns<SpentTokenOutputMetadata> = {
+  encode(message: SpentTokenOutputMetadata, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.outputId !== "") {
+      writer.uint32(10).string(message.outputId);
+    }
+    if (message.revocationSecret.length !== 0) {
+      writer.uint32(18).bytes(message.revocationSecret);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SpentTokenOutputMetadata {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSpentTokenOutputMetadata();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.outputId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.revocationSecret = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SpentTokenOutputMetadata {
+    return {
+      outputId: isSet(object.outputId) ? globalThis.String(object.outputId) : "",
+      revocationSecret: isSet(object.revocationSecret) ? bytesFromBase64(object.revocationSecret) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: SpentTokenOutputMetadata): unknown {
+    const obj: any = {};
+    if (message.outputId !== "") {
+      obj.outputId = message.outputId;
+    }
+    if (message.revocationSecret.length !== 0) {
+      obj.revocationSecret = base64FromBytes(message.revocationSecret);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SpentTokenOutputMetadata>): SpentTokenOutputMetadata {
+    return SpentTokenOutputMetadata.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SpentTokenOutputMetadata>): SpentTokenOutputMetadata {
+    const message = createBaseSpentTokenOutputMetadata();
+    message.outputId = object.outputId ?? "";
+    message.revocationSecret = object.revocationSecret ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseTokenTransactionConfirmationMetadata(): TokenTransactionConfirmationMetadata {
+  return { spentTokenOutputsMetadata: [] };
+}
+
+export const TokenTransactionConfirmationMetadata: MessageFns<TokenTransactionConfirmationMetadata> = {
+  encode(message: TokenTransactionConfirmationMetadata, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.spentTokenOutputsMetadata) {
+      SpentTokenOutputMetadata.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenTransactionConfirmationMetadata {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTokenTransactionConfirmationMetadata();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.spentTokenOutputsMetadata.push(SpentTokenOutputMetadata.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TokenTransactionConfirmationMetadata {
+    return {
+      spentTokenOutputsMetadata: globalThis.Array.isArray(object?.spentTokenOutputsMetadata)
+        ? object.spentTokenOutputsMetadata.map((e: any) => SpentTokenOutputMetadata.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: TokenTransactionConfirmationMetadata): unknown {
+    const obj: any = {};
+    if (message.spentTokenOutputsMetadata?.length) {
+      obj.spentTokenOutputsMetadata = message.spentTokenOutputsMetadata.map((e) => SpentTokenOutputMetadata.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TokenTransactionConfirmationMetadata>): TokenTransactionConfirmationMetadata {
+    return TokenTransactionConfirmationMetadata.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TokenTransactionConfirmationMetadata>): TokenTransactionConfirmationMetadata {
+    const message = createBaseTokenTransactionConfirmationMetadata();
+    message.spentTokenOutputsMetadata =
+      object.spentTokenOutputsMetadata?.map((e) => SpentTokenOutputMetadata.fromPartial(e)) || [];
+    return message;
+  },
+};
+
 function createBaseTokenTransactionWithStatus(): TokenTransactionWithStatus {
-  return { tokenTransaction: undefined, status: 0 };
+  return { tokenTransaction: undefined, status: 0, confirmationMetadata: undefined };
 }
 
 export const TokenTransactionWithStatus: MessageFns<TokenTransactionWithStatus> = {
@@ -3996,6 +4329,9 @@ export const TokenTransactionWithStatus: MessageFns<TokenTransactionWithStatus> 
     }
     if (message.status !== 0) {
       writer.uint32(16).int32(message.status);
+    }
+    if (message.confirmationMetadata !== undefined) {
+      TokenTransactionConfirmationMetadata.encode(message.confirmationMetadata, writer.uint32(26).fork()).join();
     }
     return writer;
   },
@@ -4023,6 +4359,14 @@ export const TokenTransactionWithStatus: MessageFns<TokenTransactionWithStatus> 
           message.status = reader.int32() as any;
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.confirmationMetadata = TokenTransactionConfirmationMetadata.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -4036,6 +4380,9 @@ export const TokenTransactionWithStatus: MessageFns<TokenTransactionWithStatus> 
     return {
       tokenTransaction: isSet(object.tokenTransaction) ? TokenTransaction.fromJSON(object.tokenTransaction) : undefined,
       status: isSet(object.status) ? tokenTransactionStatusFromJSON(object.status) : 0,
+      confirmationMetadata: isSet(object.confirmationMetadata)
+        ? TokenTransactionConfirmationMetadata.fromJSON(object.confirmationMetadata)
+        : undefined,
     };
   },
 
@@ -4046,6 +4393,9 @@ export const TokenTransactionWithStatus: MessageFns<TokenTransactionWithStatus> 
     }
     if (message.status !== 0) {
       obj.status = tokenTransactionStatusToJSON(message.status);
+    }
+    if (message.confirmationMetadata !== undefined) {
+      obj.confirmationMetadata = TokenTransactionConfirmationMetadata.toJSON(message.confirmationMetadata);
     }
     return obj;
   },
@@ -4059,6 +4409,9 @@ export const TokenTransactionWithStatus: MessageFns<TokenTransactionWithStatus> 
       ? TokenTransaction.fromPartial(object.tokenTransaction)
       : undefined;
     message.status = object.status ?? 0;
+    message.confirmationMetadata = (object.confirmationMetadata !== undefined && object.confirmationMetadata !== null)
+      ? TokenTransactionConfirmationMetadata.fromPartial(object.confirmationMetadata)
+      : undefined;
     return message;
   },
 };
@@ -5295,7 +5648,7 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
 };
 
 function createBaseQueryTokenOutputsRequest(): QueryTokenOutputsRequest {
-  return { ownerPublicKeys: [], tokenPublicKeys: [] };
+  return { ownerPublicKeys: [], tokenPublicKeys: [], network: 0 };
 }
 
 export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
@@ -5305,6 +5658,9 @@ export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
     }
     for (const v of message.tokenPublicKeys) {
       writer.uint32(18).bytes(v!);
+    }
+    if (message.network !== 0) {
+      writer.uint32(24).int32(message.network);
     }
     return writer;
   },
@@ -5332,6 +5688,14 @@ export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
           message.tokenPublicKeys.push(reader.bytes());
           continue;
         }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -5349,6 +5713,7 @@ export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
       tokenPublicKeys: globalThis.Array.isArray(object?.tokenPublicKeys)
         ? object.tokenPublicKeys.map((e: any) => bytesFromBase64(e))
         : [],
+      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
     };
   },
 
@@ -5360,6 +5725,9 @@ export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
     if (message.tokenPublicKeys?.length) {
       obj.tokenPublicKeys = message.tokenPublicKeys.map((e) => base64FromBytes(e));
     }
+    if (message.network !== 0) {
+      obj.network = networkToJSON(message.network);
+    }
     return obj;
   },
 
@@ -5370,6 +5738,7 @@ export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
     const message = createBaseQueryTokenOutputsRequest();
     message.ownerPublicKeys = object.ownerPublicKeys?.map((e) => e) || [];
     message.tokenPublicKeys = object.tokenPublicKeys?.map((e) => e) || [];
+    message.network = object.network ?? 0;
     return message;
   },
 };
@@ -5764,89 +6133,6 @@ export const QueryTokenOutputsResponse: MessageFns<QueryTokenOutputsResponse> = 
     const message = createBaseQueryTokenOutputsResponse();
     message.outputsWithPreviousTransactionData =
       object.outputsWithPreviousTransactionData?.map((e) => OutputWithPreviousTransactionData.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseCancelSignedTokenTransactionRequest(): CancelSignedTokenTransactionRequest {
-  return { finalTokenTransaction: undefined, senderIdentityPublicKey: new Uint8Array(0) };
-}
-
-export const CancelSignedTokenTransactionRequest: MessageFns<CancelSignedTokenTransactionRequest> = {
-  encode(message: CancelSignedTokenTransactionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.finalTokenTransaction !== undefined) {
-      TokenTransaction.encode(message.finalTokenTransaction, writer.uint32(10).fork()).join();
-    }
-    if (message.senderIdentityPublicKey.length !== 0) {
-      writer.uint32(18).bytes(message.senderIdentityPublicKey);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): CancelSignedTokenTransactionRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseCancelSignedTokenTransactionRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.finalTokenTransaction = TokenTransaction.decode(reader, reader.uint32());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.senderIdentityPublicKey = reader.bytes();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): CancelSignedTokenTransactionRequest {
-    return {
-      finalTokenTransaction: isSet(object.finalTokenTransaction)
-        ? TokenTransaction.fromJSON(object.finalTokenTransaction)
-        : undefined,
-      senderIdentityPublicKey: isSet(object.senderIdentityPublicKey)
-        ? bytesFromBase64(object.senderIdentityPublicKey)
-        : new Uint8Array(0),
-    };
-  },
-
-  toJSON(message: CancelSignedTokenTransactionRequest): unknown {
-    const obj: any = {};
-    if (message.finalTokenTransaction !== undefined) {
-      obj.finalTokenTransaction = TokenTransaction.toJSON(message.finalTokenTransaction);
-    }
-    if (message.senderIdentityPublicKey.length !== 0) {
-      obj.senderIdentityPublicKey = base64FromBytes(message.senderIdentityPublicKey);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<CancelSignedTokenTransactionRequest>): CancelSignedTokenTransactionRequest {
-    return CancelSignedTokenTransactionRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<CancelSignedTokenTransactionRequest>): CancelSignedTokenTransactionRequest {
-    const message = createBaseCancelSignedTokenTransactionRequest();
-    message.finalTokenTransaction =
-      (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
-        ? TokenTransaction.fromPartial(object.finalTokenTransaction)
-        : undefined;
-    message.senderIdentityPublicKey = object.senderIdentityPublicKey ?? new Uint8Array(0);
     return message;
   },
 };
@@ -6853,6 +7139,7 @@ function createBaseStartTransferRequest(): StartTransferRequest {
     receiverIdentityPublicKey: new Uint8Array(0),
     expiryTime: undefined,
     keyTweakProofs: {},
+    transferPackage: undefined,
   };
 }
 
@@ -6876,6 +7163,9 @@ export const StartTransferRequest: MessageFns<StartTransferRequest> = {
     Object.entries(message.keyTweakProofs).forEach(([key, value]) => {
       StartTransferRequest_KeyTweakProofsEntry.encode({ key: key as any, value }, writer.uint32(50).fork()).join();
     });
+    if (message.transferPackage !== undefined) {
+      TransferPackage.encode(message.transferPackage, writer.uint32(58).fork()).join();
+    }
     return writer;
   },
 
@@ -6937,6 +7227,14 @@ export const StartTransferRequest: MessageFns<StartTransferRequest> = {
           }
           continue;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.transferPackage = TransferPackage.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -6965,6 +7263,7 @@ export const StartTransferRequest: MessageFns<StartTransferRequest> = {
           return acc;
         }, {})
         : {},
+      transferPackage: isSet(object.transferPackage) ? TransferPackage.fromJSON(object.transferPackage) : undefined,
     };
   },
 
@@ -6994,6 +7293,9 @@ export const StartTransferRequest: MessageFns<StartTransferRequest> = {
         });
       }
     }
+    if (message.transferPackage !== undefined) {
+      obj.transferPackage = TransferPackage.toJSON(message.transferPackage);
+    }
     return obj;
   },
 
@@ -7016,6 +7318,9 @@ export const StartTransferRequest: MessageFns<StartTransferRequest> = {
       },
       {},
     );
+    message.transferPackage = (object.transferPackage !== undefined && object.transferPackage !== null)
+      ? TransferPackage.fromPartial(object.transferPackage)
+      : undefined;
     return message;
   },
 };
@@ -7174,6 +7479,260 @@ export const StartTransferResponse: MessageFns<StartTransferResponse> = {
       ? Transfer.fromPartial(object.transfer)
       : undefined;
     message.signingResults = object.signingResults?.map((e) => LeafRefundTxSigningResult.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseTransferPackage(): TransferPackage {
+  return { leavesToSend: [], keyTweakPackage: {}, userSignature: new Uint8Array(0) };
+}
+
+export const TransferPackage: MessageFns<TransferPackage> = {
+  encode(message: TransferPackage, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.leavesToSend) {
+      UserSignedTxSigningJob.encode(v!, writer.uint32(10).fork()).join();
+    }
+    Object.entries(message.keyTweakPackage).forEach(([key, value]) => {
+      TransferPackage_KeyTweakPackageEntry.encode({ key: key as any, value }, writer.uint32(18).fork()).join();
+    });
+    if (message.userSignature.length !== 0) {
+      writer.uint32(26).bytes(message.userSignature);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TransferPackage {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTransferPackage();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leavesToSend.push(UserSignedTxSigningJob.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          const entry2 = TransferPackage_KeyTweakPackageEntry.decode(reader, reader.uint32());
+          if (entry2.value !== undefined) {
+            message.keyTweakPackage[entry2.key] = entry2.value;
+          }
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.userSignature = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TransferPackage {
+    return {
+      leavesToSend: globalThis.Array.isArray(object?.leavesToSend)
+        ? object.leavesToSend.map((e: any) => UserSignedTxSigningJob.fromJSON(e))
+        : [],
+      keyTweakPackage: isObject(object.keyTweakPackage)
+        ? Object.entries(object.keyTweakPackage).reduce<{ [key: string]: Uint8Array }>((acc, [key, value]) => {
+          acc[key] = bytesFromBase64(value as string);
+          return acc;
+        }, {})
+        : {},
+      userSignature: isSet(object.userSignature) ? bytesFromBase64(object.userSignature) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: TransferPackage): unknown {
+    const obj: any = {};
+    if (message.leavesToSend?.length) {
+      obj.leavesToSend = message.leavesToSend.map((e) => UserSignedTxSigningJob.toJSON(e));
+    }
+    if (message.keyTweakPackage) {
+      const entries = Object.entries(message.keyTweakPackage);
+      if (entries.length > 0) {
+        obj.keyTweakPackage = {};
+        entries.forEach(([k, v]) => {
+          obj.keyTweakPackage[k] = base64FromBytes(v);
+        });
+      }
+    }
+    if (message.userSignature.length !== 0) {
+      obj.userSignature = base64FromBytes(message.userSignature);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TransferPackage>): TransferPackage {
+    return TransferPackage.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TransferPackage>): TransferPackage {
+    const message = createBaseTransferPackage();
+    message.leavesToSend = object.leavesToSend?.map((e) => UserSignedTxSigningJob.fromPartial(e)) || [];
+    message.keyTweakPackage = Object.entries(object.keyTweakPackage ?? {}).reduce<{ [key: string]: Uint8Array }>(
+      (acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = value;
+        }
+        return acc;
+      },
+      {},
+    );
+    message.userSignature = object.userSignature ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseTransferPackage_KeyTweakPackageEntry(): TransferPackage_KeyTweakPackageEntry {
+  return { key: "", value: new Uint8Array(0) };
+}
+
+export const TransferPackage_KeyTweakPackageEntry: MessageFns<TransferPackage_KeyTweakPackageEntry> = {
+  encode(message: TransferPackage_KeyTweakPackageEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value.length !== 0) {
+      writer.uint32(18).bytes(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TransferPackage_KeyTweakPackageEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTransferPackage_KeyTweakPackageEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TransferPackage_KeyTweakPackageEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? bytesFromBase64(object.value) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: TransferPackage_KeyTweakPackageEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value.length !== 0) {
+      obj.value = base64FromBytes(message.value);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TransferPackage_KeyTweakPackageEntry>): TransferPackage_KeyTweakPackageEntry {
+    return TransferPackage_KeyTweakPackageEntry.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TransferPackage_KeyTweakPackageEntry>): TransferPackage_KeyTweakPackageEntry {
+    const message = createBaseTransferPackage_KeyTweakPackageEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseSendLeafKeyTweaks(): SendLeafKeyTweaks {
+  return { leavesToSend: [] };
+}
+
+export const SendLeafKeyTweaks: MessageFns<SendLeafKeyTweaks> = {
+  encode(message: SendLeafKeyTweaks, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.leavesToSend) {
+      SendLeafKeyTweak.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SendLeafKeyTweaks {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSendLeafKeyTweaks();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leavesToSend.push(SendLeafKeyTweak.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SendLeafKeyTweaks {
+    return {
+      leavesToSend: globalThis.Array.isArray(object?.leavesToSend)
+        ? object.leavesToSend.map((e: any) => SendLeafKeyTweak.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: SendLeafKeyTweaks): unknown {
+    const obj: any = {};
+    if (message.leavesToSend?.length) {
+      obj.leavesToSend = message.leavesToSend.map((e) => SendLeafKeyTweak.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SendLeafKeyTweaks>): SendLeafKeyTweaks {
+    return SendLeafKeyTweaks.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SendLeafKeyTweaks>): SendLeafKeyTweaks {
+    const message = createBaseSendLeafKeyTweaks();
+    message.leavesToSend = object.leavesToSend?.map((e) => SendLeafKeyTweak.fromPartial(e)) || [];
     return message;
   },
 };
@@ -7916,7 +8475,7 @@ export const TransferLeaf: MessageFns<TransferLeaf> = {
 };
 
 function createBaseTransferFilter(): TransferFilter {
-  return { participant: undefined, transferIds: [], limit: 0, offset: 0, types: [] };
+  return { participant: undefined, transferIds: [], limit: 0, offset: 0, types: [], network: 0 };
 }
 
 export const TransferFilter: MessageFns<TransferFilter> = {
@@ -7946,6 +8505,9 @@ export const TransferFilter: MessageFns<TransferFilter> = {
       writer.int32(v);
     }
     writer.join();
+    if (message.network !== 0) {
+      writer.uint32(32).int32(message.network);
+    }
     return writer;
   },
 
@@ -8025,6 +8587,14 @@ export const TransferFilter: MessageFns<TransferFilter> = {
 
           break;
         }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -8055,6 +8625,7 @@ export const TransferFilter: MessageFns<TransferFilter> = {
       limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
       offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
       types: globalThis.Array.isArray(object?.types) ? object.types.map((e: any) => transferTypeFromJSON(e)) : [],
+      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
     };
   },
 
@@ -8078,6 +8649,9 @@ export const TransferFilter: MessageFns<TransferFilter> = {
     }
     if (message.types?.length) {
       obj.types = message.types.map((e) => transferTypeToJSON(e));
+    }
+    if (message.network !== 0) {
+      obj.network = networkToJSON(message.network);
     }
     return obj;
   },
@@ -8129,6 +8703,7 @@ export const TransferFilter: MessageFns<TransferFilter> = {
     message.limit = object.limit ?? 0;
     message.offset = object.offset ?? 0;
     message.types = object.types?.map((e) => e) || [];
+    message.network = object.network ?? 0;
     return message;
   },
 };
@@ -8500,7 +9075,7 @@ export const ClaimTransferTweakKeysRequest: MessageFns<ClaimTransferTweakKeysReq
 };
 
 function createBaseClaimTransferSignRefundsRequest(): ClaimTransferSignRefundsRequest {
-  return { transferId: "", ownerIdentityPublicKey: new Uint8Array(0), signingJobs: [], keyTweakProofs: {} };
+  return { transferId: "", ownerIdentityPublicKey: new Uint8Array(0), signingJobs: [] };
 }
 
 export const ClaimTransferSignRefundsRequest: MessageFns<ClaimTransferSignRefundsRequest> = {
@@ -8514,10 +9089,6 @@ export const ClaimTransferSignRefundsRequest: MessageFns<ClaimTransferSignRefund
     for (const v of message.signingJobs) {
       LeafRefundTxSigningJob.encode(v!, writer.uint32(26).fork()).join();
     }
-    Object.entries(message.keyTweakProofs).forEach(([key, value]) => {
-      ClaimTransferSignRefundsRequest_KeyTweakProofsEntry.encode({ key: key as any, value }, writer.uint32(34).fork())
-        .join();
-    });
     return writer;
   },
 
@@ -8552,17 +9123,6 @@ export const ClaimTransferSignRefundsRequest: MessageFns<ClaimTransferSignRefund
           message.signingJobs.push(LeafRefundTxSigningJob.decode(reader, reader.uint32()));
           continue;
         }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          const entry4 = ClaimTransferSignRefundsRequest_KeyTweakProofsEntry.decode(reader, reader.uint32());
-          if (entry4.value !== undefined) {
-            message.keyTweakProofs[entry4.key] = entry4.value;
-          }
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -8581,12 +9141,6 @@ export const ClaimTransferSignRefundsRequest: MessageFns<ClaimTransferSignRefund
       signingJobs: globalThis.Array.isArray(object?.signingJobs)
         ? object.signingJobs.map((e: any) => LeafRefundTxSigningJob.fromJSON(e))
         : [],
-      keyTweakProofs: isObject(object.keyTweakProofs)
-        ? Object.entries(object.keyTweakProofs).reduce<{ [key: string]: SecretProof }>((acc, [key, value]) => {
-          acc[key] = SecretProof.fromJSON(value);
-          return acc;
-        }, {})
-        : {},
     };
   },
 
@@ -8601,15 +9155,6 @@ export const ClaimTransferSignRefundsRequest: MessageFns<ClaimTransferSignRefund
     if (message.signingJobs?.length) {
       obj.signingJobs = message.signingJobs.map((e) => LeafRefundTxSigningJob.toJSON(e));
     }
-    if (message.keyTweakProofs) {
-      const entries = Object.entries(message.keyTweakProofs);
-      if (entries.length > 0) {
-        obj.keyTweakProofs = {};
-        entries.forEach(([k, v]) => {
-          obj.keyTweakProofs[k] = SecretProof.toJSON(v);
-        });
-      }
-    }
     return obj;
   },
 
@@ -8621,102 +9166,6 @@ export const ClaimTransferSignRefundsRequest: MessageFns<ClaimTransferSignRefund
     message.transferId = object.transferId ?? "";
     message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
     message.signingJobs = object.signingJobs?.map((e) => LeafRefundTxSigningJob.fromPartial(e)) || [];
-    message.keyTweakProofs = Object.entries(object.keyTweakProofs ?? {}).reduce<{ [key: string]: SecretProof }>(
-      (acc, [key, value]) => {
-        if (value !== undefined) {
-          acc[key] = SecretProof.fromPartial(value);
-        }
-        return acc;
-      },
-      {},
-    );
-    return message;
-  },
-};
-
-function createBaseClaimTransferSignRefundsRequest_KeyTweakProofsEntry(): ClaimTransferSignRefundsRequest_KeyTweakProofsEntry {
-  return { key: "", value: undefined };
-}
-
-export const ClaimTransferSignRefundsRequest_KeyTweakProofsEntry: MessageFns<
-  ClaimTransferSignRefundsRequest_KeyTweakProofsEntry
-> = {
-  encode(
-    message: ClaimTransferSignRefundsRequest_KeyTweakProofsEntry,
-    writer: BinaryWriter = new BinaryWriter(),
-  ): BinaryWriter {
-    if (message.key !== "") {
-      writer.uint32(10).string(message.key);
-    }
-    if (message.value !== undefined) {
-      SecretProof.encode(message.value, writer.uint32(18).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ClaimTransferSignRefundsRequest_KeyTweakProofsEntry {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseClaimTransferSignRefundsRequest_KeyTweakProofsEntry();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.key = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.value = SecretProof.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ClaimTransferSignRefundsRequest_KeyTweakProofsEntry {
-    return {
-      key: isSet(object.key) ? globalThis.String(object.key) : "",
-      value: isSet(object.value) ? SecretProof.fromJSON(object.value) : undefined,
-    };
-  },
-
-  toJSON(message: ClaimTransferSignRefundsRequest_KeyTweakProofsEntry): unknown {
-    const obj: any = {};
-    if (message.key !== "") {
-      obj.key = message.key;
-    }
-    if (message.value !== undefined) {
-      obj.value = SecretProof.toJSON(message.value);
-    }
-    return obj;
-  },
-
-  create(
-    base?: DeepPartial<ClaimTransferSignRefundsRequest_KeyTweakProofsEntry>,
-  ): ClaimTransferSignRefundsRequest_KeyTweakProofsEntry {
-    return ClaimTransferSignRefundsRequest_KeyTweakProofsEntry.fromPartial(base ?? {});
-  },
-  fromPartial(
-    object: DeepPartial<ClaimTransferSignRefundsRequest_KeyTweakProofsEntry>,
-  ): ClaimTransferSignRefundsRequest_KeyTweakProofsEntry {
-    const message = createBaseClaimTransferSignRefundsRequest_KeyTweakProofsEntry();
-    message.key = object.key ?? "";
-    message.value = (object.value !== undefined && object.value !== null)
-      ? SecretProof.fromPartial(object.value)
-      : undefined;
     return message;
   },
 };
@@ -12544,7 +12993,7 @@ export const TreeNodeIds: MessageFns<TreeNodeIds> = {
 };
 
 function createBaseQueryNodesRequest(): QueryNodesRequest {
-  return { source: undefined, includeParents: false };
+  return { source: undefined, includeParents: false, limit: 0, offset: 0, network: 0 };
 }
 
 export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
@@ -12559,6 +13008,15 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
     }
     if (message.includeParents !== false) {
       writer.uint32(24).bool(message.includeParents);
+    }
+    if (message.limit !== 0) {
+      writer.uint32(32).int64(message.limit);
+    }
+    if (message.offset !== 0) {
+      writer.uint32(40).int64(message.offset);
+    }
+    if (message.network !== 0) {
+      writer.uint32(48).int32(message.network);
     }
     return writer;
   },
@@ -12594,6 +13052,30 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
           message.includeParents = reader.bool();
           continue;
         }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.limit = longToNumber(reader.int64());
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -12611,6 +13093,9 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
         ? { $case: "nodeIds", nodeIds: TreeNodeIds.fromJSON(object.nodeIds) }
         : undefined,
       includeParents: isSet(object.includeParents) ? globalThis.Boolean(object.includeParents) : false,
+      limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
     };
   },
 
@@ -12623,6 +13108,15 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
     }
     if (message.includeParents !== false) {
       obj.includeParents = message.includeParents;
+    }
+    if (message.limit !== 0) {
+      obj.limit = Math.round(message.limit);
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
+    }
+    if (message.network !== 0) {
+      obj.network = networkToJSON(message.network);
     }
     return obj;
   },
@@ -12647,12 +13141,15 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
       }
     }
     message.includeParents = object.includeParents ?? false;
+    message.limit = object.limit ?? 0;
+    message.offset = object.offset ?? 0;
+    message.network = object.network ?? 0;
     return message;
   },
 };
 
 function createBaseQueryNodesResponse(): QueryNodesResponse {
-  return { nodes: {} };
+  return { nodes: {}, offset: 0 };
 }
 
 export const QueryNodesResponse: MessageFns<QueryNodesResponse> = {
@@ -12660,6 +13157,9 @@ export const QueryNodesResponse: MessageFns<QueryNodesResponse> = {
     Object.entries(message.nodes).forEach(([key, value]) => {
       QueryNodesResponse_NodesEntry.encode({ key: key as any, value }, writer.uint32(10).fork()).join();
     });
+    if (message.offset !== 0) {
+      writer.uint32(16).int64(message.offset);
+    }
     return writer;
   },
 
@@ -12681,6 +13181,14 @@ export const QueryNodesResponse: MessageFns<QueryNodesResponse> = {
           }
           continue;
         }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -12698,6 +13206,7 @@ export const QueryNodesResponse: MessageFns<QueryNodesResponse> = {
           return acc;
         }, {})
         : {},
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
     };
   },
 
@@ -12711,6 +13220,9 @@ export const QueryNodesResponse: MessageFns<QueryNodesResponse> = {
           obj.nodes[k] = TreeNode.toJSON(v);
         });
       }
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
     }
     return obj;
   },
@@ -12726,6 +13238,7 @@ export const QueryNodesResponse: MessageFns<QueryNodesResponse> = {
       }
       return acc;
     }, {});
+    message.offset = object.offset ?? 0;
     return message;
   },
 };
@@ -12947,13 +13460,16 @@ export const CancelTransferResponse: MessageFns<CancelTransferResponse> = {
 };
 
 function createBaseQueryUnusedDepositAddressesRequest(): QueryUnusedDepositAddressesRequest {
-  return { identityPublicKey: new Uint8Array(0) };
+  return { identityPublicKey: new Uint8Array(0), network: 0 };
 }
 
 export const QueryUnusedDepositAddressesRequest: MessageFns<QueryUnusedDepositAddressesRequest> = {
   encode(message: QueryUnusedDepositAddressesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.identityPublicKey.length !== 0) {
       writer.uint32(10).bytes(message.identityPublicKey);
+    }
+    if (message.network !== 0) {
+      writer.uint32(16).int32(message.network);
     }
     return writer;
   },
@@ -12973,6 +13489,14 @@ export const QueryUnusedDepositAddressesRequest: MessageFns<QueryUnusedDepositAd
           message.identityPublicKey = reader.bytes();
           continue;
         }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -12987,6 +13511,7 @@ export const QueryUnusedDepositAddressesRequest: MessageFns<QueryUnusedDepositAd
       identityPublicKey: isSet(object.identityPublicKey)
         ? bytesFromBase64(object.identityPublicKey)
         : new Uint8Array(0),
+      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
     };
   },
 
@@ -12994,6 +13519,9 @@ export const QueryUnusedDepositAddressesRequest: MessageFns<QueryUnusedDepositAd
     const obj: any = {};
     if (message.identityPublicKey.length !== 0) {
       obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    if (message.network !== 0) {
+      obj.network = networkToJSON(message.network);
     }
     return obj;
   },
@@ -13004,6 +13532,7 @@ export const QueryUnusedDepositAddressesRequest: MessageFns<QueryUnusedDepositAd
   fromPartial(object: DeepPartial<QueryUnusedDepositAddressesRequest>): QueryUnusedDepositAddressesRequest {
     const message = createBaseQueryUnusedDepositAddressesRequest();
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    message.network = object.network ?? 0;
     return message;
   },
 };
@@ -13188,13 +13717,16 @@ export const QueryUnusedDepositAddressesResponse: MessageFns<QueryUnusedDepositA
 };
 
 function createBaseQueryBalanceRequest(): QueryBalanceRequest {
-  return { identityPublicKey: new Uint8Array(0) };
+  return { identityPublicKey: new Uint8Array(0), network: 0 };
 }
 
 export const QueryBalanceRequest: MessageFns<QueryBalanceRequest> = {
   encode(message: QueryBalanceRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.identityPublicKey.length !== 0) {
       writer.uint32(10).bytes(message.identityPublicKey);
+    }
+    if (message.network !== 0) {
+      writer.uint32(16).int32(message.network);
     }
     return writer;
   },
@@ -13214,6 +13746,14 @@ export const QueryBalanceRequest: MessageFns<QueryBalanceRequest> = {
           message.identityPublicKey = reader.bytes();
           continue;
         }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -13228,6 +13768,7 @@ export const QueryBalanceRequest: MessageFns<QueryBalanceRequest> = {
       identityPublicKey: isSet(object.identityPublicKey)
         ? bytesFromBase64(object.identityPublicKey)
         : new Uint8Array(0),
+      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
     };
   },
 
@@ -13235,6 +13776,9 @@ export const QueryBalanceRequest: MessageFns<QueryBalanceRequest> = {
     const obj: any = {};
     if (message.identityPublicKey.length !== 0) {
       obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    if (message.network !== 0) {
+      obj.network = networkToJSON(message.network);
     }
     return obj;
   },
@@ -13245,6 +13789,7 @@ export const QueryBalanceRequest: MessageFns<QueryBalanceRequest> = {
   fromPartial(object: DeepPartial<QueryBalanceRequest>): QueryBalanceRequest {
     const message = createBaseQueryBalanceRequest();
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    message.network = object.network ?? 0;
     return message;
   },
 };
@@ -13481,6 +14026,847 @@ export const SparkAddress: MessageFns<SparkAddress> = {
   fromPartial(object: DeepPartial<SparkAddress>): SparkAddress {
     const message = createBaseSparkAddress();
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseInitiateUtxoSwapRequest(): InitiateUtxoSwapRequest {
+  return {
+    onChainUtxo: undefined,
+    requestType: 0,
+    amount: undefined,
+    sspSignature: new Uint8Array(0),
+    userSignature: new Uint8Array(0),
+    transfer: undefined,
+    spendTxSigningJob: undefined,
+  };
+}
+
+export const InitiateUtxoSwapRequest: MessageFns<InitiateUtxoSwapRequest> = {
+  encode(message: InitiateUtxoSwapRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.onChainUtxo !== undefined) {
+      UTXO.encode(message.onChainUtxo, writer.uint32(10).fork()).join();
+    }
+    if (message.requestType !== 0) {
+      writer.uint32(16).int32(message.requestType);
+    }
+    switch (message.amount?.$case) {
+      case "creditAmountSats":
+        writer.uint32(24).uint64(message.amount.creditAmountSats);
+        break;
+      case "maxFeeSats":
+        writer.uint32(32).uint64(message.amount.maxFeeSats);
+        break;
+    }
+    if (message.sspSignature.length !== 0) {
+      writer.uint32(42).bytes(message.sspSignature);
+    }
+    if (message.userSignature.length !== 0) {
+      writer.uint32(50).bytes(message.userSignature);
+    }
+    if (message.transfer !== undefined) {
+      StartUserSignedTransferRequest.encode(message.transfer, writer.uint32(58).fork()).join();
+    }
+    if (message.spendTxSigningJob !== undefined) {
+      SigningJob.encode(message.spendTxSigningJob, writer.uint32(66).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): InitiateUtxoSwapRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseInitiateUtxoSwapRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.onChainUtxo = UTXO.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.requestType = reader.int32() as any;
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.amount = { $case: "creditAmountSats", creditAmountSats: longToNumber(reader.uint64()) };
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.amount = { $case: "maxFeeSats", maxFeeSats: longToNumber(reader.uint64()) };
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.sspSignature = reader.bytes();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.userSignature = reader.bytes();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.transfer = StartUserSignedTransferRequest.decode(reader, reader.uint32());
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.spendTxSigningJob = SigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): InitiateUtxoSwapRequest {
+    return {
+      onChainUtxo: isSet(object.onChainUtxo) ? UTXO.fromJSON(object.onChainUtxo) : undefined,
+      requestType: isSet(object.requestType) ? utxoSwapRequestTypeFromJSON(object.requestType) : 0,
+      amount: isSet(object.creditAmountSats)
+        ? { $case: "creditAmountSats", creditAmountSats: globalThis.Number(object.creditAmountSats) }
+        : isSet(object.maxFeeSats)
+        ? { $case: "maxFeeSats", maxFeeSats: globalThis.Number(object.maxFeeSats) }
+        : undefined,
+      sspSignature: isSet(object.sspSignature) ? bytesFromBase64(object.sspSignature) : new Uint8Array(0),
+      userSignature: isSet(object.userSignature) ? bytesFromBase64(object.userSignature) : new Uint8Array(0),
+      transfer: isSet(object.transfer) ? StartUserSignedTransferRequest.fromJSON(object.transfer) : undefined,
+      spendTxSigningJob: isSet(object.spendTxSigningJob) ? SigningJob.fromJSON(object.spendTxSigningJob) : undefined,
+    };
+  },
+
+  toJSON(message: InitiateUtxoSwapRequest): unknown {
+    const obj: any = {};
+    if (message.onChainUtxo !== undefined) {
+      obj.onChainUtxo = UTXO.toJSON(message.onChainUtxo);
+    }
+    if (message.requestType !== 0) {
+      obj.requestType = utxoSwapRequestTypeToJSON(message.requestType);
+    }
+    if (message.amount?.$case === "creditAmountSats") {
+      obj.creditAmountSats = Math.round(message.amount.creditAmountSats);
+    } else if (message.amount?.$case === "maxFeeSats") {
+      obj.maxFeeSats = Math.round(message.amount.maxFeeSats);
+    }
+    if (message.sspSignature.length !== 0) {
+      obj.sspSignature = base64FromBytes(message.sspSignature);
+    }
+    if (message.userSignature.length !== 0) {
+      obj.userSignature = base64FromBytes(message.userSignature);
+    }
+    if (message.transfer !== undefined) {
+      obj.transfer = StartUserSignedTransferRequest.toJSON(message.transfer);
+    }
+    if (message.spendTxSigningJob !== undefined) {
+      obj.spendTxSigningJob = SigningJob.toJSON(message.spendTxSigningJob);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<InitiateUtxoSwapRequest>): InitiateUtxoSwapRequest {
+    return InitiateUtxoSwapRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<InitiateUtxoSwapRequest>): InitiateUtxoSwapRequest {
+    const message = createBaseInitiateUtxoSwapRequest();
+    message.onChainUtxo = (object.onChainUtxo !== undefined && object.onChainUtxo !== null)
+      ? UTXO.fromPartial(object.onChainUtxo)
+      : undefined;
+    message.requestType = object.requestType ?? 0;
+    switch (object.amount?.$case) {
+      case "creditAmountSats": {
+        if (object.amount?.creditAmountSats !== undefined && object.amount?.creditAmountSats !== null) {
+          message.amount = { $case: "creditAmountSats", creditAmountSats: object.amount.creditAmountSats };
+        }
+        break;
+      }
+      case "maxFeeSats": {
+        if (object.amount?.maxFeeSats !== undefined && object.amount?.maxFeeSats !== null) {
+          message.amount = { $case: "maxFeeSats", maxFeeSats: object.amount.maxFeeSats };
+        }
+        break;
+      }
+    }
+    message.sspSignature = object.sspSignature ?? new Uint8Array(0);
+    message.userSignature = object.userSignature ?? new Uint8Array(0);
+    message.transfer = (object.transfer !== undefined && object.transfer !== null)
+      ? StartUserSignedTransferRequest.fromPartial(object.transfer)
+      : undefined;
+    message.spendTxSigningJob = (object.spendTxSigningJob !== undefined && object.spendTxSigningJob !== null)
+      ? SigningJob.fromPartial(object.spendTxSigningJob)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseInitiateUtxoSwapResponse(): InitiateUtxoSwapResponse {
+  return { spendTxSigningResult: undefined, transfer: undefined, depositAddress: undefined };
+}
+
+export const InitiateUtxoSwapResponse: MessageFns<InitiateUtxoSwapResponse> = {
+  encode(message: InitiateUtxoSwapResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.spendTxSigningResult !== undefined) {
+      SigningResult.encode(message.spendTxSigningResult, writer.uint32(10).fork()).join();
+    }
+    if (message.transfer !== undefined) {
+      Transfer.encode(message.transfer, writer.uint32(18).fork()).join();
+    }
+    if (message.depositAddress !== undefined) {
+      DepositAddressQueryResult.encode(message.depositAddress, writer.uint32(26).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): InitiateUtxoSwapResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseInitiateUtxoSwapResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.spendTxSigningResult = SigningResult.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.transfer = Transfer.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.depositAddress = DepositAddressQueryResult.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): InitiateUtxoSwapResponse {
+    return {
+      spendTxSigningResult: isSet(object.spendTxSigningResult)
+        ? SigningResult.fromJSON(object.spendTxSigningResult)
+        : undefined,
+      transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined,
+      depositAddress: isSet(object.depositAddress)
+        ? DepositAddressQueryResult.fromJSON(object.depositAddress)
+        : undefined,
+    };
+  },
+
+  toJSON(message: InitiateUtxoSwapResponse): unknown {
+    const obj: any = {};
+    if (message.spendTxSigningResult !== undefined) {
+      obj.spendTxSigningResult = SigningResult.toJSON(message.spendTxSigningResult);
+    }
+    if (message.transfer !== undefined) {
+      obj.transfer = Transfer.toJSON(message.transfer);
+    }
+    if (message.depositAddress !== undefined) {
+      obj.depositAddress = DepositAddressQueryResult.toJSON(message.depositAddress);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<InitiateUtxoSwapResponse>): InitiateUtxoSwapResponse {
+    return InitiateUtxoSwapResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<InitiateUtxoSwapResponse>): InitiateUtxoSwapResponse {
+    const message = createBaseInitiateUtxoSwapResponse();
+    message.spendTxSigningResult = (object.spendTxSigningResult !== undefined && object.spendTxSigningResult !== null)
+      ? SigningResult.fromPartial(object.spendTxSigningResult)
+      : undefined;
+    message.transfer = (object.transfer !== undefined && object.transfer !== null)
+      ? Transfer.fromPartial(object.transfer)
+      : undefined;
+    message.depositAddress = (object.depositAddress !== undefined && object.depositAddress !== null)
+      ? DepositAddressQueryResult.fromPartial(object.depositAddress)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseExitingTree(): ExitingTree {
+  return { treeId: "", userSigningCommitment: undefined, vin: 0 };
+}
+
+export const ExitingTree: MessageFns<ExitingTree> = {
+  encode(message: ExitingTree, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.treeId !== "") {
+      writer.uint32(10).string(message.treeId);
+    }
+    if (message.userSigningCommitment !== undefined) {
+      SigningCommitment.encode(message.userSigningCommitment, writer.uint32(18).fork()).join();
+    }
+    if (message.vin !== 0) {
+      writer.uint32(24).uint32(message.vin);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExitingTree {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseExitingTree();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.treeId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userSigningCommitment = SigningCommitment.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.vin = reader.uint32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ExitingTree {
+    return {
+      treeId: isSet(object.treeId) ? globalThis.String(object.treeId) : "",
+      userSigningCommitment: isSet(object.userSigningCommitment)
+        ? SigningCommitment.fromJSON(object.userSigningCommitment)
+        : undefined,
+      vin: isSet(object.vin) ? globalThis.Number(object.vin) : 0,
+    };
+  },
+
+  toJSON(message: ExitingTree): unknown {
+    const obj: any = {};
+    if (message.treeId !== "") {
+      obj.treeId = message.treeId;
+    }
+    if (message.userSigningCommitment !== undefined) {
+      obj.userSigningCommitment = SigningCommitment.toJSON(message.userSigningCommitment);
+    }
+    if (message.vin !== 0) {
+      obj.vin = Math.round(message.vin);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ExitingTree>): ExitingTree {
+    return ExitingTree.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ExitingTree>): ExitingTree {
+    const message = createBaseExitingTree();
+    message.treeId = object.treeId ?? "";
+    message.userSigningCommitment =
+      (object.userSigningCommitment !== undefined && object.userSigningCommitment !== null)
+        ? SigningCommitment.fromPartial(object.userSigningCommitment)
+        : undefined;
+    message.vin = object.vin ?? 0;
+    return message;
+  },
+};
+
+function createBaseExitSingleNodeTreeSigningResult(): ExitSingleNodeTreeSigningResult {
+  return { treeId: "", signingResult: undefined, verifyingKey: new Uint8Array(0) };
+}
+
+export const ExitSingleNodeTreeSigningResult: MessageFns<ExitSingleNodeTreeSigningResult> = {
+  encode(message: ExitSingleNodeTreeSigningResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.treeId !== "") {
+      writer.uint32(10).string(message.treeId);
+    }
+    if (message.signingResult !== undefined) {
+      SigningResult.encode(message.signingResult, writer.uint32(18).fork()).join();
+    }
+    if (message.verifyingKey.length !== 0) {
+      writer.uint32(26).bytes(message.verifyingKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExitSingleNodeTreeSigningResult {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseExitSingleNodeTreeSigningResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.treeId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.signingResult = SigningResult.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.verifyingKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ExitSingleNodeTreeSigningResult {
+    return {
+      treeId: isSet(object.treeId) ? globalThis.String(object.treeId) : "",
+      signingResult: isSet(object.signingResult) ? SigningResult.fromJSON(object.signingResult) : undefined,
+      verifyingKey: isSet(object.verifyingKey) ? bytesFromBase64(object.verifyingKey) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: ExitSingleNodeTreeSigningResult): unknown {
+    const obj: any = {};
+    if (message.treeId !== "") {
+      obj.treeId = message.treeId;
+    }
+    if (message.signingResult !== undefined) {
+      obj.signingResult = SigningResult.toJSON(message.signingResult);
+    }
+    if (message.verifyingKey.length !== 0) {
+      obj.verifyingKey = base64FromBytes(message.verifyingKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ExitSingleNodeTreeSigningResult>): ExitSingleNodeTreeSigningResult {
+    return ExitSingleNodeTreeSigningResult.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ExitSingleNodeTreeSigningResult>): ExitSingleNodeTreeSigningResult {
+    const message = createBaseExitSingleNodeTreeSigningResult();
+    message.treeId = object.treeId ?? "";
+    message.signingResult = (object.signingResult !== undefined && object.signingResult !== null)
+      ? SigningResult.fromPartial(object.signingResult)
+      : undefined;
+    message.verifyingKey = object.verifyingKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseBitcoinTransactionOutput(): BitcoinTransactionOutput {
+  return { value: 0, pkScript: new Uint8Array(0) };
+}
+
+export const BitcoinTransactionOutput: MessageFns<BitcoinTransactionOutput> = {
+  encode(message: BitcoinTransactionOutput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.value !== 0) {
+      writer.uint32(8).int64(message.value);
+    }
+    if (message.pkScript.length !== 0) {
+      writer.uint32(18).bytes(message.pkScript);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): BitcoinTransactionOutput {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseBitcoinTransactionOutput();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.value = longToNumber(reader.int64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.pkScript = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): BitcoinTransactionOutput {
+    return {
+      value: isSet(object.value) ? globalThis.Number(object.value) : 0,
+      pkScript: isSet(object.pkScript) ? bytesFromBase64(object.pkScript) : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: BitcoinTransactionOutput): unknown {
+    const obj: any = {};
+    if (message.value !== 0) {
+      obj.value = Math.round(message.value);
+    }
+    if (message.pkScript.length !== 0) {
+      obj.pkScript = base64FromBytes(message.pkScript);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<BitcoinTransactionOutput>): BitcoinTransactionOutput {
+    return BitcoinTransactionOutput.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<BitcoinTransactionOutput>): BitcoinTransactionOutput {
+    const message = createBaseBitcoinTransactionOutput();
+    message.value = object.value ?? 0;
+    message.pkScript = object.pkScript ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseExitSingleNodeTreesRequest(): ExitSingleNodeTreesRequest {
+  return { ownerIdentityPublicKey: new Uint8Array(0), exitingTrees: [], rawTx: new Uint8Array(0), previousOutputs: [] };
+}
+
+export const ExitSingleNodeTreesRequest: MessageFns<ExitSingleNodeTreesRequest> = {
+  encode(message: ExitSingleNodeTreesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.ownerIdentityPublicKey);
+    }
+    for (const v of message.exitingTrees) {
+      ExitingTree.encode(v!, writer.uint32(18).fork()).join();
+    }
+    if (message.rawTx.length !== 0) {
+      writer.uint32(26).bytes(message.rawTx);
+    }
+    for (const v of message.previousOutputs) {
+      BitcoinTransactionOutput.encode(v!, writer.uint32(34).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExitSingleNodeTreesRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseExitSingleNodeTreesRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.ownerIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.exitingTrees.push(ExitingTree.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.rawTx = reader.bytes();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.previousOutputs.push(BitcoinTransactionOutput.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ExitSingleNodeTreesRequest {
+    return {
+      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+        ? bytesFromBase64(object.ownerIdentityPublicKey)
+        : new Uint8Array(0),
+      exitingTrees: globalThis.Array.isArray(object?.exitingTrees)
+        ? object.exitingTrees.map((e: any) => ExitingTree.fromJSON(e))
+        : [],
+      rawTx: isSet(object.rawTx) ? bytesFromBase64(object.rawTx) : new Uint8Array(0),
+      previousOutputs: globalThis.Array.isArray(object?.previousOutputs)
+        ? object.previousOutputs.map((e: any) => BitcoinTransactionOutput.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ExitSingleNodeTreesRequest): unknown {
+    const obj: any = {};
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
+    }
+    if (message.exitingTrees?.length) {
+      obj.exitingTrees = message.exitingTrees.map((e) => ExitingTree.toJSON(e));
+    }
+    if (message.rawTx.length !== 0) {
+      obj.rawTx = base64FromBytes(message.rawTx);
+    }
+    if (message.previousOutputs?.length) {
+      obj.previousOutputs = message.previousOutputs.map((e) => BitcoinTransactionOutput.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ExitSingleNodeTreesRequest>): ExitSingleNodeTreesRequest {
+    return ExitSingleNodeTreesRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ExitSingleNodeTreesRequest>): ExitSingleNodeTreesRequest {
+    const message = createBaseExitSingleNodeTreesRequest();
+    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
+    message.exitingTrees = object.exitingTrees?.map((e) => ExitingTree.fromPartial(e)) || [];
+    message.rawTx = object.rawTx ?? new Uint8Array(0);
+    message.previousOutputs = object.previousOutputs?.map((e) => BitcoinTransactionOutput.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseExitSingleNodeTreesResponse(): ExitSingleNodeTreesResponse {
+  return { signingResults: [] };
+}
+
+export const ExitSingleNodeTreesResponse: MessageFns<ExitSingleNodeTreesResponse> = {
+  encode(message: ExitSingleNodeTreesResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.signingResults) {
+      ExitSingleNodeTreeSigningResult.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ExitSingleNodeTreesResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseExitSingleNodeTreesResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.signingResults.push(ExitSingleNodeTreeSigningResult.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ExitSingleNodeTreesResponse {
+    return {
+      signingResults: globalThis.Array.isArray(object?.signingResults)
+        ? object.signingResults.map((e: any) => ExitSingleNodeTreeSigningResult.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: ExitSingleNodeTreesResponse): unknown {
+    const obj: any = {};
+    if (message.signingResults?.length) {
+      obj.signingResults = message.signingResults.map((e) => ExitSingleNodeTreeSigningResult.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<ExitSingleNodeTreesResponse>): ExitSingleNodeTreesResponse {
+    return ExitSingleNodeTreesResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<ExitSingleNodeTreesResponse>): ExitSingleNodeTreesResponse {
+    const message = createBaseExitSingleNodeTreesResponse();
+    message.signingResults = object.signingResults?.map((e) => ExitSingleNodeTreeSigningResult.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseInvestigateLeavesRequest(): InvestigateLeavesRequest {
+  return { leafIds: [], ownerIdentityPublicKey: new Uint8Array(0), transferId: "" };
+}
+
+export const InvestigateLeavesRequest: MessageFns<InvestigateLeavesRequest> = {
+  encode(message: InvestigateLeavesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.leafIds) {
+      writer.uint32(10).string(v!);
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.ownerIdentityPublicKey);
+    }
+    if (message.transferId !== "") {
+      writer.uint32(26).string(message.transferId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): InvestigateLeavesRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseInvestigateLeavesRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leafIds.push(reader.string());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ownerIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.transferId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): InvestigateLeavesRequest {
+    return {
+      leafIds: globalThis.Array.isArray(object?.leafIds) ? object.leafIds.map((e: any) => globalThis.String(e)) : [],
+      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+        ? bytesFromBase64(object.ownerIdentityPublicKey)
+        : new Uint8Array(0),
+      transferId: isSet(object.transferId) ? globalThis.String(object.transferId) : "",
+    };
+  },
+
+  toJSON(message: InvestigateLeavesRequest): unknown {
+    const obj: any = {};
+    if (message.leafIds?.length) {
+      obj.leafIds = message.leafIds;
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
+    }
+    if (message.transferId !== "") {
+      obj.transferId = message.transferId;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<InvestigateLeavesRequest>): InvestigateLeavesRequest {
+    return InvestigateLeavesRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<InvestigateLeavesRequest>): InvestigateLeavesRequest {
+    const message = createBaseInvestigateLeavesRequest();
+    message.leafIds = object.leafIds?.map((e) => e) || [];
+    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
+    message.transferId = object.transferId ?? "";
     return message;
   },
 };
@@ -13781,14 +15167,6 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
-    cancel_signed_token_transaction: {
-      name: "cancel_signed_token_transaction",
-      requestType: CancelSignedTokenTransactionRequest,
-      requestStream: false,
-      responseType: Empty,
-      responseStream: false,
-      options: {},
-    },
     return_lightning_payment: {
       name: "return_lightning_payment",
       requestType: ReturnLightningPaymentRequest,
@@ -13811,6 +15189,23 @@ export const SparkServiceDefinition = {
       requestStream: false,
       responseType: SubscribeToEventsResponse,
       responseStream: true,
+      options: {},
+    },
+    /** Claim a deposit to a static address from SSP side */
+    initiate_utxo_swap: {
+      name: "initiate_utxo_swap",
+      requestType: InitiateUtxoSwapRequest,
+      requestStream: false,
+      responseType: InitiateUtxoSwapResponse,
+      responseStream: false,
+      options: {},
+    },
+    exit_single_node_trees: {
+      name: "exit_single_node_trees",
+      requestType: ExitSingleNodeTreesRequest,
+      requestStream: false,
+      responseType: ExitSingleNodeTreesResponse,
+      responseStream: false,
       options: {},
     },
   },
@@ -13972,10 +15367,6 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: QueryTokenTransactionsRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<QueryTokenTransactionsResponse>>;
-  cancel_signed_token_transaction(
-    request: CancelSignedTokenTransactionRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<Empty>>;
   return_lightning_payment(
     request: ReturnLightningPaymentRequest,
     context: CallContext & CallContextExt,
@@ -13988,6 +15379,15 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: SubscribeToEventsRequest,
     context: CallContext & CallContextExt,
   ): ServerStreamingMethodResult<DeepPartial<SubscribeToEventsResponse>>;
+  /** Claim a deposit to a static address from SSP side */
+  initiate_utxo_swap(
+    request: InitiateUtxoSwapRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<InitiateUtxoSwapResponse>>;
+  exit_single_node_trees(
+    request: ExitSingleNodeTreesRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<ExitSingleNodeTreesResponse>>;
 }
 
 export interface SparkServiceClient<CallOptionsExt = {}> {
@@ -14146,10 +15546,6 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<QueryTokenTransactionsRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<QueryTokenTransactionsResponse>;
-  cancel_signed_token_transaction(
-    request: DeepPartial<CancelSignedTokenTransactionRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<Empty>;
   return_lightning_payment(
     request: DeepPartial<ReturnLightningPaymentRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -14162,6 +15558,15 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<SubscribeToEventsRequest>,
     options?: CallOptions & CallOptionsExt,
   ): AsyncIterable<SubscribeToEventsResponse>;
+  /** Claim a deposit to a static address from SSP side */
+  initiate_utxo_swap(
+    request: DeepPartial<InitiateUtxoSwapRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<InitiateUtxoSwapResponse>;
+  exit_single_node_trees(
+    request: DeepPartial<ExitSingleNodeTreesRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<ExitSingleNodeTreesResponse>;
 }
 
 function bytesFromBase64(b64: string): Uint8Array {

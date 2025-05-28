@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/ent/schema"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
@@ -108,7 +109,12 @@ func FetchAndLockTokenInputs(ctx context.Context, outputsToSpend []*pb.TokenOutp
 	return outputToSpendEnts, nil
 }
 
-func GetOwnedTokenOutputs(ctx context.Context, ownerPublicKeys [][]byte, tokenPublicKeys [][]byte) ([]*TokenOutput, error) {
+func GetOwnedTokenOutputs(ctx context.Context, ownerPublicKeys [][]byte, tokenPublicKeys [][]byte, network common.Network) ([]*TokenOutput, error) {
+	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
+	}
+
 	query := GetDbFromContext(ctx).TokenOutput.
 		Query().
 		Where(
@@ -122,7 +128,8 @@ func GetOwnedTokenOutputs(ctx context.Context, ownerPublicKeys [][]byte, tokenPu
 				schema.TokenOutputStatusSpentStarted,
 			),
 			tokenoutput.ConfirmedWithdrawBlockHashIsNil(),
-		)
+		).
+		Where(tokenoutput.NetworkEQ(schemaNetwork))
 	// Only filter by tokenPublicKey if it's provided.
 	if len(tokenPublicKeys) > 0 {
 		query = query.Where(tokenoutput.TokenPublicKeyIn(tokenPublicKeys...))
@@ -138,8 +145,8 @@ func GetOwnedTokenOutputs(ctx context.Context, ownerPublicKeys [][]byte, tokenPu
 	return outputs, nil
 }
 
-func GetOwnedTokenOutputStats(ctx context.Context, ownerPublicKeys [][]byte, tokenPublicKey []byte) ([]string, *big.Int, error) {
-	outputs, err := GetOwnedTokenOutputs(ctx, ownerPublicKeys, [][]byte{tokenPublicKey})
+func GetOwnedTokenOutputStats(ctx context.Context, ownerPublicKeys [][]byte, tokenPublicKey []byte, network common.Network) ([]string, *big.Int, error) {
+	outputs, err := GetOwnedTokenOutputs(ctx, ownerPublicKeys, [][]byte{tokenPublicKey}, network)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to query owned output stats: %w", err)
 	}

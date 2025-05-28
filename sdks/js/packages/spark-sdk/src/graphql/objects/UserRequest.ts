@@ -2,24 +2,24 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import Entity from './Entity.js';
+import {SwapLeafToJson} from './SwapLeaf.js';
 import type CoopExitRequest from './CoopExitRequest.js';
-import {SwapLeafFromJson} from './SwapLeaf.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
 import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
+import type LightningReceiveRequest from './LightningReceiveRequest.js';
+import {TransferFromJson} from './Transfer.js';
+import {CurrencyAmountToJson} from './CurrencyAmount.js';
+import { Query, isObject } from '@lightsparkdev/core';
+import LightningSendRequestStatus from './LightningSendRequestStatus.js';
+import {SwapLeafFromJson} from './SwapLeaf.js';
+import {CurrencyAmountFromJson} from './CurrencyAmount.js';
+import type LeavesSwapRequest from './LeavesSwapRequest.js';
+import { LightsparkException } from '@lightsparkdev/core';
+import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
 import {InvoiceFromJson} from './Invoice.js';
 import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
-import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import {TransferFromJson} from './Transfer.js';
-import LightningSendRequestStatus from './LightningSendRequestStatus.js';
-import SparkLeavesSwapRequestStatus from './SparkLeavesSwapRequestStatus.js';
-import type LightningReceiveRequest from './LightningReceiveRequest.js';
-import BitcoinNetwork from './BitcoinNetwork.js';
-import {SwapLeafToJson} from './SwapLeaf.js';
-import { Query, isObject } from '@lightsparkdev/core';
 import type LightningSendRequest from './LightningSendRequest.js';
-import { LightsparkException } from '@lightsparkdev/core';
 import {InvoiceToJson} from './Invoice.js';
-import type LeavesSwapRequest from './LeavesSwapRequest.js';
-import {CurrencyAmountToJson} from './CurrencyAmount.js';
 
 
 interface UserRequest {
@@ -56,6 +56,7 @@ export const UserRequestFromJson = (obj: any): UserRequest => {
             updatedAt: obj["coop_exit_request_updated_at"],
             network: BitcoinNetwork[obj["coop_exit_request_network"]] ?? BitcoinNetwork.FUTURE_VALUE,
             fee: CurrencyAmountFromJson(obj["coop_exit_request_fee"]),
+            l1BroadcastFee: CurrencyAmountFromJson(obj["coop_exit_request_l1_broadcast_fee"]),
             status: SparkCoopExitRequestStatus[obj["coop_exit_request_status"]] ?? SparkCoopExitRequestStatus.FUTURE_VALUE,
             expiresAt: obj["coop_exit_request_expires_at"],
             rawConnectorTransaction: obj["coop_exit_request_raw_connector_transaction"],
@@ -76,9 +77,9 @@ typename: "CoopExitRequest",            transfer: (!!obj["coop_exit_request_tran
             targetAmount: CurrencyAmountFromJson(obj["leaves_swap_request_target_amount"]),
             fee: CurrencyAmountFromJson(obj["leaves_swap_request_fee"]),
             inboundTransfer: TransferFromJson(obj["leaves_swap_request_inbound_transfer"]),
-            expiresAt: obj["leaves_swap_request_expires_at"],
             swapLeaves: obj["leaves_swap_request_swap_leaves"].map((e) => SwapLeafFromJson(e)),
 typename: "LeavesSwapRequest",            outboundTransfer: (!!obj["leaves_swap_request_outbound_transfer"] ? TransferFromJson(obj["leaves_swap_request_outbound_transfer"]) : undefined),
+            expiresAt: obj["leaves_swap_request_expires_at"],
 
         } as LeavesSwapRequest;
 
@@ -121,6 +122,7 @@ coop_exit_request_created_at: coopExitRequest.createdAt,
 coop_exit_request_updated_at: coopExitRequest.updatedAt,
 coop_exit_request_network: coopExitRequest.network,
 coop_exit_request_fee: CurrencyAmountToJson(coopExitRequest.fee),
+coop_exit_request_l1_broadcast_fee: CurrencyAmountToJson(coopExitRequest.l1BroadcastFee),
 coop_exit_request_status: coopExitRequest.status,
 coop_exit_request_expires_at: coopExitRequest.expiresAt,
 coop_exit_request_raw_connector_transaction: coopExitRequest.rawConnectorTransaction,
@@ -192,6 +194,14 @@ fragment UserRequestFragment on UserRequest {
         coop_exit_request_updated_at: updated_at
         coop_exit_request_network: network
         coop_exit_request_fee: fee {
+            __typename
+            currency_amount_original_value: original_value
+            currency_amount_original_unit: original_unit
+            currency_amount_preferred_currency_unit: preferred_currency_unit
+            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
+            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
+        }
+        coop_exit_request_l1_broadcast_fee: l1_broadcast_fee {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit

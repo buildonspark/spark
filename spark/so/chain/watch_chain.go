@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcjson"
+	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
@@ -127,7 +128,7 @@ func scanChainUpdates(
 	}
 	latestBlockHash, err := bitcoinClient.GetBlockHash(latestBlockHeight)
 	if err != nil {
-		return fmt.Errorf("failed to get block hash: %v", err)
+		return fmt.Errorf("failed to get block hash at height %d: %v", latestBlockHeight, err)
 	}
 	latestChainTip := NewTip(latestBlockHeight, *latestBlockHash)
 
@@ -145,7 +146,7 @@ func scanChainUpdates(
 	}
 	dbBlockHash, err := bitcoinClient.GetBlockHash(dbBlockHeight.Height)
 	if err != nil {
-		return fmt.Errorf("failed to get block hash: %v", err)
+		return fmt.Errorf("failed to get block hash at db height %d: %v", dbBlockHeight.Height, err)
 	}
 
 	dbChainTip := NewTip(dbBlockHeight.Height, *dbBlockHash)
@@ -327,6 +328,33 @@ type AddressDepositUtxo struct {
 	idx    uint32
 }
 
+// processTransactions processes a list of transactions and returns:
+// - A map of confirmed transaction hashes
+// - A list of debited addresses
+// - A map of addresses to their UTXOs
+func processTransactions(txs []wire.MsgTx, networkParams *chaincfg.Params) (map[[32]byte]bool, []string, map[string][]AddressDepositUtxo, error) {
+	confirmedTxHashSet := make(map[[32]byte]bool)
+	creditedAddresses := make(map[string]bool)
+	addressToUtxoMap := make(map[string][]AddressDepositUtxo)
+
+	for _, tx := range txs {
+		for idx, txOut := range tx.TxOut {
+			_, addresses, _, err := txscript.ExtractPkScriptAddrs(txOut.PkScript, networkParams)
+			if err != nil {
+				continue
+			}
+			for _, address := range addresses {
+				creditedAddresses[address.EncodeAddress()] = true
+				addressToUtxoMap[address.EncodeAddress()] = append(addressToUtxoMap[address.EncodeAddress()], AddressDepositUtxo{&tx, uint64(txOut.Value), uint32(idx)})
+			}
+		}
+		txid := tx.TxHash()
+		confirmedTxHashSet[txid] = true
+	}
+
+	return confirmedTxHashSet, common.KeysOfMap(creditedAddresses), addressToUtxoMap, nil
+}
+
 func handleBlock(
 	ctx context.Context,
 	lrc20Client *lrc20.Client,
@@ -348,22 +376,9 @@ func handleBlock(
 		return err
 	}
 
-	confirmedTxHashSet := make(map[[32]byte]bool)
-	debitedAddresses := make([]string, 0)
-	addressToUtxoMap := make(map[string]AddressDepositUtxo)
-	for _, tx := range txs {
-		for idx, txOut := range tx.TxOut {
-			_, addresses, _, err := txscript.ExtractPkScriptAddrs(txOut.PkScript, networkParams)
-			if err != nil {
-				return err
-			}
-			for _, address := range addresses {
-				debitedAddresses = append(debitedAddresses, address.EncodeAddress())
-				addressToUtxoMap[address.EncodeAddress()] = AddressDepositUtxo{&tx, uint64(txOut.Value), uint32(idx)}
-			}
-		}
-		txid := tx.TxHash()
-		confirmedTxHashSet[txid] = true
+	confirmedTxHashSet, creditedAddresses, addressToUtxoMap, err := processTransactions(txs, networkParams)
+	if err != nil {
+		return err
 	}
 
 	// Fetch nodes with a confirmed parent and unconfirmed node/refund TX
@@ -451,52 +466,30 @@ func handleBlock(
 		}
 	}
 
-	// Handle static deposits
-	staticDepositAddresses, err := dbTx.DepositAddress.Query().
-		Where(depositaddress.IsStaticEQ(true)).
-		Where(depositaddress.AddressIn(debitedAddresses...)).
-		All(ctx)
+	err = storeStaticDeposits(ctx, dbTx, creditedAddresses, addressToUtxoMap, network, blockHeight)
 	if err != nil {
-		return err
-	}
-
-	for _, address := range staticDepositAddresses {
-		if utxo, ok := addressToUtxoMap[address.Address]; ok {
-			txidBytes, err := hex.DecodeString(utxo.tx.TxID())
-			if err != nil {
-				return fmt.Errorf("unable to decode txid for a new utxo: %v", err)
-			}
-			_, err = dbTx.Utxo.Create().
-				SetTxid(txidBytes).
-				SetVout(uint32(utxo.idx)).
-				SetAmount(utxo.amount).
-				SetPkScript(utxo.tx.TxOut[utxo.idx].PkScript).
-				SetNetwork(common.SchemaNetwork(network)).
-				SetBlockHeight(blockHeight).
-				SetDepositAddress(address).
-				Save(ctx)
-			if err != nil {
-				return fmt.Errorf("unable to store a new utxo: %v", err)
-			}
-			logger.Debug("Stored an L1 utxo to a static deposit address", "address", address.Address, "txid", hex.EncodeToString(txidBytes), "amount", utxo.amount)
-		}
+		return fmt.Errorf("failed to store static deposits: %v", err)
 	}
 
 	confirmedDeposits, err := dbTx.DepositAddress.Query().
 		Where(depositaddress.ConfirmationHeightIsNil()).
 		Where(depositaddress.IsStaticEQ(false)).
-		Where(depositaddress.AddressIn(debitedAddresses...)).
+		Where(depositaddress.AddressIn(creditedAddresses...)).
 		All(ctx)
 	if err != nil {
 		return err
 	}
 	for _, deposit := range confirmedDeposits {
 		// TODO: only unlock if deposit reaches X confirmations
-		utxo, ok := addressToUtxoMap[deposit.Address]
-		if !ok {
+		utxos, ok := addressToUtxoMap[deposit.Address]
+		if !ok || len(utxos) == 0 {
 			logger.Info("UTXO not found for deposit address", "address", deposit.Address)
 			continue
 		}
+		if len(utxos) > 1 {
+			logger.Warn("Multiple UTXOs found for a single use deposit address, picking the first one", "address", deposit.Address)
+		}
+		utxo := utxos[0]
 		_, err = dbTx.DepositAddress.UpdateOne(deposit).
 			SetConfirmationHeight(blockHeight).
 			SetConfirmationTxid(utxo.tx.TxHash().String()).
@@ -600,6 +593,43 @@ func handleBlock(
 		return err
 	}
 
+	return nil
+}
+
+func storeStaticDeposits(ctx context.Context, dbTx *ent.Tx, creditedAddresses []string, addressToUtxoMap map[string][]AddressDepositUtxo, network common.Network, blockHeight int64) error {
+	logger := logging.GetLoggerFromContext(ctx)
+
+	staticDepositAddresses, err := dbTx.DepositAddress.Query().
+		Where(depositaddress.IsStaticEQ(true)).
+		Where(depositaddress.AddressIn(creditedAddresses...)).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, address := range staticDepositAddresses {
+		if utxos, ok := addressToUtxoMap[address.Address]; ok {
+			for _, utxo := range utxos {
+				txidBytes, err := hex.DecodeString(utxo.tx.TxID())
+				if err != nil {
+					return fmt.Errorf("unable to decode txid for a new utxo: %v", err)
+				}
+				_, err = dbTx.Utxo.Create().
+					SetTxid(txidBytes).
+					SetVout(uint32(utxo.idx)).
+					SetAmount(utxo.amount).
+					SetPkScript(utxo.tx.TxOut[utxo.idx].PkScript).
+					SetNetwork(common.SchemaNetwork(network)).
+					SetBlockHeight(blockHeight).
+					SetDepositAddress(address).
+					Save(ctx)
+				if err != nil {
+					return fmt.Errorf("unable to store a new utxo: %v", err)
+				}
+				logger.Debug("Stored an L1 utxo to a static deposit address", "address", address.Address, "txid", hex.EncodeToString(txidBytes), "amount", utxo.amount)
+			}
+		}
+	}
 	return nil
 }
 

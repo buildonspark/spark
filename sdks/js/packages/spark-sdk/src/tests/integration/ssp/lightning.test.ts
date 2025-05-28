@@ -102,13 +102,14 @@ describe("Lightning Network provider", () => {
           amountSats: -1,
           memo: "test",
         }),
-      ).rejects.toThrow(
-        new ValidationError("Invalid amount", {
+      ).rejects.toMatchObject({
+        name: ValidationError.name,
+        message: expect.stringContaining("Invalid amount"),
+        context: expect.objectContaining({
           field: "amountSats",
           value: -1,
-          expected: "Non-negative amount",
         }),
-      );
+      });
     }, 30000);
 
     it(`should fail to create lightning invoice with invalid expiration time`, async () => {
@@ -118,13 +119,14 @@ describe("Lightning Network provider", () => {
           memo: "test",
           expirySeconds: -1,
         }),
-      ).rejects.toThrow(
-        new ValidationError("Invalid expiration time", {
+      ).rejects.toMatchObject({
+        name: ValidationError.name,
+        message: expect.stringContaining("Invalid expiration time"),
+        context: expect.objectContaining({
           field: "expirySeconds",
           value: -1,
-          expected: "Non-negative expiration time",
         }),
-      );
+      });
     }, 30000);
 
     it(`should fail to create lightning invoice with invalid memo size`, async () => {
@@ -133,13 +135,14 @@ describe("Lightning Network provider", () => {
           amountSats: 1000,
           memo: "test".repeat(1000),
         }),
-      ).rejects.toThrow(
-        new ValidationError("Invalid memo size", {
+      ).rejects.toMatchObject({
+        name: ValidationError.name,
+        message: expect.stringContaining("Invalid memo size"),
+        context: expect.objectContaining({
           field: "memo",
-          value: "test".repeat(1000).length,
-          expected: "Memo size within limits",
+          value: "test".repeat(1000),
         }),
-      );
+      });
     }, 30000);
   });
 });

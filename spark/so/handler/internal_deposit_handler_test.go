@@ -6,6 +6,7 @@ import (
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark/common"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/stretchr/testify/require"
 )
 
@@ -93,7 +94,7 @@ func TestValidateUserSignature(t *testing.T) {
 			txid:           txid,
 			vout:           vout,
 			totalAmount:    90000,
-			expectedErrMsg: "invalid user signature",
+			expectedErrMsg: "invalid signature",
 		},
 		{
 			name:           "signature verification failure",
@@ -104,13 +105,13 @@ func TestValidateUserSignature(t *testing.T) {
 			txid:           txid,
 			vout:           vout,
 			totalAmount:    1000, // wrong amount
-			expectedErrMsg: "invalid user signature",
+			expectedErrMsg: "invalid signature",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateUserSignature(tt.userPubKey, tt.userSignature, tt.sspSignature, tt.network, tt.txid, tt.vout, tt.totalAmount)
+			err := validateUserSignature(tt.userPubKey, tt.userSignature, tt.sspSignature, pb.UtxoSwapRequestType_Fixed, tt.network, tt.txid, tt.vout, tt.totalAmount)
 			if tt.expectedErrMsg != "" {
 				require.Error(t, err)
 				require.Contains(t, err.Error(), tt.expectedErrMsg)

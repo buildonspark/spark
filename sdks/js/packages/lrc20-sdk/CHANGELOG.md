@@ -1,5 +1,29 @@
 # @buildonspark/lrc20-sdk
 
+## 0.0.50
+
+### Patch Changes
+
+- Fixes
+
+## 0.0.49
+
+### Patch Changes
+
+- Use browser module override for nice-grpc
+
+## 0.0.48
+
+### Patch Changes
+
+- Update homepage URL
+
+## 0.0.47
+
+### Patch Changes
+
+- Fixes
+
 ## 0.0.46
 
 ### Patch Changes

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"strings"
@@ -67,15 +68,14 @@ type Config struct {
 	DKGLimitOverride uint64
 	// RunDirectory is the base directory for resolving relative paths
 	RunDirectory string
+	// If true, return the details of the error to the client instead of just 'Internal Server Error'
+	ReturnDetailedErrors bool
 	// If true, return the details of the panic to the client instead of just 'Internal Server Error'
 	ReturnDetailedPanicErrors bool
 	// RateLimiter is the configuration for the rate limiter
 	RateLimiter RateLimiterConfig
 	// Tracing configuration
 	Tracing common.TracingConfig
-	// TokenTransactionExpiryDuration is the duration after which started token transactions expire
-	// after which the tx will be cancelled and the input TTXOs will be reset to a spendable state.
-	TokenTransactionExpiryDuration time.Duration
 }
 
 // DatabaseDriver returns the database driver based on the database path.
@@ -94,6 +94,10 @@ type OperatorConfig struct {
 	Lrc20 map[string]Lrc20Config `yaml:"lrc20"`
 	// Tracing is the configuration for tracing
 	Tracing common.TracingConfig `yaml:"tracing"`
+	// ReturnDetailedErrors determines if detailed errors should be returned to the client
+	ReturnDetailedErrors bool `yaml:"return_detailed_errors"`
+	// ReturnDetailedPanicErrors determines if detailed panic errors should be returned to the client
+	ReturnDetailedPanicErrors bool `yaml:"return_detailed_panic_errors"`
 }
 
 // BitcoindConfig is the configuration for a bitcoind node.
@@ -122,8 +126,11 @@ type Lrc20Config struct {
 	RelativeCertPath              string `yaml:"relativecertpath"`
 	WithdrawBondSats              uint64 `yaml:"withdrawbondsats"`
 	WithdrawRelativeBlockLocktime uint64 `yaml:"withdrawrelativeblocklocktime"`
-	GRPCPageSize                  uint64 `yaml:"grpcspagesize"`
-	GRPCPoolSize                  uint64 `yaml:"grpcpoolsize"`
+	// TransactionExpiryDuration is the duration after which started token transactions expire
+	// after which the tx will be cancelled and the input TTXOs will be reset to a spendable state.
+	TransactionExpiryDuration time.Duration `yaml:"transaction_expiry_duration"`
+	GRPCPageSize              uint64        `yaml:"grpcspagesize"`
+	GRPCPoolSize              uint64        `yaml:"grpcpoolsize"`
 }
 
 // RateLimiterConfig is the configuration for the rate limiter
@@ -157,7 +164,6 @@ func NewConfig(
 	serverKeyPath string,
 	dkgLimitOverride uint64,
 	runDirectory string,
-	returnDetailedPanicErrors bool,
 	rateLimiter RateLimiterConfig,
 ) (*Config, error) {
 	identityPrivateKeyHexStringBytes, err := os.ReadFile(identityPrivateKeyFilePath)
@@ -184,6 +190,8 @@ func NewConfig(
 		return nil, err
 	}
 
+	setLrc20Defaults(operatorConfig.Lrc20)
+
 	identifier := utils.IndexToIdentifier(index)
 
 	if dkgCoordinatorAddress == "" {
@@ -208,7 +216,8 @@ func NewConfig(
 		ServerKeyPath:             serverKeyPath,
 		DKGLimitOverride:          dkgLimitOverride,
 		RunDirectory:              runDirectory,
-		ReturnDetailedPanicErrors: returnDetailedPanicErrors,
+		ReturnDetailedErrors:      operatorConfig.ReturnDetailedErrors,
+		ReturnDetailedPanicErrors: operatorConfig.ReturnDetailedPanicErrors,
 		RateLimiter:               rateLimiter,
 		Tracing:                   operatorConfig.Tracing,
 	}, nil
@@ -407,5 +416,20 @@ func (c *Config) GetRateLimiterConfig() *middleware.RateLimiterConfig {
 		Window:      c.RateLimiter.Window,
 		MaxRequests: c.RateLimiter.MaxRequests,
 		Methods:     c.RateLimiter.Methods,
+	}
+}
+
+const (
+	defaultTokenTransactionExpiryDuration = 3 * time.Minute
+)
+
+// setLrc20Defaults sets default values for Lrc20Config fields if they are zero.
+func setLrc20Defaults(lrc20Configs map[string]Lrc20Config) {
+	for k, v := range lrc20Configs {
+		if v.TransactionExpiryDuration == 0 {
+			slog.Info("TokenTransactionExpiryDuration not set, using default value", "default_duration", defaultTokenTransactionExpiryDuration)
+			v.TransactionExpiryDuration = defaultTokenTransactionExpiryDuration
+		}
+		lrc20Configs[k] = v
 	}
 }

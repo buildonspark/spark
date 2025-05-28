@@ -4,7 +4,9 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 import { sha256 } from "@scure/btc-signer/utils";
 import { WalletConfigService } from "../../services/config.js";
 import { ConnectionManager } from "../../services/connection.js";
-import { LeafKeyTweak, TransferService } from "../../services/transfer.js";
+import { SigningService } from "../../services/signing.js";
+import { TransferService } from "../../services/transfer.js";
+import type { LeafKeyTweak } from "../../services/transfer.js";
 import {
   applyAdaptorToSignature,
   generateAdaptorFromSignature,
@@ -36,9 +38,11 @@ describe("swap", () => {
       senderWallet.getSigner(),
     );
     const senderConnectionManager = new ConnectionManager(senderConfig);
+    const senderSigningService = new SigningService(senderConfig);
     const senderTransferService = new TransferService(
       senderConfig,
       senderConnectionManager,
+      senderSigningService,
     );
 
     // Initiate receiver
@@ -56,9 +60,11 @@ describe("swap", () => {
       receiverWallet.getSigner(),
     );
     const receiverConnectionManager = new ConnectionManager(receiverConfig);
+    const receiverSigningService = new SigningService(receiverConfig);
     const receiverTransferService = new TransferService(
       receiverConfig,
       receiverConnectionManager,
+      receiverSigningService,
     );
 
     const senderLeafPubKey = await senderWallet.getSigner().generatePublicKey();

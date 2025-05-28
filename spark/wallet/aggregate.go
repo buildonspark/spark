@@ -64,7 +64,7 @@ func AggregateTreeNodes(
 		return nil, fmt.Errorf("failed to get next sequence: %v", err)
 	}
 	parentOutPoint := wire.OutPoint{Hash: parentTx.TxHash(), Index: uint32(parentNode.Vout)}
-	cpfpRefundTx, _, err := createRefundTxs(sequence, &parentOutPoint,
+	_, cpfpRefundTx, err := createRefundTxs(sequence, &parentOutPoint,
 		parentTx.TxOut[parentNode.Vout].Value, aggregatedSigningPublicKey, false)
 	if err != nil {
 		return nil, err

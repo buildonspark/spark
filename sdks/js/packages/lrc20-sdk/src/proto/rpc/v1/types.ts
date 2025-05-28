@@ -501,7 +501,7 @@ export const SparkSignatureData: MessageFns<SparkSignatureData> = {
     message.sparkOperatorIdentityPublicKey = object.sparkOperatorIdentityPublicKey ?? new Uint8Array(0);
     message.leavesToSpendData = object.leavesToSpendData?.map((e) => SparkSignatureLeafData.fromPartial(e)) || [];
     message.finalTokenTransaction =
-      (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
+      object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null
         ? TokenTransaction.fromPartial(object.finalTokenTransaction)
         : undefined;
     return message;
@@ -845,8 +845,8 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
       tokenInput: isSet(object.mintInput)
         ? { $case: "mintInput", mintInput: MintInput.fromJSON(object.mintInput) }
         : isSet(object.transferInput)
-        ? { $case: "transferInput", transferInput: TransferInput.fromJSON(object.transferInput) }
-        : undefined,
+          ? { $case: "transferInput", transferInput: TransferInput.fromJSON(object.transferInput) }
+          : undefined,
       outputLeaves: globalThis.Array.isArray(object?.outputLeaves)
         ? object.outputLeaves.map((e: any) => TokenLeafOutput.fromJSON(e))
         : [],
@@ -1343,7 +1343,7 @@ export const TokenTransactionResponse: MessageFns<TokenTransactionResponse> = {
     const message = createBaseTokenTransactionResponse();
     message.finalized = object.finalized ?? false;
     message.finalTokenTransaction =
-      (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
+      object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null
         ? TokenTransaction.fromPartial(object.finalTokenTransaction)
         : undefined;
     message.finalTokenTransactionHash = object.finalTokenTransactionHash ?? new Uint8Array(0);
@@ -1405,8 +1405,8 @@ export const Transaction: MessageFns<Transaction> = {
       transaction: isSet(object.onChain)
         ? { $case: "onChain", onChain: OnChainTransaction.fromJSON(object.onChain) }
         : isSet(object.spark)
-        ? { $case: "spark", spark: SparkTransaction.fromJSON(object.spark) }
-        : undefined,
+          ? { $case: "spark", spark: SparkTransaction.fromJSON(object.spark) }
+          : undefined,
     };
   },
 
@@ -2775,9 +2775,10 @@ export const TokenPubkeyAnnouncement: MessageFns<TokenPubkeyAnnouncement> = {
   },
   fromPartial(object: DeepPartial<TokenPubkeyAnnouncement>): TokenPubkeyAnnouncement {
     const message = createBaseTokenPubkeyAnnouncement();
-    message.publicKey = (object.publicKey !== undefined && object.publicKey !== null)
-      ? TokenPubkey.fromPartial(object.publicKey)
-      : undefined;
+    message.publicKey =
+      object.publicKey !== undefined && object.publicKey !== null
+        ? TokenPubkey.fromPartial(object.publicKey)
+        : undefined;
     message.name = object.name ?? "";
     message.symbol = object.symbol ?? "";
     message.decimal = object.decimal ?? new Uint8Array(0);
@@ -2814,12 +2815,17 @@ function base64FromBytes(arr: Uint8Array): string {
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends { $case: string } ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & { $case: T["$case"] }
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends { $case: string }
+        ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & { $case: T["$case"] }
+        : T extends {}
+          ? { [K in keyof T]?: DeepPartial<T[K]> }
+          : Partial<T>;
 
 function toTimestamp(date: Date): Timestamp {
   const seconds = Math.trunc(date.getTime() / 1_000);

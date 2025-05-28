@@ -698,7 +698,7 @@ func (h *TreeCreationHandler) updateParentNodeStatus(ctx context.Context, parent
 
 	err = db.TreeNode.UpdateOneID(parentNodeID).SetStatus(schema.TreeNodeStatusSplitted).Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to update status of parent node: %v", err)
+		return fmt.Errorf("unable to update status of parent node: %w", err)
 	}
 	return nil
 }

@@ -3,14 +3,14 @@
 
 import UserRequest from './UserRequest.js';
 import Entity from './Entity.js';
-import {InvoiceFromJson} from './Invoice.js';
-import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
-import Invoice from './Invoice.js';
-import {TransferFromJson} from './Transfer.js';
+import Transfer from './Transfer.js';
 import BitcoinNetwork from './BitcoinNetwork.js';
 import { Query, isObject } from '@lightsparkdev/core';
+import {TransferFromJson} from './Transfer.js';
+import Invoice from './Invoice.js';
+import LightningReceiveRequestStatus from './LightningReceiveRequestStatus.js';
+import {InvoiceFromJson} from './Invoice.js';
 import {InvoiceToJson} from './Invoice.js';
-import Transfer from './Transfer.js';
 
 
 interface LightningReceiveRequest {

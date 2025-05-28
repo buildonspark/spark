@@ -2,9 +2,9 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 
-import CoopExitFeeEstimate from './CoopExitFeeEstimate.js';
-import {CoopExitFeeEstimateFromJson} from './CoopExitFeeEstimate.js';
 import {CoopExitFeeEstimateToJson} from './CoopExitFeeEstimate.js';
+import {CoopExitFeeEstimateFromJson} from './CoopExitFeeEstimate.js';
+import CoopExitFeeEstimate from './CoopExitFeeEstimate.js';
 
 
 interface CoopExitFeeEstimatesOutput {

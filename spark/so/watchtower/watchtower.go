@@ -20,6 +20,7 @@ func BroadcastTransaction(ctx context.Context, bitcoinClient *rpcclient.Client, 
 	}
 
 	// TODO: Broadcast Direct Refund TX.
+	slog.InfoContext(ctx, "Attempting to broadcast transaction", "tx", tx)
 	txHash, err := bitcoinClient.SendRawTransaction(tx, false)
 	if err != nil {
 		if rpcErr, ok := err.(*btcjson.RPCError); ok && rpcErr.Code == -27 {
@@ -52,12 +53,13 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 				timelockExpiryHeight := uint64(nodeTx.TxIn[0].Sequence&0xFFFF) + parent.NodeConfirmationHeight
 				if timelockExpiryHeight <= uint64(blockHeight) {
 					if err := BroadcastTransaction(ctx, bitcoinClient, node.ID.String(), node.RawTx); err != nil {
+						slog.InfoContext(ctx, "Failed to broadcast node tx", "error", err)
 						return fmt.Errorf("failed to broadcast node tx: %v", err)
 					}
 				}
 			}
 		}
-	} else if len(node.RawRefundTx) > 0 {
+	} else if len(node.RawRefundTx) > 0 && node.RefundConfirmationHeight == 0 {
 		refundTx, err := common.TxFromRawTxBytes(node.RawRefundTx)
 		if err != nil {
 			return fmt.Errorf("failed to parse refund tx: %v", err)
@@ -66,6 +68,7 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 		timelockExpiryHeight := uint64(refundTx.TxIn[0].Sequence&0xFFFF) + node.NodeConfirmationHeight
 		if timelockExpiryHeight <= uint64(blockHeight) {
 			if err := BroadcastTransaction(ctx, bitcoinClient, node.ID.String(), node.RawRefundTx); err != nil {
+				slog.InfoContext(ctx, "Failed to broadcast refund tx", "error", err)
 				return fmt.Errorf("failed to broadcast refund tx: %v", err)
 			}
 		}

@@ -2,11 +2,11 @@
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
 
 import Leaf from './Leaf.js';
-import {PageInfoFromJson} from './PageInfo.js';
 import {LeafToJson} from './Leaf.js';
-import {LeafFromJson} from './Leaf.js';
-import PageInfo from './PageInfo.js';
 import {PageInfoToJson} from './PageInfo.js';
+import {LeafFromJson} from './Leaf.js';
+import {PageInfoFromJson} from './PageInfo.js';
+import PageInfo from './PageInfo.js';
 
 
 interface SparkTransferToLeavesConnection {

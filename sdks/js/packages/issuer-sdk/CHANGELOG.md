@@ -1,5 +1,63 @@
 # @buildonspark/issuer-sdk
 
+## 0.0.58
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.50
+  - @buildonspark/spark-sdk@0.1.27
+
+## 0.0.57
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.1.26
+
+## 0.0.56
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.1.25
+
+## 0.0.55
+
+### Patch Changes
+
+- - Add tracer
+  - Token transfer with multiple outputs
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.1.24
+
+## 0.0.54
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.49
+  - @buildonspark/spark-sdk@0.1.23
+
+## 0.0.53
+
+### Patch Changes
+
+- Update homepage URL
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.48
+  - @buildonspark/spark-sdk@0.1.22
+
+## 0.0.52
+
+### Patch Changes
+
+- Fixes
+- Updated dependencies
+  - @buildonspark/lrc20-sdk@0.0.47
+  - @buildonspark/spark-sdk@0.1.21
+
 ## 0.0.51
 
 ### Patch Changes

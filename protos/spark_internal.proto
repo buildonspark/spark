@@ -50,7 +50,16 @@ service SparkInternalService {
     rpc settle_sender_key_tweak(SettleSenderKeyTweakRequest) returns (google.protobuf.Empty) {}
 
     // Create UTXO swap record to claim UTXO by SSP in the static deposit flow
-    rpc create_utxo_swap(spark.InitiateUtxoSwapRequest) returns (CreateUtxoSwapResponse) {}
+    rpc create_utxo_swap(CreateUtxoSwapRequest) returns (CreateUtxoSwapResponse) {}
+
+    // Internal method to cancel a swap for other SOs if one of them failed to ack it
+    rpc rollback_utxo_swap(RollbackUtxoSwapRequest) returns (RollbackUtxoSwapResponse) {}
+
+    // Internal method to mark a swap as COMPLETE in all SOs
+    rpc utxo_swap_completed(UtxoSwapCompletedRequest) returns (UtxoSwapCompletedResponse) {}
+
+    rpc query_leaf_signing_pubkeys(QueryLeafSigningPubkeysRequest) returns (QueryLeafSigningPubkeysResponse) {}
+    rpc resolve_leaf_investigation(ResolveLeafInvestigationRequest) returns (google.protobuf.Empty) {}
 }
 
 message MarkKeysharesAsUsedRequest {
@@ -74,14 +83,14 @@ message FrostRound1Request {
     repeated string keyshare_ids = 1;
 }
 
-message FrostRound1Response {   
+message FrostRound1Response {
     repeated common.SigningCommitment signing_commitments = 1;
 }
 
 message SigningJob {
     // The unique identifier for the signing job.
     string job_id = 1;
-    
+
     // The message to sign.
     bytes message = 2;
 
@@ -192,6 +201,8 @@ message InitiateTransferRequest {
     map<string, spark.SecretProof> sender_key_tweak_proofs = 6;
     spark.TransferType type = 7;
     spark.TransferPackage transfer_package = 8;
+    // The finalized signatures for the refund transactions.
+    map<string, bytes> refund_signatures = 9;
 }
 
 message InitiateCooperativeExitRequest {
@@ -221,6 +232,7 @@ message StartTokenTransactionInternalResponse {
 message InitiateSettleReceiverKeyTweakRequest {
     string transfer_id = 1;
     map<string, spark.SecretProof> key_tweak_proofs = 2;
+    map<string, bytes> user_public_keys = 3;
 }
 
 enum SettleKeyTweakAction {
@@ -231,7 +243,9 @@ enum SettleKeyTweakAction {
 
 message SettleReceiverKeyTweakRequest {
     string transfer_id = 1;
-    bool tweak_key = 2;
+    SettleKeyTweakAction action = 3;
+
+    reserved 2;
 }
 
 message SettleSenderKeyTweakRequest {
@@ -239,7 +253,48 @@ message SettleSenderKeyTweakRequest {
     SettleKeyTweakAction action = 2;
 }
 
+message CreateUtxoSwapRequest {
+    spark.InitiateUtxoSwapRequest request = 1;
+    bytes signature = 2;
+    bytes coordinator_public_key = 3;
+}
+
 message CreateUtxoSwapResponse {
     string UtxoDepositAddress = 1;
     spark.Transfer transfer = 2;
+}
+
+message RollbackUtxoSwapRequest {
+    spark.UTXO on_chain_utxo = 1;
+    bytes signature = 2;
+    bytes coordinator_public_key = 3;
+}
+
+message RollbackUtxoSwapResponse {
+}
+
+message UtxoSwapCompletedRequest {
+    spark.UTXO on_chain_utxo = 1;
+    bytes signature = 2;
+    bytes coordinator_public_key = 3;
+}
+
+message UtxoSwapCompletedResponse {
+}
+
+message CancelOrFinalizeExpiredTokenTransactionRequest {
+    spark.TokenTransaction final_token_transaction = 1;
+}
+
+message QueryLeafSigningPubkeysRequest {
+    repeated string leaf_ids = 1;
+}
+
+message QueryLeafSigningPubkeysResponse {
+    map<string, bytes> signing_pubkeys = 1;
+}
+
+message ResolveLeafInvestigationRequest {
+    repeated string lost_leaf_ids = 1;
+    repeated string available_leaf_ids = 2;
 }

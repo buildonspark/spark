@@ -2,9 +2,11 @@ package schema
 
 import (
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 )
 
 // UtxoSwap holds the schema definition for the UtxoSwap entity.
@@ -16,12 +18,14 @@ type UtxoSwapStatus string
 
 const (
 	UtxoSwapStatusCreated   UtxoSwapStatus = "CREATED"
+	UtxoSwapStatusCompleted UtxoSwapStatus = "COMPLETED"
 	UtxoSwapStatusCancelled UtxoSwapStatus = "CANCELLED"
 )
 
 func (UtxoSwapStatus) Values() []string {
 	return []string{
 		string(UtxoSwapStatusCreated),
+		string(UtxoSwapStatusCompleted),
 		string(UtxoSwapStatusCancelled),
 	}
 }
@@ -31,12 +35,27 @@ type UtxoSwapRequestType string
 const (
 	UtxoSwapRequestTypeFixedAmount UtxoSwapRequestType = "FIXED_AMOUNT"
 	UtxoSwapRequestTypeMaxFee      UtxoSwapRequestType = "MAX_FEE"
+	UtxoSwapRequestTypeRefund      UtxoSwapRequestType = "REFUND"
 )
 
 func (UtxoSwapRequestType) Values() []string {
 	return []string{
 		string(UtxoSwapRequestTypeFixedAmount),
 		string(UtxoSwapRequestTypeMaxFee),
+		string(UtxoSwapRequestTypeRefund),
+	}
+}
+
+func UtxoSwapFromProtoRequestType(requestType pb.UtxoSwapRequestType) UtxoSwapRequestType {
+	switch requestType {
+	case pb.UtxoSwapRequestType_Fixed:
+		return UtxoSwapRequestTypeFixedAmount
+	case pb.UtxoSwapRequestType_MaxFee:
+		return UtxoSwapRequestTypeMaxFee
+	case pb.UtxoSwapRequestType_Refund:
+		return UtxoSwapRequestTypeRefund
+	default:
+		return UtxoSwapRequestTypeFixedAmount
 	}
 }
 
@@ -49,7 +68,7 @@ func (UtxoSwap) Mixin() []ent.Mixin {
 
 func (UtxoSwap) Indexes() []ent.Index {
 	return []ent.Index{
-		index.Edges("utxo").Unique(),
+		index.Edges("utxo").Unique().Annotations(entsql.IndexWhere("status != 'CANCELLED'")),
 	}
 }
 
@@ -66,6 +85,8 @@ func (UtxoSwap) Fields() []ent.Field {
 		// authorization from a user to claim this utxo after fulfilling the quote
 		field.Bytes("user_signature").Optional(),
 		field.Bytes("user_identity_public_key").Optional(),
+		// distributed transaction coordinator identity public key
+		field.Bytes("coordinator_identity_public_key"),
 	}
 }
 

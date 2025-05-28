@@ -81,7 +81,6 @@ interface SparkSigner {
 
   createSparkWalletFromSeed(
     seed: Uint8Array | string,
-    network: Network,
     accountNumber?: number,
   ): Promise<string>;
 
@@ -424,20 +423,8 @@ class DefaultSparkSigner implements SparkSigner {
 
   async createSparkWalletFromSeed(
     seed: Uint8Array | string,
-    network: Network,
     accountNumber?: number,
   ): Promise<string> {
-    if (accountNumber === 0 || accountNumber === 1) {
-      // Reserved values for the case where no account number is provided
-      throw new ValidationError(
-        "If an account number is provided, it must not be be 0 or 1",
-        {
-          field: "accountNumber",
-          value: accountNumber,
-          expected: "values that do not equal 0 or 1",
-        },
-      );
-    }
     if (typeof seed === "string") {
       seed = hexToBytes(seed);
     }
@@ -451,16 +438,9 @@ class DefaultSparkSigner implements SparkSigner {
       });
     }
 
-    const accountNetwork = network === Network.REGTEST ? 0 : 1; // When an accountNumber is not provided, set a value based on the network
-    const identityKey = hdkey.derive(
-      `m/8797555'/${accountNumber ?? accountNetwork}'/0'`,
-    );
-    const signingKey = hdkey.derive(
-      `m/8797555'/${accountNumber ?? accountNetwork}'/1'`,
-    );
-    const depositKey = hdkey.derive(
-      `m/8797555'/${accountNumber ?? accountNetwork}'/2'`,
-    );
+    const identityKey = hdkey.derive(`m/8797555'/${accountNumber}'/0'`);
+    const signingKey = hdkey.derive(`m/8797555'/${accountNumber}'/1'`);
+    const depositKey = hdkey.derive(`m/8797555'/${accountNumber}'/2'`);
 
     if (
       !identityKey.privateKey ||

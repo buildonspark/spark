@@ -49,6 +49,7 @@ service SparkService {
     rpc get_signing_operator_list(google.protobuf.Empty) returns (GetSigningOperatorListResponse) {}
 
     rpc query_nodes(QueryNodesRequest) returns (QueryNodesResponse) {}
+    rpc query_nodes_distribution(QueryNodesDistributionRequest) returns (QueryNodesDistributionResponse) {}
 
     rpc query_balance(QueryBalanceRequest) returns (QueryBalanceResponse) {}
 
@@ -61,14 +62,13 @@ service SparkService {
     rpc freeze_tokens(FreezeTokensRequest) returns (FreezeTokensResponse) {}
     rpc query_token_outputs(QueryTokenOutputsRequest) returns (QueryTokenOutputsResponse) {}
     rpc query_token_transactions(QueryTokenTransactionsRequest) returns (QueryTokenTransactionsResponse) {}
-    rpc cancel_signed_token_transaction(CancelSignedTokenTransactionRequest) returns (google.protobuf.Empty) {}
 
     rpc return_lightning_payment(ReturnLightningPaymentRequest) returns (google.protobuf.Empty) {}
 
 
     rpc query_unused_deposit_addresses(QueryUnusedDepositAddressesRequest) returns (QueryUnusedDepositAddressesResponse) {}
 
-    rpc subscribe_to_events(SubscribeToEventsRequest) returns (stream SubscribeToEventsResponse) {} 
+    rpc subscribe_to_events(SubscribeToEventsRequest) returns (stream SubscribeToEventsResponse) {}
 
     // Claim a deposit to a static address from SSP side
     rpc initiate_utxo_swap(InitiateUtxoSwapRequest) returns (InitiateUtxoSwapResponse) {}
@@ -313,7 +313,7 @@ message StartDepositTreeCreationResponse {
 // part of the token transaction.
 message TokenOutputToSpend {
     bytes prev_token_transaction_hash = 1 [(validate.rules).bytes.len = 32];
-    uint32 prev_token_transaction_vout = 2; 
+    uint32 prev_token_transaction_vout = 2;
 }
 
 message TokenTransferInput {
@@ -322,12 +322,12 @@ message TokenTransferInput {
 
 message TokenMintInput {
     bytes issuer_public_key = 1 [(validate.rules).bytes.len = 33];
-    // Issuer provided timestamp of when the transaction was signed/constructed. 
-    // Helps provide idempotency and ensures that each mint input signature is unique 
-    // as long as multiple mint signatures are not happening at the same time. Also gives a 
-    // potentially useful data point for when the issuer authorized from their 
+    // Issuer provided timestamp of when the transaction was signed/constructed.
+    // Helps provide idempotency and ensures that each mint input signature is unique
+    // as long as multiple mint signatures are not happening at the same time. Also gives a
+    // potentially useful data point for when the issuer authorized from their
     // perspective.  Note that we have no way of proving this is accurate.
-    // TODO: Consider whether implementing generic idempotency controls and/or a 
+    // TODO: Consider whether implementing generic idempotency controls and/or a
     // random nonce would be favorable to populating this field.
     uint64 issuer_provided_timestamp = 2;
 }
@@ -346,9 +346,9 @@ message TokenOutput {
 }
 
 // This proto is constructed by the wallet and is the core transaction data structure.
-// This proto is deterministically hashed to generate the token_transaction_hash that 
+// This proto is deterministically hashed to generate the token_transaction_hash that
 // is cooperatively signed by the SO group to confirm a token transaction.
-message TokenTransaction {    
+message TokenTransaction {
     // For mint transactions issuer_public_key will be specified without any outputs_to_spend.
     // For transfer transactions the token amount in the input leaves must match the token amount in the output leaves.
     oneof token_inputs {
@@ -362,8 +362,8 @@ message TokenTransaction {
 
 
 enum TokenTransactionStatus {
-    TOKEN_TRANSACTION_STARTED = 0; 
-    TOKEN_TRANSACTION_SIGNED = 1; 
+    TOKEN_TRANSACTION_STARTED = 0;
+    TOKEN_TRANSACTION_SIGNED = 1;
     TOKEN_TRANSACTION_FINALIZED = 2;
     TOKEN_TRANSACTION_STARTED_CANCELLED = 3;
     TOKEN_TRANSACTION_SIGNED_CANCELLED = 4;
@@ -371,9 +371,19 @@ enum TokenTransactionStatus {
     TOKEN_TRANSACTION_UNKNOWN = 10;
 }
 
+message SpentTokenOutputMetadata {
+    string output_id = 1;
+    bytes revocation_secret = 2;
+}
+
+message TokenTransactionConfirmationMetadata {
+    repeated SpentTokenOutputMetadata spent_token_outputs_metadata = 1;
+}
+
 message TokenTransactionWithStatus {
     TokenTransaction token_transaction = 1;
     TokenTransactionStatus status = 2;
+    TokenTransactionConfirmationMetadata confirmation_metadata = 3;
 }
 
 message SignatureWithIndex {
@@ -398,7 +408,7 @@ message StartTokenTransactionRequest {
 }
 
 message StartTokenTransactionResponse {
-    // This is the same token transaction sent by the wallet with output revocation public keys 
+    // This is the same token transaction sent by the wallet with output revocation public keys
     // filled. This is the final transaction that is published and gossiped among LRC20 nodes.
     TokenTransaction final_token_transaction = 1;
     // Information for fetching and resolving the revocation keyshare on a transfer operation.
@@ -412,7 +422,7 @@ message OperatorSpecificTokenTransactionSignablePayload {
 }
 
 // This message allows the sender of a output being spent to provide final evidence
-// that it owns a output to an SO when requesting signing and release of the  revocation keyshare.  
+// that it owns a output to an SO when requesting signing and release of the  revocation keyshare.
 message OperatorSpecificOwnerSignature {
     SignatureWithIndex owner_signature = 1;
     OperatorSpecificTokenTransactionSignablePayload payload = 2;
@@ -455,7 +465,7 @@ message FreezeTokensPayload {
     uint64 issuer_provided_timestamp = 3;
     bytes operator_identity_public_key = 4 [(validate.rules).bytes.len = 33];
     // Set to false when requesting a freeze.
-    bool should_unfreeze = 5;  
+    bool should_unfreeze = 5;
 }
 
 message FreezeTokensRequest {
@@ -473,11 +483,12 @@ message QueryTokenOutputsRequest {
     repeated bytes owner_public_keys = 1 [(validate.rules).repeated.items.bytes.len = 33];
     // Optionally provide token public keys. If not set return leaves for all tokens.
     repeated bytes token_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
+    Network network = 3; // defaults to mainnet when no network is provided.
 }
 
 // Request constraints are combined using an AND relation.
 message QueryTokenTransactionsRequest {
-    // Returns transactions that have one of these output ids in the input or output. 
+    // Returns transactions that have one of these output ids in the input or output.
     repeated string output_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
     // Returns transactions that have this owner public key as the sender or receiver in one or more of the input/output leaves.
     repeated bytes owner_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
@@ -502,11 +513,6 @@ message OutputWithPreviousTransactionData {
 
 message QueryTokenOutputsResponse {
     repeated OutputWithPreviousTransactionData outputs_with_previous_transaction_data = 1;
-}
-
-message CancelSignedTokenTransactionRequest {
-    TokenTransaction final_token_transaction = 1;
-    bytes sender_identity_public_key = 2 [(validate.rules).bytes.len = 33];
 }
 
 /**
@@ -663,7 +669,7 @@ message FinalizeTransferResponse {
 }
 
 enum TransferStatus {
-    TRANSFER_STATUS_SENDER_INITIATED = 0; 
+    TRANSFER_STATUS_SENDER_INITIATED = 0;
     TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING = 1;
     TRANSFER_STATUS_SENDER_KEY_TWEAKED = 2;
     TRANSFER_STATUS_RECEIVER_KEY_TWEAKED = 3;
@@ -717,6 +723,7 @@ message TransferFilter {
     int64 limit = 40;
     int64 offset = 50;
     repeated TransferType types = 70;
+    Network network = 4; // defaults to mainnet when no network is provided.
 }
 
 message QueryTransfersResponse {
@@ -740,7 +747,7 @@ message ClaimTransferSignRefundsRequest {
     string transfer_id = 1;
     bytes owner_identity_public_key = 2;
     repeated LeafRefundTxSigningJob signing_jobs = 3;
-    map<string, SecretProof> key_tweak_proofs = 4;
+    reserved 4;
 }
 
 message ClaimTransferSignRefundsResponse {
@@ -925,7 +932,7 @@ message CreateTreeRequest {
     }
     // The node should contain the tx that spends the source's utxo.
     CreationNode node = 3;
-    
+
     // The owner of the tree.
     bytes user_identity_public_key = 4;
 }
@@ -933,7 +940,7 @@ message CreateTreeRequest {
 message CreationResponseNode {
     string node_id = 1;
     SigningResult node_tx_signing_result = 2;
-    SigningResult refund_tx_signing_result = 3; 
+    SigningResult refund_tx_signing_result = 3;
     repeated CreationResponseNode children = 4;
 }
 
@@ -989,6 +996,7 @@ message QueryNodesRequest {
     bool include_parents = 3;
     int64 limit = 4;
     int64 offset = 5;
+    Network network = 6; // defaults to mainnet when no network is provided. Does not check network when querying by node_ids
 }
 
 message QueryNodesResponse {
@@ -1011,6 +1019,7 @@ message CancelTransferResponse {
 **/
 message QueryUnusedDepositAddressesRequest {
     bytes identity_public_key = 1;
+    Network network = 2; // defaults to mainnet when no network is provided.
 }
 
 message DepositAddressQueryResult {
@@ -1026,6 +1035,7 @@ message QueryUnusedDepositAddressesResponse {
 
 message QueryBalanceRequest {
     bytes identity_public_key = 1;
+    Network network = 2; // defaults to mainnet when no network is provided.
 }
 
 message QueryBalanceResponse {
@@ -1044,6 +1054,7 @@ message SparkAddress {
 enum UtxoSwapRequestType {
   Fixed = 0;
   MaxFee = 1;
+  Refund = 2;
 }
 
 message InitiateUtxoSwapRequest {
@@ -1066,9 +1077,10 @@ message InitiateUtxoSwapResponse {
 }
 
 
-message ExitSingleNodeTreeSigningJob {
+message ExitingTree {
     string tree_id = 1;
-    SigningJob signing_job = 2;
+    common.SigningCommitment user_signing_commitment = 2;
+    uint32 vin = 3;
 }
 
 message ExitSingleNodeTreeSigningResult {
@@ -1077,11 +1089,32 @@ message ExitSingleNodeTreeSigningResult {
     bytes verifying_key = 3;
 }
 
+message BitcoinTransactionOutput {
+    int64 value = 1;
+    bytes pk_script = 2;
+}
+
 message ExitSingleNodeTreesRequest {
     bytes owner_identity_public_key = 1;
-    repeated ExitSingleNodeTreeSigningJob signing_jobs = 2;
+    repeated ExitingTree exiting_trees = 2;
+    bytes raw_tx = 3;
+    repeated BitcoinTransactionOutput previous_outputs = 4;
 }
 
 message ExitSingleNodeTreesResponse {
     repeated ExitSingleNodeTreeSigningResult signing_results = 1;
+}
+
+message InvestigateLeavesRequest {
+    repeated string leaf_ids = 1;
+    bytes owner_identity_public_key = 2;
+    string transfer_id = 3;
+}
+
+message QueryNodesDistributionRequest {
+    bytes owner_identity_public_key = 1;
+}
+
+message QueryNodesDistributionResponse {
+    map<uint64, uint64> node_distribution = 1;
 }

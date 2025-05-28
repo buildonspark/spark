@@ -745,3 +745,106 @@ func TestStartDepositTreeCreationOffchain(t *testing.T) {
 		t.Fatalf("failed to send transfer: %v", err)
 	}
 }
+
+// Test that we cannot transfer a leaf before a deposit has confirmed
+func TestStartDepositTreeCreationUnconfirmed(t *testing.T) {
+	client, err := testutil.NewRegtestClient()
+	assert.NoError(t, err)
+
+	coin, err := faucet.Fund()
+	assert.NoError(t, err)
+
+	config, err := testutil.TestWalletConfig()
+	if err != nil {
+		t.Fatalf("failed to create wallet config: %v", err)
+	}
+
+	// Setup Mock tx
+	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
+	if err != nil {
+		t.Fatalf("failed to connect to operator: %v", err)
+	}
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(context.Background(), config, conn)
+	if err != nil {
+		t.Fatalf("failed to authenticate: %v", err)
+	}
+	ctx := wallet.ContextWithToken(context.Background(), token)
+
+	privKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	userPubKey := privKey.PubKey()
+	userPubKeyBytes := userPubKey.SerializeCompressed()
+
+	leafID := uuid.New().String()
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKeyBytes, &leafID, false)
+	if err != nil {
+		t.Fatalf("failed to generate deposit address: %v", err)
+	}
+
+	depositTx, err := testutil.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+	if err != nil {
+		t.Fatalf("failed to create deposit tx: %v", err)
+	}
+	vout := 0
+	var buf bytes.Buffer
+	err = depositTx.Serialize(&buf)
+	if err != nil {
+		t.Fatalf("failed to serialize deposit tx: %v", err)
+	}
+	depositTxHex := hex.EncodeToString(buf.Bytes())
+	decodedBytes, err := hex.DecodeString(depositTxHex)
+	if err != nil {
+		t.Fatalf("failed to decode deposit tx hex: %v", err)
+	}
+	depositTx, err = common.TxFromRawTxBytes(decodedBytes)
+	if err != nil {
+		t.Fatalf("failed to deserilize deposit tx: %v", err)
+	}
+
+	resp, err := wallet.CreateTreeRoot(ctx, config, privKey.Serialize(), depositResp.DepositAddress.VerifyingKey, depositTx, vout)
+	if err != nil {
+		t.Fatalf("failed to create tree: %v", err)
+	}
+
+	log.Printf("tree created: %v", resp)
+
+	// User should not be able to transfer funds since
+	// L1 tx has not confirmed
+	rootNode := resp.Nodes[0]
+	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("failed to create new node signing private key: %v", err)
+	}
+
+	receiverPrivKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("failed to create receiver private key: %v", err)
+	}
+
+	transferNode := wallet.LeafKeyTweak{
+		Leaf:              rootNode,
+		SigningPrivKey:    privKey.Serialize(),
+		NewSigningPrivKey: newLeafPrivKey.Serialize(),
+	}
+	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+
+	// Sign and broadcast TX but do not await confirmation
+	signedDepositTx, err := testutil.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+	assert.NoError(t, err)
+	_, err = client.SendRawTransaction(signedDepositTx, true)
+	assert.NoError(t, err)
+
+	_, err = wallet.SendTransfer(
+		context.Background(),
+		config,
+		leavesToTransfer[:],
+		receiverPrivKey.PubKey().SerializeCompressed(),
+		time.Now().Add(10*time.Minute),
+	)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to start transfer")
+}

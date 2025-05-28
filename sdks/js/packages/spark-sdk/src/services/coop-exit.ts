@@ -11,18 +11,13 @@ import {
   getP2TRScriptFromPublicKey,
   getTxFromRawTxBytes,
 } from "../utils/bitcoin.js";
-import { getCrypto } from "../utils/crypto.js";
 import { Network } from "../utils/network.js";
 import { getNextTransactionSequence } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
-import {
-  BaseTransferService,
-  LeafKeyTweak,
-  LeafRefundSigningData,
-} from "./transfer.js";
-
-const crypto = getCrypto();
+import { SigningService } from "./signing.js";
+import { BaseTransferService, LeafRefundSigningData } from "./transfer.js";
+import type { LeafKeyTweak } from "./transfer.js";
 
 export type GetConnectorRefundSignaturesParams = {
   leaves: LeafKeyTweak[];
@@ -35,8 +30,9 @@ export class CoopExitService extends BaseTransferService {
   constructor(
     config: WalletConfigService,
     connectionManager: ConnectionManager,
+    signingService: SigningService,
   ) {
-    super(config, connectionManager);
+    super(config, connectionManager, signingService);
   }
 
   async getConnectorRefundSignatures({

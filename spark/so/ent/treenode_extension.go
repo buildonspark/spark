@@ -9,6 +9,7 @@ import (
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so/ent/schema"
+	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 )
 
 // MarshalSparkProto converts a TreeNode to a spark protobuf TreeNode.
@@ -100,7 +101,11 @@ func MarkNodeAsLocked(ctx context.Context, nodeID uuid.UUID, nodeStatus schema.T
 		return fmt.Errorf("not updating node status to a locked state: %s", nodeStatus)
 	}
 
-	node, err := db.TreeNode.Get(ctx, nodeID)
+	node, err := db.TreeNode.
+		Query().
+		Where(enttreenode.ID(nodeID)).
+		ForUpdate().
+		Only(ctx)
 	if err != nil {
 		return err
 	}

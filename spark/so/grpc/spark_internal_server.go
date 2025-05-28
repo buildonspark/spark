@@ -331,12 +331,34 @@ func (s *SparkInternalServer) SettleSenderKeyTweak(ctx context.Context, req *pb.
 }
 
 // Register a utxo swap in all SEs so they can not be called concurrently to spend the same utxo
-func (s *SparkInternalServer) CreateUtxoSwap(ctx context.Context, req *pbspark.InitiateUtxoSwapRequest) (*pb.CreateUtxoSwapResponse, error) {
+func (s *SparkInternalServer) CreateUtxoSwap(ctx context.Context, req *pb.CreateUtxoSwapRequest) (*pb.CreateUtxoSwapResponse, error) {
 	depositHandler := handler.NewInternalDepositHandler(s.config)
 	return errors.WrapWithGRPCError(depositHandler.CreateUtxoSwap(ctx, s.config, req))
 }
 
 func (s *SparkInternalServer) QueryTokenOutputsInternal(ctx context.Context, req *pbspark.QueryTokenOutputsRequest) (*pbspark.QueryTokenOutputsResponse, error) {
 	tokenTransactionHandler := handler.NewInternalTokenTransactionHandler(s.config, s.lrc20Client)
-	return errors.WrapWithGRPCError(tokenTransactionHandler.QueryTokenOutputsInternal(ctx, req))
+	return errors.WrapWithGRPCError(tokenTransactionHandler.QueryOwnedTokenOutputsInternal(ctx, req))
+}
+
+// Cancel a utxo swap in an SO after the creation of the swap failed
+func (s *SparkInternalServer) RollbackUtxoSwap(ctx context.Context, req *pb.RollbackUtxoSwapRequest) (*pb.RollbackUtxoSwapResponse, error) {
+	depositHandler := handler.NewInternalDepositHandler(s.config)
+	return errors.WrapWithGRPCError(depositHandler.RollbackUtxoSwap(ctx, s.config, req))
+}
+
+// Mark a utxo swap as COMPLETE in all SEs
+func (s *SparkInternalServer) UtxoSwapCompleted(ctx context.Context, req *pb.UtxoSwapCompletedRequest) (*pb.UtxoSwapCompletedResponse, error) {
+	depositHandler := handler.NewInternalDepositHandler(s.config)
+	return errors.WrapWithGRPCError(depositHandler.UtxoSwapCompleted(ctx, s.config, req))
+}
+
+func (s *SparkInternalServer) QueryLeafSigningPubkeys(ctx context.Context, req *pb.QueryLeafSigningPubkeysRequest) (*pb.QueryLeafSigningPubkeysResponse, error) {
+	investigationHandler := handler.NewInvestigationHandler(s.config)
+	return errors.WrapWithGRPCError(investigationHandler.QueryLeafSigningPubkeys(ctx, req))
+}
+
+func (s *SparkInternalServer) ResolveLeafInvestigation(ctx context.Context, req *pb.ResolveLeafInvestigationRequest) (*emptypb.Empty, error) {
+	investigationHandler := handler.NewInvestigationHandler(s.config)
+	return errors.WrapWithGRPCError(investigationHandler.ResolveLeafInvestigation(ctx, req))
 }

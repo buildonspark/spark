@@ -341,14 +341,14 @@ func sendTransferSignRefund(
 			AdaptorPublicKey: adaptorPublicKey.SerializeCompressed(),
 		})
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed to start transfer: %v", err)
+			return nil, nil, nil, nil, fmt.Errorf("failed to start transfer: %w", err)
 		}
 		transfer = response.Transfer
 		signingResults = response.SigningResults
 	} else if forSwap {
 		response, err := sparkClient.StartLeafSwap(tmpCtx, startTransferRequest)
 		if err != nil {
-			return nil, nil, nil, nil, fmt.Errorf("failed to start transfer: %v", err)
+			return nil, nil, nil, nil, fmt.Errorf("failed to start transfer: %w", err)
 		}
 		transfer = response.Transfer
 		signingResults = response.SigningResults
@@ -363,7 +363,7 @@ func sendTransferSignRefund(
 
 	signatures, err := signRefunds(config, leafDataMap, signingResults, adaptorPublicKey)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to sign refunds for send: %v", err)
+		return transfer, nil, nil, nil, fmt.Errorf("failed to sign refunds for send: %v", err)
 	}
 	signatureMap := make(map[string][]byte)
 	for _, signature := range signatures {
@@ -481,12 +481,16 @@ func QueryPendingTransfers(
 		return nil, err
 	}
 	defer sparkConn.Close()
-
+	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert network to proto network: %w", err)
+	}
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 	return sparkClient.QueryPendingTransfers(ctx, &pb.TransferFilter{
 		Participant: &pb.TransferFilter_ReceiverIdentityPublicKey{
 			ReceiverIdentityPublicKey: config.IdentityPublicKey(),
 		},
+		Network: network,
 	})
 }
 
@@ -499,12 +503,16 @@ func QueryPendingTransfersBySender(
 		return nil, err
 	}
 	defer sparkConn.Close()
-
+	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert network to proto network: %w", err)
+	}
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 	return sparkClient.QueryPendingTransfers(ctx, &pb.TransferFilter{
 		Participant: &pb.TransferFilter_SenderIdentityPublicKey{
 			SenderIdentityPublicKey: config.IdentityPublicKey(),
 		},
+		Network: network,
 	})
 }
 
@@ -573,7 +581,29 @@ func ClaimTransfer(
 		return nil, fmt.Errorf("failed to sign refunds when claiming leaves: %v", err)
 	}
 
-	return finalizeTransfer(ctx, config, signatures)
+	return FinalizeTransfer(ctx, config, signatures)
+}
+
+func ClaimTransferWithoutFinalizeSignatures(
+	ctx context.Context,
+	transfer *pb.Transfer,
+	config *Config,
+	leaves []LeafKeyTweak,
+) ([]*pb.NodeSignatures, error) {
+	proofMap := make(map[string][][]byte)
+	if transfer.Status == pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED {
+		var err error
+		proofMap, err = ClaimTransferTweakKeys(ctx, transfer, config, leaves)
+		if err != nil {
+			return nil, fmt.Errorf("failed to tweak keys when claiming leaves: %w", err)
+		}
+	}
+
+	signatures, err := ClaimTransferSignRefunds(ctx, transfer, config, leaves, proofMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign refunds when claiming leaves: %v", err)
+	}
+	return signatures, nil
 }
 
 func ClaimTransferTweakKeys(
@@ -741,7 +771,6 @@ func ClaimTransferSignRefunds(
 		TransferId:             transfer.Id,
 		OwnerIdentityPublicKey: config.IdentityPublicKey(),
 		SigningJobs:            signingJobs,
-		KeyTweakProofs:         secretProofMap,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to call ClaimTransferSignRefunds: %v", err)
@@ -750,7 +779,7 @@ func ClaimTransferSignRefunds(
 	return signRefunds(config, leafDataMap, response.SigningResults, nil)
 }
 
-func finalizeTransfer(
+func FinalizeTransfer(
 	ctx context.Context,
 	config *Config,
 	signatures []*pb.NodeSignatures,
@@ -934,15 +963,19 @@ func QueryAllTransfersWithTypes(ctx context.Context, config *Config, limit int64
 		return nil, 0, fmt.Errorf("failed to authenticate with server: %v", err)
 	}
 	authCtx := ContextWithToken(ctx, token)
-
+	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to convert network to proto network: %w", err)
+	}
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 	response, err := sparkClient.QueryAllTransfers(authCtx, &pb.TransferFilter{
 		Participant: &pb.TransferFilter_SenderOrReceiverIdentityPublicKey{
 			SenderOrReceiverIdentityPublicKey: config.IdentityPublicKey(),
 		},
-		Limit:  limit,
-		Offset: offset,
-		Types:  types,
+		Limit:   limit,
+		Offset:  offset,
+		Types:   types,
+		Network: network,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to call QueryAllTransfers: %v", err)

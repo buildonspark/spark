@@ -13,7 +13,7 @@ service SparkService {
   rpc GetSparkTx(GetSparkTxRequest) returns (GetSparkTxResponse);
   rpc VerifySparkTx(VerifySparkTxRequest) returns (google.protobuf.Empty);
   rpc FreezeTokens(spark.FreezeTokensRequest) returns (spark.FreezeTokensResponse);
-  rpc ListWithdrawnOutputs(ListWithdrawnOutputsRequest) returns (ListWithdrawnOutputsResponse);  
+  rpc ListWithdrawnOutputs(ListWithdrawnOutputsRequest) returns (ListWithdrawnOutputsResponse);
 }
 
 message SendSparkSignatureRequest {

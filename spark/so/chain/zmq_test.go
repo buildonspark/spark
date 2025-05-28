@@ -78,7 +78,6 @@ func TestZmqSetupTeardown(t *testing.T) {
 }
 
 func TestZmqSubscribe(t *testing.T) {
-	// t.Skip("Flaky (LPT-352)")
 	zmqPub, err := NewZmqTestPublisher(t, "tcp://127.0.0.1:5555")
 	require.NoError(t, err, "Failed to create ZMQ publisher")
 	defer zmqPub.Close() //nolint:errcheck

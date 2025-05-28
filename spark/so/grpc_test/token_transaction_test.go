@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/utils"
 	testutil "github.com/lightsparkdev/spark/test_util"
@@ -34,10 +36,12 @@ const (
 	TestIssueMultiplePerOutputAmount = 1000
 	// Amount for first (and only) created output in transfer transaction
 	TestTransferOutput1Amount = 33333
-	// Configured at SO level. We validate in the tests to ensure these are populated correctly.
+	// Configured at SO level. We validate in the tests to ensure these are populated correctly
 	WithdrawalBondSatsInConfig              = 10000
 	WithdrawalRelativeBlockLocktimeInConfig = 1000
-	MinikubeTokenTransactionExpiryTimeSecs  = 60
+	MinikubeTokenTransactionExpiryTimeSecs  = 30
+	// Task runs every 30 seconds, + 3 seconds for processing time
+	TokenTransactionExpiryProcessingTimeSecs = 33
 )
 
 type PrederivedIdentityPrivateKeyFromMnemonic struct {
@@ -328,6 +332,42 @@ func TestQueryPartiallySpentTokenOutputsNotReturned(t *testing.T) {
 	require.Equal(t, uint64ToBigInt(TestIssueOutput2Amount), bytesToBigInt(notEnoughSignedOutput.OutputsWithPreviousTransactionData[0].Output.TokenAmount), "expected the second output to be returned when using not enough signatures to transfer one of two outputs")
 }
 
+func TestQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t *testing.T) {
+	config, err := testutil.TestWalletConfigWithIdentityKey(*staticLocalIssuerKey.IdentityPrivateKey())
+	require.NoError(t, err, "failed to create wallet config")
+
+	tokenPrivKey := config.IdentityPrivateKey
+	tokenIdentityPubkeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
+
+	// Create the issuance transaction
+	_, userOutput1PrivKey, _, err := createTestTokenMintTransaction(config, tokenIdentityPubkeyBytes)
+	require.NoError(t, err, "failed to create test token issuance transaction")
+
+	userOneConfig, err := testutil.TestWalletConfigWithIdentityKey(*userOutput1PrivKey)
+	require.NoError(t, err, "failed to create test user one wallet config")
+
+	correctNetworkResponse, err := wallet.QueryTokenOutputs(
+		context.Background(),
+		userOneConfig,
+		[]wallet.SerializedPublicKey{tokenIdentityPubkeyBytes},
+		nil,
+	)
+	require.NoError(t, err, "failed to query token outputs")
+	require.Equal(t, 1, len(correctNetworkResponse.OutputsWithPreviousTransactionData), "expected one outputs when using the correct network")
+
+	wrongNetworkConfig := userOneConfig
+	wrongNetworkConfig.Network = common.Mainnet
+
+	wrongNetworkResponse, err := wallet.QueryTokenOutputs(
+		context.Background(),
+		wrongNetworkConfig,
+		[]wallet.SerializedPublicKey{tokenIdentityPubkeyBytes},
+		nil,
+	)
+	require.NoError(t, err, "failed to query token outputs")
+	require.Equal(t, 0, len(wrongNetworkResponse.OutputsWithPreviousTransactionData), "expected no outputs when using a different network")
+}
+
 func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 	skipIfGithubActions(t)
 	config, err := testutil.TestWalletConfigWithIdentityKey(*staticLocalIssuerKey.IdentityPrivateKey())
@@ -343,7 +383,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
 		[]wallet.SerializedPublicKey{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
-	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
+	log.Printf("issuance broadcast finalized token transaction: %s", logging.FormatProto("token_transaction", finalIssueTokenTransaction))
 
 	// Validate withdrawal params match config
 	for i, output := range finalIssueTokenTransaction.TokenOutputs {
@@ -379,7 +419,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokens(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to broadcast transfer token transaction: %v", err)
 	}
-	log.Printf("transfer broadcast finalized token transaction: %v", transferTokenTransactionResponse)
+	log.Printf("transfer broadcast finalized token transaction: %s", logging.FormatProto("token_transaction", transferTokenTransactionResponse))
 
 	// Query token transactions with pagination - first page
 	tokenTransactionsPage1, err := wallet.QueryTokenTransactions(
@@ -544,6 +584,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfOutputs(t *testing.
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
 		[]wallet.SerializedPublicKey{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
+	log.Printf("issuance broadcast finalized token transaction: %s", logging.FormatProto("token_transaction", finalIssueTokenTransactionFirst100))
 
 	// Create issuance transaction with 100 outputs
 	issueTokenTransactionSecond100, userOutputPrivKeysSecond100, err := createTestTokenMintTransactionWithMultipleTokenOutputs(config,
@@ -556,6 +597,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfOutputs(t *testing.
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
 		[]wallet.SerializedPublicKey{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
+	log.Printf("issuance broadcast finalized token transaction: %s", logging.FormatProto("token_transaction", finalIssueTokenTransactionSecond100))
 
 	finalIssueTokenTransactionHashFirst100, err := utils.HashTokenTransaction(finalIssueTokenTransactionFirst100, false)
 	require.NoError(t, err, "failed to hash final issuance token transaction")
@@ -686,7 +728,7 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
 		[]wallet.SerializedPublicKey{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
-	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
+	log.Printf("issuance broadcast finalized token transaction: %s", logging.FormatProto("token_transaction", finalIssueTokenTransaction))
 
 	// Validate withdrawal params match config
 	for i, output := range finalIssueTokenTransaction.TokenOutputs {
@@ -740,7 +782,7 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	)
 	require.Error(t, err, "expected error when transferring frozen tokens")
 	require.Nil(t, transferFrozenTokenTransactionResponse, "expected nil response when transferring frozen tokens")
-	log.Printf("successfully froze tokens with response: %+v", freezeResponse)
+	log.Printf("successfully froze tokens with response: %s", logging.FormatProto("freeze_response", freezeResponse))
 
 	// Call FreezeTokens to thaw the created output
 	unfreezeResponse, err := wallet.FreezeTokens(
@@ -769,7 +811,7 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	)
 	require.NoError(t, err, "failed to broadcast thawed token transaction")
 	require.NotNil(t, transferTokenTransactionResponse, "expected non-nil response when transferring thawed tokens")
-	log.Printf("thawed token transfer broadcast finalized token transaction: %v", transferTokenTransactionResponse)
+	log.Printf("thawed token transfer broadcast finalized token transaction: %s", logging.FormatProto("token_transaction", transferTokenTransactionResponse))
 }
 
 // Helper function for testing token mint transaction with various signing scenarios
@@ -919,7 +961,7 @@ func testMintTransactionSigningScenarios(t *testing.T, config *wallet.Config,
 	}
 
 	finalIssueTokenTransaction := startResp.FinalTokenTransaction
-	log.Printf("mint transaction finalized: %v", finalIssueTokenTransaction)
+	log.Printf("mint transaction finalized: %s", logging.FormatProto("token_transaction", finalIssueTokenTransaction))
 	return finalIssueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey
 }
 
@@ -1031,7 +1073,9 @@ func TestTokenMintTransactionSigning(t *testing.T) {
 // - testDoubleStartSignFirst: whether to sign the first transaction when testing double start with different transactions
 // - testDoubleSign: whether to test double signing
 // - testSignExpired: whether to test signing with an expired transaction
+// - testPartialSignExpiredAndRecover: whether to test partial signing with an expired transaction and recovery
 // - testSignDifferentTx: whether to test signing with a different transaction than was started
+// - testPartialFinalizeExpireAndRecover: whether to test partial finalize with an expired transaction and recovery
 // - testInvalidSigningOperatorPublicKey: whether to test signing with an invalid operator public key
 // - expectedSigningError: whether an error is expected during any of the signing operations
 // - expectedStartError: whether an error is expected during the start operation
@@ -1047,7 +1091,9 @@ func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.Config
 	testDoubleStartSignFirst bool,
 	testDoubleSign bool,
 	testSignExpired bool,
+	testPartialSignExpiredAndRecover bool,
 	testSignDifferentTx bool,
+	testPartialFinalizeExpireAndRecover bool,
 	testInvalidSigningOperatorPublicKey bool,
 	expectedSigningError bool,
 	expectedStartError bool,
@@ -1182,7 +1228,7 @@ func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.Config
 
 	// If testing double signing, first sign with half the operators
 	var halfSignOperatorSignatures wallet.OperatorSignatures
-	if testDoubleSign {
+	if testDoubleSign || testPartialSignExpiredAndRecover {
 		operatorKeys := splitOperatorIdentityPublicKeys(config)
 		_, halfSignOperatorSignatures, err = wallet.SignTokenTransaction(
 			context.Background(),
@@ -1196,10 +1242,24 @@ func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.Config
 		require.NoError(t, err, "unexpected error during transfer half signing")
 	}
 
-	if testSignExpired {
+	if testSignExpired || testPartialSignExpiredAndRecover {
 		// Wait for the transaction to expire (MinikubeTokenTransactionExpiryTimeSecs seconds)
 		t.Logf("Waiting for %d seconds for transaction to expire...", MinikubeTokenTransactionExpiryTimeSecs)
 		time.Sleep(time.Duration(MinikubeTokenTransactionExpiryTimeSecs) * time.Second)
+	}
+
+	if testPartialSignExpiredAndRecover {
+		t.Logf("Waiting for %d seconds for expired transaction to be cancelled...", TokenTransactionExpiryProcessingTimeSecs)
+		time.Sleep(time.Duration(TokenTransactionExpiryProcessingTimeSecs) * time.Second)
+		// If the transaction is expired, we need to recover the transaction
+		// by calling the StartTokenTransaction method again with the same transaction
+		// and the same owner private keys.
+		transferStartResp, _, transferFinalTxHash, err = wallet.StartTokenTransaction(
+			context.Background(), config, transferTokenTransaction, startingOwnerPrivateKeys, startSignatureIndexOrder,
+		)
+		txToSign = transferStartResp.FinalTokenTransaction
+		require.NoError(t, err, "failed to restart after expired token transaction")
+
 	}
 
 	// Complete the transaction signing with either the original or different transaction
@@ -1231,15 +1291,37 @@ func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.Config
 		}
 	}
 
-	err = wallet.FinalizeTokenTransaction(
-		context.Background(),
-		config,
-		transferStartResp.FinalTokenTransaction,
-		signResponseTransferKeyshares,
-		[]wallet.SerializedPublicKey{revPubKey1, revPubKey2},
-	)
+	if testPartialFinalizeExpireAndRecover {
+		operatorKeys := splitOperatorIdentityPublicKeys(config)
+		err = wallet.FinalizeTokenTransaction(
+			context.Background(),
+			config,
+			transferStartResp.FinalTokenTransaction,
+			operatorKeys.FirstHalf,
+			signResponseTransferKeyshares,
+			[]wallet.SerializedPublicKey{revPubKey1, revPubKey2},
+		)
+		require.NoError(t, err, "unexpected error during transfer half finalize")
+
+		time.Sleep(time.Duration(MinikubeTokenTransactionExpiryTimeSecs)*time.Second + time.Duration(TokenTransactionExpiryProcessingTimeSecs)*time.Second)
+
+		// Verify the outputs exist and have the correct amount
+		verifyTokenOutputs(t, config,
+			transferStartResp.FinalTokenTransaction.TokenOutputs[0].OwnerPublicKey,
+			tokenIdentityPubKeyBytes, TestTransferOutput1Amount)
+
+	} else {
+		err = wallet.FinalizeTokenTransaction(
+			context.Background(),
+			config,
+			transferStartResp.FinalTokenTransaction,
+			nil, // Default to contact all operators
+			signResponseTransferKeyshares,
+			[]wallet.SerializedPublicKey{revPubKey1, revPubKey2},
+		)
+	}
 	require.NoError(t, err, "failed to finalize the transfer transaction")
-	log.Printf("transfer transaction finalized: %v", transferStartResp.FinalTokenTransaction)
+	log.Printf("transfer transaction finalized: %s", logging.FormatProto("token_transaction", transferStartResp.FinalTokenTransaction))
 }
 
 // TestTokenTransferTransactionSigning tests various signing scenarios for token transfer transactions
@@ -1254,7 +1336,9 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 		doubleStartDifferentTx          bool
 		doubleSign                      bool
 		expiredSign                     bool
+		partialSignExpireAndRecover     bool
 		signDifferentTx                 bool
+		partialFinalizeExpireAndRecover bool
 		signingOwnerPrivateKeysModifier func([]*secp256k1.PrivateKey) []*secp256k1.PrivateKey
 		signingOwnerSignatureIndexOrder []uint32
 		invalidSigningOperatorPublicKey bool
@@ -1415,7 +1499,9 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 				tc.doubleStartSignFirst,
 				tc.doubleSign,
 				tc.expiredSign,
+				tc.partialSignExpireAndRecover,
 				tc.signDifferentTx,
+				tc.partialFinalizeExpireAndRecover,
 				tc.invalidSigningOperatorPublicKey,
 				tc.expectedSigningError,
 				tc.expectedStartError)
@@ -1438,7 +1524,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensSchnorr(t *testing.T) {
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
 		[]wallet.SerializedPublicKey{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
-	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
+	log.Printf("issuance broadcast finalized token transaction: %s", logging.FormatProto("token_transaction", finalIssueTokenTransaction))
 
 	// Validate withdrawal params match config
 	for i, output := range finalIssueTokenTransaction.TokenOutputs {
@@ -1466,7 +1552,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensSchnorr(t *testing.T) {
 		[]wallet.SerializedPublicKey{revPubKey1, revPubKey2},
 	)
 	require.NoError(t, err, "failed to broadcast transfer token transaction")
-	log.Printf("transfer broadcast finalized token transaction: %v", transferTokenTransactionResponse)
+	log.Printf("transfer broadcast finalized token transaction: %s", logging.FormatProto("token_transaction", transferTokenTransactionResponse))
 }
 
 func TestFreezeAndUnfreezeTokensSchnorr(t *testing.T) {
@@ -1485,6 +1571,7 @@ func TestFreezeAndUnfreezeTokensSchnorr(t *testing.T) {
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
 		[]wallet.SerializedPublicKey{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
+	log.Printf("issuance broadcast finalized token transaction: %s", logging.FormatProto("token_transaction", finalIssueTokenTransaction))
 
 	_, err = wallet.FreezeTokens(
 		context.Background(),
@@ -1494,124 +1581,6 @@ func TestFreezeAndUnfreezeTokensSchnorr(t *testing.T) {
 		false,
 	)
 	require.NoError(t, err, "failed to freeze tokens")
-}
-
-func TestCancelTokenTransaction(t *testing.T) {
-	skipIfGithubActions(t)
-	config, err := testutil.TestWalletConfigWithIdentityKey(*staticLocalIssuerKey.IdentityPrivateKey())
-	require.NoError(t, err, "failed to create wallet config")
-
-	operatorKeys := splitOperatorIdentityPublicKeys(config)
-
-	tokenPrivKey := config.IdentityPrivateKey
-	tokenIdentityPubKeyBytes := tokenPrivKey.PubKey().SerializeCompressed()
-	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
-	require.NoError(t, err, "failed to create test token issuance transaction")
-
-	startResp, _, finalTxHash, err := wallet.StartTokenTransaction(
-		context.Background(),
-		config,
-		issueTokenTransaction,
-		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		nil,
-	)
-	require.NoError(t, err, "failed to start token transaction")
-	finalIssueTokenTransaction := startResp.FinalTokenTransaction
-
-	_, _, err = wallet.SignTokenTransaction(
-		context.Background(),
-		config,
-		startResp.FinalTokenTransaction,
-		finalTxHash,
-		operatorKeys.FirstHalf,
-		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		nil,
-	)
-	require.NoError(t, err, "failed to sign the mint transaction with the first half of SOs")
-
-	err = wallet.CancelTokenTransaction(
-		context.Background(),
-		config,
-		startResp.FinalTokenTransaction,
-		operatorKeys.FirstHalf,
-	)
-	require.Error(t, err, "expected cancel failure on mint transaction. Mint cancellation is not supported")
-
-	_, _, err = wallet.SignTokenTransaction(
-		context.Background(),
-		config,
-		startResp.FinalTokenTransaction,
-		finalTxHash,
-		operatorKeys.SecondHalf,
-		[]*secp256k1.PrivateKey{&tokenPrivKey},
-		nil,
-	)
-	require.NoError(t, err, "failed to sign the mint transaction with the second half of SOs")
-
-	// Test cancellation of a transfer transaction
-	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
-	require.NoError(t, err, "failed to hash final issuance token transaction")
-
-	transferTokenTransaction, _, err := createTestTokenTransferTransaction(config,
-		finalIssueTokenTransactionHash,
-		tokenIdentityPubKeyBytes,
-	)
-	require.NoError(t, err, "failed to create test token transfer transaction")
-
-	revPubKey1 := finalIssueTokenTransaction.TokenOutputs[0].RevocationCommitment
-	revPubKey2 := finalIssueTokenTransaction.TokenOutputs[1].RevocationCommitment
-
-	transferStartResp, _, transferFinalTxHash, err := wallet.StartTokenTransaction(
-		context.Background(),
-		config,
-		transferTokenTransaction,
-		[]*secp256k1.PrivateKey{userOutput1PrivKey, userOutput2PrivKey},
-		[]uint32{0, 1},
-	)
-	require.NoError(t, err, "failed to start transfer transaction")
-
-	log.Printf("transfer tx hash: %x", transferFinalTxHash)
-
-	// Sign with only half of the operators
-	_, _, err = wallet.SignTokenTransaction(
-		context.Background(),
-		config,
-		transferStartResp.FinalTokenTransaction,
-		transferFinalTxHash,
-		operatorKeys.FirstHalf,
-		[]*secp256k1.PrivateKey{userOutput1PrivKey, userOutput2PrivKey},
-		[]uint32{0, 1},
-	)
-	require.NoError(t, err, "failed partial signing")
-
-	// Cancel the transfer transaction after partial signing
-	err = wallet.CancelTokenTransaction(
-		context.Background(),
-		config,
-		transferStartResp.FinalTokenTransaction,
-		operatorKeys.FirstHalf, // Cancel for the half of the operators that signed.
-	)
-	require.NoError(t, err, "failed to cancel partially signed transfer token transaction")
-
-	// Attempt to cancel the transaction with the SOs that did not sign
-	err = wallet.CancelTokenTransaction(
-		context.Background(),
-		config,
-		transferStartResp.FinalTokenTransaction,
-		operatorKeys.SecondHalf,
-	)
-	require.Error(t, err, "expected error when trying to cancel transfer transaction with remaining operators")
-
-	// Verify we can create a new transfer transaction after cancellation
-	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransaction(
-		context.Background(),
-		config,
-		transferTokenTransaction,
-		[]*secp256k1.PrivateKey{userOutput1PrivKey, userOutput2PrivKey},
-		[]wallet.SerializedPublicKey{revPubKey1, revPubKey2},
-	)
-	require.NoError(t, err, "failed to broadcast transfer token transaction after cancellation")
-	log.Printf("successfully transferred tokens after cancellation: %v", transferTokenTransactionResponse)
 }
 
 func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
@@ -1628,7 +1597,7 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 		[]*secp256k1.PrivateKey{&tokenPrivKey},
 		[]wallet.SerializedPublicKey{})
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
-	log.Printf("issuance broadcast finalized token transaction: %v", finalIssueTokenTransaction)
+	log.Printf("issuance broadcast finalized token transaction: %s", logging.FormatProto("token_transaction", finalIssueTokenTransaction))
 
 	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
 	require.NoError(t, err, "failed to hash final issuance token transaction")
@@ -1776,4 +1745,22 @@ func getNonCoordinatorOperator(config *wallet.Config) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("could not find a non-coordinator operator")
+}
+
+// verifyTokenOutputs verifies that a transaction's outputs are properly finalized by querying them
+func verifyTokenOutputs(t *testing.T, config *wallet.Config,
+	ownerPubKey []byte,
+	tokenIdentityPubKeyBytes []byte,
+	expectedAmount uint64,
+) {
+	// Query the outputs to verify they exist and have the correct amount
+	tokenOutputsResponse, err := wallet.QueryTokenOutputs(
+		context.Background(),
+		config,
+		[]wallet.SerializedPublicKey{ownerPubKey},
+		[]wallet.SerializedPublicKey{tokenIdentityPubKeyBytes},
+	)
+	require.NoError(t, err, "failed to query token outputs")
+	require.Equal(t, 1, len(tokenOutputsResponse.OutputsWithPreviousTransactionData), "expected 1 output after transaction")
+	require.Equal(t, uint64ToBigInt(expectedAmount), bytesToBigInt(tokenOutputsResponse.OutputsWithPreviousTransactionData[0].Output.TokenAmount), "expected correct amount after transaction")
 }

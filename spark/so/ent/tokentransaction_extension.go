@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -454,8 +455,15 @@ func (r *TokenTransaction) MarshalProto(config *so.Config) (*pb.TokenTransaction
 		SparkOperatorIdentityPublicKeys: operatorPublicKeys,
 	}
 
-	// Set up output outputs
-	for i, output := range r.Edges.CreatedOutput {
+	// Sort outputs to match the original token transaction using CreatedTransactionOutputVout
+	sortedCreatedOutputs := make([]*TokenOutput, len(r.Edges.CreatedOutput))
+	copy(sortedCreatedOutputs, r.Edges.CreatedOutput)
+	sort.Slice(sortedCreatedOutputs, func(i, j int) bool {
+		return sortedCreatedOutputs[i].CreatedTransactionOutputVout < sortedCreatedOutputs[j].CreatedTransactionOutputVout
+	})
+
+	// Set up output outputs using sorted slice
+	for i, output := range sortedCreatedOutputs {
 		idStr := output.ID.String()
 		tokenTransaction.TokenOutputs[i] = &pb.TokenOutput{
 			Id:                            &idStr,
@@ -483,7 +491,14 @@ func (r *TokenTransaction) MarshalProto(config *so.Config) (*pb.TokenTransaction
 			OutputsToSpend: make([]*pb.TokenOutputToSpend, len(r.Edges.SpentOutput)),
 		}
 
-		for i, output := range r.Edges.SpentOutput {
+		// Sort outputs to match the original token transaction using SpentTransactionInputVout
+		sortedSpentOutputs := make([]*TokenOutput, len(r.Edges.SpentOutput))
+		copy(sortedSpentOutputs, r.Edges.SpentOutput)
+		sort.Slice(sortedSpentOutputs, func(i, j int) bool {
+			return sortedSpentOutputs[i].SpentTransactionInputVout < sortedSpentOutputs[j].SpentTransactionInputVout
+		})
+
+		for i, output := range sortedSpentOutputs {
 			// Since we assume all relationships are loaded, we can directly access the created transaction.
 			if output.Edges.OutputCreatedTokenTransaction == nil {
 				return nil, fmt.Errorf("output spent transaction edge not loaded for output %s", output.ID)

@@ -11,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark/common"
+	pbmock "github.com/lightsparkdev/spark/proto/mock"
 	"github.com/lightsparkdev/spark/proto/spark"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	testutil "github.com/lightsparkdev/spark/test_util"
@@ -76,6 +77,228 @@ func TestTransfer(t *testing.T) {
 		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
 	}
 	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	res, err := wallet.ClaimTransfer(
+		receiverCtx,
+		receiverTransfer,
+		receiverConfig,
+		leavesToClaim[:],
+	)
+	require.NoError(t, err, "failed to ClaimTransfer")
+	require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
+}
+
+func TestQueryPendingTransferByNetwork(t *testing.T) {
+	senderConfig, err := testutil.TestWalletConfig()
+	require.NoError(t, err, "failed to create sender wallet config")
+
+	leafPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create node signing private key")
+	rootNode, err := testutil.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
+	require.NoError(t, err, "failed to create new tree")
+
+	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create new node signing private key")
+
+	receiverPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create receiver private key")
+
+	transferNode := wallet.LeafKeyTweak{
+		Leaf:              rootNode,
+		SigningPrivKey:    leafPrivKey.Serialize(),
+		NewSigningPrivKey: newLeafPrivKey.Serialize(),
+	}
+	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+	_, err = wallet.SendTransfer(
+		context.Background(),
+		senderConfig,
+		leavesToTransfer[:],
+		receiverPrivKey.PubKey().SerializeCompressed(),
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err, "failed to transfer tree node")
+
+	receiverConfig, err := testutil.TestWalletConfigWithIdentityKey(*receiverPrivKey)
+	require.NoError(t, err, "failed to create wallet config")
+	receiverToken, err := wallet.AuthenticateWithServer(context.Background(), receiverConfig)
+	require.NoError(t, err, "failed to authenticate receiver")
+	receiverCtx := wallet.ContextWithToken(context.Background(), receiverToken)
+	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Equal(t, 1, len(pendingTransfer.Transfers))
+
+	incorrectNetworkReceiverConfig := receiverConfig
+	incorrectNetworkReceiverConfig.Network = common.Mainnet
+	incorrectNetworkReceiverToken, err := wallet.AuthenticateWithServer(context.Background(), incorrectNetworkReceiverConfig)
+	require.NoError(t, err, "failed to authenticate receiver")
+	incorrectNetworkReceiverCtx := wallet.ContextWithToken(context.Background(), incorrectNetworkReceiverToken)
+	pendingTransfer, err = wallet.QueryPendingTransfers(incorrectNetworkReceiverCtx, incorrectNetworkReceiverConfig)
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Equal(t, 0, len(pendingTransfer.Transfers))
+}
+
+func TestTransferInterrupt(t *testing.T) {
+	// Sender initiates transfer
+	senderConfig, err := testutil.TestWalletConfig()
+	require.NoError(t, err, "failed to create sender wallet config")
+
+	leafPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create node signing private key")
+	rootNode, err := testutil.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
+	require.NoError(t, err, "failed to create new tree")
+
+	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create new node signing private key")
+
+	receiverPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create receiver private key")
+
+	transferNode := wallet.LeafKeyTweak{
+		Leaf:              rootNode,
+		SigningPrivKey:    leafPrivKey.Serialize(),
+		NewSigningPrivKey: newLeafPrivKey.Serialize(),
+	}
+	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+	senderTransfer, err := wallet.SendTransfer(
+		context.Background(),
+		senderConfig,
+		leavesToTransfer[:],
+		receiverPrivKey.PubKey().SerializeCompressed(),
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err, "failed to transfer tree node")
+
+	// Receiver queries pending transfer
+	receiverConfig, err := testutil.TestWalletConfigWithIdentityKey(*receiverPrivKey)
+	require.NoError(t, err, "failed to create wallet config")
+	receiverToken, err := wallet.AuthenticateWithServer(context.Background(), receiverConfig)
+	require.NoError(t, err, "failed to authenticate receiver")
+	receiverCtx := wallet.ContextWithToken(context.Background(), receiverToken)
+	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Equal(t, 1, len(pendingTransfer.Transfers))
+	receiverTransfer := pendingTransfer.Transfers[0]
+	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+	require.Equal(t, receiverTransfer.Type, spark.TransferType_TRANSFER)
+
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), receiverConfig, receiverTransfer)
+	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+
+	conn, err := common.NewGRPCConnectionWithTestTLS(senderConfig.CoodinatorAddress(), nil)
+	require.NoError(t, err, "failed to create grpc connection")
+	defer conn.Close()
+	mockClient := pbmock.NewMockServiceClient(conn)
+	_, err = mockClient.InterruptTransfer(context.Background(), &pbmock.InterruptTransferRequest{
+		Action: pbmock.InterruptTransferRequest_INTERRUPT,
+	})
+	require.NoError(t, err, "failed to interrupt transfer")
+
+	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create new node signing private key")
+	claimingNode := wallet.LeafKeyTweak{
+		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey.Serialize(),
+		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
+	}
+	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	_, err = wallet.ClaimTransfer(
+		receiverCtx,
+		receiverTransfer,
+		receiverConfig,
+		leavesToClaim[:],
+	)
+	require.Error(t, err, "expected error when claiming transfer")
+
+	_, err = mockClient.InterruptTransfer(context.Background(), &pbmock.InterruptTransferRequest{
+		Action: pbmock.InterruptTransferRequest_RESUME,
+	})
+	require.NoError(t, err, "failed to resume transfer")
+
+	pendingTransfer, err = wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Equal(t, 1, len(pendingTransfer.Transfers))
+	receiverTransfer = pendingTransfer.Transfers[0]
+	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+	require.Equal(t, receiverTransfer.Type, spark.TransferType_TRANSFER)
+
+	res, err := wallet.ClaimTransfer(
+		receiverCtx,
+		receiverTransfer,
+		receiverConfig,
+		leavesToClaim[:],
+	)
+	require.NoError(t, err, "failed to ClaimTransfer")
+	require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
+}
+
+func TestTransferRecoverFinalizeSignatures(t *testing.T) {
+	// Sender initiates transfer
+	senderConfig, err := testutil.TestWalletConfig()
+	require.NoError(t, err, "failed to create sender wallet config")
+
+	leafPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create node signing private key")
+	rootNode, err := testutil.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
+	require.NoError(t, err, "failed to create new tree")
+
+	newLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create new node signing private key")
+
+	receiverPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create receiver private key")
+
+	transferNode := wallet.LeafKeyTweak{
+		Leaf:              rootNode,
+		SigningPrivKey:    leafPrivKey.Serialize(),
+		NewSigningPrivKey: newLeafPrivKey.Serialize(),
+	}
+	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+	senderTransfer, err := wallet.SendTransfer(
+		context.Background(),
+		senderConfig,
+		leavesToTransfer[:],
+		receiverPrivKey.PubKey().SerializeCompressed(),
+		time.Now().Add(10*time.Minute),
+	)
+	require.NoError(t, err, "failed to transfer tree node")
+
+	// Receiver queries pending transfer
+	receiverConfig, err := testutil.TestWalletConfigWithIdentityKey(*receiverPrivKey)
+	require.NoError(t, err, "failed to create wallet config")
+	receiverToken, err := wallet.AuthenticateWithServer(context.Background(), receiverConfig)
+	require.NoError(t, err, "failed to authenticate receiver")
+	receiverCtx := wallet.ContextWithToken(context.Background(), receiverToken)
+	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Equal(t, 1, len(pendingTransfer.Transfers))
+	receiverTransfer := pendingTransfer.Transfers[0]
+	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+	require.Equal(t, receiverTransfer.Type, spark.TransferType_TRANSFER)
+
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), receiverConfig, receiverTransfer)
+	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+
+	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create new node signing private key")
+	claimingNode := wallet.LeafKeyTweak{
+		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey.Serialize(),
+		NewSigningPrivKey: finalLeafPrivKey.Serialize(),
+	}
+	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	_, err = wallet.ClaimTransferWithoutFinalizeSignatures(
+		receiverCtx,
+		receiverTransfer,
+		receiverConfig,
+		leavesToClaim[:],
+	)
+	require.NoError(t, err, "failed to ClaimTransfer")
+
+	pendingTransfer, err = wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Equal(t, 1, len(pendingTransfer.Transfers))
+	receiverTransfer = pendingTransfer.Transfers[0]
+	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+
 	res, err := wallet.ClaimTransfer(
 		receiverCtx,
 		receiverTransfer,
@@ -691,6 +914,13 @@ func TestTransferWithPreTweakedPackage(t *testing.T) {
 	receiverTransfer := pendingTransfer.Transfers[0]
 	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
 	require.Equal(t, receiverTransfer.Type, spark.TransferType_TRANSFER)
+
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(context.Background(), receiverConfig, receiverTransfer)
+	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+
+	refundtx, err := common.TxFromRawTxBytes(receiverTransfer.Leaves[0].IntermediateRefundTx)
+	require.NoError(t, err, "failed to get refund tx")
+	require.NotEqual(t, len(refundtx.TxIn[0].Witness), 0, "refund tx should have a signature")
 
 	finalLeafPrivKey, err := secp256k1.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")

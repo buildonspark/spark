@@ -3,14 +3,14 @@
 
 import UserRequest from './UserRequest.js';
 import Entity from './Entity.js';
-import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
 import CurrencyAmount from './CurrencyAmount.js';
-import {CurrencyAmountFromJson} from './CurrencyAmount.js';
-import {TransferFromJson} from './Transfer.js';
-import BitcoinNetwork from './BitcoinNetwork.js';
-import { Query, isObject } from '@lightsparkdev/core';
 import type Transfer from './Transfer.js';
+import BitcoinNetwork from './BitcoinNetwork.js';
+import SparkCoopExitRequestStatus from './SparkCoopExitRequestStatus.js';
 import {CurrencyAmountToJson} from './CurrencyAmount.js';
+import {TransferFromJson} from './Transfer.js';
+import { Query, isObject } from '@lightsparkdev/core';
+import {CurrencyAmountFromJson} from './CurrencyAmount.js';
 
 
 interface CoopExitRequest {
@@ -31,11 +31,11 @@ updatedAt: string;
     /** The network the lightning send request is on. **/
 network: BitcoinNetwork;
 
-    /**
- * The fee includes what user pays for the coop exit and the L1 broadcast fee. The amount user will
- * receive on L1 is total_amount - fee.
-**/
+    /** The fee user pays for the coop exit not including the L1 broadcast fee. **/
 fee: CurrencyAmount;
+
+    /** The L1 broadcast fee user pays for the coop exit. **/
+l1BroadcastFee: CurrencyAmount;
 
     /** The status of this coop exit request. **/
 status: SparkCoopExitRequestStatus;
@@ -70,6 +70,7 @@ export const CoopExitRequestFromJson = (obj: any): CoopExitRequest => {
         updatedAt: obj["coop_exit_request_updated_at"],
         network: BitcoinNetwork[obj["coop_exit_request_network"]] ?? BitcoinNetwork.FUTURE_VALUE,
         fee: CurrencyAmountFromJson(obj["coop_exit_request_fee"]),
+        l1BroadcastFee: CurrencyAmountFromJson(obj["coop_exit_request_l1_broadcast_fee"]),
         status: SparkCoopExitRequestStatus[obj["coop_exit_request_status"]] ?? SparkCoopExitRequestStatus.FUTURE_VALUE,
         expiresAt: obj["coop_exit_request_expires_at"],
         rawConnectorTransaction: obj["coop_exit_request_raw_connector_transaction"],
@@ -87,6 +88,7 @@ coop_exit_request_created_at: obj.createdAt,
 coop_exit_request_updated_at: obj.updatedAt,
 coop_exit_request_network: obj.network,
 coop_exit_request_fee: CurrencyAmountToJson(obj.fee),
+coop_exit_request_l1_broadcast_fee: CurrencyAmountToJson(obj.l1BroadcastFee),
 coop_exit_request_status: obj.status,
 coop_exit_request_expires_at: obj.expiresAt,
 coop_exit_request_raw_connector_transaction: obj.rawConnectorTransaction,
@@ -107,6 +109,14 @@ fragment CoopExitRequestFragment on CoopExitRequest {
     coop_exit_request_updated_at: updated_at
     coop_exit_request_network: network
     coop_exit_request_fee: fee {
+        __typename
+        currency_amount_original_value: original_value
+        currency_amount_original_unit: original_unit
+        currency_amount_preferred_currency_unit: preferred_currency_unit
+        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
+        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
+    }
+    coop_exit_request_l1_broadcast_fee: l1_broadcast_fee {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit

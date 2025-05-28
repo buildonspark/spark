@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/btcsuite/btcd/wire"
@@ -13,7 +14,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
-	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/common/logging"
+	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -58,11 +60,11 @@ func validateLeafRefundTxOutput(refundTx *wire.MsgTx, receiverIdentityPublicKey 
 	}
 	receiverIdentityPubkey, err := secp256k1.ParsePubKey(receiverIdentityPublicKey)
 	if err != nil {
-		return fmt.Errorf("unable to parse receiver pubkey: %v", err)
+		return fmt.Errorf("unable to parse receiver pubkey: %w", err)
 	}
 	recieverP2trScript, err := common.P2TRScriptFromPubKey(receiverIdentityPubkey)
 	if err != nil {
-		return fmt.Errorf("unable to generate p2tr script from receiver pubkey: %v", err)
+		return fmt.Errorf("unable to generate p2tr script from receiver pubkey: %w", err)
 	}
 	if !bytes.Equal(recieverP2trScript, refundTx.TxOut[0].PkScript) {
 		return fmt.Errorf("refund tx is expected to send to receiver identity pubkey")
@@ -88,11 +90,11 @@ func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, leafOut
 func validateSendLeafRefundTx(leaf *ent.TreeNode, rawTx []byte, receiverIdentityKey []byte, expectedInputCount uint32) error {
 	newRefundTx, err := common.TxFromRawTxBytes(rawTx)
 	if err != nil {
-		return fmt.Errorf("unable to load new refund tx: %v", err)
+		return fmt.Errorf("unable to load new refund tx: %w", err)
 	}
 	oldRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
 	if err != nil {
-		return fmt.Errorf("unable to load old refund tx: %v", err)
+		return fmt.Errorf("unable to load old refund tx: %w", err)
 	}
 	oldRefundTxIn := oldRefundTx.TxIn[0]
 	leafOutPoint := wire.OutPoint{
@@ -102,12 +104,12 @@ func validateSendLeafRefundTx(leaf *ent.TreeNode, rawTx []byte, receiverIdentity
 
 	err = validateLeafRefundTxInput(newRefundTx, oldRefundTxIn.Sequence, &leafOutPoint, expectedInputCount)
 	if err != nil {
-		return fmt.Errorf("unable to validate refund tx inputs: %v", err)
+		return fmt.Errorf("unable to validate refund tx inputs: %w", err)
 	}
 
 	err = validateLeafRefundTxOutput(newRefundTx, receiverIdentityKey)
 	if err != nil {
-		return fmt.Errorf("unable to validate refund tx output: %v", err)
+		return fmt.Errorf("unable to validate refund tx output: %w", err)
 	}
 
 	return nil
@@ -121,16 +123,16 @@ func (h *BaseTransferHandler) createTransfer(
 	senderIdentityPublicKey []byte,
 	receiverIdentityPublicKey []byte,
 	leafRefundMap map[string][]byte,
-	leafTweakMap map[string]*pb.SendLeafKeyTweak,
+	leafTweakMap map[string]*pbspark.SendLeafKeyTweak,
 	role TransferRole,
 ) (*ent.Transfer, map[string]*ent.TreeNode, error) {
 	transferUUID, err := uuid.Parse(transferID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", transferID, err)
+		return nil, nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", transferID, err)
 	}
 
 	if expiryTime.Unix() != 0 && expiryTime.Before(time.Now()) {
-		return nil, nil, fmt.Errorf("invalid expiry_time %s: %v", expiryTime.String(), err)
+		return nil, nil, fmt.Errorf("invalid expiry_time %s: %w", expiryTime.String(), err)
 	}
 
 	var status schema.TransferStatus
@@ -155,16 +157,16 @@ func (h *BaseTransferHandler) createTransfer(
 		SetType(transferType).
 		Save(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create transfer: %v", err)
+		return nil, nil, fmt.Errorf("unable to create transfer: %w", err)
 	}
 
 	if len(leafRefundMap) == 0 {
 		return nil, nil, errors.InvalidUserInputErrorf("must provide at least one leaf for transfer")
 	}
 
-	leaves, err := loadLeaves(ctx, db, leafRefundMap)
+	leaves, err := loadLeavesWithLock(ctx, db, leafRefundMap)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to load leaves: %v", err)
+		return nil, nil, fmt.Errorf("unable to load leaves: %w", err)
 	}
 
 	switch transferType {
@@ -178,22 +180,22 @@ func (h *BaseTransferHandler) createTransfer(
 		// do nothing
 	}
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to validate transfer leaves: %v", err)
+		return nil, nil, fmt.Errorf("unable to validate transfer leaves: %w", err)
 	}
 
 	err = createTransferLeaves(ctx, db, transfer, leaves, leafRefundMap, leafTweakMap)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to create transfer leaves: %v", err)
+		return nil, nil, fmt.Errorf("unable to create transfer leaves: %w", err)
 	}
 
 	err = setTotalTransferValue(ctx, db, transfer, leaves)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to update transfer total value: %v", err)
+		return nil, nil, fmt.Errorf("unable to update transfer total value: %w", err)
 	}
 
 	leaves, err = lockLeaves(ctx, db, leaves)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to lock leaves: %v", err)
+		return nil, nil, fmt.Errorf("unable to lock leaves: %w", err)
 	}
 
 	leafMap := make(map[string]*ent.TreeNode)
@@ -204,22 +206,26 @@ func (h *BaseTransferHandler) createTransfer(
 	return transfer, leafMap, nil
 }
 
-func loadLeaves(ctx context.Context, db *ent.Tx, leafRefundMap map[string][]byte) ([]*ent.TreeNode, error) {
+func loadLeavesWithLock(ctx context.Context, db *ent.Tx, leafRefundMap map[string][]byte) ([]*ent.TreeNode, error) {
 	leaves := make([]*ent.TreeNode, 0)
 	var network *schema.Network
 	for leafID := range leafRefundMap {
 		leafUUID, err := uuid.Parse(leafID)
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse leaf_id %s: %v", leafID, err)
+			return nil, fmt.Errorf("unable to parse leaf_id %s: %w", leafID, err)
 		}
 
-		leaf, err := db.TreeNode.Get(ctx, leafUUID)
+		leaf, err := db.TreeNode.
+			Query().
+			Where(treenode.ID(leafUUID)).
+			ForUpdate().
+			Only(ctx)
 		if err != nil || leaf == nil {
-			return nil, fmt.Errorf("unable to find leaf %s: %v", leafID, err)
+			return nil, fmt.Errorf("unable to find leaf %s: %w", leafID, err)
 		}
 		tree, err := leaf.QueryTree().Only(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to find tree for leaf %s: %v", leafID, err)
+			return nil, fmt.Errorf("unable to find tree for leaf %s: %w", leafID, err)
 		}
 		if network == nil {
 			network = &tree.Network
@@ -236,11 +242,11 @@ func (h *BaseTransferHandler) validateCooperativeExitLeaves(ctx context.Context,
 		rawRefundTx := leafRefundMap[leaf.ID.String()]
 		err := validateSendLeafRefundTx(leaf, rawRefundTx, receiverIdentityPublicKey, 2)
 		if err != nil {
-			return fmt.Errorf("unable to validate refund tx for leaf %s: %v", leaf.ID, err)
+			return fmt.Errorf("unable to validate refund tx for leaf %s: %w", leaf.ID, err)
 		}
 		err = h.leafAvailableToTransfer(ctx, leaf, transfer)
 		if err != nil {
-			return fmt.Errorf("unable to validate leaf %s: %v", leaf.ID, err)
+			return fmt.Errorf("unable to validate leaf %s: %w", leaf.ID, err)
 		}
 	}
 	return nil
@@ -251,11 +257,11 @@ func (h *BaseTransferHandler) validateUtxoSwapLeaves(ctx context.Context, transf
 		rawRefundTx := leafRefundMap[leaf.ID.String()]
 		err := validateSendLeafRefundTx(leaf, rawRefundTx, receiverIdentityPublicKey, 1)
 		if err != nil {
-			return fmt.Errorf("unable to validate refund tx for leaf %s: %v", leaf.ID, err)
+			return fmt.Errorf("unable to validate refund tx for leaf %s: %w", leaf.ID, err)
 		}
 		err = h.leafAvailableToTransfer(ctx, leaf, transfer)
 		if err != nil {
-			return fmt.Errorf("unable to validate leaf %s: %v", leaf.ID, err)
+			return fmt.Errorf("unable to validate leaf %s: %w", leaf.ID, err)
 		}
 	}
 	return nil
@@ -266,11 +272,11 @@ func (h *BaseTransferHandler) validateTransferLeaves(ctx context.Context, transf
 		rawRefundTx := leafRefundMap[leaf.ID.String()]
 		err := validateSendLeafRefundTx(leaf, rawRefundTx, receiverIdentityPublicKey, 1)
 		if err != nil {
-			return fmt.Errorf("unable to validate refund tx for leaf %s: %v", leaf.ID, err)
+			return fmt.Errorf("unable to validate refund tx for leaf %s: %w", leaf.ID, err)
 		}
 		err = h.leafAvailableToTransfer(ctx, leaf, transfer)
 		if err != nil {
-			return fmt.Errorf("unable to validate leaf %s: %v", leaf.ID, err)
+			return fmt.Errorf("unable to validate leaf %s: %w", leaf.ID, err)
 		}
 	}
 	return nil
@@ -283,7 +289,7 @@ func (h *BaseTransferHandler) leafAvailableToTransfer(ctx context.Context, leaf 
 				enttransferleaf.HasLeafWith(treenode.IDEQ(leaf.ID)),
 			).WithTransfer().All(ctx)
 			if err != nil {
-				return fmt.Errorf("unable to find transfer leaf for leaf %s: %v", leaf.ID.String(), err)
+				return fmt.Errorf("unable to find transfer leaf for leaf %s: %w", leaf.ID.String(), err)
 			}
 			now := time.Now()
 			for _, transferLeaf := range transferLeaves {
@@ -293,7 +299,7 @@ func (h *BaseTransferHandler) leafAvailableToTransfer(ctx context.Context, leaf 
 						SenderIdentityPublicKey: transfer.SenderIdentityPubkey,
 					}, CancelTransferIntentTask)
 					if err != nil {
-						return fmt.Errorf("unable to cancel transfer: %v", err)
+						return fmt.Errorf("unable to cancel transfer: %w", err)
 					}
 				}
 			}
@@ -312,7 +318,7 @@ func createTransferLeaves(
 	transfer *ent.Transfer,
 	leaves []*ent.TreeNode,
 	leafRefundMap map[string][]byte,
-	leafTweakMap map[string]*pb.SendLeafKeyTweak,
+	leafTweakMap map[string]*pbspark.SendLeafKeyTweak,
 ) error {
 	for _, leaf := range leaves {
 		rawRefundTx := leafRefundMap[leaf.ID.String()]
@@ -326,14 +332,14 @@ func createTransferLeaves(
 			if ok {
 				leafTweakBinary, err := proto.Marshal(leafTweak)
 				if err != nil {
-					return fmt.Errorf("unable to marshal leaf tweak: %v", err)
+					return fmt.Errorf("unable to marshal leaf tweak: %w", err)
 				}
 				mutator = mutator.SetKeyTweak(leafTweakBinary)
 			}
 		}
 		_, err := mutator.Save(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to create transfer leaf: %v", err)
+			return fmt.Errorf("unable to create transfer leaf: %w", err)
 		}
 	}
 	return nil
@@ -343,7 +349,7 @@ func setTotalTransferValue(ctx context.Context, db *ent.Tx, transfer *ent.Transf
 	totalAmount := getTotalTransferValue(leaves)
 	_, err := db.Transfer.UpdateOne(transfer).SetTotalValue(totalAmount).Save(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to update transfer total value: %v", err)
+		return fmt.Errorf("unable to update transfer total value: %w", err)
 	}
 	return nil
 }
@@ -362,7 +368,7 @@ func lockLeaves(ctx context.Context, db *ent.Tx, leaves []*ent.TreeNode) ([]*ent
 		lockedLeaf, err := db.TreeNode.UpdateOne(leaf).SetStatus(schema.TreeNodeStatusTransferLocked).Save(ctx)
 		lockedLeaves = append(lockedLeaves, lockedLeaf)
 		if err != nil {
-			return nil, fmt.Errorf("unable to update leaf status: %v", err)
+			return nil, fmt.Errorf("unable to update leaf status: %w", err)
 		}
 	}
 	return lockedLeaves, nil
@@ -374,7 +380,78 @@ const (
 	CancelTransferIntentInternal CancelTransferIntent = iota
 	CancelTransferIntentExternal
 	CancelTransferIntentTask
+	CancelTransferIntentInternalWithNotifyOtherOperators
 )
+
+func (h *BaseTransferHandler) CancelTransferInternal(
+	ctx context.Context,
+	transferID string,
+	senderIdentityPublicKey []byte,
+	intent CancelTransferIntent,
+) (*pbspark.CancelTransferResponse, error) {
+	if intent == CancelTransferIntentExternal || intent == CancelTransferIntentInternalWithNotifyOtherOperators {
+		operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+		_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+			conn, err := operator.NewGRPCConnection()
+			if err != nil {
+				return nil, err
+			}
+			defer conn.Close()
+
+			client := pbinternal.NewSparkInternalServiceClient(conn)
+			_, err = client.CancelTransfer(ctx, &pbspark.CancelTransferRequest{
+				TransferId:              transferID,
+				SenderIdentityPublicKey: senderIdentityPublicKey,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("unable to cancel transfer: %w", err)
+			}
+			return nil, nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("unable to cancel transfer: %w", err)
+		}
+	}
+
+	transfer, err := h.loadTransfer(ctx, transferID)
+	if err != nil {
+		logger := logging.GetLoggerFromContext(ctx)
+		logger.Info("Transfer not found", "transfer_id", transferID)
+		return &pbspark.CancelTransferResponse{}, nil
+	}
+	if !bytes.Equal(transfer.SenderIdentityPubkey, senderIdentityPublicKey) {
+		return nil, fmt.Errorf("only sender is eligible to cancel the transfer %s", transferID)
+	}
+
+	// The expiry time is only checked for coordinator SO because the creation time of each SO could be different.
+	if intent == CancelTransferIntentExternal && transfer.Status != schema.TransferStatusSenderInitiated && transfer.ExpiryTime.After(time.Now()) {
+		return nil, fmt.Errorf("transfer %s has not expired, expires at %s", transferID, transfer.ExpiryTime.String())
+	}
+
+	// Check to see if preimage has already been shared before cancelling
+	// Only check external requests as there currently exists some internal
+	// use case for cancelling transfers after preimage share, e.g. preimage
+	// is incorrect
+	if intent == CancelTransferIntentExternal {
+		db := ent.GetDbFromContext(ctx)
+		preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.HasTransfersWith(enttransfer.ID(transfer.ID))).Only(ctx)
+		if err != nil && !ent.IsNotFound(err) {
+			return nil, fmt.Errorf("encountered error when fetching preimage request for transfer id %s: %w", transferID, err)
+		}
+		if preimageRequest != nil && preimageRequest.Status == schema.PreimageRequestStatusPreimageShared {
+			return nil, errors.FailedPreconditionErrorf("Cannot cancel an invoice whose preimage has already been revealed")
+		}
+	}
+
+	err = h.executeCancelTransfer(ctx, transfer)
+	if err != nil {
+		logger := logging.GetLoggerFromContext(ctx)
+		logger.Error("failed to cancel transfer", "error", err, "transfer_id", transferID)
+		return nil, err
+	}
+
+	return &pbspark.CancelTransferResponse{}, nil
+}
 
 func (h *BaseTransferHandler) CancelTransfer(
 	ctx context.Context,
@@ -385,77 +462,54 @@ func (h *BaseTransferHandler) CancelTransfer(
 		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.SenderIdentityPublicKey); err != nil {
 			return nil, err
 		}
-		operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-		_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
-			conn, err := operator.NewGRPCConnection()
-			if err != nil {
-				return nil, err
-			}
-			defer conn.Close()
-
-			client := pbinternal.NewSparkInternalServiceClient(conn)
-			_, err = client.CancelTransfer(ctx, req)
-			if err != nil {
-				return nil, fmt.Errorf("unable to cancel transfer: %v", err)
-			}
-			return nil, nil
-		})
-		if err != nil {
-			return nil, fmt.Errorf("unable to cancel transfer: %v", err)
-		}
 	}
 
-	transfer, err := h.loadTransfer(ctx, req.TransferId)
-	if err != nil {
-		// If we cannot find the transfer, don't fail the request.
-		return nil, nil
-	}
-	if !bytes.Equal(transfer.SenderIdentityPubkey, req.SenderIdentityPublicKey) {
-		return nil, fmt.Errorf("only sender is eligible to cancel the transfer %s", req.TransferId)
-	}
+	return h.CancelTransferInternal(ctx, req.TransferId, req.SenderIdentityPublicKey, intent)
+}
+
+func (h *BaseTransferHandler) executeCancelTransfer(ctx context.Context, transfer *ent.Transfer) error {
 	// Don't error if the transfer is already returned.
+	logger := logging.GetLoggerFromContext(ctx)
 	if transfer.Status == schema.TransferStatusReturned {
-		return &pbspark.CancelTransferResponse{}, nil
+		logger.Info("Transfer already returned", "transfer_id", transfer.ID.String())
+		return nil
 	}
 	if transfer.Status != schema.TransferStatusSenderInitiated && transfer.Status != schema.TransferStatusSenderKeyTweakPending {
-		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderInitiated or TransferStatusSenderKeyTweakPending but %s found", req.TransferId, transfer.Status)
+		return fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderInitiated or TransferStatusSenderKeyTweakPending but %s found", transfer.ID.String(), transfer.Status)
 	}
-	if intent == CancelTransferIntentExternal && transfer.Status != schema.TransferStatusSenderInitiated && transfer.ExpiryTime.After(time.Now()) {
-		return nil, fmt.Errorf("transfer %s has not expired, expires at %s", req.TransferId, transfer.ExpiryTime.String())
-	}
-
+	var err error
 	transfer, err = transfer.Update().SetStatus(schema.TransferStatusReturned).Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to update transfer status: %v", err)
+		return fmt.Errorf("unable to update transfer status: %w", err)
 	}
 
 	err = h.cancelTransferUnlockLeaves(ctx, transfer)
 	if err != nil {
-		return nil, fmt.Errorf("unable to unlock leaves in the transfer: %v", err)
+		return fmt.Errorf("unable to unlock leaves in the transfer: %w", err)
 	}
 
 	err = h.cancelTransferCancelRequest(ctx, transfer)
 	if err != nil {
-		return nil, fmt.Errorf("unable to cancel associated request: %v", err)
+		return fmt.Errorf("unable to cancel associated request: %w", err)
 	}
 
-	return &pbspark.CancelTransferResponse{}, nil
+	return nil
 }
 
 func (h *BaseTransferHandler) cancelTransferUnlockLeaves(ctx context.Context, transfer *ent.Transfer) error {
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to get transfer leaves: %v", err)
+		return fmt.Errorf("unable to get transfer leaves: %w", err)
 	}
 
 	for _, leaf := range transferLeaves {
 		treenode, err := leaf.QueryLeaf().Only(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to get tree node: %v", err)
+			return fmt.Errorf("unable to get tree node: %w", err)
 		}
 		_, err = treenode.Update().SetStatus(schema.TreeNodeStatusAvailable).Save(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to update tree node status: %v", err)
+			return fmt.Errorf("unable to update tree node status: %w", err)
 		}
 	}
 	return nil
@@ -470,7 +524,7 @@ func (h *BaseTransferHandler) cancelTransferCancelRequest(ctx context.Context, t
 		}
 		err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusReturned).Exec(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to update preimage request status: %v", err)
+			return fmt.Errorf("unable to update preimage request status: %w", err)
 		}
 	}
 	return nil
@@ -479,13 +533,13 @@ func (h *BaseTransferHandler) cancelTransferCancelRequest(ctx context.Context, t
 func (h *BaseTransferHandler) loadTransfer(ctx context.Context, transferID string) (*ent.Transfer, error) {
 	transferUUID, err := uuid.Parse(transferID)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", transferID, err)
+		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", transferID, err)
 	}
 
 	db := ent.GetDbFromContext(ctx)
 	transfer, err := db.Transfer.Query().Where(enttransfer.ID(transferUUID)).ForUpdate().Only(ctx)
 	if err != nil || transfer == nil {
-		return nil, fmt.Errorf("unable to find transfer %s: %v", transferID, err)
+		return nil, fmt.Errorf("unable to find transfer %s: %w", transferID, err)
 	}
 	return transfer, nil
 }
@@ -493,19 +547,19 @@ func (h *BaseTransferHandler) loadTransfer(ctx context.Context, transferID strin
 func (h *BaseTransferHandler) loadTransferWithoutUpdate(ctx context.Context, transferID string) (*ent.Transfer, error) {
 	transferUUID, err := uuid.Parse(transferID)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", transferID, err)
+		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", transferID, err)
 	}
 
 	db := ent.GetDbFromContext(ctx)
 	transfer, err := db.Transfer.Query().Where(enttransfer.ID(transferUUID)).Only(ctx)
 	if err != nil || transfer == nil {
-		return nil, fmt.Errorf("unable to find transfer %s: %v", transferID, err)
+		return nil, fmt.Errorf("unable to find transfer %s: %w", transferID, err)
 	}
 	return transfer, nil
 }
 
 // validateTransferPackage validates the transfer package, to ensure the key tweaks are valid.
-func (h *BaseTransferHandler) validateTransferPackage(_ context.Context, transferID string, req *pb.TransferPackage, senderIdentityPublicKey []byte) (map[string]*pb.SendLeafKeyTweak, error) {
+func (h *BaseTransferHandler) validateTransferPackage(_ context.Context, transferID string, req *pbspark.TransferPackage, senderIdentityPublicKey []byte) (map[string]*pbspark.SendLeafKeyTweak, error) {
 	// If the transfer package is nil, we don't need to validate it.
 	if req == nil {
 		return nil, nil
@@ -520,40 +574,55 @@ func (h *BaseTransferHandler) validateTransferPackage(_ context.Context, transfe
 	decryptionPrivateKey := eciesgo.NewPrivateKeyFromBytes(h.config.IdentityPrivateKey)
 	leafTweaksBinary, err := eciesgo.Decrypt(decryptionPrivateKey, leafTweaksCipherText)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt key tweaks: %v", err)
+		return nil, fmt.Errorf("failed to decrypt key tweaks: %w", err)
 	}
 
-	leafTweaks := &pb.SendLeafKeyTweaks{}
+	leafTweaks := &pbspark.SendLeafKeyTweaks{}
 	err = proto.Unmarshal(leafTweaksBinary, leafTweaks)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal key tweaks: %v", err)
+		return nil, fmt.Errorf("failed to unmarshal key tweaks: %w", err)
 	}
 
-	leafTweaksMap := make(map[string]*pb.SendLeafKeyTweak)
+	leafTweaksMap := make(map[string]*pbspark.SendLeafKeyTweak)
 	for _, leafTweak := range leafTweaks.LeavesToSend {
 		leafTweaksMap[leafTweak.LeafId] = leafTweak
 	}
 
 	transferIDUUID, err := uuid.Parse(transferID)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %v", transferID, err)
+		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", transferID, err)
 	}
 	payloadToVerify := common.GetTransferPackageSigningPayload(transferIDUUID, req)
 
 	signature, err := ecdsa.ParseDERSignature(req.UserSignature)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse user signature: %v", err)
+		return nil, fmt.Errorf("unable to parse user signature: %w", err)
 	}
 	userPublicKey, err := secp256k1.ParsePubKey(senderIdentityPublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse user public key: %v", err)
+		return nil, fmt.Errorf("unable to parse user public key: %w", err)
 	}
 	valid := signature.Verify(payloadToVerify, userPublicKey)
 	if !valid {
 		return nil, fmt.Errorf("invalid signature")
 	}
 
-	// TODO:(LPT-309) Validate the key tweaks is correct using VSS and each leaf is tweaked.
+	for _, leafTweak := range leafTweaksMap {
+		err := secretsharing.ValidateShare(
+			&secretsharing.VerifiableSecretShare{
+				SecretShare: secretsharing.SecretShare{
+					FieldModulus: secp256k1.S256().N,
+					Threshold:    int(h.config.Threshold),
+					Index:        big.NewInt(int64(h.config.Index + 1)),
+					Share:        new(big.Int).SetBytes(leafTweak.SecretShareTweak.SecretShare),
+				},
+				Proofs: leafTweak.SecretShareTweak.Proofs,
+			},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("unable to validate share: %w", err)
+		}
+	}
 
 	return leafTweaksMap, nil
 }
@@ -567,30 +636,34 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 	}
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to get transfer leaves: %v", err)
+		return fmt.Errorf("unable to get transfer leaves: %w", err)
 	}
 	for _, leaf := range transferLeaves {
-		keyTweak := &pb.SendLeafKeyTweak{}
+		keyTweak := &pbspark.SendLeafKeyTweak{}
 		err := proto.Unmarshal(leaf.KeyTweak, keyTweak)
 		if err != nil {
-			return fmt.Errorf("unable to unmarshal key tweak: %v", err)
+			return fmt.Errorf("unable to unmarshal key tweak: %w", err)
 		}
 		treeNode, err := leaf.QueryLeaf().Only(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to get tree node: %v", err)
+			return fmt.Errorf("unable to get tree node: %w", err)
 		}
 		err = helper.TweakLeafKey(ctx, treeNode, keyTweak, nil)
 		if err != nil {
-			return fmt.Errorf("unable to tweak leaf key: %v", err)
+			return fmt.Errorf("unable to tweak leaf key: %w", err)
 		}
-		_, err = leaf.Update().SetKeyTweak(nil).Save(ctx)
+		_, err = leaf.Update().
+			SetKeyTweak(nil).
+			SetSecretCipher(keyTweak.SecretCipher).
+			SetSignature(keyTweak.Signature).
+			Save(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to update leaf key tweak: %v", err)
+			return fmt.Errorf("unable to update leaf key tweak: %w", err)
 		}
 	}
 	_, err = transfer.Update().SetStatus(schema.TransferStatusSenderKeyTweaked).Save(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to update transfer status: %v", err)
+		return fmt.Errorf("unable to update transfer status: %w", err)
 	}
 	return nil
 }

@@ -116,6 +116,12 @@ func (usc *UtxoSwapCreate) SetUserIdentityPublicKey(b []byte) *UtxoSwapCreate {
 	return usc
 }
 
+// SetCoordinatorIdentityPublicKey sets the "coordinator_identity_public_key" field.
+func (usc *UtxoSwapCreate) SetCoordinatorIdentityPublicKey(b []byte) *UtxoSwapCreate {
+	usc.mutation.SetCoordinatorIdentityPublicKey(b)
+	return usc
+}
+
 // SetID sets the "id" field.
 func (usc *UtxoSwapCreate) SetID(u uuid.UUID) *UtxoSwapCreate {
 	usc.mutation.SetID(u)
@@ -233,6 +239,9 @@ func (usc *UtxoSwapCreate) check() error {
 			return &ValidationError{Name: "request_type", err: fmt.Errorf(`ent: validator failed for field "UtxoSwap.request_type": %w`, err)}
 		}
 	}
+	if _, ok := usc.mutation.CoordinatorIdentityPublicKey(); !ok {
+		return &ValidationError{Name: "coordinator_identity_public_key", err: errors.New(`ent: missing required field "UtxoSwap.coordinator_identity_public_key"`)}
+	}
 	if len(usc.mutation.UtxoIDs()) == 0 {
 		return &ValidationError{Name: "utxo", err: errors.New(`ent: missing required edge "UtxoSwap.utxo"`)}
 	}
@@ -310,6 +319,10 @@ func (usc *UtxoSwapCreate) createSpec() (*UtxoSwap, *sqlgraph.CreateSpec) {
 	if value, ok := usc.mutation.UserIdentityPublicKey(); ok {
 		_spec.SetField(utxoswap.FieldUserIdentityPublicKey, field.TypeBytes, value)
 		_node.UserIdentityPublicKey = value
+	}
+	if value, ok := usc.mutation.CoordinatorIdentityPublicKey(); ok {
+		_spec.SetField(utxoswap.FieldCoordinatorIdentityPublicKey, field.TypeBytes, value)
+		_node.CoordinatorIdentityPublicKey = value
 	}
 	if nodes := usc.mutation.UtxoIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

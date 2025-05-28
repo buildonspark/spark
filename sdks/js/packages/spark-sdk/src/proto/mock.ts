@@ -15,6 +15,58 @@ export interface CleanUpPreimageShareRequest {
   paymentHash: Uint8Array;
 }
 
+export interface InterruptTransferRequest {
+  action: InterruptTransferRequest_InterruptTransferAction;
+}
+
+export enum InterruptTransferRequest_InterruptTransferAction {
+  NONE = 0,
+  INTERRUPT = 1,
+  RESUME = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function interruptTransferRequest_InterruptTransferActionFromJSON(
+  object: any,
+): InterruptTransferRequest_InterruptTransferAction {
+  switch (object) {
+    case 0:
+    case "NONE":
+      return InterruptTransferRequest_InterruptTransferAction.NONE;
+    case 1:
+    case "INTERRUPT":
+      return InterruptTransferRequest_InterruptTransferAction.INTERRUPT;
+    case 2:
+    case "RESUME":
+      return InterruptTransferRequest_InterruptTransferAction.RESUME;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return InterruptTransferRequest_InterruptTransferAction.UNRECOGNIZED;
+  }
+}
+
+export function interruptTransferRequest_InterruptTransferActionToJSON(
+  object: InterruptTransferRequest_InterruptTransferAction,
+): string {
+  switch (object) {
+    case InterruptTransferRequest_InterruptTransferAction.NONE:
+      return "NONE";
+    case InterruptTransferRequest_InterruptTransferAction.INTERRUPT:
+      return "INTERRUPT";
+    case InterruptTransferRequest_InterruptTransferAction.RESUME:
+      return "RESUME";
+    case InterruptTransferRequest_InterruptTransferAction.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export interface UpdateNodesStatusRequest {
+  nodeIds: string[];
+  status: string;
+}
+
 function createBaseCleanUpPreimageShareRequest(): CleanUpPreimageShareRequest {
   return { paymentHash: new Uint8Array(0) };
 }
@@ -73,6 +125,142 @@ export const CleanUpPreimageShareRequest: MessageFns<CleanUpPreimageShareRequest
   },
 };
 
+function createBaseInterruptTransferRequest(): InterruptTransferRequest {
+  return { action: 0 };
+}
+
+export const InterruptTransferRequest: MessageFns<InterruptTransferRequest> = {
+  encode(message: InterruptTransferRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.action !== 0) {
+      writer.uint32(8).int32(message.action);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): InterruptTransferRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseInterruptTransferRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.action = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): InterruptTransferRequest {
+    return {
+      action: isSet(object.action) ? interruptTransferRequest_InterruptTransferActionFromJSON(object.action) : 0,
+    };
+  },
+
+  toJSON(message: InterruptTransferRequest): unknown {
+    const obj: any = {};
+    if (message.action !== 0) {
+      obj.action = interruptTransferRequest_InterruptTransferActionToJSON(message.action);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<InterruptTransferRequest>): InterruptTransferRequest {
+    return InterruptTransferRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<InterruptTransferRequest>): InterruptTransferRequest {
+    const message = createBaseInterruptTransferRequest();
+    message.action = object.action ?? 0;
+    return message;
+  },
+};
+
+function createBaseUpdateNodesStatusRequest(): UpdateNodesStatusRequest {
+  return { nodeIds: [], status: "" };
+}
+
+export const UpdateNodesStatusRequest: MessageFns<UpdateNodesStatusRequest> = {
+  encode(message: UpdateNodesStatusRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.nodeIds) {
+      writer.uint32(10).string(v!);
+    }
+    if (message.status !== "") {
+      writer.uint32(18).string(message.status);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateNodesStatusRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateNodesStatusRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.nodeIds.push(reader.string());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.status = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpdateNodesStatusRequest {
+    return {
+      nodeIds: globalThis.Array.isArray(object?.nodeIds) ? object.nodeIds.map((e: any) => globalThis.String(e)) : [],
+      status: isSet(object.status) ? globalThis.String(object.status) : "",
+    };
+  },
+
+  toJSON(message: UpdateNodesStatusRequest): unknown {
+    const obj: any = {};
+    if (message.nodeIds?.length) {
+      obj.nodeIds = message.nodeIds;
+    }
+    if (message.status !== "") {
+      obj.status = message.status;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpdateNodesStatusRequest>): UpdateNodesStatusRequest {
+    return UpdateNodesStatusRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpdateNodesStatusRequest>): UpdateNodesStatusRequest {
+    const message = createBaseUpdateNodesStatusRequest();
+    message.nodeIds = object.nodeIds?.map((e) => e) || [];
+    message.status = object.status ?? "";
+    return message;
+  },
+};
+
 export type MockServiceDefinition = typeof MockServiceDefinition;
 export const MockServiceDefinition = {
   name: "MockService",
@@ -86,6 +274,22 @@ export const MockServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    interrupt_transfer: {
+      name: "interrupt_transfer",
+      requestType: InterruptTransferRequest,
+      requestStream: false,
+      responseType: Empty,
+      responseStream: false,
+      options: {},
+    },
+    update_nodes_status: {
+      name: "update_nodes_status",
+      requestType: UpdateNodesStatusRequest,
+      requestStream: false,
+      responseType: Empty,
+      responseStream: false,
+      options: {},
+    },
   },
 } as const;
 
@@ -94,11 +298,27 @@ export interface MockServiceImplementation<CallContextExt = {}> {
     request: CleanUpPreimageShareRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<Empty>>;
+  interrupt_transfer(
+    request: InterruptTransferRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<Empty>>;
+  update_nodes_status(
+    request: UpdateNodesStatusRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<Empty>>;
 }
 
 export interface MockServiceClient<CallOptionsExt = {}> {
   clean_up_preimage_share(
     request: DeepPartial<CleanUpPreimageShareRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<Empty>;
+  interrupt_transfer(
+    request: DeepPartial<InterruptTransferRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<Empty>;
+  update_nodes_status(
+    request: DeepPartial<UpdateNodesStatusRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<Empty>;
 }

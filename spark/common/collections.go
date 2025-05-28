@@ -1,6 +1,9 @@
 package common
 
-import "google.golang.org/protobuf/proto"
+import (
+	"github.com/google/uuid"
+	"google.golang.org/protobuf/proto"
+)
 
 func getAny[K comparable, V any](m map[K]V) (K, V) {
 	for k, v := range m {
@@ -27,6 +30,14 @@ func MapOfArrayToArrayOfMap[K comparable, V any](mapOfArray map[K][]V) []map[K]V
 		for i, value := range v {
 			results[i][k] = value
 		}
+	}
+	return results
+}
+
+func KeysOfMap[K comparable, V any](mapOfAny map[K]V) []K {
+	results := make([]K, 0, len(mapOfAny))
+	for k := range mapOfAny {
+		results = append(results, k)
 	}
 	return results
 }
@@ -73,6 +84,18 @@ func ConvertObjectMapToProtoMap[K comparable, V ProtoConvertable[T], T proto.Mes
 			return nil, err
 		}
 		results[k] = proto
+	}
+	return results, nil
+}
+
+func StringUUIDArrayToUUIDArray(arr []string) ([]uuid.UUID, error) {
+	results := make([]uuid.UUID, len(arr))
+	for i, v := range arr {
+		uuid, err := uuid.Parse(v)
+		if err != nil {
+			return nil, err
+		}
+		results[i] = uuid
 	}
 	return results, nil
 }

@@ -37,6 +37,8 @@ const (
 	FieldUserSignature = "user_signature"
 	// FieldUserIdentityPublicKey holds the string denoting the user_identity_public_key field in the database.
 	FieldUserIdentityPublicKey = "user_identity_public_key"
+	// FieldCoordinatorIdentityPublicKey holds the string denoting the coordinator_identity_public_key field in the database.
+	FieldCoordinatorIdentityPublicKey = "coordinator_identity_public_key"
 	// EdgeUtxo holds the string denoting the utxo edge name in mutations.
 	EdgeUtxo = "utxo"
 	// EdgeTransfer holds the string denoting the transfer edge name in mutations.
@@ -72,6 +74,7 @@ var Columns = []string{
 	FieldSspIdentityPublicKey,
 	FieldUserSignature,
 	FieldUserIdentityPublicKey,
+	FieldCoordinatorIdentityPublicKey,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "utxo_swaps"
@@ -111,7 +114,7 @@ var (
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schema.UtxoSwapStatus) error {
 	switch s {
-	case "CREATED", "CANCELLED":
+	case "CREATED", "COMPLETED", "CANCELLED":
 		return nil
 	default:
 		return fmt.Errorf("utxoswap: invalid enum value for status field: %q", s)
@@ -121,7 +124,7 @@ func StatusValidator(s schema.UtxoSwapStatus) error {
 // RequestTypeValidator is a validator for the "request_type" field enum values. It is called by the builders before save.
 func RequestTypeValidator(rt schema.UtxoSwapRequestType) error {
 	switch rt {
-	case "FIXED_AMOUNT", "MAX_FEE":
+	case "FIXED_AMOUNT", "MAX_FEE", "REFUND":
 		return nil
 	default:
 		return fmt.Errorf("utxoswap: invalid enum value for request_type field: %q", rt)

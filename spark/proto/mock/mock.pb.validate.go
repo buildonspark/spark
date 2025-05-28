@@ -139,3 +139,211 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = CleanUpPreimageShareRequestValidationError{}
+
+// Validate checks the field values on InterruptTransferRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *InterruptTransferRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InterruptTransferRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// InterruptTransferRequestMultiError, or nil if none found.
+func (m *InterruptTransferRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InterruptTransferRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Action
+
+	if len(errors) > 0 {
+		return InterruptTransferRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// InterruptTransferRequestMultiError is an error wrapping multiple validation
+// errors returned by InterruptTransferRequest.ValidateAll() if the designated
+// constraints aren't met.
+type InterruptTransferRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InterruptTransferRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InterruptTransferRequestMultiError) AllErrors() []error { return m }
+
+// InterruptTransferRequestValidationError is the validation error returned by
+// InterruptTransferRequest.Validate if the designated constraints aren't met.
+type InterruptTransferRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InterruptTransferRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InterruptTransferRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InterruptTransferRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InterruptTransferRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InterruptTransferRequestValidationError) ErrorName() string {
+	return "InterruptTransferRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InterruptTransferRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInterruptTransferRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InterruptTransferRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InterruptTransferRequestValidationError{}
+
+// Validate checks the field values on UpdateNodesStatusRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *UpdateNodesStatusRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on UpdateNodesStatusRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// UpdateNodesStatusRequestMultiError, or nil if none found.
+func (m *UpdateNodesStatusRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *UpdateNodesStatusRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for Status
+
+	if len(errors) > 0 {
+		return UpdateNodesStatusRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// UpdateNodesStatusRequestMultiError is an error wrapping multiple validation
+// errors returned by UpdateNodesStatusRequest.ValidateAll() if the designated
+// constraints aren't met.
+type UpdateNodesStatusRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m UpdateNodesStatusRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m UpdateNodesStatusRequestMultiError) AllErrors() []error { return m }
+
+// UpdateNodesStatusRequestValidationError is the validation error returned by
+// UpdateNodesStatusRequest.Validate if the designated constraints aren't met.
+type UpdateNodesStatusRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e UpdateNodesStatusRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e UpdateNodesStatusRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e UpdateNodesStatusRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e UpdateNodesStatusRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e UpdateNodesStatusRequestValidationError) ErrorName() string {
+	return "UpdateNodesStatusRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e UpdateNodesStatusRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sUpdateNodesStatusRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = UpdateNodesStatusRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = UpdateNodesStatusRequestValidationError{}

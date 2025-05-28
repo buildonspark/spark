@@ -134,4 +134,3 @@ export type {
 
 export * from "./proto/rpc/v1/service.ts";
 export * as Lrc20Protos from "./proto/rpc/v1/types.js";
-

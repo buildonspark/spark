@@ -81,9 +81,7 @@ export interface FreezeTokensResponse {
 
 export interface ListAllTokenTransactionsRequest {
   cursor?: ListAllTokenTransactionsCursor | undefined;
-  pageSize?:
-    | number
-    | undefined;
+  pageSize?: number | undefined;
   /** optional filters */
   ownerPublicKey?: Uint8Array | undefined;
   tokenPublicKey?: Uint8Array | undefined;
@@ -198,7 +196,7 @@ export const SendSparkTxRequest: MessageFns<SendSparkTxRequest> = {
     const message = createBaseSendSparkTxRequest();
     message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
     message.finalTokenTransaction =
-      (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
+      object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null
         ? TokenTransaction.fromPartial(object.finalTokenTransaction)
         : undefined;
     return message;
@@ -260,9 +258,10 @@ export const SendSparkSignatureRequest: MessageFns<SendSparkSignatureRequest> = 
   },
   fromPartial(object: DeepPartial<SendSparkSignatureRequest>): SendSparkSignatureRequest {
     const message = createBaseSendSparkSignatureRequest();
-    message.signatureData = (object.signatureData !== undefined && object.signatureData !== null)
-      ? SparkSignatureData.fromPartial(object.signatureData)
-      : undefined;
+    message.signatureData =
+      object.signatureData !== undefined && object.signatureData !== null
+        ? SparkSignatureData.fromPartial(object.signatureData)
+        : undefined;
     return message;
   },
 };
@@ -387,7 +386,7 @@ export const VerifySparkTxRequest: MessageFns<VerifySparkTxRequest> = {
   fromPartial(object: DeepPartial<VerifySparkTxRequest>): VerifySparkTxRequest {
     const message = createBaseVerifySparkTxRequest();
     message.finalTokenTransaction =
-      (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
+      object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null
         ? TokenTransaction.fromPartial(object.finalTokenTransaction)
         : undefined;
     return message;
@@ -776,7 +775,7 @@ export const GetSparkTxResponse: MessageFns<GetSparkTxResponse> = {
   fromPartial(object: DeepPartial<GetSparkTxResponse>): GetSparkTxResponse {
     const message = createBaseGetSparkTxResponse();
     message.finalTokenTransaction =
-      (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
+      object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null
         ? TokenTransaction.fromPartial(object.finalTokenTransaction)
         : undefined;
     return message;
@@ -855,9 +854,10 @@ export const FreezeTokensRequest: MessageFns<FreezeTokensRequest> = {
   },
   fromPartial(object: DeepPartial<FreezeTokensRequest>): FreezeTokensRequest {
     const message = createBaseFreezeTokensRequest();
-    message.freezeTokensPayload = (object.freezeTokensPayload !== undefined && object.freezeTokensPayload !== null)
-      ? FreezeTokensPayload.fromPartial(object.freezeTokensPayload)
-      : undefined;
+    message.freezeTokensPayload =
+      object.freezeTokensPayload !== undefined && object.freezeTokensPayload !== null
+        ? FreezeTokensPayload.fromPartial(object.freezeTokensPayload)
+        : undefined;
     message.issuerSignature = object.issuerSignature ?? new Uint8Array(0);
     return message;
   },
@@ -1110,9 +1110,10 @@ export const ListAllTokenTransactionsRequest: MessageFns<ListAllTokenTransaction
   },
   fromPartial(object: DeepPartial<ListAllTokenTransactionsRequest>): ListAllTokenTransactionsRequest {
     const message = createBaseListAllTokenTransactionsRequest();
-    message.cursor = (object.cursor !== undefined && object.cursor !== null)
-      ? ListAllTokenTransactionsCursor.fromPartial(object.cursor)
-      : undefined;
+    message.cursor =
+      object.cursor !== undefined && object.cursor !== null
+        ? ListAllTokenTransactionsCursor.fromPartial(object.cursor)
+        : undefined;
     message.pageSize = object.pageSize ?? undefined;
     message.ownerPublicKey = object.ownerPublicKey ?? undefined;
     message.tokenPublicKey = object.tokenPublicKey ?? undefined;
@@ -1196,9 +1197,10 @@ export const ListAllTokenTransactionsResponse: MessageFns<ListAllTokenTransactio
   fromPartial(object: DeepPartial<ListAllTokenTransactionsResponse>): ListAllTokenTransactionsResponse {
     const message = createBaseListAllTokenTransactionsResponse();
     message.transactions = object.transactions?.map((e) => Transaction.fromPartial(e)) || [];
-    message.nextCursor = (object.nextCursor !== undefined && object.nextCursor !== null)
-      ? ListAllTokenTransactionsCursor.fromPartial(object.nextCursor)
-      : undefined;
+    message.nextCursor =
+      object.nextCursor !== undefined && object.nextCursor !== null
+        ? ListAllTokenTransactionsCursor.fromPartial(object.nextCursor)
+        : undefined;
     return message;
   },
 };
@@ -1256,9 +1258,8 @@ export const BlockInfoResponse: MessageFns<BlockInfoResponse> = {
   },
   fromPartial(object: DeepPartial<BlockInfoResponse>): BlockInfoResponse {
     const message = createBaseBlockInfoResponse();
-    message.blockInfo = (object.blockInfo !== undefined && object.blockInfo !== null)
-      ? BlockInfo.fromPartial(object.blockInfo)
-      : undefined;
+    message.blockInfo =
+      object.blockInfo !== undefined && object.blockInfo !== null ? BlockInfo.fromPartial(object.blockInfo) : undefined;
     return message;
   },
 };
@@ -1563,9 +1564,10 @@ export const TokenPubkeyInfo: MessageFns<TokenPubkeyInfo> = {
   },
   fromPartial(object: DeepPartial<TokenPubkeyInfo>): TokenPubkeyInfo {
     const message = createBaseTokenPubkeyInfo();
-    message.announcement = (object.announcement !== undefined && object.announcement !== null)
-      ? TokenPubkeyAnnouncement.fromPartial(object.announcement)
-      : undefined;
+    message.announcement =
+      object.announcement !== undefined && object.announcement !== null
+        ? TokenPubkeyAnnouncement.fromPartial(object.announcement)
+        : undefined;
     message.totalSupply = object.totalSupply ?? new Uint8Array(0);
     message.owner = object.owner ?? undefined;
     message.logoUrl = object.logoUrl ?? undefined;
@@ -1772,12 +1774,17 @@ function base64FromBytes(arr: Uint8Array): string {
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
-export type DeepPartial<T> = T extends Builtin ? T
-  : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>>
-  : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>>
-  : T extends { $case: string } ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & { $case: T["$case"] }
-  : T extends {} ? { [K in keyof T]?: DeepPartial<T[K]> }
-  : Partial<T>;
+export type DeepPartial<T> = T extends Builtin
+  ? T
+  : T extends globalThis.Array<infer U>
+    ? globalThis.Array<DeepPartial<U>>
+    : T extends ReadonlyArray<infer U>
+      ? ReadonlyArray<DeepPartial<U>>
+      : T extends { $case: string }
+        ? { [K in keyof Omit<T, "$case">]?: DeepPartial<T[K]> } & { $case: T["$case"] }
+        : T extends {}
+          ? { [K in keyof T]?: DeepPartial<T[K]> }
+          : Partial<T>;
 
 function toTimestamp(date: Date): Timestamp {
   const seconds = Math.trunc(date.getTime() / 1_000);

@@ -1,5 +1,61 @@
 # @buildonspark/spark-cli
 
+## 0.0.36
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/issuer-sdk@0.0.58
+  - @buildonspark/spark-sdk@0.1.27
+
+## 0.0.35
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.1.26
+  - @buildonspark/issuer-sdk@0.0.57
+
+## 0.0.34
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.1.25
+  - @buildonspark/issuer-sdk@0.0.56
+
+## 0.0.33
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/issuer-sdk@0.0.55
+  - @buildonspark/spark-sdk@0.1.24
+
+## 0.0.32
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.1.23
+  - @buildonspark/issuer-sdk@0.0.54
+
+## 0.0.31
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/issuer-sdk@0.0.53
+  - @buildonspark/spark-sdk@0.1.22
+
+## 0.0.30
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/issuer-sdk@0.0.52
+  - @buildonspark/spark-sdk@0.1.21
+
 ## 0.0.29
 
 ### Patch Changes

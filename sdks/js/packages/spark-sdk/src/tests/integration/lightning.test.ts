@@ -6,7 +6,9 @@ import { TransferStatus } from "../../proto/spark.js";
 import { WalletConfigService } from "../../services/config.js";
 import { ConnectionManager } from "../../services/connection.js";
 import { LightningService } from "../../services/lightning.js";
-import { LeafKeyTweak, TransferService } from "../../services/transfer.js";
+import { TransferService } from "../../services/transfer.js";
+import { SigningService } from "../../services/signing.js";
+import type { LeafKeyTweak } from "../../services/transfer.js";
 import {
   BitcoinNetwork,
   CurrencyUnit,
@@ -68,11 +70,13 @@ describe("LightningService", () => {
   let userConfig: WalletConfigService;
   let lightningService: LightningService;
   let transferService: TransferService;
+  let signingService: SigningService;
 
   let sspWallet: SparkWalletTesting;
   let sspConfig: WalletConfigService;
   let sspLightningService: LightningService;
   let sspTransferService: TransferService;
+  let sspSigningService: SigningService;
 
   beforeAll(async () => {
     const { wallet: wallet1 } = await SparkWalletTesting.initialize({
@@ -90,8 +94,17 @@ describe("LightningService", () => {
       userWallet.getSigner(),
     );
     const connectionManager = new ConnectionManager(userConfig);
-    lightningService = new LightningService(userConfig, connectionManager);
-    transferService = new TransferService(userConfig, connectionManager);
+    signingService = new SigningService(userConfig);
+    lightningService = new LightningService(
+      userConfig,
+      connectionManager,
+      signingService,
+    );
+    transferService = new TransferService(
+      userConfig,
+      connectionManager,
+      signingService,
+    );
 
     const { wallet: wallet2 } = await SparkWalletTesting.initialize({
       options: {
@@ -108,8 +121,17 @@ describe("LightningService", () => {
       sspWallet.getSigner(),
     );
     const sspConnectionManager = new ConnectionManager(sspConfig);
-    sspLightningService = new LightningService(sspConfig, sspConnectionManager);
-    sspTransferService = new TransferService(sspConfig, sspConnectionManager);
+    sspSigningService = new SigningService(sspConfig);
+    sspLightningService = new LightningService(
+      sspConfig,
+      sspConnectionManager,
+      sspSigningService,
+    );
+    sspTransferService = new TransferService(
+      sspConfig,
+      sspConnectionManager,
+      sspSigningService,
+    );
   });
   afterEach(async () => {
     await cleanUp();

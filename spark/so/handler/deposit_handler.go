@@ -7,6 +7,8 @@ import (
 	"fmt"
 
 	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -15,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/schema"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
@@ -22,6 +25,8 @@ import (
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/objects"
 )
+
+const DepositConfirmationThreshold = 6
 
 // The DepositHandler is responsible for handling deposit related requests.
 type DepositHandler struct {
@@ -83,7 +88,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 
 	combinedPublicKey, err := common.AddPublicKeys(keyshare.PublicKey, req.SigningPublicKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to add public keys for request %s: %w", logging.FormatProto("generate_deposit_address_request", req), err)
 	}
 	depositAddress, err := common.P2TRAddressFromPublicKey(combinedPublicKey, network)
 	if err != nil {
@@ -111,7 +116,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 
 	_, err = depositAddressMutator.Save(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to save deposit address for request %s: %w", logging.FormatProto("generate_deposit_address_request", req), err)
 	}
 
 	response, err := helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]byte, error) {
@@ -130,7 +135,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 			IsStatic:               req.IsStatic,
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to mark keyshare for deposit address for request %s: %w", logging.FormatProto("generate_deposit_address_request", req), err)
 		}
 		return response.AddressSignature, nil
 	})
@@ -140,7 +145,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 
 	verifyingKeyBytes, err := common.AddPublicKeys(keyshare.PublicKey, req.SigningPublicKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to generate proof of possession signatures for request %s: %w", logging.FormatProto("generate_deposit_address_request", req), err)
 	}
 
 	msg := common.ProofOfPossessionMessageHashForDepositAddress(req.IdentityPublicKey, keyshare.PublicKey, []byte(*depositAddress))
@@ -171,32 +176,32 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	// Get the on chain tx
 	onChainTx, err := common.TxFromRawTxBytes(req.OnChainUtxo.RawTx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get on-chain tx for request %s: %w", logging.FormatProto("start_tree_creation_request", req), err)
 	}
 	if len(onChainTx.TxOut) <= int(req.OnChainUtxo.Vout) {
-		return nil, fmt.Errorf("utxo index out of bounds")
+		return nil, fmt.Errorf("utxo index out of bounds for request %s", logging.FormatProto("start_tree_creation_request", req))
 	}
 
 	// Verify that the on chain utxo is paid to the registered deposit address
 	if len(onChainTx.TxOut) <= int(req.OnChainUtxo.Vout) {
-		return nil, fmt.Errorf("utxo index out of bounds")
+		return nil, fmt.Errorf("utxo index out of bounds for request %s", logging.FormatProto("start_tree_creation_request", req))
 	}
 	onChainOutput := onChainTx.TxOut[req.OnChainUtxo.Vout]
 	network, err := common.NetworkFromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get network for request %s: %w", logging.FormatProto("start_tree_creation_request", req), err)
 	}
 	if !config.IsNetworkSupported(network) {
-		return nil, fmt.Errorf("network not supported")
+		return nil, fmt.Errorf("network not supported for request %s", logging.FormatProto("start_tree_creation_request", req))
 	}
 	utxoAddress, err := common.P2TRAddressFromPkScript(onChainOutput.PkScript, network)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get P2TR address from pk script for request %s: %w", logging.FormatProto("start_tree_creation_request", req), err)
 	}
 	db := ent.GetDbFromContext(ctx)
 	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).First(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to query deposit address for request %s: %w", logging.FormatProto("start_tree_creation_request", req), err)
 	}
 	if depositAddress == nil || !bytes.Equal(depositAddress.OwnerIdentityPubkey, req.IdentityPublicKey) {
 		return nil, fmt.Errorf("deposit address not found for address: %s", *utxoAddress)
@@ -561,8 +566,8 @@ func (o *DepositHandler) verifyRootTransaction(rootTx *wire.MsgTx, onChainTx *wi
 	}
 
 	// Check root transaction amount
-	if rootTx.TxOut[0].Value != onChainTx.TxOut[onChainVout].Value {
-		return fmt.Errorf("root transaction has wrong value")
+	if rootTx.TxOut[0].Value > onChainTx.TxOut[onChainVout].Value {
+		return fmt.Errorf("root transaction has wrong value: root tx value %d > on-chain tx value %d", rootTx.TxOut[0].Value, onChainTx.TxOut[onChainVout].Value)
 	}
 
 	return nil
@@ -586,6 +591,18 @@ const (
 	UtxoSwapRequestFixed UtxoSwapRequestType = iota
 	UtxoSwapRequestMaxFee
 )
+
+type UtxoSwapStatementType int
+
+const (
+	UtxoSwapStatementTypeCreated UtxoSwapStatementType = iota
+	UtxoSwapStatementTypeRollback
+	UtxoSwapStatementTypeCompleted
+)
+
+func (s UtxoSwapStatementType) String() string {
+	return [...]string{"Created", "Rollback", "Completed"}[s]
+}
 
 // InitiateUtxoSwap initiates a UTXO swap operation, allowing a User to swap their on-chain UTXOs for Spark funds.
 // It is used in static deposit address flow.
@@ -619,20 +636,40 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Info("Start InitiateUtxoSwap request for on-chain utxo", "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout)
 
+	// **********************************************************************************************
 	// Create a swap record in all SEs so they can not be called concurrently to spend the same utxo.
 	// This will validate the swap request and store it in the database with status CREATED,
 	// blocking any other swap requests. Then it will create a transfer to the user.
+	// **********************************************************************************************
+
+	// Sign a statement that this utxo swap is created by this coordinator.
+	// SOs will use it to mark the utxo swap as owned by this coordinator.
+	// This will allow the coordinator to cancel the swap if needed.
+	createUtxoSwapRequestMessageHash, err := CreateUtxoSwapStatement(
+		UtxoSwapStatementTypeCreated,
+		hex.EncodeToString(req.OnChainUtxo.Txid),
+		req.OnChainUtxo.Vout,
+		common.Network(req.OnChainUtxo.Network),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create utxo swap statement: %w", err)
+	}
+	createUtxoSwapRequestSignature := ecdsa.Sign(secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey), createUtxoSwapRequestMessageHash)
 	allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
 	responses, err := helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
 		conn, err := operator.NewGRPCConnection()
 		if err != nil {
-			logger.Info("Failed to connect to operator for validating transaction state before cancelling", "error", err)
+			logger.Info("Failed to connect to operator", "error", err)
 			return nil, err
 		}
 		defer conn.Close()
 
 		client := pbinternal.NewSparkInternalServiceClient(conn)
-		internalResp, err := client.CreateUtxoSwap(ctx, req)
+		internalResp, err := client.CreateUtxoSwap(ctx, &pbinternal.CreateUtxoSwapRequest{
+			Request:              req,
+			Signature:            createUtxoSwapRequestSignature.Serialize(),
+			CoordinatorPublicKey: config.IdentityPublicKey(),
+		})
 		if err != nil {
 			logger.Info("Failed to execute create utxo swap task with operator", "operator", operator.Identifier, "error", err)
 			return nil, err
@@ -640,42 +677,112 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 		return internalResp, err
 	})
 	if err != nil {
-		// TODO(oleg): cancel the utxo swap for every operator
-		return nil, fmt.Errorf("failed to successfully execute create utxo swap task with all operators: %v", err)
+		originalErr := err
+		logger.Info("Failed to successfully execute create utxo swap task with all operators, rolling back", "error", originalErr)
+
+		// Sign a statement that this coordinator is rolling back the utxo swap.
+		rollbackUtxoSwapRequestMessageHash, err := CreateUtxoSwapStatement(
+			UtxoSwapStatementTypeRollback,
+			hex.EncodeToString(req.OnChainUtxo.Txid),
+			req.OnChainUtxo.Vout,
+			common.Network(req.OnChainUtxo.Network),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create utxo swap statement: %w", err)
+		}
+		rollbackUtxoSwapRequestSignature := ecdsa.Sign(secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey), rollbackUtxoSwapRequestMessageHash)
+		allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
+		_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+			conn, err := operator.NewGRPCConnection()
+			if err != nil {
+				logger.Info("Failed to connect to operator for rollback utxo swap", "error", err)
+				return nil, err
+			}
+			defer conn.Close()
+
+			client := pbinternal.NewSparkInternalServiceClient(conn)
+			internalResp, err := client.RollbackUtxoSwap(ctx, &pbinternal.RollbackUtxoSwapRequest{
+				CoordinatorPublicKey: config.IdentityPublicKey(),
+				Signature:            rollbackUtxoSwapRequestSignature.Serialize(),
+				OnChainUtxo:          req.OnChainUtxo,
+			})
+			if err != nil {
+				logger.Info("Failed to execute rollback utxo swap task with operator", "operator", operator.Identifier, "error", err)
+				return nil, err
+			}
+			return internalResp, err
+		})
+		if err != nil {
+			logger.Info("Failed to rollback utxo swap", "error", err)
+		}
+		return nil, fmt.Errorf("failed to successfully execute create utxo swap task with all operators: %v", originalErr)
 	}
 
+	completedUtxoSwapRequestMessageHash, err := CreateUtxoSwapStatement(
+		UtxoSwapStatementTypeCompleted,
+		hex.EncodeToString(req.OnChainUtxo.Txid),
+		req.OnChainUtxo.Vout,
+		common.Network(req.OnChainUtxo.Network),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create utxo swap statement: %w", err)
+	}
+	completedUtxoSwapRequestSignature := ecdsa.Sign(secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey), completedUtxoSwapRequestMessageHash)
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (interface{}, error) {
+		conn, err := operator.NewGRPCConnection()
+		if err != nil {
+			logger.Info("Failed to connect to operator", "error", err)
+			return nil, err
+		}
+		defer conn.Close()
+
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		internalResp, err := client.UtxoSwapCompleted(ctx, &pbinternal.UtxoSwapCompletedRequest{
+			OnChainUtxo:          req.OnChainUtxo,
+			Signature:            completedUtxoSwapRequestSignature.Serialize(),
+			CoordinatorPublicKey: config.IdentityPublicKey(),
+		})
+		if err != nil {
+			logger.Info("Failed to execute utxo swap completed task with operator", "operator", operator.Identifier, "error", err)
+			return nil, err
+		}
+		return internalResp, err
+	})
+	if err != nil {
+		logger.Error("Failed to mark a utxo swap as completed in all operators, on-call to manually intervene", "error", err)
+	}
+
+	// **********************************************************************************************
+	// Signing the spend transaction.
+	// **********************************************************************************************
 	transfer := responses[config.Identifier].(*pbinternal.CreateUtxoSwapResponse).Transfer
-	if transfer == nil {
+	if req.RequestType != pb.UtxoSwapRequestType_Refund && transfer == nil {
 		return nil, fmt.Errorf("create utxo swap task with operator %s returned nil transfer", config.Identifier)
 	}
 
 	db := ent.GetDbFromContext(ctx)
 	schemaNetwork, err := common.SchemaNetworkFromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get schema network: %v", err)
+		return nil, fmt.Errorf("failed to get schema network: %w", err)
 	}
-	targetUtxo, err := db.Utxo.Query().
-		Where(utxo.NetworkEQ(schemaNetwork)).
-		Where(utxo.Txid(req.OnChainUtxo.Txid)).
-		Where(utxo.Vout(req.OnChainUtxo.Vout)).
-		First(ctx)
+	targetUtxo, err := VerifiedTargetUtxo(ctx, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get target utxo: %v", err)
+		return nil, err
 	}
 	depositAddress, err := targetUtxo.QueryDepositAddress().Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get deposit address: %v", err)
+		return nil, fmt.Errorf("failed to get deposit address: %w", err)
 	}
 
 	// Recover the signature for the utxo spend
 	// Execute signing jobs with all operators and create a refund transaction
 	userRootTxNonceCommitment, err := objects.NewSigningCommitment(req.SpendTxSigningJob.SigningNonceCommitment.Binding, req.SpendTxSigningJob.SigningNonceCommitment.Hiding)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create signing commitment: %v", err)
+		return nil, fmt.Errorf("failed to create signing commitment: %w", err)
 	}
 	verifyingKeyBytes, spendTxSigningResult, err := getSpendTxSigningResult(ctx, config, depositAddress, targetUtxo, req.SpendTxSigningJob.RawTx, userRootTxNonceCommitment)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get spend tx signing result: %v", err)
+		return nil, fmt.Errorf("failed to get spend tx signing result: %w", err)
 	}
 
 	nodeIDStr := depositAddress.NodeID.String()
@@ -689,6 +796,28 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 			LeafId:               &nodeIDStr,
 		},
 	}, nil
+}
+
+// Verifies that an UTXO is confirmed on the blockchain and has sufficient confirmations.
+func VerifiedTargetUtxo(ctx context.Context, db *ent.Tx, schemaNetwork schema.Network, txid []byte, vout uint32) (*ent.Utxo, error) {
+	blockHeight, err := db.BlockHeight.Query().Where(
+		blockheight.NetworkEQ(schemaNetwork),
+	).Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find block height: %w", err)
+	}
+	targetUtxo, err := db.Utxo.Query().
+		Where(utxo.NetworkEQ(schemaNetwork)).
+		Where(utxo.Txid(txid)).
+		Where(utxo.Vout(vout)).
+		Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get target utxo: %w", err)
+	}
+	if blockHeight.Height-targetUtxo.BlockHeight+1 < DepositConfirmationThreshold {
+		return nil, errors.FailedPreconditionErrorf("deposit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", targetUtxo.BlockHeight, blockHeight.Height)
+	}
+	return targetUtxo, nil
 }
 
 // A helper function to generate a FROST signature for a spend transaction. This
@@ -709,31 +838,20 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 //     be aggregated with other signatures.
 //   - error if the operation fails.
 func getSpendTxSigningResult(ctx context.Context, config *so.Config, depositAddress *ent.DepositAddress, targetUtxo *ent.Utxo, spendTxRaw []byte, userSpendTxNonceCommitment *objects.SigningCommitment) ([]byte, *pb.SigningResult, error) {
-	logger := logging.GetLoggerFromContext(ctx)
-
 	signingKeyShare, err := depositAddress.QuerySigningKeyshare().Only(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get signing keyshare: %v", err)
+		return nil, nil, fmt.Errorf("failed to get signing keyshare: %w", err)
 	}
 	verifyingKeyBytes, err := common.AddPublicKeys(signingKeyShare.PublicKey, depositAddress.OwnerSigningPubkey)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to add public keys: %v", err)
+		return nil, nil, fmt.Errorf("failed to add public keys: %w", err)
 	}
-
-	onChainTxOut := wire.NewTxOut(int64(targetUtxo.Amount), targetUtxo.PkScript)
-	spendTx, err := common.TxFromRawTxBytes(spendTxRaw)
+	spendTxSigHash, _, err := GetTxSigningInfo(ctx, targetUtxo, spendTxRaw)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse spend tx: %v", err)
+		return nil, nil, fmt.Errorf("failed to get spend tx sig hash: %w", err)
 	}
-
-	spendTxSigHash, err := common.SigHashFromTx(spendTx, 0, onChainTxOut)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get spend tx sig hash: %v", err)
-	}
-	logger.Debug("spendTxSigHash", "spendTxSigHash", hex.EncodeToString(spendTxSigHash))
 
 	signingJobs := make([]*helper.SigningJob, 0)
-
 	signingJobs = append(
 		signingJobs,
 		&helper.SigningJob{
@@ -746,12 +864,35 @@ func getSpendTxSigningResult(ctx context.Context, config *so.Config, depositAddr
 	)
 	signingResults, err := helper.SignFrost(ctx, config, signingJobs)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to sign spend tx: %v", err)
+		return nil, nil, fmt.Errorf("failed to sign spend tx: %w", err)
 	}
 
 	spendTxSigningResult, err := signingResults[0].MarshalProto()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to marshal spend tx signing result: %v", err)
+		return nil, nil, fmt.Errorf("failed to marshal spend tx signing result: %w", err)
 	}
 	return verifyingKeyBytes, spendTxSigningResult, nil
+}
+
+func GetTxSigningInfo(ctx context.Context, targetUtxo *ent.Utxo, spendTxRaw []byte) ([]byte, uint64, error) {
+	logger := logging.GetLoggerFromContext(ctx)
+
+	onChainTxOut := wire.NewTxOut(int64(targetUtxo.Amount), targetUtxo.PkScript)
+	spendTx, err := common.TxFromRawTxBytes(spendTxRaw)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to parse spend tx: %v", err)
+	}
+
+	spendTxSigHash, err := common.SigHashFromTx(spendTx, 0, onChainTxOut)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get spend tx sig hash: %v", err)
+	}
+
+	totalAmount := int64(0)
+	for _, txOut := range spendTx.TxOut {
+		totalAmount += txOut.Value
+	}
+
+	logger.Debug("spendTxSigHash", "spendTxSigHash", hex.EncodeToString(spendTxSigHash))
+	return spendTxSigHash, uint64(totalAmount), nil
 }

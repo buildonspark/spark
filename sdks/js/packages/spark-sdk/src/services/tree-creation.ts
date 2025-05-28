@@ -1,5 +1,7 @@
+import { hexToBytes } from "@noble/curves/abstract/utils";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { sha256 } from "@scure/btc-signer/utils";
+import { NetworkError, ValidationError } from "../errors/index.js";
 import {
   AddressNode,
   AddressRequestNode,
@@ -25,7 +27,6 @@ import { getNetwork, Network } from "../utils/network.js";
 import { getEphemeralAnchorOutput } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
-import { NetworkError, ValidationError } from "../errors/index.js";
 
 export type DepositAddressTree = {
   address?: string | undefined;
@@ -95,6 +96,7 @@ export class TreeCreationService {
       request.source = {
         $case: "onChainUtxo",
         onChainUtxo: {
+          txid: hexToBytes(getTxId(parentTx)),
           vout: vout,
           rawTx: parentTx.toBytes(),
           network: this.config.getNetworkProto(),
@@ -149,6 +151,7 @@ export class TreeCreationService {
       request.source = {
         $case: "onChainUtxo",
         onChainUtxo: {
+          txid: hexToBytes(getTxId(parentTx)),
           vout: vout,
           rawTx: parentTx.toBytes(),
           network: this.config.getNetworkProto(),

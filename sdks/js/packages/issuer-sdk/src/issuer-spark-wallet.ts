@@ -9,6 +9,7 @@ import {
   SparkWalletProps,
   ValidationError,
 } from "@buildonspark/spark-sdk";
+import { isNode } from "@lightsparkdev/core";
 import {
   decodeSparkAddress,
   encodeSparkAddress,
@@ -45,6 +46,7 @@ export type IssuerTokenInfo = {
 export class IssuerSparkWallet extends SparkWallet {
   private issuerTokenTransactionService: IssuerTokenTransactionService;
   private tokenFreezeService: TokenFreezeService;
+  protected tracerId = "issuer-sdk";
 
   /**
    * Initializes a new IssuerSparkWallet instance.
@@ -58,10 +60,54 @@ export class IssuerSparkWallet extends SparkWallet {
       options.mnemonicOrSeed,
       options.accountNumber,
     );
+
+    if (isNode) {
+      wallet.wrapIssuerSparkWalletWithTracing();
+    }
+
     return {
       wallet,
       ...initResponse,
     };
+  }
+
+  private wrapIssuerSparkWalletWithTracing() {
+    this.getIssuerTokenBalance = this.wrapWithOtelSpan(
+      "SparkIssuerWallet.getIssuerTokenBalance",
+      this.getIssuerTokenBalance.bind(this),
+    );
+    this.getIssuerTokenInfo = this.wrapWithOtelSpan(
+      "SparkIssuerWallet.getIssuerTokenInfo",
+      this.getIssuerTokenInfo.bind(this),
+    );
+    this.mintTokens = this.wrapWithOtelSpan(
+      "SparkIssuerWallet.mintTokens",
+      this.mintTokens.bind(this),
+    );
+    this.burnTokens = this.wrapWithOtelSpan(
+      "SparkIssuerWallet.burnTokens",
+      this.burnTokens.bind(this),
+    );
+    this.freezeTokens = this.wrapWithOtelSpan(
+      "SparkIssuerWallet.freezeTokens",
+      this.freezeTokens.bind(this),
+    );
+    this.unfreezeTokens = this.wrapWithOtelSpan(
+      "SparkIssuerWallet.unfreezeTokens",
+      this.unfreezeTokens.bind(this),
+    );
+    this.getIssuerTokenActivity = this.wrapWithOtelSpan(
+      "SparkIssuerWallet.getIssuerTokenActivity",
+      this.getIssuerTokenActivity.bind(this),
+    );
+    this.getIssuerTokenDistribution = this.wrapWithOtelSpan(
+      "SparkIssuerWallet.getIssuerTokenDistribution",
+      this.getIssuerTokenDistribution.bind(this),
+    );
+    this.announceTokenL1 = this.wrapWithOtelSpan(
+      "SparkIssuerWallet.announceTokenL1",
+      this.announceTokenL1.bind(this),
+    );
   }
 
   protected constructor(configOptions?: ConfigOptions) {

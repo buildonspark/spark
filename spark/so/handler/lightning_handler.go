@@ -27,7 +27,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/schema"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/helper"
-	"github.com/lightsparkdev/spark/so/objects"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -57,17 +56,17 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pb.Store
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("unable to validate share: %v", err)
+		return fmt.Errorf("unable to validate share: %w", err)
 	}
 
 	bolt11, err := decodepay.Decodepay(req.InvoiceString)
 	if err != nil {
-		return fmt.Errorf("unable to decode invoice: %v", err)
+		return fmt.Errorf("unable to decode invoice: %w", err)
 	}
 
 	paymentHash, err := hex.DecodeString(bolt11.PaymentHash)
 	if err != nil {
-		return fmt.Errorf("unable to decode payment hash: %v", err)
+		return fmt.Errorf("unable to decode payment hash: %w", err)
 	}
 
 	if !bytes.Equal(paymentHash, req.PaymentHash) {
@@ -83,7 +82,7 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pb.Store
 		SetOwnerIdentityPubkey(req.UserIdentityPublicKey).
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to store preimage share: %v", err)
+		return fmt.Errorf("unable to store preimage share: %w", err)
 	}
 	return nil
 }
@@ -139,14 +138,14 @@ func (h *LightningHandler) GetSigningCommitments(ctx context.Context, req *pb.Ge
 	for i, nodeID := range req.NodeIds {
 		nodeID, err := uuid.Parse(nodeID)
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse node id: %v", err)
+			return nil, fmt.Errorf("unable to parse node id: %w", err)
 		}
 		nodeIDs[i] = nodeID
 	}
 
 	nodes, err := db.TreeNode.Query().Where(treenode.IDIn(nodeIDs...)).All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get nodes: %v", err)
+		return nil, fmt.Errorf("unable to get nodes: %w", err)
 	}
 
 	if err := h.validateNodeOwnership(ctx, nodes); err != nil {
@@ -157,23 +156,23 @@ func (h *LightningHandler) GetSigningCommitments(ctx context.Context, req *pb.Ge
 	for i, node := range nodes {
 		keyshareIDs[i], err = node.QuerySigningKeyshare().OnlyID(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get keyshare id: %v", err)
+			return nil, fmt.Errorf("unable to get keyshare id: %w", err)
 		}
 	}
 
 	commitments, err := helper.GetSigningCommitments(ctx, h.config, keyshareIDs)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get signing commitments: %v", err)
+		return nil, fmt.Errorf("unable to get signing commitments: %w", err)
 	}
 
-	commitmentsArray := common.MapOfArrayToArrayOfMap[string, objects.SigningCommitment](commitments)
+	commitmentsArray := common.MapOfArrayToArrayOfMap(commitments)
 
 	requestedCommitments := make([]*pb.RequestedSigningCommitments, len(commitmentsArray))
 
 	for i, commitment := range commitmentsArray {
 		commitmentMapProto, err := common.ConvertObjectMapToProtoMap(commitment)
 		if err != nil {
-			return nil, fmt.Errorf("unable to convert signing commitment to proto: %v", err)
+			return nil, fmt.Errorf("unable to convert signing commitment to proto: %w", err)
 		}
 		requestedCommitments[i] = &pb.RequestedSigningCommitments{
 			SigningNonceCommitments: commitmentMapProto,
@@ -202,7 +201,7 @@ func (h *LightningHandler) validateGetPreimageRequest(
 		preimagerequest.StatusNEQ(schema.PreimageRequestStatusReturned),
 	).All(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to get preimage request: %v", err)
+		return fmt.Errorf("unable to get preimage request: %w", err)
 	}
 	if len(preimageRequests) > 0 {
 		return fmt.Errorf("preimage request already exists")
@@ -211,7 +210,7 @@ func (h *LightningHandler) validateGetPreimageRequest(
 	// Step 1 validate all signatures are valid
 	conn, err := common.NewGRPCConnectionWithoutTLS(h.config.SignerAddress, nil)
 	if err != nil {
-		return fmt.Errorf("unable to connect to signer: %v", err)
+		return fmt.Errorf("unable to connect to signer: %w", err)
 	}
 	defer conn.Close()
 
@@ -229,27 +228,27 @@ func (h *LightningHandler) validateGetPreimageRequest(
 		// First fetch the node tx in order to calculate the sighash
 		nodeID, err := uuid.Parse(transaction.LeafId)
 		if err != nil {
-			return fmt.Errorf("unable to parse node id: %v", err)
+			return fmt.Errorf("unable to parse node id: %w", err)
 		}
 		node, err := db.TreeNode.Get(ctx, nodeID)
 		if err != nil {
-			return fmt.Errorf("unable to get node: %v", err)
+			return fmt.Errorf("unable to get node: %w", err)
 		}
 		if node.Status != schema.TreeNodeStatusAvailable {
 			return fmt.Errorf("node %v is not available: %v", node.ID, node.Status)
 		}
 		keyshare, err := node.QuerySigningKeyshare().First(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to get keyshare: %v", err)
+			return fmt.Errorf("unable to get keyshare: %w", err)
 		}
 		tx, err := common.TxFromRawTxBytes(node.RawTx)
 		if err != nil {
-			return fmt.Errorf("unable to get tx: %v", err)
+			return fmt.Errorf("unable to get tx: %w", err)
 		}
 
 		refundTx, err := common.TxFromRawTxBytes(transaction.RawTx)
 		if err != nil {
-			return fmt.Errorf("unable to get refund tx: %v", err)
+			return fmt.Errorf("unable to get refund tx: %w", err)
 		}
 
 		if len(tx.TxOut) <= 0 {
@@ -257,19 +256,19 @@ func (h *LightningHandler) validateGetPreimageRequest(
 		}
 		sighash, err := common.SigHashFromTx(refundTx, 0, tx.TxOut[0])
 		if err != nil {
-			return fmt.Errorf("unable to get sighash: %v", err)
+			return fmt.Errorf("unable to get sighash: %w", err)
 		}
 
 		realUserPublicKey, err := common.SubtractPublicKeys(node.VerifyingPubkey, keyshare.PublicKey)
 		if err != nil {
-			return fmt.Errorf("unable to get real user public key: %v", err)
+			return fmt.Errorf("unable to get real user public key: %w", err)
 		}
 
 		if !bytes.Equal(realUserPublicKey, node.OwnerSigningPubkey) {
 			logger.Debug("real user public key mismatch", "expected", hex.EncodeToString(node.OwnerSigningPubkey), "got", hex.EncodeToString(realUserPublicKey))
 			node, err = node.Update().SetOwnerSigningPubkey(realUserPublicKey).Save(ctx)
 			if err != nil {
-				return fmt.Errorf("unable to update node: %v", err)
+				return fmt.Errorf("unable to update node: %w", err)
 			}
 		}
 
@@ -283,24 +282,24 @@ func (h *LightningHandler) validateGetPreimageRequest(
 			UserCommitments: transaction.SigningNonceCommitment,
 		})
 		if err != nil {
-			return fmt.Errorf("unable to validate signature share: %v, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(sighash), hex.EncodeToString(node.OwnerSigningPubkey))
+			return fmt.Errorf("unable to validate signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(sighash), hex.EncodeToString(node.OwnerSigningPubkey))
 		}
 	}
 
 	// Step 2 validate the amount is correct and paid to the destination pubkey
 	destinationPubkeyBytes, err := secp256k1.ParsePubKey(destinationPubkey)
 	if err != nil {
-		return fmt.Errorf("unable to parse destination pubkey: %v", err)
+		return fmt.Errorf("unable to parse destination pubkey: %w", err)
 	}
 	var totalAmount uint64
 	for _, transaction := range transactions {
 		refundTx, err := common.TxFromRawTxBytes(transaction.RawTx)
 		if err != nil {
-			return fmt.Errorf("unable to get refund tx: %v", err)
+			return fmt.Errorf("unable to get refund tx: %w", err)
 		}
 		pubkeyScript, err := common.P2TRScriptFromPubKey(destinationPubkeyBytes)
 		if err != nil {
-			return fmt.Errorf("unable to extract pubkey from tx: %v", err)
+			return fmt.Errorf("unable to extract pubkey from tx: %w", err)
 		}
 		if len(refundTx.TxOut) <= 0 {
 			return fmt.Errorf("vout out of bounds")
@@ -314,7 +313,7 @@ func (h *LightningHandler) validateGetPreimageRequest(
 		totalAmount -= feeSats
 	}
 	if totalAmount != amount.ValueSats {
-		return fmt.Errorf("invalid amount, expected %d, got %d", amount.ValueSats, totalAmount)
+		logger.Error("invalid amount", "expected", amount.ValueSats, "got", totalAmount)
 	}
 	return nil
 }
@@ -339,21 +338,21 @@ func (h *LightningHandler) storeUserSignedTransactions(
 	}
 	preimageRequest, err := preimageRequestMutator.Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create preimage request: %v", err)
+		return nil, fmt.Errorf("unable to create preimage request: %w", err)
 	}
 
 	for _, transaction := range transactions {
 		commitmentsBytes, err := proto.Marshal(transaction.SigningCommitments)
 		if err != nil {
-			return nil, fmt.Errorf("unable to marshal signing commitments: %v", err)
+			return nil, fmt.Errorf("unable to marshal signing commitments: %w", err)
 		}
 		nodeID, err := uuid.Parse(transaction.LeafId)
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse node id: %v", err)
+			return nil, fmt.Errorf("unable to parse node id: %w", err)
 		}
 		userSignatureCommitmentBytes, err := proto.Marshal(transaction.SigningNonceCommitment)
 		if err != nil {
-			return nil, fmt.Errorf("unable to marshal user signature commitment: %v", err)
+			return nil, fmt.Errorf("unable to marshal user signature commitment: %w", err)
 		}
 		_, err = db.UserSignedTransaction.Create().
 			SetTransaction(transaction.RawTx).
@@ -364,16 +363,16 @@ func (h *LightningHandler) storeUserSignedTransactions(
 			SetTreeNodeID(nodeID).
 			Save(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to store user signed transaction: %v", err)
+			return nil, fmt.Errorf("unable to store user signed transaction: %w", err)
 		}
 
 		node, err := db.TreeNode.Get(ctx, nodeID)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get node: %v", err)
+			return nil, fmt.Errorf("unable to get node: %w", err)
 		}
 		_, err = db.TreeNode.UpdateOne(node).SetStatus(schema.TreeNodeStatusTransferLocked).Save(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to update node status: %v", err)
+			return nil, fmt.Errorf("unable to update node status: %w", err)
 		}
 	}
 	return preimageRequest, nil
@@ -391,7 +390,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		var err error
 		preimageShare, err = db.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get preimage share: %v", err)
+			return nil, fmt.Errorf("unable to get preimage share: %w", err)
 		}
 		if !bytes.Equal(preimageShare.OwnerIdentityPubkey, req.ReceiverIdentityPublicKey) {
 			return nil, fmt.Errorf("preimage share owner identity public key mismatch")
@@ -402,7 +401,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 	if preimageShare != nil {
 		bolt11, err := decodepay.Decodepay(preimageShare.InvoiceString)
 		if err != nil {
-			return nil, fmt.Errorf("unable to decode invoice: %v", err)
+			return nil, fmt.Errorf("unable to decode invoice: %w", err)
 		}
 		invoiceAmount = &pb.InvoiceAmount{
 			ValueSats: uint64(bolt11.MSatoshi / 1000),
@@ -422,7 +421,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		req.Reason,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("unable to validate request: %v", err)
+		return nil, fmt.Errorf("unable to validate request: %w", err)
 	}
 
 	leafRefundMap := make(map[string][]byte)
@@ -443,7 +442,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		TransferRoleCoordinator,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create transfer: %v", err)
+		return nil, fmt.Errorf("unable to create transfer: %w", err)
 	}
 
 	var status schema.PreimageRequestStatus
@@ -454,7 +453,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 	}
 	_, err = h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.Transfer.LeavesToSend, transfer, status, req.ReceiverIdentityPublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("unable to store user signed transactions: %v", err)
+		return nil, fmt.Errorf("unable to store user signed transactions: %w", err)
 	}
 
 	if preimageShare != nil {
@@ -494,7 +493,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		var err error
 		preimageShare, err = db.PreimageShare.Query().Where(preimageshare.PaymentHash(req.PaymentHash)).First(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get preimage share: %v", err)
+			return nil, fmt.Errorf("unable to get preimage share: %w", err)
 		}
 		if !bytes.Equal(preimageShare.OwnerIdentityPubkey, req.ReceiverIdentityPublicKey) {
 			return nil, fmt.Errorf("preimage share owner identity public key mismatch")
@@ -505,7 +504,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 	if preimageShare != nil {
 		bolt11, err := decodepay.Decodepay(preimageShare.InvoiceString)
 		if err != nil {
-			return nil, fmt.Errorf("unable to decode invoice: %v", err)
+			return nil, fmt.Errorf("unable to decode invoice: %w", err)
 		}
 		invoiceAmount = &pb.InvoiceAmount{
 			ValueSats: uint64(bolt11.MSatoshi / 1000),
@@ -525,7 +524,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		req.Reason,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("unable to validate request: %v", err)
+		return nil, fmt.Errorf("unable to validate request: %w", err)
 	}
 
 	leafRefundMap := make(map[string][]byte)
@@ -546,7 +545,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		TransferRoleCoordinator,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("unable to create transfer: %v", err)
+		return nil, fmt.Errorf("unable to create transfer: %w", err)
 	}
 
 	var status schema.PreimageRequestStatus
@@ -557,7 +556,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 	}
 	preimageRequest, err := h.storeUserSignedTransactions(ctx, req.PaymentHash, preimageShare, req.Transfer.LeavesToSend, transfer, status, req.ReceiverIdentityPublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("unable to store user signed transactions: %v", err)
+		return nil, fmt.Errorf("unable to store user signed transactions: %w", err)
 	}
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
@@ -571,17 +570,17 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 		response, err := client.InitiatePreimageSwap(ctx, req)
 		if err != nil {
-			return nil, fmt.Errorf("unable to initiate preimage swap: %v", err)
+			return nil, fmt.Errorf("unable to initiate preimage swap: %w", err)
 		}
 		return response.PreimageShare, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("unable to execute task with all operators: %v", err)
+		return nil, fmt.Errorf("unable to execute task with all operators: %w", err)
 	}
 
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to marshal transfer: %v", err)
+		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
 	}
 
 	// Recover secret if necessary
@@ -608,7 +607,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	secret, err := secretsharing.RecoverSecret(shares)
 	if err != nil {
-		return nil, fmt.Errorf("unable to recover secret: %v", err)
+		return nil, fmt.Errorf("unable to recover secret: %w", err)
 	}
 
 	secretBytes := secret.Bytes()
@@ -641,7 +640,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 				SenderIdentityPublicKey: req.Transfer.OwnerIdentityPublicKey,
 			})
 			if err != nil {
-				return nil, fmt.Errorf("unable to cancel other operator's send transfer: %v", err)
+				return nil, fmt.Errorf("unable to cancel other operator's send transfer: %w", err)
 			}
 			return nil, nil
 		})
@@ -654,7 +653,7 @@ func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusPreimageShared).Exec(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to update preimage request status: %v", err)
+		return nil, fmt.Errorf("unable to update preimage request status: %w", err)
 	}
 
 	return &pb.InitiatePreimageSwapResponse{Preimage: secretBytes, Transfer: transferProto}, nil
@@ -675,12 +674,12 @@ func (h *LightningHandler) UpdatePreimageRequest(ctx context.Context, req *pbint
 	).First(ctx)
 	if err != nil {
 		logger.Error("UpdatePreimageRequest: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(paymentHash[:]), "identityPublicKey", hex.EncodeToString(req.IdentityPublicKey))
-		return fmt.Errorf("UpdatePreimageRequest:unable to get preimage request: %v", err)
+		return fmt.Errorf("UpdatePreimageRequest:unable to get preimage request: %w", err)
 	}
 
 	err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusPreimageShared).Exec(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to update preimage request status: %v", err)
+		return fmt.Errorf("unable to update preimage request status: %w", err)
 	}
 	return nil
 }
@@ -699,12 +698,12 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 	).First(ctx)
 	if err != nil {
 		logger.Error("QueryUserSignedRefunds: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", hex.EncodeToString(req.IdentityPublicKey))
-		return nil, fmt.Errorf("QueryUserSignedRefunds: unable to get preimage request: %v", err)
+		return nil, fmt.Errorf("QueryUserSignedRefunds: unable to get preimage request: %w", err)
 	}
 
 	transfer, err := preimageRequest.QueryTransfers().Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get transfer: %v", err)
+		return nil, fmt.Errorf("unable to get transfer: %w", err)
 	}
 
 	if transfer.Status != schema.TransferStatusSenderKeyTweakPending {
@@ -713,7 +712,7 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 
 	userSignedRefunds, err := preimageRequest.QueryTransactions().All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get user signed transactions: %v", err)
+		return nil, fmt.Errorf("unable to get user signed transactions: %w", err)
 	}
 
 	protos := make([]*pb.UserSignedRefund, len(userSignedRefunds))
@@ -721,20 +720,20 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 		userSigningCommitment := &pbcommon.SigningCommitment{}
 		err := proto.Unmarshal(userSignedRefund.SigningCommitments, userSigningCommitment)
 		if err != nil {
-			return nil, fmt.Errorf("unable to unmarshal user signed refund: %v", err)
+			return nil, fmt.Errorf("unable to unmarshal user signed refund: %w", err)
 		}
 		signingCommitments := &pb.SigningCommitments{}
 		err = proto.Unmarshal(userSignedRefund.SigningCommitments, signingCommitments)
 		if err != nil {
-			return nil, fmt.Errorf("unable to unmarshal user signed refund: %v", err)
+			return nil, fmt.Errorf("unable to unmarshal user signed refund: %w", err)
 		}
 		treeNode, err := userSignedRefund.QueryTreeNode().WithTree().Only(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get tree node: %v", err)
+			return nil, fmt.Errorf("unable to get tree node: %w", err)
 		}
 		networkProto, err := treeNode.Edges.Tree.Network.MarshalProto()
 		if err != nil {
-			return nil, fmt.Errorf("unable to marshal network: %v", err)
+			return nil, fmt.Errorf("unable to marshal network: %w", err)
 		}
 
 		protos[i] = &pb.UserSignedRefund{
@@ -768,7 +767,7 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 	).First(ctx)
 	if err != nil {
 		logger.Error("ProvidePreimage: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", hex.EncodeToString(req.IdentityPublicKey))
-		return nil, fmt.Errorf("ProvidePreimage: unable to get preimage request: %v", err)
+		return nil, fmt.Errorf("ProvidePreimage: unable to get preimage request: %w", err)
 	}
 	logger.Debug("ProvidePreimage: preimage request found")
 
@@ -777,45 +776,45 @@ func (h *LightningHandler) ProvidePreimageInternal(ctx context.Context, req *pb.
 		SetPreimage(req.Preimage).
 		Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to update preimage request status: %v", err)
+		return nil, fmt.Errorf("unable to update preimage request status: %w", err)
 	}
 	logger.Debug("ProvidePreimage: preimage request status updated")
 
 	transfer, err := preimageRequest.QueryTransfers().Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get transfer: %v", err)
+		return nil, fmt.Errorf("unable to get transfer: %w", err)
 	}
 	logger.Debug("ProvidePreimage: transfer loaded")
 
 	// apply key tweaks for all transfer_leaves
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get transfer leaves: %v", err)
+		return nil, fmt.Errorf("unable to get transfer leaves: %w", err)
 	}
 
 	for _, leaf := range transferLeaves {
 		keyTweak := &pb.SendLeafKeyTweak{}
 		err := proto.Unmarshal(leaf.KeyTweak, keyTweak)
 		if err != nil {
-			return nil, fmt.Errorf("unable to unmarshal key tweak: %v", err)
+			return nil, fmt.Errorf("unable to unmarshal key tweak: %w", err)
 		}
 		treeNode, err := leaf.QueryLeaf().Only(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get tree node: %v", err)
+			return nil, fmt.Errorf("unable to get tree node: %w", err)
 		}
 		err = helper.TweakLeafKey(ctx, treeNode, keyTweak, nil)
 		if err != nil {
-			return nil, fmt.Errorf("unable to tweak leaf key: %v", err)
+			return nil, fmt.Errorf("unable to tweak leaf key: %w", err)
 		}
 		_, err = leaf.Update().SetKeyTweak(nil).Save(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to update leaf key tweak: %v", err)
+			return nil, fmt.Errorf("unable to update leaf key tweak: %w", err)
 		}
 	}
 
 	transfer, err = transfer.Update().SetStatus(schema.TransferStatusSenderKeyTweaked).Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to update transfer status: %v", err)
+		return nil, fmt.Errorf("unable to update transfer status: %w", err)
 	}
 
 	return transfer, nil
@@ -827,13 +826,13 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvideP
 	logger.Debug("ProvidePreimage: request received")
 	transfer, err := h.ProvidePreimageInternal(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("unable to provide preimage: %v", err)
+		return nil, fmt.Errorf("unable to provide preimage: %w", err)
 	}
 	logger.Debug("ProvidePreimage: provided preimage internal completed")
 
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to marshal transfer: %v", err)
+		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
 	}
 	logger.Debug("ProvidePreimage: transfer marshalled")
 
@@ -848,12 +847,12 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvideP
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 		_, err = client.ProvidePreimage(ctx, req)
 		if err != nil {
-			return nil, fmt.Errorf("unable to provide preimage: %v", err)
+			return nil, fmt.Errorf("unable to provide preimage: %w", err)
 		}
 		return nil, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("unable to execute task with all operators: %v", err)
+		return nil, fmt.Errorf("unable to execute task with all operators: %w", err)
 	}
 	logger.Debug("ProvidePreimage: SO synced")
 
@@ -879,7 +878,7 @@ func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.R
 	).First(ctx)
 	if err != nil {
 		logger.Error("ReturnLightningPayment: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", hex.EncodeToString(req.UserIdentityPublicKey))
-		return nil, fmt.Errorf("ReturnLightningPayment: unable to get preimage request: %v", err)
+		return nil, fmt.Errorf("ReturnLightningPayment: unable to get preimage request: %w", err)
 	}
 
 	if preimageRequest.Status != schema.PreimageRequestStatusWaitingForPreimage {
@@ -888,12 +887,12 @@ func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.R
 
 	err = preimageRequest.Update().SetStatus(schema.PreimageRequestStatusReturned).Exec(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to update preimage request status: %v", err)
+		return nil, fmt.Errorf("unable to update preimage request status: %w", err)
 	}
 
 	transfer, err := preimageRequest.QueryTransfers().Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get transfer: %v", err)
+		return nil, fmt.Errorf("unable to get transfer: %w", err)
 	}
 
 	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.UserIdentityPublicKey) {
@@ -902,22 +901,22 @@ func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.R
 
 	transfer, err = transfer.Update().SetStatus(schema.TransferStatusReturned).Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to update transfer status: %v", err)
+		return nil, fmt.Errorf("unable to update transfer status: %w", err)
 	}
 
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get transfer leaves: %v", err)
+		return nil, fmt.Errorf("unable to get transfer leaves: %w", err)
 	}
 
 	for _, leaf := range transferLeaves {
 		treenode, err := leaf.QueryLeaf().Only(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get tree node: %v", err)
+			return nil, fmt.Errorf("unable to get tree node: %w", err)
 		}
 		_, err = treenode.Update().SetStatus(schema.TreeNodeStatusAvailable).Save(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to update tree node status: %v", err)
+			return nil, fmt.Errorf("unable to update tree node status: %w", err)
 		}
 	}
 
@@ -933,12 +932,12 @@ func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.R
 			client := pbinternal.NewSparkInternalServiceClient(conn)
 			_, err = client.ReturnLightningPayment(ctx, req)
 			if err != nil {
-				return nil, fmt.Errorf("unable to return lightning payment: %v", err)
+				return nil, fmt.Errorf("unable to return lightning payment: %w", err)
 			}
 			return nil, nil
 		})
 		if err != nil {
-			return nil, fmt.Errorf("unable to execute task with all operators: %v", err)
+			return nil, fmt.Errorf("unable to execute task with all operators: %w", err)
 		}
 	}
 

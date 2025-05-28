@@ -33,6 +33,7 @@ import (
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbauthn "github.com/lightsparkdev/spark/proto/spark_authn"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
+	pbssp "github.com/lightsparkdev/spark/proto/spark_ssp_internal"
 	pbtree "github.com/lightsparkdev/spark/proto/spark_tree"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authn"
@@ -84,7 +85,6 @@ type args struct {
 	ServerKeyPath              string
 	DKGLimitOverride           uint64
 	RunDirectory               string
-	ReturnDetailedPanicErrors  bool
 	RateLimiterEnabled         bool
 	RateLimiterMemcachedAddrs  string
 	RateLimiterWindow          time.Duration
@@ -136,8 +136,6 @@ func loadArgs() (*args, error) {
 	flag.StringVar(&args.ServerKeyPath, "server-key", "", "Path to server key")
 	flag.Uint64Var(&args.DKGLimitOverride, "dkg-limit-override", 0, "Override the DKG limit")
 	flag.StringVar(&args.RunDirectory, "run-dir", "", "Run directory for resolving relative paths")
-	// TODO(CNT-154): Consider setting to false by default before productionization.
-	flag.BoolVar(&args.ReturnDetailedPanicErrors, "return-detailed-panic-errors", true, "Return detailed panic errors to client")
 	flag.BoolVar(&args.RateLimiterEnabled, "rate-limiter-enabled", false, "Enable rate limiting")
 	flag.StringVar(&args.RateLimiterMemcachedAddrs, "rate-limiter-memcached-addrs", "", "Comma-separated list of Memcached addresses")
 	flag.DurationVar(&args.RateLimiterWindow, "rate-limiter-window", 60*time.Second, "Rate limiter time window")
@@ -223,7 +221,6 @@ func main() {
 		args.ServerKeyPath,
 		args.DKGLimitOverride,
 		args.RunDirectory,
-		args.ReturnDetailedPanicErrors,
 		so.RateLimiterConfig{
 			Enabled:     args.RateLimiterEnabled,
 			Window:      args.RateLimiterWindow,
@@ -340,31 +337,32 @@ func main() {
 		})
 	}
 
-	if !args.RunningLocally {
-		cronCtx, cronCancel := context.WithCancel(errCtx)
-		defer cronCancel()
+	cronCtx, cronCancel := context.WithCancel(errCtx)
+	defer cronCancel()
 
-		logger := slog.Default().With("component", "cron")
-		cronCtx = logging.Inject(cronCtx, logger)
+	logger := slog.Default().With("component", "cron")
+	cronCtx = logging.Inject(cronCtx, logger)
 
-		logger.Info("Starting scheduler")
-		scheduler, err := gocron.NewScheduler(
-			gocron.WithGlobalJobOptions(gocron.WithContext(cronCtx)),
-			gocron.WithLogger(logger),
-		)
-		if err != nil {
-			log.Fatalf("Failed to create scheduler: %v", err)
-		}
-		for _, task := range task.AllTasks() {
-
-			err := task.Schedule(scheduler, config, dbClient)
+	logger.Info("Starting scheduler")
+	scheduler, err := gocron.NewScheduler(
+		gocron.WithGlobalJobOptions(gocron.WithContext(cronCtx)),
+		gocron.WithLogger(logger),
+	)
+	if err != nil {
+		log.Fatalf("Failed to create scheduler: %v", err)
+	}
+	for _, task := range task.AllTasks() {
+		// Don't run the task if the task specifies it should not be run in
+		// test environments and RunningLocally is set (eg. we are in a test environment)
+		if !args.RunningLocally || task.RunInTestEnv {
+			err := task.Schedule(scheduler, config, dbClient, lrc20Client)
 			if err != nil {
 				log.Fatalf("Failed to create job: %v", err)
 			}
 		}
-		scheduler.Start()
-		defer scheduler.Shutdown() //nolint:errcheck
 	}
+	scheduler.Start()
+	defer scheduler.Shutdown() //nolint:errcheck
 
 	sessionTokenCreatorVerifier, err := authninternal.NewSessionTokenCreatorVerifier(config.IdentityPrivateKey, nil)
 	if err != nil {
@@ -383,7 +381,7 @@ func main() {
 	serverOpts := []grpc.ServerOption{
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
-			sparkerrors.ErrorInterceptor(),
+			sparkerrors.ErrorInterceptor(config.ReturnDetailedErrors),
 			helper.LogInterceptor(args.LogJSON && args.LogRequestStats),
 			sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
 			ent.DbSessionMiddleware(dbClient),
@@ -433,21 +431,25 @@ func main() {
 		pbdkg.RegisterDKGServiceServer(grpcServer, dkgServer)
 	}
 
-	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config, lrc20Client)
+	var mockAction *common.MockAction
+	if args.RunningLocally {
+		mockAction = common.NewMockAction()
+		mockServer := sparkgrpc.NewMockServer(config, mockAction)
+		pbmock.RegisterMockServiceServer(grpcServer, mockServer)
+		go runDKGOnStartup(errCtx, dbClient, config)
+	}
 
+	sparkInternalServer := sparkgrpc.NewSparkInternalServer(config, lrc20Client)
 	pbinternal.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)
 
-	sparkServer := sparkgrpc.NewSparkServer(config, dbClient, lrc20Client)
+	sparkServer := sparkgrpc.NewSparkServer(config, dbClient, lrc20Client, mockAction)
 	pbspark.RegisterSparkServiceServer(grpcServer, sparkServer)
 
 	treeServer := sparkgrpc.NewSparkTreeServer(config, dbClient)
 	pbtree.RegisterSparkTreeServiceServer(grpcServer, treeServer)
 
-	if args.RunningLocally {
-		mockServer := sparkgrpc.NewMockServer(config)
-		pbmock.RegisterMockServiceServer(grpcServer, mockServer)
-		go runDKGOnStartup(errCtx, dbClient, config)
-	}
+	sspServer := sparkgrpc.NewSparkSspServer(config)
+	pbssp.RegisterSparkSspInternalServiceServer(grpcServer, sspServer)
 
 	authnServer, err := sparkgrpc.NewAuthnServer(sparkgrpc.AuthnServerConfig{
 		IdentityPrivateKey: config.IdentityPrivateKey,

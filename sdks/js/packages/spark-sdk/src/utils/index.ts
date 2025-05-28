@@ -8,4 +8,5 @@ export * from "./response-validation.js";
 export * from "./secret-sharing.js";
 export * from "./signing.js";
 export * from "./token-transactions.js";
+export * from "./transfer_package.js";
 export * from "./transaction.js";

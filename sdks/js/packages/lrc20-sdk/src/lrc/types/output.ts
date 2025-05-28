@@ -1,12 +1,4 @@
-import {
-  address,
-  networks,
-  opcodes,
-  type Payment,
-  type Network,
-  payments,
-  script,
-} from "bitcoinjs-lib";
+import { address, networks, opcodes, type Payment, type Network, payments, script } from "bitcoinjs-lib";
 import * as bitcoin from "bitcoinjs-lib";
 import { Receipt } from "./receipt.ts";
 import { ReceiptProof, ReceiptProofType } from "./receipt-proof.ts";

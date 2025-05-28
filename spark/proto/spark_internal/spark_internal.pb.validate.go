@@ -2776,6 +2776,8 @@ func (m *InitiateTransferRequest) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for RefundSignatures
+
 	if len(errors) > 0 {
 		return InitiateTransferRequestMultiError(errors)
 	}
@@ -3471,6 +3473,8 @@ func (m *InitiateSettleReceiverKeyTweakRequest) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for UserPublicKeys
+
 	if len(errors) > 0 {
 		return InitiateSettleReceiverKeyTweakRequestMultiError(errors)
 	}
@@ -3577,7 +3581,7 @@ func (m *SettleReceiverKeyTweakRequest) validate(all bool) error {
 
 	// no validation rules for TransferId
 
-	// no validation rules for TweakKey
+	// no validation rules for Action
 
 	if len(errors) > 0 {
 		return SettleReceiverKeyTweakRequestMultiError(errors)
@@ -3767,6 +3771,141 @@ var _ interface {
 	ErrorName() string
 } = SettleSenderKeyTweakRequestValidationError{}
 
+// Validate checks the field values on CreateUtxoSwapRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *CreateUtxoSwapRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on CreateUtxoSwapRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// CreateUtxoSwapRequestMultiError, or nil if none found.
+func (m *CreateUtxoSwapRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CreateUtxoSwapRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetRequest()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CreateUtxoSwapRequestValidationError{
+					field:  "Request",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CreateUtxoSwapRequestValidationError{
+					field:  "Request",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetRequest()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CreateUtxoSwapRequestValidationError{
+				field:  "Request",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for Signature
+
+	// no validation rules for CoordinatorPublicKey
+
+	if len(errors) > 0 {
+		return CreateUtxoSwapRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// CreateUtxoSwapRequestMultiError is an error wrapping multiple validation
+// errors returned by CreateUtxoSwapRequest.ValidateAll() if the designated
+// constraints aren't met.
+type CreateUtxoSwapRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CreateUtxoSwapRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CreateUtxoSwapRequestMultiError) AllErrors() []error { return m }
+
+// CreateUtxoSwapRequestValidationError is the validation error returned by
+// CreateUtxoSwapRequest.Validate if the designated constraints aren't met.
+type CreateUtxoSwapRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CreateUtxoSwapRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CreateUtxoSwapRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e CreateUtxoSwapRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CreateUtxoSwapRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CreateUtxoSwapRequestValidationError) ErrorName() string {
+	return "CreateUtxoSwapRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CreateUtxoSwapRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCreateUtxoSwapRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CreateUtxoSwapRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CreateUtxoSwapRequestValidationError{}
+
 // Validate checks the field values on CreateUtxoSwapResponse with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.
@@ -3899,3 +4038,926 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = CreateUtxoSwapResponseValidationError{}
+
+// Validate checks the field values on RollbackUtxoSwapRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RollbackUtxoSwapRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RollbackUtxoSwapRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RollbackUtxoSwapRequestMultiError, or nil if none found.
+func (m *RollbackUtxoSwapRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RollbackUtxoSwapRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOnChainUtxo()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RollbackUtxoSwapRequestValidationError{
+					field:  "OnChainUtxo",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RollbackUtxoSwapRequestValidationError{
+					field:  "OnChainUtxo",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOnChainUtxo()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RollbackUtxoSwapRequestValidationError{
+				field:  "OnChainUtxo",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for Signature
+
+	// no validation rules for CoordinatorPublicKey
+
+	if len(errors) > 0 {
+		return RollbackUtxoSwapRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// RollbackUtxoSwapRequestMultiError is an error wrapping multiple validation
+// errors returned by RollbackUtxoSwapRequest.ValidateAll() if the designated
+// constraints aren't met.
+type RollbackUtxoSwapRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RollbackUtxoSwapRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RollbackUtxoSwapRequestMultiError) AllErrors() []error { return m }
+
+// RollbackUtxoSwapRequestValidationError is the validation error returned by
+// RollbackUtxoSwapRequest.Validate if the designated constraints aren't met.
+type RollbackUtxoSwapRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RollbackUtxoSwapRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RollbackUtxoSwapRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RollbackUtxoSwapRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RollbackUtxoSwapRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RollbackUtxoSwapRequestValidationError) ErrorName() string {
+	return "RollbackUtxoSwapRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RollbackUtxoSwapRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRollbackUtxoSwapRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RollbackUtxoSwapRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RollbackUtxoSwapRequestValidationError{}
+
+// Validate checks the field values on RollbackUtxoSwapResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RollbackUtxoSwapResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RollbackUtxoSwapResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RollbackUtxoSwapResponseMultiError, or nil if none found.
+func (m *RollbackUtxoSwapResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RollbackUtxoSwapResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return RollbackUtxoSwapResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// RollbackUtxoSwapResponseMultiError is an error wrapping multiple validation
+// errors returned by RollbackUtxoSwapResponse.ValidateAll() if the designated
+// constraints aren't met.
+type RollbackUtxoSwapResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RollbackUtxoSwapResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RollbackUtxoSwapResponseMultiError) AllErrors() []error { return m }
+
+// RollbackUtxoSwapResponseValidationError is the validation error returned by
+// RollbackUtxoSwapResponse.Validate if the designated constraints aren't met.
+type RollbackUtxoSwapResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RollbackUtxoSwapResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RollbackUtxoSwapResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RollbackUtxoSwapResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RollbackUtxoSwapResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RollbackUtxoSwapResponseValidationError) ErrorName() string {
+	return "RollbackUtxoSwapResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RollbackUtxoSwapResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRollbackUtxoSwapResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RollbackUtxoSwapResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RollbackUtxoSwapResponseValidationError{}
+
+// Validate checks the field values on UtxoSwapCompletedRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *UtxoSwapCompletedRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on UtxoSwapCompletedRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// UtxoSwapCompletedRequestMultiError, or nil if none found.
+func (m *UtxoSwapCompletedRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *UtxoSwapCompletedRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetOnChainUtxo()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, UtxoSwapCompletedRequestValidationError{
+					field:  "OnChainUtxo",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, UtxoSwapCompletedRequestValidationError{
+					field:  "OnChainUtxo",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetOnChainUtxo()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return UtxoSwapCompletedRequestValidationError{
+				field:  "OnChainUtxo",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	// no validation rules for Signature
+
+	// no validation rules for CoordinatorPublicKey
+
+	if len(errors) > 0 {
+		return UtxoSwapCompletedRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// UtxoSwapCompletedRequestMultiError is an error wrapping multiple validation
+// errors returned by UtxoSwapCompletedRequest.ValidateAll() if the designated
+// constraints aren't met.
+type UtxoSwapCompletedRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m UtxoSwapCompletedRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m UtxoSwapCompletedRequestMultiError) AllErrors() []error { return m }
+
+// UtxoSwapCompletedRequestValidationError is the validation error returned by
+// UtxoSwapCompletedRequest.Validate if the designated constraints aren't met.
+type UtxoSwapCompletedRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e UtxoSwapCompletedRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e UtxoSwapCompletedRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e UtxoSwapCompletedRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e UtxoSwapCompletedRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e UtxoSwapCompletedRequestValidationError) ErrorName() string {
+	return "UtxoSwapCompletedRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e UtxoSwapCompletedRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sUtxoSwapCompletedRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = UtxoSwapCompletedRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = UtxoSwapCompletedRequestValidationError{}
+
+// Validate checks the field values on UtxoSwapCompletedResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *UtxoSwapCompletedResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on UtxoSwapCompletedResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// UtxoSwapCompletedResponseMultiError, or nil if none found.
+func (m *UtxoSwapCompletedResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *UtxoSwapCompletedResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return UtxoSwapCompletedResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// UtxoSwapCompletedResponseMultiError is an error wrapping multiple validation
+// errors returned by UtxoSwapCompletedResponse.ValidateAll() if the
+// designated constraints aren't met.
+type UtxoSwapCompletedResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m UtxoSwapCompletedResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m UtxoSwapCompletedResponseMultiError) AllErrors() []error { return m }
+
+// UtxoSwapCompletedResponseValidationError is the validation error returned by
+// UtxoSwapCompletedResponse.Validate if the designated constraints aren't met.
+type UtxoSwapCompletedResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e UtxoSwapCompletedResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e UtxoSwapCompletedResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e UtxoSwapCompletedResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e UtxoSwapCompletedResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e UtxoSwapCompletedResponseValidationError) ErrorName() string {
+	return "UtxoSwapCompletedResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e UtxoSwapCompletedResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sUtxoSwapCompletedResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = UtxoSwapCompletedResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = UtxoSwapCompletedResponseValidationError{}
+
+// Validate checks the field values on
+// CancelOrFinalizeExpiredTokenTransactionRequest with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *CancelOrFinalizeExpiredTokenTransactionRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// CancelOrFinalizeExpiredTokenTransactionRequest with the rules defined in
+// the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in
+// CancelOrFinalizeExpiredTokenTransactionRequestMultiError, or nil if none found.
+func (m *CancelOrFinalizeExpiredTokenTransactionRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *CancelOrFinalizeExpiredTokenTransactionRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetFinalTokenTransaction()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, CancelOrFinalizeExpiredTokenTransactionRequestValidationError{
+					field:  "FinalTokenTransaction",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, CancelOrFinalizeExpiredTokenTransactionRequestValidationError{
+					field:  "FinalTokenTransaction",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetFinalTokenTransaction()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return CancelOrFinalizeExpiredTokenTransactionRequestValidationError{
+				field:  "FinalTokenTransaction",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return CancelOrFinalizeExpiredTokenTransactionRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// CancelOrFinalizeExpiredTokenTransactionRequestMultiError is an error
+// wrapping multiple validation errors returned by
+// CancelOrFinalizeExpiredTokenTransactionRequest.ValidateAll() if the
+// designated constraints aren't met.
+type CancelOrFinalizeExpiredTokenTransactionRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m CancelOrFinalizeExpiredTokenTransactionRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m CancelOrFinalizeExpiredTokenTransactionRequestMultiError) AllErrors() []error { return m }
+
+// CancelOrFinalizeExpiredTokenTransactionRequestValidationError is the
+// validation error returned by
+// CancelOrFinalizeExpiredTokenTransactionRequest.Validate if the designated
+// constraints aren't met.
+type CancelOrFinalizeExpiredTokenTransactionRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e CancelOrFinalizeExpiredTokenTransactionRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e CancelOrFinalizeExpiredTokenTransactionRequestValidationError) Reason() string {
+	return e.reason
+}
+
+// Cause function returns cause value.
+func (e CancelOrFinalizeExpiredTokenTransactionRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e CancelOrFinalizeExpiredTokenTransactionRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e CancelOrFinalizeExpiredTokenTransactionRequestValidationError) ErrorName() string {
+	return "CancelOrFinalizeExpiredTokenTransactionRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e CancelOrFinalizeExpiredTokenTransactionRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sCancelOrFinalizeExpiredTokenTransactionRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = CancelOrFinalizeExpiredTokenTransactionRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = CancelOrFinalizeExpiredTokenTransactionRequestValidationError{}
+
+// Validate checks the field values on QueryLeafSigningPubkeysRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *QueryLeafSigningPubkeysRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryLeafSigningPubkeysRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// QueryLeafSigningPubkeysRequestMultiError, or nil if none found.
+func (m *QueryLeafSigningPubkeysRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryLeafSigningPubkeysRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return QueryLeafSigningPubkeysRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryLeafSigningPubkeysRequestMultiError is an error wrapping multiple
+// validation errors returned by QueryLeafSigningPubkeysRequest.ValidateAll()
+// if the designated constraints aren't met.
+type QueryLeafSigningPubkeysRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryLeafSigningPubkeysRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryLeafSigningPubkeysRequestMultiError) AllErrors() []error { return m }
+
+// QueryLeafSigningPubkeysRequestValidationError is the validation error
+// returned by QueryLeafSigningPubkeysRequest.Validate if the designated
+// constraints aren't met.
+type QueryLeafSigningPubkeysRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryLeafSigningPubkeysRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryLeafSigningPubkeysRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryLeafSigningPubkeysRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryLeafSigningPubkeysRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryLeafSigningPubkeysRequestValidationError) ErrorName() string {
+	return "QueryLeafSigningPubkeysRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryLeafSigningPubkeysRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryLeafSigningPubkeysRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryLeafSigningPubkeysRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryLeafSigningPubkeysRequestValidationError{}
+
+// Validate checks the field values on QueryLeafSigningPubkeysResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *QueryLeafSigningPubkeysResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryLeafSigningPubkeysResponse with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// QueryLeafSigningPubkeysResponseMultiError, or nil if none found.
+func (m *QueryLeafSigningPubkeysResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryLeafSigningPubkeysResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for SigningPubkeys
+
+	if len(errors) > 0 {
+		return QueryLeafSigningPubkeysResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryLeafSigningPubkeysResponseMultiError is an error wrapping multiple
+// validation errors returned by QueryLeafSigningPubkeysResponse.ValidateAll()
+// if the designated constraints aren't met.
+type QueryLeafSigningPubkeysResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryLeafSigningPubkeysResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryLeafSigningPubkeysResponseMultiError) AllErrors() []error { return m }
+
+// QueryLeafSigningPubkeysResponseValidationError is the validation error
+// returned by QueryLeafSigningPubkeysResponse.Validate if the designated
+// constraints aren't met.
+type QueryLeafSigningPubkeysResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryLeafSigningPubkeysResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryLeafSigningPubkeysResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryLeafSigningPubkeysResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryLeafSigningPubkeysResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryLeafSigningPubkeysResponseValidationError) ErrorName() string {
+	return "QueryLeafSigningPubkeysResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryLeafSigningPubkeysResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryLeafSigningPubkeysResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryLeafSigningPubkeysResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryLeafSigningPubkeysResponseValidationError{}
+
+// Validate checks the field values on ResolveLeafInvestigationRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *ResolveLeafInvestigationRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on ResolveLeafInvestigationRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// ResolveLeafInvestigationRequestMultiError, or nil if none found.
+func (m *ResolveLeafInvestigationRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *ResolveLeafInvestigationRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return ResolveLeafInvestigationRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// ResolveLeafInvestigationRequestMultiError is an error wrapping multiple
+// validation errors returned by ResolveLeafInvestigationRequest.ValidateAll()
+// if the designated constraints aren't met.
+type ResolveLeafInvestigationRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m ResolveLeafInvestigationRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m ResolveLeafInvestigationRequestMultiError) AllErrors() []error { return m }
+
+// ResolveLeafInvestigationRequestValidationError is the validation error
+// returned by ResolveLeafInvestigationRequest.Validate if the designated
+// constraints aren't met.
+type ResolveLeafInvestigationRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e ResolveLeafInvestigationRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e ResolveLeafInvestigationRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e ResolveLeafInvestigationRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e ResolveLeafInvestigationRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e ResolveLeafInvestigationRequestValidationError) ErrorName() string {
+	return "ResolveLeafInvestigationRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e ResolveLeafInvestigationRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sResolveLeafInvestigationRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = ResolveLeafInvestigationRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = ResolveLeafInvestigationRequestValidationError{}

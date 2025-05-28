@@ -1,12 +1,13 @@
-import { sha256 } from "@scure/btc-signer/utils";
 import { isNode } from "@lightsparkdev/core";
+import { sha256 } from "@scure/btc-signer/utils";
 import type { Channel, ClientFactory } from "nice-grpc";
+import { retryMiddleware } from "nice-grpc-client-middleware-retry";
+import { ClientMiddlewareCall, Metadata } from "nice-grpc-common";
 import type {
   Channel as ChannelWeb,
   ClientFactory as ClientFactoryWeb,
 } from "nice-grpc-web";
-import { retryMiddleware } from "nice-grpc-client-middleware-retry";
-import { Metadata, ClientMiddlewareCall } from "nice-grpc-common";
+import { isBun, isReactNative } from "../constants.js";
 import { AuthenticationError, NetworkError } from "../errors/types.js";
 import { MockServiceClient, MockServiceDefinition } from "../proto/mock.js";
 import { SparkServiceClient, SparkServiceDefinition } from "../proto/spark.js";
@@ -16,9 +17,7 @@ import {
   SparkAuthnServiceDefinition,
 } from "../proto/spark_authn.js";
 import { RetryOptions, SparkCallOptions } from "../types/grpc.js";
-import { Network } from "../utils/network.js";
 import { WalletConfigService } from "./config.js";
-import { isReactNative } from "../constants.js";
 
 // TODO: Some sort of client cleanup
 export class ConnectionManager {
@@ -28,6 +27,18 @@ export class ConnectionManager {
     {
       client: SparkServiceClient & { close?: () => void };
       authToken: string;
+    }
+  > = new Map();
+
+  // We are going to .unref() the underlying channels for stream clients
+  // to prevent the stream from keeping the process alive
+  // Using a different map to avoid unforeseen problems with unary calls
+  private streamClients: Map<
+    string,
+    {
+      client: SparkServiceClient & { close?: () => void };
+      authToken: string;
+      channel: Channel | ChannelWeb;
     }
   > = new Map();
 
@@ -61,7 +72,7 @@ export class ConnectionManager {
     const channel = await this.createChannelWithTLS(address);
     const isNodeChannel = "close" in channel;
 
-    if (isNode && isNodeChannel) {
+    if (isNode && isNodeChannel && !isBun) {
       const grpcModule = await import("nice-grpc");
       const { createClient } =
         "default" in grpcModule ? grpcModule.default : grpcModule;
@@ -82,7 +93,7 @@ export class ConnectionManager {
 
   private async createChannelWithTLS(address: string, certPath?: string) {
     try {
-      if (isNode) {
+      if (isNode && !isBun) {
         const grpcModule = await import("nice-grpc");
         const { ChannelCredentials, createChannel } =
           "default" in grpcModule ? grpcModule.default : grpcModule;
@@ -139,6 +150,28 @@ export class ConnectionManager {
     }
   }
 
+  async createSparkStreamClient(
+    address: string,
+    certPath?: string,
+  ): Promise<SparkServiceClient & { close?: () => void }> {
+    if (this.streamClients.has(address)) {
+      return this.streamClients.get(address)!.client;
+    }
+    const authToken = await this.authenticate(address);
+    const channel = await this.createChannelWithTLS(address, certPath);
+
+    const authMiddleware = this.createAuthMiddleWare(address, authToken);
+    const client = await this.createGrpcClient<SparkServiceClient>(
+      SparkServiceDefinition,
+      channel,
+      true,
+      authMiddleware,
+    );
+
+    this.streamClients.set(address, { client, authToken, channel });
+    return client;
+  }
+
   async createSparkClient(
     address: string,
     certPath?: string,
@@ -159,6 +192,10 @@ export class ConnectionManager {
 
     this.clients.set(address, { client, authToken });
     return client;
+  }
+
+  async getStreamChannel(address: string) {
+    return this.streamClients.get(address)?.channel;
   }
 
   private async authenticate(address: string, certPath?: string) {
@@ -318,15 +355,20 @@ export class ConnectionManager {
     let options: RetryOptions = {};
     const isNodeChannel = "close" in channel;
 
-    if (isNode && isNodeChannel) {
+    if (isNode && isNodeChannel && !isBun) {
       const grpcModule = await import("nice-grpc");
+      const { openTelemetryClientMiddleware } = await import(
+        "nice-grpc-opentelemetry"
+      );
       const { createClientFactory } =
         "default" in grpcModule ? grpcModule.default : grpcModule;
 
       clientFactory = createClientFactory();
       if (withRetries) {
         options = retryOptions;
-        clientFactory = clientFactory.use(retryMiddleware);
+        clientFactory = clientFactory
+          .use(openTelemetryClientMiddleware())
+          .use(retryMiddleware);
       }
       if (middleware) {
         clientFactory = clientFactory.use(middleware);

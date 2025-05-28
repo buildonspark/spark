@@ -53,16 +53,16 @@ func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.Co
 		TransferRoleCoordinator,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create transfer: %v", err)
+		return nil, fmt.Errorf("failed to create transfer for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
 	}
 
 	exitUUID, err := uuid.Parse(req.ExitId)
 	if err != nil {
-		return nil, fmt.Errorf("unable to parse exit_id %s: %v", req.ExitId, err)
+		return nil, fmt.Errorf("unable to parse exit_id %s in request %s: %w", req.ExitId, logging.FormatProto("cooperative_exit_request", req), err)
 	}
 
 	if len(req.ExitTxid) != 32 {
-		return nil, fmt.Errorf("exit_txid is not 32 bytes: %v", req.ExitTxid)
+		return nil, fmt.Errorf("exit_txid is not 32 bytes in request %s: %x", logging.FormatProto("cooperative_exit_request", req), req.ExitTxid)
 	}
 
 	db := ent.GetDbFromContext(ctx)
@@ -73,22 +73,22 @@ func (h *CooperativeExitHandler) CooperativeExit(ctx context.Context, req *pb.Co
 		// ConfirmationHeight is nil since the transaction is not confirmed yet.
 		Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create cooperative exit: %v", err)
+		return nil, fmt.Errorf("failed to create cooperative exit for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
 	}
 
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal transfer: %v", err)
+		return nil, fmt.Errorf("failed to marshal transfer for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
 	}
 
 	signingResults, err := signRefunds(ctx, h.config, req.Transfer, leafMap, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign refund transactions: %v", err)
+		return nil, fmt.Errorf("failed to sign refund transactions for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
 	}
 
 	err = transferHandler.syncCoopExitInit(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sync transfer init: %v", err)
+		return nil, fmt.Errorf("failed to sync transfer init for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
 	}
 
 	response := &pb.CooperativeExitResponse{

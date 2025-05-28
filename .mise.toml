@@ -26,6 +26,7 @@ test-go = { dir = "{{config_root}}/spark", run = 'mise test' }
 test-grpc = { dir = "{{config_root}}/spark", run = 'mise test-grpc' }
 test-js = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test' }
 test-js-integration = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test:integration' }
+test-js-integration-ssp = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test:integration:ssp' }
 
 [settings]
 activate_aggressive = true

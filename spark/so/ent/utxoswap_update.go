@@ -167,6 +167,12 @@ func (usu *UtxoSwapUpdate) ClearUserIdentityPublicKey() *UtxoSwapUpdate {
 	return usu
 }
 
+// SetCoordinatorIdentityPublicKey sets the "coordinator_identity_public_key" field.
+func (usu *UtxoSwapUpdate) SetCoordinatorIdentityPublicKey(b []byte) *UtxoSwapUpdate {
+	usu.mutation.SetCoordinatorIdentityPublicKey(b)
+	return usu
+}
+
 // SetTransferID sets the "transfer" edge to the Transfer entity by ID.
 func (usu *UtxoSwapUpdate) SetTransferID(id uuid.UUID) *UtxoSwapUpdate {
 	usu.mutation.SetTransferID(id)
@@ -313,6 +319,9 @@ func (usu *UtxoSwapUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if usu.mutation.UserIdentityPublicKeyCleared() {
 		_spec.ClearField(utxoswap.FieldUserIdentityPublicKey, field.TypeBytes)
+	}
+	if value, ok := usu.mutation.CoordinatorIdentityPublicKey(); ok {
+		_spec.SetField(utxoswap.FieldCoordinatorIdentityPublicKey, field.TypeBytes, value)
 	}
 	if usu.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -499,6 +508,12 @@ func (usuo *UtxoSwapUpdateOne) ClearUserIdentityPublicKey() *UtxoSwapUpdateOne {
 	return usuo
 }
 
+// SetCoordinatorIdentityPublicKey sets the "coordinator_identity_public_key" field.
+func (usuo *UtxoSwapUpdateOne) SetCoordinatorIdentityPublicKey(b []byte) *UtxoSwapUpdateOne {
+	usuo.mutation.SetCoordinatorIdentityPublicKey(b)
+	return usuo
+}
+
 // SetTransferID sets the "transfer" edge to the Transfer entity by ID.
 func (usuo *UtxoSwapUpdateOne) SetTransferID(id uuid.UUID) *UtxoSwapUpdateOne {
 	usuo.mutation.SetTransferID(id)
@@ -675,6 +690,9 @@ func (usuo *UtxoSwapUpdateOne) sqlSave(ctx context.Context) (_node *UtxoSwap, er
 	}
 	if usuo.mutation.UserIdentityPublicKeyCleared() {
 		_spec.ClearField(utxoswap.FieldUserIdentityPublicKey, field.TypeBytes)
+	}
+	if value, ok := usuo.mutation.CoordinatorIdentityPublicKey(); ok {
+		_spec.SetField(utxoswap.FieldCoordinatorIdentityPublicKey, field.TypeBytes, value)
 	}
 	if usuo.mutation.TransferCleared() {
 		edge := &sqlgraph.EdgeSpec{

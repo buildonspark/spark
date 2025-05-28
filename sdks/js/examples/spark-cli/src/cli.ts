@@ -1,5 +1,9 @@
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { getLatestDepositTxId } from "@buildonspark/spark-sdk";
+import {
+  decodeSparkAddress,
+  encodeSparkAddress,
+} from "@buildonspark/spark-sdk/address";
 import { TokenTransactionStatus } from "@buildonspark/spark-sdk/proto/spark";
 import {
   ConfigOptions,
@@ -18,9 +22,8 @@ import { hexToBytes } from "@noble/curves/abstract/utils";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { hex } from "@scure/base";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
-import readline from "readline";
 import fs from "fs";
-import { decodeSparkAddress } from "@buildonspark/spark-sdk/address";
+import readline from "readline";
 
 const commands = [
   "initwallet",
@@ -130,7 +133,8 @@ async function runCLI() {
   getcoopexitrequest <requestId>                                      - Get a coop exit request by ID
 
   Token Holder Commands:
-  transfertokens <tokenPubKey> <amount> <receiverSparkAddress>        - Transfer tokens
+  transfertokens <tokenPubKey> <receiverSparkAddress> <amount>        - Transfer tokens
+  batchtransfertokens <tokenPubKey> <receiverAddress1:amount1> <receiverAddress2:amount2> ... - Transfer tokens with multiple outputs
 
   Token Issuer Commands:
   gettokenl1address                                                   - Get the L1 address for on-chain token operations
@@ -159,7 +163,6 @@ async function runCLI() {
 
     if (lowerCommand === "exit" || lowerCommand === "quit") {
       rl.close();
-      wallet?.cleanupConnections();
       break;
     }
 
@@ -511,6 +514,19 @@ async function runCLI() {
           );
           console.log(decodedAddress);
           break;
+        case "encodeaddress":
+          if (args.length !== 2) {
+            console.log(
+              "Usage: encodeaddress <sparkAddress> <network> (mainnet, regtest, testnet, signet, local)",
+            );
+            break;
+          }
+          const encodedAddress = encodeSparkAddress({
+            identityPublicKey: args[0],
+            network: args[1].toUpperCase() as NetworkType,
+          });
+          console.log(encodedAddress);
+          break;
         case "createinvoice":
           if (!wallet) {
             console.log("Please initialize a wallet first");
@@ -556,14 +572,14 @@ async function runCLI() {
           }
           if (args.length < 3) {
             console.log(
-              "Usage: transfertokens <tokenPubKey> <amount> <receiverPubKey>",
+              "Usage: transfertokens <tokenPubKey> <receiverPubKey> <amount>",
             );
             break;
           }
 
           const tokenPubKey = args[0];
-          const tokenAmount = BigInt(parseInt(args[1]));
-          const tokenReceiverPubKey = args[2];
+          const tokenReceiverPubKey = args[1];
+          const tokenAmount = BigInt(parseInt(args[2]));
 
           try {
             const result = await wallet.transferTokens({
@@ -578,6 +594,62 @@ async function runCLI() {
               errorMsg = error.message;
             }
             console.error(`Failed to transfer tokens: ${errorMsg}`);
+          }
+          break;
+        case "batchtransfertokens":
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          if (args.length < 2) {
+            console.log(
+              "Usage: batchtransfertokens <tokenPubKey> <receiverAddress1:amount1> <receiverAddress2:amount2> ...",
+            );
+            break;
+          }
+
+          const batchTokenPubKey = args[0];
+          let tokenTransfers = [];
+
+          for (let i = 1; i < args.length; i++) {
+            const parts = args[i].split(":");
+            if (parts.length !== 2) {
+              console.log(
+                `Invalid format for argument ${i}: ${args[i]}. Expected format: address:amount`,
+              );
+              break;
+            }
+
+            const receiverAddress = parts[0];
+            const amount = parseInt(parts[1]);
+
+            if (isNaN(amount)) {
+              console.log(`Invalid amount for argument ${i}: ${parts[1]}`);
+              break;
+            }
+
+            tokenTransfers.push({
+              tokenPublicKey: batchTokenPubKey,
+              tokenAmount: BigInt(amount),
+              receiverSparkAddress: receiverAddress,
+            });
+          }
+
+          if (tokenTransfers.length === 0) {
+            console.log("No valid transfers provided");
+            break;
+          }
+
+          try {
+            const results = await wallet.batchTransferTokens(tokenTransfers);
+            console.log("Transfer Transaction ID:", results);
+            console.log(`Successfully sent ${tokenTransfers.length} outputs`);
+          } catch (error) {
+            let errorMsg = "Unknown error";
+            if (error instanceof Error) {
+              errorMsg = error.message;
+            }
+            console.error(`Failed to batch transfer tokens: ${errorMsg}`);
           }
           break;
         case "withdraw":

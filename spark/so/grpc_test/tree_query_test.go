@@ -17,7 +17,6 @@ func TestTreeQuery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create wallet config: %v", err)
 	}
-
 	// Create gRPC connection using common helper
 	conn, err := common.NewGRPCConnectionWithTestTLS(config.CoodinatorAddress(), nil)
 	if err != nil {
@@ -52,10 +51,14 @@ func TestTreeQuery(t *testing.T) {
 
 	leafNode := treeNodes.Nodes[1]
 
+	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	require.NoError(t, err, "failed to get proto network")
+
 	t.Run("query by owner identity key", func(t *testing.T) {
 		req := &pb.QueryNodesRequest{
 			Source:         &pb.QueryNodesRequest_OwnerIdentityPubkey{OwnerIdentityPubkey: leafNode.OwnerIdentityPublicKey},
 			IncludeParents: true,
+			Network:        network,
 		}
 
 		resp, err := client.QueryNodes(ctx, req)
@@ -63,11 +66,36 @@ func TestTreeQuery(t *testing.T) {
 		require.Len(t, resp.Nodes, 6)
 	})
 
+	t.Run("query by owner identity key for regtest wallet returns empty for mainnet", func(t *testing.T) {
+		networkMainnet := pb.Network_MAINNET
+		req := &pb.QueryNodesRequest{
+			Source:         &pb.QueryNodesRequest_OwnerIdentityPubkey{OwnerIdentityPubkey: leafNode.OwnerIdentityPublicKey},
+			IncludeParents: true,
+			Network:        networkMainnet,
+		}
+
+		resp, err := client.QueryNodes(ctx, req)
+		require.NoError(t, err)
+		require.Len(t, resp.Nodes, 0)
+	})
+
+	t.Run("query without network defaults to mainnet and returns empty for regtest test wallet", func(t *testing.T) {
+		req := &pb.QueryNodesRequest{
+			Source:         &pb.QueryNodesRequest_OwnerIdentityPubkey{OwnerIdentityPubkey: leafNode.OwnerIdentityPublicKey},
+			IncludeParents: true,
+		}
+
+		resp, err := client.QueryNodes(ctx, req)
+		require.NoError(t, err)
+		require.Len(t, resp.Nodes, 0)
+	})
+
 	t.Run("query with paginations", func(t *testing.T) {
 		nodeIDs := make([]string, 0, 2)
 		req := &pb.QueryNodesRequest{
 			Source:         &pb.QueryNodesRequest_OwnerIdentityPubkey{OwnerIdentityPubkey: leafNode.OwnerIdentityPublicKey},
 			IncludeParents: false,
+			Network:        network,
 		}
 		resp, err := client.QueryNodes(ctx, req)
 		require.NoError(t, err)
@@ -101,6 +129,7 @@ func TestTreeQuery(t *testing.T) {
 		req := &pb.QueryNodesRequest{
 			Source:         &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{leafNode.Id}}},
 			IncludeParents: false,
+			Network:        network,
 		}
 
 		resp, err := client.QueryNodes(ctx, req)
@@ -115,6 +144,7 @@ func TestTreeQuery(t *testing.T) {
 		req := &pb.QueryNodesRequest{
 			Source:         &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{leafNode.Id}}},
 			IncludeParents: true,
+			Network:        network,
 		}
 
 		resp, err := client.QueryNodes(ctx, req)
@@ -125,5 +155,18 @@ func TestTreeQuery(t *testing.T) {
 		require.True(t, exists)
 		_, exists = resp.Nodes[treeNodes.Nodes[0].Id]
 		require.True(t, exists)
+	})
+
+	t.Run("query nodes distribution", func(t *testing.T) {
+		req := &pb.QueryNodesDistributionRequest{
+			OwnerIdentityPublicKey: leafNode.OwnerIdentityPublicKey,
+		}
+
+		resp, err := client.QueryNodesDistribution(ctx, req)
+		require.NoError(t, err)
+		require.Equal(t, len(resp.NodeDistribution), 1)
+		for _, v := range resp.NodeDistribution {
+			require.Equal(t, v, int64(uint64(2)))
+		}
 	})
 }

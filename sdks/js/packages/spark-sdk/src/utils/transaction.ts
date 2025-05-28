@@ -30,8 +30,13 @@ export function createRefundTx(
   return newRefundTx;
 }
 
-export function getTransactionSequence(currSequence?: number): number {
+export function getCurrentTimelock(currSequence?: number): number {
   return (currSequence || 0) & 0xffff;
+}
+
+export function getTransactionSequence(currSequence?: number): number {
+  const timelock = getCurrentTimelock(currSequence);
+  return (1 << 30) | timelock;
 }
 
 export function getNextTransactionSequence(
@@ -41,7 +46,7 @@ export function getNextTransactionSequence(
   nextSequence: number;
   needRefresh: boolean;
 } {
-  const currentTimelock = getTransactionSequence(currSequence);
+  const currentTimelock = getCurrentTimelock(currSequence);
   const nextTimelock = currentTimelock - TIME_LOCK_INTERVAL;
   if (forRefresh && nextTimelock <= 100 && currentTimelock > 0) {
     return {

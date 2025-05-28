@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 type dbStatsContextKey string
@@ -80,13 +81,39 @@ func ObserveServiceCall(ctx context.Context, method string, duration time.Durati
 	statsMap.stats[method].serviceRequestDuration += duration
 }
 
-func LogTable(ctx context.Context, duration time.Duration, err error) {
+func LogTable(
+	ctx context.Context,
+	duration time.Duration,
+	req proto.Message,
+	res proto.Message,
+	err error,
+) {
 	result := make(map[string]any)
 	fillDbStats(ctx, result)
 	fillServiceStats(ctx, result)
 
 	result["_table"] = "spark-requests"
 	result["duration"] = duration.Seconds()
+
+	if req != nil {
+		reqJSON, err := FormatProtoMessage(req)
+		if err != nil {
+			result["request.message"] = err.Error()
+		} else {
+			result["request.message"] = reqJSON
+			result["request.length"] = len(reqJSON)
+		}
+	}
+
+	if res != nil {
+		resJSON, err := FormatProtoMessage(res)
+		if err != nil {
+			result["response.message"] = err.Error()
+		} else {
+			result["response.message"] = resJSON
+			result["response.length"] = len(resJSON)
+		}
+	}
 
 	if err != nil {
 		st, ok := status.FromError(err)

@@ -96,9 +96,10 @@ func (h *RefreshTimelockHandler) RefreshTimelock(ctx context.Context, req *pb.Re
 		if len(currentTx.TxOut) > 2 {
 			return nil, fmt.Errorf("unexpected number of outputs on current tx: %d", len(currentTx.TxOut))
 		}
-		if signingTx.TxOut[0].Value != currentTx.TxOut[0].Value {
-			return nil, fmt.Errorf("expected output value to be %d, got %d", currentTx.TxOut[0].Value, signingTx.TxOut[0].Value)
-		}
+		// TODO(mo) Reisntate value check once CPFP Refund Transactions are re-introduced into timelock flow
+		// if signingTx.TxOut[0].Value != currentTx.TxOut[0].Value {
+		// 	return nil, fmt.Errorf("expected output value to be %d, got %d", currentTx.TxOut[0].Value, signingTx.TxOut[0].Value)
+		// }
 
 		signingSequence := signingTx.TxIn[0].Sequence
 		currentSequence := currentTx.TxIn[0].Sequence
@@ -145,11 +146,11 @@ func (h *RefreshTimelockHandler) RefreshTimelock(ctx context.Context, req *pb.Re
 
 		sigHash, err := common.SigHashFromTx(signingTxs[i], 0, parentTxOut)
 		if err != nil {
-			return nil, fmt.Errorf("unable to calculate sighash from refund tx: %v", err)
+			return nil, fmt.Errorf("unable to calculate sighash from refund tx: %w", err)
 		}
 		userNonceCommitment, err := objects.NewSigningCommitment(signingJob.SigningNonceCommitment.Binding, signingJob.SigningNonceCommitment.Hiding)
 		if err != nil {
-			return nil, fmt.Errorf("unable to create user nonce commitment: %v", err)
+			return nil, fmt.Errorf("unable to create user nonce commitment: %w", err)
 		}
 
 		signingKeyshare, err := nodes[i].QuerySigningKeyshare().Only(ctx)

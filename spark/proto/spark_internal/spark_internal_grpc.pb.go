@@ -46,6 +46,10 @@ const (
 	SparkInternalService_SettleReceiverKeyTweak_FullMethodName         = "/spark_internal.SparkInternalService/settle_receiver_key_tweak"
 	SparkInternalService_SettleSenderKeyTweak_FullMethodName           = "/spark_internal.SparkInternalService/settle_sender_key_tweak"
 	SparkInternalService_CreateUtxoSwap_FullMethodName                 = "/spark_internal.SparkInternalService/create_utxo_swap"
+	SparkInternalService_RollbackUtxoSwap_FullMethodName               = "/spark_internal.SparkInternalService/rollback_utxo_swap"
+	SparkInternalService_UtxoSwapCompleted_FullMethodName              = "/spark_internal.SparkInternalService/utxo_swap_completed"
+	SparkInternalService_QueryLeafSigningPubkeys_FullMethodName        = "/spark_internal.SparkInternalService/query_leaf_signing_pubkeys"
+	SparkInternalService_ResolveLeafInvestigation_FullMethodName       = "/spark_internal.SparkInternalService/resolve_leaf_investigation"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -77,7 +81,13 @@ type SparkInternalServiceClient interface {
 	SettleReceiverKeyTweak(ctx context.Context, in *SettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SettleSenderKeyTweak(ctx context.Context, in *SettleSenderKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Create UTXO swap record to claim UTXO by SSP in the static deposit flow
-	CreateUtxoSwap(ctx context.Context, in *spark.InitiateUtxoSwapRequest, opts ...grpc.CallOption) (*CreateUtxoSwapResponse, error)
+	CreateUtxoSwap(ctx context.Context, in *CreateUtxoSwapRequest, opts ...grpc.CallOption) (*CreateUtxoSwapResponse, error)
+	// Internal method to cancel a swap for other SOs if one of them failed to ack it
+	RollbackUtxoSwap(ctx context.Context, in *RollbackUtxoSwapRequest, opts ...grpc.CallOption) (*RollbackUtxoSwapResponse, error)
+	// Internal method to mark a swap as COMPLETE in all SOs
+	UtxoSwapCompleted(ctx context.Context, in *UtxoSwapCompletedRequest, opts ...grpc.CallOption) (*UtxoSwapCompletedResponse, error)
+	QueryLeafSigningPubkeys(ctx context.Context, in *QueryLeafSigningPubkeysRequest, opts ...grpc.CallOption) (*QueryLeafSigningPubkeysResponse, error)
+	ResolveLeafInvestigation(ctx context.Context, in *ResolveLeafInvestigationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -328,10 +338,50 @@ func (c *sparkInternalServiceClient) SettleSenderKeyTweak(ctx context.Context, i
 	return out, nil
 }
 
-func (c *sparkInternalServiceClient) CreateUtxoSwap(ctx context.Context, in *spark.InitiateUtxoSwapRequest, opts ...grpc.CallOption) (*CreateUtxoSwapResponse, error) {
+func (c *sparkInternalServiceClient) CreateUtxoSwap(ctx context.Context, in *CreateUtxoSwapRequest, opts ...grpc.CallOption) (*CreateUtxoSwapResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateUtxoSwapResponse)
 	err := c.cc.Invoke(ctx, SparkInternalService_CreateUtxoSwap_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkInternalServiceClient) RollbackUtxoSwap(ctx context.Context, in *RollbackUtxoSwapRequest, opts ...grpc.CallOption) (*RollbackUtxoSwapResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RollbackUtxoSwapResponse)
+	err := c.cc.Invoke(ctx, SparkInternalService_RollbackUtxoSwap_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkInternalServiceClient) UtxoSwapCompleted(ctx context.Context, in *UtxoSwapCompletedRequest, opts ...grpc.CallOption) (*UtxoSwapCompletedResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UtxoSwapCompletedResponse)
+	err := c.cc.Invoke(ctx, SparkInternalService_UtxoSwapCompleted_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkInternalServiceClient) QueryLeafSigningPubkeys(ctx context.Context, in *QueryLeafSigningPubkeysRequest, opts ...grpc.CallOption) (*QueryLeafSigningPubkeysResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryLeafSigningPubkeysResponse)
+	err := c.cc.Invoke(ctx, SparkInternalService_QueryLeafSigningPubkeys_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkInternalServiceClient) ResolveLeafInvestigation(ctx context.Context, in *ResolveLeafInvestigationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_ResolveLeafInvestigation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +417,13 @@ type SparkInternalServiceServer interface {
 	SettleReceiverKeyTweak(context.Context, *SettleReceiverKeyTweakRequest) (*emptypb.Empty, error)
 	SettleSenderKeyTweak(context.Context, *SettleSenderKeyTweakRequest) (*emptypb.Empty, error)
 	// Create UTXO swap record to claim UTXO by SSP in the static deposit flow
-	CreateUtxoSwap(context.Context, *spark.InitiateUtxoSwapRequest) (*CreateUtxoSwapResponse, error)
+	CreateUtxoSwap(context.Context, *CreateUtxoSwapRequest) (*CreateUtxoSwapResponse, error)
+	// Internal method to cancel a swap for other SOs if one of them failed to ack it
+	RollbackUtxoSwap(context.Context, *RollbackUtxoSwapRequest) (*RollbackUtxoSwapResponse, error)
+	// Internal method to mark a swap as COMPLETE in all SOs
+	UtxoSwapCompleted(context.Context, *UtxoSwapCompletedRequest) (*UtxoSwapCompletedResponse, error)
+	QueryLeafSigningPubkeys(context.Context, *QueryLeafSigningPubkeysRequest) (*QueryLeafSigningPubkeysResponse, error)
+	ResolveLeafInvestigation(context.Context, *ResolveLeafInvestigationRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -450,8 +506,20 @@ func (UnimplementedSparkInternalServiceServer) SettleReceiverKeyTweak(context.Co
 func (UnimplementedSparkInternalServiceServer) SettleSenderKeyTweak(context.Context, *SettleSenderKeyTweakRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SettleSenderKeyTweak not implemented")
 }
-func (UnimplementedSparkInternalServiceServer) CreateUtxoSwap(context.Context, *spark.InitiateUtxoSwapRequest) (*CreateUtxoSwapResponse, error) {
+func (UnimplementedSparkInternalServiceServer) CreateUtxoSwap(context.Context, *CreateUtxoSwapRequest) (*CreateUtxoSwapResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateUtxoSwap not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) RollbackUtxoSwap(context.Context, *RollbackUtxoSwapRequest) (*RollbackUtxoSwapResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RollbackUtxoSwap not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) UtxoSwapCompleted(context.Context, *UtxoSwapCompletedRequest) (*UtxoSwapCompletedResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UtxoSwapCompleted not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) QueryLeafSigningPubkeys(context.Context, *QueryLeafSigningPubkeysRequest) (*QueryLeafSigningPubkeysResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryLeafSigningPubkeys not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) ResolveLeafInvestigation(context.Context, *ResolveLeafInvestigationRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResolveLeafInvestigation not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -907,7 +975,7 @@ func _SparkInternalService_SettleSenderKeyTweak_Handler(srv interface{}, ctx con
 }
 
 func _SparkInternalService_CreateUtxoSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(spark.InitiateUtxoSwapRequest)
+	in := new(CreateUtxoSwapRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -919,7 +987,79 @@ func _SparkInternalService_CreateUtxoSwap_Handler(srv interface{}, ctx context.C
 		FullMethod: SparkInternalService_CreateUtxoSwap_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkInternalServiceServer).CreateUtxoSwap(ctx, req.(*spark.InitiateUtxoSwapRequest))
+		return srv.(SparkInternalServiceServer).CreateUtxoSwap(ctx, req.(*CreateUtxoSwapRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkInternalService_RollbackUtxoSwap_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RollbackUtxoSwapRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).RollbackUtxoSwap(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_RollbackUtxoSwap_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).RollbackUtxoSwap(ctx, req.(*RollbackUtxoSwapRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkInternalService_UtxoSwapCompleted_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UtxoSwapCompletedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).UtxoSwapCompleted(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_UtxoSwapCompleted_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).UtxoSwapCompleted(ctx, req.(*UtxoSwapCompletedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkInternalService_QueryLeafSigningPubkeys_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryLeafSigningPubkeysRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).QueryLeafSigningPubkeys(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_QueryLeafSigningPubkeys_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).QueryLeafSigningPubkeys(ctx, req.(*QueryLeafSigningPubkeysRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkInternalService_ResolveLeafInvestigation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveLeafInvestigationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).ResolveLeafInvestigation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_ResolveLeafInvestigation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).ResolveLeafInvestigation(ctx, req.(*ResolveLeafInvestigationRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1030,6 +1170,22 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "create_utxo_swap",
 			Handler:    _SparkInternalService_CreateUtxoSwap_Handler,
+		},
+		{
+			MethodName: "rollback_utxo_swap",
+			Handler:    _SparkInternalService_RollbackUtxoSwap_Handler,
+		},
+		{
+			MethodName: "utxo_swap_completed",
+			Handler:    _SparkInternalService_UtxoSwapCompleted_Handler,
+		},
+		{
+			MethodName: "query_leaf_signing_pubkeys",
+			Handler:    _SparkInternalService_QueryLeafSigningPubkeys_Handler,
+		},
+		{
+			MethodName: "resolve_leaf_investigation",
+			Handler:    _SparkInternalService_ResolveLeafInvestigation_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

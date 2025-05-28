@@ -41,6 +41,8 @@ type UtxoSwap struct {
 	UserSignature []byte `json:"user_signature,omitempty"`
 	// UserIdentityPublicKey holds the value of the "user_identity_public_key" field.
 	UserIdentityPublicKey []byte `json:"user_identity_public_key,omitempty"`
+	// CoordinatorIdentityPublicKey holds the value of the "coordinator_identity_public_key" field.
+	CoordinatorIdentityPublicKey []byte `json:"coordinator_identity_public_key,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the UtxoSwapQuery when eager-loading is set.
 	Edges                     UtxoSwapEdges `json:"edges"`
@@ -88,7 +90,7 @@ func (*UtxoSwap) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case utxoswap.FieldSspSignature, utxoswap.FieldSspIdentityPublicKey, utxoswap.FieldUserSignature, utxoswap.FieldUserIdentityPublicKey:
+		case utxoswap.FieldSspSignature, utxoswap.FieldSspIdentityPublicKey, utxoswap.FieldUserSignature, utxoswap.FieldUserIdentityPublicKey, utxoswap.FieldCoordinatorIdentityPublicKey:
 			values[i] = new([]byte)
 		case utxoswap.FieldCreditAmountSats, utxoswap.FieldMaxFeeSats:
 			values[i] = new(sql.NullInt64)
@@ -184,6 +186,12 @@ func (us *UtxoSwap) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field user_identity_public_key", values[i])
 			} else if value != nil {
 				us.UserIdentityPublicKey = *value
+			}
+		case utxoswap.FieldCoordinatorIdentityPublicKey:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field coordinator_identity_public_key", values[i])
+			} else if value != nil {
+				us.CoordinatorIdentityPublicKey = *value
 			}
 		case utxoswap.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -281,6 +289,9 @@ func (us *UtxoSwap) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("user_identity_public_key=")
 	builder.WriteString(fmt.Sprintf("%v", us.UserIdentityPublicKey))
+	builder.WriteString(", ")
+	builder.WriteString("coordinator_identity_public_key=")
+	builder.WriteString(fmt.Sprintf("%v", us.CoordinatorIdentityPublicKey))
 	builder.WriteByte(')')
 	return builder.String()
 }

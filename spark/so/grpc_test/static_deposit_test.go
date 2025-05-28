@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so/handler"
 	testutil "github.com/lightsparkdev/spark/test_util"
 	"github.com/lightsparkdev/spark/wallet"
@@ -24,6 +25,7 @@ import (
 )
 
 func TestValidateUtxoIsNotSpent(t *testing.T) {
+	skipIfGithubActions(t)
 	bitcoinClient, err := testutil.NewRegtestClient()
 	testutil.OnErrFatal(t, err)
 
@@ -72,7 +74,7 @@ func TestValidateUtxoIsNotSpent(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestStaticDeposit(t *testing.T) {
+func TestStaticDepositSSP(t *testing.T) {
 	bitcoinClient, err := testutil.NewRegtestClient()
 	testutil.OnErrFatal(t, err)
 
@@ -188,10 +190,11 @@ func TestStaticDeposit(t *testing.T) {
 
 	// User signature authorizing the SSP to claim the deposit
 	// in return for a transfer of a fixed amount
-	userSignature, err := createUserFixedQuoteSignature(
+	userSignature, err := createUserSignature(
 		signedDepositTx.TxHash().String(),
 		uint32(vout),
 		common.Regtest,
+		pb.UtxoSwapRequestType_Fixed,
 		quoteAmount,
 		sspSignature,
 		&aliceConfig.IdentityPrivateKey,
@@ -234,6 +237,19 @@ func TestStaticDeposit(t *testing.T) {
 	spendTx.AddTxOut(wire.NewTxOut(int64(quoteAmount), spendPkScript))
 
 	// *********************************************************************************
+	// Get signing commitments to use for frost signing
+	// *********************************************************************************
+	sparkClient := pb.NewSparkServiceClient(sspConn)
+	nodeIDs := make([]string, len(leavesToTransfer))
+	for i, leaf := range leavesToTransfer {
+		nodeIDs[i] = leaf.Leaf.Id
+	}
+	signingCommitments, err := sparkClient.GetSigningCommitments(sspCtx, &pb.GetSigningCommitmentsRequest{
+		NodeIds: nodeIDs,
+	})
+	testutil.OnErrFatal(t, err)
+
+	// *********************************************************************************
 	// Claim Static Deposit
 	// *********************************************************************************
 	signedSpendTx, transferToAliceKeysTweaked, err := wallet.ClaimStaticDeposit(
@@ -249,6 +265,7 @@ func TestStaticDeposit(t *testing.T) {
 		aliceConfig.IdentityPrivateKey.PubKey(),
 		sspConn,
 		signedDepositTx.TxOut[vout],
+		signingCommitments.SigningCommitments,
 	)
 	testutil.OnErrFatal(t, err)
 
@@ -275,66 +292,251 @@ func TestStaticDeposit(t *testing.T) {
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
 	require.Equal(t, res[0].Id, transferNode.Leaf.Id)
+
+	// *********************************************************************************
+	// Claiming a Static Deposit again should fail
+	// *********************************************************************************
+	_, _, err = wallet.ClaimStaticDeposit(
+		sspCtx,
+		sspConfig,
+		common.Regtest,
+		leavesToTransfer[:],
+		spendTx,
+		pb.UtxoSwapRequestType_Fixed,
+		aliceDepositPrivKey,
+		userSignature,
+		sspSignature,
+		aliceConfig.IdentityPrivateKey.PubKey(),
+		sspConn,
+		signedDepositTx.TxOut[vout],
+		signingCommitments.SigningCommitments,
+	)
+	assert.Error(t, err)
+
+	// *********************************************************************************
+	// A call to rollback should fail
+	// *********************************************************************************
+	sparkInternalClient := pbinternal.NewSparkInternalServiceClient(sspConn)
+	rollbackUtxoSwapRequestMessageHash, err := handler.CreateUtxoSwapStatement(
+		handler.UtxoSwapStatementTypeRollback,
+		hex.EncodeToString(depositOutPoint.Hash[:]),
+		depositOutPoint.Index,
+		common.Regtest,
+	)
+	testutil.OnErrFatal(t, err)
+	rollbackUtxoSwapRequestSignature := ecdsa.Sign(&sspConfig.IdentityPrivateKey, rollbackUtxoSwapRequestMessageHash)
+
+	_, err = sparkInternalClient.RollbackUtxoSwap(sspCtx, &pbinternal.RollbackUtxoSwapRequest{
+		OnChainUtxo: &pb.UTXO{
+			Txid:    depositOutPoint.Hash[:],
+			Vout:    depositOutPoint.Index,
+			Network: pb.Network_REGTEST,
+		},
+		Signature:            rollbackUtxoSwapRequestSignature.Serialize(),
+		CoordinatorPublicKey: aliceConfig.IdentityPublicKey(),
+	})
+	assert.Error(t, err)
 }
 
-func createUserFixedQuoteSignature(
+func TestStaticDepositUserRefund(t *testing.T) {
+	bitcoinClient, err := testutil.NewRegtestClient()
+	testutil.OnErrFatal(t, err)
+
+	coin, err := faucet.Fund()
+	testutil.OnErrFatal(t, err)
+
+	// *********************************************************************************
+	// Initiate Users
+	// *********************************************************************************
+	// 1. Initiate Alice
+	aliceConfig, err := testutil.TestWalletConfig()
+	testutil.OnErrFatal(t, err)
+
+	aliceLeafPrivKey, err := secp256k1.GeneratePrivateKey()
+	testutil.OnErrFatal(t, err)
+	_, err = testutil.CreateNewTree(aliceConfig, faucet, aliceLeafPrivKey, 100_000)
+	testutil.OnErrFatal(t, err)
+
+	aliceConn, err := common.NewGRPCConnectionWithTestTLS(aliceConfig.CoodinatorAddress(), nil)
+	testutil.OnErrFatal(t, err)
+	defer aliceConn.Close()
+
+	aliceConnectionToken, err := wallet.AuthenticateWithConnection(context.Background(), aliceConfig, aliceConn)
+	testutil.OnErrFatal(t, err)
+	aliceCtx := wallet.ContextWithToken(context.Background(), aliceConnectionToken)
+
+	// *********************************************************************************
+	// Generate a new static deposit address for Alice
+	// *********************************************************************************
+
+	// Generate a new private key for Alice. In a real Wallet that key would be derived from
+	// a Signing key using derivation schema
+	aliceDepositPrivKey, err := secp256k1.GeneratePrivateKey()
+	testutil.OnErrFatal(t, err)
+	aliceDepositPubKey := aliceDepositPrivKey.PubKey()
+	aliceDepositPubKeyBytes := aliceDepositPubKey.SerializeCompressed()
+
+	leafID := uuid.New().String()
+
+	depositResp, err := wallet.GenerateDepositAddress(
+		aliceCtx,
+		aliceConfig,
+		aliceDepositPubKeyBytes,
+		&leafID,
+		true,
+	)
+	testutil.OnErrFatal(t, err)
+	time.Sleep(100 * time.Millisecond)
+
+	// *********************************************************************************
+	// Create Test Deposit TX from Alice
+	// *********************************************************************************
+	depositAmount := uint64(100_000)
+	quoteAmount := uint64(90_000)
+
+	randomKey, err := secp256k1.GeneratePrivateKey()
+	assert.NoError(t, err)
+	randomPubKey := randomKey.PubKey()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey.SerializeCompressed(), common.Regtest)
+	assert.NoError(t, err)
+
+	unsignedDepositTx, err := testutil.CreateTestDepositTransactionManyOutputs(
+		coin.OutPoint,
+		[]string{randomAddress.String(), depositResp.DepositAddress.Address},
+		int64(depositAmount),
+	)
+	testutil.OnErrFatal(t, err)
+	vout := 1
+	if unsignedDepositTx.TxOut[vout].Value != int64(depositAmount) {
+		t.Fatalf("deposit tx output value is not equal to the deposit amount")
+	}
+	signedDepositTx, err := testutil.SignFaucetCoin(unsignedDepositTx, coin.TxOut, coin.Key)
+	testutil.OnErrFatal(t, err)
+	_, err = bitcoinClient.SendRawTransaction(signedDepositTx, true)
+	testutil.OnErrFatal(t, err)
+
+	// Make sure the deposit tx gets enough confirmations
+	// Confirm extra buffer to scan more blocks than needed
+	// So that we don't race the chain watcher in this test
+	_, err = bitcoinClient.GenerateToAddress(6, randomAddress, nil)
+	assert.NoError(t, err)
+	time.Sleep(10000 * time.Millisecond)
+
+	// *********************************************************************************
+	// Create spend tx from Alice's deposit to an Alice wallet address
+	// *********************************************************************************
+	depositOutPoint := &wire.OutPoint{Hash: signedDepositTx.TxHash(), Index: uint32(vout)}
+	spendTx := wire.NewMsgTx(2)
+	spendTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: *depositOutPoint,
+		SignatureScript:  nil,
+		Witness:          nil,
+		Sequence:         wire.MaxTxInSequenceNum,
+	})
+	spendPkScript, err := common.P2TRScriptFromPubKey(aliceConfig.IdentityPrivateKey.PubKey())
+	testutil.OnErrFatal(t, err)
+	spendTx.AddTxOut(wire.NewTxOut(int64(quoteAmount), spendPkScript))
+
+	// *********************************************************************************
+	// Create request signature
+	// *********************************************************************************
+	spendTxSighash, err := common.SigHashFromTx(
+		spendTx,
+		0,
+		signedDepositTx.TxOut[vout],
+	)
+	testutil.OnErrFatal(t, err)
+	userSignature, err := createUserSignature(
+		signedDepositTx.TxHash().String(),
+		uint32(vout),
+		common.Regtest,
+		pb.UtxoSwapRequestType_Refund,
+		quoteAmount,
+		spendTxSighash[:],
+		&aliceConfig.IdentityPrivateKey,
+	)
+	testutil.OnErrFatal(t, err)
+
+	// *********************************************************************************
+	// Refund Static Deposit
+	// *********************************************************************************
+	signedSpendTx, err := wallet.RefundStaticDeposit(
+		aliceCtx,
+		aliceConfig,
+		common.Regtest,
+		spendTx,
+		aliceDepositPrivKey,
+		userSignature,
+		aliceConfig.IdentityPrivateKey.PubKey(),
+		signedDepositTx.TxOut[vout],
+		aliceConn,
+	)
+	testutil.OnErrFatal(t, err)
+
+	spendTxBytes, err := common.SerializeTx(signedSpendTx)
+	testutil.OnErrFatal(t, err)
+	assert.True(t, len(spendTxBytes) > 0)
+
+	// Sign, broadcast, and mine spend tx
+	txid, err := bitcoinClient.SendRawTransaction(signedSpendTx, true)
+	assert.NoError(t, err)
+	assert.Equal(t, len(txid), 32)
+
+	// *********************************************************************************
+	// Refunding a Static Deposit again should fail
+	// *********************************************************************************
+	_, err = wallet.RefundStaticDeposit(
+		aliceCtx,
+		aliceConfig,
+		common.Regtest,
+		spendTx,
+		aliceDepositPrivKey,
+		userSignature,
+		aliceConfig.IdentityPrivateKey.PubKey(),
+		signedDepositTx.TxOut[vout],
+		aliceConn,
+	)
+	assert.Error(t, err)
+
+	// *********************************************************************************
+	// A call to rollback should fail
+	// *********************************************************************************
+	sparkInternalClient := pbinternal.NewSparkInternalServiceClient(aliceConn)
+	rollbackUtxoSwapRequestMessageHash, err := handler.CreateUtxoSwapStatement(
+		handler.UtxoSwapStatementTypeRollback,
+		hex.EncodeToString(depositOutPoint.Hash[:]),
+		depositOutPoint.Index,
+		common.Regtest,
+	)
+	testutil.OnErrFatal(t, err)
+	rollbackUtxoSwapRequestSignature := ecdsa.Sign(&aliceConfig.IdentityPrivateKey, rollbackUtxoSwapRequestMessageHash)
+
+	_, err = sparkInternalClient.RollbackUtxoSwap(aliceCtx, &pbinternal.RollbackUtxoSwapRequest{
+		OnChainUtxo: &pb.UTXO{
+			Txid:    depositOutPoint.Hash[:],
+			Vout:    depositOutPoint.Index,
+			Network: pb.Network_REGTEST,
+		},
+		Signature:            rollbackUtxoSwapRequestSignature.Serialize(),
+		CoordinatorPublicKey: aliceConfig.IdentityPublicKey(),
+	})
+	assert.Error(t, err)
+}
+
+func createUserSignature(
 	transactionID string,
 	outputIndex uint32,
 	network common.Network,
+	requestType pb.UtxoSwapRequestType,
 	creditAmountSats uint64,
 	sspSignature []byte,
 	identityPrivateKey *secp256k1.PrivateKey,
 ) ([]byte, error) {
-	// Create a buffer to hold all the data
-	var payload bytes.Buffer
-
-	// Add action name
-	_, err := payload.WriteString("claim_static_deposit")
-	if err != nil {
-		return nil, err
-	}
-
-	// Add network value as UTF-8 bytes
-	_, err = payload.WriteString(network.String())
-	if err != nil {
-		return nil, err
-	}
-
-	// Add transaction ID as UTF-8 bytes
-	_, err = payload.WriteString(transactionID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add output index as 4-byte unsigned integer (little-endian)
-	err = binary.Write(&payload, binary.LittleEndian, outputIndex)
-	if err != nil {
-		return nil, err
-	}
-
-	// Request type fixed amount
-	err = binary.Write(&payload, binary.LittleEndian, uint8(0))
-	if err != nil {
-		return nil, err
-	}
-
-	// Add credit amount as 8-byte unsigned integer (little-endian)
-	err = binary.Write(&payload, binary.LittleEndian, uint64(creditAmountSats))
-	if err != nil {
-		return nil, err
-	}
-
-	// Add SSP signature as UTF-8 bytes
-	_, err = payload.Write(sspSignature)
-	if err != nil {
-		return nil, err
-	}
-
-	// Hash the payload with SHA-256
-	hash, err := handler.CreateUserFixedQuoteStatement(
+	hash, err := handler.CreateUserStatement(
 		transactionID,
 		outputIndex,
 		network,
+		requestType,
 		creditAmountSats,
 		sspSignature,
 	)

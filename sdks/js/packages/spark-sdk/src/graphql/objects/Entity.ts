@@ -49,6 +49,14 @@ fragment EntityFragment on Entity {
             currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
             currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
+        coop_exit_request_l1_broadcast_fee: l1_broadcast_fee {
+            __typename
+            currency_amount_original_value: original_value
+            currency_amount_original_unit: original_unit
+            currency_amount_preferred_currency_unit: preferred_currency_unit
+            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
+            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
+        }
         coop_exit_request_status: status
         coop_exit_request_expires_at: expires_at
         coop_exit_request_raw_connector_transaction: raw_connector_transaction

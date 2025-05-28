@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/spark-sdk",
-  "version": "0.1.20",
+  "version": "0.1.27",
   "author": "",
   "license": "Apache-2.0",
   "main": "./dist/index.js",
@@ -9,7 +9,7 @@
   "module": "./dist/index.js",
   "type": "module",
   "description": "Spark SDK",
-  "homepage": "https://github.com/buildonspark/spark-sdk",
+  "homepage": "https://github.com/buildonspark/spark",
   "files": [
     "dist",
     "src",
@@ -72,6 +72,7 @@
     "crypto": false,
     "fs": false,
     "fs/promises": false,
+    "nice-grpc": "nice-grpc-web",
     "path": false,
     "url": false
   },
@@ -82,7 +83,7 @@
     "clean": "rm -rf dist",
     "circular-deps": "madge --circular --extensions ts,tsx src",
     "dev": "yarn build -- --watch",
-    "depcheck": "depcheck --ignores=buffer,ts-proto,jest,ts-jest",
+    "depcheck": "depcheck --ignores=buffer,ts-proto,jest,ts-jest,publint",
     "docs": "typedoc src",
     "format:fix": "prettier src --write",
     "format": "prettier src --check",
@@ -90,7 +91,7 @@
     "lint:fix:continue": "eslint --fix . || exit 0",
     "lint:watch": "esw ./src -w --ext .ts,.tsx,.js --color",
     "lint": "eslint .",
-    "package:checks": "yarn depcheck && yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
+    "package:checks": "yarn depcheck && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
     "postversion": "yarn build",
     "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand --detectOpenHandles --forceExit",
     "test": "yarn test-cmd src/tests/*.test.ts",
@@ -99,7 +100,7 @@
     "types:watch": "tsc-absolute --watch",
     "types": "tsc",
     "patch-wasm": "node ./wasm/patch-wasm.mjs",
-    "generate:proto": "PATH=\"$PATH:./node_modules/.bin\" protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,useExactTypes=false,outputServices=generic-definitions,oneof=unions,importSuffix=.js --proto_path=../../../../protos spark.proto mock.proto spark_authn.proto"
+    "generate:proto": "PATH=\"$PATH:./node_modules/.bin\" protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,useExactTypes=false,outputServices=generic-definitions,oneof=unions,importSuffix=.js --proto_path=../../../../protos spark.proto mock.proto spark_authn.proto && yarn format:fix"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.4",
@@ -118,10 +119,14 @@
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.2.5",
-    "@buildonspark/lrc20-sdk": "0.0.46",
+    "@buildonspark/lrc20-sdk": "0.0.50",
     "@lightsparkdev/core": "^1.4.0",
     "@noble/curves": "^1.8.0",
     "@noble/hashes": "^1.7.1",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/context-async-hooks": "^2.0.0",
+    "@opentelemetry/core": "^2.0.0",
+    "@opentelemetry/sdk-trace-base": "^2.0.0",
     "@scure/base": "^1.2.4",
     "@scure/bip32": "^1.6.2",
     "@scure/bip39": "^1.5.4",
@@ -137,6 +142,7 @@
     "nice-grpc": "^2.1.10",
     "nice-grpc-client-middleware-retry": "^3.1.10",
     "nice-grpc-common": "^2.0.2",
+    "nice-grpc-opentelemetry": "^0.1.18",
     "nice-grpc-web": "^3.3.5",
     "react-native": ">=0.71.0",
     "react-native-get-random-values": "^1.11.0",

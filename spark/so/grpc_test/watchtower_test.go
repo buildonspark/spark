@@ -2,17 +2,16 @@ package grpctest
 
 import (
 	"context"
-	"encoding/hex"
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/watchtower"
 	testutil "github.com/lightsparkdev/spark/test_util"
 	"github.com/lightsparkdev/spark/wallet"
 	"github.com/stretchr/testify/require"
@@ -56,23 +55,7 @@ func TestTimelockExpirationHappyPath(t *testing.T) {
 	// Broadcast the node transaction
 	nodeTx, err := common.TxFromRawTxBytes(rootNode.GetNodeTx())
 	require.NoError(t, err)
-
-	// Get funding for the node transaction
-	coin, err := faucet.Fund()
-	require.NoError(t, err)
-
-	// Create and sign fee bump transaction for node tx
-	nodeTxHash := nodeTx.TxHash()
-	anchorOutPoint := wire.NewOutPoint(&nodeTxHash, 1)
-	outputScript, err := common.P2TRScriptFromPubKey(leafPrivKey.PubKey())
-	require.NoError(t, err)
-	nodeFeeBumpTx, err := testutil.SignFaucetCoinFeeBump(anchorOutPoint, coin, outputScript)
-	require.NoError(t, err)
-
-	// Serialize transactions
 	nodeTxBytes, err := serializeTx(nodeTx)
-	require.NoError(t, err)
-	nodeFeeBumpTxBytes, err := serializeTx(nodeFeeBumpTx)
 	require.NoError(t, err)
 
 	// Generate a block to start
@@ -81,8 +64,8 @@ func TestTimelockExpirationHappyPath(t *testing.T) {
 	_, err = client.GenerateToAddress(1, randomAddress, nil)
 	require.NoError(t, err)
 
-	// Submit node tx package
-	err = submitPackage(client, []string{hex.EncodeToString(nodeTxBytes), hex.EncodeToString(nodeFeeBumpTxBytes)})
+	// Broadcast node tx
+	_, err = client.SendRawTransaction(nodeTx, false)
 	require.NoError(t, err)
 
 	// Generate a block to confirm the node transaction
@@ -93,7 +76,6 @@ func TestTimelockExpirationHappyPath(t *testing.T) {
 	block, err := client.GetBlockVerbose(blockHashes[0])
 	require.NoError(t, err)
 	require.Contains(t, block.Tx, nodeTx.TxID())
-	require.Contains(t, block.Tx, nodeFeeBumpTx.TxID())
 
 	// Get the node from the database and verify initial state
 	node, err := dbClient.TreeNode.Query().
@@ -123,42 +105,11 @@ func TestTimelockExpirationHappyPath(t *testing.T) {
 	_, err = client.GenerateToAddress(timelock, randomAddress, nil)
 	require.NoError(t, err)
 
-	// // Get the refund transaction and create a fee bump for it
-	refundTx, err := common.TxFromRawTxBytes(rootNode.GetRefundTx())
-	require.NoError(t, err)
-
-	// // Get funding for the refund transaction
-	coin, err = faucet.Fund()
-	require.NoError(t, err)
-
-	// // Create and sign fee bump transaction for refund tx
-	refundTxHash := refundTx.TxHash()
-	refundAnchorOutPoint := wire.NewOutPoint(&refundTxHash, 1)
-	refundFeeBumpTx, err := testutil.SignFaucetCoinFeeBump(refundAnchorOutPoint, coin, outputScript)
-	require.NoError(t, err)
-
-	// // Serialize transactions
-	refundTxBytes, err := serializeTx(refundTx)
-	require.NoError(t, err)
-	refundFeeBumpTxBytes, err := serializeTx(refundFeeBumpTx)
-	require.NoError(t, err)
-
-	// // Submit refund tx package
-	err = submitPackage(client, []string{hex.EncodeToString(refundTxBytes), hex.EncodeToString(refundFeeBumpTxBytes)})
-	require.NoError(t, err)
-
 	// Mine to confirm transaction broadcasts correctly.
-	blockHashes, err = client.GenerateToAddress(1, randomAddress, nil)
+	_, err = client.GenerateToAddress(1, randomAddress, nil)
 	require.NoError(t, err)
 
-	// Verify refund tx is confirmed
-	block, err = client.GetBlockVerbose(blockHashes[0])
-	require.NoError(t, err)
-	require.NoError(t, err)
-	require.Contains(t, block.Tx, refundTx.TxID(), "Refund transaction should be in the block (TxHash)")
-	require.Contains(t, block.Tx, refundFeeBumpTx.TxID(), "Refund fee bump should be in the block")
-
-	// Get current block height
+	// Get curr block height
 	currentHeight, err := client.GetBlockCount()
 	require.NoError(t, err)
 
@@ -166,9 +117,24 @@ func TestTimelockExpirationHappyPath(t *testing.T) {
 	expectedMinHeight := int64(broadcastedNode.NodeConfirmationHeight) + getCurrentTimelock(rootNode)
 	require.Greater(t, currentHeight, expectedMinHeight, "Current block height should be greater than node confirmation height + timelock")
 
-	// Wait for refund confirmation with retry logic
+	tx, err := common.TxFromRawTxBytes(node.RawRefundTx)
+	require.NoError(t, err)
+
+	err = watchtower.CheckExpiredTimeLocks(ctx, client, broadcastedNode, currentHeight)
+	require.NoError(t, err)
+
+	// Verify refund tx is confirmed
+	blockHashes, err = client.GenerateToAddress(1, randomAddress, nil)
+	require.NoError(t, err)
+	block, err = client.GetBlockVerbose(blockHashes[0])
+	require.NoError(t, err)
+	require.Contains(t, block.Tx, tx.TxID(), "Refund transaction should be in the block (TxHash)")
+
+	// Wait for refund confirmation with retry logic while continuously generating new blocks
 	var finalNode *ent.TreeNode
-	for range 50 {
+	for range 10 {
+		_, err = client.GenerateToAddress(1, randomAddress, nil)
+		require.NoError(t, err)
 		time.Sleep(500 * time.Millisecond)
 		finalNode, err = dbClient.TreeNode.Get(ctx, node.ID)
 		require.NoError(t, err)

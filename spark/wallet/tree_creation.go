@@ -266,6 +266,7 @@ func buildCreationNodesFromTree(
 					spark.InitialSequence(),
 					&parentOutPoint,
 					wire.NewTxOut(parentTxOut.Value, parentTxOut.PkScript),
+					true,
 				)
 				var txBuf bytes.Buffer
 				err := tx.Serialize(&txBuf)
@@ -290,7 +291,7 @@ func buildCreationNodesFromTree(
 				}
 				currentElement.creationNode.NodeTxSigningJob = signingJob
 
-				cpfpRefundTx, _, err := createRefundTxs(spark.InitialSequence(),
+				_, cpfpRefundTx, err := createRefundTxs(spark.InitialSequence(),
 					&wire.OutPoint{Hash: tx.TxHash(), Index: 0},
 					tx.TxOut[0].Value, pubkey, true)
 				if err != nil {

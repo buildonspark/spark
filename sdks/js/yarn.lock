@@ -1496,15 +1496,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@buildonspark/issuer-sdk@npm:0.0.51, @buildonspark/issuer-sdk@npm:^0.0.51, @buildonspark/issuer-sdk@workspace:packages/issuer-sdk":
+"@buildonspark/issuer-sdk@npm:0.0.58, @buildonspark/issuer-sdk@npm:^0.0.58, @buildonspark/issuer-sdk@workspace:packages/issuer-sdk":
   version: 0.0.0-use.local
   resolution: "@buildonspark/issuer-sdk@workspace:packages/issuer-sdk"
   dependencies:
     "@arethetypeswrong/cli": "npm:^0.17.4"
     "@bufbuild/protobuf": "npm:^2.2.5"
-    "@buildonspark/lrc20-sdk": "npm:0.0.46"
-    "@buildonspark/spark-sdk": "npm:0.1.20"
+    "@buildonspark/lrc20-sdk": "npm:0.0.50"
+    "@buildonspark/spark-sdk": "npm:0.1.27"
     "@jest/globals": "npm:^29.7.0"
+    "@lightsparkdev/core": "npm:^1.4.0"
     "@noble/curves": "npm:^1.8.0"
     "@scure/btc-signer": "npm:^1.5.0"
     "@types/jest": "npm:^29.5.14"
@@ -1525,7 +1526,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@buildonspark/lrc20-sdk@npm:0.0.46, @buildonspark/lrc20-sdk@workspace:packages/lrc20-sdk":
+"@buildonspark/lrc20-sdk@npm:0.0.50, @buildonspark/lrc20-sdk@workspace:packages/lrc20-sdk":
   version: 0.0.0-use.local
   resolution: "@buildonspark/lrc20-sdk@workspace:packages/lrc20-sdk"
   dependencies:
@@ -1568,7 +1569,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@buildonspark/nestjs-app@workspace:examples/nestjs-app"
   dependencies:
-    "@buildonspark/spark-sdk": "npm:0.1.20"
+    "@buildonspark/spark-sdk": "npm:0.1.27"
     "@nestjs/cli": "npm:^10.0.0"
     "@nestjs/common": "npm:^10.0.0"
     "@nestjs/core": "npm:^10.0.0"
@@ -1603,8 +1604,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@buildonspark/nodejs-scripts@workspace:examples/nodejs-scripts"
   dependencies:
-    "@buildonspark/issuer-sdk": "npm:0.0.51"
-    "@buildonspark/spark-sdk": "npm:0.1.20"
+    "@buildonspark/issuer-sdk": "npm:0.0.58"
+    "@buildonspark/spark-sdk": "npm:0.1.27"
     "@types/jest": "npm:^29.5.14"
     "@types/node": "npm:^22.13.2"
     jest: "npm:^29.7.0"
@@ -1619,8 +1620,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-cli@workspace:examples/spark-cli"
   dependencies:
-    "@buildonspark/issuer-sdk": "npm:^0.0.51"
-    "@buildonspark/spark-sdk": "npm:^0.1.20"
+    "@buildonspark/issuer-sdk": "npm:^0.0.58"
+    "@buildonspark/spark-sdk": "npm:^0.1.27"
     "@types/node": "npm:^22.13.2"
     prettier: "npm:^3.5.1"
     tsx: "npm:^4.19.3"
@@ -1628,17 +1629,21 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@buildonspark/spark-sdk@npm:0.1.20, @buildonspark/spark-sdk@npm:^0.1.16, @buildonspark/spark-sdk@npm:^0.1.20, @buildonspark/spark-sdk@workspace:packages/spark-sdk":
+"@buildonspark/spark-sdk@npm:0.1.27, @buildonspark/spark-sdk@npm:^0.1.16, @buildonspark/spark-sdk@npm:^0.1.27, @buildonspark/spark-sdk@workspace:packages/spark-sdk":
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-sdk@workspace:packages/spark-sdk"
   dependencies:
     "@arethetypeswrong/cli": "npm:^0.17.4"
     "@bufbuild/protobuf": "npm:^2.2.5"
-    "@buildonspark/lrc20-sdk": "npm:0.0.46"
+    "@buildonspark/lrc20-sdk": "npm:0.0.50"
     "@jest/globals": "npm:^29.7.0"
     "@lightsparkdev/core": "npm:^1.4.0"
     "@noble/curves": "npm:^1.8.0"
     "@noble/hashes": "npm:^1.7.1"
+    "@opentelemetry/api": "npm:^1.9.0"
+    "@opentelemetry/context-async-hooks": "npm:^2.0.0"
+    "@opentelemetry/core": "npm:^2.0.0"
+    "@opentelemetry/sdk-trace-base": "npm:^2.0.0"
     "@scure/base": "npm:^1.2.4"
     "@scure/bip32": "npm:^1.6.2"
     "@scure/bip39": "npm:^1.5.4"
@@ -1659,6 +1664,7 @@ __metadata:
     nice-grpc: "npm:^2.1.10"
     nice-grpc-client-middleware-retry: "npm:^3.1.10"
     nice-grpc-common: "npm:^2.0.2"
+    nice-grpc-opentelemetry: "npm:^0.1.18"
     nice-grpc-web: "npm:^3.3.5"
     node-fetch: "npm:^3.3.2"
     prettier: "npm:^3.5.1"
@@ -1677,7 +1683,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-token-cli@workspace:examples/spark-token-cli"
   dependencies:
-    "@buildonspark/issuer-sdk": "npm:^0.0.51"
+    "@buildonspark/issuer-sdk": "npm:^0.0.58"
     "@types/node": "npm:^22.13.2"
     node-fetch: "npm:^3.3.2"
     prettier: "npm:^3.5.1"
@@ -1692,7 +1698,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-vite-app@workspace:examples/spark-vite-app"
   dependencies:
-    "@buildonspark/spark-sdk": "npm:0.1.20"
+    "@buildonspark/spark-sdk": "npm:0.1.27"
     "@types/react": "npm:^19.0.10"
     "@types/react-dom": "npm:^19.0.4"
     "@vitejs/plugin-react": "npm:^4.3.4"
@@ -3941,6 +3947,65 @@ __metadata:
     "@octokit/request-error": "npm:^6.1.7"
     "@octokit/webhooks-methods": "npm:^5.1.1"
   checksum: 10/76de4b2f48ae11d62c48cd2c7e3f2de7a151db68496eec4decd4e7b40afd4fa08ed22657a677b1640322c307a43ffea575314ec56306b10fc25e704d0242c90b
+  languageName: node
+  linkType: hard
+
+"@opentelemetry/api@npm:^1.8.0, @opentelemetry/api@npm:^1.9.0":
+  version: 1.9.0
+  resolution: "@opentelemetry/api@npm:1.9.0"
+  checksum: 10/a607f0eef971893c4f2ee2a4c2069aade6ec3e84e2a1f5c2aac19f65c5d9eeea41aa72db917c1029faafdd71789a1a040bdc18f40d63690e22ccae5d7070f194
+  languageName: node
+  linkType: hard
+
+"@opentelemetry/context-async-hooks@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "@opentelemetry/context-async-hooks@npm:2.0.0"
+  peerDependencies:
+    "@opentelemetry/api": ">=1.0.0 <1.10.0"
+  checksum: 10/38ad40f3e4ae699b970f4f988cee69b8618c1d9223bcf23c6adcfe7b3c8cb5426315fc454e9de0e2327e400cfbae7efb13b9d236d68d63b49a21fadd9e15ccb0
+  languageName: node
+  linkType: hard
+
+"@opentelemetry/core@npm:2.0.0, @opentelemetry/core@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "@opentelemetry/core@npm:2.0.0"
+  dependencies:
+    "@opentelemetry/semantic-conventions": "npm:^1.29.0"
+  peerDependencies:
+    "@opentelemetry/api": ">=1.0.0 <1.10.0"
+  checksum: 10/c3a9f98556eca8e5d2ffd66cf250f16ad6d3bbd36ae0dce5ad77d64d5cfd9cda82e625950492bd8624e204a934a52ac0431eea61fdc41f30e5b11da2289195b7
+  languageName: node
+  linkType: hard
+
+"@opentelemetry/resources@npm:2.0.0":
+  version: 2.0.0
+  resolution: "@opentelemetry/resources@npm:2.0.0"
+  dependencies:
+    "@opentelemetry/core": "npm:2.0.0"
+    "@opentelemetry/semantic-conventions": "npm:^1.29.0"
+  peerDependencies:
+    "@opentelemetry/api": ">=1.3.0 <1.10.0"
+  checksum: 10/5e4f7ddbe4c3fa6bc4c67b0349e685fe150914348530d461392626c0feccd517f365a58d3de9609620cfe96c98a11fef6a242df3081d47132dd8763997c800c7
+  languageName: node
+  linkType: hard
+
+"@opentelemetry/sdk-trace-base@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "@opentelemetry/sdk-trace-base@npm:2.0.0"
+  dependencies:
+    "@opentelemetry/core": "npm:2.0.0"
+    "@opentelemetry/resources": "npm:2.0.0"
+    "@opentelemetry/semantic-conventions": "npm:^1.29.0"
+  peerDependencies:
+    "@opentelemetry/api": ">=1.3.0 <1.10.0"
+  checksum: 10/01fa9c04e93fd4bd2d346cb630ed6e289d8e91f56e52509ca1806291f73d299be5e38610fe1c440c83ea158d5f0f893ef828a08383d2ac99c7684b7e0d3297a0
+  languageName: node
+  linkType: hard
+
+"@opentelemetry/semantic-conventions@npm:^1.22.0, @opentelemetry/semantic-conventions@npm:^1.29.0":
+  version: 1.33.0
+  resolution: "@opentelemetry/semantic-conventions@npm:1.33.0"
+  checksum: 10/c20899b6d1959d55656f3ace8e90f172a696921e174d6d784a1ef500f958bd235be69df997a9ec298f4761a26d3f3a9f312726cbe0f5e39ab7bc4d43803c0fc9
   languageName: node
   linkType: hard
 
@@ -11549,6 +11614,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"ipaddr.js@npm:^2.0.1":
+  version: 2.2.0
+  resolution: "ipaddr.js@npm:2.2.0"
+  checksum: 10/9e1cdd9110b3bca5d910ab70d7fb1933e9c485d9b92cb14ef39f30c412ba3fe02a553921bf696efc7149cc653453c48ccf173adb996ec27d925f1f340f872986
+  languageName: node
+  linkType: hard
+
 "is-array-buffer@npm:^3.0.4, is-array-buffer@npm:^3.0.5":
   version: 3.0.5
   resolution: "is-array-buffer@npm:3.0.5"
@@ -14067,6 +14139,19 @@ __metadata:
   dependencies:
     ts-error: "npm:^1.0.6"
   checksum: 10/4c8b48844bc91b7f8c69c3537a331cdb60a87f58857033d0d25fec52139f44de014adbc49680677e499d570e273d10d0a9fb8a8cfbf152c974a7d69dfe94ec26
+  languageName: node
+  linkType: hard
+
+"nice-grpc-opentelemetry@npm:^0.1.18":
+  version: 0.1.18
+  resolution: "nice-grpc-opentelemetry@npm:0.1.18"
+  dependencies:
+    "@opentelemetry/api": "npm:^1.8.0"
+    "@opentelemetry/semantic-conventions": "npm:^1.22.0"
+    abort-controller-x: "npm:^0.4.0"
+    ipaddr.js: "npm:^2.0.1"
+    nice-grpc-common: "npm:^2.0.2"
+  checksum: 10/41e4ef7d112b6b38b7b80879b77e0dcb30dbbe3d65a0249ada0522fa78bd3a8191ffba0213439c1d09481005affa53d3ea47b91cea5deebdfa0f9ec65409b907
   languageName: node
   linkType: hard
 
@@ -17022,8 +17107,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "spark-node-express@workspace:examples/spark-node-express"
   dependencies:
-    "@buildonspark/issuer-sdk": "npm:^0.0.51"
-    "@buildonspark/spark-sdk": "npm:^0.1.20"
+    "@buildonspark/issuer-sdk": "npm:^0.0.58"
+    "@buildonspark/spark-sdk": "npm:^0.1.27"
     "@lightsparkdev/core": "npm:^1.4.0"
     "@noble/curves": "npm:^1.8.0"
     "@types/express": "npm:^5.0.0"

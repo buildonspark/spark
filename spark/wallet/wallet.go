@@ -242,9 +242,14 @@ func (w *SingleKeyWallet) SyncWallet(ctx context.Context) error {
 	}
 	defer conn.Close()
 
+	network, err := common.ProtoNetworkFromNetwork(common.Network(w.Config.Network))
+	if err != nil {
+		return err
+	}
 	response, err := (*client).QueryNodes(ctx, &pb.QueryNodesRequest{
 		Source:         &pb.QueryNodesRequest_OwnerIdentityPubkey{OwnerIdentityPubkey: w.Config.IdentityPublicKey()},
 		IncludeParents: true,
+		Network:        network,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to get owned nodes: %w", err)
@@ -363,7 +368,10 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 		return nil, fmt.Errorf("failed to create grpc client: %w", err)
 	}
 	defer conn.Close()
-
+	network, err := common.ProtoNetworkFromNetwork(common.Network(w.Config.Network))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get proto network: %w", err)
+	}
 	for _, leaf := range leaves {
 		response, err := (*grpcClient).QueryNodes(ctx, &pb.QueryNodesRequest{
 			Source: &pb.QueryNodesRequest_NodeIds{
@@ -371,6 +379,7 @@ func (w *SingleKeyWallet) RequestLeavesSwap(ctx context.Context, targetAmount in
 					NodeIds: []string{leaf.LeafID},
 				},
 			},
+			Network: network,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to query nodes: %w", err)
@@ -577,7 +586,6 @@ func (w *SingleKeyWallet) RefreshTimelocks(ctx context.Context, nodeUUID *uuid.U
 		return fmt.Errorf("failed to create grpc client: %w", err)
 	}
 	defer conn.Close()
-
 	nodesResp, err := (*client).QueryNodes(authCtx, &pb.QueryNodesRequest{
 		Source: &pb.QueryNodesRequest_NodeIds{
 			NodeIds: &pb.TreeNodeIds{

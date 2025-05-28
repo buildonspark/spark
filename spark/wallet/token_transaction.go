@@ -363,6 +363,7 @@ func FinalizeTokenTransaction(
 	ctx context.Context,
 	config *Config,
 	finalTx *pb.TokenTransaction,
+	operatorIdentityPublicKeys []SerializedPublicKey,
 	outputRevocationKeyshares [][]*KeyshareWithOperatorIndex,
 	outputToSpendRevocationCommitments []SerializedPublicKey,
 ) error {
@@ -404,8 +405,12 @@ func FinalizeTokenTransaction(
 		}
 	}
 
-	// For each operator, finalize the transaction
-	for _, operator := range config.SigningOperators {
+	operatorsToContact, _, err := getOperatorsToContact(config, operatorIdentityPublicKeys)
+	if err != nil {
+		return err
+	}
+
+	for _, operator := range operatorsToContact {
 		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address, nil)
 		if err != nil {
 			log.Printf("Error while establishing gRPC connection to operator at %s: %v", operator.Address, err)
@@ -474,6 +479,7 @@ func BroadcastTokenTransaction(
 			ctx,
 			config,
 			startResp.FinalTokenTransaction,
+			nil, // All operators
 			outputRevocationKeyshares,
 			outputToSpendRevocationCommitments,
 		)
@@ -571,9 +577,14 @@ func QueryTokenOutputs(
 	tmpCtx := ContextWithToken(ctx, token)
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
 
+	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert network to proto network: %w", err)
+	}
 	request := &pb.QueryTokenOutputsRequest{
 		OwnerPublicKeys: toByteSlices(ownerPublicKeys),
 		TokenPublicKeys: toByteSlices(tokenPublicKeys),
+		Network:         network,
 	}
 
 	response, err := sparkClient.QueryTokenOutputs(tmpCtx, request)
@@ -623,48 +634,6 @@ func QueryTokenTransactions(
 	}
 
 	return response, nil
-}
-
-// CancelTokenTransaction cancels a token transaction that has been signed but not yet finalized.
-// This is only possible if fewer than (total operators - threshold) operators have signed the transaction.
-// If operatorIdentityPublicKeys is provided and not empty, only those operators will be contacted.
-func CancelTokenTransaction(
-	ctx context.Context,
-	config *Config,
-	finalTokenTransaction *pb.TokenTransaction,
-	operatorIdentityPublicKeys []SerializedPublicKey,
-) error {
-	operatorsToContact, _, err := getOperatorsToContact(config, operatorIdentityPublicKeys)
-	if err != nil {
-		return err
-	}
-
-	// Now cancel with each operator
-	for _, operator := range operatorsToContact {
-		operatorConn, err := common.NewGRPCConnectionWithTestTLS(operator.Address, nil)
-		if err != nil {
-			log.Printf("Error while establishing gRPC connection to operator at %s: %v", operator.Address, err)
-			return err
-		}
-		defer operatorConn.Close()
-
-		operatorToken, err := AuthenticateWithConnection(ctx, config, operatorConn)
-		if err != nil {
-			return fmt.Errorf("failed to authenticate with operator %s: %v", operator.Identifier, err)
-		}
-		operatorCtx := ContextWithToken(ctx, operatorToken)
-		operatorClient := pb.NewSparkServiceClient(operatorConn)
-
-		_, err = operatorClient.CancelSignedTokenTransaction(operatorCtx, &pb.CancelSignedTokenTransactionRequest{
-			FinalTokenTransaction:   finalTokenTransaction,
-			SenderIdentityPublicKey: config.IdentityPublicKey(),
-		})
-		if err != nil {
-			return fmt.Errorf("failed to cancel token transaction with operator %s: %v", operator.Identifier, err)
-		}
-	}
-
-	return nil
 }
 
 func parseHexIdentifierToUint64(binaryIdentifier string) uint64 {

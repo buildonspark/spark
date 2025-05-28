@@ -71,8 +71,10 @@ func LogInterceptor(enableStats bool) grpc.UnaryServerInterceptor {
 		response, err := handler(ctx, req)
 		duration := time.Since(startTime)
 
+		respProto, _ := response.(proto.Message)
+
 		if enableStats {
-			logging.LogTable(ctx, duration, err)
+			logging.LogTable(ctx, duration, reqProto, respProto, err)
 		}
 
 		if err != nil {

@@ -1,6 +1,6 @@
 import { createLrc20ConnectionManager } from "@buildonspark/lrc20-sdk/grpc";
 import { ILrc20ConnectionManager } from "@buildonspark/lrc20-sdk/grpc/types";
-import { mapCurrencyAmount } from "@lightsparkdev/core";
+import { isNode, mapCurrencyAmount } from "@lightsparkdev/core";
 import {
   bytesToHex,
   bytesToNumberBE,
@@ -34,6 +34,7 @@ import {
   LightningReceiveRequest,
   LightningSendFeeEstimateInput,
   LightningSendRequest,
+  SwapLeaf,
   UserLeafInput,
 } from "./graphql/objects/index.js";
 import {
@@ -52,8 +53,10 @@ import { ConnectionManager } from "./services/connection.js";
 import { CoopExitService } from "./services/coop-exit.js";
 import { DepositService } from "./services/deposit.js";
 import { LightningService } from "./services/lightning.js";
+import { SigningService } from "./services/signing.js";
 import { TokenTransactionService } from "./services/token-transactions.js";
-import { LeafKeyTweak, TransferService } from "./services/transfer.js";
+import { TransferService } from "./services/transfer.js";
+import type { LeafKeyTweak } from "./services/transfer.js";
 import {
   DepositAddressTree,
   TreeCreationService,
@@ -80,14 +83,13 @@ import {
   LRC_WALLET_NETWORK,
   LRC_WALLET_NETWORK_TYPE,
   Network,
+  NetworkToProto,
 } from "./utils/network.js";
-import {
-  calculateAvailableTokenAmount,
-  checkIfSelectedOutputsAreAvailable,
-} from "./utils/token-transactions.js";
+import { calculateAvailableTokenAmount } from "./utils/token-transactions.js";
 import { getNextTransactionSequence } from "./utils/transaction.js";
 
 import { LRCWallet } from "@buildonspark/lrc20-sdk";
+import type { Tracer } from "@opentelemetry/api";
 import { EventEmitter } from "eventemitter3";
 import {
   decodeSparkAddress,
@@ -103,12 +105,8 @@ import {
   WalletLeaf,
   WalletTransfer,
 } from "./types/sdk-types.js";
-import { getCrypto } from "./utils/crypto.js";
 import { getMasterHDKeyFromSeed } from "./utils/index.js";
-const crypto = getCrypto();
-
-// Add this constant at the file level
-const MAX_TOKEN_OUTPUTS = 100;
+import { chunkArray } from "./utils/chunkArray.js";
 
 export type CreateLightningInvoiceParams = {
   amountSats: number;
@@ -175,17 +173,21 @@ export interface SparkWalletEvents {
  * and interacting with the Lightning Network.
  */
 export class SparkWallet extends EventEmitter {
+  private tracer: Tracer | null = null;
+
   protected config: WalletConfigService;
 
   protected connectionManager: ConnectionManager;
   protected lrc20ConnectionManager: ILrc20ConnectionManager;
   protected lrc20Wallet: LRCWallet | undefined;
+  protected transferService: TransferService;
+  protected tracerId = "spark-sdk";
 
   private depositService: DepositService;
-  protected transferService: TransferService;
   private treeCreationService: TreeCreationService;
   private lightningService: LightningService;
   private coopExitService: CoopExitService;
+  private signingService: SigningService;
   private tokenTransactionService: TokenTransactionService;
 
   private claimTransferMutex = new Mutex();
@@ -202,17 +204,129 @@ export class SparkWallet extends EventEmitter {
   private streamController: AbortController | null = null;
 
   protected leaves: TreeNode[] = [];
-  protected tokenOuputs: Map<string, OutputWithPreviousTransactionData[]> =
+  protected tokenOutputs: Map<string, OutputWithPreviousTransactionData[]> =
     new Map();
 
   // Add this property near the top of the class with other private properties
   private claimTransfersInterval: NodeJS.Timeout | null = null;
+
+  protected wrapWithOtelSpan<T>(
+    name: string,
+    fn: (...args: any[]) => Promise<T>,
+  ): (...args: any[]) => Promise<T> {
+    return async (...args: any[]): Promise<T> => {
+      if (!this.tracer) {
+        throw new Error("Tracer not initialized");
+      }
+
+      return await this.tracer.startActiveSpan(name, async (span) => {
+        const traceId = span.spanContext().traceId;
+        try {
+          return await fn(...args);
+        } catch (error) {
+          if (error instanceof Error) {
+            error.message += ` [traceId: ${traceId}]`;
+          } else if (typeof error === "object" && error !== null) {
+            (error as any).traceId = traceId;
+          }
+          throw error;
+        } finally {
+          span.end();
+        }
+      });
+    };
+  }
+
+  protected async initializeTracer(tracerName: string) {
+    const { trace, propagation, context } = await import("@opentelemetry/api");
+    const { W3CTraceContextPropagator } = await import("@opentelemetry/core");
+    const { AsyncLocalStorageContextManager } = await import(
+      "@opentelemetry/context-async-hooks"
+    );
+    const { BasicTracerProvider } = await import(
+      "@opentelemetry/sdk-trace-base"
+    );
+
+    trace.setGlobalTracerProvider(new BasicTracerProvider());
+    propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+    context.setGlobalContextManager(new AsyncLocalStorageContextManager());
+
+    this.tracer = trace.getTracer(tracerName);
+  }
+
+  private wrapSparkWalletWithTracing() {
+    this.getIdentityPublicKey = this.wrapWithOtelSpan(
+      "SparkWallet.getIdentityPublicKey",
+      this.getIdentityPublicKey.bind(this),
+    );
+    this.getSparkAddress = this.wrapWithOtelSpan(
+      "SparkWallet.getSparkAddress",
+      this.getSparkAddress.bind(this),
+    );
+    this.getSwapFeeEstimate = this.wrapWithOtelSpan(
+      "SparkWallet.getSwapFeeEstimate",
+      this.getSwapFeeEstimate.bind(this),
+    );
+    this.getTransfers = this.wrapWithOtelSpan(
+      "SparkWallet.getTransfers",
+      this.getTransfers.bind(this),
+    );
+    this.getTokenInfo = this.wrapWithOtelSpan(
+      "SparkWallet.getTokenInfo",
+      this.getTokenInfo.bind(this),
+    );
+    this.getBalance = this.wrapWithOtelSpan(
+      "SparkWallet.getBalance",
+      this.getBalance.bind(this),
+    );
+    this.getSingleUseDepositAddress = this.wrapWithOtelSpan(
+      "SparkWallet.getSingleUseDepositAddress",
+      this.getSingleUseDepositAddress.bind(this),
+    );
+    this.getUnusedDepositAddresses = this.wrapWithOtelSpan(
+      "SparkWallet.getUnusedDepositAddresses",
+      this.getUnusedDepositAddresses.bind(this),
+    );
+    this.claimDeposit = this.wrapWithOtelSpan(
+      "SparkWallet.claimDeposit",
+      this.claimDeposit.bind(this),
+    );
+    this.advancedDeposit = this.wrapWithOtelSpan(
+      "SparkWallet.advancedDeposit",
+      this.advancedDeposit.bind(this),
+    );
+    this.transfer = this.wrapWithOtelSpan(
+      "SparkWallet.transfer",
+      this.transfer.bind(this),
+    );
+    this.createLightningInvoice = this.wrapWithOtelSpan(
+      "SparkWallet.createLightningInvoice",
+      this.createLightningInvoice.bind(this),
+    );
+    this.payLightningInvoice = this.wrapWithOtelSpan(
+      "SparkWallet.payLightningInvoice",
+      this.payLightningInvoice.bind(this),
+    );
+    this.getLightningSendFeeEstimate = this.wrapWithOtelSpan(
+      "SparkWallet.getLightningSendFeeEstimate",
+      this.getLightningSendFeeEstimate.bind(this),
+    );
+    this.withdraw = this.wrapWithOtelSpan(
+      "SparkWallet.withdraw",
+      this.withdraw.bind(this),
+    );
+    this.getWithdrawalFeeEstimate = this.wrapWithOtelSpan(
+      "SparkWallet.getWithdrawalFeeEstimate",
+      this.getWithdrawalFeeEstimate.bind(this),
+    );
+  }
 
   protected constructor(options?: ConfigOptions, signer?: SparkSigner) {
     super();
 
     this.config = new WalletConfigService(options, signer);
     this.connectionManager = new ConnectionManager(this.config);
+    this.signingService = new SigningService(this.config);
     this.lrc20ConnectionManager = createLrc20ConnectionManager(
       this.config.getLrc20Address(),
     );
@@ -223,6 +337,7 @@ export class SparkWallet extends EventEmitter {
     this.transferService = new TransferService(
       this.config,
       this.connectionManager,
+      this.signingService,
     );
     this.treeCreationService = new TreeCreationService(
       this.config,
@@ -235,10 +350,12 @@ export class SparkWallet extends EventEmitter {
     this.lightningService = new LightningService(
       this.config,
       this.connectionManager,
+      this.signingService,
     );
     this.coopExitService = new CoopExitService(
       this.config,
       this.connectionManager,
+      this.signingService,
     );
   }
 
@@ -250,6 +367,7 @@ export class SparkWallet extends EventEmitter {
   }: SparkWalletProps) {
     const wallet = new SparkWallet(options, signer);
     const initResponse = await wallet.initWallet(mnemonicOrSeed, accountNumber);
+
     return {
       wallet,
       ...initResponse,
@@ -267,6 +385,15 @@ export class SparkWallet extends EventEmitter {
     }
 
     await this.syncWallet();
+  }
+
+  private getSspClient() {
+    if (!this.sspClient) {
+      throw new ConfigurationError("SSP client not initialized", {
+        configKey: "sspClient",
+      });
+    }
+    return this.sspClient;
   }
 
   private async handleStreamEvent({ event }: SubscribeToEventsResponse) {
@@ -339,9 +466,11 @@ export class SparkWallet extends EventEmitter {
     let retryCount = 0;
     while (retryCount <= MAX_RETRIES) {
       try {
-        const sparkClient = await this.connectionManager.createSparkClient(
-          this.config.getCoordinatorAddress(),
-        );
+        const address = this.config.getCoordinatorAddress();
+
+        const sparkClient =
+          await this.connectionManager.createSparkStreamClient(address);
+        const channel = await this.connectionManager.getStreamChannel(address);
 
         const stream = sparkClient.subscribe_to_events(
           {
@@ -352,11 +481,44 @@ export class SparkWallet extends EventEmitter {
           },
         );
 
+        // In Node.js, long-lived gRPC streams keep the underlying socket "ref'd",
+        // which prevents the process from exiting. To avoid that (e.g. in CLI tools),
+        // we manually unref the socket so Node can shut down when nothing else is active.
+        //
+        // The gRPC client doesn't expose the socket directly, so we dig through
+        // internal fields to find it. This is a bit of a hack and may break if the
+        // internals change.
+        //
+        // Since the socket isn't always immediately available, we retry with setTimeout
+        // until it shows up.
+        const maybeUnref = () => {
+          const internalChannel = (channel as any).internalChannel;
+          if (
+            internalChannel?.currentPicker?.subchannel?.child?.transport
+              ?.session?.socket
+          ) {
+            internalChannel.currentPicker.subchannel.child.transport.session.socket.unref();
+          } else {
+            setTimeout(maybeUnref, 100);
+          }
+        };
+
+        // Only need to unref in Node environments.
+        // In the browser and React Native, the runtime handles shutdown when the tab/app closes.
+        if (isNode) {
+          maybeUnref();
+        }
+
         const claimedTransfersIds = await this.claimTransfers();
 
         try {
           for await (const data of stream) {
+            if (this.streamController?.signal.aborted) {
+              break;
+            }
+
             if (data.event?.$case === "connected") {
+              console.log("connected");
               this.emit("stream:connected");
               retryCount = 0;
             }
@@ -423,6 +585,7 @@ export class SparkWallet extends EventEmitter {
         ownerIdentityPubkey: await this.config.signer.getIdentityPublicKey(),
       },
       includeParents: false,
+      network: NetworkToProto[this.config.getNetwork()],
     });
 
     return Object.entries(leaves.nodes)
@@ -601,6 +764,8 @@ export class SparkWallet extends EventEmitter {
    *   - A raw seed as Uint8Array or hex string
    *   If not provided, generates a new mnemonic and uses it to create a new wallet
    *
+   * @param {number} [accountNumber] - (Optional) The account number to use for the wallet. Defaults to 1 to maintain backwards compatability for legacy mainnet wallets.
+   *
    * @returns {Promise<Object>} Object containing:
    *   - mnemonic: The mnemonic if one was generated (undefined for raw seed)
    *   - balance: The wallet's initial balance in satoshis
@@ -611,16 +776,12 @@ export class SparkWallet extends EventEmitter {
     mnemonicOrSeed?: Uint8Array | string,
     accountNumber?: number,
   ): Promise<InitWalletResponse | undefined> {
-    if (accountNumber === 0 || accountNumber === 1) {
-      // Reserved values for the case where no account number is provided
-      throw new ValidationError(
-        "If an account number is provided, it must not be be 0 or 1",
-        {
-          field: "accountNumber",
-          value: accountNumber,
-          expected: "values that do not equal 0 or 1",
-        },
-      );
+    if (accountNumber === undefined) {
+      if (this.config.getNetwork() === Network.REGTEST) {
+        accountNumber = 0;
+      } else {
+        accountNumber = 1;
+      }
     }
     let mnemonic: string | undefined;
     if (!mnemonicOrSeed) {
@@ -655,9 +816,8 @@ export class SparkWallet extends EventEmitter {
         value: seed,
       });
     }
-    const accountNetwork = network === Network.REGTEST ? 0 : 1;
     const identityKey = hdkey.derive(
-      `m/8797555'/${accountNumber ?? accountNetwork}'/0'`, // When an accountNumber is not provided, set a value based on the network
+      `m/8797555'/${accountNumber}'/0'`, // When an accountNumber is not provided, set a value based on the network
     );
     this.lrc20Wallet = new LRCWallet(
       bytesToHex(identityKey.privateKey!),
@@ -665,6 +825,11 @@ export class SparkWallet extends EventEmitter {
       LRC_WALLET_NETWORK_TYPE[network],
       this.config.lrc20ApiConfig,
     );
+
+    if (isNode) {
+      await this.initializeTracer(this.tracerId);
+      this.wrapSparkWalletWithTracing();
+    }
 
     return {
       mnemonic,
@@ -683,11 +848,7 @@ export class SparkWallet extends EventEmitter {
     accountNumber?: number,
   ) {
     const identityPublicKey =
-      await this.config.signer.createSparkWalletFromSeed(
-        seed,
-        this.config.getNetwork(),
-        accountNumber,
-      );
+      await this.config.signer.createSparkWalletFromSeed(seed, accountNumber);
     await this.initializeWallet();
 
     this.sparkAddress = encodeSparkAddress({
@@ -707,13 +868,9 @@ export class SparkWallet extends EventEmitter {
   public async getSwapFeeEstimate(
     amountSats: number,
   ): Promise<LeavesSwapFeeEstimateOutput> {
-    if (!this.sspClient) {
-      throw new ConfigurationError("SSP client not initialized", {
-        configKey: "sspClient",
-      });
-    }
+    const sspClient = this.getSspClient();
 
-    const feeEstimate = await this.sspClient.getSwapFeeEstimate(amountSats);
+    const feeEstimate = await sspClient.getSwapFeeEstimate(amountSats);
     if (!feeEstimate) {
       throw new Error("Failed to get swap fee estimate");
     }
@@ -769,8 +926,28 @@ export class SparkWallet extends EventEmitter {
       throw new Error("targetAmount or leaves must be provided");
     }
 
+    leavesToSwap.sort((a, b) => a.value - b.value);
+
+    const batches = chunkArray(leavesToSwap, 100);
+
+    const results: SwapLeaf[] = [];
+    for (const batch of batches) {
+      const result = await this.processSwapBatch(batch, targetAmount);
+      results.push(...result.swapLeaves);
+    }
+
+    return results;
+  }
+
+  /**
+   * Processes a single batch of leaves for swapping.
+   */
+  private async processSwapBatch(
+    leavesBatch: TreeNode[],
+    targetAmount?: number,
+  ): Promise<LeavesSwapRequest> {
     const leafKeyTweaks = await Promise.all(
-      leavesToSwap.map(async (leaf) => ({
+      leavesBatch.map(async (leaf) => ({
         leaf,
         signingPubKey: await this.config.signer.generatePublicKey(
           sha256(leaf.id),
@@ -836,20 +1013,18 @@ export class SparkWallet extends EventEmitter {
         });
       }
 
+      const sspClient = this.getSspClient();
       const adaptorPubkey = bytesToHex(
         secp256k1.getPublicKey(adaptorPrivateKey),
       );
       let request: LeavesSwapRequest | null | undefined = null;
-      request = await this.sspClient?.requestLeaveSwap({
+      request = await sspClient.requestLeaveSwap({
         userLeaves,
         adaptorPubkey,
         targetAmountSats:
           targetAmount ||
-          leavesToSwap.reduce((acc, leaf) => acc + leaf.value, 0),
-        totalAmountSats: leavesToSwap.reduce(
-          (acc, leaf) => acc + leaf.value,
-          0,
-        ),
+          leavesBatch.reduce((acc, leaf) => acc + leaf.value, 0),
+        totalAmountSats: leavesBatch.reduce((acc, leaf) => acc + leaf.value, 0),
         // TODO: Request fee from SSP
         feeSats: 0,
         idempotencyKey: uuidv7(),
@@ -871,6 +1046,7 @@ export class SparkWallet extends EventEmitter {
           },
         },
         includeParents: false,
+        network: NetworkToProto[this.config.getNetwork()],
       });
 
       if (Object.values(nodes.nodes).length !== request.swapLeaves.length) {
@@ -915,7 +1091,7 @@ export class SparkWallet extends EventEmitter {
         signatureMap,
       );
 
-      const completeResponse = await this.sspClient?.completeLeaveSwap({
+      const completeResponse = await sspClient.completeLeaveSwap({
         adaptorSecretKey: bytesToHex(adaptorPrivateKey),
         userOutboundTransferExternalId: transfer.id,
         leavesSwapRequestId: request.id,
@@ -1007,7 +1183,7 @@ export class SparkWallet extends EventEmitter {
 
     let tokenBalances: Map<string, { balance: bigint; tokenInfo: TokenInfo }>;
 
-    if (this.tokenOuputs.size !== 0) {
+    if (this.tokenOutputs.size !== 0) {
       tokenBalances = await this.getTokenBalance();
     } else {
       tokenBalances = new Map<
@@ -1029,7 +1205,7 @@ export class SparkWallet extends EventEmitter {
 
     // Get token info for all tokens
     const tokenInfo = await lrc20Client.getTokenPubkeyInfo({
-      publicKeys: Array.from(this.tokenOuputs.keys()).map(hexToBytes),
+      publicKeys: Array.from(this.tokenOutputs.keys()).map(hexToBytes),
     });
 
     const result = new Map<string, { balance: bigint; tokenInfo: TokenInfo }>();
@@ -1038,7 +1214,7 @@ export class SparkWallet extends EventEmitter {
       const tokenPublicKey = bytesToHex(
         info.announcement!.publicKey!.publicKey,
       );
-      const leaves = this.tokenOuputs.get(tokenPublicKey);
+      const leaves = this.tokenOutputs.get(tokenPublicKey);
 
       result.set(tokenPublicKey, {
         balance: leaves ? calculateAvailableTokenAmount(leaves) : BigInt(0),
@@ -1165,6 +1341,7 @@ export class SparkWallet extends EventEmitter {
     return (
       await sparkClient.query_unused_deposit_addresses({
         identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+        network: NetworkToProto[this.config.getNetwork()],
       })
     ).depositAddresses.map((addr) => addr.depositAddress);
   }
@@ -1189,9 +1366,7 @@ export class SparkWallet extends EventEmitter {
 
     const nodes = await mutex.runExclusive(async () => {
       const baseUrl = this.config.getElectrsUrl();
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
+      const headers: Record<string, string> = {};
 
       let txHex: string | undefined;
 
@@ -1236,10 +1411,10 @@ export class SparkWallet extends EventEmitter {
             await sparkClient.query_unused_deposit_addresses({
               identityPublicKey:
                 await this.config.signer.getIdentityPublicKey(),
+              network: NetworkToProto[this.config.getNetwork()],
             })
           ).depositAddresses.map((addr) => [addr.depositAddress, addr]),
         );
-
       let depositAddress: DepositAddressQueryResult | undefined;
       let vout = 0;
       for (let i = 0; i < depositTx.outputsLength; i++) {
@@ -1306,6 +1481,7 @@ export class SparkWallet extends EventEmitter {
         (
           await sparkClient.query_unused_deposit_addresses({
             identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+            network: NetworkToProto[this.config.getNetwork()],
           })
         ).depositAddresses.map((addr) => [addr.depositAddress, addr]),
       );
@@ -1438,7 +1614,7 @@ export class SparkWallet extends EventEmitter {
         })),
       );
 
-      const transfer = await this.transferService.sendTransfer(
+      const transfer = await this.transferService.sendTransferWithKeyTweaks(
         leafKeyTweaks,
         hexToBytes(receiverAddress),
       );
@@ -1534,6 +1710,7 @@ export class SparkWallet extends EventEmitter {
         },
       },
       includeParents: true,
+      network: NetworkToProto[this.config.getNetwork()],
     });
 
     const nodesMap = new Map<string, TreeNode>();
@@ -1680,7 +1857,9 @@ export class SparkWallet extends EventEmitter {
         transfer.status !==
           TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED &&
         transfer.status !==
-          TransferStatus.TRANSFER_STATUSR_RECEIVER_REFUND_SIGNED
+          TransferStatus.TRANSFER_STATUSR_RECEIVER_REFUND_SIGNED &&
+        transfer.status !==
+          TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED
       ) {
         continue;
       }
@@ -1740,11 +1919,7 @@ export class SparkWallet extends EventEmitter {
     memo,
     expirySeconds = 60 * 60 * 24 * 30,
   }: CreateLightningInvoiceParams): Promise<LightningReceiveRequest> {
-    if (!this.sspClient) {
-      throw new ConfigurationError("SSP client not initialized", {
-        configKey: "sspClient",
-      });
-    }
+    const sspClient = this.getSspClient();
 
     if (isNaN(amountSats) || amountSats < 0) {
       throw new ValidationError("Invalid amount", {
@@ -1799,7 +1974,7 @@ export class SparkWallet extends EventEmitter {
         bitcoinNetwork = BitcoinNetwork.REGTEST;
       }
 
-      const invoice = await this.sspClient!.requestLightningReceive({
+      const invoice = await sspClient.requestLightningReceive({
         amountSats,
         network: bitcoinNetwork,
         paymentHash: bytesToHex(paymentHash),
@@ -1831,11 +2006,7 @@ export class SparkWallet extends EventEmitter {
     maxFeeSats,
   }: PayLightningInvoiceParams) {
     return await this.withLeaves(async () => {
-      if (!this.sspClient) {
-        throw new ConfigurationError("SSP client not initialized", {
-          configKey: "sspClient",
-        });
-      }
+      const sspClient = this.getSspClient();
 
       const decodedInvoice = decode(invoice);
       const amountSats =
@@ -1921,7 +2092,7 @@ export class SparkWallet extends EventEmitter {
         new Map(),
       );
 
-      const sspResponse = await this.sspClient.requestLightningSend({
+      const sspResponse = await sspClient.requestLightningSend({
         encodedInvoice: invoice,
         idempotencyKey: paymentHash,
       });
@@ -1946,14 +2117,10 @@ export class SparkWallet extends EventEmitter {
   public async getLightningSendFeeEstimate({
     encodedInvoice,
   }: LightningSendFeeEstimateInput): Promise<number> {
-    if (!this.sspClient) {
-      throw new ConfigurationError("SSP client not initialized", {
-        configKey: "sspClient",
-      });
-    }
+    const sspClient = this.getSspClient();
 
     const feeEstimate =
-      await this.sspClient.getLightningSendFeeEstimate(encodedInvoice);
+      await sspClient.getLightningSendFeeEstimate(encodedInvoice);
 
     if (!feeEstimate) {
       throw new Error("Failed to get lightning send fee estimate");
@@ -2076,7 +2243,8 @@ export class SparkWallet extends EventEmitter {
       }));
     }
 
-    const feeEstimate = await this.sspClient?.getCoopExitFeeEstimate({
+    const sspClient = this.getSspClient();
+    const feeEstimate = await sspClient.getCoopExitFeeEstimate({
       leafExternalIds: leavesToSend.map((leaf) => leaf.id),
       withdrawalAddress: onchainAddress,
     });
@@ -2134,11 +2302,12 @@ export class SparkWallet extends EventEmitter {
       })),
     );
 
-    const coopExitRequest = await this.sspClient?.requestCoopExit({
+    const coopExitRequest = await sspClient.requestCoopExit({
       leafExternalIds: leavesToSend.map((leaf) => leaf.id),
       withdrawalAddress: onchainAddress,
       idempotencyKey: uuidv7(),
       exitSpeed,
+      withdrawAll: true,
     });
 
     if (!coopExitRequest?.rawConnectorTransaction) {
@@ -2165,7 +2334,6 @@ export class SparkWallet extends EventEmitter {
     }
 
     const sspPubIdentityKey = hexToBytes(this.config.getSspIdentityPublicKey());
-
     const transfer = await this.coopExitService.getConnectorRefundSignatures({
       leaves: leafKeyTweaks,
       exitTxId: coopExitTxId,
@@ -2173,7 +2341,7 @@ export class SparkWallet extends EventEmitter {
       receiverPubKey: sspPubIdentityKey,
     });
 
-    const completeResponse = await this.sspClient?.completeCoopExit({
+    const completeResponse = await sspClient.completeCoopExit({
       userOutboundTransferExternalId: transfer.transfer.id,
       coopExitRequestId: coopExitRequest.id,
     });
@@ -2196,11 +2364,7 @@ export class SparkWallet extends EventEmitter {
     amountSats: number;
     withdrawalAddress: string;
   }): Promise<CoopExitFeeEstimatesOutput | null> {
-    if (!this.sspClient) {
-      throw new ConfigurationError("SSP client not initialized", {
-        configKey: "sspClient",
-      });
-    }
+    const sspClient = this.getSspClient();
 
     if (!Number.isSafeInteger(amountSats)) {
       throw new ValidationError("Sats amount must be less than 2^53", {
@@ -2215,7 +2379,7 @@ export class SparkWallet extends EventEmitter {
     await this.checkRefreshTimelockNodes(leaves);
     leaves = await this.checkExtendTimeLockNodes(leaves);
 
-    const feeEstimate = await this.sspClient.getCoopExitFeeEstimate({
+    const feeEstimate = await sspClient.getCoopExitFeeEstimate({
       leafExternalIds: leaves.map((leaf) => leaf.id),
       withdrawalAddress,
     });
@@ -2232,7 +2396,7 @@ export class SparkWallet extends EventEmitter {
    * @private
    */
   protected async syncTokenOutputs() {
-    this.tokenOuputs.clear();
+    this.tokenOutputs.clear();
 
     const unsortedTokenOutputs =
       await this.tokenTransactionService.fetchOwnedTokenOutputs(
@@ -2272,7 +2436,7 @@ export class SparkWallet extends EventEmitter {
       });
     });
 
-    this.tokenOuputs = groupedOutputs;
+    this.tokenOutputs = groupedOutputs;
   }
 
   /**
@@ -2296,52 +2460,78 @@ export class SparkWallet extends EventEmitter {
     receiverSparkAddress: string;
     selectedOutputs?: OutputWithPreviousTransactionData[];
   }): Promise<string> {
-    const receiverAddress = decodeSparkAddress(
-      receiverSparkAddress,
-      this.config.getNetworkType(),
-    );
-
     await this.syncTokenOutputs();
-    if (!this.tokenOuputs.has(tokenPublicKey)) {
-      throw new Error("No TTXOs with the given tokenPublicKey");
-    }
 
-    const tokenPublicKeyBytes = hexToBytes(tokenPublicKey);
-    const receiverSparkAddressBytes = hexToBytes(receiverAddress);
-
-    if (selectedOutputs) {
-      if (
-        !checkIfSelectedOutputsAreAvailable(
-          selectedOutputs,
-          this.tokenOuputs,
-          tokenPublicKeyBytes,
-        )
-      ) {
-        throw new Error("One or more selected TTXOs are not available");
-      }
-    } else {
-      selectedOutputs = this.selectTokenOutputs(tokenPublicKey, tokenAmount);
-    }
-
-    if (selectedOutputs!.length > MAX_TOKEN_OUTPUTS) {
-      throw new Error("Too many TTXOs selected");
-    }
-
-    const tokenTransaction =
-      await this.tokenTransactionService.constructTransferTokenTransaction(
-        selectedOutputs,
-        receiverSparkAddressBytes,
-        tokenPublicKeyBytes,
-        tokenAmount,
-      );
-
-    return await this.tokenTransactionService.broadcastTokenTransaction(
-      tokenTransaction,
-      selectedOutputs.map((output) => output.output!.ownerPublicKey),
-      selectedOutputs.map((output) => output.output!.revocationCommitment!),
+    return this.tokenTransactionService.tokenTransfer(
+      this.tokenOutputs,
+      [
+        {
+          tokenPublicKey,
+          tokenAmount,
+          receiverSparkAddress,
+        },
+      ],
+      selectedOutputs,
     );
   }
 
+  /**
+   * Transfers tokens with multiple outputs
+   *
+   * @param {Array} receiverOutputs - Array of transfer parameters
+   * @param {string} receiverOutputs[].tokenPublicKey - The public key of the token to transfer
+   * @param {bigint} receiverOutputs[].tokenAmount - The amount of tokens to transfer
+   * @param {string} receiverOutputs[].receiverSparkAddress - The recipient's public key
+   * @param {OutputWithPreviousTransactionData[]} [selectedOutputs] - Optional specific leaves to use for the transfer
+   * @returns {Promise<string[]>} Array of transaction IDs for the token transfers
+   */
+  public async batchTransferTokens(
+    receiverOutputs: {
+      tokenPublicKey: string;
+      tokenAmount: bigint;
+      receiverSparkAddress: string;
+    }[],
+    selectedOutputs?: OutputWithPreviousTransactionData[],
+  ): Promise<string> {
+    if (receiverOutputs.length === 0) {
+      throw new ValidationError("At least one receiver output is required", {
+        field: "receiverOutputs",
+        value: receiverOutputs,
+        expected: "Non-empty array",
+      });
+    }
+    const firstTokenPublicKey = receiverOutputs[0]!.tokenPublicKey;
+    const allSameToken = receiverOutputs.every(
+      (output) => output.tokenPublicKey === firstTokenPublicKey,
+    );
+    if (!allSameToken) {
+      throw new ValidationError(
+        "All receiver outputs must have the same token public key",
+        {
+          field: "receiverOutputs",
+          value: receiverOutputs,
+          expected: "All outputs must have the same token public key",
+        },
+      );
+    }
+
+    await this.syncTokenOutputs();
+
+    return this.tokenTransactionService.tokenTransfer(
+      this.tokenOutputs,
+      receiverOutputs,
+      selectedOutputs,
+    );
+  }
+
+  /**
+   * Retrieves token transaction history for specified tokens owned by the wallet.
+   * Can optionally filter by specific transaction hashes.
+   *
+   * @param tokenPublicKeys - Array of token public keys to query transactions for
+   * @param tokenTransactionHashes - Optional array of specific transaction hashes to filter by
+   * @returns Promise resolving to array of token transactions with their current status
+   */
   public async queryTokenTransactions(
     tokenPublicKeys: string[],
     tokenTransactionHashes?: string[],
@@ -2372,24 +2562,6 @@ export class SparkWallet extends EventEmitter {
     return getP2WPKHAddressFromPublicKey(
       await this.config.signer.getIdentityPublicKey(),
       this.config.getNetwork(),
-    );
-  }
-
-  /**
-   * Selects TTXOs for a transfer.
-   *
-   * @param {string} tokenPublicKey - The public key of the token
-   * @param {bigint} tokenAmount - The amount of tokens to select TTXOs for
-   * @returns {OutputWithPreviousTransactionData[]} The selected TTXOs
-   * @private
-   */
-  private selectTokenOutputs(
-    tokenPublicKey: string,
-    tokenAmount: bigint,
-  ): OutputWithPreviousTransactionData[] {
-    return this.tokenTransactionService.selectTokenOutputs(
-      this.tokenOuputs.get(tokenPublicKey)!,
-      tokenAmount,
     );
   }
 
@@ -2439,13 +2611,8 @@ export class SparkWallet extends EventEmitter {
   public async getLightningReceiveRequest(
     id: string,
   ): Promise<LightningReceiveRequest | null> {
-    if (!this.sspClient) {
-      throw new ConfigurationError("SSP client not initialized", {
-        configKey: "sspClient",
-      });
-    }
-
-    return await this.sspClient.getLightningReceiveRequest(id);
+    const sspClient = this.getSspClient();
+    return await sspClient.getLightningReceiveRequest(id);
   }
 
   /**
@@ -2457,13 +2624,8 @@ export class SparkWallet extends EventEmitter {
   public async getLightningSendRequest(
     id: string,
   ): Promise<LightningSendRequest | null> {
-    if (!this.sspClient) {
-      throw new ConfigurationError("SSP client not initialized", {
-        configKey: "sspClient",
-      });
-    }
-
-    return await this.sspClient.getLightningSendRequest(id);
+    const sspClient = this.getSspClient();
+    return await sspClient.getLightningSendRequest(id);
   }
 
   /**
@@ -2473,13 +2635,8 @@ export class SparkWallet extends EventEmitter {
    * @returns {Promise<CoopExitRequest | null>} The coop exit request
    */
   public async getCoopExitRequest(id: string): Promise<CoopExitRequest | null> {
-    if (!this.sspClient) {
-      throw new ConfigurationError("SSP client not initialized", {
-        configKey: "sspClient",
-      });
-    }
-
-    return await this.sspClient.getCoopExitRequest(id);
+    const sspClient = this.getSspClient();
+    return await sspClient.getCoopExitRequest(id);
   }
 
   private cleanup() {

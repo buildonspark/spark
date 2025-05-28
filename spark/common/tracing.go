@@ -47,13 +47,15 @@ type SpanSamplingConfig struct {
 	BlockList []string `yaml:"block_list"`
 }
 
-// ConfigureTracing sets up the complete tracing configuration including sampling and exporters
-// Returns a shutdown function that should be deferred by the caller
-func ConfigureTracing(ctx context.Context, config TracingConfig) (func(context.Context) error, error) {
-	slog.Info("Configuring tracing", "endpoint", config.OTelCollectorEndpoint)
+// getOTLPTraceExporter sets up the OTLP trace exporter if endpoint is provided, else returns nil and logs.
+func getOTLPTraceExporter(ctx context.Context, endpoint, certPath string) (trace.SpanExporter, error) {
+	if endpoint == "" {
+		slog.Info("No OTEL collector endpoint configured, tracing will be enabled locally only")
+		return nil, nil
+	}
 
 	certPool := x509.NewCertPool()
-	collectorCert, err := os.ReadFile(config.OTelCollectorCertPath)
+	collectorCert, err := os.ReadFile(certPath)
 	if err != nil {
 		return nil, err
 	}
@@ -62,12 +64,24 @@ func ConfigureTracing(ctx context.Context, config TracingConfig) (func(context.C
 	}
 
 	traceExporter, err := otlptracegrpc.New(ctx,
-		otlptracegrpc.WithEndpoint(config.OTelCollectorEndpoint),
+		otlptracegrpc.WithEndpoint(endpoint),
 		otlptracegrpc.WithTLSCredentials(credentials.NewClientTLSFromCert(certPool, "")),
 		otlptracegrpc.WithTimeout(5*time.Second),
 	)
 	if err != nil {
 		return nil, err
+	}
+	return traceExporter, nil
+}
+
+// ConfigureTracing sets up the complete tracing configuration including sampling and exporters
+// Returns a shutdown function that should be deferred by the caller
+func ConfigureTracing(ctx context.Context, config TracingConfig) (func(context.Context) error, error) {
+	slog.Info("Configuring tracing", "endpoint", config.OTelCollectorEndpoint)
+
+	traceExporter, err := getOTLPTraceExporter(ctx, config.OTelCollectorEndpoint, config.OTelCollectorCertPath)
+	if err != nil {
+		slog.Warn("failed to get OTLP trace exporter; continuing to run with local tracing", "error", err)
 	}
 
 	sampler := trace.TraceIDRatioBased(config.GlobalSamplingRate)
@@ -91,16 +105,19 @@ func ConfigureTracing(ctx context.Context, config TracingConfig) (func(context.C
 		return nil, fmt.Errorf("failed to merge OpenTelemetry resources: %w", err)
 	}
 
-	// Create the TracerProvider with all configuration
-	tp := trace.NewTracerProvider(
-		trace.WithBatcher(traceExporter,
+	var opts []trace.TracerProviderOption
+	if traceExporter != nil {
+		opts = append(opts, trace.WithBatcher(traceExporter,
 			trace.WithBatchTimeout(10*time.Second),
 			trace.WithMaxExportBatchSize(1000),
-		),
+		))
+	}
+	opts = append(opts,
 		trace.WithSampler(trace.ParentBased(sampler)),
 		trace.WithResource(resource),
 	)
 
+	tp := trace.NewTracerProvider(opts...)
 	otel.SetTracerProvider(tp)
 
 	return tp.Shutdown, nil

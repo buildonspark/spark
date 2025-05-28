@@ -72,7 +72,7 @@ service DKGService {
  * Initiate Distributed Key Generation Request
  */
 message InitiateDkgRequest {
-    // An uuid to identify the request. 
+    // An uuid to identify the request.
     string request_id = 1;
 
     // The number of keys to generate.

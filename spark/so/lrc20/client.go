@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -590,4 +591,17 @@ func (c *Client) Close() error {
 		}
 	}
 	return lastErr
+}
+
+func (c *Client) BuildLrc20SendSignaturesRequest(finalTokenTransaction *pb.TokenTransaction, operatorSignature []byte, identityPrivateKey *secp256k1.PrivateKey, revocationSecrets []*pb.RevocationSecretWithIndex) *pblrc20.SendSparkSignatureRequest {
+	operatorSignatureData := &pblrc20.SparkOperatorSignatureData{
+		SparkOperatorSignature:    operatorSignature,
+		OperatorIdentityPublicKey: identityPrivateKey.PubKey().SerializeCompressed(),
+	}
+
+	return &pblrc20.SendSparkSignatureRequest{
+		FinalTokenTransaction: finalTokenTransaction,
+		OperatorSignatureData: operatorSignatureData,
+		RevocationSecrets:     revocationSecrets,
+	}
 }

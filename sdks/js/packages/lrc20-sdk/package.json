@@ -1,11 +1,12 @@
 {
   "name": "@buildonspark/lrc20-sdk",
-  "version": "0.0.46",
+  "version": "0.0.50",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "module": "./dist/index.js",
+  "homepage": "https://github.com/buildonspark/spark",
   "exports": {
     ".": {
       "require": "./dist/index.cjs",
@@ -45,6 +46,7 @@
     "crypto": false,
     "fs": false,
     "fs/promises": false,
+    "nice-grpc": "nice-grpc-web",
     "path": false,
     "url": false
   },
@@ -57,8 +59,10 @@
     "build": "yarn tsc && tsup",
     "circular-deps": "madge --circular --extensions ts,tsx src",
     "clean": "rm -rf dist",
-    "depcheck": "depcheck --ignores=buffer,ts-proto,jest,ts-jest,stream",
-    "package:checks": "yarn depcheck && yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
+    "depcheck": "depcheck --ignores=buffer,ts-proto,jest,ts-jest,stream,publint",
+    "format:fix": "prettier src --write",
+    "format": "prettier src --check",
+    "package:checks": "yarn depcheck && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
     "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand --detectOpenHandles --forceExit",
     "test": "yarn test-cmd src/tests/*.test.ts",
     "typecheck": "tsc --noEmit",
@@ -66,7 +70,7 @@
     "lint-ts-fix": "prettier --write \"./**/*.ts\"",
     "lint-js-fix": "prettier --write \"./**/*.js\"",
     "lint-json-fix": "prettier --write \"./[a-zA-Z0-9.]+(?!-lock).json\"",
-    "generate:proto": "PATH=\"$PATH:./node_modules/.bin\" protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,useExactTypes=false,outputServices=generic-definitions,oneof=unions,importSuffix=.js --proto_path=./protos rpc/v1/service.proto"
+    "generate:proto": "PATH=\"$PATH:./node_modules/.bin\" protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,useExactTypes=false,outputServices=generic-definitions,oneof=unions,importSuffix=.js --proto_path=./protos rpc/v1/service.proto && yarn format:fix"
   },
   "dependencies": {
     "@bitcoinerlab/secp256k1": "^1.1.1",

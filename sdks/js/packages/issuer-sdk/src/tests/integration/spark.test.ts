@@ -113,6 +113,132 @@ describe("token integration tests", () => {
     expect(destinationBalance.balance).toEqual(tokenAmount);
   });
 
+  it("should announce, mint, and batchtransfer tokens with ECDSA", async () => {
+    const tokenAmount: bigint = 999n;
+
+    const { wallet: issuerWallet } = await IssuerSparkWalletTesting.initialize({
+      options: LOCAL_WALLET_CONFIG_ECDSA,
+    });
+
+    const { wallet: destinationWallet } = await SparkWalletTesting.initialize({
+      options: LOCAL_WALLET_CONFIG_ECDSA,
+    });
+
+    const { wallet: destinationWallet2 } = await SparkWalletTesting.initialize({
+      options: LOCAL_WALLET_CONFIG_ECDSA,
+    });
+
+    const { wallet: destinationWallet3 } = await SparkWalletTesting.initialize({
+      options: LOCAL_WALLET_CONFIG_ECDSA,
+    });
+
+    await fundAndAnnounce(issuerWallet, 100000n, 0, "ECDSATransfer", "ETT");
+
+    await issuerWallet.mintTokens(tokenAmount);
+    await issuerWallet.batchTransferTokens([
+      {
+        tokenAmount: tokenAmount / 3n,
+        tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
+        receiverSparkAddress: await destinationWallet.getSparkAddress(),
+      },
+      {
+        tokenAmount: tokenAmount / 3n,
+        tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
+        receiverSparkAddress: await destinationWallet2.getSparkAddress(),
+      },
+      {
+        tokenAmount: tokenAmount / 3n,
+        tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
+        receiverSparkAddress: await destinationWallet3.getSparkAddress(),
+      },
+    ]);
+    const sourceBalance = (await issuerWallet.getIssuerTokenBalance()).balance;
+    expect(sourceBalance).toEqual(0n);
+
+    const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
+    const balanceObj = await destinationWallet.getBalance();
+    const destinationBalance = filterTokenBalanceForTokenPublicKey(
+      balanceObj?.tokenBalances,
+      tokenPublicKey,
+    );
+    expect(destinationBalance.balance).toEqual(tokenAmount / 3n);
+    const balanceObj2 = await destinationWallet2.getBalance();
+    const destinationBalance2 = filterTokenBalanceForTokenPublicKey(
+      balanceObj2?.tokenBalances,
+      tokenPublicKey,
+    );
+    expect(destinationBalance2.balance).toEqual(tokenAmount / 3n);
+    const balanceObj3 = await destinationWallet3.getBalance();
+    const destinationBalance3 = filterTokenBalanceForTokenPublicKey(
+      balanceObj3?.tokenBalances,
+      tokenPublicKey,
+    );
+    expect(destinationBalance3.balance).toEqual(tokenAmount / 3n);
+  });
+
+  it("should announce, mint, and batchtransfer tokens with Schnorr", async () => {
+    const tokenAmount: bigint = 999n;
+
+    const { wallet: issuerWallet } = await IssuerSparkWalletTesting.initialize({
+      options: LOCAL_WALLET_CONFIG_SCHNORR,
+    });
+
+    const { wallet: destinationWallet } = await SparkWalletTesting.initialize({
+      options: LOCAL_WALLET_CONFIG_SCHNORR,
+    });
+
+    const { wallet: destinationWallet2 } = await SparkWalletTesting.initialize({
+      options: LOCAL_WALLET_CONFIG_SCHNORR,
+    });
+
+    const { wallet: destinationWallet3 } = await SparkWalletTesting.initialize({
+      options: LOCAL_WALLET_CONFIG_SCHNORR,
+    });
+
+    await fundAndAnnounce(issuerWallet, 100000n, 0, "SchnorrTransfer", "STT");
+
+    await issuerWallet.mintTokens(tokenAmount);
+    await issuerWallet.batchTransferTokens([
+      {
+        tokenAmount: tokenAmount / 3n,
+        tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
+        receiverSparkAddress: await destinationWallet.getSparkAddress(),
+      },
+      {
+        tokenAmount: tokenAmount / 3n,
+        tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
+        receiverSparkAddress: await destinationWallet2.getSparkAddress(),
+      },
+      {
+        tokenAmount: tokenAmount / 3n,
+        tokenPublicKey: await issuerWallet.getIdentityPublicKey(),
+        receiverSparkAddress: await destinationWallet3.getSparkAddress(),
+      },
+    ]);
+    const sourceBalance = (await issuerWallet.getIssuerTokenBalance()).balance;
+    expect(sourceBalance).toEqual(0n);
+
+    const tokenPublicKey = await issuerWallet.getIdentityPublicKey();
+    const balanceObj = await destinationWallet.getBalance();
+    const destinationBalance = filterTokenBalanceForTokenPublicKey(
+      balanceObj?.tokenBalances,
+      tokenPublicKey,
+    );
+    expect(destinationBalance.balance).toEqual(tokenAmount / 3n);
+    const balanceObj2 = await destinationWallet2.getBalance();
+    const destinationBalance2 = filterTokenBalanceForTokenPublicKey(
+      balanceObj2?.tokenBalances,
+      tokenPublicKey,
+    );
+    expect(destinationBalance2.balance).toEqual(tokenAmount / 3n);
+    const balanceObj3 = await destinationWallet3.getBalance();
+    const destinationBalance3 = filterTokenBalanceForTokenPublicKey(
+      balanceObj3?.tokenBalances,
+      tokenPublicKey,
+    );
+    expect(destinationBalance3.balance).toEqual(tokenAmount / 3n);
+  });
+
   it("should track token operations in monitoring", async () => {
     const tokenAmount: bigint = 1000n;
 
