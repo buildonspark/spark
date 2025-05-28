@@ -317,6 +317,23 @@ export interface SubscribeToEventsResponse {
   } | undefined;
 }
 
+export interface QueryNodesByValueRequest {
+  ownerIdentityPublicKey: Uint8Array;
+  value: number;
+  offset: number;
+  limit: number;
+}
+
+export interface QueryNodesByValueResponse {
+  nodes: { [key: string]: TreeNode };
+  offset: number;
+}
+
+export interface QueryNodesByValueResponse_NodesEntry {
+  key: string;
+  value: TreeNode | undefined;
+}
+
 export interface ConnectedEvent {
 }
 
@@ -1429,6 +1446,19 @@ export interface InvestigateLeavesRequest {
   transferId: string;
 }
 
+export interface QueryNodesDistributionRequest {
+  ownerIdentityPublicKey: Uint8Array;
+}
+
+export interface QueryNodesDistributionResponse {
+  nodeDistribution: { [key: number]: number };
+}
+
+export interface QueryNodesDistributionResponse_NodeDistributionEntry {
+  key: number;
+  value: number;
+}
+
 function createBaseSubscribeToEventsRequest(): SubscribeToEventsRequest {
   return { identityPublicKey: new Uint8Array(0) };
 }
@@ -1600,6 +1630,289 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
         break;
       }
     }
+    return message;
+  },
+};
+
+function createBaseQueryNodesByValueRequest(): QueryNodesByValueRequest {
+  return { ownerIdentityPublicKey: new Uint8Array(0), value: 0, offset: 0, limit: 0 };
+}
+
+export const QueryNodesByValueRequest: MessageFns<QueryNodesByValueRequest> = {
+  encode(message: QueryNodesByValueRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.ownerIdentityPublicKey);
+    }
+    if (message.value !== 0) {
+      writer.uint32(16).int64(message.value);
+    }
+    if (message.offset !== 0) {
+      writer.uint32(24).int64(message.offset);
+    }
+    if (message.limit !== 0) {
+      writer.uint32(32).int64(message.limit);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryNodesByValueRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryNodesByValueRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.ownerIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.value = longToNumber(reader.int64());
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.limit = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryNodesByValueRequest {
+    return {
+      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+        ? bytesFromBase64(object.ownerIdentityPublicKey)
+        : new Uint8Array(0),
+      value: isSet(object.value) ? globalThis.Number(object.value) : 0,
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+      limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
+    };
+  },
+
+  toJSON(message: QueryNodesByValueRequest): unknown {
+    const obj: any = {};
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
+    }
+    if (message.value !== 0) {
+      obj.value = Math.round(message.value);
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
+    }
+    if (message.limit !== 0) {
+      obj.limit = Math.round(message.limit);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryNodesByValueRequest>): QueryNodesByValueRequest {
+    return QueryNodesByValueRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryNodesByValueRequest>): QueryNodesByValueRequest {
+    const message = createBaseQueryNodesByValueRequest();
+    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
+    message.value = object.value ?? 0;
+    message.offset = object.offset ?? 0;
+    message.limit = object.limit ?? 0;
+    return message;
+  },
+};
+
+function createBaseQueryNodesByValueResponse(): QueryNodesByValueResponse {
+  return { nodes: {}, offset: 0 };
+}
+
+export const QueryNodesByValueResponse: MessageFns<QueryNodesByValueResponse> = {
+  encode(message: QueryNodesByValueResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    Object.entries(message.nodes).forEach(([key, value]) => {
+      QueryNodesByValueResponse_NodesEntry.encode({ key: key as any, value }, writer.uint32(10).fork()).join();
+    });
+    if (message.offset !== 0) {
+      writer.uint32(16).int64(message.offset);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryNodesByValueResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryNodesByValueResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          const entry1 = QueryNodesByValueResponse_NodesEntry.decode(reader, reader.uint32());
+          if (entry1.value !== undefined) {
+            message.nodes[entry1.key] = entry1.value;
+          }
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryNodesByValueResponse {
+    return {
+      nodes: isObject(object.nodes)
+        ? Object.entries(object.nodes).reduce<{ [key: string]: TreeNode }>((acc, [key, value]) => {
+          acc[key] = TreeNode.fromJSON(value);
+          return acc;
+        }, {})
+        : {},
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+    };
+  },
+
+  toJSON(message: QueryNodesByValueResponse): unknown {
+    const obj: any = {};
+    if (message.nodes) {
+      const entries = Object.entries(message.nodes);
+      if (entries.length > 0) {
+        obj.nodes = {};
+        entries.forEach(([k, v]) => {
+          obj.nodes[k] = TreeNode.toJSON(v);
+        });
+      }
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryNodesByValueResponse>): QueryNodesByValueResponse {
+    return QueryNodesByValueResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryNodesByValueResponse>): QueryNodesByValueResponse {
+    const message = createBaseQueryNodesByValueResponse();
+    message.nodes = Object.entries(object.nodes ?? {}).reduce<{ [key: string]: TreeNode }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = TreeNode.fromPartial(value);
+      }
+      return acc;
+    }, {});
+    message.offset = object.offset ?? 0;
+    return message;
+  },
+};
+
+function createBaseQueryNodesByValueResponse_NodesEntry(): QueryNodesByValueResponse_NodesEntry {
+  return { key: "", value: undefined };
+}
+
+export const QueryNodesByValueResponse_NodesEntry: MessageFns<QueryNodesByValueResponse_NodesEntry> = {
+  encode(message: QueryNodesByValueResponse_NodesEntry, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== undefined) {
+      TreeNode.encode(message.value, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryNodesByValueResponse_NodesEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryNodesByValueResponse_NodesEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = TreeNode.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryNodesByValueResponse_NodesEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? TreeNode.fromJSON(object.value) : undefined,
+    };
+  },
+
+  toJSON(message: QueryNodesByValueResponse_NodesEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== undefined) {
+      obj.value = TreeNode.toJSON(message.value);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryNodesByValueResponse_NodesEntry>): QueryNodesByValueResponse_NodesEntry {
+    return QueryNodesByValueResponse_NodesEntry.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryNodesByValueResponse_NodesEntry>): QueryNodesByValueResponse_NodesEntry {
+    const message = createBaseQueryNodesByValueResponse_NodesEntry();
+    message.key = object.key ?? "";
+    message.value = (object.value !== undefined && object.value !== null)
+      ? TreeNode.fromPartial(object.value)
+      : undefined;
     return message;
   },
 };
@@ -14871,6 +15184,236 @@ export const InvestigateLeavesRequest: MessageFns<InvestigateLeavesRequest> = {
   },
 };
 
+function createBaseQueryNodesDistributionRequest(): QueryNodesDistributionRequest {
+  return { ownerIdentityPublicKey: new Uint8Array(0) };
+}
+
+export const QueryNodesDistributionRequest: MessageFns<QueryNodesDistributionRequest> = {
+  encode(message: QueryNodesDistributionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.ownerIdentityPublicKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryNodesDistributionRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryNodesDistributionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.ownerIdentityPublicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryNodesDistributionRequest {
+    return {
+      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+        ? bytesFromBase64(object.ownerIdentityPublicKey)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: QueryNodesDistributionRequest): unknown {
+    const obj: any = {};
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryNodesDistributionRequest>): QueryNodesDistributionRequest {
+    return QueryNodesDistributionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryNodesDistributionRequest>): QueryNodesDistributionRequest {
+    const message = createBaseQueryNodesDistributionRequest();
+    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseQueryNodesDistributionResponse(): QueryNodesDistributionResponse {
+  return { nodeDistribution: {} };
+}
+
+export const QueryNodesDistributionResponse: MessageFns<QueryNodesDistributionResponse> = {
+  encode(message: QueryNodesDistributionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    Object.entries(message.nodeDistribution).forEach(([key, value]) => {
+      QueryNodesDistributionResponse_NodeDistributionEntry.encode({ key: key as any, value }, writer.uint32(10).fork())
+        .join();
+    });
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryNodesDistributionResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryNodesDistributionResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          const entry1 = QueryNodesDistributionResponse_NodeDistributionEntry.decode(reader, reader.uint32());
+          if (entry1.value !== undefined) {
+            message.nodeDistribution[entry1.key] = entry1.value;
+          }
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryNodesDistributionResponse {
+    return {
+      nodeDistribution: isObject(object.nodeDistribution)
+        ? Object.entries(object.nodeDistribution).reduce<{ [key: number]: number }>((acc, [key, value]) => {
+          acc[globalThis.Number(key)] = Number(value);
+          return acc;
+        }, {})
+        : {},
+    };
+  },
+
+  toJSON(message: QueryNodesDistributionResponse): unknown {
+    const obj: any = {};
+    if (message.nodeDistribution) {
+      const entries = Object.entries(message.nodeDistribution);
+      if (entries.length > 0) {
+        obj.nodeDistribution = {};
+        entries.forEach(([k, v]) => {
+          obj.nodeDistribution[k] = Math.round(v);
+        });
+      }
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryNodesDistributionResponse>): QueryNodesDistributionResponse {
+    return QueryNodesDistributionResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryNodesDistributionResponse>): QueryNodesDistributionResponse {
+    const message = createBaseQueryNodesDistributionResponse();
+    message.nodeDistribution = Object.entries(object.nodeDistribution ?? {}).reduce<{ [key: number]: number }>(
+      (acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[globalThis.Number(key)] = globalThis.Number(value);
+        }
+        return acc;
+      },
+      {},
+    );
+    return message;
+  },
+};
+
+function createBaseQueryNodesDistributionResponse_NodeDistributionEntry(): QueryNodesDistributionResponse_NodeDistributionEntry {
+  return { key: 0, value: 0 };
+}
+
+export const QueryNodesDistributionResponse_NodeDistributionEntry: MessageFns<
+  QueryNodesDistributionResponse_NodeDistributionEntry
+> = {
+  encode(
+    message: QueryNodesDistributionResponse_NodeDistributionEntry,
+    writer: BinaryWriter = new BinaryWriter(),
+  ): BinaryWriter {
+    if (message.key !== 0) {
+      writer.uint32(8).uint64(message.key);
+    }
+    if (message.value !== 0) {
+      writer.uint32(16).uint64(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryNodesDistributionResponse_NodeDistributionEntry {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryNodesDistributionResponse_NodeDistributionEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.key = longToNumber(reader.uint64());
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.value = longToNumber(reader.uint64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryNodesDistributionResponse_NodeDistributionEntry {
+    return {
+      key: isSet(object.key) ? globalThis.Number(object.key) : 0,
+      value: isSet(object.value) ? globalThis.Number(object.value) : 0,
+    };
+  },
+
+  toJSON(message: QueryNodesDistributionResponse_NodeDistributionEntry): unknown {
+    const obj: any = {};
+    if (message.key !== 0) {
+      obj.key = Math.round(message.key);
+    }
+    if (message.value !== 0) {
+      obj.value = Math.round(message.value);
+    }
+    return obj;
+  },
+
+  create(
+    base?: DeepPartial<QueryNodesDistributionResponse_NodeDistributionEntry>,
+  ): QueryNodesDistributionResponse_NodeDistributionEntry {
+    return QueryNodesDistributionResponse_NodeDistributionEntry.fromPartial(base ?? {});
+  },
+  fromPartial(
+    object: DeepPartial<QueryNodesDistributionResponse_NodeDistributionEntry>,
+  ): QueryNodesDistributionResponse_NodeDistributionEntry {
+    const message = createBaseQueryNodesDistributionResponse_NodeDistributionEntry();
+    message.key = object.key ?? 0;
+    message.value = object.value ?? 0;
+    return message;
+  },
+};
+
 export type SparkServiceDefinition = typeof SparkServiceDefinition;
 export const SparkServiceDefinition = {
   name: "SparkService",
@@ -14934,6 +15477,14 @@ export const SparkServiceDefinition = {
       requestType: CancelTransferRequest,
       requestStream: false,
       responseType: CancelTransferResponse,
+      responseStream: false,
+      options: {},
+    },
+    query_nodes_by_value: {
+      name: "query_nodes_by_value",
+      requestType: QueryNodesByValueRequest,
+      requestStream: false,
+      responseType: QueryNodesByValueResponse,
       responseStream: false,
       options: {},
     },
@@ -15102,6 +15653,14 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    query_nodes_distribution: {
+      name: "query_nodes_distribution",
+      requestType: QueryNodesDistributionRequest,
+      requestStream: false,
+      responseType: QueryNodesDistributionResponse,
+      responseStream: false,
+      options: {},
+    },
     query_balance: {
       name: "query_balance",
       requestType: QueryBalanceRequest,
@@ -15245,6 +15804,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: CancelTransferRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<CancelTransferResponse>>;
+  query_nodes_by_value(
+    request: QueryNodesByValueRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<QueryNodesByValueResponse>>;
   query_pending_transfers(
     request: TransferFilter,
     context: CallContext & CallContextExt,
@@ -15334,6 +15897,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: QueryNodesRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<QueryNodesResponse>>;
+  query_nodes_distribution(
+    request: QueryNodesDistributionRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<QueryNodesDistributionResponse>>;
   query_balance(
     request: QueryBalanceRequest,
     context: CallContext & CallContextExt,
@@ -15424,6 +15991,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<CancelTransferRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<CancelTransferResponse>;
+  query_nodes_by_value(
+    request: DeepPartial<QueryNodesByValueRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<QueryNodesByValueResponse>;
   query_pending_transfers(
     request: DeepPartial<TransferFilter>,
     options?: CallOptions & CallOptionsExt,
@@ -15513,6 +16084,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<QueryNodesRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<QueryNodesResponse>;
+  query_nodes_distribution(
+    request: DeepPartial<QueryNodesDistributionRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<QueryNodesDistributionResponse>;
   query_balance(
     request: DeepPartial<QueryBalanceRequest>,
     options?: CallOptions & CallOptionsExt,

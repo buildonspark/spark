@@ -27,14 +27,14 @@ import {
   QueryTransfersResponse,
   SecretProof,
   SendLeafKeyTweak,
+  SendLeafKeyTweaks,
   SigningJob,
+  StartTransferResponse,
   Transfer,
+  TransferPackage,
   TransferStatus,
   TransferType,
   TreeNode,
-  TransferPackage,
-  SendLeafKeyTweaks,
-  StartTransferResponse,
 } from "../proto/spark.js";
 import { SigningCommitment } from "../signer/signer.js";
 import {
@@ -42,6 +42,7 @@ import {
   getTxFromRawTxBytes,
   getTxId,
 } from "../utils/bitcoin.js";
+import { NetworkToProto } from "../utils/network.js";
 import { VerifiableSecretShare } from "../utils/secret-sharing.js";
 import {
   createRefundTx,
@@ -54,7 +55,6 @@ import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
 import { SigningService } from "./signing.js";
 import { SigningOperator } from "./wallet-config.js";
-import { NetworkToProto } from "../utils/network.js";
 const INITIAL_TIME_LOCK = 2000;
 
 const DEFAULT_EXPIRY_TIME = 10 * 60 * 1000;
@@ -536,6 +536,22 @@ export class TransferService extends BaseTransferService {
     signingService: SigningService,
   ) {
     super(config, connectionManager, signingService);
+  }
+
+  async queryTransfer(transferId: string): Promise<Transfer | undefined> {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+    const transferResp = await sparkClient.query_all_transfers({
+      participant: {
+        $case: "senderOrReceiverIdentityPublicKey",
+        senderOrReceiverIdentityPublicKey:
+          await this.config.signer.getIdentityPublicKey(),
+      },
+      transferIds: [transferId],
+      network: NetworkToProto[this.config.getNetwork()],
+    });
+    return transferResp.transfers[0];
   }
 
   async sendTransfer(

@@ -27,6 +27,7 @@ const (
 	SparkService_StartTransfer_FullMethodName               = "/spark.SparkService/start_transfer"
 	SparkService_FinalizeTransfer_FullMethodName            = "/spark.SparkService/finalize_transfer"
 	SparkService_CancelTransfer_FullMethodName              = "/spark.SparkService/cancel_transfer"
+	SparkService_QueryNodesByValue_FullMethodName           = "/spark.SparkService/query_nodes_by_value"
 	SparkService_QueryPendingTransfers_FullMethodName       = "/spark.SparkService/query_pending_transfers"
 	SparkService_QueryAllTransfers_FullMethodName           = "/spark.SparkService/query_all_transfers"
 	SparkService_ClaimTransferTweakKeys_FullMethodName      = "/spark.SparkService/claim_transfer_tweak_keys"
@@ -75,6 +76,7 @@ type SparkServiceClient interface {
 	StartTransfer(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error)
 	FinalizeTransfer(ctx context.Context, in *FinalizeTransferRequest, opts ...grpc.CallOption) (*FinalizeTransferResponse, error)
 	CancelTransfer(ctx context.Context, in *CancelTransferRequest, opts ...grpc.CallOption) (*CancelTransferResponse, error)
+	QueryNodesByValue(ctx context.Context, in *QueryNodesByValueRequest, opts ...grpc.CallOption) (*QueryNodesByValueResponse, error)
 	QueryPendingTransfers(ctx context.Context, in *TransferFilter, opts ...grpc.CallOption) (*QueryTransfersResponse, error)
 	QueryAllTransfers(ctx context.Context, in *TransferFilter, opts ...grpc.CallOption) (*QueryTransfersResponse, error)
 	ClaimTransferTweakKeys(ctx context.Context, in *ClaimTransferTweakKeysRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -191,6 +193,16 @@ func (c *sparkServiceClient) CancelTransfer(ctx context.Context, in *CancelTrans
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CancelTransferResponse)
 	err := c.cc.Invoke(ctx, SparkService_CancelTransfer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) QueryNodesByValue(ctx context.Context, in *QueryNodesByValueRequest, opts ...grpc.CallOption) (*QueryNodesByValueResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryNodesByValueResponse)
+	err := c.cc.Invoke(ctx, SparkService_QueryNodesByValue_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -550,6 +562,7 @@ type SparkServiceServer interface {
 	StartTransfer(context.Context, *StartTransferRequest) (*StartTransferResponse, error)
 	FinalizeTransfer(context.Context, *FinalizeTransferRequest) (*FinalizeTransferResponse, error)
 	CancelTransfer(context.Context, *CancelTransferRequest) (*CancelTransferResponse, error)
+	QueryNodesByValue(context.Context, *QueryNodesByValueRequest) (*QueryNodesByValueResponse, error)
 	QueryPendingTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error)
 	QueryAllTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error)
 	ClaimTransferTweakKeys(context.Context, *ClaimTransferTweakKeysRequest) (*emptypb.Empty, error)
@@ -621,6 +634,9 @@ func (UnimplementedSparkServiceServer) FinalizeTransfer(context.Context, *Finali
 }
 func (UnimplementedSparkServiceServer) CancelTransfer(context.Context, *CancelTransferRequest) (*CancelTransferResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CancelTransfer not implemented")
+}
+func (UnimplementedSparkServiceServer) QueryNodesByValue(context.Context, *QueryNodesByValueRequest) (*QueryNodesByValueResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryNodesByValue not implemented")
 }
 func (UnimplementedSparkServiceServer) QueryPendingTransfers(context.Context, *TransferFilter) (*QueryTransfersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryPendingTransfers not implemented")
@@ -864,6 +880,24 @@ func _SparkService_CancelTransfer_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkServiceServer).CancelTransfer(ctx, req.(*CancelTransferRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_QueryNodesByValue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryNodesByValueRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).QueryNodesByValue(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_QueryNodesByValue_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).QueryNodesByValue(ctx, req.(*QueryNodesByValueRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1489,6 +1523,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "cancel_transfer",
 			Handler:    _SparkService_CancelTransfer_Handler,
+		},
+		{
+			MethodName: "query_nodes_by_value",
+			Handler:    _SparkService_QueryNodesByValue_Handler,
 		},
 		{
 			MethodName: "query_pending_transfers",

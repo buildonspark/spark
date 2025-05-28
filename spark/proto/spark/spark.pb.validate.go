@@ -376,6 +376,266 @@ var _ interface {
 	ErrorName() string
 } = SubscribeToEventsResponseValidationError{}
 
+// Validate checks the field values on QueryNodesByValueRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *QueryNodesByValueRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryNodesByValueRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// QueryNodesByValueRequestMultiError, or nil if none found.
+func (m *QueryNodesByValueRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryNodesByValueRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for OwnerIdentityPublicKey
+
+	// no validation rules for Value
+
+	// no validation rules for Offset
+
+	// no validation rules for Limit
+
+	if len(errors) > 0 {
+		return QueryNodesByValueRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryNodesByValueRequestMultiError is an error wrapping multiple validation
+// errors returned by QueryNodesByValueRequest.ValidateAll() if the designated
+// constraints aren't met.
+type QueryNodesByValueRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryNodesByValueRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryNodesByValueRequestMultiError) AllErrors() []error { return m }
+
+// QueryNodesByValueRequestValidationError is the validation error returned by
+// QueryNodesByValueRequest.Validate if the designated constraints aren't met.
+type QueryNodesByValueRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryNodesByValueRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryNodesByValueRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryNodesByValueRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryNodesByValueRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryNodesByValueRequestValidationError) ErrorName() string {
+	return "QueryNodesByValueRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryNodesByValueRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryNodesByValueRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryNodesByValueRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryNodesByValueRequestValidationError{}
+
+// Validate checks the field values on QueryNodesByValueResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *QueryNodesByValueResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryNodesByValueResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// QueryNodesByValueResponseMultiError, or nil if none found.
+func (m *QueryNodesByValueResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryNodesByValueResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	{
+		sorted_keys := make([]string, len(m.GetNodes()))
+		i := 0
+		for key := range m.GetNodes() {
+			sorted_keys[i] = key
+			i++
+		}
+		sort.Slice(sorted_keys, func(i, j int) bool { return sorted_keys[i] < sorted_keys[j] })
+		for _, key := range sorted_keys {
+			val := m.GetNodes()[key]
+			_ = val
+
+			// no validation rules for Nodes[key]
+
+			if all {
+				switch v := interface{}(val).(type) {
+				case interface{ ValidateAll() error }:
+					if err := v.ValidateAll(); err != nil {
+						errors = append(errors, QueryNodesByValueResponseValidationError{
+							field:  fmt.Sprintf("Nodes[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				case interface{ Validate() error }:
+					if err := v.Validate(); err != nil {
+						errors = append(errors, QueryNodesByValueResponseValidationError{
+							field:  fmt.Sprintf("Nodes[%v]", key),
+							reason: "embedded message failed validation",
+							cause:  err,
+						})
+					}
+				}
+			} else if v, ok := interface{}(val).(interface{ Validate() error }); ok {
+				if err := v.Validate(); err != nil {
+					return QueryNodesByValueResponseValidationError{
+						field:  fmt.Sprintf("Nodes[%v]", key),
+						reason: "embedded message failed validation",
+						cause:  err,
+					}
+				}
+			}
+
+		}
+	}
+
+	// no validation rules for Offset
+
+	if len(errors) > 0 {
+		return QueryNodesByValueResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryNodesByValueResponseMultiError is an error wrapping multiple validation
+// errors returned by QueryNodesByValueResponse.ValidateAll() if the
+// designated constraints aren't met.
+type QueryNodesByValueResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryNodesByValueResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryNodesByValueResponseMultiError) AllErrors() []error { return m }
+
+// QueryNodesByValueResponseValidationError is the validation error returned by
+// QueryNodesByValueResponse.Validate if the designated constraints aren't met.
+type QueryNodesByValueResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryNodesByValueResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryNodesByValueResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryNodesByValueResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryNodesByValueResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryNodesByValueResponseValidationError) ErrorName() string {
+	return "QueryNodesByValueResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryNodesByValueResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryNodesByValueResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryNodesByValueResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryNodesByValueResponseValidationError{}
+
 // Validate checks the field values on ConnectedEvent with the rules defined in
 // the proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.

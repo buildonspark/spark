@@ -20,6 +20,7 @@ service SparkService {
     rpc start_transfer(StartTransferRequest) returns (StartTransferResponse) {}
     rpc finalize_transfer(FinalizeTransferRequest) returns (FinalizeTransferResponse) {}
     rpc cancel_transfer(CancelTransferRequest) returns (CancelTransferResponse) {}
+    rpc query_nodes_by_value(QueryNodesByValueRequest) returns (QueryNodesByValueResponse) {}
 
     rpc query_pending_transfers(TransferFilter) returns (QueryTransfersResponse) {}
     rpc query_all_transfers(TransferFilter) returns (QueryTransfersResponse) {}
@@ -86,6 +87,18 @@ message SubscribeToEventsResponse {
         DepositEvent deposit = 2;
         ConnectedEvent connected = 3;
     }
+}
+
+message QueryNodesByValueRequest {
+    bytes owner_identity_public_key = 1;
+    int64 value = 2;
+    int64 offset = 3;
+    int64 limit = 4;
+}
+
+message QueryNodesByValueResponse {
+    map<string, TreeNode> nodes = 1;
+    int64 offset = 2;
 }
 
 message ConnectedEvent { }

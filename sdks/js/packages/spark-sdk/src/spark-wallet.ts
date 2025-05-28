@@ -55,8 +55,8 @@ import { DepositService } from "./services/deposit.js";
 import { LightningService } from "./services/lightning.js";
 import { SigningService } from "./services/signing.js";
 import { TokenTransactionService } from "./services/token-transactions.js";
-import { TransferService } from "./services/transfer.js";
 import type { LeafKeyTweak } from "./services/transfer.js";
+import { TransferService } from "./services/transfer.js";
 import {
   DepositAddressTree,
   TreeCreationService,
@@ -105,8 +105,8 @@ import {
   WalletLeaf,
   WalletTransfer,
 } from "./types/sdk-types.js";
-import { getMasterHDKeyFromSeed } from "./utils/index.js";
 import { chunkArray } from "./utils/chunkArray.js";
+import { getMasterHDKeyFromSeed } from "./utils/index.js";
 
 export type CreateLightningInvoiceParams = {
   amountSats: number;
@@ -689,6 +689,94 @@ export class SparkWallet extends EventEmitter {
     return this.leaves.length > optimalLeavesLength * 5;
   }
 
+  private async batchOptimizeLeaves() {
+    const ignoredLeaves: string[] = [];
+    console.log("Starting optimization");
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+    const distribution = await sparkClient.query_nodes_distribution({
+      ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
+    });
+
+    const min = Math.min(
+      ...Object.keys(distribution.nodeDistribution).map(Number),
+    );
+    const max = Math.max(
+      ...Object.keys(distribution.nodeDistribution).map(Number),
+    );
+
+    let currentValue = min;
+    let valueToCheckUntil = max * 64;
+
+    while (currentValue <= valueToCheckUntil) {
+      console.log("Checking value", currentValue);
+      const sparkClient = await this.connectionManager.createSparkClient(
+        this.config.getCoordinatorAddress(),
+      );
+
+      const leaves = await sparkClient.query_nodes_by_value({
+        ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
+        value: currentValue,
+        offset: 0,
+        limit: 100,
+      });
+
+      if (Object.entries(leaves.nodes).length <= 1) {
+        currentValue *= 2;
+        continue;
+      } else {
+        if (currentValue * 64 > valueToCheckUntil) {
+          valueToCheckUntil = currentValue * 64;
+        }
+
+        const leavesToSwap = Object.values(leaves.nodes)
+          .slice(0, 64)
+          .filter((leaf) => !ignoredLeaves.includes(leaf.id));
+        const fallbackLeaves = Object.values(leaves.nodes).slice(64);
+
+        if (leavesToSwap.length === 0) {
+          currentValue *= 2;
+          continue;
+        }
+
+        try {
+          await this.requestLeavesSwap({
+            targetAmount: leavesToSwap.reduce(
+              (acc, leaf) => acc + leaf.value,
+              0,
+            ),
+            leaves: leavesToSwap,
+          });
+        } catch (error) {
+          if (isNode) {
+            ignoredLeaves.push(...leavesToSwap.map((leaf) => leaf.id));
+            const leafIds = leavesToSwap.map((leaf) => leaf.id).join("\n");
+            const fs = await import("fs/promises");
+            await fs.appendFile("leaves.log", leafIds);
+          }
+          try {
+            await this.requestLeavesSwap({
+              targetAmount: fallbackLeaves.reduce(
+                (acc, leaf) => acc + leaf.value,
+                0,
+              ),
+              leaves: fallbackLeaves,
+            });
+          } catch (error) {
+            if (isNode) {
+              ignoredLeaves.push(...fallbackLeaves.map((leaf) => leaf.id));
+              const leafIds = fallbackLeaves.map((leaf) => leaf.id).join("\n");
+              const fs = await import("fs/promises");
+              await fs.appendFile("leaves.log", leafIds);
+            }
+          }
+        }
+      }
+    }
+    console.log("Optimization complete");
+  }
+
   private async optimizeLeaves() {
     if (this.optimizationInProgress || !this.areLeavesInefficient()) {
       return;
@@ -713,9 +801,19 @@ export class SparkWallet extends EventEmitter {
     await this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
     await this.checkRefreshTimelockNodes();
     await this.checkExtendTimeLockNodes();
-    this.optimizeLeaves().catch((e) => {
-      console.error("Failed to optimize leaves", e);
-    });
+    if (isNode) {
+      const fs = await import("fs/promises");
+      try {
+        await fs.access("leaves.log");
+      } catch {
+        // File doesn't exist, create it
+        await fs.writeFile("leaves.log", "");
+      }
+    }
+    await this.batchOptimizeLeaves();
+    // this.optimizeLeaves().catch((e) => {
+    //   console.error("Failed to optimize leaves", e);
+    // });
   }
 
   private async withLeaves<T>(operation: () => Promise<T>): Promise<T> {
@@ -1543,7 +1641,14 @@ export class SparkWallet extends EventEmitter {
       await this.config.signer.getIdentityPublicKey(),
     );
 
-    const resultNodes = await this.claimTransfer(transfer);
+    const transferToClaim = await this.transferService.queryTransfer(
+      transfer.id,
+    );
+
+    let resultNodes: TreeNode[] = [];
+    if (transferToClaim) {
+      resultNodes = await this.claimTransfer(transferToClaim);
+    }
 
     const leavesToRemove = new Set(leaves.map((leaf) => leaf.id));
     this.leaves = [
@@ -1624,7 +1729,12 @@ export class SparkWallet extends EventEmitter {
 
       // If this is a self-transfer, lets claim it immediately
       if (isSelfTransfer) {
-        await this.claimTransfer(transfer);
+        const transferToClaim = await this.transferService.queryTransfer(
+          transfer.id,
+        );
+        if (transferToClaim) {
+          await this.claimTransfer(transferToClaim);
+        }
       }
 
       return mapTransferToWalletTransfer(
