@@ -509,7 +509,7 @@ export class SparkWallet extends EventEmitter {
           maybeUnref();
         }
 
-        const claimedTransfersIds = await this.claimTransfers();
+        const claimedTransfersIds: string[] = [];
 
         try {
           for await (const data of stream) {
@@ -1005,7 +1005,7 @@ export class SparkWallet extends EventEmitter {
     }
 
     try {
-      await this.claimTransfers();
+      // await this.claimTransfers();
     } catch (e) {
       console.warn("Unabled to claim transfers.");
     }
