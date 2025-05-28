@@ -710,7 +710,7 @@ export class SparkWallet extends EventEmitter {
     let valueToCheckUntil = max * 64;
 
     while (currentValue <= valueToCheckUntil) {
-      console.log("Checking value", currentValue);
+      // console.log("Checking value", currentValue);
       const sparkClient = await this.connectionManager.createSparkClient(
         this.config.getCoordinatorAddress(),
       );
