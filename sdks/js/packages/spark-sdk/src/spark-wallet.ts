@@ -832,12 +832,7 @@ export class SparkWallet extends EventEmitter {
     await this.checkExtendTimeLockNodes();
     if (isNode) {
       const fs = await import("fs/promises");
-      try {
-        await fs.access("leaves.log");
-      } catch {
-        // File doesn't exist, create it
-        await fs.writeFile("leaves.log", "");
-      }
+      await fs.writeFile("leaves.log", "");
     }
     await this.batchOptimizeLeaves();
     // this.optimizeLeaves().catch((e) => {
