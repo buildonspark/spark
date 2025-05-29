@@ -737,6 +737,7 @@ export class SparkWallet extends EventEmitter {
         );
         offset = res.offset;
 
+        // If we only have on good leaf, don't swap it, just continue with next offset
         if (leaves.length === 1) {
           leaves = [];
         }
@@ -766,7 +767,7 @@ export class SparkWallet extends EventEmitter {
             ),
             leaves: leavesToSwap,
           });
-          if ("failedLeaves" in res) {
+          if ("failedLeaves" in res && res.failedLeaves.length > 0) {
             ignoredLeaves.push(...res.failedLeaves);
             if (isNode) {
               const leafIds = res.failedLeaves.map((leaf) => leaf).join("\n");
@@ -784,7 +785,7 @@ export class SparkWallet extends EventEmitter {
               ),
               leaves: fallbackLeaves,
             });
-            if ("failedLeaves" in res) {
+            if ("failedLeaves" in res && res.failedLeaves.length > 0) {
               ignoredLeaves.push(...res.failedLeaves);
               if (isNode) {
                 const leafIds = res.failedLeaves.map((leaf) => leaf).join("\n");
