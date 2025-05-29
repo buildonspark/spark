@@ -722,7 +722,7 @@ export class SparkWallet extends EventEmitter {
           ownerIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
           value: currentValue,
-          offset: 0,
+          offset,
           limit: 100,
         });
 

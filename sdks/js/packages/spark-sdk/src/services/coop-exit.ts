@@ -16,8 +16,8 @@ import { getNextTransactionSequence } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
 import { SigningService } from "./signing.js";
-import { BaseTransferService, LeafRefundSigningData } from "./transfer.js";
 import type { LeafKeyTweak } from "./transfer.js";
+import { BaseTransferService, LeafRefundSigningData } from "./transfer.js";
 
 export type GetConnectorRefundSignaturesParams = {
   leaves: LeafKeyTweak[];
@@ -216,7 +216,7 @@ export class CoopExitService extends BaseTransferService {
     );
 
     const signaturesMap: Map<string, Uint8Array> = new Map();
-    for (const signature of signatures) {
+    for (const signature of signatures.nodeSignatures) {
       signaturesMap.set(signature.nodeId, signature.refundTxSignature);
     }
 
