@@ -337,8 +337,9 @@ export class BaseTransferService {
     leafDataMap: Map<string, ClaimLeafData>,
     operatorSigningResults: LeafRefundTxSigningResult[],
     adaptorPubKey?: Uint8Array,
-  ): Promise<NodeSignatures[]> {
+  ): Promise<{ nodeSignatures: NodeSignatures[]; failedLeaves: string[] }> {
     const nodeSignatures: NodeSignatures[] = [];
+    const failedLeaves: string[] = [];
     for (const operatorSigningResult of operatorSigningResults) {
       const leafData = leafDataMap.get(operatorSigningResult.leafId);
       if (
@@ -361,40 +362,46 @@ export class BaseTransferService {
 
       const refundTxSighash = getSigHashFromTx(leafData.refundTx, 0, txOutput);
 
-      const userSignature = await this.config.signer.signFrost({
-        message: refundTxSighash,
-        publicKey: leafData.signingPubKey,
-        privateAsPubKey: leafData.signingPubKey,
-        selfCommitment: leafData.signingNonceCommitment,
-        statechainCommitments:
-          operatorSigningResult.refundTxSigningResult?.signingNonceCommitments,
-        adaptorPubKey: adaptorPubKey,
-        verifyingKey: operatorSigningResult.verifyingKey,
-      });
+      try {
+        const userSignature = await this.config.signer.signFrost({
+          message: refundTxSighash,
+          publicKey: leafData.signingPubKey,
+          privateAsPubKey: leafData.signingPubKey,
+          selfCommitment: leafData.signingNonceCommitment,
+          statechainCommitments:
+            operatorSigningResult.refundTxSigningResult
+              ?.signingNonceCommitments,
+          adaptorPubKey: adaptorPubKey,
+          verifyingKey: operatorSigningResult.verifyingKey,
+        });
 
-      const refundAggregate = await this.config.signer.aggregateFrost({
-        message: refundTxSighash,
-        statechainSignatures:
-          operatorSigningResult.refundTxSigningResult?.signatureShares,
-        statechainPublicKeys:
-          operatorSigningResult.refundTxSigningResult?.publicKeys,
-        verifyingKey: operatorSigningResult.verifyingKey,
-        statechainCommitments:
-          operatorSigningResult.refundTxSigningResult?.signingNonceCommitments,
-        selfCommitment: leafData.signingNonceCommitment,
-        publicKey: leafData.signingPubKey,
-        selfSignature: userSignature,
-        adaptorPubKey: adaptorPubKey,
-      });
+        const refundAggregate = await this.config.signer.aggregateFrost({
+          message: refundTxSighash,
+          statechainSignatures:
+            operatorSigningResult.refundTxSigningResult?.signatureShares,
+          statechainPublicKeys:
+            operatorSigningResult.refundTxSigningResult?.publicKeys,
+          verifyingKey: operatorSigningResult.verifyingKey,
+          statechainCommitments:
+            operatorSigningResult.refundTxSigningResult
+              ?.signingNonceCommitments,
+          selfCommitment: leafData.signingNonceCommitment,
+          publicKey: leafData.signingPubKey,
+          selfSignature: userSignature,
+          adaptorPubKey: adaptorPubKey,
+        });
 
-      nodeSignatures.push({
-        nodeId: operatorSigningResult.leafId,
-        refundTxSignature: refundAggregate,
-        nodeTxSignature: new Uint8Array(),
-      });
+        nodeSignatures.push({
+          nodeId: operatorSigningResult.leafId,
+          refundTxSignature: refundAggregate,
+          nodeTxSignature: new Uint8Array(),
+        });
+      } catch (error) {
+        failedLeaves.push(operatorSigningResult.leafId);
+      }
     }
 
-    return nodeSignatures;
+    return { nodeSignatures, failedLeaves };
   }
 
   private async prepareSendTransferKeyTweaks(
@@ -710,8 +717,9 @@ export class TransferService extends BaseTransferService {
     transfer: Transfer;
     signatureMap: Map<string, Uint8Array>;
     leafDataMap: Map<string, LeafRefundSigningData>;
+    failedLeaves?: string[];
   }> {
-    const { transfer, signatureMap, leafDataMap } =
+    const { transfer, signatureMap, leafDataMap, failedLeaves } =
       await this.sendTransferSignRefundInternal(
         leaves,
         receiverIdentityPubkey,
@@ -723,6 +731,7 @@ export class TransferService extends BaseTransferService {
       transfer,
       signatureMap,
       leafDataMap,
+      failedLeaves,
     };
   }
 
@@ -757,6 +766,7 @@ export class TransferService extends BaseTransferService {
     signatureMap: Map<string, Uint8Array>;
     leafDataMap: Map<string, LeafRefundSigningData>;
     signingResults: LeafRefundTxSigningResult[];
+    failedLeaves?: string[];
   }> {
     const transferId = uuidv7();
     const leafDataMap = new Map<string, LeafRefundSigningData>();
@@ -831,7 +841,7 @@ export class TransferService extends BaseTransferService {
     );
 
     const signatureMap = new Map<string, Uint8Array>();
-    for (const signature of signatures) {
+    for (const signature of signatures.nodeSignatures) {
       signatureMap.set(signature.nodeId, signature.refundTxSignature);
     }
 
@@ -840,6 +850,7 @@ export class TransferService extends BaseTransferService {
       signatureMap,
       leafDataMap,
       signingResults: response.signingResults,
+      failedLeaves: signatures.failedLeaves,
     };
   }
 
@@ -1090,7 +1101,8 @@ export class TransferService extends BaseTransferService {
     } catch (error) {
       throw new Error(`Error claiming transfer sign refunds: ${error}`);
     }
-    return this.signRefunds(leafDataMap, resp.signingResults);
+    return (await this.signRefunds(leafDataMap, resp.signingResults))
+      .nodeSignatures;
   }
 
   private async finalizeNodeSignatures(nodeSignatures: NodeSignatures[]) {

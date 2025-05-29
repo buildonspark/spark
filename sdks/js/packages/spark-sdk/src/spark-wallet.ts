@@ -715,14 +715,24 @@ export class SparkWallet extends EventEmitter {
         this.config.getCoordinatorAddress(),
       );
 
-      const leaves = await sparkClient.query_nodes_by_value({
-        ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
-        value: currentValue,
-        offset: 0,
-        limit: 100,
-      });
+      let offset = 0;
+      let leaves: TreeNode[] = [];
+      while (leaves.length === 0 && offset !== -1) {
+        const res = await sparkClient.query_nodes_by_value({
+          ownerIdentityPublicKey:
+            await this.config.signer.getIdentityPublicKey(),
+          value: currentValue,
+          offset: 0,
+          limit: 100,
+        });
 
-      if (Object.entries(leaves.nodes).length <= 1) {
+        leaves = Object.values(res.nodes).filter(
+          (leaf) => !ignoredLeaves.includes(leaf.id),
+        );
+        offset = res.offset;
+      }
+
+      if (offset === -1 && leaves.length === 0) {
         currentValue *= 2;
         continue;
       } else {
@@ -730,10 +740,8 @@ export class SparkWallet extends EventEmitter {
           valueToCheckUntil = currentValue * 64;
         }
 
-        const leavesToSwap = Object.values(leaves.nodes)
-          .slice(0, 64)
-          .filter((leaf) => !ignoredLeaves.includes(leaf.id));
-        const fallbackLeaves = Object.values(leaves.nodes).slice(64);
+        const leavesToSwap = Object.values(leaves).slice(0, 64);
+        const fallbackLeaves = Object.values(leaves).slice(64);
 
         if (leavesToSwap.length === 0) {
           currentValue *= 2;
@@ -741,28 +749,39 @@ export class SparkWallet extends EventEmitter {
         }
 
         try {
-          await this.requestLeavesSwap({
+          const res = await this.requestLeavesSwap({
             targetAmount: leavesToSwap.reduce(
               (acc, leaf) => acc + leaf.value,
               0,
             ),
             leaves: leavesToSwap,
           });
-        } catch (error) {
-          if (isNode) {
-            ignoredLeaves.push(...leavesToSwap.map((leaf) => leaf.id));
-            const leafIds = leavesToSwap.map((leaf) => leaf.id).join("\n");
-            const fs = await import("fs/promises");
-            await fs.appendFile("leaves.log", leafIds);
+          if ("failedLeaves" in res) {
+            ignoredLeaves.push(...res.failedLeaves);
+            if (isNode) {
+              const leafIds = res.failedLeaves.map((leaf) => leaf).join("\n");
+              const fs = await import("fs/promises");
+              await fs.appendFile("leaves.log", leafIds);
+            }
+            throw new Error();
           }
+        } catch (error) {
           try {
-            await this.requestLeavesSwap({
+            const res = await this.requestLeavesSwap({
               targetAmount: fallbackLeaves.reduce(
                 (acc, leaf) => acc + leaf.value,
                 0,
               ),
               leaves: fallbackLeaves,
             });
+            if ("failedLeaves" in res) {
+              ignoredLeaves.push(...res.failedLeaves);
+              if (isNode) {
+                const leafIds = res.failedLeaves.map((leaf) => leaf).join("\n");
+                const fs = await import("fs/promises");
+                await fs.appendFile("leaves.log", leafIds);
+              }
+            }
           } catch (error) {
             if (isNode) {
               ignoredLeaves.push(...fallbackLeaves.map((leaf) => leaf.id));
@@ -991,7 +1010,7 @@ export class SparkWallet extends EventEmitter {
   }: {
     targetAmount?: number;
     leaves?: TreeNode[];
-  }) {
+  }): Promise<SwapLeaf[] | { failedLeaves: string[] }> {
     if (targetAmount && targetAmount <= 0) {
       throw new Error("targetAmount must be positive");
     }
@@ -1031,6 +1050,9 @@ export class SparkWallet extends EventEmitter {
     const results: SwapLeaf[] = [];
     for (const batch of batches) {
       const result = await this.processSwapBatch(batch, targetAmount);
+      if ("failedLeaves" in result) {
+        return { failedLeaves: result.failedLeaves };
+      }
       results.push(...result.swapLeaves);
     }
 
@@ -1043,7 +1065,7 @@ export class SparkWallet extends EventEmitter {
   private async processSwapBatch(
     leavesBatch: TreeNode[],
     targetAmount?: number,
-  ): Promise<LeavesSwapRequest> {
+  ): Promise<LeavesSwapRequest | { failedLeaves: string[] }> {
     const leafKeyTweaks = await Promise.all(
       leavesBatch.map(async (leaf) => ({
         leaf,
@@ -1054,12 +1076,17 @@ export class SparkWallet extends EventEmitter {
       })),
     );
 
-    const { transfer, signatureMap } =
+    const { transfer, signatureMap, failedLeaves } =
       await this.transferService.startSwapSignRefund(
         leafKeyTweaks,
         hexToBytes(this.config.getSspIdentityPublicKey()),
         new Date(Date.now() + 2 * 60 * 1000),
       );
+
+    if (failedLeaves && failedLeaves.length > 0) {
+      return { failedLeaves };
+    }
+
     try {
       if (!transfer.leaves[0]?.leaf) {
         throw new Error("Failed to get leaf");
