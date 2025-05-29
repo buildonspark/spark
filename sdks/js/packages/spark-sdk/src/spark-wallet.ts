@@ -797,7 +797,7 @@ export class SparkWallet extends EventEmitter {
 
   private async syncWallet() {
     await this.syncTokenOutputs();
-    this.leaves = await this.getLeaves();
+    // this.leaves = await this.getLeaves();
     await this.config.signer.restoreSigningKeysFromLeafs(this.leaves);
     await this.checkRefreshTimelockNodes();
     await this.checkExtendTimeLockNodes();
