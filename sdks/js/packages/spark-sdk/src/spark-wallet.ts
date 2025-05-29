@@ -743,6 +743,9 @@ export class SparkWallet extends EventEmitter {
           offset += 100 - leavesToUse.length;
           continue;
         }
+
+        leaves = leavesToUse;
+        offset = res.offset;
       }
 
       if (offset === -1 && leaves.length === 0) {
