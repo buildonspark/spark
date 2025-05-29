@@ -454,6 +454,8 @@ export interface SigningKeyshare {
   ownerIdentifiers: string[];
   /** The threshold of the keyshare. */
   threshold: number;
+  /** The public key of the keyshare. */
+  publicKey: Uint8Array;
 }
 
 /**
@@ -2844,7 +2846,7 @@ export const SigningJob: MessageFns<SigningJob> = {
 };
 
 function createBaseSigningKeyshare(): SigningKeyshare {
-  return { ownerIdentifiers: [], threshold: 0 };
+  return { ownerIdentifiers: [], threshold: 0, publicKey: new Uint8Array(0) };
 }
 
 export const SigningKeyshare: MessageFns<SigningKeyshare> = {
@@ -2854,6 +2856,9 @@ export const SigningKeyshare: MessageFns<SigningKeyshare> = {
     }
     if (message.threshold !== 0) {
       writer.uint32(16).uint32(message.threshold);
+    }
+    if (message.publicKey.length !== 0) {
+      writer.uint32(26).bytes(message.publicKey);
     }
     return writer;
   },
@@ -2881,6 +2886,14 @@ export const SigningKeyshare: MessageFns<SigningKeyshare> = {
           message.threshold = reader.uint32();
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.publicKey = reader.bytes();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2896,6 +2909,7 @@ export const SigningKeyshare: MessageFns<SigningKeyshare> = {
         ? object.ownerIdentifiers.map((e: any) => globalThis.String(e))
         : [],
       threshold: isSet(object.threshold) ? globalThis.Number(object.threshold) : 0,
+      publicKey: isSet(object.publicKey) ? bytesFromBase64(object.publicKey) : new Uint8Array(0),
     };
   },
 
@@ -2907,6 +2921,9 @@ export const SigningKeyshare: MessageFns<SigningKeyshare> = {
     if (message.threshold !== 0) {
       obj.threshold = Math.round(message.threshold);
     }
+    if (message.publicKey.length !== 0) {
+      obj.publicKey = base64FromBytes(message.publicKey);
+    }
     return obj;
   },
 
@@ -2917,6 +2934,7 @@ export const SigningKeyshare: MessageFns<SigningKeyshare> = {
     const message = createBaseSigningKeyshare();
     message.ownerIdentifiers = object.ownerIdentifiers?.map((e) => e) || [];
     message.threshold = object.threshold ?? 0;
+    message.publicKey = object.publicKey ?? new Uint8Array(0);
     return message;
   },
 };

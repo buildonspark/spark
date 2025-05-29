@@ -216,7 +216,7 @@ export class CoopExitService extends BaseTransferService {
     );
 
     const signaturesMap: Map<string, Uint8Array> = new Map();
-    for (const signature of signatures.nodeSignatures) {
+    for (const signature of signatures) {
       signaturesMap.set(signature.nodeId, signature.refundTxSignature);
     }
 

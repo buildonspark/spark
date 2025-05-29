@@ -106,7 +106,7 @@ import {
   WalletTransfer,
 } from "./types/sdk-types.js";
 import { chunkArray } from "./utils/chunkArray.js";
-import { getMasterHDKeyFromSeed } from "./utils/index.js";
+import { addPublicKeys, getMasterHDKeyFromSeed } from "./utils/index.js";
 
 export type CreateLightningInvoiceParams = {
   amountSats: number;
@@ -1072,17 +1072,68 @@ export class SparkWallet extends EventEmitter {
     leavesBatch: TreeNode[],
     targetAmount?: number,
   ): Promise<LeavesSwapRequest | { failedLeaves: string[] }> {
-    const leafKeyTweaks = await Promise.all(
-      leavesBatch.map(async (leaf) => ({
-        leaf,
-        signingPubKey: await this.config.signer.generatePublicKey(
-          sha256(leaf.id),
-        ),
-        newSigningPubKey: await this.config.signer.generatePublicKey(),
-      })),
-    );
+    const leafKeyTweaks: LeafKeyTweak[] = [];
+    const verifyKey = (
+      pubkey1: Uint8Array,
+      pubkey2: Uint8Array,
+      verifyingKey: Uint8Array,
+    ) => {
+      return equalBytes(addPublicKeys(pubkey1, pubkey2), verifyingKey);
+    };
 
-    const { transfer, signatureMap, failedLeaves } =
+    const failedLeaves: string[] = [];
+
+    for (const leaf of leavesBatch) {
+      let signingPubKey = await this.config.signer.generatePublicKey(
+        sha256(leaf.id),
+      );
+
+      if (
+        !verifyKey(
+          signingPubKey,
+          leaf.signingKeyshare?.publicKey ?? new Uint8Array(),
+          leaf.verifyingPublicKey,
+        )
+      ) {
+        console.log({
+          message: "Failed to verify key, retrying with different derivation",
+          signingPubKey: bytesToHex(signingPubKey),
+          leafSigningPubKey: bytesToHex(
+            leaf.signingKeyshare?.publicKey ?? new Uint8Array(),
+          ),
+          sum: bytesToHex(
+            addPublicKeys(
+              signingPubKey,
+              leaf.signingKeyshare?.publicKey ?? new Uint8Array(),
+            ),
+          ),
+          leafVerifyingPubKey: bytesToHex(leaf.verifyingPublicKey),
+          leafId: leaf.id,
+        });
+        signingPubKey = await this.config.signer.generatePublicKey(
+          new Uint8Array(Buffer.from(leaf.id, "hex")),
+        );
+      }
+
+      if (
+        !verifyKey(
+          signingPubKey,
+          leaf.signingKeyshare?.publicKey ?? new Uint8Array(),
+          leaf.verifyingPublicKey,
+        )
+      ) {
+        console.log("Failed to verify again");
+        failedLeaves.push(leaf.id);
+      } else {
+        leafKeyTweaks.push({
+          leaf,
+          signingPubKey,
+          newSigningPubKey: await this.config.signer.generatePublicKey(),
+        });
+      }
+    }
+
+    const { transfer, signatureMap } =
       await this.transferService.startSwapSignRefund(
         leafKeyTweaks,
         hexToBytes(this.config.getSspIdentityPublicKey()),

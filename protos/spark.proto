@@ -228,6 +228,8 @@ message SigningKeyshare {
     repeated string owner_identifiers = 1;
     // The threshold of the keyshare.
     uint32 threshold = 2;
+    // The public key of the keyshare.
+    bytes public_key = 3;
 }
 
 /**
