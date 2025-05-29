@@ -726,26 +726,20 @@ export class SparkWallet extends EventEmitter {
           limit: 100,
         });
 
-        const len = Object.values(res.nodes).length;
-
-        if (len === 1) {
+        if (Object.values(res.nodes).length === 1) {
           leaves = [];
           offset = -1;
           break;
         }
 
-        const leavesToUse = Object.values(res.nodes).filter(
+        leaves = Object.values(res.nodes).filter(
           (leaf) => !ignoredLeaves.includes(leaf.id),
         );
-
-        if (leavesToUse.length < 100 && leavesToUse.length !== len) {
-          leaves = [];
-          offset += 100 - leavesToUse.length;
-          continue;
-        }
-
-        leaves = leavesToUse;
         offset = res.offset;
+
+        if (leaves.length === 1) {
+          leaves = [];
+        }
       }
 
       if (offset === -1 && leaves.length === 0) {
