@@ -1095,21 +1095,6 @@ export class SparkWallet extends EventEmitter {
           leaf.verifyingPublicKey,
         )
       ) {
-        console.log({
-          message: "Failed to verify key, retrying with different derivation",
-          signingPubKey: bytesToHex(signingPubKey),
-          leafSigningPubKey: bytesToHex(
-            leaf.signingKeyshare?.publicKey ?? new Uint8Array(),
-          ),
-          sum: bytesToHex(
-            addPublicKeys(
-              signingPubKey,
-              leaf.signingKeyshare?.publicKey ?? new Uint8Array(),
-            ),
-          ),
-          leafVerifyingPubKey: bytesToHex(leaf.verifyingPublicKey),
-          leafId: leaf.id,
-        });
         signingPubKey = await this.config.signer.generatePublicKey(
           new Uint8Array(Buffer.from(leaf.id, "hex")),
         );
@@ -1122,7 +1107,6 @@ export class SparkWallet extends EventEmitter {
           leaf.verifyingPublicKey,
         )
       ) {
-        console.log("Failed to verify again");
         failedLeaves.push(leaf.id);
       } else {
         leafKeyTweaks.push({
@@ -1243,7 +1227,7 @@ export class SparkWallet extends EventEmitter {
         if (!node.verifyingPublicKey) {
           throw new Error(`Node public key not found for leaf ${nodeId}`);
         }
-
+        console.log;
         const leaf = request.swapLeaves.find((leaf) => leaf.leafId === nodeId);
         if (!leaf) {
           throw new Error(`Leaf not found for node ${nodeId}`);
