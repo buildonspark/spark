@@ -727,21 +727,31 @@ export class SparkWallet extends EventEmitter {
           limit: 100,
         });
 
+        console.log("res length", Object.values(res.nodes).length);
+
         if (Object.values(res.nodes).length === 1) {
           leaves = [];
           offset = -1;
           break;
         }
 
+        console.log("continuing");
+
         leaves = Object.values(res.nodes).filter(
           (leaf) => !ignoredLeaves.includes(leaf.id),
         );
+
+        console.log("leaves length", leaves.length);
+
         offset = res.offset;
 
+        console.log("new offset", offset);
         // If we only have on good leaf, don't swap it, just continue with next offset
         if (leaves.length === 1) {
           leaves = [];
         }
+
+        console.log("leaves length again", leaves.length);
       }
 
       console.log({
@@ -1131,16 +1141,16 @@ export class SparkWallet extends EventEmitter {
       }
     }
 
+    if (failedLeaves && failedLeaves.length > 0) {
+      return { failedLeaves };
+    }
+
     const { transfer, signatureMap } =
       await this.transferService.startSwapSignRefund(
         leafKeyTweaks,
         hexToBytes(this.config.getSspIdentityPublicKey()),
         new Date(Date.now() + 2 * 60 * 1000),
       );
-
-    if (failedLeaves && failedLeaves.length > 0) {
-      return { failedLeaves };
-    }
 
     try {
       if (!transfer.leaves[0]?.leaf) {
