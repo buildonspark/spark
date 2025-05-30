@@ -744,23 +744,34 @@ export class SparkWallet extends EventEmitter {
         }
       }
 
+      console.log({
+        value: currentValue,
+        length: leaves.length,
+        offset,
+      });
+
       if (offset === -1 && leaves.length === 0) {
         currentValue *= 2;
         continue;
       } else {
         if (currentValue * 64 > valueToCheckUntil) {
+          console.log("update valid");
           valueToCheckUntil = currentValue * 64;
         }
 
         const leavesToSwap = Object.values(leaves).slice(0, 64);
         const fallbackLeaves = Object.values(leaves).slice(64);
 
+        console.log({
+          leavesToSwapLength: leavesToSwap.length,
+        });
         if (leavesToSwap.length === 0) {
           currentValue *= 2;
           continue;
         }
 
         try {
+          console.log("attempting");
           const res = await this.requestLeavesSwap({
             targetAmount: leavesToSwap.reduce(
               (acc, leaf) => acc + leaf.value,
@@ -768,6 +779,7 @@ export class SparkWallet extends EventEmitter {
             ),
             leaves: leavesToSwap,
           });
+          console.log("success");
           if ("failedLeaves" in res && res.failedLeaves.length > 0) {
             ignoredLeaves.push(...res.failedLeaves);
             if (isNode) {
@@ -778,6 +790,7 @@ export class SparkWallet extends EventEmitter {
             throw new Error();
           }
         } catch (error) {
+          console.log("");
           try {
             const res = await this.requestLeavesSwap({
               targetAmount: fallbackLeaves.reduce(
