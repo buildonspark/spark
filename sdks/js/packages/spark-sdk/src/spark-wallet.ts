@@ -800,7 +800,7 @@ export class SparkWallet extends EventEmitter {
             throw new Error();
           }
         } catch (error) {
-          console.log("");
+          console.log("error", error);
           try {
             const res = await this.requestLeavesSwap({
               targetAmount: fallbackLeaves.reduce(
