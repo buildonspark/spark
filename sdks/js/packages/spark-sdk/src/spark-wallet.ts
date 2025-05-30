@@ -710,7 +710,7 @@ export class SparkWallet extends EventEmitter {
     let valueToCheckUntil = max * 64;
 
     while (currentValue <= valueToCheckUntil) {
-      // console.log("Checking value", currentValue);
+      console.log("Checking value", currentValue);
       const sparkClient = await this.connectionManager.createSparkClient(
         this.config.getCoordinatorAddress(),
       );
@@ -718,6 +718,7 @@ export class SparkWallet extends EventEmitter {
       let offset = 0;
       let leaves: TreeNode[] = [];
       while (leaves.length === 0 && offset !== -1) {
+        console.log("Using offset", offset);
         const res = await sparkClient.query_nodes_by_value({
           ownerIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
