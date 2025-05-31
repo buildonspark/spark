@@ -710,7 +710,7 @@ export class SparkWallet extends EventEmitter {
     let valueToCheckUntil = max * 64;
 
     while (currentValue <= valueToCheckUntil) {
-      console.log("Checking value", currentValue);
+      // console.log("Checking value", currentValue);
       const sparkClient = await this.connectionManager.createSparkClient(
         this.config.getCoordinatorAddress(),
       );
@@ -718,7 +718,7 @@ export class SparkWallet extends EventEmitter {
       let offset = 0;
       let leaves: TreeNode[] = [];
       while (leaves.length === 0 && offset !== -1) {
-        console.log("Using offset", offset);
+        // console.log("Using offset", offset);
         const res = await sparkClient.query_nodes_by_value({
           ownerIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
@@ -727,60 +727,40 @@ export class SparkWallet extends EventEmitter {
           limit: 100,
         });
 
-        console.log("res length", Object.values(res.nodes).length);
-
         if (Object.values(res.nodes).length === 1) {
           leaves = [];
           offset = -1;
           break;
         }
 
-        console.log("continuing");
-
         leaves = Object.values(res.nodes).filter(
           (leaf) => !ignoredLeaves.includes(leaf.id),
         );
 
-        console.log("leaves length", leaves.length);
-
         offset = res.offset;
 
-        console.log("new offset", offset);
         // If we only have on good leaf, don't swap it, just continue with next offset
         if (leaves.length === 1) {
           leaves = [];
         }
-
-        console.log("leaves length again", leaves.length);
       }
-
-      console.log({
-        value: currentValue,
-        length: leaves.length,
-        offset,
-      });
 
       if (offset === -1 && leaves.length === 0) {
         currentValue *= 2;
         continue;
       } else {
         if (currentValue * 64 > valueToCheckUntil) {
-          console.log("update valid");
           valueToCheckUntil = currentValue * 64;
         }
 
         const leavesToSwap = Object.values(leaves).slice(0, 64);
 
-        console.log({
-          leavesToSwapLength: leavesToSwap.length,
-        });
         if (leavesToSwap.length === 0) {
           currentValue *= 2;
           continue;
         }
 
         try {
-          console.log("attempting");
           const res = await this.requestLeavesSwap({
             targetAmount: leavesToSwap.reduce(
               (acc, leaf) => acc + leaf.value,
@@ -788,7 +768,6 @@ export class SparkWallet extends EventEmitter {
             ),
             leaves: leavesToSwap,
           });
-          console.log("success");
           if ("failedLeaves" in res && res.failedLeaves.length > 0) {
             ignoredLeaves.push(...res.failedLeaves);
             if (isNode) {
@@ -1225,7 +1204,6 @@ export class SparkWallet extends EventEmitter {
         if (!node.verifyingPublicKey) {
           throw new Error(`Node public key not found for leaf ${nodeId}`);
         }
-        console.log;
         const leaf = request.swapLeaves.find((leaf) => leaf.leafId === nodeId);
         if (!leaf) {
           throw new Error(`Leaf not found for node ${nodeId}`);
