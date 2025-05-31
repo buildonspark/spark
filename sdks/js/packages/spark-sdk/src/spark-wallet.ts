@@ -770,7 +770,6 @@ export class SparkWallet extends EventEmitter {
         }
 
         const leavesToSwap = Object.values(leaves).slice(0, 64);
-        const fallbackLeaves = Object.values(leaves).slice(64);
 
         console.log({
           leavesToSwapLength: leavesToSwap.length,
@@ -797,34 +796,10 @@ export class SparkWallet extends EventEmitter {
               const fs = await import("fs/promises");
               await fs.appendFile("leaves.log", leafIds);
             }
-            throw new Error();
           }
         } catch (error) {
           console.log("error", error);
-          try {
-            const res = await this.requestLeavesSwap({
-              targetAmount: fallbackLeaves.reduce(
-                (acc, leaf) => acc + leaf.value,
-                0,
-              ),
-              leaves: fallbackLeaves,
-            });
-            if ("failedLeaves" in res && res.failedLeaves.length > 0) {
-              ignoredLeaves.push(...res.failedLeaves);
-              if (isNode) {
-                const leafIds = res.failedLeaves.map((leaf) => leaf).join("\n");
-                const fs = await import("fs/promises");
-                await fs.appendFile("leaves.log", leafIds);
-              }
-            }
-          } catch (error) {
-            if (isNode) {
-              ignoredLeaves.push(...fallbackLeaves.map((leaf) => leaf.id));
-              const leafIds = fallbackLeaves.map((leaf) => leaf.id).join("\n");
-              const fs = await import("fs/promises");
-              await fs.appendFile("leaves.log", leafIds);
-            }
-          }
+          ignoredLeaves.push(...leavesToSwap.map((leaf) => leaf.id));
         }
       }
     }
