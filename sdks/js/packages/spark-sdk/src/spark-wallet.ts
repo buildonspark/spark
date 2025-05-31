@@ -798,7 +798,6 @@ export class SparkWallet extends EventEmitter {
             }
           }
         } catch (error) {
-          console.log("error", error);
           ignoredLeaves.push(...leavesToSwap.map((leaf) => leaf.id));
         }
       }
