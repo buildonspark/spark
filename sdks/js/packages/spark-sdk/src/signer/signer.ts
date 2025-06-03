@@ -71,6 +71,85 @@ export type SplitSecretWithProofsParams = {
   isSecretPubkey?: boolean;
 };
 
+type DerivedHDKey = {
+  hdKey: HDKey;
+  privateKey: Uint8Array;
+  publicKey: Uint8Array;
+};
+
+interface HDKeyGenerator {
+  deriveHDKeysFromSeed(
+    seed: Uint8Array,
+    accountNumber: number,
+  ): Promise<{
+    masterKey: DerivedHDKey;
+    identityKey: DerivedHDKey;
+    signingKey: DerivedHDKey;
+    depositKey: DerivedHDKey;
+  }>;
+}
+
+class DefaultHDKeyGenerator implements HDKeyGenerator {
+  async deriveHDKeysFromSeed(seed: Uint8Array, accountNumber: number): Promise<{
+    masterKey: DerivedHDKey;
+    identityKey: DerivedHDKey;
+    signingKey: DerivedHDKey;
+    depositKey: DerivedHDKey;
+  }> {
+    const hdkey = getMasterHDKeyFromSeed(seed);
+
+    if (!hdkey.privateKey || !hdkey.publicKey) {
+      throw new ValidationError("Failed to derive keys from seed", {
+        field: "hdkey",
+        value: seed,
+      });
+    }
+
+    const identityKey = hdkey.derive(`m/8797555'/${accountNumber}'/0'`);
+    const signingKey = hdkey.derive(`m/8797555'/${accountNumber}'/1'`);
+    const depositKey = hdkey.derive(`m/8797555'/${accountNumber}'/2'`);
+
+    if (
+      !identityKey.privateKey ||
+      !depositKey.privateKey ||
+      !signingKey.privateKey ||
+      !identityKey.publicKey ||
+      !depositKey.publicKey ||
+      !signingKey.publicKey
+    ) {
+      throw new ValidationError(
+        "Failed to derive all required keys from seed",
+        {
+          field: "derivedKeys",
+        },
+      );
+    }
+
+    return {
+      masterKey: {
+        hdKey: hdkey,
+        privateKey: hdkey.privateKey,
+        publicKey: hdkey.publicKey,
+      },
+      identityKey: {
+        hdKey: identityKey,
+        privateKey: identityKey.privateKey,
+        publicKey: identityKey.publicKey,
+      },
+      signingKey: {
+        hdKey: signingKey,
+        privateKey: signingKey.privateKey,
+        publicKey: signingKey.publicKey,
+      },
+      depositKey: {
+        hdKey: depositKey,
+        privateKey: depositKey.privateKey,
+        publicKey: depositKey.publicKey,
+      },
+    };
+  }
+}
+
 // TODO: Properly clean up keys when they are no longer needed
 interface SparkSigner {
   getIdentityPublicKey(): Promise<Uint8Array>;
@@ -150,6 +229,12 @@ class DefaultSparkSigner implements SparkSigner {
 
   protected commitmentToNonceMap: Map<SigningCommitment, SigningNonce> =
     new Map();
+
+  private readonly hdKeyGenerator: HDKeyGenerator;
+
+  constructor({hdKeyGenerator}: {hdKeyGenerator?: HDKeyGenerator} = {}) {
+    this.hdKeyGenerator = hdKeyGenerator ?? new DefaultHDKeyGenerator();
+  }
 
   private deriveSigningKey(hash: Uint8Array): Uint8Array {
     if (!this.masterKey) {
@@ -429,39 +514,13 @@ class DefaultSparkSigner implements SparkSigner {
       seed = hexToBytes(seed);
     }
 
-    const hdkey = getMasterHDKeyFromSeed(seed);
+    const {masterKey, identityKey, signingKey, depositKey} =
+      await this.hdKeyGenerator.deriveHDKeysFromSeed(seed, accountNumber ?? 0)
 
-    if (!hdkey.privateKey || !hdkey.publicKey) {
-      throw new ValidationError("Failed to derive keys from seed", {
-        field: "hdkey",
-        value: seed,
-      });
-    }
-
-    const identityKey = hdkey.derive(`m/8797555'/${accountNumber}'/0'`);
-    const signingKey = hdkey.derive(`m/8797555'/${accountNumber}'/1'`);
-    const depositKey = hdkey.derive(`m/8797555'/${accountNumber}'/2'`);
-
-    if (
-      !identityKey.privateKey ||
-      !depositKey.privateKey ||
-      !signingKey.privateKey ||
-      !identityKey.publicKey ||
-      !depositKey.publicKey ||
-      !signingKey.publicKey
-    ) {
-      throw new ValidationError(
-        "Failed to derive all required keys from seed",
-        {
-          field: "derivedKeys",
-        },
-      );
-    }
-
-    this.masterKey = hdkey;
-    this.identityKey = identityKey;
-    this.depositKey = depositKey;
-    this.signingKey = signingKey;
+    this.masterKey = masterKey.hdKey;
+    this.identityKey = identityKey.hdKey;
+    this.depositKey = depositKey.hdKey;
+    this.signingKey = signingKey.hdKey;
 
     this.publicKeyToPrivateKeyMap.set(
       bytesToHex(identityKey.publicKey),
