@@ -690,7 +690,7 @@ export class SparkWallet extends EventEmitter {
   }
 
   private async batchOptimizeLeaves() {
-    const ignoredLeaves: string[] = [];
+    const ignoredLeaves: Set<string> = new Set();
     console.log("Starting optimization");
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
@@ -734,8 +734,59 @@ export class SparkWallet extends EventEmitter {
           break;
         }
 
+        for (const [id, operator] of Object.entries(
+          this.config.getSigningOperators(),
+        )) {
+          if (id !== this.config.getCoordinatorIdentifier()) {
+            const client = await this.connectionManager.createSparkClient(
+              operator.address,
+            );
+            const operatorLeaves = await client.query_nodes({
+              source: {
+                $case: "nodeIds",
+                nodeIds: {
+                  nodeIds: Object.values(res.nodes).map((leaf) => leaf.id),
+                },
+              },
+              includeParents: false,
+              network: NetworkToProto[this.config.getNetwork()],
+            });
+
+            // Loop over leaves returned by coordinator.
+            // If the leaf is not present in the operator's leaves, we'll ignore it.
+            // If the leaf is present, we'll check if the leaf is in sync with the operator's leaf.
+            // If the leaf is not in sync, we'll ignore it.
+            for (const [nodeId, leaf] of Object.entries(res.nodes)) {
+              const operatorLeaf = operatorLeaves.nodes[nodeId];
+
+              if (!operatorLeaf) {
+                ignoredLeaves.add(nodeId);
+                if (isNode) {
+                  const fs = await import("fs/promises");
+                  await fs.appendFile("leaves.log", nodeId);
+                }
+                continue;
+              }
+
+              if (
+                leaf.status !== operatorLeaf.status ||
+                leaf.signingKeyshare?.publicKey !==
+                  operatorLeaf.signingKeyshare?.publicKey ||
+                !equalBytes(leaf.nodeTx, operatorLeaf.nodeTx) ||
+                !equalBytes(leaf.refundTx, operatorLeaf.refundTx)
+              ) {
+                ignoredLeaves.add(nodeId);
+                if (isNode) {
+                  const fs = await import("fs/promises");
+                  await fs.appendFile("leaves.log", nodeId);
+                }
+              }
+            }
+          }
+        }
+
         leaves = Object.values(res.nodes).filter(
-          (leaf) => !ignoredLeaves.includes(leaf.id),
+          (leaf) => !ignoredLeaves.has(leaf.id),
         );
 
         offset = res.offset;
@@ -785,7 +836,9 @@ export class SparkWallet extends EventEmitter {
             leaves: leavesToSwap,
           });
           if ("failedLeaves" in res && res.failedLeaves.length > 0) {
-            ignoredLeaves.push(...res.failedLeaves);
+            for (const leaf of res.failedLeaves) {
+              ignoredLeaves.add(leaf);
+            }
             if (isNode) {
               const leafIds = res.failedLeaves.map((leaf) => leaf).join("\n");
               const fs = await import("fs/promises");
@@ -793,7 +846,9 @@ export class SparkWallet extends EventEmitter {
             }
           }
         } catch (error) {
-          ignoredLeaves.push(...leavesToSwap.map((leaf) => leaf.id));
+          for (const leaf of leavesToSwap) {
+            ignoredLeaves.add(leaf.id);
+          }
         }
       }
     }
