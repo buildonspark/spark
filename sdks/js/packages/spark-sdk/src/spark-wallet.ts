@@ -795,21 +795,6 @@ export class SparkWallet extends EventEmitter {
         if (leaves.length === 1) {
           leaves = [];
         }
-
-        // We're in a batch less than 64, and there's more leaves to fetch
-        if (leaves.length < 64 && offset !== -1) {
-          const lastNLeaves = Object.values(res.nodes).slice(-leaves.length);
-
-          // Check if our filtered leaves match the last N leaves of the response
-          const leavesMatch =
-            leaves.length === lastNLeaves.length &&
-            leaves.every((leaf, index) => leaf.id === lastNLeaves[index]?.id);
-
-          if (leavesMatch) {
-            leaves = [];
-            offset -= leaves.length;
-          }
-        }
       }
 
       if (offset === -1 && leaves.length === 0) {
