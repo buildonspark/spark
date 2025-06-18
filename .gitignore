@@ -43,3 +43,5 @@ _data/
 
 # Cursor files
 /.cursor*
+
+*.code-workspace
