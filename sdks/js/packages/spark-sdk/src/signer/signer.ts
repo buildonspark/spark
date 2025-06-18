@@ -449,9 +449,9 @@ class DefaultSparkSigner implements SparkSigner {
   }
 
   async generatePublicKey(hash?: Uint8Array): Promise<Uint8Array> {
-    if (!this.masterPublicKey) {
+    if (!this.signingKey) {
       throw new ValidationError("Private key is not set", {
-        field: "masterKey",
+        field: "signingKey",
       });
     }
 
