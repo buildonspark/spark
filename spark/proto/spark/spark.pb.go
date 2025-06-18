@@ -3311,9 +3311,11 @@ type TreeNode struct {
 	// The creation time of the node.
 	CreatedTime *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=created_time,json=createdTime,proto3" json:"created_time,omitempty"`
 	// The latest update time of the node.
-	UpdatedTime   *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=updated_time,json=updatedTime,proto3" json:"updated_time,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	UpdatedTime *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=updated_time,json=updatedTime,proto3" json:"updated_time,omitempty"`
+	// The signing public key of the owner of the node.
+	OwnerSigningPublicKey []byte `protobuf:"bytes,15,opt,name=owner_signing_public_key,json=ownerSigningPublicKey,proto3" json:"owner_signing_public_key,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *TreeNode) Reset() {
@@ -3440,6 +3442,13 @@ func (x *TreeNode) GetCreatedTime() *timestamppb.Timestamp {
 func (x *TreeNode) GetUpdatedTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UpdatedTime
+	}
+	return nil
+}
+
+func (x *TreeNode) GetOwnerSigningPublicKey() []byte {
+	if x != nil {
+		return x.OwnerSigningPublicKey
 	}
 	return nil
 }
@@ -8996,7 +9005,7 @@ const file_spark_proto_rawDesc = "" +
 	"\x19previous_transaction_hash\x18\x02 \x01(\fB\a\xfaB\x04z\x02h R\x17previousTransactionHash\x12:\n" +
 	"\x19previous_transaction_vout\x18\x03 \x01(\rR\x17previousTransactionVout\"\x99\x01\n" +
 	"\x19QueryTokenOutputsResponse\x12|\n" +
-	"&outputs_with_previous_transaction_data\x18\x01 \x03(\v2(.spark.OutputWithPreviousTransactionDataR\"outputsWithPreviousTransactionData\"\xc1\x04\n" +
+	"&outputs_with_previous_transaction_data\x18\x01 \x03(\v2(.spark.OutputWithPreviousTransactionDataR\"outputsWithPreviousTransactionData\"\xfa\x04\n" +
 	"\bTreeNode\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\atree_id\x18\x02 \x01(\tR\x06treeId\x12\x14\n" +
@@ -9012,7 +9021,8 @@ const file_spark_proto_rawDesc = "" +
 	"\x06status\x18\v \x01(\tR\x06status\x12(\n" +
 	"\anetwork\x18\f \x01(\x0e2\x0e.spark.NetworkR\anetwork\x12=\n" +
 	"\fcreated_time\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\vcreatedTime\x12=\n" +
-	"\fupdated_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\vupdatedTimeB\x11\n" +
+	"\fupdated_time\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\vupdatedTime\x127\n" +
+	"\x18owner_signing_public_key\x18\x0f \x01(\fR\x15ownerSigningPublicKeyB\x11\n" +
 	"\x0f_parent_node_id\"\x90\x01\n" +
 	"\x1dFinalizeNodeSignaturesRequest\x12/\n" +
 	"\x06intent\x18\x01 \x01(\x0e2\x17.common.SignatureIntentR\x06intent\x12>\n" +

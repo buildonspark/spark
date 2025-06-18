@@ -6933,6 +6933,8 @@ func (m *TreeNode) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for OwnerSigningPublicKey
+
 	if m.ParentNodeId != nil {
 		// no validation rules for ParentNodeId
 	}

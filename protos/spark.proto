@@ -557,6 +557,8 @@ message TreeNode {
     google.protobuf.Timestamp created_time = 13;
     // The latest update time of the node.
     google.protobuf.Timestamp updated_time = 14;
+    // The signing public key of the owner of the node.
+    bytes owner_signing_public_key = 15;
 }
 
 /**
