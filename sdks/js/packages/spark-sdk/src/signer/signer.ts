@@ -92,8 +92,8 @@ type KeyPair = {
   publicKey: Uint8Array;
 };
 
-interface SparkKeyGenerator {
-  deriveHDKeysFromSeed(
+interface SparkKeysGenerator {
+  deriveKeysFromSeed(
     seed: Uint8Array,
     accountNumber: number,
   ): Promise<{
@@ -107,8 +107,8 @@ interface SparkKeyGenerator {
 
 const HARDENED_OFFSET = 0x80000000; // 2^31
 
-class DefaultSparkKeyGenerator implements SparkKeyGenerator {
-  async deriveHDKeysFromSeed(
+class DefaultSparkKeysGenerator implements SparkKeysGenerator {
+  async deriveKeysFromSeed(
     seed: Uint8Array,
     accountNumber: number,
   ): Promise<{
@@ -265,10 +265,10 @@ class DefaultSparkSigner implements SparkSigner {
   protected commitmentToNonceMap: Map<SigningCommitment, SigningNonce> =
     new Map();
 
-  private readonly keyGenerator: SparkKeyGenerator;
+  private readonly keysGenerator: SparkKeysGenerator;
 
-  constructor({ hdKeyGenerator }: { hdKeyGenerator?: SparkKeyGenerator } = {}) {
-    this.keyGenerator = hdKeyGenerator ?? new DefaultSparkKeyGenerator();
+  constructor({ sparkKeysGenerator }: { sparkKeysGenerator?: SparkKeysGenerator } = {}) {
+    this.keysGenerator = sparkKeysGenerator ?? new DefaultSparkKeysGenerator();
   }
 
   private deriveSigningKey(hash: Uint8Array): Uint8Array {
@@ -618,7 +618,7 @@ class DefaultSparkSigner implements SparkSigner {
     }
 
     const { masterPublicKey, identityKey, signingHDKey: signingKey, depositKey, staticDepositHDKey: staticDepositKey } =
-      await this.keyGenerator.deriveHDKeysFromSeed(seed, accountNumber ?? 0);
+      await this.keysGenerator.deriveKeysFromSeed(seed, accountNumber ?? 0);
 
     this.masterPublicKey = masterPublicKey;
     this.identityKey = identityKey;
