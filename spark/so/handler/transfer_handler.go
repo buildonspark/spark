@@ -919,7 +919,11 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	if len(filter.Statuses) > 0 {
 		statuses := make([]st.TransferStatus, len(filter.Statuses))
 		for i, status := range filter.Statuses {
-			statuses[i] = st.TransferStatus(status.String())
+			var err error
+			statuses[i], err = st.SchemaTransferStatusFromProtoTransferStatus(status)
+			if err != nil {
+				return nil, fmt.Errorf("invalid transfer status: %w", err)
+			}
 		}
 		transferPredicate = append(transferPredicate, enttransfer.StatusIn(statuses...))
 	}
