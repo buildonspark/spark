@@ -87,31 +87,36 @@ type DerivedHDKey = {
   publicKey: Uint8Array;
 };
 
-interface HDKeyGenerator {
-  deriveHDKeysFromSeed(
+type KeyPair = {
+  privateKey: Uint8Array;
+  publicKey: Uint8Array;
+};
+
+interface SparkKeysGenerator {
+  deriveKeysFromSeed(
     seed: Uint8Array,
     accountNumber: number,
   ): Promise<{
-    masterKey: DerivedHDKey;
-    identityKey: DerivedHDKey;
-    signingKey: DerivedHDKey;
-    depositKey: DerivedHDKey;
-    staticDepositKey: DerivedHDKey;
+    masterPublicKey: Uint8Array;
+    identityKey: KeyPair;
+    signingHDKey: DerivedHDKey;
+    depositKey: KeyPair;
+    staticDepositHDKey: DerivedHDKey;
   }>;
 }
 
 const HARDENED_OFFSET = 0x80000000; // 2^31
 
-class DefaultHDKeyGenerator implements HDKeyGenerator {
-  async deriveHDKeysFromSeed(
+class DefaultSparkKeysGenerator implements SparkKeysGenerator {
+  async deriveKeysFromSeed(
     seed: Uint8Array,
     accountNumber: number,
   ): Promise<{
-    masterKey: DerivedHDKey;
-    identityKey: DerivedHDKey;
-    signingKey: DerivedHDKey;
-    depositKey: DerivedHDKey;
-    staticDepositKey: DerivedHDKey;
+    masterPublicKey: Uint8Array;
+    identityKey: KeyPair;
+    signingHDKey: DerivedHDKey;
+    depositKey: KeyPair;
+    staticDepositHDKey: DerivedHDKey;
   }> {
     const hdkey = HDKey.fromMasterSeed(seed);
 
@@ -146,27 +151,21 @@ class DefaultHDKeyGenerator implements HDKeyGenerator {
     }
 
     return {
-      masterKey: {
-        hdKey: hdkey,
-        privateKey: hdkey.privateKey,
-        publicKey: hdkey.publicKey,
-      },
+      masterPublicKey: hdkey.publicKey,
       identityKey: {
-        hdKey: identityKey,
         privateKey: identityKey.privateKey,
         publicKey: identityKey.publicKey,
       },
-      signingKey: {
+      signingHDKey: {
         hdKey: signingKey,
         privateKey: signingKey.privateKey,
         publicKey: signingKey.publicKey,
       },
       depositKey: {
-        hdKey: depositKey,
         privateKey: depositKey.privateKey,
         publicKey: depositKey.publicKey,
       },
-      staticDepositKey: {
+      staticDepositHDKey: {
         hdKey: staticDepositKey,
         privateKey: staticDepositKey.privateKey,
         publicKey: staticDepositKey.publicKey,
@@ -253,10 +252,10 @@ interface SparkSigner extends TokenSigner {
 }
 
 class DefaultSparkSigner implements SparkSigner {
-  private masterKey: HDKey | null = null;
-  private identityKey: HDKey | null = null;
+  private masterPublicKey: Uint8Array | null = null;
+  private identityKey: KeyPair | null = null;
   private signingKey: HDKey | null = null;
-  private depositKey: HDKey | null = null;
+  private depositKey: KeyPair | null = null;
   private staticDepositKey: HDKey | null = null;
   private staticDepositKeyMap: Map<number, HDKey> = new Map();
 
@@ -266,16 +265,18 @@ class DefaultSparkSigner implements SparkSigner {
   protected commitmentToNonceMap: Map<SigningCommitment, SigningNonce> =
     new Map();
 
-  private readonly hdKeyGenerator: HDKeyGenerator;
+  private readonly keysGenerator: SparkKeysGenerator;
 
-  constructor({ hdKeyGenerator }: { hdKeyGenerator?: HDKeyGenerator } = {}) {
-    this.hdKeyGenerator = hdKeyGenerator ?? new DefaultHDKeyGenerator();
+  constructor({
+    sparkKeysGenerator,
+  }: { sparkKeysGenerator?: SparkKeysGenerator } = {}) {
+    this.keysGenerator = sparkKeysGenerator ?? new DefaultSparkKeysGenerator();
   }
 
   private deriveSigningKey(hash: Uint8Array): Uint8Array {
-    if (!this.masterKey) {
+    if (!this.signingKey) {
       throw new ValidationError("Private key not initialized", {
-        field: "masterKey",
+        field: "signingKey",
       });
     }
 
@@ -295,9 +296,9 @@ class DefaultSparkSigner implements SparkSigner {
   }
 
   async restoreSigningKeysFromLeafs(leafs: TreeNode[]) {
-    if (!this.masterKey) {
-      throw new ValidationError("Master key is not set", {
-        field: "masterKey",
+    if (!this.signingKey) {
+      throw new ValidationError("Signing key is not set", {
+        field: "signingKey",
       });
     }
 
@@ -450,9 +451,9 @@ class DefaultSparkSigner implements SparkSigner {
   }
 
   async generatePublicKey(hash?: Uint8Array): Promise<Uint8Array> {
-    if (!this.masterKey) {
+    if (!this.signingKey) {
       throw new ValidationError("Private key is not set", {
-        field: "masterKey",
+        field: "signingKey",
       });
     }
 
@@ -618,12 +619,17 @@ class DefaultSparkSigner implements SparkSigner {
       seed = hexToBytes(seed);
     }
 
-    const { masterKey, identityKey, signingKey, depositKey, staticDepositKey } =
-      await this.hdKeyGenerator.deriveHDKeysFromSeed(seed, accountNumber ?? 0);
+    const {
+      masterPublicKey,
+      identityKey,
+      signingHDKey: signingKey,
+      depositKey,
+      staticDepositHDKey: staticDepositKey,
+    } = await this.keysGenerator.deriveKeysFromSeed(seed, accountNumber ?? 0);
 
-    this.masterKey = masterKey.hdKey;
-    this.identityKey = identityKey.hdKey;
-    this.depositKey = depositKey.hdKey;
+    this.masterPublicKey = masterPublicKey;
+    this.identityKey = identityKey;
+    this.depositKey = depositKey;
     this.signingKey = signingKey.hdKey;
     this.staticDepositKey = staticDepositKey.hdKey;
 
@@ -744,11 +750,11 @@ class DefaultSparkSigner implements SparkSigner {
   }
 
   async getMasterPublicKey(): Promise<Uint8Array> {
-    if (!this.masterKey?.publicKey) {
+    if (!this.masterPublicKey) {
       throw new Error("Private key is not set");
     }
 
-    return this.masterKey.publicKey;
+    return this.masterPublicKey;
   }
 
   async validateMessageWithIdentityKey(
