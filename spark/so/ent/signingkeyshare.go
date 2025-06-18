@@ -34,7 +34,7 @@ type SigningKeyshare struct {
 	PublicKey []byte `json:"public_key,omitempty"`
 	// The minimum number of signers required to produce a valid signature using this signing keyshare.
 	MinSigners int32 `json:"min_signers,omitempty"`
-	// The SO index that acts as the coordinator for all signatures using this signing keyshare.
+	// The SO index of the coordinator that initiated the DKG round that produced this signing keyshare. An SO can only claim a signing keyshare to mark it in-use for which it is the coordinator.
 	CoordinatorIndex uint64 `json:"coordinator_index,omitempty"`
 	selectValues     sql.SelectValues
 }

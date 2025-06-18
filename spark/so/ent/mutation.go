@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
+	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
@@ -51,6 +52,7 @@ const (
 	TypeCooperativeExit         = "CooperativeExit"
 	TypeDepositAddress          = "DepositAddress"
 	TypeGossip                  = "Gossip"
+	TypePaymentIntent           = "PaymentIntent"
 	TypePreimageRequest         = "PreimageRequest"
 	TypePreimageShare           = "PreimageShare"
 	TypeSigningKeyshare         = "SigningKeyshare"
@@ -2933,6 +2935,622 @@ func (m *GossipMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *GossipMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown Gossip edge %s", name)
+}
+
+// PaymentIntentMutation represents an operation that mutates the PaymentIntent nodes in the graph.
+type PaymentIntentMutation struct {
+	config
+	op                       Op
+	typ                      string
+	id                       *uuid.UUID
+	create_time              *time.Time
+	update_time              *time.Time
+	payment_intent           *string
+	clearedFields            map[string]struct{}
+	transfer                 map[uuid.UUID]struct{}
+	removedtransfer          map[uuid.UUID]struct{}
+	clearedtransfer          bool
+	token_transaction        map[uuid.UUID]struct{}
+	removedtoken_transaction map[uuid.UUID]struct{}
+	clearedtoken_transaction bool
+	done                     bool
+	oldValue                 func(context.Context) (*PaymentIntent, error)
+	predicates               []predicate.PaymentIntent
+}
+
+var _ ent.Mutation = (*PaymentIntentMutation)(nil)
+
+// paymentintentOption allows management of the mutation configuration using functional options.
+type paymentintentOption func(*PaymentIntentMutation)
+
+// newPaymentIntentMutation creates new mutation for the PaymentIntent entity.
+func newPaymentIntentMutation(c config, op Op, opts ...paymentintentOption) *PaymentIntentMutation {
+	m := &PaymentIntentMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePaymentIntent,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPaymentIntentID sets the ID field of the mutation.
+func withPaymentIntentID(id uuid.UUID) paymentintentOption {
+	return func(m *PaymentIntentMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PaymentIntent
+		)
+		m.oldValue = func(ctx context.Context) (*PaymentIntent, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PaymentIntent.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPaymentIntent sets the old PaymentIntent of the mutation.
+func withPaymentIntent(node *PaymentIntent) paymentintentOption {
+	return func(m *PaymentIntentMutation) {
+		m.oldValue = func(context.Context) (*PaymentIntent, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PaymentIntentMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PaymentIntentMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PaymentIntent entities.
+func (m *PaymentIntentMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PaymentIntentMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PaymentIntentMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PaymentIntent.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *PaymentIntentMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *PaymentIntentMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the PaymentIntent entity.
+// If the PaymentIntent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentIntentMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *PaymentIntentMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *PaymentIntentMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *PaymentIntentMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the PaymentIntent entity.
+// If the PaymentIntent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentIntentMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *PaymentIntentMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetPaymentIntent sets the "payment_intent" field.
+func (m *PaymentIntentMutation) SetPaymentIntent(s string) {
+	m.payment_intent = &s
+}
+
+// PaymentIntent returns the value of the "payment_intent" field in the mutation.
+func (m *PaymentIntentMutation) PaymentIntent() (r string, exists bool) {
+	v := m.payment_intent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPaymentIntent returns the old "payment_intent" field's value of the PaymentIntent entity.
+// If the PaymentIntent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentIntentMutation) OldPaymentIntent(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPaymentIntent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPaymentIntent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPaymentIntent: %w", err)
+	}
+	return oldValue.PaymentIntent, nil
+}
+
+// ResetPaymentIntent resets all changes to the "payment_intent" field.
+func (m *PaymentIntentMutation) ResetPaymentIntent() {
+	m.payment_intent = nil
+}
+
+// AddTransferIDs adds the "transfer" edge to the Transfer entity by ids.
+func (m *PaymentIntentMutation) AddTransferIDs(ids ...uuid.UUID) {
+	if m.transfer == nil {
+		m.transfer = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.transfer[ids[i]] = struct{}{}
+	}
+}
+
+// ClearTransfer clears the "transfer" edge to the Transfer entity.
+func (m *PaymentIntentMutation) ClearTransfer() {
+	m.clearedtransfer = true
+}
+
+// TransferCleared reports if the "transfer" edge to the Transfer entity was cleared.
+func (m *PaymentIntentMutation) TransferCleared() bool {
+	return m.clearedtransfer
+}
+
+// RemoveTransferIDs removes the "transfer" edge to the Transfer entity by IDs.
+func (m *PaymentIntentMutation) RemoveTransferIDs(ids ...uuid.UUID) {
+	if m.removedtransfer == nil {
+		m.removedtransfer = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.transfer, ids[i])
+		m.removedtransfer[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedTransfer returns the removed IDs of the "transfer" edge to the Transfer entity.
+func (m *PaymentIntentMutation) RemovedTransferIDs() (ids []uuid.UUID) {
+	for id := range m.removedtransfer {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// TransferIDs returns the "transfer" edge IDs in the mutation.
+func (m *PaymentIntentMutation) TransferIDs() (ids []uuid.UUID) {
+	for id := range m.transfer {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetTransfer resets all changes to the "transfer" edge.
+func (m *PaymentIntentMutation) ResetTransfer() {
+	m.transfer = nil
+	m.clearedtransfer = false
+	m.removedtransfer = nil
+}
+
+// AddTokenTransactionIDs adds the "token_transaction" edge to the TokenTransaction entity by ids.
+func (m *PaymentIntentMutation) AddTokenTransactionIDs(ids ...uuid.UUID) {
+	if m.token_transaction == nil {
+		m.token_transaction = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.token_transaction[ids[i]] = struct{}{}
+	}
+}
+
+// ClearTokenTransaction clears the "token_transaction" edge to the TokenTransaction entity.
+func (m *PaymentIntentMutation) ClearTokenTransaction() {
+	m.clearedtoken_transaction = true
+}
+
+// TokenTransactionCleared reports if the "token_transaction" edge to the TokenTransaction entity was cleared.
+func (m *PaymentIntentMutation) TokenTransactionCleared() bool {
+	return m.clearedtoken_transaction
+}
+
+// RemoveTokenTransactionIDs removes the "token_transaction" edge to the TokenTransaction entity by IDs.
+func (m *PaymentIntentMutation) RemoveTokenTransactionIDs(ids ...uuid.UUID) {
+	if m.removedtoken_transaction == nil {
+		m.removedtoken_transaction = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.token_transaction, ids[i])
+		m.removedtoken_transaction[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedTokenTransaction returns the removed IDs of the "token_transaction" edge to the TokenTransaction entity.
+func (m *PaymentIntentMutation) RemovedTokenTransactionIDs() (ids []uuid.UUID) {
+	for id := range m.removedtoken_transaction {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// TokenTransactionIDs returns the "token_transaction" edge IDs in the mutation.
+func (m *PaymentIntentMutation) TokenTransactionIDs() (ids []uuid.UUID) {
+	for id := range m.token_transaction {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetTokenTransaction resets all changes to the "token_transaction" edge.
+func (m *PaymentIntentMutation) ResetTokenTransaction() {
+	m.token_transaction = nil
+	m.clearedtoken_transaction = false
+	m.removedtoken_transaction = nil
+}
+
+// Where appends a list predicates to the PaymentIntentMutation builder.
+func (m *PaymentIntentMutation) Where(ps ...predicate.PaymentIntent) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PaymentIntentMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PaymentIntentMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PaymentIntent, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PaymentIntentMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PaymentIntentMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PaymentIntent).
+func (m *PaymentIntentMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PaymentIntentMutation) Fields() []string {
+	fields := make([]string, 0, 3)
+	if m.create_time != nil {
+		fields = append(fields, paymentintent.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, paymentintent.FieldUpdateTime)
+	}
+	if m.payment_intent != nil {
+		fields = append(fields, paymentintent.FieldPaymentIntent)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PaymentIntentMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case paymentintent.FieldCreateTime:
+		return m.CreateTime()
+	case paymentintent.FieldUpdateTime:
+		return m.UpdateTime()
+	case paymentintent.FieldPaymentIntent:
+		return m.PaymentIntent()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PaymentIntentMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case paymentintent.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case paymentintent.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case paymentintent.FieldPaymentIntent:
+		return m.OldPaymentIntent(ctx)
+	}
+	return nil, fmt.Errorf("unknown PaymentIntent field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PaymentIntentMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case paymentintent.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case paymentintent.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case paymentintent.FieldPaymentIntent:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPaymentIntent(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PaymentIntent field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PaymentIntentMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PaymentIntentMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PaymentIntentMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PaymentIntent numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PaymentIntentMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PaymentIntentMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PaymentIntentMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown PaymentIntent nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PaymentIntentMutation) ResetField(name string) error {
+	switch name {
+	case paymentintent.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case paymentintent.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case paymentintent.FieldPaymentIntent:
+		m.ResetPaymentIntent()
+		return nil
+	}
+	return fmt.Errorf("unknown PaymentIntent field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PaymentIntentMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.transfer != nil {
+		edges = append(edges, paymentintent.EdgeTransfer)
+	}
+	if m.token_transaction != nil {
+		edges = append(edges, paymentintent.EdgeTokenTransaction)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PaymentIntentMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case paymentintent.EdgeTransfer:
+		ids := make([]ent.Value, 0, len(m.transfer))
+		for id := range m.transfer {
+			ids = append(ids, id)
+		}
+		return ids
+	case paymentintent.EdgeTokenTransaction:
+		ids := make([]ent.Value, 0, len(m.token_transaction))
+		for id := range m.token_transaction {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PaymentIntentMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.removedtransfer != nil {
+		edges = append(edges, paymentintent.EdgeTransfer)
+	}
+	if m.removedtoken_transaction != nil {
+		edges = append(edges, paymentintent.EdgeTokenTransaction)
+	}
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PaymentIntentMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case paymentintent.EdgeTransfer:
+		ids := make([]ent.Value, 0, len(m.removedtransfer))
+		for id := range m.removedtransfer {
+			ids = append(ids, id)
+		}
+		return ids
+	case paymentintent.EdgeTokenTransaction:
+		ids := make([]ent.Value, 0, len(m.removedtoken_transaction))
+		for id := range m.removedtoken_transaction {
+			ids = append(ids, id)
+		}
+		return ids
+	}
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PaymentIntentMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedtransfer {
+		edges = append(edges, paymentintent.EdgeTransfer)
+	}
+	if m.clearedtoken_transaction {
+		edges = append(edges, paymentintent.EdgeTokenTransaction)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PaymentIntentMutation) EdgeCleared(name string) bool {
+	switch name {
+	case paymentintent.EdgeTransfer:
+		return m.clearedtransfer
+	case paymentintent.EdgeTokenTransaction:
+		return m.clearedtoken_transaction
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PaymentIntentMutation) ClearEdge(name string) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PaymentIntent unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PaymentIntentMutation) ResetEdge(name string) error {
+	switch name {
+	case paymentintent.EdgeTransfer:
+		m.ResetTransfer()
+		return nil
+	case paymentintent.EdgeTokenTransaction:
+		m.ResetTokenTransaction()
+		return nil
+	}
+	return fmt.Errorf("unknown PaymentIntent edge %s", name)
 }
 
 // PreimageRequestMutation represents an operation that mutates the PreimageRequest nodes in the graph.
@@ -12069,6 +12687,8 @@ type TokenTransactionMutation struct {
 	clearedmint                      bool
 	create                           *uuid.UUID
 	clearedcreate                    bool
+	payment_intent                   *uuid.UUID
+	clearedpayment_intent            bool
 	done                             bool
 	oldValue                         func(context.Context) (*TokenTransaction, error)
 	predicates                       []predicate.TokenTransaction
@@ -12704,6 +13324,45 @@ func (m *TokenTransactionMutation) ResetCreate() {
 	m.clearedcreate = false
 }
 
+// SetPaymentIntentID sets the "payment_intent" edge to the PaymentIntent entity by id.
+func (m *TokenTransactionMutation) SetPaymentIntentID(id uuid.UUID) {
+	m.payment_intent = &id
+}
+
+// ClearPaymentIntent clears the "payment_intent" edge to the PaymentIntent entity.
+func (m *TokenTransactionMutation) ClearPaymentIntent() {
+	m.clearedpayment_intent = true
+}
+
+// PaymentIntentCleared reports if the "payment_intent" edge to the PaymentIntent entity was cleared.
+func (m *TokenTransactionMutation) PaymentIntentCleared() bool {
+	return m.clearedpayment_intent
+}
+
+// PaymentIntentID returns the "payment_intent" edge ID in the mutation.
+func (m *TokenTransactionMutation) PaymentIntentID() (id uuid.UUID, exists bool) {
+	if m.payment_intent != nil {
+		return *m.payment_intent, true
+	}
+	return
+}
+
+// PaymentIntentIDs returns the "payment_intent" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PaymentIntentID instead. It exists only for internal usage by the builders.
+func (m *TokenTransactionMutation) PaymentIntentIDs() (ids []uuid.UUID) {
+	if id := m.payment_intent; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPaymentIntent resets all changes to the "payment_intent" edge.
+func (m *TokenTransactionMutation) ResetPaymentIntent() {
+	m.payment_intent = nil
+	m.clearedpayment_intent = false
+}
+
 // Where appends a list predicates to the TokenTransactionMutation builder.
 func (m *TokenTransactionMutation) Where(ps ...predicate.TokenTransaction) {
 	m.predicates = append(m.predicates, ps...)
@@ -12983,7 +13642,7 @@ func (m *TokenTransactionMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *TokenTransactionMutation) AddedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.spent_output != nil {
 		edges = append(edges, tokentransaction.EdgeSpentOutput)
 	}
@@ -12995,6 +13654,9 @@ func (m *TokenTransactionMutation) AddedEdges() []string {
 	}
 	if m.create != nil {
 		edges = append(edges, tokentransaction.EdgeCreate)
+	}
+	if m.payment_intent != nil {
+		edges = append(edges, tokentransaction.EdgePaymentIntent)
 	}
 	return edges
 }
@@ -13023,13 +13685,17 @@ func (m *TokenTransactionMutation) AddedIDs(name string) []ent.Value {
 		if id := m.create; id != nil {
 			return []ent.Value{*id}
 		}
+	case tokentransaction.EdgePaymentIntent:
+		if id := m.payment_intent; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *TokenTransactionMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.removedspent_output != nil {
 		edges = append(edges, tokentransaction.EdgeSpentOutput)
 	}
@@ -13061,7 +13727,7 @@ func (m *TokenTransactionMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *TokenTransactionMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 4)
+	edges := make([]string, 0, 5)
 	if m.clearedspent_output {
 		edges = append(edges, tokentransaction.EdgeSpentOutput)
 	}
@@ -13073,6 +13739,9 @@ func (m *TokenTransactionMutation) ClearedEdges() []string {
 	}
 	if m.clearedcreate {
 		edges = append(edges, tokentransaction.EdgeCreate)
+	}
+	if m.clearedpayment_intent {
+		edges = append(edges, tokentransaction.EdgePaymentIntent)
 	}
 	return edges
 }
@@ -13089,6 +13758,8 @@ func (m *TokenTransactionMutation) EdgeCleared(name string) bool {
 		return m.clearedmint
 	case tokentransaction.EdgeCreate:
 		return m.clearedcreate
+	case tokentransaction.EdgePaymentIntent:
+		return m.clearedpayment_intent
 	}
 	return false
 }
@@ -13102,6 +13773,9 @@ func (m *TokenTransactionMutation) ClearEdge(name string) error {
 		return nil
 	case tokentransaction.EdgeCreate:
 		m.ClearCreate()
+		return nil
+	case tokentransaction.EdgePaymentIntent:
+		m.ClearPaymentIntent()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenTransaction unique edge %s", name)
@@ -13122,6 +13796,9 @@ func (m *TokenTransactionMutation) ResetEdge(name string) error {
 		return nil
 	case tokentransaction.EdgeCreate:
 		m.ResetCreate()
+		return nil
+	case tokentransaction.EdgePaymentIntent:
+		m.ResetPaymentIntent()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenTransaction edge %s", name)
@@ -14025,6 +14702,8 @@ type TransferMutation struct {
 	transfer_leaves          map[uuid.UUID]struct{}
 	removedtransfer_leaves   map[uuid.UUID]struct{}
 	clearedtransfer_leaves   bool
+	payment_intent           *uuid.UUID
+	clearedpayment_intent    bool
 	done                     bool
 	oldValue                 func(context.Context) (*Transfer, error)
 	predicates               []predicate.Transfer
@@ -14545,6 +15224,45 @@ func (m *TransferMutation) ResetTransferLeaves() {
 	m.removedtransfer_leaves = nil
 }
 
+// SetPaymentIntentID sets the "payment_intent" edge to the PaymentIntent entity by id.
+func (m *TransferMutation) SetPaymentIntentID(id uuid.UUID) {
+	m.payment_intent = &id
+}
+
+// ClearPaymentIntent clears the "payment_intent" edge to the PaymentIntent entity.
+func (m *TransferMutation) ClearPaymentIntent() {
+	m.clearedpayment_intent = true
+}
+
+// PaymentIntentCleared reports if the "payment_intent" edge to the PaymentIntent entity was cleared.
+func (m *TransferMutation) PaymentIntentCleared() bool {
+	return m.clearedpayment_intent
+}
+
+// PaymentIntentID returns the "payment_intent" edge ID in the mutation.
+func (m *TransferMutation) PaymentIntentID() (id uuid.UUID, exists bool) {
+	if m.payment_intent != nil {
+		return *m.payment_intent, true
+	}
+	return
+}
+
+// PaymentIntentIDs returns the "payment_intent" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PaymentIntentID instead. It exists only for internal usage by the builders.
+func (m *TransferMutation) PaymentIntentIDs() (ids []uuid.UUID) {
+	if id := m.payment_intent; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetPaymentIntent resets all changes to the "payment_intent" edge.
+func (m *TransferMutation) ResetPaymentIntent() {
+	m.payment_intent = nil
+	m.clearedpayment_intent = false
+}
+
 // Where appends a list predicates to the TransferMutation builder.
 func (m *TransferMutation) Where(ps ...predicate.Transfer) {
 	m.predicates = append(m.predicates, ps...)
@@ -14838,9 +15556,12 @@ func (m *TransferMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *TransferMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.transfer_leaves != nil {
 		edges = append(edges, transfer.EdgeTransferLeaves)
+	}
+	if m.payment_intent != nil {
+		edges = append(edges, transfer.EdgePaymentIntent)
 	}
 	return edges
 }
@@ -14855,13 +15576,17 @@ func (m *TransferMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case transfer.EdgePaymentIntent:
+		if id := m.payment_intent; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *TransferMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.removedtransfer_leaves != nil {
 		edges = append(edges, transfer.EdgeTransferLeaves)
 	}
@@ -14884,9 +15609,12 @@ func (m *TransferMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *TransferMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.clearedtransfer_leaves {
 		edges = append(edges, transfer.EdgeTransferLeaves)
+	}
+	if m.clearedpayment_intent {
+		edges = append(edges, transfer.EdgePaymentIntent)
 	}
 	return edges
 }
@@ -14897,6 +15625,8 @@ func (m *TransferMutation) EdgeCleared(name string) bool {
 	switch name {
 	case transfer.EdgeTransferLeaves:
 		return m.clearedtransfer_leaves
+	case transfer.EdgePaymentIntent:
+		return m.clearedpayment_intent
 	}
 	return false
 }
@@ -14905,6 +15635,9 @@ func (m *TransferMutation) EdgeCleared(name string) bool {
 // if that edge is not defined in the schema.
 func (m *TransferMutation) ClearEdge(name string) error {
 	switch name {
+	case transfer.EdgePaymentIntent:
+		m.ClearPaymentIntent()
+		return nil
 	}
 	return fmt.Errorf("unknown Transfer unique edge %s", name)
 }
@@ -14915,6 +15648,9 @@ func (m *TransferMutation) ResetEdge(name string) error {
 	switch name {
 	case transfer.EdgeTransferLeaves:
 		m.ResetTransferLeaves()
+		return nil
+	case transfer.EdgePaymentIntent:
+		m.ResetPaymentIntent()
 		return nil
 	}
 	return fmt.Errorf("unknown Transfer edge %s", name)

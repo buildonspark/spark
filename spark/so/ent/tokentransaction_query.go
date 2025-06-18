@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenmint"
@@ -32,6 +33,7 @@ type TokenTransactionQuery struct {
 	withCreatedOutput *TokenOutputQuery
 	withMint          *TokenMintQuery
 	withCreate        *TokenCreateQuery
+	withPaymentIntent *PaymentIntentQuery
 	withFKs           bool
 	modifiers         []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
@@ -151,6 +153,28 @@ func (ttq *TokenTransactionQuery) QueryCreate() *TokenCreateQuery {
 			sqlgraph.From(tokentransaction.Table, tokentransaction.FieldID, selector),
 			sqlgraph.To(tokencreate.Table, tokencreate.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, tokentransaction.CreateTable, tokentransaction.CreateColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(ttq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryPaymentIntent chains the current query on the "payment_intent" edge.
+func (ttq *TokenTransactionQuery) QueryPaymentIntent() *PaymentIntentQuery {
+	query := (&PaymentIntentClient{config: ttq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := ttq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := ttq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokentransaction.Table, tokentransaction.FieldID, selector),
+			sqlgraph.To(paymentintent.Table, paymentintent.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, tokentransaction.PaymentIntentTable, tokentransaction.PaymentIntentColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(ttq.driver.Dialect(), step)
 		return fromU, nil
@@ -354,6 +378,7 @@ func (ttq *TokenTransactionQuery) Clone() *TokenTransactionQuery {
 		withCreatedOutput: ttq.withCreatedOutput.Clone(),
 		withMint:          ttq.withMint.Clone(),
 		withCreate:        ttq.withCreate.Clone(),
+		withPaymentIntent: ttq.withPaymentIntent.Clone(),
 		// clone intermediate query.
 		sql:  ttq.sql.Clone(),
 		path: ttq.path,
@@ -401,6 +426,17 @@ func (ttq *TokenTransactionQuery) WithCreate(opts ...func(*TokenCreateQuery)) *T
 		opt(query)
 	}
 	ttq.withCreate = query
+	return ttq
+}
+
+// WithPaymentIntent tells the query-builder to eager-load the nodes that are connected to
+// the "payment_intent" edge. The optional arguments are used to configure the query builder of the edge.
+func (ttq *TokenTransactionQuery) WithPaymentIntent(opts ...func(*PaymentIntentQuery)) *TokenTransactionQuery {
+	query := (&PaymentIntentClient{config: ttq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	ttq.withPaymentIntent = query
 	return ttq
 }
 
@@ -483,14 +519,15 @@ func (ttq *TokenTransactionQuery) sqlAll(ctx context.Context, hooks ...queryHook
 		nodes       = []*TokenTransaction{}
 		withFKs     = ttq.withFKs
 		_spec       = ttq.querySpec()
-		loadedTypes = [4]bool{
+		loadedTypes = [5]bool{
 			ttq.withSpentOutput != nil,
 			ttq.withCreatedOutput != nil,
 			ttq.withMint != nil,
 			ttq.withCreate != nil,
+			ttq.withPaymentIntent != nil,
 		}
 	)
-	if ttq.withMint != nil || ttq.withCreate != nil {
+	if ttq.withMint != nil || ttq.withCreate != nil || ttq.withPaymentIntent != nil {
 		withFKs = true
 	}
 	if withFKs {
@@ -540,6 +577,12 @@ func (ttq *TokenTransactionQuery) sqlAll(ctx context.Context, hooks ...queryHook
 	if query := ttq.withCreate; query != nil {
 		if err := ttq.loadCreate(ctx, query, nodes, nil,
 			func(n *TokenTransaction, e *TokenCreate) { n.Edges.Create = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := ttq.withPaymentIntent; query != nil {
+		if err := ttq.loadPaymentIntent(ctx, query, nodes, nil,
+			func(n *TokenTransaction, e *PaymentIntent) { n.Edges.PaymentIntent = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -665,6 +708,38 @@ func (ttq *TokenTransactionQuery) loadCreate(ctx context.Context, query *TokenCr
 		nodes, ok := nodeids[n.ID]
 		if !ok {
 			return fmt.Errorf(`unexpected foreign-key "token_transaction_create" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (ttq *TokenTransactionQuery) loadPaymentIntent(ctx context.Context, query *PaymentIntentQuery, nodes []*TokenTransaction, init func(*TokenTransaction), assign func(*TokenTransaction, *PaymentIntent)) error {
+	ids := make([]uuid.UUID, 0, len(nodes))
+	nodeids := make(map[uuid.UUID][]*TokenTransaction)
+	for i := range nodes {
+		if nodes[i].token_transaction_payment_intent == nil {
+			continue
+		}
+		fk := *nodes[i].token_transaction_payment_intent
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(paymentintent.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "token_transaction_payment_intent" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)

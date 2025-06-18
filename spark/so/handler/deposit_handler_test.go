@@ -2,10 +2,13 @@ package handler
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/enttest"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	testutil "github.com/lightsparkdev/spark/test_util"
 	_ "github.com/mattn/go-sqlite3"
@@ -42,6 +45,15 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 	testutil.OnErrFatal(t, err)
 
 	t.Run("successful verification", func(t *testing.T) {
+		config := &so.Config{
+			BitcoindConfigs: map[string]so.BitcoindConfig{
+				"regtest": {
+					DepositConfirmationThreshold: 1,
+				},
+			},
+		}
+		require.Equal(t, strings.ToLower(string(schematype.NetworkRegtest)), "regtest")
+
 		// Create signing keyshare first
 		signingKeyshare, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
@@ -63,7 +75,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create UTXO with sufficient confirmations
-		utxoBlockHeight := blockHeight - int(DepositConfirmationThresholdRegtest) + 1
+		utxoBlockHeight := blockHeight - int(config.BitcoindConfigs["regtest"].DepositConfirmationThreshold) + 1
 		utxo, err := tx.Utxo.Create().
 			SetNetwork(st.NetworkRegtest).
 			SetTxid(txid).
@@ -76,18 +88,26 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test verification
-		verifiedUtxo, err := VerifiedTargetUtxo(ctx, tx, st.NetworkRegtest, txid, vout)
+		verifiedUtxo, err := VerifiedTargetUtxo(ctx, config, tx, st.NetworkRegtest, txid, vout)
 		require.NoError(t, err)
 		assert.Equal(t, utxo.ID, verifiedUtxo.ID)
 		assert.Equal(t, utxo.BlockHeight, verifiedUtxo.BlockHeight)
 
 		// Test verification in mainnet (should fail)
-		_, err = VerifiedTargetUtxo(ctx, tx, st.NetworkMainnet, txid, vout)
+		_, err = VerifiedTargetUtxo(ctx, config, tx, st.NetworkMainnet, txid, vout)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "utxo not found")
 	})
 
 	t.Run("insufficient confirmations", func(t *testing.T) {
+		config := &so.Config{
+			BitcoindConfigs: map[string]so.BitcoindConfig{
+				"regtest": {
+					DepositConfirmationThreshold: 1,
+				},
+			},
+		}
+
 		// Create signing keyshare first
 		signingKeyshare, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
@@ -109,7 +129,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create UTXO with insufficient confirmations
-		utxoBlockHeight := blockHeight - int(DepositConfirmationThresholdRegtest) + 2
+		utxoBlockHeight := blockHeight - int(config.BitcoindConfigs["regtest"].DepositConfirmationThreshold) + 2
 		_, err = tx.Utxo.Create().
 			SetNetwork(st.NetworkRegtest).
 			SetTxid([]byte("test_txid2")).
@@ -122,7 +142,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test verification
-		_, err = VerifiedTargetUtxo(ctx, tx, st.NetworkRegtest, []byte("test_txid2"), 1)
+		_, err = VerifiedTargetUtxo(ctx, config, tx, st.NetworkRegtest, []byte("test_txid2"), 1)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "deposit tx doesn't have enough confirmations")
 	})

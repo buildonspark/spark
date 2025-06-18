@@ -121,6 +121,19 @@ var (
 			},
 		},
 	}
+	// PaymentIntentsColumns holds the columns for the "payment_intents" table.
+	PaymentIntentsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "payment_intent", Type: field.TypeString},
+	}
+	// PaymentIntentsTable holds the schema information for the "payment_intents" table.
+	PaymentIntentsTable = &schema.Table{
+		Name:       "payment_intents",
+		Columns:    PaymentIntentsColumns,
+		PrimaryKey: []*schema.Column{PaymentIntentsColumns[0]},
+	}
 	// PreimageRequestsColumns holds the columns for the "preimage_requests" table.
 	PreimageRequestsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -451,6 +464,7 @@ var (
 		{Name: "coordinator_public_key", Type: field.TypeBytes, Nullable: true},
 		{Name: "token_transaction_mint", Type: field.TypeUUID, Nullable: true},
 		{Name: "token_transaction_create", Type: field.TypeUUID, Nullable: true},
+		{Name: "token_transaction_payment_intent", Type: field.TypeUUID, Nullable: true},
 	}
 	// TokenTransactionsTable holds the schema information for the "token_transactions" table.
 	TokenTransactionsTable = &schema.Table{
@@ -468,6 +482,12 @@ var (
 				Symbol:     "token_transactions_token_creates_create",
 				Columns:    []*schema.Column{TokenTransactionsColumns[10]},
 				RefColumns: []*schema.Column{TokenCreatesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "token_transactions_payment_intents_payment_intent",
+				Columns:    []*schema.Column{TokenTransactionsColumns[11]},
+				RefColumns: []*schema.Column{PaymentIntentsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 		},
@@ -528,12 +548,21 @@ var (
 		{Name: "type", Type: field.TypeEnum, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP", "UTXO_SWAP"}},
 		{Name: "expiry_time", Type: field.TypeTime},
 		{Name: "completion_time", Type: field.TypeTime, Nullable: true},
+		{Name: "transfer_payment_intent", Type: field.TypeUUID, Nullable: true},
 	}
 	// TransfersTable holds the schema information for the "transfers" table.
 	TransfersTable = &schema.Table{
 		Name:       "transfers",
 		Columns:    TransfersColumns,
 		PrimaryKey: []*schema.Column{TransfersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "transfers_payment_intents_payment_intent",
+				Columns:    []*schema.Column{TransfersColumns[10]},
+				RefColumns: []*schema.Column{PaymentIntentsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "transfer_sender_identity_pubkey",
@@ -863,6 +892,7 @@ var (
 		CooperativeExitsTable,
 		DepositAddressesTable,
 		GossipsTable,
+		PaymentIntentsTable,
 		PreimageRequestsTable,
 		PreimageSharesTable,
 		SigningKeysharesTable,
@@ -897,7 +927,9 @@ func init() {
 	TokenOutputsTable.ForeignKeys[2].RefTable = TokenTransactionsTable
 	TokenTransactionsTable.ForeignKeys[0].RefTable = TokenMintsTable
 	TokenTransactionsTable.ForeignKeys[1].RefTable = TokenCreatesTable
+	TokenTransactionsTable.ForeignKeys[2].RefTable = PaymentIntentsTable
 	TokenTransactionReceiptsTable.ForeignKeys[0].RefTable = TokenMintsTable
+	TransfersTable.ForeignKeys[0].RefTable = PaymentIntentsTable
 	TransferLeafsTable.ForeignKeys[0].RefTable = TransfersTable
 	TransferLeafsTable.ForeignKeys[1].RefTable = TreeNodesTable
 	TreesTable.ForeignKeys[0].RefTable = TreeNodesTable

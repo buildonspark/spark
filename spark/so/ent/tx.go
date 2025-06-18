@@ -20,6 +20,8 @@ type Tx struct {
 	DepositAddress *DepositAddressClient
 	// Gossip is the client for interacting with the Gossip builders.
 	Gossip *GossipClient
+	// PaymentIntent is the client for interacting with the PaymentIntent builders.
+	PaymentIntent *PaymentIntentClient
 	// PreimageRequest is the client for interacting with the PreimageRequest builders.
 	PreimageRequest *PreimageRequestClient
 	// PreimageShare is the client for interacting with the PreimageShare builders.
@@ -191,6 +193,7 @@ func (tx *Tx) init() {
 	tx.CooperativeExit = NewCooperativeExitClient(tx.config)
 	tx.DepositAddress = NewDepositAddressClient(tx.config)
 	tx.Gossip = NewGossipClient(tx.config)
+	tx.PaymentIntent = NewPaymentIntentClient(tx.config)
 	tx.PreimageRequest = NewPreimageRequestClient(tx.config)
 	tx.PreimageShare = NewPreimageShareClient(tx.config)
 	tx.SigningKeyshare = NewSigningKeyshareClient(tx.config)

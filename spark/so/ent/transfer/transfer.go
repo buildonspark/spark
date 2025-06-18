@@ -37,6 +37,8 @@ const (
 	FieldCompletionTime = "completion_time"
 	// EdgeTransferLeaves holds the string denoting the transfer_leaves edge name in mutations.
 	EdgeTransferLeaves = "transfer_leaves"
+	// EdgePaymentIntent holds the string denoting the payment_intent edge name in mutations.
+	EdgePaymentIntent = "payment_intent"
 	// Table holds the table name of the transfer in the database.
 	Table = "transfers"
 	// TransferLeavesTable is the table that holds the transfer_leaves relation/edge.
@@ -46,6 +48,13 @@ const (
 	TransferLeavesInverseTable = "transfer_leafs"
 	// TransferLeavesColumn is the table column denoting the transfer_leaves relation/edge.
 	TransferLeavesColumn = "transfer_leaf_transfer"
+	// PaymentIntentTable is the table that holds the payment_intent relation/edge.
+	PaymentIntentTable = "transfers"
+	// PaymentIntentInverseTable is the table name for the PaymentIntent entity.
+	// It exists in this package in order to avoid circular dependency with the "paymentintent" package.
+	PaymentIntentInverseTable = "payment_intents"
+	// PaymentIntentColumn is the table column denoting the payment_intent relation/edge.
+	PaymentIntentColumn = "transfer_payment_intent"
 )
 
 // Columns holds all SQL columns for transfer fields.
@@ -62,10 +71,21 @@ var Columns = []string{
 	FieldCompletionTime,
 }
 
+// ForeignKeys holds the SQL foreign-keys that are owned by the "transfers"
+// table and are not defined as standalone fields in the schema.
+var ForeignKeys = []string{
+	"transfer_payment_intent",
+}
+
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
 	for i := range Columns {
 		if column == Columns[i] {
+			return true
+		}
+	}
+	for i := range ForeignKeys {
+		if column == ForeignKeys[i] {
 			return true
 		}
 	}
@@ -163,10 +183,24 @@ func ByTransferLeaves(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newTransferLeavesStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByPaymentIntentField orders the results by payment_intent field.
+func ByPaymentIntentField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPaymentIntentStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newTransferLeavesStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(TransferLeavesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, true, TransferLeavesTable, TransferLeavesColumn),
+	)
+}
+func newPaymentIntentStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PaymentIntentInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, PaymentIntentTable, PaymentIntentColumn),
 	)
 }

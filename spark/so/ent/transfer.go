@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 )
@@ -39,17 +40,20 @@ type Transfer struct {
 	CompletionTime *time.Time `json:"completion_time,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TransferQuery when eager-loading is set.
-	Edges        TransferEdges `json:"edges"`
-	selectValues sql.SelectValues
+	Edges                   TransferEdges `json:"edges"`
+	transfer_payment_intent *uuid.UUID
+	selectValues            sql.SelectValues
 }
 
 // TransferEdges holds the relations/edges for other nodes in the graph.
 type TransferEdges struct {
 	// TransferLeaves holds the value of the transfer_leaves edge.
 	TransferLeaves []*TransferLeaf `json:"transfer_leaves,omitempty"`
+	// PaymentIntent holds the value of the payment_intent edge.
+	PaymentIntent *PaymentIntent `json:"payment_intent,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [2]bool
 }
 
 // TransferLeavesOrErr returns the TransferLeaves value or an error if the edge
@@ -59,6 +63,17 @@ func (e TransferEdges) TransferLeavesOrErr() ([]*TransferLeaf, error) {
 		return e.TransferLeaves, nil
 	}
 	return nil, &NotLoadedError{edge: "transfer_leaves"}
+}
+
+// PaymentIntentOrErr returns the PaymentIntent value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e TransferEdges) PaymentIntentOrErr() (*PaymentIntent, error) {
+	if e.PaymentIntent != nil {
+		return e.PaymentIntent, nil
+	} else if e.loadedTypes[1] {
+		return nil, &NotFoundError{label: paymentintent.Label}
+	}
+	return nil, &NotLoadedError{edge: "payment_intent"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -76,6 +91,8 @@ func (*Transfer) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullTime)
 		case transfer.FieldID:
 			values[i] = new(uuid.UUID)
+		case transfer.ForeignKeys[0]: // transfer_payment_intent
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
 		}
@@ -152,6 +169,13 @@ func (t *Transfer) assignValues(columns []string, values []any) error {
 				t.CompletionTime = new(time.Time)
 				*t.CompletionTime = value.Time
 			}
+		case transfer.ForeignKeys[0]:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field transfer_payment_intent", values[i])
+			} else if value.Valid {
+				t.transfer_payment_intent = new(uuid.UUID)
+				*t.transfer_payment_intent = *value.S.(*uuid.UUID)
+			}
 		default:
 			t.selectValues.Set(columns[i], values[i])
 		}
@@ -168,6 +192,11 @@ func (t *Transfer) Value(name string) (ent.Value, error) {
 // QueryTransferLeaves queries the "transfer_leaves" edge of the Transfer entity.
 func (t *Transfer) QueryTransferLeaves() *TransferLeafQuery {
 	return NewTransferClient(t.config).QueryTransferLeaves(t)
+}
+
+// QueryPaymentIntent queries the "payment_intent" edge of the Transfer entity.
+func (t *Transfer) QueryPaymentIntent() *PaymentIntentQuery {
+	return NewTransferClient(t.config).QueryPaymentIntent(t)
 }
 
 // Update returns a builder for updating this Transfer.

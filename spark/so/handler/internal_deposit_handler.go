@@ -302,7 +302,7 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 		return nil, err
 	}
 
-	targetUtxo, err := VerifiedTargetUtxo(ctx, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 	if err != nil {
 		return nil, err
 	}
@@ -644,7 +644,7 @@ func GetTransferFromUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) (*ent.
 	return transfer, false, nil
 }
 
-func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, _ *so.Config, req *pbinternal.RollbackUtxoSwapRequest) (*pbinternal.RollbackUtxoSwapResponse, error) {
+func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *so.Config, req *pbinternal.RollbackUtxoSwapRequest) (*pbinternal.RollbackUtxoSwapResponse, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 	db := ent.GetDbFromContext(ctx)
 
@@ -668,7 +668,7 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, _ *so.Con
 	if err != nil {
 		return nil, fmt.Errorf("unable to get schema network: %w", err)
 	}
-	targetUtxo, err := VerifiedTargetUtxo(ctx, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 	if err != nil {
 		return nil, err
 	}
@@ -760,7 +760,7 @@ func CreateUtxoSwapStatement(
 	return hash[:], nil
 }
 
-func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, _ *so.Config, req *pbinternal.UtxoSwapCompletedRequest) (*pbinternal.UtxoSwapCompletedResponse, error) {
+func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *so.Config, req *pbinternal.UtxoSwapCompletedRequest) (*pbinternal.UtxoSwapCompletedResponse, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 	db := ent.GetDbFromContext(ctx)
 
@@ -787,7 +787,7 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, _ *so.Co
 	if err != nil {
 		return nil, fmt.Errorf("unable to get schema network: %w", err)
 	}
-	targetUtxo, err := VerifiedTargetUtxo(ctx, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 	if err != nil {
 		return nil, err
 	}

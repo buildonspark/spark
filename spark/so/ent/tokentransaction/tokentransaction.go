@@ -41,6 +41,8 @@ const (
 	EdgeMint = "mint"
 	// EdgeCreate holds the string denoting the create edge name in mutations.
 	EdgeCreate = "create"
+	// EdgePaymentIntent holds the string denoting the payment_intent edge name in mutations.
+	EdgePaymentIntent = "payment_intent"
 	// Table holds the table name of the tokentransaction in the database.
 	Table = "token_transactions"
 	// SpentOutputTable is the table that holds the spent_output relation/edge.
@@ -71,6 +73,13 @@ const (
 	CreateInverseTable = "token_creates"
 	// CreateColumn is the table column denoting the create relation/edge.
 	CreateColumn = "token_transaction_create"
+	// PaymentIntentTable is the table that holds the payment_intent relation/edge.
+	PaymentIntentTable = "token_transactions"
+	// PaymentIntentInverseTable is the table name for the PaymentIntent entity.
+	// It exists in this package in order to avoid circular dependency with the "paymentintent" package.
+	PaymentIntentInverseTable = "payment_intents"
+	// PaymentIntentColumn is the table column denoting the payment_intent relation/edge.
+	PaymentIntentColumn = "token_transaction_payment_intent"
 )
 
 // Columns holds all SQL columns for tokentransaction fields.
@@ -91,6 +100,7 @@ var Columns = []string{
 var ForeignKeys = []string{
 	"token_transaction_mint",
 	"token_transaction_create",
+	"token_transaction_payment_intent",
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -202,6 +212,13 @@ func ByCreateField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newCreateStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByPaymentIntentField orders the results by payment_intent field.
+func ByPaymentIntentField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPaymentIntentStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newSpentOutputStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -228,5 +245,12 @@ func newCreateStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(CreateInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, false, CreateTable, CreateColumn),
+	)
+}
+func newPaymentIntentStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PaymentIntentInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, PaymentIntentTable, PaymentIntentColumn),
 	)
 }

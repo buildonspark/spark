@@ -110,11 +110,12 @@ type OperatorConfig struct {
 
 // BitcoindConfig is the configuration for a bitcoind node.
 type BitcoindConfig struct {
-	Network        string `yaml:"network"`
-	Host           string `yaml:"host"`
-	User           string `yaml:"rpcuser"`
-	Password       string `yaml:"rpcpassword"`
-	ZmqPubRawBlock string `yaml:"zmqpubrawblock"`
+	Network                      string `yaml:"network"`
+	Host                         string `yaml:"host"`
+	User                         string `yaml:"rpcuser"`
+	Password                     string `yaml:"rpcpassword"`
+	ZmqPubRawBlock               string `yaml:"zmqpubrawblock"`
+	DepositConfirmationThreshold uint   `yaml:"deposit_confirmation_threshold"`
 }
 
 type Lrc20Config struct {

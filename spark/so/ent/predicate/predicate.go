@@ -18,6 +18,9 @@ type DepositAddress func(*sql.Selector)
 // Gossip is the predicate function for gossip builders.
 type Gossip func(*sql.Selector)
 
+// PaymentIntent is the predicate function for paymentintent builders.
+type PaymentIntent func(*sql.Selector)
+
 // PreimageRequest is the predicate function for preimagerequest builders.
 type PreimageRequest func(*sql.Selector)
 

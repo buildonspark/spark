@@ -42,6 +42,7 @@ func (TokenTransaction) Edges() []ent.Edge {
 			Unique(),
 		edge.To("create", TokenCreate.Type).
 			Unique(),
+		edge.To("payment_intent", PaymentIntent.Type).Unique(),
 	}
 }
 

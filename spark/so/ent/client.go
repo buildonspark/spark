@@ -20,6 +20,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
+	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
@@ -53,6 +54,8 @@ type Client struct {
 	DepositAddress *DepositAddressClient
 	// Gossip is the client for interacting with the Gossip builders.
 	Gossip *GossipClient
+	// PaymentIntent is the client for interacting with the PaymentIntent builders.
+	PaymentIntent *PaymentIntentClient
 	// PreimageRequest is the client for interacting with the PreimageRequest builders.
 	PreimageRequest *PreimageRequestClient
 	// PreimageShare is the client for interacting with the PreimageShare builders.
@@ -104,6 +107,7 @@ func (c *Client) init() {
 	c.CooperativeExit = NewCooperativeExitClient(c.config)
 	c.DepositAddress = NewDepositAddressClient(c.config)
 	c.Gossip = NewGossipClient(c.config)
+	c.PaymentIntent = NewPaymentIntentClient(c.config)
 	c.PreimageRequest = NewPreimageRequestClient(c.config)
 	c.PreimageShare = NewPreimageShareClient(c.config)
 	c.SigningKeyshare = NewSigningKeyshareClient(c.config)
@@ -218,6 +222,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		CooperativeExit:         NewCooperativeExitClient(cfg),
 		DepositAddress:          NewDepositAddressClient(cfg),
 		Gossip:                  NewGossipClient(cfg),
+		PaymentIntent:           NewPaymentIntentClient(cfg),
 		PreimageRequest:         NewPreimageRequestClient(cfg),
 		PreimageShare:           NewPreimageShareClient(cfg),
 		SigningKeyshare:         NewSigningKeyshareClient(cfg),
@@ -259,6 +264,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		CooperativeExit:         NewCooperativeExitClient(cfg),
 		DepositAddress:          NewDepositAddressClient(cfg),
 		Gossip:                  NewGossipClient(cfg),
+		PaymentIntent:           NewPaymentIntentClient(cfg),
 		PreimageRequest:         NewPreimageRequestClient(cfg),
 		PreimageShare:           NewPreimageShareClient(cfg),
 		SigningKeyshare:         NewSigningKeyshareClient(cfg),
@@ -306,11 +312,11 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.Gossip, c.PreimageRequest,
-		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.TokenCreate,
-		c.TokenFreeze, c.TokenLeaf, c.TokenMint, c.TokenOutput, c.TokenTransaction,
-		c.TokenTransactionReceipt, c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode,
-		c.UserSignedTransaction, c.Utxo, c.UtxoSwap,
+		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.Gossip, c.PaymentIntent,
+		c.PreimageRequest, c.PreimageShare, c.SigningKeyshare, c.SigningNonce,
+		c.TokenCreate, c.TokenFreeze, c.TokenLeaf, c.TokenMint, c.TokenOutput,
+		c.TokenTransaction, c.TokenTransactionReceipt, c.Transfer, c.TransferLeaf,
+		c.Tree, c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap,
 	} {
 		n.Use(hooks...)
 	}
@@ -320,11 +326,11 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.Gossip, c.PreimageRequest,
-		c.PreimageShare, c.SigningKeyshare, c.SigningNonce, c.TokenCreate,
-		c.TokenFreeze, c.TokenLeaf, c.TokenMint, c.TokenOutput, c.TokenTransaction,
-		c.TokenTransactionReceipt, c.Transfer, c.TransferLeaf, c.Tree, c.TreeNode,
-		c.UserSignedTransaction, c.Utxo, c.UtxoSwap,
+		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.Gossip, c.PaymentIntent,
+		c.PreimageRequest, c.PreimageShare, c.SigningKeyshare, c.SigningNonce,
+		c.TokenCreate, c.TokenFreeze, c.TokenLeaf, c.TokenMint, c.TokenOutput,
+		c.TokenTransaction, c.TokenTransactionReceipt, c.Transfer, c.TransferLeaf,
+		c.Tree, c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -341,6 +347,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.DepositAddress.mutate(ctx, m)
 	case *GossipMutation:
 		return c.Gossip.mutate(ctx, m)
+	case *PaymentIntentMutation:
+		return c.PaymentIntent.mutate(ctx, m)
 	case *PreimageRequestMutation:
 		return c.PreimageRequest.mutate(ctx, m)
 	case *PreimageShareMutation:
@@ -975,6 +983,171 @@ func (c *GossipClient) mutate(ctx context.Context, m *GossipMutation) (Value, er
 		return (&GossipDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Gossip mutation op: %q", m.Op())
+	}
+}
+
+// PaymentIntentClient is a client for the PaymentIntent schema.
+type PaymentIntentClient struct {
+	config
+}
+
+// NewPaymentIntentClient returns a client for the PaymentIntent from the given config.
+func NewPaymentIntentClient(c config) *PaymentIntentClient {
+	return &PaymentIntentClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `paymentintent.Hooks(f(g(h())))`.
+func (c *PaymentIntentClient) Use(hooks ...Hook) {
+	c.hooks.PaymentIntent = append(c.hooks.PaymentIntent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `paymentintent.Intercept(f(g(h())))`.
+func (c *PaymentIntentClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PaymentIntent = append(c.inters.PaymentIntent, interceptors...)
+}
+
+// Create returns a builder for creating a PaymentIntent entity.
+func (c *PaymentIntentClient) Create() *PaymentIntentCreate {
+	mutation := newPaymentIntentMutation(c.config, OpCreate)
+	return &PaymentIntentCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PaymentIntent entities.
+func (c *PaymentIntentClient) CreateBulk(builders ...*PaymentIntentCreate) *PaymentIntentCreateBulk {
+	return &PaymentIntentCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PaymentIntentClient) MapCreateBulk(slice any, setFunc func(*PaymentIntentCreate, int)) *PaymentIntentCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PaymentIntentCreateBulk{err: fmt.Errorf("calling to PaymentIntentClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PaymentIntentCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PaymentIntentCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PaymentIntent.
+func (c *PaymentIntentClient) Update() *PaymentIntentUpdate {
+	mutation := newPaymentIntentMutation(c.config, OpUpdate)
+	return &PaymentIntentUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PaymentIntentClient) UpdateOne(pi *PaymentIntent) *PaymentIntentUpdateOne {
+	mutation := newPaymentIntentMutation(c.config, OpUpdateOne, withPaymentIntent(pi))
+	return &PaymentIntentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PaymentIntentClient) UpdateOneID(id uuid.UUID) *PaymentIntentUpdateOne {
+	mutation := newPaymentIntentMutation(c.config, OpUpdateOne, withPaymentIntentID(id))
+	return &PaymentIntentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PaymentIntent.
+func (c *PaymentIntentClient) Delete() *PaymentIntentDelete {
+	mutation := newPaymentIntentMutation(c.config, OpDelete)
+	return &PaymentIntentDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PaymentIntentClient) DeleteOne(pi *PaymentIntent) *PaymentIntentDeleteOne {
+	return c.DeleteOneID(pi.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PaymentIntentClient) DeleteOneID(id uuid.UUID) *PaymentIntentDeleteOne {
+	builder := c.Delete().Where(paymentintent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PaymentIntentDeleteOne{builder}
+}
+
+// Query returns a query builder for PaymentIntent.
+func (c *PaymentIntentClient) Query() *PaymentIntentQuery {
+	return &PaymentIntentQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePaymentIntent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PaymentIntent entity by its id.
+func (c *PaymentIntentClient) Get(ctx context.Context, id uuid.UUID) (*PaymentIntent, error) {
+	return c.Query().Where(paymentintent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PaymentIntentClient) GetX(ctx context.Context, id uuid.UUID) *PaymentIntent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryTransfer queries the transfer edge of a PaymentIntent.
+func (c *PaymentIntentClient) QueryTransfer(pi *PaymentIntent) *TransferQuery {
+	query := (&TransferClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := pi.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(paymentintent.Table, paymentintent.FieldID, id),
+			sqlgraph.To(transfer.Table, transfer.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, paymentintent.TransferTable, paymentintent.TransferColumn),
+		)
+		fromV = sqlgraph.Neighbors(pi.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryTokenTransaction queries the token_transaction edge of a PaymentIntent.
+func (c *PaymentIntentClient) QueryTokenTransaction(pi *PaymentIntent) *TokenTransactionQuery {
+	query := (&TokenTransactionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := pi.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(paymentintent.Table, paymentintent.FieldID, id),
+			sqlgraph.To(tokentransaction.Table, tokentransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, paymentintent.TokenTransactionTable, paymentintent.TokenTransactionColumn),
+		)
+		fromV = sqlgraph.Neighbors(pi.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *PaymentIntentClient) Hooks() []Hook {
+	return c.hooks.PaymentIntent
+}
+
+// Interceptors returns the client interceptors.
+func (c *PaymentIntentClient) Interceptors() []Interceptor {
+	return c.inters.PaymentIntent
+}
+
+func (c *PaymentIntentClient) mutate(ctx context.Context, m *PaymentIntentMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PaymentIntentCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PaymentIntentUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PaymentIntentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PaymentIntentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PaymentIntent mutation op: %q", m.Op())
 	}
 }
 
@@ -2555,6 +2728,22 @@ func (c *TokenTransactionClient) QueryCreate(tt *TokenTransaction) *TokenCreateQ
 	return query
 }
 
+// QueryPaymentIntent queries the payment_intent edge of a TokenTransaction.
+func (c *TokenTransactionClient) QueryPaymentIntent(tt *TokenTransaction) *PaymentIntentQuery {
+	query := (&PaymentIntentClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := tt.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokentransaction.Table, tokentransaction.FieldID, id),
+			sqlgraph.To(paymentintent.Table, paymentintent.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, tokentransaction.PaymentIntentTable, tokentransaction.PaymentIntentColumn),
+		)
+		fromV = sqlgraph.Neighbors(tt.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *TokenTransactionClient) Hooks() []Hook {
 	return c.hooks.TokenTransaction
@@ -2878,6 +3067,22 @@ func (c *TransferClient) QueryTransferLeaves(t *Transfer) *TransferLeafQuery {
 			sqlgraph.From(transfer.Table, transfer.FieldID, id),
 			sqlgraph.To(transferleaf.Table, transferleaf.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, true, transfer.TransferLeavesTable, transfer.TransferLeavesColumn),
+		)
+		fromV = sqlgraph.Neighbors(t.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPaymentIntent queries the payment_intent edge of a Transfer.
+func (c *TransferClient) QueryPaymentIntent(t *Transfer) *PaymentIntentQuery {
+	query := (&PaymentIntentClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := t.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transfer.Table, transfer.FieldID, id),
+			sqlgraph.To(paymentintent.Table, paymentintent.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, transfer.PaymentIntentTable, transfer.PaymentIntentColumn),
 		)
 		fromV = sqlgraph.Neighbors(t.driver.Dialect(), step)
 		return fromV, nil
@@ -3919,17 +4124,17 @@ func (c *UtxoSwapClient) mutate(ctx context.Context, m *UtxoSwapMutation) (Value
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		BlockHeight, CooperativeExit, DepositAddress, Gossip, PreimageRequest,
-		PreimageShare, SigningKeyshare, SigningNonce, TokenCreate, TokenFreeze,
-		TokenLeaf, TokenMint, TokenOutput, TokenTransaction, TokenTransactionReceipt,
-		Transfer, TransferLeaf, Tree, TreeNode, UserSignedTransaction, Utxo,
-		UtxoSwap []ent.Hook
+		BlockHeight, CooperativeExit, DepositAddress, Gossip, PaymentIntent,
+		PreimageRequest, PreimageShare, SigningKeyshare, SigningNonce, TokenCreate,
+		TokenFreeze, TokenLeaf, TokenMint, TokenOutput, TokenTransaction,
+		TokenTransactionReceipt, Transfer, TransferLeaf, Tree, TreeNode,
+		UserSignedTransaction, Utxo, UtxoSwap []ent.Hook
 	}
 	inters struct {
-		BlockHeight, CooperativeExit, DepositAddress, Gossip, PreimageRequest,
-		PreimageShare, SigningKeyshare, SigningNonce, TokenCreate, TokenFreeze,
-		TokenLeaf, TokenMint, TokenOutput, TokenTransaction, TokenTransactionReceipt,
-		Transfer, TransferLeaf, Tree, TreeNode, UserSignedTransaction, Utxo,
-		UtxoSwap []ent.Interceptor
+		BlockHeight, CooperativeExit, DepositAddress, Gossip, PaymentIntent,
+		PreimageRequest, PreimageShare, SigningKeyshare, SigningNonce, TokenCreate,
+		TokenFreeze, TokenLeaf, TokenMint, TokenOutput, TokenTransaction,
+		TokenTransactionReceipt, Transfer, TransferLeaf, Tree, TreeNode,
+		UserSignedTransaction, Utxo, UtxoSwap []ent.Interceptor
 	}
 )

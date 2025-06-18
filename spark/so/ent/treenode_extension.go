@@ -10,6 +10,7 @@ import (
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // MarshalSparkProto converts a TreeNode to a spark protobuf TreeNode.
@@ -43,6 +44,8 @@ func (tn *TreeNode) MarshalSparkProto(ctx context.Context) (*pbspark.TreeNode, e
 		SigningKeyshare:        signingKeyshare.MarshalProto(),
 		Status:                 string(tn.Status),
 		Network:                networkProto,
+		CreatedTime:            timestamppb.New(tn.CreateTime),
+		UpdatedTime:            timestamppb.New(tn.UpdateTime),
 	}, nil
 }
 

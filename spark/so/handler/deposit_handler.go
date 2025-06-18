@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -27,9 +28,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const DepositConfirmationThresholdRegtest = int64(1)
-
-const DepositConfirmationThresholdMainnet = int64(3)
+const DefaultDepositConfirmationThreshold = uint(3)
 
 // The DepositHandler is responsible for handling deposit related requests.
 type DepositHandler struct {
@@ -663,7 +662,7 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 		return nil, err
 	}
 
-	targetUtxo, err := VerifiedTargetUtxo(ctx, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 	if err != nil {
 		return nil, err
 	}
@@ -837,7 +836,7 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 }
 
 // Verifies that an UTXO is confirmed on the blockchain and has sufficient confirmations.
-func VerifiedTargetUtxo(ctx context.Context, db *ent.Tx, schemaNetwork st.Network, txid []byte, vout uint32) (*ent.Utxo, error) {
+func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Tx, schemaNetwork st.Network, txid []byte, vout uint32) (*ent.Utxo, error) {
 	blockHeight, err := db.BlockHeight.Query().Where(
 		blockheight.NetworkEQ(schemaNetwork),
 	).Only(ctx)
@@ -852,11 +851,12 @@ func VerifiedTargetUtxo(ctx context.Context, db *ent.Tx, schemaNetwork st.Networ
 	if err != nil {
 		return nil, fmt.Errorf("failed to get target utxo: %w", err)
 	}
-	threshold := DepositConfirmationThresholdMainnet
-	if schemaNetwork == st.NetworkRegtest {
-		threshold = DepositConfirmationThresholdRegtest
+
+	threshold := DefaultDepositConfirmationThreshold
+	if bitcoinConfig, ok := config.BitcoindConfigs[strings.ToLower(string(schemaNetwork))]; ok {
+		threshold = bitcoinConfig.DepositConfirmationThreshold
 	}
-	if blockHeight.Height-targetUtxo.BlockHeight+1 < threshold {
+	if blockHeight.Height-targetUtxo.BlockHeight+1 < int64(threshold) {
 		return nil, errors.FailedPreconditionErrorf("deposit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", targetUtxo.BlockHeight, blockHeight.Height)
 	}
 	return targetUtxo, nil
@@ -945,7 +945,7 @@ func GetSpendTxSigningResult(ctx context.Context, config *so.Config, req *pb.Ini
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get schema network: %w", err)
 	}
-	targetUtxo, err := VerifiedTargetUtxo(ctx, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 	if err != nil {
 		return nil, nil, err
 	}

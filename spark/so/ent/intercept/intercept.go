@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
+	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
@@ -195,6 +196,33 @@ func (f TraverseGossip) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.GossipQuery", q)
+}
+
+// The PaymentIntentFunc type is an adapter to allow the use of ordinary function as a Querier.
+type PaymentIntentFunc func(context.Context, *ent.PaymentIntentQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f PaymentIntentFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.PaymentIntentQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.PaymentIntentQuery", q)
+}
+
+// The TraversePaymentIntent type is an adapter to allow the use of ordinary function as Traverser.
+type TraversePaymentIntent func(context.Context, *ent.PaymentIntentQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraversePaymentIntent) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraversePaymentIntent) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.PaymentIntentQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.PaymentIntentQuery", q)
 }
 
 // The PreimageRequestFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -694,6 +722,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.DepositAddressQuery, predicate.DepositAddress, depositaddress.OrderOption]{typ: ent.TypeDepositAddress, tq: q}, nil
 	case *ent.GossipQuery:
 		return &query[*ent.GossipQuery, predicate.Gossip, gossip.OrderOption]{typ: ent.TypeGossip, tq: q}, nil
+	case *ent.PaymentIntentQuery:
+		return &query[*ent.PaymentIntentQuery, predicate.PaymentIntent, paymentintent.OrderOption]{typ: ent.TypePaymentIntent, tq: q}, nil
 	case *ent.PreimageRequestQuery:
 		return &query[*ent.PreimageRequestQuery, predicate.PreimageRequest, preimagerequest.OrderOption]{typ: ent.TypePreimageRequest, tq: q}, nil
 	case *ent.PreimageShareQuery:

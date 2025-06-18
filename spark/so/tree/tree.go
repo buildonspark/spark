@@ -95,31 +95,3 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 	logger.Info("leaf count", slog.Int("num_leaves", len(leaves)), slog.String("public_key", hex.EncodeToString(req.OwnerIdentityPublicKey)))
 	return &pb.GetLeafDenominationCountsResponse{Counts: counts}, nil
 }
-
-// ProposeTreeDenominations is called with the amount of sats we have available, the number of users we expect to need to support, and
-// returns the list of denominations we should use for the tree. The SSP is responsible for taking this and mapping it to a structure.
-func ProposeTreeDenominations(ctx context.Context, req *pb.ProposeTreeDenominationsRequest) (*pb.ProposeTreeDenominationsResponse, error) {
-	logger := logging.GetLoggerFromContext(ctx)
-
-	// Figure out how many leaves of each denomination we are missing.
-	leafDenominationCounts, err := GetLeafDenominationCounts(ctx, &pb.GetLeafDenominationCountsRequest{
-		OwnerIdentityPublicKey: req.SspIdentityPublicKey,
-		Network:                req.Network,
-	})
-	if err != nil {
-		return nil, err
-	}
-	logger.Info("leaf denomination counts", slog.Any("counts", leafDenominationCounts.Counts), slog.String("public_key", hex.EncodeToString(req.SspIdentityPublicKey)))
-
-	minTreeDepth := req.MinTreeDepth
-	if minTreeDepth == 0 {
-		minTreeDepth = 6
-	}
-
-	maxTreeDepth := req.MaxTreeDepth
-	if maxTreeDepth == 0 {
-		maxTreeDepth = 12
-	}
-
-	return solveLeafDenominations(ctx, leafDenominationCounts, DefaultDenominationsCounts, req.MaxAmountSats, minTreeDepth, maxTreeDepth)
-}

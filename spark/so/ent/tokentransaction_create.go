@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenmint"
@@ -185,6 +186,25 @@ func (ttc *TokenTransactionCreate) SetNillableCreateID(id *uuid.UUID) *TokenTran
 // SetCreate sets the "create" edge to the TokenCreate entity.
 func (ttc *TokenTransactionCreate) SetCreate(t *TokenCreate) *TokenTransactionCreate {
 	return ttc.SetCreateID(t.ID)
+}
+
+// SetPaymentIntentID sets the "payment_intent" edge to the PaymentIntent entity by ID.
+func (ttc *TokenTransactionCreate) SetPaymentIntentID(id uuid.UUID) *TokenTransactionCreate {
+	ttc.mutation.SetPaymentIntentID(id)
+	return ttc
+}
+
+// SetNillablePaymentIntentID sets the "payment_intent" edge to the PaymentIntent entity by ID if the given value is not nil.
+func (ttc *TokenTransactionCreate) SetNillablePaymentIntentID(id *uuid.UUID) *TokenTransactionCreate {
+	if id != nil {
+		ttc = ttc.SetPaymentIntentID(*id)
+	}
+	return ttc
+}
+
+// SetPaymentIntent sets the "payment_intent" edge to the PaymentIntent entity.
+func (ttc *TokenTransactionCreate) SetPaymentIntent(p *PaymentIntent) *TokenTransactionCreate {
+	return ttc.SetPaymentIntentID(p.ID)
 }
 
 // Mutation returns the TokenTransactionMutation object of the builder.
@@ -396,6 +416,23 @@ func (ttc *TokenTransactionCreate) createSpec() (*TokenTransaction, *sqlgraph.Cr
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.token_transaction_create = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := ttc.mutation.PaymentIntentIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   tokentransaction.PaymentIntentTable,
+			Columns: []string{tokentransaction.PaymentIntentColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(paymentintent.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.token_transaction_payment_intent = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

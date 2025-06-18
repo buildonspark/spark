@@ -118,178 +118,6 @@ func (x *GetLeafDenominationCountsResponse) GetCounts() map[uint64]uint64 {
 	return nil
 }
 
-type ProposeTreeDenominationsRequest struct {
-	state                protoimpl.MessageState `protogen:"open.v1"`
-	SspIdentityPublicKey []byte                 `protobuf:"bytes,1,opt,name=ssp_identity_public_key,json=sspIdentityPublicKey,proto3" json:"ssp_identity_public_key,omitempty"`
-	MaxAmountSats        uint64                 `protobuf:"varint,2,opt,name=max_amount_sats,json=maxAmountSats,proto3" json:"max_amount_sats,omitempty"`
-	MaxTreeDepth         uint64                 `protobuf:"varint,3,opt,name=max_tree_depth,json=maxTreeDepth,proto3" json:"max_tree_depth,omitempty"`
-	MinTreeDepth         uint64                 `protobuf:"varint,4,opt,name=min_tree_depth,json=minTreeDepth,proto3" json:"min_tree_depth,omitempty"`
-	Network              spark.Network          `protobuf:"varint,5,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
-}
-
-func (x *ProposeTreeDenominationsRequest) Reset() {
-	*x = ProposeTreeDenominationsRequest{}
-	mi := &file_spark_tree_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ProposeTreeDenominationsRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProposeTreeDenominationsRequest) ProtoMessage() {}
-
-func (x *ProposeTreeDenominationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_tree_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProposeTreeDenominationsRequest.ProtoReflect.Descriptor instead.
-func (*ProposeTreeDenominationsRequest) Descriptor() ([]byte, []int) {
-	return file_spark_tree_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *ProposeTreeDenominationsRequest) GetSspIdentityPublicKey() []byte {
-	if x != nil {
-		return x.SspIdentityPublicKey
-	}
-	return nil
-}
-
-func (x *ProposeTreeDenominationsRequest) GetMaxAmountSats() uint64 {
-	if x != nil {
-		return x.MaxAmountSats
-	}
-	return 0
-}
-
-func (x *ProposeTreeDenominationsRequest) GetMaxTreeDepth() uint64 {
-	if x != nil {
-		return x.MaxTreeDepth
-	}
-	return 0
-}
-
-func (x *ProposeTreeDenominationsRequest) GetMinTreeDepth() uint64 {
-	if x != nil {
-		return x.MinTreeDepth
-	}
-	return 0
-}
-
-func (x *ProposeTreeDenominationsRequest) GetNetwork() spark.Network {
-	if x != nil {
-		return x.Network
-	}
-	return spark.Network(0)
-}
-
-type ProposeTree struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	IsSmall       bool                   `protobuf:"varint,1,opt,name=is_small,json=isSmall,proto3" json:"is_small,omitempty"`
-	Leaves        []uint64               `protobuf:"varint,2,rep,packed,name=leaves,proto3" json:"leaves,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ProposeTree) Reset() {
-	*x = ProposeTree{}
-	mi := &file_spark_tree_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ProposeTree) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProposeTree) ProtoMessage() {}
-
-func (x *ProposeTree) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_tree_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProposeTree.ProtoReflect.Descriptor instead.
-func (*ProposeTree) Descriptor() ([]byte, []int) {
-	return file_spark_tree_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *ProposeTree) GetIsSmall() bool {
-	if x != nil {
-		return x.IsSmall
-	}
-	return false
-}
-
-func (x *ProposeTree) GetLeaves() []uint64 {
-	if x != nil {
-		return x.Leaves
-	}
-	return nil
-}
-
-type ProposeTreeDenominationsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Trees         []*ProposeTree         `protobuf:"bytes,1,rep,name=trees,proto3" json:"trees,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ProposeTreeDenominationsResponse) Reset() {
-	*x = ProposeTreeDenominationsResponse{}
-	mi := &file_spark_tree_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ProposeTreeDenominationsResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ProposeTreeDenominationsResponse) ProtoMessage() {}
-
-func (x *ProposeTreeDenominationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_tree_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ProposeTreeDenominationsResponse.ProtoReflect.Descriptor instead.
-func (*ProposeTreeDenominationsResponse) Descriptor() ([]byte, []int) {
-	return file_spark_tree_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *ProposeTreeDenominationsResponse) GetTrees() []*ProposeTree {
-	if x != nil {
-		return x.Trees
-	}
-	return nil
-}
-
 type FetchPolarityScoreRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PublicKeys    [][]byte               `protobuf:"bytes,1,rep,name=public_keys,json=publicKeys,proto3" json:"public_keys,omitempty"`
@@ -299,7 +127,7 @@ type FetchPolarityScoreRequest struct {
 
 func (x *FetchPolarityScoreRequest) Reset() {
 	*x = FetchPolarityScoreRequest{}
-	mi := &file_spark_tree_proto_msgTypes[5]
+	mi := &file_spark_tree_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -311,7 +139,7 @@ func (x *FetchPolarityScoreRequest) String() string {
 func (*FetchPolarityScoreRequest) ProtoMessage() {}
 
 func (x *FetchPolarityScoreRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_tree_proto_msgTypes[5]
+	mi := &file_spark_tree_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -324,7 +152,7 @@ func (x *FetchPolarityScoreRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchPolarityScoreRequest.ProtoReflect.Descriptor instead.
 func (*FetchPolarityScoreRequest) Descriptor() ([]byte, []int) {
-	return file_spark_tree_proto_rawDescGZIP(), []int{5}
+	return file_spark_tree_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *FetchPolarityScoreRequest) GetPublicKeys() [][]byte {
@@ -345,7 +173,7 @@ type PolarityScore struct {
 
 func (x *PolarityScore) Reset() {
 	*x = PolarityScore{}
-	mi := &file_spark_tree_proto_msgTypes[6]
+	mi := &file_spark_tree_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -357,7 +185,7 @@ func (x *PolarityScore) String() string {
 func (*PolarityScore) ProtoMessage() {}
 
 func (x *PolarityScore) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_tree_proto_msgTypes[6]
+	mi := &file_spark_tree_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -370,7 +198,7 @@ func (x *PolarityScore) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PolarityScore.ProtoReflect.Descriptor instead.
 func (*PolarityScore) Descriptor() ([]byte, []int) {
-	return file_spark_tree_proto_rawDescGZIP(), []int{6}
+	return file_spark_tree_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *PolarityScore) GetLeafId() string {
@@ -406,18 +234,7 @@ const file_spark_tree_proto_rawDesc = "" +
 	"\x06counts\x18\x01 \x03(\v24.spark.GetLeafDenominationCountsResponse.CountsEntryR\x06counts\x1a9\n" +
 	"\vCountsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\x04R\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x04R\x05value:\x028\x01\"\xf6\x01\n" +
-	"\x1fProposeTreeDenominationsRequest\x125\n" +
-	"\x17ssp_identity_public_key\x18\x01 \x01(\fR\x14sspIdentityPublicKey\x12&\n" +
-	"\x0fmax_amount_sats\x18\x02 \x01(\x04R\rmaxAmountSats\x12$\n" +
-	"\x0emax_tree_depth\x18\x03 \x01(\x04R\fmaxTreeDepth\x12$\n" +
-	"\x0emin_tree_depth\x18\x04 \x01(\x04R\fminTreeDepth\x12(\n" +
-	"\anetwork\x18\x05 \x01(\x0e2\x0e.spark.NetworkR\anetwork\"@\n" +
-	"\vProposeTree\x12\x19\n" +
-	"\bis_small\x18\x01 \x01(\bR\aisSmall\x12\x16\n" +
-	"\x06leaves\x18\x02 \x03(\x04R\x06leaves\"L\n" +
-	" ProposeTreeDenominationsResponse\x12(\n" +
-	"\x05trees\x18\x01 \x03(\v2\x12.spark.ProposeTreeR\x05trees\"<\n" +
+	"\x05value\x18\x02 \x01(\x04R\x05value:\x028\x01\"<\n" +
 	"\x19FetchPolarityScoreRequest\x12\x1f\n" +
 	"\vpublic_keys\x18\x01 \x03(\fR\n" +
 	"publicKeys\"]\n" +
@@ -425,10 +242,9 @@ const file_spark_tree_proto_rawDesc = "" +
 	"\aleaf_id\x18\x01 \x01(\tR\x06leafId\x12\x1d\n" +
 	"\n" +
 	"public_key\x18\x02 \x01(\fR\tpublicKey\x12\x14\n" +
-	"\x05score\x18\x03 \x01(\x02R\x05score2\xcd\x02\n" +
+	"\x05score\x18\x03 \x01(\x02R\x05score2\xdc\x01\n" +
 	"\x10SparkTreeService\x12s\n" +
-	"\x1cget_leaf_denomination_counts\x12'.spark.GetLeafDenominationCountsRequest\x1a(.spark.GetLeafDenominationCountsResponse\"\x00\x12o\n" +
-	"\x1apropose_tree_denominations\x12&.spark.ProposeTreeDenominationsRequest\x1a'.spark.ProposeTreeDenominationsResponse\"\x00\x12S\n" +
+	"\x1cget_leaf_denomination_counts\x12'.spark.GetLeafDenominationCountsRequest\x1a(.spark.GetLeafDenominationCountsResponse\"\x00\x12S\n" +
 	"\x15fetch_polarity_scores\x12 .spark.FetchPolarityScoreRequest\x1a\x14.spark.PolarityScore\"\x000\x01B1Z/github.com/lightsparkdev/spark/proto/spark_treeb\x06proto3"
 
 var (
@@ -443,34 +259,27 @@ func file_spark_tree_proto_rawDescGZIP() []byte {
 	return file_spark_tree_proto_rawDescData
 }
 
-var file_spark_tree_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_spark_tree_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_spark_tree_proto_goTypes = []any{
 	(*GetLeafDenominationCountsRequest)(nil),  // 0: spark.GetLeafDenominationCountsRequest
 	(*GetLeafDenominationCountsResponse)(nil), // 1: spark.GetLeafDenominationCountsResponse
-	(*ProposeTreeDenominationsRequest)(nil),   // 2: spark.ProposeTreeDenominationsRequest
-	(*ProposeTree)(nil),                       // 3: spark.ProposeTree
-	(*ProposeTreeDenominationsResponse)(nil),  // 4: spark.ProposeTreeDenominationsResponse
-	(*FetchPolarityScoreRequest)(nil),         // 5: spark.FetchPolarityScoreRequest
-	(*PolarityScore)(nil),                     // 6: spark.PolarityScore
-	nil,                                       // 7: spark.GetLeafDenominationCountsResponse.CountsEntry
-	(spark.Network)(0),                        // 8: spark.Network
+	(*FetchPolarityScoreRequest)(nil),         // 2: spark.FetchPolarityScoreRequest
+	(*PolarityScore)(nil),                     // 3: spark.PolarityScore
+	nil,                                       // 4: spark.GetLeafDenominationCountsResponse.CountsEntry
+	(spark.Network)(0),                        // 5: spark.Network
 }
 var file_spark_tree_proto_depIdxs = []int32{
-	8, // 0: spark.GetLeafDenominationCountsRequest.network:type_name -> spark.Network
-	7, // 1: spark.GetLeafDenominationCountsResponse.counts:type_name -> spark.GetLeafDenominationCountsResponse.CountsEntry
-	8, // 2: spark.ProposeTreeDenominationsRequest.network:type_name -> spark.Network
-	3, // 3: spark.ProposeTreeDenominationsResponse.trees:type_name -> spark.ProposeTree
-	0, // 4: spark.SparkTreeService.get_leaf_denomination_counts:input_type -> spark.GetLeafDenominationCountsRequest
-	2, // 5: spark.SparkTreeService.propose_tree_denominations:input_type -> spark.ProposeTreeDenominationsRequest
-	5, // 6: spark.SparkTreeService.fetch_polarity_scores:input_type -> spark.FetchPolarityScoreRequest
-	1, // 7: spark.SparkTreeService.get_leaf_denomination_counts:output_type -> spark.GetLeafDenominationCountsResponse
-	4, // 8: spark.SparkTreeService.propose_tree_denominations:output_type -> spark.ProposeTreeDenominationsResponse
-	6, // 9: spark.SparkTreeService.fetch_polarity_scores:output_type -> spark.PolarityScore
-	7, // [7:10] is the sub-list for method output_type
-	4, // [4:7] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	5, // 0: spark.GetLeafDenominationCountsRequest.network:type_name -> spark.Network
+	4, // 1: spark.GetLeafDenominationCountsResponse.counts:type_name -> spark.GetLeafDenominationCountsResponse.CountsEntry
+	0, // 2: spark.SparkTreeService.get_leaf_denomination_counts:input_type -> spark.GetLeafDenominationCountsRequest
+	2, // 3: spark.SparkTreeService.fetch_polarity_scores:input_type -> spark.FetchPolarityScoreRequest
+	1, // 4: spark.SparkTreeService.get_leaf_denomination_counts:output_type -> spark.GetLeafDenominationCountsResponse
+	3, // 5: spark.SparkTreeService.fetch_polarity_scores:output_type -> spark.PolarityScore
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_spark_tree_proto_init() }
@@ -484,7 +293,7 @@ func file_spark_tree_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_spark_tree_proto_rawDesc), len(file_spark_tree_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

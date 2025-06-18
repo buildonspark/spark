@@ -465,6 +465,29 @@ func HasTransferLeavesWith(preds ...predicate.TransferLeaf) predicate.Transfer {
 	})
 }
 
+// HasPaymentIntent applies the HasEdge predicate on the "payment_intent" edge.
+func HasPaymentIntent() predicate.Transfer {
+	return predicate.Transfer(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, PaymentIntentTable, PaymentIntentColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPaymentIntentWith applies the HasEdge predicate on the "payment_intent" edge with a given conditions (other predicates).
+func HasPaymentIntentWith(preds ...predicate.PaymentIntent) predicate.Transfer {
+	return predicate.Transfer(func(s *sql.Selector) {
+		step := newPaymentIntentStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.Transfer) predicate.Transfer {
 	return predicate.Transfer(sql.AndPredicates(predicates...))

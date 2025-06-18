@@ -20,7 +20,6 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	SparkTreeService_GetLeafDenominationCounts_FullMethodName = "/spark.SparkTreeService/get_leaf_denomination_counts"
-	SparkTreeService_ProposeTreeDenominations_FullMethodName  = "/spark.SparkTreeService/propose_tree_denominations"
 	SparkTreeService_FetchPolarityScores_FullMethodName       = "/spark.SparkTreeService/fetch_polarity_scores"
 )
 
@@ -29,7 +28,6 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SparkTreeServiceClient interface {
 	GetLeafDenominationCounts(ctx context.Context, in *GetLeafDenominationCountsRequest, opts ...grpc.CallOption) (*GetLeafDenominationCountsResponse, error)
-	ProposeTreeDenominations(ctx context.Context, in *ProposeTreeDenominationsRequest, opts ...grpc.CallOption) (*ProposeTreeDenominationsResponse, error)
 	FetchPolarityScores(ctx context.Context, in *FetchPolarityScoreRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[PolarityScore], error)
 }
 
@@ -45,16 +43,6 @@ func (c *sparkTreeServiceClient) GetLeafDenominationCounts(ctx context.Context, 
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetLeafDenominationCountsResponse)
 	err := c.cc.Invoke(ctx, SparkTreeService_GetLeafDenominationCounts_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *sparkTreeServiceClient) ProposeTreeDenominations(ctx context.Context, in *ProposeTreeDenominationsRequest, opts ...grpc.CallOption) (*ProposeTreeDenominationsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ProposeTreeDenominationsResponse)
-	err := c.cc.Invoke(ctx, SparkTreeService_ProposeTreeDenominations_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +73,6 @@ type SparkTreeService_FetchPolarityScoresClient = grpc.ServerStreamingClient[Pol
 // for forward compatibility.
 type SparkTreeServiceServer interface {
 	GetLeafDenominationCounts(context.Context, *GetLeafDenominationCountsRequest) (*GetLeafDenominationCountsResponse, error)
-	ProposeTreeDenominations(context.Context, *ProposeTreeDenominationsRequest) (*ProposeTreeDenominationsResponse, error)
 	FetchPolarityScores(*FetchPolarityScoreRequest, grpc.ServerStreamingServer[PolarityScore]) error
 	mustEmbedUnimplementedSparkTreeServiceServer()
 }
@@ -99,9 +86,6 @@ type UnimplementedSparkTreeServiceServer struct{}
 
 func (UnimplementedSparkTreeServiceServer) GetLeafDenominationCounts(context.Context, *GetLeafDenominationCountsRequest) (*GetLeafDenominationCountsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLeafDenominationCounts not implemented")
-}
-func (UnimplementedSparkTreeServiceServer) ProposeTreeDenominations(context.Context, *ProposeTreeDenominationsRequest) (*ProposeTreeDenominationsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ProposeTreeDenominations not implemented")
 }
 func (UnimplementedSparkTreeServiceServer) FetchPolarityScores(*FetchPolarityScoreRequest, grpc.ServerStreamingServer[PolarityScore]) error {
 	return status.Errorf(codes.Unimplemented, "method FetchPolarityScores not implemented")
@@ -145,24 +129,6 @@ func _SparkTreeService_GetLeafDenominationCounts_Handler(srv interface{}, ctx co
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkTreeService_ProposeTreeDenominations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ProposeTreeDenominationsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkTreeServiceServer).ProposeTreeDenominations(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkTreeService_ProposeTreeDenominations_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkTreeServiceServer).ProposeTreeDenominations(ctx, req.(*ProposeTreeDenominationsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SparkTreeService_FetchPolarityScores_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(FetchPolarityScoreRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -184,10 +150,6 @@ var SparkTreeService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "get_leaf_denomination_counts",
 			Handler:    _SparkTreeService_GetLeafDenominationCounts_Handler,
-		},
-		{
-			MethodName: "propose_tree_denominations",
-			Handler:    _SparkTreeService_ProposeTreeDenominations_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

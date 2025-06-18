@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
@@ -163,6 +164,25 @@ func (ttu *TokenTransactionUpdate) SetCreate(t *TokenCreate) *TokenTransactionUp
 	return ttu.SetCreateID(t.ID)
 }
 
+// SetPaymentIntentID sets the "payment_intent" edge to the PaymentIntent entity by ID.
+func (ttu *TokenTransactionUpdate) SetPaymentIntentID(id uuid.UUID) *TokenTransactionUpdate {
+	ttu.mutation.SetPaymentIntentID(id)
+	return ttu
+}
+
+// SetNillablePaymentIntentID sets the "payment_intent" edge to the PaymentIntent entity by ID if the given value is not nil.
+func (ttu *TokenTransactionUpdate) SetNillablePaymentIntentID(id *uuid.UUID) *TokenTransactionUpdate {
+	if id != nil {
+		ttu = ttu.SetPaymentIntentID(*id)
+	}
+	return ttu
+}
+
+// SetPaymentIntent sets the "payment_intent" edge to the PaymentIntent entity.
+func (ttu *TokenTransactionUpdate) SetPaymentIntent(p *PaymentIntent) *TokenTransactionUpdate {
+	return ttu.SetPaymentIntentID(p.ID)
+}
+
 // Mutation returns the TokenTransactionMutation object of the builder.
 func (ttu *TokenTransactionUpdate) Mutation() *TokenTransactionMutation {
 	return ttu.mutation
@@ -219,6 +239,12 @@ func (ttu *TokenTransactionUpdate) ClearMint() *TokenTransactionUpdate {
 // ClearCreate clears the "create" edge to the TokenCreate entity.
 func (ttu *TokenTransactionUpdate) ClearCreate() *TokenTransactionUpdate {
 	ttu.mutation.ClearCreate()
+	return ttu
+}
+
+// ClearPaymentIntent clears the "payment_intent" edge to the PaymentIntent entity.
+func (ttu *TokenTransactionUpdate) ClearPaymentIntent() *TokenTransactionUpdate {
+	ttu.mutation.ClearPaymentIntent()
 	return ttu
 }
 
@@ -468,6 +494,35 @@ func (ttu *TokenTransactionUpdate) sqlSave(ctx context.Context) (n int, err erro
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if ttu.mutation.PaymentIntentCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   tokentransaction.PaymentIntentTable,
+			Columns: []string{tokentransaction.PaymentIntentColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(paymentintent.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := ttu.mutation.PaymentIntentIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   tokentransaction.PaymentIntentTable,
+			Columns: []string{tokentransaction.PaymentIntentColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(paymentintent.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, ttu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{tokentransaction.Label}
@@ -618,6 +673,25 @@ func (ttuo *TokenTransactionUpdateOne) SetCreate(t *TokenCreate) *TokenTransacti
 	return ttuo.SetCreateID(t.ID)
 }
 
+// SetPaymentIntentID sets the "payment_intent" edge to the PaymentIntent entity by ID.
+func (ttuo *TokenTransactionUpdateOne) SetPaymentIntentID(id uuid.UUID) *TokenTransactionUpdateOne {
+	ttuo.mutation.SetPaymentIntentID(id)
+	return ttuo
+}
+
+// SetNillablePaymentIntentID sets the "payment_intent" edge to the PaymentIntent entity by ID if the given value is not nil.
+func (ttuo *TokenTransactionUpdateOne) SetNillablePaymentIntentID(id *uuid.UUID) *TokenTransactionUpdateOne {
+	if id != nil {
+		ttuo = ttuo.SetPaymentIntentID(*id)
+	}
+	return ttuo
+}
+
+// SetPaymentIntent sets the "payment_intent" edge to the PaymentIntent entity.
+func (ttuo *TokenTransactionUpdateOne) SetPaymentIntent(p *PaymentIntent) *TokenTransactionUpdateOne {
+	return ttuo.SetPaymentIntentID(p.ID)
+}
+
 // Mutation returns the TokenTransactionMutation object of the builder.
 func (ttuo *TokenTransactionUpdateOne) Mutation() *TokenTransactionMutation {
 	return ttuo.mutation
@@ -674,6 +748,12 @@ func (ttuo *TokenTransactionUpdateOne) ClearMint() *TokenTransactionUpdateOne {
 // ClearCreate clears the "create" edge to the TokenCreate entity.
 func (ttuo *TokenTransactionUpdateOne) ClearCreate() *TokenTransactionUpdateOne {
 	ttuo.mutation.ClearCreate()
+	return ttuo
+}
+
+// ClearPaymentIntent clears the "payment_intent" edge to the PaymentIntent entity.
+func (ttuo *TokenTransactionUpdateOne) ClearPaymentIntent() *TokenTransactionUpdateOne {
+	ttuo.mutation.ClearPaymentIntent()
 	return ttuo
 }
 
@@ -946,6 +1026,35 @@ func (ttuo *TokenTransactionUpdateOne) sqlSave(ctx context.Context) (_node *Toke
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokencreate.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if ttuo.mutation.PaymentIntentCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   tokentransaction.PaymentIntentTable,
+			Columns: []string{tokentransaction.PaymentIntentColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(paymentintent.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := ttuo.mutation.PaymentIntentIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   tokentransaction.PaymentIntentTable,
+			Columns: []string{tokentransaction.PaymentIntentColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(paymentintent.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

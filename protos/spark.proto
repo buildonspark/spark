@@ -220,6 +220,10 @@ message SigningKeyshare {
     uint32 threshold = 2;
     // The public key of the keyshare.
     bytes public_key = 3;
+    // The public shares of the keyshare.
+    map<string, bytes> public_shares = 4;
+    // The latest update time of the keyshare.
+    google.protobuf.Timestamp updated_time = 5;
 }
 
 /**
@@ -549,6 +553,10 @@ message TreeNode {
     string status = 11;
     // The network of the node.
     Network network = 12;
+    // The creation time of the node.
+    google.protobuf.Timestamp created_time = 13;
+    // The latest update time of the node.
+    google.protobuf.Timestamp updated_time = 14;
 }
 
 /**
@@ -737,6 +745,7 @@ message TransferFilter {
     int64 offset = 50;
     repeated TransferType types = 70;
     Network network = 4; // defaults to mainnet when no network is provided.
+    repeated TransferStatus statuses = 80;
 }
 
 message QueryTransfersResponse {

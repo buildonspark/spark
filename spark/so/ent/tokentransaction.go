@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenmint"
@@ -39,10 +40,11 @@ type TokenTransaction struct {
 	CoordinatorPublicKey []byte `json:"coordinator_public_key,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenTransactionQuery when eager-loading is set.
-	Edges                    TokenTransactionEdges `json:"edges"`
-	token_transaction_mint   *uuid.UUID
-	token_transaction_create *uuid.UUID
-	selectValues             sql.SelectValues
+	Edges                            TokenTransactionEdges `json:"edges"`
+	token_transaction_mint           *uuid.UUID
+	token_transaction_create         *uuid.UUID
+	token_transaction_payment_intent *uuid.UUID
+	selectValues                     sql.SelectValues
 }
 
 // TokenTransactionEdges holds the relations/edges for other nodes in the graph.
@@ -55,9 +57,11 @@ type TokenTransactionEdges struct {
 	Mint *TokenMint `json:"mint,omitempty"`
 	// Create holds the value of the create edge.
 	Create *TokenCreate `json:"create,omitempty"`
+	// PaymentIntent holds the value of the payment_intent edge.
+	PaymentIntent *PaymentIntent `json:"payment_intent,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
+	loadedTypes [5]bool
 }
 
 // SpentOutputOrErr returns the SpentOutput value or an error if the edge
@@ -100,6 +104,17 @@ func (e TokenTransactionEdges) CreateOrErr() (*TokenCreate, error) {
 	return nil, &NotLoadedError{edge: "create"}
 }
 
+// PaymentIntentOrErr returns the PaymentIntent value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e TokenTransactionEdges) PaymentIntentOrErr() (*PaymentIntent, error) {
+	if e.PaymentIntent != nil {
+		return e.PaymentIntent, nil
+	} else if e.loadedTypes[4] {
+		return nil, &NotFoundError{label: paymentintent.Label}
+	}
+	return nil, &NotLoadedError{edge: "payment_intent"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*TokenTransaction) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -116,6 +131,8 @@ func (*TokenTransaction) scanValues(columns []string) ([]any, error) {
 		case tokentransaction.ForeignKeys[0]: // token_transaction_mint
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		case tokentransaction.ForeignKeys[1]: // token_transaction_create
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
+		case tokentransaction.ForeignKeys[2]: // token_transaction_payment_intent
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
@@ -200,6 +217,13 @@ func (tt *TokenTransaction) assignValues(columns []string, values []any) error {
 				tt.token_transaction_create = new(uuid.UUID)
 				*tt.token_transaction_create = *value.S.(*uuid.UUID)
 			}
+		case tokentransaction.ForeignKeys[2]:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field token_transaction_payment_intent", values[i])
+			} else if value.Valid {
+				tt.token_transaction_payment_intent = new(uuid.UUID)
+				*tt.token_transaction_payment_intent = *value.S.(*uuid.UUID)
+			}
 		default:
 			tt.selectValues.Set(columns[i], values[i])
 		}
@@ -231,6 +255,11 @@ func (tt *TokenTransaction) QueryMint() *TokenMintQuery {
 // QueryCreate queries the "create" edge of the TokenTransaction entity.
 func (tt *TokenTransaction) QueryCreate() *TokenCreateQuery {
 	return NewTokenTransactionClient(tt.config).QueryCreate(tt)
+}
+
+// QueryPaymentIntent queries the "payment_intent" edge of the TokenTransaction entity.
+func (tt *TokenTransaction) QueryPaymentIntent() *PaymentIntentQuery {
+	return NewTokenTransactionClient(tt.config).QueryPaymentIntent(tt)
 }
 
 // Update returns a builder for updating this TokenTransaction.

@@ -48,7 +48,9 @@ func (SigningKeyshare) Fields() []ent.Field {
 			Comment("The minimum number of signers required to produce a valid signature using this signing keyshare."),
 		field.
 			Uint64("coordinator_index").
-			Comment("The SO index that acts as the coordinator for all signatures using this signing keyshare."),
+			Comment("The SO index of the coordinator that initiated the DKG round that produced this signing keyshare. " +
+				"An SO can only claim a signing keyshare to mark it in-use for which it is the coordinator.",
+			),
 	}
 }
 

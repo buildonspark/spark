@@ -812,6 +812,11 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	defer span.End()
 
 	db := ent.GetDbFromContext(ctx)
+
+	if isPending && len(filter.Statuses) > 0 {
+		return nil, fmt.Errorf("cannot specify both isPending=true and filter.Statuses")
+	}
+
 	var transferPredicate []predicate.Transfer
 
 	receiverPendingStatuses := []st.TransferStatus{
@@ -910,6 +915,14 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 			),
 		),
 	))
+
+	if len(filter.Statuses) > 0 {
+		statuses := make([]st.TransferStatus, len(filter.Statuses))
+		for i, status := range filter.Statuses {
+			statuses[i] = st.TransferStatus(status.String())
+		}
+		transferPredicate = append(transferPredicate, enttransfer.StatusIn(statuses...))
+	}
 
 	baseQuery := db.Transfer.Query()
 	if len(transferPredicate) > 0 {

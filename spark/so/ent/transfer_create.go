@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
@@ -128,6 +129,25 @@ func (tc *TransferCreate) AddTransferLeaves(t ...*TransferLeaf) *TransferCreate 
 		ids[i] = t[i].ID
 	}
 	return tc.AddTransferLeafeIDs(ids...)
+}
+
+// SetPaymentIntentID sets the "payment_intent" edge to the PaymentIntent entity by ID.
+func (tc *TransferCreate) SetPaymentIntentID(id uuid.UUID) *TransferCreate {
+	tc.mutation.SetPaymentIntentID(id)
+	return tc
+}
+
+// SetNillablePaymentIntentID sets the "payment_intent" edge to the PaymentIntent entity by ID if the given value is not nil.
+func (tc *TransferCreate) SetNillablePaymentIntentID(id *uuid.UUID) *TransferCreate {
+	if id != nil {
+		tc = tc.SetPaymentIntentID(*id)
+	}
+	return tc
+}
+
+// SetPaymentIntent sets the "payment_intent" edge to the PaymentIntent entity.
+func (tc *TransferCreate) SetPaymentIntent(p *PaymentIntent) *TransferCreate {
+	return tc.SetPaymentIntentID(p.ID)
 }
 
 // Mutation returns the TransferMutation object of the builder.
@@ -310,6 +330,23 @@ func (tc *TransferCreate) createSpec() (*Transfer, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := tc.mutation.PaymentIntentIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   transfer.PaymentIntentTable,
+			Columns: []string{transfer.PaymentIntentColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(paymentintent.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.transfer_payment_intent = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

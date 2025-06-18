@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // TweakKeyShare tweaks the given keyshare with the given tweak, updates the keyshare in the database and returns the updated keyshare.
@@ -62,6 +63,8 @@ func (keyshare *SigningKeyshare) MarshalProto() *pb.SigningKeyshare {
 		OwnerIdentifiers: ownerIdentifiers,
 		Threshold:        uint32(keyshare.MinSigners),
 		PublicKey:        keyshare.PublicKey,
+		PublicShares:     keyshare.PublicShares,
+		UpdatedTime:      timestamppb.New(keyshare.UpdateTime),
 	}
 }
 

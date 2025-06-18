@@ -1634,6 +1634,37 @@ func (m *SigningKeyshare) validate(all bool) error {
 
 	// no validation rules for PublicKey
 
+	// no validation rules for PublicShares
+
+	if all {
+		switch v := interface{}(m.GetUpdatedTime()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, SigningKeyshareValidationError{
+					field:  "UpdatedTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, SigningKeyshareValidationError{
+					field:  "UpdatedTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetUpdatedTime()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return SigningKeyshareValidationError{
+				field:  "UpdatedTime",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
 	if len(errors) > 0 {
 		return SigningKeyshareMultiError(errors)
 	}
@@ -6843,6 +6874,64 @@ func (m *TreeNode) validate(all bool) error {
 	// no validation rules for Status
 
 	// no validation rules for Network
+
+	if all {
+		switch v := interface{}(m.GetCreatedTime()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, TreeNodeValidationError{
+					field:  "CreatedTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, TreeNodeValidationError{
+					field:  "CreatedTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetCreatedTime()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return TreeNodeValidationError{
+				field:  "CreatedTime",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetUpdatedTime()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, TreeNodeValidationError{
+					field:  "UpdatedTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, TreeNodeValidationError{
+					field:  "UpdatedTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetUpdatedTime()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return TreeNodeValidationError{
+				field:  "UpdatedTime",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
 
 	if m.ParentNodeId != nil {
 		// no validation rules for ParentNodeId

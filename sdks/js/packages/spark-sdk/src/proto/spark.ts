@@ -371,8 +371,8 @@ export interface GenerateDepositAddressRequest {
   network: Network;
   /** The UUID to use for the created TreeNode */
   leafId?:
-    | string
-    | undefined;
+  | string
+  | undefined;
   /** Generate static deposit address */
   isStatic?: boolean | undefined;
 }
@@ -385,8 +385,8 @@ export interface Address {
   verifyingKey: Uint8Array;
   /** The proof of possession of the address by the SE. */
   depositAddressProof:
-    | DepositAddressProof
-    | undefined;
+  | DepositAddressProof
+  | undefined;
   /** Is it a static deposit address */
   isStatic: boolean;
 }
@@ -487,12 +487,12 @@ export interface NodeSignatureShares {
   nodeId: string;
   /** The signing result of the node's transaction. This transaction is to pay to self. */
   nodeTxSigningResult:
-    | SigningResult
-    | undefined;
+  | SigningResult
+  | undefined;
   /** The signing result of the node's refund transaction. This transaction is to pay to the user. */
   refundTxSigningResult:
-    | SigningResult
-    | undefined;
+  | SigningResult
+  | undefined;
   /** The verifying key of the node. */
   verifyingKey: Uint8Array;
 }
@@ -516,12 +516,12 @@ export interface StartTreeCreationRequest {
   identityPublicKey: Uint8Array;
   /** The on-chain utxo to be used to be spent by the root node. */
   onChainUtxo:
-    | UTXO
-    | undefined;
+  | UTXO
+  | undefined;
   /** The signing job for the root node's transaction. */
   rootTxSigningJob:
-    | SigningJob
-    | undefined;
+  | SigningJob
+  | undefined;
   /** The signing job for the root node's refund transaction. */
   refundTxSigningJob: SigningJob | undefined;
 }
@@ -540,12 +540,12 @@ export interface StartDepositTreeCreationRequest {
   identityPublicKey: Uint8Array;
   /** The on-chain utxo to be used to be spent by the root node. */
   onChainUtxo:
-    | UTXO
-    | undefined;
+  | UTXO
+  | undefined;
   /** The signing job for the root node's transaction. */
   rootTxSigningJob:
-    | SigningJob
-    | undefined;
+  | SigningJob
+  | undefined;
   /** The signing job for the root node's refund transaction. */
   refundTxSigningJob: SigningJob | undefined;
 }
@@ -654,8 +654,8 @@ export interface TokenTransactionSignatures {
 export interface StartTokenTransactionRequest {
   identityPublicKey: Uint8Array;
   partialTokenTransaction:
-    | TokenTransaction
-    | undefined;
+  | TokenTransaction
+  | undefined;
   /** List of ecdsa signatures authorizing movement of tokens from the token input. */
   tokenTransactionSignatures: TokenTransactionSignatures | undefined;
 }
@@ -666,8 +666,8 @@ export interface StartTokenTransactionResponse {
    * filled. This is the final transaction that is published and gossiped among LRC20 nodes.
    */
   finalTokenTransaction:
-    | TokenTransaction
-    | undefined;
+  | TokenTransaction
+  | undefined;
   /**
    * Information for fetching and resolving the revocation keyshare on a transfer operation.
    * Contains the threshold of keyshares needed and the SO owners of those keyshares.
@@ -714,8 +714,8 @@ export interface RevocationSecretWithIndex {
 
 export interface FinalizeTokenTransactionRequest {
   finalTokenTransaction:
-    | TokenTransaction
-    | undefined;
+  | TokenTransaction
+  | undefined;
   /**
    * List of ordered revocation secrets that map 1:1 with leaves being spent in the
    * token transaction.
@@ -735,8 +735,8 @@ export interface FreezeTokensPayload {
 
 export interface FreezeTokensRequest {
   freezeTokensPayload:
-    | FreezeTokensPayload
-    | undefined;
+  | FreezeTokensPayload
+  | undefined;
   /** This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes. */
   issuerSignature: Uint8Array;
 }
@@ -794,8 +794,8 @@ export interface TreeNode {
   value: number;
   /** The id of the parent node. */
   parentNodeId?:
-    | string
-    | undefined;
+  | string
+  | undefined;
   /** The transaction of the node, this transaction is to pay to the same address as the node. */
   nodeTx: Uint8Array;
   /** The refund transaction of the node, this transaction is to pay to the user. */
@@ -808,8 +808,8 @@ export interface TreeNode {
   ownerIdentityPublicKey: Uint8Array;
   /** The signing keyshare information of the node on the SE side. */
   signingKeyshare:
-    | SigningKeyshare
-    | undefined;
+  | SigningKeyshare
+  | undefined;
   /** The status of the node. */
   status: string;
   /** The network of the node. */
@@ -1026,8 +1026,8 @@ export interface ClaimTransferSignRefundsResponse {
 export interface AggregateNodesRequest {
   nodeIds: string[];
   signingJob:
-    | SigningJob
-    | undefined;
+  | SigningJob
+  | undefined;
   /** Serves as a temporary identity public key, this should be get from auth process. */
   ownerIdentityPublicKey: Uint8Array;
 }
@@ -1175,8 +1175,8 @@ export interface RefreshTimelockRequest {
 
 export interface RefreshTimelockSigningResult {
   signingResult:
-    | SigningResult
-    | undefined;
+  | SigningResult
+  | undefined;
   /** Should maybe just be a part of SigningResult? */
   verifyingKey: Uint8Array;
 }
@@ -1210,9 +1210,9 @@ export interface AddressRequestNode {
 
 export interface PrepareTreeAddressRequest {
   source?:
-    | { $case: "parentNodeOutput"; parentNodeOutput: NodeOutput }
-    | { $case: "onChainUtxo"; onChainUtxo: UTXO }
-    | undefined;
+  | { $case: "parentNodeOutput"; parentNodeOutput: NodeOutput }
+  | { $case: "onChainUtxo"; onChainUtxo: UTXO }
+  | undefined;
   /**
    * The tx on this node is to spend the source's utxo.
    * The user's public key should already be registered with the SE for the root node.
@@ -1233,25 +1233,25 @@ export interface PrepareTreeAddressResponse {
 export interface CreationNode {
   /** This is the tx that spends the parent node's output. */
   nodeTxSigningJob:
-    | SigningJob
-    | undefined;
+  | SigningJob
+  | undefined;
   /** The refund tx can only exist if there's no children. */
   refundTxSigningJob:
-    | SigningJob
-    | undefined;
+  | SigningJob
+  | undefined;
   /** The children will spend the output of the node's tx. Vout is the index of the child. */
   children: CreationNode[];
 }
 
 export interface CreateTreeRequest {
   source?:
-    | { $case: "parentNodeOutput"; parentNodeOutput: NodeOutput }
-    | { $case: "onChainUtxo"; onChainUtxo: UTXO }
-    | undefined;
+  | { $case: "parentNodeOutput"; parentNodeOutput: NodeOutput }
+  | { $case: "onChainUtxo"; onChainUtxo: UTXO }
+  | undefined;
   /** The node should contain the tx that spends the source's utxo. */
   node:
-    | CreationNode
-    | undefined;
+  | CreationNode
+  | undefined;
   /** The owner of the tree. */
   userIdentityPublicKey: Uint8Array;
 }
@@ -1410,9 +1410,9 @@ export interface InitiateUtxoSwapRequest {
   onChainUtxo: UTXO | undefined;
   requestType: UtxoSwapRequestType;
   amount?:
-    | { $case: "creditAmountSats"; creditAmountSats: number }
-    | { $case: "maxFeeSats"; maxFeeSats: number }
-    | undefined;
+  | { $case: "creditAmountSats"; creditAmountSats: number }
+  | { $case: "maxFeeSats"; maxFeeSats: number }
+  | undefined;
   sspSignature: Uint8Array;
   userSignature: Uint8Array;
   transfer: StartTransferRequest | undefined;
@@ -1616,10 +1616,10 @@ export const SubscribeToEventsResponse: MessageFns<SubscribeToEventsResponse> = 
       event: isSet(object.transfer)
         ? { $case: "transfer", transfer: TransferEvent.fromJSON(object.transfer) }
         : isSet(object.deposit)
-        ? { $case: "deposit", deposit: DepositEvent.fromJSON(object.deposit) }
-        : isSet(object.connected)
-        ? { $case: "connected", connected: ConnectedEvent.fromJSON(object.connected) }
-        : undefined,
+          ? { $case: "deposit", deposit: DepositEvent.fromJSON(object.deposit) }
+          : isSet(object.connected)
+            ? { $case: "connected", connected: ConnectedEvent.fromJSON(object.connected) }
+            : undefined,
     };
   },
 
@@ -4192,8 +4192,8 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
       tokenInputs: isSet(object.mintInput)
         ? { $case: "mintInput", mintInput: TokenMintInput.fromJSON(object.mintInput) }
         : isSet(object.transferInput)
-        ? { $case: "transferInput", transferInput: TokenTransferInput.fromJSON(object.transferInput) }
-        : undefined,
+          ? { $case: "transferInput", transferInput: TokenTransferInput.fromJSON(object.transferInput) }
+          : undefined,
       tokenOutputs: globalThis.Array.isArray(object?.tokenOutputs)
         ? object.tokenOutputs.map((e: any) => TokenOutput.fromJSON(e))
         : [],
@@ -8669,13 +8669,13 @@ export const TransferFilter: MessageFns<TransferFilter> = {
           receiverIdentityPublicKey: bytesFromBase64(object.receiverIdentityPublicKey),
         }
         : isSet(object.senderIdentityPublicKey)
-        ? { $case: "senderIdentityPublicKey", senderIdentityPublicKey: bytesFromBase64(object.senderIdentityPublicKey) }
-        : isSet(object.senderOrReceiverIdentityPublicKey)
-        ? {
-          $case: "senderOrReceiverIdentityPublicKey",
-          senderOrReceiverIdentityPublicKey: bytesFromBase64(object.senderOrReceiverIdentityPublicKey),
-        }
-        : undefined,
+          ? { $case: "senderIdentityPublicKey", senderIdentityPublicKey: bytesFromBase64(object.senderIdentityPublicKey) }
+          : isSet(object.senderOrReceiverIdentityPublicKey)
+            ? {
+              $case: "senderOrReceiverIdentityPublicKey",
+              senderOrReceiverIdentityPublicKey: bytesFromBase64(object.senderOrReceiverIdentityPublicKey),
+            }
+            : undefined,
       transferIds: globalThis.Array.isArray(object?.transferIds)
         ? object.transferIds.map((e: any) => globalThis.String(e))
         : [],
@@ -11734,8 +11734,8 @@ export const PrepareTreeAddressRequest: MessageFns<PrepareTreeAddressRequest> = 
       source: isSet(object.parentNodeOutput)
         ? { $case: "parentNodeOutput", parentNodeOutput: NodeOutput.fromJSON(object.parentNodeOutput) }
         : isSet(object.onChainUtxo)
-        ? { $case: "onChainUtxo", onChainUtxo: UTXO.fromJSON(object.onChainUtxo) }
-        : undefined,
+          ? { $case: "onChainUtxo", onChainUtxo: UTXO.fromJSON(object.onChainUtxo) }
+          : undefined,
       node: isSet(object.node) ? AddressRequestNode.fromJSON(object.node) : undefined,
       userIdentityPublicKey: isSet(object.userIdentityPublicKey)
         ? bytesFromBase64(object.userIdentityPublicKey)
@@ -12103,8 +12103,8 @@ export const CreateTreeRequest: MessageFns<CreateTreeRequest> = {
       source: isSet(object.parentNodeOutput)
         ? { $case: "parentNodeOutput", parentNodeOutput: NodeOutput.fromJSON(object.parentNodeOutput) }
         : isSet(object.onChainUtxo)
-        ? { $case: "onChainUtxo", onChainUtxo: UTXO.fromJSON(object.onChainUtxo) }
-        : undefined,
+          ? { $case: "onChainUtxo", onChainUtxo: UTXO.fromJSON(object.onChainUtxo) }
+          : undefined,
       node: isSet(object.node) ? CreationNode.fromJSON(object.node) : undefined,
       userIdentityPublicKey: isSet(object.userIdentityPublicKey)
         ? bytesFromBase64(object.userIdentityPublicKey)
@@ -13147,8 +13147,8 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
       source: isSet(object.ownerIdentityPubkey)
         ? { $case: "ownerIdentityPubkey", ownerIdentityPubkey: bytesFromBase64(object.ownerIdentityPubkey) }
         : isSet(object.nodeIds)
-        ? { $case: "nodeIds", nodeIds: TreeNodeIds.fromJSON(object.nodeIds) }
-        : undefined,
+          ? { $case: "nodeIds", nodeIds: TreeNodeIds.fromJSON(object.nodeIds) }
+          : undefined,
       includeParents: isSet(object.includeParents) ? globalThis.Boolean(object.includeParents) : false,
       limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
       offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
@@ -14517,8 +14517,8 @@ export const InitiateUtxoSwapRequest: MessageFns<InitiateUtxoSwapRequest> = {
       amount: isSet(object.creditAmountSats)
         ? { $case: "creditAmountSats", creditAmountSats: globalThis.Number(object.creditAmountSats) }
         : isSet(object.maxFeeSats)
-        ? { $case: "maxFeeSats", maxFeeSats: globalThis.Number(object.maxFeeSats) }
-        : undefined,
+          ? { $case: "maxFeeSats", maxFeeSats: globalThis.Number(object.maxFeeSats) }
+          : undefined,
       sspSignature: isSet(object.sspSignature) ? bytesFromBase64(object.sspSignature) : new Uint8Array(0),
       userSignature: isSet(object.userSignature) ? bytesFromBase64(object.userSignature) : new Uint8Array(0),
       transfer: isSet(object.transfer) ? StartTransferRequest.fromJSON(object.transfer) : undefined,

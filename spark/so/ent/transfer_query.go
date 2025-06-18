@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
@@ -27,6 +28,8 @@ type TransferQuery struct {
 	inters             []Interceptor
 	predicates         []predicate.Transfer
 	withTransferLeaves *TransferLeafQuery
+	withPaymentIntent  *PaymentIntentQuery
+	withFKs            bool
 	modifiers          []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
@@ -79,6 +82,28 @@ func (tq *TransferQuery) QueryTransferLeaves() *TransferLeafQuery {
 			sqlgraph.From(transfer.Table, transfer.FieldID, selector),
 			sqlgraph.To(transferleaf.Table, transferleaf.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, true, transfer.TransferLeavesTable, transfer.TransferLeavesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryPaymentIntent chains the current query on the "payment_intent" edge.
+func (tq *TransferQuery) QueryPaymentIntent() *PaymentIntentQuery {
+	query := (&PaymentIntentClient{config: tq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := tq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := tq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transfer.Table, transfer.FieldID, selector),
+			sqlgraph.To(paymentintent.Table, paymentintent.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, transfer.PaymentIntentTable, transfer.PaymentIntentColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
 		return fromU, nil
@@ -279,6 +304,7 @@ func (tq *TransferQuery) Clone() *TransferQuery {
 		inters:             append([]Interceptor{}, tq.inters...),
 		predicates:         append([]predicate.Transfer{}, tq.predicates...),
 		withTransferLeaves: tq.withTransferLeaves.Clone(),
+		withPaymentIntent:  tq.withPaymentIntent.Clone(),
 		// clone intermediate query.
 		sql:  tq.sql.Clone(),
 		path: tq.path,
@@ -293,6 +319,17 @@ func (tq *TransferQuery) WithTransferLeaves(opts ...func(*TransferLeafQuery)) *T
 		opt(query)
 	}
 	tq.withTransferLeaves = query
+	return tq
+}
+
+// WithPaymentIntent tells the query-builder to eager-load the nodes that are connected to
+// the "payment_intent" edge. The optional arguments are used to configure the query builder of the edge.
+func (tq *TransferQuery) WithPaymentIntent(opts ...func(*PaymentIntentQuery)) *TransferQuery {
+	query := (&PaymentIntentClient{config: tq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	tq.withPaymentIntent = query
 	return tq
 }
 
@@ -373,11 +410,19 @@ func (tq *TransferQuery) prepareQuery(ctx context.Context) error {
 func (tq *TransferQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Transfer, error) {
 	var (
 		nodes       = []*Transfer{}
+		withFKs     = tq.withFKs
 		_spec       = tq.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [2]bool{
 			tq.withTransferLeaves != nil,
+			tq.withPaymentIntent != nil,
 		}
 	)
+	if tq.withPaymentIntent != nil {
+		withFKs = true
+	}
+	if withFKs {
+		_spec.Node.Columns = append(_spec.Node.Columns, transfer.ForeignKeys...)
+	}
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*Transfer).scanValues(nil, columns)
 	}
@@ -403,6 +448,12 @@ func (tq *TransferQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tra
 		if err := tq.loadTransferLeaves(ctx, query, nodes,
 			func(n *Transfer) { n.Edges.TransferLeaves = []*TransferLeaf{} },
 			func(n *Transfer, e *TransferLeaf) { n.Edges.TransferLeaves = append(n.Edges.TransferLeaves, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := tq.withPaymentIntent; query != nil {
+		if err := tq.loadPaymentIntent(ctx, query, nodes, nil,
+			func(n *Transfer, e *PaymentIntent) { n.Edges.PaymentIntent = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -437,6 +488,38 @@ func (tq *TransferQuery) loadTransferLeaves(ctx context.Context, query *Transfer
 			return fmt.Errorf(`unexpected referenced foreign-key "transfer_leaf_transfer" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
+	}
+	return nil
+}
+func (tq *TransferQuery) loadPaymentIntent(ctx context.Context, query *PaymentIntentQuery, nodes []*Transfer, init func(*Transfer), assign func(*Transfer, *PaymentIntent)) error {
+	ids := make([]uuid.UUID, 0, len(nodes))
+	nodeids := make(map[uuid.UUID][]*Transfer)
+	for i := range nodes {
+		if nodes[i].transfer_payment_intent == nil {
+			continue
+		}
+		fk := *nodes[i].transfer_payment_intent
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(paymentintent.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "transfer_payment_intent" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
 	}
 	return nil
 }

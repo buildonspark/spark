@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
@@ -121,6 +122,25 @@ func (tu *TransferUpdate) AddTransferLeaves(t ...*TransferLeaf) *TransferUpdate 
 	return tu.AddTransferLeafeIDs(ids...)
 }
 
+// SetPaymentIntentID sets the "payment_intent" edge to the PaymentIntent entity by ID.
+func (tu *TransferUpdate) SetPaymentIntentID(id uuid.UUID) *TransferUpdate {
+	tu.mutation.SetPaymentIntentID(id)
+	return tu
+}
+
+// SetNillablePaymentIntentID sets the "payment_intent" edge to the PaymentIntent entity by ID if the given value is not nil.
+func (tu *TransferUpdate) SetNillablePaymentIntentID(id *uuid.UUID) *TransferUpdate {
+	if id != nil {
+		tu = tu.SetPaymentIntentID(*id)
+	}
+	return tu
+}
+
+// SetPaymentIntent sets the "payment_intent" edge to the PaymentIntent entity.
+func (tu *TransferUpdate) SetPaymentIntent(p *PaymentIntent) *TransferUpdate {
+	return tu.SetPaymentIntentID(p.ID)
+}
+
 // Mutation returns the TransferMutation object of the builder.
 func (tu *TransferUpdate) Mutation() *TransferMutation {
 	return tu.mutation
@@ -145,6 +165,12 @@ func (tu *TransferUpdate) RemoveTransferLeaves(t ...*TransferLeaf) *TransferUpda
 		ids[i] = t[i].ID
 	}
 	return tu.RemoveTransferLeafeIDs(ids...)
+}
+
+// ClearPaymentIntent clears the "payment_intent" edge to the PaymentIntent entity.
+func (tu *TransferUpdate) ClearPaymentIntent() *TransferUpdate {
+	tu.mutation.ClearPaymentIntent()
+	return tu
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -276,6 +302,35 @@ func (tu *TransferUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if tu.mutation.PaymentIntentCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   transfer.PaymentIntentTable,
+			Columns: []string{transfer.PaymentIntentColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(paymentintent.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tu.mutation.PaymentIntentIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   transfer.PaymentIntentTable,
+			Columns: []string{transfer.PaymentIntentColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(paymentintent.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, tu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{transfer.Label}
@@ -386,6 +441,25 @@ func (tuo *TransferUpdateOne) AddTransferLeaves(t ...*TransferLeaf) *TransferUpd
 	return tuo.AddTransferLeafeIDs(ids...)
 }
 
+// SetPaymentIntentID sets the "payment_intent" edge to the PaymentIntent entity by ID.
+func (tuo *TransferUpdateOne) SetPaymentIntentID(id uuid.UUID) *TransferUpdateOne {
+	tuo.mutation.SetPaymentIntentID(id)
+	return tuo
+}
+
+// SetNillablePaymentIntentID sets the "payment_intent" edge to the PaymentIntent entity by ID if the given value is not nil.
+func (tuo *TransferUpdateOne) SetNillablePaymentIntentID(id *uuid.UUID) *TransferUpdateOne {
+	if id != nil {
+		tuo = tuo.SetPaymentIntentID(*id)
+	}
+	return tuo
+}
+
+// SetPaymentIntent sets the "payment_intent" edge to the PaymentIntent entity.
+func (tuo *TransferUpdateOne) SetPaymentIntent(p *PaymentIntent) *TransferUpdateOne {
+	return tuo.SetPaymentIntentID(p.ID)
+}
+
 // Mutation returns the TransferMutation object of the builder.
 func (tuo *TransferUpdateOne) Mutation() *TransferMutation {
 	return tuo.mutation
@@ -410,6 +484,12 @@ func (tuo *TransferUpdateOne) RemoveTransferLeaves(t ...*TransferLeaf) *Transfer
 		ids[i] = t[i].ID
 	}
 	return tuo.RemoveTransferLeafeIDs(ids...)
+}
+
+// ClearPaymentIntent clears the "payment_intent" edge to the PaymentIntent entity.
+func (tuo *TransferUpdateOne) ClearPaymentIntent() *TransferUpdateOne {
+	tuo.mutation.ClearPaymentIntent()
+	return tuo
 }
 
 // Where appends a list predicates to the TransferUpdate builder.
@@ -564,6 +644,35 @@ func (tuo *TransferUpdateOne) sqlSave(ctx context.Context) (_node *Transfer, err
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(transferleaf.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if tuo.mutation.PaymentIntentCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   transfer.PaymentIntentTable,
+			Columns: []string{transfer.PaymentIntentColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(paymentintent.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tuo.mutation.PaymentIntentIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   transfer.PaymentIntentTable,
+			Columns: []string{transfer.PaymentIntentColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(paymentintent.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

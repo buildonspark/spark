@@ -57,6 +57,18 @@ func (f GossipFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, erro
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.GossipMutation", m)
 }
 
+// The PaymentIntentFunc type is an adapter to allow the use of ordinary
+// function as PaymentIntent mutator.
+type PaymentIntentFunc func(context.Context, *ent.PaymentIntentMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PaymentIntentFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PaymentIntentMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PaymentIntentMutation", m)
+}
+
 // The PreimageRequestFunc type is an adapter to allow the use of ordinary
 // function as PreimageRequest mutator.
 type PreimageRequestFunc func(context.Context, *ent.PreimageRequestMutation) (ent.Value, error)

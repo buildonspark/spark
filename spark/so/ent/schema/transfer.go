@@ -37,6 +37,7 @@ func (Transfer) Fields() []ent.Field {
 func (Transfer) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.From("transfer_leaves", TransferLeaf.Type).Ref("transfer"),
+		edge.To("payment_intent", PaymentIntent.Type).Unique(),
 	}
 }
 

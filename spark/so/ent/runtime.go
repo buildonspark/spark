@@ -10,6 +10,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
+	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark/so/ent/schema"
@@ -131,6 +132,29 @@ func init() {
 	gossipDescID := gossipMixinFields0[0].Descriptor()
 	// gossip.DefaultID holds the default value on creation for the id field.
 	gossip.DefaultID = gossipDescID.Default.(func() uuid.UUID)
+	paymentintentMixin := schema.PaymentIntent{}.Mixin()
+	paymentintentMixinFields0 := paymentintentMixin[0].Fields()
+	_ = paymentintentMixinFields0
+	paymentintentFields := schema.PaymentIntent{}.Fields()
+	_ = paymentintentFields
+	// paymentintentDescCreateTime is the schema descriptor for create_time field.
+	paymentintentDescCreateTime := paymentintentMixinFields0[1].Descriptor()
+	// paymentintent.DefaultCreateTime holds the default value on creation for the create_time field.
+	paymentintent.DefaultCreateTime = paymentintentDescCreateTime.Default.(func() time.Time)
+	// paymentintentDescUpdateTime is the schema descriptor for update_time field.
+	paymentintentDescUpdateTime := paymentintentMixinFields0[2].Descriptor()
+	// paymentintent.DefaultUpdateTime holds the default value on creation for the update_time field.
+	paymentintent.DefaultUpdateTime = paymentintentDescUpdateTime.Default.(func() time.Time)
+	// paymentintent.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	paymentintent.UpdateDefaultUpdateTime = paymentintentDescUpdateTime.UpdateDefault.(func() time.Time)
+	// paymentintentDescPaymentIntent is the schema descriptor for payment_intent field.
+	paymentintentDescPaymentIntent := paymentintentFields[0].Descriptor()
+	// paymentintent.PaymentIntentValidator is a validator for the "payment_intent" field. It is called by the builders before save.
+	paymentintent.PaymentIntentValidator = paymentintentDescPaymentIntent.Validators[0].(func(string) error)
+	// paymentintentDescID is the schema descriptor for id field.
+	paymentintentDescID := paymentintentMixinFields0[0].Descriptor()
+	// paymentintent.DefaultID holds the default value on creation for the id field.
+	paymentintent.DefaultID = paymentintentDescID.Default.(func() uuid.UUID)
 	preimagerequestMixin := schema.PreimageRequest{}.Mixin()
 	preimagerequestMixinFields0 := preimagerequestMixin[0].Fields()
 	_ = preimagerequestMixinFields0
