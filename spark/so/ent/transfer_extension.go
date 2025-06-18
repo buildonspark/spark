@@ -74,35 +74,6 @@ func (t *Transfer) getProtoStatus() (*pb.TransferStatus, error) {
 	return nil, fmt.Errorf("unknown transfer status %s", t.Status)
 }
 
-func TransferStatusSchema(transferStatusProto pb.TransferStatus) (st.TransferStatus, error) {
-	switch transferStatusProto {
-	case pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED:
-		return st.TransferStatusSenderInitiated, nil
-	case pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR:
-		return st.TransferStatusSenderInitiatedCoordinator, nil
-	case pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING:
-		return st.TransferStatusSenderKeyTweakPending, nil
-	case pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED:
-		return st.TransferStatusSenderKeyTweaked, nil
-	case pb.TransferStatus_TRANSFER_STATUS_RECEIVER_KEY_TWEAKED:
-		return st.TransferStatusReceiverKeyTweaked, nil
-	case pb.TransferStatus_TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED:
-		return st.TransferStatusReceiverKeyTweakLocked, nil
-	case pb.TransferStatus_TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED:
-		return st.TransferStatusReceiverKeyTweakApplied, nil
-	case pb.TransferStatus_TRANSFER_STATUS_RECEIVER_REFUND_SIGNED:
-		return st.TransferStatusReceiverRefundSigned, nil
-	case pb.TransferStatus_TRANSFER_STATUS_COMPLETED:
-		return st.TransferStatusCompleted, nil
-	case pb.TransferStatus_TRANSFER_STATUS_EXPIRED:
-		return st.TransferStatusExpired, nil
-	case pb.TransferStatus_TRANSFER_STATUS_RETURNED:
-		return st.TransferStatusReturned, nil
-	default:
-		return "", fmt.Errorf("unknown transfer status: %v", transferStatusProto)
-	}
-}
-
 func TransferTypeProto(transferType st.TransferType) (*pb.TransferType, error) {
 	switch transferType {
 	case st.TransferTypePreimageSwap:

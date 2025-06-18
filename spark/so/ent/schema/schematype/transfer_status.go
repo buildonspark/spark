@@ -1,5 +1,11 @@
 package schematype
 
+import (
+	"fmt"
+
+	pb "github.com/lightsparkdev/spark/proto/spark"
+)
+
 // TransferStatus is the status of a transfer
 type TransferStatus string
 
@@ -42,5 +48,34 @@ func (TransferStatus) Values() []string {
 		string(TransferStatusExpired),
 		string(TransferStatusReturned),
 		string(TransferStatusReceiverKeyTweakApplied),
+	}
+}
+
+func SchemaTransferStatusFromProtoTransferStatus(protoTransferStatus pb.TransferStatus) (TransferStatus, error) {
+	switch protoTransferStatus {
+	case pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED:
+		return TransferStatusSenderInitiated, nil
+	case pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR:
+		return TransferStatusSenderInitiatedCoordinator, nil
+	case pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING:
+		return TransferStatusSenderKeyTweakPending, nil
+	case pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED:
+		return TransferStatusSenderKeyTweaked, nil
+	case pb.TransferStatus_TRANSFER_STATUS_RECEIVER_KEY_TWEAKED:
+		return TransferStatusReceiverKeyTweaked, nil
+	case pb.TransferStatus_TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED:
+		return TransferStatusReceiverKeyTweakLocked, nil
+	case pb.TransferStatus_TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED:
+		return TransferStatusReceiverKeyTweakApplied, nil
+	case pb.TransferStatus_TRANSFER_STATUS_RECEIVER_REFUND_SIGNED:
+		return TransferStatusReceiverRefundSigned, nil
+	case pb.TransferStatus_TRANSFER_STATUS_COMPLETED:
+		return TransferStatusCompleted, nil
+	case pb.TransferStatus_TRANSFER_STATUS_EXPIRED:
+		return TransferStatusExpired, nil
+	case pb.TransferStatus_TRANSFER_STATUS_RETURNED:
+		return TransferStatusReturned, nil
+	default:
+		return "", fmt.Errorf("unknown transfer status: %v", protoTransferStatus)
 	}
 }
