@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lightsparkdev/spark/so/tokens"
+
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
@@ -148,7 +150,7 @@ func (h InternalTokenTransactionHandler) SignAndPersistTokenTransaction(
 	logger := logging.GetLoggerFromContext(ctx)
 
 	if err := validateTokenTransactionForSigning(tokenTransaction); err != nil {
-		return nil, formatErrorWithTransactionEnt(err.Error(), tokenTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionEnt(err.Error(), tokenTransaction, err)
 	}
 
 	if err := validateOperatorSpecificSignatures(config.IdentityPublicKey(), operatorSpecificSignatures, tokenTransaction); err != nil {
@@ -165,7 +167,7 @@ func (h InternalTokenTransactionHandler) SignAndPersistTokenTransaction(
 
 	invalidOutputs := validateOutputs(tokenTransaction.Edges.CreatedOutput, st.TokenOutputStatusCreatedStarted)
 	if len(invalidOutputs) > 0 {
-		return nil, formatErrorWithTransactionEnt(fmt.Sprintf("%s: %s", errInvalidOutputs, strings.Join(invalidOutputs, "; ")), tokenTransaction, nil)
+		return nil, tokens.FormatErrorWithTransactionEnt(fmt.Sprintf("%s: %s", tokens.ErrInvalidOutputs, strings.Join(invalidOutputs, "; ")), tokenTransaction, nil)
 	}
 
 	// If token outputs are being spent, verify the expected status of inputs and check for active freezes.
@@ -173,7 +175,7 @@ func (h InternalTokenTransactionHandler) SignAndPersistTokenTransaction(
 	if len(tokenTransaction.Edges.SpentOutput) > 0 {
 		invalidOutputs := validateInputs(tokenTransaction.Edges.SpentOutput, st.TokenOutputStatusSpentStarted)
 		if len(invalidOutputs) > 0 {
-			return nil, formatErrorWithTransactionEnt(fmt.Sprintf("%s: %s", errInvalidInputs, strings.Join(invalidOutputs, "; ")), tokenTransaction, nil)
+			return nil, tokens.FormatErrorWithTransactionEnt(fmt.Sprintf("%s: %s", tokens.ErrInvalidInputs, strings.Join(invalidOutputs, "; ")), tokenTransaction, nil)
 		}
 
 		// Collect owner public keys for freeze check.
@@ -188,7 +190,7 @@ func (h InternalTokenTransactionHandler) SignAndPersistTokenTransaction(
 		// Bulk query all input ids to ensure none of them are frozen.
 		activeFreezes, err := ent.GetActiveFreezes(ctx, ownerPublicKeys, tokenPublicKey)
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", errFailedToQueryTokenFreezeStatus, err)
+			return nil, fmt.Errorf("%s: %w", tokens.ErrFailedToQueryTokenFreezeStatus, err)
 		}
 
 		if len(activeFreezes) > 0 {
@@ -214,7 +216,7 @@ func (h InternalTokenTransactionHandler) SignAndPersistTokenTransaction(
 	}
 	err := ent.UpdateSignedTransaction(ctx, tokenTransaction, operatorSpecificSignaturesArr, operatorSignature.Serialize())
 	if err != nil {
-		return nil, formatErrorWithTransactionEnt("failed to update outputs after signing", tokenTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionEnt("failed to update outputs after signing", tokenTransaction, err)
 	}
 
 	return operatorSignature.Serialize(), nil
@@ -243,7 +245,7 @@ func validateOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecif
 // validateTransferOperatorSpecificSignatures validates signatures for transfer transactions
 func validateTransferOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecificSignatures []*pb.OperatorSpecificOwnerSignature, tokenTransaction *ent.TokenTransaction) error {
 	if len(operatorSpecificSignatures) != len(tokenTransaction.Edges.SpentOutput) {
-		return formatErrorWithTransactionEnt(
+		return tokens.FormatErrorWithTransactionEnt(
 			fmt.Sprintf("expected %d signatures for transfer (one per input), but got %d",
 				len(tokenTransaction.Edges.SpentOutput), len(operatorSpecificSignatures)),
 			tokenTransaction, nil)
@@ -255,13 +257,13 @@ func validateTransferOperatorSpecificSignatures(identityPublicKey []byte, operat
 	for _, sig := range operatorSpecificSignatures {
 		index := int(sig.OwnerSignature.InputIndex)
 		if index < 0 || index >= numInputs {
-			return formatErrorWithTransactionEnt(
-				fmt.Sprintf(errInputIndexOutOfRange, index, numInputs-1),
+			return tokens.FormatErrorWithTransactionEnt(
+				fmt.Sprintf(tokens.ErrInputIndexOutOfRange, index, numInputs-1),
 				tokenTransaction, nil)
 		}
 
 		if signaturesByIndex[index] != nil {
-			return formatErrorWithTransactionEnt(
+			return tokens.FormatErrorWithTransactionEnt(
 				fmt.Sprintf("duplicate signature for input index %d", index),
 				tokenTransaction, nil)
 		}
@@ -271,7 +273,7 @@ func validateTransferOperatorSpecificSignatures(identityPublicKey []byte, operat
 
 	for i := 0; i < numInputs; i++ {
 		if signaturesByIndex[i] == nil {
-			return formatErrorWithTransactionEnt(
+			return tokens.FormatErrorWithTransactionEnt(
 				fmt.Sprintf("missing signature for input index %d", i),
 				tokenTransaction, nil)
 		}
@@ -288,16 +290,16 @@ func validateTransferOperatorSpecificSignatures(identityPublicKey []byte, operat
 	for i, sig := range signaturesByIndex {
 		payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(sig.Payload)
 		if err != nil {
-			return fmt.Errorf("%s: %w", errFailedToHashRevocationKeyshares, err)
+			return fmt.Errorf("%s: %w", tokens.ErrFailedToHashRevocationKeyshares, err)
 		}
 
 		if !bytes.Equal(sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash) {
-			return fmt.Errorf(errTransactionHashMismatch,
+			return fmt.Errorf(tokens.ErrTransactionHashMismatch,
 				sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash)
 		}
 
 		if !bytes.Equal(sig.Payload.OperatorIdentityPublicKey, identityPublicKey) {
-			return fmt.Errorf(errOperatorPublicKeyMismatch,
+			return fmt.Errorf(tokens.ErrOperatorPublicKeyMismatch,
 				sig.Payload.OperatorIdentityPublicKey, identityPublicKey)
 		}
 
@@ -307,7 +309,7 @@ func validateTransferOperatorSpecificSignatures(identityPublicKey []byte, operat
 			payloadHash,
 			output.OwnerPublicKey,
 		); err != nil {
-			return formatErrorWithTransactionEnt(errInvalidOwnerSignature, tokenTransaction, err)
+			return tokens.FormatErrorWithTransactionEnt(tokens.ErrInvalidOwnerSignature, tokenTransaction, err)
 		}
 	}
 
@@ -317,14 +319,14 @@ func validateTransferOperatorSpecificSignatures(identityPublicKey []byte, operat
 // validateMintOperatorSpecificSignatures validates signatures for mint transactions
 func validateMintOperatorSpecificSignatures(identityPublicKey []byte, operatorSpecificSignatures []*pb.OperatorSpecificOwnerSignature, tokenTransaction *ent.TokenTransaction) error {
 	if len(operatorSpecificSignatures) != 1 {
-		return formatErrorWithTransactionEnt(
+		return tokens.FormatErrorWithTransactionEnt(
 			fmt.Sprintf("expected exactly 1 signature for mint, but got %d",
 				len(operatorSpecificSignatures)),
 			tokenTransaction, nil)
 	}
 
 	if tokenTransaction.Edges.Mint == nil {
-		return formatErrorWithTransactionEnt(
+		return tokens.FormatErrorWithTransactionEnt(
 			"mint record not found in db, but expected a mint for this transaction",
 			tokenTransaction, nil)
 	}
@@ -334,17 +336,17 @@ func validateMintOperatorSpecificSignatures(identityPublicKey []byte, operatorSp
 	// Validate the signature payload
 	payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(sig.Payload)
 	if err != nil {
-		return fmt.Errorf("%s: %w", errFailedToHashRevocationKeyshares, err)
+		return fmt.Errorf("%s: %w", tokens.ErrFailedToHashRevocationKeyshares, err)
 	}
 
 	if !bytes.Equal(sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash) {
-		return fmt.Errorf(errTransactionHashMismatch,
+		return fmt.Errorf(tokens.ErrTransactionHashMismatch,
 			sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash)
 	}
 
 	if len(sig.Payload.OperatorIdentityPublicKey) > 0 {
 		if !bytes.Equal(sig.Payload.OperatorIdentityPublicKey, identityPublicKey) {
-			return fmt.Errorf(errOperatorPublicKeyMismatch,
+			return fmt.Errorf(tokens.ErrOperatorPublicKeyMismatch,
 				sig.Payload.OperatorIdentityPublicKey, identityPublicKey)
 		}
 	}
@@ -355,7 +357,7 @@ func validateMintOperatorSpecificSignatures(identityPublicKey []byte, operatorSp
 		payloadHash,
 		tokenTransaction.Edges.Mint.IssuerPublicKey,
 	); err != nil {
-		return formatErrorWithTransactionEnt(errInvalidIssuerSignature, tokenTransaction, err)
+		return tokens.FormatErrorWithTransactionEnt(tokens.ErrInvalidIssuerSignature, tokenTransaction, err)
 	}
 
 	return nil
@@ -398,7 +400,7 @@ func (h InternalTokenTransactionHandler) regenerateOperatorSignatureForDuplicate
 	tokenTransaction *ent.TokenTransaction,
 	finalTokenTransactionHash []byte,
 ) ([]byte, error) {
-	logWithTransactionEnt(ctx, "Regenerating response for a duplicate SignTokenTransaction() Call", tokenTransaction, slog.LevelDebug)
+	tokens.LogWithTransactionEnt(ctx, "Regenerating response for a duplicate SignTokenTransaction() Call", tokenTransaction, slog.LevelDebug)
 
 	var invalidOutputs []string
 	isMint := tokenTransaction.Edges.Mint != nil
@@ -412,9 +414,9 @@ func (h InternalTokenTransactionHandler) regenerateOperatorSignatureForDuplicate
 		invalidOutputs = append(invalidOutputs, validateInputs(tokenTransaction.Edges.SpentOutput, st.TokenOutputStatusSpentSigned)...)
 	}
 	if len(invalidOutputs) > 0 {
-		return nil, formatErrorWithTransactionEnt(
+		return nil, tokens.FormatErrorWithTransactionEnt(
 			fmt.Sprintf("%s: %s",
-				errInvalidOutputs,
+				tokens.ErrInvalidOutputs,
 				strings.Join(invalidOutputs, "; ")),
 			tokenTransaction, nil)
 	}
@@ -424,10 +426,10 @@ func (h InternalTokenTransactionHandler) regenerateOperatorSignatureForDuplicate
 		finalTokenTransactionHash,
 		config.IdentityPublicKey(),
 	); err != nil {
-		return nil, formatErrorWithTransactionEnt(errStoredOperatorSignatureInvalid, tokenTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrStoredOperatorSignatureInvalid, tokenTransaction, err)
 	}
 
-	logWithTransactionEnt(ctx, "Returning stored signature in response to repeat Sign() call", tokenTransaction, slog.LevelDebug)
+	tokens.LogWithTransactionEnt(ctx, "Returning stored signature in response to repeat Sign() call", tokenTransaction, slog.LevelDebug)
 	return tokenTransaction.OperatorSignature, nil
 }
 
@@ -440,7 +442,7 @@ func (h InternalTokenTransactionHandler) CancelOrFinalizeExpiredTokenTransaction
 	if lockedTokenTransaction.Status != st.TokenTransactionStatusSigned &&
 		lockedTokenTransaction.Status != st.TokenTransactionStatusStarted {
 		return formatErrorWithTransactionEntInternal(
-			fmt.Sprintf(errInvalidTransactionStatus,
+			fmt.Sprintf(tokens.ErrInvalidTransactionStatus,
 				lockedTokenTransaction.Status, fmt.Sprintf("%s or %s", st.TokenTransactionStatusStarted, st.TokenTransactionStatusSigned)),
 			lockedTokenTransaction, nil)
 	}
@@ -455,7 +457,7 @@ func (h InternalTokenTransactionHandler) CancelOrFinalizeExpiredTokenTransaction
 		conn, err := operator.NewGRPCConnection()
 		if err != nil {
 			return nil, formatErrorWithTransactionEntInternal(
-				fmt.Sprintf(errFailedToConnectToOperatorForCancel, operator.Identifier),
+				fmt.Sprintf(tokens.ErrFailedToConnectToOperatorForCancel, operator.Identifier),
 				lockedTokenTransaction, err)
 		}
 		defer conn.Close()
@@ -466,13 +468,13 @@ func (h InternalTokenTransactionHandler) CancelOrFinalizeExpiredTokenTransaction
 		})
 		if err != nil {
 			return nil, formatErrorWithTransactionEntInternal(
-				fmt.Sprintf(errFailedToQueryOperatorForCancel, operator.Identifier),
+				fmt.Sprintf(tokens.ErrFailedToQueryOperatorForCancel, operator.Identifier),
 				lockedTokenTransaction, err)
 		}
 		return internalResp, err
 	})
 	if err != nil {
-		return formatErrorWithTransactionEntInternal(errFailedToExecuteWithAllOperators, lockedTokenTransaction, err)
+		return formatErrorWithTransactionEntInternal(tokens.ErrFailedToExecuteWithAllOperators, lockedTokenTransaction, err)
 	}
 
 	// Check if any operator has finalized the transaction
@@ -555,7 +557,7 @@ func (h InternalTokenTransactionHandler) CancelOrFinalizeExpiredTokenTransaction
 
 	err = ent.UpdateCancelledTransaction(ctx, lockedTokenTransaction)
 	if err != nil {
-		return formatErrorWithTransactionEntInternal(fmt.Sprintf(errFailedToUpdateOutputs, "canceling"), lockedTokenTransaction, err)
+		return formatErrorWithTransactionEntInternal(fmt.Sprintf(tokens.ErrFailedToUpdateOutputs, "canceling"), lockedTokenTransaction, err)
 	}
 
 	return nil
@@ -595,7 +597,7 @@ func (h *InternalTokenTransactionHandler) QueryOwnedTokenOutputsInternal(
 	}
 	outputs, err := ent.GetOwnedTokenOutputs(ctx, req.OwnerPublicKeys, req.TokenPublicKeys, network)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", errFailedToGetOwnedOutputStats, err)
+		return nil, fmt.Errorf("%s: %w", tokens.ErrFailedToGetOwnedOutputStats, err)
 	}
 	ownedTokenOutputs := make([]*pb.OutputWithPreviousTransactionData, 0)
 	for _, output := range outputs {
@@ -630,13 +632,13 @@ func (h InternalTokenTransactionHandler) FinalizeTokenTransactionInternal(
 	}
 	tokenTransaction, err := ent.FetchAndLockTokenTransactionData(ctx, tokenProtoTokenTransaction)
 	if err != nil {
-		return nil, formatErrorWithTransactionEnt(errFailedToFetchTransaction, tokenTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToFetchTransaction, tokenTransaction, err)
 	}
 
 	// Verify that the transaction is in a signed state before finalizing
 	if tokenTransaction.Status != st.TokenTransactionStatusSigned {
-		return nil, formatErrorWithTransactionEnt(
-			fmt.Sprintf(errInvalidTransactionStatus,
+		return nil, tokens.FormatErrorWithTransactionEnt(
+			fmt.Sprintf(tokens.ErrInvalidTransactionStatus,
 				tokenTransaction.Status, st.TokenTransactionStatusSigned),
 			tokenTransaction, nil)
 	}
@@ -648,11 +650,11 @@ func (h InternalTokenTransactionHandler) FinalizeTokenTransactionInternal(
 	}
 
 	if len(invalidOutputs) > 0 {
-		return nil, formatErrorWithTransactionEnt(fmt.Sprintf("%s: %s", errInvalidOutputs, strings.Join(invalidOutputs, "; ")), tokenTransaction, nil)
+		return nil, tokens.FormatErrorWithTransactionEnt(fmt.Sprintf("%s: %s", tokens.ErrInvalidOutputs, strings.Join(invalidOutputs, "; ")), tokenTransaction, nil)
 	}
 
 	if len(tokenTransaction.Edges.SpentOutput) != len(req.RevocationSecrets) {
-		return nil, formatErrorWithTransactionEnt(
+		return nil, tokens.FormatErrorWithTransactionEnt(
 			fmt.Sprintf("number of revocation keys (%d) does not match number of spent outputs (%d)",
 				len(req.RevocationSecrets),
 				len(tokenTransaction.Edges.SpentOutput)),
@@ -666,7 +668,7 @@ func (h InternalTokenTransactionHandler) FinalizeTokenTransactionInternal(
 	// and that they form a contiguous sequence from 0 to len(tokenTransaction.Edges.SpentOutput)-1
 	for i := 0; i < len(tokenTransaction.Edges.SpentOutput); i++ {
 		if _, exists := revocationSecretMap[i]; !exists {
-			return nil, formatErrorWithTransactionEnt(
+			return nil, tokens.FormatErrorWithTransactionEnt(
 				fmt.Sprintf("missing revocation secret for input index %d", i),
 				tokenTransaction, nil)
 		}
@@ -686,14 +688,14 @@ func (h InternalTokenTransactionHandler) FinalizeTokenTransactionInternal(
 		index := int(output.SpentTransactionInputVout)
 		revocationSecret, exists := revocationSecretMap[index]
 		if !exists {
-			return nil, formatErrorWithTransactionEnt(
+			return nil, tokens.FormatErrorWithTransactionEnt(
 				fmt.Sprintf("missing revocation secret for input at index %d", index),
 				tokenTransaction, nil)
 		}
 
 		revocationPrivateKey, err := common.PrivateKeyFromBytes(revocationSecret)
 		if err != nil {
-			return nil, formatErrorWithTransactionEnt(errFailedToParseRevocationPrivateKey, tokenTransaction, err)
+			return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToParseRevocationPrivateKey, tokenTransaction, err)
 		}
 
 		revocationSecrets[i] = revocationPrivateKey
@@ -702,7 +704,7 @@ func (h InternalTokenTransactionHandler) FinalizeTokenTransactionInternal(
 
 	err = utils.ValidateRevocationKeys(revocationSecrets, revocationCommitements)
 	if err != nil {
-		return nil, formatErrorWithTransactionEnt(errFailedToValidateRevocationKeys, tokenTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToValidateRevocationKeys, tokenTransaction, err)
 	}
 
 	identityPrivateKey := secp256k1.PrivKeyFromBytes(config.IdentityPrivateKey)
@@ -714,12 +716,12 @@ func (h InternalTokenTransactionHandler) FinalizeTokenTransactionInternal(
 		req.RevocationSecrets,
 	))
 	if err != nil {
-		return nil, formatErrorWithTransactionEnt(errFailedToSendToLRC20Node, tokenTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToSendToLRC20Node, tokenTransaction, err)
 	}
 
 	err = ent.UpdateFinalizedTransaction(ctx, tokenTransaction, req.RevocationSecrets)
 	if err != nil {
-		return nil, formatErrorWithTransactionEnt(fmt.Sprintf(errFailedToUpdateOutputs, "finalizing"), tokenTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionEnt(fmt.Sprintf(tokens.ErrFailedToUpdateOutputs, "finalizing"), tokenTransaction, err)
 	}
 
 	return &emptypb.Empty{}, nil
