@@ -45,6 +45,7 @@ import {
 } from "@buildonspark/lrc20-sdk";
 import { sha256 } from "@noble/hashes/sha2";
 import { Transaction } from "@scure/btc-signer";
+import { taprootTweakPrivKey } from "@scure/btc-signer/utils";
 import type { Psbt } from "bitcoinjs-lib";
 
 export type SigningNonce = {
@@ -139,6 +140,92 @@ class DefaultSparkKeysGenerator implements SparkKeysGenerator {
       !identityKey.publicKey ||
       !depositKey.publicKey ||
       !signingKey.publicKey ||
+      !staticDepositKey.privateKey ||
+      !staticDepositKey.publicKey
+    ) {
+      throw new ValidationError(
+        "Failed to derive all required keys from seed",
+        {
+          field: "derivedKeys",
+        },
+      );
+    }
+
+    return {
+      masterPublicKey: hdkey.publicKey,
+      identityKey: {
+        privateKey: identityKey.privateKey,
+        publicKey: identityKey.publicKey,
+      },
+      signingHDKey: {
+        hdKey: signingKey,
+        privateKey: signingKey.privateKey,
+        publicKey: signingKey.publicKey,
+      },
+      depositKey: {
+        privateKey: depositKey.privateKey,
+        publicKey: depositKey.publicKey,
+      },
+      staticDepositHDKey: {
+        hdKey: staticDepositKey,
+        privateKey: staticDepositKey.privateKey,
+        publicKey: staticDepositKey.publicKey,
+      },
+    };
+  }
+}
+
+class TaprootOutputKeysGenerator implements SparkKeysGenerator {
+  constructor(private readonly useAddressIndex: boolean = false) {}
+
+  async deriveKeysFromSeed(
+    seed: Uint8Array,
+    accountNumber: number,
+  ): Promise<{
+    masterPublicKey: Uint8Array;
+    identityKey: KeyPair;
+    signingHDKey: DerivedHDKey;
+    depositKey: KeyPair;
+    staticDepositHDKey: DerivedHDKey;
+  }> {
+    const hdkey = HDKey.fromMasterSeed(seed);
+
+    if (!hdkey.privateKey || !hdkey.publicKey) {
+      throw new ValidationError("Failed to derive keys from seed", {
+        field: "hdkey",
+        value: seed,
+      });
+    }
+
+    const derivationPath = this.useAddressIndex
+      ? `m/86'/0'/0'/0/${accountNumber}`
+      : `m/86'/0'/${accountNumber}'/0/0`;
+
+    const taprootInternalKey = hdkey.derive(derivationPath);
+
+    let tweakedPrivateKey = taprootTweakPrivKey(taprootInternalKey.privateKey!);
+    let tweakedPublicKey = secp256k1.getPublicKey(tweakedPrivateKey);
+
+    // always use the even key
+    if (tweakedPublicKey[0] === 3) {
+      tweakedPrivateKey = privateNegate(tweakedPrivateKey);
+      tweakedPublicKey = secp256k1.getPublicKey(tweakedPrivateKey);
+    }
+
+    const identityKey = {
+      publicKey: tweakedPublicKey,
+      privateKey: tweakedPrivateKey,
+    };
+
+    const signingKey = hdkey.derive(`${derivationPath}/1'`);
+    const depositKey = hdkey.derive(`${derivationPath}/2'`);
+    const staticDepositKey = hdkey.derive(`${derivationPath}/3'`);
+
+    if (
+      !signingKey.privateKey ||
+      !signingKey.publicKey ||
+      !depositKey.privateKey ||
+      !depositKey.publicKey ||
       !staticDepositKey.privateKey ||
       !staticDepositKey.publicKey
     ) {
@@ -839,5 +926,12 @@ class DefaultSparkSigner implements SparkSigner {
     tx.signIdx(privateKey, index);
   }
 }
-export { DefaultSparkSigner };
+
+class TaprootSparkSigner extends DefaultSparkSigner {
+  constructor() {
+    super({sparkKeysGenerator: new TaprootOutputKeysGenerator()});
+  }
+}
+
+export { DefaultSparkSigner, TaprootSparkSigner, TaprootOutputKeysGenerator };
 export type { SparkSigner };
