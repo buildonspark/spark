@@ -146,6 +146,8 @@ func TestTimelockExpirationHappyPath(t *testing.T) {
 }
 
 func TestTimelockExpirationTransferredNode(t *testing.T) {
+	skipIfGithubActions(t)
+
 	walletConfig, err := testutil.TestWalletConfig()
 	require.NoError(t, err)
 

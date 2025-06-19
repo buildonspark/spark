@@ -676,13 +676,13 @@ const file_spark_ssp_internal_proto_rawDesc = "" +
 	"\rpublic_shares\x18\x01 \x03(\v28.spark_ssp.SigningKeysharePublicShares.PublicSharesEntryR\fpublicShares\x1a?\n" +
 	"\x11PublicSharesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x012\xee\x03\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x012\xf4\x03\n" +
 	"\x17SparkSspInternalService\x12Y\n" +
 	"\x10query_lost_nodes\x12 .spark_ssp.QueryLostNodesRequest\x1a!.spark_ssp.QueryLostNodesResponse\"\x00\x12I\n" +
 	"\n" +
 	"magic_swap\x12\x1b.spark_ssp.MagicSwapRequest\x1a\x1c.spark_ssp.MagicSwapResponse\"\x00\x12b\n" +
-	"\x13get_stuck_transfers\x12#.spark_ssp.GetStuckTransfersRequest\x1a$.spark_ssp.GetStuckTransfersResponse\"\x00\x12_\n" +
-	"\x0equery_transfer\x12$.spark_ssp.QueryStuckTransferRequest\x1a%.spark_ssp.QueryStuckTransferResponse\"\x00\x12h\n" +
+	"\x13get_stuck_transfers\x12#.spark_ssp.GetStuckTransfersRequest\x1a$.spark_ssp.GetStuckTransfersResponse\"\x00\x12e\n" +
+	"\x14query_stuck_transfer\x12$.spark_ssp.QueryStuckTransferRequest\x1a%.spark_ssp.QueryStuckTransferResponse\"\x00\x12h\n" +
 	"\x15cancel_stuck_transfer\x12%.spark_ssp.CancelStuckTransferRequest\x1a&.spark_ssp.CancelStuckTransferResponse\"\x00B0Z.github.com/lightsparkdev/spark/proto/spark_sspb\x06proto3"
 
 var (
@@ -734,12 +734,12 @@ var file_spark_ssp_internal_proto_depIdxs = []int32{
 	0,  // 12: spark_ssp.SparkSspInternalService.query_lost_nodes:input_type -> spark_ssp.QueryLostNodesRequest
 	2,  // 13: spark_ssp.SparkSspInternalService.magic_swap:input_type -> spark_ssp.MagicSwapRequest
 	4,  // 14: spark_ssp.SparkSspInternalService.get_stuck_transfers:input_type -> spark_ssp.GetStuckTransfersRequest
-	6,  // 15: spark_ssp.SparkSspInternalService.query_transfer:input_type -> spark_ssp.QueryStuckTransferRequest
+	6,  // 15: spark_ssp.SparkSspInternalService.query_stuck_transfer:input_type -> spark_ssp.QueryStuckTransferRequest
 	8,  // 16: spark_ssp.SparkSspInternalService.cancel_stuck_transfer:input_type -> spark_ssp.CancelStuckTransferRequest
 	1,  // 17: spark_ssp.SparkSspInternalService.query_lost_nodes:output_type -> spark_ssp.QueryLostNodesResponse
 	3,  // 18: spark_ssp.SparkSspInternalService.magic_swap:output_type -> spark_ssp.MagicSwapResponse
 	5,  // 19: spark_ssp.SparkSspInternalService.get_stuck_transfers:output_type -> spark_ssp.GetStuckTransfersResponse
-	7,  // 20: spark_ssp.SparkSspInternalService.query_transfer:output_type -> spark_ssp.QueryStuckTransferResponse
+	7,  // 20: spark_ssp.SparkSspInternalService.query_stuck_transfer:output_type -> spark_ssp.QueryStuckTransferResponse
 	9,  // 21: spark_ssp.SparkSspInternalService.cancel_stuck_transfer:output_type -> spark_ssp.CancelStuckTransferResponse
 	17, // [17:22] is the sub-list for method output_type
 	12, // [12:17] is the sub-list for method input_type

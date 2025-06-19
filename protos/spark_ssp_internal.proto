@@ -10,7 +10,7 @@ service SparkSspInternalService {
     rpc query_lost_nodes(QueryLostNodesRequest) returns (QueryLostNodesResponse) {}
     rpc magic_swap(MagicSwapRequest) returns (MagicSwapResponse) {}
     rpc get_stuck_transfers(GetStuckTransfersRequest) returns (GetStuckTransfersResponse) {}
-    rpc query_transfer(QueryStuckTransferRequest) returns (QueryStuckTransferResponse) {}
+    rpc query_stuck_transfer(QueryStuckTransferRequest) returns (QueryStuckTransferResponse) {}
     rpc cancel_stuck_transfer(CancelStuckTransferRequest) returns (CancelStuckTransferResponse) {}
 }
 
