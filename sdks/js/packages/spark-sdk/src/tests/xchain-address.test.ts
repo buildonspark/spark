@@ -11,7 +11,7 @@ describe("xchain-address", () => {
     ["regtest",
       "bcrt1p47kh0ff29d3rjw2n43vxqgmrgv9az562x37x6dp4ehyqq7ezyhcqlz5y42",
       "sprt1pgss9tadw7jj52mz8yu48tzcvq3kxsct69f55drud56rtnwgqpajyf0sp8jkjq"],
-  ])("getSparkAddressFromTaproot success (%d)", (_network, taprootAddress, expectedSparkAddress) => {
+  ])("getSparkAddressFromTaproot success (%s)", (_network, taprootAddress, expectedSparkAddress) => {
     expect(getSparkAddressFromTaproot(taprootAddress)).toBe(expectedSparkAddress);
   });
 });
