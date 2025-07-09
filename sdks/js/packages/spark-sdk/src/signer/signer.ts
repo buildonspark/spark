@@ -178,6 +178,77 @@ class DefaultSparkKeysGenerator implements SparkKeysGenerator {
   }
 }
 
+class DerivationPathKeysGenerator implements SparkKeysGenerator {
+  constructor(private readonly derivationPathTemplate: string) {}
+
+  async deriveKeysFromSeed(
+    seed: Uint8Array,
+    accountNumber: number,
+  ): Promise<{
+    masterPublicKey: Uint8Array;
+    identityKey: KeyPair;
+    signingHDKey: DerivedHDKey;
+    depositKey: KeyPair;
+    staticDepositHDKey: DerivedHDKey;
+  }> {
+    const hdkey = HDKey.fromMasterSeed(seed);
+
+    if (!hdkey.privateKey || !hdkey.publicKey) {
+      throw new ValidationError("Failed to derive keys from seed", {
+        field: "hdkey",
+        value: seed,
+      });
+    }
+
+    const derivationPath = this.derivationPathTemplate.replaceAll('?', accountNumber.toString());
+
+    const identityKey = hdkey.derive(derivationPath);
+    const signingKey = hdkey.derive(`${derivationPath}/1'`);
+    const depositKey = hdkey.derive(`${derivationPath}/2'`);
+    const staticDepositKey = hdkey.derive(`${derivationPath}/3'`);
+
+    if (
+      !identityKey.privateKey ||
+      !identityKey.publicKey ||
+      !signingKey.privateKey ||
+      !signingKey.publicKey ||
+      !depositKey.privateKey ||
+      !depositKey.publicKey ||
+      !staticDepositKey.privateKey ||
+      !staticDepositKey.publicKey
+    ) {
+      throw new ValidationError(
+        "Failed to derive all required keys from seed",
+        {
+          field: "derivedKeys",
+        },
+      );
+    }
+
+    return {
+      masterPublicKey: hdkey.publicKey,
+      identityKey: {
+        privateKey: identityKey.privateKey,
+        publicKey: identityKey.publicKey,
+      },
+      signingHDKey: {
+        hdKey: signingKey,
+        privateKey: signingKey.privateKey,
+        publicKey: signingKey.publicKey,
+      },
+      depositKey: {
+        privateKey: depositKey.privateKey,
+        publicKey: depositKey.publicKey,
+      },
+      staticDepositHDKey: {
+        hdKey: staticDepositKey,
+        privateKey: staticDepositKey.privateKey,
+        publicKey: staticDepositKey.publicKey,
+      },
+    };
+  }
+}
+
 class TaprootOutputKeysGenerator implements SparkKeysGenerator {
   constructor(private readonly useAddressIndex: boolean = false) {}
 
@@ -931,10 +1002,38 @@ class DefaultSparkSigner implements SparkSigner {
 }
 
 class TaprootSparkSigner extends DefaultSparkSigner {
-  constructor() {
-    super({ sparkKeysGenerator: new TaprootOutputKeysGenerator() });
+  constructor(useAddressIndex = false) {
+    super({ sparkKeysGenerator: new TaprootOutputKeysGenerator(useAddressIndex) });
   }
 }
 
-export { DefaultSparkSigner, TaprootSparkSigner, TaprootOutputKeysGenerator };
-export type { SparkSigner, TokenSigner };
+class NativeSegwitSparkSigner extends DefaultSparkSigner {
+  constructor(useAddressIndex = false) {
+    super({ sparkKeysGenerator: new DerivationPathKeysGenerator(
+      useAddressIndex ? "m/84'/0'/0'/0/?" : "m/84'/0'/?'/0/0") });
+  }
+}
+
+class WrappedSegwitSparkSigner extends DefaultSparkSigner {
+  constructor(useAddressIndex = false) {
+    super({ sparkKeysGenerator: new DerivationPathKeysGenerator(
+      useAddressIndex ? "m/49'/0'/0'/0/?" : "m/49'/0'/?'/0/0") });
+  }
+}
+
+class LegacyBitcoinSparkSigner extends DefaultSparkSigner {
+  constructor(useAddressIndex = false) {
+    super({ sparkKeysGenerator: new DerivationPathKeysGenerator(
+      useAddressIndex ? "m/44'/0'/0'/0/?" : "m/44'/0'/?'/0/0") });
+  }
+}
+
+export {
+  DefaultSparkSigner,
+  TaprootSparkSigner,
+  NativeSegwitSparkSigner,
+  WrappedSegwitSparkSigner,
+  LegacyBitcoinSparkSigner,
+  TaprootOutputKeysGenerator,
+};
+export type { SparkSigner };
