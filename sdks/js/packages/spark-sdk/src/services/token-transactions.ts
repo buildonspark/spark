@@ -709,67 +709,11 @@ export class TokenTransactionService {
           const identityPublicKey =
             await this.config.signer.getIdentityPublicKey();
 
-          // Create operator-specific payload with operator's identity public key
-          const payload: OperatorSpecificTokenTransactionSignablePayload = {
-            finalTokenTransactionHash: finalTokenTransactionHash,
-            operatorIdentityPublicKey: hexToBytes(operator.identityPublicKey),
-          };
-
-          const payloadHash =
-            await hashOperatorSpecificTokenTransactionSignablePayload(payload);
-
-          let operatorSpecificSignatures: OperatorSpecificOwnerSignature[] = [];
-          if (finalTokenTransaction.tokenInputs!.$case === "mintInput") {
-            const issuerPublicKey =
-              finalTokenTransaction.tokenInputs!.mintInput.issuerPublicKey;
-            if (!issuerPublicKey) {
-              throw new ValidationError("Invalid mint input", {
-                field: "issuerPublicKey",
-                value: null,
-                expected: "Non-null issuer public key",
-              });
-            }
-
-            const ownerSignature = await this.signMessageWithKey(
-              payloadHash,
-              issuerPublicKey,
-            );
-
-            operatorSpecificSignatures.push({
-              ownerSignature: {
-                signature: ownerSignature,
-                inputIndex: 0,
-              },
-              payload: payload,
-            });
-          }
-
-          if (finalTokenTransaction.tokenInputs!.$case === "transferInput") {
-            const transferInput =
-              finalTokenTransaction.tokenInputs!.transferInput;
-            for (let i = 0; i < transferInput.outputsToSpend.length; i++) {
-              let ownerSignature: Uint8Array;
-              if (this.config.getTokenSignatures() === "SCHNORR") {
-                ownerSignature =
-                  await this.config.signer.signSchnorrWithIdentityKey(
-                    payloadHash,
-                  );
-              } else {
-                ownerSignature =
-                  await this.config.signer.signMessageWithIdentityKey(
-                    payloadHash,
-                  );
-              }
-
-              operatorSpecificSignatures.push({
-                ownerSignature: {
-                  signature: ownerSignature,
-                  inputIndex: i,
-                },
-                payload,
-              });
-            }
-          }
+          const operatorSpecificSignatures = await this.createOperatorSpecificSignaturesV0(
+            finalTokenTransaction,
+            finalTokenTransactionHash,
+            operator,
+          );
 
           try {
             const response = await internalSparkClient.sign_token_transaction(
@@ -1009,6 +953,77 @@ export class TokenTransactionService {
         );
       }
     }
+  }
+
+  // Helper method to create operator-specific signatures for V0 transactions
+  private async createOperatorSpecificSignaturesV0(
+    finalTokenTransaction: TokenTransactionV0,
+    finalTokenTransactionHash: Uint8Array,
+    operator: SigningOperator,
+  ): Promise<OperatorSpecificOwnerSignature[]> {
+    const payload: OperatorSpecificTokenTransactionSignablePayload = {
+      finalTokenTransactionHash: finalTokenTransactionHash,
+      operatorIdentityPublicKey: hexToBytes(operator.identityPublicKey),
+    };
+
+    const payloadHash =
+      await hashOperatorSpecificTokenTransactionSignablePayload(payload);
+
+    let operatorSpecificSignatures: OperatorSpecificOwnerSignature[] = [];
+    
+    if (finalTokenTransaction.tokenInputs!.$case === "mintInput") {
+      const issuerPublicKey =
+        finalTokenTransaction.tokenInputs!.mintInput.issuerPublicKey;
+      if (!issuerPublicKey) {
+        throw new ValidationError("Invalid mint input", {
+          field: "issuerPublicKey",
+          value: null,
+          expected: "Non-null issuer public key",
+        });
+      }
+
+      const ownerSignature = await this.signMessageWithKey(
+        payloadHash,
+        issuerPublicKey,
+      );
+
+      operatorSpecificSignatures.push({
+        ownerSignature: {
+          signature: ownerSignature,
+          inputIndex: 0,
+        },
+        payload: payload,
+      });
+    }
+
+    if (finalTokenTransaction.tokenInputs!.$case === "transferInput") {
+      const transferInput =
+        finalTokenTransaction.tokenInputs!.transferInput;
+      for (let i = 0; i < transferInput.outputsToSpend.length; i++) {
+        let ownerSignature: Uint8Array;
+        if (this.config.getTokenSignatures() === "SCHNORR") {
+          ownerSignature =
+            await this.config.signer.signSchnorrWithIdentityKey(
+              payloadHash,
+            );
+        } else {
+          ownerSignature =
+            await this.config.signer.signMessageWithIdentityKey(
+              payloadHash,
+            );
+        }
+
+        operatorSpecificSignatures.push({
+          ownerSignature: {
+            signature: ownerSignature,
+            inputIndex: i,
+          },
+          payload,
+        });
+      }
+    }
+
+    return operatorSpecificSignatures;
   }
 
   private async finalizeTokenTransaction(
