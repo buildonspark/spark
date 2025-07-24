@@ -768,21 +768,21 @@ export class SparkWallet extends EventEmitter {
                 continue;
               }
 
-              if (
-                leaf.status !== operatorLeaf.status ||
-                leaf.signingKeyshare?.publicKey !==
-                  operatorLeaf.signingKeyshare?.publicKey ||
-                !equalBytes(leaf.nodeTx, operatorLeaf.nodeTx) ||
-                !equalBytes(leaf.refundTx, operatorLeaf.refundTx)
-              ) {
-                console.log(`${leaf.value} - not equal`);
-                ignoredLeaves.add(nodeId);
-                if (isNode) {
-                  const fs = await import("fs/promises");
-                  await fs.appendFile("leaves.log", nodeId);
-                }
-              }
-            }
+//               if (
+// leaf.status !== operatorLeaf.status ||
+// leaf.signingKeyshare?.publicKey !==
+//   operatorLeaf.signingKeyshare?.publicKey ||
+// !equalBytes(leaf.nodeTx, operatorLeaf.nodeTx) ||
+// !equalBytes(leaf.refundTx, operatorLeaf.refundTx)
+//               ) {
+//                 console.log(`${leaf.value} - not equal`);
+//                 ignoredLeaves.add(nodeId);
+//                 if (isNode) {
+//                   const fs = await import("fs/promises");
+//                   await fs.appendFile("leaves.log", nodeId);
+//                 }
+//               }
+//             }
           }
         }
 
