@@ -710,7 +710,7 @@ export class SparkWallet extends EventEmitter {
     let valueToCheckUntil = max * 64;
 
     while (currentValue <= valueToCheckUntil) {
-      // console.log("Checking value", currentValue);
+      console.log("Checking value", currentValue);
       const sparkClient = await this.connectionManager.createSparkClient(
         this.config.getCoordinatorAddress(),
       );
@@ -718,7 +718,7 @@ export class SparkWallet extends EventEmitter {
       let offset = 0;
       let leaves: TreeNode[] = [];
       while (leaves.length === 0 && offset !== -1) {
-        // console.log("Using offset", offset);
+        console.log("Using offset", offset);
         const res = await sparkClient.query_nodes_by_value({
           ownerIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
@@ -775,6 +775,7 @@ export class SparkWallet extends EventEmitter {
                 !equalBytes(leaf.nodeTx, operatorLeaf.nodeTx) ||
                 !equalBytes(leaf.refundTx, operatorLeaf.refundTx)
               ) {
+                console.log(`${leaf.value} - not equal`);
                 ignoredLeaves.add(nodeId);
                 if (isNode) {
                   const fs = await import("fs/promises");
@@ -1146,6 +1147,7 @@ export class SparkWallet extends EventEmitter {
           leaf.verifyingPublicKey,
         )
       ) {
+        console.log("verifying with spark derivation failed");
         signingPubKey = await this.config.signer.generatePublicKey(
           new Uint8Array(Buffer.from(leaf.id, "hex")),
         );
@@ -1158,8 +1160,10 @@ export class SparkWallet extends EventEmitter {
           leaf.verifyingPublicKey,
         )
       ) {
+        console.log("verifying with timestamp derivation failed");
         failedLeaves.push(leaf.id);
       } else {
+        console.log("verifying success");
         leafKeyTweaks.push({
           leaf,
           signingPubKey,
