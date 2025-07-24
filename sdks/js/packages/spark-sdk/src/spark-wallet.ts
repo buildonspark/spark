@@ -1117,36 +1117,61 @@ export class SparkWallet extends EventEmitter {
     const failedLeaves: string[] = [];
 
     for (const leaf of leavesBatch) {
-      let signingPubKey = await this.config.signer.generatePublicKey(
+      const signingPubKey = await this.config.signer.generatePublicKey(
         sha256(leaf.id),
       );
+      const signingPubKeyFromParent = leaf.parentNodeId
+        ? await this.config.signer.generatePublicKey(sha256(leaf.parentNodeId))
+        : undefined;
 
-      if (
-        !verifyKey(
-          signingPubKey,
+      const signingPubKeyFromTimestamp = new Uint8Array(
+        Buffer.from(leaf.id, "hex"),
+      );
+
+      const isKeyFromSparkDerivation = verifyKey(
+        signingPubKey,
+        leaf.signingKeyshare?.publicKey ?? new Uint8Array(),
+        leaf.verifyingPublicKey,
+      );
+      const isKeyFromParent =
+        signingPubKeyFromParent &&
+        verifyKey(
+          signingPubKeyFromParent,
           leaf.signingKeyshare?.publicKey ?? new Uint8Array(),
           leaf.verifyingPublicKey,
-        )
-      ) {
-        signingPubKey = await this.config.signer.generatePublicKey(
-          new Uint8Array(Buffer.from(leaf.id, "hex")),
         );
-      }
+      const isKeyFromTimestamp = verifyKey(
+        signingPubKeyFromTimestamp,
+        leaf.signingKeyshare?.publicKey ?? new Uint8Array(),
+        leaf.verifyingPublicKey,
+      );
 
-      if (
-        !verifyKey(
-          signingPubKey,
-          leaf.signingKeyshare?.publicKey ?? new Uint8Array(),
-          leaf.verifyingPublicKey,
-        )
-      ) {
-        failedLeaves.push(leaf.id);
-      } else {
+      console.log({
+        isKeyFromSparkDerivation,
+        isKeyFromParent,
+        isKeyFromTimestamp,
+      });
+
+      if (isKeyFromSparkDerivation) {
         leafKeyTweaks.push({
           leaf,
           signingPubKey,
           newSigningPubKey: await this.config.signer.generatePublicKey(),
         });
+      } else if (isKeyFromParent) {
+        leafKeyTweaks.push({
+          leaf,
+          signingPubKey: signingPubKeyFromParent,
+          newSigningPubKey: await this.config.signer.generatePublicKey(),
+        });
+      } else if (isKeyFromTimestamp) {
+        leafKeyTweaks.push({
+          leaf,
+          signingPubKey: signingPubKeyFromTimestamp,
+          newSigningPubKey: await this.config.signer.generatePublicKey(),
+        });
+      } else {
+        failedLeaves.push(leaf.id);
       }
     }
 
