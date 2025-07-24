@@ -1143,13 +1143,15 @@ export class SparkWallet extends EventEmitter {
       const signingPubKey = await this.config.signer.generatePublicKey(
         sha256(leaf.id),
       );
+
       const signingPubKeyFromParent = leaf.parentNodeId
         ? await this.config.signer.generatePublicKey(sha256(leaf.parentNodeId))
         : undefined;
 
-      const signingPubKeyFromTimestamp = new Uint8Array(
-        Buffer.from(leaf.id, "hex"),
-      );
+      const signingPubKeyFromTimestamp =
+        await this.config.signer.generatePublicKey(
+          new Uint8Array(Buffer.from(leaf.id, "hex")),
+        );
 
       const isKeyFromSparkDerivation = verifyKey(
         signingPubKey,
