@@ -798,8 +798,17 @@ export class SparkWallet extends EventEmitter {
       }
 
       if (offset === -1 && leaves.length === 0) {
-        currentValue *= 2;
-        continue;
+        const nextValue = Object.keys(distribution.nodeDistribution)
+          .map(Number)
+          .sort((a, b) => a - b)
+          .find((value) => value > currentValue);
+
+        if (nextValue) {
+          currentValue = nextValue;
+          continue;
+        } else {
+          break;
+        }
       } else {
         if (currentValue * 64 > valueToCheckUntil) {
           valueToCheckUntil = currentValue * 64;
@@ -808,8 +817,17 @@ export class SparkWallet extends EventEmitter {
         const leavesToSwap = Object.values(leaves).slice(0, 64);
 
         if (leavesToSwap.length === 0) {
-          currentValue *= 2;
-          continue;
+          const nextValue = Object.keys(distribution.nodeDistribution)
+            .map(Number)
+            .sort((a, b) => a - b)
+            .find((value) => value > currentValue);
+
+          if (nextValue) {
+            currentValue = nextValue;
+            continue;
+          } else {
+            break;
+          }
         }
 
         try {
