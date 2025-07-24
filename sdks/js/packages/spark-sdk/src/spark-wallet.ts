@@ -710,7 +710,7 @@ export class SparkWallet extends EventEmitter {
     let valueToCheckUntil = max * 64;
 
     while (currentValue <= valueToCheckUntil) {
-      console.log("Checking value", currentValue);
+      // console.log("Checking value", currentValue);
       const sparkClient = await this.connectionManager.createSparkClient(
         this.config.getCoordinatorAddress(),
       );
@@ -798,17 +798,8 @@ export class SparkWallet extends EventEmitter {
       }
 
       if (offset === -1 && leaves.length === 0) {
-        const nextValue = Object.keys(distribution.nodeDistribution)
-          .map(Number)
-          .sort((a, b) => a - b)
-          .find((value) => value > currentValue);
-
-        if (nextValue) {
-          currentValue = nextValue;
-          continue;
-        } else {
-          break;
-        }
+        currentValue *= 2;
+        continue;
       } else {
         if (currentValue * 64 > valueToCheckUntil) {
           valueToCheckUntil = currentValue * 64;
@@ -1157,11 +1148,11 @@ export class SparkWallet extends EventEmitter {
         leaf.verifyingPublicKey,
       );
 
-      // console.log({
-      //   isKeyFromSparkDerivation,
-      //   isKeyFromParent,
-      //   isKeyFromTimestamp,
-      // });
+      console.log({
+        isKeyFromSparkDerivation,
+        isKeyFromParent,
+        isKeyFromTimestamp,
+      });
 
       if (isKeyFromSparkDerivation) {
         leafKeyTweaks.push({
