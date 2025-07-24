@@ -718,7 +718,7 @@ export class SparkWallet extends EventEmitter {
       let offset = 0;
       let leaves: TreeNode[] = [];
       while (leaves.length === 0 && offset !== -1) {
-        // console.log("Using offset", offset);
+        console.log("Using offset", offset);
         const res = await sparkClient.query_nodes_by_value({
           ownerIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
@@ -727,13 +727,17 @@ export class SparkWallet extends EventEmitter {
           limit: 100,
         });
 
+        console.log("Result length", res.nodes.length);
+
         const resLength = Object.values(res.nodes).length;
         if (resLength === 1) {
+          console.log("Breaking out of loop");
           leaves = [];
           offset = -1;
           break;
         }
 
+        console.log("Syncing");
         for (const [id, operator] of Object.entries(
           this.config.getSigningOperators(),
         )) {
@@ -775,6 +779,7 @@ export class SparkWallet extends EventEmitter {
                 !equalBytes(leaf.nodeTx, operatorLeaf.nodeTx) ||
                 !equalBytes(leaf.refundTx, operatorLeaf.refundTx)
               ) {
+                console.log("Not equal");
                 ignoredLeaves.add(nodeId);
                 if (isNode) {
                   const fs = await import("fs/promises");
@@ -817,8 +822,17 @@ export class SparkWallet extends EventEmitter {
         const leavesToSwap = Object.values(leaves).slice(0, 64);
 
         if (leavesToSwap.length === 0) {
-          currentValue *= 2;
-          continue;
+          const nextValue = Object.keys(distribution.nodeDistribution)
+            .map(Number)
+            .sort((a, b) => a - b)
+            .find((value) => value > currentValue);
+
+          if (nextValue) {
+            currentValue = nextValue;
+            continue;
+          } else {
+            break;
+          }
         }
 
         try {
@@ -1155,11 +1169,11 @@ export class SparkWallet extends EventEmitter {
         leaf.verifyingPublicKey,
       );
 
-      // console.log({
-      //   isKeyFromSparkDerivation,
-      //   isKeyFromParent,
-      //   isKeyFromTimestamp,
-      // });
+      console.log({
+        isKeyFromSparkDerivation,
+        isKeyFromParent,
+        isKeyFromTimestamp,
+      });
 
       if (isKeyFromSparkDerivation) {
         leafKeyTweaks.push({
