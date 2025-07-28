@@ -102,7 +102,7 @@ type Config struct {
 
 // DatabaseDriver returns the database driver based on the database path.
 func (c *Config) DatabaseDriver() string {
-	if strings.HasPrefix(c.DatabasePath, "postgresql") {
+	if strings.HasPrefix(c.DatabasePath, "postgres") {
 		return "postgres"
 	}
 	return "sqlite3"
