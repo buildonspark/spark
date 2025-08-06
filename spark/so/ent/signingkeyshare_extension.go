@@ -9,6 +9,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -172,7 +173,7 @@ func GetUnusedSigningKeysharesTx(
 
 // MarkSigningKeysharesAsUsed marks the given keyshares as used. If any of the keyshares are not
 // found or not available, it returns an error.
-func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UUID) (map[uuid.UUID]*SigningKeyshare, error) {
+func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UUID) ([]*SigningKeyshare, error) {
 	ctx, span := tracer.Start(ctx, "SigningKeyshare.MarkSigningKeysharesAsUsed")
 	defer span.End()
 
@@ -183,30 +184,49 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UU
 	}
 	logger.Sugar().Infof("Marking %d keyshares as used", len(ids))
 
-	keysharesMap, err := GetSigningKeysharesMap(ctx, ids)
+	var updatedKeyshares []*SigningKeyshare
+
+	// We use a custom a custom query here to select and update the keyshares in a single query
+
+	// nolint:forbidigo
+	rows, err := db.QueryContext(ctx, `
+		UPDATE signing_keyshares
+		SET status = 'IN_USE', update_time = NOW()
+		WHERE signing_keyshares.status = 'AVAILABLE'
+		AND signing_keyshares.id = ANY($1)
+		RETURNING signing_keyshares.*
+	`, []any{pq.Array(ids)}...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check for existing in use keyshares: %w", err)
+		return nil, err
 	}
-	if len(keysharesMap) != len(ids) {
-		return nil, fmt.Errorf("some shares are already in use: %d", len(ids)-len(keysharesMap))
+	defer func() {
+		if cerr := rows.Close(); cerr != nil {
+			// If ScanSlice already returned an error, we don't want to overwrite it,
+			// so just log the close error.
+			logging.GetLoggerFromContext(ctx).Error("failed to close rows", zap.Error(cerr))
+			span.RecordError(cerr)
+		}
+	}()
+
+	if err := sql.ScanSlice(rows, &updatedKeyshares); err != nil {
+		return nil, err
 	}
 
-	// If these keyshares are not already in use, proceed with the update.
-	count, err := db.SigningKeyshare.
-		Update().
-		Where(signingkeyshare.IDIn(ids...)).
-		SetStatus(st.KeyshareStatusInUse).
-		Save(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to update keyshares to in use: %w", err)
+	if len(updatedKeyshares) != len(ids) {
+		missing := make([]uuid.UUID, 0, len(ids)-len(updatedKeyshares))
+		updatedSet := make(map[uuid.UUID]struct{}, len(updatedKeyshares))
+		for _, k := range updatedKeyshares {
+			updatedSet[k.ID] = struct{}{}
+		}
+		for _, id := range ids {
+			if _, ok := updatedSet[id]; !ok {
+				missing = append(missing, id)
+			}
+		}
+		return nil, fmt.Errorf("keyshares are not all available: ids=%v (total=%d) could not be reserved from %v", missing, len(ids)-len(updatedKeyshares), ids)
 	}
 
-	if count != len(ids) {
-		return nil, fmt.Errorf("some keyshares are not available in %v", ids)
-	}
-
-	// Return the keyshares that were marked as used in case the caller wants to make use of them.
-	return keysharesMap, nil
+	return updatedKeyshares, nil
 }
 
 // GetKeyPackage returns the key package for the given keyshare ID.

@@ -25,13 +25,8 @@ func NewInternalTreeCreationHandler(config *so.Config) *InternalTreeCreationHand
 	return &InternalTreeCreationHandler{config: config}
 }
 
-func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx context.Context, req *pbinternal.PrepareTreeAddressRequest) (map[string]*ent.SigningKeyshare, error) {
-	parentKeyshardID, err := uuid.Parse(req.TargetKeyshareId)
-	if err != nil {
-		return nil, err
-	}
-
-	keyshareIDs := []uuid.UUID{parentKeyshardID}
+func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx context.Context, req *pbinternal.PrepareTreeAddressRequest) ([]*ent.SigningKeyshare, error) {
+	keyshareIDs := []uuid.UUID{}
 	nodeQueue := []*pbinternal.PrepareTreeAddressNode{req.Node}
 
 	for len(nodeQueue) > 0 {
@@ -54,22 +49,33 @@ func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx con
 		nodeQueue = append(nodeQueue, node.Children[len(node.Children)-1])
 	}
 
-	_, err = ent.MarkSigningKeysharesAsUsed(ctx, h.config, keyshareIDs)
+	keyshares, err := ent.MarkSigningKeysharesAsUsed(ctx, h.config, keyshareIDs)
 	if err != nil {
 		return nil, err
 	}
 
-	keysharesMap, err := ent.GetSigningKeysharesMap(ctx, keyshareIDs)
+	return keyshares, nil
+}
+
+func (h *InternalTreeCreationHandler) createKeyshareMapWithTarget(ctx context.Context, req *pbinternal.PrepareTreeAddressRequest, existingSigningKeyshares []*ent.SigningKeyshare) (map[string]*ent.SigningKeyshare, error) {
+	parentKeyshareID, err := uuid.Parse(req.TargetKeyshareId)
 	if err != nil {
 		return nil, err
 	}
-
-	result := make(map[string]*ent.SigningKeyshare, len(keysharesMap))
-	for _, keyshare := range keysharesMap {
-		result[keyshare.ID.String()] = keyshare
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, err
 	}
-
-	return result, nil
+	parentKeyshare, err := db.SigningKeyshare.Get(ctx, parentKeyshareID)
+	if err != nil {
+		return nil, err
+	}
+	keysharesMap := make(map[string]*ent.SigningKeyshare, len(existingSigningKeyshares)+1)
+	for _, keyshare := range existingSigningKeyshares {
+		keysharesMap[keyshare.ID.String()] = keyshare
+	}
+	keysharesMap[parentKeyshare.ID.String()] = parentKeyshare
+	return keysharesMap, nil
 }
 
 func (h *InternalTreeCreationHandler) generateAndStoreDepositAddress(
@@ -207,8 +213,12 @@ func (h *InternalTreeCreationHandler) PrepareTreeAddress(ctx context.Context, re
 	if err != nil {
 		return nil, err
 	}
+	keysharesMap, err := h.createKeyshareMapWithTarget(ctx, req, existingSigningKeyshares)
+	if err != nil {
+		return nil, err
+	}
 
-	depositAddressSignatures, err := h.prepareDepositAddress(ctx, req, existingSigningKeyshares)
+	depositAddressSignatures, err := h.prepareDepositAddress(ctx, req, keysharesMap)
 	if err != nil {
 		return nil, err
 	}

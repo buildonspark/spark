@@ -8,9 +8,12 @@ import (
 	"fmt"
 	"math/big"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -63,7 +66,8 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 
 	logger.Sugar().Infof("Starting token transaction (expiry: %s, %+q)", req.FinalTokenTransaction.ExpiryTime, req.KeyshareIds)
 
-	expectedRevocationPublicKeys, err := h.validateAndReserveKeyshares(ctx, req.KeyshareIds, req.FinalTokenTransaction)
+	isCoordinator := bytes.Equal(req.CoordinatorPublicKey, h.config.IdentityPublicKey().Serialize())
+	expectedRevocationPublicKeys, err := h.validateAndReserveKeyshares(ctx, req.KeyshareIds, req.FinalTokenTransaction, isCoordinator)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +199,7 @@ func anyTtxosHaveSpentTransactions(ttxos []*ent.TokenOutput) bool {
 }
 
 // validateAndReserveKeyshares parses keyshare IDs, checks for duplicates, marks them as used, and returns expected revocation public keys
-func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Context, keyshareIDs []string, finalTokenTransaction *tokenpb.TokenTransaction) ([]keys.Public, error) {
+func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Context, keyshareIDs []string, finalTokenTransaction *tokenpb.TokenTransaction, isCoordinator bool) ([]keys.Public, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 	keyshareUUIDs := make([]uuid.UUID, len(keyshareIDs))
 	// Ensure that the coordinator SO did not pass duplicate keyshare UUIDs for different outputs.
@@ -211,12 +215,30 @@ func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Co
 		seenUUIDs[keyshareUUID] = true
 		keyshareUUIDs[i] = keyshareUUID
 	}
-	logger.Info("Marking keyshares as used")
-	keysharesMap, err := ent.MarkSigningKeysharesAsUsed(ctx, h.config, keyshareUUIDs)
-	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto("failed to mark keyshares as used", finalTokenTransaction, sparkerrors.InternalErrorf("failed to mark keyshares as used: %w", err))
+
+	var keysharesMap map[uuid.UUID]*ent.SigningKeyshare
+	var err error
+	if !isCoordinator {
+		logger.Info("Marking keyshares as used")
+		keyshares, err := ent.MarkSigningKeysharesAsUsed(ctx, h.config, keyshareUUIDs)
+		addTraceEvent(ctx, "mark_keyshares", attribute.String("keyshare_ids", strings.Join(keyshareIDs, ",")), attribute.Bool("success", err == nil), attribute.Bool("skipped", false))
+		if err != nil {
+			return nil, tokens.FormatErrorWithTransactionProto("failed to mark keyshares as used", finalTokenTransaction, sparkerrors.InternalErrorf("failed to mark keyshares as used: %w", err))
+		}
+		logger.Info("Keyshares marked as used")
+		keysharesMap = make(map[uuid.UUID]*ent.SigningKeyshare, len(keyshares))
+		for _, keyshare := range keyshares {
+			keysharesMap[keyshare.ID] = keyshare
+		}
+	} else {
+		addTraceEvent(ctx, "mark_keyshares", attribute.String("keyshare_ids", strings.Join(keyshareIDs, ",")), attribute.Bool("skipped", true))
+		logger.Info("Skipping marking keyshares as used for coordinator")
+		keysharesMap, err = ent.GetSigningKeysharesMap(ctx, keyshareUUIDs)
+		if err != nil {
+			return nil, tokens.FormatErrorWithTransactionProto("failed to get keyshares map", finalTokenTransaction, err)
+		}
 	}
-	logger.Info("Keyshares marked as used")
+
 	expectedRevocationPublicKeys := make([]keys.Public, len(keyshareIDs))
 	for i, id := range keyshareUUIDs {
 		keyshare, ok := keysharesMap[id]
@@ -935,4 +957,14 @@ func validateOutputsMatchSenderAndNetwork(ctx context.Context, tokenTransaction 
 		}
 	}
 	return nil
+}
+
+// addTraceEvent adds a trace event if a span is available
+func addTraceEvent(ctx context.Context, eventName string, attributes ...attribute.KeyValue) {
+	span := trace.SpanFromContext(ctx)
+	if span != nil {
+		span.AddEvent(eventName, trace.WithAttributes(
+			attributes...,
+		))
+	}
 }
