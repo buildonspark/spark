@@ -350,12 +350,28 @@ func (h *TreeQueryHandler) depositAddressToQueryResult(ctx context.Context, depo
 		return nil, fmt.Errorf("failed to get keyshare for static deposit address: %w", err)
 	}
 
-	addressSignatures, proofOfPossessionSignature, err := generateStaticDepositAddressProofs(ctx, h.config, keyshare, depositAddress)
-	if err != nil {
-		return nil, err
-	}
-	if addressSignatures == nil {
-		return nil, nil
+	// Return the proofs of possession if they are cached.
+	// Caching is done in the GenerateStaticDepositAddressResponse handler on the coordinator.
+	// If there are no proofs of possession, the user is advised to generate them by calling the GenerateStaticDepositAddressProofs RPC.
+	var proofOfPossession *pb.DepositAddressProof
+	if depositAddress.AddressSignatures != nil && depositAddress.PossessionSignature != nil {
+		proofOfPossession = &pb.DepositAddressProof{
+			AddressSignatures:          depositAddress.AddressSignatures,
+			ProofOfPossessionSignature: depositAddress.PossessionSignature,
+		}
+	} else {
+		addressSignatures, proofOfPossessionSignature, err := generateStaticDepositAddressProofs(ctx, h.config, keyshare, depositAddress)
+		if err != nil {
+			return nil, err
+		}
+		if addressSignatures == nil {
+			return nil, nil
+		}
+
+		proofOfPossession = &pb.DepositAddressProof{
+			AddressSignatures:          addressSignatures,
+			ProofOfPossessionSignature: proofOfPossessionSignature,
+		}
 	}
 
 	return &pb.DepositAddressQueryResult{
@@ -363,10 +379,7 @@ func (h *TreeQueryHandler) depositAddressToQueryResult(ctx context.Context, depo
 		UserSigningPublicKey: depositAddress.OwnerSigningPubkey,
 		VerifyingPublicKey:   verifyingPublicKey,
 		LeafId:               &nodeIDStr,
-		ProofOfPossession: &pb.DepositAddressProof{
-			AddressSignatures:          addressSignatures,
-			ProofOfPossessionSignature: proofOfPossessionSignature,
-		},
+		ProofOfPossession:    proofOfPossession,
 	}, nil
 }
 
