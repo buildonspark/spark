@@ -231,6 +231,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		SetRequestedTransferID(transferUUID).
 		Save(ctx)
 	if err != nil {
+		logger.Error("Failed to create utxo swap", "error", err, "txid", hex.EncodeToString(targetUtxo.Txid), "vout", targetUtxo.Vout, "Operator", config.Identifier)
 		return nil, fmt.Errorf("unable to store utxo swap: %w", err)
 	}
 	// Add the utxo swap to the deposit address
