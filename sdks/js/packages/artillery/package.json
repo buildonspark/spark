@@ -1,6 +1,6 @@
 {
   "name": "artillery-engine-spark",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "commonjs",
   "description": "Artillery engine for Spark testing",
@@ -26,8 +26,8 @@
     "package:checks": "yarn depcheck && echo \"Package checks passed successfully!\""
   },
   "dependencies": {
-    "@buildonspark/issuer-sdk": "0.0.89",
-    "@buildonspark/spark-sdk": "0.2.10",
+    "@buildonspark/issuer-sdk": "0.0.90",
+    "@buildonspark/spark-sdk": "0.2.11",
     "@noble/hashes": "^1.7.0",
     "@scure/bip39": "^1.5.4",
     "better-sqlite3": "^9.0.0"

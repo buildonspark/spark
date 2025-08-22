@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/nodejs-scripts",
-  "version": "0.0.84",
+  "version": "0.0.85",
   "private": true,
   "description": "Example NodeJS scripts for Spark SDK",
   "main": "index.js",
@@ -24,8 +24,8 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
-    "@buildonspark/issuer-sdk": "0.0.89",
-    "@buildonspark/spark-sdk": "0.2.10",
+    "@buildonspark/issuer-sdk": "0.0.90",
+    "@buildonspark/spark-sdk": "0.2.11",
     "tsx": "^4.19.3"
   },
   "engines": {

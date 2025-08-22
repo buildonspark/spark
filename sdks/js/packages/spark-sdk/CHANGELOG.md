@@ -1,5 +1,13 @@
 # @buildonspark/spark-sdk
 
+## 0.2.11
+
+### Patch Changes
+
+- - Update integration tests
+  - Add logging class to SDK
+  - Bug fixes
+
 ## 0.2.10
 
 ### Patch Changes
