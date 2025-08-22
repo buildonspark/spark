@@ -29,5 +29,3 @@ yarn
 ```
 
 Please note there is a postinstall script that runs after install to build some dependencies. This will run automatically when the dependency tree changes or when manually running `yarn rebuild`.
-
-tmp
