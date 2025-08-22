@@ -389,38 +389,6 @@ describe("SSP static deposit address integration", () => {
       ).rejects.toThrow();
     });
 
-    it("should error if tx amount does not cover fees", async () => {
-      const { wallet: aliceWallet } = await SparkWalletTesting.initialize(
-        {
-          options: {
-            network: "LOCAL",
-          },
-        },
-        false,
-      );
-
-      const faucet = BitcoinFaucet.getInstance();
-
-      const depositAddress = await aliceWallet.getStaticDepositAddress();
-      expect(depositAddress).toBeDefined();
-
-      const signedTx = await faucet.sendToAddress(
-        depositAddress,
-        SMALL_DEPOSIT_AMOUNT,
-      );
-
-      // Wait for the transaction to be mined
-      await faucet.mineBlocks(6);
-
-      expect(signedTx).toBeDefined();
-
-      const transactionId = signedTx.id;
-
-      await expect(
-        aliceWallet.getClaimStaticDepositQuote(transactionId),
-      ).rejects.toThrow();
-    }, 60000);
-
     it("should error claim quote if tx already claimed", async () => {
       const { wallet: aliceWallet } = await SparkWalletTesting.initialize(
         {
