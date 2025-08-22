@@ -1657,7 +1657,7 @@ PODS:
     - React-perflogger (= 0.79.4)
     - React-utils (= 0.79.4)
   - SocketRocket (0.7.1)
-  - spark-sdk (0.2.5):
+  - spark-sdk (0.2.10):
     - React
     - React-Core
   - Yoga (0.0.0)
@@ -1961,7 +1961,7 @@ SPEC CHECKSUMS:
   ReactCodegen: e713bcd88244fff6026629aebe9aa61b693beb9c
   ReactCommon: c7d636ec1b9801ff4ee83cce8e0bf74a1610fc3f
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
-  spark-sdk: 476b47d7cdc485b64fbc1865d935c8aff99524c9
+  spark-sdk: a126ef95d385f3dd89438855e291c86e7b884ebc
   Yoga: a6cb833e04fb8c59a012b49fb1d040fcb0cbb633
 
 PODFILE CHECKSUM: ea1210c0e7d02ebb3d518cc5766a9f3dde871573
