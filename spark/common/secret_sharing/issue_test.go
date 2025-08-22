@@ -7,7 +7,13 @@ import (
 
 	"github.com/lightsparkdev/spark/common/secret_sharing/curve"
 	"github.com/lightsparkdev/spark/common/secret_sharing/polynomial"
+	"github.com/stretchr/testify/require"
 )
+
+func scalarPointerFromInt(n uint32) *curve.Scalar {
+	s := curve.ScalarFromInt(n)
+	return &s
+}
 
 // TestIssueProtocolFull tests the full issue protocol flow
 // from setup through all rounds to final share generation and verification
@@ -17,11 +23,11 @@ func TestIssueProtocolFull(t *testing.T) {
 	threshold := 3
 
 	establishedShareArgs := map[PartyIndex]*curve.Scalar{
-		"0": curve.ScalarFromInt(1),
-		"1": curve.ScalarFromInt(2),
-		"2": curve.ScalarFromInt(3),
-		"3": curve.ScalarFromInt(4),
-		"4": curve.ScalarFromInt(5),
+		"0": scalarPointerFromInt(1),
+		"1": scalarPointerFromInt(2),
+		"2": scalarPointerFromInt(3),
+		"3": scalarPointerFromInt(4),
+		"4": scalarPointerFromInt(5),
 	}
 
 	issuePartyIndex := PartyIndex("8")
@@ -39,7 +45,8 @@ func TestIssueProtocolFull(t *testing.T) {
 
 	establishedShares := make(map[PartyIndex]*curve.Scalar)
 	for partyIdx, shareArg := range establishedShareArgs {
-		establishedShares[partyIdx] = sharingPoly.Eval(shareArg)
+		share := sharingPoly.Eval(*shareArg)
+		establishedShares[partyIdx] = &share
 	}
 
 	pubSharesInterpolatingPoly := polynomial.NewInterpolatingPointPolynomialFromPolynomial(pubSharingPoly)
@@ -52,7 +59,7 @@ func TestIssueProtocolFull(t *testing.T) {
 	}
 
 	shareArgs := maps.Clone(establishedShareArgs)
-	shareArgs[issuePartyIndex] = issueShareArg
+	shareArgs[issuePartyIndex] = &issueShareArg
 
 	// Create the common configuration for all parties
 	config := IssueConfig{
@@ -140,7 +147,9 @@ func TestIssueProtocolFull(t *testing.T) {
 
 	// === Verification ===
 
-	sIssue := finalResult.SIssue.Decode()
+	sIssue, err := curve.ParseScalar(finalResult.SIssue)
+	require.NoError(t, err)
+
 	mathcalB := finalResult.MathcalB.Decode()
 
 	// Verify that the issued share lies on the sharing polynomial
@@ -157,14 +166,14 @@ func TestIssueProtocolFull(t *testing.T) {
 	}
 
 	// Verify that the new share can help reconstruct the secret
-	var interpolationEvals []*polynomial.ScalarEval
+	var interpolationEvals []polynomial.ScalarEval
 	for _, partyIdx := range req.BigI[:threshold-1] {
-		interpolationEvals = append(interpolationEvals, &polynomial.ScalarEval{
-			X: establishedShareArgs[partyIdx],
-			Y: establishedShares[partyIdx],
+		interpolationEvals = append(interpolationEvals, polynomial.ScalarEval{
+			X: *establishedShareArgs[partyIdx],
+			Y: *establishedShares[partyIdx],
 		})
 	}
-	interpolationEvals = append(interpolationEvals, &polynomial.ScalarEval{
+	interpolationEvals = append(interpolationEvals, polynomial.ScalarEval{
 		X: issueShareArg,
 		Y: sIssue,
 	})

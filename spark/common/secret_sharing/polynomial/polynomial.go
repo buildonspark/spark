@@ -1,128 +1,112 @@
 package polynomial
 
 import (
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark/common/secret_sharing/curve"
 )
 
-// ScalarEval represents the evaluation of polynomial whose coefficients are scalars.
-type ScalarEval struct {
-	X *secp256k1.ModNScalar
-	Y *secp256k1.ModNScalar
+// polynomialEval is the evaluation of a polynomial.
+type polynomialEval[Codomain any] struct {
+	X curve.Scalar
+	Y Codomain
 }
 
-// PointEval represents the evaluation of a polynomial whose coefficients are curve points.
-type PointEval struct {
-	X *secp256k1.ModNScalar
-	Y *secp256k1.JacobianPoint
+// ScalarEval is the evaluation of a polynomial that outputs scalars.
+type ScalarEval = polynomialEval[curve.Scalar]
+
+// PointEval is the evaluation of a polynomial that outputs curve points.
+type PointEval = polynomialEval[curve.Point]
+
+func xCoords[T any](evals []polynomialEval[T]) []curve.Scalar {
+	xs := make([]curve.Scalar, len(evals))
+	for i, eval := range evals {
+		xs[i] = eval.X
+	}
+	return xs
 }
 
 // LagrangeBasisAt computes the Lagrange basis polynomial for index i evaluated at x:
-// L_i(x) = prod_{j≠i} (x - x_j)/(x_i - x_j).
-func LagrangeBasisAt(xs []*secp256k1.ModNScalar, i int, x *secp256k1.ModNScalar) *secp256k1.ModNScalar {
-	var result secp256k1.ModNScalar
-	result.SetInt(1)
+// L_i(x) = prod_{j≠i} (x - x_j) / (x_i - x_j).
+func LagrangeBasisAt(xs []curve.Scalar, i int, x curve.Scalar) curve.Scalar {
+	prod := curve.ScalarFromInt(1)
 
 	for j, xj := range xs {
 		if i == j {
 			continue
 		}
 
-		var numerator, denominator, ratio secp256k1.ModNScalar
+		// (x - x_j) / (x_i - x_j)
+		num := x.Sub(xj)
+		den := xs[i].Sub(xj)
+		ratio := den.InvNonConst().Mul(num)
 
-		// numerator = x - x_j
-		numerator.NegateVal(xj).Add(x)
-
-		// denominator = x_i - x_j
-		denominator.NegateVal(xj).Add(xs[i])
-
-		// ratio = numerator / denominator
-		ratio.InverseValNonConst(&denominator)
-		ratio.Mul(&numerator)
-
-		// result *= temp
-		result.Mul(&ratio)
+		prod.SetMul(&ratio)
 	}
 
-	return &result
+	return prod
 }
 
 // InterpolateScalar returns P(x) for given x where P is the unique polynomial
-// of least degree that passes through the given evaluation points.
-func InterpolateScalar(points []*ScalarEval, x *secp256k1.ModNScalar) *secp256k1.ModNScalar {
-	var result secp256k1.ModNScalar
-	result.SetInt(0)
+// of least degree that passes through the given evaluations.
+func InterpolateScalar(evals []ScalarEval, x curve.Scalar) curve.Scalar {
+	sum := curve.ScalarFromInt(0)
 
-	// Extract x coordinates
-	xs := make([]*secp256k1.ModNScalar, len(points))
-	for i := range points {
-		xs[i] = points[i].X
-	}
+	xs := xCoords(evals)
 
 	// P(x) = sum_i y_i * L_i(x)
-	for i := range points {
-		weight := LagrangeBasisAt(xs, i, x)
+	for i, eval := range evals {
+		// y_i * L_i(x)
+		lagrangeI := LagrangeBasisAt(xs, i, x)
+		yI := eval.Y
+		term := yI.Mul(lagrangeI)
 
-		// Compute y_i * L_i(x)
-		var term secp256k1.ModNScalar
-		term.Set(points[i].Y)
-		term.Mul(weight)
-
-		// Add to result
-		result.Add(&term)
+		sum.SetAdd(&term)
 	}
 
-	return &result
+	return sum
 }
 
 // InterpolatePoint returns P(x) for given x where P is the unique polynomial
-// of least degree that passes through the given evaluation points.
-func InterpolatePoint(points []*PointEval, x *secp256k1.ModNScalar) *secp256k1.JacobianPoint {
-	var result secp256k1.JacobianPoint // Zero value is identity point.
+// of least degree that passes through the given evaluations.
+func InterpolatePoint(evals []PointEval, x curve.Scalar) curve.Point {
+	sum := curve.ScalarFromInt(0).Point()
 
-	// Extract x coordinates
-	xs := make([]*secp256k1.ModNScalar, len(points))
-	for i := range points {
-		xs[i] = points[i].X
-	}
+	xs := xCoords(evals)
 
 	// P(x) = sum_i y_i * L_i(x)
-	for i := range points {
-		weight := LagrangeBasisAt(xs, i, x)
+	for i, eval := range evals {
+		// y_i * L_i(x)
+		lagrangeI := LagrangeBasisAt(xs, i, x)
+		term := eval.Y
+		term.SetScalarMul(&lagrangeI)
 
-		// Compute y_i * L_i(x)
-		var term secp256k1.JacobianPoint
-		secp256k1.ScalarMultNonConst(weight, points[i].Y, &term)
-
-		// Add to result
-		secp256k1.AddNonConst(&result, &term, &result)
+		sum.SetAdd(&term)
 	}
 
-	return &result
+	return sum
 }
 
 // ReconstructScalar returns P(0) where P is the unique polynomial
 // of least degree that passes through the given evaluation points.
-func ReconstructScalar(points []*ScalarEval) *secp256k1.ModNScalar {
-	return InterpolateScalar(points, curve.ScalarFromInt(0))
+func ReconstructScalar(evals []ScalarEval) curve.Scalar {
+	return InterpolateScalar(evals, curve.ScalarFromInt(0))
 }
 
 // ReconstructPoint returns P(0) where P is the unique polynomial
 // of least degree that passes through the given evaluation points.
-func ReconstructPoint(points []*PointEval) *secp256k1.JacobianPoint {
-	return InterpolatePoint(points, curve.ScalarFromInt(0))
+func ReconstructPoint(evals []PointEval) curve.Point {
+	return InterpolatePoint(evals, curve.ScalarFromInt(0))
 }
 
 // InterpolatingPointPolynomial is the unique polynomial of least degree
 // that has the given evaluations.
 type InterpolatingPointPolynomial struct {
-	standardEvals []*PointEval
+	standardEvals []PointEval
 }
 
 // InterpolatingPointPolynomialBytes holds an encoding of a polynomial.
 type InterpolatingPointPolynomialBytes []byte
 
-func standardInterpolatingX(index int) *secp256k1.ModNScalar {
+func standardInterpolatingX(index int) curve.Scalar {
 	return curve.ScalarFromInt(uint32(index + 1))
 }
 
@@ -130,7 +114,7 @@ func standardInterpolatingX(index int) *secp256k1.ModNScalar {
 func (p *InterpolatingPointPolynomial) Encode() InterpolatingPointPolynomialBytes {
 	var encoding []byte
 	for _, eval := range p.standardEvals {
-		yEncoding := curve.EncodePoint(eval.Y)
+		yEncoding := eval.Y.Serialize()
 		encoding = append(encoding, yEncoding[:]...)
 	}
 	return encoding
@@ -138,16 +122,20 @@ func (p *InterpolatingPointPolynomial) Encode() InterpolatingPointPolynomialByte
 
 // Decode returns a polynomial decoded from an encoding.
 func (pb InterpolatingPointPolynomialBytes) Decode() *InterpolatingPointPolynomial {
-	ptByteLen := 64
-
-	evalsCount := len(pb) / ptByteLen
-	standardEvals := make([]*PointEval, evalsCount)
+	evalsCount := len(pb) / curve.PointBytesLen
+	standardEvals := make([]PointEval, evalsCount)
 
 	for i := range standardEvals {
-		yBytes := curve.PointBytes(pb[i*ptByteLen : (i+1)*ptByteLen])
-		standardEvals[i] = &PointEval{
+		yBytes := pb[i*curve.PointBytesLen : (i+1)*curve.PointBytesLen]
+		y, err := curve.ParsePoint(yBytes)
+		if err != nil {
+			// TODO: return an error and adjust the caller to expect it
+			panic("failed to parse")
+		}
+
+		standardEvals[i] = PointEval{
 			X: standardInterpolatingX(i),
-			Y: yBytes.Decode(),
+			Y: y,
 		}
 	}
 
@@ -156,13 +144,13 @@ func (pb InterpolatingPointPolynomialBytes) Decode() *InterpolatingPointPolynomi
 	}
 }
 
-func NewInterpolatingPointPolynomial(evals []*PointEval) InterpolatingPointPolynomial {
-	standardEvals := make([]*PointEval, len(evals))
+func NewInterpolatingPointPolynomial(evals []PointEval) InterpolatingPointPolynomial {
+	standardEvals := make([]PointEval, len(evals))
 
 	for i := range standardEvals {
 		standardX := standardInterpolatingX(i)
 		standardY := InterpolatePoint(evals, standardX)
-		standardEvals[i] = &PointEval{
+		standardEvals[i] = PointEval{
 			X: standardX,
 			Y: standardY,
 		}
@@ -174,12 +162,12 @@ func NewInterpolatingPointPolynomial(evals []*PointEval) InterpolatingPointPolyn
 }
 
 func NewInterpolatingPointPolynomialFromPolynomial(poly *PointPolynomial) InterpolatingPointPolynomial {
-	standardEvals := make([]*PointEval, len(poly.Coefs))
+	standardEvals := make([]PointEval, len(poly.Coefs))
 
 	for i := range standardEvals {
 		standardX := standardInterpolatingX(i)
 		standardY := poly.Eval(standardX)
-		standardEvals[i] = &PointEval{
+		standardEvals[i] = PointEval{
 			X: standardX,
 			Y: standardY,
 		}
@@ -194,7 +182,7 @@ func (p *InterpolatingPointPolynomial) Degree() int {
 }
 
 // Eval evaluates the polynomial at x.
-func (p *InterpolatingPointPolynomial) Eval(x *secp256k1.ModNScalar) *secp256k1.JacobianPoint {
+func (p *InterpolatingPointPolynomial) Eval(x curve.Scalar) curve.Point {
 	return InterpolatePoint(p.standardEvals, x)
 }
 
@@ -204,7 +192,10 @@ func (p *InterpolatingPointPolynomial) Equal(q *InterpolatingPointPolynomial) bo
 	}
 
 	for i := range p.standardEvals {
-		if !curve.PointEqual(p.standardEvals[i].Y, q.standardEvals[i].Y) {
+		pY := p.standardEvals[i].Y
+		qY := q.standardEvals[i].Y
+
+		if !pY.Equals(qY) {
 			return false
 		}
 	}
@@ -214,12 +205,12 @@ func (p *InterpolatingPointPolynomial) Equal(q *InterpolatingPointPolynomial) bo
 
 // ScalarPolynomial represents a polynomial with scalar coefficients.
 type ScalarPolynomial struct {
-	Coefs []*secp256k1.ModNScalar
+	Coefs []curve.Scalar
 }
 
 // PointPolynomial represents a polynomial with curve point coefficients.
 type PointPolynomial struct {
-	Coefs []*secp256k1.JacobianPoint
+	Coefs []curve.Point
 }
 
 // PointPolynomialBytes holds an encoding of a polynomial.
@@ -229,7 +220,7 @@ type PointPolynomialBytes []byte
 func (p *PointPolynomial) Encode() PointPolynomialBytes {
 	var encoding []byte
 	for _, coef := range p.Coefs {
-		coefEncoding := curve.EncodePoint(coef)
+		coefEncoding := coef.Serialize()
 		encoding = append(encoding, coefEncoding[:]...)
 	}
 	return encoding
@@ -237,14 +228,18 @@ func (p *PointPolynomial) Encode() PointPolynomialBytes {
 
 // Decode returns a polynomial decoded from an encoding.
 func (pb PointPolynomialBytes) Decode() *PointPolynomial {
-	ptByteLen := 64
-
-	coefCount := len(pb) / ptByteLen
-	coefs := make([]*secp256k1.JacobianPoint, coefCount)
+	coefCount := len(pb) / curve.PointBytesLen
+	coefs := make([]curve.Point, coefCount)
 
 	for i := range coefs {
-		coefBytes := curve.PointBytes(pb[i*ptByteLen : (i+1)*ptByteLen])
-		coefs[i] = coefBytes.Decode()
+		coefBytes := pb[i*curve.PointBytesLen : (i+1)*curve.PointBytesLen]
+		coef, err := curve.ParsePoint(coefBytes)
+		if err != nil {
+			// TODO: return an error and adjust the caller to expect it
+			panic("failed to parse")
+		}
+
+		coefs[i] = coef
 	}
 
 	return &PointPolynomial{
@@ -254,16 +249,16 @@ func (pb PointPolynomialBytes) Decode() *PointPolynomial {
 
 // NewScalarPolynomialSharing returns a polynomial with random scalar coefficients
 // and the passed secret as constant term.
-func NewScalarPolynomialSharing(secret *secp256k1.ModNScalar, degree int) (*ScalarPolynomial, error) {
-	coefs := make([]*secp256k1.ModNScalar, degree+1)
+func NewScalarPolynomialSharing(secret curve.Scalar, degree int) (*ScalarPolynomial, error) {
+	coefs := make([]curve.Scalar, degree+1)
 
 	for i := range coefs {
-		coefKey, err := secp256k1.GeneratePrivateKey()
+		coef, err := curve.GenerateScalar()
 		if err != nil {
 			return nil, err
 		}
 
-		coefs[i] = &coefKey.Key
+		coefs[i] = coef
 	}
 
 	coefs[0] = secret
@@ -274,53 +269,47 @@ func NewScalarPolynomialSharing(secret *secp256k1.ModNScalar, degree int) (*Scal
 
 // ToPointPolynomial creates a polynomial whose coefficients are the original scalars times the base point.
 func (p *ScalarPolynomial) ToPointPolynomial() *PointPolynomial {
-	pointCoefs := make([]*curve.Point, len(p.Coefs))
+	pointCoefs := make([]curve.Point, len(p.Coefs))
 
 	for i, coef := range p.Coefs {
-		pointCoefs[i] = new(curve.Point)
-		secp256k1.ScalarBaseMultNonConst(coef, pointCoefs[i])
+		pointCoefs[i] = coef.Point()
 	}
 
 	return &PointPolynomial{Coefs: pointCoefs}
 }
 
 // Eval evaluates the polynomial at x.
-func (p *ScalarPolynomial) Eval(x *secp256k1.ModNScalar) *secp256k1.ModNScalar {
-	var result secp256k1.ModNScalar
-	result.SetInt(0)
-
+func (p *ScalarPolynomial) Eval(x curve.Scalar) curve.Scalar {
 	if len(p.Coefs) == 0 {
-		return &result
+		return curve.ScalarFromInt(0)
 	}
 
 	// Use Horner's method: a + b x + c x^2 + d x^3 = ((d x + c) x + b) x + a.
-	result.Set(p.Coefs[len(p.Coefs)-1])
+	result := p.Coefs[len(p.Coefs)-1]
 
 	for i := len(p.Coefs) - 2; i >= 0; i-- {
-		result.Mul(x)
-		result.Add(p.Coefs[i])
+		result.SetMul(&x)
+		result.SetAdd(&p.Coefs[i])
 	}
 
-	return &result
+	return result
 }
 
 // Eval evaluates the polynomial at x.
-func (p *PointPolynomial) Eval(x *secp256k1.ModNScalar) *secp256k1.JacobianPoint {
-	var result secp256k1.JacobianPoint // Zero value is identity point.
-
+func (p *PointPolynomial) Eval(x curve.Scalar) curve.Point {
 	if len(p.Coefs) == 0 {
-		return &result
+		return curve.IdentityPoint()
 	}
 
 	// Use Horner's method: a + b x + c x^2 + d x^3 = ((d x + c) x + b) x + a.
-	result = *p.Coefs[len(p.Coefs)-1]
+	result := p.Coefs[len(p.Coefs)-1]
 
 	for i := len(p.Coefs) - 2; i >= 0; i-- {
-		secp256k1.ScalarMultNonConst(x, &result, &result)
-		secp256k1.AddNonConst(&result, p.Coefs[i], &result)
+		result.SetScalarMul(&x)
+		result.SetAdd(&p.Coefs[i])
 	}
 
-	return &result
+	return result
 }
 
 func (p *PointPolynomial) Equal(q *PointPolynomial) bool {
@@ -329,7 +318,7 @@ func (p *PointPolynomial) Equal(q *PointPolynomial) bool {
 	}
 
 	for i := range p.Coefs {
-		if !curve.PointEqual(p.Coefs[i], q.Coefs[i]) {
+		if !p.Coefs[i].Equals(q.Coefs[i]) {
 			return false
 		}
 	}

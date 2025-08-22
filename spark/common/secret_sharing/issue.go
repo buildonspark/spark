@@ -27,7 +27,6 @@ package secretsharing
 import (
 	"fmt"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark/common/secret_sharing/curve"
 	"github.com/lightsparkdev/spark/common/secret_sharing/polynomial"
 )
@@ -90,21 +89,21 @@ type Message[T any] struct {
 // IssuePayload1 is the data from round 1 for other parties.
 // It must be sent securely to its recipient.
 type IssuePayload1 struct {
-	Sid    []byte            `json:"sid"`
-	SArrow curve.ScalarBytes `json:"sArrow"`
+	Sid    []byte `json:"sid"`
+	SArrow []byte `json:"sArrow"` // TODO: Convert to use `curve.Scalar` directly
 }
 
 // IssuePayload2 is the data from round 2 for other parties.
 // It must be sent securely to its recipient.
 type IssuePayload2 struct {
 	MathcalB polynomial.InterpolatingPointPolynomialBytes `json:"mathcalB"` // NOTE: Would be a `PointPolynomialBytes` if following the described protocol.
-	SIIssue  curve.ScalarBytes                            `json:"sIIssue"`
+	SIIssue  []byte                                       `json:"sIIssue"`  // TODO: Convert to use `curve.Scalar` directly
 }
 
 // IssuePayload3 is the final result of round 3.
 type IssuePayload3 struct {
 	MathcalB polynomial.InterpolatingPointPolynomialBytes `json:"mathcalB"` // NOTE: Would be a `PointPolynomialBytes` if following the described protocol.
-	SIssue   curve.ScalarBytes                            `json:"sIssue"`
+	SIssue   []byte                                       `json:"sIssue"`   // TODO: Convert to use `curve.Scalar` directly
 }
 
 func newIssueError(round int, err error) error {
@@ -134,13 +133,12 @@ func (p IssueSender) checkAssumptions() error {
 		return fmt.Errorf("all parties must have identical secret sharing polynomial coefficients")
 	}
 
-	lhs := new(curve.Point)
-	secp256k1.ScalarBaseMultNonConst(p.SIScalar, lhs)
+	lhs := p.SIScalar.Point()
 
 	alphaI := p.Config.Alphas[p.SmallI]
-	rhs := p.MathcalB.Eval(alphaI)
+	rhs := p.MathcalB.Eval(*alphaI)
 
-	if !curve.PointEqual(lhs, rhs) {
+	if !lhs.Equals(rhs) {
 		return fmt.Errorf("party %s's secret share does not match the sharing polynomial", p.SmallI)
 	}
 
@@ -156,7 +154,7 @@ func (p IssueSender) Round1() ([]Message[IssuePayload1], error) {
 	// Each party P_i subshares its share:
 
 	// (a) P_i chooses a random polynomial s_i(x) of degree (t - 1) such that s_i(0) = s_i
-	sIPoly, err := polynomial.NewScalarPolynomialSharing(p.SIScalar, p.Config.T-1)
+	sIPoly, err := polynomial.NewScalarPolynomialSharing(*p.SIScalar, p.Config.T-1)
 	if err != nil {
 		return nil, err
 	}
@@ -166,11 +164,11 @@ func (p IssueSender) Round1() ([]Message[IssuePayload1], error) {
 	var outMessages []Message[IssuePayload1]
 	for _, j := range p.Config.BigI {
 		alphaJ := p.Config.Alphas[j]
-		sArrow := sIPoly.Eval(alphaJ)
+		sArrow := sIPoly.Eval(*alphaJ)
 
 		payload := IssuePayload1{
 			Sid:    p.Config.Sid,
-			SArrow: curve.EncodeScalar(sArrow),
+			SArrow: sArrow.Serialize(),
 		}
 		message := Message[IssuePayload1]{
 			From:    p.SmallI,
@@ -183,18 +181,19 @@ func (p IssueSender) Round1() ([]Message[IssuePayload1], error) {
 	return outMessages, nil
 }
 
-func (c IssueConfig) lagrangeBasisAt(i int, x *curve.Scalar) *curve.Scalar {
+func (c IssueConfig) lagrangeBasisAt(i int, x curve.Scalar) *curve.Scalar {
 	// Let α_1, ... , α_n be distinct field elements.
 	// We denote the Lagrange basis polynomials with respect to a set I ⊆ [n] by { L_i^I(x) }_{i ∈ I}
 	// where L_i^I(x) = prod_{j ∈ I\{i}} (x − α_j) / (α_i − α_j).
 
 	// TODO: Optimize by computing in a constructor
-	var xs []*curve.Scalar
+	var xs []curve.Scalar
 	for _, j := range c.BigI {
-		xs = append(xs, c.Alphas[j])
+		xs = append(xs, *c.Alphas[j])
 	}
 
-	return polynomial.LagrangeBasisAt(xs, i, x)
+	l := polynomial.LagrangeBasisAt(xs, i, x)
+	return &l
 }
 
 // Round2 is round 2 of the protocol to issue a secret share.
@@ -211,14 +210,16 @@ func (p IssueSender) Round2(payloadFrom map[PartyIndex]IssuePayload1) (Message[I
 	alphaIssue := p.Config.Alphas[p.Config.IssueIndex]
 
 	for idx, j := range p.Config.BigI {
-		lagrangeCoeff := p.Config.lagrangeBasisAt(idx, alphaIssue)
-		sArrow := payloadFrom[j].SArrow.Decode()
+		lagrangeCoeff := p.Config.lagrangeBasisAt(idx, *alphaIssue)
 
-		term := new(curve.Scalar)
-		term.Set(lagrangeCoeff)
-		term.Mul(sArrow)
+		sArrow, err := curve.ParseScalar(payloadFrom[j].SArrow)
+		if err != nil {
+			return Message[IssuePayload2]{}, err
+		}
 
-		sIIssue.Add(term)
+		term := sArrow.Mul(*lagrangeCoeff)
+
+		sIIssue.SetAdd(&term)
 	}
 
 	// (b) P_i sends (B, s_i^{n + 1}) to P_{n + 1}
@@ -226,7 +227,7 @@ func (p IssueSender) Round2(payloadFrom map[PartyIndex]IssuePayload1) (Message[I
 	// and signed with P_i's private signing key, using secure signcryption.)
 	outPayload := IssuePayload2{
 		MathcalB: p.MathcalB.Encode(),
-		SIIssue:  curve.EncodeScalar(sIIssue),
+		SIIssue:  sIIssue.Serialize(),
 	}
 	outMessage := Message[IssuePayload2]{
 		From:    p.SmallI,
@@ -266,28 +267,31 @@ func (p IssueReceiver) Round3(payloadFrom map[PartyIndex]IssuePayload2) (*IssueP
 	sIssue := curve.ScalarFromInt(0)
 	for idx, i := range p.Config.BigI {
 		term := p.Config.lagrangeBasisAt(idx, curve.ScalarFromInt(0))
-		sIIssue := payloadFrom[i].SIIssue.Decode()
 
-		term.Mul(sIIssue)
-		sIssue.Add(term)
+		sIIssue, err := curve.ParseScalar(payloadFrom[i].SIIssue)
+		if err != nil {
+			return nil, err
+		}
+
+		term.SetMul(&sIIssue)
+		sIssue.SetAdd(term)
 	}
 
 	// (c) P_{n + 1} verifies that s_{n + 1} · G = sum_{k = 0}^{t - 1} (α_{n + 1})^k · B_k,
 	// where mathcal{B} = (B_0, . . . , B_{t − 1}), and aborts if not
-	lhs := new(curve.Point)
-	secp256k1.ScalarBaseMultNonConst(sIssue, lhs)
+	lhs := sIssue.Point()
 
 	alphaIssue := p.Config.Alphas[p.Config.IssueIndex]
-	rhs := mathcalB.Eval(alphaIssue)
+	rhs := mathcalB.Eval(*alphaIssue)
 
-	if !curve.PointEqual(lhs, rhs) {
+	if !lhs.Equals(rhs) {
 		return nil, newIssueError(3, fmt.Errorf("abort: issued share is not correct"))
 	}
 
 	// (d) P_{n + 1} outputs (B, s_{n + 1})
 	outPayload := IssuePayload3{
 		MathcalB: mathcalB.Encode(),
-		SIssue:   curve.EncodeScalar(sIssue),
+		SIssue:   sIssue.Serialize(),
 	}
 
 	return &outPayload, nil

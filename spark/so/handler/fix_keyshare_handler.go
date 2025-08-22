@@ -195,12 +195,6 @@ func (h FixKeyshareHandler) FixKeyshare(ctx context.Context, req *pb.FixKeyshare
 	return nil
 }
 
-func scalarFromInt(n uint32) *secp256k1.ModNScalar {
-	s := new(secp256k1.ModNScalar)
-	s.SetInt(n)
-	return s
-}
-
 func (h FixKeyshareHandler) createConfig(args FixKeyshareArgs) (*secretsharing.IssueConfig, error) {
 	request := secretsharing.IssueRequest{
 		IssueIndex: args.badOperator.Identifier,
@@ -211,14 +205,15 @@ func (h FixKeyshareHandler) createConfig(args FixKeyshareArgs) (*secretsharing.I
 	for identifier, operator := range args.goodOperators {
 		// TODO: Don't hardcode the magic (+ 1) mapping
 		// TODO: Somehow avoid unsafe cast
-		alpha := scalarFromInt(uint32(operator.ID) + 1)
+		alpha := curve.ScalarFromInt(uint32(operator.ID) + 1)
 
-		alphas[identifier] = alpha
+		alphas[identifier] = &alpha
 	}
 
 	// TODO: Don't hardcode the magic (+ 1) mapping
 	// TODO: Somehow avoid unsafe cast
-	alphas[args.badOperator.Identifier] = scalarFromInt(uint32(args.badOperator.ID) + 1)
+	badAlpha := curve.ScalarFromInt(uint32(args.badOperator.ID) + 1)
+	alphas[args.badOperator.Identifier] = &badAlpha
 
 	config := secretsharing.IssueConfig{
 		IssueRequest: request,
@@ -236,13 +231,13 @@ func (h FixKeyshareHandler) createSender(args FixKeyshareArgs) (*secretsharing.I
 		return nil, err
 	}
 
-	var ownSecretShare curve.Scalar
-	overflowed := ownSecretShare.SetByteSlice(args.badKeyshare.SecretShare)
-	if overflowed {
-		return nil, fmt.Errorf("secret share overflowed when parsing")
+	sb := args.badKeyshare.SecretShare
+	ownSecretShare, err := curve.ParseScalar(sb)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse own secret share: %w", err)
 	}
 
-	pubShareEvals := make([]*polynomial.PointEval, 0)
+	pubShareEvals := make([]polynomial.PointEval, 0)
 
 	for goodIdentifier, goodOperator := range args.goodOperators {
 		publicShareCompressed := args.badKeyshare.PublicShares[goodIdentifier]
@@ -252,17 +247,19 @@ func (h FixKeyshareHandler) createSender(args FixKeyshareArgs) (*secretsharing.I
 			return nil, fmt.Errorf("failed to parse public key share for operator %s: %w", goodIdentifier, err)
 		}
 
-		var sharePoint secp256k1.JacobianPoint
-		sharePubKey.AsJacobian(&sharePoint)
+		sharePoint, err := curve.NewPointFromPublicKey(*sharePubKey)
+		if err != nil {
+			return nil, fmt.Errorf("invalid share public key: %w", err)
+		}
 
 		eval := polynomial.PointEval{
 			// TODO: Don't hardcode the magic (+ 1) mapping
 			// TODO: Somehow avoid unsafe cast
 			X: curve.ScalarFromInt(uint32(goodOperator.ID) + 1),
-			Y: &sharePoint,
+			Y: sharePoint,
 		}
 
-		pubShareEvals = append(pubShareEvals, &eval)
+		pubShareEvals = append(pubShareEvals, eval)
 	}
 
 	pubSharesPoly := polynomial.NewInterpolatingPointPolynomial(pubShareEvals)
@@ -436,17 +433,21 @@ func (h FixKeyshareHandler) updateWithFixed(ctx context.Context, outPayload *sec
 	for identifier, operator := range h.config.SigningOperatorMap {
 		// TODO: Don't hardcode the magic (+ 1) mapping
 		// TODO: Somehow avoid unsafe cast
-		alpha := scalarFromInt(uint32(operator.ID) + 1)
+		alpha := curve.ScalarFromInt(uint32(operator.ID) + 1)
 		pubSharePoint := pubSharesPoly.Eval(alpha)
-		pubSharePoint.ToAffine()
-		pubShareCompressed := secp256k1.NewPublicKey(&pubSharePoint.X, &pubSharePoint.Y).SerializeCompressed()
-		pubShares[identifier] = pubShareCompressed
+		pubShare, err := pubSharePoint.ToPublicKey() // TODO: Convert to use keys.Public
+		if err != nil {
+			return fmt.Errorf("invalid public share: %w", err)
+		}
+		pubShares[identifier] = pubShare.SerializeCompressed()
 	}
 
 	// Recover the public key.
-	pubKeyPoint := pubSharesPoly.Eval(scalarFromInt(0))
-	pubKeyPoint.ToAffine()
-	pubKey := secp256k1.NewPublicKey(&pubKeyPoint.X, &pubKeyPoint.Y).SerializeCompressed()
+	pubKeyPoint := pubSharesPoly.Eval(curve.ScalarFromInt(0))
+	pubKey, err := pubKeyPoint.ToPublicKey() // TODO: Convert to use keys.Public
+	if err != nil {
+		return fmt.Errorf("invalid public key: %w", err)
+	}
 
 	// Update to fix the bad keyshare in the database.
 	db, err := ent.GetDbFromContext(ctx)
@@ -457,7 +458,7 @@ func (h FixKeyshareHandler) updateWithFixed(ctx context.Context, outPayload *sec
 	_, err = db.SigningKeyshare.UpdateOneID(badKeyshare.ID).
 		SetSecretShare(outPayload.SIssue[:]).
 		SetPublicShares(pubShares).
-		SetPublicKey(pubKey).
+		SetPublicKey(pubKey.SerializeCompressed()).
 		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to update keyshare: %w", err)
