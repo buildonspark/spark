@@ -32,8 +32,19 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/knobs"
 	events "github.com/lightsparkdev/spark/so/stream"
 	"google.golang.org/protobuf/proto"
+)
+
+// Validation constants to prevent resource exhaustion and DoS attacks
+const (
+	MaxLeavesToSend         = 1000              // Default fallback limit for leaf processing (can be overridden by knobs)
+	MaxKeyTweakPackageSize  = 4 * 1024 * 1024   // 4MB limit for encrypted package
+	MaxLeafIdLength         = 256               // Prevent extremely long leaf IDs
+	MaxSecretShareSize      = 32                // Limit secret share size
+	MaxSignatureSize        = 73                // Reasonable limit for ECDSA secp256k1 signatures
+	MaxEstimatedMemoryUsage = 100 * 1024 * 1024 // 100MB limit for estimated memory usage
 )
 
 type TransferRole int
@@ -764,16 +775,97 @@ func (h *BaseTransferHandler) loadTransferNoUpdate(ctx context.Context, transfer
 }
 
 // validateTransferPackage validates the transfer package, to ensure the key tweaks are valid.
-func (h *BaseTransferHandler) validateTransferPackage(_ context.Context, transferID string, req *pbspark.TransferPackage, senderIdentityPublicKey []byte) (map[string]*pbspark.SendLeafKeyTweak, error) {
+func (h *BaseTransferHandler) validateTransferPackage(ctx context.Context, transferID string, req *pbspark.TransferPackage, senderIdentityPublicKey []byte) (map[string]*pbspark.SendLeafKeyTweak, error) {
 	// If the transfer package is nil, we don't need to validate it.
 	if req == nil {
 		return nil, nil
+	}
+
+	// Get the transfer limit from knobs if available
+	// This allows runtime configuration of transfer limits without code changes
+	// If KnobSoTransferLimit is set to 0, it uses the default MaxLeavesToSend constant
+	transferLimit := MaxLeavesToSend // Default fallback
+	knobService := knobs.GetKnobsService(ctx)
+	if knobService != nil {
+		knobLimit := knobService.GetValue(knobs.KnobSoTransferLimit, 0)
+		if knobLimit > 0 {
+			transferLimit = int(knobLimit)
+		}
+	}
+
+	// Input size and count validation - prevent resource exhaustion
+	if len(req.LeavesToSend) > transferLimit {
+		return nil, fmt.Errorf("too many leaves to send: %d (max: %d)", len(req.LeavesToSend), transferLimit)
+	}
+
+	if len(req.DirectLeavesToSend) > transferLimit {
+		return nil, fmt.Errorf("too many direct leaves to send: %d (max: %d)", len(req.DirectLeavesToSend), transferLimit)
+	}
+
+	if len(req.DirectFromCpfpLeavesToSend) > transferLimit {
+		return nil, fmt.Errorf("too many direct from cpfp leaves to send: %d (max: %d)", len(req.DirectFromCpfpLeavesToSend), transferLimit)
+	}
+
+	// Validate key tweak package size
+	totalSize := 0
+	for _, ciphertext := range req.KeyTweakPackage {
+		totalSize += len(ciphertext)
+	}
+	if totalSize > MaxKeyTweakPackageSize {
+		return nil, fmt.Errorf("key tweak package too large: %d bytes (max: %d)", totalSize, MaxKeyTweakPackageSize)
+	}
+
+	// Validate leaf IDs in leaves_to_send
+	for _, leaf := range req.LeavesToSend {
+		_, err := uuid.Parse(leaf.LeafId)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse leaf_id as a uuid %s: %w", leaf.LeafId, err)
+		}
+	}
+
+	// Validate leaf IDs in direct_leaves_to_send
+	for _, leaf := range req.DirectLeavesToSend {
+		_, err := uuid.Parse(leaf.LeafId)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse direct_leaves_to_send leaf_id as a uuid %s: %w", leaf.LeafId, err)
+		}
+	}
+
+	// Validate leaf IDs in direct_from_cpfp_leaves_to_send
+	for _, leaf := range req.DirectFromCpfpLeavesToSend {
+		_, err := uuid.Parse(leaf.LeafId)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse direct_from_cpfp_leaves_to_send leaf_id as a uuid %s: %w", leaf.LeafId, err)
+		}
+	}
+
+	// Signature validation - prevent replay/DoS
+	if len(req.UserSignature) == 0 {
+		return nil, fmt.Errorf("user signature cannot be empty")
+	}
+
+	if len(req.UserSignature) > MaxSignatureSize {
+		return nil, fmt.Errorf("user signature too large: %d bytes (max: %d)", len(req.UserSignature), MaxSignatureSize)
+	}
+
+	// Validate sender public key size
+	if len(senderIdentityPublicKey) != 33 && len(senderIdentityPublicKey) != 65 {
+		return nil, fmt.Errorf("invalid sender public key size: %d bytes (expected 33 or 65)", len(senderIdentityPublicKey))
 	}
 
 	// Decrypt the key tweaks
 	leafTweaksCipherText := req.KeyTweakPackage[h.config.Identifier]
 	if leafTweaksCipherText == nil {
 		return nil, fmt.Errorf("no key tweaks found for SO %s", h.config.Identifier)
+	}
+
+	// Encrypted data validation - prevent decryption attacks
+	if len(leafTweaksCipherText) == 0 {
+		return nil, fmt.Errorf("encrypted key tweaks cannot be empty")
+	}
+
+	if len(leafTweaksCipherText) > MaxKeyTweakPackageSize {
+		return nil, fmt.Errorf("encrypted key tweaks too large: %d bytes (max: %d)", len(leafTweaksCipherText), MaxKeyTweakPackageSize)
 	}
 
 	decryptionPrivateKey := eciesgo.NewPrivateKeyFromBytes(h.config.IdentityPrivateKey.Serialize())
@@ -788,8 +880,45 @@ func (h *BaseTransferHandler) validateTransferPackage(_ context.Context, transfe
 		return nil, fmt.Errorf("failed to unmarshal key tweaks: %w", err)
 	}
 
+	// Memory usage validation - prevent OOM
+	totalLeafCount := len(leafTweaks.LeavesToSend)
+	if totalLeafCount > transferLimit {
+		return nil, fmt.Errorf("too many leaves in key tweaks: %d (max: %d)", totalLeafCount, transferLimit)
+	}
+
+	// This should equal the number of SOs
+	maxPubkeySharesTweakCount := len(h.config.GetSigningOperatorList())
+	maxProofsCount := int(h.config.Threshold)
+
+	// Estimate memory usage for the map
+	estimatedMemory := totalLeafCount * (MaxLeafIdLength + MaxSecretShareSize + maxProofsCount*33 + maxPubkeySharesTweakCount*33)
+	if estimatedMemory > MaxEstimatedMemoryUsage {
+		return nil, fmt.Errorf("estimated memory usage too high: %d bytes (max: %d)", estimatedMemory, MaxEstimatedMemoryUsage)
+	}
+
 	leafTweaksMap := make(map[string]*pbspark.SendLeafKeyTweak)
 	for _, leafTweak := range leafTweaks.LeavesToSend {
+		// Validate leaf ID in key tweaks
+		_, err := uuid.Parse(leafTweak.LeafId)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse key tweaks leaf_id as a uuid %s: %w", leafTweak.LeafId, err)
+		}
+
+		// Validate secret share size
+		if len(leafTweak.SecretShareTweak.SecretShare) > MaxSecretShareSize {
+			return nil, fmt.Errorf("secret share too large: %d bytes (max: %d)", len(leafTweak.SecretShareTweak.SecretShare), MaxSecretShareSize)
+		}
+
+		// Validate proofs count
+		if len(leafTweak.SecretShareTweak.Proofs) > maxProofsCount {
+			return nil, fmt.Errorf("too many proofs: %d (max: %d)", len(leafTweak.SecretShareTweak.Proofs), maxProofsCount)
+		}
+
+		// Validate pubkey shares count
+		if len(leafTweak.PubkeySharesTweak) > maxPubkeySharesTweakCount {
+			return nil, fmt.Errorf("too many pubkey shares: %d (max: %d)", len(leafTweak.PubkeySharesTweak), maxPubkeySharesTweakCount)
+		}
+
 		leafTweaksMap[leafTweak.LeafId] = leafTweak
 	}
 
