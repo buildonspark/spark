@@ -19,7 +19,9 @@ import {
   WalletConfig,
   SparkAddressFormat,
   validateSparkInvoiceSignature,
+  SparkSdkLogger,
 } from "@buildonspark/spark-sdk";
+import { LoggingLevel } from "@lightsparkdev/core";
 import {
   TokenTransactionStatus,
   TreeNode,
@@ -355,6 +357,8 @@ const commands = [
   "fulfillsparkinvoice",
   "validateinvoicesig",
 
+  "enablelogging",
+  "setloggerlevel",
   "help",
   "exit",
   "quit",
@@ -684,6 +688,8 @@ async function runCLI() {
   createtoken <tokenName> <tokenTicker> <decimals> <maxSupply> <isFreezable> - Create a new token
   decodetokenidentifier <tokenIdentifier>                             - Returns the raw token identifier as a hex string
 
+  enablelogging <true|false>                                          - Enable or disable logging
+  setloggerlevel <trace|info>                                         - Set the logging level
   help                                                                - Show this help message
   exit/quit                                                           - Exit the program
 `;
@@ -709,6 +715,14 @@ async function runCLI() {
       switch (lowerCommand) {
         case "help":
           console.log(helpMessage);
+          break;
+        case "enablelogging":
+          SparkSdkLogger.setAllEnabled(args[0] === "true");
+          break;
+        case "setloggerlevel":
+          SparkSdkLogger.setAllLevels(
+            args[0] === "trace" ? LoggingLevel.Trace : LoggingLevel.Info,
+          );
           break;
         case "nontrustydeposit":
           if (process.env.NODE_ENV !== "development" || network !== "REGTEST") {

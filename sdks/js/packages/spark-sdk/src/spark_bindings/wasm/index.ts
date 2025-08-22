@@ -1,3 +1,5 @@
+import { bytesToHex } from "@noble/curves/utils";
+
 import {
   create_dummy_tx,
   decrypt_ecies,
@@ -16,6 +18,7 @@ import {
   ISigningNonce,
   SignFrostParams,
 } from "../types.js";
+import { SparkSdkLogger, LOGGER_NAMES } from "../../utils/logging.js";
 
 function createKeyPackage(params: IKeyPackage): KeyPackage {
   return new KeyPackage(
@@ -43,6 +46,13 @@ export function signFrost({
   statechainCommitments,
   adaptorPubKey,
 }: SignFrostParams): Uint8Array {
+  SparkSdkLogger.get(LOGGER_NAMES.wasm).trace("signFrost", {
+    message: bytesToHex(message),
+    keyPackage: keyPackage,
+    nonce: nonce,
+    selfCommitment: selfCommitment,
+    statechainCommitments: statechainCommitments,
+  });
   return wasm_sign_frost(
     message,
     createKeyPackage(keyPackage),
@@ -64,6 +74,17 @@ export function aggregateFrost({
   verifyingKey,
   adaptorPubKey,
 }: AggregateFrostParams): Uint8Array {
+  SparkSdkLogger.get(LOGGER_NAMES.wasm).trace("aggregateFrost", {
+    message: bytesToHex(message),
+    statechainCommitments: statechainCommitments,
+    selfCommitment: selfCommitment,
+    statechainSignatures: statechainSignatures,
+    selfSignature: bytesToHex(selfSignature),
+    statechainPublicKeys: statechainPublicKeys,
+    selfPublicKey: bytesToHex(selfPublicKey),
+    verifyingKey: bytesToHex(verifyingKey),
+    adaptorPubKey: adaptorPubKey ? bytesToHex(adaptorPubKey) : undefined,
+  });
   return wasm_aggregate_frost(
     message,
     statechainCommitments,
