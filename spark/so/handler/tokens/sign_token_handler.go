@@ -559,33 +559,32 @@ func verifyOperatorSignatures(
 	operatorMap map[string]*so.SigningOperator,
 	finalTokenTransactionHash []byte,
 ) error {
-	validateOperatorSignature := func(operatorID string, sigBytes []byte) error {
+	var errors []string
+	for operatorID, sigBytes := range signatures {
 		operator, ok := operatorMap[operatorID]
 		if !ok {
 			return fmt.Errorf("operator %s not found in operator map", operatorID)
 		}
-
-		operatorSig, err := ecdsa.ParseDERSignature(sigBytes)
-		if err != nil {
-			return fmt.Errorf("failed to parse operator signature for operator %s: %w", operatorID, err)
-		}
-
-		if !operatorSig.Verify(finalTokenTransactionHash, operator.IdentityPublicKey.ToBTCEC()) {
-			return fmt.Errorf("invalid signature from operator %s", operatorID)
-		}
-
-		return nil
-	}
-
-	var errors []string
-	for operatorID, sigBytes := range signatures {
-		if err := validateOperatorSignature(operatorID, sigBytes); err != nil {
+		if err := verifyOperatorSignature(sigBytes, operator, finalTokenTransactionHash); err != nil {
 			errors = append(errors, err.Error())
 		}
 	}
 
 	if len(errors) > 0 {
 		return fmt.Errorf("signature verification failed: %s", strings.Join(errors, "; "))
+	}
+
+	return nil
+}
+
+func verifyOperatorSignature(sigBytes []byte, operator *so.SigningOperator, finalTokenTransactionHash []byte) error {
+	operatorSig, err := ecdsa.ParseDERSignature(sigBytes)
+	if err != nil {
+		return fmt.Errorf("failed to parse operator signature for operator %s: %w", operator.Identifier, err)
+	}
+
+	if !operatorSig.Verify(finalTokenTransactionHash, operator.IdentityPublicKey.ToBTCEC()) {
+		return fmt.Errorf("invalid signature from operator %s", operator.Identifier)
 	}
 
 	return nil

@@ -420,6 +420,61 @@ func UpdateSignedTransaction(
 	return nil
 }
 
+// UpdateSignedTransferTransactionWithoutOperatorSpecificOwnershipSignatures is used to update the status of a token transaction to signed
+// when the operator specific ownership signatures are not available. This is used when the operator does not successfully commit
+// after signing, but we have proof that the operator signed the transaction.
+func UpdateSignedTransferTransactionWithoutOperatorSpecificOwnershipSignatures(
+	ctx context.Context,
+	tokenTransactionEnt *TokenTransaction,
+	operatorSignature []byte,
+) error {
+	db, err := GetDbFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	// Update the token transaction with the operator signature and new status
+	_, err = db.TokenTransaction.UpdateOne(tokenTransactionEnt).
+		SetOperatorSignature(operatorSignature).
+		SetStatus(st.TokenTransactionStatusSigned).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to update token transaction with operator signature and status: %w", err)
+	}
+
+	// Update inputs.
+	if tokenTransactionEnt.Edges.SpentOutput != nil {
+		outputIDs := make([]uuid.UUID, len(tokenTransactionEnt.Edges.SpentOutput))
+		for i, output := range tokenTransactionEnt.Edges.SpentOutput {
+			outputIDs[i] = output.ID
+		}
+		_, err = db.TokenOutput.Update().
+			Where(tokenoutput.IDIn(outputIDs...)).
+			SetStatus(st.TokenOutputStatusSpentSigned).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to bulk update spent output status to signed: %w", err)
+		}
+	}
+
+	// Update outputs.
+	if numOutputs := len(tokenTransactionEnt.Edges.CreatedOutput); numOutputs > 0 {
+		outputIDs := make([]uuid.UUID, numOutputs)
+		for i, output := range tokenTransactionEnt.Edges.CreatedOutput {
+			outputIDs[i] = output.ID
+		}
+		_, err = db.TokenOutput.Update().
+			Where(tokenoutput.IDIn(outputIDs...)).
+			SetStatus(st.TokenOutputStatusCreatedSigned).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to bulk update output status to signed: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // UpdateFinalizedTransaction updates the status and ownership signatures of the finalized input + output outputs.
 func UpdateFinalizedTransaction(
 	ctx context.Context,

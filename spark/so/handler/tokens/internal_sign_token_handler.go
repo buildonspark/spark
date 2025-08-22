@@ -244,12 +244,20 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 	}
 	tokenTransaction, err := db.TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHashEQ(req.FinalTokenTransactionHash)).
+		WithSpentOutput().
+		WithCreatedOutput().
 		Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load token transaction with txHash (%x) in ExchangeRevocationSecretsShares: %w", req.FinalTokenTransactionHash, err)
 	}
 	if err := h.validateSignaturesPackageAndPersistPeerSignatures(ctx, operatorSignatures, tokenTransaction); err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt("failed to validate signature package and persist peer signatures", tokenTransaction, err)
+	}
+	if tokenTransaction.Status == st.TokenTransactionStatusStarted {
+		err = h.validateAndSignTransactionWithProvidedOwnSignature(ctx, tokenTransaction, operatorSignatures[h.config.Identifier])
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	inputOperatorShareMap, err := buildInputOperatorShareMap(req.OperatorShares)
@@ -291,6 +299,23 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 		}
 	}
 	return response, nil
+}
+
+func (h *InternalSignTokenHandler) validateAndSignTransactionWithProvidedOwnSignature(ctx context.Context, tokenTransaction *ent.TokenTransaction, ownSignature []byte) error {
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Error("Updating token transaction status to signed from peer operator's signature. This should not happen unless the operator did not successfully commit after signing.")
+
+	if err := verifyOperatorSignature(
+		ownSignature,
+		h.config.SigningOperatorMap[h.config.Identifier],
+		tokenTransaction.FinalizedTokenTransactionHash); err != nil {
+		return tokens.FormatErrorWithTransactionEnt("failed to verify own operator signature", tokenTransaction, err)
+	}
+
+	if err := ent.UpdateSignedTransferTransactionWithoutOperatorSpecificOwnershipSignatures(ctx, tokenTransaction, ownSignature); err != nil {
+		return tokens.FormatErrorWithTransactionEnt("failed to update token transaction status to signed", tokenTransaction, err)
+	}
+	return nil
 }
 
 func (h *InternalSignTokenHandler) prepareResponseForExchangeRevocationSecretsShare(ctx context.Context, inputOperatorShareMap map[ShareKey]ShareValue) (*pbtkinternal.ExchangeRevocationSecretsSharesResponse, error) {
@@ -521,6 +546,7 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecretsAndFinalize(ctx c
 	tokenTransaction, err := db.TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHashEQ(tokenTransactionHash)).
 		Where(tokentransaction.StatusIn(
+			st.TokenTransactionStatusStarted,
 			st.TokenTransactionStatusSigned,
 			st.TokenTransactionStatusRevealed,
 			st.TokenTransactionStatusFinalized,
@@ -711,7 +737,11 @@ func buildInputOperatorShareMap(operatorShares []*pbtkinternal.OperatorRevocatio
 	return inputOperatorShareMap, nil
 }
 
-func (h *InternalSignTokenHandler) validateSignaturesPackageAndPersistPeerSignatures(ctx context.Context, signatures operatorSignaturesMap, tokenTransaction *ent.TokenTransaction) error {
+func (h *InternalSignTokenHandler) validateSignaturesPackageAndPersistPeerSignatures(
+	ctx context.Context,
+	signatures operatorSignaturesMap,
+	tokenTransaction *ent.TokenTransaction,
+) error {
 	expectedSignatures := h.getRequiredParticipatingOperatorsCount()
 	if len(signatures) < expectedSignatures {
 		return tokens.FormatErrorWithTransactionEnt("less than required operators have signed this transaction", tokenTransaction, fmt.Errorf("expected %d signatures, got %d", expectedSignatures, len(signatures)))

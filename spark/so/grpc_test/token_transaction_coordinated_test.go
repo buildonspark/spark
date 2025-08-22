@@ -23,6 +23,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokenpartialrevocationsecretshare"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	"github.com/lightsparkdev/spark/so/ent/tokentransactionpeersignature"
 	"github.com/lightsparkdev/spark/so/protoconverter"
 	"github.com/lightsparkdev/spark/so/utils"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -177,15 +178,7 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 			finalTransferTokenTransactionHash, err := utils.HashTokenTransaction(transferTokenTransactionResponse, false)
 			require.NoError(t, err, "failed to hash transfer token transaction")
 
-			var entClient *ent.Client
-			for i := 0; i < 3; i++ {
-				entClient, err = ent.Open("postgres", config.CoordinatorDatabaseURI)
-				if err == nil {
-					break
-				}
-				time.Sleep(1 * time.Second)
-			}
-			require.NoError(t, err, "failed to connect to database")
+			entClient := sparktesting.NewPostgresEntClient(t, config.CoordinatorDatabaseURI)
 			defer entClient.Close()
 
 			numOperators := len(config.SigningOperators)
@@ -251,54 +244,14 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 }
 
 func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealed(t *testing.T) {
-	config, err := sparktesting.TestWalletConfigWithIdentityKey(staticLocalIssuerKey.IdentityPrivateKey())
-	require.NoError(t, err, "failed to create wallet config")
-
-	numOperators := len(config.SigningOperators)
-
-	// ==== Make a valid token transaction ====
-	tokenPrivKey := config.IdentityPrivateKey
-	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
-	require.NoError(t, err, "failed to create test token issuance transaction")
-
-	finalIssueTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
-		t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey},
-	)
-	require.NoError(t, err, "failed to broadcast issuance token transaction")
-
-	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
-	require.NoError(t, err, "failed to hash final issuance token transaction")
-
-	transferTokenTransaction, _, err := createTestTokenTransferTransactionTokenPb(t,
-		config,
-		finalIssueTokenTransactionHash,
-		tokenPrivKey.Public(),
-	)
-	require.NoError(t, err, "failed to create test token transfer transaction")
-
 	ctx := t.Context()
+	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+	require.NoError(t, err, "failed to create transfer token transaction")
 
-	transferTokenTransactionResponse, err := wallet.BroadcastCoordinatedTokenTransfer(
-		ctx, config, transferTokenTransaction,
-		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
-	)
-	require.NoError(t, err, "failed to broadcast transfer token transaction")
-
-	finalTransferTokenTransactionHash, err := utils.HashTokenTransaction(transferTokenTransactionResponse, false)
-	require.NoError(t, err, "failed to hash transfer token transaction")
-
-	var entClient *ent.Client
-	for i := 0; i < 3; i++ {
-		entClient, err = ent.Open("postgres", config.CoordinatorDatabaseURI)
-		if err == nil {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
-	require.NoError(t, err, "failed to connect to database")
+	entClient := sparktesting.NewPostgresEntClient(t, config.CoordinatorDatabaseURI)
 	defer entClient.Close()
 
-	setAndValidateSuccessfulTokenTransactionToRevealedForCoordinator(t, ctx, entClient, finalTransferTokenTransactionHash)
+	setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t, ctx, entClient, finalTransferTokenTransactionHash)
 
 	conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000001"].NewOperatorGRPCConnection()
 	require.NoError(t, err)
@@ -321,11 +274,151 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealed(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, st.TokenTransactionStatusFinalized, tokenTransactionAfterFinalizeRevealedTransactions.Status)
 	for _, tokenOutput := range tokenTransactionAfterFinalizeRevealedTransactions.Edges.SpentOutput {
-		require.Equal(t, len(tokenOutput.Edges.TokenPartialRevocationSecretShares), numOperators-1, "should have exactly numOperators-1 secret shares")
+		require.Equal(t, len(tokenOutput.Edges.TokenPartialRevocationSecretShares), len(config.SigningOperators)-1, "should have exactly numOperators-1 secret shares")
 	}
 }
 
-func setAndValidateSuccessfulTokenTransactionToRevealedForCoordinator(t *testing.T, ctx context.Context, entClient *ent.Client, finalTransferTokenTransactionHash []byte) {
+func TestRevocationExchangeCronJobSuccessfullyFinalizesStarted(t *testing.T) {
+	ctx := t.Context()
+	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+	require.NoError(t, err, "failed to create transfer token transaction")
+
+	var coordinatorEntClient, nonCoordEntClient *ent.Client
+	coordinatorEntClient = sparktesting.NewPostgresEntClient(t, config.CoordinatorDatabaseURI)
+	defer coordinatorEntClient.Close()
+
+	nonCoordOperatorConfig, err := sparktesting.SpecificOperatorTestConfig(1)
+	require.NoError(t, err, "failed to get non-coordinator operator config")
+	nonCoordEntClient = sparktesting.NewPostgresEntClient(t, nonCoordOperatorConfig.DatabasePath)
+	defer nonCoordEntClient.Close()
+
+	setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t, ctx, nonCoordEntClient, finalTransferTokenTransactionHash)
+	setAndValidateSuccessfulTokenTransactionToStartedForOperator(t, ctx, coordinatorEntClient, finalTransferTokenTransactionHash)
+
+	conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000002"].NewOperatorGRPCConnection()
+	require.NoError(t, err)
+	mockClient := pbmock.NewMockServiceClient(conn)
+	_, err = mockClient.TriggerTask(t.Context(), &pbmock.TriggerTaskRequest{TaskName: "finalize_revealed_token_transactions"})
+	require.NoError(t, err)
+	conn.Close()
+
+	// ==== Verify the transaction is finalized ====
+	tokenTransactionAfterFinalizeRevealedTransactions, err := coordinatorEntClient.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)).
+		WithPeerSignatures().
+		WithSpentOutput(
+			func(to *ent.TokenOutputQuery) {
+				to.WithTokenPartialRevocationSecretShares()
+			},
+		).
+		WithCreatedOutput().
+		Only(ctx)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenTransactionStatusFinalized, tokenTransactionAfterFinalizeRevealedTransactions.Status)
+	for _, tokenOutput := range tokenTransactionAfterFinalizeRevealedTransactions.Edges.SpentOutput {
+		require.Equal(t, len(tokenOutput.Edges.TokenPartialRevocationSecretShares), len(config.SigningOperators)-1, "should have exactly numOperators-1 secret shares")
+	}
+}
+
+func TestRevocationExchangeCronJobDoesNotFinalizeStartedIfSignatureIsInvalid(t *testing.T) {
+	ctx := t.Context()
+	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+	require.NoError(t, err, "failed to create transfer token transaction")
+
+	var coordinatorEntClient, nonCoordEntClient *ent.Client
+	coordinatorEntClient = sparktesting.NewPostgresEntClient(t, config.CoordinatorDatabaseURI)
+	defer coordinatorEntClient.Close()
+
+	nonCoordOperatorConfig, err := sparktesting.SpecificOperatorTestConfig(1)
+	require.NoError(t, err, "failed to get non-coordinator operator config")
+	nonCoordEntClient = sparktesting.NewPostgresEntClient(t, nonCoordOperatorConfig.DatabasePath)
+	defer nonCoordEntClient.Close()
+
+	setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t, ctx, nonCoordEntClient, finalTransferTokenTransactionHash)
+	peerSignature, err := nonCoordEntClient.TokenTransactionPeerSignature.Query().
+		Where(tokentransactionpeersignature.And(
+			tokentransactionpeersignature.HasTokenTransactionWith(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)),
+			tokentransactionpeersignature.OperatorIdentityPublicKeyEQ(config.SigningOperators[config.CoordinatorIdentifier].IdentityPublicKey.Serialize()),
+		)).Only(ctx)
+	require.NoError(t, err)
+	// Reset the peer signature to its original value after the test
+	defer func() {
+		err = nonCoordEntClient.TokenTransactionPeerSignature.Update().
+			Where(tokentransactionpeersignature.IDEQ(peerSignature.ID)).
+			SetSignature(peerSignature.Signature).
+			Exec(ctx)
+		require.NoError(t, err, "failed to reset peer signature; other finalize_revealed_token_transactions task tests will likely fail")
+	}()
+
+	err = nonCoordEntClient.TokenTransactionPeerSignature.Update().
+		Where(tokentransactionpeersignature.IDEQ(peerSignature.ID)).
+		SetSignature(make([]byte, 64)).
+		Exec(ctx)
+	require.NoError(t, err)
+	setAndValidateSuccessfulTokenTransactionToStartedForOperator(t, ctx, coordinatorEntClient, finalTransferTokenTransactionHash)
+
+	conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000002"].NewOperatorGRPCConnection()
+	require.NoError(t, err)
+	mockClient := pbmock.NewMockServiceClient(conn)
+	_, err = mockClient.TriggerTask(t.Context(), &pbmock.TriggerTaskRequest{TaskName: "finalize_revealed_token_transactions"})
+	require.Error(t, err, "should have error because signature is invalid")
+	require.Contains(t, err.Error(), "failed to verify operator signatures")
+	conn.Close()
+
+	// ==== Verify the transaction is still STARTED ====
+	tokenTransactionAfterFinalizeRevealedTransactions, err := coordinatorEntClient.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)).
+		WithPeerSignatures().
+		WithSpentOutput(
+			func(to *ent.TokenOutputQuery) {
+				to.WithTokenPartialRevocationSecretShares()
+			},
+		).
+		WithCreatedOutput().
+		Only(ctx)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenTransactionStatusStarted, tokenTransactionAfterFinalizeRevealedTransactions.Status)
+	for _, tokenOutput := range tokenTransactionAfterFinalizeRevealedTransactions.Edges.SpentOutput {
+		require.Empty(t, tokenOutput.Edges.TokenPartialRevocationSecretShares, "should have no secret shares")
+	}
+}
+
+func createTransferTokenTransactionForWallet(t *testing.T, ctx context.Context) (*wallet.TestWalletConfig, []byte, error) {
+	config, err := sparktesting.TestWalletConfigWithIdentityKey(staticLocalIssuerKey.IdentityPrivateKey())
+	require.NoError(t, err, "failed to create wallet config")
+
+	// ==== Make a valid token transaction ====
+	tokenPrivKey := config.IdentityPrivateKey
+	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
+	require.NoError(t, err, "failed to create test token issuance transaction")
+
+	finalIssueTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+		t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast issuance token transaction")
+
+	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
+	require.NoError(t, err, "failed to hash final issuance token transaction")
+
+	transferTokenTransaction, _, err := createTestTokenTransferTransactionTokenPb(t,
+		config,
+		finalIssueTokenTransactionHash,
+		tokenPrivKey.Public(),
+	)
+	require.NoError(t, err, "failed to create test token transfer transaction")
+
+	transferTokenTransactionResponse, err := wallet.BroadcastCoordinatedTokenTransfer(
+		ctx, config, transferTokenTransaction,
+		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast transfer token transaction")
+
+	finalTransferTokenTransactionHash, err := utils.HashTokenTransaction(transferTokenTransactionResponse, false)
+	require.NoError(t, err, "failed to hash transfer token transaction")
+	return config, finalTransferTokenTransactionHash, nil
+}
+
+func setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t *testing.T, ctx context.Context, entClient *ent.Client, finalTransferTokenTransactionHash []byte) {
 	tx, err := entClient.Tx(ctx)
 	require.NoError(t, err)
 
@@ -398,6 +491,83 @@ func setAndValidateSuccessfulTokenTransactionToRevealedForCoordinator(t *testing
 	}
 	for _, output := range tokenTransaction.Edges.CreatedOutput {
 		require.Equal(t, st.TokenOutputStatusCreatedSigned, output.Status, "created output %s should be signed", output.ID)
+	}
+}
+
+func setAndValidateSuccessfulTokenTransactionToStartedForOperator(t *testing.T, ctx context.Context, entClient *ent.Client, finalTransferTokenTransactionHash []byte) {
+	tx, err := entClient.Tx(ctx)
+	require.NoError(t, err)
+
+	tokenTransaction, err := tx.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)).
+		WithSpentOutput().
+		WithCreatedOutput().
+		Only(ctx)
+	require.NoError(t, err)
+	createdIDs := make([]uuid.UUID, 0, len(tokenTransaction.Edges.CreatedOutput))
+	for _, o := range tokenTransaction.Edges.CreatedOutput {
+		createdIDs = append(createdIDs, o.ID)
+	}
+
+	spentIDs := make([]uuid.UUID, 0, len(tokenTransaction.Edges.SpentOutput))
+	for _, o := range tokenTransaction.Edges.SpentOutput {
+		fmt.Println("spent output", o.ID)
+		spentIDs = append(spentIDs, o.ID)
+	}
+
+	err = tx.TokenOutput.
+		Update().
+		Where(tokenoutput.IDIn(createdIDs...)).
+		SetStatus(st.TokenOutputStatusCreatedStarted).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	err = tx.TokenOutput.
+		Update().
+		Where(tokenoutput.IDIn(spentIDs...)).
+		SetStatus(st.TokenOutputStatusSpentStarted).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	_, err = tx.TokenPartialRevocationSecretShare.
+		Delete().
+		Where(tokenpartialrevocationsecretshare.HasTokenOutputWith(
+			tokenoutput.IDIn(spentIDs...),
+		)).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	err = tx.TokenTransaction.Update().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)).
+		SetStatus(st.TokenTransactionStatusStarted).
+		ClearOperatorSignature().
+		SetUpdateTime(time.Now().Add(-25 * time.Minute).UTC()).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	err = tx.Commit()
+	require.NoError(t, err)
+
+	tokenTransaction, err = entClient.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)).
+		WithPeerSignatures().
+		WithSpentOutput(
+			func(to *ent.TokenOutputQuery) {
+				to.WithTokenPartialRevocationSecretShares()
+			},
+		).
+		WithCreatedOutput().
+		Only(ctx)
+	require.NoError(t, err)
+
+	require.Equal(t, st.TokenTransactionStatusStarted, tokenTransaction.Status, "token transaction status should be started")
+	require.Greater(t, time.Now().In(time.UTC).Sub(tokenTransaction.UpdateTime.In(time.UTC)), 5*time.Minute, "update time should be more than 5 minutes before now")
+	for _, output := range tokenTransaction.Edges.SpentOutput {
+		require.Equal(t, st.TokenOutputStatusSpentStarted, output.Status, "spent output %s should be started", output.ID)
+		require.Empty(t, output.Edges.TokenPartialRevocationSecretShares, "should have 0 secret shares")
+	}
+	for _, output := range tokenTransaction.Edges.CreatedOutput {
+		require.Equal(t, st.TokenOutputStatusCreatedStarted, output.Status, "created output %s should be started", output.ID)
 	}
 }
 
