@@ -61,5 +61,6 @@ func (TokenTransaction) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("finalized_token_transaction_hash"),
 		index.Fields("partial_token_transaction_hash"),
+		index.Fields("expiry_time", "status"),
 	}
 }
