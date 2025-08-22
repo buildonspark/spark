@@ -124,11 +124,11 @@ function schnorrVerifyWithAdaptor(
   // Step 3 and 4 is handled by parseSignature
   const { r, s } = parseSignature(signature);
 
-  // Step 5: Compute challenge
+  // Step 5: Compute challenge.
   const commitmenet = schnorr.utils.taggedHash(
     "BIP0340/challenge",
     r,
-    pubKey.toRawBytes().slice(1),
+    pubKey.toBytes().slice(1),
     hash,
   );
   if (commitmenet.length > 32) {
@@ -139,29 +139,28 @@ function schnorrVerifyWithAdaptor(
   const negE = mod(-e, secp256k1.CURVE.n); // Negate e before multiplication
 
   // Step 6: Calculate R = sG - eP
-  const R = secp256k1.ProjectivePoint.BASE.multiplyAndAddUnsafe(
-    pubKey,
-    bytesToNumberBE(s),
-    negE,
-  );
-  if (!R) {
-    throw new Error("R is undefined");
+  const sG = secp256k1.Point.BASE.multiplyUnsafe(bytesToNumberBE(s));
+  const eP = pubKey.multiplyUnsafe(negE);
+  const R = sG.add(eP);
+
+  if (R.is0()) {
+    throw new Error("R is zero");
   }
 
   R.assertValidity();
 
   // Step 6.5: Add adaptor public key T to R
-  const adaptorPoint = secp256k1.ProjectivePoint.fromHex(adaptorPubkey);
+  const adaptorPoint = secp256k1.Point.fromHex(adaptorPubkey);
   const newR = R.add(adaptorPoint);
 
   // Step 7: Check for point at infinity (if not inbound)
-  if (!inbound && newR.equals(secp256k1.ProjectivePoint.ZERO)) {
+  if (!inbound && newR.equals(secp256k1.Point.ZERO)) {
     throw new Error("calculated R point is the point at infinity");
   }
 
   // Step 8: Check if R.y is odd
   newR.assertValidity();
-  if (!newR.hasEvenY()) {
+  if (newR.y % 2n !== 0n) {
     throw new Error("calculated R y-value is odd");
   }
 

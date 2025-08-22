@@ -1,19 +1,19 @@
-import { secp256k1, schnorr } from "@noble/curves/secp256k1";
+import { BinaryWriter } from "@bufbuild/protobuf/wire";
+import { bytesToNumberBE } from "@noble/curves/abstract/utils";
+import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { bech32m } from "@scure/base";
-import {
-  SparkInvoiceFields,
-  SparkAddress,
-  TokensPayment,
-  SatsPayment,
-} from "../proto/spark.js";
-import { NetworkType } from "./network.js";
-import { ValidationError } from "../errors/index.js";
-import { HashSparkInvoice } from "./invoice-hashing.js";
 import { UUID } from "uuidv7";
-import { bytesToNumberBE } from "@noble/curves/abstract/utils";
+import { ValidationError } from "../errors/index.js";
 import { Timestamp } from "../proto/google/protobuf/timestamp.js";
-import { BinaryWriter } from "@bufbuild/protobuf/wire";
+import {
+  SatsPayment,
+  SparkAddress,
+  SparkInvoiceFields,
+  TokensPayment,
+} from "../proto/spark.js";
+import { HashSparkInvoice } from "./invoice-hashing.js";
+import { NetworkType } from "./network.js";
 
 const BECH32M_LIMIT = 1024;
 
@@ -212,7 +212,7 @@ export function isValidSparkAddress(address: string) {
 
 export function isValidPublicKey(publicKey: string) {
   try {
-    const point = secp256k1.ProjectivePoint.fromHex(publicKey);
+    const point = secp256k1.Point.fromHex(publicKey);
     point.assertValidity();
   } catch (error) {
     throw new ValidationError(

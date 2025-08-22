@@ -10,9 +10,9 @@ export function addPublicKeys(a: Uint8Array, b: Uint8Array): Uint8Array {
       expected: 33,
     });
   }
-  const pubkeyA = secp256k1.ProjectivePoint.fromHex(a);
-  const pubkeyB = secp256k1.ProjectivePoint.fromHex(b);
-  return pubkeyA.add(pubkeyB).toRawBytes(true);
+  const pubkeyA = secp256k1.Point.fromHex(a);
+  const pubkeyB = secp256k1.Point.fromHex(b);
+  return pubkeyA.add(pubkeyB).toBytes(true);
 }
 
 export function applyAdditiveTweakToPublicKey(
@@ -33,13 +33,13 @@ export function applyAdditiveTweakToPublicKey(
       expected: 32,
     });
   }
-  const pubkeyPoint = secp256k1.ProjectivePoint.fromHex(pubkey);
+  const pubkeyPoint = secp256k1.Point.fromHex(pubkey);
 
   const privTweek = secp256k1.utils.normPrivateKeyToScalar(tweak);
   const pubTweek = secp256k1.getPublicKey(privTweek, true);
-  const tweekPoint = secp256k1.ProjectivePoint.fromHex(pubTweek);
+  const tweekPoint = secp256k1.Point.fromHex(pubTweek);
 
-  return pubkeyPoint.add(tweekPoint).toRawBytes(true);
+  return pubkeyPoint.add(tweekPoint).toBytes(true);
 }
 
 export function subtractPublicKeys(a: Uint8Array, b: Uint8Array) {
@@ -51,9 +51,9 @@ export function subtractPublicKeys(a: Uint8Array, b: Uint8Array) {
     });
   }
 
-  const pubkeyA = secp256k1.ProjectivePoint.fromHex(a);
-  const pubkeyB = secp256k1.ProjectivePoint.fromHex(b);
-  return pubkeyA.subtract(pubkeyB).toRawBytes(true);
+  const pubkeyA = secp256k1.Point.fromHex(a);
+  const pubkeyB = secp256k1.Point.fromHex(b);
+  return pubkeyA.subtract(pubkeyB).toBytes(true);
 }
 
 export function addPrivateKeys(a: Uint8Array, b: Uint8Array) {

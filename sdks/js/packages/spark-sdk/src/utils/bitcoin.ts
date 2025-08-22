@@ -30,9 +30,9 @@ export function computeTaprootKeyNoScript(pubkey: Uint8Array): Uint8Array {
   const P = schnorr.utils.lift_x(schnorr.utils.bytesToNumberBE(pubkey));
 
   // Add the tweak times the generator point
-  const Q = P.add(secp256k1.ProjectivePoint.fromPrivateKey(tweak));
+  const Q = P.add(secp256k1.Point.fromPrivateKey(tweak));
 
-  return Q.toRawBytes();
+  return Q.toBytes();
 }
 
 export function getP2TRScriptFromPublicKey(
@@ -47,9 +47,9 @@ export function getP2TRScriptFromPublicKey(
     });
   }
 
-  const internalKey = secp256k1.ProjectivePoint.fromHex(pubKey);
+  const internalKey = secp256k1.Point.fromHex(pubKey);
   const script = btc.p2tr(
-    internalKey.toRawBytes().slice(1, 33),
+    internalKey.toBytes().slice(1, 33),
     undefined,
     getNetwork(network),
   ).script;
@@ -74,9 +74,9 @@ export function getP2TRAddressFromPublicKey(
     });
   }
 
-  const internalKey = secp256k1.ProjectivePoint.fromHex(pubKey);
+  const internalKey = secp256k1.Point.fromHex(pubKey);
   const address = btc.p2tr(
-    internalKey.toRawBytes().slice(1, 33),
+    internalKey.toBytes().slice(1, 33),
     undefined,
     getNetwork(network),
   ).address;

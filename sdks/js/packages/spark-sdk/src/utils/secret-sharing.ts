@@ -1,7 +1,7 @@
 import { bytesToHex, equalBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { getCrypto } from "./crypto.js";
 import { ValidationError } from "../errors/index.js";
+import { getCrypto } from "./crypto.js";
 
 type Polynomial = {
   fieldModulus: bigint;
@@ -140,13 +140,12 @@ export function generatePolynomialForSecretSharing(
   const proofs: Uint8Array[] = new Array(degree);
 
   coefficients[0] = secret;
-  proofs[0] = secp256k1.ProjectivePoint.fromPrivateKey(secret).toRawBytes(true);
+  proofs[0] = secp256k1.Point.fromPrivateKey(secret).toBytes(true);
 
   for (let i = 1; i < degree; i++) {
     const coefficient = getRandomBigInt(fieldModulus);
     coefficients[i] = coefficient;
-    proofs[i] =
-      secp256k1.ProjectivePoint.fromPrivateKey(coefficient).toRawBytes(true);
+    proofs[i] = secp256k1.Point.fromPrivateKey(coefficient).toBytes(true);
   }
   return {
     fieldModulus,
@@ -246,9 +245,9 @@ export function recoverSecret(shares: VerifiableSecretShare[]) {
 
 // Validates a share of a secret
 export function validateShare(share: VerifiableSecretShare) {
-  const targetPubkey = secp256k1.ProjectivePoint.fromPrivateKey(
-    share.share,
-  ).toRawBytes(true);
+  const targetPubkey = secp256k1.Point.fromPrivateKey(share.share).toBytes(
+    true,
+  );
 
   let resultPubkey = share.proofs[0];
   if (!resultPubkey) {
@@ -270,11 +269,10 @@ export function validateShare(share: VerifiableSecretShare) {
     }
     const value = share.index ** BigInt(i) % share.fieldModulus;
 
-    const scaledPoint =
-      secp256k1.ProjectivePoint.fromHex(pubkey).multiply(value);
-    resultPubkey = secp256k1.ProjectivePoint.fromHex(resultPubkey)
+    const scaledPoint = secp256k1.Point.fromHex(pubkey).multiply(value);
+    resultPubkey = secp256k1.Point.fromHex(resultPubkey)
       .add(scaledPoint)
-      .toRawBytes(true);
+      .toBytes(true);
   }
 
   if (!equalBytes(resultPubkey, targetPubkey)) {
