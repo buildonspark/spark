@@ -3,33 +3,34 @@ package ent
 import (
 	"context"
 	"fmt"
+	"github.com/lightsparkdev/spark/common/keys"
 )
 
 // GetEntityDkgKeyPublicKey fetches the entity DKG key and returns its associated public key.
 // Returns an error if no entity DKG key is found, if there are multiple entity DKG keys,
 // or if the SigningKeyshare is not loaded.
-func GetEntityDkgKeyPublicKey(ctx context.Context, db *Client) ([]byte, error) {
+func GetEntityDkgKeyPublicKey(ctx context.Context, db *Client) (keys.Public, error) {
 	entityDkgKey, err := db.EntityDkgKey.Query().
 		WithSigningKeyshare().
 		Only(ctx)
 	if err != nil {
 		if IsNotFound(err) {
-			return nil, fmt.Errorf("entity DKG key not found")
+			return keys.Public{}, fmt.Errorf("entity DKG key not found")
 		}
 		if IsNotSingular(err) {
-			return nil, fmt.Errorf("multiple entity DKG keys found, expected exactly one")
+			return keys.Public{}, fmt.Errorf("multiple entity DKG keys found, expected exactly one")
 		}
-		return nil, fmt.Errorf("failed to query entity DKG key: %w", err)
+		return keys.Public{}, fmt.Errorf("failed to query entity DKG key: %w", err)
 	}
 
 	signingKeyshare, err := entityDkgKey.Edges.SigningKeyshareOrErr()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get signing keyshare from entity DKG key: %w", err)
+		return keys.Public{}, fmt.Errorf("failed to get signing keyshare from entity DKG key: %w", err)
 	}
 
-	if len(signingKeyshare.PublicKey) == 0 {
-		return nil, fmt.Errorf("entity DKG key has empty public key")
+	pubKey, err := keys.ParsePublicKey(signingKeyshare.PublicKey)
+	if err != nil {
+		return keys.Public{}, fmt.Errorf("failed to parse entity DKG key public key: %w", err)
 	}
-
-	return signingKeyshare.PublicKey, nil
+	return pubKey, nil
 }

@@ -2,9 +2,10 @@ package chain
 
 import (
 	"bytes"
-	"encoding/hex"
+	"math/rand/v2"
 	"testing"
 
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -174,6 +175,7 @@ func TestProcessTransactions(t *testing.T) {
 }
 
 func TestHandleBlock_MixedTransactions(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
 	ctx, client := db.NewTestSQLiteContext(t, t.Context())
 	defer client.Close()
 	dbTx, err := ent.GetDbFromContext(ctx)
@@ -193,22 +195,25 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	require.NoError(t, err)
 	rawNodeTx := nodeTxBuf.Bytes()
 
+	secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerIDPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	signingPublicKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	validIssuerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
 	// The node needs a dummy tree to satisfy foreign key constraints.
 	tree, err := dbTx.Tree.Create().
 		SetStatus(schematype.TreeStatusPending).
 		SetBaseTxid([]byte("dummytxid")).
-		SetOwnerIdentityPubkey([]byte("owner")).
+		SetOwnerIdentityPubkey(ownerIDPubKey.Serialize()).
 		SetNetwork(common.SchemaNetwork(common.Testnet)).
 		SetVout(0).
 		Save(ctx)
 	require.NoError(t, err)
 
-	signingPublicKey := make([]byte, 33)
-	copy(signingPublicKey, "static_dkg_key_public_key_bytes")
-
 	signingKey, err := dbTx.SigningKeyshare.Create().
-		SetPublicKey(signingPublicKey).
-		SetSecretShare([]byte("secret")).
+		SetPublicKey(signingPublicKey.Serialize()).
+		SetSecretShare(secretShare.Serialize()).
 		SetMinSigners(1).
 		SetPublicShares(map[string][]byte{}).
 		SetStatus(schematype.KeyshareStatusAvailable).
@@ -231,24 +236,22 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 		SetDirectFromCpfpRefundTx(rawRefundTx).
 		SetStatus(schematype.TreeNodeStatusOnChain).
 		SetNodeConfirmationHeight(100).
-		SetOwnerIdentityPubkey([]byte("owner")).
+		SetOwnerIdentityPubkey(ownerIDPubKey.Serialize()).
 		SetRawTx(rawNodeTx).
 		SetTree(tree).
 		SetValue(1000).
-		SetVerifyingPubkey([]byte("verifying")).
-		SetOwnerSigningPubkey([]byte("owner")).
+		SetVerifyingPubkey(verifyingPubKey.Serialize()).
+		SetOwnerSigningPubkey(ownerIDPubKey.Serialize()).
 		SetVout(0).
 		SetSigningKeyshare(signingKey).
 		Save(ctx)
 	require.NoError(t, err)
 
 	// A valid token announcement
-	validIssuerPubKey, err := hex.DecodeString("02a0434d9e47f3c86235477c7b1ae6ae5d3442d49b1943c2b752a68e2a47e247c7")
-	require.NoError(t, err)
 	validScriptData := func() []byte {
 		s := []byte(announcementPrefix)
 		s = append(s, creationAnnouncementKind[:]...)
-		s = append(s, validIssuerPubKey...)
+		s = append(s, validIssuerPubKey.Serialize()...)
 		s = append(s, 9) // "TestToken"
 		s = append(s, []byte("TestToken")...)
 		s = append(s, 4) // "TICK"
@@ -270,7 +273,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	duplicateScriptData := func() []byte {
 		s := []byte(announcementPrefix)
 		s = append(s, creationAnnouncementKind[:]...)
-		s = append(s, validIssuerPubKey...) // Same issuer pubkey
+		s = append(s, validIssuerPubKey.Serialize()...) // Same issuer pubkey
 		s = append(s, 4)
 		s = append(s, []byte("DUP1")...)
 		s = append(s, 4)
@@ -344,10 +347,10 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	require.NotNil(t, duplicateToken)
 	assert.Equal(t, "TestToken", validToken.TokenName)
 	assert.Equal(t, "TICK", validToken.TokenTicker)
-	assert.Equal(t, validIssuerPubKey, validToken.IssuerPublicKey)
+	assert.Equal(t, validIssuerPubKey.Serialize(), validToken.IssuerPublicKey)
 	assert.Equal(t, "DUP1", duplicateToken.TokenName)
 	assert.Equal(t, "DUP1", duplicateToken.TokenTicker)
-	assert.Equal(t, validIssuerPubKey, duplicateToken.IssuerPublicKey)
+	assert.Equal(t, validIssuerPubKey.Serialize(), duplicateToken.IssuerPublicKey)
 
 	// Only one TokenCreate should be created (duplicate issuer filtered out)
 	createdTokens, err := dbTx.TokenCreate.Query().All(ctx)
@@ -355,7 +358,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	require.Len(t, createdTokens, 1)
 	assert.Equal(t, "TestToken", createdTokens[0].TokenName)
 	assert.Equal(t, "TICK", createdTokens[0].TokenTicker)
-	assert.Equal(t, validIssuerPubKey, createdTokens[0].IssuerPublicKey)
+	assert.Equal(t, validIssuerPubKey.Serialize(), createdTokens[0].IssuerPublicKey)
 
 	// And the tree node should have been refunded
 	node, err := dbTx.TreeNode.Get(ctx, treeNode.ID)

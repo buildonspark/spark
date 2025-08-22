@@ -1435,10 +1435,10 @@ type FinalValidationConfig struct {
 	SupportedNetworks                  []common.Network
 	RequireTokenIdentifierForMints     bool
 	RequireTokenIdentifierForTransfers bool
-	ExpectedRevocationPublicKeys       [][]byte
+	ExpectedRevocationPublicKeys       []keys.Public
 	ExpectedBondSats                   uint64
 	ExpectedRelativeBlockLocktime      uint64
-	ExpectedCreationEntityPublicKey    []byte
+	ExpectedCreationEntityPublicKey    keys.Public
 }
 
 // ValidateFinalTokenTransaction validates that the final token transaction
@@ -1469,18 +1469,20 @@ func ValidateFinalTokenTransaction(
 	switch inputType {
 	case TokenTransactionTypeCreate:
 		createInput := tokenTransaction.GetCreateInput()
-		if createInput.GetCreationEntityPublicKey() == nil {
-			return fmt.Errorf("creation entity public key cannot be nil")
+		creationPubKey, err := keys.ParsePublicKey(createInput.GetCreationEntityPublicKey())
+		if err != nil {
+			return fmt.Errorf("unable to parse creation entity public key: %w", err)
 		}
-		if !bytes.Equal(createInput.GetCreationEntityPublicKey(), config.ExpectedCreationEntityPublicKey) {
+		if !creationPubKey.Equals(config.ExpectedCreationEntityPublicKey) {
 			return fmt.Errorf("creation entity public key does not match the reserved entity public key")
 		}
 	case TokenTransactionTypeMint, TokenTransactionTypeTransfer:
 		for i, output := range tokenTransaction.TokenOutputs {
-			if output.GetRevocationCommitment() == nil {
-				return fmt.Errorf("revocation commitment cannot be nil for output %d", i)
+			revocationCommitment, err := keys.ParsePublicKey(output.GetRevocationCommitment())
+			if err != nil {
+				return fmt.Errorf("unable to parse revocation commitment: %w", err)
 			}
-			if !bytes.Equal(output.GetRevocationCommitment(), config.ExpectedRevocationPublicKeys[i]) {
+			if !revocationCommitment.Equals(config.ExpectedRevocationPublicKeys[i]) {
 				return fmt.Errorf("revocation commitment mismatch for output %d", i)
 			}
 			if output.WithdrawBondSats == nil || output.WithdrawRelativeBlockLocktime == nil {

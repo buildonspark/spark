@@ -3,22 +3,22 @@ package tokens
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/hex"
+
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so"
+
 	"fmt"
+	"math/rand/v2"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	ecdsa "github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-
 	sparktokeninternal "github.com/lightsparkdev/spark/proto/spark_token_internal"
-	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -85,7 +85,7 @@ func TestExchangeRevocationSecretsShares(t *testing.T) {
 
 		_, err := handler.ExchangeRevocationSecretsShares(ctx, req)
 
-		assert.ErrorContains(t, err, "no operator shares provided in request")
+		require.ErrorContains(t, err, "no operator shares provided in request")
 	})
 
 	t.Run("fails when operator signatures verification fails", func(t *testing.T) {
@@ -120,32 +120,36 @@ func TestExchangeRevocationSecretsShares(t *testing.T) {
 func TestGetSecretSharesNotInInput(t *testing.T) {
 	handler, ctx, tx, cleanup := setupInternalSignTokenTestHandler(t)
 	defer cleanup()
+	rng := rand.NewChaCha8([32]byte{})
 
 	aliceOperatorPubKey := handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000001"].IdentityPublicKey
 	bobOperatorPubKey := handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000002"].IdentityPublicKey
 	carolOperatorPubKey := handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000003"].IdentityPublicKey
 
+	aliceSecret := keys.MustGeneratePrivateKeyFromRand(rng)
 	aliceSigningKeyshare := tx.SigningKeyshare.Create().
-		SetSecretShare([]byte("alice_secret")).
-		SetPublicKey([]byte("alice_public_key")).
+		SetSecretShare(aliceSecret.Serialize()).
+		SetPublicKey(aliceSecret.Public().Serialize()).
 		SetStatus(st.KeyshareStatusInUse).
 		SetPublicShares(map[string][]byte{}).
 		SetMinSigners(1).
 		SetCoordinatorIndex(1).
 		SaveX(ctx)
 
+	bobSecret := keys.MustGeneratePrivateKeyFromRand(rng)
 	bobSigningKeyshare := tx.SigningKeyshare.Create().
-		SetSecretShare([]byte("bob_secret")).
-		SetPublicKey([]byte("bob_public_key")).
+		SetSecretShare(bobSecret.Serialize()).
+		SetPublicKey(bobSecret.Public().Serialize()).
 		SetStatus(st.KeyshareStatusInUse).
 		SetPublicShares(map[string][]byte{}).
 		SetMinSigners(1).
 		SetCoordinatorIndex(1).
 		SaveX(ctx)
 
+	carolSecret := keys.MustGeneratePrivateKeyFromRand(rng)
 	carolSigningKeyshare := tx.SigningKeyshare.Create().
-		SetSecretShare([]byte("carol_secret")).
-		SetPublicKey([]byte("carol_public_key")).
+		SetSecretShare(carolSecret.Serialize()).
+		SetPublicKey(carolSecret.Public().Serialize()).
 		SetStatus(st.KeyshareStatusInUse).
 		SetPublicShares(map[string][]byte{}).
 		SetMinSigners(1).
@@ -165,6 +169,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SetCreationEntityPublicKey(handler.config.IdentityPublicKey().Serialize()).
 		SaveX(ctx)
 
+	withdrawRevocationCommitment := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	tokenOutputInDb := tx.TokenOutput.Create().
 		SetID(uuid.New()).
 		SetOwnerPublicKey(aliceOperatorPubKey.Serialize()).
@@ -174,7 +179,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SetStatus(st.TokenOutputStatusCreatedFinalized).
 		SetWithdrawBondSats(1).
 		SetWithdrawRelativeBlockLocktime(1).
-		SetWithdrawRevocationCommitment([]byte("withdraw_revocation_commitment")).
+		SetWithdrawRevocationCommitment(withdrawRevocationCommitment.Serialize()).
 		SetCreatedTransactionOutputVout(0).
 		SetNetwork(st.NetworkRegtest).
 		SetTokenIdentifier([]byte("token_identifier")).
@@ -236,103 +241,6 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 	})
 }
 
-func TestValidateSecretShareMatchesPublicKey(t *testing.T) {
-	t.Run("valid secret share matches public key", func(t *testing.T) {
-		privKey, err := btcec.NewPrivateKey()
-		require.NoError(t, err)
-
-		pubKey := privKey.PubKey()
-
-		secretShareBytes := privKey.Serialize()
-		publicKeyBytes := pubKey.SerializeCompressed()
-
-		err = validateSecretShareMatchesPublicKey(secretShareBytes, publicKeyBytes)
-		require.NoError(t, err)
-	})
-
-	t.Run("throws error when secret share does not match public key", func(t *testing.T) {
-		privKey1, err := btcec.NewPrivateKey()
-		require.NoError(t, err)
-
-		privKey2, err := btcec.NewPrivateKey()
-		require.NoError(t, err)
-
-		secretShareBytes := privKey1.Serialize()
-		publicKeyBytes := privKey2.PubKey().SerializeCompressed()
-
-		err = validateSecretShareMatchesPublicKey(secretShareBytes, publicKeyBytes)
-		require.ErrorContains(t, err, "secret share:")
-		require.ErrorContains(t, err, "does not match public key:")
-	})
-
-	t.Run("throws error when public key bytes are invalid", func(t *testing.T) {
-		privKey, err := btcec.NewPrivateKey()
-		require.NoError(t, err)
-
-		secretShareBytes := privKey.Serialize()
-		invalidPublicKeyBytes := []byte{0x01, 0x02, 0x03}
-
-		err = validateSecretShareMatchesPublicKey(secretShareBytes, invalidPublicKeyBytes)
-		require.ErrorContains(t, err, "failed to parse public key:")
-	})
-
-	t.Run("throws error when public key bytes are empty", func(t *testing.T) {
-		privKey, err := btcec.NewPrivateKey()
-		require.NoError(t, err)
-
-		secretShareBytes := privKey.Serialize()
-		var emptyPublicKeyBytes []byte
-
-		err = validateSecretShareMatchesPublicKey(secretShareBytes, emptyPublicKeyBytes)
-		require.ErrorContains(t, err, "failed to parse public key:")
-	})
-
-	t.Run("throws error when secret share byte array is not 32 bytes in length", func(t *testing.T) {
-		privKey, err := btcec.NewPrivateKey()
-		require.NoError(t, err)
-
-		tooShortSecretShareBytes := []byte{0x01}
-		tooLongSecretShareBytes := make([]byte, 33)
-		wayTooLongSecretShareBytes := make([]byte, 65)
-		publicKeyBytes := privKey.PubKey().SerializeCompressed()
-
-		err = validateSecretShareMatchesPublicKey(tooShortSecretShareBytes, publicKeyBytes)
-		require.ErrorContains(t, err, "secret share must be 32 bytes")
-
-		err = validateSecretShareMatchesPublicKey(tooLongSecretShareBytes, publicKeyBytes)
-		require.ErrorContains(t, err, "secret share must be 32 bytes")
-
-		err = validateSecretShareMatchesPublicKey(wayTooLongSecretShareBytes, publicKeyBytes)
-		require.ErrorContains(t, err, "secret share must be 32 bytes")
-	})
-
-	t.Run("uncompressed public key format", func(t *testing.T) {
-		privKey, err := btcec.NewPrivateKey()
-		require.NoError(t, err)
-
-		pubKey := privKey.PubKey()
-
-		secretShareBytes := privKey.Serialize()
-		publicKeyBytes := pubKey.SerializeUncompressed()
-
-		err = validateSecretShareMatchesPublicKey(secretShareBytes, publicKeyBytes)
-		require.NoError(t, err)
-	})
-
-	t.Run("valid known secret share", func(t *testing.T) {
-		secretHex := "076f9db936edeaf93d5bb927fb48891421a6241023a451995f71e3283420ce31"
-		secretBytes, err := hex.DecodeString(secretHex)
-		require.NoError(t, err)
-
-		pubKeyBase64 := "AwsfmIPOldrBkOQv9FISbbyIjVCLEoFy2+0hiAwV0U/I"
-		pubKeyBytes, err := base64.RawStdEncoding.DecodeString(pubKeyBase64)
-		require.NoError(t, err)
-
-		err = validateSecretShareMatchesPublicKey(secretBytes, pubKeyBytes)
-		require.NoError(t, err)
-	})
-}
-
 func TestValidateSignaturesPackageAndPersistPeerSignatures_RequireThresholdOperators(t *testing.T) {
 	handler, ctx, tx, cleanup := setupInternalSignTokenTestHandler(t)
 	defer cleanup()
@@ -381,8 +289,8 @@ func TestValidateSignaturesPackageAndPersistPeerSignatures_RequireThresholdOpera
 		// Operator 1
 		const operator1PrivHex = "bc0f5b9055c4a88b881d4bb48d95b409cd910fb27c088380f8ecda2150ee8faf"
 		privBytes, _ := hex.DecodeString(operator1PrivHex)
-		privKey1 := secp256k1.PrivKeyFromBytes(privBytes)
-		sig1 := ecdsa.Sign(privKey1, testHash)
+		privKey1, _ := keys.ParsePrivateKey(privBytes)
+		sig1 := ecdsa.Sign(privKey1.ToBTCEC(), testHash)
 		sigs[ids[1]] = sig1.Serialize()
 
 		return sigs

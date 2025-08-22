@@ -488,7 +488,7 @@ func (h *SignTokenHandler) localSignAndCommitTransaction(
 	operatorSpecificSignatures := convertTokenProtoSignaturesToOperatorSpecific(
 		foundOperatorSignatures.TtxoSignatures,
 		finalTokenTransactionHash,
-		h.config.IdentityPublicKey().Serialize(),
+		h.config.IdentityPublicKey(),
 	)
 	internalSignTokenHandler := NewInternalSignTokenHandler(h.config)
 	sigBytes, err := internalSignTokenHandler.SignAndPersistTokenTransaction(ctx, tokenTransaction, finalTokenTransactionHash, operatorSpecificSignatures)
@@ -698,7 +698,7 @@ func (h *SignTokenHandler) getRevealCommitProgress(ctx context.Context, tokenTra
 func convertTokenProtoSignaturesToOperatorSpecific(
 	ttxoSignatures []*tokenpb.SignatureWithIndex,
 	finalTokenTransactionHash []byte,
-	operatorIdentityPublicKey []byte,
+	operatorIdentityPublicKey keys.Public,
 ) []*sparkpb.OperatorSpecificOwnerSignature {
 	operatorSpecificSignatures := make([]*sparkpb.OperatorSpecificOwnerSignature, 0, len(ttxoSignatures))
 	for _, operatorSignatures := range ttxoSignatures {
@@ -706,7 +706,7 @@ func convertTokenProtoSignaturesToOperatorSpecific(
 			OwnerSignature: protoconverter.SparkSignatureWithIndexFromTokenProto(operatorSignatures),
 			Payload: &sparkpb.OperatorSpecificTokenTransactionSignablePayload{
 				FinalTokenTransactionHash: finalTokenTransactionHash,
-				OperatorIdentityPublicKey: operatorIdentityPublicKey,
+				OperatorIdentityPublicKey: operatorIdentityPublicKey.Serialize(),
 			},
 		})
 	}

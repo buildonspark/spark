@@ -242,7 +242,7 @@ func createNativeSparkTokenEntity(ctx context.Context, dbTx *ent.Tx, tokenMetada
 	// (creation entity key = 0x00..00). For the Spark `token_creates` table we use
 	// the SO entity DKG key as the creation entity key.
 	sparkTokenMetadata := *tokenMetadata
-	sparkTokenMetadata.CreationEntityPublicKey = entityDkgKeyPublicKey
+	sparkTokenMetadata.CreationEntityPublicKey = entityDkgKeyPublicKey.Serialize()
 	sparkTokenIdentifier, err := sparkTokenMetadata.ComputeTokenIdentifierV1()
 	if err != nil {
 		return fmt.Errorf("failed to compute Spark token identifier: %w", err)
@@ -260,7 +260,7 @@ func createNativeSparkTokenEntity(ctx context.Context, dbTx *ent.Tx, tokenMetada
 		SetMaxSupply(tokenMetadata.MaxSupply).
 		SetIsFreezable(tokenMetadata.IsFreezable).
 		SetNetwork(schemaNetwork).
-		SetCreationEntityPublicKey(entityDkgKeyPublicKey).
+		SetCreationEntityPublicKey(entityDkgKeyPublicKey.Serialize()).
 		SetTokenIdentifier(sparkTokenIdentifier).
 		SetL1TokenCreateID(l1TokenCreateID).
 		Save(ctx)

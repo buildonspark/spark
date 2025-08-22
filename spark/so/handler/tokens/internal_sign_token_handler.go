@@ -800,21 +800,3 @@ func validateInputTokenOutputsMatchSpentTokenOutputs(tokenOutputIDs []uuid.UUID,
 	}
 	return nil
 }
-
-func validateSecretShareMatchesPublicKey(secretShareBytes []byte, publicKeyBytes []byte) error {
-	if len(secretShareBytes) != 32 {
-		// validate the secret share length from other operator
-		return fmt.Errorf("secret share must be 32 bytes")
-	}
-	secretSharePrivKey := secp256k1.PrivKeyFromBytes(secretShareBytes)
-	derivedPubKey := secretSharePrivKey.PubKey()
-
-	pubkey, err := secp256k1.ParsePubKey(publicKeyBytes)
-	if err != nil {
-		return fmt.Errorf("failed to parse public key: %w", err)
-	}
-	if !derivedPubKey.IsEqual(pubkey) {
-		return fmt.Errorf("secret share: (%x) does not match public key: (%x)", secretShareBytes, publicKeyBytes)
-	}
-	return nil
-}

@@ -450,7 +450,7 @@ func (h *StartTokenTransactionHandler) constructFinalTokenTransaction(
 		if err != nil {
 			return nil, nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToGetCreationEntityPublicKey, partialTokenTransaction, err)
 		}
-		createInput.CreationEntityPublicKey = creationEntityPublicKey
+		createInput.CreationEntityPublicKey = creationEntityPublicKey.Serialize()
 	case utils.TokenTransactionTypeMint, utils.TokenTransactionTypeTransfer:
 		// Mint and transfer transactions create outputs that require keyshares for revocation commitments
 		if numOutputs > 0 {

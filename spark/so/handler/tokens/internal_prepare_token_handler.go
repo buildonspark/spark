@@ -191,9 +191,7 @@ func anyTtxosHaveSpentTransactions(ttxos []*ent.TokenOutput) bool {
 }
 
 // validateAndReserveKeyshares parses keyshare IDs, checks for duplicates, marks them as used, and returns expected revocation public keys
-func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Context, keyshareIDs []string, finalTokenTransaction *tokenpb.TokenTransaction) ([][]byte, error) {
-	ctx, span := tracer.Start(ctx, "InternalPrepareTokenHandler.validateAndReserveKeyshares", getTokenTransactionAttributes(finalTokenTransaction))
-	defer span.End()
+func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Context, keyshareIDs []string, finalTokenTransaction *tokenpb.TokenTransaction) ([]keys.Public, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 	keyshareUUIDs := make([]uuid.UUID, len(keyshareIDs))
 	// Ensure that the coordinator SO did not pass duplicate keyshare UUIDs for different outputs.
@@ -215,13 +213,17 @@ func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Co
 		return nil, tokens.FormatErrorWithTransactionProto("failed to mark keyshares as used", finalTokenTransaction, err)
 	}
 	logger.Info("Keyshares marked as used")
-	expectedRevocationPublicKeys := make([][]byte, len(keyshareIDs))
+	expectedRevocationPublicKeys := make([]keys.Public, len(keyshareIDs))
 	for i, id := range keyshareUUIDs {
 		keyshare, ok := keysharesMap[id]
 		if !ok {
 			return nil, tokens.FormatErrorWithTransactionProto("keyshare ID not found", finalTokenTransaction, fmt.Errorf("keyshare ID not found: %s", id))
 		}
-		expectedRevocationPublicKeys[i] = keyshare.PublicKey
+		pubKey, err := keys.ParsePublicKey(keyshare.PublicKey)
+		if err != nil {
+			return nil, tokens.FormatErrorWithTransactionProto("failed to parse public key", finalTokenTransaction, err)
+		}
+		expectedRevocationPublicKeys[i] = pubKey
 	}
 	return expectedRevocationPublicKeys, nil
 }
@@ -558,16 +560,15 @@ func validateOutputIsSpendable(ctx context.Context, enablePreemption bool, index
 
 // isSpendableOutputStatus checks if a output's status allows it to be spent.
 func isSpendableOutputStatus(status st.TokenOutputStatus) bool {
-	return status == st.TokenOutputStatusCreatedFinalized ||
-		status == st.TokenOutputStatusSpentStarted
+	return status == st.TokenOutputStatusCreatedFinalized || status == st.TokenOutputStatusSpentStarted
 }
 
 func validateFinalTokenTransaction(
 	config *so.Config,
 	tokenTransaction *tokenpb.TokenTransaction,
 	signaturesWithIndex []*tokenpb.SignatureWithIndex,
-	expectedRevocationPublicKeys [][]byte,
-	expectedCreationEntityPublicKey []byte,
+	expectedRevocationPublicKeys []keys.Public,
+	expectedCreationEntityPublicKey keys.Public,
 ) error {
 	network, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
 	if err != nil {
@@ -588,11 +589,7 @@ func validateFinalTokenTransaction(
 		ExpectedCreationEntityPublicKey:    expectedCreationEntityPublicKey,
 	}
 
-	err = utils.ValidateFinalTokenTransaction(
-		tokenTransaction,
-		signaturesWithIndex,
-		validationConfig,
-	)
+	err = utils.ValidateFinalTokenTransaction(tokenTransaction, signaturesWithIndex, validationConfig)
 	if err != nil {
 		return fmt.Errorf("failed to validate final token transaction structure: %w", err)
 	}
