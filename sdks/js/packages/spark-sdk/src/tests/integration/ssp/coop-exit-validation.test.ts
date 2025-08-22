@@ -135,13 +135,13 @@ describe("SSP coop exit basic validation", () => {
 
   it("should fail if deductFeeFromWithdrawalAmount is true and amount is too small", async () => {
     const feeQuote = await userWallet.getWithdrawalFeeQuote({
-      amountSats: 100,
+      amountSats: 330,
       withdrawalAddress,
     });
 
     await expect(
       userWallet.withdraw({
-        amountSats: 100, // Fails if amount is less than the fee.
+        amountSats: 330, // Fails if amount is less than the fee.
         onchainAddress: withdrawalAddress,
         feeQuote: feeQuote!,
         exitSpeed: ExitSpeed.FAST,
