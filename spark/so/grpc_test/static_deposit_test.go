@@ -1860,7 +1860,7 @@ func TestStaticDepositSSPConcurrent(t *testing.T) {
 	// *********************************************************************************
 	// Execute ClaimStaticDeposit concurrently in 10 threads
 	// *********************************************************************************
-	const numThreads = 15
+	const numThreads = 10
 	requests := make(chan *pbssp.InitiateStaticDepositUtxoSwapRequest, numThreads)
 
 	var wg sync.WaitGroup
@@ -1992,6 +1992,16 @@ func TestStaticDepositSSPConcurrent(t *testing.T) {
 		}
 		go func(threadID int, request *pbssp.InitiateStaticDepositUtxoSwapRequest) {
 			defer wg.Done()
+
+			sspConn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(sspConfig.CoordinatorAddress(), nil)
+			if err != nil {
+				results <- struct {
+					threadID int
+					err      error
+				}{threadID: threadID, err: err}
+				return
+			}
+			defer sspConn.Close()
 
 			sparkSspInternalClient := pbssp.NewSparkSspInternalServiceClient(sspConn)
 			_, err = sparkSspInternalClient.InitiateStaticDepositUtxoSwap(sspCtx, request)
