@@ -100,7 +100,7 @@ export function XHRTransport(config?: XHRTransportConfig): Transport {
         break;
       }
 
-      requestBody = bodyBuffer!;
+      requestBody = new Blob([new Uint8Array(bodyBuffer!)]);
     } else {
       let iterator: AsyncIterator<Uint8Array> | undefined;
 
@@ -117,7 +117,7 @@ export function XHRTransport(config?: XHRTransportConfig): Transport {
           if (done) {
             controller.close();
           } else {
-            controller.enqueue(value);
+            controller.enqueue(new Uint8Array(value));
           }
         },
         async cancel() {

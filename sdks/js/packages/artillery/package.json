@@ -1,0 +1,73 @@
+{
+  "name": "artillery-engine-spark",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Artillery engine for Spark testing",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "yarn build",
+    "artillery:install": "yarn build && npm link",
+    "test:transfer-simple": "yarn build && yarn artillery run ./config/scenarios/transfer-simple.yml",
+    "test:token-simple": "yarn build && yarn artillery run ./config/scenarios/token-simple.yml",
+    "format": "prettier --check \"engines/**/*.ts\" \"config/**/*.yml\"",
+    "format:fix": "prettier --write \"engines/**/*.ts\" \"config/**/*.yml\"",
+    "lint": "eslint engines --ext .ts",
+    "lint:fix": "eslint engines --ext .ts --fix",
+    "depcheck": "depcheck --ignores=buffer,ts-proto,jest,ts-jest,publint",
+    "circular-deps": "madge --circular --extensions ts engines",
+    "package:checks": "yarn depcheck && echo \"Package checks passed successfully!\""
+  },
+  "dependencies": {
+    "@buildonspark/issuer-sdk": "0.0.89",
+    "@buildonspark/spark-sdk": "0.2.10",
+    "@noble/hashes": "^1.7.0",
+    "@scure/bip39": "^1.5.4",
+    "better-sqlite3": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^22.13.2",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "artillery": "^2.0.0",
+    "depcheck": "^1.4.7",
+    "eslint": "^9.25.0",
+    "madge": "^8.0.0",
+    "prettier": "^3.5.1",
+    "typescript": "^5.7.3"
+  },
+  "peerDependencies": {
+    "artillery": "^2.0.0"
+  },
+  "artillery": {
+    "engines": {
+      "spark": "."
+    }
+  },
+  "keywords": [
+    "artillery",
+    "artillery-engine",
+    "engine",
+    "spark",
+    "load-testing",
+    "performance-testing"
+  ],
+  "files": [
+    "../../node_modules/**/*",
+    "dist/**/*",
+    "package.json",
+    "README.md",
+    "tsconfig.json"
+  ],
+  "repository": {
+    "directory": "sdks/js/packages/artillery"
+  }
+}

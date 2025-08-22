@@ -1,0 +1,27 @@
+config:
+  target: "http://localhost"
+  engines:
+    spark: {}
+  phases:
+    - duration: 30
+      arrivalRate: 100
+      maxVusers: 100
+
+scenarios:
+  - name: "Pool Initialization Metrics Test"
+    weight: 1
+    engine: spark
+
+    flow:
+      - initializePools:
+          pools:
+            - name: "test-pool"
+              mnemonicsFile: "./mnemonics/example-wallets.txt"
+              useWalletStateCache: false
+              randomSelection: true
+              amount: 1
+              batchSize: 1
+              lockWallets: false
+
+      # Clean up after test
+      - cleanupPools: {}

@@ -121,7 +121,11 @@ export class DepositService {
       }
       const sig = secp256k1.Signature.fromDER(operatorSig);
 
-      const isVerified = secp256k1.verify(sig, addrHash, operatorPubkey);
+      const isVerified = secp256k1.verify(
+        sig.toCompactRawBytes(),
+        addrHash,
+        operatorPubkey,
+      );
       if (!isVerified) {
         throw new ValidationError("Operator signature verification failed", {
           field: "operatorSignature",

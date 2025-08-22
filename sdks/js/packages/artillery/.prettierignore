@@ -1,0 +1,8 @@
+dist/
+node_modules/
+*.md
+*.json
+tsconfig.json
+package.json
+yarn.lock
+*.log
