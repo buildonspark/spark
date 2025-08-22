@@ -27,7 +27,16 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func validateDepositAddress(config *TestWalletConfig, address *pb.Address, userPubKey keys.Public) error {
+// validateDepositAddress validates the cryptographic proofs of a deposit address.
+//  1. Proof of keyshare possession signature - ensures that the keyshare is known by all SOs
+//  2. Address signatures from all participating signing operators - ensures that all SOs have generated the address
+//
+// Parameters:
+//   - config: Test wallet configuration containing signing operator details
+//   - address: The deposit address with its associated cryptographic proofs
+//   - signingPubKey: The user's public part of the signing key used in deposit address generation
+//   - verifyCoordinatorProof: Whether to verify the coordinator's address signature in addition to the other operator signatures
+func validateDepositAddress(config *TestWalletConfig, address *pb.Address, signingPubKey keys.Public, verifyCoordinatorProof bool) error {
 	if address.DepositAddressProof.ProofOfPossessionSignature == nil {
 		return fmt.Errorf("proof of possession signature is nil")
 	}
@@ -35,7 +44,7 @@ func validateDepositAddress(config *TestWalletConfig, address *pb.Address, userP
 	if err != nil {
 		return err
 	}
-	operatorPubKey := verifyingKey.Sub(userPubKey)
+	operatorPubKey := verifyingKey.Sub(signingPubKey)
 	msg := common.ProofOfPossessionMessageHashForDepositAddress(config.IdentityPublicKey().Serialize(), operatorPubKey.Serialize(), []byte(address.Address))
 	sig, err := schnorr.ParseSignature(address.DepositAddressProof.ProofOfPossessionSignature)
 	if err != nil {
@@ -55,9 +64,10 @@ func validateDepositAddress(config *TestWalletConfig, address *pb.Address, userP
 
 	addrHash := sha256.Sum256([]byte(address.Address))
 	for _, operator := range config.SigningOperators {
-		if operator.Identifier == config.CoordinatorIdentifier {
+		if operator.Identifier == config.CoordinatorIdentifier && !verifyCoordinatorProof {
 			continue
 		}
+
 		operatorSig, ok := address.DepositAddressProof.AddressSignatures[operator.Identifier]
 		if !ok {
 			return fmt.Errorf("address signature for operator %s is nil", operator.Identifier)
@@ -101,7 +111,7 @@ func GenerateDepositAddress(
 	if err != nil {
 		return nil, err
 	}
-	if err := validateDepositAddress(config, depositResp.DepositAddress, signingPubkey); err != nil {
+	if err := validateDepositAddress(config, depositResp.DepositAddress, signingPubkey, false); err != nil {
 		return nil, err
 	}
 	return depositResp, nil
@@ -129,7 +139,7 @@ func GenerateStaticDepositAddress(
 	if err != nil {
 		return nil, err
 	}
-	if err := validateDepositAddress(config, depositResp.DepositAddress, signingPubKey); err != nil {
+	if err := validateDepositAddress(config, depositResp.DepositAddress, signingPubKey, false); err != nil {
 		return nil, err
 	}
 	return depositResp, nil
@@ -155,7 +165,7 @@ func GenerateStaticDepositAddressDedicatedEndpoint(
 	if err != nil {
 		return nil, err
 	}
-	if err := validateDepositAddress(config, depositResp.DepositAddress, signingPubKey); err != nil {
+	if err := validateDepositAddress(config, depositResp.DepositAddress, signingPubKey, true); err != nil {
 		return nil, err
 	}
 	return depositResp, nil
@@ -235,7 +245,7 @@ func QueryStaticDepositAddresses(
 			Address:             address.DepositAddress,
 			VerifyingKey:        address.VerifyingPublicKey,
 			DepositAddressProof: address.ProofOfPossession,
-		}, signingPubKey); err != nil {
+		}, signingPubKey, true); err != nil {
 			return nil, err
 		}
 	}
