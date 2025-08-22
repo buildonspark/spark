@@ -43,6 +43,7 @@ func (TokenTransactionPeerSignature) Edges() []ent.Edge {
 
 func (TokenTransactionPeerSignature) Indexes() []ent.Index {
 	return []ent.Index{
+		index.Edges("token_transaction"),
 		index.Fields("operator_identity_public_key").
 			Edges("token_transaction").
 			Unique().

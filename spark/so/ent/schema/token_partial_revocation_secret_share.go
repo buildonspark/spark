@@ -43,6 +43,7 @@ func (TokenPartialRevocationSecretShare) Edges() []ent.Edge {
 
 func (TokenPartialRevocationSecretShare) Indexes() []ent.Index {
 	return []ent.Index{
+		index.Edges("token_output"),
 		index.Fields("operator_identity_public_key").
 			Edges("token_output").
 			Unique().

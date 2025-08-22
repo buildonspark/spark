@@ -1,0 +1,4 @@
+-- Create index "tokenpartialrevocationsecretsh_c470bd8286dc87186a3d2c85f96c75b0" to table: "token_partial_revocation_secret_shares"
+CREATE INDEX "tokenpartialrevocationsecretsh_c470bd8286dc87186a3d2c85f96c75b0" ON "token_partial_revocation_secret_shares" ("token_output_token_partial_revocation_secret_shares");
+-- Create index "tokentransactionpeersignature_token_transaction_peer_signatures" to table: "token_transaction_peer_signatures"
+CREATE INDEX "tokentransactionpeersignature_token_transaction_peer_signatures" ON "token_transaction_peer_signatures" ("token_transaction_peer_signatures");

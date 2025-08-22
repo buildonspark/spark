@@ -596,6 +596,11 @@ var (
 		},
 		Indexes: []*schema.Index{
 			{
+				Name:    "tokenpartialrevocationsecretshare_token_output_token_partial_revocation_secret_shares",
+				Unique:  false,
+				Columns: []*schema.Column{TokenPartialRevocationSecretSharesColumns[5]},
+			},
+			{
 				Name:    "tokenpartialrevocationsecretshare_operator_identity_public_key_token_output_token_partial_revocation_secret_shares",
 				Unique:  true,
 				Columns: []*schema.Column{TokenPartialRevocationSecretSharesColumns[3], TokenPartialRevocationSecretSharesColumns[5]},
@@ -680,6 +685,11 @@ var (
 			},
 		},
 		Indexes: []*schema.Index{
+			{
+				Name:    "tokentransactionpeersignature_token_transaction_peer_signatures",
+				Unique:  false,
+				Columns: []*schema.Column{TokenTransactionPeerSignaturesColumns[5]},
+			},
 			{
 				Name:    "tokentransactionpeersignature_operator_identity_public_key_token_transaction_peer_signatures",
 				Unique:  true,
