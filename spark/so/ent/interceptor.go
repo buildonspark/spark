@@ -18,11 +18,6 @@ func DatabaseStatsInterceptor(threshold time.Duration) ent.Interceptor {
 
 			logging.ObserveQuery(ctx, reflect.TypeOf(query).Elem().Name(), duration)
 
-			if duration > threshold {
-				logger := logging.GetLoggerFromContext(ctx)
-				logger.Warn("[SLOW QUERY]", "ent", reflect.TypeOf(query).Elem().Name(), "duration", duration.String())
-			}
-
 			return result, err
 		})
 	})
