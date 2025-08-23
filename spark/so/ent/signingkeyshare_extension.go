@@ -117,17 +117,24 @@ func GetUnusedSigningKeysharesTx(
 		return nil, fmt.Errorf("keyshare count must be greater than 0")
 	}
 
-	err := tx.driver.Exec(ctx, `
+	// Setting these parameters to optimize the performance of the query below.
+
+	// nolint:forbidigo
+	_, err := tx.ExecContext(ctx, `
 		SET LOCAL seq_page_cost = 10.0;
 		SET LOCAL random_page_cost = 1.0;
-	`, []any{}, nil)
+	`)
 	if err != nil {
 		return nil, err
 	}
 
 	var updatedKeyshares []*SigningKeyshare
-	rows := &sql.Rows{}
-	err = tx.driver.Query(ctx, `
+
+	// We use a custom a custom query here to select and update the keyshares in a single query, while
+	// skipping locked rows to avoid contention.
+
+	// nolint:forbidigo
+	rows, err := tx.QueryContext(ctx, `
 		WITH selected_ids AS (
 			SELECT id FROM signing_keyshares
 			WHERE status = 'AVAILABLE' AND coordinator_index = $1
@@ -139,7 +146,7 @@ func GetUnusedSigningKeysharesTx(
 		FROM selected_ids
 		WHERE signing_keyshares.id = selected_ids.id
 		RETURNING signing_keyshares.*
-	`, []any{cfg.Index, keyshareCount}, rows)
+	`, []any{cfg.Index, keyshareCount}...)
 	if err != nil {
 		return nil, err
 	}

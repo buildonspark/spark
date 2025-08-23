@@ -19,6 +19,7 @@ linters:
     - predeclared # Finds code that shadows one of Go's predeclared identifiers
     - testifylint # Checks that testify test assertions are correct
     - unconvert # Checks for no-op type conversions
+    - forbidigo # Checks for forbidden identifiers
   exclusions:
     generated: lax
     presets:
@@ -58,6 +59,21 @@ linters:
         - (*google.golang.org/grpc.ClientConn).Close
         - (*database/sql.DB).Close
         - (*github.com/lightsparkdev/spark/so/ent.Client).Close
+    forbidigo:
+      forbid:
+        - pattern: '^.*\.Client\.ExecContext$'
+          pkg: '^github.com/lightsparkdev/spark/so/ent$'
+          msg: 'Use of ent.Client.ExecContext is forbidden. Use ent query builders unless you know what you are doing!'
+        - pattern: '^.*\.Client\.QueryContext$'
+          pkg: '^github.com/lightsparkdev/spark/so/ent$'
+          msg: 'Use of ent.Client.QueryContext is forbidden. Use ent query builders unless you know what you are doing!'
+        - pattern: '^.*\.Tx\.ExecContext$'
+          pkg: '^github.com/lightsparkdev/spark/so/ent$'
+          msg: 'Use of ent.Tx.ExecContext is forbidden. Use ent query builders unless you know what you are doing!'
+        - pattern: '^.*\.Tx\.QueryContext$'
+          pkg: '^github.com/lightsparkdev/spark/so/ent$'
+          msg: 'Use of ent.Tx.QueryContext is forbidden. Use ent query builders unless you know what you are doing!'
+      analyze-types: true
     staticcheck:
       checks:
         - "-SA1019"
