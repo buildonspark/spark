@@ -55,6 +55,8 @@ type TokenTransaction struct {
 type TokenTransactionEdges struct {
 	// SpentOutput holds the value of the spent_output edge.
 	SpentOutput []*TokenOutput `json:"spent_output,omitempty"`
+	// SpentOutputV2 holds the value of the spent_output_v2 edge.
+	SpentOutputV2 []*TokenOutput `json:"spent_output_v2,omitempty"`
 	// CreatedOutput holds the value of the created_output edge.
 	CreatedOutput []*TokenOutput `json:"created_output,omitempty"`
 	// Mint holds the value of the mint edge.
@@ -69,7 +71,7 @@ type TokenTransactionEdges struct {
 	SparkInvoice []*SparkInvoice `json:"spark_invoice,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [7]bool
+	loadedTypes [8]bool
 }
 
 // SpentOutputOrErr returns the SpentOutput value or an error if the edge
@@ -81,10 +83,19 @@ func (e TokenTransactionEdges) SpentOutputOrErr() ([]*TokenOutput, error) {
 	return nil, &NotLoadedError{edge: "spent_output"}
 }
 
+// SpentOutputV2OrErr returns the SpentOutputV2 value or an error if the edge
+// was not loaded in eager-loading.
+func (e TokenTransactionEdges) SpentOutputV2OrErr() ([]*TokenOutput, error) {
+	if e.loadedTypes[1] {
+		return e.SpentOutputV2, nil
+	}
+	return nil, &NotLoadedError{edge: "spent_output_v2"}
+}
+
 // CreatedOutputOrErr returns the CreatedOutput value or an error if the edge
 // was not loaded in eager-loading.
 func (e TokenTransactionEdges) CreatedOutputOrErr() ([]*TokenOutput, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[2] {
 		return e.CreatedOutput, nil
 	}
 	return nil, &NotLoadedError{edge: "created_output"}
@@ -95,7 +106,7 @@ func (e TokenTransactionEdges) CreatedOutputOrErr() ([]*TokenOutput, error) {
 func (e TokenTransactionEdges) MintOrErr() (*TokenMint, error) {
 	if e.Mint != nil {
 		return e.Mint, nil
-	} else if e.loadedTypes[2] {
+	} else if e.loadedTypes[3] {
 		return nil, &NotFoundError{label: tokenmint.Label}
 	}
 	return nil, &NotLoadedError{edge: "mint"}
@@ -106,7 +117,7 @@ func (e TokenTransactionEdges) MintOrErr() (*TokenMint, error) {
 func (e TokenTransactionEdges) CreateOrErr() (*TokenCreate, error) {
 	if e.Create != nil {
 		return e.Create, nil
-	} else if e.loadedTypes[3] {
+	} else if e.loadedTypes[4] {
 		return nil, &NotFoundError{label: tokencreate.Label}
 	}
 	return nil, &NotLoadedError{edge: "create"}
@@ -117,7 +128,7 @@ func (e TokenTransactionEdges) CreateOrErr() (*TokenCreate, error) {
 func (e TokenTransactionEdges) PaymentIntentOrErr() (*PaymentIntent, error) {
 	if e.PaymentIntent != nil {
 		return e.PaymentIntent, nil
-	} else if e.loadedTypes[4] {
+	} else if e.loadedTypes[5] {
 		return nil, &NotFoundError{label: paymentintent.Label}
 	}
 	return nil, &NotLoadedError{edge: "payment_intent"}
@@ -126,7 +137,7 @@ func (e TokenTransactionEdges) PaymentIntentOrErr() (*PaymentIntent, error) {
 // PeerSignaturesOrErr returns the PeerSignatures value or an error if the edge
 // was not loaded in eager-loading.
 func (e TokenTransactionEdges) PeerSignaturesOrErr() ([]*TokenTransactionPeerSignature, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[6] {
 		return e.PeerSignatures, nil
 	}
 	return nil, &NotLoadedError{edge: "peer_signatures"}
@@ -135,7 +146,7 @@ func (e TokenTransactionEdges) PeerSignaturesOrErr() ([]*TokenTransactionPeerSig
 // SparkInvoiceOrErr returns the SparkInvoice value or an error if the edge
 // was not loaded in eager-loading.
 func (e TokenTransactionEdges) SparkInvoiceOrErr() ([]*SparkInvoice, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[7] {
 		return e.SparkInvoice, nil
 	}
 	return nil, &NotLoadedError{edge: "spark_invoice"}
@@ -280,6 +291,11 @@ func (tt *TokenTransaction) Value(name string) (ent.Value, error) {
 // QuerySpentOutput queries the "spent_output" edge of the TokenTransaction entity.
 func (tt *TokenTransaction) QuerySpentOutput() *TokenOutputQuery {
 	return NewTokenTransactionClient(tt.config).QuerySpentOutput(tt)
+}
+
+// QuerySpentOutputV2 queries the "spent_output_v2" edge of the TokenTransaction entity.
+func (tt *TokenTransaction) QuerySpentOutputV2() *TokenOutputQuery {
+	return NewTokenTransactionClient(tt.config).QuerySpentOutputV2(tt)
 }
 
 // QueryCreatedOutput queries the "created_output" edge of the TokenTransaction entity.

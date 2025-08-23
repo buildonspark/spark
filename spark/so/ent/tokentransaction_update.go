@@ -154,6 +154,21 @@ func (ttu *TokenTransactionUpdate) AddSpentOutput(t ...*TokenOutput) *TokenTrans
 	return ttu.AddSpentOutputIDs(ids...)
 }
 
+// AddSpentOutputV2IDs adds the "spent_output_v2" edge to the TokenOutput entity by IDs.
+func (ttu *TokenTransactionUpdate) AddSpentOutputV2IDs(ids ...uuid.UUID) *TokenTransactionUpdate {
+	ttu.mutation.AddSpentOutputV2IDs(ids...)
+	return ttu
+}
+
+// AddSpentOutputV2 adds the "spent_output_v2" edges to the TokenOutput entity.
+func (ttu *TokenTransactionUpdate) AddSpentOutputV2(t ...*TokenOutput) *TokenTransactionUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return ttu.AddSpentOutputV2IDs(ids...)
+}
+
 // AddCreatedOutputIDs adds the "created_output" edge to the TokenOutput entity by IDs.
 func (ttu *TokenTransactionUpdate) AddCreatedOutputIDs(ids ...uuid.UUID) *TokenTransactionUpdate {
 	ttu.mutation.AddCreatedOutputIDs(ids...)
@@ -280,6 +295,27 @@ func (ttu *TokenTransactionUpdate) RemoveSpentOutput(t ...*TokenOutput) *TokenTr
 		ids[i] = t[i].ID
 	}
 	return ttu.RemoveSpentOutputIDs(ids...)
+}
+
+// ClearSpentOutputV2 clears all "spent_output_v2" edges to the TokenOutput entity.
+func (ttu *TokenTransactionUpdate) ClearSpentOutputV2() *TokenTransactionUpdate {
+	ttu.mutation.ClearSpentOutputV2()
+	return ttu
+}
+
+// RemoveSpentOutputV2IDs removes the "spent_output_v2" edge to TokenOutput entities by IDs.
+func (ttu *TokenTransactionUpdate) RemoveSpentOutputV2IDs(ids ...uuid.UUID) *TokenTransactionUpdate {
+	ttu.mutation.RemoveSpentOutputV2IDs(ids...)
+	return ttu
+}
+
+// RemoveSpentOutputV2 removes "spent_output_v2" edges to TokenOutput entities.
+func (ttu *TokenTransactionUpdate) RemoveSpentOutputV2(t ...*TokenOutput) *TokenTransactionUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return ttu.RemoveSpentOutputV2IDs(ids...)
 }
 
 // ClearCreatedOutput clears all "created_output" edges to the TokenOutput entity.
@@ -513,6 +549,51 @@ func (ttu *TokenTransactionUpdate) sqlSave(ctx context.Context) (n int, err erro
 			Inverse: true,
 			Table:   tokentransaction.SpentOutputTable,
 			Columns: []string{tokentransaction.SpentOutputColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenoutput.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if ttu.mutation.SpentOutputV2Cleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   tokentransaction.SpentOutputV2Table,
+			Columns: tokentransaction.SpentOutputV2PrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenoutput.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := ttu.mutation.RemovedSpentOutputV2IDs(); len(nodes) > 0 && !ttu.mutation.SpentOutputV2Cleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   tokentransaction.SpentOutputV2Table,
+			Columns: tokentransaction.SpentOutputV2PrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenoutput.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := ttu.mutation.SpentOutputV2IDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   tokentransaction.SpentOutputV2Table,
+			Columns: tokentransaction.SpentOutputV2PrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokenoutput.FieldID, field.TypeUUID),
@@ -883,6 +964,21 @@ func (ttuo *TokenTransactionUpdateOne) AddSpentOutput(t ...*TokenOutput) *TokenT
 	return ttuo.AddSpentOutputIDs(ids...)
 }
 
+// AddSpentOutputV2IDs adds the "spent_output_v2" edge to the TokenOutput entity by IDs.
+func (ttuo *TokenTransactionUpdateOne) AddSpentOutputV2IDs(ids ...uuid.UUID) *TokenTransactionUpdateOne {
+	ttuo.mutation.AddSpentOutputV2IDs(ids...)
+	return ttuo
+}
+
+// AddSpentOutputV2 adds the "spent_output_v2" edges to the TokenOutput entity.
+func (ttuo *TokenTransactionUpdateOne) AddSpentOutputV2(t ...*TokenOutput) *TokenTransactionUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return ttuo.AddSpentOutputV2IDs(ids...)
+}
+
 // AddCreatedOutputIDs adds the "created_output" edge to the TokenOutput entity by IDs.
 func (ttuo *TokenTransactionUpdateOne) AddCreatedOutputIDs(ids ...uuid.UUID) *TokenTransactionUpdateOne {
 	ttuo.mutation.AddCreatedOutputIDs(ids...)
@@ -1009,6 +1105,27 @@ func (ttuo *TokenTransactionUpdateOne) RemoveSpentOutput(t ...*TokenOutput) *Tok
 		ids[i] = t[i].ID
 	}
 	return ttuo.RemoveSpentOutputIDs(ids...)
+}
+
+// ClearSpentOutputV2 clears all "spent_output_v2" edges to the TokenOutput entity.
+func (ttuo *TokenTransactionUpdateOne) ClearSpentOutputV2() *TokenTransactionUpdateOne {
+	ttuo.mutation.ClearSpentOutputV2()
+	return ttuo
+}
+
+// RemoveSpentOutputV2IDs removes the "spent_output_v2" edge to TokenOutput entities by IDs.
+func (ttuo *TokenTransactionUpdateOne) RemoveSpentOutputV2IDs(ids ...uuid.UUID) *TokenTransactionUpdateOne {
+	ttuo.mutation.RemoveSpentOutputV2IDs(ids...)
+	return ttuo
+}
+
+// RemoveSpentOutputV2 removes "spent_output_v2" edges to TokenOutput entities.
+func (ttuo *TokenTransactionUpdateOne) RemoveSpentOutputV2(t ...*TokenOutput) *TokenTransactionUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return ttuo.RemoveSpentOutputV2IDs(ids...)
 }
 
 // ClearCreatedOutput clears all "created_output" edges to the TokenOutput entity.
@@ -1272,6 +1389,51 @@ func (ttuo *TokenTransactionUpdateOne) sqlSave(ctx context.Context) (_node *Toke
 			Inverse: true,
 			Table:   tokentransaction.SpentOutputTable,
 			Columns: []string{tokentransaction.SpentOutputColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenoutput.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if ttuo.mutation.SpentOutputV2Cleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   tokentransaction.SpentOutputV2Table,
+			Columns: tokentransaction.SpentOutputV2PrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenoutput.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := ttuo.mutation.RemovedSpentOutputV2IDs(); len(nodes) > 0 && !ttuo.mutation.SpentOutputV2Cleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   tokentransaction.SpentOutputV2Table,
+			Columns: tokentransaction.SpentOutputV2PrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenoutput.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := ttuo.mutation.SpentOutputV2IDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   tokentransaction.SpentOutputV2Table,
+			Columns: tokentransaction.SpentOutputV2PrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokenoutput.FieldID, field.TypeUUID),

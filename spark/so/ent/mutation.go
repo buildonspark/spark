@@ -12590,45 +12590,48 @@ func (m *TokenMintMutation) ResetEdge(name string) error {
 // TokenOutputMutation represents an operation that mutates the TokenOutput nodes in the graph.
 type TokenOutputMutation struct {
 	config
-	op                                            Op
-	typ                                           string
-	id                                            *uuid.UUID
-	create_time                                   *time.Time
-	update_time                                   *time.Time
-	status                                        *schematype.TokenOutputStatus
-	owner_public_key                              *[]byte
-	withdraw_bond_sats                            *uint64
-	addwithdraw_bond_sats                         *int64
-	withdraw_relative_block_locktime              *uint64
-	addwithdraw_relative_block_locktime           *int64
-	withdraw_revocation_commitment                *[]byte
-	token_public_key                              *[]byte
-	token_amount                                  *[]byte
-	created_transaction_output_vout               *int32
-	addcreated_transaction_output_vout            *int32
-	spent_ownership_signature                     *[]byte
-	spent_operator_specific_ownership_signature   *[]byte
-	spent_transaction_input_vout                  *int32
-	addspent_transaction_input_vout               *int32
-	spent_revocation_secret                       *[]byte
-	confirmed_withdraw_block_hash                 *[]byte
-	network                                       *schematype.Network
-	token_identifier                              *[]byte
-	clearedFields                                 map[string]struct{}
-	revocation_keyshare                           *uuid.UUID
-	clearedrevocation_keyshare                    bool
-	output_created_token_transaction              *uuid.UUID
-	clearedoutput_created_token_transaction       bool
-	output_spent_token_transaction                *uuid.UUID
-	clearedoutput_spent_token_transaction         bool
-	token_partial_revocation_secret_shares        map[uuid.UUID]struct{}
-	removedtoken_partial_revocation_secret_shares map[uuid.UUID]struct{}
-	clearedtoken_partial_revocation_secret_shares bool
-	token_create                                  *uuid.UUID
-	clearedtoken_create                           bool
-	done                                          bool
-	oldValue                                      func(context.Context) (*TokenOutput, error)
-	predicates                                    []predicate.TokenOutput
+	op                                             Op
+	typ                                            string
+	id                                             *uuid.UUID
+	create_time                                    *time.Time
+	update_time                                    *time.Time
+	status                                         *schematype.TokenOutputStatus
+	owner_public_key                               *[]byte
+	withdraw_bond_sats                             *uint64
+	addwithdraw_bond_sats                          *int64
+	withdraw_relative_block_locktime               *uint64
+	addwithdraw_relative_block_locktime            *int64
+	withdraw_revocation_commitment                 *[]byte
+	token_public_key                               *[]byte
+	token_amount                                   *[]byte
+	created_transaction_output_vout                *int32
+	addcreated_transaction_output_vout             *int32
+	spent_ownership_signature                      *[]byte
+	spent_operator_specific_ownership_signature    *[]byte
+	spent_transaction_input_vout                   *int32
+	addspent_transaction_input_vout                *int32
+	spent_revocation_secret                        *[]byte
+	confirmed_withdraw_block_hash                  *[]byte
+	network                                        *schematype.Network
+	token_identifier                               *[]byte
+	clearedFields                                  map[string]struct{}
+	revocation_keyshare                            *uuid.UUID
+	clearedrevocation_keyshare                     bool
+	output_created_token_transaction               *uuid.UUID
+	clearedoutput_created_token_transaction        bool
+	output_spent_token_transaction                 *uuid.UUID
+	clearedoutput_spent_token_transaction          bool
+	output_spent_started_token_transactions        map[uuid.UUID]struct{}
+	removedoutput_spent_started_token_transactions map[uuid.UUID]struct{}
+	clearedoutput_spent_started_token_transactions bool
+	token_partial_revocation_secret_shares         map[uuid.UUID]struct{}
+	removedtoken_partial_revocation_secret_shares  map[uuid.UUID]struct{}
+	clearedtoken_partial_revocation_secret_shares  bool
+	token_create                                   *uuid.UUID
+	clearedtoken_create                            bool
+	done                                           bool
+	oldValue                                       func(context.Context) (*TokenOutput, error)
+	predicates                                     []predicate.TokenOutput
 }
 
 var _ ent.Mutation = (*TokenOutputMutation)(nil)
@@ -13672,6 +13675,60 @@ func (m *TokenOutputMutation) ResetOutputSpentTokenTransaction() {
 	m.clearedoutput_spent_token_transaction = false
 }
 
+// AddOutputSpentStartedTokenTransactionIDs adds the "output_spent_started_token_transactions" edge to the TokenTransaction entity by ids.
+func (m *TokenOutputMutation) AddOutputSpentStartedTokenTransactionIDs(ids ...uuid.UUID) {
+	if m.output_spent_started_token_transactions == nil {
+		m.output_spent_started_token_transactions = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.output_spent_started_token_transactions[ids[i]] = struct{}{}
+	}
+}
+
+// ClearOutputSpentStartedTokenTransactions clears the "output_spent_started_token_transactions" edge to the TokenTransaction entity.
+func (m *TokenOutputMutation) ClearOutputSpentStartedTokenTransactions() {
+	m.clearedoutput_spent_started_token_transactions = true
+}
+
+// OutputSpentStartedTokenTransactionsCleared reports if the "output_spent_started_token_transactions" edge to the TokenTransaction entity was cleared.
+func (m *TokenOutputMutation) OutputSpentStartedTokenTransactionsCleared() bool {
+	return m.clearedoutput_spent_started_token_transactions
+}
+
+// RemoveOutputSpentStartedTokenTransactionIDs removes the "output_spent_started_token_transactions" edge to the TokenTransaction entity by IDs.
+func (m *TokenOutputMutation) RemoveOutputSpentStartedTokenTransactionIDs(ids ...uuid.UUID) {
+	if m.removedoutput_spent_started_token_transactions == nil {
+		m.removedoutput_spent_started_token_transactions = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.output_spent_started_token_transactions, ids[i])
+		m.removedoutput_spent_started_token_transactions[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedOutputSpentStartedTokenTransactions returns the removed IDs of the "output_spent_started_token_transactions" edge to the TokenTransaction entity.
+func (m *TokenOutputMutation) RemovedOutputSpentStartedTokenTransactionsIDs() (ids []uuid.UUID) {
+	for id := range m.removedoutput_spent_started_token_transactions {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// OutputSpentStartedTokenTransactionsIDs returns the "output_spent_started_token_transactions" edge IDs in the mutation.
+func (m *TokenOutputMutation) OutputSpentStartedTokenTransactionsIDs() (ids []uuid.UUID) {
+	for id := range m.output_spent_started_token_transactions {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetOutputSpentStartedTokenTransactions resets all changes to the "output_spent_started_token_transactions" edge.
+func (m *TokenOutputMutation) ResetOutputSpentStartedTokenTransactions() {
+	m.output_spent_started_token_transactions = nil
+	m.clearedoutput_spent_started_token_transactions = false
+	m.removedoutput_spent_started_token_transactions = nil
+}
+
 // AddTokenPartialRevocationSecretShareIDs adds the "token_partial_revocation_secret_shares" edge to the TokenPartialRevocationSecretShare entity by ids.
 func (m *TokenOutputMutation) AddTokenPartialRevocationSecretShareIDs(ids ...uuid.UUID) {
 	if m.token_partial_revocation_secret_shares == nil {
@@ -14271,7 +14328,7 @@ func (m *TokenOutputMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *TokenOutputMutation) AddedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.revocation_keyshare != nil {
 		edges = append(edges, tokenoutput.EdgeRevocationKeyshare)
 	}
@@ -14280,6 +14337,9 @@ func (m *TokenOutputMutation) AddedEdges() []string {
 	}
 	if m.output_spent_token_transaction != nil {
 		edges = append(edges, tokenoutput.EdgeOutputSpentTokenTransaction)
+	}
+	if m.output_spent_started_token_transactions != nil {
+		edges = append(edges, tokenoutput.EdgeOutputSpentStartedTokenTransactions)
 	}
 	if m.token_partial_revocation_secret_shares != nil {
 		edges = append(edges, tokenoutput.EdgeTokenPartialRevocationSecretShares)
@@ -14306,6 +14366,12 @@ func (m *TokenOutputMutation) AddedIDs(name string) []ent.Value {
 		if id := m.output_spent_token_transaction; id != nil {
 			return []ent.Value{*id}
 		}
+	case tokenoutput.EdgeOutputSpentStartedTokenTransactions:
+		ids := make([]ent.Value, 0, len(m.output_spent_started_token_transactions))
+		for id := range m.output_spent_started_token_transactions {
+			ids = append(ids, id)
+		}
+		return ids
 	case tokenoutput.EdgeTokenPartialRevocationSecretShares:
 		ids := make([]ent.Value, 0, len(m.token_partial_revocation_secret_shares))
 		for id := range m.token_partial_revocation_secret_shares {
@@ -14322,7 +14388,10 @@ func (m *TokenOutputMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *TokenOutputMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
+	if m.removedoutput_spent_started_token_transactions != nil {
+		edges = append(edges, tokenoutput.EdgeOutputSpentStartedTokenTransactions)
+	}
 	if m.removedtoken_partial_revocation_secret_shares != nil {
 		edges = append(edges, tokenoutput.EdgeTokenPartialRevocationSecretShares)
 	}
@@ -14333,6 +14402,12 @@ func (m *TokenOutputMutation) RemovedEdges() []string {
 // the given name in this mutation.
 func (m *TokenOutputMutation) RemovedIDs(name string) []ent.Value {
 	switch name {
+	case tokenoutput.EdgeOutputSpentStartedTokenTransactions:
+		ids := make([]ent.Value, 0, len(m.removedoutput_spent_started_token_transactions))
+		for id := range m.removedoutput_spent_started_token_transactions {
+			ids = append(ids, id)
+		}
+		return ids
 	case tokenoutput.EdgeTokenPartialRevocationSecretShares:
 		ids := make([]ent.Value, 0, len(m.removedtoken_partial_revocation_secret_shares))
 		for id := range m.removedtoken_partial_revocation_secret_shares {
@@ -14345,7 +14420,7 @@ func (m *TokenOutputMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *TokenOutputMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.clearedrevocation_keyshare {
 		edges = append(edges, tokenoutput.EdgeRevocationKeyshare)
 	}
@@ -14354,6 +14429,9 @@ func (m *TokenOutputMutation) ClearedEdges() []string {
 	}
 	if m.clearedoutput_spent_token_transaction {
 		edges = append(edges, tokenoutput.EdgeOutputSpentTokenTransaction)
+	}
+	if m.clearedoutput_spent_started_token_transactions {
+		edges = append(edges, tokenoutput.EdgeOutputSpentStartedTokenTransactions)
 	}
 	if m.clearedtoken_partial_revocation_secret_shares {
 		edges = append(edges, tokenoutput.EdgeTokenPartialRevocationSecretShares)
@@ -14374,6 +14452,8 @@ func (m *TokenOutputMutation) EdgeCleared(name string) bool {
 		return m.clearedoutput_created_token_transaction
 	case tokenoutput.EdgeOutputSpentTokenTransaction:
 		return m.clearedoutput_spent_token_transaction
+	case tokenoutput.EdgeOutputSpentStartedTokenTransactions:
+		return m.clearedoutput_spent_started_token_transactions
 	case tokenoutput.EdgeTokenPartialRevocationSecretShares:
 		return m.clearedtoken_partial_revocation_secret_shares
 	case tokenoutput.EdgeTokenCreate:
@@ -14414,6 +14494,9 @@ func (m *TokenOutputMutation) ResetEdge(name string) error {
 		return nil
 	case tokenoutput.EdgeOutputSpentTokenTransaction:
 		m.ResetOutputSpentTokenTransaction()
+		return nil
+	case tokenoutput.EdgeOutputSpentStartedTokenTransactions:
+		m.ResetOutputSpentStartedTokenTransactions()
 		return nil
 	case tokenoutput.EdgeTokenPartialRevocationSecretShares:
 		m.ResetTokenPartialRevocationSecretShares()
@@ -15007,6 +15090,9 @@ type TokenTransactionMutation struct {
 	spent_output                     map[uuid.UUID]struct{}
 	removedspent_output              map[uuid.UUID]struct{}
 	clearedspent_output              bool
+	spent_output_v2                  map[uuid.UUID]struct{}
+	removedspent_output_v2           map[uuid.UUID]struct{}
+	clearedspent_output_v2           bool
 	created_output                   map[uuid.UUID]struct{}
 	removedcreated_output            map[uuid.UUID]struct{}
 	clearedcreated_output            bool
@@ -15630,6 +15716,60 @@ func (m *TokenTransactionMutation) ResetSpentOutput() {
 	m.removedspent_output = nil
 }
 
+// AddSpentOutputV2IDs adds the "spent_output_v2" edge to the TokenOutput entity by ids.
+func (m *TokenTransactionMutation) AddSpentOutputV2IDs(ids ...uuid.UUID) {
+	if m.spent_output_v2 == nil {
+		m.spent_output_v2 = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.spent_output_v2[ids[i]] = struct{}{}
+	}
+}
+
+// ClearSpentOutputV2 clears the "spent_output_v2" edge to the TokenOutput entity.
+func (m *TokenTransactionMutation) ClearSpentOutputV2() {
+	m.clearedspent_output_v2 = true
+}
+
+// SpentOutputV2Cleared reports if the "spent_output_v2" edge to the TokenOutput entity was cleared.
+func (m *TokenTransactionMutation) SpentOutputV2Cleared() bool {
+	return m.clearedspent_output_v2
+}
+
+// RemoveSpentOutputV2IDs removes the "spent_output_v2" edge to the TokenOutput entity by IDs.
+func (m *TokenTransactionMutation) RemoveSpentOutputV2IDs(ids ...uuid.UUID) {
+	if m.removedspent_output_v2 == nil {
+		m.removedspent_output_v2 = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.spent_output_v2, ids[i])
+		m.removedspent_output_v2[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedSpentOutputV2 returns the removed IDs of the "spent_output_v2" edge to the TokenOutput entity.
+func (m *TokenTransactionMutation) RemovedSpentOutputV2IDs() (ids []uuid.UUID) {
+	for id := range m.removedspent_output_v2 {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// SpentOutputV2IDs returns the "spent_output_v2" edge IDs in the mutation.
+func (m *TokenTransactionMutation) SpentOutputV2IDs() (ids []uuid.UUID) {
+	for id := range m.spent_output_v2 {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetSpentOutputV2 resets all changes to the "spent_output_v2" edge.
+func (m *TokenTransactionMutation) ResetSpentOutputV2() {
+	m.spent_output_v2 = nil
+	m.clearedspent_output_v2 = false
+	m.removedspent_output_v2 = nil
+}
+
 // AddCreatedOutputIDs adds the "created_output" edge to the TokenOutput entity by ids.
 func (m *TokenTransactionMutation) AddCreatedOutputIDs(ids ...uuid.UUID) {
 	if m.created_output == nil {
@@ -16243,9 +16383,12 @@ func (m *TokenTransactionMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *TokenTransactionMutation) AddedEdges() []string {
-	edges := make([]string, 0, 7)
+	edges := make([]string, 0, 8)
 	if m.spent_output != nil {
 		edges = append(edges, tokentransaction.EdgeSpentOutput)
+	}
+	if m.spent_output_v2 != nil {
+		edges = append(edges, tokentransaction.EdgeSpentOutputV2)
 	}
 	if m.created_output != nil {
 		edges = append(edges, tokentransaction.EdgeCreatedOutput)
@@ -16275,6 +16418,12 @@ func (m *TokenTransactionMutation) AddedIDs(name string) []ent.Value {
 	case tokentransaction.EdgeSpentOutput:
 		ids := make([]ent.Value, 0, len(m.spent_output))
 		for id := range m.spent_output {
+			ids = append(ids, id)
+		}
+		return ids
+	case tokentransaction.EdgeSpentOutputV2:
+		ids := make([]ent.Value, 0, len(m.spent_output_v2))
+		for id := range m.spent_output_v2 {
 			ids = append(ids, id)
 		}
 		return ids
@@ -16314,9 +16463,12 @@ func (m *TokenTransactionMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *TokenTransactionMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 7)
+	edges := make([]string, 0, 8)
 	if m.removedspent_output != nil {
 		edges = append(edges, tokentransaction.EdgeSpentOutput)
+	}
+	if m.removedspent_output_v2 != nil {
+		edges = append(edges, tokentransaction.EdgeSpentOutputV2)
 	}
 	if m.removedcreated_output != nil {
 		edges = append(edges, tokentransaction.EdgeCreatedOutput)
@@ -16337,6 +16489,12 @@ func (m *TokenTransactionMutation) RemovedIDs(name string) []ent.Value {
 	case tokentransaction.EdgeSpentOutput:
 		ids := make([]ent.Value, 0, len(m.removedspent_output))
 		for id := range m.removedspent_output {
+			ids = append(ids, id)
+		}
+		return ids
+	case tokentransaction.EdgeSpentOutputV2:
+		ids := make([]ent.Value, 0, len(m.removedspent_output_v2))
+		for id := range m.removedspent_output_v2 {
 			ids = append(ids, id)
 		}
 		return ids
@@ -16364,9 +16522,12 @@ func (m *TokenTransactionMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *TokenTransactionMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 7)
+	edges := make([]string, 0, 8)
 	if m.clearedspent_output {
 		edges = append(edges, tokentransaction.EdgeSpentOutput)
+	}
+	if m.clearedspent_output_v2 {
+		edges = append(edges, tokentransaction.EdgeSpentOutputV2)
 	}
 	if m.clearedcreated_output {
 		edges = append(edges, tokentransaction.EdgeCreatedOutput)
@@ -16395,6 +16556,8 @@ func (m *TokenTransactionMutation) EdgeCleared(name string) bool {
 	switch name {
 	case tokentransaction.EdgeSpentOutput:
 		return m.clearedspent_output
+	case tokentransaction.EdgeSpentOutputV2:
+		return m.clearedspent_output_v2
 	case tokentransaction.EdgeCreatedOutput:
 		return m.clearedcreated_output
 	case tokentransaction.EdgeMint:
@@ -16434,6 +16597,9 @@ func (m *TokenTransactionMutation) ResetEdge(name string) error {
 	switch name {
 	case tokentransaction.EdgeSpentOutput:
 		m.ResetSpentOutput()
+		return nil
+	case tokentransaction.EdgeSpentOutputV2:
+		m.ResetSpentOutputV2()
 		return nil
 	case tokentransaction.EdgeCreatedOutput:
 		m.ResetCreatedOutput()

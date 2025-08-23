@@ -25,17 +25,18 @@ import (
 // TokenOutputQuery is the builder for querying TokenOutput entities.
 type TokenOutputQuery struct {
 	config
-	ctx                                    *QueryContext
-	order                                  []tokenoutput.OrderOption
-	inters                                 []Interceptor
-	predicates                             []predicate.TokenOutput
-	withRevocationKeyshare                 *SigningKeyshareQuery
-	withOutputCreatedTokenTransaction      *TokenTransactionQuery
-	withOutputSpentTokenTransaction        *TokenTransactionQuery
-	withTokenPartialRevocationSecretShares *TokenPartialRevocationSecretShareQuery
-	withTokenCreate                        *TokenCreateQuery
-	withFKs                                bool
-	modifiers                              []func(*sql.Selector)
+	ctx                                     *QueryContext
+	order                                   []tokenoutput.OrderOption
+	inters                                  []Interceptor
+	predicates                              []predicate.TokenOutput
+	withRevocationKeyshare                  *SigningKeyshareQuery
+	withOutputCreatedTokenTransaction       *TokenTransactionQuery
+	withOutputSpentTokenTransaction         *TokenTransactionQuery
+	withOutputSpentStartedTokenTransactions *TokenTransactionQuery
+	withTokenPartialRevocationSecretShares  *TokenPartialRevocationSecretShareQuery
+	withTokenCreate                         *TokenCreateQuery
+	withFKs                                 bool
+	modifiers                               []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -131,6 +132,28 @@ func (toq *TokenOutputQuery) QueryOutputSpentTokenTransaction() *TokenTransactio
 			sqlgraph.From(tokenoutput.Table, tokenoutput.FieldID, selector),
 			sqlgraph.To(tokentransaction.Table, tokentransaction.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, tokenoutput.OutputSpentTokenTransactionTable, tokenoutput.OutputSpentTokenTransactionColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(toq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryOutputSpentStartedTokenTransactions chains the current query on the "output_spent_started_token_transactions" edge.
+func (toq *TokenOutputQuery) QueryOutputSpentStartedTokenTransactions() *TokenTransactionQuery {
+	query := (&TokenTransactionClient{config: toq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := toq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := toq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokenoutput.Table, tokenoutput.FieldID, selector),
+			sqlgraph.To(tokentransaction.Table, tokentransaction.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, tokenoutput.OutputSpentStartedTokenTransactionsTable, tokenoutput.OutputSpentStartedTokenTransactionsPrimaryKey...),
 		)
 		fromU = sqlgraph.SetNeighbors(toq.driver.Dialect(), step)
 		return fromU, nil
@@ -369,16 +392,17 @@ func (toq *TokenOutputQuery) Clone() *TokenOutputQuery {
 		return nil
 	}
 	return &TokenOutputQuery{
-		config:                                 toq.config,
-		ctx:                                    toq.ctx.Clone(),
-		order:                                  append([]tokenoutput.OrderOption{}, toq.order...),
-		inters:                                 append([]Interceptor{}, toq.inters...),
-		predicates:                             append([]predicate.TokenOutput{}, toq.predicates...),
-		withRevocationKeyshare:                 toq.withRevocationKeyshare.Clone(),
-		withOutputCreatedTokenTransaction:      toq.withOutputCreatedTokenTransaction.Clone(),
-		withOutputSpentTokenTransaction:        toq.withOutputSpentTokenTransaction.Clone(),
-		withTokenPartialRevocationSecretShares: toq.withTokenPartialRevocationSecretShares.Clone(),
-		withTokenCreate:                        toq.withTokenCreate.Clone(),
+		config:                                  toq.config,
+		ctx:                                     toq.ctx.Clone(),
+		order:                                   append([]tokenoutput.OrderOption{}, toq.order...),
+		inters:                                  append([]Interceptor{}, toq.inters...),
+		predicates:                              append([]predicate.TokenOutput{}, toq.predicates...),
+		withRevocationKeyshare:                  toq.withRevocationKeyshare.Clone(),
+		withOutputCreatedTokenTransaction:       toq.withOutputCreatedTokenTransaction.Clone(),
+		withOutputSpentTokenTransaction:         toq.withOutputSpentTokenTransaction.Clone(),
+		withOutputSpentStartedTokenTransactions: toq.withOutputSpentStartedTokenTransactions.Clone(),
+		withTokenPartialRevocationSecretShares:  toq.withTokenPartialRevocationSecretShares.Clone(),
+		withTokenCreate:                         toq.withTokenCreate.Clone(),
 		// clone intermediate query.
 		sql:  toq.sql.Clone(),
 		path: toq.path,
@@ -415,6 +439,17 @@ func (toq *TokenOutputQuery) WithOutputSpentTokenTransaction(opts ...func(*Token
 		opt(query)
 	}
 	toq.withOutputSpentTokenTransaction = query
+	return toq
+}
+
+// WithOutputSpentStartedTokenTransactions tells the query-builder to eager-load the nodes that are connected to
+// the "output_spent_started_token_transactions" edge. The optional arguments are used to configure the query builder of the edge.
+func (toq *TokenOutputQuery) WithOutputSpentStartedTokenTransactions(opts ...func(*TokenTransactionQuery)) *TokenOutputQuery {
+	query := (&TokenTransactionClient{config: toq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	toq.withOutputSpentStartedTokenTransactions = query
 	return toq
 }
 
@@ -519,10 +554,11 @@ func (toq *TokenOutputQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 		nodes       = []*TokenOutput{}
 		withFKs     = toq.withFKs
 		_spec       = toq.querySpec()
-		loadedTypes = [5]bool{
+		loadedTypes = [6]bool{
 			toq.withRevocationKeyshare != nil,
 			toq.withOutputCreatedTokenTransaction != nil,
 			toq.withOutputSpentTokenTransaction != nil,
+			toq.withOutputSpentStartedTokenTransactions != nil,
 			toq.withTokenPartialRevocationSecretShares != nil,
 			toq.withTokenCreate != nil,
 		}
@@ -569,6 +605,15 @@ func (toq *TokenOutputQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 	if query := toq.withOutputSpentTokenTransaction; query != nil {
 		if err := toq.loadOutputSpentTokenTransaction(ctx, query, nodes, nil,
 			func(n *TokenOutput, e *TokenTransaction) { n.Edges.OutputSpentTokenTransaction = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := toq.withOutputSpentStartedTokenTransactions; query != nil {
+		if err := toq.loadOutputSpentStartedTokenTransactions(ctx, query, nodes,
+			func(n *TokenOutput) { n.Edges.OutputSpentStartedTokenTransactions = []*TokenTransaction{} },
+			func(n *TokenOutput, e *TokenTransaction) {
+				n.Edges.OutputSpentStartedTokenTransactions = append(n.Edges.OutputSpentStartedTokenTransactions, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -684,6 +729,67 @@ func (toq *TokenOutputQuery) loadOutputSpentTokenTransaction(ctx context.Context
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (toq *TokenOutputQuery) loadOutputSpentStartedTokenTransactions(ctx context.Context, query *TokenTransactionQuery, nodes []*TokenOutput, init func(*TokenOutput), assign func(*TokenOutput, *TokenTransaction)) error {
+	edgeIDs := make([]driver.Value, len(nodes))
+	byID := make(map[uuid.UUID]*TokenOutput)
+	nids := make(map[uuid.UUID]map[*TokenOutput]struct{})
+	for i, node := range nodes {
+		edgeIDs[i] = node.ID
+		byID[node.ID] = node
+		if init != nil {
+			init(node)
+		}
+	}
+	query.Where(func(s *sql.Selector) {
+		joinT := sql.Table(tokenoutput.OutputSpentStartedTokenTransactionsTable)
+		s.Join(joinT).On(s.C(tokentransaction.FieldID), joinT.C(tokenoutput.OutputSpentStartedTokenTransactionsPrimaryKey[1]))
+		s.Where(sql.InValues(joinT.C(tokenoutput.OutputSpentStartedTokenTransactionsPrimaryKey[0]), edgeIDs...))
+		columns := s.SelectedColumns()
+		s.Select(joinT.C(tokenoutput.OutputSpentStartedTokenTransactionsPrimaryKey[0]))
+		s.AppendSelect(columns...)
+		s.SetDistinct(false)
+	})
+	if err := query.prepareQuery(ctx); err != nil {
+		return err
+	}
+	qr := QuerierFunc(func(ctx context.Context, q Query) (Value, error) {
+		return query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]any, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
+				}
+				return append([]any{new(uuid.UUID)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []any) error {
+				outValue := *values[0].(*uuid.UUID)
+				inValue := *values[1].(*uuid.UUID)
+				if nids[inValue] == nil {
+					nids[inValue] = map[*TokenOutput]struct{}{byID[outValue]: {}}
+					return assign(columns[1:], values[1:])
+				}
+				nids[inValue][byID[outValue]] = struct{}{}
+				return nil
+			}
+		})
+	})
+	neighbors, err := withInterceptors[[]*TokenTransaction](ctx, query, qr, query.inters)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected "output_spent_started_token_transactions" node returned %v`, n.ID)
+		}
+		for kn := range nodes {
+			assign(kn, n)
 		}
 	}
 	return nil

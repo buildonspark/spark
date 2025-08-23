@@ -39,6 +39,8 @@ const (
 	FieldVersion = "version"
 	// EdgeSpentOutput holds the string denoting the spent_output edge name in mutations.
 	EdgeSpentOutput = "spent_output"
+	// EdgeSpentOutputV2 holds the string denoting the spent_output_v2 edge name in mutations.
+	EdgeSpentOutputV2 = "spent_output_v2"
 	// EdgeCreatedOutput holds the string denoting the created_output edge name in mutations.
 	EdgeCreatedOutput = "created_output"
 	// EdgeMint holds the string denoting the mint edge name in mutations.
@@ -60,6 +62,11 @@ const (
 	SpentOutputInverseTable = "token_outputs"
 	// SpentOutputColumn is the table column denoting the spent_output relation/edge.
 	SpentOutputColumn = "token_output_output_spent_token_transaction"
+	// SpentOutputV2Table is the table that holds the spent_output_v2 relation/edge. The primary key declared below.
+	SpentOutputV2Table = "token_output_output_spent_started_token_transactions"
+	// SpentOutputV2InverseTable is the table name for the TokenOutput entity.
+	// It exists in this package in order to avoid circular dependency with the "tokenoutput" package.
+	SpentOutputV2InverseTable = "token_outputs"
 	// CreatedOutputTable is the table that holds the created_output relation/edge.
 	CreatedOutputTable = "token_outputs"
 	// CreatedOutputInverseTable is the table name for the TokenOutput entity.
@@ -126,6 +133,9 @@ var ForeignKeys = []string{
 }
 
 var (
+	// SpentOutputV2PrimaryKey and SpentOutputV2Column2 are the table columns denoting the
+	// primary key for the spent_output_v2 relation (M2M).
+	SpentOutputV2PrimaryKey = []string{"token_output_id", "token_transaction_id"}
 	// SparkInvoicePrimaryKey and SparkInvoiceColumn2 are the table columns denoting the
 	// primary key for the spark_invoice relation (M2M).
 	SparkInvoicePrimaryKey = []string{"token_transaction_id", "spark_invoice_id"}
@@ -227,6 +237,20 @@ func BySpentOutput(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// BySpentOutputV2Count orders the results by spent_output_v2 count.
+func BySpentOutputV2Count(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newSpentOutputV2Step(), opts...)
+	}
+}
+
+// BySpentOutputV2 orders the results by spent_output_v2 terms.
+func BySpentOutputV2(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSpentOutputV2Step(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByCreatedOutputCount orders the results by created_output count.
 func ByCreatedOutputCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -294,6 +318,13 @@ func newSpentOutputStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(SpentOutputInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, true, SpentOutputTable, SpentOutputColumn),
+	)
+}
+func newSpentOutputV2Step() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(SpentOutputV2InverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2M, true, SpentOutputV2Table, SpentOutputV2PrimaryKey...),
 	)
 }
 func newCreatedOutputStep() *sqlgraph.Step {

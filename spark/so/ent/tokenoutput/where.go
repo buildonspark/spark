@@ -956,6 +956,29 @@ func HasOutputSpentTokenTransactionWith(preds ...predicate.TokenTransaction) pre
 	})
 }
 
+// HasOutputSpentStartedTokenTransactions applies the HasEdge predicate on the "output_spent_started_token_transactions" edge.
+func HasOutputSpentStartedTokenTransactions() predicate.TokenOutput {
+	return predicate.TokenOutput(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, OutputSpentStartedTokenTransactionsTable, OutputSpentStartedTokenTransactionsPrimaryKey...),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasOutputSpentStartedTokenTransactionsWith applies the HasEdge predicate on the "output_spent_started_token_transactions" edge with a given conditions (other predicates).
+func HasOutputSpentStartedTokenTransactionsWith(preds ...predicate.TokenTransaction) predicate.TokenOutput {
+	return predicate.TokenOutput(func(s *sql.Selector) {
+		step := newOutputSpentStartedTokenTransactionsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasTokenPartialRevocationSecretShares applies the HasEdge predicate on the "token_partial_revocation_secret_shares" edge.
 func HasTokenPartialRevocationSecretShares() predicate.TokenOutput {
 	return predicate.TokenOutput(func(s *sql.Selector) {

@@ -59,6 +59,8 @@ const (
 	EdgeOutputCreatedTokenTransaction = "output_created_token_transaction"
 	// EdgeOutputSpentTokenTransaction holds the string denoting the output_spent_token_transaction edge name in mutations.
 	EdgeOutputSpentTokenTransaction = "output_spent_token_transaction"
+	// EdgeOutputSpentStartedTokenTransactions holds the string denoting the output_spent_started_token_transactions edge name in mutations.
+	EdgeOutputSpentStartedTokenTransactions = "output_spent_started_token_transactions"
 	// EdgeTokenPartialRevocationSecretShares holds the string denoting the token_partial_revocation_secret_shares edge name in mutations.
 	EdgeTokenPartialRevocationSecretShares = "token_partial_revocation_secret_shares"
 	// EdgeTokenCreate holds the string denoting the token_create edge name in mutations.
@@ -86,6 +88,11 @@ const (
 	OutputSpentTokenTransactionInverseTable = "token_transactions"
 	// OutputSpentTokenTransactionColumn is the table column denoting the output_spent_token_transaction relation/edge.
 	OutputSpentTokenTransactionColumn = "token_output_output_spent_token_transaction"
+	// OutputSpentStartedTokenTransactionsTable is the table that holds the output_spent_started_token_transactions relation/edge. The primary key declared below.
+	OutputSpentStartedTokenTransactionsTable = "token_output_output_spent_started_token_transactions"
+	// OutputSpentStartedTokenTransactionsInverseTable is the table name for the TokenTransaction entity.
+	// It exists in this package in order to avoid circular dependency with the "tokentransaction" package.
+	OutputSpentStartedTokenTransactionsInverseTable = "token_transactions"
 	// TokenPartialRevocationSecretSharesTable is the table that holds the token_partial_revocation_secret_shares relation/edge.
 	TokenPartialRevocationSecretSharesTable = "token_partial_revocation_secret_shares"
 	// TokenPartialRevocationSecretSharesInverseTable is the table name for the TokenPartialRevocationSecretShare entity.
@@ -132,6 +139,12 @@ var ForeignKeys = []string{
 	"token_output_output_created_token_transaction",
 	"token_output_output_spent_token_transaction",
 }
+
+var (
+	// OutputSpentStartedTokenTransactionsPrimaryKey and OutputSpentStartedTokenTransactionsColumn2 are the table columns denoting the
+	// primary key for the output_spent_started_token_transactions relation (M2M).
+	OutputSpentStartedTokenTransactionsPrimaryKey = []string{"token_output_id", "token_transaction_id"}
+)
 
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
@@ -257,6 +270,20 @@ func ByOutputSpentTokenTransactionField(field string, opts ...sql.OrderTermOptio
 	}
 }
 
+// ByOutputSpentStartedTokenTransactionsCount orders the results by output_spent_started_token_transactions count.
+func ByOutputSpentStartedTokenTransactionsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newOutputSpentStartedTokenTransactionsStep(), opts...)
+	}
+}
+
+// ByOutputSpentStartedTokenTransactions orders the results by output_spent_started_token_transactions terms.
+func ByOutputSpentStartedTokenTransactions(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newOutputSpentStartedTokenTransactionsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByTokenPartialRevocationSecretSharesCount orders the results by token_partial_revocation_secret_shares count.
 func ByTokenPartialRevocationSecretSharesCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -296,6 +323,13 @@ func newOutputSpentTokenTransactionStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(OutputSpentTokenTransactionInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, false, OutputSpentTokenTransactionTable, OutputSpentTokenTransactionColumn),
+	)
+}
+func newOutputSpentStartedTokenTransactionsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(OutputSpentStartedTokenTransactionsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2M, false, OutputSpentStartedTokenTransactionsTable, OutputSpentStartedTokenTransactionsPrimaryKey...),
 	)
 }
 func newTokenPartialRevocationSecretSharesStep() *sqlgraph.Step {

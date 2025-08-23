@@ -168,6 +168,21 @@ func (ttc *TokenTransactionCreate) AddSpentOutput(t ...*TokenOutput) *TokenTrans
 	return ttc.AddSpentOutputIDs(ids...)
 }
 
+// AddSpentOutputV2IDs adds the "spent_output_v2" edge to the TokenOutput entity by IDs.
+func (ttc *TokenTransactionCreate) AddSpentOutputV2IDs(ids ...uuid.UUID) *TokenTransactionCreate {
+	ttc.mutation.AddSpentOutputV2IDs(ids...)
+	return ttc
+}
+
+// AddSpentOutputV2 adds the "spent_output_v2" edges to the TokenOutput entity.
+func (ttc *TokenTransactionCreate) AddSpentOutputV2(t ...*TokenOutput) *TokenTransactionCreate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return ttc.AddSpentOutputV2IDs(ids...)
+}
+
 // AddCreatedOutputIDs adds the "created_output" edge to the TokenOutput entity by IDs.
 func (ttc *TokenTransactionCreate) AddCreatedOutputIDs(ids ...uuid.UUID) *TokenTransactionCreate {
 	ttc.mutation.AddCreatedOutputIDs(ids...)
@@ -442,6 +457,22 @@ func (ttc *TokenTransactionCreate) createSpec() (*TokenTransaction, *sqlgraph.Cr
 			Inverse: true,
 			Table:   tokentransaction.SpentOutputTable,
 			Columns: []string{tokentransaction.SpentOutputColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokenoutput.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := ttc.mutation.SpentOutputV2IDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   tokentransaction.SpentOutputV2Table,
+			Columns: tokentransaction.SpentOutputV2PrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokenoutput.FieldID, field.TypeUUID),

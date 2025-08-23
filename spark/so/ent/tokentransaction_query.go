@@ -32,6 +32,7 @@ type TokenTransactionQuery struct {
 	inters             []Interceptor
 	predicates         []predicate.TokenTransaction
 	withSpentOutput    *TokenOutputQuery
+	withSpentOutputV2  *TokenOutputQuery
 	withCreatedOutput  *TokenOutputQuery
 	withMint           *TokenMintQuery
 	withCreate         *TokenCreateQuery
@@ -91,6 +92,28 @@ func (ttq *TokenTransactionQuery) QuerySpentOutput() *TokenOutputQuery {
 			sqlgraph.From(tokentransaction.Table, tokentransaction.FieldID, selector),
 			sqlgraph.To(tokenoutput.Table, tokenoutput.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, true, tokentransaction.SpentOutputTable, tokentransaction.SpentOutputColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(ttq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QuerySpentOutputV2 chains the current query on the "spent_output_v2" edge.
+func (ttq *TokenTransactionQuery) QuerySpentOutputV2() *TokenOutputQuery {
+	query := (&TokenOutputClient{config: ttq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := ttq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := ttq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tokentransaction.Table, tokentransaction.FieldID, selector),
+			sqlgraph.To(tokenoutput.Table, tokenoutput.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, true, tokentransaction.SpentOutputV2Table, tokentransaction.SpentOutputV2PrimaryKey...),
 		)
 		fromU = sqlgraph.SetNeighbors(ttq.driver.Dialect(), step)
 		return fromU, nil
@@ -423,6 +446,7 @@ func (ttq *TokenTransactionQuery) Clone() *TokenTransactionQuery {
 		inters:             append([]Interceptor{}, ttq.inters...),
 		predicates:         append([]predicate.TokenTransaction{}, ttq.predicates...),
 		withSpentOutput:    ttq.withSpentOutput.Clone(),
+		withSpentOutputV2:  ttq.withSpentOutputV2.Clone(),
 		withCreatedOutput:  ttq.withCreatedOutput.Clone(),
 		withMint:           ttq.withMint.Clone(),
 		withCreate:         ttq.withCreate.Clone(),
@@ -443,6 +467,17 @@ func (ttq *TokenTransactionQuery) WithSpentOutput(opts ...func(*TokenOutputQuery
 		opt(query)
 	}
 	ttq.withSpentOutput = query
+	return ttq
+}
+
+// WithSpentOutputV2 tells the query-builder to eager-load the nodes that are connected to
+// the "spent_output_v2" edge. The optional arguments are used to configure the query builder of the edge.
+func (ttq *TokenTransactionQuery) WithSpentOutputV2(opts ...func(*TokenOutputQuery)) *TokenTransactionQuery {
+	query := (&TokenOutputClient{config: ttq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	ttq.withSpentOutputV2 = query
 	return ttq
 }
 
@@ -591,8 +626,9 @@ func (ttq *TokenTransactionQuery) sqlAll(ctx context.Context, hooks ...queryHook
 		nodes       = []*TokenTransaction{}
 		withFKs     = ttq.withFKs
 		_spec       = ttq.querySpec()
-		loadedTypes = [7]bool{
+		loadedTypes = [8]bool{
 			ttq.withSpentOutput != nil,
+			ttq.withSpentOutputV2 != nil,
 			ttq.withCreatedOutput != nil,
 			ttq.withMint != nil,
 			ttq.withCreate != nil,
@@ -632,6 +668,13 @@ func (ttq *TokenTransactionQuery) sqlAll(ctx context.Context, hooks ...queryHook
 		if err := ttq.loadSpentOutput(ctx, query, nodes,
 			func(n *TokenTransaction) { n.Edges.SpentOutput = []*TokenOutput{} },
 			func(n *TokenTransaction, e *TokenOutput) { n.Edges.SpentOutput = append(n.Edges.SpentOutput, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := ttq.withSpentOutputV2; query != nil {
+		if err := ttq.loadSpentOutputV2(ctx, query, nodes,
+			func(n *TokenTransaction) { n.Edges.SpentOutputV2 = []*TokenOutput{} },
+			func(n *TokenTransaction, e *TokenOutput) { n.Edges.SpentOutputV2 = append(n.Edges.SpentOutputV2, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -707,6 +750,67 @@ func (ttq *TokenTransactionQuery) loadSpentOutput(ctx context.Context, query *To
 			return fmt.Errorf(`unexpected referenced foreign-key "token_output_output_spent_token_transaction" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
+	}
+	return nil
+}
+func (ttq *TokenTransactionQuery) loadSpentOutputV2(ctx context.Context, query *TokenOutputQuery, nodes []*TokenTransaction, init func(*TokenTransaction), assign func(*TokenTransaction, *TokenOutput)) error {
+	edgeIDs := make([]driver.Value, len(nodes))
+	byID := make(map[uuid.UUID]*TokenTransaction)
+	nids := make(map[uuid.UUID]map[*TokenTransaction]struct{})
+	for i, node := range nodes {
+		edgeIDs[i] = node.ID
+		byID[node.ID] = node
+		if init != nil {
+			init(node)
+		}
+	}
+	query.Where(func(s *sql.Selector) {
+		joinT := sql.Table(tokentransaction.SpentOutputV2Table)
+		s.Join(joinT).On(s.C(tokenoutput.FieldID), joinT.C(tokentransaction.SpentOutputV2PrimaryKey[0]))
+		s.Where(sql.InValues(joinT.C(tokentransaction.SpentOutputV2PrimaryKey[1]), edgeIDs...))
+		columns := s.SelectedColumns()
+		s.Select(joinT.C(tokentransaction.SpentOutputV2PrimaryKey[1]))
+		s.AppendSelect(columns...)
+		s.SetDistinct(false)
+	})
+	if err := query.prepareQuery(ctx); err != nil {
+		return err
+	}
+	qr := QuerierFunc(func(ctx context.Context, q Query) (Value, error) {
+		return query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]any, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
+				}
+				return append([]any{new(uuid.UUID)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []any) error {
+				outValue := *values[0].(*uuid.UUID)
+				inValue := *values[1].(*uuid.UUID)
+				if nids[inValue] == nil {
+					nids[inValue] = map[*TokenTransaction]struct{}{byID[outValue]: {}}
+					return assign(columns[1:], values[1:])
+				}
+				nids[inValue][byID[outValue]] = struct{}{}
+				return nil
+			}
+		})
+	})
+	neighbors, err := withInterceptors[[]*TokenOutput](ctx, query, qr, query.inters)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected "spent_output_v2" node returned %v`, n.ID)
+		}
+		for kn := range nodes {
+			assign(kn, n)
+		}
 	}
 	return nil
 }

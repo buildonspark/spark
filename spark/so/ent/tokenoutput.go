@@ -69,19 +69,21 @@ type TokenOutput struct {
 
 // TokenOutputEdges holds the relations/edges for other nodes in the graph.
 type TokenOutputEdges struct {
-	// RevocationKeyshare holds the value of the revocation_keyshare edge.
+	// The signing keyshare used to derive the revocation secret for this output.
 	RevocationKeyshare *SigningKeyshare `json:"revocation_keyshare,omitempty"`
-	// OutputCreatedTokenTransaction holds the value of the output_created_token_transaction edge.
+	// The token transaction that created this output.
 	OutputCreatedTokenTransaction *TokenTransaction `json:"output_created_token_transaction,omitempty"`
-	// OutputSpentTokenTransaction holds the value of the output_spent_token_transaction edge.
+	// The most recent token transaction attempting to spend this output. Not necessarily finalized.
 	OutputSpentTokenTransaction *TokenTransaction `json:"output_spent_token_transaction,omitempty"`
+	// All token transactions that attempted to spend this output. At most one will finalize.
+	OutputSpentStartedTokenTransactions []*TokenTransaction `json:"output_spent_started_token_transactions,omitempty"`
 	// The partial revocation secret shares gathered from each SO for this token output.
 	TokenPartialRevocationSecretShares []*TokenPartialRevocationSecretShare `json:"token_partial_revocation_secret_shares,omitempty"`
 	// Token create contains the token metadata associated with this output.
 	TokenCreate *TokenCreate `json:"token_create,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [5]bool
+	loadedTypes [6]bool
 }
 
 // RevocationKeyshareOrErr returns the RevocationKeyshare value or an error if the edge
@@ -117,10 +119,19 @@ func (e TokenOutputEdges) OutputSpentTokenTransactionOrErr() (*TokenTransaction,
 	return nil, &NotLoadedError{edge: "output_spent_token_transaction"}
 }
 
+// OutputSpentStartedTokenTransactionsOrErr returns the OutputSpentStartedTokenTransactions value or an error if the edge
+// was not loaded in eager-loading.
+func (e TokenOutputEdges) OutputSpentStartedTokenTransactionsOrErr() ([]*TokenTransaction, error) {
+	if e.loadedTypes[3] {
+		return e.OutputSpentStartedTokenTransactions, nil
+	}
+	return nil, &NotLoadedError{edge: "output_spent_started_token_transactions"}
+}
+
 // TokenPartialRevocationSecretSharesOrErr returns the TokenPartialRevocationSecretShares value or an error if the edge
 // was not loaded in eager-loading.
 func (e TokenOutputEdges) TokenPartialRevocationSecretSharesOrErr() ([]*TokenPartialRevocationSecretShare, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[4] {
 		return e.TokenPartialRevocationSecretShares, nil
 	}
 	return nil, &NotLoadedError{edge: "token_partial_revocation_secret_shares"}
@@ -131,7 +142,7 @@ func (e TokenOutputEdges) TokenPartialRevocationSecretSharesOrErr() ([]*TokenPar
 func (e TokenOutputEdges) TokenCreateOrErr() (*TokenCreate, error) {
 	if e.TokenCreate != nil {
 		return e.TokenCreate, nil
-	} else if e.loadedTypes[4] {
+	} else if e.loadedTypes[5] {
 		return nil, &NotFoundError{label: tokencreate.Label}
 	}
 	return nil, &NotLoadedError{edge: "token_create"}
@@ -334,6 +345,11 @@ func (to *TokenOutput) QueryOutputCreatedTokenTransaction() *TokenTransactionQue
 // QueryOutputSpentTokenTransaction queries the "output_spent_token_transaction" edge of the TokenOutput entity.
 func (to *TokenOutput) QueryOutputSpentTokenTransaction() *TokenTransactionQuery {
 	return NewTokenOutputClient(to.config).QueryOutputSpentTokenTransaction(to)
+}
+
+// QueryOutputSpentStartedTokenTransactions queries the "output_spent_started_token_transactions" edge of the TokenOutput entity.
+func (to *TokenOutput) QueryOutputSpentStartedTokenTransactions() *TokenTransactionQuery {
+	return NewTokenOutputClient(to.config).QueryOutputSpentStartedTokenTransactions(to)
 }
 
 // QueryTokenPartialRevocationSecretShares queries the "token_partial_revocation_secret_shares" edge of the TokenOutput entity.

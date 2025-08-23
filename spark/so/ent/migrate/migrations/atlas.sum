@@ -1,4 +1,4 @@
-h1:Q0yVp+KNwdHMZJolxAAy5m3IwTv9IHdcqPAm97EmGQs=
+h1:hptspHsCjK/M7AxxFLVMgt6EMI+UqKccfVuiE9CSDsc=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -61,3 +61,4 @@ h1:Q0yVp+KNwdHMZJolxAAy5m3IwTv9IHdcqPAm97EmGQs=
 20250821030436_deposit_address_proofs.sql h1:LWulJZi6ugY0CIx8tyOnyo/ybJrVuE4DR0exzK0yvaQ=
 20250822102804_add_token_foreign_key_indexes.sql h1:v2bWzR5VrY7BKSUGnU/VOG1ZsKWeJdi6Xc4O/WIfoZk=
 20250822224608_add_expiry_time_and_status_token_transaction_index.sql h1:ok+fkSigLAylP2j1dE5FFR1qYIB5dbtzuzm3JO1DnVA=
+20250822232855_token_add_m2m_output_relation.sql h1:u3ggT0OZdoaqU7mfCQ5zpddnXUjt3Ax6FPXi7u602AE=

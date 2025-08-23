@@ -45,15 +45,22 @@ func (TokenOutput) Edges() []ent.Edge {
 		edge.To("revocation_keyshare", SigningKeyshare.Type).
 			Unique().
 			Required().
-			Immutable(),
+			Immutable().
+			Comment("The signing keyshare used to derive the revocation secret for this output."),
 		edge.To("output_created_token_transaction", TokenTransaction.Type).
-			Unique(),
-		// Not required because these are only set once the output has been spent.
+			Unique().
+			Comment("The token transaction that created this output."),
+		// This relation maps the most recent transaction attempting to spend this output.
+		// It is not necessarily finalized.
 		edge.To("output_spent_token_transaction", TokenTransaction.Type).
-			Unique(),
+			Unique().
+			Comment("The most recent token transaction attempting to spend this output. Not necessarily finalized."),
+		// This relation maps all transaction attempting to spend this output.
+		// No more than one of them should have been finalized.
+		edge.To("output_spent_started_token_transactions", TokenTransaction.Type).
+			Comment("All token transactions that attempted to spend this output. At most one will finalize."),
 		edge.To("token_partial_revocation_secret_shares", TokenPartialRevocationSecretShare.Type).
 			Comment("The partial revocation secret shares gathered from each SO for this token output."),
-		// Add immutable and required after backfill.
 		edge.
 			From("token_create", TokenCreate.Type).
 			Ref("token_output").

@@ -45,6 +45,8 @@ func (TokenTransaction) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.From("spent_output", TokenOutput.Type).
 			Ref("output_spent_token_transaction"),
+		edge.From("spent_output_v2", TokenOutput.Type).
+			Ref("output_spent_started_token_transactions"),
 		edge.From("created_output", TokenOutput.Type).
 			Ref("output_created_token_transaction"),
 		edge.To("mint", TokenMint.Type).

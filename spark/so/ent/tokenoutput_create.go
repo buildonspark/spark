@@ -232,6 +232,21 @@ func (toc *TokenOutputCreate) SetOutputSpentTokenTransaction(t *TokenTransaction
 	return toc.SetOutputSpentTokenTransactionID(t.ID)
 }
 
+// AddOutputSpentStartedTokenTransactionIDs adds the "output_spent_started_token_transactions" edge to the TokenTransaction entity by IDs.
+func (toc *TokenOutputCreate) AddOutputSpentStartedTokenTransactionIDs(ids ...uuid.UUID) *TokenOutputCreate {
+	toc.mutation.AddOutputSpentStartedTokenTransactionIDs(ids...)
+	return toc
+}
+
+// AddOutputSpentStartedTokenTransactions adds the "output_spent_started_token_transactions" edges to the TokenTransaction entity.
+func (toc *TokenOutputCreate) AddOutputSpentStartedTokenTransactions(t ...*TokenTransaction) *TokenOutputCreate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return toc.AddOutputSpentStartedTokenTransactionIDs(ids...)
+}
+
 // AddTokenPartialRevocationSecretShareIDs adds the "token_partial_revocation_secret_shares" edge to the TokenPartialRevocationSecretShare entity by IDs.
 func (toc *TokenOutputCreate) AddTokenPartialRevocationSecretShareIDs(ids ...uuid.UUID) *TokenOutputCreate {
 	toc.mutation.AddTokenPartialRevocationSecretShareIDs(ids...)
@@ -515,6 +530,22 @@ func (toc *TokenOutputCreate) createSpec() (*TokenOutput, *sqlgraph.CreateSpec) 
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.token_output_output_spent_token_transaction = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := toc.mutation.OutputSpentStartedTokenTransactionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   tokenoutput.OutputSpentStartedTokenTransactionsTable,
+			Columns: tokenoutput.OutputSpentStartedTokenTransactionsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := toc.mutation.TokenPartialRevocationSecretSharesIDs(); len(nodes) > 0 {

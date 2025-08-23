@@ -168,6 +168,7 @@ func CreateStartedTransactionEntities(
 			_, err = db.TokenOutput.UpdateOne(outputToSpendEnt).
 				SetStatus(st.TokenOutputStatusSpentStarted).
 				SetOutputSpentTokenTransactionID(tokenTransactionEnt.ID).
+				AddOutputSpentStartedTokenTransactions(tokenTransactionEnt).
 				SetSpentOwnershipSignature(signaturesWithIndex[outputIndex].Signature).
 				SetSpentTransactionInputVout(int32(outputIndex)).
 				Save(ctx)

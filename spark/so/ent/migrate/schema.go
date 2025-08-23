@@ -1058,6 +1058,31 @@ var (
 			},
 		},
 	}
+	// TokenOutputOutputSpentStartedTokenTransactionsColumns holds the columns for the "token_output_output_spent_started_token_transactions" table.
+	TokenOutputOutputSpentStartedTokenTransactionsColumns = []*schema.Column{
+		{Name: "token_output_id", Type: field.TypeUUID},
+		{Name: "token_transaction_id", Type: field.TypeUUID},
+	}
+	// TokenOutputOutputSpentStartedTokenTransactionsTable holds the schema information for the "token_output_output_spent_started_token_transactions" table.
+	TokenOutputOutputSpentStartedTokenTransactionsTable = &schema.Table{
+		Name:       "token_output_output_spent_started_token_transactions",
+		Columns:    TokenOutputOutputSpentStartedTokenTransactionsColumns,
+		PrimaryKey: []*schema.Column{TokenOutputOutputSpentStartedTokenTransactionsColumns[0], TokenOutputOutputSpentStartedTokenTransactionsColumns[1]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "token_output_output_spent_started_token_transactions_token_output_id",
+				Columns:    []*schema.Column{TokenOutputOutputSpentStartedTokenTransactionsColumns[0]},
+				RefColumns: []*schema.Column{TokenOutputsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "token_output_output_spent_started_token_transactions_token_transaction_id",
+				Columns:    []*schema.Column{TokenOutputOutputSpentStartedTokenTransactionsColumns[1]},
+				RefColumns: []*schema.Column{TokenTransactionsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+	}
 	// TokenTransactionSparkInvoiceColumns holds the columns for the "token_transaction_spark_invoice" table.
 	TokenTransactionSparkInvoiceColumns = []*schema.Column{
 		{Name: "token_transaction_id", Type: field.TypeUUID},
@@ -1112,6 +1137,7 @@ var (
 		UserSignedTransactionsTable,
 		UtxosTable,
 		UtxoSwapsTable,
+		TokenOutputOutputSpentStartedTokenTransactionsTable,
 		TokenTransactionSparkInvoiceTable,
 	}
 )
@@ -1146,6 +1172,8 @@ func init() {
 	UtxoSwapsTable.ForeignKeys[0].RefTable = DepositAddressesTable
 	UtxoSwapsTable.ForeignKeys[1].RefTable = UtxosTable
 	UtxoSwapsTable.ForeignKeys[2].RefTable = TransfersTable
+	TokenOutputOutputSpentStartedTokenTransactionsTable.ForeignKeys[0].RefTable = TokenOutputsTable
+	TokenOutputOutputSpentStartedTokenTransactionsTable.ForeignKeys[1].RefTable = TokenTransactionsTable
 	TokenTransactionSparkInvoiceTable.ForeignKeys[0].RefTable = TokenTransactionsTable
 	TokenTransactionSparkInvoiceTable.ForeignKeys[1].RefTable = SparkInvoicesTable
 }

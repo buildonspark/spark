@@ -185,6 +185,21 @@ func (tou *TokenOutputUpdate) SetOutputSpentTokenTransaction(t *TokenTransaction
 	return tou.SetOutputSpentTokenTransactionID(t.ID)
 }
 
+// AddOutputSpentStartedTokenTransactionIDs adds the "output_spent_started_token_transactions" edge to the TokenTransaction entity by IDs.
+func (tou *TokenOutputUpdate) AddOutputSpentStartedTokenTransactionIDs(ids ...uuid.UUID) *TokenOutputUpdate {
+	tou.mutation.AddOutputSpentStartedTokenTransactionIDs(ids...)
+	return tou
+}
+
+// AddOutputSpentStartedTokenTransactions adds the "output_spent_started_token_transactions" edges to the TokenTransaction entity.
+func (tou *TokenOutputUpdate) AddOutputSpentStartedTokenTransactions(t ...*TokenTransaction) *TokenOutputUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tou.AddOutputSpentStartedTokenTransactionIDs(ids...)
+}
+
 // AddTokenPartialRevocationSecretShareIDs adds the "token_partial_revocation_secret_shares" edge to the TokenPartialRevocationSecretShare entity by IDs.
 func (tou *TokenOutputUpdate) AddTokenPartialRevocationSecretShareIDs(ids ...uuid.UUID) *TokenOutputUpdate {
 	tou.mutation.AddTokenPartialRevocationSecretShareIDs(ids...)
@@ -215,6 +230,27 @@ func (tou *TokenOutputUpdate) ClearOutputCreatedTokenTransaction() *TokenOutputU
 func (tou *TokenOutputUpdate) ClearOutputSpentTokenTransaction() *TokenOutputUpdate {
 	tou.mutation.ClearOutputSpentTokenTransaction()
 	return tou
+}
+
+// ClearOutputSpentStartedTokenTransactions clears all "output_spent_started_token_transactions" edges to the TokenTransaction entity.
+func (tou *TokenOutputUpdate) ClearOutputSpentStartedTokenTransactions() *TokenOutputUpdate {
+	tou.mutation.ClearOutputSpentStartedTokenTransactions()
+	return tou
+}
+
+// RemoveOutputSpentStartedTokenTransactionIDs removes the "output_spent_started_token_transactions" edge to TokenTransaction entities by IDs.
+func (tou *TokenOutputUpdate) RemoveOutputSpentStartedTokenTransactionIDs(ids ...uuid.UUID) *TokenOutputUpdate {
+	tou.mutation.RemoveOutputSpentStartedTokenTransactionIDs(ids...)
+	return tou
+}
+
+// RemoveOutputSpentStartedTokenTransactions removes "output_spent_started_token_transactions" edges to TokenTransaction entities.
+func (tou *TokenOutputUpdate) RemoveOutputSpentStartedTokenTransactions(t ...*TokenTransaction) *TokenOutputUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tou.RemoveOutputSpentStartedTokenTransactionIDs(ids...)
 }
 
 // ClearTokenPartialRevocationSecretShares clears all "token_partial_revocation_secret_shares" edges to the TokenPartialRevocationSecretShare entity.
@@ -403,6 +439,51 @@ func (tou *TokenOutputUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Inverse: false,
 			Table:   tokenoutput.OutputSpentTokenTransactionTable,
 			Columns: []string{tokenoutput.OutputSpentTokenTransactionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if tou.mutation.OutputSpentStartedTokenTransactionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   tokenoutput.OutputSpentStartedTokenTransactionsTable,
+			Columns: tokenoutput.OutputSpentStartedTokenTransactionsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tou.mutation.RemovedOutputSpentStartedTokenTransactionsIDs(); len(nodes) > 0 && !tou.mutation.OutputSpentStartedTokenTransactionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   tokenoutput.OutputSpentStartedTokenTransactionsTable,
+			Columns: tokenoutput.OutputSpentStartedTokenTransactionsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tou.mutation.OutputSpentStartedTokenTransactionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   tokenoutput.OutputSpentStartedTokenTransactionsTable,
+			Columns: tokenoutput.OutputSpentStartedTokenTransactionsPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
@@ -631,6 +712,21 @@ func (touo *TokenOutputUpdateOne) SetOutputSpentTokenTransaction(t *TokenTransac
 	return touo.SetOutputSpentTokenTransactionID(t.ID)
 }
 
+// AddOutputSpentStartedTokenTransactionIDs adds the "output_spent_started_token_transactions" edge to the TokenTransaction entity by IDs.
+func (touo *TokenOutputUpdateOne) AddOutputSpentStartedTokenTransactionIDs(ids ...uuid.UUID) *TokenOutputUpdateOne {
+	touo.mutation.AddOutputSpentStartedTokenTransactionIDs(ids...)
+	return touo
+}
+
+// AddOutputSpentStartedTokenTransactions adds the "output_spent_started_token_transactions" edges to the TokenTransaction entity.
+func (touo *TokenOutputUpdateOne) AddOutputSpentStartedTokenTransactions(t ...*TokenTransaction) *TokenOutputUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return touo.AddOutputSpentStartedTokenTransactionIDs(ids...)
+}
+
 // AddTokenPartialRevocationSecretShareIDs adds the "token_partial_revocation_secret_shares" edge to the TokenPartialRevocationSecretShare entity by IDs.
 func (touo *TokenOutputUpdateOne) AddTokenPartialRevocationSecretShareIDs(ids ...uuid.UUID) *TokenOutputUpdateOne {
 	touo.mutation.AddTokenPartialRevocationSecretShareIDs(ids...)
@@ -661,6 +757,27 @@ func (touo *TokenOutputUpdateOne) ClearOutputCreatedTokenTransaction() *TokenOut
 func (touo *TokenOutputUpdateOne) ClearOutputSpentTokenTransaction() *TokenOutputUpdateOne {
 	touo.mutation.ClearOutputSpentTokenTransaction()
 	return touo
+}
+
+// ClearOutputSpentStartedTokenTransactions clears all "output_spent_started_token_transactions" edges to the TokenTransaction entity.
+func (touo *TokenOutputUpdateOne) ClearOutputSpentStartedTokenTransactions() *TokenOutputUpdateOne {
+	touo.mutation.ClearOutputSpentStartedTokenTransactions()
+	return touo
+}
+
+// RemoveOutputSpentStartedTokenTransactionIDs removes the "output_spent_started_token_transactions" edge to TokenTransaction entities by IDs.
+func (touo *TokenOutputUpdateOne) RemoveOutputSpentStartedTokenTransactionIDs(ids ...uuid.UUID) *TokenOutputUpdateOne {
+	touo.mutation.RemoveOutputSpentStartedTokenTransactionIDs(ids...)
+	return touo
+}
+
+// RemoveOutputSpentStartedTokenTransactions removes "output_spent_started_token_transactions" edges to TokenTransaction entities.
+func (touo *TokenOutputUpdateOne) RemoveOutputSpentStartedTokenTransactions(t ...*TokenTransaction) *TokenOutputUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return touo.RemoveOutputSpentStartedTokenTransactionIDs(ids...)
 }
 
 // ClearTokenPartialRevocationSecretShares clears all "token_partial_revocation_secret_shares" edges to the TokenPartialRevocationSecretShare entity.
@@ -879,6 +996,51 @@ func (touo *TokenOutputUpdateOne) sqlSave(ctx context.Context) (_node *TokenOutp
 			Inverse: false,
 			Table:   tokenoutput.OutputSpentTokenTransactionTable,
 			Columns: []string{tokenoutput.OutputSpentTokenTransactionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if touo.mutation.OutputSpentStartedTokenTransactionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   tokenoutput.OutputSpentStartedTokenTransactionsTable,
+			Columns: tokenoutput.OutputSpentStartedTokenTransactionsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := touo.mutation.RemovedOutputSpentStartedTokenTransactionsIDs(); len(nodes) > 0 && !touo.mutation.OutputSpentStartedTokenTransactionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   tokenoutput.OutputSpentStartedTokenTransactionsTable,
+			Columns: tokenoutput.OutputSpentStartedTokenTransactionsPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := touo.mutation.OutputSpentStartedTokenTransactionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   tokenoutput.OutputSpentStartedTokenTransactionsTable,
+			Columns: tokenoutput.OutputSpentStartedTokenTransactionsPrimaryKey,
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
