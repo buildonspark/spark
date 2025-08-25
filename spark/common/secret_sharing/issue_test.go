@@ -7,7 +7,6 @@ import (
 
 	"github.com/lightsparkdev/spark/common/secret_sharing/curve"
 	"github.com/lightsparkdev/spark/common/secret_sharing/polynomial"
-	"github.com/stretchr/testify/require"
 )
 
 func scalarPointerFromInt(n uint32) *curve.Scalar {
@@ -147,8 +146,7 @@ func TestIssueProtocolFull(t *testing.T) {
 
 	// === Verification ===
 
-	sIssue, err := curve.ParseScalar(finalResult.SIssue)
-	require.NoError(t, err)
+	sIssue := finalResult.SIssue
 
 	mathcalB := finalResult.MathcalB.Decode()
 

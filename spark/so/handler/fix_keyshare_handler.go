@@ -7,8 +7,8 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	"github.com/lightsparkdev/spark/common/secret_sharing/curve"
 	"github.com/lightsparkdev/spark/common/secret_sharing/polynomial"
@@ -242,15 +242,12 @@ func (h FixKeyshareHandler) createSender(args FixKeyshareArgs) (*secretsharing.I
 	for goodIdentifier, goodOperator := range args.goodOperators {
 		publicShareCompressed := args.badKeyshare.PublicShares[goodIdentifier]
 
-		sharePubKey, err := secp256k1.ParsePubKey(publicShareCompressed)
+		sharePubKey, err := keys.ParsePublicKey(publicShareCompressed)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse public key share for operator %s: %w", goodIdentifier, err)
 		}
 
-		sharePoint, err := curve.NewPointFromPublicKey(*sharePubKey)
-		if err != nil {
-			return nil, fmt.Errorf("invalid share public key: %w", err)
-		}
+		sharePoint := curve.NewPointFromPublicKey(sharePubKey)
 
 		eval := polynomial.PointEval{
 			// TODO: Don't hardcode the magic (+ 1) mapping
@@ -429,22 +426,23 @@ func (h FixKeyshareHandler) updateWithFixed(ctx context.Context, outPayload *sec
 	pubSharesPoly := outPayload.MathcalB.Decode()
 
 	// Recover the public shares.
-	pubShares := make(map[string][]byte)
+	pubShares := make(map[string]keys.Public)
 	for identifier, operator := range h.config.SigningOperatorMap {
 		// TODO: Don't hardcode the magic (+ 1) mapping
 		// TODO: Somehow avoid unsafe cast
 		alpha := curve.ScalarFromInt(uint32(operator.ID) + 1)
-		pubSharePoint := pubSharesPoly.Eval(alpha)
-		pubShare, err := pubSharePoint.ToPublicKey() // TODO: Convert to use keys.Public
+
+		pubShare, err := pubSharesPoly.Eval(alpha).ToPublicKey()
 		if err != nil {
 			return fmt.Errorf("invalid public share: %w", err)
 		}
-		pubShares[identifier] = pubShare.SerializeCompressed()
+
+		pubShares[identifier] = pubShare
 	}
 
 	// Recover the public key.
 	pubKeyPoint := pubSharesPoly.Eval(curve.ScalarFromInt(0))
-	pubKey, err := pubKeyPoint.ToPublicKey() // TODO: Convert to use keys.Public
+	pubKey, err := pubKeyPoint.ToPublicKey()
 	if err != nil {
 		return fmt.Errorf("invalid public key: %w", err)
 	}
@@ -456,9 +454,9 @@ func (h FixKeyshareHandler) updateWithFixed(ctx context.Context, outPayload *sec
 	}
 
 	_, err = db.SigningKeyshare.UpdateOneID(badKeyshare.ID).
-		SetSecretShare(outPayload.SIssue[:]).
-		SetPublicShares(pubShares).
-		SetPublicKey(pubKey.SerializeCompressed()).
+		SetSecretShare(outPayload.SIssue.Serialize()).
+		SetPublicShares(keys.ToBytesMap(pubShares)).
+		SetPublicKey(pubKey.Serialize()).
 		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to update keyshare: %w", err)

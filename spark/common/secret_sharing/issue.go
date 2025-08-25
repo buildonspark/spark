@@ -89,21 +89,21 @@ type Message[T any] struct {
 // IssuePayload1 is the data from round 1 for other parties.
 // It must be sent securely to its recipient.
 type IssuePayload1 struct {
-	Sid    []byte `json:"sid"`
-	SArrow []byte `json:"sArrow"` // TODO: Convert to use `curve.Scalar` directly
+	Sid    []byte       `json:"sid"`
+	SArrow curve.Scalar `json:"sArrow"`
 }
 
 // IssuePayload2 is the data from round 2 for other parties.
 // It must be sent securely to its recipient.
 type IssuePayload2 struct {
 	MathcalB polynomial.InterpolatingPointPolynomialBytes `json:"mathcalB"` // NOTE: Would be a `PointPolynomialBytes` if following the described protocol.
-	SIIssue  []byte                                       `json:"sIIssue"`  // TODO: Convert to use `curve.Scalar` directly
+	SIIssue  curve.Scalar                                 `json:"sIIssue"`
 }
 
 // IssuePayload3 is the final result of round 3.
 type IssuePayload3 struct {
 	MathcalB polynomial.InterpolatingPointPolynomialBytes `json:"mathcalB"` // NOTE: Would be a `PointPolynomialBytes` if following the described protocol.
-	SIssue   []byte                                       `json:"sIssue"`   // TODO: Convert to use `curve.Scalar` directly
+	SIssue   curve.Scalar                                 `json:"sIssue"`
 }
 
 func newIssueError(round int, err error) error {
@@ -168,7 +168,7 @@ func (p IssueSender) Round1() ([]Message[IssuePayload1], error) {
 
 		payload := IssuePayload1{
 			Sid:    p.Config.Sid,
-			SArrow: sArrow.Serialize(),
+			SArrow: sArrow,
 		}
 		message := Message[IssuePayload1]{
 			From:    p.SmallI,
@@ -212,11 +212,7 @@ func (p IssueSender) Round2(payloadFrom map[PartyIndex]IssuePayload1) (Message[I
 	for idx, j := range p.Config.BigI {
 		lagrangeCoeff := p.Config.lagrangeBasisAt(idx, *alphaIssue)
 
-		sArrow, err := curve.ParseScalar(payloadFrom[j].SArrow)
-		if err != nil {
-			return Message[IssuePayload2]{}, err
-		}
-
+		sArrow := payloadFrom[j].SArrow
 		term := sArrow.Mul(*lagrangeCoeff)
 
 		sIIssue.SetAdd(&term)
@@ -227,7 +223,7 @@ func (p IssueSender) Round2(payloadFrom map[PartyIndex]IssuePayload1) (Message[I
 	// and signed with P_i's private signing key, using secure signcryption.)
 	outPayload := IssuePayload2{
 		MathcalB: p.MathcalB.Encode(),
-		SIIssue:  sIIssue.Serialize(),
+		SIIssue:  sIIssue,
 	}
 	outMessage := Message[IssuePayload2]{
 		From:    p.SmallI,
@@ -268,12 +264,9 @@ func (p IssueReceiver) Round3(payloadFrom map[PartyIndex]IssuePayload2) (*IssueP
 	for idx, i := range p.Config.BigI {
 		term := p.Config.lagrangeBasisAt(idx, curve.ScalarFromInt(0))
 
-		sIIssue, err := curve.ParseScalar(payloadFrom[i].SIIssue)
-		if err != nil {
-			return nil, err
-		}
-
+		sIIssue := payloadFrom[i].SIIssue
 		term.SetMul(&sIIssue)
+
 		sIssue.SetAdd(term)
 	}
 
@@ -291,7 +284,7 @@ func (p IssueReceiver) Round3(payloadFrom map[PartyIndex]IssuePayload2) (*IssueP
 	// (d) P_{n + 1} outputs (B, s_{n + 1})
 	outPayload := IssuePayload3{
 		MathcalB: mathcalB.Encode(),
-		SIssue:   sIssue.Serialize(),
+		SIssue:   sIssue,
 	}
 
 	return &outPayload, nil

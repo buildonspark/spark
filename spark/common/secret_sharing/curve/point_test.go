@@ -3,7 +3,6 @@ package curve
 import (
 	"testing"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -84,16 +83,6 @@ func TestPointParseNotOnCurve(t *testing.T) {
 	assert.Error(t, err, "point not on curve should cause parsing to return an error")
 }
 
-func TestPointFromPublicKeyNotOnCurve(t *testing.T) {
-	// The elliptic curve equation must hold for a point to be on the curve.
-	x := new(secp256k1.FieldVal).SetInt(5)
-	y := new(secp256k1.FieldVal).SetInt(1)
-	pubKeyNotOnCurve := *secp256k1.NewPublicKey(x, y)
-
-	_, err := NewPointFromPublicKey(pubKeyNotOnCurve)
-	assert.Error(t, err, "converting an public key not on the curve to a point should return an error")
-}
-
 func TestPointToPublicKeyIdentity(t *testing.T) {
 	p := IdentityPoint()
 
@@ -107,8 +96,7 @@ func TestPointPublicKeyInterchange(t *testing.T) {
 	pPubKey, err := p.ToPublicKey()
 	require.NoError(t, err, "converting a point to a public key should not return an error")
 
-	pPubKeyPoint, err := NewPointFromPublicKey(pPubKey)
-	require.NoError(t, err, "converting a public key to a point should not return an error")
+	pPubKeyPoint := NewPointFromPublicKey(pPubKey)
 
 	assert.True(t, p.Equals(pPubKeyPoint), "converting a point to and from a public key should not change the original")
 }

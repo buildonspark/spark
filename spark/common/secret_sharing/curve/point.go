@@ -75,23 +75,7 @@ func (p Point) Serialize() []byte {
 }
 
 // NewPointFromPublicKey returns the point corresponding to the passed public key.
-func NewPointFromPublicKey(pubKey secp256k1.PublicKey) (Point, error) {
-	// NOTE: If a public key type that guarantees being on the curve is used,
-	// the error path can be removed.
-	if !pubKey.IsOnCurve() {
-		return Point{}, fmt.Errorf("public key must be on curve")
-	}
-
-	pt := Point{}
-	pubKey.AsJacobian(&pt.point)
-
-	return pt, nil
-}
-
-// NewPointFromPublic returns the point corresponding to the passed public key.
-//
-// TODO: Remove `NewPointFromPublicKey` after fixing its callers and rename this to that.
-func NewPointFromPublic(pubKey keys.Public) Point {
+func NewPointFromPublicKey(pubKey keys.Public) Point {
 	pt := Point{}
 	pubKey.ToBTCEC().AsJacobian(&pt.point)
 
@@ -100,22 +84,7 @@ func NewPointFromPublic(pubKey keys.Public) Point {
 
 // ToPublicKey creates a public key representation of this point.
 // It returns an error if this is the identity point, which has no public key representation.
-func (p Point) ToPublicKey() (secp256k1.PublicKey, error) {
-	if p.isIdentity() {
-		return secp256k1.PublicKey{}, fmt.Errorf("identity point cannot be a public key")
-	}
-
-	p.point.ToAffine()
-	pubKey := secp256k1.NewPublicKey(&p.point.X, &p.point.Y)
-
-	return *pubKey, nil
-}
-
-// ToPublic creates a public key representation of this point.
-// It returns an error if this is the identity point, which has no public key representation.
-//
-// TODO: Remove `ToPublicKey` after fixing its callers and rename this to that.
-func (p Point) ToPublic() (keys.Public, error) {
+func (p Point) ToPublicKey() (keys.Public, error) {
 	if p.isIdentity() {
 		return keys.Public{}, fmt.Errorf("identity point cannot be a public key")
 	}
