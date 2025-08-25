@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"github.com/lightsparkdev/spark/common/keys"
 	"unicode/utf8"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -303,14 +304,18 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbTx *ent.
 	}
 
 	tokenIdentifiersAnnouncedInBlock := make(map[string]struct{})
-	issuerPublicKeysAnnouncedInBlock := make(map[string]struct{})
+	issuerPublicKeysAnnouncedInBlock := make(map[keys.Public]struct{})
 	for _, ann := range announcements {
+		announcementIssuerPubKey, err := keys.ParsePublicKey(ann.l1TokenToCreate.IssuerPublicKey)
+		if err != nil {
+			return fmt.Errorf("failed to parse issuer public key: %w", err)
+		}
 		logger.Info("Successfully parsed token announcement",
 			"txid", ann.txHash,
 			"output_idx", ann.outputIdx,
 			"token_name", ann.l1TokenToCreate.TokenName,
 			"token_ticker", ann.l1TokenToCreate.TokenTicker,
-			"issuer_public_key", hex.EncodeToString(ann.l1TokenToCreate.IssuerPublicKey))
+			"issuer_public_key", announcementIssuerPubKey)
 
 		provider := ann.l1TokenToCreate
 		tokenMetadata, err := provider.ToTokenMetadata()
@@ -335,9 +340,14 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbTx *ent.
 			logger.Error("Failed to check for duplicate announcement", "error", err, "txid", ann.txHash)
 			continue
 		}
+		tokenIssuerPubKey, err := keys.ParsePublicKey(tokenMetadata.IssuerPublicKey)
+		if err != nil {
+			logger.Error("failed to parse issuer public key", "error", err, "txid", ann.txHash)
+			continue
+		}
 		if isDuplicate {
 			logger.Info("Token with this issuer public key already exists. Ignoring the announcement.",
-				"issuer_public", hex.EncodeToString(tokenMetadata.IssuerPublicKey),
+				"issuer_public", tokenIssuerPubKey,
 				"network", tokenMetadata.Network.String(),
 				"txid", ann.txHash)
 			continue
@@ -357,14 +367,14 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbTx *ent.
 		)
 
 		if !config.Token.DisableSparkTokenCreationForL1TokenAnnouncements {
-			exists, err := issuerAlreadyHasSparkToken(ctx, dbTx, tokenMetadata.IssuerPublicKey, issuerPublicKeysAnnouncedInBlock)
+			exists, err := issuerAlreadyHasSparkToken(ctx, dbTx, tokenIssuerPubKey, issuerPublicKeysAnnouncedInBlock)
 			if err != nil {
 				logger.Error("failed to check for existing spark token", "error", err)
 				continue
 			}
 			if exists {
 				logger.Info("Issuer already has a Spark token. Not creating a spark native token.",
-					"issuer_public", hex.EncodeToString(tokenMetadata.IssuerPublicKey),
+					"issuer_public", tokenIssuerPubKey,
 					"network", tokenMetadata.Network.String(),
 					"txid", ann.txHash)
 			} else {
@@ -374,7 +384,7 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbTx *ent.
 			}
 		}
 		tokenIdentifiersAnnouncedInBlock[hex.EncodeToString(tokenIdentifier)] = struct{}{}
-		issuerPublicKeysAnnouncedInBlock[hex.EncodeToString(ann.l1TokenToCreate.IssuerPublicKey)] = struct{}{}
+		issuerPublicKeysAnnouncedInBlock[announcementIssuerPubKey] = struct{}{}
 	}
 	return nil
 }
@@ -404,16 +414,13 @@ func isDuplicateAnnouncement(ctx context.Context, dbTx *ent.Tx, tokenIdentifier 
 	if exists {
 		return true, nil
 	}
-	if _, ok := tokenIdentifiersAnnouncedInBlock[hex.EncodeToString(tokenIdentifier)]; ok {
-		return true, nil
-	}
-
-	return false, nil
+	_, ok := tokenIdentifiersAnnouncedInBlock[string(tokenIdentifier)]
+	return ok, nil
 }
 
-func issuerAlreadyHasSparkToken(ctx context.Context, dbTx *ent.Tx, issuerPublicKey []byte, issuerPublicKeysAnnouncedInBlock map[string]struct{}) (bool, error) {
+func issuerAlreadyHasSparkToken(ctx context.Context, dbTx *ent.Tx, issuerPublicKey keys.Public, issuerPublicKeysAnnouncedInBlock map[keys.Public]struct{}) (bool, error) {
 	exists, err := dbTx.TokenCreate.Query().
-		Where(tokencreate.IssuerPublicKeyEQ(issuerPublicKey)).
+		Where(tokencreate.IssuerPublicKeyEQ(issuerPublicKey.Serialize())).
 		Exist(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to query for existing spark token: %w", err)
@@ -421,8 +428,6 @@ func issuerAlreadyHasSparkToken(ctx context.Context, dbTx *ent.Tx, issuerPublicK
 	if exists {
 		return true, nil
 	}
-	if _, ok := issuerPublicKeysAnnouncedInBlock[hex.EncodeToString(issuerPublicKey)]; ok {
-		return true, nil
-	}
-	return false, nil
+	_, ok := issuerPublicKeysAnnouncedInBlock[issuerPublicKey]
+	return ok, nil
 }

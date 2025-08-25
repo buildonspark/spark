@@ -211,7 +211,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	signingKey, err := dbTx.SigningKeyshare.Create().
+	signingKeyshare, err := dbTx.SigningKeyshare.Create().
 		SetPublicKey(signingPublicKey.Serialize()).
 		SetSecretShare(secretShare.Serialize()).
 		SetMinSigners(1).
@@ -224,7 +224,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	// Create EntityDkgKey so that token_scanner.go can get the entity DKG key public key which
 	// is necessary for writing the TokenCreate ent.
 	_, err = dbTx.EntityDkgKey.Create().
-		SetSigningKeyshare(signingKey).
+		SetSigningKeyshare(signingKeyshare).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -243,7 +243,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 		SetVerifyingPubkey(verifyingPubKey.Serialize()).
 		SetOwnerSigningPubkey(ownerIDPubKey.Serialize()).
 		SetVout(0).
-		SetSigningKeyshare(signingKey).
+		SetSigningKeyshare(signingKeyshare).
 		Save(ctx)
 	require.NoError(t, err)
 
