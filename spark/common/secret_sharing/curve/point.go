@@ -61,14 +61,12 @@ func (p Point) Serialize() []byte {
 	serialDiscriminant := &serial[0]
 	serialPubKey := serial[1:]
 
-	if p.isIdentity() {
+	pubKey, err := p.ToPublicKey()
+	if err != nil {
 		*serialDiscriminant = pointSerialDiscriminantIdentity
 	} else {
 		*serialDiscriminant = pointSerialDiscriminantNonIdentity
-
-		p.point.ToAffine()
-		pubKey := secp256k1.NewPublicKey(&p.point.X, &p.point.Y)
-		copy(serialPubKey, pubKey.SerializeCompressed())
+		copy(serialPubKey, pubKey.Serialize())
 	}
 
 	return serial[:]
@@ -155,7 +153,13 @@ func (p *Point) SetScalarMul(s *Scalar) *Point {
 
 // isIdentity returns true if this point is the curve group identity.
 func (p Point) isIdentity() bool {
-	return (p.point.X.IsZero() && p.point.Y.IsZero()) || p.point.Z.IsZero()
+	isIdentityStandard := p.point.Z.IsZero()
+
+	// An example of where this arises: `p = ScalarFromInt(0).Point()`.
+	// It appears to behave algebraically as the identity point.
+	isIdentityNonStandard := p.point.Z.IsOne() && p.point.X.IsZero() && p.point.Y.IsZero()
+
+	return isIdentityStandard || isIdentityNonStandard
 }
 
 // Equals returns true if this and the passed point represent the same secp256k1 point and false otherwise.

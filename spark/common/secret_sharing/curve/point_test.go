@@ -7,6 +7,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestPointZeroIsIdentity(t *testing.T) {
+	zeroPt := ScalarFromInt(0).Point()
+
+	assert.True(t, zeroPt.isIdentity(), "scaling a point by zero should produce the idenity point, but got %v", zeroPt.point)
+}
+
+func TestPointZeroDoublesToIdentity(t *testing.T) {
+	zeroPt := ScalarFromInt(0).Point()
+	require.True(t, zeroPt.point.X.IsZero(), "bug in test, expected (0, 0, 1) but X is not 0")
+	require.True(t, zeroPt.point.Y.IsZero(), "bug in test, expected (0, 0, 1) but Y is not 0")
+	require.True(t, zeroPt.point.Z.IsOne(), "bug in test, expected (0, 0, 1) but Z is not 1")
+
+	doubleZeroPt := zeroPt.ScalarMul(ScalarFromInt(2))
+
+	assert.True(t, doubleZeroPt.isIdentity(), "doubling the identity point should produce the identity")
+}
+
 func TestPointEqual(t *testing.T) {
 	p := ScalarFromInt(123).Point()
 	pAgain := ScalarFromInt(123).Point()
@@ -41,6 +58,18 @@ func TestPointSerializeParseIdentity(t *testing.T) {
 func TestPointSerializeParse(t *testing.T) {
 	p := ScalarFromInt(123).Point()
 	assertPointEqualAfterSerializeParse(t, &p)
+}
+
+func TestPointParseTooShort(t *testing.T) {
+	var serial [PointBytesLen - 1]byte
+	_, err := ParsePoint(serial[:])
+	assert.Error(t, err, "too few bytes should cause parsing to return an error")
+}
+
+func TestPointParseTooLong(t *testing.T) {
+	var serial [PointBytesLen + 1]byte
+	_, err := ParsePoint(serial[:])
+	assert.Error(t, err, "too many bytes should cause parsing to return an error")
 }
 
 func TestPointParseInvalidDiscriminant(t *testing.T) {
