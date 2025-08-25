@@ -2,10 +2,12 @@ package tokens
 
 import (
 	"context"
-	"crypto/rand"
+	"math/rand/v2"
+
 	"testing"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/keys"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -26,7 +28,7 @@ type queryTokenTestFixture struct {
 	Cleanup func()
 }
 
-func setupQueryTokenTestHandler(t *testing.T) *queryTokenTestFixture {
+func setUpQueryTokenTestHandler(t *testing.T) *queryTokenTestFixture {
 	t.Helper()
 
 	config, err := sparktesting.TestConfig()
@@ -39,19 +41,15 @@ func setupQueryTokenTestHandler(t *testing.T) *queryTokenTestFixture {
 		includeExpiredTransactions: true,
 	}
 
-	cleanup := func() {
-		dbContext.Close()
-	}
-
 	return &queryTokenTestFixture{
 		Handler: handler,
 		Ctx:     ctx,
-		Cleanup: cleanup,
+		Cleanup: dbContext.Close,
 	}
 }
 
 func TestExpiredOutputBeforeFinalization(t *testing.T) {
-	setup := setupQueryTokenTestHandler(t)
+	setup := setUpQueryTokenTestHandler(t)
 	defer setup.Cleanup()
 
 	handler := setup.Handler
@@ -60,10 +58,11 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
+	rng := rand.NewChaCha8([32]byte{})
 	t.Run("return output after transaction has expired in signed state", func(t *testing.T) {
 		randomBytes := func(length int) []byte {
 			b := make([]byte, length)
-			_, err := rand.Read(b)
+			_, err := rng.Read(b)
 			require.NoError(t, err)
 			return b
 		}
@@ -71,9 +70,9 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 		// Create two signing keyshares (one for the mint output, one for transfer output)
 		signKS1, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
-			SetSecretShare(randomBytes(32)).
+			SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
 			SetPublicShares(map[string][]byte{}).
-			SetPublicKey(randomBytes(33)).
+			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
 			SetMinSigners(1).
 			SetCoordinatorIndex(0).
 			Save(ctx)
@@ -81,9 +80,9 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 
 		signKS2, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
-			SetSecretShare(randomBytes(32)).
+			SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
 			SetPublicShares(map[string][]byte{}).
-			SetPublicKey(randomBytes(33)).
+			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
 			SetMinSigners(1).
 			SetCoordinatorIndex(0).
 			Save(ctx)
@@ -91,7 +90,7 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 
 		// Create a mint transaction that produces an output we will later spend
 		mintEnt, err := tx.TokenMint.Create().
-			SetIssuerPublicKey(randomBytes(33)).
+			SetIssuerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
 			SetWalletProvidedTimestamp(uint64(time.Now().UnixMilli())).
 			SetIssuerSignature(randomBytes(64)).
 			Save(ctx)
@@ -99,7 +98,7 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 
 		tokenIdentifier := randomBytes(32)
 		tokenCreate, err := tx.TokenCreate.Create().
-			SetIssuerPublicKey(randomBytes(33)).
+			SetIssuerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
 			SetTokenName("TestToken").
 			SetTokenTicker("TT").
 			SetDecimals(0).
@@ -121,10 +120,10 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 
 		mintOutput, err := tx.TokenOutput.Create().
 			SetStatus(st.TokenOutputStatusCreatedFinalized).
-			SetOwnerPublicKey(randomBytes(33)).
+			SetOwnerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
 			SetWithdrawBondSats(1_000).
 			SetWithdrawRelativeBlockLocktime(10).
-			SetWithdrawRevocationCommitment(randomBytes(33)).
+			SetWithdrawRevocationCommitment(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
 			SetTokenAmount(randomBytes(16)).
 			SetCreatedTransactionOutputVout(0).
 			SetRevocationKeyshareID(signKS1.ID).
@@ -156,10 +155,10 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 		// Create a new output produced by the transferTx
 		_, err = tx.TokenOutput.Create().
 			SetStatus(st.TokenOutputStatusCreatedSigned).
-			SetOwnerPublicKey(randomBytes(33)).
+			SetOwnerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
 			SetWithdrawBondSats(500).
 			SetWithdrawRelativeBlockLocktime(10).
-			SetWithdrawRevocationCommitment(randomBytes(33)).
+			SetWithdrawRevocationCommitment(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
 			SetTokenAmount(randomBytes(16)).
 			SetCreatedTransactionOutputVout(0).
 			SetRevocationKeyshareID(signKS2.ID).

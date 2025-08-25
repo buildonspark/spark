@@ -59,7 +59,7 @@ func NewSessionTokenCreatorVerifier(identityPrivateKey keys.Private, clock Clock
 		clock = RealClock{}
 	}
 
-	if identityPrivateKey == (keys.Private{}) {
+	if identityPrivateKey.IsZero() {
 		return nil, ErrInvalidIdentityKey
 	}
 
@@ -82,7 +82,7 @@ func (stcv *SessionTokenCreatorVerifier) computeSessionHmac(sessionBytes []byte)
 }
 
 // CreateToken generates a new session token and returns both the token and its expiration time
-func (stcv *SessionTokenCreatorVerifier) CreateToken(publicKey []byte, duration time.Duration) (*TokenCreationResult, error) {
+func (stcv *SessionTokenCreatorVerifier) CreateToken(publicKey keys.Public, duration time.Duration) (*TokenCreationResult, error) {
 	nonce := make([]byte, 32)
 	if _, err := rand.Read(nonce); err != nil {
 		return nil, fmt.Errorf("failed to generate nonce: %w", err)
@@ -94,7 +94,7 @@ func (stcv *SessionTokenCreatorVerifier) CreateToken(publicKey []byte, duration 
 		Version:             currentSessionVersion,
 		ExpirationTimestamp: expirationTimestamp,
 		Nonce:               nonce,
-		PublicKey:           publicKey,
+		PublicKey:           publicKey.Serialize(),
 	}
 
 	sessionBytes, err := proto.Marshal(session)

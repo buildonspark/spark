@@ -782,7 +782,7 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create a valid session token for the session identity
-		tokenResult, err := tokenVerifier.CreateToken(sessionIdentityKey.Public().Serialize(), time.Hour)
+		tokenResult, err := tokenVerifier.CreateToken(sessionIdentityKey.Public(), time.Hour)
 		require.NoError(t, err)
 
 		// Create context with authorization header like real gRPC requests

@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"github.com/lightsparkdev/spark/common/keys"
 	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -212,8 +213,9 @@ func (s *AuthnServer) VerifyChallenge(ctx context.Context, req *pb.VerifyChallen
 		return nil, fmt.Errorf("invalid request: signature cannot be empty")
 	}
 
-	if len(req.PublicKey) == 0 {
-		return nil, fmt.Errorf("invalid request: public key cannot be empty")
+	pubKey, err := keys.ParsePublicKey(req.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("%w: invalid public key format: %w", ErrInvalidPublicKeyFormat, err)
 	}
 
 	challenge := req.ProtectedChallenge.Challenge
@@ -231,11 +233,11 @@ func (s *AuthnServer) VerifyChallenge(ctx context.Context, req *pb.VerifyChallen
 		return nil, fmt.Errorf("challenge verification failed: %w", err)
 	}
 
-	if err := s.verifyClientSignature(challengeBytes, req.PublicKey, req.Signature); err != nil {
+	if err := s.verifyClientSignature(challengeBytes, pubKey, req.Signature); err != nil {
 		return nil, fmt.Errorf("signature verification failed: %w", err)
 	}
 
-	result, err := s.sessionTokenCreatorVerifier.CreateToken(req.PublicKey, s.config.SessionDuration)
+	result, err := s.sessionTokenCreatorVerifier.CreateToken(pubKey, s.config.SessionDuration)
 	if err != nil {
 		return nil, fmt.Errorf("internal error: failed to create session token: %w", err)
 	}
@@ -286,22 +288,13 @@ func (s *AuthnServer) validateChallenge(ctx context.Context, challenge *pb.Chall
 	return nil
 }
 
-func (s *AuthnServer) verifyClientSignature(challengeBytes []byte, pubKeyBytes []byte, signature []byte) error {
+func (s *AuthnServer) verifyClientSignature(challengeBytes []byte, pubKey keys.Public, signature []byte) error {
 	if len(challengeBytes) == 0 {
 		return fmt.Errorf("invalid input: challenge bytes cannot be empty")
 	}
 
-	if len(pubKeyBytes) == 0 {
-		return fmt.Errorf("invalid input: public key bytes cannot be empty")
-	}
-
 	if len(signature) == 0 {
 		return fmt.Errorf("invalid input: signature cannot be empty")
-	}
-
-	pubKey, err := secp256k1.ParsePubKey(pubKeyBytes)
-	if err != nil {
-		return fmt.Errorf("%w: failed to parse public key: %w", ErrInvalidPublicKeyFormat, err)
 	}
 
 	sig, err := ecdsa.ParseDERSignature(signature)
@@ -310,7 +303,7 @@ func (s *AuthnServer) verifyClientSignature(challengeBytes []byte, pubKeyBytes [
 	}
 
 	hash := sha256.Sum256(challengeBytes)
-	if !sig.Verify(hash[:], pubKey) {
+	if !sig.Verify(hash[:], pubKey.ToBTCEC()) {
 		return fmt.Errorf("%w: signature verification failed", ErrInvalidSignature)
 	}
 
