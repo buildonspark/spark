@@ -115,7 +115,7 @@ func (h *LightningHandler) validateNodeOwnership(ctx context.Context, nodes []*e
 	if err != nil {
 		return err
 	}
-	sessionIdentityPubkeyBytes := session.IdentityPublicKeyBytes()
+	sessionIdentityPubkeyBytes := session.IdentityPublicKey().Serialize()
 
 	var mismatchedNodes []string
 	for _, node := range nodes {
@@ -1321,9 +1321,12 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvideP
 
 func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.ReturnLightningPaymentRequest, internal bool) (*emptypb.Empty, error) {
 	logger := logging.GetLoggerFromContext(ctx)
-
 	if !internal {
-		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.UserIdentityPublicKey); err != nil {
+		reqUserIDPubKey, err := keys.ParsePublicKey(req.UserIdentityPublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("invalid identity public key: %w", err)
+		}
+		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqUserIDPubKey); err != nil {
 			return nil, err
 		}
 	}

@@ -51,7 +51,11 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 }
 
 func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest, requireDirectTx bool) (*pb.CooperativeExitResponse, error) {
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.Transfer.OwnerIdentityPublicKey); err != nil {
+	reqTransferOwnerIDPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse transfer owner identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqTransferOwnerIDPubKey); err != nil {
 		return nil, err
 	}
 
@@ -77,7 +81,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 		req.Transfer.TransferId,
 		st.TransferTypeCooperativeExit,
 		req.Transfer.ExpiryTime.AsTime(),
-		req.Transfer.OwnerIdentityPublicKey,
+		reqTransferOwnerIDPubKey.Serialize(),
 		req.Transfer.ReceiverIdentityPublicKey,
 		cpfpLeafRefundMap,
 		directLeafRefundMap,
@@ -148,8 +152,8 @@ func (h *TransferHandler) syncCoopExitInit(ctx context.Context, req *pb.Cooperat
 	transfer := req.Transfer
 	leaves := make([]*pbinternal.InitiateTransferLeaf, 0)
 	for _, leaf := range transfer.LeavesToSend {
-		directRefundTx := []byte{}
-		directFromCpfpRefundTx := []byte{}
+		var directRefundTx []byte
+		var directFromCpfpRefundTx []byte
 		if leaf.DirectRefundTxSigningJob != nil {
 			directRefundTx = leaf.DirectRefundTxSigningJob.RawTx
 		}

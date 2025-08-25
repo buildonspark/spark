@@ -120,7 +120,11 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	))
 	defer span.End()
 
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
+	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
 		return nil, err
 	}
 
@@ -1128,8 +1132,11 @@ func (h *TransferHandler) FinalizeTransfer(ctx context.Context, req *pb.Finalize
 	defer span.End()
 
 	logger := logging.GetLoggerFromContext(ctx)
-
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
+	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
 		return nil, err
 	}
 
@@ -1536,7 +1543,11 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 
 	switch filter.Participant.(type) {
 	case *pb.TransferFilter_ReceiverIdentityPublicKey:
-		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, filter.GetReceiverIdentityPublicKey()); err != nil {
+		receiverIDPubKey, err := keys.ParsePublicKey(filter.GetReceiverIdentityPublicKey())
+		if err != nil {
+			return nil, fmt.Errorf("invalid receiver identity public key: %w", err)
+		}
+		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, receiverIDPubKey); err != nil {
 			return nil, err
 		}
 		transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(filter.GetReceiverIdentityPublicKey()))
@@ -1546,7 +1557,11 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 			)
 		}
 	case *pb.TransferFilter_SenderIdentityPublicKey:
-		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, filter.GetSenderIdentityPublicKey()); err != nil {
+		senderIDPubKey, err := keys.ParsePublicKey(filter.GetSenderIdentityPublicKey())
+		if err != nil {
+			return nil, fmt.Errorf("invalid sender identity public key: %w", err)
+		}
+		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, senderIDPubKey); err != nil {
 			return nil, err
 		}
 		transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(filter.GetSenderIdentityPublicKey()))
@@ -1557,26 +1572,29 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 			)
 		}
 	case *pb.TransferFilter_SenderOrReceiverIdentityPublicKey:
-		identityPubkey := filter.GetSenderOrReceiverIdentityPublicKey()
-		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, identityPubkey); err != nil {
+		identityPubKey, err := keys.ParsePublicKey(filter.GetSenderOrReceiverIdentityPublicKey())
+		if err != nil {
+			return nil, fmt.Errorf("invalid identity public key: %w", err)
+		}
+		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, identityPubKey); err != nil {
 			return nil, err
 		}
 		if isPending {
 			transferPredicate = append(transferPredicate, enttransfer.Or(
 				enttransfer.And(
-					enttransfer.ReceiverIdentityPubkeyEQ(identityPubkey),
+					enttransfer.ReceiverIdentityPubkeyEQ(identityPubKey.Serialize()),
 					enttransfer.StatusIn(receiverPendingStatuses...),
 				),
 				enttransfer.And(
-					enttransfer.SenderIdentityPubkeyEQ(identityPubkey),
+					enttransfer.SenderIdentityPubkeyEQ(identityPubKey.Serialize()),
 					enttransfer.StatusIn(senderPendingStatuses...),
 					enttransfer.ExpiryTimeLT(time.Now()),
 				),
 			))
 		} else {
 			transferPredicate = append(transferPredicate, enttransfer.Or(
-				enttransfer.ReceiverIdentityPubkeyEQ(identityPubkey),
-				enttransfer.SenderIdentityPubkeyEQ(identityPubkey),
+				enttransfer.ReceiverIdentityPubkeyEQ(identityPubKey.Serialize()),
+				enttransfer.SenderIdentityPubkeyEQ(identityPubKey.Serialize()),
 			))
 		}
 	}
@@ -1730,8 +1748,11 @@ func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Tx, transfer *ent.T
 func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.ClaimTransferTweakKeysRequest) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.ClaimTransferTweakKeys")
 	defer span.End()
-
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
+	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	if err != nil {
+		return fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
 		return err
 	}
 
@@ -2021,8 +2042,11 @@ func (h *TransferHandler) ClaimTransferSignRefunds(ctx context.Context, req *pb.
 func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest, requireDirectTx bool) (*pb.ClaimTransferSignRefundsResponse, error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.ClaimTransferSignRefunds")
 	defer span.End()
-
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
+	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
 		return nil, err
 	}
 
@@ -2462,7 +2486,11 @@ func (h *TransferHandler) ResumeSendTransfer(ctx context.Context, transfer *ent.
 }
 
 func (h *TransferHandler) InvestigateLeaves(ctx context.Context, req *pb.InvestigateLeavesRequest) (*emptypb.Empty, error) {
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
+	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
 		return nil, err
 	}
 

@@ -40,7 +40,11 @@ func (h *ExtendLeafHandler) ExtendLeafV2(ctx context.Context, req *pb.ExtendLeaf
 }
 
 func (h *ExtendLeafHandler) extendLeaf(ctx context.Context, req *pb.ExtendLeafRequest, requireDirectTx bool) (*pb.ExtendLeafResponse, error) {
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
+	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
 		return nil, fmt.Errorf("failed to enforce session identity public key matches: %w", err)
 	}
 
@@ -100,14 +104,12 @@ func (h *ExtendLeafHandler) extendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 		return nil, fmt.Errorf("failed to create refund signing job: %w", err)
 	}
 
-	signingJobs := make([]*helper.SigningJob, 0)
-	signingJobs = append(signingJobs, newCpfpNodeSigningJob, cpfpRefundSigningJob)
+	signingJobs := []*helper.SigningJob{newCpfpNodeSigningJob, cpfpRefundSigningJob}
 	directNodeSigningJob := req.GetDirectNodeTxSigningJob()
 	directRefundSigningJob := req.GetDirectRefundTxSigningJob()
 	directFromCpfpRefundSigningJob := req.GetDirectFromCpfpRefundTxSigningJob()
 
 	if directNodeSigningJob != nil && directRefundSigningJob != nil && directFromCpfpRefundSigningJob != nil {
-
 		directRefundTx, err := common.TxFromRawTxBytes(leaf.DirectRefundTx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse leaf refund tx: %w", err)

@@ -1,9 +1,9 @@
 package authz
 
 import (
-	"bytes"
 	"context"
 	"fmt"
+	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/lightsparkdev/spark/so/authn"
 	"google.golang.org/grpc/codes"
@@ -53,7 +53,7 @@ func (e *Error) ToGRPCError() error {
 
 // EnforceSessionIdentityPublicKeyMatches checks if the request's identity public key matches the current session.
 // Returns an error if authorization fails or is required but not present.
-func EnforceSessionIdentityPublicKeyMatches(ctx context.Context, config Config, identityPublicKey []byte) error {
+func EnforceSessionIdentityPublicKeyMatches(ctx context.Context, config Config, identityPublicKey keys.Public) error {
 	if !config.IsAuthzEnforced() {
 		return nil
 	}
@@ -67,7 +67,7 @@ func EnforceSessionIdentityPublicKeyMatches(ctx context.Context, config Config, 
 		}
 	}
 
-	if !bytes.Equal(session.IdentityPublicKeyBytes(), identityPublicKey) {
+	if !session.IdentityPublicKey().Equals(identityPublicKey) {
 		return &Error{
 			Code:    ErrorCodeIdentityMismatch,
 			Message: "session identity does not match request identity",

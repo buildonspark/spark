@@ -33,11 +33,15 @@ func NewTreeExitHandler(config *so.Config) *TreeExitHandler {
 }
 
 func (h *TreeExitHandler) ExitSingleNodeTrees(ctx context.Context, req *pb.ExitSingleNodeTreesRequest) (*pb.ExitSingleNodeTreesResponse, error) {
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
+	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
 		return nil, err
 	}
 
-	trees := make([]*ent.Tree, 0)
+	var trees []*ent.Tree
 	var network *st.Network
 	for _, exitingTree := range req.ExitingTrees {
 		tree, err := h.validateSingleNodeTree(ctx, exitingTree.TreeId, req.OwnerIdentityPublicKey)
@@ -65,9 +69,7 @@ func (h *TreeExitHandler) ExitSingleNodeTrees(ctx context.Context, req *pb.ExitS
 		return nil, fmt.Errorf("failed to mark trees as exited: %w", err)
 	}
 
-	return &pb.ExitSingleNodeTreesResponse{
-		SigningResults: signingResults,
-	}, nil
+	return &pb.ExitSingleNodeTreesResponse{SigningResults: signingResults}, nil
 }
 
 func (h *TreeExitHandler) MarkTreesExited(ctx context.Context, trees []*ent.Tree) error {

@@ -59,7 +59,11 @@ func (h *SignTokenHandler) SignTokenTransaction(
 ) (*sparkpb.SignTokenTransactionResponse, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.IdentityPublicKey); err != nil {
+	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, idPubKey); err != nil {
 		return nil, err
 	}
 
@@ -131,8 +135,11 @@ func (h *SignTokenHandler) SignTokenTransaction(
 func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.CommitTransactionRequest) (*tokenpb.CommitTransactionResponse, error) {
 	ctx, span := tracer.Start(ctx, "SignTokenHandler.CommitTransaction", getTokenTransactionAttributes(req.FinalTokenTransaction))
 	defer span.End()
-
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
+	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, ownerIDPubKey); err != nil {
 		return nil, fmt.Errorf("identity public key authentication failed: %w", err)
 	}
 

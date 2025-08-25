@@ -314,12 +314,15 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(
 
 // PrepareTreeAddress prepares the tree address for the given public key.
 func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.PrepareTreeAddressRequest) (*pb.PrepareTreeAddressResponse, error) {
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.UserIdentityPublicKey); err != nil {
+	reqUserIDPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqUserIDPubKey); err != nil {
 		return nil, err
 	}
 
 	var network common.Network
-	var err error
 	switch req.Source.(type) {
 	case *pb.PrepareTreeAddressRequest_ParentNodeOutput:
 		nodeID, err := uuid.Parse(req.GetParentNodeOutput().NodeId)
@@ -795,7 +798,11 @@ func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(req *pb.
 
 // createTree creates a tree from user input and signs the transactions in the tree.
 func (h *TreeCreationHandler) createTree(ctx context.Context, req *pb.CreateTreeRequest, requireDirectTx bool) (*pb.CreateTreeResponse, error) {
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.UserIdentityPublicKey); err != nil {
+	reqUserIDPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqUserIDPubKey); err != nil {
 		return nil, err
 	}
 

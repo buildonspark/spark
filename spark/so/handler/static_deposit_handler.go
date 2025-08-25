@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/lightsparkdev/spark/common"
@@ -205,7 +206,11 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 			return nil, fmt.Errorf("failed to get deposit address: %w", err)
 		}
 		if utxoSwap.Status == st.UtxoSwapStatusCompleted && utxoSwap.RequestType == st.UtxoSwapRequestTypeRefund && bytes.Equal(utxoSwap.UserIdentityPublicKey, depositAddress.OwnerIdentityPubkey) {
-			if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, utxoSwap.UserIdentityPublicKey); err != nil {
+			userIDPubKey, err := keys.ParsePublicKey(utxoSwap.UserIdentityPublicKey)
+			if err != nil {
+				return nil, fmt.Errorf("invalid identity public key: %w", err)
+			}
+			if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, userIDPubKey); err != nil {
 				return nil, fmt.Errorf("utxo swap is already completed by another user")
 			}
 			spendTxSigningResult, depositAddressQueryResult, err := GetSpendTxSigningResult(ctx, config, req.OnChainUtxo, req.RefundTxSigningJob)

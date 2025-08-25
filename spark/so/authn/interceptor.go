@@ -32,19 +32,13 @@ type Context struct {
 
 // Session represents the session information to be used within the product.
 type Session struct {
-	identityPublicKey      keys.Public
-	identityPublicKeyBytes []byte
-	expirationTimestamp    int64
+	identityPublicKey   keys.Public
+	expirationTimestamp int64
 }
 
 // IdentityPublicKey returns the public key
 func (s *Session) IdentityPublicKey() keys.Public {
 	return s.identityPublicKey
-}
-
-// IdentityPublicKeyBytes returns the public key bytes
-func (s *Session) IdentityPublicKeyBytes() []byte {
-	return s.identityPublicKeyBytes
 }
 
 // ExpirationTimestamp returns the expiration of the session
@@ -130,9 +124,8 @@ func (i *Interceptor) authenticateContext(ctx context.Context) context.Context {
 
 	return context.WithValue(ctx, authnContextKey, &Context{
 		Session: &Session{
-			identityPublicKey:      key,
-			identityPublicKeyBytes: sessionInfo.PublicKey,
-			expirationTimestamp:    sessionInfo.ExpirationTimestamp,
+			identityPublicKey:   key,
+			expirationTimestamp: sessionInfo.ExpirationTimestamp,
 		},
 	})
 }

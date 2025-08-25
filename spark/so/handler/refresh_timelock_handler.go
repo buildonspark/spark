@@ -42,7 +42,11 @@ func (h *RefreshTimelockHandler) RefreshTimelockV2(ctx context.Context, req *pb.
 }
 
 func (h *RefreshTimelockHandler) refreshTimelock(ctx context.Context, req *pb.RefreshTimelockRequest, requireDirectTx bool) (*pb.RefreshTimelockResponse, error) {
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.OwnerIdentityPublicKey); err != nil {
+	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
 		return nil, err
 	}
 

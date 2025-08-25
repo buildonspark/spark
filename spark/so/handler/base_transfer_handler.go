@@ -516,18 +516,15 @@ func lockLeaves(ctx context.Context, db *ent.Tx, leaves []*ent.TreeNode) ([]*ent
 	return updatedLeaves, nil
 }
 
-type CancelTransferIntent int
-
-const (
-	CancelTransferIntentInternal CancelTransferIntent = iota
-	CancelTransferIntentExternal
-)
-
 func (h *BaseTransferHandler) CancelTransfer(
 	ctx context.Context,
 	req *pbspark.CancelTransferRequest,
 ) (*pbspark.CancelTransferResponse, error) {
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.SenderIdentityPublicKey); err != nil {
+	reqSenderIDPubKey, err := keys.ParsePublicKey(req.SenderIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse sender identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqSenderIDPubKey); err != nil {
 		return nil, err
 	}
 
@@ -537,8 +534,12 @@ func (h *BaseTransferHandler) CancelTransfer(
 		logger.Info("Transfer not found", "transfer_id", req.TransferId)
 		return &pbspark.CancelTransferResponse{}, nil
 	}
+	transferSenderIDPubKey, err := keys.ParsePublicKey(transfer.SenderIdentityPubkey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse transfer sender identity public key: %w", err)
+	}
 
-	if !bytes.Equal(transfer.SenderIdentityPubkey, req.SenderIdentityPublicKey) {
+	if !transferSenderIDPubKey.Equals(reqSenderIDPubKey) {
 		return nil, fmt.Errorf("only sender is eligible to cancel the transfer %s", req.TransferId)
 	}
 

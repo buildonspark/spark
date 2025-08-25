@@ -79,8 +79,17 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	if !config.IsNetworkSupported(network) {
 		return nil, fmt.Errorf("network not supported")
 	}
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
+
+	reqIDPubKey, err := keys.ParsePublicKey(req.IdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, reqIDPubKey); err != nil {
 		return nil, err
+	}
+	reqSigningPubKey, err := keys.ParsePublicKey(req.SigningPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid signing public key: %w", err)
 	}
 
 	// TODO(LIG-8000): remove when we have a way to support multiple static deposit addresses per (identity, network).
@@ -91,7 +100,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		}
 		depositAddresses, err := db.DepositAddress.Query().
 			Where(
-				depositaddress.OwnerIdentityPubkey(req.IdentityPublicKey),
+				depositaddress.OwnerIdentityPubkey(reqIDPubKey.Serialize()),
 				depositaddress.IsStatic(true),
 			).
 			All(ctx)
@@ -106,7 +115,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		}
 	}
 
-	logger.Info("Generating deposit address for public key", "public_key", hex.EncodeToString(req.SigningPublicKey), "identity_public_key", hex.EncodeToString(req.IdentityPublicKey))
+	logger.Info("Generating deposit address for public key", "public_key", reqSigningPubKey, "identity_public_key", reqIDPubKey)
 	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
 	if err != nil {
 		return nil, err
@@ -134,14 +143,11 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		return nil, err
 	}
 
-	combinedPublicKeyBytes, err := common.AddPublicKeys(keyshare.PublicKey, req.SigningPublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to add public keys: %w", err)
-	}
-	combinedPublicKey, err := keys.ParsePublicKey(combinedPublicKeyBytes)
+	keysharePubKey, err := keys.ParsePublicKey(keyshare.PublicKey)
 	if err != nil {
 		return nil, err
 	}
+	combinedPublicKey := keysharePubKey.Add(reqSigningPubKey)
 	depositAddress, err := common.P2TRAddressFromPublicKey(combinedPublicKey, network)
 	if err != nil {
 		return nil, err
@@ -154,8 +160,8 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 
 	depositAddressMutator := db.DepositAddress.Create().
 		SetSigningKeyshareID(keyshare.ID).
-		SetOwnerIdentityPubkey(req.IdentityPublicKey).
-		SetOwnerSigningPubkey(req.SigningPublicKey).
+		SetOwnerIdentityPubkey(reqIDPubKey.Serialize()).
+		SetOwnerSigningPubkey(reqSigningPubKey.Serialize()).
 		SetAddress(depositAddress)
 	// Confirmation height is not set since nothing has been confirmed yet.
 
@@ -187,8 +193,8 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		response, err := client.MarkKeyshareForDepositAddress(ctx, &pbinternal.MarkKeyshareForDepositAddressRequest{
 			KeyshareId:             keyshare.ID.String(),
 			Address:                depositAddress,
-			OwnerIdentityPublicKey: req.IdentityPublicKey,
-			OwnerSigningPublicKey:  req.SigningPublicKey,
+			OwnerIdentityPublicKey: reqIDPubKey.Serialize(),
+			OwnerSigningPublicKey:  reqSigningPubKey.Serialize(),
 			IsStatic:               req.IsStatic,
 		})
 		if err != nil {
@@ -200,12 +206,9 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		return nil, err
 	}
 
-	verifyingKeyBytes, err := common.AddPublicKeys(keyshare.PublicKey, req.SigningPublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate proof of possession signatures: %w", err)
-	}
+	verifyingKey := keysharePubKey.Add(reqSigningPubKey)
 
-	msg := common.ProofOfPossessionMessageHashForDepositAddress(req.IdentityPublicKey, keyshare.PublicKey, []byte(depositAddress))
+	msg := common.ProofOfPossessionMessageHashForDepositAddress(reqIDPubKey.Serialize(), keysharePubKey.Serialize(), []byte(depositAddress))
 	proofOfPossessionSignature, err := helper.GenerateProofOfPossessionSignatures(ctx, config, [][]byte{msg}, []*ent.SigningKeyshare{keyshare})
 	if err != nil {
 		return nil, err
@@ -213,7 +216,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 	return &pb.GenerateDepositAddressResponse{
 		DepositAddress: &pb.Address{
 			Address:      depositAddress,
-			VerifyingKey: verifyingKeyBytes,
+			VerifyingKey: verifyingKey.Serialize(),
 			DepositAddressProof: &pb.DepositAddressProof{
 				AddressSignatures:          response,
 				ProofOfPossessionSignature: proofOfPossessionSignature[0],
@@ -258,7 +261,11 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 	if !config.IsNetworkSupported(network) {
 		return nil, fmt.Errorf("network not supported")
 	}
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, req.IdentityPublicKey); err != nil {
+	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, idPubKey); err != nil {
 		return nil, err
 	}
 
@@ -271,7 +278,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 	// TODO(LIG-8000): remove when we have a way to support multiple static deposit addresses per (identity, network).
 	depositAddresses, err := db.DepositAddress.Query().
 		Where(
-			depositaddress.OwnerIdentityPubkey(req.IdentityPublicKey),
+			depositaddress.OwnerIdentityPubkey(idPubKey.Serialize()),
 			depositaddress.IsStatic(true),
 		).
 		All(ctx)
@@ -340,7 +347,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 		}
 	}
 
-	logger.Info("Generating static deposit address for public key", "public_key", hex.EncodeToString(req.SigningPublicKey), "identity_public_key", hex.EncodeToString(req.IdentityPublicKey))
+	logger.Info("Generating static deposit address for public key", "public_key", hex.EncodeToString(req.SigningPublicKey), "identity_public_key", idPubKey)
 
 	// Note that this method will COMMIT or ROLLBACK the DB transaction.
 	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
@@ -389,7 +396,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 
 	depositAddressMutator := db.DepositAddress.Create().
 		SetSigningKeyshareID(keyshare.ID).
-		SetOwnerIdentityPubkey(req.IdentityPublicKey).
+		SetOwnerIdentityPubkey(idPubKey.Serialize()).
 		SetOwnerSigningPubkey(req.SigningPublicKey).
 		SetAddress(depositAddress).
 		SetIsStatic(true)
@@ -412,7 +419,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 		response, err := client.MarkKeyshareForDepositAddress(ctx, &pbinternal.MarkKeyshareForDepositAddressRequest{
 			KeyshareId:             keyshare.ID.String(),
 			Address:                depositAddress,
-			OwnerIdentityPublicKey: req.IdentityPublicKey,
+			OwnerIdentityPublicKey: idPubKey.Serialize(),
 			OwnerSigningPublicKey:  req.SigningPublicKey,
 			IsStatic:               &isStatic,
 		})
@@ -430,7 +437,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 		return nil, fmt.Errorf("failed to generate proof of possession signatures: %w", err)
 	}
 
-	msg := common.ProofOfPossessionMessageHashForDepositAddress(req.IdentityPublicKey, keyshare.PublicKey, []byte(depositAddress))
+	msg := common.ProofOfPossessionMessageHashForDepositAddress(idPubKey.Serialize(), keyshare.PublicKey, []byte(depositAddress))
 	proofOfPossessionSignatures, err := helper.GenerateProofOfPossessionSignatures(ctx, config, [][]byte{msg}, []*ent.SigningKeyshare{keyshare})
 	if err != nil {
 		return nil, err
@@ -548,7 +555,11 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	ctx, span := tracer.Start(ctx, "DepositHandler.StartTreeCreation")
 	defer span.End()
 
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
+	reqIDPubKey, err := keys.ParsePublicKey(req.IdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, reqIDPubKey); err != nil {
 		return nil, err
 	}
 	// Get the on chain tx
@@ -860,8 +871,11 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *so.Config, req *pb.StartDepositTreeCreationRequest) (*pb.StartDepositTreeCreationResponse, error) {
 	ctx, span := tracer.Start(ctx, "DepositHandler.StartDepositTreeCreation")
 	defer span.End()
-
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, req.IdentityPublicKey); err != nil {
+	reqIDPubKey, err := keys.ParsePublicKey(req.IdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, o.config, reqIDPubKey); err != nil {
 		return nil, err
 	}
 	// Get the on chain tx
@@ -1295,7 +1309,11 @@ func (s UtxoSwapStatementType) String() string {
 // InitiateUtxoSwap initiates a UTXO swap operation, allowing a User to swap their on-chain UTXOs for Spark funds.
 // Deprecated: Use InitiateStaticDepositUtxoSwap instead.
 func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config, req *pb.InitiateUtxoSwapRequest) (*pb.InitiateUtxoSwapResponse, error) {
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, req.Transfer.OwnerIdentityPublicKey); err != nil {
+	reqTransferOwnerIDPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, reqTransferOwnerIDPubKey); err != nil {
 		return nil, err
 	}
 	ctx, span := tracer.Start(ctx, "DepositHandler.InitiateUtxoSwap", trace.WithAttributes(

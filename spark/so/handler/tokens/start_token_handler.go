@@ -63,7 +63,11 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	ctx, span := tracer.Start(ctx, "StartTokenTransactionHandler.StartTokenTransaction", getTokenTransactionAttributes(req.PartialTokenTransaction))
 	defer span.End()
 
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, req.IdentityPublicKey); err != nil {
+	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, idPubKey); err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrIdentityPublicKeyAuthFailed, req.PartialTokenTransaction, err)
 	}
 
