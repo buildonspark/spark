@@ -1468,6 +1468,16 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 			return nil, fmt.Errorf("create utxo swap task with operator %s returned nil transfer", config.Identifier)
 		}
 
+		db, err = ent.GetDbFromContext(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get db: %w", err)
+		}
+
+		utxoSwap, err = db.UtxoSwap.Get(ctx, utxoSwap.ID)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get utxo swap: %w", err)
+		}
+
 		// The transfer is created, update the utxo swap with the transfer.
 		entTransfer, err := db.Transfer.Get(ctx, utxoSwap.RequestedTransferID)
 		if err != nil {

@@ -250,6 +250,14 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	// After this point, the transfer send is considered successful.
 
 	if req.TransferPackage != nil {
+		db, err := ent.GetDbFromContext(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get db before sync transfer init: %w", err)
+		}
+		err = db.Commit()
+		if err != nil {
+			return nil, fmt.Errorf("unable to commit db before sync transfer init: %w", err)
+		}
 		// If all other SOs have settled the sender key tweaks, we can commit the sender key tweaks.
 		// If there's any error, it means one or more of the SOs are down at the time, we will have a
 		// cron job to retry the key commit.
