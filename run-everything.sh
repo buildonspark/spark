@@ -282,8 +282,7 @@ run_bitcoind_tmux() {
 # Function to create operator config JSON
 create_operator_config() {
     local run_dir=$1
-    local tls=$2
-    shift 2 # Remove first two arguments
+    shift 1 # Remove first argument
     local pub_keys=("$@")  # Get remaining arguments as pub_keys array
     local config_file="${run_dir}/config.json"
 
@@ -298,8 +297,7 @@ create_operator_config() {
         # Calculate port
         local port=$((8535 + i))
 
-        if [ "$tls" = true ]; then
-            json+=$(cat <<EOF
+        json+=$(cat <<EOF
 {
     "id": $i,
     "address": "localhost:$port",
@@ -308,18 +306,7 @@ create_operator_config() {
     "cert_path": "${run_dir}/server_${i}.crt"
 }
 EOF
-)
-        else
-            json+=$(cat <<EOF
-{
-    "id": $i,
-    "address": "localhost:$port",
-    "external_address": "localhost:$port",
-    "identity_public_key": "${pub_keys[$i]}"
-}
-EOF
-)
-        fi
+        )
 
     done
     json+="]"
@@ -335,7 +322,6 @@ run_operators_tmux() {
    local min_signers=$2
    local session_name="operators"
    local operator_config_file="${run_dir}/config.json"
-   local tls=$3
 
    # Kill existing session if it exists
    if tmux has-session -t "$session_name" 2>/dev/null; then
@@ -370,10 +356,6 @@ run_operators_tmux() {
        local priv_key_file="${run_dir}/operator_${i}.key"
        local key_file="${run_dir}/server_${i}.key"
        local cert_file="${run_dir}/server_${i}.crt"
-       local cert_config=""
-       if [ "$tls" = true ]; then
-           cert_config="-server-cert '${cert_file}' -server-key '${key_file}'"
-       fi
 
        # Construct the command with all parameters
        local cmd="${run_dir}/bin/operator \
@@ -385,6 +367,8 @@ run_operators_tmux() {
            -signer '${signer_socket}' \
            -port ${port} \
            -database '${db_file}' \
+           -server-cert '${cert_file}' \
+           -server-key '${key_file}' \
            ${cert_config} \
            -run-dir '${run_dir}' \
            -local true \
@@ -564,10 +548,6 @@ for arg in "$@"; do
             WIPE=true
             shift
             ;;
-        --disable-tls)
-            TLS=false
-            shift
-            ;;
     esac
 done
 
@@ -597,7 +577,7 @@ build_go_operator "$run_dir" || {
 }
 
 # Create operator config
-create_operator_config "$run_dir" "$TLS" "${PUB_KEYS[@]}"
+create_operator_config "$run_dir" "${PUB_KEYS[@]}"
 create_private_key_files "$run_dir" "${PRIV_KEYS[@]}"
 
 if ! check_signers_ready "$run_dir"; then
@@ -608,7 +588,7 @@ fi
 echo "All signers are ready"
 
 # Run operators
-run_operators_tmux "$run_dir" "$MIN_SIGNERS" "$TLS"
+run_operators_tmux "$run_dir" "$MIN_SIGNERS"
 
 if ! check_operators_ready "$run_dir"; then
     echo "Failed to start all operators"
