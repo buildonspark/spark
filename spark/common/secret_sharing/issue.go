@@ -181,7 +181,7 @@ func (p IssueSender) Round1() ([]Message[IssuePayload1], error) {
 	return outMessages, nil
 }
 
-func (c IssueConfig) lagrangeBasisAt(i int, x curve.Scalar) *curve.Scalar {
+func (c IssueConfig) lagrangeBasisAt(i int, x curve.Scalar) (*curve.Scalar, error) {
 	// Let α_1, ... , α_n be distinct field elements.
 	// We denote the Lagrange basis polynomials with respect to a set I ⊆ [n] by { L_i^I(x) }_{i ∈ I}
 	// where L_i^I(x) = prod_{j ∈ I\{i}} (x − α_j) / (α_i − α_j).
@@ -192,8 +192,8 @@ func (c IssueConfig) lagrangeBasisAt(i int, x curve.Scalar) *curve.Scalar {
 		xs = append(xs, *c.Alphas[j])
 	}
 
-	l := polynomial.LagrangeBasisAt(xs, i, x)
-	return &l
+	l, err := polynomial.LagrangeBasisAt(xs, i, x)
+	return &l, err
 }
 
 // Round2 is round 2 of the protocol to issue a secret share.
@@ -210,7 +210,10 @@ func (p IssueSender) Round2(payloadFrom map[PartyIndex]IssuePayload1) (Message[I
 	alphaIssue := p.Config.Alphas[p.Config.IssueIndex]
 
 	for idx, j := range p.Config.BigI {
-		lagrangeCoeff := p.Config.lagrangeBasisAt(idx, *alphaIssue)
+		lagrangeCoeff, err := p.Config.lagrangeBasisAt(idx, *alphaIssue)
+		if err != nil {
+			return Message[IssuePayload2]{}, err
+		}
 
 		sArrow := payloadFrom[j].SArrow
 		term := sArrow.Mul(*lagrangeCoeff)
@@ -262,7 +265,10 @@ func (p IssueReceiver) Round3(payloadFrom map[PartyIndex]IssuePayload2) (*IssueP
 
 	sIssue := curve.ScalarFromInt(0)
 	for idx, i := range p.Config.BigI {
-		term := p.Config.lagrangeBasisAt(idx, curve.ScalarFromInt(0))
+		term, err := p.Config.lagrangeBasisAt(idx, curve.ScalarFromInt(0))
+		if err != nil {
+			return nil, err
+		}
 
 		sIIssue := payloadFrom[i].SIIssue
 		term.SetMul(&sIIssue)

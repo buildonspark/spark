@@ -135,19 +135,20 @@ func (s *Scalar) SetMul(t *Scalar) *Scalar {
 }
 
 // InvNonConst returns the multiplicative inverse of this scalar in non-constant time.
-func (s Scalar) InvNonConst() Scalar {
-	return *s.SetInvNonConst()
+func (s Scalar) InvNonConst() (Scalar, error) {
+	err := s.SetInvNonConst()
+	return s, err
 }
 
 // SetInvNonConst finds the multiplicative inverse of this scalar in non-constant time.
 // This scalar is modified.
-//
-// This scalar is returned to allow method chaining.
-func (s *Scalar) SetInvNonConst() *Scalar {
-	// TODO: Return an error if s = zero?
+func (s *Scalar) SetInvNonConst() error {
+	if s.scalar.IsZero() {
+		return fmt.Errorf("zero scalar has no multiplicative inverse")
+	}
 
 	s.scalar.InverseNonConst()
-	return s
+	return nil
 }
 
 // Equals returns true if this and the passed point represent the same scalar and false otherwise.

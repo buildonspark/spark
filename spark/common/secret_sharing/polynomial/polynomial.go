@@ -1,6 +1,8 @@
 package polynomial
 
 import (
+	"fmt"
+
 	"github.com/lightsparkdev/spark/common/secret_sharing/curve"
 )
 
@@ -25,9 +27,12 @@ func xCoords[T any](evals []polynomialEval[T]) []curve.Scalar {
 }
 
 // LagrangeBasisAt computes the Lagrange basis polynomial for index i evaluated at x:
-// L_i(x) = prod_{j≠i} (x - x_j) / (x_i - x_j).
-func LagrangeBasisAt(xs []curve.Scalar, i int, x curve.Scalar) curve.Scalar {
-	prod := curve.ScalarFromInt(1)
+// prod_{j≠i} (x - xs[j]) / (xs[i] - xs[j]).
+//
+// It returns an error if two passed xs are the same.
+func LagrangeBasisAt(xs []curve.Scalar, i int, x curve.Scalar) (curve.Scalar, error) {
+	numProd := curve.ScalarFromInt(1)
+	denProd := curve.ScalarFromInt(1)
 
 	for j, xj := range xs {
 		if i == j {
@@ -37,63 +42,84 @@ func LagrangeBasisAt(xs []curve.Scalar, i int, x curve.Scalar) curve.Scalar {
 		// (x - x_j) / (x_i - x_j)
 		num := x.Sub(xj)
 		den := xs[i].Sub(xj)
-		ratio := den.InvNonConst().Mul(num)
 
-		prod.SetMul(&ratio)
+		numProd.SetMul(&num)
+		denProd.SetMul(&den)
 	}
 
-	return prod
+	denProdInv, err := denProd.InvNonConst()
+	if err != nil {
+		return curve.Scalar{}, fmt.Errorf("Lagrange basis polynomial is not defined when two nodes are equal")
+	}
+
+	return numProd.Mul(denProdInv), nil
 }
 
 // InterpolateScalar returns P(x) for given x where P is the unique polynomial
 // of least degree that passes through the given evaluations.
-func InterpolateScalar(evals []ScalarEval, x curve.Scalar) curve.Scalar {
+//
+// It returns an error if two passed evals have the same x coordinate.
+func InterpolateScalar(evals []ScalarEval, x curve.Scalar) (curve.Scalar, error) {
 	sum := curve.ScalarFromInt(0)
 
 	xs := xCoords(evals)
 
 	// P(x) = sum_i y_i * L_i(x)
 	for i, eval := range evals {
+		lagrangeI, err := LagrangeBasisAt(xs, i, x)
+		if err != nil {
+			return curve.Scalar{}, fmt.Errorf("failed to interpolate: %w", err)
+		}
+
 		// y_i * L_i(x)
-		lagrangeI := LagrangeBasisAt(xs, i, x)
 		yI := eval.Y
 		term := yI.Mul(lagrangeI)
 
 		sum.SetAdd(&term)
 	}
 
-	return sum
+	return sum, nil
 }
 
 // InterpolatePoint returns P(x) for given x where P is the unique polynomial
 // of least degree that passes through the given evaluations.
-func InterpolatePoint(evals []PointEval, x curve.Scalar) curve.Point {
+//
+// It returns an error if two passed evals have the same x coordinate.
+func InterpolatePoint(evals []PointEval, x curve.Scalar) (curve.Point, error) {
 	sum := curve.ScalarFromInt(0).Point()
 
 	xs := xCoords(evals)
 
 	// P(x) = sum_i y_i * L_i(x)
 	for i, eval := range evals {
+		lagrangeI, err := LagrangeBasisAt(xs, i, x)
+		if err != nil {
+			return curve.Point{}, fmt.Errorf("failed to interpolate: %w", err)
+		}
+
 		// y_i * L_i(x)
-		lagrangeI := LagrangeBasisAt(xs, i, x)
 		term := eval.Y
 		term.SetScalarMul(&lagrangeI)
 
 		sum.SetAdd(&term)
 	}
 
-	return sum
+	return sum, nil
 }
 
 // ReconstructScalar returns P(0) where P is the unique polynomial
 // of least degree that passes through the given evaluation points.
-func ReconstructScalar(evals []ScalarEval) curve.Scalar {
+//
+// It returns an error if two passed evals have the same x coordinate.
+func ReconstructScalar(evals []ScalarEval) (curve.Scalar, error) {
 	return InterpolateScalar(evals, curve.ScalarFromInt(0))
 }
 
 // ReconstructPoint returns P(0) where P is the unique polynomial
 // of least degree that passes through the given evaluation points.
-func ReconstructPoint(evals []PointEval) curve.Point {
+//
+// It returns an error if two passed evals have the same x coordinate.
+func ReconstructPoint(evals []PointEval) (curve.Point, error) {
 	return InterpolatePoint(evals, curve.ScalarFromInt(0))
 }
 
@@ -149,7 +175,10 @@ func NewInterpolatingPointPolynomial(evals []PointEval) InterpolatingPointPolyno
 
 	for i := range standardEvals {
 		standardX := standardInterpolatingX(i)
-		standardY := InterpolatePoint(evals, standardX)
+
+		// Since the standard xs are all different, interpolating does not return an error.
+		standardY, _ := InterpolatePoint(evals, standardX)
+
 		standardEvals[i] = PointEval{
 			X: standardX,
 			Y: standardY,
@@ -183,7 +212,10 @@ func (p *InterpolatingPointPolynomial) Degree() int {
 
 // Eval evaluates the polynomial at x.
 func (p *InterpolatingPointPolynomial) Eval(x curve.Scalar) curve.Point {
-	return InterpolatePoint(p.standardEvals, x)
+	// Since the standard xs are all different, interpolating does not return an error.
+	value, _ := InterpolatePoint(p.standardEvals, x)
+
+	return value
 }
 
 func (p *InterpolatingPointPolynomial) Equal(q *InterpolatingPointPolynomial) bool {
@@ -249,6 +281,8 @@ func (pb PointPolynomialBytes) Decode() *PointPolynomial {
 
 // NewScalarPolynomialSharing returns a polynomial with random scalar coefficients
 // and the passed secret as constant term.
+//
+// It returns an error if the internal random generation does.
 func NewScalarPolynomialSharing(secret curve.Scalar, degree int) (*ScalarPolynomial, error) {
 	coefs := make([]curve.Scalar, degree+1)
 

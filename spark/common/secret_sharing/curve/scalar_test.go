@@ -196,11 +196,17 @@ func TestScalarMulAssociative(t *testing.T) {
 	assert.True(t, aBThenC.Equals(aThenBC), "multiplication should be associative")
 }
 
-func TestScalarInvZero(t *testing.T) {}
+func TestScalarInvZero(t *testing.T) {
+	zero := ScalarFromInt(0)
+	_, err := zero.InvNonConst()
+
+	assert.Error(t, err, "taking the inverse of scalar zero should cause an error")
+}
 
 func TestScalarInvOne(t *testing.T) {
 	one := ScalarFromInt(1)
-	oneInv := one.InvNonConst()
+	oneInv, err := one.InvNonConst()
+	require.NoError(t, err, "scalar one should have an inverse")
 
 	assert.True(t, one.Equals(oneInv), "the inverse of one should be one")
 }
@@ -208,7 +214,8 @@ func TestScalarInvOne(t *testing.T) {
 func TestScalarInvMul(t *testing.T) {
 	one := ScalarFromInt(1)
 	a := ScalarFromInt(123)
-	aInv := a.InvNonConst()
+	aInv, err := a.InvNonConst()
+	require.NoError(t, err, "non-zero scalar should have an inverse")
 
 	aAInv := a.Mul(aInv)
 	aInvA := aInv.Mul(a)
@@ -260,5 +267,5 @@ func TestScalarMulNil(t *testing.T) {
 
 func TestScalarInv(t *testing.T) {
 	var nilScalar *Scalar
-	assert.Panics(t, func() { nilScalar.SetInvNonConst() })
+	assert.Panics(t, func() { _ = nilScalar.SetInvNonConst() })
 }

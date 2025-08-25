@@ -5,6 +5,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/secret_sharing/curve"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Test basic ScalarPolynomial creation and evaluation
@@ -152,7 +153,8 @@ func TestScalarLagrangeInterpolation(t *testing.T) {
 	}
 
 	// Reconstruct at x=0 (should give us the secret)
-	reconstructed := ReconstructScalar(points)
+	reconstructed, err := ReconstructScalar(points)
+	require.NoError(t, err)
 
 	if !reconstructed.Equals(secret) {
 		t.Errorf("Scalar Lagrange interpolation failed")
@@ -182,7 +184,8 @@ func TestPointLagrangeInterpolation(t *testing.T) {
 	}
 
 	// Reconstruct at x=0 (should give us the secret point)
-	reconstructed := ReconstructPoint(points)
+	reconstructed, err := ReconstructPoint(points)
+	require.NoError(t, err)
 
 	assert.True(t, secretPoint.Equals(reconstructed), "Point Lagrange interpolation failed to reconstruct secret point")
 }
@@ -210,7 +213,8 @@ func TestThresholdSecretSharing(t *testing.T) {
 	// Test that any 3 shares can reconstruct the secret
 	for i := 0; i <= numShares-threshold; i++ {
 		subset := shares[i : i+threshold]
-		reconstructed := ReconstructScalar(subset)
+		reconstructed, err := ReconstructScalar(subset)
+		require.NoError(t, err)
 
 		if !reconstructed.Equals(secret) {
 			t.Errorf("Failed to reconstruct secret with shares %d-%d",
@@ -220,7 +224,8 @@ func TestThresholdSecretSharing(t *testing.T) {
 
 	// Test that 2 shares cannot reconstruct (should give wrong result)
 	twoShares := shares[0:2]
-	wrongReconstruction := ReconstructScalar(twoShares)
+	wrongReconstruction, err := ReconstructScalar(twoShares)
+	require.NoError(t, err)
 
 	if wrongReconstruction.Equals(secret) {
 		t.Errorf("Two shares should not be able to reconstruct the secret")
@@ -244,7 +249,10 @@ func TestScalarPolynomialSingeton(t *testing.T) {
 		{X: curve.ScalarFromInt(5), Y: curve.ScalarFromInt(42)},
 	}
 
-	assert.Equal(t, curve.ScalarFromInt(42), ReconstructScalar(singleton), "single eval interpolation failed")
+	recons, err := ReconstructScalar(singleton)
+	require.NoError(t, err)
+
+	assert.Equal(t, curve.ScalarFromInt(42), recons, "single eval interpolation failed")
 }
 
 func TestPointPolynomialSingleton(t *testing.T) {
@@ -253,7 +261,10 @@ func TestPointPolynomialSingleton(t *testing.T) {
 		{X: curve.ScalarFromInt(5), Y: height},
 	}
 
-	assert.True(t, height.Equals(ReconstructPoint(singleton)), "single eval interpolation failed")
+	recons, err := ReconstructPoint(singleton)
+	require.NoError(t, err)
+
+	assert.True(t, height.Equals(recons), "single eval interpolation failed")
 }
 
 // Test Lagrange basis function
@@ -266,17 +277,23 @@ func TestLagrangeBasis(t *testing.T) {
 	}
 
 	// L_0(0) = (0-2)(0-3) / ((1-2)(1-3)) = 6/2 = 3
-	basis0 := LagrangeBasisAt(xs, 0, curve.ScalarFromInt(0))
+	basis0, err := LagrangeBasisAt(xs, 0, curve.ScalarFromInt(0))
+	require.NoError(t, err)
+
 	expected0 := curve.ScalarFromInt(3)
 	assert.True(t, expected0.Equals(basis0), "L_0(0) expected 3, got %s", basis0.String())
 
 	// L_1(0) = (0-1)(0-3) / ((2-1)(2-3)) = 3/(-1) = -3
-	basis1 := LagrangeBasisAt(xs, 1, curve.ScalarFromInt(0))
+	basis1, err := LagrangeBasisAt(xs, 1, curve.ScalarFromInt(0))
+	require.NoError(t, err)
+
 	expected1 := curve.ScalarFromInt(3).Neg()
 	assert.True(t, expected1.Equals(basis1), "L_1(0) expected -3, got %s", basis1.String())
 
 	// L_2(0) = (0-1)(0-2) / ((3-1)(3-2)) = 2/2 = 1
-	basis2 := LagrangeBasisAt(xs, 2, curve.ScalarFromInt(0))
+	basis2, err := LagrangeBasisAt(xs, 2, curve.ScalarFromInt(0))
+	require.NoError(t, err)
+
 	expected2 := curve.ScalarFromInt(1)
 	assert.True(t, expected2.Equals(basis2), "L_2(0) expected 1, got %s", basis2.String())
 }
@@ -334,7 +351,9 @@ func TestInterpolatingPointPolynomialFromEvals(t *testing.T) {
 	secretPoint := poly.Eval(zero)
 
 	// Verify using direct interpolation
-	expectedSecret := InterpolatePoint(evals, zero)
+	expectedSecret, err := InterpolatePoint(evals, zero)
+	require.NoError(t, err)
+
 	assert.True(t, expectedSecret.Equals(secretPoint), "Interpolating polynomial gives different result than direct interpolation")
 }
 
@@ -533,7 +552,8 @@ func TestInterpolatingPointPolynomialConsistency(t *testing.T) {
 	for _, xVal := range testPoints {
 		x := curve.ScalarFromInt(xVal)
 		polyResult := poly.Eval(x)
-		directResult := InterpolatePoint(evals, x)
+		directResult, err := InterpolatePoint(evals, x)
+		require.NoError(t, err)
 
 		assert.True(t, directResult.Equals(polyResult), "InterpolatingPointPolynomial inconsistent with direct interpolation at x=%d", xVal)
 	}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/secret_sharing/curve"
 	"github.com/lightsparkdev/spark/common/secret_sharing/polynomial"
+	"github.com/stretchr/testify/require"
 )
 
 func scalarPointerFromInt(n uint32) *curve.Scalar {
@@ -176,7 +177,8 @@ func TestIssueProtocolFull(t *testing.T) {
 		Y: sIssue,
 	})
 
-	reconstructedSecret := polynomial.ReconstructScalar(interpolationEvals)
+	reconstructedSecret, err := polynomial.ReconstructScalar(interpolationEvals)
+	require.NoError(t, err)
 
 	if !reconstructedSecret.Equals(secret) {
 		t.Errorf("Reconstruction with new share failed")
