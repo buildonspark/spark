@@ -317,6 +317,10 @@ func UpdateTxWithSignature(rawTxBytes []byte, vin int, signature []byte) ([]byte
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse tx: %w", err)
 	}
+
+	if len(tx.TxIn) <= vin || vin < 0 {
+		return nil, fmt.Errorf("invalid input index %d for tx with %d inputs", vin, len(tx.TxIn))
+	}
 	tx.TxIn[vin].Witness = wire.TxWitness{signature}
 	var buf bytes.Buffer
 	err = tx.Serialize(&buf)

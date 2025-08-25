@@ -59,6 +59,9 @@ func (o *OperatorSelection) OperatorList(config *so.Config) ([]*so.SigningOperat
 	if o.operatorList != nil {
 		return o.operatorList, nil
 	}
+	if config == nil || len(config.SigningOperatorMap) == 0 {
+		return nil, fmt.Errorf("no signing operators configured")
+	}
 
 	switch o.Option {
 	case OperatorSelectionOptionAll:

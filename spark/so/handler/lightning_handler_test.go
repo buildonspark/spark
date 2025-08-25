@@ -313,7 +313,14 @@ func TestGetSigningCommitments(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
-	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
+	signingOperators, err := sparktesting.GetAllSigningOperators()
+	require.NoError(t, err)
+
+	config := &so.Config{
+		SigningOperatorMap:         signingOperators,
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+
 	lightningHandler := NewLightningHandler(config)
 
 	tests := []struct {

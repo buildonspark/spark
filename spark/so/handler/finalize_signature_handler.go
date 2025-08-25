@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -91,7 +92,7 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 				return nil, fmt.Errorf("failed to get deposit address: %w", err)
 			}
 			if address.ConfirmationHeight != 0 {
-				if len(address.ConfirmationTxid) > 0 && address.ConfirmationTxid != string(tree.BaseTxid) {
+				if len(address.ConfirmationTxid) > 0 && address.ConfirmationTxid != hex.EncodeToString(tree.BaseTxid) {
 					return nil, fmt.Errorf("confirmation txid does not match tree base txid")
 				}
 				_, err = tree.Update().SetStatus(st.TreeStatusAvailable).Save(ctx)

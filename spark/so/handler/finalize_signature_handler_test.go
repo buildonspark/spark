@@ -280,6 +280,35 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignatures_InvalidIntent(t *testin
 	assert.Nil(t, resp)
 }
 
+func TestFinalizeSignatureHandler_FinalizeNodeSignatures_EmptyOperatorsMap(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	ctx, dbCtx := db.NewTestSQLiteContext(t, ctx)
+	defer dbCtx.Close()
+
+	config := &so.Config{
+		SigningOperatorMap: map[string]*so.SigningOperator{},
+	}
+	handler := NewFinalizeSignatureHandler(config)
+
+	_, node := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusAvailable)
+
+	req := &pb.FinalizeNodeSignaturesRequest{
+		NodeSignatures: []*pb.NodeSignatures{
+			{
+				NodeId: node.ID.String(),
+			},
+		},
+		Intent: pbcommon.SignatureIntent(999),
+	}
+
+	resp, err := handler.FinalizeNodeSignatures(ctx, req)
+
+	require.ErrorContains(t, err, "no signing operators configured")
+	assert.Nil(t, resp)
+}
+
 func TestFinalizeSignatureHandler_FinalizeNodeSignaturesV2_RequireDirectTx(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
