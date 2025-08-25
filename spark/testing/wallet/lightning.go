@@ -104,7 +104,7 @@ func SwapNodesForPreimage(
 	if isInboundPayment {
 		reason = pb.InitiatePreimageSwapRequest_REASON_RECEIVE
 	}
-	response, err := client.InitiatePreimageSwap(tmpCtx, &pb.InitiatePreimageSwapRequest{
+	response, err := client.InitiatePreimageSwapV2(tmpCtx, &pb.InitiatePreimageSwapRequest{
 		PaymentHash: paymentHash,
 		Reason:      reason,
 		InvoiceAmount: &pb.InvoiceAmount{

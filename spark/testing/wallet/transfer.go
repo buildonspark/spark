@@ -100,7 +100,7 @@ func SendTransferWithKeyTweaks(
 		return nil, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
 
-	resp, err := client.StartTransfer(authCtx, &pb.StartTransferRequest{
+	resp, err := client.StartTransferV2(authCtx, &pb.StartTransferRequest{
 		TransferId:                transferID.String(),
 		OwnerIdentityPublicKey:    config.IdentityPublicKey().Serialize(),
 		ReceiverIdentityPublicKey: receiverIdentityPubkey.Serialize(),
@@ -411,7 +411,7 @@ func sendTransferSignRefund(
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed to generate swap id: %w", err)
 		}
-		response, err := sparkClient.CounterLeafSwap(tmpCtx, &pb.CounterLeafSwapRequest{
+		response, err := sparkClient.CounterLeafSwapV2(tmpCtx, &pb.CounterLeafSwapRequest{
 			Transfer:         startTransferRequest,
 			SwapId:           swapID.String(),
 			AdaptorPublicKey: adaptorPublicKey.Serialize(),
@@ -422,14 +422,14 @@ func sendTransferSignRefund(
 		transfer = response.Transfer
 		signingResults = response.SigningResults
 	} else if forSwap {
-		response, err := sparkClient.StartLeafSwap(tmpCtx, startTransferRequest)
+		response, err := sparkClient.StartLeafSwapV2(tmpCtx, startTransferRequest)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed to start transfer: %w", err)
 		}
 		transfer = response.Transfer
 		signingResults = response.SigningResults
 	} else {
-		response, err := sparkClient.StartTransfer(tmpCtx, startTransferRequest)
+		response, err := sparkClient.StartTransferV2(tmpCtx, startTransferRequest)
 		if err != nil {
 			return nil, nil, nil, nil, fmt.Errorf("failed to start transfer: %w", err)
 		}
@@ -833,7 +833,7 @@ func ClaimTransferSignRefunds(
 			Proofs: proof,
 		}
 	}
-	response, err := sparkClient.ClaimTransferSignRefunds(ctx, &pb.ClaimTransferSignRefundsRequest{
+	response, err := sparkClient.ClaimTransferSignRefundsV2(ctx, &pb.ClaimTransferSignRefundsRequest{
 		TransferId:             transfer.Id,
 		OwnerIdentityPublicKey: config.IdentityPublicKey().Serialize(),
 		SigningJobs:            signingJobs,
@@ -856,7 +856,7 @@ func FinalizeTransfer(
 	}
 	defer sparkConn.Close()
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	response, err := sparkClient.FinalizeNodeSignatures(ctx, &pb.FinalizeNodeSignaturesRequest{
+	response, err := sparkClient.FinalizeNodeSignaturesV2(ctx, &pb.FinalizeNodeSignaturesRequest{
 		Intent:         pbcommon.SignatureIntent_TRANSFER,
 		NodeSignatures: signatures,
 	})

@@ -93,7 +93,7 @@ func RefreshTimelockRefundTx(
 	authCtx := ContextWithToken(ctx, token)
 
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	response, err := sparkClient.RefreshTimelock(authCtx, &pb.RefreshTimelockRequest{
+	response, err := sparkClient.RefreshTimelockV2(authCtx, &pb.RefreshTimelockRequest{
 		LeafId:                 leaf.Id,
 		OwnerIdentityPublicKey: config.IdentityPublicKey().Serialize(),
 		SigningJobs:            signingJobs,
@@ -189,7 +189,7 @@ func RefreshTimelockRefundTx(
 		})
 	}
 
-	resp, err := sparkClient.FinalizeNodeSignatures(authCtx, &pb.FinalizeNodeSignaturesRequest{
+	resp, err := sparkClient.FinalizeNodeSignaturesV2(authCtx, &pb.FinalizeNodeSignaturesRequest{
 		Intent:         pbcommon.SignatureIntent_REFRESH,
 		NodeSignatures: nodeSignatures,
 	})
@@ -297,7 +297,7 @@ func RefreshTimelockNodes(
 	authCtx := ContextWithToken(ctx, token)
 
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	response, err := sparkClient.RefreshTimelock(authCtx, &pb.RefreshTimelockRequest{
+	response, err := sparkClient.RefreshTimelockV2(authCtx, &pb.RefreshTimelockRequest{
 		LeafId:                 leaf.Id,
 		OwnerIdentityPublicKey: config.IdentityPublicKey().Serialize(),
 		SigningJobs:            signingJobs,
@@ -442,7 +442,7 @@ func RefreshTimelockNodes(
 		RefundTxSignature: refundResponse.Signature,
 	})
 
-	finalResp, err := sparkClient.FinalizeNodeSignatures(authCtx, &pb.FinalizeNodeSignaturesRequest{
+	finalResp, err := sparkClient.FinalizeNodeSignaturesV2(authCtx, &pb.FinalizeNodeSignaturesRequest{
 		Intent:         pbcommon.SignatureIntent_REFRESH,
 		NodeSignatures: nodeSignatures,
 	})
@@ -512,7 +512,7 @@ func ExtendTimelock(
 	authCtx := ContextWithToken(ctx, token)
 
 	sparkClient := pb.NewSparkServiceClient(sparkConn)
-	response, err := sparkClient.ExtendLeaf(authCtx, &pb.ExtendLeafRequest{
+	response, err := sparkClient.ExtendLeafV2(authCtx, &pb.ExtendLeafRequest{
 		LeafId:                 node.Id,
 		OwnerIdentityPublicKey: config.IdentityPublicKey().Serialize(),
 		NodeTxSigningJob:       newNodeSigningJob,
@@ -562,7 +562,7 @@ func ExtendTimelock(
 	}
 
 	// Finalize signatures
-	_, err = sparkClient.FinalizeNodeSignatures(authCtx, &pb.FinalizeNodeSignaturesRequest{
+	_, err = sparkClient.FinalizeNodeSignaturesV2(authCtx, &pb.FinalizeNodeSignaturesRequest{
 		Intent: pbcommon.SignatureIntent_EXTEND,
 		NodeSignatures: []*pb.NodeSignatures{{
 			NodeId:            response.LeafId,
