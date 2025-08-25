@@ -48,6 +48,10 @@ var (
 	defaultGRPCServerKeepaliveTime       = 300 * time.Second
 	defaultGRPCServerKeepaliveTimeout    = 20 * time.Second
 	defaultGRPCServerUnaryHandlerTimeout = 60 * time.Second
+	// 0 or unset means to fall back to the default value.
+	// < 0 means disable timeouts
+	// > 0 means enable timeouts with the specified value
+	defaultGRPCClientTimeout = -1 * time.Second
 )
 
 // Config is the configuration for the signing operator.
@@ -213,7 +217,7 @@ type Lrc20Config struct {
 	GRPCPoolSize              uint64        `yaml:"grpcpoolsize"`
 }
 
-// GRPCConfig contains configuration for gRPC server behavior.
+// GRPCConfig contains configuration for gRPC server and client behavior.
 // All durations support Go-style duration strings such as "5s", "3m", etc.
 type GRPCConfig struct {
 	// ServerConnectionTimeout controls the timeout for establishing new incoming connections.
@@ -224,6 +228,8 @@ type GRPCConfig struct {
 	ServerKeepaliveTimeout time.Duration `yaml:"server_keepalive_timeout"`
 	// ServerUnaryHandlerTimeout enforces a per-request timeout for unary RPC handlers.
 	ServerUnaryHandlerTimeout time.Duration `yaml:"server_unary_handler_timeout"`
+	// ClientTimeout enforces a per-request timeout for unary RPC client calls.
+	ClientTimeout time.Duration `yaml:"client_timeout"`
 }
 
 type DatabaseConfig struct {
@@ -673,5 +679,8 @@ func setGrpcDefaults(cfg *GRPCConfig) {
 	}
 	if cfg.ServerUnaryHandlerTimeout == 0 {
 		cfg.ServerUnaryHandlerTimeout = defaultGRPCServerUnaryHandlerTimeout
+	}
+	if cfg.ClientTimeout == 0 {
+		cfg.ClientTimeout = defaultGRPCClientTimeout
 	}
 }

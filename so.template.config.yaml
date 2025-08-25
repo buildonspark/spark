@@ -25,6 +25,11 @@ grpc:
   server_keepalive_timeout: 20s
   # Per-request timeout for unary RPC handlers
   server_unary_handler_timeout: 60s
+  # Per-request timeout for unary RPC client calls
+  # 0 or unset means to fall back to the default value.
+  # < 0 means disable timeouts
+  # > 0 means enable timeouts with the specified value
+  client_timeout: 20s
 
 lrc20:
   regtest:

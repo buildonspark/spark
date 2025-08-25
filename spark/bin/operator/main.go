@@ -338,6 +338,12 @@ func main() {
 	}
 	defer connector.Close()
 
+	for _, op := range config.SigningOperatorMap {
+		op.ClientTimeoutConfig = common.ClientTimeoutConfig{
+			TimeoutProvider: knobs.NewKnobsTimeoutProvider(knobsService, config.GRPC.ClientTimeout),
+		}
+	}
+
 	var sqlDb entsql.ExecQuerier
 	if dbDriver == "postgres" {
 		sqlDb = stdlib.OpenDBFromPool(connector.Pool())

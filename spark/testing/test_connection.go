@@ -10,7 +10,7 @@ import (
 )
 
 func DangerousNewGRPCConnectionWithoutTLS(address string, retryPolicy *common.RetryPolicyConfig) (*grpc.ClientConn, error) {
-	clientOpts := common.BasicClientOptions(address, retryPolicy)
+	clientOpts := common.BasicClientOptions(address, retryPolicy, nil)
 	// !!!DANGER DANGER WILL ROBINSON!!!
 	clientOpts = append(clientOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
@@ -18,7 +18,7 @@ func DangerousNewGRPCConnectionWithoutTLS(address string, retryPolicy *common.Re
 }
 
 func DangerousNewGRPCConnectionWithoutVerifyTLS(address string, retryPolicy *common.RetryPolicyConfig) (*grpc.ClientConn, error) {
-	clientOpts := common.BasicClientOptions(address, retryPolicy)
+	clientOpts := common.BasicClientOptions(address, retryPolicy, nil)
 	// !!!DANGER DANGER HIGH VOLTAGE!!!
 	clientOpts = append(clientOpts, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
 		InsecureSkipVerify: true,

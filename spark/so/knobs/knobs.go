@@ -23,6 +23,7 @@ const (
 	KnobGrpcServerKeepaliveTimeout       = "spark.so.grpc.server.keepalive_timeout"
 	KnobGrpcServerUnaryHandlerTimeout    = "spark.so.grpc.server.unary_handler_timeout"
 	KnobSoGenerateStaticDepositAddressV2 = "spark.so.generate_static_deposit_address_v2"
+	KnobGRPCClientTimeout                = "spark.so.grpc.client.timeout"
 )
 
 type Config struct {

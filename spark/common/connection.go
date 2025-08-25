@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	sogrpc "github.com/lightsparkdev/spark/common/grpc"
 	"github.com/lightsparkdev/spark/common/logging"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
@@ -36,6 +37,10 @@ var defaultRetryPolicy = RetryPolicyConfig{
 	MaxBackoff:           10 * time.Second,
 	BackoffMultiplier:    2.0,
 	RetryableStatusCodes: []string{"UNAVAILABLE"},
+}
+
+type ClientTimeoutConfig struct {
+	TimeoutProvider sogrpc.TimeoutProvider
 }
 
 // createRetryPolicy generates a service config JSON string from a RetryPolicyConfig
@@ -77,19 +82,26 @@ func loggingUnaryClientInterceptor(
 	return err
 }
 
-func BasicClientOptions(address string, retryPolicy *RetryPolicyConfig) []grpc.DialOption {
+func BasicClientOptions(address string, retryPolicy *RetryPolicyConfig, clientTimeoutConfig *ClientTimeoutConfig) []grpc.DialOption {
 	clientOpts := []grpc.DialOption{
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler(
 			otelgrpc.WithMetricAttributes(attribute.String("server.address", address)),
 		)),
-		grpc.WithUnaryInterceptor(loggingUnaryClientInterceptor),
+	}
+
+	interceptors := []grpc.UnaryClientInterceptor{
+		loggingUnaryClientInterceptor,
+	}
+
+	if clientTimeoutConfig != nil {
+		interceptors = append(interceptors, sogrpc.ClientTimeoutInterceptor(clientTimeoutConfig.TimeoutProvider))
 	}
 
 	rp := &defaultRetryPolicy
 	if retryPolicy != nil {
 		rp = retryPolicy
 	}
-	clientOpts = append(clientOpts, grpc.WithDefaultServiceConfig(createRetryPolicy(rp)))
+	clientOpts = append(clientOpts, grpc.WithDefaultServiceConfig(createRetryPolicy(rp)), grpc.WithChainUnaryInterceptor(interceptors...))
 
 	return clientOpts
 }
@@ -97,12 +109,12 @@ func BasicClientOptions(address string, retryPolicy *RetryPolicyConfig) []grpc.D
 // Creates a secure gRPC connection to the given address. If certPath is empty, it will create a connection to the
 // address as a Unix domain socket (which is a secure connection). If address is not a Unix domain socket, it will
 // return an error.
-func NewGRPCConnection(address string, certPath string, retryPolicy *RetryPolicyConfig) (*grpc.ClientConn, error) {
+func NewGRPCConnection(address string, certPath string, retryPolicy *RetryPolicyConfig, clientTimeoutConfig *ClientTimeoutConfig) (*grpc.ClientConn, error) {
 	if len(certPath) == 0 {
-		return NewGRPCConnectionUnixDomainSocket(address, retryPolicy)
+		return NewGRPCConnectionUnixDomainSocket(address, retryPolicy, clientTimeoutConfig)
 	}
 
-	clientOpts := BasicClientOptions(address, retryPolicy)
+	clientOpts := BasicClientOptions(address, retryPolicy, clientTimeoutConfig)
 
 	certPool := x509.NewCertPool()
 	serverCert, err := os.ReadFile(certPath)
@@ -137,7 +149,7 @@ func NewGRPCConnection(address string, certPath string, retryPolicy *RetryPolicy
 
 // Will only attempt to connect to a unix domain socket address. If the address
 // is not prefixed explicitly with "unix://", it will be prepended.
-func NewGRPCConnectionUnixDomainSocket(address string, retryPolicy *RetryPolicyConfig) (*grpc.ClientConn, error) {
+func NewGRPCConnectionUnixDomainSocket(address string, retryPolicy *RetryPolicyConfig, clientTimeoutConfig *ClientTimeoutConfig) (*grpc.ClientConn, error) {
 	// Unix domain sockets always have a prefix of unix:// or unix: followed by
 	// a path. So in practice, we need to accept either unix:///path/to/socket
 	// or unix:/path/to/socket.
@@ -145,7 +157,7 @@ func NewGRPCConnectionUnixDomainSocket(address string, retryPolicy *RetryPolicyC
 		address = "unix://" + address
 	}
 
-	clientOpts := BasicClientOptions(address, retryPolicy)
+	clientOpts := BasicClientOptions(address, retryPolicy, clientTimeoutConfig)
 	// This is safe because we verified above that we are only connecting to a
 	// unix domain socket, which are always secure, local connections.
 	clientOpts = append(clientOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))

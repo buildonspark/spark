@@ -13,5 +13,5 @@ type FrostGRPCConnectionFactory interface {
 type FrostGRPCConnectionFactorySecure struct{}
 
 func (f *FrostGRPCConnectionFactorySecure) NewFrostGRPCConnection(signerAddress string) (*grpc.ClientConn, error) {
-	return common.NewGRPCConnectionUnixDomainSocket(signerAddress, nil)
+	return common.NewGRPCConnectionUnixDomainSocket(signerAddress, nil, nil)
 }

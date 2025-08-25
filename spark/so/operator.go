@@ -10,6 +10,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/utils"
+
 	"google.golang.org/grpc"
 )
 
@@ -34,18 +35,20 @@ type SigningOperator struct {
 	// OperatorConnectionFactorySecure, but this allows the setting of alternate
 	// connection types, generally for testing.
 	OperatorConnectionFactory OperatorConnectionFactory
+	// ClientTimeoutConfig is the configuration for the client timeout's knob service and defaulttimeout length
+	ClientTimeoutConfig common.ClientTimeoutConfig
 }
 
 type OperatorConnectionFactory interface {
-	NewGRPCConnection(address string, retryPolicy *common.RetryPolicyConfig) (*grpc.ClientConn, error)
+	NewGRPCConnection(address string, retryPolicy *common.RetryPolicyConfig, clientTimeoutConfig *common.ClientTimeoutConfig) (*grpc.ClientConn, error)
 }
 
 type operatorConnectionFactorySecure struct {
 	operator *SigningOperator
 }
 
-func (o *operatorConnectionFactorySecure) NewGRPCConnection(address string, retryPolicy *common.RetryPolicyConfig) (*grpc.ClientConn, error) {
-	return common.NewGRPCConnection(address, *o.operator.CertPath, retryPolicy)
+func (o *operatorConnectionFactorySecure) NewGRPCConnection(address string, retryPolicy *common.RetryPolicyConfig, clientTimeoutConfig *common.ClientTimeoutConfig) (*grpc.ClientConn, error) {
+	return common.NewGRPCConnection(address, *o.operator.CertPath, retryPolicy, clientTimeoutConfig)
 }
 
 func NewOperatorConnectionFactorySecure(operator *SigningOperator) OperatorConnectionFactory {
@@ -110,7 +113,8 @@ func (s *SigningOperator) newGrpcConnection(address string) (*grpc.ClientConn, e
 	if s.OperatorConnectionFactory != nil {
 		ocf = s.OperatorConnectionFactory
 	}
-	return ocf.NewGRPCConnection(address, nil)
+
+	return ocf.NewGRPCConnection(address, nil, &s.ClientTimeoutConfig)
 }
 
 func (s *SigningOperator) NewOperatorGRPCConnection() (*grpc.ClientConn, error) {
