@@ -71,8 +71,12 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		}, nil
 	}
 
-	network, err := common.NetworkFromProtoNetwork(req.Network)
 	logger := logging.GetLoggerFromContext(ctx)
+	network, err := common.NetworkFromProtoNetwork(req.Network)
+	if err != nil {
+		return nil, err
+	}
+	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
 	if err != nil {
 		return nil, err
 	}
@@ -162,6 +166,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		SetSigningKeyshareID(keyshare.ID).
 		SetOwnerIdentityPubkey(reqIDPubKey.Serialize()).
 		SetOwnerSigningPubkey(reqSigningPubKey.Serialize()).
+		SetNetwork(schemaNetwork).
 		SetAddress(depositAddress)
 	// Confirmation height is not set since nothing has been confirmed yet.
 
@@ -254,6 +259,10 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 	defer span.End()
 
 	network, err := common.NetworkFromProtoNetwork(req.Network)
+	if err != nil {
+		return nil, err
+	}
+	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
 	if err != nil {
 		return nil, err
 	}
@@ -398,6 +407,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 		SetSigningKeyshareID(keyshare.ID).
 		SetOwnerIdentityPubkey(idPubKey.Serialize()).
 		SetOwnerSigningPubkey(req.SigningPublicKey).
+		SetNetwork(schemaNetwork).
 		SetAddress(depositAddress).
 		SetIsStatic(true)
 

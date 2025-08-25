@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
@@ -58,6 +59,20 @@ func (dac *DepositAddressCreate) SetNillableUpdateTime(t *time.Time) *DepositAdd
 // SetAddress sets the "address" field.
 func (dac *DepositAddressCreate) SetAddress(s string) *DepositAddressCreate {
 	dac.mutation.SetAddress(s)
+	return dac
+}
+
+// SetNetwork sets the "network" field.
+func (dac *DepositAddressCreate) SetNetwork(s schematype.Network) *DepositAddressCreate {
+	dac.mutation.SetNetwork(s)
+	return dac
+}
+
+// SetNillableNetwork sets the "network" field if the given value is not nil.
+func (dac *DepositAddressCreate) SetNillableNetwork(s *schematype.Network) *DepositAddressCreate {
+	if s != nil {
+		dac.SetNetwork(*s)
+	}
 	return dac
 }
 
@@ -265,6 +280,11 @@ func (dac *DepositAddressCreate) check() error {
 			return &ValidationError{Name: "address", err: fmt.Errorf(`ent: validator failed for field "DepositAddress.address": %w`, err)}
 		}
 	}
+	if v, ok := dac.mutation.Network(); ok {
+		if err := depositaddress.NetworkValidator(v); err != nil {
+			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "DepositAddress.network": %w`, err)}
+		}
+	}
 	if _, ok := dac.mutation.OwnerIdentityPubkey(); !ok {
 		return &ValidationError{Name: "owner_identity_pubkey", err: errors.New(`ent: missing required field "DepositAddress.owner_identity_pubkey"`)}
 	}
@@ -334,6 +354,10 @@ func (dac *DepositAddressCreate) createSpec() (*DepositAddress, *sqlgraph.Create
 	if value, ok := dac.mutation.Address(); ok {
 		_spec.SetField(depositaddress.FieldAddress, field.TypeString, value)
 		_node.Address = value
+	}
+	if value, ok := dac.mutation.Network(); ok {
+		_spec.SetField(depositaddress.FieldNetwork, field.TypeEnum, value)
+		_node.Network = value
 	}
 	if value, ok := dac.mutation.OwnerIdentityPubkey(); ok {
 		_spec.SetField(depositaddress.FieldOwnerIdentityPubkey, field.TypeBytes, value)
@@ -610,6 +634,9 @@ func (u *DepositAddressUpsertOne) UpdateNewValues() *DepositAddressUpsertOne {
 		}
 		if _, exists := u.create.mutation.Address(); exists {
 			s.SetIgnore(depositaddress.FieldAddress)
+		}
+		if _, exists := u.create.mutation.Network(); exists {
+			s.SetIgnore(depositaddress.FieldNetwork)
 		}
 		if _, exists := u.create.mutation.OwnerIdentityPubkey(); exists {
 			s.SetIgnore(depositaddress.FieldOwnerIdentityPubkey)
@@ -976,6 +1003,9 @@ func (u *DepositAddressUpsertBulk) UpdateNewValues() *DepositAddressUpsertBulk {
 			}
 			if _, exists := b.mutation.Address(); exists {
 				s.SetIgnore(depositaddress.FieldAddress)
+			}
+			if _, exists := b.mutation.Network(); exists {
+				s.SetIgnore(depositaddress.FieldNetwork)
 			}
 			if _, exists := b.mutation.OwnerIdentityPubkey(); exists {
 				s.SetIgnore(depositaddress.FieldOwnerIdentityPubkey)

@@ -632,6 +632,7 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 		// This txid is different from the tree's base txid, which is the core of the issue.
 		SetConfirmationTxid("other_non_root_deposit_txid_" + testID).
 		SetSigningKeyshare(keyshare).
+		SetNetwork(st.NetworkRegtest).
 		Save(ctx)
 	require.NoError(t, err)
 

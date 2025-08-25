@@ -28,6 +28,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/utils"
 )
 
 // InternalDepositHandler is the deposit handler for so internal
@@ -57,10 +58,26 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
+	var network common.Network
+	for _, networkVariant := range []common.Network{common.Mainnet, common.Regtest, common.Testnet, common.Signet} {
+		if utils.IsBitcoinAddressForNetwork(req.Address, networkVariant) {
+			network = networkVariant
+			break
+		}
+	}
+	if network == common.Unspecified {
+		return nil, fmt.Errorf("can not determine network for address: %s", req.Address)
+	}
+
+	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+	if err != nil {
+		return nil, err
+	}
 	depositAddressMutator := db.DepositAddress.Create().
 		SetSigningKeyshareID(keyshareID).
 		SetOwnerIdentityPubkey(req.OwnerIdentityPublicKey).
 		SetOwnerSigningPubkey(req.OwnerSigningPublicKey).
+		SetNetwork(schemaNetwork).
 		SetAddress(req.Address)
 
 	if req.IsStatic != nil && *req.IsStatic {

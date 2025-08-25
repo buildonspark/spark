@@ -1240,6 +1240,7 @@ type DepositAddressMutation struct {
 	create_time             *time.Time
 	update_time             *time.Time
 	address                 *string
+	network                 *schematype.Network
 	owner_identity_pubkey   *[]byte
 	owner_signing_pubkey    *[]byte
 	confirmation_height     *int64
@@ -1473,6 +1474,55 @@ func (m *DepositAddressMutation) OldAddress(ctx context.Context) (v string, err 
 // ResetAddress resets all changes to the "address" field.
 func (m *DepositAddressMutation) ResetAddress() {
 	m.address = nil
+}
+
+// SetNetwork sets the "network" field.
+func (m *DepositAddressMutation) SetNetwork(s schematype.Network) {
+	m.network = &s
+}
+
+// Network returns the value of the "network" field in the mutation.
+func (m *DepositAddressMutation) Network() (r schematype.Network, exists bool) {
+	v := m.network
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNetwork returns the old "network" field's value of the DepositAddress entity.
+// If the DepositAddress object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DepositAddressMutation) OldNetwork(ctx context.Context) (v schematype.Network, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNetwork requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNetwork: %w", err)
+	}
+	return oldValue.Network, nil
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (m *DepositAddressMutation) ClearNetwork() {
+	m.network = nil
+	m.clearedFields[depositaddress.FieldNetwork] = struct{}{}
+}
+
+// NetworkCleared returns if the "network" field was cleared in this mutation.
+func (m *DepositAddressMutation) NetworkCleared() bool {
+	_, ok := m.clearedFields[depositaddress.FieldNetwork]
+	return ok
+}
+
+// ResetNetwork resets all changes to the "network" field.
+func (m *DepositAddressMutation) ResetNetwork() {
+	m.network = nil
+	delete(m.clearedFields, depositaddress.FieldNetwork)
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
@@ -2030,7 +2080,7 @@ func (m *DepositAddressMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DepositAddressMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.create_time != nil {
 		fields = append(fields, depositaddress.FieldCreateTime)
 	}
@@ -2039,6 +2089,9 @@ func (m *DepositAddressMutation) Fields() []string {
 	}
 	if m.address != nil {
 		fields = append(fields, depositaddress.FieldAddress)
+	}
+	if m.network != nil {
+		fields = append(fields, depositaddress.FieldNetwork)
 	}
 	if m.owner_identity_pubkey != nil {
 		fields = append(fields, depositaddress.FieldOwnerIdentityPubkey)
@@ -2078,6 +2131,8 @@ func (m *DepositAddressMutation) Field(name string) (ent.Value, bool) {
 		return m.UpdateTime()
 	case depositaddress.FieldAddress:
 		return m.Address()
+	case depositaddress.FieldNetwork:
+		return m.Network()
 	case depositaddress.FieldOwnerIdentityPubkey:
 		return m.OwnerIdentityPubkey()
 	case depositaddress.FieldOwnerSigningPubkey:
@@ -2109,6 +2164,8 @@ func (m *DepositAddressMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldUpdateTime(ctx)
 	case depositaddress.FieldAddress:
 		return m.OldAddress(ctx)
+	case depositaddress.FieldNetwork:
+		return m.OldNetwork(ctx)
 	case depositaddress.FieldOwnerIdentityPubkey:
 		return m.OldOwnerIdentityPubkey(ctx)
 	case depositaddress.FieldOwnerSigningPubkey:
@@ -2154,6 +2211,13 @@ func (m *DepositAddressMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAddress(v)
+		return nil
+	case depositaddress.FieldNetwork:
+		v, ok := value.(schematype.Network)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNetwork(v)
 		return nil
 	case depositaddress.FieldOwnerIdentityPubkey:
 		v, ok := value.([]byte)
@@ -2256,6 +2320,9 @@ func (m *DepositAddressMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *DepositAddressMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(depositaddress.FieldNetwork) {
+		fields = append(fields, depositaddress.FieldNetwork)
+	}
 	if m.FieldCleared(depositaddress.FieldConfirmationHeight) {
 		fields = append(fields, depositaddress.FieldConfirmationHeight)
 	}
@@ -2285,6 +2352,9 @@ func (m *DepositAddressMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *DepositAddressMutation) ClearField(name string) error {
 	switch name {
+	case depositaddress.FieldNetwork:
+		m.ClearNetwork()
+		return nil
 	case depositaddress.FieldConfirmationHeight:
 		m.ClearConfirmationHeight()
 		return nil
@@ -2316,6 +2386,9 @@ func (m *DepositAddressMutation) ResetField(name string) error {
 		return nil
 	case depositaddress.FieldAddress:
 		m.ResetAddress()
+		return nil
+	case depositaddress.FieldNetwork:
+		m.ResetNetwork()
 		return nil
 	case depositaddress.FieldOwnerIdentityPubkey:
 		m.ResetOwnerIdentityPubkey()

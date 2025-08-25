@@ -59,6 +59,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "address", Type: field.TypeString, Unique: true},
+		{Name: "network", Type: field.TypeEnum, Nullable: true, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
 		{Name: "owner_signing_pubkey", Type: field.TypeBytes},
 		{Name: "confirmation_height", Type: field.TypeInt64, Nullable: true},
@@ -77,7 +78,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "deposit_addresses_signing_keyshares_signing_keyshare",
-				Columns:    []*schema.Column{DepositAddressesColumns[12]},
+				Columns:    []*schema.Column{DepositAddressesColumns[13]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -91,17 +92,17 @@ var (
 			{
 				Name:    "depositaddress_owner_identity_pubkey",
 				Unique:  false,
-				Columns: []*schema.Column{DepositAddressesColumns[4]},
+				Columns: []*schema.Column{DepositAddressesColumns[5]},
 			},
 			{
 				Name:    "depositaddress_owner_signing_pubkey",
 				Unique:  false,
-				Columns: []*schema.Column{DepositAddressesColumns[5]},
+				Columns: []*schema.Column{DepositAddressesColumns[6]},
 			},
 			{
 				Name:    "depositaddress_deposit_address_signing_keyshare",
 				Unique:  false,
-				Columns: []*schema.Column{DepositAddressesColumns[12]},
+				Columns: []*schema.Column{DepositAddressesColumns[13]},
 			},
 		},
 	}

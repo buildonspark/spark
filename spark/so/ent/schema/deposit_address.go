@@ -6,6 +6,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
+	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
 // DepositAddress is the schema for the deposit addresses table.
@@ -38,6 +39,10 @@ func (DepositAddress) Fields() []ent.Field {
 			Immutable().
 			Unique().
 			Comment("P2TR address string that pays to the combined public key of SOs and the owner's signing public key."),
+		field.Enum("network").GoType(st.Network("")).
+			Immutable().
+			Comment("Network on which the deposit address is valid.").
+			Optional(),
 		field.Bytes("owner_identity_pubkey").
 			NotEmpty().
 			Immutable().

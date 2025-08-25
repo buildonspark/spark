@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
 // ID filters vertices based on their ID field.
@@ -249,6 +250,46 @@ func AddressEqualFold(v string) predicate.DepositAddress {
 // AddressContainsFold applies the ContainsFold predicate on the "address" field.
 func AddressContainsFold(v string) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldContainsFold(FieldAddress, v))
+}
+
+// NetworkEQ applies the EQ predicate on the "network" field.
+func NetworkEQ(v schematype.Network) predicate.DepositAddress {
+	vc := v
+	return predicate.DepositAddress(sql.FieldEQ(FieldNetwork, vc))
+}
+
+// NetworkNEQ applies the NEQ predicate on the "network" field.
+func NetworkNEQ(v schematype.Network) predicate.DepositAddress {
+	vc := v
+	return predicate.DepositAddress(sql.FieldNEQ(FieldNetwork, vc))
+}
+
+// NetworkIn applies the In predicate on the "network" field.
+func NetworkIn(vs ...schematype.Network) predicate.DepositAddress {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.DepositAddress(sql.FieldIn(FieldNetwork, v...))
+}
+
+// NetworkNotIn applies the NotIn predicate on the "network" field.
+func NetworkNotIn(vs ...schematype.Network) predicate.DepositAddress {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.DepositAddress(sql.FieldNotIn(FieldNetwork, v...))
+}
+
+// NetworkIsNil applies the IsNil predicate on the "network" field.
+func NetworkIsNil() predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldIsNull(FieldNetwork))
+}
+
+// NetworkNotNil applies the NotNil predicate on the "network" field.
+func NetworkNotNil() predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldNotNull(FieldNetwork))
 }
 
 // OwnerIdentityPubkeyEQ applies the EQ predicate on the "owner_identity_pubkey" field.

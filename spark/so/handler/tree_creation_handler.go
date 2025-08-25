@@ -278,11 +278,16 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(
 		if err != nil {
 			return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 		}
+		schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+		if err != nil {
+			return nil, err
+		}
 		_, err = db.DepositAddress.Create().
 			SetSigningKeyshareID(keysharesMap[node.SigningKeyshareId].ID).
 			SetOwnerIdentityPubkey(userIdentityPublicKey).
 			SetOwnerSigningPubkey(node.UserPublicKey).
 			SetAddress(depositAddress).
+			SetNetwork(schemaNetwork).
 			Save(ctx)
 		if err != nil {
 			return nil, err

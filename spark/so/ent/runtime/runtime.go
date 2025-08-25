@@ -99,15 +99,15 @@ func init() {
 	// depositaddress.AddressValidator is a validator for the "address" field. It is called by the builders before save.
 	depositaddress.AddressValidator = depositaddressDescAddress.Validators[0].(func(string) error)
 	// depositaddressDescOwnerIdentityPubkey is the schema descriptor for owner_identity_pubkey field.
-	depositaddressDescOwnerIdentityPubkey := depositaddressFields[1].Descriptor()
+	depositaddressDescOwnerIdentityPubkey := depositaddressFields[2].Descriptor()
 	// depositaddress.OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
 	depositaddress.OwnerIdentityPubkeyValidator = depositaddressDescOwnerIdentityPubkey.Validators[0].(func([]byte) error)
 	// depositaddressDescOwnerSigningPubkey is the schema descriptor for owner_signing_pubkey field.
-	depositaddressDescOwnerSigningPubkey := depositaddressFields[2].Descriptor()
+	depositaddressDescOwnerSigningPubkey := depositaddressFields[3].Descriptor()
 	// depositaddress.OwnerSigningPubkeyValidator is a validator for the "owner_signing_pubkey" field. It is called by the builders before save.
 	depositaddress.OwnerSigningPubkeyValidator = depositaddressDescOwnerSigningPubkey.Validators[0].(func([]byte) error)
 	// depositaddressDescIsStatic is the schema descriptor for is_static field.
-	depositaddressDescIsStatic := depositaddressFields[8].Descriptor()
+	depositaddressDescIsStatic := depositaddressFields[9].Descriptor()
 	// depositaddress.DefaultIsStatic holds the default value on creation for the is_static field.
 	depositaddress.DefaultIsStatic = depositaddressDescIsStatic.Default.(bool)
 	// depositaddressDescID is the schema descriptor for id field.

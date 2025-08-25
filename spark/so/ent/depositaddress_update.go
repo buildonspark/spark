@@ -278,6 +278,9 @@ func (dau *DepositAddressUpdate) sqlSave(ctx context.Context) (n int, err error)
 	if value, ok := dau.mutation.UpdateTime(); ok {
 		_spec.SetField(depositaddress.FieldUpdateTime, field.TypeTime, value)
 	}
+	if dau.mutation.NetworkCleared() {
+		_spec.ClearField(depositaddress.FieldNetwork, field.TypeEnum)
+	}
 	if value, ok := dau.mutation.ConfirmationHeight(); ok {
 		_spec.SetField(depositaddress.FieldConfirmationHeight, field.TypeInt64, value)
 	}
@@ -700,6 +703,9 @@ func (dauo *DepositAddressUpdateOne) sqlSave(ctx context.Context) (_node *Deposi
 	}
 	if value, ok := dauo.mutation.UpdateTime(); ok {
 		_spec.SetField(depositaddress.FieldUpdateTime, field.TypeTime, value)
+	}
+	if dauo.mutation.NetworkCleared() {
+		_spec.ClearField(depositaddress.FieldNetwork, field.TypeEnum)
 	}
 	if value, ok := dauo.mutation.ConfirmationHeight(); ok {
 		_spec.SetField(depositaddress.FieldConfirmationHeight, field.TypeInt64, value)

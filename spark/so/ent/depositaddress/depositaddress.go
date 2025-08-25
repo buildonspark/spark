@@ -3,11 +3,13 @@
 package depositaddress
 
 import (
+	"fmt"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
 const (
@@ -21,6 +23,8 @@ const (
 	FieldUpdateTime = "update_time"
 	// FieldAddress holds the string denoting the address field in the database.
 	FieldAddress = "address"
+	// FieldNetwork holds the string denoting the network field in the database.
+	FieldNetwork = "network"
 	// FieldOwnerIdentityPubkey holds the string denoting the owner_identity_pubkey field in the database.
 	FieldOwnerIdentityPubkey = "owner_identity_pubkey"
 	// FieldOwnerSigningPubkey holds the string denoting the owner_signing_pubkey field in the database.
@@ -74,6 +78,7 @@ var Columns = []string{
 	FieldCreateTime,
 	FieldUpdateTime,
 	FieldAddress,
+	FieldNetwork,
 	FieldOwnerIdentityPubkey,
 	FieldOwnerSigningPubkey,
 	FieldConfirmationHeight,
@@ -124,6 +129,16 @@ var (
 	DefaultID func() uuid.UUID
 )
 
+// NetworkValidator is a validator for the "network" field enum values. It is called by the builders before save.
+func NetworkValidator(n schematype.Network) error {
+	switch n {
+	case "UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET":
+		return nil
+	default:
+		return fmt.Errorf("depositaddress: invalid enum value for network field: %q", n)
+	}
+}
+
 // OrderOption defines the ordering options for the DepositAddress queries.
 type OrderOption func(*sql.Selector)
 
@@ -145,6 +160,11 @@ func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByAddress orders the results by the address field.
 func ByAddress(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAddress, opts...).ToFunc()
+}
+
+// ByNetwork orders the results by the network field.
+func ByNetwork(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNetwork, opts...).ToFunc()
 }
 
 // ByConfirmationHeight orders the results by the confirmation_height field.

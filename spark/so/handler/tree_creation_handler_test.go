@@ -440,6 +440,7 @@ func TestGetSigningKeyshareFromOutput(t *testing.T) {
 		SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
 		SetOwnerSigningPubkey(signingPrivkey.Public().Serialize()).
 		SetSigningKeyshare(signingKeyshare).
+		SetNetwork(st.NetworkRegtest).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -873,6 +874,7 @@ func TestPrepareSigningJobs_EnsureConfTxidMatchesUtxoId(t *testing.T) {
 		SetSigningKeyshare(signingKeyshare).
 		SetConfirmationHeight(100).                     // Confirmed at height 100
 		SetConfirmationTxid(legitimateTxHash.String()). // CONFIRMED with legitimate TX
+		SetNetwork(st.NetworkRegtest).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -1008,6 +1010,7 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 				SetSigningKeyshare(signingKeyshare).
 				SetConfirmationHeight(0). // Not confirmed, so no txid validation
 				// Don't set confirmation txid to bypass the validation
+				SetNetwork(st.NetworkRegtest).
 				Save(ctx)
 			require.NoError(t, err)
 
@@ -1049,6 +1052,7 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 					SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
 					SetOwnerSigningPubkey(childKeyshare.PublicKey).
 					SetSigningKeyshare(childKeyshare).
+					SetNetwork(st.NetworkRegtest).
 					Save(ctx)
 				require.NoError(t, err)
 

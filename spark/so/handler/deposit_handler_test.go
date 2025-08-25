@@ -77,6 +77,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 			SetOwnerIdentityPubkey([]byte("test_identity_pubkey")).
 			SetOwnerSigningPubkey([]byte("test_signing_pubkey")).
 			SetSigningKeyshare(signingKeyshare).
+			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -131,6 +132,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 			SetOwnerIdentityPubkey([]byte("test_identity_pubkey2")).
 			SetOwnerSigningPubkey([]byte("test_signing_pubkey2")).
 			SetSigningKeyshare(signingKeyshare).
+			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -218,6 +220,7 @@ func TestGenerateDepositAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
+			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
 		require.NotNil(t, existingAddress)
@@ -373,6 +376,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
+			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -429,6 +433,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
+			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -456,6 +461,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetIsStatic(false).
 			SetConfirmationTxid(confirmationTxid).
 			SetConfirmationHeight(195). // Set confirmation height to satisfy threshold (current height 200 - 3 = 197, so <= 197)
+			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -481,6 +487,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(false).
+			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -517,6 +524,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
+			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -578,6 +586,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(false).
 			SetConfirmationTxid(invalidTxid).
+			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -601,6 +610,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
+			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -637,6 +647,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
+			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -660,6 +671,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
+			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -671,6 +683,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
+			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -778,6 +791,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
+			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
 

@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 )
 
@@ -26,6 +27,8 @@ type DepositAddress struct {
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// P2TR address string that pays to the combined public key of SOs and the owner's signing public key.
 	Address string `json:"address,omitempty"`
+	// Network on which the deposit address is valid.
+	Network schematype.Network `json:"network,omitempty"`
 	// Identity public key of the owner of the deposit address.
 	OwnerIdentityPubkey []byte `json:"owner_identity_pubkey,omitempty"`
 	// Signing public key of the owner of the deposit address.
@@ -102,7 +105,7 @@ func (*DepositAddress) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case depositaddress.FieldConfirmationHeight:
 			values[i] = new(sql.NullInt64)
-		case depositaddress.FieldAddress, depositaddress.FieldConfirmationTxid:
+		case depositaddress.FieldAddress, depositaddress.FieldNetwork, depositaddress.FieldConfirmationTxid:
 			values[i] = new(sql.NullString)
 		case depositaddress.FieldCreateTime, depositaddress.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -148,6 +151,12 @@ func (da *DepositAddress) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field address", values[i])
 			} else if value.Valid {
 				da.Address = value.String
+			}
+		case depositaddress.FieldNetwork:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field network", values[i])
+			} else if value.Valid {
+				da.Network = schematype.Network(value.String)
 			}
 		case depositaddress.FieldOwnerIdentityPubkey:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -265,6 +274,9 @@ func (da *DepositAddress) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("address=")
 	builder.WriteString(da.Address)
+	builder.WriteString(", ")
+	builder.WriteString("network=")
+	builder.WriteString(fmt.Sprintf("%v", da.Network))
 	builder.WriteString(", ")
 	builder.WriteString("owner_identity_pubkey=")
 	builder.WriteString(fmt.Sprintf("%v", da.OwnerIdentityPubkey))
