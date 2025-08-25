@@ -18,6 +18,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
+	"github.com/lightsparkdev/spark/so/errors"
 )
 
 type StaticDepositInternalHandler struct {
@@ -141,7 +142,8 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		return nil, fmt.Errorf("unable to check if utxo swap is already registered: %w", err)
 	}
 	if utxoSwap != nil {
-		return nil, fmt.Errorf("utxo swap is already registered")
+		logger.Info("utxo swap is already registered", "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout, "request_type", utxoSwap.RequestType)
+		return nil, errors.AlreadyExistsErrorf("utxo swap is already registered")
 	}
 
 	// Check that the utxo deposit address is static and belongs to the receiver of the transfer
@@ -330,7 +332,8 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, fmt.Errorf("unable to check if utxo swap is already registered: %w", err)
 	}
 	if utxoSwap != nil {
-		return nil, fmt.Errorf("utxo swap is already registered")
+		logger.Info("utxo swap is already registered", "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout, "request_type", utxoSwap.Status)
+		return nil, errors.AlreadyExistsErrorf("utxo swap is already registered")
 	}
 
 	// Validate user statement

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -19,6 +20,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
+	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"go.opentelemetry.io/otel/trace"
@@ -223,7 +225,8 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 				DepositAddress:        depositAddressQueryResult,
 			}, nil
 		}
-		return nil, fmt.Errorf("utxo swap is already registered")
+		logger.Info("utxo swap is already registered", "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout, "request_type", utxoSwap.RequestType)
+		return nil, errors.AlreadyExistsErrorf("utxo swap is already registered")
 	}
 
 	// **********************************************************************************************
