@@ -25,11 +25,17 @@ const (
 	signingOperatorIdentifier1 = signingOperatorPrefix + "1"
 	signingOperatorIdentifier2 = signingOperatorPrefix + "2"
 	signingOperatorIdentifier3 = signingOperatorPrefix + "3"
+	gripmock                   = "GRIPMOCK"
 )
 
 func isHermeticTest() bool {
 	_, err := os.Stat(hermeticMarkerPath)
 	return err == nil || os.Getenv(hermeticTestEnvVar) == "true"
+}
+
+func IsGripmock() bool {
+	_, err := os.Stat(gripmock)
+	return err == nil || os.Getenv(gripmock) == "true"
 }
 
 // Common pubkeys used for both hermetic and local test environments
@@ -108,9 +114,12 @@ func GetAllSigningOperators() (map[string]*so.SigningOperator, error) {
 	for i := range opCount {
 		id := fmt.Sprintf("%064x", i+1) // "000…001", "000…002" …
 		address := fmt.Sprintf("localhost:%d", basePort+i)
-		operatorConnectionFactory := &DangerousTestOperatorConnectionFactoryNoVerifyTLS{}
+		var operatorConnectionFactory so.OperatorConnectionFactory = &DangerousTestOperatorConnectionFactoryNoVerifyTLS{}
 		if isHermeticTest() {
 			address = fmt.Sprintf("dns:///%d.spark.minikube.local", i)
+		}
+		if IsGripmock() {
+			operatorConnectionFactory = &DangerousTestOperatorConnectionFactoryNoTLS{}
 		}
 
 		operators[id] = &so.SigningOperator{
@@ -176,6 +185,9 @@ func getTestDatabasePath(operatorIndex int) string {
 func getLocalFrostSignerAddress() string {
 	if isHermeticTest() {
 		return "localhost:9999"
+	}
+	if IsGripmock() {
+		return "localhost:8535"
 	}
 	return "unix:///tmp/frost_0.sock"
 }

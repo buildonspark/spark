@@ -8,6 +8,7 @@ import (
 	"math"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	testutil "github.com/lightsparkdev/spark/testing"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -91,7 +92,7 @@ func (c *SparkServiceFrostSignerImpl) CallFrostRound1(ctx context.Context, opera
 	// This is a shortcut to avoid an unnecessary round trip when we're asking
 	// for signing from the current SO. That is, no need for a gRPC call to
 	// ourself.
-	if operator.Identifier == c.config.Identifier {
+	if operator.Identifier == c.config.Identifier && !testutil.IsGripmock() {
 		handler := signing_handler.NewFrostSigningHandler(c.config)
 		return handler.FrostRound1(ctx, req)
 	} else {
@@ -109,7 +110,7 @@ func (c *SparkServiceFrostSignerImpl) CallFrostRound2(ctx context.Context, opera
 	// This is a shortcut to avoid an unnecessary round trip when we're asking
 	// for signing from the current SO. That is, no need for a gRPC call to
 	// ourself.
-	if operator.Identifier == c.config.Identifier {
+	if operator.Identifier == c.config.Identifier && !testutil.IsGripmock() {
 		handler := signing_handler.NewFrostSigningHandler(c.config)
 		return handler.FrostRound2(ctx, req)
 	} else {
