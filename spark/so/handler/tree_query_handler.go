@@ -29,7 +29,7 @@ func NewTreeQueryHandler(config *so.Config) *TreeQueryHandler {
 }
 
 // QueryNodes queries the details of nodes given either the owner identity public key or a list of node ids.
-func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesRequest) (*pb.QueryNodesResponse, error) {
+func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesRequest, isSSP bool) (*pb.QueryNodesResponse, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -98,7 +98,7 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 			return nil, fmt.Errorf("unable to marshal node %s: %w", node.ID.String(), err)
 		}
 		if req.IncludeParents {
-			err := getAncestorChain(ctx, db, node, protoNodeMap)
+			err := getAncestorChain(ctx, db, node, protoNodeMap, isSSP)
 			if err != nil {
 				return nil, err
 			}
@@ -161,7 +161,7 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 	}, nil
 }
 
-func getAncestorChain(ctx context.Context, db *ent.Tx, node *ent.TreeNode, nodeMap map[string]*pb.TreeNode) error {
+func getAncestorChain(ctx context.Context, db *ent.Tx, node *ent.TreeNode, nodeMap map[string]*pb.TreeNode, isSSP bool) error {
 	parent, err := node.QueryParent().Only(ctx)
 	if err != nil {
 		if !ent.IsNotFound(err) {
@@ -171,17 +171,19 @@ func getAncestorChain(ctx context.Context, db *ent.Tx, node *ent.TreeNode, nodeM
 	}
 
 	// skip root node to temporarily disable unilateral exit.
-	_, err = parent.QueryParent().Only(ctx)
-	if err != nil {
-		if !ent.IsNotFound(err) {
-			return err
-		}
-		tree, err := node.QueryTree().Only(ctx)
+	if !isSSP {
+		_, err = parent.QueryParent().Only(ctx)
 		if err != nil {
-			return err
-		}
-		if tree.Network == st.NetworkMainnet {
-			return nil
+			if !ent.IsNotFound(err) {
+				return err
+			}
+			tree, err := node.QueryTree().Only(ctx)
+			if err != nil {
+				return err
+			}
+			if tree.Network == st.NetworkMainnet {
+				return nil
+			}
 		}
 	}
 
@@ -191,7 +193,7 @@ func getAncestorChain(ctx context.Context, db *ent.Tx, node *ent.TreeNode, nodeM
 		return fmt.Errorf("unable to marshal node %s: %w", parent.ID.String(), err)
 	}
 
-	return getAncestorChain(ctx, db, parent, nodeMap)
+	return getAncestorChain(ctx, db, parent, nodeMap, isSSP)
 }
 
 func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req *pb.QueryUnusedDepositAddressesRequest) (*pb.QueryUnusedDepositAddressesResponse, error) {

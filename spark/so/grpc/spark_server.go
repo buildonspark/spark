@@ -306,7 +306,7 @@ func (s *SparkServer) StartTokenTransaction(ctx context.Context, req *pb.StartTo
 // QueryNodes queries the details of nodes given either the owner identity public key or a list of node ids.
 func (s *SparkServer) QueryNodes(ctx context.Context, req *pb.QueryNodesRequest) (*pb.QueryNodesResponse, error) {
 	treeQueryHandler := handler.NewTreeQueryHandler(s.config)
-	return treeQueryHandler.QueryNodes(ctx, req)
+	return treeQueryHandler.QueryNodes(ctx, req, false)
 }
 
 // GetTokenTransactionRevocationKeyshares allows the wallet to retrieve the revocation keyshares from each individual SO to
