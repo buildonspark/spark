@@ -695,9 +695,18 @@ func CompleteUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) error {
 			}
 		}
 
-		// generally having a transfer attached is enough, checking for failure statuses is a sanity check
+		// Validate transfer is in a valid state for completion
 		if transfer.Status == st.TransferStatusExpired || transfer.Status == st.TransferStatusReturned {
 			return fmt.Errorf("transfer is expired or returned")
+		}
+		if transfer.Status == st.TransferStatusCompleted {
+			return nil
+		}
+		// Only allow completion from valid intermediate states
+		if transfer.Status != st.TransferStatusSenderKeyTweaked &&
+			transfer.Status != st.TransferStatusReceiverKeyTweakApplied &&
+			transfer.Status != st.TransferStatusReceiverRefundSigned {
+			return fmt.Errorf("transfer cannot be completed from status %s", transfer.Status)
 		}
 	}
 	if _, err := utxoSwap.Update().SetStatus(st.UtxoSwapStatusCompleted).Save(ctx); err != nil {

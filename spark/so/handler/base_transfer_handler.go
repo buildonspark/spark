@@ -636,9 +636,16 @@ func (h *BaseTransferHandler) executeCancelTransfer(ctx context.Context, transfe
 		logger.Info("Transfer already returned", "transfer_id", transfer.ID.String())
 		return nil
 	}
+	// Prevent cancellation of transfers in terminal or advanced states
+	if transfer.Status == st.TransferStatusCompleted ||
+		transfer.Status == st.TransferStatusExpired {
+		return fmt.Errorf("transfer %s is already in terminal state %s and cannot be cancelled", transfer.ID.String(), transfer.Status)
+	}
+	// Only allow cancellation from early states
 	if transfer.Status != st.TransferStatusSenderInitiated &&
-		transfer.Status != st.TransferStatusSenderKeyTweakPending {
-		return fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderInitiated, TransferStatusSenderKeyTweakPending but %s found", transfer.ID.String(), transfer.Status)
+		transfer.Status != st.TransferStatusSenderKeyTweakPending &&
+		transfer.Status != st.TransferStatusSenderInitiatedCoordinator {
+		return fmt.Errorf("transfer %s cannot be cancelled from status %s", transfer.ID.String(), transfer.Status)
 	}
 
 	var err error
