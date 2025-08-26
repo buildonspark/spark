@@ -1628,7 +1628,7 @@ export class SparkWallet extends EventEmitter {
    * @returns {Promise<string>} A Bitcoin address for depositing funds
    */
   public async getSingleUseDepositAddress(): Promise<string> {
-    return await this.generateDepositAddress(false);
+    return await this.generateDepositAddress();
   }
 
   /**
@@ -1638,47 +1638,38 @@ export class SparkWallet extends EventEmitter {
    * @returns {Promise<string>} A Bitcoin address for depositing funds
    */
   public async getStaticDepositAddress(): Promise<string> {
-    try {
-      return await this.generateDepositAddress(true);
-    } catch (error: any) {
-      if (error.message?.includes("static deposit address already exists")) {
-        // Query instead of checking error message in case error message changes.
-        const existingAddresses = await this.queryStaticDepositAddresses();
-        if (existingAddresses.length > 0 && existingAddresses[0]) {
-          return existingAddresses[0];
-        } else {
-          throw error;
-        }
-      } else {
-        throw error;
-      }
+    const signingPubkey =
+      await this.config.signer.getStaticDepositSigningKey(0);
+
+    const address = await this.depositService!.generateStaticDepositAddress({
+      signingPubkey,
+    });
+    if (!address.depositAddress) {
+      throw new RPCError("Failed to generate static deposit address", {
+        method: "generateStaticDepositAddress",
+        params: { signingPubkey },
+      });
     }
+
+    return address.depositAddress.address;
   }
 
   /**
    * Generates a deposit address for receiving funds.
-   *
-   * @param {boolean} static - Whether the address is static or single use
    * @returns {Promise<string>} A deposit address
    * @private
    */
-  private async generateDepositAddress(isStatic?: boolean): Promise<string> {
+  private async generateDepositAddress(): Promise<string> {
     const leafId = uuidv7();
-    let signingPubkey: Uint8Array;
-    if (isStatic) {
-      // TODO: Add support for multiple static deposit addresses
-      signingPubkey = await this.config.signer.getStaticDepositSigningKey(0);
-    } else {
-      signingPubkey = await this.config.signer.getPublicKeyFromDerivation({
-        type: KeyDerivationType.LEAF,
-        path: leafId,
-      });
-    }
+
+    const signingPubkey = await this.config.signer.getPublicKeyFromDerivation({
+      type: KeyDerivationType.LEAF,
+      path: leafId,
+    });
 
     const address = await this.depositService!.generateDepositAddress({
       signingPubkey,
       leafId,
-      isStatic,
     });
     if (!address.depositAddress) {
       throw new RPCError("Failed to generate deposit address", {

@@ -28,6 +28,11 @@ import { ConnectionManager } from "./connection.js";
 type ValidateDepositAddressParams = {
   address: Address;
   userPubkey: Uint8Array;
+  verifyCoordinatorProof?: boolean;
+};
+
+export type GenerateStaticDepositAddressParams = {
+  signingPubkey: Uint8Array;
 };
 
 export type GenerateDepositAddressParams = {
@@ -42,8 +47,6 @@ export type CreateTreeRootParams = {
   depositTx: Transaction;
   vout: number;
 };
-
-const INITIAL_TIME_LOCK = 2000;
 
 export class DepositService {
   private readonly config: WalletConfigService;
@@ -60,6 +63,7 @@ export class DepositService {
   private async validateDepositAddress({
     address,
     userPubkey,
+    verifyCoordinatorProof = false,
   }: ValidateDepositAddressParams) {
     if (
       !address.depositAddressProof ||
@@ -106,7 +110,10 @@ export class DepositService {
 
     const addrHash = sha256(address.address);
     for (const operator of Object.values(this.config.getSigningOperators())) {
-      if (operator.identifier === this.config.getCoordinatorIdentifier()) {
+      if (
+        operator.identifier === this.config.getCoordinatorIdentifier() &&
+        !verifyCoordinatorProof
+      ) {
         continue;
       }
 
@@ -133,6 +140,51 @@ export class DepositService {
         });
       }
     }
+  }
+
+  async generateStaticDepositAddress({
+    signingPubkey,
+  }: GenerateStaticDepositAddressParams): Promise<GenerateDepositAddressResponse> {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    let depositResp: GenerateDepositAddressResponse;
+    try {
+      depositResp = await sparkClient.generate_static_deposit_address({
+        signingPublicKey: signingPubkey,
+        identityPublicKey: await this.config.signer.getIdentityPublicKey(),
+        network: this.config.getNetworkProto(),
+      });
+    } catch (error) {
+      throw new NetworkError(
+        "Failed to generate static deposit address",
+        {
+          operation: "generate_static_deposit_address",
+          errorCount: 1,
+          errors: error instanceof Error ? error.message : String(error),
+        },
+        error as Error,
+      );
+    }
+
+    if (!depositResp.depositAddress) {
+      throw new ValidationError(
+        "No static deposit address response from coordinator",
+        {
+          field: "depositAddress",
+          value: depositResp,
+        },
+      );
+    }
+
+    await this.validateDepositAddress({
+      address: depositResp.depositAddress,
+      userPubkey: signingPubkey,
+      verifyCoordinatorProof: true,
+    });
+
+    return depositResp;
   }
 
   async generateDepositAddress({
