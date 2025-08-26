@@ -1,4 +1,4 @@
-import { bytesToHex } from "@noble/curves/abstract/utils";
+import { bytesToHex } from "@noble/curves/utils";
 import ClaimStaticDeposit from "../graphql/objects/ClaimStaticDeposit.js";
 import CoopExitRequest from "../graphql/objects/CoopExitRequest.js";
 import LeavesSwapRequest from "../graphql/objects/LeavesSwapRequest.js";

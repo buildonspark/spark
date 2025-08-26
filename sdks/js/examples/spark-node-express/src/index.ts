@@ -1,8 +1,8 @@
-import express from "express";
-import sparkRoutes from "../routes/sparkRoutes.js";
-import issuerRoutes from "../routes/issuerRoutes.js";
 import { isError } from "@lightsparkdev/core";
-import { bytesToHex } from "@noble/curves/abstract/utils";
+import { bytesToHex } from "@noble/curves/utils";
+import express from "express";
+import issuerRoutes from "../routes/issuerRoutes.js";
+import sparkRoutes from "../routes/sparkRoutes.js";
 
 const app = express();
 

@@ -1,6 +1,6 @@
 // unilateral-exit.ts
 
-import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
+import { bytesToHex, hexToBytes } from "@noble/curves/utils";
 import { ripemd160 } from "@noble/hashes/legacy";
 import { sha256 } from "@noble/hashes/sha2";
 import * as btc from "@scure/btc-signer";

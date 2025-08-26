@@ -1,9 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import {
-  bytesToHex,
-  equalBytes,
-  hexToBytes,
-} from "@noble/curves/abstract/utils";
+import { bytesToHex, equalBytes, hexToBytes } from "@noble/curves/utils";
 import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { uuidv7 } from "uuidv7";

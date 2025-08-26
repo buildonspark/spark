@@ -1,4 +1,4 @@
-import { hexToBytes } from "@noble/curves/abstract/utils";
+import { hexToBytes } from "@noble/curves/utils";
 import { Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { ValidationError } from "../errors/types.js";

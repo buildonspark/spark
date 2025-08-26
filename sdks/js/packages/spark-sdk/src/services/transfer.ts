@@ -1,10 +1,10 @@
+import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToHex,
   equalBytes,
   hexToBytes,
   numberToBytesBE,
-} from "@noble/curves/abstract/utils";
-import { secp256k1 } from "@noble/curves/secp256k1";
+} from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import { Transaction } from "@scure/btc-signer";
 import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";

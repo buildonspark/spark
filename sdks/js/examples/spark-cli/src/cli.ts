@@ -4,35 +4,31 @@ import {
   ConfigOptions,
   constructUnilateralExitFeeBumpPackages,
   decodeBech32mTokenIdentifier,
-  getNetworkFromBech32mTokenIdentifier,
   decodeSparkAddress,
   encodeBech32mTokenIdentifier,
   encodeSparkAddress,
   getLatestDepositTxId,
   getNetwork,
+  getNetworkFromBech32mTokenIdentifier,
   getP2TRScriptFromPublicKey,
   getP2WPKHAddressFromPublicKey,
   isEphemeralAnchorOutput,
   Network,
   NetworkType,
   protoToNetwork,
-  WalletConfig,
   SparkAddressFormat,
-  validateSparkInvoiceSignature,
   SparkSdkLogger,
+  validateSparkInvoiceSignature,
+  WalletConfig,
 } from "@buildonspark/spark-sdk";
-import { LoggingLevel } from "@lightsparkdev/core";
 import {
   TokenTransactionStatus,
   TreeNode,
 } from "@buildonspark/spark-sdk/proto/spark";
 import { CoopExitFeeQuote, ExitSpeed } from "@buildonspark/spark-sdk/types";
-import {
-  bytesToHex,
-  bytesToNumberBE,
-  hexToBytes,
-} from "@noble/curves/abstract/utils";
+import { LoggingLevel } from "@lightsparkdev/core";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
+import { bytesToHex, bytesToNumberBE, hexToBytes } from "@noble/curves/utils";
 import { ripemd160 } from "@noble/hashes/legacy";
 import { sha256 } from "@noble/hashes/sha2";
 import { hex } from "@scure/base";

@@ -1,20 +1,20 @@
 import { describe, expect, it } from "@jest/globals";
-import { ConfigOptions } from "../../services/wallet-config.js";
-import { NetworkType } from "../../utils/network.js";
-import { walletTypes } from "../test-utils.js";
-import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
-import { secp256k1, schnorr } from "@noble/curves/secp256k1";
-import { bytesToHex } from "@noble/curves/abstract/utils";
-import type { SparkSigner } from "../../signer/signer.js";
+import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
+import { bytesToHex } from "@noble/curves/utils";
 import type { Transaction } from "@scure/btc-signer";
+import { ConfigOptions } from "../../services/wallet-config.js";
+import type { SparkSigner } from "../../signer/signer.js";
 import type {
   AggregateFrostParams,
   KeyDerivation,
-  SigningCommitmentWithOptionalNonce,
   SignFrostParams,
+  SigningCommitmentWithOptionalNonce,
   SplitSecretWithProofsParams,
 } from "../../signer/types.js";
+import { NetworkType } from "../../utils/network.js";
 import type { VerifiableSecretShare } from "../../utils/secret-sharing.js";
+import { walletTypes } from "../test-utils.js";
+import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 
 describe.each(walletTypes)("wallet", ({ name, Signer }) => {
   it(`${name} - should initialize a wallet`, async () => {

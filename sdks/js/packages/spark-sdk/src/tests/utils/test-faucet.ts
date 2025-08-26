@@ -1,5 +1,5 @@
-import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
+import { bytesToHex, hexToBytes } from "@noble/curves/utils";
 import * as btc from "@scure/btc-signer";
 import { Address, OutScript, SigHash, Transaction } from "@scure/btc-signer";
 import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";
@@ -9,8 +9,8 @@ import {
   getP2TRAddressFromPublicKey,
   getP2TRScriptFromPublicKey,
 } from "../../utils/bitcoin.js";
-import { getNetwork, Network } from "../../utils/network.js";
 import { getFetch } from "../../utils/fetch.js";
+import { getNetwork, Network } from "../../utils/network.js";
 
 // Static keys for deterministic testing
 // P2TRAddress: bcrt1p2uy9zw5ltayucsuzl4tet6ckelzawp08qrtunacscsszflye907q62uqhl

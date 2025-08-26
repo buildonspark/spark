@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
-import { hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { hexToBytes } from "@noble/curves/utils";
 import { uuidv7 } from "uuidv7";
 import { ValidationError } from "../../errors/types.js";
 import { KeyDerivationType } from "../../index.js";

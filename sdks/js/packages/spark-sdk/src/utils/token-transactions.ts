@@ -1,5 +1,4 @@
-import { bytesToHex, bytesToNumberBE } from "@noble/curves/abstract/utils";
-import { equalBytes } from "@scure/btc-signer/utils";
+import { bytesToNumberBE, equalBytes } from "@noble/curves/utils";
 import { OutputWithPreviousTransactionData } from "../proto/spark.js";
 import { TokenBalanceMap, TokenOutputsMap } from "../spark-wallet/types.js";
 import {

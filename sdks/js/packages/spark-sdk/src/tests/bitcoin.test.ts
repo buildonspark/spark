@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
-import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
+import { bytesToHex, hexToBytes } from "@noble/curves/utils";
 import { Transaction } from "@scure/btc-signer";
+import { ValidationError } from "../errors/types.js";
 import {
   getP2TRAddressFromPkScript,
   getP2TRAddressFromPublicKey,
@@ -10,7 +11,6 @@ import {
   getTxId,
 } from "../utils/bitcoin.js";
 import { Network } from "../utils/network.js";
-import { ValidationError } from "../errors/types.js";
 
 describe("bitcoin", () => {
   it("test p2tr address from public key", () => {

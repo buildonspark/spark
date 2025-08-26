@@ -1,6 +1,6 @@
 import { mod } from "@noble/curves/abstract/modular";
-import { bytesToNumberBE, numberToBytesBE } from "@noble/curves/abstract/utils";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
+import { bytesToNumberBE, numberToBytesBE } from "@noble/curves/utils";
 import { ValidationError } from "../errors/index.js";
 
 export function generateSignatureFromExistingAdaptor(

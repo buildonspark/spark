@@ -1,35 +1,27 @@
 import {
+  Bech32mTokenIdentifier,
+  decodeBech32mTokenIdentifier,
+  decodeSparkAddress,
+  encodeBech32mTokenIdentifier,
+  encodeSparkAddress,
   NetworkError,
+  NotImplementedError,
+  SparkSigner,
   SparkWallet,
   SparkWalletProps,
   ValidationError,
-} from "@buildonspark/spark-sdk";
-import {
-  decodeSparkAddress,
-  encodeSparkAddress,
+  type ConfigOptions,
 } from "@buildonspark/spark-sdk";
 import {
   OutputWithPreviousTransactionData,
   TokenTransaction as TokenTransactionV0,
 } from "@buildonspark/spark-sdk/proto/spark";
 import { TokenTransaction } from "@buildonspark/spark-sdk/proto/spark_token";
-import { type ConfigOptions } from "@buildonspark/spark-sdk";
-import {
-  bytesToHex,
-  bytesToNumberBE,
-  hexToBytes,
-} from "@noble/curves/abstract/utils";
-import { decodeBech32mTokenIdentifier } from "@buildonspark/spark-sdk";
+import { bytesToHex, bytesToNumberBE, hexToBytes } from "@noble/curves/utils";
 import { TokenFreezeService } from "../services/freeze.js";
 import { IssuerTokenTransactionService } from "../services/token-transactions.js";
-import { TokenDistribution, IssuerTokenMetadata } from "./types.js";
-import { NotImplementedError } from "@buildonspark/spark-sdk";
-import { SparkSigner } from "@buildonspark/spark-sdk";
 import { validateTokenParameters } from "../utils/create-validation.js";
-import {
-  encodeBech32mTokenIdentifier,
-  Bech32mTokenIdentifier,
-} from "@buildonspark/spark-sdk";
+import { IssuerTokenMetadata, TokenDistribution } from "./types.js";
 
 const BURN_ADDRESS = "02".repeat(33);
 

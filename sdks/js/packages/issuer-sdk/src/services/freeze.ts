@@ -1,15 +1,15 @@
 import {
-  FreezeTokensResponse,
-  FreezeTokensPayload,
-} from "@buildonspark/spark-sdk/proto/spark_token";
-import {
   type ConnectionManager,
-  WalletConfigService,
   NetworkError,
+  WalletConfigService,
   collectResponses,
 } from "@buildonspark/spark-sdk";
+import {
+  FreezeTokensPayload,
+  FreezeTokensResponse,
+} from "@buildonspark/spark-sdk/proto/spark_token";
+import { hexToBytes } from "@noble/curves/utils";
 import { hashFreezeTokensPayload } from "../utils/token-hashing.js";
-import { hexToBytes } from "@noble/curves/abstract/utils";
 
 export class TokenFreezeService {
   private readonly config: WalletConfigService;

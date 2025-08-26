@@ -1,26 +1,26 @@
 import { uuidv7obj } from "uuidv7";
 
 import {
-  Bech32mTokenIdentifier,
-  decodeBech32mTokenIdentifier,
-} from "../utils/token-identifier.js";
-import {
   bytesToHex,
   bytesToNumberBE,
   hexToBytes,
   numberToVarBytesBE,
-} from "@noble/curves/abstract/utils";
+} from "@noble/curves/utils";
+import { bech32m } from "@scure/base";
+import { SparkAddress } from "../proto/spark.js";
 import {
-  encodeSparkAddress,
-  decodeSparkAddress,
-  getNetworkFromSparkAddress,
-  encodeSparkAddressWithSignature,
-  SparkAddressData,
   bech32mDecode,
+  decodeSparkAddress,
+  encodeSparkAddress,
+  encodeSparkAddressWithSignature,
+  getNetworkFromSparkAddress,
+  SparkAddressData,
   SparkAddressFormat,
 } from "../utils/address.js";
-import { SparkAddress } from "../proto/spark.js";
-import { bech32m } from "@scure/base";
+import {
+  Bech32mTokenIdentifier,
+  decodeBech32mTokenIdentifier,
+} from "../utils/token-identifier.js";
 
 describe("Spark Invoice Encode/Decode", () => {
   const testCases = [

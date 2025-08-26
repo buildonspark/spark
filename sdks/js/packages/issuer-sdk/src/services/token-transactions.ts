@@ -1,9 +1,11 @@
-import { WalletConfigService } from "@buildonspark/spark-sdk";
-import { type ConnectionManager } from "@buildonspark/spark-sdk";
+import {
+  TokenTransactionService,
+  WalletConfigService,
+  type ConnectionManager,
+} from "@buildonspark/spark-sdk";
 import { TokenTransaction as TokenTransactionV0 } from "@buildonspark/spark-sdk/proto/spark";
 import { TokenTransaction } from "@buildonspark/spark-sdk/proto/spark_token";
-import { TokenTransactionService } from "@buildonspark/spark-sdk";
-import { numberToBytesBE } from "@noble/curves/abstract/utils";
+import { numberToBytesBE } from "@noble/curves/utils";
 
 export class IssuerTokenTransactionService extends TokenTransactionService {
   constructor(

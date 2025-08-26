@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import { bytesToHex, hexToBytes } from "@noble/curves/abstract/utils";
+import { bytesToHex, hexToBytes } from "@noble/curves/utils";
 import { uuidv7 } from "uuidv7";
 import { KeyDerivation, KeyDerivationType } from "../../index.js";
 import { WalletConfigService } from "../../services/config.js";

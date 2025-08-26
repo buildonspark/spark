@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it } from "@jest/globals";
-import { hexToBytes } from "@noble/curves/abstract/utils";
+import { hexToBytes } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import { equalBytes } from "@scure/btc-signer/utils";
 import { uuidv7 } from "uuidv7";

@@ -1,11 +1,11 @@
 import { privateNegate } from "@bitcoinerlab/secp256k1";
+import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToHex,
   bytesToNumberBE,
   equalBytes,
   hexToBytes,
-} from "@noble/curves/abstract/utils";
-import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
+} from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import { HDKey } from "@scure/bip32";
 import { generateMnemonic, mnemonicToSeed } from "@scure/bip39";

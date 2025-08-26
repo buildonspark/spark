@@ -1,5 +1,5 @@
-import { numberToBytesBE } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { numberToBytesBE } from "@noble/curves/utils";
 import { ValidationError } from "../errors/index.js";
 
 export function addPublicKeys(a: Uint8Array, b: Uint8Array): Uint8Array {

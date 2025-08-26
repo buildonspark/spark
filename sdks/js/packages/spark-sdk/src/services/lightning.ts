@@ -1,9 +1,9 @@
+import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToNumberBE,
   hexToBytes,
   numberToBytesBE,
-} from "@noble/curves/abstract/utils";
-import { secp256k1 } from "@noble/curves/secp256k1";
+} from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import { uuidv7 } from "uuidv7";
 import { NetworkError, ValidationError } from "../errors/types.js";

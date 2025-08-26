@@ -1,14 +1,11 @@
-import { numberToBytesBE } from "@noble/curves/abstract/utils";
+import { numberToBytesBE } from "@noble/curves/utils";
+import { sha256 } from "@noble/hashes/sha2";
+import { Network } from "../proto/spark.js";
 import {
   hashTokenTransactionV0,
   hashTokenTransactionV1,
   hashTokenTransactionV2,
 } from "../utils/token-hashing.js";
-import { Network, OutputWithPreviousTransactionData } from "../proto/spark.js";
-import { TokenTransactionService } from "../services/token-transactions.js";
-import { WalletConfigService } from "../services/config.js";
-import { ConnectionManager } from "../services/connection.js";
-import { sha256 } from "@noble/hashes/sha2";
 
 // Test constants for consistent test data across all hash tests
 const TEST_TOKEN_PUBLIC_KEY = new Uint8Array([

@@ -1,9 +1,5 @@
-import {
-  bytesToHex,
-  bytesToNumberBE,
-  hexToBytes,
-} from "@noble/curves/abstract/utils";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
+import { bytesToHex, bytesToNumberBE, hexToBytes } from "@noble/curves/utils";
 
 import { sha256 } from "@noble/hashes/sha2";
 import * as btc from "@scure/btc-signer";

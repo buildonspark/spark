@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
-import { hexToBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { hexToBytes } from "@noble/curves/utils";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { equalBytes } from "@scure/btc-signer/utils";

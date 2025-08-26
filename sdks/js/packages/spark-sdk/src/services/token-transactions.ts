@@ -1,9 +1,9 @@
+import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToHex,
   bytesToNumberBE,
   numberToBytesBE,
-} from "@noble/curves/abstract/utils";
-import { secp256k1 } from "@noble/curves/secp256k1";
+} from "@noble/curves/utils";
 import { hexToBytes } from "@noble/hashes/utils";
 import {
   InternalValidationError,
@@ -17,9 +17,7 @@ import {
   QueryTokenTransactionsRequest as QueryTokenTransactionsRequestV0,
   RevocationSecretWithIndex,
   SignTokenTransactionResponse,
-  SparkInvoiceFields,
   TokenTransaction as TokenTransactionV0,
-  TokenTransactionWithStatus as TokenTransactionWithStatusV0,
 } from "../proto/spark.js";
 import {
   InputTtxoSignaturesPerOperator,
@@ -28,7 +26,6 @@ import {
   SignatureWithIndex,
   TokenOutput,
   TokenTransaction,
-  TokenTransactionWithStatus as TokenTransactionWithStatusV1,
 } from "../proto/spark_token.js";
 import { TokenOutputsMap } from "../spark-wallet/types.js";
 import { SparkCallOptions } from "../types/grpc.js";

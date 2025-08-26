@@ -1,5 +1,5 @@
-import { bytesToHex, equalBytes } from "@noble/curves/abstract/utils";
 import { secp256k1 } from "@noble/curves/secp256k1";
+import { bytesToHex, equalBytes } from "@noble/curves/utils";
 import { ValidationError } from "../errors/index.js";
 import { getCrypto } from "./crypto.js";
 

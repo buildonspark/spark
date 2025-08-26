@@ -1,12 +1,12 @@
 import { isNode, isObject, mapCurrencyAmount } from "@lightsparkdev/core";
+import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToHex,
   bytesToNumberBE,
   equalBytes,
   hexToBytes,
   numberToVarBytesBE,
-} from "@noble/curves/abstract/utils";
-import { secp256k1 } from "@noble/curves/secp256k1";
+} from "@noble/curves/utils";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
@@ -100,7 +100,6 @@ import { EventEmitter } from "eventemitter3";
 import { ClientError, Status } from "nice-grpc-common";
 import { isReactNative } from "../constants.js";
 import { Network as NetworkProto, networkToJSON } from "../proto/spark.js";
-import { TokenTransactionWithStatus } from "../proto/spark_token.js";
 import {
   decodeInvoice,
   getNetworkFromInvoice,
@@ -126,6 +125,7 @@ import {
 } from "../utils/address.js";
 import { chunkArray } from "../utils/chunkArray.js";
 import { getFetch } from "../utils/fetch.js";
+import { HashSparkInvoice } from "../utils/invoice-hashing.js";
 import { addPublicKeys } from "../utils/keys.js";
 import { RetryContext, withRetry } from "../utils/retry.js";
 import {
@@ -145,7 +145,6 @@ import type {
   TransferParams,
   UserTokenMetadata,
 } from "./types.js";
-import { HashSparkInvoice } from "../utils/invoice-hashing.js";
 
 /**
  * The SparkWallet class is the primary interface for interacting with the Spark network.

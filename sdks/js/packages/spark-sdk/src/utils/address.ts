@@ -1,6 +1,6 @@
 import { BinaryWriter } from "@bufbuild/protobuf/wire";
-import { bytesToNumberBE } from "@noble/curves/abstract/utils";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
+import { bytesToNumberBE } from "@noble/curves/utils";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import { bech32m } from "@scure/base";
 import { UUID } from "uuidv7";
