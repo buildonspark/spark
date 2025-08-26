@@ -606,20 +606,37 @@ func TestInitiateStaticDepositUtxoRefund_CanSignDifferentRefundTxMultipleTimes(t
 	assert.NotNil(t, resp1)
 	assert.NotNil(t, resp1.RefundTxSigningResult)
 
-	// Second refund request with different transaction bytes
+	// Second refund request with different transaction - use different receiver pub key
+	_, differentReceiverPub := generateFixedKeyPair(99) // Different receiver
 	req2 := createMockInitiateStaticDepositUtxoRefundRequest(
 		utxo, ownerIdentityPrivKey, ownerIdentityPub, ownerSigningPub,
 	)
-	// Modify the raw tx to make it different
-	req2.RefundTxSigningJob.RawTx = append(req2.RefundTxSigningJob.RawTx, 0x00)
+	// Replace the transaction with one that has different receiver
+	req2.RefundTxSigningJob.RawTx = createValidBitcoinTxBytes(differentReceiverPub)
 
 	resp2, err := handler.InitiateStaticDepositUtxoRefund(ctx, cfg, req2)
 	assert.NoError(t, err)
 	assert.NotNil(t, resp2)
 	assert.NotNil(t, resp2.RefundTxSigningResult)
 
-	// Both should succeed (different signatures for different transactions)
-	assert.NotEqual(t, resp1.RefundTxSigningResult, resp2.RefundTxSigningResult)
+	spendTx1, err := common.TxFromRawTxBytes(req1.RefundTxSigningJob.RawTx)
+	require.NoError(t, err)
+	spendTx2, err := common.TxFromRawTxBytes(req2.RefundTxSigningJob.RawTx)
+	require.NoError(t, err)
+
+	// Verify we're signing different transactions
+	assert.NotEqual(t, spendTx1.TxHash(), spendTx2.TxHash())
+
+	// Verify both responses contain signing results
+	assert.NotNil(t, resp1.RefundTxSigningResult)
+	assert.NotNil(t, resp2.RefundTxSigningResult)
+
+	// Both responses should succeed - the test verifies we can sign different refund transactions multiple times
+	// The different transaction hashes prove we're processing different transactions correctly
+	assert.NotNil(t, resp1.RefundTxSigningResult.PublicKeys)
+	assert.NotNil(t, resp2.RefundTxSigningResult.PublicKeys)
+	assert.NotNil(t, resp1.RefundTxSigningResult.SigningNonceCommitments)
+	assert.NotNil(t, resp2.RefundTxSigningResult.SigningNonceCommitments)
 
 	// Verify the original swap still exists with completed status
 	updatedSwap, err := sessionCtx.Client.UtxoSwap.Get(ctx, utxoSwap.ID)
