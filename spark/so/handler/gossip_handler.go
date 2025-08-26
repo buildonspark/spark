@@ -148,9 +148,10 @@ func (h *GossipHandler) handleDepositCleanupGossipMessage(ctx context.Context, r
 		return
 	}
 
-	// a) Query all tree nodes under this tree
+	// a) Query all tree nodes under this tree with lock to prevent race conditions
 	treeNodes, err := db.TreeNode.Query().
 		Where(treenode.HasTreeWith(tree.IDEQ(treeID))).
+		ForUpdate().
 		All(ctx)
 	if err != nil {
 		logger.Error("Failed to query tree nodes", "error", err, "tree_id", req.TreeId)
@@ -182,26 +183,17 @@ func (h *GossipHandler) handleDepositCleanupGossipMessage(ctx context.Context, r
 		logger.Info("Successfully deleted tree node for deposit cleanup", "node_id", node.ID.String())
 	}
 
-	// Query the tree
-	tree, err := db.Tree.Get(ctx, treeID)
+	// Delete the tree
+	err = db.Tree.DeleteOneID(treeID).Exec(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			logger.Warn("Tree not found for deposit cleanup", "tree_id", req.TreeId)
 		} else {
-			logger.Error("Failed to query tree", "error", err, "tree_id", req.TreeId)
-			return
-		}
-	}
-
-	// Delete the tree if it exists
-	if tree != nil {
-		err = db.Tree.DeleteOne(tree).Exec(ctx)
-		if err != nil {
 			logger.Error("Failed to delete tree", "error", err, "tree_id", req.TreeId)
-			return
 		}
-		logger.Info("Successfully deleted tree for deposit cleanup", "tree_id", req.TreeId)
+		return
 	}
+	logger.Info("Successfully deleted tree for deposit cleanup", "tree_id", req.TreeId)
 
 	logger.Info("Completed deposit cleanup processing", "tree_id", req.TreeId)
 }
