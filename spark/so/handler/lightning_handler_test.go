@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"math/rand/v2"
 	"testing"
 	"time"
@@ -409,19 +410,19 @@ func TestValidatePreimage(t *testing.T) {
 	}{
 		{
 			name:              "invalid preimage - hash mismatch",
-			paymentHash:       []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
-			preimage:          []byte("wrong_preimage_that_doesnt_match_hash"),
-			identityPublicKey: []byte("identity_key"),
+			paymentHash:       make([]byte, 32),
+			preimage:          make([]byte, 32),
+			identityPublicKey: make([]byte, 33),
 			expectError:       true,
 			expectedErrMsgs:   []string{"invalid preimage"},
 		},
 		{
 			name:              "non-existent preimage request",
-			paymentHash:       []byte("some_hash_that_matches_preimage_"),
-			preimage:          []byte("test_preimage_32_bytes_long_____"),
-			identityPublicKey: []byte("identity_key"),
+			paymentHash:       make([]byte, 32),
+			preimage:          make([]byte, 32),
+			identityPublicKey: make([]byte, 33),
 			expectError:       true,
-			expectedErrMsgs:   []string{"invalid preimage", "unable to get preimage request"},
+			expectedErrMsgs:   []string{"invalid preimage"},
 		},
 		{
 			name:              "empty payment hash",
@@ -429,7 +430,7 @@ func TestValidatePreimage(t *testing.T) {
 			preimage:          []byte("test_preimage"),
 			identityPublicKey: []byte("identity_key"),
 			expectError:       true,
-			expectedErrMsgs:   []string{"invalid preimage"},
+			expectedErrMsgs:   []string{"payment hash cannot be empty"},
 		},
 		{
 			name:              "empty preimage",
@@ -437,7 +438,7 @@ func TestValidatePreimage(t *testing.T) {
 			preimage:          []byte{},
 			identityPublicKey: []byte("identity_key"),
 			expectError:       true,
-			expectedErrMsgs:   []string{"invalid preimage"},
+			expectedErrMsgs:   []string{"preimage cannot be empty"},
 		},
 		{
 			name:              "nil identity public key",
@@ -445,7 +446,7 @@ func TestValidatePreimage(t *testing.T) {
 			preimage:          []byte("test_preimage_32_bytes_long_____"),
 			identityPublicKey: nil,
 			expectError:       true,
-			expectedErrMsgs:   []string{"invalid preimage", "unable to get preimage request"},
+			expectedErrMsgs:   []string{"identity public key cannot be empty"},
 		},
 	}
 
@@ -528,13 +529,13 @@ func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 			name:              "nil cpfp transactions",
 			cpfpTransactions:  nil,
 			destinationPubkey: validPubKey,
-			expectedErrMsg:    "invalid amount, expected: 1000 or more, got: 0",
+			expectedErrMsg:    "at least one transaction type must be provided",
 		},
 		{
 			name:              "empty cpfp transactions",
 			cpfpTransactions:  []*pb.UserSignedTxSigningJob{},
 			destinationPubkey: validPubKey,
-			expectedErrMsg:    "invalid amount, expected: 1000 or more, got: 0",
+			expectedErrMsg:    "at least one transaction type must be provided",
 		},
 		{
 			name:              "nil transaction in cpfp array",
@@ -551,30 +552,26 @@ func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 				},
 			},
 			destinationPubkey: validPubKey,
-			expectedErrMsg:    "signing commitments is nil",
+			expectedErrMsg:    "signing commitments is nil for cpfpTransaction, leaf_id: 550e8400-e29b-41d4-a716-446655440000",
 		},
 		{
 			name: "nil signing nonce commitment",
 			cpfpTransactions: []*pb.UserSignedTxSigningJob{
 				{
-					LeafId: "550e8400-e29b-41d4-a716-446655440000",
-					SigningCommitments: &pb.SigningCommitments{
-						SigningCommitments: map[string]*pbcommon.SigningCommitment{},
-					},
+					LeafId:                 "550e8400-e29b-41d4-a716-446655440000",
+					SigningCommitments:     &pb.SigningCommitments{SigningCommitments: map[string]*pbcommon.SigningCommitment{}},
 					SigningNonceCommitment: nil,
 				},
 			},
 			destinationPubkey: validPubKey,
-			expectedErrMsg:    "signing nonce commitment is nil",
+			expectedErrMsg:    "signing nonce commitment is nil for cpfpTransaction, leaf_id: 550e8400-e29b-41d4-a716-446655440000",
 		},
 		{
 			name: "invalid leaf ID format",
 			cpfpTransactions: []*pb.UserSignedTxSigningJob{
 				{
-					LeafId: "invalid-uuid-format",
-					SigningCommitments: &pb.SigningCommitments{
-						SigningCommitments: map[string]*pbcommon.SigningCommitment{},
-					},
+					LeafId:                 "invalid-uuid",
+					SigningCommitments:     &pb.SigningCommitments{SigningCommitments: map[string]*pbcommon.SigningCommitment{}},
 					SigningNonceCommitment: &pbcommon.SigningCommitment{},
 				},
 			},
@@ -590,10 +587,11 @@ func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 						SigningCommitments: map[string]*pbcommon.SigningCommitment{}, // empty map
 					},
 					SigningNonceCommitment: &pbcommon.SigningCommitment{},
+					RawTx:                  []byte("dummy_transaction_data_for_testing"),
 				},
 			},
 			destinationPubkey: validPubKey,
-			expectedErrMsg:    "unable to get cpfpTransaction tree_node with id", // Will fail at node lookup
+			expectedErrMsg:    "unable to get cpfpTransaction tree_node with id: 550e8400-e29b-41d4-a716-446655440000", // Will fail at node lookup
 		},
 	}
 
@@ -601,7 +599,7 @@ func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := lightningHandler.ValidateGetPreimageRequest(
 				ctx,
-				[]byte("payment_hash"),
+				[]byte("payment_hash_32_bytes_long______"),
 				tt.cpfpTransactions,
 				tt.directTransactions,
 				tt.directFromCpfpTransactions,
@@ -700,6 +698,32 @@ func TestInitiatePreimageSwapEdgeCases(t *testing.T) {
 			},
 			expectError:    true,
 			expectedErrMsg: "fee is not allowed for receive preimage swap",
+		},
+		{
+			name: "too many transactions exceeds knob limit",
+			setupRequest: func() *pb.InitiatePreimageSwapRequest {
+				// Create 101 transactions to exceed the default limit of 100
+				leaves := make([]*pb.UserSignedTxSigningJob, 101)
+				for i := 0; i < 101; i++ {
+					leaves[i] = &pb.UserSignedTxSigningJob{
+						LeafId:                 fmt.Sprintf("550e8400-e29b-41d4-a716-44665544%04d", i),
+						SigningCommitments:     &pb.SigningCommitments{SigningCommitments: map[string]*pbcommon.SigningCommitment{}},
+						SigningNonceCommitment: &pbcommon.SigningCommitment{},
+						RawTx:                  []byte("dummy_transaction_data_for_testing"),
+					}
+				}
+				return &pb.InitiatePreimageSwapRequest{
+					PaymentHash: []byte("payment_hash_32_bytes_long______"),
+					Transfer: &pb.StartUserSignedTransferRequest{
+						LeavesToSend:              leaves,
+						OwnerIdentityPublicKey:    []byte("owner_key"),
+						ReceiverIdentityPublicKey: []byte("receiver_key"),
+					},
+					Reason: pb.InitiatePreimageSwapRequest_REASON_SEND,
+				}
+			},
+			expectError:    true,
+			expectedErrMsg: "too many transactions: 101, maximum allowed: 100",
 		},
 		{
 			name: "nil leaves to send",

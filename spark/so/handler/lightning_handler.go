@@ -31,6 +31,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/knobs"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -305,6 +306,23 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 	validateNodeOwnership bool,
 ) error {
 	logger := logging.GetLoggerFromContext(ctx)
+
+	// Validate input parameters
+	if len(paymentHash) != 32 {
+		return fmt.Errorf("invalid payment hash length: %d bytes, expected 32 bytes", len(paymentHash))
+	}
+
+	if len(cpfpTransactions) == 0 && len(directTransactions) == 0 && len(directFromCpfpTransactions) == 0 {
+		return fmt.Errorf("at least one transaction type must be provided")
+	}
+
+	// Validate transaction limits to prevent DoS
+	maxTransactionsPerRequest := int(knobs.GetKnobsService(ctx).GetValue(knobs.KnobSoMaxTransactionsPerRequest, 100))
+	totalTransactions := len(cpfpTransactions) + len(directTransactions) + len(directFromCpfpTransactions)
+	if totalTransactions > maxTransactionsPerRequest {
+		return fmt.Errorf("too many transactions: %d, maximum allowed: %d", totalTransactions, maxTransactionsPerRequest)
+	}
+
 	destinationPubKey, err := keys.ParsePublicKey(destinationPubKeyBytes)
 	if err != nil {
 		return fmt.Errorf("invalid destination public key: %w", err)
@@ -314,6 +332,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 	if err != nil {
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
+	// Check for existing preimage requests (duplicate prevention)
 	preimageRequests, err := tx.PreimageRequest.Query().Where(
 		preimagerequest.PaymentHashEQ(paymentHash),
 		preimagerequest.ReceiverIdentityPubkeyEQ(destinationPubKey.Serialize()),
@@ -342,7 +361,11 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return fmt.Errorf("cpfp transaction is nil")
 		}
 
-		// First fetch the node tx in order to calculate the sighash
+		// Validate leaf ID format
+		if len(cpfpTransaction.LeafId) == 0 {
+			return fmt.Errorf("leaf ID cannot be empty")
+		}
+
 		nodeID, err := uuid.Parse(cpfpTransaction.LeafId)
 		if err != nil {
 			return fmt.Errorf("unable to parse node id: %w", err)
@@ -354,6 +377,16 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 
 		if cpfpTransaction.SigningNonceCommitment == nil {
 			return fmt.Errorf("signing nonce commitment is nil for cpfpTransaction, leaf_id: %s", nodeID)
+		}
+
+		// Validate raw transaction data
+		if len(cpfpTransaction.RawTx) == 0 {
+			return fmt.Errorf("raw transaction data cannot be empty for cpfpTransaction, leaf_id: %s", nodeID)
+		}
+
+		const MaxTransactionSize = 100000 // 100KB limit for individual transactions
+		if len(cpfpTransaction.RawTx) > MaxTransactionSize {
+			return fmt.Errorf("raw transaction too large: %d bytes, maximum allowed: %d bytes for leaf_id: %s", len(cpfpTransaction.RawTx), MaxTransactionSize, nodeID)
 		}
 
 		node, err := tx.TreeNode.Get(ctx, nodeID)
@@ -1172,11 +1205,33 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 
 func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pb.ProvidePreimageRequest) (*ent.Transfer, error) {
 	logger := logging.GetLoggerFromContext(ctx)
+
+	// Validate input parameters
+	if len(req.PaymentHash) == 0 {
+		return nil, fmt.Errorf("payment hash cannot be empty")
+	}
+	if len(req.PaymentHash) != 32 {
+		return nil, fmt.Errorf("invalid payment hash length: %d bytes, expected 32 bytes", len(req.PaymentHash))
+	}
+	if len(req.Preimage) == 0 {
+		return nil, fmt.Errorf("preimage cannot be empty")
+	}
+	if len(req.Preimage) != 32 {
+		return nil, fmt.Errorf("invalid preimage length: %d bytes, expected 32 bytes", len(req.Preimage))
+	}
+	if len(req.IdentityPublicKey) == 0 {
+		return nil, fmt.Errorf("identity public key cannot be empty")
+	}
+	if len(req.IdentityPublicKey) != 33 {
+		return nil, fmt.Errorf("invalid identity public key length: %d bytes, expected 33 bytes", len(req.IdentityPublicKey))
+	}
+
 	tx, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
+	// Validate preimage produces the correct payment hash
 	calculatedPaymentHash := sha256.Sum256(req.Preimage)
 	if !bytes.Equal(calculatedPaymentHash[:], req.PaymentHash) {
 		return nil, fmt.Errorf("invalid preimage")
