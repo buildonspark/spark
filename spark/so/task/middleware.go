@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime/debug"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -78,20 +79,29 @@ func TimeoutMiddleware() TaskMiddleware {
 	}
 }
 
-func DatabaseMiddleware(factory db.SessionFactory) TaskMiddleware {
+func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration) TaskMiddleware {
 	return func(ctx context.Context, config *so.Config, task *BaseTaskSpec) error {
 		logger := logging.GetLoggerFromContext(ctx)
 
 		sessionCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		sessionCtx = db.WithMetricAttributes(sessionCtx, []attribute.KeyValue{
-			TaskNameKey.String(task.Name),
-		})
+		opts := []db.SessionOption{
+			db.WithMetricAttributes([]attribute.KeyValue{
+				TaskNameKey.String(task.Name),
+			}),
+		}
 
-		session := factory.NewSession(sessionCtx)
+		if beginTxTimeout != nil {
+			opts = append(opts, db.WithTxBeginTimeout(*beginTxTimeout))
+		}
+
+		session := factory.NewSession(
+			sessionCtx,
+			opts...,
+		)
+
 		ctx = ent.Inject(ctx, session)
-
 		err := task.Task(ctx, config)
 
 		tx := session.GetTxIfExists()

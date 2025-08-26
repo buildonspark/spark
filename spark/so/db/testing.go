@@ -18,7 +18,7 @@ type TestSessionFactory struct {
 	Session *Session
 }
 
-func (t *TestSessionFactory) NewSession(ctx context.Context) *Session {
+func (t *TestSessionFactory) NewSession(ctx context.Context, opts ...SessionOption) *Session {
 	return t.Session
 }
 
@@ -57,7 +57,7 @@ func NewTestContext(
 		return nil, nil, err
 	}
 
-	dbSession := NewDefaultSessionFactory(dbClient, nil).NewSession(ctx)
+	dbSession := NewDefaultSessionFactory(dbClient).NewSession(ctx)
 	return ent.Inject(ctx, dbSession), &TestContext{t: t, Client: dbClient, Session: dbSession}, nil
 }
 
@@ -66,7 +66,7 @@ func NewTestSQLiteContext(
 	ctx context.Context,
 ) (context.Context, *TestContext) {
 	dbClient := NewTestSQLiteClient(t)
-	session := NewSession(ctx, dbClient, nil)
+	session := NewSession(ctx, dbClient)
 	return ent.Inject(ctx, session), &TestContext{t: t, Client: dbClient, Session: session}
 }
 
@@ -114,7 +114,7 @@ func NewPgTestContext(t *testing.T, ctx context.Context, dsn string) (context.Co
 	err = client.Schema.Create(ctx)
 	require.NoError(t, err)
 
-	session := NewSession(ctx, client, nil)
+	session := NewSession(ctx, client)
 	return ent.Inject(ctx, session), &TestContext{t: t, Client: client, Session: session}, nil
 }
 

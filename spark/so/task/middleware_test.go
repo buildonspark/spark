@@ -130,7 +130,7 @@ func TestDatabaseMiddleware_TestCommitWhenTaskSuccessful(t *testing.T) {
 	require.NoError(t, err)
 
 	dbClient := db.NewTestSQLiteClient(t)
-	dbSession := db.NewSession(t.Context(), dbClient, nil)
+	dbSession := db.NewSession(t.Context(), dbClient)
 
 	// Seed a transaction in the session that we can verify is committed.
 	dbTx, err := dbSession.GetOrBeginTx(t.Context())
@@ -167,7 +167,7 @@ func TestDatabaseMiddleware_TestCommitWhenTaskSuccessful(t *testing.T) {
 	go func() {
 		defer close(errChan)
 
-		taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}))
+		taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}, nil))
 		err = taskWithDb.Task(t.Context(), config)
 
 		select {
@@ -201,7 +201,7 @@ func TestDatabaseMiddleware_TestRollbackWhenTaskUnsuccessful(t *testing.T) {
 	require.NoError(t, err)
 
 	dbClient := db.NewTestSQLiteClient(t)
-	dbSession := db.NewSession(t.Context(), dbClient, nil)
+	dbSession := db.NewSession(t.Context(), dbClient)
 
 	// Seed a transaction in the session that we can verify is committed.
 	dbTx, err := dbSession.GetOrBeginTx(t.Context())
@@ -239,7 +239,7 @@ func TestDatabaseMiddleware_TestRollbackWhenTaskUnsuccessful(t *testing.T) {
 	go func() {
 		defer close(errChan)
 
-		taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}))
+		taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}, nil))
 		err = taskWithDb.Task(t.Context(), config)
 		if err != nil {
 			errChan <- err
@@ -271,7 +271,7 @@ func TestDatabaseMiddleware_TestTaskCanCommitTransaction(t *testing.T) {
 	require.NoError(t, err)
 
 	dbClient := db.NewTestSQLiteClient(t)
-	dbSession := db.NewSession(t.Context(), dbClient, nil)
+	dbSession := db.NewSession(t.Context(), dbClient)
 
 	task := BaseTaskSpec{
 		Name:    "Test",
@@ -286,7 +286,7 @@ func TestDatabaseMiddleware_TestTaskCanCommitTransaction(t *testing.T) {
 		},
 	}
 
-	taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}))
+	taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}, nil))
 
 	err = taskWithDb.Task(t.Context(), config)
 	require.NoError(t, err, "Expected task to commit transaction successfully")

@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"time"
 
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/db"
@@ -10,7 +11,7 @@ import (
 )
 
 // DatabaseSessionMiddleware is a middleware to manage database sessions for each gRPC call.
-func DatabaseSessionMiddleware(factory db.SessionFactory) grpc.UnaryServerInterceptor {
+func DatabaseSessionMiddleware(factory db.SessionFactory, txBeginTimeout *time.Duration) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if info != nil &&
 			(info.FullMethod == "/grpc.health.v1.Health/Check") {
@@ -19,15 +20,23 @@ func DatabaseSessionMiddleware(factory db.SessionFactory) grpc.UnaryServerInterc
 
 		logger := logging.GetLoggerFromContext(ctx)
 
+		opts := []db.SessionOption{}
+		if txBeginTimeout != nil {
+			opts = append(opts, db.WithTxBeginTimeout(*txBeginTimeout))
+		}
+
 		if metricAttrs := ParseFullMethod(info.FullMethod); metricAttrs != nil {
-			ctx = db.WithMetricAttributes(ctx, metricAttrs)
+			opts = append(opts, db.WithMetricAttributes(metricAttrs))
 		}
 
 		sessionCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		// Start a transaction or session
-		session := factory.NewSession(sessionCtx)
+		session := factory.NewSession(
+			sessionCtx,
+			opts...,
+		)
 
 		// Attach the transaction to the context
 		ctx = ent.Inject(ctx, session)

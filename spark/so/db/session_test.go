@@ -40,7 +40,7 @@ func TestSession_GetOrBeginTxReturnsSameTx(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, nil).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	tx1, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")
@@ -55,7 +55,7 @@ func TestSession_GetCurrentTxReturnsNilWithNoTx(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, nil).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	tx := session.GetTxIfExists()
 	require.Nil(t, tx, "Expected no current transaction to exist")
@@ -65,7 +65,7 @@ func TestSession_GetCurrentTxReturnsNilAfterSuccessfulCommit(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, nil).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	tx, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")
@@ -81,7 +81,7 @@ func TestSession_GetCurrentTxReturnsNilAfterSuccessfulRollback(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, nil).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	tx, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")
@@ -97,7 +97,7 @@ func TestSession_GetCurrrentTxReturnsSameTxAfterFailedCommit(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, nil).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	tx, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")
@@ -119,7 +119,7 @@ func TestSession_GetCurrrentTxReturnsSameTxAfterFailedRollback(t *testing.T) {
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, nil).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	tx, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")
@@ -141,7 +141,7 @@ func TestSession_GetOrBeginTxCommitAfterCancelledTransactionContext(t *testing.T
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, nil).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	innerCtx, innerCancel := context.WithCancel(t.Context())
 
@@ -160,7 +160,7 @@ func TestSession_GetOrBeginTxCommitAfterCancelledSessionContext(t *testing.T) {
 	defer dbClient.Close()
 
 	sessionCtx, sessionCancel := context.WithCancel(t.Context())
-	session := NewDefaultSessionFactory(dbClient, nil).NewSession(sessionCtx)
+	session := NewDefaultSessionFactory(dbClient).NewSession(sessionCtx)
 
 	tx, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")
@@ -181,7 +181,7 @@ func TestSession_GetOrBeginTxRollbackAfterCancelledTransactionContext(t *testing
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
-	session := NewDefaultSessionFactory(dbClient, nil).NewSession(t.Context())
+	session := NewDefaultSessionFactory(dbClient).NewSession(t.Context())
 
 	innerCtx, innerCancel := context.WithCancel(t.Context())
 
@@ -200,7 +200,7 @@ func TestSession_GetOrBeginTxRollbackAfterCancelledSessionContext(t *testing.T) 
 	defer dbClient.Close()
 
 	sessionCtx, sessionCancel := context.WithCancel(t.Context())
-	session := NewDefaultSessionFactory(dbClient, nil).NewSession(sessionCtx)
+	session := NewDefaultSessionFactory(dbClient).NewSession(sessionCtx)
 
 	tx, err := session.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction")
@@ -221,7 +221,7 @@ func TestTxProviderWithTimeout_Success(t *testing.T) {
 	defer dbClient.Close()
 
 	timeout := 5 * time.Second
-	provider := NewTxProviderWithTimeout(ent.NewEntClientTxProvider(dbClient), &timeout)
+	provider := NewTxProviderWithTimeout(ent.NewEntClientTxProvider(dbClient), timeout)
 
 	_, err := provider.GetOrBeginTx(t.Context())
 	require.NoError(t, err, "Expected to retrieve a transaction within the timeout")
@@ -229,7 +229,7 @@ func TestTxProviderWithTimeout_Success(t *testing.T) {
 
 func TestTxProviderWithTimeout_Timeout(t *testing.T) {
 	timeout := 200 * time.Millisecond
-	provider := NewTxProviderWithTimeout(&NeverTxProvider{}, &timeout)
+	provider := NewTxProviderWithTimeout(&NeverTxProvider{}, timeout)
 
 	_, err := provider.GetOrBeginTx(t.Context())
 	require.ErrorIs(t, err, ErrTxBeginTimeout)
@@ -237,7 +237,7 @@ func TestTxProviderWithTimeout_Timeout(t *testing.T) {
 
 func TestTxProviderWithTimeout_CancelledContext(t *testing.T) {
 	timeout := 5 * time.Second
-	provider := NewTxProviderWithTimeout(&NeverTxProvider{}, &timeout)
+	provider := NewTxProviderWithTimeout(&NeverTxProvider{}, timeout)
 
 	_, err := provider.GetOrBeginTx(t.Context())
 	require.ErrorIs(t, err, ErrTxBeginTimeout)
@@ -262,7 +262,7 @@ func TestTxProviderWithTimeout_SlowProvider(t *testing.T) {
 	defer close(trigger)
 
 	timeout := 200 * time.Millisecond
-	provider := NewTxProviderWithTimeout(&SlowTxProvider{tx: tx, trigger: trigger}, &timeout)
+	provider := NewTxProviderWithTimeout(&SlowTxProvider{tx: tx, trigger: trigger}, timeout)
 
 	_, err = provider.GetOrBeginTx(t.Context())
 	require.ErrorIs(t, err, ErrTxBeginTimeout)
@@ -295,7 +295,7 @@ func TestTxProviderWithTimeout_NoTimeout(t *testing.T) {
 	defer close(txChan)
 
 	timeout := 0 * time.Second
-	provider := NewTxProviderWithTimeout(&SlowTxProvider{tx: tx, trigger: trigger}, &timeout)
+	provider := NewTxProviderWithTimeout(&SlowTxProvider{tx: tx, trigger: trigger}, timeout)
 
 	go func() {
 		tx, err := provider.GetOrBeginTx(t.Context())

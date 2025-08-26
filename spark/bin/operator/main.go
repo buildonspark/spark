@@ -523,7 +523,10 @@ func main() {
 					return handler(ctx, req)
 				}
 			}(),
-			sparkgrpc.DatabaseSessionMiddleware(db.NewDefaultSessionFactory(dbClient, config.Database.NewTxTimeout)),
+			sparkgrpc.DatabaseSessionMiddleware(
+				db.NewDefaultSessionFactory(dbClient),
+				config.Database.NewTxTimeout,
+			),
 			helper.SigningCommitmentInterceptor(config.SigningOperatorMap, knobsService),
 			authn.NewInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
 			authz.NewAuthzInterceptor(authz.NewAuthzConfig(

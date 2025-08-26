@@ -727,7 +727,7 @@ func (t *BaseTaskSpec) RunOnce(config *so.Config, dbClient *ent.Client) error {
 
 	wrappedTask := t.chainMiddleware(
 		LogMiddleware(),
-		DatabaseMiddleware(db.NewDefaultSessionFactory(dbClient, config.Database.NewTxTimeout)),
+		DatabaseMiddleware(db.NewDefaultSessionFactory(dbClient), config.Database.NewTxTimeout),
 		TimeoutMiddleware(),
 		PanicRecoveryMiddleware(),
 	)
@@ -738,7 +738,7 @@ func (t *BaseTaskSpec) RunOnce(config *so.Config, dbClient *ent.Client) error {
 func (t *ScheduledTaskSpec) Schedule(scheduler gocron.Scheduler, config *so.Config, dbClient *ent.Client) error {
 	wrappedTask := t.chainMiddleware(
 		LogMiddleware(),
-		DatabaseMiddleware(db.NewDefaultSessionFactory(dbClient, config.Database.NewTxTimeout)),
+		DatabaseMiddleware(db.NewDefaultSessionFactory(dbClient), config.Database.NewTxTimeout),
 		TimeoutMiddleware(),
 		PanicRecoveryMiddleware(),
 	)
