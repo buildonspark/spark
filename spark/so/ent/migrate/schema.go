@@ -542,14 +542,14 @@ var (
 		},
 		Indexes: []*schema.Index{
 			{
-				Name:    "tokenoutput_owner_public_key_token_public_key_status_network",
+				Name:    "tokenoutput_owner_public_key_status_network",
 				Unique:  false,
-				Columns: []*schema.Column{TokenOutputsColumns[4], TokenOutputsColumns[8], TokenOutputsColumns[3], TokenOutputsColumns[16]},
+				Columns: []*schema.Column{TokenOutputsColumns[4], TokenOutputsColumns[3], TokenOutputsColumns[16]},
 			},
 			{
-				Name:    "tokenoutput_owner_public_key_token_identifier_status",
+				Name:    "tokenoutput_token_identifier_status",
 				Unique:  false,
-				Columns: []*schema.Column{TokenOutputsColumns[4], TokenOutputsColumns[17], TokenOutputsColumns[3]},
+				Columns: []*schema.Column{TokenOutputsColumns[17], TokenOutputsColumns[3]},
 			},
 			{
 				Name:    "tokenoutput_confirmed_withdraw_block_hash",

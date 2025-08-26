@@ -74,11 +74,9 @@ func (TokenOutput) Edges() []ent.Edge {
 
 func (TokenOutput) Indexes() []ent.Index {
 	return []ent.Index{
-		// Optimized for GetOwnedTokenOutputs query: high cardinality fields first, then low cardinality enums.
-		// Supports: owner_public_key, owner_public_key+token_public_key, owner_public_key+token_public_key+status, etc.
-		index.Fields("owner_public_key", "token_public_key", "status", "network"),
-		// Omit network because token identifier is unique per network.
-		index.Fields("owner_public_key", "token_identifier", "status"),
+		// Optimized for GetOwnedTokenOutputs query
+		index.Fields("owner_public_key", "status", "network"),
+		index.Fields("token_identifier", "status"),
 		// Enables quick unmarking of withdrawn outputs in response to block reorgs.
 		index.Fields("confirmed_withdraw_block_hash"),
 		// Optimize pre-emption queries by indexing the spent transaction relationship
