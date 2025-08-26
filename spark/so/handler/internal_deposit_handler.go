@@ -457,7 +457,7 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 	// Check that the utxo swap is not already registered
 	utxoSwap, err := db.UtxoSwap.Query().
 		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).
-		Where(utxoswap.StatusNEQ(st.UtxoSwapStatusCancelled)).
+		Where(utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted)).
 		First(ctx)
 	if err != nil && !ent.IsNotFound(err) {
 		return nil, fmt.Errorf("unable to check if utxo swap is already registered: %w", err)

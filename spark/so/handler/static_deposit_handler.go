@@ -194,7 +194,7 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 
 	utxoSwap, err := db.UtxoSwap.Query().
 		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).
-		Where(utxoswap.StatusNEQ(st.UtxoSwapStatusCancelled)).
+		Where(utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted)).
 		First(ctx)
 	if err != nil && !ent.IsNotFound(err) {
 		return nil, fmt.Errorf("unable to check if utxo swap is already completed: %w", err)
@@ -241,7 +241,7 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 
 	utxoSwap, err = db.UtxoSwap.Query().
 		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).
-		Where(utxoswap.StatusNEQ(st.UtxoSwapStatusCancelled)).
+		Where(utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted)).
 		First(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get utxo swap: %w", err)

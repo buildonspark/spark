@@ -1352,7 +1352,7 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 
 	utxoSwap, err := db.UtxoSwap.Query().
 		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).
-		Where(utxoswap.StatusNEQ(st.UtxoSwapStatusCancelled)).
+		Where(utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted)).
 		First(ctx)
 	if err != nil && !ent.IsNotFound(err) {
 		return nil, fmt.Errorf("unable to check if utxo swap is already completed: %w", err)
@@ -1435,7 +1435,7 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 
 	utxoSwap, err = db.UtxoSwap.Query().
 		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).
-		Where(utxoswap.StatusNEQ(st.UtxoSwapStatusCancelled)).
+		Where(utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted)).
 		First(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get utxo swap: %w", err)
