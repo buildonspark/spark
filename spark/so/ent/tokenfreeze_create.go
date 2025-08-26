@@ -104,14 +104,6 @@ func (tfc *TokenFreezeCreate) SetTokenCreateID(u uuid.UUID) *TokenFreezeCreate {
 	return tfc
 }
 
-// SetNillableTokenCreateID sets the "token_create_id" field if the given value is not nil.
-func (tfc *TokenFreezeCreate) SetNillableTokenCreateID(u *uuid.UUID) *TokenFreezeCreate {
-	if u != nil {
-		tfc.SetTokenCreateID(*u)
-	}
-	return tfc
-}
-
 // SetID sets the "id" field.
 func (tfc *TokenFreezeCreate) SetID(u uuid.UUID) *TokenFreezeCreate {
 	tfc.mutation.SetID(u)
@@ -214,6 +206,12 @@ func (tfc *TokenFreezeCreate) check() error {
 	}
 	if _, ok := tfc.mutation.WalletProvidedFreezeTimestamp(); !ok {
 		return &ValidationError{Name: "wallet_provided_freeze_timestamp", err: errors.New(`ent: missing required field "TokenFreeze.wallet_provided_freeze_timestamp"`)}
+	}
+	if _, ok := tfc.mutation.TokenCreateID(); !ok {
+		return &ValidationError{Name: "token_create_id", err: errors.New(`ent: missing required field "TokenFreeze.token_create_id"`)}
+	}
+	if len(tfc.mutation.TokenCreateIDs()) == 0 {
+		return &ValidationError{Name: "token_create", err: errors.New(`ent: missing required edge "TokenFreeze.token_create"`)}
 	}
 	return nil
 }
@@ -400,24 +398,6 @@ func (u *TokenFreezeUpsert) ClearWalletProvidedThawTimestamp() *TokenFreezeUpser
 	return u
 }
 
-// SetTokenCreateID sets the "token_create_id" field.
-func (u *TokenFreezeUpsert) SetTokenCreateID(v uuid.UUID) *TokenFreezeUpsert {
-	u.Set(tokenfreeze.FieldTokenCreateID, v)
-	return u
-}
-
-// UpdateTokenCreateID sets the "token_create_id" field to the value that was provided on create.
-func (u *TokenFreezeUpsert) UpdateTokenCreateID() *TokenFreezeUpsert {
-	u.SetExcluded(tokenfreeze.FieldTokenCreateID)
-	return u
-}
-
-// ClearTokenCreateID clears the value of the "token_create_id" field.
-func (u *TokenFreezeUpsert) ClearTokenCreateID() *TokenFreezeUpsert {
-	u.SetNull(tokenfreeze.FieldTokenCreateID)
-	return u
-}
-
 // UpdateNewValues updates the mutable fields using the new values that were set on create except the ID field.
 // Using this option is equivalent to using:
 //
@@ -449,6 +429,9 @@ func (u *TokenFreezeUpsertOne) UpdateNewValues() *TokenFreezeUpsertOne {
 		}
 		if _, exists := u.create.mutation.WalletProvidedFreezeTimestamp(); exists {
 			s.SetIgnore(tokenfreeze.FieldWalletProvidedFreezeTimestamp)
+		}
+		if _, exists := u.create.mutation.TokenCreateID(); exists {
+			s.SetIgnore(tokenfreeze.FieldTokenCreateID)
 		}
 	}))
 	return u
@@ -534,27 +517,6 @@ func (u *TokenFreezeUpsertOne) UpdateWalletProvidedThawTimestamp() *TokenFreezeU
 func (u *TokenFreezeUpsertOne) ClearWalletProvidedThawTimestamp() *TokenFreezeUpsertOne {
 	return u.Update(func(s *TokenFreezeUpsert) {
 		s.ClearWalletProvidedThawTimestamp()
-	})
-}
-
-// SetTokenCreateID sets the "token_create_id" field.
-func (u *TokenFreezeUpsertOne) SetTokenCreateID(v uuid.UUID) *TokenFreezeUpsertOne {
-	return u.Update(func(s *TokenFreezeUpsert) {
-		s.SetTokenCreateID(v)
-	})
-}
-
-// UpdateTokenCreateID sets the "token_create_id" field to the value that was provided on create.
-func (u *TokenFreezeUpsertOne) UpdateTokenCreateID() *TokenFreezeUpsertOne {
-	return u.Update(func(s *TokenFreezeUpsert) {
-		s.UpdateTokenCreateID()
-	})
-}
-
-// ClearTokenCreateID clears the value of the "token_create_id" field.
-func (u *TokenFreezeUpsertOne) ClearTokenCreateID() *TokenFreezeUpsertOne {
-	return u.Update(func(s *TokenFreezeUpsert) {
-		s.ClearTokenCreateID()
 	})
 }
 
@@ -756,6 +718,9 @@ func (u *TokenFreezeUpsertBulk) UpdateNewValues() *TokenFreezeUpsertBulk {
 			if _, exists := b.mutation.WalletProvidedFreezeTimestamp(); exists {
 				s.SetIgnore(tokenfreeze.FieldWalletProvidedFreezeTimestamp)
 			}
+			if _, exists := b.mutation.TokenCreateID(); exists {
+				s.SetIgnore(tokenfreeze.FieldTokenCreateID)
+			}
 		}
 	}))
 	return u
@@ -841,27 +806,6 @@ func (u *TokenFreezeUpsertBulk) UpdateWalletProvidedThawTimestamp() *TokenFreeze
 func (u *TokenFreezeUpsertBulk) ClearWalletProvidedThawTimestamp() *TokenFreezeUpsertBulk {
 	return u.Update(func(s *TokenFreezeUpsert) {
 		s.ClearWalletProvidedThawTimestamp()
-	})
-}
-
-// SetTokenCreateID sets the "token_create_id" field.
-func (u *TokenFreezeUpsertBulk) SetTokenCreateID(v uuid.UUID) *TokenFreezeUpsertBulk {
-	return u.Update(func(s *TokenFreezeUpsert) {
-		s.SetTokenCreateID(v)
-	})
-}
-
-// UpdateTokenCreateID sets the "token_create_id" field to the value that was provided on create.
-func (u *TokenFreezeUpsertBulk) UpdateTokenCreateID() *TokenFreezeUpsertBulk {
-	return u.Update(func(s *TokenFreezeUpsert) {
-		s.UpdateTokenCreateID()
-	})
-}
-
-// ClearTokenCreateID clears the value of the "token_create_id" field.
-func (u *TokenFreezeUpsertBulk) ClearTokenCreateID() *TokenFreezeUpsertBulk {
-	return u.Update(func(s *TokenFreezeUpsert) {
-		s.ClearTokenCreateID()
 	})
 }
 

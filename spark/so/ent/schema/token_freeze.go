@@ -30,7 +30,7 @@ func (TokenFreeze) Fields() []ent.Field {
 		field.Bytes("issuer_signature").NotEmpty().Immutable().Unique(),
 		field.Uint64("wallet_provided_freeze_timestamp").Immutable(),
 		field.Uint64("wallet_provided_thaw_timestamp").Optional(),
-		field.UUID("token_create_id", uuid.UUID{}).Optional(), // Not immutable for backfill, set immutable and required afterwards
+		field.UUID("token_create_id", uuid.UUID{}).Immutable(),
 	}
 }
 
@@ -44,7 +44,9 @@ func (TokenFreeze) Edges() []ent.Edge {
 			Ref("token_freeze").
 			Unique().
 			Field("token_create_id").
-			Comment("Token create contains the token metadata associated with this token freeze."),
+			Comment("Token create contains the token metadata associated with this token freeze.").
+			Immutable().
+			Required(),
 	}
 }
 

@@ -11,10 +11,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
 )
 
@@ -78,40 +76,9 @@ func (tfu *TokenFreezeUpdate) ClearWalletProvidedThawTimestamp() *TokenFreezeUpd
 	return tfu
 }
 
-// SetTokenCreateID sets the "token_create_id" field.
-func (tfu *TokenFreezeUpdate) SetTokenCreateID(u uuid.UUID) *TokenFreezeUpdate {
-	tfu.mutation.SetTokenCreateID(u)
-	return tfu
-}
-
-// SetNillableTokenCreateID sets the "token_create_id" field if the given value is not nil.
-func (tfu *TokenFreezeUpdate) SetNillableTokenCreateID(u *uuid.UUID) *TokenFreezeUpdate {
-	if u != nil {
-		tfu.SetTokenCreateID(*u)
-	}
-	return tfu
-}
-
-// ClearTokenCreateID clears the value of the "token_create_id" field.
-func (tfu *TokenFreezeUpdate) ClearTokenCreateID() *TokenFreezeUpdate {
-	tfu.mutation.ClearTokenCreateID()
-	return tfu
-}
-
-// SetTokenCreate sets the "token_create" edge to the TokenCreate entity.
-func (tfu *TokenFreezeUpdate) SetTokenCreate(t *TokenCreate) *TokenFreezeUpdate {
-	return tfu.SetTokenCreateID(t.ID)
-}
-
 // Mutation returns the TokenFreezeMutation object of the builder.
 func (tfu *TokenFreezeUpdate) Mutation() *TokenFreezeMutation {
 	return tfu.mutation
-}
-
-// ClearTokenCreate clears the "token_create" edge to the TokenCreate entity.
-func (tfu *TokenFreezeUpdate) ClearTokenCreate() *TokenFreezeUpdate {
-	tfu.mutation.ClearTokenCreate()
-	return tfu
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -157,6 +124,9 @@ func (tfu *TokenFreezeUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TokenFreeze.status": %w`, err)}
 		}
 	}
+	if tfu.mutation.TokenCreateCleared() && len(tfu.mutation.TokenCreateIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "TokenFreeze.token_create"`)
+	}
 	return nil
 }
 
@@ -189,35 +159,6 @@ func (tfu *TokenFreezeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if tfu.mutation.WalletProvidedThawTimestampCleared() {
 		_spec.ClearField(tokenfreeze.FieldWalletProvidedThawTimestamp, field.TypeUint64)
-	}
-	if tfu.mutation.TokenCreateCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   tokenfreeze.TokenCreateTable,
-			Columns: []string{tokenfreeze.TokenCreateColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tokencreate.FieldID, field.TypeUUID),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := tfu.mutation.TokenCreateIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   tokenfreeze.TokenCreateTable,
-			Columns: []string{tokenfreeze.TokenCreateColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tokencreate.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if n, err = sqlgraph.UpdateNodes(ctx, tfu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -286,40 +227,9 @@ func (tfuo *TokenFreezeUpdateOne) ClearWalletProvidedThawTimestamp() *TokenFreez
 	return tfuo
 }
 
-// SetTokenCreateID sets the "token_create_id" field.
-func (tfuo *TokenFreezeUpdateOne) SetTokenCreateID(u uuid.UUID) *TokenFreezeUpdateOne {
-	tfuo.mutation.SetTokenCreateID(u)
-	return tfuo
-}
-
-// SetNillableTokenCreateID sets the "token_create_id" field if the given value is not nil.
-func (tfuo *TokenFreezeUpdateOne) SetNillableTokenCreateID(u *uuid.UUID) *TokenFreezeUpdateOne {
-	if u != nil {
-		tfuo.SetTokenCreateID(*u)
-	}
-	return tfuo
-}
-
-// ClearTokenCreateID clears the value of the "token_create_id" field.
-func (tfuo *TokenFreezeUpdateOne) ClearTokenCreateID() *TokenFreezeUpdateOne {
-	tfuo.mutation.ClearTokenCreateID()
-	return tfuo
-}
-
-// SetTokenCreate sets the "token_create" edge to the TokenCreate entity.
-func (tfuo *TokenFreezeUpdateOne) SetTokenCreate(t *TokenCreate) *TokenFreezeUpdateOne {
-	return tfuo.SetTokenCreateID(t.ID)
-}
-
 // Mutation returns the TokenFreezeMutation object of the builder.
 func (tfuo *TokenFreezeUpdateOne) Mutation() *TokenFreezeMutation {
 	return tfuo.mutation
-}
-
-// ClearTokenCreate clears the "token_create" edge to the TokenCreate entity.
-func (tfuo *TokenFreezeUpdateOne) ClearTokenCreate() *TokenFreezeUpdateOne {
-	tfuo.mutation.ClearTokenCreate()
-	return tfuo
 }
 
 // Where appends a list predicates to the TokenFreezeUpdate builder.
@@ -378,6 +288,9 @@ func (tfuo *TokenFreezeUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TokenFreeze.status": %w`, err)}
 		}
 	}
+	if tfuo.mutation.TokenCreateCleared() && len(tfuo.mutation.TokenCreateIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "TokenFreeze.token_create"`)
+	}
 	return nil
 }
 
@@ -427,35 +340,6 @@ func (tfuo *TokenFreezeUpdateOne) sqlSave(ctx context.Context) (_node *TokenFree
 	}
 	if tfuo.mutation.WalletProvidedThawTimestampCleared() {
 		_spec.ClearField(tokenfreeze.FieldWalletProvidedThawTimestamp, field.TypeUint64)
-	}
-	if tfuo.mutation.TokenCreateCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   tokenfreeze.TokenCreateTable,
-			Columns: []string{tokenfreeze.TokenCreateColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tokencreate.FieldID, field.TypeUUID),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := tfuo.mutation.TokenCreateIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   tokenfreeze.TokenCreateTable,
-			Columns: []string{tokenfreeze.TokenCreateColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tokencreate.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &TokenFreeze{config: tfuo.config}
 	_spec.Assign = _node.assignValues

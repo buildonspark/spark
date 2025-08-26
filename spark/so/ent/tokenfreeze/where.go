@@ -447,16 +447,6 @@ func TokenCreateIDNotIn(vs ...uuid.UUID) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldNotIn(FieldTokenCreateID, vs...))
 }
 
-// TokenCreateIDIsNil applies the IsNil predicate on the "token_create_id" field.
-func TokenCreateIDIsNil() predicate.TokenFreeze {
-	return predicate.TokenFreeze(sql.FieldIsNull(FieldTokenCreateID))
-}
-
-// TokenCreateIDNotNil applies the NotNil predicate on the "token_create_id" field.
-func TokenCreateIDNotNil() predicate.TokenFreeze {
-	return predicate.TokenFreeze(sql.FieldNotNull(FieldTokenCreateID))
-}
-
 // HasTokenCreate applies the HasEdge predicate on the "token_create" edge.
 func HasTokenCreate() predicate.TokenFreeze {
 	return predicate.TokenFreeze(func(s *sql.Selector) {

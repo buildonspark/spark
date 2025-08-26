@@ -417,7 +417,7 @@ var (
 		{Name: "issuer_signature", Type: field.TypeBytes, Unique: true},
 		{Name: "wallet_provided_freeze_timestamp", Type: field.TypeUint64},
 		{Name: "wallet_provided_thaw_timestamp", Type: field.TypeUint64, Nullable: true},
-		{Name: "token_create_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "token_create_id", Type: field.TypeUUID},
 	}
 	// TokenFreezesTable holds the schema information for the "token_freezes" table.
 	TokenFreezesTable = &schema.Table{
@@ -429,7 +429,7 @@ var (
 				Symbol:     "token_freezes_token_creates_token_freeze",
 				Columns:    []*schema.Column{TokenFreezesColumns[9]},
 				RefColumns: []*schema.Column{TokenCreatesColumns[0]},
-				OnDelete:   schema.SetNull,
+				OnDelete:   schema.NoAction,
 			},
 		},
 		Indexes: []*schema.Index{

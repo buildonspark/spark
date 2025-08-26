@@ -11400,22 +11400,9 @@ func (m *TokenFreezeMutation) OldTokenCreateID(ctx context.Context) (v uuid.UUID
 	return oldValue.TokenCreateID, nil
 }
 
-// ClearTokenCreateID clears the value of the "token_create_id" field.
-func (m *TokenFreezeMutation) ClearTokenCreateID() {
-	m.token_create = nil
-	m.clearedFields[tokenfreeze.FieldTokenCreateID] = struct{}{}
-}
-
-// TokenCreateIDCleared returns if the "token_create_id" field was cleared in this mutation.
-func (m *TokenFreezeMutation) TokenCreateIDCleared() bool {
-	_, ok := m.clearedFields[tokenfreeze.FieldTokenCreateID]
-	return ok
-}
-
 // ResetTokenCreateID resets all changes to the "token_create_id" field.
 func (m *TokenFreezeMutation) ResetTokenCreateID() {
 	m.token_create = nil
-	delete(m.clearedFields, tokenfreeze.FieldTokenCreateID)
 }
 
 // ClearTokenCreate clears the "token_create" edge to the TokenCreate entity.
@@ -11426,7 +11413,7 @@ func (m *TokenFreezeMutation) ClearTokenCreate() {
 
 // TokenCreateCleared reports if the "token_create" edge to the TokenCreate entity was cleared.
 func (m *TokenFreezeMutation) TokenCreateCleared() bool {
-	return m.TokenCreateIDCleared() || m.clearedtoken_create
+	return m.clearedtoken_create
 }
 
 // TokenCreateIDs returns the "token_create" edge IDs in the mutation.
@@ -11695,9 +11682,6 @@ func (m *TokenFreezeMutation) ClearedFields() []string {
 	if m.FieldCleared(tokenfreeze.FieldWalletProvidedThawTimestamp) {
 		fields = append(fields, tokenfreeze.FieldWalletProvidedThawTimestamp)
 	}
-	if m.FieldCleared(tokenfreeze.FieldTokenCreateID) {
-		fields = append(fields, tokenfreeze.FieldTokenCreateID)
-	}
 	return fields
 }
 
@@ -11717,9 +11701,6 @@ func (m *TokenFreezeMutation) ClearField(name string) error {
 		return nil
 	case tokenfreeze.FieldWalletProvidedThawTimestamp:
 		m.ClearWalletProvidedThawTimestamp()
-		return nil
-	case tokenfreeze.FieldTokenCreateID:
-		m.ClearTokenCreateID()
 		return nil
 	}
 	return fmt.Errorf("unknown TokenFreeze nullable field %s", name)
