@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -115,6 +116,12 @@ func GetUnusedSigningKeysharesTx(
 
 	if keyshareCount <= 0 {
 		return nil, fmt.Errorf("keyshare count must be greater than 0")
+	}
+
+	// Prevent keyshare exhaustion attacks by limiting maximum request size
+	maxKeysharesPerRequest := int(knobs.GetKnobsService(ctx).GetValue(knobs.KnobSoMaxKeysharesPerRequest, 1000))
+	if keyshareCount > maxKeysharesPerRequest {
+		return nil, fmt.Errorf("keyshare request too large: requested %d, maximum allowed %d", keyshareCount, maxKeysharesPerRequest)
 	}
 
 	// Setting these parameters to optimize the performance of the query below.

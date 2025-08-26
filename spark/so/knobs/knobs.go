@@ -23,6 +23,7 @@ const (
 	KnobGrpcServerKeepaliveTimeout       = "spark.so.grpc.server.keepalive_timeout"
 	KnobGrpcServerUnaryHandlerTimeout    = "spark.so.grpc.server.unary_handler_timeout"
 	KnobSoGenerateStaticDepositAddressV2 = "spark.so.generate_static_deposit_address_v2"
+	KnobSoMaxKeysharesPerRequest         = "spark.so.max_keyshares_per_request"
 	KnobGRPCClientTimeout                = "spark.so.grpc.client.timeout"
 )
 
