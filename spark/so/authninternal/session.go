@@ -138,6 +138,9 @@ func (stcv *SessionTokenCreatorVerifier) VerifyToken(token string) (*pb.Session,
 	if protected.Version != currentSessionProtectionVersion {
 		return nil, fmt.Errorf("%w: %d", ErrUnsupportedProtectionVersion, protected.Version)
 	}
+	if protected.Session == nil {
+		return nil, fmt.Errorf("invalid token: missing session")
+	}
 	if protected.Session.Version != currentSessionVersion {
 		return nil, fmt.Errorf("%w: %d", ErrUnsupportedSessionVersion, protected.Session.Version)
 	}
