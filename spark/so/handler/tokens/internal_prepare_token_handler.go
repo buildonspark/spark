@@ -912,16 +912,34 @@ func validateOutputsMatchSenderAndNetwork(ctx context.Context, tokenTransaction 
 		return err
 	}
 	if len(outputsToSpend) > 0 {
-		predicates := make([]predicate.TokenOutput, 0, len(outputsToSpend))
+		voutsByPrevHash := make(map[string][]int32)
+		hashBytesByKey := make(map[string][]byte)
 		for _, o := range outputsToSpend {
 			prevHash := o.PrevTokenTransactionHash
-			prevVout := o.PrevTokenTransactionVout
+			prevVout := int32(o.PrevTokenTransactionVout)
+			key := hex.EncodeToString(prevHash)
+			hashBytesByKey[key] = prevHash
+			existing := voutsByPrevHash[key]
+			seen := false
+			for _, v := range existing {
+				if v == prevVout {
+					seen = true
+					break
+				}
+			}
+			if !seen {
+				voutsByPrevHash[key] = append(existing, prevVout)
+			}
+		}
 
+		predicates := make([]predicate.TokenOutput, 0, len(voutsByPrevHash))
+		for prevHash, vouts := range voutsByPrevHash {
+			hash := hashBytesByKey[prevHash]
 			condition := []predicate.TokenOutput{
 				tokenoutput.HasOutputCreatedTokenTransactionWith(
-					tokentransaction.FinalizedTokenTransactionHash(prevHash),
+					tokentransaction.FinalizedTokenTransactionHashEQ(hash),
 				),
-				tokenoutput.CreatedTransactionOutputVout(int32(prevVout)),
+				tokenoutput.CreatedTransactionOutputVoutIn(vouts...),
 				tokenoutput.NetworkEQ(schemaNetwork),
 			}
 			if len(senderPublicKeyBytes) > 0 {

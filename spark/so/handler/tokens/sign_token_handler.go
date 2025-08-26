@@ -404,18 +404,41 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 
 	outputsToSpend := tokenTransaction.GetTransferInput().GetOutputsToSpend()
 
-	var matchOutputsToSpendPredicates []predicate.TokenOutput
+	voutsByPrevHash := make(map[string][]int32)
+	hashBytesByKey := make(map[string][]byte)
 	for _, outputToSpend := range outputsToSpend {
-		if outputToSpend != nil {
-			matchOutputsToSpendPredicates = append(matchOutputsToSpendPredicates,
-				tokenoutput.And(
-					tokenoutput.HasOutputCreatedTokenTransactionWith(
-						tokentransaction.FinalizedTokenTransactionHashEQ(outputToSpend.GetPrevTokenTransactionHash()),
-					),
-					tokenoutput.CreatedTransactionOutputVout(int32(outputToSpend.GetPrevTokenTransactionVout())),
-				),
-			)
+		if outputToSpend == nil {
+			continue
 		}
+		hashBytes := outputToSpend.GetPrevTokenTransactionHash()
+		key := string(hashBytes)
+		hashBytesByKey[key] = hashBytes
+		vout := int32(outputToSpend.GetPrevTokenTransactionVout())
+		// Deduplicate vouts per hash to keep predicates minimal
+		existing := voutsByPrevHash[key]
+		seen := false
+		for _, existingVout := range existing {
+			if existingVout == vout {
+				seen = true
+				break
+			}
+		}
+		if !seen {
+			voutsByPrevHash[key] = append(existing, vout)
+		}
+	}
+
+	var matchOutputsToSpendPredicates []predicate.TokenOutput
+	for prevHash, vouts := range voutsByPrevHash {
+		hash := hashBytesByKey[prevHash]
+		matchOutputsToSpendPredicates = append(matchOutputsToSpendPredicates,
+			tokenoutput.And(
+				tokenoutput.HasOutputCreatedTokenTransactionWith(
+					tokentransaction.FinalizedTokenTransactionHashEQ(hash),
+				),
+				tokenoutput.CreatedTransactionOutputVoutIn(vouts...),
+			),
+		)
 	}
 
 	const batchSize = queryTokenOutputsWithPartialRevocationSecretSharesBatchSize
