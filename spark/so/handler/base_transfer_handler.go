@@ -547,7 +547,7 @@ func (h *BaseTransferHandler) CancelTransfer(
 		transfer.Status != st.TransferStatusSenderKeyTweakPending &&
 		transfer.Status != st.TransferStatusSenderInitiatedCoordinator &&
 		transfer.Status != st.TransferStatusReturned {
-		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderInitiated, TransferStatusSenderKeyTweakPending or TransferStatusSenderInitiatedCoordinator but %s found", transfer.ID.String(), transfer.Status)
+		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderInitiated, TransferStatusSenderKeyTweakPending or TransferStatusSenderInitiatedCoordinator or TransferStatusReturned but %s found", transfer.ID.String(), transfer.Status)
 	}
 
 	// The expiry time is only checked for coordinator SO because the creation time of each SO could be different.
