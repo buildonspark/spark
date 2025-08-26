@@ -139,6 +139,8 @@ type TokenConfig struct {
 	// DisableSparkTokenCreationForL1TokenAnnouncements disables logic creating a spark native token in response to finding a token announcement on L1.
 	// We will turn this flag on to require spark native announce or L1 + cross-consensus reserve for token creation.
 	DisableSparkTokenCreationForL1TokenAnnouncements bool `yaml:"disable_spark_token_creation_for_l1_token_announcements"`
+	// EnableBackfillSpentTokenTransactionHistoryTask enables the backfill spent token transaction history task.
+	EnableBackfillSpentTokenTransactionHistoryTask bool `yaml:"enable_backfill_spent_token_transaction_history_task"`
 	// RequireThresholdOperators, when set to true, makes operator signature and finalization use
 	// the configured threshold value instead of requiring responses from all operators to succeed.
 	RequireThresholdOperators bool `yaml:"require_threshold_operators"`
