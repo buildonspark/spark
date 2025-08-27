@@ -96,6 +96,10 @@ func AlreadyExistsErrorf(format string, args ...any) error {
 	return newGRPCError(codes.AlreadyExists, fmt.Errorf(format, args...))
 }
 
+func UnauthenticatedError(format string, args ...any) error {
+	return newGRPCError(codes.Unauthenticated, fmt.Errorf(format, args...))
+}
+
 func AlreadyExistsError(err error) error {
 	return newGRPCError(codes.AlreadyExists, err)
 }

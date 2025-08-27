@@ -19,7 +19,9 @@ import (
 	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/authninternal"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -94,8 +96,9 @@ func TestGetChallenge_InvalidPublicKey(t *testing.T) {
 			_, err := server.GetChallenge(t.Context(), &pb.GetChallengeRequest{
 				PublicKey: tt.pubkey,
 			})
+			st, _ := status.FromError(err)
+			require.Equal(t, codes.InvalidArgument, st.Code())
 
-			assert.ErrorIs(t, err, ErrInvalidPublicKeyFormat)
 		})
 	}
 }
@@ -149,7 +152,8 @@ func TestVerifyChallenge_InvalidSignature(t *testing.T) {
 		},
 	)
 
-	require.ErrorIs(t, err, ErrInvalidSignature)
+	st, _ := status.FromError(err)
+	require.Equal(t, codes.Unauthenticated, st.Code())
 	assert.Nil(t, resp)
 }
 
@@ -169,12 +173,15 @@ func TestVerifyChallenge_ExpiredSessionToken(t *testing.T) {
 	ctx := metadata.NewIncomingContext(t.Context(), metadata.Pairs(
 		"authorization", "Bearer "+resp.SessionToken,
 	))
-	authnInterceptor.AuthnInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, func(_ context.Context, _ any) (any, error) { //nolint:errcheck
+	var forwardedCtx context.Context
+	_, _ = authnInterceptor.AuthnInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, func(hctx context.Context, _ any) (any, error) {
+		forwardedCtx = hctx
 		return nil, nil
 	})
 
-	noSession, err := authn.GetSessionFromContext(ctx)
-	require.Error(t, err)
+	noSession, err := authn.GetSessionFromContext(forwardedCtx)
+	st, _ := status.FromError(err)
+	require.Equal(t, codes.Unauthenticated, st.Code())
 	assert.Nil(t, noSession)
 }
 
@@ -196,6 +203,8 @@ func TestVerifyChallenge_ExpiredChallenge(t *testing.T) {
 		},
 	)
 
+	st, _ := status.FromError(err)
+	require.Equal(t, codes.Unauthenticated, st.Code())
 	require.ErrorIs(t, err, ErrChallengeExpired)
 	require.Nil(t, resp)
 }
@@ -279,7 +288,10 @@ func TestVerifyChallenge_ReusedChallenge(t *testing.T) {
 		PublicKey:          privKey.Public().Serialize(),
 		Signature:          signature,
 	})
-	assert.ErrorIs(t, err, ErrChallengeReused)
+
+	st, _ := status.FromError(err)
+	require.Equal(t, codes.Unauthenticated, st.Code())
+	require.ErrorIs(t, err, ErrChallengeReused)
 }
 
 func TestVerifyChallenge_CacheExpiration(t *testing.T) {
@@ -311,6 +323,9 @@ func TestVerifyChallenge_CacheExpiration(t *testing.T) {
 		PublicKey:          pubKey.Serialize(),
 		Signature:          signature,
 	})
+
+	st, _ := status.FromError(err)
+	require.Equal(t, codes.Unauthenticated, st.Code())
 	require.ErrorIs(t, err, ErrChallengeReused)
 
 	// Wait for cache to expire
@@ -321,6 +336,9 @@ func TestVerifyChallenge_CacheExpiration(t *testing.T) {
 		PublicKey:          pubKey.Serialize(),
 		Signature:          signature,
 	})
+
+	st, _ = status.FromError(err)
+	require.Equal(t, codes.Unauthenticated, st.Code())
 	require.ErrorIs(t, err, ErrChallengeExpired)
 }
 
