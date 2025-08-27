@@ -269,19 +269,19 @@ func (s *AuthnServer) validateChallenge(ctx context.Context, challenge *pb.Chall
 
 	challengeAge := s.clock.Now().Unix() + clockSkewSeconds - challenge.Timestamp
 	if challengeAge > int64(s.config.ChallengeTimeout.Seconds()) {
-		return sparkerrors.UnauthenticatedError("%w: challenge expired %d seconds ago",
+		return sparkerrors.InvalidUserInputErrorf("%w: challenge expired %d seconds ago",
 			ErrChallengeExpired,
 			challengeAge-int64(s.config.ChallengeTimeout.Seconds()))
 	}
 
 	if !bytes.Equal(req.PublicKey, challenge.PublicKey) {
-		return sparkerrors.UnauthenticatedError("%w: request public key does not match challenge public key",
+		return sparkerrors.InvalidUserInputErrorf("%w: request public key does not match challenge public key",
 			ErrPublicKeyMismatch)
 	}
 
 	if err := s.nonceCache.markNonceUsed(ctx, challenge.Nonce); err != nil {
 		if errors.Is(err, ErrChallengeReused) {
-			return sparkerrors.UnauthenticatedError("challenge reused: %w", err)
+			return sparkerrors.InvalidUserInputErrorf("challenge reused: %w", err)
 		}
 		return fmt.Errorf("failed to mark nonce as used: %w", err)
 	}
@@ -305,7 +305,7 @@ func (s *AuthnServer) verifyClientSignature(challengeBytes []byte, pubKey keys.P
 
 	hash := sha256.Sum256(challengeBytes)
 	if !sig.Verify(hash[:], pubKey.ToBTCEC()) {
-		return sparkerrors.UnauthenticatedError("signature verification failed")
+		return sparkerrors.InvalidUserInputErrorf("signature verification failed")
 	}
 
 	return nil
@@ -314,7 +314,7 @@ func (s *AuthnServer) verifyClientSignature(challengeBytes []byte, pubKey keys.P
 func (s *AuthnServer) verifyChallengeHmac(challengeBytes []byte, serverHMAC []byte) error {
 	expectedMAC := s.computeChallengeHmac(challengeBytes)
 	if !hmac.Equal(expectedMAC, serverHMAC) {
-		return sparkerrors.UnauthenticatedError("verify challenge hmac: %w", ErrInvalidChallengeHmac)
+		return sparkerrors.InvalidUserInputErrorf("verify challenge hmac: %w", ErrInvalidChallengeHmac)
 	}
 	return nil
 }

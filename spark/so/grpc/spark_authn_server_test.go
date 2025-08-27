@@ -98,7 +98,6 @@ func TestGetChallenge_InvalidPublicKey(t *testing.T) {
 			})
 			st, _ := status.FromError(err)
 			require.Equal(t, codes.InvalidArgument, st.Code())
-
 		})
 	}
 }
@@ -153,7 +152,7 @@ func TestVerifyChallenge_InvalidSignature(t *testing.T) {
 	)
 
 	st, _ := status.FromError(err)
-	require.Equal(t, codes.Unauthenticated, st.Code())
+	require.Equal(t, codes.InvalidArgument, st.Code())
 	assert.Nil(t, resp)
 }
 
@@ -204,7 +203,7 @@ func TestVerifyChallenge_ExpiredChallenge(t *testing.T) {
 	)
 
 	st, _ := status.FromError(err)
-	require.Equal(t, codes.Unauthenticated, st.Code())
+	require.Equal(t, codes.InvalidArgument, st.Code())
 	require.ErrorIs(t, err, ErrChallengeExpired)
 	require.Nil(t, resp)
 }
@@ -290,7 +289,7 @@ func TestVerifyChallenge_ReusedChallenge(t *testing.T) {
 	})
 
 	st, _ := status.FromError(err)
-	require.Equal(t, codes.Unauthenticated, st.Code())
+	require.Equal(t, codes.InvalidArgument, st.Code())
 	require.ErrorIs(t, err, ErrChallengeReused)
 }
 
@@ -325,7 +324,7 @@ func TestVerifyChallenge_CacheExpiration(t *testing.T) {
 	})
 
 	st, _ := status.FromError(err)
-	require.Equal(t, codes.Unauthenticated, st.Code())
+	require.Equal(t, codes.InvalidArgument, st.Code())
 	require.ErrorIs(t, err, ErrChallengeReused)
 
 	// Wait for cache to expire
@@ -338,7 +337,7 @@ func TestVerifyChallenge_CacheExpiration(t *testing.T) {
 	})
 
 	st, _ = status.FromError(err)
-	require.Equal(t, codes.Unauthenticated, st.Code())
+	require.Equal(t, codes.InvalidArgument, st.Code())
 	require.ErrorIs(t, err, ErrChallengeExpired)
 }
 
