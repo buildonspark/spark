@@ -28,7 +28,7 @@ type SigningOperator struct {
 	// IdentityPublicKey is the identity public key of the signing operator.
 	IdentityPublicKey keys.Public
 	// ServerCertPath is the path to the server certificate.
-	CertPath *string
+	CertPath string
 	// ExternalAddress is the external address of the signing operator.
 	ExternalAddress string
 	// Generates connections to the signing operator. By default, will use
@@ -48,7 +48,7 @@ type operatorConnectionFactorySecure struct {
 }
 
 func (o *operatorConnectionFactorySecure) NewGRPCConnection(address string, retryPolicy *common.RetryPolicyConfig, clientTimeoutConfig *common.ClientTimeoutConfig) (*grpc.ClientConn, error) {
-	return common.NewGRPCConnection(address, *o.operator.CertPath, retryPolicy, clientTimeoutConfig)
+	return common.NewGRPCConnection(address, o.operator.CertPath, retryPolicy, clientTimeoutConfig)
 }
 
 func NewOperatorConnectionFactorySecure(operator *SigningOperator) OperatorConnectionFactory {
@@ -61,7 +61,7 @@ type jsonSigningOperator struct {
 	Address           string  `json:"address"`
 	AddressDkg        *string `json:"address_dkg"`
 	IdentityPublicKey string  `json:"identity_public_key"`
-	CertPath          *string `json:"cert_path"`
+	CertPath          string  `json:"cert_path"`
 	ExternalAddress   string  `json:"external_address"`
 }
 

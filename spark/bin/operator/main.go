@@ -10,7 +10,6 @@ import (
 	"io"
 	"log" //nolint:depguard
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -189,42 +188,6 @@ func createRateLimiter(config *so.Config) (*middleware.RateLimiter, error) {
 	}
 
 	return middleware.NewRateLimiter(config)
-}
-
-type StartServerFunc func() (*http.Server, error)
-
-func startTLSServer(args *args, mux *http.ServeMux, tlsConfig *tls.Config) StartServerFunc {
-	return func() (*http.Server, error) {
-		server := &http.Server{
-			Addr:      fmt.Sprintf(":%d", args.Port),
-			Handler:   mux,
-			TLSConfig: tlsConfig,
-		}
-
-		slog.Info(fmt.Sprintf("Serving on port %d (TLS)", args.Port))
-		if err := server.ListenAndServeTLS(args.ServerCertPath, args.ServerKeyPath); !errors.Is(err, http.ErrServerClosed) {
-			return nil, err
-		}
-		return server, nil
-	}
-}
-
-// Danger Zone! No TLS used here!
-func dangerousStartNonTLSServer(args *args, grpcServer *grpc.Server) StartServerFunc {
-	return func() (*http.Server, error) {
-		var lis net.Listener
-		var err error
-		if lis, err = net.Listen("tcp", fmt.Sprintf(":%d", args.Port)); err != nil {
-			slog.Error("Failed to listen to TCP socket", "error", err)
-			return nil, err
-		}
-
-		slog.Info(fmt.Sprintf("Serving on port %d (non-TLS)", args.Port))
-		if err := grpcServer.Serve(lis); !errors.Is(err, grpc.ErrServerStopped) {
-			return nil, err
-		}
-		return nil, nil
-	}
 }
 
 type BufferedBody struct {
@@ -550,29 +513,20 @@ func main() {
 		)),
 	)
 
-	var grpcServer *grpc.Server
-	var tlsConfig *tls.Config
-	if args.ServerCertPath != "" && args.ServerKeyPath != "" {
-		cert, err := tls.LoadX509KeyPair(args.ServerCertPath, args.ServerKeyPath)
-		if err != nil {
-			log.Fatalf("Failed to load server certificate: %v", err)
-		}
-		creds := credentials.NewTLS(&tls.Config{
-			Certificates: []tls.Certificate{cert},
-			ClientAuth:   tls.NoClientCert,
-			MinVersion:   tls.VersionTLS12,
-		})
-		serverOpts = append(serverOpts, grpc.Creds(creds))
-		grpcServer = grpc.NewServer(serverOpts...)
-		slog.Info(fmt.Sprintf("Server starting with TLS on: %v", args.ServerCertPath))
-		tlsConfig = &tls.Config{
-			Certificates: []tls.Certificate{cert},
-			MinVersion:   tls.VersionTLS12,
-		}
-	} else {
-		grpcServer = grpc.NewServer(serverOpts...)
-		tlsConfig = nil
+	cert, err := tls.LoadX509KeyPair(args.ServerCertPath, args.ServerKeyPath)
+	if err != nil {
+		log.Fatalf("Failed to load server certificate: %v", err)
 	}
+
+	tlsConfig := tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.NoClientCert,
+		MinVersion:   tls.VersionTLS12,
+	}
+
+	creds := credentials.NewTLS(&tlsConfig)
+	serverOpts = append(serverOpts, grpc.Creds(creds))
+	grpcServer := grpc.NewServer(serverOpts...)
 
 	var mockAction *common.MockAction
 	if args.RunningLocally {
@@ -636,25 +590,16 @@ func main() {
 		),
 	)
 
-	var server *http.Server
-	var startServer StartServerFunc
-
-	if tlsConfig != nil {
-		// HTTP + TLS server
-		startServer = startTLSServer(args, mux, tlsConfig)
-	} else {
-		// No TLS!
-		startServer = dangerousStartNonTLSServer(args, grpcServer)
+	server := &http.Server{
+		Addr:      fmt.Sprintf(":%d", args.Port),
+		Handler:   mux,
+		TLSConfig: &tlsConfig,
 	}
 
 	errGrp.Go(func() error {
-		if server, err = startServer(); err != nil {
-			slog.Error("Failed to serve", "error", err)
+		if err := server.ListenAndServeTLS("", ""); !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("HTTP server failed", "error", err)
 			return err
-		}
-
-		if errCtx.Err() == nil {
-			return fmt.Errorf("server stopped unexpectedly")
 		}
 
 		return nil
@@ -672,16 +617,15 @@ func main() {
 	slog.Info("Stopping gRPC server...")
 	grpcServer.GracefulStop()
 	slog.Info("gRPC server stopped")
-	if server != nil {
-		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
-		defer shutdownRelease()
 
-		slog.Info("Stopping HTTP server...")
-		if err := server.Shutdown(shutdownCtx); err != nil {
-			slog.Error("HTTP server failed to shutdown gracefully", "error", err)
-		} else {
-			slog.Info("HTTP server stopped")
-		}
+	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownRelease()
+
+	slog.Info("Stopping HTTP server...")
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		slog.Error("HTTP server failed to shutdown gracefully", "error", err)
+	} else {
+		slog.Info("HTTP server stopped")
 	}
 
 	if err := errGrp.Wait(); err != nil {

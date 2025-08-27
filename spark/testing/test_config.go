@@ -128,7 +128,7 @@ func GetAllSigningOperators() (map[string]*so.SigningOperator, error) {
 			AddressRpc:                address,
 			AddressDkg:                address,
 			IdentityPublicKey:         pubkeyBytesArray[i],
-			CertPath:                  &certPath,
+			CertPath:                  certPath,
 			OperatorConnectionFactory: operatorConnectionFactory,
 		}
 	}
