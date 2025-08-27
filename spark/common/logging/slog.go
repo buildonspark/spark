@@ -3,6 +3,7 @@ package logging
 import (
 	"context"
 	"encoding/hex"
+	"github.com/lightsparkdev/spark/common/keys"
 	"log/slog"
 )
 
@@ -21,8 +22,8 @@ func Inject(ctx context.Context, logger *slog.Logger) context.Context {
 	return context.WithValue(ctx, loggerKey, logger)
 }
 
-func WithIdentityPubkey(ctx context.Context, pubkey []byte) (context.Context, *slog.Logger) {
-	return WithAttr(ctx, Attr{Key: "identity_public_key", Value: Pubkey{Pubkey: pubkey}})
+func WithIdentityPubkey(ctx context.Context, pubKey keys.Public) (context.Context, *slog.Logger) {
+	return WithAttr(ctx, Attr{Key: "identity_public_key", Value: pubKey.LogValue()})
 }
 
 func WithAttr(ctx context.Context, attr Attr) (context.Context, *slog.Logger) {

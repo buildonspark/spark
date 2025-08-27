@@ -2,7 +2,9 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -27,21 +29,19 @@ func NewSparkTokenServer(authzConfig authz.Config, soConfig *so.Config, db *ent.
 	}
 }
 
-func (s *SparkTokenServer) StartTransaction(
-	ctx context.Context,
-	req *tokenpb.StartTransactionRequest,
-) (*tokenpb.StartTransactionResponse, error) {
-	ctx, _ = logging.WithIdentityPubkey(ctx, req.IdentityPublicKey)
+func (s *SparkTokenServer) StartTransaction(ctx context.Context, req *tokenpb.StartTransactionRequest) (*tokenpb.StartTransactionResponse, error) {
+	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
+	}
+	ctx, _ = logging.WithIdentityPubkey(ctx, idPubKey)
 	tokenTransactionHandler := tokens.NewStartTokenTransactionHandlerWithPreemption(s.soConfig)
 	resp, err := tokenTransactionHandler.StartTokenTransaction(ctx, req)
 	return resp, err
 }
 
 // CommitTransaction is called by the client to initiate the coordinated signing process.
-func (s *SparkTokenServer) CommitTransaction(
-	ctx context.Context,
-	req *tokenpb.CommitTransactionRequest,
-) (*tokenpb.CommitTransactionResponse, error) {
+func (s *SparkTokenServer) CommitTransaction(ctx context.Context, req *tokenpb.CommitTransactionRequest) (*tokenpb.CommitTransactionResponse, error) {
 	signTokenHandler := tokens.NewSignTokenHandler(s.soConfig)
 	resp, err := signTokenHandler.CommitTransaction(ctx, req)
 	return resp, err
