@@ -28,6 +28,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/staticdeposit"
 	"github.com/lightsparkdev/spark/so/utils"
 )
 
@@ -455,12 +456,9 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 	}
 
 	// Check that the utxo swap is not already registered
-	utxoSwap, err := db.UtxoSwap.Query().
-		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).
-		Where(utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted)).
-		First(ctx)
-	if err != nil && !ent.IsNotFound(err) {
-		return nil, fmt.Errorf("unable to check if utxo swap is already registered: %w", err)
+	utxoSwap, err := staticdeposit.GetRegisteredUtxoSwapForUtxo(ctx, db, targetUtxo)
+	if err != nil {
+		return nil, fmt.Errorf("unable to check if utxo swap is already completed: %w", err)
 	}
 	if utxoSwap != nil {
 		return nil, fmt.Errorf("utxo swap is already registered")

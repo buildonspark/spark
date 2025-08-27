@@ -18,11 +18,10 @@ import (
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/ent/utxo"
-	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"github.com/lightsparkdev/spark/so/staticdeposit"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"
 )
@@ -192,12 +191,9 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 		return nil, err
 	}
 
-	utxoSwap, err := db.UtxoSwap.Query().
-		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).
-		Where(utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted)).
-		First(ctx)
-	if err != nil && !ent.IsNotFound(err) {
-		return nil, fmt.Errorf("unable to check if utxo swap is already completed: %w", err)
+	utxoSwap, err := staticdeposit.GetRegisteredUtxoSwapForUtxo(ctx, db, targetUtxo)
+	if err != nil {
+		return nil, err
 	}
 	if utxoSwap != nil {
 		// Once a static deposit has been refunded it can no longer be used in a
@@ -239,11 +235,8 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 		return nil, fmt.Errorf("failed to create utxo swap: %w", err)
 	}
 
-	utxoSwap, err = db.UtxoSwap.Query().
-		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).
-		Where(utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted)).
-		First(ctx)
-	if err != nil {
+	utxoSwap, err = staticdeposit.GetRegisteredUtxoSwapForUtxo(ctx, db, targetUtxo)
+	if err != nil || utxoSwap == nil {
 		return nil, fmt.Errorf("unable to get utxo swap: %w", err)
 	}
 

@@ -30,6 +30,7 @@ import (
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/objects"
+	"github.com/lightsparkdev/spark/so/staticdeposit"
 	"github.com/lightsparkdev/spark/so/utils"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
@@ -1350,11 +1351,8 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 		return nil, err
 	}
 
-	utxoSwap, err := db.UtxoSwap.Query().
-		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).
-		Where(utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted)).
-		First(ctx)
-	if err != nil && !ent.IsNotFound(err) {
+	utxoSwap, err := staticdeposit.GetRegisteredUtxoSwapForUtxo(ctx, db, targetUtxo)
+	if err != nil {
 		return nil, fmt.Errorf("unable to check if utxo swap is already completed: %w", err)
 	}
 	if utxoSwap != nil {
@@ -1433,11 +1431,8 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 	}
 	logger.Info("Created utxo swap", "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout)
 
-	utxoSwap, err = db.UtxoSwap.Query().
-		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).
-		Where(utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted)).
-		First(ctx)
-	if err != nil {
+	utxoSwap, err = staticdeposit.GetRegisteredUtxoSwapForUtxo(ctx, db, targetUtxo)
+	if err != nil || utxoSwap == nil {
 		return nil, fmt.Errorf("unable to get utxo swap: %w", err)
 	}
 
