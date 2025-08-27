@@ -5,7 +5,6 @@ import {
 import { bytesToHex } from "@noble/hashes/utils";
 import { BitcoinFaucet } from "../../utils/test-faucet.js";
 
-const SMALL_DEPOSIT_AMOUNT = 10n;
 export const DEPOSIT_AMOUNT = 10000n;
 const SECOND_DEPOSIT_AMOUNT = 20000n;
 const THIRD_DEPOSIT_AMOUNT = 30000n;
@@ -167,6 +166,128 @@ describe("SSP static deposit address integration", () => {
       expect(refundTx2).toBeDefined();
 
       expect(refundTx).not.toBe(refundTx2);
+    }, 60000);
+
+    it("should return the right amount of txns when querying for utxos sent to a static deposit address", async () => {
+      const faucet = BitcoinFaucet.getInstance();
+      const { wallet: userWallet } = await SparkWalletTesting.initialize(
+        {
+          options: {
+            network: "LOCAL",
+          },
+        },
+        false,
+      );
+
+      const depositAddress = await userWallet.getStaticDepositAddress();
+      expect(depositAddress).toBeDefined();
+      const signedTx = await faucet.sendToAddress(
+        depositAddress,
+        DEPOSIT_AMOUNT,
+      );
+
+      // Wait for the transaction to be mined
+      await faucet.mineBlocks(6);
+      expect(signedTx).toBeDefined();
+      const transactionId = signedTx.id;
+      let vout;
+      for (let i = 0; i < signedTx.outputsLength; i++) {
+        const output = signedTx.getOutput(i);
+        if (output.amount === DEPOSIT_AMOUNT) {
+          vout = i;
+          break;
+        }
+      }
+
+      const quote = await userWallet.getClaimStaticDepositQuote(
+        transactionId,
+        vout!,
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      const quoteAmount = quote!.creditAmountSats;
+      const sspSignature = quote!.signature;
+
+      await userWallet.claimStaticDeposit({
+        transactionId,
+        creditAmountSats: quoteAmount,
+        sspSignature,
+        outputIndex: vout!,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const { balance } = await userWallet.getBalance();
+      expect(balance).toBe(BigInt(quoteAmount));
+
+      // Test depositing money to the same address and second time and claiming.
+      const signedTx2 = await faucet.sendToAddress(
+        depositAddress,
+        SECOND_DEPOSIT_AMOUNT,
+      );
+      const transactionId2 = signedTx2.id;
+      // Wait for the transaction to be mined
+      await faucet.mineBlocks(6);
+      // Test claiming and getting the quote without passing in the output index.
+      const quote2 =
+        await userWallet.getClaimStaticDepositQuote(transactionId2);
+      const quoteAmount2 = quote2!.creditAmountSats;
+      const sspSignature2 = quote2!.signature;
+      await userWallet.claimStaticDeposit({
+        transactionId: transactionId2,
+        creditAmountSats: quoteAmount2,
+        sspSignature: sspSignature2,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const { balance: balance2 } = await userWallet.getBalance();
+      expect(balance2).toBe(BigInt(quoteAmount + quoteAmount2));
+
+      // Test depositing money to the same address and test claim with max fee flow.
+      const signedTx3 = await faucet.sendToAddress(
+        depositAddress,
+        THIRD_DEPOSIT_AMOUNT,
+      );
+      const transactionId3 = signedTx3.id;
+      // Wait for the transaction to be mined
+      await faucet.mineBlocks(6);
+      // Get quote so we can calculate the expected balance. Not needed for actual flow.
+      const quote3 =
+        await userWallet.getClaimStaticDepositQuote(transactionId3);
+      const quoteAmount3 = quote3!.creditAmountSats;
+      await userWallet.claimStaticDepositWithMaxFee({
+        transactionId: transactionId3,
+        maxFee: 1000,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const { balance: balance3 } = await userWallet.getBalance();
+      expect(balance3).toBe(BigInt(quoteAmount + quoteAmount2 + quoteAmount3));
+      // Get transfers should include static deposit transfers.
+      const transfers = await userWallet.getTransfers();
+      expect(transfers.transfers.length).toBe(3);
+
+      for (let i = 0; i < 98; i++) {
+        await faucet.sendToAddress(depositAddress, THIRD_DEPOSIT_AMOUNT);
+        await faucet.mineBlocks(6);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      await faucet.mineBlocks(6);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      const utxosExcludeClaimed = await userWallet.getUtxosForDepositAddress(
+        depositAddress,
+        100,
+        0,
+        true,
+      );
+      expect(utxosExcludeClaimed.length).toBe(98);
+
+      const utxos = await userWallet.getUtxosForDepositAddress(
+        depositAddress,
+        100,
+        0,
+        false,
+      );
+      expect(utxos.length).toBe(100);
     }, 60000);
   });
 

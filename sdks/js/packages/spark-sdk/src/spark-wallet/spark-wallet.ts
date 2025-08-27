@@ -1703,6 +1703,7 @@ export class SparkWallet extends EventEmitter {
     depositAddress: string,
     limit: number = 100,
     offset: number = 0,
+    excludeClaimed: boolean = false,
   ): Promise<{ txid: string; vout: number }[]> {
     if (!depositAddress) {
       throw new ValidationError("Deposit address cannot be empty", {
@@ -1720,6 +1721,7 @@ export class SparkWallet extends EventEmitter {
         network: NetworkToProto[this.config.getNetwork()],
         limit,
         offset,
+        excludeClaimed,
       });
 
       return (

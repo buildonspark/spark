@@ -311,6 +311,7 @@ const commands = [
   "refundstaticdeposit",
   "refundstaticdepositlegacy",
   "claimstaticdepositwithmaxfee",
+  "getutxosfordepositaddress",
   "createsparkinvoice",
   "createinvoice",
   "payinvoice",
@@ -636,6 +637,7 @@ async function runCLI() {
   claimstaticdepositquote <txid> [outputIndex]                        - Get a quote for claiming a static deposit
   claimstaticdeposit <txid> <creditAmountSats> <sspSignature> [outputIndex] - Claim a static deposits
   claimstaticdepositwithmaxfee <txid> <maxFee> [outputIndex]          - Claim a static deposit with a max fee
+  getutxosfordepositaddress <depositAddress> <excludeClaimed(true|false)> - Get all UTXOs for a deposit address
   refundstaticdepositlegacy <depositTransactionId> <destinationAddress> <fee> [outputIndex] - Refund a static deposit legacy
   refundstaticdeposit <depositTransactionId> <destinationAddress> <satsPerVbyteFee> [outputIndex] - Refund a static deposit
   gettransfers [limit] [offset]                                       - Get a list of transfers
@@ -1144,6 +1146,19 @@ async function runCLI() {
 
             console.log(claimDepositWithMaxFee);
           }
+          break;
+        case "getutxosfordepositaddress":
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          const utxos = await wallet.getUtxosForDepositAddress(
+            args[0],
+            10,
+            0,
+            args[1] === "true",
+          );
+          console.log(utxos);
           break;
         case "refundstaticdepositlegacy":
           if (!wallet) {
