@@ -37,7 +37,7 @@ func (s *SparkTokenServer) StartTransaction(
 	return resp, err
 }
 
-// This RPC is called by the client to initiate the coordinated signing process.
+// CommitTransaction is called by the client to initiate the coordinated signing process.
 func (s *SparkTokenServer) CommitTransaction(
 	ctx context.Context,
 	req *tokenpb.CommitTransactionRequest,
@@ -47,7 +47,7 @@ func (s *SparkTokenServer) CommitTransaction(
 	return resp, err
 }
 
-// QueryTokenOutputs returns created token metadata associated with passed in token identifiers or issuer public keys.
+// QueryTokenMetadata returns created token metadata associated with passed in token identifiers or issuer public keys.
 func (s *SparkTokenServer) QueryTokenMetadata(ctx context.Context, req *tokenpb.QueryTokenMetadataRequest) (*tokenpb.QueryTokenMetadataResponse, error) {
 	queryTokenHandler := tokens.NewQueryTokenHandler(s.soConfig)
 	resp, err := queryTokenHandler.QueryTokenMetadata(ctx, req)

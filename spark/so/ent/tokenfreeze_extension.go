@@ -2,6 +2,7 @@ package ent
 
 import (
 	"context"
+	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -10,7 +11,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
 )
 
-func GetActiveFreezes(ctx context.Context, ownerPublicKeys [][]byte, tokenCreateId uuid.UUID) ([]*TokenFreeze, error) {
+func GetActiveFreezes(ctx context.Context, ownerPublicKeys []keys.Public, tokenCreateId uuid.UUID) ([]*TokenFreeze, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	db, err := GetDbFromContext(ctx)
@@ -18,8 +19,12 @@ func GetActiveFreezes(ctx context.Context, ownerPublicKeys [][]byte, tokenCreate
 		return nil, err
 	}
 
+	ownerPubKeyBytes := make([][]byte, len(ownerPublicKeys))
+	for i, ownerPublicKey := range ownerPublicKeys {
+		ownerPubKeyBytes[i] = ownerPublicKey.Serialize()
+	}
 	conditions := []predicate.TokenFreeze{
-		tokenfreeze.OwnerPublicKeyIn(ownerPublicKeys...),
+		tokenfreeze.OwnerPublicKeyIn(ownerPubKeyBytes...),
 		tokenfreeze.StatusEQ(st.TokenFreezeStatusFrozen),
 		tokenfreeze.TokenCreateID(tokenCreateId),
 	}
@@ -41,9 +46,7 @@ func ThawActiveFreeze(ctx context.Context, activeFreezeID uuid.UUID, timestamp u
 	}
 
 	_, err = db.TokenFreeze.Update().
-		Where(
-			tokenfreeze.IDEQ(activeFreezeID),
-		).
+		Where(tokenfreeze.IDEQ(activeFreezeID)).
 		SetStatus(st.TokenFreezeStatusThawed).
 		SetWalletProvidedThawTimestamp(timestamp).
 		Save(ctx)
@@ -54,7 +57,7 @@ func ThawActiveFreeze(ctx context.Context, activeFreezeID uuid.UUID, timestamp u
 	return nil
 }
 
-func ActivateFreeze(ctx context.Context, ownerPublicKey []byte, tokenCreateID uuid.UUID, issuerSignature []byte, timestamp uint64) error {
+func ActivateFreeze(ctx context.Context, ownerPublicKey keys.Public, tokenCreateID uuid.UUID, issuerSignature []byte, timestamp uint64) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	db, err := GetDbFromContext(ctx)
@@ -64,7 +67,7 @@ func ActivateFreeze(ctx context.Context, ownerPublicKey []byte, tokenCreateID uu
 
 	_, err = db.TokenFreeze.Create().
 		SetStatus(st.TokenFreezeStatusFrozen).
-		SetOwnerPublicKey(ownerPublicKey).
+		SetOwnerPublicKey(ownerPublicKey.Serialize()).
 		SetTokenCreateID(tokenCreateID).
 		SetWalletProvidedFreezeTimestamp(timestamp).
 		SetIssuerSignature(issuerSignature).

@@ -3,7 +3,9 @@ package tokens
 import (
 	"context"
 	"fmt"
+
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/errors"
 
 	"github.com/lightsparkdev/spark/common"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -26,10 +28,7 @@ func NewFreezeTokenHandler(config *so.Config) *FreezeTokenHandler {
 }
 
 // FreezeTokens freezes or unfreezes tokens on the LRC20 node.
-func (h *FreezeTokenHandler) FreezeTokens(
-	ctx context.Context,
-	req *tokenpb.FreezeTokensRequest,
-) (*tokenpb.FreezeTokensResponse, error) {
+func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.FreezeTokensRequest) (*tokenpb.FreezeTokensResponse, error) {
 	// Validate freeze tokens payload
 	if err := utils.ValidateFreezeTokensPayload(req.FreezeTokensPayload, h.config.IdentityPublicKey()); err != nil {
 		return nil, fmt.Errorf("freeze tokens payload validation failed: %w", err)
@@ -65,7 +64,12 @@ func (h *FreezeTokenHandler) FreezeTokens(
 	}
 
 	// Check for existing freeze.
-	activeFreezes, err := ent.GetActiveFreezes(ctx, [][]byte{req.FreezeTokensPayload.OwnerPublicKey}, tokenCreateEnt.ID)
+	ownerPubKey, err := keys.ParsePublicKey(req.FreezeTokensPayload.OwnerPublicKey)
+	if err != nil {
+		return nil, errors.InvalidUserInputErrorf("failed to parse owner public key: %w", err)
+	}
+
+	activeFreezes, err := ent.GetActiveFreezes(ctx, []keys.Public{ownerPubKey}, tokenCreateEnt.ID)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", tokens.ErrFailedToQueryTokenFreezeStatus, err)
 	}
@@ -74,7 +78,7 @@ func (h *FreezeTokenHandler) FreezeTokens(
 			return nil, fmt.Errorf("no active freezes found to thaw")
 		}
 		if len(activeFreezes) > 1 {
-			return nil, fmt.Errorf("%s", tokens.ErrMultipleActiveFreezes)
+			return nil, fmt.Errorf(tokens.ErrMultipleActiveFreezes)
 		}
 		err = ent.ThawActiveFreeze(ctx, activeFreezes[0].ID, req.FreezeTokensPayload.IssuerProvidedTimestamp)
 		if err != nil {
@@ -82,10 +86,10 @@ func (h *FreezeTokenHandler) FreezeTokens(
 		}
 	} else { // Freeze
 		if len(activeFreezes) > 0 {
-			return nil, fmt.Errorf("%s", tokens.ErrAlreadyFrozen)
+			return nil, fmt.Errorf(tokens.ErrAlreadyFrozen)
 		}
 		err = ent.ActivateFreeze(ctx,
-			req.FreezeTokensPayload.OwnerPublicKey,
+			ownerPubKey,
 			tokenCreateEnt.ID,
 			req.IssuerSignature,
 			req.FreezeTokensPayload.IssuerProvidedTimestamp,
@@ -100,7 +104,7 @@ func (h *FreezeTokenHandler) FreezeTokens(
 		return nil, fmt.Errorf("failed to get token network: %w", err)
 	}
 	outputIDs, totalAmount, err := ent.GetOwnedTokenOutputStats(ctx,
-		[][]byte{req.FreezeTokensPayload.OwnerPublicKey},
+		[]keys.Public{ownerPubKey},
 		tokenCreateEnt.TokenIdentifier,
 		tokenNetwork,
 	)

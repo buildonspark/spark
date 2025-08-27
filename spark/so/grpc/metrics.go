@@ -9,7 +9,7 @@ import (
 
 // ParseFullMethod  all applicable span or metric attribute.KeyValue attributes based
 // on a gRPC's FullMethod, following OpenTelemetry semantic conventions.
-
+//
 // Taken from go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc/internal
 func ParseFullMethod(fullMethod string) []attribute.KeyValue {
 	if !strings.HasPrefix(fullMethod, "/") {

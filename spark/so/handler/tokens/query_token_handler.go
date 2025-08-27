@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/errors"
+
 	"github.com/lightsparkdev/spark/common"
 
 	"github.com/lightsparkdev/spark/so/protoconverter"
@@ -399,9 +402,18 @@ func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tok
 		return nil, err
 	}
 
+	ownerPubKeys, err := parsePubKeys(req.GetOwnerPublicKeys())
+	if err != nil {
+		return nil, errors.InvalidUserInputErrorf("invalid owner public keys: %w", err)
+	}
+	issuerPubKeys, err := parsePubKeys(req.GetIssuerPublicKeys())
+	if err != nil {
+		return nil, errors.InvalidUserInputErrorf("invalid issuer public keys: %w", err)
+	}
+
 	outputs, err := ent.GetOwnedTokenOutputs(ctx, ent.GetOwnedTokenOutputsParams{
-		OwnerPublicKeys:            req.OwnerPublicKeys,
-		TokenPublicKeys:            req.IssuerPublicKeys,
+		OwnerPublicKeys:            ownerPubKeys,
+		IssuerPublicKeys:           issuerPubKeys,
 		TokenIdentifiers:           nil,
 		IncludeExpiredTransactions: true,
 		Network:                    *network,
@@ -409,7 +421,7 @@ func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tok
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", tokens.ErrFailedToGetOwnedOutputStats, err)
 	}
-	ownedTokenOutputs := make([]*tokenpb.OutputWithPreviousTransactionData, 0)
+	var ownedTokenOutputs []*tokenpb.OutputWithPreviousTransactionData
 	for _, output := range outputs {
 		idStr := output.ID.String()
 		ownedTokenOutputs = append(ownedTokenOutputs, &tokenpb.OutputWithPreviousTransactionData{
@@ -430,4 +442,16 @@ func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tok
 	return &tokenpb.QueryTokenOutputsResponse{
 		OutputsWithPreviousTransactionData: ownedTokenOutputs,
 	}, nil
+}
+
+func parsePubKeys(rawKeys [][]byte) ([]keys.Public, error) {
+	parsed := make([]keys.Public, len(rawKeys))
+	for i, rawKey := range rawKeys {
+		pubKey, err := keys.ParsePublicKey(rawKey)
+		if err != nil {
+			return nil, err
+		}
+		parsed[i] = pubKey
+	}
+	return parsed, nil
 }

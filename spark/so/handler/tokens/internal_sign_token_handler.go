@@ -113,13 +113,17 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 			return nil, tokens.FormatErrorWithTransactionEnt(fmt.Sprintf("%s: %s", tokens.ErrInvalidInputs, strings.Join(invalidInputs, "; ")), tokenTransaction, nil)
 		}
 		// Collect owner public keys for freeze check.
-		ownerPublicKeys := make([][]byte, len(tokenTransaction.Edges.SpentOutput))
+		ownerPublicKeys := make([]keys.Public, len(tokenTransaction.Edges.SpentOutput))
 		tokenCreateId := tokenTransaction.Edges.SpentOutput[0].TokenCreateID
 		if tokenCreateId == uuid.Nil {
 			return nil, tokens.FormatErrorWithTransactionEnt("no created token found when attempting to validate transfer transaction", tokenTransaction, nil)
 		}
 		for i, output := range tokenTransaction.Edges.SpentOutput {
-			ownerPublicKeys[i] = output.OwnerPublicKey
+			pubKey, err := keys.ParsePublicKey(output.OwnerPublicKey)
+			if err != nil {
+				return nil, tokens.FormatErrorWithTransactionEnt(err.Error(), tokenTransaction, nil)
+			}
+			ownerPublicKeys[i] = pubKey
 		}
 
 		// Bulk query all input ids to ensure none of them are frozen.

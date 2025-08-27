@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/keys"
+
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -121,8 +123,8 @@ func FetchAndLockTokenInputs(ctx context.Context, outputsToSpend []*tokenpb.Toke
 
 // GetOwnedTokenOutputsParams holds the parameters for GetOwnedTokenOutputs
 type GetOwnedTokenOutputsParams struct {
-	OwnerPublicKeys            [][]byte
-	TokenPublicKeys            [][]byte
+	OwnerPublicKeys            []keys.Public
+	IssuerPublicKeys           []keys.Public
 	TokenIdentifiers           [][]byte
 	IncludeExpiredTransactions bool
 	Network                    common.Network
@@ -165,11 +167,15 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 		statusPredicate = ownedStatusPredicate
 	}
 
+	ownerPubKeyBytes := make([][]byte, len(params.OwnerPublicKeys))
+	for i, pk := range params.OwnerPublicKeys {
+		ownerPubKeyBytes[i] = pk.Serialize()
+	}
 	query := db.TokenOutput.
 		Query().
 		Where(
 			// Order matters here to leverage the index.
-			tokenoutput.OwnerPublicKeyIn(params.OwnerPublicKeys...),
+			tokenoutput.OwnerPublicKeyIn(ownerPubKeyBytes...),
 			// A output is 'owned' as long as it has been fully created and a spending transaction
 			// has not yet been signed by this SO (if a transaction with it has been started
 			// and not yet signed it is still considered owned).
@@ -177,16 +183,18 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 			tokenoutput.ConfirmedWithdrawBlockHashIsNil(),
 		).
 		Where(tokenoutput.NetworkEQ(schemaNetwork))
-	if len(params.TokenPublicKeys) > 0 {
-		query = query.Where(tokenoutput.TokenPublicKeyIn(params.TokenPublicKeys...))
+	if len(params.IssuerPublicKeys) > 0 {
+		issuerPubKeyBytes := make([][]byte, len(params.IssuerPublicKeys))
+		for i, pk := range params.IssuerPublicKeys {
+			issuerPubKeyBytes[i] = pk.Serialize()
+		}
+		query = query.Where(tokenoutput.TokenPublicKeyIn(issuerPubKeyBytes...))
 	}
 	if len(params.TokenIdentifiers) > 0 {
 		query = query.Where(tokenoutput.TokenIdentifierIn(params.TokenIdentifiers...))
 	}
-	query = query.
-		WithOutputCreatedTokenTransaction()
 
-	outputs, err := query.All(ctx)
+	outputs, err := query.WithOutputCreatedTokenTransaction().All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query owned outputs: %w", err)
 	}
@@ -194,7 +202,7 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 	return outputs, nil
 }
 
-func GetOwnedTokenOutputStats(ctx context.Context, ownerPublicKeys [][]byte, tokenIdentifier []byte, network common.Network) ([]string, *big.Int, error) {
+func GetOwnedTokenOutputStats(ctx context.Context, ownerPublicKeys []keys.Public, tokenIdentifier []byte, network common.Network) ([]string, *big.Int, error) {
 	outputs, err := GetOwnedTokenOutputs(ctx, GetOwnedTokenOutputsParams{
 		OwnerPublicKeys:            ownerPublicKeys,
 		TokenIdentifiers:           [][]byte{tokenIdentifier},
