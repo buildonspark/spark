@@ -281,10 +281,7 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignatures_InvalidIntent(t *testin
 }
 
 func TestFinalizeSignatureHandler_FinalizeNodeSignatures_EmptyOperatorsMap(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, ctx)
+	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
 	config := &so.Config{

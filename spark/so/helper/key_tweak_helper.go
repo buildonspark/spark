@@ -21,6 +21,9 @@ func TweakLeafKeyUpdate(ctx context.Context, leaf *ent.TreeNode, req *pb.SendLea
 		return nil, fmt.Errorf("secret share tweak is not provided for leaf %s", req.LeafId)
 	}
 
+	if len(req.SecretShareTweak.Proofs) == 0 {
+		return nil, fmt.Errorf("no proofs provided for secret share tweak for leaf %s", req.LeafId)
+	}
 	keyshare, err = keyshare.TweakKeyShare(
 		ctx,
 		req.SecretShareTweak.SecretShare,
