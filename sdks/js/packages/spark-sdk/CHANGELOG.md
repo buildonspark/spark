@@ -1,5 +1,13 @@
 # @buildonspark/spark-sdk
 
+## 0.2.12
+
+### Patch Changes
+
+- - Update static deposit address generation rpc method
+  - Add exclude claimed input for get utxo for address query
+  - Bug fixes
+
 ## 0.2.11
 
 ### Patch Changes

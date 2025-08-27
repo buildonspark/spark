@@ -6,7 +6,7 @@
     "build": "webpack --mode production"
   },
   "dependencies": {
-    "@buildonspark/spark-sdk": "0.2.11",
+    "@buildonspark/spark-sdk": "0.2.12",
     "react": "19.0.0",
     "react-dom": "19.0.0"
   },
