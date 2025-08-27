@@ -142,6 +142,10 @@ func (t *TableLogger) Log(
 	}
 
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		if len(md.Get("origin")) > 0 {
+			result["grpc.client.origin"] = md.Get("origin")[0]
+		}
+
 		if len(md.Get("user-agent")) > 0 {
 			result["grpc.client.user_agent"] = md.Get("user-agent")[0]
 		}
