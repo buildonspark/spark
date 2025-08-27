@@ -173,7 +173,11 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 	//	logger.Info("Token transaction verified with LRC20 node")
 	// }
 	// Save the token transaction, created output ents, and update the outputs to spend.
-	_, err = ent.CreateStartedTransactionEntities(ctx, req.FinalTokenTransaction, req.TokenTransactionSignatures, req.KeyshareIds, inputTtxos, req.CoordinatorPublicKey)
+	coordinatorPubKey, err := keys.ParsePublicKey(req.CoordinatorPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse coordinator public key: %w", err)
+	}
+	_, err = ent.CreateStartedTransactionEntities(ctx, req.FinalTokenTransaction, req.TokenTransactionSignatures, req.KeyshareIds, inputTtxos, coordinatorPubKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save token transaction and output ents %s: %w", logging.FormatProto("final_token_transaction", req.FinalTokenTransaction), err)
 	}

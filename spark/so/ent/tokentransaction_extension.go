@@ -46,7 +46,7 @@ func CreateStartedTransactionEntities(
 	signaturesWithIndex []*tokenpb.SignatureWithIndex,
 	orderedOutputToCreateRevocationKeyshareIDs []string,
 	orderedOutputToSpendEnts []*TokenOutput,
-	coordinatorPublicKey []byte,
+	coordinatorPublicKey keys.Public,
 ) (*TokenTransaction, error) {
 	// Ordered fields are ordered according to the order of the input in the token transaction proto.
 	logger := logging.GetLoggerFromContext(ctx)
@@ -102,7 +102,7 @@ func CreateStartedTransactionEntities(
 			SetPartialTokenTransactionHash(partialTokenTransactionHash).
 			SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
 			SetStatus(st.TokenTransactionStatusStarted).
-			SetCoordinatorPublicKey(coordinatorPublicKey).
+			SetCoordinatorPublicKey(coordinatorPublicKey.Serialize()).
 			SetVersion(st.TokenTransactionVersion(tokenTransaction.Version)).
 			SetCreateID(tokenCreateEnt.ID)
 		if tokenTransaction.ExpiryTime != nil {
@@ -129,7 +129,7 @@ func CreateStartedTransactionEntities(
 			SetPartialTokenTransactionHash(partialTokenTransactionHash).
 			SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
 			SetStatus(st.TokenTransactionStatusStarted).
-			SetCoordinatorPublicKey(coordinatorPublicKey).
+			SetCoordinatorPublicKey(coordinatorPublicKey.Serialize()).
 			SetClientCreatedTimestamp(tokenTransaction.ClientCreatedTimestamp.AsTime()).
 			SetVersion(st.TokenTransactionVersion(tokenTransaction.Version)).
 			SetMintID(tokenMintEnt.ID)
@@ -154,7 +154,7 @@ func CreateStartedTransactionEntities(
 			SetPartialTokenTransactionHash(partialTokenTransactionHash).
 			SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
 			SetStatus(st.TokenTransactionStatusStarted).
-			SetCoordinatorPublicKey(coordinatorPublicKey).
+			SetCoordinatorPublicKey(coordinatorPublicKey.Serialize()).
 			SetClientCreatedTimestamp(tokenTransaction.ClientCreatedTimestamp.AsTime()).
 			SetVersion(st.TokenTransactionVersion(tokenTransaction.Version))
 		if tokenTransaction.ExpiryTime != nil && tokenTransaction.Version != 0 {
