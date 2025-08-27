@@ -59,15 +59,11 @@ func LogInterceptor(tableLogger *logging.TableLogger) grpc.UnaryServerIntercepto
 		ctx = logging.Inject(ctx, logger)
 		ctx = logging.InitTable(ctx)
 
-		reqProto, ok := req.(proto.Message)
-		if ok {
-			logger.Info("grpc call started", "request", proto.MessageName(reqProto))
-		}
-
 		startTime := time.Now()
 		response, err := handler(ctx, req)
 		duration := time.Since(startTime)
 
+		reqProto, _ := req.(proto.Message)
 		respProto, _ := response.(proto.Message)
 
 		if tableLogger != nil {
@@ -76,11 +72,6 @@ func LogInterceptor(tableLogger *logging.TableLogger) grpc.UnaryServerIntercepto
 
 		if err != nil {
 			logger.Error("error in grpc", "error", err, "duration", duration.Seconds())
-		} else {
-			responseProto, ok := response.(proto.Message)
-			if ok {
-				logger.Info("grpc call successful", "response", proto.MessageName(responseProto), "duration", duration.Seconds())
-			}
 		}
 
 		return response, err

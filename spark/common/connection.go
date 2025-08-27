@@ -76,8 +76,6 @@ func loggingUnaryClientInterceptor(
 
 	if err != nil {
 		logger.Error("gRPC client request failed", "grpc_client_method", method, "grpc_client_duration", duration.Seconds(), "error", err)
-	} else {
-		logger.Info("gRPC client request succeeded", "grpc_client_method", method, "grpc_client_duration", duration.Seconds())
 	}
 	return err
 }

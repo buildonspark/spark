@@ -8,8 +8,9 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"github.com/lightsparkdev/spark/common/keys"
 	"time"
+
+	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -45,19 +46,15 @@ func newChallengeNonceCache(challengeTimeout time.Duration) *challengeNonceCache
 // markNonceUsed marks a nonce as used. Returns ErrChallengeReused if the nonce was already used.
 func (cnc *challengeNonceCache) markNonceUsed(ctx context.Context, nonce []byte) error {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Debug("attempting to mark nonce as used",
-		"nonce", fmt.Sprintf("%x", nonce))
 
 	// Add is atomic - returns nil only if the key didn't exist and was added
 	err := cnc.cache.Add(string(nonce), true, cache.DefaultExpiration)
 	if err != nil {
-		logger.Debug("nonce reuse detected",
+		logger.Warn("nonce reuse detected",
 			"nonce", fmt.Sprintf("%x", nonce),
 			"error", err)
 		return ErrChallengeReused
 	}
-	logger.Debug("successfully marked nonce as used",
-		"nonce", fmt.Sprintf("%x", nonce))
 	return nil
 }
 

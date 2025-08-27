@@ -90,7 +90,6 @@ func (i *Interceptor) authenticateContext(ctx context.Context) context.Context {
 		})
 
 	}
-	logger.Info("metadata found, doing authentication", "metadata", md)
 
 	// Tokens are typically sent in "authorization" header
 	tokens := md.Get(authorizationHeader)

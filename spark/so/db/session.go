@@ -218,7 +218,6 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 
 	if s.currentTx == nil {
 		logger := logging.GetLoggerFromContext(ctx)
-		logger.Info("Creating new transaction")
 
 		txActiveGauge.Add(ctx, 1, metric.WithAttributes(s.getGaugeAttributes(attrOperationBegin)...))
 
@@ -234,7 +233,6 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 
 			return nil, err
 		}
-		logger.Info("New transaction created")
 		s.currentTx = tx
 		s.startTime = time.Now()
 		s.timer = time.AfterFunc(30*time.Second, func() {
@@ -247,7 +245,6 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 			return ent.CommitFunc(func(ctx context.Context, tx *ent.Tx) error {
 				s.mu.Lock()
 				defer s.mu.Unlock()
-				logger.Info("Committing transaction")
 
 				duration := time.Since(s.startTime).Seconds()
 				durationMs := duration * 1000
@@ -283,7 +280,6 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 			return ent.RollbackFunc(func(ctx context.Context, tx *ent.Tx) error {
 				s.mu.Lock()
 				defer s.mu.Unlock()
-				logger.Info("Rolling back transaction")
 
 				duration := time.Since(s.startTime).Seconds()
 
