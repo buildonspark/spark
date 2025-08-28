@@ -6,14 +6,13 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"sync"
 
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -953,7 +952,6 @@ func TestStaticDepositSSP(t *testing.T) {
 			require.NoError(t, err)
 			require.Empty(t, nodes)
 		})
-
 	})
 
 	t.Run("Claiming a Static Deposit again should fail", func(t *testing.T) {
@@ -1489,7 +1487,6 @@ func TestStaticDepositUserRefund(t *testing.T) {
 		)
 		require.ErrorContains(t, err, "utxo swap is already completed by another user")
 	})
-
 }
 
 func TestStaticDepositUserRefundAfterFailedClaim(t *testing.T) {
@@ -1717,6 +1714,9 @@ func TestStaticDepositUserRefundAfterFailedClaim(t *testing.T) {
 }
 
 func TestStaticDepositSSPConcurrent(t *testing.T) {
+	// LPT-439
+	skipIfGithubActions(t)
+
 	bitcoinClient := sparktesting.GetBitcoinClient()
 
 	coin, err := faucet.Fund()
