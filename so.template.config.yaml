@@ -45,6 +45,11 @@ service_authz:
   mode: 1 # AuthzModeDisabled
   ip_allowlist: []
 xff_client_ip_position: 0
+rate_limiter:
+  enabled: true
+  window: 60s
+  max_requests: 1000
+  methods: []
 return_detailed_errors: true
 return_detailed_panic_errors: true
 tracing:
