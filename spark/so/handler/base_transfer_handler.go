@@ -8,6 +8,7 @@ import (
 	"slices"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/btcsuite/btcd/wire"
@@ -773,7 +774,7 @@ func (h *BaseTransferHandler) cancelTransferCancelRequest(ctx context.Context, t
 	return nil
 }
 
-func (h *BaseTransferHandler) loadTransferForUpdate(ctx context.Context, transferID string) (*ent.Transfer, error) {
+func (h *BaseTransferHandler) loadTransferForUpdate(ctx context.Context, transferID string, opts ...sql.LockOption) (*ent.Transfer, error) {
 	transferUUID, err := uuid.Parse(transferID)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", transferID, err)
@@ -784,7 +785,7 @@ func (h *BaseTransferHandler) loadTransferForUpdate(ctx context.Context, transfe
 		return nil, err
 	}
 
-	transfer, err := db.Transfer.Query().Where(enttransfer.ID(transferUUID)).ForUpdate().Only(ctx)
+	transfer, err := db.Transfer.Query().Where(enttransfer.ID(transferUUID)).ForUpdate(opts...).Only(ctx)
 	if err != nil || transfer == nil {
 		return nil, fmt.Errorf("unable to find transfer %s: %w", transferID, err)
 	}

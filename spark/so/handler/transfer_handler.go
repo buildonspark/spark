@@ -3,11 +3,14 @@ package handler
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
 
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/btcsuite/btcd/wire"
@@ -33,7 +36,7 @@ import (
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
-	"github.com/lightsparkdev/spark/so/errors"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/objects"
@@ -1252,7 +1255,7 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 		}
 		errorMsg := fmt.Sprintf("failed to sync deliver sender key tweak for request %s", logging.FormatProto("finalize_transfer_with_transfer_package", req))
 		if stat, ok := status.FromError(err); ok && stat.Code() == codes.Unavailable {
-			return nil, errors.UnavailableErrorf("%s: %w", errorMsg, err)
+			return nil, sparkerrors.UnavailableErrorf("%s: %w", errorMsg, err)
 		}
 		dbTx, dbErr = ent.GetDbFromContext(ctx)
 		if dbErr != nil {
@@ -1744,10 +1747,10 @@ func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Tx, transfer *ent.T
 		return fmt.Errorf("failed to find block height: %w", err)
 	}
 	if coopExit.ConfirmationHeight == 0 {
-		return errors.FailedPreconditionErrorf("coop exit tx hasn't been broadcasted")
+		return sparkerrors.FailedPreconditionErrorf("coop exit tx hasn't been broadcasted")
 	}
 	if coopExit.ConfirmationHeight+CoopExitConfirmationThreshold-1 > blockHeight.Height {
-		return errors.FailedPreconditionErrorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", coopExit.ConfirmationHeight, blockHeight.Height)
+		return sparkerrors.FailedPreconditionErrorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", coopExit.ConfirmationHeight, blockHeight.Height)
 	}
 	return nil
 }
@@ -1774,14 +1777,14 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	}
 	// Validate transfer is not in terminal states
 	if transfer.Status == st.TransferStatusCompleted {
-		return errors.AlreadyExistsErrorf("transfer %s has already been claimed", req.TransferId)
+		return sparkerrors.AlreadyExistsErrorf("transfer %s has already been claimed", req.TransferId)
 	}
 	if transfer.Status == st.TransferStatusExpired ||
 		transfer.Status == st.TransferStatusReturned {
-		return errors.FailedPreconditionErrorf("transfer %s is in terminal state %s and cannot be processed", req.TransferId, transfer.Status)
+		return sparkerrors.FailedPreconditionErrorf("transfer %s is in terminal state %s and cannot be processed", req.TransferId, transfer.Status)
 	}
 	if transfer.Status != st.TransferStatusSenderKeyTweaked {
-		return errors.FailedPreconditionErrorf("please call ClaimTransferSignRefunds to claim the transfer %s, the transfer is not in SENDER_KEY_TWEAKED status. transferstatus: %s,", req.TransferId, transfer.Status)
+		return sparkerrors.FailedPreconditionErrorf("please call ClaimTransferSignRefunds to claim the transfer %s, the transfer is not in SENDER_KEY_TWEAKED status. transferstatus: %s,", req.TransferId, transfer.Status)
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
@@ -2079,7 +2082,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	case st.TransferStatusReceiverKeyTweakApplied:
 		// do nothing
 	case st.TransferStatusCompleted:
-		return nil, errors.AlreadyExistsErrorf("transfer %s has already been claimed", req.TransferId)
+		return nil, sparkerrors.AlreadyExistsErrorf("transfer %s has already been claimed", req.TransferId)
 	default:
 		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusKeyTweaked or TransferStatusReceiverRefundSigned or TransferStatusReceiverKeyTweakLocked or TransferStatusReceiverKeyTweakApplied but %s found", req.TransferId, transfer.Status)
 	}
@@ -2121,8 +2124,11 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	}
 
 	// Lock the transfer after the key tweak is settled.
-	transfer, err = h.loadTransferForUpdate(ctx, req.TransferId)
+	transfer, err = h.loadTransferForUpdate(ctx, req.TransferId, entsql.WithLockAction(entsql.NoWait))
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, sparkerrors.AbortedErrorf("transfer %s is being processed by another request, please try again later", req.TransferId)
+		}
 		return nil, fmt.Errorf("unable to load transfer %s: %w", req.TransferId, err)
 	}
 	if transfer.Status == st.TransferStatusCompleted {
