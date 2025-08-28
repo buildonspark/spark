@@ -51,11 +51,11 @@ func (h *CooperativeExitHandler) CooperativeExitV2(ctx context.Context, req *pb.
 }
 
 func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest, requireDirectTx bool) (*pb.CooperativeExitResponse, error) {
-	reqTransferOwnerIDPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
+	reqTransferOwnerIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer owner identity public key: %w", err)
 	}
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqTransferOwnerIDPubKey); err != nil {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqTransferOwnerIdentityPubKey); err != nil {
 		return nil, err
 	}
 
@@ -76,13 +76,17 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 		}
 	}
 
+	reqTransferReceiverIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse transfer receiver identity public key: %w", err)
+	}
 	transfer, leafMap, err := transferHandler.createTransfer(
 		ctx,
 		req.Transfer.TransferId,
 		st.TransferTypeCooperativeExit,
 		req.Transfer.ExpiryTime.AsTime(),
-		reqTransferOwnerIDPubKey.Serialize(),
-		req.Transfer.ReceiverIdentityPublicKey,
+		reqTransferOwnerIdentityPubKey,
+		reqTransferReceiverIdentityPubKey,
 		cpfpLeafRefundMap,
 		directLeafRefundMap,
 		directFromCpfpLeafRefundMap,

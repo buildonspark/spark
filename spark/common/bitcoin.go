@@ -372,22 +372,12 @@ func VerifySignatureMultiInput(signedTx *wire.MsgTx, prevOutputFetcher txscript.
 
 // VerifyECDSASignature verifies an ECDSA signature with comprehensive validation
 // including empty input checks and canonical encoding validation to prevent malleability attacks.
-func VerifyECDSASignature(publicKeyBytes []byte, signatureBytes []byte, messageHash []byte) error {
-	// Input validation
-	if len(publicKeyBytes) == 0 {
-		return fmt.Errorf("public key cannot be empty")
-	}
+func VerifyECDSASignature(pubKey keys.Public, signatureBytes []byte, messageHash []byte) error {
 	if len(signatureBytes) == 0 {
 		return fmt.Errorf("signature cannot be empty")
 	}
 	if len(messageHash) == 0 {
 		return fmt.Errorf("message hash cannot be empty")
-	}
-
-	// Parse the public key
-	pubKey, err := keys.ParsePublicKey(publicKeyBytes)
-	if err != nil {
-		return fmt.Errorf("invalid public key format: failed to parse public key: %w", err)
 	}
 
 	// Parse the signature - strict DER parsing prevents many malleability issues

@@ -131,7 +131,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		return nil, err
 	}
 
-	leafTweakMap, err := h.validateTransferPackage(ctx, req.TransferId, req.TransferPackage, req.OwnerIdentityPublicKey)
+	leafTweakMap, err := h.validateTransferPackage(ctx, req.TransferId, req.TransferPackage, reqOwnerIDPubKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate transfer package for transfer %s: %w", req.TransferId, err)
 	}
@@ -148,13 +148,17 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	leafDirectRefundMap := h.loadDirectLeafRefundMap(req)
 	leafDirectFromCpfpRefundMap := h.loadDirectFromCpfpLeafRefundMap(req)
 
+	reqReceiverIDPubKey, err := keys.ParsePublicKey(req.ReceiverIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid receiver identity public key: %w", err)
+	}
 	transfer, leafMap, err := h.createTransfer(
 		ctx,
 		req.TransferId,
 		transferType,
 		req.ExpiryTime.AsTime(),
-		req.OwnerIdentityPublicKey,
-		req.ReceiverIdentityPublicKey,
+		reqOwnerIDPubKey,
+		reqReceiverIDPubKey,
 		leafCpfpRefundMap,
 		leafDirectRefundMap,
 		leafDirectFromCpfpRefundMap,
@@ -1300,14 +1304,16 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	if err != nil {
 		return nil, fmt.Errorf("failed to update status of transfer %s: %w", req.TransferId, err)
 	}
-	err = h.setSoCoordinatorKeyTweaks(ctx, transfer, req.TransferPackage, req.OwnerIdentityPublicKey)
+	ownerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
 	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
+	}
+	if err = h.setSoCoordinatorKeyTweaks(ctx, transfer, req.TransferPackage, ownerIDPubKey); err != nil {
 		return nil, err
 	}
 
 	if shouldTweakKey {
-		err = db.Commit()
-		if err != nil {
+		if err = db.Commit(); err != nil {
 			return nil, fmt.Errorf("failed to commit transaction: %w", err)
 		}
 		err = h.settleSenderKeyTweaks(ctx, req.TransferId, pbinternal.SettleKeyTweakAction_COMMIT)
@@ -2579,9 +2585,9 @@ func (h *TransferHandler) InvestigateLeaves(ctx context.Context, req *pb.Investi
 }
 
 // setSoCoordinatorKeyTweaks sets the key tweaks for each transfer leaf based on the validated transfer package.
-func (h *TransferHandler) setSoCoordinatorKeyTweaks(ctx context.Context, transfer *ent.Transfer, req *pb.TransferPackage, ownerIdentityPublicKey []byte) error {
+func (h *TransferHandler) setSoCoordinatorKeyTweaks(ctx context.Context, transfer *ent.Transfer, req *pb.TransferPackage, ownerIdentityPubKey keys.Public) error {
 	// Get key tweak map from transfer package
-	keyTweakMap, err := h.validateTransferPackage(ctx, transfer.ID.String(), req, ownerIdentityPublicKey)
+	keyTweakMap, err := h.validateTransferPackage(ctx, transfer.ID.String(), req, ownerIdentityPubKey)
 	if err != nil {
 		return fmt.Errorf("failed to validate transfer package: %w", err)
 	}

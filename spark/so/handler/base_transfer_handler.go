@@ -70,15 +70,11 @@ func NewBaseTransferHandler(config *so.Config) BaseTransferHandler {
 	}
 }
 
-func validateLeafRefundTxOutput(refundTx *wire.MsgTx, receiverIdentityPublicKey []byte) error {
+func validateLeafRefundTxOutput(refundTx *wire.MsgTx, receiverIdentityPubKey keys.Public) error {
 	if len(refundTx.TxOut) == 0 {
 		return fmt.Errorf("refund tx must have at least 1 output")
 	}
-	receiverIdentityPubkey, err := keys.ParsePublicKey(receiverIdentityPublicKey)
-	if err != nil {
-		return fmt.Errorf("unable to parse receiver pubkey: %w", err)
-	}
-	recieverP2trScript, err := common.P2TRScriptFromPubKey(receiverIdentityPubkey)
+	recieverP2trScript, err := common.P2TRScriptFromPubKey(receiverIdentityPubKey)
 	if err != nil {
 		return fmt.Errorf("unable to generate p2tr script from receiver pubkey: %w", err)
 	}
@@ -119,7 +115,7 @@ func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, leafOut
 	return nil
 }
 
-func validateSendLeafRefundTxs(leaf *ent.TreeNode, rawTx []byte, directTx []byte, directFromCpfpRefundTx []byte, receiverIdentityKey []byte, expectedInputCount uint32, requireDirectTx bool) error {
+func validateSendLeafRefundTxs(leaf *ent.TreeNode, rawTx []byte, directTx []byte, directFromCpfpRefundTx []byte, receiverIdentityPubKey keys.Public, expectedInputCount uint32, requireDirectTx bool) error {
 	newCpfpRefundTx, err := common.TxFromRawTxBytes(rawTx)
 	if err != nil {
 		return fmt.Errorf("unable to load new cpfp refund tx: %w", err)
@@ -187,11 +183,11 @@ func validateSendLeafRefundTxs(leaf *ent.TreeNode, rawTx []byte, directTx []byte
 		if err != nil {
 			return fmt.Errorf("unable to validate direct from cpfp refund tx inputs: %w", err)
 		}
-		err = validateLeafRefundTxOutput(newDirectRefundTx, receiverIdentityKey)
+		err = validateLeafRefundTxOutput(newDirectRefundTx, receiverIdentityPubKey)
 		if err != nil {
 			return fmt.Errorf("unable to validate direct refund tx output: %w", err)
 		}
-		err = validateLeafRefundTxOutput(newDirectFromCpfpRefundTx, receiverIdentityKey)
+		err = validateLeafRefundTxOutput(newDirectFromCpfpRefundTx, receiverIdentityPubKey)
 		if err != nil {
 			return fmt.Errorf("unable to validate direct from cpfp refund tx output: %w", err)
 		}
@@ -217,7 +213,7 @@ func validateSendLeafRefundTxs(leaf *ent.TreeNode, rawTx []byte, directTx []byte
 		return fmt.Errorf("unable to validate cpfp refund tx inputs: %w", err)
 	}
 
-	err = validateLeafRefundTxOutput(newCpfpRefundTx, receiverIdentityKey)
+	err = validateLeafRefundTxOutput(newCpfpRefundTx, receiverIdentityPubKey)
 	if err != nil {
 		return fmt.Errorf("unable to validate cpfp refund tx output: %w", err)
 	}
@@ -229,8 +225,8 @@ func (h *BaseTransferHandler) createTransfer(
 	transferID string,
 	transferType st.TransferType,
 	expiryTime time.Time,
-	senderIdentityPublicKey []byte,
-	receiverIdentityPublicKey []byte,
+	senderIdentityPubKey keys.Public,
+	receiverIdentityPubKey keys.Public,
 	leafCpfpRefundMap map[string][]byte,
 	leafDirectRefundMap map[string][]byte,
 	leafDirectFromCpfpRefundMap map[string][]byte,
@@ -265,8 +261,8 @@ func (h *BaseTransferHandler) createTransfer(
 
 	transfer, err := db.Transfer.Create().
 		SetID(transferUUID).
-		SetSenderIdentityPubkey(senderIdentityPublicKey).
-		SetReceiverIdentityPubkey(receiverIdentityPublicKey).
+		SetSenderIdentityPubkey(senderIdentityPubKey.Serialize()).
+		SetReceiverIdentityPubkey(receiverIdentityPubKey.Serialize()).
 		SetStatus(status).
 		SetTotalValue(0).
 		SetExpiryTime(expiryTime).
@@ -287,11 +283,11 @@ func (h *BaseTransferHandler) createTransfer(
 
 	switch transferType {
 	case st.TransferTypeCooperativeExit:
-		err = h.validateCooperativeExitLeaves(ctx, transfer, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPublicKey, requireDirectTx)
+		err = h.validateCooperativeExitLeaves(ctx, transfer, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey, requireDirectTx)
 	case st.TransferTypeTransfer, st.TransferTypeSwap, st.TransferTypeCounterSwap:
-		err = h.validateTransferLeaves(ctx, transfer, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPublicKey, requireDirectTx)
+		err = h.validateTransferLeaves(ctx, transfer, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey, requireDirectTx)
 	case st.TransferTypeUtxoSwap:
-		err = h.validateUtxoSwapLeaves(ctx, transfer, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPublicKey, requireDirectTx)
+		err = h.validateUtxoSwapLeaves(ctx, transfer, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey, requireDirectTx)
 	case st.TransferTypePreimageSwap:
 		// do nothing
 	}
@@ -360,7 +356,7 @@ func loadLeavesWithLock(ctx context.Context, db *ent.Tx, leafRefundMap map[strin
 	return leaves, nil
 }
 
-func (h *BaseTransferHandler) validateCooperativeExitLeaves(ctx context.Context, transfer *ent.Transfer, leaves []*ent.TreeNode, leafCpfpRefundMap map[string][]byte, leafDirectRefundMap map[string][]byte, leafDirectFromCpfpRefundMap map[string][]byte, receiverIdentityPublicKey []byte, requireDirectTx bool) error {
+func (h *BaseTransferHandler) validateCooperativeExitLeaves(ctx context.Context, transfer *ent.Transfer, leaves []*ent.TreeNode, leafCpfpRefundMap map[string][]byte, leafDirectRefundMap map[string][]byte, leafDirectFromCpfpRefundMap map[string][]byte, receiverIdentityPublicKey keys.Public, requireDirectTx bool) error {
 	for _, leaf := range leaves {
 		directRefundTx := leafDirectRefundMap[leaf.ID.String()]
 		intermediateDirectFromCpfpRefundTx := leafDirectFromCpfpRefundMap[leaf.ID.String()]
@@ -383,7 +379,16 @@ func (h *BaseTransferHandler) validateCooperativeExitLeaves(ctx context.Context,
 	return nil
 }
 
-func (h *BaseTransferHandler) validateUtxoSwapLeaves(ctx context.Context, transfer *ent.Transfer, leaves []*ent.TreeNode, leafCpfpRefundMap map[string][]byte, leafDirectRefundMap map[string][]byte, leafDirectFromCpfpRefundMap map[string][]byte, receiverIdentityPublicKey []byte, requireDirectTx bool) error {
+func (h *BaseTransferHandler) validateUtxoSwapLeaves(
+	ctx context.Context,
+	transfer *ent.Transfer,
+	leaves []*ent.TreeNode,
+	leafCpfpRefundMap map[string][]byte,
+	leafDirectRefundMap map[string][]byte,
+	leafDirectFromCpfpRefundMap map[string][]byte,
+	receiverIdentityPublicKey keys.Public,
+	requireDirectTx bool,
+) error {
 	for _, leaf := range leaves {
 		directRefundTx := leafDirectRefundMap[leaf.ID.String()]
 		intermediateDirectFromCpfpRefundTx := leafDirectFromCpfpRefundMap[leaf.ID.String()]
@@ -406,7 +411,16 @@ func (h *BaseTransferHandler) validateUtxoSwapLeaves(ctx context.Context, transf
 	return nil
 }
 
-func (h *BaseTransferHandler) validateTransferLeaves(ctx context.Context, transfer *ent.Transfer, leaves []*ent.TreeNode, leafCpfpRefundMap map[string][]byte, leafDirectRefundMap map[string][]byte, leafDirectFromCpfpRefundMap map[string][]byte, receiverIdentityPublicKey []byte, requireDirectTx bool) error {
+func (h *BaseTransferHandler) validateTransferLeaves(
+	ctx context.Context,
+	transfer *ent.Transfer,
+	leaves []*ent.TreeNode,
+	leafCpfpRefundMap map[string][]byte,
+	leafDirectRefundMap map[string][]byte,
+	leafDirectFromCpfpRefundMap map[string][]byte,
+	receiverIdentityPublicKey keys.Public,
+	requireDirectTx bool,
+) error {
 	for _, leaf := range leaves {
 		directRefundTx := leafDirectRefundMap[leaf.ID.String()]
 		intermediateDirectFromCpfpRefundTx := leafDirectFromCpfpRefundMap[leaf.ID.String()]
@@ -544,10 +558,7 @@ func lockLeaves(ctx context.Context, db *ent.Tx, leaves []*ent.TreeNode) ([]*ent
 	return updatedLeaves, nil
 }
 
-func (h *BaseTransferHandler) CancelTransfer(
-	ctx context.Context,
-	req *pbspark.CancelTransferRequest,
-) (*pbspark.CancelTransferResponse, error) {
+func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.CancelTransferRequest) (*pbspark.CancelTransferResponse, error) {
 	reqSenderIDPubKey, err := keys.ParsePublicKey(req.SenderIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse sender identity public key: %w", err)
@@ -811,7 +822,7 @@ func (h *BaseTransferHandler) loadTransferNoUpdate(ctx context.Context, transfer
 }
 
 // validateTransferPackage validates the transfer package, to ensure the key tweaks are valid.
-func (h *BaseTransferHandler) validateTransferPackage(ctx context.Context, transferID string, req *pbspark.TransferPackage, senderIdentityPublicKey []byte) (map[string]*pbspark.SendLeafKeyTweak, error) {
+func (h *BaseTransferHandler) validateTransferPackage(ctx context.Context, transferID string, req *pbspark.TransferPackage, senderIdentityPubKey keys.Public) (map[string]*pbspark.SendLeafKeyTweak, error) {
 	// If the transfer package is nil, we don't need to validate it.
 	if req == nil {
 		return nil, nil
@@ -885,11 +896,6 @@ func (h *BaseTransferHandler) validateTransferPackage(ctx context.Context, trans
 
 	if len(req.UserSignature) > MaxSignatureSize {
 		return nil, fmt.Errorf("user signature too large: %d bytes (max: %d)", len(req.UserSignature), MaxSignatureSize)
-	}
-
-	// Validate sender public key size
-	if len(senderIdentityPublicKey) != 33 && len(senderIdentityPublicKey) != 65 {
-		return nil, fmt.Errorf("invalid sender public key size: %d bytes (expected 33 or 65)", len(senderIdentityPublicKey))
 	}
 
 	// Decrypt the key tweaks
@@ -967,7 +973,7 @@ func (h *BaseTransferHandler) validateTransferPackage(ctx context.Context, trans
 	}
 	payloadToVerify := common.GetTransferPackageSigningPayload(transferIDUUID, req)
 
-	if err := common.VerifyECDSASignature(senderIdentityPublicKey, req.UserSignature, payloadToVerify); err != nil {
+	if err := common.VerifyECDSASignature(senderIdentityPubKey, req.UserSignature, payloadToVerify); err != nil {
 		return nil, fmt.Errorf("unable to verify user signature: %w", err)
 	}
 
@@ -987,11 +993,7 @@ func (h *BaseTransferHandler) validateTransferPackage(ctx context.Context, trans
 			return nil, fmt.Errorf("unable to validate share: %w", err)
 		}
 		for _, pubkeyTweak := range leafTweak.PubkeySharesTweak {
-			if len(pubkeyTweak) != 33 {
-				return nil, fmt.Errorf("pubkeys must be 33 bytes")
-			}
-			_, err := secp256k1.ParsePubKey(pubkeyTweak)
-			if err != nil {
+			if _, err := keys.ParsePublicKey(pubkeyTweak); err != nil {
 				return nil, fmt.Errorf("encountered error when parsing pubkey tweak: %w", err)
 			}
 		}

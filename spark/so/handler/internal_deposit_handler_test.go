@@ -4,7 +4,8 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/lightsparkdev/spark/common/keys"
+
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/stretchr/testify/require"
@@ -13,8 +14,9 @@ import (
 func TestValidateUserSignature(t *testing.T) {
 	privKeyHex, err := hex.DecodeString("3418d19f934d800fed3e364568e2d3a34d6574d7fa9459caea7c790e294651a9")
 	require.NoError(t, err)
-	userIdentityPrivKey := secp256k1.PrivKeyFromBytes(privKeyHex)
-	userIdentityPubKey := userIdentityPrivKey.PubKey().SerializeCompressed()
+	userIdentityPrivKey, err := keys.ParsePrivateKey(privKeyHex)
+	require.NoError(t, err)
+	userIdentityPubKey := userIdentityPrivKey.Public()
 
 	// Create test data
 	network := common.Regtest
@@ -32,7 +34,7 @@ func TestValidateUserSignature(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		userPubKey     []byte
+		userPubKey     keys.Public
 		userSignature  []byte
 		sspSignature   []byte
 		network        common.Network
@@ -62,17 +64,6 @@ func TestValidateUserSignature(t *testing.T) {
 			vout:           vout,
 			totalAmount:    90000,
 			expectedErrMsg: "user signature is required",
-		},
-		{
-			name:           "invalid public key",
-			userPubKey:     []byte("invalid"),
-			userSignature:  userSignatureBytes,
-			sspSignature:   sspSignatureBytes,
-			network:        network,
-			txid:           txid,
-			vout:           vout,
-			totalAmount:    90000,
-			expectedErrMsg: "invalid public key format: failed to parse public key",
 		},
 		{
 			name:           "invalid signature format",
@@ -140,7 +131,7 @@ func FuzzValidateUserSignature(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, privKeyHex, userSigHex, sspSigHex []byte, requestTypeInt, networkInt int32, txidHex []byte, vout uint32, totalAmount uint64) {
 		// Convert inputs to appropriate types
-		var userIdentityPublicKey []byte
+		var userIdentityPublicKey keys.Public
 		var userSignature []byte
 		var sspSignature []byte
 		var txid []byte
@@ -149,12 +140,12 @@ func FuzzValidateUserSignature(f *testing.F) {
 		if len(privKeyHex) > 0 {
 			if decodedPrivKey, err := hex.DecodeString(string(privKeyHex)); err == nil && len(decodedPrivKey) == 32 {
 				// Valid private key - generate public key
-				if privKey := secp256k1.PrivKeyFromBytes(decodedPrivKey); privKey != nil {
-					userIdentityPublicKey = privKey.PubKey().SerializeCompressed()
+				if privKey, err := keys.ParsePrivateKey(decodedPrivKey); err == nil {
+					userIdentityPublicKey = privKey.Public()
 				}
 			} else {
-				// Use raw bytes as public key (will likely be invalid)
-				userIdentityPublicKey = privKeyHex
+				// Use empty public key (will likely be invalid)
+				userIdentityPublicKey = keys.Public{}
 			}
 		}
 
@@ -236,7 +227,7 @@ func FuzzValidateUserSignature(f *testing.F) {
 		}
 
 		// If we have valid-looking inputs, we can perform some additional checks
-		if len(userIdentityPublicKey) == 33 && len(userSignature) > 0 && len(sspSignature) > 0 && len(txid) == 32 {
+		if !userIdentityPublicKey.IsZero() && len(userSignature) > 0 && len(sspSignature) > 0 && len(txid) == 32 {
 			// These look like valid inputs, so function should at least parse them
 			// Even if signature verification fails, parsing should succeed
 			if err != nil {

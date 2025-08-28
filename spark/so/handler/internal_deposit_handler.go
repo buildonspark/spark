@@ -357,8 +357,7 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 	if !coordinatorIsSO {
 		return nil, fmt.Errorf("coordinator is not a signing operator")
 	}
-
-	if err := verifySignature(reqWithSignature.CoordinatorPublicKey, reqWithSignature.Signature, messageHash); err != nil {
+	if err := common.VerifyECDSASignature(coordinatorPubKey, reqWithSignature.Signature, messageHash); err != nil {
 		return nil, fmt.Errorf("unable to verify coordinator signature for creating a swap: %w", err)
 	}
 
@@ -397,11 +396,22 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 	totalAmount := uint64(0)
 	quoteSigningBytes := req.SspSignature
 
+	ownerIDPubKey, err := parsePublicKeyIfPresent(req.GetTransfer().GetOwnerIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
+	}
+	receiverIDPubKey, err := parsePublicKeyIfPresent(req.GetTransfer().GetReceiverIdentityPublicKey())
+	if err != nil {
+		return nil, err
+	}
+
 	switch req.RequestType {
 	case pb.UtxoSwapRequestType_Fixed:
 		// *** Validate fixed amount request ***
-
-		if _, err := transferHandler.validateTransferPackage(ctx, req.Transfer.TransferId, req.Transfer.TransferPackage, req.Transfer.OwnerIdentityPublicKey); err != nil {
+		if ownerIDPubKey.IsZero() {
+			return nil, fmt.Errorf("owner identity public key is required")
+		}
+		if _, err := transferHandler.validateTransferPackage(ctx, req.Transfer.TransferId, req.Transfer.TransferPackage, ownerIDPubKey); err != nil {
 			return nil, fmt.Errorf("error validating transfer package: %w", err)
 		}
 
@@ -416,7 +426,7 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 			return nil, fmt.Errorf("unable to load leaves: %w", err)
 		}
 		totalAmount = getTotalTransferValue(leaves)
-		if err = validateUserSignature(req.Transfer.ReceiverIdentityPublicKey, req.UserSignature, req.SspSignature, req.RequestType, network, targetUtxo.Txid, targetUtxo.Vout, totalAmount); err != nil {
+		if err = validateUserSignature(receiverIDPubKey, req.UserSignature, req.SspSignature, req.RequestType, network, targetUtxo.Txid, targetUtxo.Vout, totalAmount); err != nil {
 			return nil, fmt.Errorf("user signature validation failed: %w", err)
 		}
 
@@ -426,12 +436,10 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 
 	case pb.UtxoSwapRequestType_Refund:
 		// *** Validate refund request ***
-
-		if req.Transfer.OwnerIdentityPublicKey == nil {
+		if ownerIDPubKey.IsZero() {
 			return nil, fmt.Errorf("owner identity public key is required")
 		}
-
-		if req.Transfer.ReceiverIdentityPublicKey == nil {
+		if receiverIDPubKey.IsZero() {
 			return nil, fmt.Errorf("receiver identity public key is required")
 		}
 
@@ -441,7 +449,7 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 		}
 		// Validate user signature, receiver identitypubkey and amount in transfer
 		if err = validateUserSignature(
-			req.Transfer.ReceiverIdentityPublicKey,
+			receiverIDPubKey,
 			req.UserSignature,
 			spendTxSighash,
 			req.RequestType,
@@ -467,7 +475,7 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 		"Creating UTXO swap record",
 		"request_type", req.RequestType,
 		"transfer_id", req.Transfer.TransferId,
-		"user_identity_public_key", hex.EncodeToString(req.Transfer.ReceiverIdentityPublicKey),
+		"user_identity_public_key", receiverIDPubKey,
 		"txid", hex.EncodeToString(targetUtxo.Txid),
 		"vout", targetUtxo.Vout,
 		"network", network,
@@ -492,10 +500,10 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 		SetCreditAmountSats(totalAmount).
 		// quote signing bytes are the sighash of the spend tx if SSP is not used
 		SetSspSignature(quoteSigningBytes).
-		SetSspIdentityPublicKey(req.Transfer.OwnerIdentityPublicKey).
+		SetSspIdentityPublicKey(ownerIDPubKey.Serialize()).
 		// authorization from a user to claim this utxo after fulfilling the quote
 		SetUserSignature(req.UserSignature).
-		SetUserIdentityPublicKey(req.Transfer.ReceiverIdentityPublicKey).
+		SetUserIdentityPublicKey(receiverIDPubKey.Serialize()).
 		// Identity of the owner who can cancel this swap (if it's not yet completed), normally -- the coordinator SO
 		SetCoordinatorIdentityPublicKey(reqWithSignature.CoordinatorPublicKey).
 		SetRequestedTransferID(transferUUID).
@@ -524,9 +532,7 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 		return nil, fmt.Errorf("deposit address owner signing pubkey does not match the signing public key")
 	}
 
-	return &pbinternal.CreateUtxoSwapResponse{
-		UtxoDepositAddress: depositAddress.Address,
-	}, nil
+	return &pbinternal.CreateUtxoSwapResponse{UtxoDepositAddress: depositAddress.Address}, nil
 }
 
 func ValidateUtxoIsNotSpent(bitcoinClient *rpcclient.Client, txid []byte, vout uint32) error {
@@ -563,7 +569,7 @@ func validateTransfer(transferRequest *pb.StartTransferRequest) error {
 }
 
 // validateUserSignature verifies that the user has authorized the UTXO swap by validating their signature.
-func validateUserSignature(userIdentityPublicKey []byte, userSignature []byte, sspSignature []byte, requestType pb.UtxoSwapRequestType, network common.Network, txid []byte, vout uint32, totalAmount uint64) error {
+func validateUserSignature(userIdentityPubKey keys.Public, userSignature []byte, sspSignature []byte, requestType pb.UtxoSwapRequestType, network common.Network, txid []byte, vout uint32, totalAmount uint64) error {
 	if userSignature == nil {
 		return fmt.Errorf("user signature is required")
 	}
@@ -581,7 +587,7 @@ func validateUserSignature(userIdentityPublicKey []byte, userSignature []byte, s
 		return fmt.Errorf("failed to create user statement: %w", err)
 	}
 
-	return verifySignature(userIdentityPublicKey, userSignature, messageHash)
+	return common.VerifyECDSASignature(userIdentityPubKey, userSignature, messageHash)
 }
 
 // CreateUserStatement creates a user statement to authorize the UTXO swap.
@@ -751,7 +757,11 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 		return nil, fmt.Errorf("failed to create rollback utxo swap request statement: %w", err)
 	}
 	// Coordinator pubkey comes from the request, but it's fine because it will be checked against the DB.
-	if err := verifySignature(req.CoordinatorPublicKey, req.Signature, messageHash); err != nil {
+	coordinatorPubKey, err := keys.ParsePublicKey(req.CoordinatorPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse coordinator public key: %w", err)
+	}
+	if err := common.VerifyECDSASignature(coordinatorPubKey, req.Signature, messageHash); err != nil {
 		logger.Debug("Rollback utxo swap request signature", "signature", hex.EncodeToString(req.Signature), "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout, "network", common.Network(req.OnChainUtxo.Network).String(), "coordinator", req.CoordinatorPublicKey, "message_hash", hex.EncodeToString(messageHash))
 		return nil, fmt.Errorf("unable to verify coordinator signature: %w", err)
 	}
@@ -787,11 +797,6 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 
 	logger.Info("UTXO swap cancelled", "utxo_swap_id", utxoSwap.ID, "txid", hex.EncodeToString(targetUtxo.Txid), "vout", targetUtxo.Vout)
 	return &pbinternal.RollbackUtxoSwapResponse{}, nil
-}
-
-// verifySignature verifies that the signature is correct for the given message and public key
-func verifySignature(publicKey []byte, signature []byte, messageHash []byte) error {
-	return common.VerifyECDSASignature(publicKey, signature, messageHash)
 }
 
 func CreateUtxoSwapStatement(statementType UtxoSwapStatementType, transactionID string, outputIndex uint32, network common.Network) ([]byte, error) {
@@ -837,7 +842,11 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 	if err != nil {
 		return nil, fmt.Errorf("failed to create utxo swap completed statement: %w", err)
 	}
-	if err := verifySignature(req.CoordinatorPublicKey, req.Signature, messageHash); err != nil {
+	coordinatorPubKey, err := keys.ParsePublicKey(req.CoordinatorPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse coordinator public key: %w", err)
+	}
+	if err := common.VerifyECDSASignature(coordinatorPubKey, req.Signature, messageHash); err != nil {
 		return nil, fmt.Errorf("unable to verify coordinator signature: %w", err)
 	}
 
@@ -857,7 +866,7 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 		Where(utxoswap.StatusEQ(st.UtxoSwapStatusCreated)).
 		// The identity public key of the coordinator that created the utxo swap.
 		// It's been verified above.
-		Where(utxoswap.CoordinatorIdentityPublicKeyEQ(req.CoordinatorPublicKey)).
+		Where(utxoswap.CoordinatorIdentityPublicKeyEQ(coordinatorPubKey.Serialize())).
 		Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get utxo swap: %w", err)

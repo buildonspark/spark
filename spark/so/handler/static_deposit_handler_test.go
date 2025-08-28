@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	testutil "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
@@ -45,15 +46,10 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Call the function
 			result, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t.Context(), config, tc.utxo)
 
-			// Check error expectations
 			if tc.expectError {
-				require.Error(t, err)
-				if tc.errorMsg != "" {
-					assert.Contains(t, err.Error(), tc.errorMsg)
-				}
+				require.ErrorContains(t, err, tc.errorMsg)
 				return
 			}
 
@@ -61,17 +57,13 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t *testing.T) {
 			require.NotNil(t, result)
 
 			// Verify the result structure
-			assert.NotNil(t, result.OnChainUtxo)
 			assert.NotNil(t, result.Signature)
 			assert.NotNil(t, result.CoordinatorPublicKey)
 
 			// Verify the UTXO data matches input
-			assert.Equal(t, tc.utxo.Txid, result.OnChainUtxo.Txid)
-			assert.Equal(t, tc.utxo.Vout, result.OnChainUtxo.Vout)
-			assert.Equal(t, tc.utxo.Network, result.OnChainUtxo.Network)
-
-			// Verify coordinator public key matches config
-			assert.Equal(t, config.IdentityPublicKey().ToBTCEC().SerializeCompressed(), result.CoordinatorPublicKey)
+			assert.Equal(t, tc.utxo.Txid, result.GetOnChainUtxo().GetTxid())
+			assert.Equal(t, tc.utxo.Vout, result.GetOnChainUtxo().GetVout())
+			assert.Equal(t, tc.utxo.Network, result.GetOnChainUtxo().GetNetwork())
 
 			// Verify signature is valid
 			// First, recreate the expected message hash
@@ -79,15 +71,18 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t *testing.T) {
 
 			expectedMessageHash, err := CreateUtxoSwapStatement(
 				UtxoSwapStatementTypeRollback,
-				hex.EncodeToString(result.OnChainUtxo.Txid),
+				hex.EncodeToString(result.GetOnChainUtxo().GetTxid()),
 				result.OnChainUtxo.Vout,
 				network,
 			)
 			require.NoError(t, err)
 
 			// Verify the signature
-			err = verifySignature(result.CoordinatorPublicKey, result.Signature, expectedMessageHash)
-			assert.NoError(t, err, "Signature verification failed")
+			coordinatorPubKey, err := keys.ParsePublicKey(result.GetCoordinatorPublicKey())
+			require.NoError(t, err)
+			assert.Equal(t, config.IdentityPublicKey(), coordinatorPubKey)
+			err = common.VerifyECDSASignature(coordinatorPubKey, result.Signature, expectedMessageHash)
+			require.NoError(t, err, "Signature verification failed")
 		})
 	}
 }

@@ -289,7 +289,7 @@ func (s *AuthnServer) verifyClientSignature(challengeBytes []byte, pubKey keys.P
 	}
 
 	hash := sha256.Sum256(challengeBytes)
-	if err := common.VerifyECDSASignature(pubKey.Serialize(), signature, hash[:]); err != nil {
+	if err := common.VerifyECDSASignature(pubKey, signature, hash[:]); err != nil {
 		return sparkerrors.InvalidUserInputErrorf("%w: %w", ErrInvalidSignature, err)
 	}
 

@@ -606,8 +606,8 @@ func verifyOperatorSignatures(
 }
 
 func verifyOperatorSignature(sigBytes []byte, operator *so.SigningOperator, finalTokenTransactionHash []byte) error {
-	pubKeyBytes := operator.IdentityPublicKey.Serialize()
-	if err := common.VerifyECDSASignature(pubKeyBytes, sigBytes, finalTokenTransactionHash); err != nil {
+	pubKey := operator.IdentityPublicKey
+	if err := common.VerifyECDSASignature(pubKey, sigBytes, finalTokenTransactionHash); err != nil {
 		return fmt.Errorf("failed to verify operator signature for operator %s: %w", operator.Identifier, err)
 	}
 	return nil

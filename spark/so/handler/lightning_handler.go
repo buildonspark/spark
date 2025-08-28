@@ -835,13 +835,21 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 	}
 
 	transferHandler := NewTransferHandler(h.config)
+	receiverIDPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse receiver identity public key: %w", err)
+	}
+	ownerIDPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse owner identity public key: %w", err)
+	}
 	transfer, _, err := transferHandler.createTransfer(
 		ctx,
 		req.Transfer.TransferId,
 		st.TransferTypePreimageSwap,
 		req.Transfer.ExpiryTime.AsTime(),
-		req.Transfer.OwnerIdentityPublicKey,
-		req.Transfer.ReceiverIdentityPublicKey,
+		ownerIDPubKey,
+		receiverIDPubKey,
 		cpfpLeafRefundMap,
 		directLeafRefundMap,
 		directFromCpfpLeafRefundMap,
@@ -871,7 +879,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 	return nil, nil
 }
 
-// InitiatePreimageSwap initiates a preimage swap for the given payment hash.
+// InitiatePreimageSwapV2 initiates a preimage swap for the given payment hash.
 func (h *LightningHandler) InitiatePreimageSwapV2(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
 	return h.initiatePreimageSwap(ctx, req, true)
 }
@@ -978,13 +986,21 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 	}
 
 	transferHandler := NewTransferHandler(h.config)
+	receiverIDPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse receiver identity public key: %w", err)
+	}
+	ownerIDPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse owner identity public key: %w", err)
+	}
 	transfer, _, err := transferHandler.createTransfer(
 		ctx,
 		req.Transfer.TransferId,
 		st.TransferTypePreimageSwap,
 		req.Transfer.ExpiryTime.AsTime(),
-		req.Transfer.OwnerIdentityPublicKey,
-		req.Transfer.ReceiverIdentityPublicKey,
+		ownerIDPubKey,
+		receiverIDPubKey,
 		cpfpLeafRefundMap,
 		directLeafRefundMap,
 		directFromCpfpLeafRefundMap,
@@ -1042,7 +1058,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return &pb.InitiatePreimageSwapResponse{Transfer: transferProto}, nil
 	}
 
-	shares := make([]*secretsharing.SecretShare, 0)
+	var shares []*secretsharing.SecretShare
 	for identifier, share := range result {
 		if share == nil {
 			continue

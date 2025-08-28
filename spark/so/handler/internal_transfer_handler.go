@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -163,7 +164,15 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 		return fmt.Errorf("failed to parse transfer type during initiate transfer for transfer id: %s with req.Type: %s and error: %w", req.TransferId, req.Type, err)
 	}
 
-	keyTweakMap, err := h.validateTransferPackage(ctx, req.TransferId, req.TransferPackage, req.SenderIdentityPublicKey)
+	senderIDPubKey, err := keys.ParsePublicKey(req.SenderIdentityPublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to parse sender identity public key: %w", err)
+	}
+	receiverIDPubKey, err := keys.ParsePublicKey(req.ReceiverIdentityPublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to parse receiver identity public key: %w", err)
+	}
+	keyTweakMap, err := h.validateTransferPackage(ctx, req.TransferId, req.TransferPackage, senderIDPubKey)
 	if err != nil {
 		return err
 	}
@@ -189,8 +198,8 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 		req.TransferId,
 		transferType,
 		req.ExpiryTime.AsTime(),
-		req.SenderIdentityPublicKey,
-		req.ReceiverIdentityPublicKey,
+		senderIDPubKey,
+		receiverIDPubKey,
 		cpfpLeafRefundMap,
 		directLeafRefundMap,
 		directFromCpfpLeafRefundMap,
@@ -209,8 +218,11 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 	for _, leaf := range req.TransferPackage.LeavesToSend {
 		leafRefundMap[leaf.LeafId] = leaf.RawTx
 	}
-
-	keyTweakMap, err := h.validateTransferPackage(ctx, req.TransferId, req.TransferPackage, req.SenderIdentityPublicKey)
+	senderIDPubKey, err := keys.ParsePublicKey(req.SenderIdentityPublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to parse sender identity public key: %w", err)
+	}
+	keyTweakMap, err := h.validateTransferPackage(ctx, req.TransferId, req.TransferPackage, senderIDPubKey)
 	if err != nil {
 		return err
 	}
@@ -309,13 +321,21 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 		directLeafRefundMap[leaf.LeafId] = leaf.DirectRefundTx
 		directFromCpfpLeafRefundMap[leaf.LeafId] = leaf.DirectFromCpfpRefundTx
 	}
+	senderIDPubKey, err := keys.ParsePublicKey(transferReq.SenderIdentityPublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to parse sender identity public key: %w", err)
+	}
+	receiverIDPubKey, err := keys.ParsePublicKey(transferReq.ReceiverIdentityPublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to parse receiver identity public key: %w", err)
+	}
 	transfer, _, err := h.createTransfer(
 		ctx,
 		transferReq.TransferId,
 		st.TransferTypeCooperativeExit,
 		transferReq.ExpiryTime.AsTime(),
-		transferReq.SenderIdentityPublicKey,
-		transferReq.ReceiverIdentityPublicKey,
+		senderIDPubKey,
+		receiverIDPubKey,
 		cpfpLeafRefundMap,
 		directLeafRefundMap,
 		directFromCpfpLeafRefundMap,

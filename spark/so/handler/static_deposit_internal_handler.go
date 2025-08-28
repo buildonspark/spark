@@ -28,7 +28,7 @@ func NewStaticDepositInternalHandler(config *so.Config) *StaticDepositInternalHa
 	return &StaticDepositInternalHandler{config: config}
 }
 
-// Creates a new UTXO swap record and a transfer record to a user.
+// CreateStaticDepositUtxoSwap creates a new UTXO swap record and a transfer record to a user.
 // The function performs the following steps:
 // 1. Validates the request by checking:
 //   - The network is supported
@@ -103,7 +103,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		return nil, fmt.Errorf("coordinator is not a signing operator")
 	}
 
-	if err := verifySignature(reqWithSignature.CoordinatorPublicKey, reqWithSignature.Signature, messageHash); err != nil {
+	if err := common.VerifyECDSASignature(coordinatorPubKey, reqWithSignature.Signature, messageHash); err != nil {
 		return nil, fmt.Errorf("unable to verify coordinator signature for creating a swap: %w", err)
 	}
 
@@ -150,9 +150,19 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	if !depositAddress.IsStatic {
 		return nil, fmt.Errorf("unable to claim a deposit to a non-static address: %w", err)
 	}
-	if !bytes.Equal(depositAddress.OwnerIdentityPubkey, req.Transfer.ReceiverIdentityPublicKey) {
+	reqTransferReceiverIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse transfer receiver public key: %w", err)
+	}
+
+	depositOwnerIdentityPubKey, err := keys.ParsePublicKey(depositAddress.OwnerIdentityPubkey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse deposit owner identity public key: %w", err)
+	}
+	if !depositOwnerIdentityPubKey.Equals(reqTransferReceiverIdentityPubKey) {
 		return nil, fmt.Errorf("transfer is not to the recepient of the deposit")
 	}
+
 	// Validate that the deposit key provided by the user matches what's in the DB.
 	// SSP should generate the deposit public key from a deposit secret key provided by the customer.
 	if !bytes.Equal(depositAddress.OwnerSigningPubkey, req.SpendTxSigningJob.SigningPublicKey) {
@@ -168,7 +178,11 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	totalAmount := uint64(0)
 	quoteSigningBytes := req.SspSignature
 
-	if _, err := transferHandler.validateTransferPackage(ctx, req.Transfer.TransferId, req.Transfer.TransferPackage, req.Transfer.OwnerIdentityPublicKey); err != nil {
+	reqTransferOwnerIDPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
+	}
+	if _, err := transferHandler.validateTransferPackage(ctx, req.Transfer.TransferId, req.Transfer.TransferPackage, reqTransferOwnerIDPubKey); err != nil {
 		return nil, fmt.Errorf("error validating transfer package: %w", err)
 	}
 
@@ -190,7 +204,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		return nil, fmt.Errorf("transfer network %s does not match utxo network %s", transferNetwork, network)
 	}
 	totalAmount = getTotalTransferValue(leaves)
-	if err = validateUserSignature(req.Transfer.ReceiverIdentityPublicKey, req.UserSignature, req.SspSignature, pb.UtxoSwapRequestType_Fixed, network, targetUtxo.Txid, targetUtxo.Vout, totalAmount); err != nil {
+	if err = validateUserSignature(reqTransferReceiverIdentityPubKey, req.UserSignature, req.SspSignature, pb.UtxoSwapRequestType_Fixed, network, targetUtxo.Txid, targetUtxo.Vout, totalAmount); err != nil {
 		return nil, fmt.Errorf("user signature validation failed: %w", err)
 	}
 
@@ -198,7 +212,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		"Creating UTXO swap record",
 		"request_type", pb.UtxoSwapRequestType_Fixed,
 		"transfer_id", req.Transfer.TransferId,
-		"user_identity_public_key", hex.EncodeToString(req.Transfer.ReceiverIdentityPublicKey),
+		"user_identity_public_key", reqTransferReceiverIdentityPubKey,
 		"txid", hex.EncodeToString(targetUtxo.Txid),
 		"vout", targetUtxo.Vout,
 		"network", network,
@@ -221,10 +235,10 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		SetCreditAmountSats(totalAmount).
 		// quote signing bytes are the sighash of the spend tx if SSP is not used
 		SetSspSignature(quoteSigningBytes).
-		SetSspIdentityPublicKey(req.Transfer.OwnerIdentityPublicKey).
+		SetSspIdentityPublicKey(reqTransferOwnerIDPubKey.Serialize()).
 		// authorization from a user to claim this utxo after fulfilling the quote
 		SetUserSignature(req.UserSignature).
-		SetUserIdentityPublicKey(req.Transfer.ReceiverIdentityPublicKey).
+		SetUserIdentityPublicKey(reqTransferReceiverIdentityPubKey.Serialize()).
 		SetCoordinatorIdentityPublicKey(reqWithSignature.CoordinatorPublicKey).
 		SetRequestedTransferID(transferUUID).
 		Save(ctx)
@@ -237,9 +251,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		return nil, fmt.Errorf("unable to add utxo swap to deposit address: %w", err)
 	}
 
-	return &pbinternal.CreateStaticDepositUtxoSwapResponse{
-		UtxoDepositAddress: depositAddress.Address,
-	}, nil
+	return &pbinternal.CreateStaticDepositUtxoSwapResponse{UtxoDepositAddress: depositAddress.Address}, nil
 }
 
 func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context.Context, config *so.Config, reqWithSignature *pbinternal.CreateStaticDepositUtxoRefundRequest) (*pbinternal.CreateStaticDepositUtxoRefundResponse, error) {
@@ -275,7 +287,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, fmt.Errorf("coordinator is not a signing operator")
 	}
 
-	if err := verifySignature(reqWithSignature.CoordinatorPublicKey, reqWithSignature.Signature, messageHash); err != nil {
+	if err := common.VerifyECDSASignature(coordinatorPubKey, reqWithSignature.Signature, messageHash); err != nil {
 		return nil, fmt.Errorf("unable to verify coordinator signature for creating a swap: %w", err)
 	}
 
@@ -330,14 +342,18 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 	}
 
 	// Validate user statement
-	if err = validateUserSignature(depositAddress.OwnerIdentityPubkey, req.UserSignature, spendTxSighash, pb.UtxoSwapRequestType_Refund, network, targetUtxo.Txid, targetUtxo.Vout, totalAmount); err != nil {
+	depositOwnerIDPubKey, err := keys.ParsePublicKey(depositAddress.OwnerIdentityPubkey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse deposit owner identity public key: %w", err)
+	}
+	if err = validateUserSignature(depositOwnerIDPubKey, req.UserSignature, spendTxSighash, pb.UtxoSwapRequestType_Refund, network, targetUtxo.Txid, targetUtxo.Vout, totalAmount); err != nil {
 		return nil, fmt.Errorf("user signature validation failed: %w", err)
 	}
 
 	logger.Info(
 		"Creating UTXO swap record",
 		"request_type", pb.UtxoSwapRequestType_Refund,
-		"user_identity_public_key", hex.EncodeToString(depositAddress.OwnerIdentityPubkey),
+		"user_identity_public_key", depositOwnerIDPubKey,
 		"txid", hex.EncodeToString(targetUtxo.Txid),
 		"vout", targetUtxo.Vout,
 		"network", network,
@@ -353,8 +369,8 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		SetCreditAmountSats(totalAmount).
 		// quote signing bytes are the sighash of the spend tx if SSP is not used
 		SetSspSignature(spendTxSighash).
-		SetSspIdentityPublicKey(depositAddress.OwnerIdentityPubkey).
-		SetUserIdentityPublicKey(depositAddress.OwnerIdentityPubkey).
+		SetSspIdentityPublicKey(depositOwnerIDPubKey.Serialize()).
+		SetUserIdentityPublicKey(depositOwnerIDPubKey.Serialize()).
 		SetCoordinatorIdentityPublicKey(reqWithSignature.CoordinatorPublicKey).
 		Save(ctx)
 	if err != nil {
@@ -366,7 +382,5 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, fmt.Errorf("unable to add utxo swap to deposit address: %w", err)
 	}
 
-	return &pbinternal.CreateStaticDepositUtxoRefundResponse{
-		UtxoDepositAddress: depositAddress.Address,
-	}, nil
+	return &pbinternal.CreateStaticDepositUtxoRefundResponse{UtxoDepositAddress: depositAddress.Address}, nil
 }
