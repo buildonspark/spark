@@ -2,10 +2,10 @@ package handler
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"time"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -92,8 +92,13 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 				return nil, fmt.Errorf("failed to get deposit address: %w", err)
 			}
 			if address.ConfirmationHeight != 0 {
-				if len(address.ConfirmationTxid) > 0 && address.ConfirmationTxid != hex.EncodeToString(tree.BaseTxid) {
-					return nil, fmt.Errorf("confirmation txid does not match tree base txid")
+				if len(address.ConfirmationTxid) > 0 {
+					var baseHash chainhash.Hash
+					// Convert the tree.BaseTxid back to chainhash so it matches the format of address.ConfirmationTxid
+					copy(baseHash[:], tree.BaseTxid)
+					if address.ConfirmationTxid != baseHash.String() {
+						return nil, fmt.Errorf("confirmation txid does not match tree base txid")
+					}
 				}
 				_, err = tree.Update().SetStatus(st.TreeStatusAvailable).Save(ctx)
 				if err != nil {
