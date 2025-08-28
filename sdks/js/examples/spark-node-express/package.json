@@ -16,7 +16,7 @@
   "dependencies": {
     "@buildonspark/issuer-sdk": "0.0.91",
     "@buildonspark/spark-sdk": "0.2.12",
-    "@lightsparkdev/core": "^1.4.3",
+    "@lightsparkdev/core": "^1.4.4",
     "@noble/curves": "^1.8.0",
     "express": "^4.21.2"
   },

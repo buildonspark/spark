@@ -7,8 +7,18 @@ const path = require('path');
  *
  * @type {import('@react-native/metro-config').MetroConfig}
  */
+const workspaceRoot = path.resolve(__dirname, '../../');
+const projectRoot = __dirname;
+
 const config = {
-  watchFolders: [path.resolve(__dirname, '../../')],
+  projectRoot,
+  watchFolders: [workspaceRoot],
+  resolver: {
+    nodeModulesPaths: [
+      path.resolve(projectRoot, 'node_modules'),
+      path.resolve(workspaceRoot, 'node_modules'),
+    ],
+  },
 };
 
-module.exports = mergeConfig(getDefaultConfig(__dirname), config);
+module.exports = mergeConfig(getDefaultConfig(projectRoot), config);

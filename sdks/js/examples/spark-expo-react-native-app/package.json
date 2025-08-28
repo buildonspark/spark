@@ -45,6 +45,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.27.3",
+    "@babel/plugin-transform-class-static-block": "^7.28.3",
     "@types/react": "^19.0.10",
     "@types/react-native-get-random-values": "^1",
     "eslint": "^9.25.0",
