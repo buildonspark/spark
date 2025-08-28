@@ -87,6 +87,7 @@ type args struct {
 	RateLimiterWindow          time.Duration
 	RateLimiterMaxRequests     int
 	RateLimiterMethods         string
+	EntDebug                   bool
 }
 
 func (a *args) SupportedNetworksList() []common.Network {
@@ -137,6 +138,7 @@ func loadArgs() (*args, error) {
 	flag.DurationVar(&args.RateLimiterWindow, "rate-limiter-window", 60*time.Second, "Rate limiter time window")
 	flag.IntVar(&args.RateLimiterMaxRequests, "rate-limiter-max-requests", 100, "Maximum requests allowed in the time window")
 	flag.StringVar(&args.RateLimiterMethods, "rate-limiter-methods", "", "Comma-separated list of methods to rate limit")
+	flag.BoolVar(&args.EntDebug, "ent-debug", false, "Log all the SQL queries")
 
 	// Parse flags
 	flag.Parse()
@@ -319,7 +321,14 @@ func main() {
 	}
 
 	dialectDriver := entsql.NewDriver(dbDriver, entsql.Conn{ExecQuerier: sqlDb})
-	dbClient := ent.NewClient(ent.Driver(dialectDriver))
+
+	var dbClient *ent.Client
+	if args.EntDebug {
+		dbClient = ent.NewClient(ent.Driver(dialectDriver), ent.Debug())
+	} else {
+		dbClient = ent.NewClient(ent.Driver(dialectDriver))
+	}
+
 	dbClient.Intercept(ent.DatabaseStatsInterceptor(10 * time.Second))
 	defer dbClient.Close()
 
