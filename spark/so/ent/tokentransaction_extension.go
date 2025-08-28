@@ -72,8 +72,12 @@ func CreateStartedTransactionEntities(
 	}
 
 	var tokenTransactionEnt *TokenTransaction
-
-	if tokenTransaction.GetCreateInput() != nil {
+	tokenTransactionType, err := utils.InferTokenTransactionType(tokenTransaction)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer token transaction type: %w", err)
+	}
+	switch tokenTransactionType {
+	case utils.TokenTransactionTypeCreate:
 		tokenMetadata, err := common.NewTokenMetadataFromCreateInput(tokenTransaction.GetCreateInput(), tokenTransaction.Network)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create token metadata: %w", err)
@@ -112,9 +116,7 @@ func CreateStartedTransactionEntities(
 		if err != nil {
 			return nil, fmt.Errorf("failed to create create token transaction: %w", err)
 		}
-	}
-
-	if tokenTransaction.GetMintInput() != nil {
+	case utils.TokenTransactionTypeMint:
 		tokenMintEnt, err := db.TokenMint.Create().
 			SetIssuerPublicKey(tokenTransaction.GetMintInput().GetIssuerPublicKey()).
 			SetIssuerSignature(signaturesWithIndex[0].Signature).
@@ -140,9 +142,7 @@ func CreateStartedTransactionEntities(
 		if err != nil {
 			return nil, fmt.Errorf("failed to create mint token transaction: %w", err)
 		}
-	}
-
-	if tokenTransaction.GetTransferInput() != nil {
+	case utils.TokenTransactionTypeTransfer:
 		if len(signaturesWithIndex) != len(orderedOutputToSpendEnts) {
 			return nil, fmt.Errorf(
 				"number of signatures %d doesn't match number of outputs to spend %d",
@@ -176,8 +176,10 @@ func CreateStartedTransactionEntities(
 				return nil, fmt.Errorf("failed to update output to spend: %w", err)
 			}
 		}
+	case utils.TokenTransactionTypeUnknown:
+	default:
+		return nil, fmt.Errorf("token transaction type unknown")
 	}
-
 	if tokenTransaction.Version >= 2 && tokenTransaction.GetInvoiceAttachments() != nil {
 		sparkInvoiceIDs, sparkInvoicesToCreate, err := prepareSparkInvoiceCreates(ctx, tokenTransaction, tokenTransactionEnt)
 		if err != nil {
