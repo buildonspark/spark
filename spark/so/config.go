@@ -456,6 +456,10 @@ func getDatabaseStatementTimeoutMs(k knobs.Knobs) uint64 {
 	return uint64(k.GetValue(knobs.KnobDatabaseStatementTimeout, 60) * 1000)
 }
 
+func getDatabaseLockTimeoutMs(k knobs.Knobs) uint64 {
+	return uint64(k.GetValue(knobs.KnobDatabaseLockTimeout, 15) * 1000)
+}
+
 func NewDBConnector(ctx context.Context, soConfig *Config, knobsService knobs.Knobs) (*DBConnector, error) {
 	uri, err := url.Parse(soConfig.DatabasePath)
 	if err != nil {
@@ -530,6 +534,12 @@ func NewDBConnector(ctx context.Context, soConfig *Config, knobsService knobs.Kn
 			_, err := conn.Exec(ctx, fmt.Sprintf("SET statement_timeout = %d", statementTimeoutMs))
 			if err != nil {
 				return fmt.Errorf("failed to set statement_timeout: %w", err)
+			}
+
+			lockTimeoutMs := getDatabaseLockTimeoutMs(knobsService)
+			_, err = conn.Exec(ctx, fmt.Sprintf("SET lock_timeout = %d", lockTimeoutMs))
+			if err != nil {
+				return fmt.Errorf("failed to set lock_timeout: %w", err)
 			}
 			return nil
 		}
