@@ -72,7 +72,7 @@ func TestValidateUserSignature(t *testing.T) {
 			txid:           txid,
 			vout:           vout,
 			totalAmount:    90000,
-			expectedErrMsg: "failed to parse user identity public key",
+			expectedErrMsg: "invalid public key format: failed to parse public key",
 		},
 		{
 			name:           "invalid signature format",
@@ -83,7 +83,7 @@ func TestValidateUserSignature(t *testing.T) {
 			txid:           txid,
 			vout:           vout,
 			totalAmount:    90000,
-			expectedErrMsg: "failed to parse user signature",
+			expectedErrMsg: "invalid signature format: malformed DER signature",
 		},
 		{
 			name:           "signature verification failure",

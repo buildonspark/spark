@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -366,6 +367,52 @@ func VerifySignatureMultiInput(signedTx *wire.MsgTx, prevOutputFetcher txscript.
 			return fmt.Errorf("failed to verify signature on input %d: %w", vin, err)
 		}
 	}
+	return nil
+}
+
+// VerifyECDSASignature verifies an ECDSA signature with comprehensive validation
+// including empty input checks and canonical encoding validation to prevent malleability attacks.
+func VerifyECDSASignature(publicKeyBytes []byte, signatureBytes []byte, messageHash []byte) error {
+	// Input validation
+	if len(publicKeyBytes) == 0 {
+		return fmt.Errorf("public key cannot be empty")
+	}
+	if len(signatureBytes) == 0 {
+		return fmt.Errorf("signature cannot be empty")
+	}
+	if len(messageHash) == 0 {
+		return fmt.Errorf("message hash cannot be empty")
+	}
+
+	// Parse the public key
+	pubKey, err := keys.ParsePublicKey(publicKeyBytes)
+	if err != nil {
+		return fmt.Errorf("invalid public key format: failed to parse public key: %w", err)
+	}
+
+	// Parse the signature - strict DER parsing prevents many malleability issues
+	sig, err := ecdsa.ParseDERSignature(signatureBytes)
+	if err != nil {
+		return fmt.Errorf("invalid signature format: malformed DER signature: %w", err)
+	}
+
+	// Additional validation: ensure signature encoding is minimal (no extra padding)
+	// This prevents signature malleability attacks through non-canonical encoding
+	reencoded := sig.Serialize()
+	if len(signatureBytes) != len(reencoded) {
+		return fmt.Errorf("signature encoding is not minimal")
+	}
+	for i, b := range signatureBytes {
+		if b != reencoded[i] {
+			return fmt.Errorf("signature encoding is not canonical")
+		}
+	}
+
+	// Verify the signature
+	if !sig.Verify(messageHash, pubKey.ToBTCEC()) {
+		return fmt.Errorf("invalid signature")
+	}
+
 	return nil
 }
 

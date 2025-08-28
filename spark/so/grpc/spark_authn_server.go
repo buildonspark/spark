@@ -13,7 +13,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark_authn"
 	"github.com/lightsparkdev/spark/so/authninternal"
@@ -294,18 +294,9 @@ func (s *AuthnServer) verifyClientSignature(challengeBytes []byte, pubKey keys.P
 		return sparkerrors.InvalidUserInputErrorf("invalid input: challenge bytes cannot be empty")
 	}
 
-	if len(signature) == 0 {
-		return sparkerrors.InvalidUserInputErrorf("invalid input: signature cannot be empty")
-	}
-
-	sig, err := ecdsa.ParseDERSignature(signature)
-	if err != nil {
-		return sparkerrors.InvalidUserInputErrorf("invalid signature format: malformed DER signature: %w", err)
-	}
-
 	hash := sha256.Sum256(challengeBytes)
-	if !sig.Verify(hash[:], pubKey.ToBTCEC()) {
-		return sparkerrors.InvalidUserInputErrorf("signature verification failed")
+	if err := common.VerifyECDSASignature(pubKey.Serialize(), signature, hash[:]); err != nil {
+		return sparkerrors.InvalidUserInputErrorf("%w: %w", ErrInvalidSignature, err)
 	}
 
 	return nil

@@ -12,7 +12,6 @@ import (
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
@@ -792,22 +791,7 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 
 // verifySignature verifies that the signature is correct for the given message and public key
 func verifySignature(publicKey []byte, signature []byte, messageHash []byte) error {
-	// Parse the user's identity public key
-	userPubKey, err := secp256k1.ParsePubKey(publicKey)
-	if err != nil {
-		return fmt.Errorf("failed to parse user identity public key: %w", err)
-	}
-
-	// Parse and verify the signature
-	sig, err := ecdsa.ParseDERSignature(signature)
-	if err != nil {
-		return fmt.Errorf("failed to parse user signature: %w", err)
-	}
-
-	if !sig.Verify(messageHash[:], userPubKey) {
-		return fmt.Errorf("invalid signature")
-	}
-	return nil
+	return common.VerifyECDSASignature(publicKey, signature, messageHash)
 }
 
 func CreateUtxoSwapStatement(statementType UtxoSwapStatementType, transactionID string, outputIndex uint32, network common.Network) ([]byte, error) {

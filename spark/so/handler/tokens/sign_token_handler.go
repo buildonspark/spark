@@ -12,9 +12,6 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/lightsparkdev/spark/common"
-	"github.com/lightsparkdev/spark/so/tokens"
-
-	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/lightsparkdev/spark/common/logging"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -28,6 +25,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/protoconverter"
+	"github.com/lightsparkdev/spark/so/tokens"
 	"github.com/lightsparkdev/spark/so/utils"
 )
 
@@ -608,15 +606,10 @@ func verifyOperatorSignatures(
 }
 
 func verifyOperatorSignature(sigBytes []byte, operator *so.SigningOperator, finalTokenTransactionHash []byte) error {
-	operatorSig, err := ecdsa.ParseDERSignature(sigBytes)
-	if err != nil {
-		return fmt.Errorf("failed to parse operator signature for operator %s: %w", operator.Identifier, err)
+	pubKeyBytes := operator.IdentityPublicKey.Serialize()
+	if err := common.VerifyECDSASignature(pubKeyBytes, sigBytes, finalTokenTransactionHash); err != nil {
+		return fmt.Errorf("failed to verify operator signature for operator %s: %w", operator.Identifier, err)
 	}
-
-	if !operatorSig.Verify(finalTokenTransactionHash, operator.IdentityPublicKey.ToBTCEC()) {
-		return fmt.Errorf("invalid signature from operator %s", operator.Identifier)
-	}
-
 	return nil
 }
 

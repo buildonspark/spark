@@ -12,7 +12,6 @@ import (
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	eciesgo "github.com/ecies/go/v2"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark"
@@ -967,17 +966,8 @@ func (h *BaseTransferHandler) validateTransferPackage(ctx context.Context, trans
 	}
 	payloadToVerify := common.GetTransferPackageSigningPayload(transferIDUUID, req)
 
-	signature, err := ecdsa.ParseDERSignature(req.UserSignature)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse user signature: %w", err)
-	}
-	userPublicKey, err := secp256k1.ParsePubKey(senderIdentityPublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse user public key: %w", err)
-	}
-	valid := signature.Verify(payloadToVerify, userPublicKey)
-	if !valid {
-		return nil, fmt.Errorf("invalid signature")
+	if err := common.VerifyECDSASignature(senderIdentityPublicKey, req.UserSignature, payloadToVerify); err != nil {
+		return nil, fmt.Errorf("unable to verify user signature: %w", err)
 	}
 
 	for _, leafTweak := range leafTweaksMap {
