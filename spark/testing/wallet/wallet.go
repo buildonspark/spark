@@ -451,7 +451,7 @@ func (w *SingleKeyTestWallet) RequestLeavesSwap(ctx context.Context, targetAmoun
 		amountClaimed += int64(node.Value)
 	}
 
-	// TODO: accomodate for fees
+	// TODO: accommodate for fees
 	if amountClaimed != totalAmount {
 		return nil, fmt.Errorf("amount claimed is not equal to the total amount")
 	}

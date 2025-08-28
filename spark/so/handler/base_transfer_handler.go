@@ -77,11 +77,11 @@ func validateLeafRefundTxOutput(refundTx *wire.MsgTx, receiverIdentityPublicKey 
 	if err != nil {
 		return fmt.Errorf("unable to parse receiver pubkey: %w", err)
 	}
-	recieverP2trScript, err := common.P2TRScriptFromPubKey(receiverIdentityPubkey)
+	receiverP2trScript, err := common.P2TRScriptFromPubKey(receiverIdentityPubkey)
 	if err != nil {
 		return fmt.Errorf("unable to generate p2tr script from receiver pubkey: %w", err)
 	}
-	if !bytes.Equal(recieverP2trScript, refundTx.TxOut[0].PkScript) {
+	if !bytes.Equal(receiverP2trScript, refundTx.TxOut[0].PkScript) {
 		return fmt.Errorf("refund tx is expected to send to receiver identity pubkey")
 	}
 	return nil

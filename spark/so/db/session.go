@@ -360,7 +360,7 @@ func (t *TxProviderWithTimeout) GetOrBeginTx(ctx context.Context) (*ent.Tx, erro
 	// this into a goroutine so that we can run a select on:
 	//
 	// 		1. A connection being acquired and a transaction being started successfully.
-	//		2. An error occuring while staring the transaction.
+	//		2. An error occurring while starting the transaction.
 	//		3. Neither (1) nor (2) happening within the timeout period.
 	//
 	// If (3) happens, this function will return an error AND the caller needs to cancel the context in

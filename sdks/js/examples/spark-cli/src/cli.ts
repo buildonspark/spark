@@ -734,7 +734,7 @@ async function runCLI() {
            *
            * 1. Get an address to deposit funds from L1 to Spark
            * 2. Construct a tx spending from the L1 address to the Spark address
-           * 3. Call initalizeDeposit with the tx hex
+           * 3. Call initializeDeposit with the tx hex
            * 4. Sign the tx
            * 5. Broadcast the tx
            */

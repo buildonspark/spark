@@ -230,7 +230,7 @@ func CreateStartedTransactionEntities(
 				Where(tokencreate.TokenIdentifier(tokenOutputs[0].TokenIdentifier)).
 				Only(ctx)
 			if err != nil {
-				// An error occured when fetching the spark token create ent.
+				// An error occurred when fetching the spark token create ent.
 				return nil, fmt.Errorf("failed to fetch token create ent: %w", err)
 			}
 			issuerPublicKeyToWrite = tokenCreateEnt.IssuerPublicKey
