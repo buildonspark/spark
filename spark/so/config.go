@@ -48,6 +48,7 @@ var (
 	defaultGRPCServerKeepaliveTime       = 300 * time.Second
 	defaultGRPCServerKeepaliveTimeout    = 20 * time.Second
 	defaultGRPCServerUnaryHandlerTimeout = 60 * time.Second
+	// Defaults for gRPC client behavior
 	// 0 or unset means to fall back to the default value.
 	// < 0 means disable timeouts
 	// > 0 means enable timeouts with the specified value
@@ -379,7 +380,7 @@ func NewConfig(
 		ServiceAuthz:               operatorConfig.ServiceAuthz,
 		XffClientIpPosition:        operatorConfig.XffClientIpPosition,
 		Knobs:                      operatorConfig.Knobs,
-		FrostGRPCConnectionFactory: &frost.FrostGRPCConnectionFactorySecure{},
+		FrostGRPCConnectionFactory: frost.NewFrostGRPCConnectionFactorySecure(),
 		GRPC:                       operatorConfig.GRPC,
 	}
 

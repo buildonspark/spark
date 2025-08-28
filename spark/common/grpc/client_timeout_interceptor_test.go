@@ -54,8 +54,10 @@ func TestClientTimeoutInterceptor_TimesOut(t *testing.T) {
 func TestClientTimeoutInterceptor_NoTimeout(t *testing.T) {
 	// Use a 0 timeout to test that the interceptor does not enforce a timeout.
 	const timeout = 0 * time.Second
+
 	timeoutProvider := &mockTimeoutProvider{timeout: timeout}
 	interceptor := ClientTimeoutInterceptor(timeoutProvider)
+
 	// invoker waits for a reasonable duration to verify no timeout is applied.
 	invoker := func(ctx context.Context, _ string, _ any, _ any, _ *grpc.ClientConn, _ ...grpc.CallOption) error {
 		select {
@@ -66,11 +68,14 @@ func TestClientTimeoutInterceptor_NoTimeout(t *testing.T) {
 			return nil
 		}
 	}
+
 	start := time.Now()
 	err := interceptor(t.Context(), "/test.Service/TestMethod", nil, nil, nil, invoker)
 	elapsed := time.Since(start)
+
 	// Expect the interceptor to not enforce timeout and return nil.
 	require.NoError(t, err)
+
 	// Sanity check on duration: should be at least 500ms (our wait time), but not excessively larger.
 	require.GreaterOrEqual(t, elapsed, 500*time.Millisecond)
 	require.Less(t, elapsed, 1*time.Second)

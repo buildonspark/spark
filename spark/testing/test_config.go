@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/lightsparkdev/spark/common"
+	sparkgrpc "github.com/lightsparkdev/spark/common/grpc"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/testing/wallet"
 )
@@ -55,10 +56,18 @@ var testOperatorPrivkeys = []string{
 	"effe79dc2a911a5a359910cb7782f5cabb3b7cf01e3809f8d323898ffd78e408",
 }
 
-type TestGRPCConnectionFactory struct{}
+type TestGRPCConnectionFactory struct {
+	timeoutProvider *common.ClientTimeoutConfig
+}
 
 func (f *TestGRPCConnectionFactory) NewFrostGRPCConnection(frostSignerAddress string) (*grpc.ClientConn, error) {
 	return DangerousNewGRPCConnectionWithoutTLS(frostSignerAddress, nil)
+}
+
+func (f *TestGRPCConnectionFactory) SetTimeoutProvider(timeoutProvider sparkgrpc.TimeoutProvider) {
+	f.timeoutProvider = &common.ClientTimeoutConfig{
+		TimeoutProvider: timeoutProvider,
+	}
 }
 
 func decodePubKeys(pubKeys []string) ([]keys.Public, error) {

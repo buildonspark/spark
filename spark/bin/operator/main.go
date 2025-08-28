@@ -37,6 +37,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	_ "github.com/lightsparkdev/spark/so/ent/runtime"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
+
 	sparkgrpc "github.com/lightsparkdev/spark/so/grpc"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
@@ -306,6 +307,9 @@ func main() {
 			TimeoutProvider: knobs.NewKnobsTimeoutProvider(knobsService, config.GRPC.ClientTimeout),
 		}
 	}
+
+	config.FrostGRPCConnectionFactory.SetTimeoutProvider(
+		knobs.NewKnobsTimeoutProvider(knobsService, config.GRPC.ClientTimeout))
 
 	var sqlDb entsql.ExecQuerier
 	if dbDriver == "postgres" {
