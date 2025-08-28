@@ -41,7 +41,8 @@ func ParsePublicKeyMap[k comparable](asBytes map[k][]byte) (map[k]Public, error)
 	return asKeys, nil
 }
 
-// publicKeyFromInts creates an secp256k1 public key from x and y big integers. x and y must not be nil.
+// publicKeyFromInts creates an secp256k1 public key from x and y big integers. x and y must not be nil, and must be
+// on the secp256k1 curve.
 func publicKeyFromInts(x, y *big.Int) Public {
 	xFieldVal := secp256k1.FieldVal{}
 	xFieldVal.SetByteSlice(x.Bytes())
@@ -89,7 +90,7 @@ func (p Public) Equals(other Public) bool {
 	return p.key.IsEqual(&other.key)
 }
 
-// IsZero returns true if this key is the empty key and false otherwise.
+// IsZero returns true if p is the empty key.
 func (p Public) IsZero() bool {
 	return p == Public{}
 }

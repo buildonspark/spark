@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/errors"
 
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"

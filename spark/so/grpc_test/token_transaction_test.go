@@ -113,13 +113,11 @@ func getSigningOperatorPublicKeyBytes(config *wallet.TestWalletConfig) [][]byte 
 	return publicKeys
 }
 
-func createTestTokenMintTransaction(config *wallet.TestWalletConfig,
-	tokenIdentityPubKeyBytes []byte,
-) (*pb.TokenTransaction, keys.Private, keys.Private, error) {
-	return createTestTokenMintTransactionWithParams(config, tokenIdentityPubKeyBytes)
+func createTestTokenMintTransaction(config *wallet.TestWalletConfig, tokenIdentityPubKey keys.Public) (*pb.TokenTransaction, keys.Private, keys.Private, error) {
+	return createTestTokenMintTransactionWithParams(config, tokenIdentityPubKey)
 }
 
-func createTestTokenMintTransactionWithParams(config *wallet.TestWalletConfig, issuerPublicKeyBytes []byte) (*pb.TokenTransaction, keys.Private, keys.Private, error) {
+func createTestTokenMintTransactionWithParams(config *wallet.TestWalletConfig, issuerPublicKey keys.Public) (*pb.TokenTransaction, keys.Private, keys.Private, error) {
 	// Generate two user output key pairs
 	userOutput1PrivKey, err := keys.GeneratePrivateKey()
 	if err != nil {
@@ -136,19 +134,19 @@ func createTestTokenMintTransactionWithParams(config *wallet.TestWalletConfig, i
 	mintTokenTransaction := &pb.TokenTransaction{
 		TokenInputs: &pb.TokenTransaction_MintInput{
 			MintInput: &pb.TokenMintInput{
-				IssuerPublicKey:         issuerPublicKeyBytes,
+				IssuerPublicKey:         issuerPublicKey.Serialize(),
 				IssuerProvidedTimestamp: uint64(time.Now().UnixMilli()),
 			},
 		},
 		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: userOutput1PubKeyBytes,
-				TokenPublicKey: issuerPublicKeyBytes,
+				TokenPublicKey: issuerPublicKey.Serialize(),
 				TokenAmount:    int64ToUint128Bytes(0, TestIssueOutput1Amount),
 			},
 			{
 				OwnerPublicKey: userOutput2PubKeyBytes,
-				TokenPublicKey: issuerPublicKeyBytes,
+				TokenPublicKey: issuerPublicKey.Serialize(),
 				TokenAmount:    int64ToUint128Bytes(0, TestIssueOutput2Amount),
 			},
 		},
@@ -159,18 +157,14 @@ func createTestTokenMintTransactionWithParams(config *wallet.TestWalletConfig, i
 	return mintTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, nil
 }
 
-func createTestTokenTransferTransaction(
-	config *wallet.TestWalletConfig,
-	finalIssueTokenTransactionHash []byte,
-	issuerPublicKeyBytes []byte,
-) (*pb.TokenTransaction, keys.Private, error) {
-	return createTestTokenTransferTransactionWithParams(config, finalIssueTokenTransactionHash, issuerPublicKeyBytes)
+func createTestTokenTransferTransaction(config *wallet.TestWalletConfig, finalIssueTokenTransactionHash []byte, issuerPublicKey keys.Public) (*pb.TokenTransaction, keys.Private, error) {
+	return createTestTokenTransferTransactionWithParams(config, finalIssueTokenTransactionHash, issuerPublicKey)
 }
 
 func createTestTokenTransferTransactionWithParams(
 	config *wallet.TestWalletConfig,
 	finalIssueTokenTransactionHash []byte,
-	issuerPublicKeyBytes []byte,
+	issuerPublicKey keys.Public,
 ) (*pb.TokenTransaction, keys.Private, error) {
 	userOutput3PrivKey, err := keys.GeneratePrivateKey()
 	if err != nil {
@@ -196,7 +190,7 @@ func createTestTokenTransferTransactionWithParams(
 		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: userOutput3PubKeyBytes,
-				TokenPublicKey: issuerPublicKeyBytes,
+				TokenPublicKey: issuerPublicKey.Serialize(),
 				TokenAmount:    int64ToUint128Bytes(0, TestTransferOutput1Amount),
 			},
 		},
@@ -206,9 +200,7 @@ func createTestTokenTransferTransactionWithParams(
 	return transferTokenTransaction, userOutput3PrivKey, nil
 }
 
-func createTestTokenMintTransactionWithMultipleTokenOutputs(config *wallet.TestWalletConfig,
-	issuerPublicKeyBytes []byte, numOutputs int,
-) (*pb.TokenTransaction, []keys.Private, error) {
+func createTestTokenMintTransactionWithMultipleTokenOutputs(config *wallet.TestWalletConfig, issuerPublicKey keys.Public, numOutputs int) (*pb.TokenTransaction, []keys.Private, error) {
 	userOutputPrivKeys := make([]keys.Private, numOutputs)
 	outputOutputs := make([]*pb.TokenOutput, numOutputs)
 
@@ -222,7 +214,7 @@ func createTestTokenMintTransactionWithMultipleTokenOutputs(config *wallet.TestW
 
 		outputOutputs[i] = &pb.TokenOutput{
 			OwnerPublicKey: pubKeyBytes,
-			TokenPublicKey: issuerPublicKeyBytes,
+			TokenPublicKey: issuerPublicKey.Serialize(),
 			TokenAmount:    int64ToUint128Bytes(0, uint64(testIssueMultiplePerOutputAmount)),
 		}
 	}
@@ -230,7 +222,7 @@ func createTestTokenMintTransactionWithMultipleTokenOutputs(config *wallet.TestW
 	issueTokenTransaction := &pb.TokenTransaction{
 		TokenInputs: &pb.TokenTransaction_MintInput{
 			MintInput: &pb.TokenMintInput{
-				IssuerPublicKey:         issuerPublicKeyBytes,
+				IssuerPublicKey:         issuerPublicKey.Serialize(),
 				IssuerProvidedTimestamp: uint64(time.Now().UnixMilli()),
 			},
 		},
@@ -376,7 +368,7 @@ func TestQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t *testing.T)
 
 	tokenPrivKey := config.IdentityPrivateKey
 	// Create the issuance transaction
-	_, userOutput1PrivKey, _, err := createTestTokenMintTransaction(config, tokenPrivKey.Public().Serialize())
+	_, userOutput1PrivKey, _, err := createTestTokenMintTransaction(config, tokenPrivKey.Public())
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	userOneConfig, err := sparktesting.TestWalletConfigWithIdentityKey(userOutput1PrivKey)
@@ -421,8 +413,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensExpectedOutputAndTxRetrie
 	require.NoError(t, err, "failed to create native spark token")
 
 	tokenPrivKey := config.IdentityPrivateKey
-	issuerPublicKeyBytes := tokenPrivKey.Public().Serialize()
-	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransaction(config, issuerPublicKeyBytes)
+	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransaction(config, tokenPrivKey.Public())
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
@@ -448,7 +439,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensExpectedOutputAndTxRetrie
 	}
 	transferTokenTransaction, userOutput3PrivKey, err := createTestTokenTransferTransaction(config,
 		finalIssueTokenTransactionHash,
-		issuerPublicKeyBytes,
+		tokenPrivKey.Public(),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -610,11 +601,8 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfOutputs(t *testing.
 	require.NoError(t, err, "failed to create wallet config")
 
 	tokenPrivKey := config.IdentityPrivateKey
-	issuerPublicKeyBytes := tokenPrivKey.Public().Serialize()
-
 	// Try to create issuance transaction with 101 outputs (should fail)
-	tooBigIssuanceTransaction, _, err := createTestTokenMintTransactionWithMultipleTokenOutputs(config,
-		issuerPublicKeyBytes, 101)
+	tooBigIssuanceTransaction, _, err := createTestTokenMintTransactionWithMultipleTokenOutputs(config, tokenPrivKey.Public(), 101)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	// Attempt to broadcast the issuance transaction with too many outputs
@@ -626,7 +614,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfOutputs(t *testing.
 
 	// Create issuance transaction with 100 outputs
 	issueTokenTransactionFirst100, userOutputPrivKeysFirst100, err := createTestTokenMintTransactionWithMultipleTokenOutputs(config,
-		issuerPublicKeyBytes, manyOutputsCount)
+		tokenPrivKey.Public(), manyOutputsCount)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	// Broadcast the issuance transaction
@@ -639,7 +627,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfOutputs(t *testing.
 
 	// Create issuance transaction with 100 outputs
 	issueTokenTransactionSecond100, userOutputPrivKeysSecond100, err := createTestTokenMintTransactionWithMultipleTokenOutputs(config,
-		issuerPublicKeyBytes, manyOutputsCount)
+		tokenPrivKey.Public(), manyOutputsCount)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	// Broadcast the issuance transaction
@@ -686,7 +674,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfOutputs(t *testing.
 		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: consolidatedOutputPubKeyBytes,
-				TokenPublicKey: issuerPublicKeyBytes,
+				TokenPublicKey: tokenPrivKey.Public().Serialize(),
 				TokenAmount:    int64ToUint128Bytes(0, uint64(testIssueMultiplePerOutputAmount)*uint64(manyOutputsCount)),
 			},
 		},
@@ -733,7 +721,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfOutputs(t *testing.
 		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: consolidatedOutputPubKeyBytes,
-				TokenPublicKey: issuerPublicKeyBytes,
+				TokenPublicKey: tokenPrivKey.Public().Serialize(),
 				TokenAmount:    int64ToUint128Bytes(0, uint64(testIssueMultiplePerOutputAmount)*uint64(manyOutputsCount)),
 			},
 		},
@@ -773,8 +761,7 @@ func TestV0FreezeAndUnfreezeTokens(t *testing.T) {
 	config, err := sparktesting.TestWalletConfigWithIdentityKey(staticLocalIssuerKey.IdentityPrivateKey())
 	require.NoError(t, err, "failed to create wallet config")
 	tokenPrivKey := config.IdentityPrivateKey
-	issuerPublicKeyBytes := tokenPrivKey.Public().Serialize()
-	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransaction(config, issuerPublicKeyBytes)
+	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransaction(config, tokenPrivKey.Public())
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	// Broadcast the token transaction
@@ -823,7 +810,7 @@ func TestV0FreezeAndUnfreezeTokens(t *testing.T) {
 
 	transferTokenTransaction, _, err := createTestTokenTransferTransaction(config,
 		finalIssueTokenTransactionHash,
-		issuerPublicKeyBytes,
+		tokenPrivKey.Public(),
 	)
 	require.NoError(t, err, "failed to create test token transfer transaction")
 
@@ -903,13 +890,11 @@ func testMintTransactionSigningScenarios(t *testing.T, config *wallet.TestWallet
 	expectedStartError bool,
 	expectedSigningError bool,
 ) (*pb.TokenTransaction, keys.Private, keys.Private) {
-	issuerPubKeyBytes := config.IdentityPublicKey().Serialize()
-
 	if ownerSigningPrivateKeys == nil {
 		ownerSigningPrivateKeys = []keys.Private{config.IdentityPrivateKey}
 	}
 
-	tokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionWithParams(config, issuerPubKeyBytes)
+	tokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionWithParams(config, config.IdentityPublicKey())
 	require.NoError(t, err, "failed to create test token mint transaction")
 
 	var startResp *pb.StartTokenTransactionResponse
@@ -971,7 +956,7 @@ func testMintTransactionSigningScenarios(t *testing.T, config *wallet.TestWallet
 
 	txToSign := startResp.FinalTokenTransaction
 	if testSignDifferentTx {
-		differentIssueTokenTransaction, _, _, err := createTestTokenMintTransaction(config, issuerPubKeyBytes)
+		differentIssueTokenTransaction, _, _, err := createTestTokenMintTransaction(config, config.IdentityPublicKey())
 		require.NoError(t, err, "failed to create different test token issuance transaction")
 		txToSign = differentIssueTokenTransaction
 	}
@@ -1201,7 +1186,7 @@ func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.TestWa
 
 	transferTokenTransaction, _, err := createTestTokenTransferTransactionWithParams(config,
 		finalIssueTokenTransactionHash,
-		config.IdentityPublicKey().Serialize(),
+		config.IdentityPublicKey(),
 	)
 	require.NoError(t, err, "failed to create test token transfer transaction")
 
@@ -1238,7 +1223,7 @@ func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.TestWa
 	} else if testDoubleStartDifferentTransaction {
 		secondTxToStart := cloneTransferTransactionWithDifferentOutputOwner(
 			transferTokenTransaction,
-			signingOwnerPrivateKeys[0].Public().Serialize(),
+			signingOwnerPrivateKeys[0].Public(),
 		)
 
 		transferStartResp1, _, transferFinalTxHash1, err := wallet.StartTokenTransaction(
@@ -1305,7 +1290,7 @@ func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.TestWa
 	if testSignDifferentTx {
 		txToSign = cloneTransferTransactionWithDifferentOutputOwner(
 			transferStartResp.FinalTokenTransaction,
-			signingOwnerPrivateKeys[0].Public().Serialize(),
+			signingOwnerPrivateKeys[0].Public(),
 		)
 	}
 
@@ -1588,8 +1573,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensSchnorr(t *testing.T) {
 	require.NoError(t, err, "failed to create wallet config")
 
 	tokenPrivKey := config.IdentityPrivateKey
-	issuerPublicKeyBytes := tokenPrivKey.Public().Serialize()
-	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransaction(config, issuerPublicKeyBytes)
+	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransaction(config, tokenPrivKey.Public())
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
@@ -1612,7 +1596,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensSchnorr(t *testing.T) {
 
 	transferTokenTransaction, _, err := createTestTokenTransferTransaction(config,
 		finalIssueTokenTransactionHash,
-		issuerPublicKeyBytes,
+		tokenPrivKey.Public(),
 	)
 	require.NoError(t, err, "failed to create test token transfer transaction")
 
@@ -1636,7 +1620,7 @@ func TestV0FreezeAndUnfreezeTokensSchnorr(t *testing.T) {
 	require.NoError(t, err, "failed to create wallet config")
 
 	tokenPrivKey := config.IdentityPrivateKey
-	issueTokenTransaction, _, _, err := createTestTokenMintTransaction(config, tokenPrivKey.Public().Serialize())
+	issueTokenTransaction, _, _, err := createTestTokenMintTransaction(config, tokenPrivKey.Public())
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
@@ -1664,8 +1648,7 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 	require.NoError(t, err, "failed to create wallet config")
 
 	tokenPrivKey := config.IdentityPrivateKey
-	issuerPublicKeyBytes := tokenPrivKey.Public().Serialize()
-	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransaction(config, issuerPublicKeyBytes)
+	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransaction(config, tokenPrivKey.Public())
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
 	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransaction(
@@ -1700,7 +1683,7 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: userOutput1PrivKey.Public().Serialize(),
-				TokenPublicKey: issuerPublicKeyBytes,
+				TokenPublicKey: tokenPrivKey.Public().Serialize(),
 				TokenAmount:    int64ToUint128Bytes(0, TestTransferOutput1Amount),
 			},
 		},
@@ -1743,7 +1726,7 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 		TokenOutputs: []*pb.TokenOutput{
 			{
 				OwnerPublicKey: userOutput1PrivKey.Public().Serialize(),
-				TokenPublicKey: issuerPublicKeyBytes,
+				TokenPublicKey: tokenPrivKey.Public().Serialize(),
 				TokenAmount:    int64ToUint128Bytes(0, TestTransferOutput1Amount),
 			},
 		},
@@ -1767,8 +1750,7 @@ func TestBroadcastTokenTransactionUnspecifiedNetwork(t *testing.T) {
 	require.NoError(t, err, "failed to create wallet config")
 
 	tokenPrivKey := config.IdentityPrivateKey
-	tokenIdentityPubKeyBytes := tokenPrivKey.Public().Serialize()
-	issueTokenTransaction, _, _, err := createTestTokenMintTransaction(config, tokenIdentityPubKeyBytes)
+	issueTokenTransaction, _, _, err := createTestTokenMintTransaction(config, tokenPrivKey.Public())
 	require.NoError(t, err, "failed to create test token issuance transaction")
 	issueTokenTransaction.Network = pb.Network_UNSPECIFIED
 
@@ -1783,10 +1765,10 @@ func TestBroadcastTokenTransactionUnspecifiedNetwork(t *testing.T) {
 
 // cloneTransferTransactionWithDifferentOutputOwner creates a copy of a transfer transaction
 // with a modified owner public key in the first output
-func cloneTransferTransactionWithDifferentOutputOwner(tx *pb.TokenTransaction, newOwnerPubKey []byte) *pb.TokenTransaction {
+func cloneTransferTransactionWithDifferentOutputOwner(tx *pb.TokenTransaction, newOwnerPubKey keys.Public) *pb.TokenTransaction {
 	clone := proto.CloneOf(tx)
 	if len(clone.TokenOutputs) > 0 {
-		clone.TokenOutputs[0].OwnerPublicKey = newOwnerPubKey
+		clone.TokenOutputs[0].OwnerPublicKey = newOwnerPubKey.Serialize()
 	}
 	return clone
 }
@@ -1965,11 +1947,11 @@ func TestCreateNativeSparkToken(t *testing.T) {
 }
 
 // createTestTokenCreateTransactionWithParams creates a token transaction with custom parameters
-func createTestTokenCreateTransactionWithParams(config *wallet.TestWalletConfig, issuerPubKeyBytes []byte, name string, ticker string, maxSupply uint64) (*pb.TokenTransaction, error) {
+func createTestTokenCreateTransactionWithParams(config *wallet.TestWalletConfig, issuerPubKey keys.Public, name string, ticker string, maxSupply uint64) (*pb.TokenTransaction, error) {
 	createTokenTransaction := &pb.TokenTransaction{
 		TokenInputs: &pb.TokenTransaction_CreateInput{
 			CreateInput: &pb.TokenCreateInput{
-				IssuerPublicKey: issuerPubKeyBytes,
+				IssuerPublicKey: issuerPubKey.Serialize(),
 				TokenName:       name,
 				TokenTicker:     ticker,
 				Decimals:        uint32(TestTokenDecimals),
@@ -1986,10 +1968,7 @@ func createTestTokenCreateTransactionWithParams(config *wallet.TestWalletConfig,
 
 // testCreateNativeSparkTokenWithParams creates a native spark token with custom parameters
 func testCreateNativeSparkTokenWithParams(t *testing.T, config *wallet.TestWalletConfig, issuerPrivateKey keys.Private, name string, ticker string, maxSupply uint64) error {
-	issuerPrivateKeys := []keys.Private{issuerPrivateKey}
-	issuerPubKeyBytes := issuerPrivateKey.Public().Serialize()
-
-	createTokenTransaction, err := createTestTokenCreateTransactionWithParams(config, issuerPubKeyBytes, name, ticker, maxSupply)
+	createTokenTransaction, err := createTestTokenCreateTransactionWithParams(config, issuerPrivateKey.Public(), name, ticker, maxSupply)
 	if err != nil {
 		return err
 	}
@@ -1997,7 +1976,7 @@ func testCreateNativeSparkTokenWithParams(t *testing.T, config *wallet.TestWalle
 		t.Context(),
 		config,
 		createTokenTransaction,
-		issuerPrivateKeys,
+		[]keys.Private{issuerPrivateKey},
 		nil,
 	)
 	if err != nil {

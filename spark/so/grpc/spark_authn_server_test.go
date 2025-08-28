@@ -76,16 +76,16 @@ func withClock(clock authninternal.Clock) func(*testServerConfig) {
 
 func TestGetChallenge_InvalidPublicKey(t *testing.T) {
 	tests := []struct {
-		name   string
-		pubkey []byte
+		name        string
+		pubKeyBytes []byte
 	}{
 		{
-			name:   "empty pubkey",
-			pubkey: []byte{},
+			name:        "empty pubkey",
+			pubKeyBytes: []byte{},
 		},
 		{
-			name:   "malformed pubkey",
-			pubkey: []byte{0x02, 0x03},
+			name:        "malformed pubkey",
+			pubKeyBytes: []byte{0x02, 0x03},
 		},
 	}
 
@@ -94,7 +94,7 @@ func TestGetChallenge_InvalidPublicKey(t *testing.T) {
 			server, _ := newTestServerAndTokenVerifier(t)
 
 			_, err := server.GetChallenge(t.Context(), &pb.GetChallengeRequest{
-				PublicKey: tt.pubkey,
+				PublicKey: tt.pubKeyBytes,
 			})
 			st, _ := status.FromError(err)
 			require.Equal(t, codes.InvalidArgument, st.Code())

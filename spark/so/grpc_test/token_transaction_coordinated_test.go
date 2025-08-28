@@ -1020,7 +1020,6 @@ func TestV1FreezeAndUnfreezeTokens(t *testing.T) {
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
 			tokenPrivKey := config.IdentityPrivateKey
-			tokenIdentityPubKeyBytes := tokenPrivKey.Public().Serialize()
 			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
@@ -1063,10 +1062,7 @@ func TestV1FreezeAndUnfreezeTokens(t *testing.T) {
 			require.NoError(t, err, "failed to hash final transfer token transaction")
 
 			// Create transfer transaction
-			transferTokenTransaction, _, err := createTestTokenTransferTransaction(config,
-				finalIssueTokenTransactionHash,
-				tokenIdentityPubKeyBytes,
-			)
+			transferTokenTransaction, _, err := createTestTokenTransferTransaction(config, finalIssueTokenTransactionHash, tokenPrivKey.Public())
 			require.NoError(t, err, "failed to create test token transfer transaction")
 
 			// Convert to tokenpb for the coordinated API

@@ -117,7 +117,7 @@ func (p Private) Equals(other Private) bool {
 	return p.key.Key.Equals(&other.key.Key)
 }
 
-// IsZero returns true if this key is the empty key and false otherwise.
+// IsZero returns true if p is the empty key.
 func (p Private) IsZero() bool {
 	return p.key.Key.IsZero()
 }
