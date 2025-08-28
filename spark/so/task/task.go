@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/so/handler/signing_handler"
 	"github.com/lightsparkdev/spark/so/handler/tokens"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/objects"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -65,7 +66,7 @@ type BaseTaskSpec struct { //nolint:revive
 	// If true, the task will not run
 	Disabled bool
 	// Task is the function that is run when the task is scheduled.
-	Task func(context.Context, *so.Config) error
+	Task func(context.Context, *so.Config, knobs.Knobs) error
 }
 
 // ScheduledTask is a task that runs on a schedule.
@@ -93,7 +94,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				Name:         "dkg",
 				Timeout:      &dkgTaskTimeout,
 				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config) error {
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					return ent.RunDKGIfNeeded(ctx, config)
 				},
 			},
@@ -103,7 +104,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "generate_signing_commitments",
 				RunInTestEnv: false,
-				Task: func(ctx context.Context, config *so.Config) error {
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					db, err := ent.GetDbFromContext(ctx)
 					if err != nil {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -178,7 +179,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "cancel_expired_transfers",
 				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config) error {
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					logger := logging.GetLoggerFromContext(ctx)
 					h := handler.NewTransferHandler(config)
 
@@ -233,7 +234,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				// TODO(LIG-7896): This task keeps on getting stuck on
 				// very large trees. Disabling for now as we investigate
 				Disabled: true,
-				Task: func(ctx context.Context, _ *so.Config) error {
+				Task: func(ctx context.Context, _ *so.Config, knobsService knobs.Knobs) error {
 					logger := logging.GetLoggerFromContext(ctx)
 					tx, err := ent.GetDbFromContext(ctx)
 					if err != nil {
@@ -298,7 +299,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			ExecutionInterval: 5 * time.Minute,
 			BaseTaskSpec: BaseTaskSpec{
 				Name: "resume_send_transfer",
-				Task: func(ctx context.Context, config *so.Config) error {
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					logger := logging.GetLoggerFromContext(ctx)
 					h := handler.NewTransferHandler(config)
 
@@ -343,7 +344,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "finalize_revealed_token_transactions",
 				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config) error {
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					logger := logging.GetLoggerFromContext(ctx)
 					logger.Info("[cron] Finalizing revealed token transactions")
 					db, err := ent.GetDbFromContext(ctx)
@@ -470,7 +471,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "send_gossip",
 				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config) error {
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					logger := logging.GetLoggerFromContext(ctx)
 					gossipHandler := handler.NewSendGossipHandler(config)
 					tx, err := ent.GetDbFromContext(ctx)
@@ -498,7 +499,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "complete_utxo_swap",
 				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config) error {
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					logger := logging.GetLoggerFromContext(ctx)
 					tx, err := ent.GetDbFromContext(ctx)
 					if err != nil {
@@ -573,7 +574,7 @@ func AllStartupTasks() []StartupTaskSpec {
 				Name:         "maybe_reserve_entity_dkg",
 				RunInTestEnv: true,
 				Timeout:      &entityDkgTaskTimeout,
-				Task: func(ctx context.Context, config *so.Config) error {
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					logger := logging.GetLoggerFromContext(ctx)
 					tx, err := ent.GetDbFromContext(ctx)
 					if err != nil {
@@ -650,7 +651,7 @@ func AllStartupTasks() []StartupTaskSpec {
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "backfill_spent_token_transaction_history",
 				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config) error {
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					logger := logging.GetLoggerFromContext(ctx)
 
 					if !config.Token.EnableBackfillSpentTokenTransactionHistoryTask {
@@ -739,7 +740,7 @@ func (t *BaseTaskSpec) getTimeout() time.Duration {
 	return defaultTaskTimeout
 }
 
-func (t *BaseTaskSpec) RunOnce(config *so.Config, dbClient *ent.Client) error {
+func (t *BaseTaskSpec) RunOnce(config *so.Config, dbClient *ent.Client, knobsService knobs.Knobs) error {
 	ctx := context.Background()
 
 	wrappedTask := t.chainMiddleware(
@@ -749,10 +750,10 @@ func (t *BaseTaskSpec) RunOnce(config *so.Config, dbClient *ent.Client) error {
 		PanicRecoveryMiddleware(),
 	)
 
-	return wrappedTask.Task(ctx, config)
+	return wrappedTask.Task(ctx, config, knobsService)
 }
 
-func (t *ScheduledTaskSpec) Schedule(scheduler gocron.Scheduler, config *so.Config, dbClient *ent.Client) error {
+func (t *ScheduledTaskSpec) Schedule(scheduler gocron.Scheduler, config *so.Config, dbClient *ent.Client, knobsService knobs.Knobs) error {
 	wrappedTask := t.chainMiddleware(
 		LogMiddleware(),
 		DatabaseMiddleware(db.NewDefaultSessionFactory(dbClient), config.Database.NewTxTimeout),
@@ -762,7 +763,7 @@ func (t *ScheduledTaskSpec) Schedule(scheduler gocron.Scheduler, config *so.Conf
 
 	_, err := scheduler.NewJob(
 		gocron.DurationJob(t.ExecutionInterval),
-		gocron.NewTask(wrappedTask.Task, config),
+		gocron.NewTask(wrappedTask.Task, config, knobsService),
 		gocron.WithName(t.Name),
 	)
 	if err != nil {
@@ -779,8 +780,8 @@ func (t *BaseTaskSpec) wrapMiddleware(middleware TaskMiddleware) *BaseTaskSpec {
 		Name:         t.Name,
 		Timeout:      t.Timeout,
 		RunInTestEnv: t.RunInTestEnv,
-		Task: func(ctx context.Context, config *so.Config) error {
-			return middleware(ctx, config, t)
+		Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+			return middleware(ctx, config, t, knobsService)
 		},
 	}
 }
@@ -817,7 +818,7 @@ func (t *BaseTaskSpec) chainMiddleware(
 
 // RunStartupTasks runs startup tasks with optional retry logic.
 // Any task with a non-nil RetryInterval will be retried in the background on failure.
-func RunStartupTasks(config *so.Config, db *ent.Client, runningLocally bool) error {
+func RunStartupTasks(config *so.Config, db *ent.Client, runningLocally bool, knobsService knobs.Knobs) error {
 	slog.Info("Running startup tasks...")
 
 	for _, task := range AllStartupTasks() {
@@ -827,7 +828,7 @@ func RunStartupTasks(config *so.Config, db *ent.Client, runningLocally bool) err
 					retryInterval := *task.RetryInterval
 
 					for {
-						err := task.RunOnce(config, db)
+						err := task.RunOnce(config, db, knobsService)
 						if err == nil {
 							break
 						}
@@ -841,7 +842,7 @@ func RunStartupTasks(config *so.Config, db *ent.Client, runningLocally bool) err
 					}
 				}(task)
 			} else {
-				task.RunOnce(config, db) // nolint: errcheck
+				task.RunOnce(config, db, knobsService) // nolint: errcheck
 			}
 		}
 	}

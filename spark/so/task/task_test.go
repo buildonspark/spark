@@ -11,6 +11,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
@@ -100,7 +101,7 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 	}
 	require.NotNil(t, backfillTask, "Should find backfill task")
 
-	err = backfillTask.Task(ctx, config)
+	err = backfillTask.Task(ctx, config, knobs.NewFixedKnobs(map[string]float64{}))
 	require.NoError(t, err)
 
 	// Verify the M2M relationship was created

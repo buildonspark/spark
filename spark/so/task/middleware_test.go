@@ -10,6 +10,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/require"
 )
@@ -25,7 +26,7 @@ func TestTimeoutMiddleware_TestSlowTask(t *testing.T) {
 	task := BaseTaskSpec{
 		Name:    "Test",
 		Timeout: &timeout,
-		Task: func(ctx context.Context, _ *so.Config) error {
+		Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
 			select {
 			case <-time.After(10 * time.Second):
 			case <-ctx.Done():
@@ -38,7 +39,7 @@ func TestTimeoutMiddleware_TestSlowTask(t *testing.T) {
 
 	taskWithTimeout := task.wrapMiddleware(TimeoutMiddleware())
 
-	err = taskWithTimeout.Task(ctx, config)
+	err = taskWithTimeout.Task(ctx, config, knobs.NewFixedKnobs(map[string]float64{}))
 	require.ErrorIs(t, err, errTaskTimeout)
 }
 
@@ -53,7 +54,7 @@ func TestTimeoutMiddleware_TestTaskFinishes(t *testing.T) {
 	task := BaseTaskSpec{
 		Name:    "Test",
 		Timeout: &timeout,
-		Task: func(ctx context.Context, _ *so.Config) error {
+		Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
 			select {
 			case <-time.After(200 * time.Millisecond):
 			case <-ctx.Done():
@@ -66,7 +67,7 @@ func TestTimeoutMiddleware_TestTaskFinishes(t *testing.T) {
 
 	taskWithTimeout := task.wrapMiddleware(TimeoutMiddleware())
 
-	err = taskWithTimeout.Task(ctx, config)
+	err = taskWithTimeout.Task(ctx, config, knobs.NewFixedKnobs(map[string]float64{}))
 	require.NoError(t, err)
 }
 
@@ -81,7 +82,7 @@ func TestTimeoutMiddleware_TestContextCancelled(t *testing.T) {
 	task := BaseTaskSpec{
 		Name:    "Test",
 		Timeout: &timeout,
-		Task: func(ctx context.Context, _ *so.Config) error {
+		Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
 			select {
 			case <-time.After(10 * time.Second):
 			case <-ctx.Done():
@@ -101,7 +102,7 @@ func TestTimeoutMiddleware_TestContextCancelled(t *testing.T) {
 		defer close(errChan)
 
 		select {
-		case errChan <- taskWithTimeout.Task(cancelCtx, config):
+		case errChan <- taskWithTimeout.Task(cancelCtx, config, knobs.NewFixedKnobs(map[string]float64{})):
 		case <-ctx.Done():
 		}
 	}()
@@ -158,7 +159,7 @@ func TestDatabaseMiddleware_TestCommitWhenTaskSuccessful(t *testing.T) {
 	task := BaseTaskSpec{
 		Name:    "Test",
 		Timeout: nil,
-		Task: func(_ context.Context, _ *so.Config) error {
+		Task: func(_ context.Context, _ *so.Config, _ knobs.Knobs) error {
 			return nil
 		},
 	}
@@ -168,7 +169,7 @@ func TestDatabaseMiddleware_TestCommitWhenTaskSuccessful(t *testing.T) {
 		defer close(errChan)
 
 		taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}, nil))
-		err = taskWithDb.Task(t.Context(), config)
+		err = taskWithDb.Task(t.Context(), config, knobs.NewFixedKnobs(map[string]float64{}))
 
 		select {
 		case <-t.Context().Done():
@@ -230,7 +231,7 @@ func TestDatabaseMiddleware_TestRollbackWhenTaskUnsuccessful(t *testing.T) {
 	task := BaseTaskSpec{
 		Name:    "Test",
 		Timeout: nil,
-		Task: func(_ context.Context, _ *so.Config) error {
+		Task: func(_ context.Context, _ *so.Config, _ knobs.Knobs) error {
 			return taskErr
 		},
 	}
@@ -240,7 +241,7 @@ func TestDatabaseMiddleware_TestRollbackWhenTaskUnsuccessful(t *testing.T) {
 		defer close(errChan)
 
 		taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}, nil))
-		err = taskWithDb.Task(t.Context(), config)
+		err = taskWithDb.Task(t.Context(), config, knobs.NewFixedKnobs(map[string]float64{}))
 		if err != nil {
 			errChan <- err
 		}
@@ -276,7 +277,7 @@ func TestDatabaseMiddleware_TestTaskCanCommitTransaction(t *testing.T) {
 	task := BaseTaskSpec{
 		Name:    "Test",
 		Timeout: nil,
-		Task: func(ctx context.Context, _ *so.Config) error {
+		Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
 			tx, err := ent.GetDbFromContext(ctx)
 			if err != nil {
 				return err
@@ -288,7 +289,7 @@ func TestDatabaseMiddleware_TestTaskCanCommitTransaction(t *testing.T) {
 
 	taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}, nil))
 
-	err = taskWithDb.Task(t.Context(), config)
+	err = taskWithDb.Task(t.Context(), config, knobs.NewFixedKnobs(map[string]float64{}))
 	require.NoError(t, err, "Expected task to commit transaction successfully")
 
 	require.Nil(t, dbSession.GetTxIfExists(), "Expected no current transaction after task completed.")
@@ -304,14 +305,14 @@ func TestPanicRecoveryInterceptor_TestNoPanic(t *testing.T) {
 	task := BaseTaskSpec{
 		Name:    "Test",
 		Timeout: nil,
-		Task: func(_ context.Context, _ *so.Config) error {
+		Task: func(_ context.Context, _ *so.Config, _ knobs.Knobs) error {
 			return nil // No panic, just cool calm task execution.
 		},
 	}
 
 	taskWithRecovery := task.wrapMiddleware(PanicRecoveryMiddleware())
 
-	err = taskWithRecovery.Task(ctx, config)
+	err = taskWithRecovery.Task(ctx, config, knobs.NewFixedKnobs(map[string]float64{}))
 	require.NoError(t, err)
 }
 
@@ -325,13 +326,13 @@ func TestPanicRecoveryInterceptor_TestPanic(t *testing.T) {
 	task := BaseTaskSpec{
 		Name:    "Test",
 		Timeout: nil,
-		Task: func(_ context.Context, _ *so.Config) error {
+		Task: func(_ context.Context, _ *so.Config, _ knobs.Knobs) error {
 			panic("AHHHHHHHHHHHHHH!")
 		},
 	}
 
 	taskWithRecovery := task.wrapMiddleware(PanicRecoveryMiddleware())
 
-	err = taskWithRecovery.Task(ctx, config)
+	err = taskWithRecovery.Task(ctx, config, knobs.NewFixedKnobs(map[string]float64{}))
 	require.ErrorIs(t, err, errTaskPanic)
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
@@ -141,7 +142,7 @@ func TestReserveEntityDkg_OperatorDown(t *testing.T) {
 
 			reserveTask, err := getReserveEntityDkgTask()
 			require.NoError(t, err)
-			err = reserveTask.RunOnce(cfg, client)
+			err = reserveTask.RunOnce(cfg, client, knobs.NewFixedKnobs(map[string]float64{}))
 
 			if tc.failOneOperator {
 				require.Error(t, err)
@@ -193,11 +194,11 @@ func TestReserveEntityDkg_Idempotent(t *testing.T) {
 
 	reserveTask, err := getReserveEntityDkgTask()
 	require.NoError(t, err)
-	err = reserveTask.RunOnce(cfg, client)
+	err = reserveTask.RunOnce(cfg, client, knobs.NewFixedKnobs(map[string]float64{}))
 	require.NoError(t, err)
 
 	// Run again to ensure idempotency.
-	err = reserveTask.RunOnce(cfg, client)
+	err = reserveTask.RunOnce(cfg, client, knobs.NewFixedKnobs(map[string]float64{}))
 	require.NoError(t, err)
 
 	count, err := client.EntityDkgKey.Query().Count(ctx)
@@ -231,7 +232,7 @@ func TestReserveEntityDkg_NonCoordinator(t *testing.T) {
 
 	reserveTask, err := getReserveEntityDkgTask()
 	require.NoError(t, err)
-	err = reserveTask.RunOnce(cfg, client)
+	err = reserveTask.RunOnce(cfg, client, knobs.NewFixedKnobs(map[string]float64{}))
 	require.NoError(t, err)
 
 	count, err := client.EntityDkgKey.Query().Count(ctx)

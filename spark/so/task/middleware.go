@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -20,10 +21,10 @@ var (
 	errTaskPanic   = fmt.Errorf("task panicked")
 )
 
-type TaskMiddleware func(context.Context, *so.Config, *BaseTaskSpec) error //nolint:revive
+type TaskMiddleware func(context.Context, *so.Config, *BaseTaskSpec, knobs.Knobs) error //nolint:revive
 
 func LogMiddleware() TaskMiddleware {
-	return func(ctx context.Context, config *so.Config, task *BaseTaskSpec) error {
+	return func(ctx context.Context, config *so.Config, task *BaseTaskSpec, knobsService knobs.Knobs) error {
 		logger := logging.GetLoggerFromContext(ctx).
 			With("task.name", task.Name).
 			With("task.id", uuid.New().String())
@@ -32,7 +33,7 @@ func LogMiddleware() TaskMiddleware {
 
 		logger.Info("Executing task")
 
-		err := task.Task(ctx, config)
+		err := task.Task(ctx, config, knobsService)
 		if err != nil {
 			logger.Error("Task execution failed", "error", err)
 			return err
@@ -44,7 +45,7 @@ func LogMiddleware() TaskMiddleware {
 }
 
 func TimeoutMiddleware() TaskMiddleware {
-	return func(ctx context.Context, config *so.Config, task *BaseTaskSpec) error {
+	return func(ctx context.Context, config *so.Config, task *BaseTaskSpec, knobsService knobs.Knobs) error {
 		logger := logging.GetLoggerFromContext(ctx)
 
 		ctx, cancel := context.WithTimeoutCause(ctx, task.getTimeout(), errTaskTimeout)
@@ -55,7 +56,7 @@ func TimeoutMiddleware() TaskMiddleware {
 		go func() {
 			defer close(done)
 
-			err := task.Task(ctx, config)
+			err := task.Task(ctx, config, knobsService)
 
 			select {
 			case done <- err:
@@ -80,7 +81,7 @@ func TimeoutMiddleware() TaskMiddleware {
 }
 
 func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration) TaskMiddleware {
-	return func(ctx context.Context, config *so.Config, task *BaseTaskSpec) error {
+	return func(ctx context.Context, config *so.Config, task *BaseTaskSpec, knobsService knobs.Knobs) error {
 		logger := logging.GetLoggerFromContext(ctx)
 
 		sessionCtx, cancel := context.WithCancel(ctx)
@@ -102,7 +103,7 @@ func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration
 		)
 
 		ctx = ent.Inject(ctx, session)
-		err := task.Task(ctx, config)
+		err := task.Task(ctx, config, knobsService)
 
 		tx := session.GetTxIfExists()
 		if tx != nil {
@@ -123,7 +124,7 @@ func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration
 }
 
 func PanicRecoveryMiddleware() TaskMiddleware {
-	return func(ctx context.Context, config *so.Config, task *BaseTaskSpec) (err error) {
+	return func(ctx context.Context, config *so.Config, task *BaseTaskSpec, knobsService knobs.Knobs) (err error) {
 		logger := logging.GetLoggerFromContext(ctx)
 		defer func() {
 			if r := recover(); r != nil {
@@ -136,6 +137,6 @@ func PanicRecoveryMiddleware() TaskMiddleware {
 			}
 		}()
 
-		return task.Task(ctx, config)
+		return task.Task(ctx, config, knobsService)
 	}
 }

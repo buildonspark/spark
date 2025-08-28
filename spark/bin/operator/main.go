@@ -408,7 +408,7 @@ func main() {
 			// Don't run the task if the task specifies it should not be run in
 			// test environments and RunningLocally is set (eg. we are in a test environment)
 			if (!args.RunningLocally || scheduled.RunInTestEnv) && !scheduled.Disabled {
-				err := scheduled.Schedule(scheduler, config, dbClient)
+				err := scheduled.Schedule(scheduler, config, dbClient, knobsService)
 				if err != nil {
 					log.Fatalf("Failed to create job: %v", err)
 				}
@@ -419,7 +419,7 @@ func main() {
 	}
 
 	errGrp.Go(func() error {
-		return task.RunStartupTasks(config, dbClient, args.RunningLocally)
+		return task.RunStartupTasks(config, dbClient, args.RunningLocally, knobsService)
 	})
 
 	sessionTokenCreatorVerifier, err := authninternal.NewSessionTokenCreatorVerifier(config.IdentityPrivateKey, nil)

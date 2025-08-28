@@ -8,6 +8,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/knobs"
 
 	"github.com/lightsparkdev/spark/so/task"
 
@@ -122,7 +123,7 @@ func (o *MockServer) TriggerTask(_ context.Context, req *pbmock.TriggerTaskReque
 	}
 	// Use the operator's root *ent.Client instead of the transactional one because RunOnce expects *ent.Client.
 	dbClient := o.rootClient
-	if err := selected.RunOnce(o.config, dbClient); err != nil {
+	if err := selected.RunOnce(o.config, dbClient, knobs.NewFixedKnobs(map[string]float64{})); err != nil {
 		return nil, status.Errorf(codes.Internal, "task %s failed: %v", taskName, err)
 	}
 
