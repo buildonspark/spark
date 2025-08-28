@@ -56,7 +56,7 @@ func newTestServerAndTokenVerifier(
 	require.NoError(t, err)
 
 	config := AuthnServerConfig{
-		IdentityPrivateKey: testIdentityKey.Serialize(),
+		IdentityPrivateKey: testIdentityKey,
 		ChallengeTimeout:   testChallengeTimeout,
 		SessionDuration:    testSessionDuration,
 		Clock:              cfg.clock,
@@ -297,7 +297,7 @@ func TestVerifyChallenge_CacheExpiration(t *testing.T) {
 	// Use a very short challenge timeout for testing cache expiration
 	shortTimeout := 1 * time.Second
 	config := AuthnServerConfig{
-		IdentityPrivateKey: testIdentityKey.Serialize(),
+		IdentityPrivateKey: testIdentityKey,
 		ChallengeTimeout:   shortTimeout,
 		SessionDuration:    testSessionDuration,
 		Clock:              authninternal.RealClock{},
@@ -456,7 +456,7 @@ func TestNewAuthnServer_InvalidChallengeTimeoutFails(t *testing.T) {
 	require.NoError(t, err)
 
 	config := AuthnServerConfig{
-		IdentityPrivateKey: testIdentityKey.Serialize(),
+		IdentityPrivateKey: testIdentityKey,
 		ChallengeTimeout:   500 * time.Millisecond, // Less than one second
 		SessionDuration:    testSessionDuration,
 		Clock:              authninternal.RealClock{},

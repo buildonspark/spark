@@ -12,7 +12,6 @@ import (
 
 	"github.com/lightsparkdev/spark/common/keys"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark_authn"
@@ -71,7 +70,7 @@ func (cnc *challengeNonceCache) generateNonce() ([]byte, error) {
 // AuthnServerConfig contains the configuration for the AuthenticationServer
 type AuthnServerConfig struct {
 	// Server's secp256k1 private key for identity
-	IdentityPrivateKey []byte
+	IdentityPrivateKey keys.Private
 	// Challenge validity duration
 	ChallengeTimeout time.Duration
 	// Session duration
@@ -121,7 +120,7 @@ func NewAuthnServer(
 		config.Clock = authninternal.RealClock{}
 	}
 
-	if len(config.IdentityPrivateKey) == 0 {
+	if config.IdentityPrivateKey.IsZero() {
 		return nil, fmt.Errorf("%w: identity private key is required", ErrInternalError)
 	}
 
@@ -131,7 +130,7 @@ func NewAuthnServer(
 
 	// Derive challenge HMAC key from identity key and constant
 	h := sha256.New()
-	h.Write(config.IdentityPrivateKey)
+	h.Write(config.IdentityPrivateKey.Serialize())
 	h.Write([]byte(challengeSecretConstant))
 	challengeHmacKey := h.Sum(nil)
 
@@ -151,18 +150,13 @@ func (s *AuthnServer) GetChallenge(_ context.Context, req *pb.GetChallengeReques
 		return nil, sparkerrors.InvalidUserInputErrorf("invalid request: request cannot be nil")
 	}
 
-	if len(req.PublicKey) == 0 {
-		return nil, sparkerrors.InvalidUserInputErrorf("public key cannot be empty")
+	_, err := keys.ParsePublicKey(req.PublicKey)
+	if err != nil {
+		return nil, sparkerrors.InvalidUserInputErrorf("invalid public key format: %w", err)
 	}
-
 	nonce, err := s.nonceCache.generateNonce()
 	if err != nil {
 		return nil, fmt.Errorf("internal error: failed to generate nonce: %w", err)
-	}
-
-	_, err = secp256k1.ParsePubKey(req.PublicKey)
-	if err != nil {
-		return nil, sparkerrors.InvalidUserInputErrorf("invalid secp256k1 public key format: %w", err)
 	}
 
 	challenge := &pb.Challenge{

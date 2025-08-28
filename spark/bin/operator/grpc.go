@@ -70,7 +70,7 @@ func RegisterGrpcServers(
 
 	// Public ID challenge auth endpoint
 	authnServer, err := sparkgrpc.NewAuthnServer(sparkgrpc.AuthnServerConfig{
-		IdentityPrivateKey: config.IdentityPrivateKey.Serialize(),
+		IdentityPrivateKey: config.IdentityPrivateKey,
 		ChallengeTimeout:   args.ChallengeTimeout,
 		SessionDuration:    args.SessionDuration,
 	}, sessionTokenCreatorVerifier)
