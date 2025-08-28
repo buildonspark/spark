@@ -58,6 +58,17 @@ func (h *QueryTokenHandler) QueryTokenMetadata(ctx context.Context, req *tokenpb
 		return nil, fmt.Errorf("must provide at least one token identifier or issuer public key")
 	}
 
+	fields := []string{
+		tokencreate.FieldIssuerPublicKey,
+		tokencreate.FieldTokenName,
+		tokencreate.FieldTokenTicker,
+		tokencreate.FieldDecimals,
+		tokencreate.FieldMaxSupply,
+		tokencreate.FieldIsFreezable,
+		tokencreate.FieldCreationEntityPublicKey,
+		tokencreate.FieldNetwork,
+	}
+
 	query := db.TokenCreate.Query()
 	var conditions []predicate.TokenCreate
 	if len(req.TokenIdentifiers) > 0 {
@@ -68,7 +79,7 @@ func (h *QueryTokenHandler) QueryTokenMetadata(ctx context.Context, req *tokenpb
 		conditions = append(conditions, tokencreate.IssuerPublicKeyIn(req.IssuerPublicKeys...))
 	}
 	query = query.Where(tokencreate.Or(conditions...))
-	tokenCreateEntities, err := query.All(ctx)
+	tokenCreateEntities, err := query.Select(fields...).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query token metadata: %w", err)
 	}
