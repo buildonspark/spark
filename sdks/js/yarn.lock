@@ -2570,12 +2570,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@buildonspark/bare@npm:0.0.8, @buildonspark/bare@workspace:packages/bare":
+"@buildonspark/bare@npm:0.0.9, @buildonspark/bare@workspace:packages/bare":
   version: 0.0.0-use.local
   resolution: "@buildonspark/bare@workspace:packages/bare"
   dependencies:
     "@arethetypeswrong/cli": "npm:^0.17.4"
-    "@buildonspark/spark-frost-bare-addon": "npm:0.0.2"
+    "@buildonspark/spark-frost-bare-addon": "npm:0.0.3"
     "@buildonspark/spark-sdk": "npm:0.2.12"
     "@noble/hashes": "npm:^1.7.0"
     bare-buffer: "npm:^3.3.0"
@@ -2692,7 +2692,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-bare-app@workspace:examples/spark-bare-app"
   dependencies:
-    "@buildonspark/bare": "npm:0.0.8"
+    "@buildonspark/bare": "npm:0.0.9"
     "@buildonspark/spark-sdk": "npm:0.2.12"
     bare: "npm:^1.21.3"
     bare-assert: "npm:^1.0.2"
@@ -2721,7 +2721,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-bare-expo-app@workspace:examples/spark-bare-expo-react-native-app"
   dependencies:
-    "@buildonspark/spark-frost-bare-addon": "npm:0.0.2"
+    "@buildonspark/spark-frost-bare-addon": "npm:0.0.3"
     "@types/react": "npm:^19.0.10"
     b4a: "npm:^1.6.7"
     events: "npm:^3.3.0"
@@ -2800,7 +2800,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@buildonspark/spark-frost-bare-addon@npm:0.0.2, @buildonspark/spark-frost-bare-addon@workspace:packages/spark-frost-bare-addon":
+"@buildonspark/spark-frost-bare-addon@npm:0.0.3, @buildonspark/spark-frost-bare-addon@workspace:packages/spark-frost-bare-addon":
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-frost-bare-addon@workspace:packages/spark-frost-bare-addon"
   dependencies:

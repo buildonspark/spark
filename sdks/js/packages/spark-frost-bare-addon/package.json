@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/spark-frost-bare-addon",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Example Bare addon",
   "exports": {
     "./package": "./package.json",
