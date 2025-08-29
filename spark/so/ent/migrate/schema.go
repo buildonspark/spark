@@ -661,6 +661,11 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{TokenTransactionsColumns[7], TokenTransactionsColumns[6]},
 			},
+			{
+				Name:    "tokentransaction_update_time",
+				Unique:  false,
+				Columns: []*schema.Column{TokenTransactionsColumns[2]},
+			},
 		},
 	}
 	// TokenTransactionPeerSignaturesColumns holds the columns for the "token_transaction_peer_signatures" table.

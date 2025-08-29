@@ -64,5 +64,7 @@ func (TokenTransaction) Indexes() []ent.Index {
 		index.Fields("finalized_token_transaction_hash"),
 		index.Fields("partial_token_transaction_hash"),
 		index.Fields("expiry_time", "status"),
+		// Needed for query_token_transactions query
+		index.Fields("update_time"),
 	}
 }
