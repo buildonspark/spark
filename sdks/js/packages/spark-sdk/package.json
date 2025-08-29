@@ -110,7 +110,7 @@
     "types:watch": "tsc-absolute --watch",
     "types": "tsc",
     "patch-wasm": "node ./wasm/patch-wasm.mjs",
-    "generate:proto": "PATH=\"$PATH:./node_modules/.bin\" protoc --ts_proto_out=./src/proto --ts_proto_opt=outputServices=nice-grpc,useExactTypes=false,outputServices=generic-definitions,oneof=unions,importSuffix=.js --proto_path=../../../../protos spark.proto spark_token.proto mock.proto spark_authn.proto && yarn format:fix"
+    "generate:proto": "./generate-proto.sh"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.17.4",

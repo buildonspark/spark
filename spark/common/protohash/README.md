@@ -96,37 +96,39 @@ if err != nil {
 
 ### Testing (cross-language verification)
 
-Before adding or relying on a new proto shape for cross-language hashing, add or update a test case in `spark/testdata/cross_language_hash_cases.json` and validate both Go and JS implementations.
+Use the canonical Protobuf JSON dataset and zero-mapping tests.
 
 1. Add a test case
 
-- Append a case to `spark/testdata/cross_language_hash_cases.json` under `test_cases`.
-- If you do not yet know the expected hash, set `expected_hash` to `"TBD"` or an empty string.
+- Append a case to `spark/testdata/cross_language_hash_cases_proto.json` under `testCases`.
+- The `sparkInvoiceFields` payload must be canonical Protobuf JSON for `spark.SparkInvoiceFields`:
+  - oneofs as `satsPayment`/`tokensPayment`
+  - bytes as base64 strings
+  - camelCase field names
+  - `expiryTime` as RFC3339 (supports fractional nanos)
+- If you do not yet know the expected hash, set `expectedHash` to `"TBD"` or an empty string.
 
 2. Compute expected hash in Go
 
-- Run the JSON-driven test; it will print `COMPUTED_HASH <name>: <hex>` for cases with missing `expected_hash`.
-
 ```bash
 cd spark
-go test ./common -run TestSparkInvoiceFieldsJSONCases -v | cat
+go test ./common -run TestSparkInvoiceFieldsProtoJSONCases -v | cat
 ```
 
-- Copy the printed hex into the case’s `expected_hash` field.
+- Copy any printed `COMPUTED_HASH` into the case’s `expectedHash` field.
 
 3. Verify in JavaScript
 
-- Run the JS test that consumes the same JSON and compares against the JS hasher.
-
 ```bash
 cd sdks/js/packages/spark-sdk
-yarn test src/tests/cross-language-hash-cases.test.ts
+yarn test src/tests/cross-language-hash-protojson.test.ts -i
 ```
 
 Notes
 
-- The current JSON harness and JS test construct `spark.SparkInvoiceFields` messages. If you introduce new message types for cross-language hashing, update the Go JSON→proto conversion in `spark/common/hash_cross_language_json_test.go` and the JS constructor in `sdks/js/packages/spark-sdk/src/tests/cross-language-hash-cases.test.ts` accordingly, then add corresponding JSON cases.
-- Keep cases small and targeted (one aspect per case) to make discrepancies easy to diagnose.
+- If you need to migrate the legacy dataset, run the converter:
+  `node sdks/js/packages/spark-sdk/scripts/convert-cross-lang-json.mjs`.
+- Avoid `google.protobuf.Any`; it is not supported by the hasher.
 
 ### Notes
 
