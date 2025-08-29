@@ -24,6 +24,7 @@ func (TokenMetadataMixin) Fields() []ent.Field {
 		field.Enum("network").GoType(st.Network("")).Immutable(),
 		// Token identifier is derived from the above token metadata fields.
 		// Despite that, we store it explicitly to enable efficient indexed lookups.
+		// The .Unique() generates an index on the token_identifier
 		field.Bytes("token_identifier").NotEmpty().Immutable().Unique(),
 	}
 }
@@ -31,6 +32,5 @@ func (TokenMetadataMixin) Fields() []ent.Field {
 func (TokenMetadataMixin) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("issuer_public_key"),
-		index.Fields("token_identifier").Unique(),
 	}
 }

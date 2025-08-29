@@ -184,11 +184,6 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{L1tokenCreatesColumns[3]},
 			},
-			{
-				Name:    "l1tokencreate_token_identifier",
-				Unique:  true,
-				Columns: []*schema.Column{L1tokenCreatesColumns[10]},
-			},
 		},
 	}
 	// PaymentIntentsColumns holds the columns for the "payment_intents" table.
@@ -403,11 +398,6 @@ var (
 				Name:    "tokencreate_issuer_public_key",
 				Unique:  false,
 				Columns: []*schema.Column{TokenCreatesColumns[3]},
-			},
-			{
-				Name:    "tokencreate_token_identifier",
-				Unique:  true,
-				Columns: []*schema.Column{TokenCreatesColumns[10]},
 			},
 		},
 	}
