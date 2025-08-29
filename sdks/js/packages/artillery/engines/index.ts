@@ -9,16 +9,21 @@ import type {
   EngineStep,
   SparkContext,
 } from "./types";
+import { TransferActions } from "./transfer";
 
 export class SparkEngine {
   private script: ArtilleryScript;
   private walletActions: WalletActions;
+  private transferActions: TransferActions;
   private scenarioEE: ArtilleryEventEmitter | null = null;
 
   private readonly stepActions = {
     initializePools: (params?: any) => this.walletActions.initializePools(params),
     cleanupPools: () => this.walletActions.cleanupPools(),
 
+    getBalance: (params?: any) => this.walletActions.getBalance(params),
+    claimTransfer: (params?: any) => this.transferActions.claimTransfer(params),
+    transfer: (params?: any) => this.transferActions.transfer(params),
     getStaticAddress: (params?: any) => this.walletActions.getStaticAddress(params),
     printWalletInfo: (params?: any) => this.walletActions.printWalletInfo(params),
     claimStaticDeposit: (params?: any) => this.walletActions.claimStaticDeposit(params),
@@ -33,6 +38,7 @@ export class SparkEngine {
     this.script = script;
 
     this.walletActions = new WalletActions(ee, this);
+    this.transferActions = new TransferActions(ee, this);
 
     this.initializationPromise = this.processBeforeTestActions();
   }

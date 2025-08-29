@@ -1,0 +1,48 @@
+config:
+  target: "http://localhost"
+  engines:
+    spark: {}
+  phases:
+    - duration: 5
+      arrivalRate: 1
+      maxVusers: 1
+      name: "warm-up"
+
+scenarios:
+  - name: "Simple Transfer Chain Test"
+    weight: 1
+    engine: spark
+
+    before:
+      # Initialize pools with named wallets and lock them
+      # Wallets will be stored in scenario context (context.vars)
+      - initializePools:
+          pools:
+            - name: "transfer-pool"
+              mnemonicsFile: "./mnemonics/batch-source-wallets.txt"
+              namedWallets:
+                - { name: "sender", lock: true, minBalance: 50 } # Lock sender wallet with at least 50 sats
+                - { name: "receiver", lock: true, minBalance: 0 } # Lock receiver wallet
+
+    flow:
+      # Check initial balances
+      - getBalance:
+          walletName: "sender"
+          storeAs: "senderInitial"
+
+      - getBalance:
+          walletName: "receiver"
+          storeAs: "receiverInitial"
+
+      # Transfer from sender to receiver
+      - transfer:
+          walletName: "sender"
+          receiverName: "receiver"
+          amount: 10
+
+      - claimTransfer:
+          walletName: "receiver"
+
+    after:
+      # Unlock the wallets and close connections
+      - cleanupPools: {}
