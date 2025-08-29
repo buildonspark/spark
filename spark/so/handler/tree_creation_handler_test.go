@@ -77,7 +77,7 @@ func TestFindParentOutputFromUtxo(t *testing.T) {
 		utxo                  *pb.UTXO
 		expectError           bool
 		expectedErrorContains string
-		setupTree             bool
+		setUpTree             bool
 	}{
 		{
 			name:        "valid utxo with single output",
@@ -104,22 +104,22 @@ func TestFindParentOutputFromUtxo(t *testing.T) {
 			utxo:                  createTestUTXO(txBuf, 0),
 			expectError:           true,
 			expectedErrorContains: "already exists",
-			setupTree:             true,
+			setUpTree:             true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.setupTree {
+			if tt.setUpTree {
 				// Create a tree with the same base txid to trigger "already exists" error
-				db, err := ent.GetDbFromContext(ctx)
+				dbTX, err := ent.GetDbFromContext(ctx)
 				require.NoError(t, err)
 
 				tx, err := common.TxFromRawTxBytes(tt.utxo.RawTx)
 				require.NoError(t, err)
 
 				txHash := tx.TxHash()
-				_, err = db.Tree.Create().
+				_, err = dbTX.Tree.Create().
 					SetOwnerIdentityPubkey([]byte("test")).
 					SetNetwork(st.NetworkRegtest).
 					SetBaseTxid(txHash[:]).
@@ -152,29 +152,29 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 	handler := createTestHandler()
 
 	// Setup test data
-	db, err := ent.GetDbFromContext(ctx)
+	dbTX, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	keysharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	publicSharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	identityPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	signingPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	verifyingPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	identityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	verifyingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 
 	// Create a signing keyshare
-	signingKeyshare, err := db.SigningKeyshare.Create().
+	signingKeyshare, err := dbTX.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(keysharePrivkey.Serialize()).
-		SetPublicShares(map[string][]byte{"test": publicSharePrivkey.Public().Serialize()}).
-		SetPublicKey(keysharePrivkey.Public().Serialize()).
+		SetSecretShare(keysharePrivKey.Serialize()).
+		SetPublicShares(map[string][]byte{"test": publicSharePrivKey.Public().Serialize()}).
+		SetPublicKey(keysharePrivKey.Public().Serialize()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
 		Save(ctx)
 	require.NoError(t, err)
 
 	// Create a tree
-	tree, err := db.Tree.Create().
-		SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
+	tree, err := dbTX.Tree.Create().
+		SetOwnerIdentityPubkey(identityPrivKey.Public().Serialize()).
 		SetNetwork(st.NetworkRegtest).
 		SetBaseTxid(make([]byte, 32)).
 		SetVout(0).
@@ -187,13 +187,13 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a tree node
-	node, err := db.TreeNode.Create().
+	node, err := dbTX.TreeNode.Create().
 		SetTree(tree).
 		SetStatus(st.TreeNodeStatusAvailable).
-		SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
-		SetOwnerSigningPubkey(signingPrivkey.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPrivKey.Public().Serialize()).
+		SetOwnerSigningPubkey(signingPrivKey.Public().Serialize()).
 		SetValue(100000).
-		SetVerifyingPubkey(verifyingPrivkey.Public().Serialize()).
+		SetVerifyingPubkey(verifyingPrivKey.Public().Serialize()).
 		SetSigningKeyshare(signingKeyshare).
 		SetRawTx(txBuf).
 		SetVout(0).
@@ -258,7 +258,7 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.setupChild {
 				// Create a child node to trigger "already exists" error
-				_, err = db.TreeNode.Create().
+				_, err = dbTX.TreeNode.Create().
 					SetTree(tree).
 					SetStatus(st.TreeNodeStatusAvailable).
 					SetOwnerIdentityPubkey([]byte("test_identity")).
@@ -454,30 +454,27 @@ func TestValidateAndCountTreeAddressNodes(t *testing.T) {
 
 	handler := createTestHandler()
 
-	parentPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	child1Privkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	child2Privkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	parentPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	child1PrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	child2PrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 
 	tests := []struct {
-		name                string
-		parentUserPublicKey keys.Public
-		nodes               []*pb.AddressRequestNode
-		expectedCount       int
-		expectError         bool
+		name          string
+		nodes         []*pb.AddressRequestNode
+		expectedCount int
+		expectError   bool
 	}{
 		{
-			name:                "empty nodes",
-			parentUserPublicKey: parentPrivkey.Public(),
-			nodes:               []*pb.AddressRequestNode{},
-			expectedCount:       0,
-			expectError:         false,
+			name:          "empty nodes",
+			nodes:         []*pb.AddressRequestNode{},
+			expectedCount: 0,
+			expectError:   false,
 		},
 		{
-			name:                "single leaf node",
-			parentUserPublicKey: parentPrivkey.Public(),
+			name: "single leaf node",
 			nodes: []*pb.AddressRequestNode{
 				{
-					UserPublicKey: parentPrivkey.Public().Serialize(),
+					UserPublicKey: parentPrivKey.Public().Serialize(),
 					Children:      nil,
 				},
 			},
@@ -485,15 +482,14 @@ func TestValidateAndCountTreeAddressNodes(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:                "nodes with children - key mismatch",
-			parentUserPublicKey: parentPrivkey.Public(),
+			name: "nodes with children - key mismatch",
 			nodes: []*pb.AddressRequestNode{
 				{
-					UserPublicKey: child1Privkey.Public().Serialize(), // This doesn't match parent
+					UserPublicKey: child1PrivKey.Public().Serialize(), // This doesn't match parent
 					Children:      nil,
 				},
 				{
-					UserPublicKey: child2Privkey.Public().Serialize(), // This doesn't match parent
+					UserPublicKey: child2PrivKey.Public().Serialize(), // This doesn't match parent
 					Children:      nil,
 				},
 			},
@@ -504,7 +500,7 @@ func TestValidateAndCountTreeAddressNodes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			count, err := handler.validateAndCountTreeAddressNodes(ctx, tt.parentUserPublicKey, tt.nodes)
+			count, err := handler.validateAndCountTreeAddressNodes(ctx, parentPrivKey.Public(), tt.nodes)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -580,7 +576,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	handler := createTestHandler()
 
 	// Setup test data
-	db, err := ent.GetDbFromContext(ctx)
+	dbTX, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
 	keysharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -590,7 +586,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	verifyingPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
 
 	// Create a signing keyshare
-	signingKeyshare, err := db.SigningKeyshare.Create().
+	signingKeyshare, err := dbTX.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
 		SetSecretShare(keysharePrivkey.Serialize()).
 		SetPublicShares(map[string][]byte{"test": publicSharePrivkey.Public().Serialize()}).
@@ -601,7 +597,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a tree
-	tree, err := db.Tree.Create().
+	tree, err := dbTX.Tree.Create().
 		SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
 		SetNetwork(st.NetworkRegtest).
 		SetBaseTxid(make([]byte, 32)).
@@ -611,7 +607,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a tree node with Available status
-	availableNode, err := db.TreeNode.Create().
+	availableNode, err := dbTX.TreeNode.Create().
 		SetTree(tree).
 		SetStatus(st.TreeNodeStatusAvailable).
 		SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
@@ -625,7 +621,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a tree node with different status
-	creatingNode, err := db.TreeNode.Create().
+	creatingNode, err := dbTX.TreeNode.Create().
 		SetTree(tree).
 		SetStatus(st.TreeNodeStatusCreating).
 		SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
@@ -699,7 +695,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 					nodeID, err := uuid.Parse(tt.parentNodeOutput.NodeId)
 					require.NoError(t, err)
 
-					updatedNode, err := db.TreeNode.Get(ctx, nodeID)
+					updatedNode, err := dbTX.TreeNode.Get(ctx, nodeID)
 					require.NoError(t, err)
 					assert.Equal(t, tt.expectedFinalStatus, updatedNode.Status)
 				}
@@ -750,12 +746,12 @@ func TestEdgeCases(t *testing.T) {
 		assert.Nil(t, output)
 	})
 
-	t.Run("validateAndCountTreeAddressNodes with nil parent key", func(t *testing.T) {
+	t.Run("validateAndCountTreeAddressNodes with empty parent key", func(t *testing.T) {
 		rng := rand.NewChaCha8([32]byte{1})
-		userPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+		userPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 		nodes := []*pb.AddressRequestNode{
 			{
-				UserPublicKey: userPrivkey.Public().Serialize(),
+				UserPublicKey: userPrivKey.Public().Serialize(),
 				Children:      nil,
 			},
 		}
@@ -776,19 +772,19 @@ func TestPrepareSigningJobs_EnsureConfTxidMatchesUtxoId(t *testing.T) {
 
 	handler := createTestHandler()
 
-	db, err := ent.GetDbFromContext(ctx)
+	dbTX, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	keysharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	publicSharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	identityPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	signingPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	identityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 
-	signingKeyshare, err := db.SigningKeyshare.Create().
+	signingKeyshare, err := dbTX.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(keysharePrivkey.Serialize()).
-		SetPublicShares(map[string][]byte{"test": publicSharePrivkey.Public().Serialize()}).
-		SetPublicKey(keysharePrivkey.Public().Serialize()).
+		SetSecretShare(keysharePrivKey.Serialize()).
+		SetPublicShares(map[string][]byte{"test": publicSharePrivKey.Public().Serialize()}).
+		SetPublicKey(keysharePrivKey.Public().Serialize()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
 		Save(ctx)
@@ -826,10 +822,10 @@ func TestPrepareSigningJobs_EnsureConfTxidMatchesUtxoId(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a deposit address that's confirmed with the LEGITIMATE transaction
-	_, err = db.DepositAddress.Create().
+	_, err = dbTX.DepositAddress.Create().
 		SetAddress(*outputAddress).
-		SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
-		SetOwnerSigningPubkey(signingPrivkey.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPrivKey.Public().Serialize()).
+		SetOwnerSigningPubkey(signingPrivKey.Public().Serialize()).
 		SetSigningKeyshare(signingKeyshare).
 		SetConfirmationHeight(100).                     // Confirmed at height 100
 		SetConfirmationTxid(legitimateTxHash.String()). // CONFIRMED with legitimate TX
@@ -853,7 +849,7 @@ func TestPrepareSigningJobs_EnsureConfTxidMatchesUtxoId(t *testing.T) {
 	// Create a CreateTreeRequest that tries to use the MALICIOUS transaction
 	// This should be rejected because the TXID doesn't match the confirmed TXID
 	req := &pb.CreateTreeRequest{
-		UserIdentityPublicKey: identityPrivkey.Public().Serialize(),
+		UserIdentityPublicKey: identityPrivKey.Public().Serialize(),
 		Source: &pb.CreateTreeRequest_OnChainUtxo{
 			OnChainUtxo: &pb.UTXO{
 				RawTx:   maliciousTxBuf,     // MALICIOUS transaction bytes
@@ -865,7 +861,7 @@ func TestPrepareSigningJobs_EnsureConfTxidMatchesUtxoId(t *testing.T) {
 		Node: &pb.CreationNode{
 			NodeTxSigningJob: &pb.SigningJob{
 				RawTx:                  nodeTxBuf,
-				SigningPublicKey:       signingPrivkey.Public().Serialize(),
+				SigningPublicKey:       signingPrivKey.Public().Serialize(),
 				SigningNonceCommitment: &pbcommon.SigningCommitment{Hiding: make([]byte, 33), Binding: make([]byte, 33)},
 			},
 		},
