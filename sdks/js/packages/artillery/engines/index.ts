@@ -18,6 +18,11 @@ export class SparkEngine {
   private readonly stepActions = {
     initializePools: (params?: any) => this.walletActions.initializePools(params),
     cleanupPools: () => this.walletActions.cleanupPools(),
+
+    getStaticAddress: (params?: any) => this.walletActions.getStaticAddress(params),
+    printWalletInfo: (params?: any) => this.walletActions.printWalletInfo(params),
+    claimStaticDeposit: (params?: any) => this.walletActions.claimStaticDeposit(params),
+    withdraw: (params?: any) => this.walletActions.withdraw(params),
   } as const;
 
   public readonly availableActions = Object.keys(this.stepActions) as Array<keyof typeof this.stepActions>;

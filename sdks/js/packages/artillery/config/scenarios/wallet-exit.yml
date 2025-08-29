@@ -1,0 +1,46 @@
+config:
+  target: "http://localhost"
+  engines:
+    spark: {}
+  phases:
+    - duration: 5
+      arrivalRate: 1
+      maxVusers: 1
+      name: "warm-up"
+
+scenarios:
+  - name: "Exit wallet"
+    weight: 1
+    engine: spark
+
+    before:
+      - initializePools:
+          pools:
+            - name: "sender-pool"
+              mnemonicsFile: "./mnemonics/batch-source-wallets.txt"
+              lockWallets: true
+              randomSelection: true
+              namedWallets:
+                - { name: "sender", lock: true, minBalance: 3000 }
+            - name: "receiver-pool"
+              randomSelection: true
+              mnemonicsFile: "./mnemonics/batch-recipient-wallets.txt"
+              namedWallets:
+                - { name: "receiver", lock: true, minBalance: 0 }
+
+    flow:
+      - getStaticAddress:
+          walletName: "receiver"
+          storeAs: "receiverInitial"
+
+      - withdraw:
+          senderWallet: "sender"
+          receiverWallet: "receiverInitial"
+          storeAs: "receiverWallet"
+          amount: 2500
+
+      - claimStaticDeposit:
+          walletName: "receiverWallet"
+
+    after:
+      - cleanupPools: {}

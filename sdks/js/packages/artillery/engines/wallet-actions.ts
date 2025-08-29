@@ -1940,6 +1940,7 @@ export class WalletActions {
 
         const wallet: IssuerSparkWallet = walletInfo.wallet;
 
+        // Check if the wallet is already has static address
         const staticAddresses = await wallet.queryStaticDepositAddresses();
         let staticDepostAddress: string;
         if (staticAddresses && staticAddresses.length > 0) {
@@ -2025,12 +2026,7 @@ export class WalletActions {
           throw new Error(`Wallet ${params.walletName} not found`);
         }
 
-        const vout = await (walletInfo.wallet as any).getDepositTransactionVout(walletInfo.txId);
-
-        console.log(`\n\nTxID: ${walletInfo.txId}\n\n`);
-
-        console.log(`Claiming static deposit for wallet ${params.walletName}...`);
-        const quote = await walletInfo.wallet.getClaimStaticDepositQuote(walletInfo.txId, vout!);
+        const quote = await walletInfo.wallet.getClaimStaticDepositQuote(walletInfo.txId);
         if (!quote) {
           console.error(`  ERROR: No quote found for static deposit claim in wallet ${params.walletName}`);
           throw new Error(`No quote found for static deposit claim in wallet ${params.walletName}`);
@@ -2044,7 +2040,6 @@ export class WalletActions {
           transactionId: walletInfo.txId,
           creditAmountSats: quote.creditAmountSats,
           sspSignature: quote.signature,
-          outputIndex: vout!,
         });
 
         await new Promise((resolve) => setTimeout(resolve, 60000)); // Wait for 60 seconds to ensure claim is processed
@@ -2079,13 +2074,14 @@ export class WalletActions {
     };
   }
 
-  exitSpark(params?: { senderWallet: string; receiverWallet: string; storeAs: string; amount: number }): EngineStep {
+  withdraw(params?: { senderWallet: string; receiverWallet: string; storeAs: string; amount: number }): EngineStep {
     const ee = this.ee;
 
     return async function (context, callback) {
       try {
         console.log(`Starting withdrawal from wallet: ${params.senderWallet}`);
 
+        // get sender wallet instance
         let namedWalletInfo = context.vars?.[params.senderWallet];
         if (!namedWalletInfo) {
           throw new Error(`Wallet "${params.senderWallet}" not found. Make sure it's locked first.`);
@@ -2109,6 +2105,7 @@ export class WalletActions {
         const receiverWallet: IssuerSparkWallet = namedWalletInfo.wallet;
         const staticReceiverAddress = namedWalletInfo.staticAddress;
 
+        // get withdrawal fee
         const feeQuote = await sendWallet.getWithdrawalFeeQuote({
           amountSats: params.amount,
           withdrawalAddress: staticReceiverAddress,
