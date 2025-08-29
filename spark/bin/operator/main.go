@@ -305,9 +305,7 @@ func main() {
 	defer connector.Close()
 
 	for _, op := range config.SigningOperatorMap {
-		op.ClientTimeoutConfig = common.ClientTimeoutConfig{
-			TimeoutProvider: knobs.NewKnobsTimeoutProvider(knobsService, config.GRPC.ClientTimeout),
-		}
+		op.SetTimeoutProvider(knobs.NewKnobsTimeoutProvider(knobsService, config.GRPC.ClientTimeout))
 	}
 
 	config.FrostGRPCConnectionFactory.SetTimeoutProvider(

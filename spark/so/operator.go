@@ -8,6 +8,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/lightsparkdev/spark/common"
+	sparkgrpc "github.com/lightsparkdev/spark/common/grpc"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/utils"
 
@@ -123,4 +124,11 @@ func (s *SigningOperator) NewOperatorGRPCConnection() (*grpc.ClientConn, error) 
 
 func (s *SigningOperator) NewOperatorGRPCConnectionForDKG() (*grpc.ClientConn, error) {
 	return s.newGrpcConnection(s.AddressDkg)
+}
+
+// SetTimeoutProvider sets the timeout provider for this signing operator.
+func (s *SigningOperator) SetTimeoutProvider(timeoutProvider sparkgrpc.TimeoutProvider) {
+	s.ClientTimeoutConfig = common.ClientTimeoutConfig{
+		TimeoutProvider: timeoutProvider,
+	}
 }
