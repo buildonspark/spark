@@ -1,0 +1,161 @@
+{
+  "description": "Cross-language hash cases in canonical Protobuf JSON for spark.SparkInvoiceFields",
+  "testCases": [
+    {
+      "name": "basic_sats_payment",
+      "description": "Simple sats payment with memo",
+      "expectedHash": "72e28f0a3509d3e268ed2f5e2a3478f2775634c5001aa5f141df98b588c1563b",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AQIDBAUGBwgJCgsMDQ4PEA==",
+        "memo": "test memo",
+        "satsPayment": {
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "name": "basic_tokens_payment",
+      "description": "Simple tokens payment with memo",
+      "expectedHash": "b1d6781c4233d28408e8e1cb02dd396a7eab22bfdc24c753b0470348f3898590",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AQIDBAUGBwgJCgsMDQ4PEA==",
+        "memo": "test memo",
+        "tokensPayment": {
+          "tokenIdentifier": "AQIDBA==",
+          "amount": "AAAAAAAAAAAAAAAAAAAD6A=="
+        }
+      }
+    },
+    {
+      "name": "minimal_fields",
+      "description": "Only required fields, no optional fields",
+      "expectedHash": "b03d460a89f09abdbe06db92884b1c804db78889f99382784bf7386f3407bb56",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AQIDBAUGBwgJCgsMDQ4PEA==",
+        "satsPayment": {
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "name": "with_empty_memo",
+      "description": "Test empty string vs undefined memo distinction",
+      "expectedHash": "b03d460a89f09abdbe06db92884b1c804db78889f99382784bf7386f3407bb56",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AQIDBAUGBwgJCgsMDQ4PEA==",
+        "memo": "",
+        "satsPayment": {
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "name": "with_sender_public_key",
+      "description": "Test with sender public key field",
+      "expectedHash": "a7c7a2a64c5e95458607e39b1b2de2c028dd25be081f4de6dd1c49e61fbad650",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AQIDBAUGBwgJCgsMDQ4PEA==",
+        "senderPublicKey": "AhEiM0RVZneImaq7zN3u/wEjRWeJq83v/ty6mHZUMhAA",
+        "satsPayment": {
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "name": "with_expiry_time",
+      "description": "Test with expiry timestamp",
+      "expectedHash": "588b5c5f16e87b218021fd1d740a18edb6c0f284d633615e77664f820c4d0b1a",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AQIDBAUGBwgJCgsMDQ4PEA==",
+        "expiryTime": "2022-01-01T00:00:00Z",
+        "satsPayment": {
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "name": "all_fields_set",
+      "description": "Test with all optional fields populated",
+      "expectedHash": "bc2dd601c55fd9df9480c368886756dde997e83b0a18b7b7c28f3c89fdbd38d0",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AQIDBAUGBwgJCgsMDQ4PEA==",
+        "memo": "comprehensive test memo",
+        "senderPublicKey": "AhEiM0RVZneImaq7zN3u/wEjRWeJq83v/ty6mHZUMhAA",
+        "expiryTime": "2022-01-01T00:00:00Z",
+        "tokensPayment": {
+          "tokenIdentifier": "AQIDBA==",
+          "amount": "AAAAAAAAAAAAAAAAAAAD6A=="
+        }
+      }
+    },
+    {
+      "name": "sats_payment_amount_zero",
+      "description": "Sats payment with amount explicitly set to 0",
+      "expectedHash": "afb07e28fcd32b891498d8009f7959044e31a97967a88eea89189eeac460a1e8",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AQIDBAUGBwgJCgsMDQ4PEA==",
+        "satsPayment": {
+          "amount": 0
+        }
+      }
+    },
+    {
+      "name": "with_empty_sender_public_key",
+      "description": "Empty sender_public_key should not hash",
+      "expectedHash": "b03d460a89f09abdbe06db92884b1c804db78889f99382784bf7386f3407bb56",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AQIDBAUGBwgJCgsMDQ4PEA==",
+        "senderPublicKey": "",
+        "satsPayment": {
+          "amount": 1000
+        }
+      }
+    },
+    {
+      "name": "tokens_only_identifier",
+      "description": "Tokens payment with only token_identifier set",
+      "expectedHash": "a9425b95d19fdf023722ef2b65539fcad0f3fbee98696c457e19f88262ef26c0",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AQIDBAUGBwgJCgsMDQ4PEA==",
+        "tokensPayment": {
+          "tokenIdentifier": "CQgHBg=="
+        }
+      }
+    },
+    {
+      "name": "tokens_only_amount",
+      "description": "Tokens payment with only amount set",
+      "expectedHash": "02c650cb5e68491623f35a4f8308771c8b8171abb0b5839dff98fec6d03e0bb2",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AQIDBAUGBwgJCgsMDQ4PEA==",
+        "tokensPayment": {
+          "amount": "AAAAAAAAAAAAAAAAAAAD6A=="
+        }
+      }
+    },
+    {
+      "name": "tokens_empty_fields",
+      "description": "Tokens payment selected with both fields empty; inner empties should be skipped",
+      "expectedHash": "b8dad086bf5214afdca740f2098d8497650caa9b6623c7a00b0319052c6ef32a",
+      "sparkInvoiceFields": {
+        "version": 1,
+        "id": "AQIDBAUGBwgJCgsMDQ4PEA==",
+        "tokensPayment": {
+          "tokenIdentifier": "",
+          "amount": ""
+        }
+      }
+    }
+  ]
+}
