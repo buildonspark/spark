@@ -45,7 +45,7 @@ func (o *StaticDepositHandler) CreateStaticDepositUtxoSwapForAllOperators(ctx co
 	logger := logging.GetLoggerFromContext(ctx)
 
 	// Try to complete with other operators first.
-	_, err := helper.ExecuteTaskWithAllOperators(ctx, config, &helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
+	_, err := helper.ExecuteTaskWithAllOperators(ctx, config, &helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}, func(ctx context.Context, operator *so.SigningOperator) (*pbinternal.CreateStaticDepositUtxoSwapResponse, error) {
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {
 			logger.Error("Failed to connect to operator", "operator", operator.Identifier, "error", err)
@@ -111,7 +111,7 @@ func (o *StaticDepositHandler) rollbackUtxoSwap(ctx context.Context, config *so.
 	}
 
 	allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
-	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (*pbinternal.RollbackUtxoSwapResponse, error) {
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {
 			logger.Error("Failed to connect to operator for rollback utxo swap", "error", err)
@@ -254,6 +254,7 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 	_, err = db.UtxoSwap.UpdateOne(utxoSwap).SetSpendTxSigningResult(spendTxSigningResultBytes).Save(ctx)
 	if err != nil {
 		logger.Warn("failed to update utxo swap", "error", err, "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout)
+		return nil, fmt.Errorf("failed to update utxo swap with spend tx signing result: %w", err)
 	}
 
 	// **********************************************************************************************
@@ -323,7 +324,7 @@ func GenerateCreateStaticDepositUtxoRefundRequest(ctx context.Context, config *s
 func CreateUtxoSwapRefundWithOtherOperators(ctx context.Context, config *so.Config, request *pbinternal.CreateStaticDepositUtxoRefundRequest) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
-	_, err := helper.ExecuteTaskWithAllOperators(ctx, config, &helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
+	_, err := helper.ExecuteTaskWithAllOperators(ctx, config, &helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}, func(ctx context.Context, operator *so.SigningOperator) (*pbinternal.CreateStaticDepositUtxoRefundResponse, error) {
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {
 			logger.Error("Failed to connect to operator", "operator", operator.Identifier, "error", err)
