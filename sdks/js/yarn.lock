@@ -11561,12 +11561,12 @@ __metadata:
   linkType: hard
 
 "bare-tls@npm:^2.0.0":
-  version: 2.1.2
-  resolution: "bare-tls@npm:2.1.2"
+  version: 2.1.3
+  resolution: "bare-tls@npm:2.1.3"
   dependencies:
     bare-net: "npm:^2.0.1"
     bare-stream: "npm:^2.6.4"
-  checksum: 10/c72d30ff9c8fc912a3a03110f91d90e1fdc8e727532e20d6cefc07a4d0b3d15cfe8821c786c0e7263ea536de359f9e6864418b0d87a83f1b4e652da5ee7cf204
+  checksum: 10/3ff985b4c50676b05d1b29befb6de4ba70a59bb7f3789524f48d33017594fd13eaa459f07238066eecd332766d8b0652f6790be5011e83acc65b76bc87fc1bc4
   languageName: node
   linkType: hard
 
