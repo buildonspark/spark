@@ -1261,7 +1261,7 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 				logger.Error("Error when canceling transfer", "error", cancelErr, "transfer_id", req.TransferId)
 			}
 		}
-		errorMsg := fmt.Sprintf("failed to sync deliver sender key tweak for request %s", logging.FormatProto("finalize_transfer_with_transfer_package", req))
+		errorMsg := fmt.Sprintf("failed to sync deliver sender key tweak for transfer %s", req.TransferId)
 		if stat, ok := status.FromError(err); ok && stat.Code() == codes.Unavailable {
 			return nil, sparkerrors.UnavailableErrorf("%s: %w", errorMsg, err)
 		}
