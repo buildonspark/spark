@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/lightsparkdev/spark/common/keys"
 
@@ -16,6 +17,8 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/handler"
 	events "github.com/lightsparkdev/spark/so/stream"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -25,13 +28,17 @@ type SparkServer struct {
 	pb.UnimplementedSparkServiceServer
 	config     *so.Config
 	mockAction *common.MockAction
+
+	// Map to track active `claim_transfer_sign_refund` requests to prevent BitBit from overwhelming
+	// us.
+	activeClaimTransferSignRefunds sync.Map
 }
 
 var emptyResponse = &emptypb.Empty{}
 
 // NewSparkServer creates a new SparkServer.
 func NewSparkServer(config *so.Config, mockAction *common.MockAction) *SparkServer {
-	return &SparkServer{config: config, mockAction: mockAction}
+	return &SparkServer{config: config, mockAction: mockAction, activeClaimTransferSignRefunds: sync.Map{}}
 }
 
 // GenerateDepositAddress generates a deposit address for the given public key.
@@ -183,6 +190,14 @@ func (s *SparkServer) ClaimTransferSignRefunds(ctx context.Context, req *pb.Clai
 		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
 	}
 	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
+
+	// Concurrency limiting for requests from BitBit which spam us with the same transfer ID.
+	transferID := req.TransferId
+	if _, loaded := s.activeClaimTransferSignRefunds.LoadOrStore(transferID, struct{}{}); loaded {
+		return nil, status.Errorf(codes.ResourceExhausted, "transfer %s is being processed by another request, please try again later", transferID)
+	}
+	defer s.activeClaimTransferSignRefunds.Delete(transferID)
+
 	transferHander := handler.NewTransferHandler(s.config)
 	if s.mockAction != nil {
 		transferHander.SetMockAction(s.mockAction)
