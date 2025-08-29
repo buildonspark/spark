@@ -1112,7 +1112,7 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 			},
 		})
 		if err != nil {
-			logger.Error("failed to notify user about transfer event", "error", err, "identity_public_key", logging.Pubkey{Pubkey: transfer.ReceiverIdentityPubkey})
+			logger.Error("failed to notify user about transfer event", "error", err, "identity_public_key", receiverIDPubKey)
 		}
 	}
 	return transfer, nil

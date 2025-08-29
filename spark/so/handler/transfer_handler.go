@@ -1213,7 +1213,7 @@ func (h *TransferHandler) FinalizeTransfer(ctx context.Context, req *pb.Finalize
 		},
 	})
 	if err != nil {
-		logger.Error("failed to notify user about transfer event", "error", err, "identity_public_key", logging.Pubkey{Pubkey: transfer.ReceiverIdentityPubkey})
+		logger.Error("failed to notify user about transfer event", "error", err, "identity_public_key", receiverIDPubKey)
 	}
 
 	return &pb.FinalizeTransferResponse{Transfer: transferProto}, nil
@@ -2499,7 +2499,7 @@ func (h *TransferHandler) ResumeSendTransfer(ctx context.Context, transfer *ent.
 			},
 		})
 		if err != nil {
-			logger.Error("failed to notify user about transfer event", "error", err, "identity_public_key", logging.Pubkey{Pubkey: transfer.ReceiverIdentityPubkey})
+			logger.Error("failed to notify user about transfer event", "error", err, "identity_public_key", receiverIDPubKey)
 		}
 	}
 

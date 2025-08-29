@@ -2,7 +2,6 @@ package logging
 
 import (
 	"context"
-	"encoding/hex"
 	"github.com/lightsparkdev/spark/common/keys"
 	"log/slog"
 )
@@ -52,10 +51,4 @@ func GetLoggerFromContext(ctx context.Context) *slog.Logger {
 		return slog.Default()
 	}
 	return logger
-}
-
-type Pubkey struct{ Pubkey []byte }
-
-func (l Pubkey) LogValue() slog.Value {
-	return slog.AnyValue(hex.EncodeToString(l.Pubkey))
 }
