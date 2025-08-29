@@ -191,7 +191,6 @@ pub extern "C" fn bare_addon_exports(
             adaptor_pk,
         ) {
             Ok(sig) => {
-                log_binding!("sig ({} bytes): {}", sig.len(), hex::encode(&sig));
                 let js_sig = Uint8Array::new(env, sig.len())?;
                 js_sig.as_mut_slice().copy_from_slice(&sig);
                 Ok(js_sig.into())
