@@ -504,6 +504,24 @@ func (u *DepositAddressUpsert) UpdateUpdateTime() *DepositAddressUpsert {
 	return u
 }
 
+// SetNetwork sets the "network" field.
+func (u *DepositAddressUpsert) SetNetwork(v schematype.Network) *DepositAddressUpsert {
+	u.Set(depositaddress.FieldNetwork, v)
+	return u
+}
+
+// UpdateNetwork sets the "network" field to the value that was provided on create.
+func (u *DepositAddressUpsert) UpdateNetwork() *DepositAddressUpsert {
+	u.SetExcluded(depositaddress.FieldNetwork)
+	return u
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (u *DepositAddressUpsert) ClearNetwork() *DepositAddressUpsert {
+	u.SetNull(depositaddress.FieldNetwork)
+	return u
+}
+
 // SetConfirmationHeight sets the "confirmation_height" field.
 func (u *DepositAddressUpsert) SetConfirmationHeight(v int64) *DepositAddressUpsert {
 	u.Set(depositaddress.FieldConfirmationHeight, v)
@@ -635,9 +653,6 @@ func (u *DepositAddressUpsertOne) UpdateNewValues() *DepositAddressUpsertOne {
 		if _, exists := u.create.mutation.Address(); exists {
 			s.SetIgnore(depositaddress.FieldAddress)
 		}
-		if _, exists := u.create.mutation.Network(); exists {
-			s.SetIgnore(depositaddress.FieldNetwork)
-		}
 		if _, exists := u.create.mutation.OwnerIdentityPubkey(); exists {
 			s.SetIgnore(depositaddress.FieldOwnerIdentityPubkey)
 		}
@@ -686,6 +701,27 @@ func (u *DepositAddressUpsertOne) SetUpdateTime(v time.Time) *DepositAddressUpse
 func (u *DepositAddressUpsertOne) UpdateUpdateTime() *DepositAddressUpsertOne {
 	return u.Update(func(s *DepositAddressUpsert) {
 		s.UpdateUpdateTime()
+	})
+}
+
+// SetNetwork sets the "network" field.
+func (u *DepositAddressUpsertOne) SetNetwork(v schematype.Network) *DepositAddressUpsertOne {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.SetNetwork(v)
+	})
+}
+
+// UpdateNetwork sets the "network" field to the value that was provided on create.
+func (u *DepositAddressUpsertOne) UpdateNetwork() *DepositAddressUpsertOne {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.UpdateNetwork()
+	})
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (u *DepositAddressUpsertOne) ClearNetwork() *DepositAddressUpsertOne {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.ClearNetwork()
 	})
 }
 
@@ -1004,9 +1040,6 @@ func (u *DepositAddressUpsertBulk) UpdateNewValues() *DepositAddressUpsertBulk {
 			if _, exists := b.mutation.Address(); exists {
 				s.SetIgnore(depositaddress.FieldAddress)
 			}
-			if _, exists := b.mutation.Network(); exists {
-				s.SetIgnore(depositaddress.FieldNetwork)
-			}
 			if _, exists := b.mutation.OwnerIdentityPubkey(); exists {
 				s.SetIgnore(depositaddress.FieldOwnerIdentityPubkey)
 			}
@@ -1056,6 +1089,27 @@ func (u *DepositAddressUpsertBulk) SetUpdateTime(v time.Time) *DepositAddressUps
 func (u *DepositAddressUpsertBulk) UpdateUpdateTime() *DepositAddressUpsertBulk {
 	return u.Update(func(s *DepositAddressUpsert) {
 		s.UpdateUpdateTime()
+	})
+}
+
+// SetNetwork sets the "network" field.
+func (u *DepositAddressUpsertBulk) SetNetwork(v schematype.Network) *DepositAddressUpsertBulk {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.SetNetwork(v)
+	})
+}
+
+// UpdateNetwork sets the "network" field to the value that was provided on create.
+func (u *DepositAddressUpsertBulk) UpdateNetwork() *DepositAddressUpsertBulk {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.UpdateNetwork()
+	})
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (u *DepositAddressUpsertBulk) ClearNetwork() *DepositAddressUpsertBulk {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.ClearNetwork()
 	})
 }
 
