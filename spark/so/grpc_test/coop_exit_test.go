@@ -183,7 +183,20 @@ func TestCoopExitBasic(t *testing.T) {
 	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
 	startTime := time.Now()
 	for {
-		_, err = wallet.ClaimTransfer(sspCtx, receiverTransfer, sspConfig, leavesToClaim)
+		// Refresh transfer status from server to make sure the ClaimTransfer function has the correct transfer status
+		currentTransfer := receiverTransfer
+		transfers, _, err := wallet.QueryAllTransfersWithTypes(
+			sspCtx, sspConfig, 100, 0, []pb.TransferType{pb.TransferType_COOPERATIVE_EXIT},
+		)
+		require.NoError(t, err)
+		for _, tr := range transfers {
+			if tr.Id == receiverTransfer.Id {
+				currentTransfer = tr
+				break
+			}
+		}
+
+		_, err = wallet.ClaimTransfer(sspCtx, currentTransfer, sspConfig, leavesToClaim)
 		if err == nil {
 			break
 		}
