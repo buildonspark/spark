@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/errors"
@@ -109,7 +110,7 @@ func FormatErrorWithTransactionProtoAndSparkInvoice(msg string, tokenTransaction
 }
 
 func NewTransactionPreemptedError(tokenTransaction *tokenpb.TokenTransaction, reason, details string) error {
-	formattedError := FormatErrorWithTransactionProto(fmt.Sprintf(ErrTransactionPreemptedByExisting, reason, details), tokenTransaction, nil)
+	formattedError := FormatErrorWithTransactionProto(fmt.Sprintf(ErrTransactionPreemptedByExisting, reason, details), tokenTransaction, sparkerrors.AlreadyExistsErrorf("Token Transaction is already in progress"))
 	return errors.AbortedError(formattedError)
 }
 
