@@ -32,6 +32,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
+	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingcommitment"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
@@ -308,7 +309,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					query := tx.Transfer.Query().Where(
 						transfer.And(
 							transfer.StatusEQ(st.TransferStatusSenderInitiatedCoordinator),
-							transfer.TypeNotIn(st.TransferTypeCooperativeExit, st.TransferTypePreimageSwap),
+							transfer.TypeNEQ(st.TransferTypeCooperativeExit),
 						),
 					).Limit(1000)
 
@@ -318,6 +319,16 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					}
 
 					for _, dbTransfer := range transfers {
+						if dbTransfer.Type == st.TransferTypePreimageSwap {
+							preimageRequest, err := tx.PreimageRequest.Query().Where(preimagerequest.HasTransfersWith(transfer.IDEQ(dbTransfer.ID))).Only(ctx)
+							if err != nil {
+								logger.Error("failed to get preimage request for transfer", "error", err)
+								continue
+							}
+							if preimageRequest.Status != st.PreimageRequestStatusPreimageShared {
+								continue
+							}
+						}
 						err := h.ResumeSendTransfer(ctx, dbTransfer)
 						if err != nil {
 							logger.Error("failed to resume send transfer", "error", err)

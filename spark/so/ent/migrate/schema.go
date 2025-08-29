@@ -234,6 +234,11 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{PreimageRequestsColumns[3], PreimageRequestsColumns[5]},
 			},
+			{
+				Name:    "preimagerequest_preimage_request_transfers",
+				Unique:  false,
+				Columns: []*schema.Column{PreimageRequestsColumns[7]},
+			},
 		},
 	}
 	// PreimageSharesColumns holds the columns for the "preimage_shares" table.

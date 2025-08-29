@@ -24,6 +24,7 @@ func (PreimageRequest) Mixin() []ent.Mixin {
 func (PreimageRequest) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("payment_hash", "receiver_identity_pubkey"),
+		index.Edges("transfers"),
 	}
 }
 
