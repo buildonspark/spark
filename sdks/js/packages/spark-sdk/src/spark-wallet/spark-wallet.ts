@@ -2094,6 +2094,76 @@ export class SparkWallet extends EventEmitter {
     return tx.hex;
   }
 
+  /**
+   * Refunds a static deposit and broadcasts the transaction to the network.
+   *
+   * @param {Object} params - The refund parameters
+   * @param {string} params.depositTransactionId - The ID of the transaction
+   * @param {number} [params.outputIndex] - The index of the output
+   * @param {string} params.destinationAddress - The destination address
+   * @param {number} [params.satsPerVbyteFee] - The fee per vbyte to refund
+   * @returns {Promise<string>} The transaction ID
+   */
+  public async refundAndBroadcastStaticDeposit({
+    depositTransactionId,
+    outputIndex,
+    destinationAddress,
+    satsPerVbyteFee,
+  }: {
+    depositTransactionId: string;
+    outputIndex?: number;
+    destinationAddress: string;
+    satsPerVbyteFee?: number;
+  }): Promise<string> {
+    const txHex = await this.refundStaticDeposit({
+      depositTransactionId,
+      outputIndex,
+      destinationAddress,
+      satsPerVbyteFee,
+    });
+
+    return await this.broadcastTx(txHex);
+  }
+
+  /**
+   * Broadcasts a transaction to the network.
+   *
+   * @param {string} txHex - The hex of the transaction
+   * @returns {Promise<string>} The transaction ID
+   */
+  private async broadcastTx(txHex: string): Promise<string> {
+    if (!txHex) {
+      throw new ValidationError("Transaction hex cannot be empty", {
+        field: "txHex",
+      });
+    }
+
+    const { fetch, Headers } = getFetch();
+    const baseUrl = this.config.getElectrsUrl();
+    const headers = new Headers();
+
+    if (this.config.getNetwork() === Network.LOCAL) {
+      const localFaucet = BitcoinFaucet.getInstance();
+      const response = await localFaucet.broadcastTx(txHex);
+      return response;
+    } else {
+      if (this.config.getNetwork() === Network.REGTEST) {
+        const auth = btoa(
+          `${ELECTRS_CREDENTIALS.username}:${ELECTRS_CREDENTIALS.password}`,
+        );
+        headers.set("Authorization", `Basic ${auth}`);
+      }
+
+      const response = await fetch(`${baseUrl}/tx`, {
+        method: "POST",
+        body: txHex,
+        headers,
+      });
+
+      return response.text();
+    }
+  }
+
   private async getStaticDepositSigningPayload(
     transactionID: string,
     outputIndex: number,

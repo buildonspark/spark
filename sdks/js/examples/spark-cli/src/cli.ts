@@ -310,6 +310,7 @@ const commands = [
   "claimstaticdeposit",
   "refundstaticdeposit",
   "refundstaticdepositlegacy",
+  "refundandbroadcaststaticdeposit",
   "claimstaticdepositwithmaxfee",
   "getutxosfordepositaddress",
   "createsparkinvoice",
@@ -640,6 +641,7 @@ async function runCLI() {
   getutxosfordepositaddress <depositAddress> <excludeClaimed(true|false)> - Get all UTXOs for a deposit address
   refundstaticdepositlegacy <depositTransactionId> <destinationAddress> <fee> [outputIndex] - Refund a static deposit legacy
   refundstaticdeposit <depositTransactionId> <destinationAddress> <satsPerVbyteFee> [outputIndex] - Refund a static deposit
+  refundandbroadcaststaticdeposit <depositTransactionId> <destinationAddress> <satsPerVbyteFee> [outputIndex] - Refund and broadcast a static deposit
   gettransfers [limit] [offset]                                       - Get a list of transfers
   createinvoice <amount> <memo> <includeSparkAddress> [receiverIdentityPubkey] [descriptionHash] - Create a new lightning invoice
   payinvoice <invoice> <maxFeeSats> <preferSpark> [amountSatsToSend]  - Pay a lightning invoice
@@ -1187,6 +1189,20 @@ async function runCLI() {
           });
           console.log("Broadcast the transaction below to refund the deposit");
           console.log(refundDeposit);
+          break;
+        case "refundandbroadcaststaticdeposit":
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          const refundedTxId = await wallet.refundAndBroadcastStaticDeposit({
+            depositTransactionId: args[0],
+            destinationAddress: args[1],
+            satsPerVbyteFee: parseInt(args[2]),
+            outputIndex: args[3] ? parseInt(args[3]) : undefined,
+          });
+          console.log("Refund transaction broadcasted! Transaction ID:");
+          console.log(refundedTxId);
           break;
         case "identity":
           if (!wallet) {

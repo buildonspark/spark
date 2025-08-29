@@ -52,6 +52,32 @@ describe("SSP static deposit address integration", () => {
       ).rejects.toThrow();
     }, 600000);
 
+    it("should refund and broadcast a static deposit refund transaction", async () => {
+      const {
+        wallet: userWallet,
+        depositAddress,
+        signedTx,
+        vout,
+        faucet,
+      } = await initWallet(DEPOSIT_AMOUNT, "LOCAL");
+
+      // Wait for the transaction to be mined
+      await faucet.mineBlocks(6);
+
+      const transactionId = signedTx.id;
+
+      const txId = await userWallet.refundAndBroadcastStaticDeposit({
+        depositTransactionId: transactionId,
+        outputIndex: vout!,
+        destinationAddress: depositAddress,
+        satsPerVbyteFee: 2,
+      });
+
+      await faucet.mineBlocks(6);
+
+      expect(txId).toBeDefined();
+    }, 600000);
+
     it("should fail due to low fee", async () => {
       console.log("Initializing wallet for low-fee refund test...");
       const {
