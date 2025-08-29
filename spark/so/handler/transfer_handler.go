@@ -3,15 +3,12 @@ package handler
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math/big"
 	"sync"
 	"time"
 
-	entsql "entgo.io/ent/dialect/sql"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/btcsuite/btcd/wire"
@@ -2141,11 +2138,8 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	}
 
 	// Lock the transfer after the key tweak is settled.
-	transfer, err = h.loadTransferForUpdate(ctx, req.TransferId, entsql.WithLockAction(entsql.NoWait))
+	transfer, err = h.loadTransferForUpdate(ctx, req.TransferId)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, sparkerrors.AbortedErrorf("transfer %s is being processed by another request, please try again later", req.TransferId)
-		}
 		return nil, fmt.Errorf("unable to load transfer %s: %w", req.TransferId, err)
 	}
 	if transfer.Status == st.TransferStatusCompleted {
