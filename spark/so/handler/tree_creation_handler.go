@@ -118,59 +118,67 @@ func (h *TreeCreationHandler) findParentOutputFromCreateTreeRequest(ctx context.
 	}
 }
 
-func (h *TreeCreationHandler) getSigningKeyshareFromOutput(ctx context.Context, network common.Network, output *wire.TxOut) ([]byte, *ent.SigningKeyshare, error) {
+func (h *TreeCreationHandler) getSigningKeyshareFromOutput(ctx context.Context, network common.Network, output *wire.TxOut) (keys.Public, *ent.SigningKeyshare, error) {
 	addressString, err := common.P2TRAddressFromPkScript(output.PkScript, network)
 	if err != nil {
-		return nil, nil, err
+		return keys.Public{}, nil, err
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+		return keys.Public{}, nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*addressString)).Only(ctx)
 	if err != nil {
-		return nil, nil, err
+		return keys.Public{}, nil, err
 	}
 
 	keyshare, err := depositAddress.QuerySigningKeyshare().First(ctx)
 	if err != nil {
-		return nil, nil, err
+		return keys.Public{}, nil, err
 	}
 
-	return depositAddress.OwnerSigningPubkey, keyshare, nil
+	pubKey, err := keys.ParsePublicKey(depositAddress.OwnerSigningPubkey)
+	if err != nil {
+		return keys.Public{}, nil, err
+	}
+	return pubKey, keyshare, nil
 }
 
-func (h *TreeCreationHandler) findParentPublicKeys(ctx context.Context, network common.Network, req *pb.PrepareTreeAddressRequest) ([]byte, *ent.SigningKeyshare, error) {
+func (h *TreeCreationHandler) findParentPublicKeys(ctx context.Context, network common.Network, req *pb.PrepareTreeAddressRequest) (keys.Public, *ent.SigningKeyshare, error) {
 	parentOutput, err := h.findParentOutputFromPrepareTreeAddressRequest(ctx, req)
 	if err != nil {
-		return nil, nil, err
+		return keys.Public{}, nil, err
 	}
 	return h.getSigningKeyshareFromOutput(ctx, network, parentOutput)
 }
 
-func (h *TreeCreationHandler) validateAndCountTreeAddressNodes(ctx context.Context, parentUserPublicKey []byte, nodes []*pb.AddressRequestNode) (int, error) {
+func (h *TreeCreationHandler) validateAndCountTreeAddressNodes(ctx context.Context, parentUserPubKey keys.Public, nodes []*pb.AddressRequestNode) (int, error) {
 	if len(nodes) == 0 {
 		return 0, nil
 	}
 
 	count := len(nodes) - 1
-	var publicKeys [][]byte
+	var publicKeys []keys.Public
 	for _, child := range nodes {
-		childCount, err := h.validateAndCountTreeAddressNodes(ctx, child.UserPublicKey, child.Children)
+		childPubKey, err := keys.ParsePublicKey(child.UserPublicKey)
+		if err != nil {
+			return 0, err
+		}
+		childCount, err := h.validateAndCountTreeAddressNodes(ctx, childPubKey, child.Children)
 		if err != nil {
 			return 0, err
 		}
 		count += childCount
-		publicKeys = append(publicKeys, child.UserPublicKey)
+		publicKeys = append(publicKeys, childPubKey)
 	}
 
-	sum, err := common.AddPublicKeysList(publicKeys)
+	sum, err := keys.SumPublicKeys(publicKeys)
 	if err != nil {
 		return 0, err
 	}
 
-	if !bytes.Equal(sum, parentUserPublicKey) {
+	if !sum.Equals(parentUserPubKey) {
 		return 0, errors.New("user public key does not add up to the parent public key")
 	}
 	return count, nil
@@ -178,9 +186,7 @@ func (h *TreeCreationHandler) validateAndCountTreeAddressNodes(ctx context.Conte
 
 func (h *TreeCreationHandler) createPrepareTreeAddressNodeFromAddressNode(ctx context.Context, node *pb.AddressRequestNode) (*pbinternal.PrepareTreeAddressNode, error) {
 	if node.Children == nil {
-		return &pbinternal.PrepareTreeAddressNode{
-			UserPublicKey: node.UserPublicKey,
-		}, nil
+		return &pbinternal.PrepareTreeAddressNode{UserPublicKey: node.UserPublicKey}, nil
 	}
 	children := make([]*pbinternal.PrepareTreeAddressNode, len(node.Children))
 	var err error
@@ -256,17 +262,19 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(
 	network common.Network,
 	node *pbinternal.PrepareTreeAddressNode,
 	keysharesMap map[string]*ent.SigningKeyshare,
-	userIdentityPublicKey []byte,
+	userIdentityPubKey keys.Public,
 	save bool,
 ) (addressNode *pb.AddressNode, err error) {
-	combinedPublicKeyBytes, err := common.AddPublicKeys(keysharesMap[node.SigningKeyshareId].PublicKey, node.UserPublicKey)
+	signingKeyshare := keysharesMap[node.SigningKeyshareId]
+	keysharePubKey, err := keys.ParsePublicKey(signingKeyshare.PublicKey)
 	if err != nil {
 		return nil, err
 	}
-	combinedPublicKey, err := keys.ParsePublicKey(combinedPublicKeyBytes)
+	nodeUserPubKey, err := keys.ParsePublicKey(node.UserPublicKey)
 	if err != nil {
 		return nil, err
 	}
+	combinedPublicKey := keysharePubKey.Add(nodeUserPubKey)
 
 	depositAddress, err := common.P2TRAddressFromPublicKey(combinedPublicKey, network)
 	if err != nil {
@@ -283,9 +291,9 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(
 			return nil, err
 		}
 		_, err = db.DepositAddress.Create().
-			SetSigningKeyshareID(keysharesMap[node.SigningKeyshareId].ID).
-			SetOwnerIdentityPubkey(userIdentityPublicKey).
-			SetOwnerSigningPubkey(node.UserPublicKey).
+			SetSigningKeyshareID(signingKeyshare.ID).
+			SetOwnerIdentityPubkey(userIdentityPubKey.Serialize()).
+			SetOwnerSigningPubkey(nodeUserPubKey.Serialize()).
 			SetAddress(depositAddress).
 			SetNetwork(schemaNetwork).
 			Save(ctx)
@@ -303,7 +311,7 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(
 	}
 	children := make([]*pb.AddressNode, len(node.Children))
 	for i, child := range node.Children {
-		children[i], err = h.createAddressNodeFromPrepareTreeAddressNode(ctx, network, child, keysharesMap, userIdentityPublicKey, len(node.Children) > 1)
+		children[i], err = h.createAddressNodeFromPrepareTreeAddressNode(ctx, network, child, keysharesMap, userIdentityPubKey, len(node.Children) > 1)
 		if err != nil {
 			return nil, err
 		}
@@ -410,7 +418,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		return client.PrepareTreeAddress(ctx, &pbinternal.PrepareTreeAddressRequest{
 			TargetKeyshareId:      signingKeyshare.ID.String(),
 			Node:                  addressNode,
-			UserIdentityPublicKey: req.UserIdentityPublicKey,
+			UserIdentityPublicKey: reqUserIDPubKey.Serialize(),
 			Network:               protoNetwork,
 		})
 	})
@@ -418,18 +426,14 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 		return nil, err
 	}
 
-	resultRootNode, err := h.createAddressNodeFromPrepareTreeAddressNode(ctx, network, addressNode, keysharesMap, req.UserIdentityPublicKey, false)
+	resultRootNode, err := h.createAddressNodeFromPrepareTreeAddressNode(ctx, network, addressNode, keysharesMap, reqUserIDPubKey, false)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO: Sign proof of possession for all signing keyshares.
 
-	response := &pb.PrepareTreeAddressResponse{
-		Node: resultRootNode,
-	}
-
-	return response, nil
+	return &pb.PrepareTreeAddressResponse{Node: resultRootNode}, nil
 }
 
 func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.CreateTreeRequest, requireDirectTx bool) ([]*helper.SigningJob, []*ent.TreeNode, error) {
@@ -476,12 +480,12 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	}
 
 	type element struct {
-		output        *wire.TxOut
-		node          *pb.CreationNode
-		userPublicKey []byte
-		keyshare      *ent.SigningKeyshare
-		parentNode    *ent.TreeNode
-		vout          uint32
+		output     *wire.TxOut
+		node       *pb.CreationNode
+		userPubKey keys.Public
+		keyshare   *ent.SigningKeyshare
+		parentNode *ent.TreeNode
+		vout       uint32
 	}
 
 	addressString, err := common.P2TRAddressFromPkScript(parentOutput.PkScript, network)
@@ -496,9 +500,12 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	if err != nil {
 		return nil, nil, err
 	}
-	userPublicKey := depositAddress.OwnerSigningPubkey
+	userPublicKey, err := keys.ParsePublicKey(depositAddress.OwnerSigningPubkey)
+	if err != nil {
+		return nil, nil, err
+	}
 	unchainUtxo := req.GetOnChainUtxo()
-	onchain := depositAddress.ConfirmationHeight != 0
+	onChain := depositAddress.ConfirmationHeight != 0
 	if depositAddress.ConfirmationTxid != "" && unchainUtxo != nil {
 		if depositAddress.ConfirmationTxid != hex.EncodeToString(unchainUtxo.Txid) {
 			return nil, nil, errors.New("confirmation txid does not match utxo txid")
@@ -506,12 +513,12 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	}
 
 	queue := []*element{{
-		output:        parentOutput,
-		node:          req.Node,
-		userPublicKey: userPublicKey,
-		keyshare:      keyshare,
-		parentNode:    parentNode,
-		vout:          vout,
+		output:     parentOutput,
+		node:       req.Node,
+		userPubKey: userPublicKey,
+		keyshare:   keyshare,
+		parentNode: parentNode,
+		vout:       vout,
 	}}
 
 	var signingJobs []*helper.SigningJob
@@ -563,7 +570,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 				SetNetwork(schemaNetwork).
 				SetBaseTxid(txid[:]).
 				SetVout(int16(req.GetOnChainUtxo().Vout))
-			if onchain {
+			if onChain {
 				treeMutator.SetStatus(st.TreeStatusAvailable)
 			} else {
 				treeMutator.SetStatus(st.TreeStatusPending)
@@ -580,11 +587,11 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			}
 			parentNodeID = &currentElement.parentNode.ID
 		}
-
-		verifyingKey, err := common.AddPublicKeys(currentElement.keyshare.PublicKey, currentElement.userPublicKey)
+		currentKeysharePubKey, err := keys.ParsePublicKey(currentElement.keyshare.PublicKey)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("failed to parse keyshare public key: %w", err)
 		}
+		verifyingKey := currentKeysharePubKey.Add(currentElement.userPubKey)
 
 		var cpfpRefundTx []byte
 		if currentElement.node.RefundTxSigningJob != nil {
@@ -618,9 +625,9 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			SetTree(savedTree).
 			SetStatus(st.TreeNodeStatusCreating).
 			SetOwnerIdentityPubkey(req.UserIdentityPublicKey).
-			SetOwnerSigningPubkey(currentElement.userPublicKey).
+			SetOwnerSigningPubkey(currentElement.userPubKey.Serialize()).
 			SetValue(uint64(currentElement.output.Value)).
-			SetVerifyingPubkey(verifyingKey).
+			SetVerifyingPubkey(verifyingKey.Serialize()).
 			SetSigningKeyshare(currentElement.keyshare).
 			SetRawTx(currentElement.node.NodeTxSigningJob.RawTx).
 			SetRawRefundTx(cpfpRefundTx).
@@ -664,8 +671,8 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 				return nil, nil, errors.New("directRefundTxSigningJob or DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 			}
 		} else if len(currentElement.node.Children) > 0 {
-			var userPublicKeys [][]byte
-			var statechainPublicKeys [][]byte
+			var userPublicKeys []keys.Public
+			var statechainPublicKeys []keys.Public
 			if len(cpfpTx.TxOut) < len(currentElement.node.Children) {
 				return nil, nil, fmt.Errorf("vout out of bounds for node split cpfp tx, had: %d, needed: %d", len(cpfpTx.TxOut), len(currentElement.node.Children))
 			}
@@ -673,35 +680,39 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 				return nil, nil, fmt.Errorf("vout out of bounds for node split direct tx, had: %d, needed: %d", len(directTx.TxOut), len(currentElement.node.Children))
 			}
 			for i, child := range currentElement.node.Children {
-				userSigningKey, keyshare, err := h.getSigningKeyshareFromOutput(ctx, network, cpfpTx.TxOut[i])
+				userSigningKey, signingKeyshare, err := h.getSigningKeyshareFromOutput(ctx, network, cpfpTx.TxOut[i])
 				if err != nil {
 					return nil, nil, err
 				}
+				signingKeysharePubKey, err := keys.ParsePublicKey(signingKeyshare.PublicKey)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to parse signing keyshare public key: %w", err)
+				}
 				userPublicKeys = append(userPublicKeys, userSigningKey)
-				statechainPublicKeys = append(statechainPublicKeys, keyshare.PublicKey)
+				statechainPublicKeys = append(statechainPublicKeys, signingKeysharePubKey)
 				queue = append(queue, &element{
-					output:        cpfpTx.TxOut[i],
-					node:          child,
-					userPublicKey: userSigningKey,
-					keyshare:      keyshare,
-					parentNode:    node,
-					vout:          uint32(i),
+					output:     cpfpTx.TxOut[i],
+					node:       child,
+					userPubKey: userSigningKey,
+					keyshare:   signingKeyshare,
+					parentNode: node,
+					vout:       uint32(i),
 				})
 			}
 
-			userPublicKeySum, err := common.AddPublicKeysList(userPublicKeys)
+			userPublicKeySum, err := keys.SumPublicKeys(userPublicKeys)
 			if err != nil {
 				return nil, nil, err
 			}
-			if !bytes.Equal(userPublicKeySum, currentElement.userPublicKey) {
+			if !userPublicKeySum.Equals(currentElement.userPubKey) {
 				return nil, nil, errors.New("user public key does not add up")
 			}
 
-			statechainPublicKeySum, err := common.AddPublicKeysList(statechainPublicKeys)
+			statechainPublicKeySum, err := keys.SumPublicKeys(statechainPublicKeys)
 			if err != nil {
 				return nil, nil, err
 			}
-			if !bytes.Equal(statechainPublicKeySum, currentElement.keyshare.PublicKey) {
+			if !statechainPublicKeySum.Equals(currentKeysharePubKey) {
 				return nil, nil, errors.New("statechain public key does not add up")
 			}
 		}
@@ -710,7 +721,12 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	return signingJobs, nodes, nil
 }
 
-func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(req *pb.CreateTreeRequest, signingResults []*helper.SigningResult, nodes []*ent.TreeNode, requireDirectTx bool) (*pb.CreationResponseNode, error) {
+func (h *TreeCreationHandler) createTreeResponseNodesFromSigningResults(
+	req *pb.CreateTreeRequest,
+	signingResults []*helper.SigningResult,
+	nodes []*ent.TreeNode,
+	requireDirectTx bool,
+) (*pb.CreationResponseNode, error) {
 	signingResultIndex := 0
 	nodesIndex := 0
 	root := &pb.CreationResponseNode{}

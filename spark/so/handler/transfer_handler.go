@@ -1837,7 +1837,7 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	return nil
 }
 
-func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeNode, req *pb.ClaimLeafKeyTweak, ownerIdentityPubkey []byte) error {
+func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeNode, req *pb.ClaimLeafKeyTweak, ownerIdentityPubKey keys.Public) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.claimLeafTweakKey")
 	defer span.End()
 
@@ -1888,7 +1888,7 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 	}
 	_, err = leaf.
 		Update().
-		SetOwnerIdentityPubkey(ownerIdentityPubkey).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey.Serialize()).
 		SetOwnerSigningPubkey(signingPubkey).
 		Save(ctx)
 	if err != nil {
@@ -2421,7 +2421,11 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			if err != nil {
 				return fmt.Errorf("unable to unmarshal key tweak for leaf %s: %w", leaf.ID.String(), err)
 			}
-			err = h.claimLeafTweakKey(ctx, treeNode, keyTweakProto, transfer.ReceiverIdentityPubkey)
+			transferReceiverIDPubKey, err := keys.ParsePublicKey(transfer.ReceiverIdentityPubkey)
+			if err != nil {
+				return fmt.Errorf("unable to parse transfer receiver identity pubkey for leaf %s: %w", leaf.ID.String(), err)
+			}
+			err = h.claimLeafTweakKey(ctx, treeNode, keyTweakProto, transferReceiverIDPubKey)
 			if err != nil {
 				return fmt.Errorf("unable to claim leaf tweak key for leaf %s: %w", leaf.ID.String(), err)
 			}

@@ -129,6 +129,14 @@ func FuzzValidateUserSignature(f *testing.F) {
 	f.Add([]byte{}, []byte{}, []byte{}, int32(0), int32(10), []byte{}, uint32(0), uint64(0))
 	f.Add([]byte("invalid"), []byte("invalid"), []byte("invalid"), int32(1), int32(30), []byte("deadbeef"), uint32(999), uint64(999999))
 
+	parsePrivKeyHex := func(privKeyHex string) (keys.Private, error) {
+		decodedPrivKey, err := hex.DecodeString(privKeyHex)
+		if err != nil {
+			return keys.Private{}, err
+		}
+		return keys.ParsePrivateKey(decodedPrivKey)
+	}
+
 	f.Fuzz(func(t *testing.T, privKeyHex, userSigHex, sspSigHex []byte, requestTypeInt, networkInt int32, txidHex []byte, vout uint32, totalAmount uint64) {
 		// Convert inputs to appropriate types
 		var userIdentityPublicKey keys.Public
@@ -138,15 +146,13 @@ func FuzzValidateUserSignature(f *testing.F) {
 
 		// Try to decode private key to get public key (if valid)
 		if len(privKeyHex) > 0 {
-			if decodedPrivKey, err := hex.DecodeString(string(privKeyHex)); err == nil && len(decodedPrivKey) == 32 {
+			if privKey, err := parsePrivKeyHex(string(privKeyHex)); err == nil {
 				// Valid private key - generate public key
-				if privKey, err := keys.ParsePrivateKey(decodedPrivKey); err == nil {
-					userIdentityPublicKey = privKey.Public()
-				}
-			} else {
-				// Use empty public key (will likely be invalid)
-				userIdentityPublicKey = keys.Public{}
+				userIdentityPublicKey = privKey.Public()
 			}
+		} else {
+			// Use empty public key
+			userIdentityPublicKey = keys.Public{}
 		}
 
 		// Try to decode user signature

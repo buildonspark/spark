@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func createTestHandler(_ *testing.T) *TreeCreationHandler {
+func createTestHandler() *TreeCreationHandler {
 	config := &so.Config{
 		BitcoindConfigs: map[string]so.BitcoindConfig{
 			"regtest": {
@@ -31,7 +31,7 @@ func createTestHandler(_ *testing.T) *TreeCreationHandler {
 	return NewTreeCreationHandler(config)
 }
 
-func createTestTx(_ *testing.T) *wire.MsgTx {
+func createTestTx() *wire.MsgTx {
 	tx := wire.NewMsgTx(wire.TxVersion)
 	// Add a proper input
 	tx.AddTxIn(&wire.TxIn{
@@ -44,7 +44,7 @@ func createTestTx(_ *testing.T) *wire.MsgTx {
 	return tx
 }
 
-func createTestUTXO(_ *testing.T, rawTx []byte, vout uint32) *pb.UTXO {
+func createTestUTXO(rawTx []byte, vout uint32) *pb.UTXO {
 	return &pb.UTXO{
 		RawTx:   rawTx,
 		Vout:    vout,
@@ -65,8 +65,8 @@ func TestFindParentOutputFromUtxo(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
-	handler := createTestHandler(t)
-	testTx := createTestTx(t)
+	handler := createTestHandler()
+	testTx := createTestTx()
 
 	var txBuf []byte
 	txBuf, err := common.SerializeTx(testTx)
@@ -81,7 +81,7 @@ func TestFindParentOutputFromUtxo(t *testing.T) {
 	}{
 		{
 			name:        "valid utxo with single output",
-			utxo:        createTestUTXO(t, txBuf, 0),
+			utxo:        createTestUTXO(txBuf, 0),
 			expectError: false,
 		},
 		{
@@ -95,13 +95,13 @@ func TestFindParentOutputFromUtxo(t *testing.T) {
 		},
 		{
 			name:                  "vout out of bounds",
-			utxo:                  createTestUTXO(t, txBuf, 5), // tx only has 1 output (index 0)
+			utxo:                  createTestUTXO(txBuf, 5), // tx only has 1 output (index 0)
 			expectError:           true,
 			expectedErrorContains: "vout out of bounds",
 		},
 		{
 			name:                  "tree already exists",
-			utxo:                  createTestUTXO(t, txBuf, 0),
+			utxo:                  createTestUTXO(txBuf, 0),
 			expectError:           true,
 			expectedErrorContains: "already exists",
 			setupTree:             true,
@@ -149,7 +149,7 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
-	handler := createTestHandler(t)
+	handler := createTestHandler()
 
 	// Setup test data
 	db, err := ent.GetDbFromContext(ctx)
@@ -182,7 +182,7 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	testTx := createTestTx(t)
+	testTx := createTestTx()
 	txBuf, err := common.SerializeTx(testTx)
 	require.NoError(t, err)
 
@@ -291,8 +291,8 @@ func TestFindParentOutputFromPrepareTreeAddressRequest(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
-	handler := createTestHandler(t)
-	testTx := createTestTx(t)
+	handler := createTestHandler()
+	testTx := createTestTx()
 	txBuf, err := common.SerializeTx(testTx)
 	require.NoError(t, err)
 
@@ -317,7 +317,7 @@ func TestFindParentOutputFromPrepareTreeAddressRequest(t *testing.T) {
 			name: "on-chain utxo source",
 			req: &pb.PrepareTreeAddressRequest{
 				Source: &pb.PrepareTreeAddressRequest_OnChainUtxo{
-					OnChainUtxo: createTestUTXO(t, txBuf, 0),
+					OnChainUtxo: createTestUTXO(txBuf, 0),
 				},
 			},
 			expectError: false,
@@ -350,8 +350,8 @@ func TestFindParentOutputFromCreateTreeRequest(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
-	handler := createTestHandler(t)
-	testTx := createTestTx(t)
+	handler := createTestHandler()
+	testTx := createTestTx()
 	txBuf, err := common.SerializeTx(testTx)
 	require.NoError(t, err)
 
@@ -376,7 +376,7 @@ func TestFindParentOutputFromCreateTreeRequest(t *testing.T) {
 			name: "on-chain utxo source",
 			req: &pb.CreateTreeRequest{
 				Source: &pb.CreateTreeRequest_OnChainUtxo{
-					OnChainUtxo: createTestUTXO(t, txBuf, 0),
+					OnChainUtxo: createTestUTXO(txBuf, 0),
 				},
 			},
 			expectError: false,
@@ -405,59 +405,25 @@ func TestFindParentOutputFromCreateTreeRequest(t *testing.T) {
 	}
 }
 
-func TestGetSigningKeyshareFromOutput(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{1})
-
+func TestGetSigningKeyshareFromOutput_Invalid_Errors(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
-	handler := createTestHandler(t)
-
-	// Setup test data
-	db, err := ent.GetDbFromContext(ctx)
-	require.NoError(t, err)
-
-	keysharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	publicSharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	identityPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	signingPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
-
-	// Create a signing keyshare
-	signingKeyshare, err := db.SigningKeyshare.Create().
-		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(keysharePrivkey.Serialize()).
-		SetPublicShares(map[string][]byte{"test": publicSharePrivkey.Public().Serialize()}).
-		SetPublicKey(keysharePrivkey.Public().Serialize()).
-		SetMinSigners(2).
-		SetCoordinatorIndex(0).
-		Save(ctx)
-	require.NoError(t, err)
-
-	// Create a deposit address
-	testAddress := "bcrt1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx"
-	depositAddress, err := db.DepositAddress.Create().
-		SetAddress(testAddress).
-		SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
-		SetOwnerSigningPubkey(signingPrivkey.Public().Serialize()).
-		SetSigningKeyshare(signingKeyshare).
-		SetNetwork(st.NetworkRegtest).
-		Save(ctx)
-	require.NoError(t, err)
+	handler := createTestHandler()
 
 	tests := []struct {
-		name        string
-		output      *wire.TxOut
-		network     common.Network
-		expectError bool
+		name    string
+		output  *wire.TxOut
+		network common.Network
 	}{
 		{
+			// Will fail because P2TRAddressFromPkScript won't work with this script
 			name: "valid output with existing deposit address",
 			output: &wire.TxOut{
 				Value:    100000,
 				PkScript: []byte{0x00, 0x14, 0x75, 0x1e, 0x76, 0xe8, 0x19, 0x91, 0x96, 0xd4, 0x54, 0x94, 0x1c, 0x45, 0xd1, 0xb3, 0xa3, 0x23, 0xf1, 0x43, 0x3b, 0xd6}, // P2WPKH script
 			},
-			network:     common.Regtest,
-			expectError: true, // Will fail because P2TRAddressFromPkScript won't work with this script
+			network: common.Regtest,
 		},
 		{
 			name: "invalid pkScript",
@@ -465,8 +431,7 @@ func TestGetSigningKeyshareFromOutput(t *testing.T) {
 				Value:    100000,
 				PkScript: []byte{0x01, 0x02}, // invalid script
 			},
-			network:     common.Regtest,
-			expectError: true,
+			network: common.Regtest,
 		},
 	}
 
@@ -474,15 +439,9 @@ func TestGetSigningKeyshareFromOutput(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			userPubKey, keyshare, err := handler.getSigningKeyshareFromOutput(ctx, tt.network, tt.output)
 
-			if tt.expectError {
-				require.Error(t, err)
-				assert.Nil(t, userPubKey)
-				assert.Nil(t, keyshare)
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, depositAddress.OwnerSigningPubkey, userPubKey)
-				assert.Equal(t, signingKeyshare.ID, keyshare.ID)
-			}
+			require.Error(t, err)
+			assert.Zero(t, userPubKey)
+			assert.Nil(t, keyshare)
 		})
 	}
 }
@@ -493,7 +452,7 @@ func TestValidateAndCountTreeAddressNodes(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
-	handler := createTestHandler(t)
+	handler := createTestHandler()
 
 	parentPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
 	child1Privkey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -501,21 +460,21 @@ func TestValidateAndCountTreeAddressNodes(t *testing.T) {
 
 	tests := []struct {
 		name                string
-		parentUserPublicKey []byte
+		parentUserPublicKey keys.Public
 		nodes               []*pb.AddressRequestNode
 		expectedCount       int
 		expectError         bool
 	}{
 		{
 			name:                "empty nodes",
-			parentUserPublicKey: parentPrivkey.Public().Serialize(),
+			parentUserPublicKey: parentPrivkey.Public(),
 			nodes:               []*pb.AddressRequestNode{},
 			expectedCount:       0,
 			expectError:         false,
 		},
 		{
 			name:                "single leaf node",
-			parentUserPublicKey: parentPrivkey.Public().Serialize(),
+			parentUserPublicKey: parentPrivkey.Public(),
 			nodes: []*pb.AddressRequestNode{
 				{
 					UserPublicKey: parentPrivkey.Public().Serialize(),
@@ -527,7 +486,7 @@ func TestValidateAndCountTreeAddressNodes(t *testing.T) {
 		},
 		{
 			name:                "nodes with children - key mismatch",
-			parentUserPublicKey: parentPrivkey.Public().Serialize(),
+			parentUserPublicKey: parentPrivkey.Public(),
 			nodes: []*pb.AddressRequestNode{
 				{
 					UserPublicKey: child1Privkey.Public().Serialize(), // This doesn't match parent
@@ -563,9 +522,9 @@ func TestCreatePrepareTreeAddressNodeFromAddressNode(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
-	handler := createTestHandler(t)
+	handler := createTestHandler()
 
-	test_privkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	privKey := keys.MustGeneratePrivateKeyFromRand(rng)
 
 	tests := []struct {
 		name        string
@@ -575,7 +534,7 @@ func TestCreatePrepareTreeAddressNodeFromAddressNode(t *testing.T) {
 		{
 			name: "leaf node",
 			node: &pb.AddressRequestNode{
-				UserPublicKey: test_privkey.Public().Serialize(),
+				UserPublicKey: privKey.Public().Serialize(),
 				Children:      nil,
 			},
 			expectError: false,
@@ -583,10 +542,10 @@ func TestCreatePrepareTreeAddressNodeFromAddressNode(t *testing.T) {
 		{
 			name: "node with children",
 			node: &pb.AddressRequestNode{
-				UserPublicKey: test_privkey.Public().Serialize(),
+				UserPublicKey: privKey.Public().Serialize(),
 				Children: []*pb.AddressRequestNode{
 					{
-						UserPublicKey: test_privkey.Public().Serialize(),
+						UserPublicKey: privKey.Public().Serialize(),
 						Children:      nil,
 					},
 				},
@@ -618,24 +577,24 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
-	handler := createTestHandler(t)
+	handler := createTestHandler()
 
 	// Setup test data
 	db, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	keyshare_privkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	public_share_privkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	identity_privkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	signing_privkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	verifying_privkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	keysharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicSharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	identityPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	verifyingPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
 
 	// Create a signing keyshare
 	signingKeyshare, err := db.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(keyshare_privkey.Serialize()).
-		SetPublicShares(map[string][]byte{"test": public_share_privkey.Public().Serialize()}).
-		SetPublicKey(keyshare_privkey.Public().Serialize()).
+		SetSecretShare(keysharePrivkey.Serialize()).
+		SetPublicShares(map[string][]byte{"test": publicSharePrivkey.Public().Serialize()}).
+		SetPublicKey(keysharePrivkey.Public().Serialize()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
 		Save(ctx)
@@ -643,7 +602,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 
 	// Create a tree
 	tree, err := db.Tree.Create().
-		SetOwnerIdentityPubkey(identity_privkey.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
 		SetNetwork(st.NetworkRegtest).
 		SetBaseTxid(make([]byte, 32)).
 		SetVout(0).
@@ -655,10 +614,10 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	availableNode, err := db.TreeNode.Create().
 		SetTree(tree).
 		SetStatus(st.TreeNodeStatusAvailable).
-		SetOwnerIdentityPubkey(identity_privkey.Public().Serialize()).
-		SetOwnerSigningPubkey(signing_privkey.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
+		SetOwnerSigningPubkey(signingPrivkey.Public().Serialize()).
 		SetValue(100000).
-		SetVerifyingPubkey(verifying_privkey.Public().Serialize()).
+		SetVerifyingPubkey(verifyingPrivkey.Public().Serialize()).
 		SetSigningKeyshare(signingKeyshare).
 		SetRawTx([]byte("test_tx")).
 		SetVout(0).
@@ -669,10 +628,10 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	creatingNode, err := db.TreeNode.Create().
 		SetTree(tree).
 		SetStatus(st.TreeNodeStatusCreating).
-		SetOwnerIdentityPubkey(identity_privkey.Public().Serialize()).
-		SetOwnerSigningPubkey(signing_privkey.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
+		SetOwnerSigningPubkey(signingPrivkey.Public().Serialize()).
 		SetValue(100000).
-		SetVerifyingPubkey(verifying_privkey.Public().Serialize()).
+		SetVerifyingPubkey(verifyingPrivkey.Public().Serialize()).
 		SetSigningKeyshare(signingKeyshare).
 		SetRawTx([]byte("test_tx")).
 		SetVout(1).
@@ -751,13 +710,13 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 
 func TestCreateTestHelpers(t *testing.T) {
 	t.Run("createTestHandler", func(t *testing.T) {
-		handler := createTestHandler(t)
+		handler := createTestHandler()
 		assert.NotNil(t, handler)
 		assert.NotNil(t, handler.config)
 	})
 
 	t.Run("createTestTx", func(t *testing.T) {
-		tx := createTestTx(t)
+		tx := createTestTx()
 		assert.NotNil(t, tx)
 		assert.Len(t, tx.TxOut, 1)
 		assert.Equal(t, int64(100000), tx.TxOut[0].Value)
@@ -766,7 +725,7 @@ func TestCreateTestHelpers(t *testing.T) {
 	t.Run("createTestUTXO", func(t *testing.T) {
 		rawTx := []byte("test_tx")
 		vout := uint32(1)
-		utxo := createTestUTXO(t, rawTx, vout)
+		utxo := createTestUTXO(rawTx, vout)
 
 		assert.NotNil(t, utxo)
 		assert.Equal(t, rawTx, utxo.RawTx)
@@ -779,7 +738,7 @@ func TestEdgeCases(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
-	handler := createTestHandler(t)
+	handler := createTestHandler()
 
 	t.Run("findParentOutputFromUtxo with malformed transaction", func(t *testing.T) {
 		utxo := &pb.UTXO{
@@ -801,7 +760,7 @@ func TestEdgeCases(t *testing.T) {
 			},
 		}
 
-		count, err := handler.validateAndCountTreeAddressNodes(ctx, nil, nodes)
+		count, err := handler.validateAndCountTreeAddressNodes(ctx, keys.Public{}, nodes)
 		require.Error(t, err) // Should fail due to nil parent key
 		assert.Equal(t, 0, count)
 	})
@@ -815,7 +774,7 @@ func TestPrepareSigningJobs_EnsureConfTxidMatchesUtxoId(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
-	handler := createTestHandler(t)
+	handler := createTestHandler()
 
 	db, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -964,9 +923,9 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 			ctx, dbCtx := db.NewTestSQLiteContext(t, ctx)
 			defer dbCtx.Close()
 
-			handler := createTestHandler(t)
+			handler := createTestHandler()
 
-			db, err := ent.GetDbFromContext(ctx)
+			dbTx, err := ent.GetDbFromContext(ctx)
 			require.NoError(t, err)
 
 			keysharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -974,7 +933,7 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 			identityPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
 			signingPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
 
-			signingKeyshare, err := db.SigningKeyshare.Create().
+			signingKeyshare, err := dbTx.SigningKeyshare.Create().
 				SetStatus(st.KeyshareStatusAvailable).
 				SetSecretShare(keysharePrivkey.Serialize()).
 				SetPublicShares(map[string][]byte{"test": publicSharePrivkey.Public().Serialize()}).
@@ -1003,7 +962,7 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 			parentAddress, err := common.P2TRAddressFromPkScript(parentTxOutput.PkScript, common.Regtest)
 			require.NoError(t, err)
 
-			_, err = db.DepositAddress.Create().
+			_, err = dbTx.DepositAddress.Create().
 				SetAddress(*parentAddress).
 				SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
 				SetOwnerSigningPubkey(signingPrivkey.Public().Serialize()).
@@ -1025,9 +984,9 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 				Sequence:         wire.MaxTxInSequenceNum,
 			})
 
-			childrenSigningJobs := []*pb.CreationNode{}
+			var childrenSigningJobs []*pb.CreationNode
 			for _, childValue := range tt.childrenValues {
-				childKeyshare, err := db.SigningKeyshare.Create().
+				childKeyshare, err := dbTx.SigningKeyshare.Create().
 					SetStatus(st.KeyshareStatusAvailable).
 					SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
 					SetPublicShares(map[string][]byte{"test": publicSharePrivkey.Public().Serialize()}).
@@ -1047,7 +1006,7 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 				childAddress, err := common.P2TRAddressFromPkScript(childScript, common.Regtest)
 				require.NoError(t, err)
 
-				_, err = db.DepositAddress.Create().
+				_, err = dbTx.DepositAddress.Create().
 					SetAddress(*childAddress).
 					SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
 					SetOwnerSigningPubkey(childKeyshare.PublicKey).

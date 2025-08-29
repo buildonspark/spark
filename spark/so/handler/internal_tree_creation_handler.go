@@ -26,7 +26,7 @@ func NewInternalTreeCreationHandler(config *so.Config) *InternalTreeCreationHand
 }
 
 func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx context.Context, req *pbinternal.PrepareTreeAddressRequest) (map[string]*ent.SigningKeyshare, error) {
-	keyshareIDs := make([]uuid.UUID, 0)
+	var keyshareIDs []uuid.UUID
 
 	parentKeyshardID, err := uuid.Parse(req.TargetKeyshareId)
 	if err != nil {
@@ -35,7 +35,7 @@ func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx con
 
 	keyshareIDs = append(keyshareIDs, parentKeyshardID)
 
-	nodeQueue := make([]*pbinternal.PrepareTreeAddressNode, 0)
+	var nodeQueue []*pbinternal.PrepareTreeAddressNode
 	nodeQueue = append(nodeQueue, req.Node)
 
 	for len(nodeQueue) > 0 {
@@ -76,15 +76,18 @@ func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx con
 	return result, nil
 }
 
-func (h *InternalTreeCreationHandler) generateAndStoreDepositAddress(ctx context.Context, network common.Network, seKeyshare *ent.SigningKeyshare, userPubkey, identityPubkey []byte, save bool) (string, []byte, error) {
-	combinedPublicKeyBytes, err := common.AddPublicKeys(seKeyshare.PublicKey, userPubkey)
+func (h *InternalTreeCreationHandler) generateAndStoreDepositAddress(
+	ctx context.Context,
+	network common.Network,
+	seKeyshare *ent.SigningKeyshare,
+	userPubkey, identityPubKey keys.Public,
+	save bool,
+) (string, []byte, error) {
+	keysharePubKey, err := keys.ParsePublicKey(seKeyshare.PublicKey)
 	if err != nil {
 		return "", nil, err
 	}
-	combinedPublicKey, err := keys.ParsePublicKey(combinedPublicKeyBytes)
-	if err != nil {
-		return "", nil, err
-	}
+	combinedPublicKey := keysharePubKey.Add(userPubkey)
 	address, err := common.P2TRAddressFromPublicKey(combinedPublicKey, network)
 	if err != nil {
 		return "", nil, err
@@ -100,8 +103,8 @@ func (h *InternalTreeCreationHandler) generateAndStoreDepositAddress(ctx context
 		}
 		_, err = db.DepositAddress.Create().
 			SetSigningKeyshareID(seKeyshare.ID).
-			SetOwnerIdentityPubkey(identityPubkey).
-			SetOwnerSigningPubkey(userPubkey).
+			SetOwnerIdentityPubkey(identityPubKey.Serialize()).
+			SetOwnerSigningPubkey(userPubkey.Serialize()).
 			SetAddress(address).
 			SetNetwork(schemaNetwork).
 			Save(ctx)
@@ -121,11 +124,15 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 		nodes          []*pbinternal.PrepareTreeAddressNode
 	}
 
-	queue := make([]element, 0)
-	queue = append(queue, element{
+	queue := []element{{
 		targetKeyshare: existingSigningKeyshares[req.TargetKeyshareId],
 		nodes:          []*pbinternal.PrepareTreeAddressNode{req.Node},
-	})
+	}}
+
+	userIdentityPubKey, err := keys.ParsePublicKey(req.UserIdentityPublicKey)
+	if err != nil {
+		return nil, err
+	}
 
 	depositAddressSignatures := make(map[string][]byte)
 	for len(queue) > 0 {
@@ -136,7 +143,7 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 			continue
 		}
 
-		selectedSigningKeyshares := make([]*ent.SigningKeyshare, 0)
+		var selectedSigningKeyshares []*ent.SigningKeyshare
 		for _, node := range currentElement.nodes[:len(currentElement.nodes)-1] {
 			selectedSigningKeyshare, ok := existingSigningKeyshares[node.SigningKeyshareId]
 			if !ok {
@@ -151,7 +158,11 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 			if !h.config.IsNetworkSupported(network) {
 				return nil, fmt.Errorf("network not supported")
 			}
-			address, signature, err := h.generateAndStoreDepositAddress(ctx, network, selectedSigningKeyshare, node.UserPublicKey, req.UserIdentityPublicKey, true)
+			userPubKey, err := keys.ParsePublicKey(node.UserPublicKey)
+			if err != nil {
+				return nil, err
+			}
+			address, signature, err := h.generateAndStoreDepositAddress(ctx, network, selectedSigningKeyshare, userPubKey, userIdentityPubKey, true)
 			if err != nil {
 				return nil, err
 			}
@@ -179,7 +190,12 @@ func (h *InternalTreeCreationHandler) prepareDepositAddress(ctx context.Context,
 		if !h.config.IsNetworkSupported(network) {
 			return nil, fmt.Errorf("network not supported")
 		}
-		address, signature, err := h.generateAndStoreDepositAddress(ctx, network, lastKeyShare, lastNode.UserPublicKey, req.UserIdentityPublicKey, len(currentElement.nodes) > 1)
+		lastNodeUserPubKey, err := keys.ParsePublicKey(lastNode.UserPublicKey)
+		if err != nil {
+			return nil, err
+		}
+
+		address, signature, err := h.generateAndStoreDepositAddress(ctx, network, lastKeyShare, lastNodeUserPubKey, userIdentityPubKey, len(currentElement.nodes) > 1)
 		if err != nil {
 			return nil, err
 		}
@@ -205,7 +221,5 @@ func (h *InternalTreeCreationHandler) PrepareTreeAddress(ctx context.Context, re
 		return nil, err
 	}
 
-	return &pbinternal.PrepareTreeAddressResponse{
-		Signatures: depositAddressSignatures,
-	}, nil
+	return &pbinternal.PrepareTreeAddressResponse{Signatures: depositAddressSignatures}, nil
 }

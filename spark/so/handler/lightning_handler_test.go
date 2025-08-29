@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -393,60 +394,56 @@ func TestGetSigningCommitments(t *testing.T) {
 	}
 }
 
-func TestValidatePreimage(t *testing.T) {
+func TestValidatePreimage_InvalidPreimage_Errors(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	lightningHandler := NewLightningHandler(config)
 
+	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	tests := []struct {
-		name              string
-		paymentHash       []byte
-		preimage          []byte
-		identityPublicKey []byte
-		expectError       bool
-		expectedErrMsgs   []string // Multiple possible error messages
+		name           string
+		paymentHash    []byte
+		preimage       []byte
+		identityPubKey keys.Public
+		expectedErrMsg string
 	}{
 		{
-			name:              "invalid preimage - hash mismatch",
-			paymentHash:       make([]byte, 32),
-			preimage:          make([]byte, 32),
-			identityPublicKey: make([]byte, 33),
-			expectError:       true,
-			expectedErrMsgs:   []string{"invalid preimage"},
+			name:           "invalid preimage - hash mismatch",
+			paymentHash:    bytes.Repeat([]byte{0}, 32),
+			preimage:       []byte("wrong_preimage_that_doesnt_match_hash"),
+			identityPubKey: identityKey,
+			expectedErrMsg: "invalid preimage",
 		},
 		{
-			name:              "non-existent preimage request",
-			paymentHash:       make([]byte, 32),
-			preimage:          make([]byte, 32),
-			identityPublicKey: make([]byte, 33),
-			expectError:       true,
-			expectedErrMsgs:   []string{"invalid preimage"},
+			name:           "non-existent preimage request",
+			paymentHash:    []byte("some_hash_that_matches_preimage_"),
+			preimage:       []byte("test_preimage_32_bytes_long_____"),
+			identityPubKey: identityKey,
+			expectedErrMsg: "invalid preimage",
 		},
 		{
-			name:              "empty payment hash",
-			paymentHash:       []byte{},
-			preimage:          []byte("test_preimage"),
-			identityPublicKey: []byte("identity_key"),
-			expectError:       true,
-			expectedErrMsgs:   []string{"payment hash cannot be empty"},
+			name:           "empty payment hash",
+			paymentHash:    []byte{},
+			preimage:       []byte("test_preimage"),
+			identityPubKey: identityKey,
+			expectedErrMsg: "payment hash cannot be empty",
 		},
 		{
-			name:              "empty preimage",
-			paymentHash:       []byte("payment_hash_32_bytes_long______"),
-			preimage:          []byte{},
-			identityPublicKey: []byte("identity_key"),
-			expectError:       true,
-			expectedErrMsgs:   []string{"preimage cannot be empty"},
+			name:           "empty preimage",
+			paymentHash:    []byte("payment_hash_32_bytes_long______"),
+			preimage:       []byte{},
+			identityPubKey: identityKey,
+			expectedErrMsg: "preimage cannot be empty",
 		},
 		{
-			name:              "nil identity public key",
-			paymentHash:       []byte("payment_hash_32_bytes_long______"),
-			preimage:          []byte("test_preimage_32_bytes_long_____"),
-			identityPublicKey: nil,
-			expectError:       true,
-			expectedErrMsgs:   []string{"identity public key cannot be empty"},
+			name:           "nil identity public key",
+			paymentHash:    []byte("payment_hash_32_bytes_long______"),
+			preimage:       []byte("test_preimage_32_bytes_long_____"),
+			identityPubKey: keys.Public{},
+			expectedErrMsg: "identity public key cannot be empty",
 		},
 	}
 
@@ -455,29 +452,13 @@ func TestValidatePreimage(t *testing.T) {
 			req := &pb.ProvidePreimageRequest{
 				PaymentHash:       tt.paymentHash,
 				Preimage:          tt.preimage,
-				IdentityPublicKey: tt.identityPublicKey,
+				IdentityPublicKey: tt.identityPubKey.Serialize(),
 			}
 
 			transfer, err := lightningHandler.ValidatePreimage(ctx, req)
 
-			if tt.expectError {
-				require.Error(t, err)
-				assert.Nil(t, transfer)
-
-				// Check if error message contains one of the expected messages
-				errorMatches := false
-				for _, expectedMsg := range tt.expectedErrMsgs {
-					if assert.ObjectsAreEqual(expectedMsg, err.Error()) {
-						errorMatches = true
-						break
-					}
-				}
-				assert.True(t, errorMatches,
-					"Expected one of %v, got: %v", tt.expectedErrMsgs, err.Error())
-			} else {
-				require.NoError(t, err)
-				assert.NotNil(t, transfer)
-			}
+			require.ErrorContains(t, err, tt.expectedErrMsg)
+			assert.Nil(t, transfer)
 		})
 	}
 }
@@ -486,13 +467,16 @@ func TestReturnLightningPayment(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
+	rng := rand.NewChaCha8([32]byte{})
+	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	lightningHandler := NewLightningHandler(config)
 
 	t.Run("non-existent payment hash", func(t *testing.T) {
 		req := &pb.ReturnLightningPaymentRequest{
 			PaymentHash:           []byte("non_existent_payment_hash_______"),
-			UserIdentityPublicKey: []byte("user_identity_key"),
+			UserIdentityPublicKey: userIdentityPubKey.Serialize(),
 		}
 
 		resp, err := lightningHandler.ReturnLightningPayment(ctx, req, true) // internal=true to skip auth
@@ -515,32 +499,32 @@ func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 	}
 	lightningHandler := NewLightningHandler(config)
 
-	validPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()
+	validPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	tests := []struct {
 		name                       string
 		cpfpTransactions           []*pb.UserSignedTxSigningJob
 		directTransactions         []*pb.UserSignedTxSigningJob
 		directFromCpfpTransactions []*pb.UserSignedTxSigningJob
-		destinationPubkey          []byte
+		destinationPubKey          keys.Public
 		expectedErrMsg             string
 	}{
 		{
 			name:              "nil cpfp transactions",
 			cpfpTransactions:  nil,
-			destinationPubkey: validPubKey,
+			destinationPubKey: validPubKey,
 			expectedErrMsg:    "at least one transaction type must be provided",
 		},
 		{
 			name:              "empty cpfp transactions",
 			cpfpTransactions:  []*pb.UserSignedTxSigningJob{},
-			destinationPubkey: validPubKey,
+			destinationPubKey: validPubKey,
 			expectedErrMsg:    "at least one transaction type must be provided",
 		},
 		{
 			name:              "nil transaction in cpfp array",
 			cpfpTransactions:  []*pb.UserSignedTxSigningJob{nil},
-			destinationPubkey: validPubKey,
+			destinationPubKey: validPubKey,
 			expectedErrMsg:    "cpfp transaction is nil",
 		},
 		{
@@ -551,7 +535,7 @@ func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 					SigningCommitments: nil,
 				},
 			},
-			destinationPubkey: validPubKey,
+			destinationPubKey: validPubKey,
 			expectedErrMsg:    "signing commitments is nil for cpfpTransaction, leaf_id: 550e8400-e29b-41d4-a716-446655440000",
 		},
 		{
@@ -563,7 +547,7 @@ func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 					SigningNonceCommitment: nil,
 				},
 			},
-			destinationPubkey: validPubKey,
+			destinationPubKey: validPubKey,
 			expectedErrMsg:    "signing nonce commitment is nil for cpfpTransaction, leaf_id: 550e8400-e29b-41d4-a716-446655440000",
 		},
 		{
@@ -575,7 +559,7 @@ func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 					SigningNonceCommitment: &pbcommon.SigningCommitment{},
 				},
 			},
-			destinationPubkey: validPubKey,
+			destinationPubKey: validPubKey,
 			expectedErrMsg:    "unable to parse node id",
 		},
 		{
@@ -590,7 +574,7 @@ func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 					RawTx:                  []byte("dummy_transaction_data_for_testing"),
 				},
 			},
-			destinationPubkey: validPubKey,
+			destinationPubKey: validPubKey,
 			expectedErrMsg:    "unable to get cpfpTransaction tree_node with id: 550e8400-e29b-41d4-a716-446655440000", // Will fail at node lookup
 		},
 	}
@@ -604,7 +588,7 @@ func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 				tt.directTransactions,
 				tt.directFromCpfpTransactions,
 				&pb.InvoiceAmount{ValueSats: 1000},
-				tt.destinationPubkey,
+				tt.destinationPubKey,
 				0,
 				pb.InitiatePreimageSwapRequest_REASON_SEND,
 				false,
@@ -615,93 +599,89 @@ func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 	}
 }
 
-func TestInitiatePreimageSwapEdgeCases(t *testing.T) {
+func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	lightningHandler := NewLightningHandler(config)
 
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
 	tests := []struct {
 		name           string
-		setupRequest   func() *pb.InitiatePreimageSwapRequest
-		expectError    bool
+		setUpRequest   func() *pb.InitiatePreimageSwapRequest
 		expectedErrMsg string
 	}{
 		{
 			name: "nil transfer",
-			setupRequest: func() *pb.InitiatePreimageSwapRequest {
-				return &pb.InitiatePreimageSwapRequest{
-					Transfer: nil, // nil transfer
-				}
+			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
+				return &pb.InitiatePreimageSwapRequest{Transfer: nil}
 			},
-			expectError:    true,
 			expectedErrMsg: "transfer is required",
 		},
 		{
 			name: "empty leaves to send",
-			setupRequest: func() *pb.InitiatePreimageSwapRequest {
+			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
 				return &pb.InitiatePreimageSwapRequest{
 					Transfer: &pb.StartUserSignedTransferRequest{
 						LeavesToSend: []*pb.UserSignedTxSigningJob{}, // empty
 					},
 				}
 			},
-			expectError:    true,
 			expectedErrMsg: "at least one cpfp leaf tx must be provided",
 		},
 		{
 			name: "nil owner identity public key",
-			setupRequest: func() *pb.InitiatePreimageSwapRequest {
+			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
 				return &pb.InitiatePreimageSwapRequest{
 					Transfer: &pb.StartUserSignedTransferRequest{
 						LeavesToSend: []*pb.UserSignedTxSigningJob{
 							{LeafId: "test-leaf"},
 						},
-						OwnerIdentityPublicKey: nil, // nil owner identity key
+						OwnerIdentityPublicKey: nil,
 					},
 				}
 			},
-			expectError:    true,
 			expectedErrMsg: "owner identity public key is required",
 		},
 		{
 			name: "nil receiver identity public key",
-			setupRequest: func() *pb.InitiatePreimageSwapRequest {
+			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
 				return &pb.InitiatePreimageSwapRequest{
 					Transfer: &pb.StartUserSignedTransferRequest{
 						LeavesToSend: []*pb.UserSignedTxSigningJob{
 							{LeafId: "test-leaf"},
 						},
-						OwnerIdentityPublicKey:    []byte("owner_key"),
-						ReceiverIdentityPublicKey: nil, // nil receiver identity key
+						OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+						ReceiverIdentityPublicKey: nil,
 					},
 				}
 			},
-			expectError:    true,
 			expectedErrMsg: "receiver identity public key is required",
 		},
 		{
 			name: "fee not allowed for receive",
-			setupRequest: func() *pb.InitiatePreimageSwapRequest {
+			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
 				return &pb.InitiatePreimageSwapRequest{
 					Transfer: &pb.StartUserSignedTransferRequest{
 						LeavesToSend: []*pb.UserSignedTxSigningJob{
 							{LeafId: "test-leaf"},
 						},
-						OwnerIdentityPublicKey:    []byte("owner_key"),
-						ReceiverIdentityPublicKey: []byte("receiver_key"),
+						OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+						ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
 					},
 					Reason:  pb.InitiatePreimageSwapRequest_REASON_RECEIVE,
 					FeeSats: 100, // fee not allowed for receive
 				}
 			},
-			expectError:    true,
 			expectedErrMsg: "fee is not allowed for receive preimage swap",
 		},
 		{
 			name: "too many transactions exceeds knob limit",
-			setupRequest: func() *pb.InitiatePreimageSwapRequest {
+			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
 				// Create 101 transactions to exceed the default limit of 100
 				leaves := make([]*pb.UserSignedTxSigningJob, 101)
 				for i := 0; i < 101; i++ {
@@ -716,44 +696,37 @@ func TestInitiatePreimageSwapEdgeCases(t *testing.T) {
 					PaymentHash: []byte("payment_hash_32_bytes_long______"),
 					Transfer: &pb.StartUserSignedTransferRequest{
 						LeavesToSend:              leaves,
-						OwnerIdentityPublicKey:    []byte("owner_key"),
-						ReceiverIdentityPublicKey: []byte("receiver_key"),
+						OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+						ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
 					},
 					Reason: pb.InitiatePreimageSwapRequest_REASON_SEND,
 				}
 			},
-			expectError:    true,
 			expectedErrMsg: "too many transactions: 101, maximum allowed: 100",
 		},
 		{
 			name: "nil leaves to send",
-			setupRequest: func() *pb.InitiatePreimageSwapRequest {
+			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
 				return &pb.InitiatePreimageSwapRequest{
 					Transfer: &pb.StartUserSignedTransferRequest{
 						LeavesToSend:              nil, // nil instead of empty
-						OwnerIdentityPublicKey:    []byte("owner_key"),
-						ReceiverIdentityPublicKey: []byte("receiver_key"),
+						OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+						ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
 					},
 				}
 			},
-			expectError:    true,
 			expectedErrMsg: "at least one cpfp leaf tx must be provided",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := tt.setupRequest()
+			req := tt.setUpRequest()
 
 			resp, err := lightningHandler.InitiatePreimageSwap(ctx, req)
 
-			if tt.expectError {
-				require.ErrorContains(t, err, tt.expectedErrMsg)
-				assert.Nil(t, resp)
-			} else {
-				require.NoError(t, err)
-				assert.NotNil(t, resp)
-			}
+			require.ErrorContains(t, err, tt.expectedErrMsg)
+			assert.Nil(t, resp)
 		})
 	}
 }
@@ -844,9 +817,10 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 
 		wrongKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		// Create a keyshare with proper 33-byte public keys
+		secretShare := keys.MustGeneratePrivateKeyFromRand(rng).Serialize()
 		keyshare, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusInUse).
-			SetSecretShare([]byte("test_secret_share_32_bytes_long_")).
+			SetSecretShare(secretShare).
 			SetPublicShares(map[string][]byte{"operator1": wrongKey.Serialize()}).
 			SetPublicKey(sessionIdentityKey.Public().Serialize()).
 			SetMinSigners(2).
@@ -904,7 +878,7 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 			[]*pb.UserSignedTxSigningJob{},
 			[]*pb.UserSignedTxSigningJob{},
 			&pb.InvoiceAmount{ValueSats: 1000},
-			wrongKey.Serialize(),
+			wrongKey,
 			0,
 			pb.InitiatePreimageSwapRequest_REASON_SEND,
 			true, // validateNodeOwnership = true
@@ -924,14 +898,14 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	lightningHandler := NewLightningHandler(config)
 
-	validPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()
+	validPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	paymentHash := []byte("test_payment_hash_32_bytes_long_")
 
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
 	tree, err := tx.Tree.Create().
-		SetOwnerIdentityPubkey(validPubKey).
+		SetOwnerIdentityPubkey(validPubKey.Serialize()).
 		SetStatus(st.TreeStatusAvailable).
 		SetNetwork(st.NetworkMainnet).
 		SetBaseTxid([]byte("test_base_txid_32_bytes_long_")).
@@ -942,8 +916,8 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	keyshare, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusInUse).
 		SetSecretShare([]byte("test_secret_share_32_bytes_long_")).
-		SetPublicShares(map[string][]byte{"operator1": validPubKey}).
-		SetPublicKey(validPubKey).
+		SetPublicShares(map[string][]byte{"operator1": validPubKey.Serialize()}).
+		SetPublicKey(validPubKey.Serialize()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(1).
 		Save(ctx)
@@ -972,9 +946,7 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	}
 	mockTx = append(mockTx, valueBytes...)
 	// Add the correct P2TR script for the destination pubkey
-	parsedPubKey, err := keys.ParsePublicKey(validPubKey)
-	require.NoError(t, err)
-	correctScript, err := common.P2TRScriptFromPubKey(parsedPubKey)
+	correctScript, err := common.P2TRScriptFromPubKey(validPubKey)
 	require.NoError(t, err)
 	mockScript := []byte{byte(len(correctScript))}    // script length
 	mockScript = append(mockScript, correctScript...) // the correct P2TR script
@@ -987,9 +959,9 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 		SetID(nodeID).
 		SetValue(500). // This is the value in the tree node, but RawTx will also have 500 sats
 		SetStatus(st.TreeNodeStatusAvailable).
-		SetVerifyingPubkey(validPubKey).
-		SetOwnerIdentityPubkey(validPubKey).
-		SetOwnerSigningPubkey(validPubKey).
+		SetVerifyingPubkey(validPubKey.Serialize()).
+		SetOwnerIdentityPubkey(validPubKey.Serialize()).
+		SetOwnerSigningPubkey(validPubKey.Serialize()).
 		SetRawTx(mockTx).
 		SetDirectTx(mockTx). // Set direct_tx field which is required for direct transaction validation
 		SetVout(0).

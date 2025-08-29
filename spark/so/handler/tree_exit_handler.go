@@ -44,7 +44,7 @@ func (h *TreeExitHandler) ExitSingleNodeTrees(ctx context.Context, req *pb.ExitS
 	var trees []*ent.Tree
 	var network *st.Network
 	for _, exitingTree := range req.ExitingTrees {
-		tree, err := h.validateSingleNodeTree(ctx, exitingTree.TreeId, req.OwnerIdentityPublicKey)
+		tree, err := h.validateSingleNodeTree(ctx, exitingTree.TreeId, reqOwnerIDPubKey)
 		if err != nil {
 			return nil, err
 		}
@@ -208,7 +208,7 @@ func (h *TreeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 	return pbSigningResults, nil
 }
 
-func (h *TreeExitHandler) validateSingleNodeTree(ctx context.Context, treeID string, ownerIdentityPublicKey []byte) (*ent.Tree, error) {
+func (h *TreeExitHandler) validateSingleNodeTree(ctx context.Context, treeID string, ownerIdentityPubKey keys.Public) (*ent.Tree, error) {
 	treeUUID, err := uuid.Parse(treeID)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse tree_id %s: %w", treeID, err)
@@ -246,7 +246,7 @@ func (h *TreeExitHandler) validateSingleNodeTree(ctx context.Context, treeID str
 	if len(leaves) != 1 {
 		return nil, fmt.Errorf("tree %s is not a single node tree", treeID)
 	}
-	if !bytes.Equal(leaves[0].OwnerIdentityPubkey, ownerIdentityPublicKey) {
+	if !bytes.Equal(leaves[0].OwnerIdentityPubkey, ownerIdentityPubKey.Serialize()) {
 		return nil, fmt.Errorf("not the owner of the tree %s", treeID)
 	}
 	if leaves[0].Status != st.TreeNodeStatusAvailable && leaves[0].Status != st.TreeNodeStatusExited {
