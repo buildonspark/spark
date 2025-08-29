@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	entsql "entgo.io/ent/dialect/sql"
@@ -54,13 +55,16 @@ type TransferHandler struct {
 	BaseTransferHandler
 	config     *so.Config
 	mockAction *common.MockAction
+	// Map to track active `claim_transfer_sign_refund` requests to prevent BitBit from overwhelming
+	// us.
+	activeClaimTransferSignRefunds sync.Map
 }
 
 var transferTypeKey = attribute.Key("transfer_type")
 
 // NewTransferHandler creates a new TransferHandler.
 func NewTransferHandler(config *so.Config) *TransferHandler {
-	return &TransferHandler{BaseTransferHandler: NewBaseTransferHandler(config), config: config}
+	return &TransferHandler{BaseTransferHandler: NewBaseTransferHandler(config), config: config, activeClaimTransferSignRefunds: sync.Map{}}
 }
 
 func (h *TransferHandler) SetMockAction(mockAction *common.MockAction) {
@@ -2057,6 +2061,13 @@ func (h *TransferHandler) ClaimTransferSignRefundsV2(ctx context.Context, req *p
 
 // ClaimTransferSignRefunds signs new refund transactions as part of the transfer.
 func (h *TransferHandler) ClaimTransferSignRefunds(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
+	transferID := req.TransferId
+
+	if _, loaded := h.activeClaimTransferSignRefunds.LoadOrStore(transferID, struct{}{}); loaded {
+		return nil, status.Errorf(codes.ResourceExhausted, "transfer %s is being processed by another request, please try again later", transferID)
+	}
+	defer h.activeClaimTransferSignRefunds.Delete(transferID)
+
 	return h.claimTransferSignRefunds(ctx, req, false)
 }
 
