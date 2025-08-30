@@ -8,12 +8,11 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/sethvargo/go-limiter"
 	"github.com/sethvargo/go-limiter/memorystore"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // sanitizeKey removes control characters and limits key length
@@ -164,10 +163,10 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 		key := sanitizeKey(fmt.Sprintf("rl:%s:%s", info.FullMethod, ip))
 		_, _, _, ok, err := r.store.Take(ctx, key)
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "rate limit error: %v", err)
+			return nil, fmt.Errorf("rate limit error: %w", err)
 		}
 		if !ok {
-			return nil, status.Errorf(codes.ResourceExhausted, "rate limit exceeded")
+			return nil, errors.RateLimitExceededError()
 		}
 
 		return handler(ctx, req)

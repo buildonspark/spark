@@ -81,6 +81,10 @@ func ConcurrencyLimitExceededError() error {
 	return newGRPCError(codes.ResourceExhausted, fmt.Errorf("concurrency limit exceeded"))
 }
 
+func RateLimitExceededError() error {
+	return newGRPCError(codes.ResourceExhausted, fmt.Errorf("rate limit exceeded"))
+}
+
 func InvalidUserInputErrorf(format string, args ...any) error {
 	return newGRPCError(codes.InvalidArgument, fmt.Errorf(format, args...))
 }
