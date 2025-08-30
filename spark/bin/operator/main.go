@@ -469,6 +469,15 @@ func main() {
 		Timeout: grpcKeepaliveTimeout,
 	}))
 
+	var concurrencyGuard sparkgrpc.ResourceLimiter
+	if config.GRPC.ServerConcurrencyLimitEnabled {
+		slog.Info("Concurrency limit enabled", "limit", config.GRPC.ServerConcurrencyLimit)
+		concurrencyGuard = sparkgrpc.NewConcurrencyGuard(knobsService, config.GRPC.ServerConcurrencyLimit)
+	} else {
+		slog.Info("Concurrency limit disabled")
+		concurrencyGuard = &sparkgrpc.NoopResourceLimiter{}
+	}
+
 	// Add Interceptors aka gRPC middleware
 	//
 	// Interceptors wrap RPC handlers so we can apply cross‑cutting concerns in one place
@@ -486,6 +495,7 @@ func main() {
 					return handler(ctx, req)
 				}
 			}(),
+			sparkgrpc.ConcurrencyInterceptor(concurrencyGuard),
 			sparkgrpc.TimeoutInterceptor(knobsService, config.GRPC.ServerUnaryHandlerTimeout),
 			sparkgrpc.SparkTokenMetricsInterceptor(),
 			sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
