@@ -76,6 +76,11 @@ func toGRPCError(err error) error {
 	return newGRPCError(codes.Internal, err)
 }
 
+// Error for when a concurrency limit is exceeded (e.g. too many concurrent requests)
+func ConcurrencyLimitExceededError() error {
+	return newGRPCError(codes.ResourceExhausted, fmt.Errorf("concurrency limit exceeded"))
+}
+
 func InvalidUserInputErrorf(format string, args ...any) error {
 	return newGRPCError(codes.InvalidArgument, fmt.Errorf(format, args...))
 }

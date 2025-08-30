@@ -7,6 +7,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/keys"
 
+	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/protoconverter"
 
 	"github.com/lightsparkdev/spark/so/handler/tokens"
@@ -17,8 +18,6 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/handler"
 	events "github.com/lightsparkdev/spark/so/stream"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -194,7 +193,7 @@ func (s *SparkServer) ClaimTransferSignRefunds(ctx context.Context, req *pb.Clai
 	// Concurrency limiting for requests from BitBit which spam us with the same transfer ID.
 	transferID := req.TransferId
 	if _, loaded := s.activeClaimTransferSignRefunds.LoadOrStore(transferID, struct{}{}); loaded {
-		return nil, status.Errorf(codes.ResourceExhausted, "transfer %s is being processed by another request, please try again later", transferID)
+		return nil, errors.ConcurrencyLimitExceededError()
 	}
 	defer s.activeClaimTransferSignRefunds.Delete(transferID)
 
