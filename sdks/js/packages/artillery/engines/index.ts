@@ -20,6 +20,7 @@ export class SparkEngine {
   private readonly stepActions = {
     initializePools: (params?: any) => this.walletActions.initializePools(params),
     cleanupPools: () => this.walletActions.cleanupPools(),
+    distributeAndRebalance: (params?: any) => this.walletActions.distributeAndRebalance(params),
 
     getBalance: (params?: any) => this.walletActions.getBalance(params),
     claimTransfer: (params?: any) => this.transferActions.claimTransfer(params),

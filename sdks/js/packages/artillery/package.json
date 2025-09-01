@@ -28,8 +28,10 @@
   "dependencies": {
     "@buildonspark/issuer-sdk": "0.0.91",
     "@buildonspark/spark-sdk": "0.2.12",
+    "@noble/curves": "^1.8.0",
     "@noble/hashes": "^1.7.0",
     "@scure/bip39": "^1.5.4",
+    "@scure/btc-signer": "^1.5.0",
     "better-sqlite3": "^9.0.0"
   },
   "devDependencies": {

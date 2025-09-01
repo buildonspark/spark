@@ -10365,8 +10365,10 @@ __metadata:
   dependencies:
     "@buildonspark/issuer-sdk": "npm:0.0.91"
     "@buildonspark/spark-sdk": "npm:0.2.12"
+    "@noble/curves": "npm:^1.8.0"
     "@noble/hashes": "npm:^1.7.0"
     "@scure/bip39": "npm:^1.5.4"
+    "@scure/btc-signer": "npm:^1.5.0"
     "@types/better-sqlite3": "npm:^7.6.0"
     "@types/node": "npm:^22.13.2"
     "@typescript-eslint/eslint-plugin": "npm:^8.0.0"

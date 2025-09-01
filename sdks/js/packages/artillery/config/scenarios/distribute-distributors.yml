@@ -1,0 +1,30 @@
+config:
+  target: "http://localhost"
+  engines:
+    spark: {}
+  phases:
+    - duration: 10
+      arrivalRate: 10
+      maxVusers: 10
+
+scenarios:
+  - name: "Distribute to Distributors Pool"
+    weight: 1
+    engine: spark
+    before:
+      # Initialize distributor pool
+      - initializePools:
+          pools:
+            - name: "distributor-pool"
+              amount: 200
+              randomSelection: true
+              batchSize: 50
+              mnemonicsFile: "./mnemonics/batch-source-wallets.txt"
+              lockWallets: true
+
+    flow:
+      - distributeAndRebalance:
+          pools: ["distributor-pool"]
+          minAmount: 3500
+    after:
+      - cleanupPools: {}

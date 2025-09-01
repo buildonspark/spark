@@ -2149,4 +2149,396 @@ export class WalletActions {
       }
     };
   }
+
+  distributeAndRebalance(params?: { pools?: string[]; minAmount?: number }): EngineStep {
+    const ee = this.ee;
+
+    return async function (context: SparkContext, callback) {
+      try {
+        console.log("DistributeAndRebalance: Starting wallet rebalancing...");
+
+        const minAmount = params?.minAmount || 10; // Default minimum 10 sats per wallet
+        const poolNames = params?.pools || Array.from(walletPools.keys());
+
+        // Phase 1: Analyze current balances
+        const walletBalances: Map<
+          string,
+          { wallet: IssuerSparkWallet; balance: bigint; pool: string; address: string }
+        > = new Map();
+        const needsFunding: Array<{ wallet: IssuerSparkWallet; deficit: bigint; pool: string; address: string }> = [];
+        const hasSurplus: Array<{ wallet: IssuerSparkWallet; surplus: bigint; pool: string; address: string }> = [];
+
+        let totalDeficit = 0n;
+        let totalSurplus = 0n;
+
+        console.log(`  Analyzing wallet balances (minimum required: ${minAmount} sats)...`);
+
+        // Check all wallets in specified pools
+        for (const poolName of poolNames) {
+          const pool = walletPools.get(poolName);
+          if (!pool) {
+            console.warn(`  Pool "${poolName}" not found, skipping...`);
+            continue;
+          }
+
+          console.log(`  Checking pool "${poolName}" with ${pool.wallets.length} wallets...`);
+
+          for (const wallet of pool.wallets) {
+            try {
+              const address = await wallet.getSparkAddress();
+              const balanceResult = await safeGetBalance(wallet);
+              const balance = BigInt(balanceResult.balance);
+
+              walletBalances.set(address, { wallet, balance, pool: poolName, address });
+
+              if (balance < BigInt(minAmount)) {
+                const deficit = BigInt(minAmount) - balance;
+                needsFunding.push({ wallet, deficit, pool: poolName, address });
+                totalDeficit += deficit;
+                console.log(`    Wallet ${address.substring(0, 10)}... needs ${deficit} sats (current: ${balance})`);
+              } else if (balance > BigInt(minAmount)) {
+                const surplus = balance - BigInt(minAmount);
+                hasSurplus.push({ wallet, surplus, pool: poolName, address });
+                totalSurplus += surplus;
+              } else {
+                console.log(`    Wallet ${address.substring(0, 10)} have sats: ${balance})`);
+              }
+            } catch (error) {
+              console.error(`    Failed to check wallet balance: ${error.message}`);
+            }
+          }
+        }
+
+        console.log(`  Analysis complete:`);
+        console.log(`    - Wallets needing funds: ${needsFunding.length}`);
+        console.log(`    - Wallets with surplus: ${hasSurplus.length}`);
+        console.log(`    - Total deficit: ${totalDeficit} sats`);
+        console.log(`    - Total surplus: ${totalSurplus} sats`);
+
+        if (needsFunding.length === 0) {
+          console.log("  All wallets have sufficient balance. No rebalancing needed.");
+          callback(null, context);
+          return;
+        }
+
+        // Phase 2: Determine funding strategy
+        const fundingSources: Array<{
+          wallet: IssuerSparkWallet;
+          availableAmount: bigint;
+          pool: string;
+          address: string;
+        }> = [];
+
+        // Sort surplus wallets by available amount (descending) for efficient redistribution
+        hasSurplus.sort((a, b) => Number(b.surplus - a.surplus));
+
+        // Add surplus wallets as funding sources
+        for (const surplusWallet of hasSurplus) {
+          fundingSources.push({
+            wallet: surplusWallet.wallet,
+            availableAmount: surplusWallet.surplus,
+            pool: surplusWallet.pool,
+            address: surplusWallet.address,
+          });
+        }
+
+        // Check if we have enough funds
+        const totalAvailable = fundingSources.reduce((sum, source) => sum + source.availableAmount, 0n);
+
+        if (totalAvailable < totalDeficit) {
+          console.warn(
+            `  WARNING: Not enough funds available. Need ${totalDeficit} sats but only have ${totalAvailable} sats.`
+          );
+
+          // Phase 2b: Use faucet to get additional funds
+          const fundingNeeded = totalDeficit - totalAvailable;
+          console.log(`\n  Attempting to get ${fundingNeeded} sats from faucet...`);
+
+          // Find wallets to use for faucet funding - prioritize those with lowest balances
+          const allWallets: Array<{ wallet: IssuerSparkWallet; balance: bigint; pool: string }> = [];
+
+          // Collect all wallets and their balances
+          for (const poolName of poolNames) {
+            const pool = walletPools.get(poolName);
+            if (pool) {
+              for (const wallet of pool.wallets) {
+                const balanceInfo = walletBalances.get(await wallet.getSparkAddress());
+                if (balanceInfo) {
+                  allWallets.push({
+                    wallet,
+                    balance: balanceInfo.balance,
+                    pool: poolName,
+                  });
+                }
+              }
+            }
+          }
+
+          // Sort by balance (ascending) to use wallets with lowest balance first
+          allWallets.sort((a, b) => Number(a.balance - b.balance));
+
+          // Select up to 10 wallets for faucet operations
+          const faucetWallets = allWallets.slice(0, 10).map((w) => w.wallet);
+
+          if (faucetWallets.length === 0) {
+            throw new Error("No wallets available for faucet funding");
+          }
+
+          // Calculate faucet strategy
+          const maxPerTransaction = 50000n;
+          const maxTransactionsPerBatch = 2; // 2 wallets per 30 seconds
+          const batchDelayMs = 30000; // 30 seconds between batches
+          const maxRetryDuration = 120000; // 120 seconds max retry
+          const retryInterval = 30000; // Retry every 30 seconds
+
+          let totalFaucetReceived = 0n;
+          let faucetAttempts = 0;
+          let currentWalletIndex = 0;
+          const startTime = Date.now();
+
+          while (totalFaucetReceived < fundingNeeded && currentWalletIndex < faucetWallets.length) {
+            const elapsedTime = Date.now() - startTime;
+            if (elapsedTime > maxRetryDuration) {
+              console.warn(`  Faucet timeout reached after ${maxRetryDuration / 1000} seconds`);
+              break;
+            }
+
+            const batchWallets: IssuerSparkWallet[] = [];
+            const batchAmounts: bigint[] = [];
+
+            // Prepare batch (up to 2 wallets)
+            for (
+              let i = 0;
+              i < maxTransactionsPerBatch &&
+              currentWalletIndex < faucetWallets.length &&
+              totalFaucetReceived < fundingNeeded;
+              i++
+            ) {
+              const remainingNeeded = fundingNeeded - totalFaucetReceived;
+              const amountToRequest = remainingNeeded < maxPerTransaction ? remainingNeeded : maxPerTransaction;
+
+              batchWallets.push(faucetWallets[currentWalletIndex]);
+              batchAmounts.push(amountToRequest);
+              currentWalletIndex++;
+            }
+
+            // Execute faucet requests for this batch
+            console.log(`  Faucet batch ${faucetAttempts + 1}: Requesting funds for ${batchWallets.length} wallets...`);
+
+            let encounteredRateLimit = false;
+
+            for (let i = 0; i < batchWallets.length; i++) {
+              const wallet = batchWallets[i];
+              const amount = batchAmounts[i];
+
+              try {
+                const address = await wallet.getSparkAddress();
+                console.log(`    Requesting ${amount} sats for wallet ${address.substring(0, 10)}...`);
+
+                // Import faucet function
+                const { fundWalletFromGraphQL } = await import("./bitcoin-faucet-wrapper");
+
+                // Get deposit address
+                const depositAddress = await wallet.getSingleUseDepositAddress();
+                console.log(`    Deposit address: ${depositAddress}`);
+
+                // Faucet request
+                let txId: string;
+                try {
+                  txId = await fundWalletFromGraphQL(depositAddress, Number(amount));
+                  console.log(`    ✓ Funded with ${amount} sats, txId: ${txId}`);
+                } catch (faucetError: any) {
+                  console.error(`    ✗ Faucet request failed: ${faucetError.message}`);
+
+                  // Check if rate limited
+                  if (
+                    faucetError.message &&
+                    (faucetError.message.includes("rate") || faucetError.message.includes("429"))
+                  ) {
+                    console.log(`    Rate limited - waiting ${retryInterval / 1000} seconds before retry...`);
+                    ee.emit("counter", "spark.faucet_rate_limited", 1);
+
+                    // Move back the wallet index to retry these wallets
+                    currentWalletIndex = Math.max(0, currentWalletIndex - batchWallets.length + i);
+
+                    // Wait before retrying
+                    await new Promise((resolve) => setTimeout(resolve, retryInterval));
+                    encounteredRateLimit = true;
+                    break;
+                  }
+                  continue;
+                }
+
+                // Wait for confirmations (at least 1)
+                console.log(`    Waiting for confirmations...`);
+                await new Promise((resolve) => setTimeout(resolve, 10000)); // 10 seconds for 1 confirmation
+
+                // Claim deposit to Spark
+                try {
+                  const leaves = await wallet.claimDeposit(txId);
+                  if (leaves && leaves.length > 0) {
+                    console.log(`    ✓ Successfully deposited ${amount} sats to Spark`);
+                    totalFaucetReceived += amount;
+
+                    // Find which pool this wallet belongs to
+                    let walletPool = poolNames[0];
+                    for (const poolName of poolNames) {
+                      const pool = walletPools.get(poolName);
+                      if (pool && pool.wallets.includes(wallet)) {
+                        walletPool = poolName;
+                        break;
+                      }
+                    }
+
+                    // Add this wallet as a funding source
+                    fundingSources.push({
+                      wallet,
+                      availableAmount: amount,
+                      pool: walletPool,
+                      address,
+                    });
+
+                    ee.emit("counter", "spark.faucet_deposit_success", 1);
+                    ee.emit("counter", "spark.faucet_amount_received", Number(amount));
+                  } else {
+                    console.warn(`    ⚠ No leaves returned from claim deposit`);
+                    ee.emit("counter", "spark.faucet_deposit_failed", 1);
+                  }
+                } catch (claimError: any) {
+                  if (
+                    !claimError.message.includes("already claimed") &&
+                    !claimError.message.includes("already processed")
+                  ) {
+                    console.error(`    ✗ Failed to claim deposit: ${claimError.message}`);
+                    ee.emit("counter", "spark.faucet_deposit_failed", 1);
+                  } else {
+                    console.log(`    ℹ Deposit already claimed`);
+                    totalFaucetReceived += amount;
+
+                    // Find which pool this wallet belongs to
+                    let walletPool = poolNames[0];
+                    for (const poolName of poolNames) {
+                      const pool = walletPools.get(poolName);
+                      if (pool && pool.wallets.includes(wallet)) {
+                        walletPool = poolName;
+                        break;
+                      }
+                    }
+
+                    fundingSources.push({
+                      wallet,
+                      availableAmount: amount,
+                      pool: walletPool,
+                      address,
+                    });
+                  }
+                }
+              } catch (error) {
+                console.error(`    ✗ Faucet operation error: ${error.message}`);
+                ee.emit("counter", "spark.faucet_error", 1);
+              }
+            }
+
+            faucetAttempts++;
+
+            // Wait between batches if we have more wallets to process
+            // Skip wait if we just waited due to rate limiting
+            if (
+              !encounteredRateLimit &&
+              currentWalletIndex < faucetWallets.length &&
+              totalFaucetReceived < fundingNeeded
+            ) {
+              console.log(`  Waiting ${batchDelayMs / 1000} seconds before next faucet batch...`);
+              await new Promise((resolve) => setTimeout(resolve, batchDelayMs));
+            }
+          }
+
+          console.log(`  Faucet funding complete: Received ${totalFaucetReceived} sats of ${fundingNeeded} needed`);
+
+          // Update total available after faucet
+          const newTotalAvailable = fundingSources.reduce((sum, source) => sum + source.availableAmount, 0n);
+          console.log(`  Total available after faucet: ${newTotalAvailable} sats`);
+        }
+
+        // Phase 3: Execute transfers (minimize transactions)
+        console.log("\n  Executing rebalancing transfers...");
+        let transferCount = 0;
+        let totalTransferred = 0n;
+
+        // Sort needsFunding by deficit (descending) to handle largest deficits first
+        needsFunding.sort((a, b) => Number(b.deficit - a.deficit));
+
+        for (const recipient of needsFunding) {
+          let remainingDeficit = recipient.deficit;
+
+          // Try to fulfill from funding sources
+          for (const source of fundingSources) {
+            if (remainingDeficit <= 0n || source.availableAmount <= 0n) break;
+
+            // Don't transfer from a wallet to itself
+            if (source.address === recipient.address) continue;
+
+            const transferAmount =
+              remainingDeficit < source.availableAmount ? remainingDeficit : source.availableAmount;
+
+            try {
+              console.log(
+                `    Transferring ${transferAmount} sats from ${source.address.substring(0, 10)}... to ${recipient.address.substring(0, 10)}...`
+              );
+
+              const transferResult = await source.wallet.transfer({
+                receiverSparkAddress: recipient.address,
+                amountSats: Number(transferAmount),
+              });
+
+              await new Promise((resolve) => setTimeout(resolve, 2000));
+
+              const transactionId = transferResult.id;
+              const pendingTransfer = await (recipient.wallet as any).transferService.queryTransfer(transactionId);
+              if (pendingTransfer) {
+                await (recipient.wallet as any).claimTransfer({
+                  transfer: pendingTransfer,
+                  optimize: true,
+                });
+              }
+
+              console.log(` Wait for transfer claim...`);
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+
+              // If we reach here, transfer was successful
+              transferCount++;
+              totalTransferred += transferAmount;
+              source.availableAmount -= transferAmount;
+              remainingDeficit -= transferAmount;
+
+              console.log(`    ✓ Transfer successful (ID: ${transferResult.id})`);
+              ee.emit("counter", "spark.rebalance_transfer_success", 1);
+              ee.emit("counter", "spark.rebalance_amount_transferred", Number(transferAmount));
+            } catch (error) {
+              ee.emit("counter", "spark.rebalance_transfer_failed", 1);
+            }
+          }
+
+          if (remainingDeficit > 0n) {
+            console.warn(
+              `    Could not fully fund ${recipient.address.substring(0, 10)}... (${remainingDeficit} sats short)`
+            );
+          }
+        }
+
+        console.log(`\n  Rebalancing complete:`);
+        console.log(`    - Transfers executed: ${transferCount}`);
+        console.log(`    - Total transferred: ${totalTransferred} sats`);
+
+        context.vars = context.vars || {};
+        context.vars.rebalanceTransferCount = transferCount;
+        context.vars.rebalanceTotalTransferred = Number(totalTransferred);
+
+        callback(null, context);
+      } catch (error) {
+        console.error("DistributeAndRebalance failed:", error);
+        callback(error);
+      }
+    };
+  }
 }
