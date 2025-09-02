@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/hex"
+	"fmt"
 	"testing"
 	"time"
 
@@ -36,43 +37,87 @@ func TestGetStuckLightningPayments(t *testing.T) {
 	paymentHash2 := []byte("payment_hash_2_32_bytes_long____")
 	paymentHash3 := []byte("payment_hash_3_32_bytes_long____")
 
+	// Create a tree for the transfers
+	tree, err := db.Tree.Create().
+		SetNetwork(st.NetworkMainnet).
+		SetOwnerIdentityPubkey([]byte("owner")).
+		SetBaseTxid([]byte("base_txid")).
+		SetVout(0).
+		SetStatus(st.TreeStatusAvailable).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Helper function to create a transfer with all required relationships
+	createTransferWithLeaf := func(transferID uuid.UUID, status st.TransferStatus, expiryTime time.Time, publicKey []byte) (*ent.Transfer, error) {
+		transfer, err := db.Transfer.Create().
+			SetID(transferID).
+			SetType(st.TransferTypePreimageSwap).
+			SetStatus(status).
+			SetExpiryTime(expiryTime).
+			SetTotalValue(1000).
+			SetSenderIdentityPubkey([]byte("sender")).
+			SetReceiverIdentityPubkey([]byte("receiver")).
+			Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create a signing keyshare for the leaf node
+		keyshare, err := db.SigningKeyshare.Create().
+			SetPublicShares(map[string][]byte{"key": []byte("value")}).
+			SetStatus(st.KeyshareStatusAvailable).
+			SetSecretShare([]byte("secret_share")).
+			SetPublicKey(publicKey).
+			SetMinSigners(2).
+			SetCoordinatorIndex(1).
+			Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create a tree node for the transfer
+		treeNode, err := db.TreeNode.Create().
+			SetTree(tree).
+			SetValue(1000).
+			SetStatus(st.TreeNodeStatusAvailable).
+			SetVerifyingPubkey([]byte("verifying_pubkey")).
+			SetOwnerIdentityPubkey([]byte("owner")).
+			SetOwnerSigningPubkey([]byte("owner_signing_pubkey")).
+			SetRawTx([]byte("raw_tx")).
+			SetVout(0).
+			SetSigningKeyshare(keyshare).
+			Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create a transfer leaf for the transfer
+		_, err = db.TransferLeaf.Create().
+			SetTransfer(transfer).
+			SetLeaf(treeNode).
+			SetPreviousRefundTx([]byte("previous_refund_tx")).
+			SetIntermediateRefundTx([]byte("intermediate_refund_tx")).
+			Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		return transfer, nil
+	}
+
 	// Create test transfers
 	stuckTransferID := uuid.New()
-	stuckTransfer, err := db.Transfer.Create().
-		SetID(stuckTransferID).
-		SetType(st.TransferTypePreimageSwap).
-		SetStatus(st.TransferStatusSenderKeyTweakPending).
-		SetExpiryTime(expiredTime).
-		SetTotalValue(1000).
-		SetSenderIdentityPubkey([]byte("sender")).
-		SetReceiverIdentityPubkey([]byte("receiver")).
-		Save(ctx)
+	stuckTransfer, err := createTransferWithLeaf(stuckTransferID, st.TransferStatusSenderKeyTweakPending, expiredTime, []byte("public_key_1"))
 	require.NoError(t, err)
 
 	// Create a transfer that's not expired yet
 	nonExpiredTransferID := uuid.New()
-	nonExpiredTransfer, err := db.Transfer.Create().
-		SetID(nonExpiredTransferID).
-		SetType(st.TransferTypePreimageSwap).
-		SetStatus(st.TransferStatusSenderKeyTweakPending).
-		SetExpiryTime(futureTime).
-		SetTotalValue(1000).
-		SetSenderIdentityPubkey([]byte("sender")).
-		SetReceiverIdentityPubkey([]byte("receiver")).
-		Save(ctx)
+	nonExpiredTransfer, err := createTransferWithLeaf(nonExpiredTransferID, st.TransferStatusSenderKeyTweakPending, futureTime, []byte("public_key_2"))
 	require.NoError(t, err)
 
 	// Create a transfer with wrong status
 	wrongStatusTransferID := uuid.New()
-	wrongStatusTransfer, err := db.Transfer.Create().
-		SetID(wrongStatusTransferID).
-		SetType(st.TransferTypePreimageSwap).
-		SetStatus(st.TransferStatusCompleted).
-		SetExpiryTime(expiredTime).
-		SetTotalValue(1000).
-		SetSenderIdentityPubkey([]byte("sender")).
-		SetReceiverIdentityPubkey([]byte("receiver")).
-		Save(ctx)
+	wrongStatusTransfer, err := createTransferWithLeaf(wrongStatusTransferID, st.TransferStatusCompleted, expiredTime, []byte("public_key_3"))
 	require.NoError(t, err)
 
 	// Create preimage requests in different states
@@ -123,15 +168,7 @@ func TestGetStuckLightningPayments(t *testing.T) {
 		// Create additional stuck transfers to test pagination
 		for i := 0; i < 5; i++ {
 			transferID := uuid.New()
-			transfer, err := db.Transfer.Create().
-				SetID(transferID).
-				SetType(st.TransferTypePreimageSwap).
-				SetStatus(st.TransferStatusSenderKeyTweakPending).
-				SetExpiryTime(expiredTime).
-				SetTotalValue(1000).
-				SetSenderIdentityPubkey([]byte("sender")).
-				SetReceiverIdentityPubkey([]byte("receiver")).
-				Save(ctx)
+			transfer, err := createTransferWithLeaf(transferID, st.TransferStatusSenderKeyTweakPending, expiredTime, []byte(fmt.Sprintf("public_key_pagination_%d", i)))
 			require.NoError(t, err)
 
 			_, err = db.PreimageRequest.Create().
