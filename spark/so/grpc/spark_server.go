@@ -3,11 +3,11 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/lightsparkdev/spark/so/errors"
+	"github.com/lightsparkdev/spark/so/limiter"
 	"github.com/lightsparkdev/spark/so/protoconverter"
 
 	"github.com/lightsparkdev/spark/so/handler/tokens"
@@ -28,16 +28,16 @@ type SparkServer struct {
 	config     *so.Config
 	mockAction *common.MockAction
 
-	// Map to track active `claim_transfer_sign_refund` requests to prevent BitBit from overwhelming
-	// us.
-	activeClaimTransferSignRefunds sync.Map
+	// ResourceGuard to limit concurrent ClaimTransferSignRefunds calls for the same transfer ID. This
+	// is already enforced through row locking, but is more to prevent unnecessary load on the DB.
+	claimTransferSignRefundsTransferGuard limiter.ResourceGuard
 }
 
 var emptyResponse = &emptypb.Empty{}
 
 // NewSparkServer creates a new SparkServer.
 func NewSparkServer(config *so.Config, mockAction *common.MockAction) *SparkServer {
-	return &SparkServer{config: config, mockAction: mockAction, activeClaimTransferSignRefunds: sync.Map{}}
+	return &SparkServer{config: config, mockAction: mockAction, claimTransferSignRefundsTransferGuard: limiter.NewResourceGuard()}
 }
 
 // GenerateDepositAddress generates a deposit address for the given public key.
@@ -190,12 +190,10 @@ func (s *SparkServer) ClaimTransferSignRefunds(ctx context.Context, req *pb.Clai
 	}
 	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 
-	// Concurrency limiting for requests from BitBit which spam us with the same transfer ID.
-	transferID := req.TransferId
-	if _, loaded := s.activeClaimTransferSignRefunds.LoadOrStore(transferID, struct{}{}); loaded {
+	if !s.claimTransferSignRefundsTransferGuard.Acquire(req.TransferId) {
 		return nil, errors.ConcurrencyLimitExceededError()
 	}
-	defer s.activeClaimTransferSignRefunds.Delete(transferID)
+	defer s.claimTransferSignRefundsTransferGuard.Release(req.TransferId)
 
 	transferHander := handler.NewTransferHandler(s.config)
 	if s.mockAction != nil {
