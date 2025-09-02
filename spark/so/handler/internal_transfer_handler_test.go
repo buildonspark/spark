@@ -32,13 +32,11 @@ func createTestTxBytes(t *testing.T, value int64) []byte {
 }
 
 func TestFinalizeTransfer(t *testing.T) {
-	ctx, dbCtx := db.SetupPostgresTestContext(t)
+	ctx, dbCtx := db.SetUpPostgresTestContext(t)
 
 	config := &so.Config{
 		BitcoindConfigs: map[string]so.BitcoindConfig{
-			"regtest": {
-				DepositConfirmationThreshold: 1,
-			},
+			"regtest": {DepositConfirmationThreshold: 1},
 		},
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 	}

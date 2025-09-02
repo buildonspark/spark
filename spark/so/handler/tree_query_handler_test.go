@@ -8,6 +8,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 )
@@ -18,15 +19,19 @@ func TestQueryStaticDepositAddresses(t *testing.T) {
 
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
+	rng := rand.NewChaCha8([32]byte{})
 
-	// Create test data
-	randomPrivKey1 := keys.MustGeneratePrivateKeyFromRand(rand.NewChaCha8([32]byte{1}))
-	randomPrivKey2 := keys.MustGeneratePrivateKeyFromRand(rand.NewChaCha8([32]byte{2}))
-	randomPrivKey3 := keys.MustGeneratePrivateKeyFromRand(rand.NewChaCha8([32]byte{3}))
+	randomPrivKey1 := keys.MustGeneratePrivateKeyFromRand(rng)
+	randomPrivKey2 := keys.MustGeneratePrivateKeyFromRand(rng)
+	randomPrivKey3 := keys.MustGeneratePrivateKeyFromRand(rng)
+	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	identityPubKey2 := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
+
 	signingKeyshare1, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare([]byte("test_secret_share")).
-		SetPublicShares(map[string][]byte{"test": []byte("test_public_share")}).
+		SetSecretShare(secretShare.Serialize()).
+		SetPublicShares(map[string][]byte{"test": secretShare.Public().Serialize()}).
 		SetPublicKey(randomPrivKey1.Public().Serialize()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
@@ -34,8 +39,8 @@ func TestQueryStaticDepositAddresses(t *testing.T) {
 	require.NoError(t, err)
 	signingKeyshare2, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare([]byte("test_secret_share")).
-		SetPublicShares(map[string][]byte{"test": []byte("test_public_share")}).
+		SetSecretShare(secretShare.Serialize()).
+		SetPublicShares(map[string][]byte{"test": secretShare.Public().Serialize()}).
 		SetPublicKey(randomPrivKey2.Public().Serialize()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
@@ -43,8 +48,8 @@ func TestQueryStaticDepositAddresses(t *testing.T) {
 	require.NoError(t, err)
 	signingKeyshare3, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare([]byte("test_secret_share")).
-		SetPublicShares(map[string][]byte{"test": []byte("test_public_share")}).
+		SetSecretShare(secretShare.Serialize()).
+		SetPublicShares(map[string][]byte{"test": secretShare.Public().Serialize()}).
 		SetPublicKey(randomPrivKey3.Public().Serialize()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
@@ -52,7 +57,7 @@ func TestQueryStaticDepositAddresses(t *testing.T) {
 	require.NoError(t, err)
 	_, err = tx.DepositAddress.Create().
 		SetAddress("bcrt1qfpk6cxxfr49wtvzxd72ahe2xtu7gj6vx7m0ksy").
-		SetOwnerIdentityPubkey([]byte("test_identity_pubkey")).
+		SetOwnerIdentityPubkey(identityPubKey.Serialize()).
 		SetOwnerSigningPubkey(randomPrivKey1.Public().Serialize()).
 		SetSigningKeyshare(signingKeyshare1).
 		SetNetwork(st.NetworkRegtest).
@@ -61,7 +66,7 @@ func TestQueryStaticDepositAddresses(t *testing.T) {
 	require.NoError(t, err)
 	_, err = tx.DepositAddress.Create().
 		SetAddress("bcrt1q043w4fkg4w0jl6fxrx0kd4ww3rsq2tm4mtmv9e").
-		SetOwnerIdentityPubkey([]byte("test_identity_pubkey")).
+		SetOwnerIdentityPubkey(identityPubKey.Serialize()).
 		SetOwnerSigningPubkey(randomPrivKey2.Public().Serialize()).
 		SetSigningKeyshare(signingKeyshare2).
 		SetNetwork(st.NetworkRegtest).
@@ -71,7 +76,7 @@ func TestQueryStaticDepositAddresses(t *testing.T) {
 	// This is a different identity pubkey, so it should not be returned
 	_, err = tx.DepositAddress.Create().
 		SetAddress("bcrt1q043w4fkg4w0jl6fxrx0kd4ww3rsq2tm4mtmv9d").
-		SetOwnerIdentityPubkey([]byte("test_identity_pubkey2")).
+		SetOwnerIdentityPubkey(identityPubKey2.Serialize()).
 		SetOwnerSigningPubkey(randomPrivKey2.Public().Serialize()).
 		SetSigningKeyshare(signingKeyshare3).
 		SetNetwork(st.NetworkRegtest).

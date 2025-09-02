@@ -149,7 +149,7 @@ type testSetupCommon struct {
 
 // setupCommonTest sets up common test infrastructure
 func setupCommonTest(t *testing.T) *testSetupCommon {
-	ctx, sessionCtx := db.SetupPostgresTestContext(t)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 
 	cfg, err := sparktesting.TestConfig()
 	require.NoError(t, err)

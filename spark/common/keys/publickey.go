@@ -124,7 +124,7 @@ func SumPublicKeys(keys []Public) (Public, error) {
 
 // Serialize serializes this key into the 33-byte compressed format. It is equivalent to [secp256k1.PublicKey.SerializeCompressed].
 func (p Public) Serialize() []byte {
-	if p.key == (secp256k1.PublicKey{}) {
+	if p.IsZero() {
 		return nil
 	}
 	return p.key.SerializeCompressed()
@@ -160,7 +160,7 @@ func (p *Public) Scan(src any) error {
 
 // MarshalJSON implements json.Marshaler interface.
 func (p Public) MarshalJSON() ([]byte, error) {
-	if (p.key == secp256k1.PublicKey{}) {
+	if p.IsZero() {
 		return json.Marshal(nil)
 	}
 	return json.Marshal(p.Serialize())
@@ -186,13 +186,13 @@ func (p Public) LogValue() slog.Value {
 	return slog.AnyValue(p.String())
 }
 
-type key interface {
+type cryptoKey interface {
 	Private | Public
 	Serialize() []byte
 }
 
 // ToBytesMap converts a map[k]v, where v is a Public or a Private, to a map[k][]byte, using each type's Serialize.
-func ToBytesMap[k comparable, v key](m map[k]v) map[k][]byte {
+func ToBytesMap[k comparable, v cryptoKey](m map[k]v) map[k][]byte {
 	if len(m) == 0 {
 		return nil
 	}

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -166,15 +165,13 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 func TestGenerateDepositAddress(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
+	rng := rand.NewChaCha8([32]byte{})
 
-	// Generate valid secp256k1 keys for testing
-	testIdentityPrivKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	testIdentityPubKey := testIdentityPrivKey.PubKey().SerializeCompressed()
+	testIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	testIdentityPubKey := testIdentityPrivKey.Public()
 
-	testSigningPrivKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	testSigningPubKey := testSigningPrivKey.PubKey().SerializeCompressed()
+	testSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	testSigningPubKey := testSigningPrivKey.Public()
 
 	// Setup test configuration using supported networks
 	config := &so.Config{
@@ -198,16 +195,15 @@ func TestGenerateDepositAddress(t *testing.T) {
 		require.NoError(t, err)
 
 		// Generate valid secp256k1 operator public key
-		operatorPrivKey2, err := secp256k1.GeneratePrivateKey()
-		require.NoError(t, err)
-		operatorPubKey2 := operatorPrivKey2.PubKey().SerializeCompressed()
+		operatorPrivKey2 := keys.MustGeneratePrivateKeyFromRand(rng)
+		operatorPubKey2 := operatorPrivKey2.Public()
 
 		// Create a signing keyshare
 		signingKeyshare, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
 			SetSecretShare([]byte("test_secret_share_2")).
 			SetPublicShares(map[string][]byte{"test": []byte("test_public_share_2")}).
-			SetPublicKey(operatorPubKey2).
+			SetPublicKey(operatorPubKey2.Serialize()).
 			SetMinSigners(2).
 			SetCoordinatorIndex(0).
 			Save(ctx)
@@ -216,8 +212,8 @@ func TestGenerateDepositAddress(t *testing.T) {
 		// Create an existing static deposit address
 		existingAddress, err := tx.DepositAddress.Create().
 			SetAddress("bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e").
-			SetOwnerIdentityPubkey(testIdentityPubKey).
-			SetOwnerSigningPubkey(testSigningPubKey).
+			SetOwnerIdentityPubkey(testIdentityPubKey.Serialize()).
+			SetOwnerSigningPubkey(testSigningPubKey.Serialize()).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
 			SetNetwork(st.NetworkRegtest).
@@ -235,8 +231,8 @@ func TestGenerateDepositAddress(t *testing.T) {
 
 		isStatic := true
 		req := &pb.GenerateDepositAddressRequest{
-			SigningPublicKey:  testSigningPubKey,
-			IdentityPublicKey: testIdentityPubKey,
+			SigningPublicKey:  testSigningPubKey.Serialize(),
+			IdentityPublicKey: testIdentityPubKey.Serialize(),
 			Network:           pb.Network_REGTEST,
 			IsStatic:          &isStatic,
 		}
@@ -245,8 +241,7 @@ func TestGenerateDepositAddress(t *testing.T) {
 		require.ErrorContains(t, err, "static deposit address already exists: bcrt1p")
 		previousError := err.Error()
 		_, err = handler.GenerateDepositAddress(ctx, testConfig, req)
-		require.Error(t, err)
-		require.Equal(t, previousError, err.Error())
+		require.EqualError(t, err, previousError)
 	})
 
 	t.Run("allow static deposit address for same identity on different network", func(t *testing.T) {
@@ -261,42 +256,31 @@ func TestGenerateDepositAddress(t *testing.T) {
 
 		isStatic := true
 		req := &pb.GenerateDepositAddressRequest{
-			SigningPublicKey:  testSigningPubKey,
-			IdentityPublicKey: testIdentityPubKey,
+			SigningPublicKey:  testSigningPubKey.Serialize(),
+			IdentityPublicKey: testIdentityPubKey.Serialize(),
 			Network:           pb.Network_MAINNET,
 			IsStatic:          &isStatic,
 		}
 
 		// Testing that the handler tries to create a new address
-		_, err = handler.GenerateDepositAddress(ctx, testConfig, req)
-		require.Error(t, err, "near \"SET\": syntax error")
+		_, err := handler.GenerateDepositAddress(ctx, testConfig, req)
+		require.ErrorContains(t, err, "near \"SET\": syntax error")
 	})
 }
 
 func TestGenerateStaticDepositAddress(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
+	rng := rand.NewChaCha8([32]byte{})
 
-	// Generate valid secp256k1 keys for testing
-	testIdentityPrivKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	testIdentityPubKey := testIdentityPrivKey.PubKey().SerializeCompressed()
-
-	testSigningPrivKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	testSigningPubKey := testSigningPrivKey.PubKey().SerializeCompressed()
-
-	// Setup test configuration using supported networks
+	testIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	testSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	// Set up test configuration using supported networks
 	config := &so.Config{
-		SupportedNetworks: []common.Network{
-			common.Regtest,
-			common.Mainnet,
-		},
+		SupportedNetworks:  []common.Network{common.Regtest, common.Mainnet},
 		SigningOperatorMap: map[string]*so.SigningOperator{},
 		BitcoindConfigs: map[string]so.BitcoindConfig{
-			"regtest": {
-				DepositConfirmationThreshold: 1,
-			},
+			"regtest": {DepositConfirmationThreshold: 1},
 		},
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 	}
@@ -305,22 +289,19 @@ func TestGenerateStaticDepositAddress(t *testing.T) {
 
 	t.Run("allow static deposit address for same identity on different network", func(t *testing.T) {
 		testConfig := &so.Config{
-			SupportedNetworks: []common.Network{
-				common.Regtest,
-				common.Mainnet,
-			},
+			SupportedNetworks:          []common.Network{common.Regtest, common.Mainnet},
 			SigningOperatorMap:         map[string]*so.SigningOperator{},
 			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 		}
 
 		req := &pb.GenerateStaticDepositAddressRequest{
-			SigningPublicKey:  testSigningPubKey,
-			IdentityPublicKey: testIdentityPubKey,
+			SigningPublicKey:  testSigningPrivKey.Public().Serialize(),
+			IdentityPublicKey: testIdentityPrivKey.Public().Serialize(),
 			Network:           pb.Network_MAINNET,
 		}
 
 		// Testing that the handler tries to create a new address
-		_, err = handler.GenerateStaticDepositAddress(ctx, testConfig, req)
+		_, err := handler.GenerateStaticDepositAddress(ctx, testConfig, req)
 		require.Error(t, err, "near \"SET\": syntax error")
 	})
 }
@@ -328,9 +309,9 @@ func TestGenerateStaticDepositAddress(t *testing.T) {
 func TestGetUtxosFromAddress(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
-
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
+	rng := rand.NewChaCha8([32]byte{})
 
 	// Create block height records for both networks
 	_, err = tx.BlockHeight.Create().
@@ -345,21 +326,17 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	// Generate valid secp256k1 keys for testing
-	testIdentityPrivKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	testIdentityPubKey := testIdentityPrivKey.PubKey().SerializeCompressed()
+	testIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	testIdentityPubKey := testIdentityPrivKey.Public()
+	testSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	testSigningPubKey := testSigningPrivKey.Public()
+	secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
 
-	testSigningPrivKey, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	testSigningPubKey := testSigningPrivKey.PubKey().SerializeCompressed()
-
-	// Create signing keyshare
 	signingKeyshare, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare([]byte("test_secret_share")).
-		SetPublicShares(map[string][]byte{"test": []byte("test_public_share")}).
-		SetPublicKey([]byte("test_public_key")).
+		SetSecretShare(secretShare.Serialize()).
+		SetPublicShares(map[string][]byte{"test": secretShare.Public().Serialize()}).
+		SetPublicKey(secretShare.Public().Serialize()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
 		Save(ctx)
@@ -372,8 +349,8 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		staticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e"
 		depositAddress, err := tx.DepositAddress.Create().
 			SetAddress(staticAddress).
-			SetOwnerIdentityPubkey(testIdentityPubKey).
-			SetOwnerSigningPubkey(testSigningPubKey).
+			SetOwnerIdentityPubkey(testIdentityPubKey.Serialize()).
+			SetOwnerSigningPubkey(testSigningPubKey.Serialize()).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
 			SetNetwork(st.NetworkRegtest).
@@ -429,8 +406,8 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		staticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e2"
 		_, err := tx.DepositAddress.Create().
 			SetAddress(staticAddress).
-			SetOwnerIdentityPubkey(testIdentityPubKey).
-			SetOwnerSigningPubkey(testSigningPubKey).
+			SetOwnerIdentityPubkey(testIdentityPubKey.Serialize()).
+			SetOwnerSigningPubkey(testSigningPubKey.Serialize()).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
 			SetNetwork(st.NetworkRegtest).
@@ -455,8 +432,8 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		confirmationTxid := "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
 		_, err := tx.DepositAddress.Create().
 			SetAddress(nonStaticAddress).
-			SetOwnerIdentityPubkey(testIdentityPubKey).
-			SetOwnerSigningPubkey(testSigningPubKey).
+			SetOwnerIdentityPubkey(testIdentityPubKey.Serialize()).
+			SetOwnerSigningPubkey(testSigningPubKey.Serialize()).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(false).
 			SetConfirmationTxid(confirmationTxid).
@@ -483,8 +460,8 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		nonStaticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e4"
 		_, err := tx.DepositAddress.Create().
 			SetAddress(nonStaticAddress).
-			SetOwnerIdentityPubkey(testIdentityPubKey).
-			SetOwnerSigningPubkey(testSigningPubKey).
+			SetOwnerIdentityPubkey(testIdentityPubKey.Serialize()).
+			SetOwnerSigningPubkey(testSigningPubKey.Serialize()).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(false).
 			SetNetwork(st.NetworkRegtest).
@@ -520,8 +497,8 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		staticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e5"
 		depositAddress, err := tx.DepositAddress.Create().
 			SetAddress(staticAddress).
-			SetOwnerIdentityPubkey(testIdentityPubKey).
-			SetOwnerSigningPubkey(testSigningPubKey).
+			SetOwnerIdentityPubkey(testIdentityPubKey.Serialize()).
+			SetOwnerSigningPubkey(testSigningPubKey.Serialize()).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
 			SetNetwork(st.NetworkRegtest).
@@ -581,8 +558,8 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		invalidTxid := "invalid_hex_string"
 		_, err := tx.DepositAddress.Create().
 			SetAddress(nonStaticAddress).
-			SetOwnerIdentityPubkey(testIdentityPubKey).
-			SetOwnerSigningPubkey(testSigningPubKey).
+			SetOwnerIdentityPubkey(testIdentityPubKey.Serialize()).
+			SetOwnerSigningPubkey(testSigningPubKey.Serialize()).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(false).
 			SetConfirmationTxid(invalidTxid).
@@ -606,8 +583,8 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		staticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e7"
 		depositAddress, err := tx.DepositAddress.Create().
 			SetAddress(staticAddress).
-			SetOwnerIdentityPubkey(testIdentityPubKey).
-			SetOwnerSigningPubkey(testSigningPubKey).
+			SetOwnerIdentityPubkey(testIdentityPubKey.Serialize()).
+			SetOwnerSigningPubkey(testSigningPubKey.Serialize()).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
 			SetNetwork(st.NetworkRegtest).
@@ -643,8 +620,8 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		staticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e8"
 		_, err := tx.DepositAddress.Create().
 			SetAddress(staticAddress).
-			SetOwnerIdentityPubkey(testIdentityPubKey).
-			SetOwnerSigningPubkey(testSigningPubKey).
+			SetOwnerIdentityPubkey(testIdentityPubKey.Serialize()).
+			SetOwnerSigningPubkey(testSigningPubKey.Serialize()).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
 			SetNetwork(st.NetworkRegtest).
@@ -659,7 +636,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		}
 
 		_, err = handler.GetUtxosForAddress(ctx, req)
-		require.Error(t, err, "deposit address is not aligned with the requested network")
+		require.ErrorContains(t, err, "deposit address is not aligned with the requested network")
 	})
 
 	t.Run("multiple deposit addresses with UTXOs - verify correct filtering", func(t *testing.T) {
@@ -667,8 +644,8 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		staticAddress1 := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e9"
 		depositAddress1, err := tx.DepositAddress.Create().
 			SetAddress(staticAddress1).
-			SetOwnerIdentityPubkey(testIdentityPubKey).
-			SetOwnerSigningPubkey(testSigningPubKey).
+			SetOwnerIdentityPubkey(testIdentityPubKey.Serialize()).
+			SetOwnerSigningPubkey(testSigningPubKey.Serialize()).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
 			SetNetwork(st.NetworkRegtest).
@@ -679,8 +656,8 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		staticAddress2 := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6ea"
 		depositAddress2, err := tx.DepositAddress.Create().
 			SetAddress(staticAddress2).
-			SetOwnerIdentityPubkey(testIdentityPubKey).
-			SetOwnerSigningPubkey(testSigningPubKey).
+			SetOwnerIdentityPubkey(testIdentityPubKey.Serialize()).
+			SetOwnerSigningPubkey(testSigningPubKey.Serialize()).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
 			SetNetwork(st.NetworkRegtest).
@@ -787,8 +764,8 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		staticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jzeb"
 		depositAddress, err := tx.DepositAddress.Create().
 			SetAddress(staticAddress).
-			SetOwnerIdentityPubkey(testIdentityPubKey).
-			SetOwnerSigningPubkey(testSigningPubKey).
+			SetOwnerIdentityPubkey(testIdentityPubKey.Serialize()).
+			SetOwnerSigningPubkey(testSigningPubKey.Serialize()).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
 			SetNetwork(st.NetworkRegtest).

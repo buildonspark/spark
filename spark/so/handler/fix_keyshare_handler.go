@@ -7,8 +7,9 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+
+	"github.com/google/uuid"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	"github.com/lightsparkdev/spark/common/secret_sharing/curve"
 	"github.com/lightsparkdev/spark/common/secret_sharing/polynomial"
@@ -237,7 +238,7 @@ func (h FixKeyshareHandler) createSender(args FixKeyshareArgs) (*secretsharing.I
 		return nil, fmt.Errorf("failed to parse own secret share: %w", err)
 	}
 
-	pubShareEvals := make([]polynomial.PointEval, 0)
+	var pubShareEvals []polynomial.PointEval
 
 	for goodIdentifier, goodOperator := range args.goodOperators {
 		publicShareCompressed := args.badKeyshare.PublicShares[goodIdentifier]
@@ -248,7 +249,6 @@ func (h FixKeyshareHandler) createSender(args FixKeyshareArgs) (*secretsharing.I
 		}
 
 		sharePoint := curve.NewPointFromPublicKey(sharePubKey)
-
 		eval := polynomial.PointEval{
 			// TODO: Don't hardcode the magic (+ 1) mapping
 			// TODO: Somehow avoid unsafe cast
@@ -436,7 +436,6 @@ func (h FixKeyshareHandler) updateWithFixed(ctx context.Context, outPayload *sec
 		if err != nil {
 			return fmt.Errorf("invalid public share: %w", err)
 		}
-
 		pubShares[identifier] = pubShare
 	}
 

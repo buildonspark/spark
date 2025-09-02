@@ -134,7 +134,7 @@ func (p Private) String() string {
 
 // Serialize returns the key as a 256-bit big-endian binary-encoded number.
 func (p Private) Serialize() []byte {
-	if p.key.Key.IsZero() {
+	if p.IsZero() {
 		return nil
 	}
 	return p.key.Serialize()
@@ -164,7 +164,7 @@ func (p *Private) Scan(src any) error {
 
 // MarshalJSON implements json.Marshaler interface.
 func (p Private) MarshalJSON() ([]byte, error) {
-	if (p.key == secp256k1.PrivateKey{}) {
+	if p.IsZero() {
 		return json.Marshal(nil)
 	}
 	return json.Marshal(p.Serialize())

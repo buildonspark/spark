@@ -3,11 +3,12 @@ package protoconverter
 import (
 	"bytes"
 	"crypto/sha256"
+	"github.com/lightsparkdev/spark/common/keys"
+	"math/rand/v2"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -19,12 +20,13 @@ import (
 )
 
 var (
-	ownerPubKey          = genPubKey()
-	issuerPubKey         = genPubKey()
-	revocationCommitment = genPubKey()
-	tokenPubKey          = genPubKey()
-	op1Key               = genPubKey()
-	op2Key               = genPubKey()
+	rng                  = rand.NewChaCha8([32]byte{})
+	ownerPubKey          = keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()
+	issuerPubKey         = keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()
+	revocationCommitment = keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()
+	tokenPubKey          = keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()
+	op1Key               = keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()
+	op2Key               = keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()
 	tokenAmount          = bytes.Repeat([]byte{1}, 16)
 	prevHash1            = sha256.Sum256([]byte{0})
 	prevHash2            = sha256.Sum256([]byte{1})
@@ -573,24 +575,4 @@ func TestTokenTransactionConversionRoundTrip(t *testing.T) {
 			}
 		})
 	}
-}
-
-func genPubKey() []byte {
-	privateKey, err := secp256k1.GeneratePrivateKeyFromRand(fakeRand{})
-	if err != nil {
-		panic(err)
-	}
-	return privateKey.PubKey().SerializeCompressed()
-}
-
-type fakeRand struct {
-	timesUsed int
-}
-
-func (f fakeRand) Read(p []byte) (n int, err error) {
-	for i := range p {
-		p[i] = byte(f.timesUsed + i)
-	}
-	f.timesUsed++
-	return len(p), nil
 }
