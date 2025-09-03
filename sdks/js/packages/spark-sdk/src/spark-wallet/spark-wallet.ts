@@ -1496,7 +1496,6 @@ export class SparkWallet extends EventEmitter {
         message: (e as Error).message,
         stack: (e as Error).stack,
       });
-      await this.cancelAllSenderInitiatedTransfers();
       throw new Error(`Failed to request leaves swap: ${e}`);
     }
   }
@@ -3095,29 +3094,6 @@ export class SparkWallet extends EventEmitter {
         (result) => result.status === "fulfilled" && result.value !== null,
       )
       .map((result) => (result as PromiseFulfilledResult<string>).value);
-  }
-
-  /**
-   * Cancels all sender-initiated transfers.
-   *
-   * @returns {Promise<void>}
-   * @private
-   */
-  private async cancelAllSenderInitiatedTransfers() {
-    for (const operator of Object.values(this.config.getSigningOperators())) {
-      const transfers =
-        await this.transferService.queryPendingTransfersBySender(
-          operator.address,
-        );
-
-      for (const transfer of transfers.transfers) {
-        if (
-          transfer.status === TransferStatus.TRANSFER_STATUS_SENDER_INITIATED
-        ) {
-          await this.transferService.cancelTransfer(transfer, operator.address);
-        }
-      }
-    }
   }
 
   // ***** Lightning Flow *****

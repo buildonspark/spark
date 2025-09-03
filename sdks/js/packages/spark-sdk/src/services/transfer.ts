@@ -1452,32 +1452,6 @@ export class TransferService extends BaseTransferService {
     }
   }
 
-  async cancelTransfer(
-    transfer: Transfer,
-    operatorAddress: string,
-  ): Promise<Transfer | undefined> {
-    const sparkClient =
-      await this.connectionManager.createSparkClient(operatorAddress);
-
-    try {
-      const response = await sparkClient.cancel_transfer({
-        transferId: transfer.id,
-        senderIdentityPublicKey:
-          await this.config.signer.getIdentityPublicKey(),
-      });
-
-      return response.transfer;
-    } catch (error) {
-      throw new NetworkError(
-        "Failed to cancel transfer",
-        {
-          method: "POST",
-        },
-        error as Error,
-      );
-    }
-  }
-
   async queryPendingTransfersBySender(
     operatorAddress: string,
   ): Promise<QueryTransfersResponse> {
