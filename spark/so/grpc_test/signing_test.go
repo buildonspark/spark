@@ -2,16 +2,15 @@ package grpctest
 
 import (
 	"crypto/sha256"
+	"math/rand/v2"
 	"testing"
 
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
@@ -28,6 +27,7 @@ import (
 // It mimics both the user and signing coordinator side of the frost signing process.
 // Since the FROST signer is a stateless signer except for DKG, it is reused for both the user and the operator.
 func TestFrostSign(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{1})
 	// Step 1: Setup config
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)
@@ -47,8 +47,7 @@ func TestFrostSign(t *testing.T) {
 	require.NoError(t, err)
 
 	// Step 3: Get user key pubkey
-	privKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	privKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	userPubKey := privKey.Public()
 
 	// Step 4: Calculate verifying key
@@ -67,12 +66,12 @@ func TestFrostSign(t *testing.T) {
 	}
 
 	// Step 5: Generate user side of nonce.
-	hidingPriv, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	bindingPriv, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	hidingPubBytes := hidingPriv.PubKey().SerializeCompressed()
-	bindingPubBytes := bindingPriv.PubKey().SerializeCompressed()
+	hidingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	bindingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	hidingPubBytes := hidingPriv.Public().Serialize()
+	bindingPubBytes := bindingPriv.Public().Serialize()
 	userNonceCommitment, err := objects.NewSigningCommitment(bindingPubBytes, hidingPubBytes)
 	require.NoError(t, err)
 	userNonce, err := objects.NewSigningNonce(bindingPriv.Serialize(), hidingPriv.Serialize())
@@ -244,17 +243,17 @@ func TestFrostWithoutUserSign(t *testing.T) {
 // It mimics both the user and signing coordinator side of the frost signing process.
 // Since the FROST signer is a stateless signer except for DKG, it is reused for both the user and the operator.
 func TestFrostSignWithAdaptor(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{2})
 	// Step 0: Create adaptor.
-	sk, err := btcec.NewPrivateKey()
-	require.NoError(t, err)
-	pk := sk.PubKey()
+	sk := keys.MustGeneratePrivateKeyFromRand(rng)
+	pk := sk.Public()
 
 	msg := []byte("hello")
 	msgHash := sha256.Sum256(msg)
-	senderSig, err := schnorr.Sign(sk, msgHash[:], schnorr.FastSign())
+	senderSig, err := schnorr.Sign(sk.ToBTCEC(), msgHash[:], schnorr.FastSign())
 	require.NoError(t, err)
 
-	assert.True(t, senderSig.Verify(msgHash[:], pk))
+	assert.True(t, senderSig.Verify(msgHash[:], pk.ToBTCEC()))
 
 	adaptorSig, adaptorPrivKeyBytes, err := common.GenerateAdaptorFromSignature(senderSig.Serialize())
 	require.NoError(t, err)
@@ -263,7 +262,7 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 	require.NoError(t, err)
 	adaptorPub := adaptorPrivKey.Public()
 
-	err = common.ValidateOutboundAdaptorSignature(pk, msgHash[:], adaptorSig, adaptorPub.Serialize())
+	err = common.ValidateOutboundAdaptorSignature(pk.ToBTCEC(), msgHash[:], adaptorSig, adaptorPub.Serialize())
 	require.NoError(t, err)
 
 	// Step 1: Setup config
@@ -282,8 +281,7 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 	require.NoError(t, err)
 
 	// Step 3: Get user key pubkey
-	privKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	privKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	userPubKey := privKey.Public()
 
 	// Step 4: Calculate verifying key
@@ -302,12 +300,12 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 	}
 
 	// Step 5: Generate user side of nonce.
-	hidingPriv, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	bindingPriv, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	hidingPubBytes := hidingPriv.PubKey().SerializeCompressed()
-	bindingPubBytes := bindingPriv.PubKey().SerializeCompressed()
+	hidingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	bindingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	hidingPubBytes := hidingPriv.Public().Serialize()
+	bindingPubBytes := bindingPriv.Public().Serialize()
 	userNonceCommitment, err := objects.NewSigningCommitment(bindingPubBytes, hidingPubBytes)
 	require.NoError(t, err)
 	userNonce, err := objects.NewSigningNonce(bindingPriv.Serialize(), hidingPriv.Serialize())
@@ -415,6 +413,7 @@ func TestFrostRound1(t *testing.T) {
 }
 
 func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{3})
 	// Step 1: Setup config
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)
@@ -434,8 +433,7 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 	require.NoError(t, err)
 
 	// Step 3: Get user key pubkey
-	privKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	privKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	userPubKey := privKey.Public()
 
 	// Step 4: Calculate verifying key
@@ -454,12 +452,11 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 	}
 
 	// Step 5: Generate user side of nonce.
-	hidingPriv, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	bindingPriv, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
-	hidingPubBytes := hidingPriv.PubKey().SerializeCompressed()
-	bindingPubBytes := bindingPriv.PubKey().SerializeCompressed()
+	hidingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
+	bindingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	hidingPubBytes := hidingPriv.Public().Serialize()
+	bindingPubBytes := bindingPriv.Public().Serialize()
 	userNonceCommitment, err := objects.NewSigningCommitment(bindingPubBytes, hidingPubBytes)
 	require.NoError(t, err)
 	userNonce, err := objects.NewSigningNonce(bindingPriv.Serialize(), hidingPriv.Serialize())
