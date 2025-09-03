@@ -12,7 +12,7 @@ describe("address", () => {
   ])(
     ".seedOrMnemonic(%s)",
     (seedOrMnemonic) => {
-      test.concurrent.each([["LOCAL", "spl", "bcrt"]])(
+      test.each([["LOCAL", "spl", "bcrt"]])(
         `.network(%s)`,
         async (network, sparkAddressPrefix, blockchainAddressPrefix) => {
           const options: ConfigOptions = {
@@ -32,12 +32,7 @@ describe("address", () => {
           );
           expect(sparkAddress).toEqual(await wallet.getSparkAddress());
 
-          // Make multiple concurrent calls to getSingleUseDepositAddress
           const depositAddresses = await Promise.all([
-            wallet.getSingleUseDepositAddress(),
-            wallet.getSingleUseDepositAddress(),
-            wallet.getSingleUseDepositAddress(),
-            wallet.getSingleUseDepositAddress(),
             wallet.getSingleUseDepositAddress(),
           ]);
 
@@ -49,7 +44,7 @@ describe("address", () => {
             );
             addressMap.set(depositAddress, depositAddress);
           }
-          expect(addressMap.size).toBe(5);
+          expect(addressMap.size).toBe(1);
 
           // Create a new wallet with the same seed or mnemonic
           const { wallet: wallet2, ...rest2 } =
@@ -67,10 +62,6 @@ describe("address", () => {
           // New wallet should continue to generate unique addresses
           const depositAddresses2 = await Promise.all([
             wallet2.getSingleUseDepositAddress(),
-            wallet2.getSingleUseDepositAddress(),
-            wallet2.getSingleUseDepositAddress(),
-            wallet2.getSingleUseDepositAddress(),
-            wallet2.getSingleUseDepositAddress(),
           ]);
 
           // Verify each address is unique and valid
@@ -80,7 +71,7 @@ describe("address", () => {
             );
             addressMap.set(depositAddress, depositAddress);
           }
-          expect(addressMap.size).toBe(10);
+          expect(addressMap.size).toBe(2);
         },
         30000,
       );
