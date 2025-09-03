@@ -1871,25 +1871,38 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 	if err != nil {
 		return fmt.Errorf("unable to load keyshare for leaf %s: %w", leaf.ID.String(), err)
 	}
-	keyshareID := keyshare.ID.String()
-	keyshare, err = keyshare.TweakKeyShare(
-		ctx,
-		req.SecretShareTweak.SecretShare,
-		req.SecretShareTweak.Proofs[0],
-		req.PubkeySharesTweak,
-	)
+
+	secretShare, err := keys.ParsePrivateKey(req.SecretShareTweak.SecretShare)
 	if err != nil {
-		return fmt.Errorf("unable to tweak keyshare %s for leaf %s: %w", keyshareID, leaf.ID.String(), err)
+		return fmt.Errorf("unable to parse secret share: %w", err)
+	}
+	pubKeyTweak, err := keys.ParsePublicKey(req.SecretShareTweak.Proofs[0])
+	if err != nil {
+		return fmt.Errorf("unable to parse public key: %w", err)
+	}
+	pubKeySharesTweak, err := keys.ParsePublicKeyMap(req.PubkeySharesTweak)
+	if err != nil {
+		return fmt.Errorf("unable to parse public key shares tweaks: %w", err)
+	}
+	tweakedKeyshare, err := keyshare.TweakKeyShare(ctx, secretShare, pubKeyTweak, pubKeySharesTweak)
+	if err != nil {
+		return fmt.Errorf("unable to tweak keyshare %v for leaf %v: %w", keyshare.ID, leaf.ID, err)
 	}
 
-	signingPubkey, err := common.SubtractPublicKeys(leaf.VerifyingPubkey, keyshare.PublicKey)
+	verifyingPubKey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
 	if err != nil {
-		return fmt.Errorf("unable to calculate new signing pubkey for leaf %s: %w", req.LeafId, err)
+		return fmt.Errorf("unable to parse verifying public key: %w", err)
 	}
+	tweakedPubKey, err := keys.ParsePublicKey(tweakedKeyshare.PublicKey)
+	if err != nil {
+		return fmt.Errorf("unable to parse tweaked public key: %w", err)
+	}
+
+	signingPubkey := verifyingPubKey.Sub(tweakedPubKey)
 	_, err = leaf.
 		Update().
 		SetOwnerIdentityPubkey(ownerIdentityPubKey.Serialize()).
-		SetOwnerSigningPubkey(signingPubkey).
+		SetOwnerSigningPubkey(signingPubkey.Serialize()).
 		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to update leaf %s: %w", req.LeafId, err)
@@ -2047,7 +2060,7 @@ func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *
 	return nil
 }
 
-// ClaimTransferSignRefunds signs new refund transactions as part of the transfer.
+// ClaimTransferSignRefundsV2 signs new refund transactions as part of the transfer.
 func (h *TransferHandler) ClaimTransferSignRefundsV2(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
 	return h.claimTransferSignRefunds(ctx, req, true)
 }

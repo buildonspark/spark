@@ -11,7 +11,6 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -537,7 +536,7 @@ func UpdateFinalizedTransaction(
 
 type RecoveredRevocationSecret struct {
 	OutputIndex      uint32
-	RevocationSecret *secp256k1.PrivateKey
+	RevocationSecret keys.Private
 }
 
 func FinalizeCoordinatedTokenTransactionWithRevocationKeys(
@@ -559,7 +558,7 @@ func FinalizeCoordinatedTokenTransactionWithRevocationKeys(
 		)
 	}
 
-	revocationSecretMap := make(map[uint32]*secp256k1.PrivateKey)
+	revocationSecretMap := make(map[uint32]keys.Private, len(revocationSecrets))
 	for _, revocationSecret := range revocationSecrets {
 		revocationSecretMap[revocationSecret.OutputIndex] = revocationSecret.RevocationSecret
 	}
@@ -578,8 +577,8 @@ func FinalizeCoordinatedTokenTransactionWithRevocationKeys(
 		if !ok {
 			return fmt.Errorf("no revocation secret found for input index %d for txHash %x", inputIndex, txHash)
 		}
-		if revocationSecret == nil {
-			return fmt.Errorf("revocation secret is nil for input index %d for txHash %x", inputIndex, txHash)
+		if revocationSecret.IsZero() {
+			return fmt.Errorf("revocation secret is zero for input index %d for txHash %x", inputIndex, txHash)
 		}
 
 		_, err := db.TokenOutput.UpdateOne(outputToSpendEnt).
@@ -619,10 +618,7 @@ func FinalizeCoordinatedTokenTransactionWithRevocationKeys(
 }
 
 // UpdateCancelledTransaction updates the status and ownership signatures in the inputs + outputs in response to a cancelled transaction.
-func UpdateCancelledTransaction(
-	ctx context.Context,
-	tokenTransactionEnt *TokenTransaction,
-) error {
+func UpdateCancelledTransaction(ctx context.Context, tokenTransactionEnt *TokenTransaction) error {
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
 		return err

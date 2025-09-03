@@ -14,7 +14,6 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -640,9 +639,9 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecretsAndFinalize(ctx c
 			return false, tokens.FormatErrorWithTransactionEnt("failed to recover full revocation secrets", tokenTransaction, err)
 		}
 
-		recoveredSecretsToValidate := make([]keys.Private, 0, len(outputRecoveredSecrets))
-		for _, secret := range outputRecoveredSecrets {
-			recoveredSecretsToValidate = append(recoveredSecretsToValidate, keys.PrivateFromKey(*secret.RevocationSecret))
+		recoveredSecretsToValidate := make([]keys.Private, len(outputRecoveredSecrets))
+		for i, secret := range outputRecoveredSecrets {
+			recoveredSecretsToValidate[i] = secret.RevocationSecret
 		}
 		if err := utils.ValidateRevocationKeys(recoveredSecretsToValidate, outputToSpendRevocationCommitments); err != nil {
 			return false, tokens.FormatErrorWithTransactionEnt("invalid revocation keys found", tokenTransaction, err)
@@ -699,7 +698,7 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(tokenTransaction
 		if err != nil {
 			return nil, nil, tokens.FormatErrorWithTransactionEnt("failed to recover secret", tokenTransaction, err)
 		}
-		privKey, err := common.PrivateKeyFromBigInt(recoveredSecret)
+		privKey, err := keys.PrivateKeyFromBigInt(recoveredSecret)
 		if err != nil {
 			return nil, nil, tokens.FormatErrorWithTransactionEnt("failed to convert recovered keyshare to private key", tokenTransaction, err)
 		}

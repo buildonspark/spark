@@ -12,20 +12,19 @@ import (
 func (t *TransferLeaf) MarshalProto(ctx context.Context) (*pb.TransferLeaf, error) {
 	leaf, err := t.QueryLeaf().Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to query leaf for transfer leaf %s: %w", t.ID.String(), err)
+		return nil, fmt.Errorf("unable to query leaf for transfer leaf %s: %w", t.ID, err)
 	}
 	leafProto, err := leaf.MarshalSparkProto(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to marshal leaf  %s: %w", leaf.ID.String(), err)
+		return nil, fmt.Errorf("unable to marshal leaf %s: %w", leaf.ID, err)
 	}
 	var keyTweakProof []byte
 	secretCipher := t.SecretCipher
 	signature := t.Signature
-	if t.KeyTweak != nil {
+	if len(t.KeyTweak) != 0 {
 		leafKeyTweak := &pb.SendLeafKeyTweak{}
-		err = proto.Unmarshal(t.KeyTweak, leafKeyTweak)
-		if err == nil {
-			keyTweakProof = leafKeyTweak.SecretShareTweak.Proofs[0]
+		if err = proto.Unmarshal(t.KeyTweak, leafKeyTweak); err == nil {
+			keyTweakProof = leafKeyTweak.GetSecretShareTweak().GetProofs()[0]
 			if len(secretCipher) == 0 {
 				secretCipher = leafKeyTweak.SecretCipher
 			}

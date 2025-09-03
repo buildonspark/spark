@@ -5,8 +5,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/lightsparkdev/spark/common/keys"
+
 	"entgo.io/ent/dialect/sql"
-	"github.com/decred/dcrd/dcrec/secp256k1"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
@@ -27,51 +28,51 @@ import (
 var DefaultMinAvailableKeys = 100_000
 
 // TweakKeyShare tweaks the given keyshare with the given tweak, updates the keyshare in the database and returns the updated keyshare.
-func (keyshare *SigningKeyshare) TweakKeyShare(ctx context.Context, shareTweak []byte, pubkeyTweak []byte, pubkeySharesTweak map[string][]byte) (*SigningKeyshare, error) {
+func (sk *SigningKeyshare) TweakKeyShare(ctx context.Context, shareTweak keys.Private, pubKeyTweak keys.Public, pubKeySharesTweak map[string]keys.Public) (*SigningKeyshare, error) {
 	ctx, span := tracer.Start(ctx, "SigningKeyshare.TweakKeyShare")
 	defer span.End()
 
-	tweakPriv, _ := secp256k1.PrivKeyFromBytes(shareTweak)
-	tweakBytes := tweakPriv.Serialize()
-
-	newSecretShare, err := common.AddPrivateKeys(keyshare.SecretShare, tweakBytes)
+	secretShare, err := keys.ParsePrivateKey(sk.SecretShare)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to parse secret share: %w", err)
 	}
+	newSecretShare := secretShare.Add(shareTweak)
 
-	newPublicKey, err := common.AddPublicKeys(keyshare.PublicKey, pubkeyTweak)
+	pubKey, err := keys.ParsePublicKey(sk.PublicKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unable to parse public key: %w", err)
 	}
+	newPubKey := pubKey.Add(pubKeyTweak)
 
-	newPublicShares := make(map[string][]byte)
-	for i, publicShare := range keyshare.PublicShares {
-		newPublicShares[i], err = common.AddPublicKeys(publicShare, pubkeySharesTweak[i])
+	newPublicShares := make(map[string]keys.Public)
+	for id, publicShareBytes := range sk.PublicShares {
+		pubShare, err := keys.ParsePublicKey(publicShareBytes)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("unable to parse public share %s: %w", id, err)
 		}
+		newPublicShares[id] = pubShare.Add(pubKeySharesTweak[id])
 	}
 
-	return keyshare.Update().
-		SetSecretShare(newSecretShare).
-		SetPublicKey(newPublicKey).
-		SetPublicShares(newPublicShares).
+	return sk.Update().
+		SetSecretShare(newSecretShare.Serialize()).
+		SetPublicKey(newPubKey.Serialize()).
+		SetPublicShares(keys.ToBytesMap(newPublicShares)).
 		Save(ctx)
 }
 
 // MarshalProto converts a SigningKeyshare to a spark protobuf SigningKeyshare.
-func (keyshare *SigningKeyshare) MarshalProto() *pb.SigningKeyshare {
-	ownerIdentifiers := make([]string, 0)
-	for identifier := range keyshare.PublicShares {
+func (sk *SigningKeyshare) MarshalProto() *pb.SigningKeyshare {
+	var ownerIdentifiers []string
+	for identifier := range sk.PublicShares {
 		ownerIdentifiers = append(ownerIdentifiers, identifier)
 	}
 
 	return &pb.SigningKeyshare{
 		OwnerIdentifiers: ownerIdentifiers,
-		Threshold:        uint32(keyshare.MinSigners),
-		PublicKey:        keyshare.PublicKey,
-		PublicShares:     keyshare.PublicShares,
-		UpdatedTime:      timestamppb.New(keyshare.UpdateTime),
+		Threshold:        uint32(sk.MinSigners),
+		PublicKey:        sk.PublicKey,
+		PublicShares:     sk.PublicShares,
+		UpdatedTime:      timestamppb.New(sk.UpdateTime),
 	}
 }
 

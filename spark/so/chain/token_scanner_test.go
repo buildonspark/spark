@@ -3,12 +3,12 @@ package chain
 import (
 	"context"
 	"encoding/binary"
+	"github.com/lightsparkdev/spark/common/keys"
 	"math/rand/v2"
 	"slices"
 	"testing"
 
 	"github.com/btcsuite/btcd/wire"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/stretchr/testify/require"
 
 	"github.com/btcsuite/btcd/txscript"
@@ -24,7 +24,7 @@ import (
 var (
 	seededRand   = rand.NewChaCha8([32]byte{})
 	maxSupply    = []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
-	issuerPubKey = genSeededPubKey()
+	issuerPubKey = keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()
 )
 
 // setupIsolatedTest creates a fresh database context for a test or subtest with proper cleanup.
@@ -42,7 +42,7 @@ func setupIsolatedTest(t *testing.T) (context.Context, *ent.Tx) {
 	require.NoError(t, err)
 
 	// Create required EntityDkgKey for token operations
-	entityDkgPublicKey := genSeededPubKey()
+	entityDkgPublicKey := keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()
 	signingKeyshare, err := dbTx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
 		SetSecretShare([]byte("test_secret")).
@@ -407,14 +407,6 @@ func createExpectedTokenMetadata() *common.TokenMetadata {
 	}
 }
 
-func genSeededPubKey() []byte {
-	key, err := secp256k1.GeneratePrivateKeyFromRand(seededRand)
-	if err != nil {
-		panic(err)
-	}
-	return key.PubKey().SerializeCompressed()
-}
-
 // Helper function to verify entity counts in the database
 func verifyEntityCounts(t *testing.T, ctx context.Context, dbTx *ent.Tx, expectedL1Count, expectedSparkCount int, messagePrefix string) {
 	t.Helper()
@@ -506,7 +498,7 @@ func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
 	}
 
 	// Create required EntityDkgKey for Spark token creation (reused across tests)
-	entityDkgPublicKey := genSeededPubKey()
+	entityDkgPublicKey := keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()
 	signingKeyshare, err := dbTx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
 		SetSecretShare([]byte("test_secret")).
