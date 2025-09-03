@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/spark-bare-app",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,8 +8,8 @@
     "create-lightning-invoice": "bare create-lightning-invoice.js 1000"
   },
   "dependencies": {
-    "@buildonspark/bare": "0.0.9",
-    "@buildonspark/spark-sdk": "0.2.12",
+    "@buildonspark/bare": "0.0.10",
+    "@buildonspark/spark-sdk": "0.2.13",
     "bare": "^1.21.3",
     "bare-assert": "^1.0.2",
     "bare-async-hooks": "^0.0.0",

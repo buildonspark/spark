@@ -1,7 +1,7 @@
 {
   "name": "@buildonspark/spark-expo-react-native-app",
   "main": "expo-router/entry",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "type": "module",
   "scripts": {
     "start": "expo start",
@@ -13,7 +13,7 @@
     "lint": "expo lint"
   },
   "dependencies": {
-    "@buildonspark/spark-sdk": "0.2.12",
+    "@buildonspark/spark-sdk": "0.2.13",
     "@expo/vector-icons": "^14.1.0",
     "@react-native-community/cli": "19.0.0",
     "@react-navigation/bottom-tabs": "^7.3.10",

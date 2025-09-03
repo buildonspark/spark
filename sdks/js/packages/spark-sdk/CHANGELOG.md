@@ -1,5 +1,12 @@
 # @buildonspark/spark-sdk
 
+## 0.2.13
+
+### Patch Changes
+
+- - Add create and broadcast static deposit refund tx
+  - Update tests to be less flaky
+
 ## 0.2.12
 
 ### Patch Changes

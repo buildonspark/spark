@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/spark-react-native-app",
-  "version": "0.0.18",
+  "version": "0.0.19",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@azure/core-asynciterator-polyfill": "^1.0.2",
-    "@buildonspark/spark-sdk": "0.2.12",
+    "@buildonspark/spark-sdk": "0.2.13",
     "@react-native/new-app-screen": "0.80.1",
     "react": "19.0.0",
     "react-native": "0.79.4",
