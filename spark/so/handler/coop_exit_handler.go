@@ -10,7 +10,6 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authz"
@@ -134,12 +133,10 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 
 	err = transferHandler.syncCoopExitInit(ctx, req)
 	if err != nil {
-		_, err = transferHandler.CancelTransfer(ctx, &pbspark.CancelTransferRequest{
-			TransferId:              req.Transfer.TransferId,
-			SenderIdentityPublicKey: req.Transfer.OwnerIdentityPublicKey,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to cancel transfer for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
+
+		cancelErr := transferHandler.CreateCancelTransferGossipMessage(ctx, req.Transfer.TransferId)
+		if cancelErr != nil {
+			return nil, fmt.Errorf("failed to create cancel transfer gossip message for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
 		}
 
 		return nil, fmt.Errorf("failed to sync transfer init for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
