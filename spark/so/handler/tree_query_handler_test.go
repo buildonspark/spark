@@ -71,6 +71,7 @@ func TestQueryStaticDepositAddresses(t *testing.T) {
 		SetSigningKeyshare(signingKeyshare2).
 		SetNetwork(st.NetworkRegtest).
 		SetIsStatic(true).
+		SetIsDefault(false).
 		Save(ctx)
 	require.NoError(t, err)
 	// This is a different identity pubkey, so it should not be returned

@@ -68,6 +68,7 @@ var (
 		{Name: "possession_signature", Type: field.TypeBytes, Nullable: true},
 		{Name: "node_id", Type: field.TypeUUID, Nullable: true},
 		{Name: "is_static", Type: field.TypeBool, Default: false},
+		{Name: "is_default", Type: field.TypeBool, Default: true},
 		{Name: "deposit_address_signing_keyshare", Type: field.TypeUUID},
 	}
 	// DepositAddressesTable holds the schema information for the "deposit_addresses" table.
@@ -78,7 +79,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "deposit_addresses_signing_keyshares_signing_keyshare",
-				Columns:    []*schema.Column{DepositAddressesColumns[13]},
+				Columns:    []*schema.Column{DepositAddressesColumns[14]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -102,7 +103,15 @@ var (
 			{
 				Name:    "depositaddress_deposit_address_signing_keyshare",
 				Unique:  false,
-				Columns: []*schema.Column{DepositAddressesColumns[13]},
+				Columns: []*schema.Column{DepositAddressesColumns[14]},
+			},
+			{
+				Name:    "depositaddress_network_owner_identity_pubkey",
+				Unique:  true,
+				Columns: []*schema.Column{DepositAddressesColumns[4], DepositAddressesColumns[5]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "is_static = true and is_default = true",
+				},
 			},
 		},
 	}

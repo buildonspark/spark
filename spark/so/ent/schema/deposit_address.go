@@ -2,6 +2,7 @@ package schema
 
 import (
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -30,6 +31,7 @@ func (DepositAddress) Indexes() []ent.Index {
 		index.Fields("owner_identity_pubkey"),
 		index.Fields("owner_signing_pubkey"),
 		index.Edges("signing_keyshare"),
+		index.Fields("network", "owner_identity_pubkey").Unique().Annotations(entsql.IndexWhere("is_static = true and is_default = true")),
 	}
 }
 
@@ -70,6 +72,10 @@ func (DepositAddress) Fields() []ent.Field {
 		field.Bool("is_static").
 			Default(false).
 			Comment("Whether the deposit address is static."),
+		field.Bool("is_default").
+			Default(true).
+			Comment("Whether the deposit address is the default address for the user." +
+				"This is only used for static deposit addresses. Static deposit addresses should be unique for the network/user, but since this was not previously enforced, is_default is used to enforce uniqueness."),
 	}
 }
 

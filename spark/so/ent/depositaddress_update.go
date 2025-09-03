@@ -163,6 +163,20 @@ func (dau *DepositAddressUpdate) SetNillableIsStatic(b *bool) *DepositAddressUpd
 	return dau
 }
 
+// SetIsDefault sets the "is_default" field.
+func (dau *DepositAddressUpdate) SetIsDefault(b bool) *DepositAddressUpdate {
+	dau.mutation.SetIsDefault(b)
+	return dau
+}
+
+// SetNillableIsDefault sets the "is_default" field if the given value is not nil.
+func (dau *DepositAddressUpdate) SetNillableIsDefault(b *bool) *DepositAddressUpdate {
+	if b != nil {
+		dau.SetIsDefault(*b)
+	}
+	return dau
+}
+
 // AddUtxoIDs adds the "utxo" edge to the Utxo entity by IDs.
 func (dau *DepositAddressUpdate) AddUtxoIDs(ids ...uuid.UUID) *DepositAddressUpdate {
 	dau.mutation.AddUtxoIDs(ids...)
@@ -351,6 +365,9 @@ func (dau *DepositAddressUpdate) sqlSave(ctx context.Context) (n int, err error)
 	}
 	if value, ok := dau.mutation.IsStatic(); ok {
 		_spec.SetField(depositaddress.FieldIsStatic, field.TypeBool, value)
+	}
+	if value, ok := dau.mutation.IsDefault(); ok {
+		_spec.SetField(depositaddress.FieldIsDefault, field.TypeBool, value)
 	}
 	if dau.mutation.UtxoCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -593,6 +610,20 @@ func (dauo *DepositAddressUpdateOne) SetNillableIsStatic(b *bool) *DepositAddres
 	return dauo
 }
 
+// SetIsDefault sets the "is_default" field.
+func (dauo *DepositAddressUpdateOne) SetIsDefault(b bool) *DepositAddressUpdateOne {
+	dauo.mutation.SetIsDefault(b)
+	return dauo
+}
+
+// SetNillableIsDefault sets the "is_default" field if the given value is not nil.
+func (dauo *DepositAddressUpdateOne) SetNillableIsDefault(b *bool) *DepositAddressUpdateOne {
+	if b != nil {
+		dauo.SetIsDefault(*b)
+	}
+	return dauo
+}
+
 // AddUtxoIDs adds the "utxo" edge to the Utxo entity by IDs.
 func (dauo *DepositAddressUpdateOne) AddUtxoIDs(ids ...uuid.UUID) *DepositAddressUpdateOne {
 	dauo.mutation.AddUtxoIDs(ids...)
@@ -811,6 +842,9 @@ func (dauo *DepositAddressUpdateOne) sqlSave(ctx context.Context) (_node *Deposi
 	}
 	if value, ok := dauo.mutation.IsStatic(); ok {
 		_spec.SetField(depositaddress.FieldIsStatic, field.TypeBool, value)
+	}
+	if value, ok := dauo.mutation.IsDefault(); ok {
+		_spec.SetField(depositaddress.FieldIsDefault, field.TypeBool, value)
 	}
 	if dauo.mutation.UtxoCleared() {
 		edge := &sqlgraph.EdgeSpec{

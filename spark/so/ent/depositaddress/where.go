@@ -108,6 +108,11 @@ func IsStatic(v bool) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldIsStatic, v))
 }
 
+// IsDefault applies equality check predicate on the "is_default" field. It's identical to IsDefaultEQ.
+func IsDefault(v bool) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldEQ(FieldIsDefault, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldCreateTime, v))
@@ -616,6 +621,16 @@ func IsStaticEQ(v bool) predicate.DepositAddress {
 // IsStaticNEQ applies the NEQ predicate on the "is_static" field.
 func IsStaticNEQ(v bool) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldNEQ(FieldIsStatic, v))
+}
+
+// IsDefaultEQ applies the EQ predicate on the "is_default" field.
+func IsDefaultEQ(v bool) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldEQ(FieldIsDefault, v))
+}
+
+// IsDefaultNEQ applies the NEQ predicate on the "is_default" field.
+func IsDefaultNEQ(v bool) predicate.DepositAddress {
+	return predicate.DepositAddress(sql.FieldNEQ(FieldIsDefault, v))
 }
 
 // HasSigningKeyshare applies the HasEdge predicate on the "signing_keyshare" edge.

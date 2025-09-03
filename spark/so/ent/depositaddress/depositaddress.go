@@ -42,6 +42,8 @@ const (
 	FieldNodeID = "node_id"
 	// FieldIsStatic holds the string denoting the is_static field in the database.
 	FieldIsStatic = "is_static"
+	// FieldIsDefault holds the string denoting the is_default field in the database.
+	FieldIsDefault = "is_default"
 	// EdgeSigningKeyshare holds the string denoting the signing_keyshare edge name in mutations.
 	EdgeSigningKeyshare = "signing_keyshare"
 	// EdgeUtxo holds the string denoting the utxo edge name in mutations.
@@ -88,6 +90,7 @@ var Columns = []string{
 	FieldPossessionSignature,
 	FieldNodeID,
 	FieldIsStatic,
+	FieldIsDefault,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "deposit_addresses"
@@ -128,6 +131,8 @@ var (
 	AddressValidator func(string) error
 	// DefaultIsStatic holds the default value on creation for the "is_static" field.
 	DefaultIsStatic bool
+	// DefaultIsDefault holds the default value on creation for the "is_default" field.
+	DefaultIsDefault bool
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )
@@ -188,6 +193,11 @@ func ByNodeID(opts ...sql.OrderTermOption) OrderOption {
 // ByIsStatic orders the results by the is_static field.
 func ByIsStatic(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldIsStatic, opts...).ToFunc()
+}
+
+// ByIsDefault orders the results by the is_default field.
+func ByIsDefault(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIsDefault, opts...).ToFunc()
 }
 
 // BySigningKeyshareField orders the results by signing_keyshare field.

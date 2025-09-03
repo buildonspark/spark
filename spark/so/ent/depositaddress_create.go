@@ -157,6 +157,20 @@ func (dac *DepositAddressCreate) SetNillableIsStatic(b *bool) *DepositAddressCre
 	return dac
 }
 
+// SetIsDefault sets the "is_default" field.
+func (dac *DepositAddressCreate) SetIsDefault(b bool) *DepositAddressCreate {
+	dac.mutation.SetIsDefault(b)
+	return dac
+}
+
+// SetNillableIsDefault sets the "is_default" field if the given value is not nil.
+func (dac *DepositAddressCreate) SetNillableIsDefault(b *bool) *DepositAddressCreate {
+	if b != nil {
+		dac.SetIsDefault(*b)
+	}
+	return dac
+}
+
 // SetID sets the "id" field.
 func (dac *DepositAddressCreate) SetID(u uuid.UUID) *DepositAddressCreate {
 	dac.mutation.SetID(u)
@@ -267,6 +281,10 @@ func (dac *DepositAddressCreate) defaults() error {
 		v := depositaddress.DefaultIsStatic
 		dac.mutation.SetIsStatic(v)
 	}
+	if _, ok := dac.mutation.IsDefault(); !ok {
+		v := depositaddress.DefaultIsDefault
+		dac.mutation.SetIsDefault(v)
+	}
 	if _, ok := dac.mutation.ID(); !ok {
 		if depositaddress.DefaultID == nil {
 			return fmt.Errorf("ent: uninitialized depositaddress.DefaultID (forgotten import ent/runtime?)")
@@ -306,6 +324,9 @@ func (dac *DepositAddressCreate) check() error {
 	}
 	if _, ok := dac.mutation.IsStatic(); !ok {
 		return &ValidationError{Name: "is_static", err: errors.New(`ent: missing required field "DepositAddress.is_static"`)}
+	}
+	if _, ok := dac.mutation.IsDefault(); !ok {
+		return &ValidationError{Name: "is_default", err: errors.New(`ent: missing required field "DepositAddress.is_default"`)}
 	}
 	if len(dac.mutation.SigningKeyshareIDs()) == 0 {
 		return &ValidationError{Name: "signing_keyshare", err: errors.New(`ent: missing required edge "DepositAddress.signing_keyshare"`)}
@@ -393,6 +414,10 @@ func (dac *DepositAddressCreate) createSpec() (*DepositAddress, *sqlgraph.Create
 	if value, ok := dac.mutation.IsStatic(); ok {
 		_spec.SetField(depositaddress.FieldIsStatic, field.TypeBool, value)
 		_node.IsStatic = value
+	}
+	if value, ok := dac.mutation.IsDefault(); ok {
+		_spec.SetField(depositaddress.FieldIsDefault, field.TypeBool, value)
+		_node.IsDefault = value
 	}
 	if nodes := dac.mutation.SigningKeyshareIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -633,6 +658,18 @@ func (u *DepositAddressUpsert) UpdateIsStatic() *DepositAddressUpsert {
 	return u
 }
 
+// SetIsDefault sets the "is_default" field.
+func (u *DepositAddressUpsert) SetIsDefault(v bool) *DepositAddressUpsert {
+	u.Set(depositaddress.FieldIsDefault, v)
+	return u
+}
+
+// UpdateIsDefault sets the "is_default" field to the value that was provided on create.
+func (u *DepositAddressUpsert) UpdateIsDefault() *DepositAddressUpsert {
+	u.SetExcluded(depositaddress.FieldIsDefault)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create except the ID field.
 // Using this option is equivalent to using:
 //
@@ -851,6 +888,20 @@ func (u *DepositAddressUpsertOne) SetIsStatic(v bool) *DepositAddressUpsertOne {
 func (u *DepositAddressUpsertOne) UpdateIsStatic() *DepositAddressUpsertOne {
 	return u.Update(func(s *DepositAddressUpsert) {
 		s.UpdateIsStatic()
+	})
+}
+
+// SetIsDefault sets the "is_default" field.
+func (u *DepositAddressUpsertOne) SetIsDefault(v bool) *DepositAddressUpsertOne {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.SetIsDefault(v)
+	})
+}
+
+// UpdateIsDefault sets the "is_default" field to the value that was provided on create.
+func (u *DepositAddressUpsertOne) UpdateIsDefault() *DepositAddressUpsertOne {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.UpdateIsDefault()
 	})
 }
 
@@ -1239,6 +1290,20 @@ func (u *DepositAddressUpsertBulk) SetIsStatic(v bool) *DepositAddressUpsertBulk
 func (u *DepositAddressUpsertBulk) UpdateIsStatic() *DepositAddressUpsertBulk {
 	return u.Update(func(s *DepositAddressUpsert) {
 		s.UpdateIsStatic()
+	})
+}
+
+// SetIsDefault sets the "is_default" field.
+func (u *DepositAddressUpsertBulk) SetIsDefault(v bool) *DepositAddressUpsertBulk {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.SetIsDefault(v)
+	})
+}
+
+// UpdateIsDefault sets the "is_default" field to the value that was provided on create.
+func (u *DepositAddressUpsertBulk) UpdateIsDefault() *DepositAddressUpsertBulk {
+	return u.Update(func(s *DepositAddressUpsert) {
+		s.UpdateIsDefault()
 	})
 }
 

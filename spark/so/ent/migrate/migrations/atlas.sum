@@ -1,4 +1,4 @@
-h1:NR1nw4avnJ8hQKBrvKH90VPg5o8Gg5IrANB8l4Iuv5U=
+h1:ZbcB0PqVLCjE46EyaaRQSwveYsMgziBGwPaJJBrtBrk=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -70,3 +70,4 @@ h1:NR1nw4avnJ8hQKBrvKH90VPg5o8Gg5IrANB8l4Iuv5U=
 20250829214835_add_update_time_token_transaction_index.sql h1:DATNtHzWJwlVh2jNfiz3Vbn6eqvDr3KWizJ9sJ4jztY=
 20250902221055_add_spark_invoice_to_sats_transfer.sql h1:CXaaRUMerJin1pJVbmGLYPf0m9HDWNEUpjamL8Hpibw=
 20250904025400_backfill_deposit_address_network.sql h1:KFkxP+UBmvAbWNrQ87M/eoIc5lw1KkCtdrD+Ovl2T+k=
+20250904025519_deposit_address_is_static_default.sql h1:dBFg1gpuJSI3y4aUdzLvEoJzHARiofxpnH1QeXYuYIg=

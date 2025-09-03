@@ -320,6 +320,94 @@ func TestGenerateStaticDepositAddress(t *testing.T) {
 	})
 }
 
+func TestGenerateStaticDepositAddressReturnsDefaultAddress(t *testing.T) {
+	config := &so.Config{
+		BitcoindConfigs: map[string]so.BitcoindConfig{
+			"regtest": {
+				DepositConfirmationThreshold: 1,
+			},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+		SupportedNetworks: []common.Network{
+			common.Regtest,
+			common.Mainnet,
+		},
+	}
+	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
+	defer dbCtx.Close()
+
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	rng := rand.NewChaCha8([32]byte{})
+	testSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	testIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	keyshare1Key := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingKeyshare1, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare([]byte("test_secret_share1")).
+		SetPublicShares(map[string][]byte{"test": []byte("test_public_share1")}).
+		SetPublicKey(keyshare1Key.Public().Serialize()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create deposit address
+	depositAddress1, err := tx.DepositAddress.Create().
+		SetAddress("test_address1").
+		SetOwnerIdentityPubkey(testIdentityPrivKey.Public()).
+		SetOwnerSigningPubkey(testSigningPrivKey.Public()).
+		SetSigningKeyshare(signingKeyshare1).
+		SetNetwork(st.NetworkRegtest).
+		SetIsStatic(true).
+		SetIsDefault(true).
+		SetAddressSignatures(map[string][]byte{"test": []byte("test_address_signature2")}).
+		SetPossessionSignature([]byte("test_possession_signature2")).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keyshare2Key := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingKeyshare2, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare([]byte("test_secret_share2")).
+		SetPublicShares(map[string][]byte{"test": []byte("test_public_share2")}).
+		SetPublicKey(keyshare2Key.Public().Serialize()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create deposit address
+	_, err = tx.DepositAddress.Create().
+		SetAddress("test_address2").
+		SetOwnerIdentityPubkey(testIdentityPrivKey.Public()).
+		SetOwnerSigningPubkey(testSigningPrivKey.Public()).
+		SetSigningKeyshare(signingKeyshare2).
+		SetNetwork(st.NetworkRegtest).
+		SetIsStatic(true).
+		SetIsDefault(false).
+		SetAddressSignatures(map[string][]byte{"test": []byte("test_address_signature2")}).
+		SetPossessionSignature([]byte("test_possession_signature2")).
+		Save(ctx)
+	require.NoError(t, err)
+
+	req := &pb.GenerateStaticDepositAddressRequest{
+		SigningPublicKey:  testSigningPrivKey.Public().Serialize(),
+		IdentityPublicKey: testIdentityPrivKey.Public().Serialize(),
+		Network:           pb.Network_REGTEST,
+	}
+
+	handler := NewDepositHandler(config)
+	response, err := handler.GenerateStaticDepositAddress(ctx, config, req)
+	require.NoError(t, err)
+	require.Equal(t, depositAddress1.Address, response.DepositAddress.Address)
+	require.Equal(t, depositAddress1.AddressSignatures, response.DepositAddress.DepositAddressProof.AddressSignatures)
+	require.Equal(t, depositAddress1.PossessionSignature, response.DepositAddress.DepositAddressProof.ProofOfPossessionSignature)
+
+}
+
 func TestGetUtxosFromAddress(t *testing.T) {
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
@@ -418,7 +506,10 @@ func TestGetUtxosFromAddress(t *testing.T) {
 	t.Run("static deposit address with no UTXOs", func(t *testing.T) {
 		// Create static deposit address with no UTXOs
 		staticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e2"
-		_, err := tx.DepositAddress.Create().
+		rng := rand.NewChaCha8([32]byte{2})
+		testIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		testSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		_, err = tx.DepositAddress.Create().
 			SetAddress(staticAddress).
 			SetOwnerIdentityPubkey(testIdentityPubKey).
 			SetOwnerSigningPubkey(testSigningPubKey).
@@ -509,6 +600,9 @@ func TestGetUtxosFromAddress(t *testing.T) {
 	t.Run("pagination limits", func(t *testing.T) {
 		// Create static deposit address
 		staticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e5"
+		rng := rand.NewChaCha8([32]byte{3})
+		testIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		testSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		depositAddress, err := tx.DepositAddress.Create().
 			SetAddress(staticAddress).
 			SetOwnerIdentityPubkey(testIdentityPubKey).
@@ -595,6 +689,9 @@ func TestGetUtxosFromAddress(t *testing.T) {
 	t.Run("static deposit address with insufficient confirmations", func(t *testing.T) {
 		// Create static deposit address
 		staticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e7"
+		rng := rand.NewChaCha8([32]byte{4})
+		testIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		testSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		depositAddress, err := tx.DepositAddress.Create().
 			SetAddress(staticAddress).
 			SetOwnerIdentityPubkey(testIdentityPubKey).
@@ -632,6 +729,9 @@ func TestGetUtxosFromAddress(t *testing.T) {
 	t.Run("network validation error", func(t *testing.T) {
 		// Create static deposit address
 		staticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e8"
+		rng := rand.NewChaCha8([32]byte{5})
+		testIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		testSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		_, err := tx.DepositAddress.Create().
 			SetAddress(staticAddress).
 			SetOwnerIdentityPubkey(testIdentityPubKey).
@@ -654,14 +754,24 @@ func TestGetUtxosFromAddress(t *testing.T) {
 	})
 
 	t.Run("multiple deposit addresses with UTXOs - verify correct filtering", func(t *testing.T) {
+		// This test is to verify that the correct UTXOs are returned when a user
+		// has multiple static deposit addresses. A user should only have one static
+		// deposit address that is the default address, but this was not enforced
+		// initially so there are legacy cases where a user may have multiple static
+		// deposit addresses.
+
 		// Create first static deposit address
 		staticAddress1 := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e9"
+		rng := rand.NewChaCha8([32]byte{6})
+		testIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		testSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		depositAddress1, err := tx.DepositAddress.Create().
 			SetAddress(staticAddress1).
 			SetOwnerIdentityPubkey(testIdentityPubKey).
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
+			SetIsDefault(true).
 			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
@@ -674,6 +784,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 			SetOwnerSigningPubkey(testSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
+			SetIsDefault(false).
 			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
@@ -772,10 +883,11 @@ func TestGetUtxosFromAddress(t *testing.T) {
 	})
 
 	t.Run("UTXOs with UTXO swaps - verify correct filtering", func(t *testing.T) {
-		rng := rand.NewChaCha8([32]byte{})
-
 		// Create static deposit address
 		staticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jzeb"
+		rng := rand.NewChaCha8([32]byte{7})
+		testIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		testSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		depositAddress, err := tx.DepositAddress.Create().
 			SetAddress(staticAddress).
 			SetOwnerIdentityPubkey(testIdentityPubKey).

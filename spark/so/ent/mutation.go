@@ -1251,6 +1251,7 @@ type DepositAddressMutation struct {
 	possession_signature    *[]byte
 	node_id                 *uuid.UUID
 	is_static               *bool
+	is_default              *bool
 	clearedFields           map[string]struct{}
 	signing_keyshare        *uuid.UUID
 	clearedsigning_keyshare bool
@@ -1900,6 +1901,42 @@ func (m *DepositAddressMutation) ResetIsStatic() {
 	m.is_static = nil
 }
 
+// SetIsDefault sets the "is_default" field.
+func (m *DepositAddressMutation) SetIsDefault(b bool) {
+	m.is_default = &b
+}
+
+// IsDefault returns the value of the "is_default" field in the mutation.
+func (m *DepositAddressMutation) IsDefault() (r bool, exists bool) {
+	v := m.is_default
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIsDefault returns the old "is_default" field's value of the DepositAddress entity.
+// If the DepositAddress object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DepositAddressMutation) OldIsDefault(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIsDefault is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIsDefault requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIsDefault: %w", err)
+	}
+	return oldValue.IsDefault, nil
+}
+
+// ResetIsDefault resets all changes to the "is_default" field.
+func (m *DepositAddressMutation) ResetIsDefault() {
+	m.is_default = nil
+}
+
 // SetSigningKeyshareID sets the "signing_keyshare" edge to the SigningKeyshare entity by id.
 func (m *DepositAddressMutation) SetSigningKeyshareID(id uuid.UUID) {
 	m.signing_keyshare = &id
@@ -2081,7 +2118,7 @@ func (m *DepositAddressMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DepositAddressMutation) Fields() []string {
-	fields := make([]string, 0, 12)
+	fields := make([]string, 0, 13)
 	if m.create_time != nil {
 		fields = append(fields, depositaddress.FieldCreateTime)
 	}
@@ -2118,6 +2155,9 @@ func (m *DepositAddressMutation) Fields() []string {
 	if m.is_static != nil {
 		fields = append(fields, depositaddress.FieldIsStatic)
 	}
+	if m.is_default != nil {
+		fields = append(fields, depositaddress.FieldIsDefault)
+	}
 	return fields
 }
 
@@ -2150,6 +2190,8 @@ func (m *DepositAddressMutation) Field(name string) (ent.Value, bool) {
 		return m.NodeID()
 	case depositaddress.FieldIsStatic:
 		return m.IsStatic()
+	case depositaddress.FieldIsDefault:
+		return m.IsDefault()
 	}
 	return nil, false
 }
@@ -2183,6 +2225,8 @@ func (m *DepositAddressMutation) OldField(ctx context.Context, name string) (ent
 		return m.OldNodeID(ctx)
 	case depositaddress.FieldIsStatic:
 		return m.OldIsStatic(ctx)
+	case depositaddress.FieldIsDefault:
+		return m.OldIsDefault(ctx)
 	}
 	return nil, fmt.Errorf("unknown DepositAddress field %s", name)
 }
@@ -2275,6 +2319,13 @@ func (m *DepositAddressMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetIsStatic(v)
+		return nil
+	case depositaddress.FieldIsDefault:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIsDefault(v)
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress field %s", name)
@@ -2414,6 +2465,9 @@ func (m *DepositAddressMutation) ResetField(name string) error {
 		return nil
 	case depositaddress.FieldIsStatic:
 		m.ResetIsStatic()
+		return nil
+	case depositaddress.FieldIsDefault:
+		m.ResetIsDefault()
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress field %s", name)

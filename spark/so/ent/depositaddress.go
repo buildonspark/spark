@@ -46,6 +46,8 @@ type DepositAddress struct {
 	NodeID uuid.UUID `json:"node_id,omitempty"`
 	// Whether the deposit address is static.
 	IsStatic bool `json:"is_static,omitempty"`
+	// Whether the deposit address is the default address for the user.This is only used for static deposit addresses. Static deposit addresses should be unique for the network/user, but since this was not previously enforced, is_default is used to enforce uniqueness.
+	IsDefault bool `json:"is_default,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the DepositAddressQuery when eager-loading is set.
 	Edges                            DepositAddressEdges `json:"edges"`
@@ -104,7 +106,7 @@ func (*DepositAddress) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case depositaddress.FieldOwnerIdentityPubkey, depositaddress.FieldOwnerSigningPubkey:
 			values[i] = new(keys.Public)
-		case depositaddress.FieldIsStatic:
+		case depositaddress.FieldIsStatic, depositaddress.FieldIsDefault:
 			values[i] = new(sql.NullBool)
 		case depositaddress.FieldConfirmationHeight:
 			values[i] = new(sql.NullInt64)
@@ -211,6 +213,12 @@ func (da *DepositAddress) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				da.IsStatic = value.Bool
 			}
+		case depositaddress.FieldIsDefault:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field is_default", values[i])
+			} else if value.Valid {
+				da.IsDefault = value.Bool
+			}
 		case depositaddress.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
 				return fmt.Errorf("unexpected type %T for field deposit_address_signing_keyshare", values[i])
@@ -304,6 +312,9 @@ func (da *DepositAddress) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("is_static=")
 	builder.WriteString(fmt.Sprintf("%v", da.IsStatic))
+	builder.WriteString(", ")
+	builder.WriteString("is_default=")
+	builder.WriteString(fmt.Sprintf("%v", da.IsDefault))
 	builder.WriteByte(')')
 	return builder.String()
 }

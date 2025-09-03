@@ -108,6 +108,10 @@ func init() {
 	depositaddressDescIsStatic := depositaddressFields[9].Descriptor()
 	// depositaddress.DefaultIsStatic holds the default value on creation for the is_static field.
 	depositaddress.DefaultIsStatic = depositaddressDescIsStatic.Default.(bool)
+	// depositaddressDescIsDefault is the schema descriptor for is_default field.
+	depositaddressDescIsDefault := depositaddressFields[10].Descriptor()
+	// depositaddress.DefaultIsDefault holds the default value on creation for the is_default field.
+	depositaddress.DefaultIsDefault = depositaddressDescIsDefault.Default.(bool)
 	// depositaddressDescID is the schema descriptor for id field.
 	depositaddressDescID := depositaddressMixinFields0[0].Descriptor()
 	// depositaddress.DefaultID holds the default value on creation for the id field.
