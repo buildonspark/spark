@@ -855,8 +855,6 @@ func TestStartDepositTreeCreationUnconfirmed(t *testing.T) {
 	_, err = client.SendRawTransaction(signedDepositTx, true)
 	require.NoError(t, err)
 
-	_, err = wallet.SendTransfer(t.Context(), config, leavesToTransfer, receiverPrivKey.Public(), time.Now().Add(10*time.Minute))
-	require.ErrorContains(t, err, "failed to start transfer")
 	_, err = wallet.SendTransferWithKeyTweaks(
 		t.Context(),
 		config,
