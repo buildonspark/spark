@@ -266,19 +266,25 @@ describe("SSP static deposit address integration", () => {
 
       for (let i = 0; i < 98; i++) {
         await faucet.sendToAddress(depositAddress, THIRD_DEPOSIT_AMOUNT);
-        await faucet.mineBlocks(6);
-        await new Promise((resolve) => setTimeout(resolve, 100));
       }
 
       await faucet.mineBlocks(6);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      const utxosExcludeClaimed = await userWallet.getUtxosForDepositAddress(
-        depositAddress,
-        100,
-        0,
-        true,
-      );
+      let utxosExcludeClaimed: any[] = [];
+      const utxosExcludeClaimedExpected = 98;
+      const maxAttempts = 10;
+      for (let attempt = 1; attempt <= 10; attempt++) {
+        utxosExcludeClaimed = await userWallet.getUtxosForDepositAddress(
+          depositAddress,
+          100,
+          0,
+          true,
+        );
+        if (utxosExcludeClaimed.length === utxosExcludeClaimedExpected) break;
+        if (attempt < maxAttempts)
+          await new Promise((r) => setTimeout(r, 5000));
+      }
+
       expect(utxosExcludeClaimed.length).toBe(98);
 
       const utxos = await userWallet.getUtxosForDepositAddress(
