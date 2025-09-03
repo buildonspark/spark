@@ -8,7 +8,6 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark/common"
 	pbmock "github.com/lightsparkdev/spark/proto/mock"
 	"github.com/lightsparkdev/spark/proto/spark"
@@ -622,9 +621,9 @@ func TestQueryTransfers(t *testing.T) {
 	require.NoError(t, err)
 
 	// Alice sends adaptor and signature to Bob, Bob validates the adaptor
-	nodeVerifyingPubkey, err := secp256k1.ParsePubKey(senderRootNode.VerifyingPublicKey)
+	nodeVerifyingPubKey, err := keys.ParsePublicKey(senderRootNode.VerifyingPublicKey)
 	require.NoError(t, err)
-	taprootKey := txscript.ComputeTaprootKeyNoScript(nodeVerifyingPubkey)
+	taprootKey := txscript.ComputeTaprootKeyNoScript(nodeVerifyingPubKey.ToBTCEC())
 	err = common.ValidateOutboundAdaptorSignature(taprootKey, sighash, adaptorAddedSignature, adaptorPrivKey.Public().Serialize())
 	require.NoError(t, err)
 
@@ -652,9 +651,9 @@ func TestQueryTransfers(t *testing.T) {
 	receiverSighash, err := common.SigHashFromTx(leafDataMap[receiverLeavesToTransfer[0].Leaf.Id].RefundTx, 0, leafDataMap[receiverLeavesToTransfer[0].Leaf.Id].Tx.TxOut[leafDataMap[receiverLeavesToTransfer[0].Leaf.Id].Vout])
 	require.NoError(t, err)
 
-	receiverKey, err := secp256k1.ParsePubKey(receiverLeavesToTransfer[0].Leaf.VerifyingPublicKey)
+	receiverKey, err := keys.ParsePublicKey(receiverLeavesToTransfer[0].Leaf.VerifyingPublicKey)
 	require.NoError(t, err)
-	receiverTaprootKey := txscript.ComputeTaprootKeyNoScript(receiverKey)
+	receiverTaprootKey := txscript.ComputeTaprootKeyNoScript(receiverKey.ToBTCEC())
 
 	_, err = common.ApplyAdaptorToSignature(receiverTaprootKey, receiverSighash, receiverRefundSignatureMap[receiverLeavesToTransfer[0].Leaf.Id], adaptorPrivKeyBytes)
 	require.NoError(t, err)
@@ -664,15 +663,15 @@ func TestQueryTransfers(t *testing.T) {
 	for nodeID, signature := range receiverRefundSignatureMap {
 		leafData := leafDataMap[nodeID]
 		sighash, _ := common.SigHashFromTx(leafData.RefundTx, 0, leafData.Tx.TxOut[leafData.Vout])
-		var verifyingPubkey *secp256k1.PublicKey
+		var verifyingPubkey keys.Public
 		for _, signingResult := range operatorSigningResults {
 			if signingResult.LeafId == nodeID {
-				verifyingPubkey, err = secp256k1.ParsePubKey(signingResult.VerifyingKey)
+				verifyingPubkey, err = keys.ParsePublicKey(signingResult.VerifyingKey)
 				require.NoError(t, err)
 			}
 		}
 		assert.NotNil(t, verifyingPubkey, "expected signing result for leaf %s", nodeID)
-		taprootKey := txscript.ComputeTaprootKeyNoScript(verifyingPubkey)
+		taprootKey := txscript.ComputeTaprootKeyNoScript(verifyingPubkey.ToBTCEC())
 		adaptorSig, err := common.ApplyAdaptorToSignature(taprootKey, sighash, signature, adaptorPrivKeyBytes)
 		require.NoError(t, err)
 		newReceiverRefundSignatureMap[nodeID] = adaptorSig

@@ -1394,11 +1394,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 		require.NoError(t, err)
 		spendTx2.AddTxOut(wire.NewTxOut(int64(quoteAmount), spendPkScript2))
 
-		spendTxSighash2, err := common.SigHashFromTx(
-			spendTx2,
-			0,
-			signedDepositTx.TxOut[vout],
-		)
+		spendTxSighash2, err := common.SigHashFromTx(spendTx2, 0, signedDepositTx.TxOut[vout])
 		require.NoError(t, err)
 		userSignature2, err := createUserSignature(
 			signedDepositTx.TxHash().String(),
