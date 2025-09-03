@@ -122,19 +122,26 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 		if err != nil {
 			return nil, err
 		}
-
-		// When disconnecting LRC20, we must have token metadata
-		if h.config.Token.DisconnectLRC20Node && tokenMetadata == nil {
+		if tokenMetadata == nil {
 			return nil, tokens.FormatErrorWithTransactionProto("minting not allowed because a created token was not found", req.FinalTokenTransaction,
 				fmt.Errorf("no tokencreate entity found for token"))
 		}
 
-		// Enforce max supply if disconnecting LRC20 or if we have a token create entry in the DB
-		if h.config.Token.DisconnectLRC20Node || tokenMetadata != nil {
-			err = tokens.ValidateMintDoesNotExceedMaxSupply(ctx, req.FinalTokenTransaction)
-			if err != nil {
-				return nil, err
-			}
+		txNet, err := common.NetworkFromProtoNetwork(req.FinalTokenTransaction.Network)
+		if err != nil {
+			return nil, tokens.FormatErrorWithTransactionProto("failed to get network from proto network", req.FinalTokenTransaction, err)
+		}
+		if txNet != tokenMetadata.Network {
+			return nil, tokens.FormatErrorWithTransactionProto(
+				fmt.Sprintf("transaction network %s does not match token network %s", txNet.String(), tokenMetadata.Network.String()),
+				req.FinalTokenTransaction,
+				nil,
+			)
+		}
+
+		err = tokens.ValidateMintDoesNotExceedMaxSupply(ctx, req.FinalTokenTransaction)
+		if err != nil {
+			return nil, err
 		}
 	case utils.TokenTransactionTypeTransfer:
 		inputTtxos, err = ent.FetchAndLockTokenInputs(ctx, req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend())

@@ -3,8 +3,10 @@ package tokens
 import (
 	"context"
 	"fmt"
-	"github.com/lightsparkdev/spark/common/keys"
 	"math/big"
+
+	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/lightsparkdev/spark/common/logging"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -45,7 +47,16 @@ func ValidateMintDoesNotExceedMaxSupply(ctx context.Context, tokenTransaction *t
 		issuerPublicKey = tokenPublicKey
 	}
 
-	err := validateMintAgainstMaxSupplyCore(ctx, mintAmount, tokenIdentifier, issuerPublicKey)
+	network, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
+	if err != nil {
+		return fmt.Errorf("failed to get network: %w", err)
+	}
+	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+	if err != nil {
+		return fmt.Errorf("failed to get schema network: %w", err)
+	}
+
+	err = validateMintAgainstMaxSupplyCore(ctx, mintAmount, tokenIdentifier, issuerPublicKey, schemaNetwork)
 	if err != nil {
 		return FormatErrorWithTransactionProto(err.Error(), tokenTransaction, err)
 	}
@@ -63,21 +74,27 @@ func ValidateMintDoesNotExceedMaxSupplyEnt(ctx context.Context, tokenTransaction
 
 	if tokenTransaction.Edges.Mint == nil {
 		return fmt.Errorf("cannot verify max supply for mint transaction because no mint input was found")
-
 	}
+
 	tokenIdentifier := tokenTransaction.Edges.Mint.TokenIdentifier
 	issuerPublicKey, err := keys.ParsePublicKey(tokenTransaction.Edges.Mint.IssuerPublicKey)
 	if err != nil {
 		return fmt.Errorf("failed to get issuer public key: %w", err)
 	}
-	if err := validateMintAgainstMaxSupplyCore(ctx, mintAmount, tokenIdentifier, issuerPublicKey); err != nil {
+
+	network, err := tokenTransaction.GetNetworkFromEdges()
+	if err != nil {
+		return FormatErrorWithTransactionEnt("failed to get network from token transaction", tokenTransaction, err)
+	}
+
+	if err := validateMintAgainstMaxSupplyCore(ctx, mintAmount, tokenIdentifier, issuerPublicKey, network); err != nil {
 		return FormatErrorWithTransactionEnt(err.Error(), tokenTransaction, err)
 	}
 	return nil
 }
 
 // validateMintAgainstMaxSupplyCore contains the core validation logic that both proto and Ent versions can use.
-func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, tokenIdentifier []byte, issuerPublicKey keys.Public) error {
+func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, tokenIdentifier []byte, issuerPublicKey keys.Public, network st.Network) error {
 	logger := logging.GetLoggerFromContext(ctx)
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -86,13 +103,12 @@ func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, 
 
 	// Get token metadata
 	var tokenCreate *ent.TokenCreate
-
 	var identifierInfo string
 	if tokenIdentifier != nil {
 		tokenCreate, err = db.TokenCreate.Query().Where(tokencreate.TokenIdentifierEQ(tokenIdentifier)).First(ctx)
 		identifierInfo = fmt.Sprintf("token identifier: %x", tokenIdentifier)
 	} else if !issuerPublicKey.IsZero() {
-		tokenCreate, err = db.TokenCreate.Query().Where(tokencreate.IssuerPublicKeyEQ(issuerPublicKey.Serialize())).First(ctx)
+		tokenCreate, err = db.TokenCreate.Query().Where(tokencreate.IssuerPublicKeyEQ(issuerPublicKey.Serialize()), tokencreate.NetworkEQ(network)).First(ctx)
 		identifierInfo = fmt.Sprintf("issuer public key: %v", issuerPublicKey)
 	} else {
 		return fmt.Errorf("no token identifier or issuer public key provided")

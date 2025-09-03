@@ -55,13 +55,22 @@ func GetTokenMetadataForTokenTransaction(ctx context.Context, tokenTransaction *
 
 	issuerPublicKey := getIssuerPublicKeyFromTransaction(tokenTransaction)
 	if issuerPublicKey != nil {
-		tokenCreate, err := tx.TokenCreate.Query().Where(tokencreate.IssuerPublicKeyEQ(issuerPublicKey)).First(ctx)
+		network, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
+		if err != nil {
+			return nil, err
+		}
+		schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+		if err != nil {
+			return nil, err
+		}
+		tokenCreate, err := tx.TokenCreate.Query().Where(tokencreate.IssuerPublicKeyEQ(issuerPublicKey), tokencreate.NetworkEQ(schemaNetwork)).First(ctx)
 		if err == nil {
 			return tokenCreate.ToTokenMetadata()
 		}
 		if !IsNotFound(err) {
 			return nil, fmt.Errorf("error querying TokenCreate table: %w", err)
 		}
+
 		logger.Warn("no token found for token transaction by issuer public key", "token_transaction", tokenTransaction)
 		return nil, nil
 	}

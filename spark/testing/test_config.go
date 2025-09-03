@@ -240,6 +240,7 @@ func SpecificOperatorTestConfig(operatorIndex int) (*so.Config, error) {
 		SignerAddress:              getLocalFrostSignerAddress(),
 		DatabasePath:               getTestDatabasePath(operatorIndex),
 		FrostGRPCConnectionFactory: &TestGRPCConnectionFactory{},
+		SupportedNetworks:          []common.Network{common.Regtest, common.Mainnet},
 	}
 
 	return &config, nil
@@ -354,6 +355,9 @@ type TestWalletConfigParams struct {
 	// UseTokenTransactionSchnorrSignatures toggles Schnorr vs ECDSA signatures when constructing
 	// transactions in tests.
 	UseTokenTransactionSchnorrSignatures bool
+
+	// Network allows callers to override the default network (Regtest).
+	Network common.Network
 }
 
 // TestWalletConfigWithParams creates a wallet.Config suitable for tests using the provided parameters.
@@ -378,9 +382,14 @@ func TestWalletConfigWithParams(p TestWalletConfigParams) (*wallet.TestWalletCon
 		return nil, err
 	}
 
+	network := common.Regtest
+	if p.Network != common.Unspecified {
+		network = p.Network
+	}
+
 	coordinatorIdentifier := fmt.Sprintf("%064d", p.CoordinatorIndex+1)
 	return &wallet.TestWalletConfig{
-		Network:                               common.Regtest,
+		Network:                               network,
 		SigningOperators:                      signingOperators,
 		CoordinatorIdentifier:                 coordinatorIdentifier,
 		FrostSignerAddress:                    getLocalFrostSignerAddress(),
