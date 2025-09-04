@@ -307,27 +307,6 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 			return nil, fmt.Errorf("failed to get keyshare for static deposit address id %s: %w", depositAddress.ID, err)
 		}
 
-		keysharePubKey, err := keys.ParsePublicKey(keyshare.PublicKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse keyshare public key: %w", err)
-		}
-		verifyingKey := keysharePubKey.Add(depositAddress.OwnerSigningPubkey)
-
-		// Check if the proofs are already cached.
-		if depositAddress.AddressSignatures != nil && depositAddress.PossessionSignature != nil {
-
-			return &pb.GenerateStaticDepositAddressResponse{
-				DepositAddress: &pb.Address{
-					Address:      depositAddress.Address,
-					VerifyingKey: verifyingKey.Serialize(),
-					DepositAddressProof: &pb.DepositAddressProof{
-						AddressSignatures:          depositAddress.AddressSignatures,
-						ProofOfPossessionSignature: depositAddress.PossessionSignature,
-					},
-				},
-			}, nil
-		}
-
 		addressSignatures, proofOfPossessionSignature, err := generateStaticDepositAddressProofs(ctx, config, keyshare, depositAddress)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate static deposit address proofs for static deposit address id %s: %w", depositAddress.ID, err)
@@ -335,6 +314,12 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 		if addressSignatures == nil {
 			return nil, fmt.Errorf("static deposit address id %s does not have proofs on all operators", depositAddress.ID)
 		}
+
+		keysharePubKey, err := keys.ParsePublicKey(keyshare.PublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse keyshare public key: %w", err)
+		}
+		verifyingKey := keysharePubKey.Add(depositAddress.OwnerSigningPubkey)
 
 		// Return the whole deposit address data.
 		logger.Info("Static deposit address already exists", "id", depositAddress.ID, "address", depositAddress.Address)
@@ -485,6 +470,11 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 }
 
 func generateStaticDepositAddressProofs(ctx context.Context, config *so.Config, keyshare *ent.SigningKeyshare, depositAddress *ent.DepositAddress) (map[string][]byte, []byte, error) {
+	// If the proofs are already cached, return them.
+	if depositAddress.AddressSignatures != nil && depositAddress.PossessionSignature != nil {
+		return depositAddress.AddressSignatures, depositAddress.PossessionSignature, nil
+	}
+
 	logger := logging.GetLoggerFromContext(ctx)
 
 	internalHandler := NewInternalDepositHandler(config)
