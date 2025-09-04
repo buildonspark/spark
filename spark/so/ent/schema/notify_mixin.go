@@ -10,7 +10,30 @@ import (
 	"entgo.io/ent/schema/mixin"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/ent"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 )
+
+var globalNotifyCounter metric.Int64Counter
+
+func init() {
+	meter := otel.GetMeterProvider().Meter("spark.db.ent")
+	notifyCounter, err := meter.Int64Counter(
+		"spark_ent_notify_per_channel",
+		metric.WithDescription("Count of Postgres NOTIFY per channel"),
+		metric.WithUnit("{count}"),
+	)
+	if err != nil {
+		otel.Handle(err)
+		if notifyCounter == nil {
+			notifyCounter = noop.Int64Counter{}
+		}
+	}
+
+	globalNotifyCounter = notifyCounter
+}
 
 /*
 The payload will always include the ID field.
@@ -61,6 +84,8 @@ func (n NotifyMixin) sendNotification(ctx context.Context, m ent.Mutation, v ent
 
 	channel := m.Type()
 	query := fmt.Sprintf("NOTIFY %s, '%s'", channel, payloadJSON)
+
+	globalNotifyCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("channel", channel)))
 
 	// nolint:forbidigo
 	_, err = client.ExecContext(ctx, query)
