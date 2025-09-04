@@ -464,7 +464,7 @@ func (h *BaseTransferHandler) validateCooperativeExitLeaves(ctx context.Context,
 		if err != nil {
 			return fmt.Errorf("unable to validate refund tx for leaf %s: %w", leaf.ID, err)
 		}
-		err = h.leafAvailableToTransfer(ctx, leaf, transfer)
+		err = h.LeafAvailableToTransfer(ctx, leaf, transfer)
 		if err != nil {
 			return fmt.Errorf("unable to validate leaf %s: %w", leaf.ID, err)
 		}
@@ -483,7 +483,7 @@ func (h *BaseTransferHandler) validatePreimageSwapLeaves(
 	requireDirectTx bool,
 ) error {
 	for _, leaf := range leaves {
-		err := h.leafAvailableToTransfer(ctx, leaf, transfer)
+		err := h.LeafAvailableToTransfer(ctx, leaf, transfer)
 		if err != nil {
 			return fmt.Errorf("unable to validate leaf %s: %w", leaf.ID, err)
 		}
@@ -514,7 +514,7 @@ func (h *BaseTransferHandler) validateUtxoSwapLeaves(
 		if err != nil {
 			return fmt.Errorf("unable to validate refund tx for leaf %s: %w", leaf.ID, err)
 		}
-		err = h.leafAvailableToTransfer(ctx, leaf, transfer)
+		err = h.LeafAvailableToTransfer(ctx, leaf, transfer)
 		if err != nil {
 			return fmt.Errorf("unable to validate leaf %s: %w", leaf.ID, err)
 		}
@@ -543,7 +543,7 @@ func (h *BaseTransferHandler) validateTransferLeaves(
 		if err != nil {
 			return fmt.Errorf("unable to validate refund tx for leaf %s: %w", leaf.ID, err)
 		}
-		err = h.leafAvailableToTransfer(ctx, leaf, transfer)
+		err = h.LeafAvailableToTransfer(ctx, leaf, transfer)
 		if err != nil {
 			return fmt.Errorf("unable to validate leaf %s: %w", leaf.ID, err)
 		}
@@ -551,7 +551,7 @@ func (h *BaseTransferHandler) validateTransferLeaves(
 	return nil
 }
 
-func (h *BaseTransferHandler) leafAvailableToTransfer(ctx context.Context, leaf *ent.TreeNode, transfer *ent.Transfer) error {
+func (h *BaseTransferHandler) LeafAvailableToTransfer(ctx context.Context, leaf *ent.TreeNode, transfer *ent.Transfer) error {
 	if leaf.Status != st.TreeNodeStatusAvailable {
 		if leaf.Status == st.TreeNodeStatusTransferLocked {
 			transferLeaves, err := transfer.QueryTransferLeaves().

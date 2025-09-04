@@ -30,6 +30,8 @@ const (
 	TreeNodeStatusLost TreeNodeStatus = "LOST"
 	// TreeNodeStatusReimbursed is the status of a tree node that is reimbursed after LOST.
 	TreeNodeStatusReimbursed TreeNodeStatus = "REIMBURSED"
+	// This node is not valid for transfer, timelock refresh, etc., because the parent node is in the exiting process.
+	TreeNodeStatusParentExited TreeNodeStatus = "PARENT_EXITED"
 )
 
 // Values returns the values of the tree node status.
@@ -48,5 +50,6 @@ func (TreeNodeStatus) Values() []string {
 		string(TreeNodeStatusInvestigation),
 		string(TreeNodeStatusLost),
 		string(TreeNodeStatusReimbursed),
+		string(TreeNodeStatusParentExited),
 	}
 }

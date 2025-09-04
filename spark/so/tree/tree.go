@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark_tree"
@@ -58,8 +59,12 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 	return &pb.GetLeafDenominationCountsResponse{Counts: counts}, nil
 }
 
-// Marks exiting nodes with a proper status and confirmation height in batch update query to the DB.
+// Marks exiting nodes and their children with a proper status and confirmation height in batch update query to the DB.
 // It takes a list of confirmed in a bitcoin block txids and sends it to Postgres to update the tree nodes that have those txids.
+//
+// Each query sends a list of txids to the DB with the length up to 5000 items, amounting to up to 1Mb for the largest query.
+// This should not be a problem for the DB, but one possible optimization is to load the txids to a memory table in the DB
+// and then join it into the queries.
 func MarkExitingNodes(ctx context.Context, dbTx *ent.Tx, confirmedTxHashSet map[[32]byte]bool, blockHeight int64) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
@@ -69,7 +74,7 @@ func MarkExitingNodes(ctx context.Context, dbTx *ent.Tx, confirmedTxHashSet map[
 	}
 
 	// The state goes from OnChain to Exited, so we need to mark the nodes as OnChain first.
-	count, err := dbTx.TreeNode.Update().SetStatus(st.TreeNodeStatusOnChain).
+	countOnChain, err := dbTx.TreeNode.Update().SetStatus(st.TreeNodeStatusOnChain).
 		SetNodeConfirmationHeight(uint64(blockHeight)).
 		Where(treenode.Or(
 			treenode.RawTxidIn(confirmedTxids...),
@@ -79,9 +84,9 @@ func MarkExitingNodes(ctx context.Context, dbTx *ent.Tx, confirmedTxHashSet map[
 	if err != nil {
 		return fmt.Errorf("failed to mark exiting nodes as on chain: %w", err)
 	}
-	logger.Sugar().Infof("MarkExitingNodes: marked %d nodes as %v at block height %d", count, st.TreeNodeStatusOnChain, blockHeight)
+	logger.Sugar().Infof("MarkExitingNodes: marked %d nodes as %v at block height %d", countOnChain, st.TreeNodeStatusOnChain, blockHeight)
 
-	count, err = dbTx.TreeNode.Update().SetStatus(st.TreeNodeStatusExited).
+	countExited, err := dbTx.TreeNode.Update().SetStatus(st.TreeNodeStatusExited).
 		SetRefundConfirmationHeight(uint64(blockHeight)).
 		Where(treenode.Or(
 			treenode.RawRefundTxidIn(confirmedTxids...),
@@ -92,7 +97,41 @@ func MarkExitingNodes(ctx context.Context, dbTx *ent.Tx, confirmedTxHashSet map[
 	if err != nil {
 		return fmt.Errorf("failed to mark exiting nodes as exited: %w", err)
 	}
-	logger.Sugar().Infof("MarkExitingNodes: marked %d nodes as %v at block height %d", count, st.TreeNodeStatusExited, blockHeight)
+	logger.Sugar().Infof("MarkExitingNodes: marked %d nodes as %v at block height %d", countExited, st.TreeNodeStatusExited, blockHeight)
 
+	// With 2 counters, we may update the child node twice (first when we see the
+	// node tx on chain, and then again when the node is exited). We can potentially
+	// optimize this by marking the children only when the parent is marked as OnChain,
+	// but it is safer to do it for each status.
+	if countOnChain > 0 || countExited > 0 {
+		exitedTreeNodes, err := dbTx.TreeNode.Query().Where(treenode.Or(
+			treenode.RawTxidIn(confirmedTxids...),
+			treenode.DirectTxidIn(confirmedTxids...),
+			treenode.RawRefundTxidIn(confirmedTxids...),
+			treenode.DirectRefundTxidIn(confirmedTxids...),
+			treenode.DirectFromCpfpRefundTxidIn(confirmedTxids...),
+		)).
+			Select(treenode.FieldID).
+			All(ctx)
+		if err != nil {
+			return err
+		}
+
+		var exitedTreeNodesIds []uuid.UUID
+		for _, treeNode := range exitedTreeNodes {
+			exitedTreeNodesIds = append(exitedTreeNodesIds, treeNode.ID)
+		}
+		countParentExited, err := dbTx.TreeNode.Update().
+			Where(treenode.HasParentWith(treenode.IDIn(exitedTreeNodesIds...))).
+			SetStatus(st.TreeNodeStatusParentExited).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to update child nodes status: %w", err)
+		}
+		logger.Sugar().Infof("Child tree nodes marked as unusable because parent node is exiting",
+			"node_ids", exitedTreeNodesIds,
+			"count", countParentExited,
+			"block_height", blockHeight)
+	}
 	return nil
 }

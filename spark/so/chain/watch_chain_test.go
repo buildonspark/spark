@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"math/rand/v2"
 	"testing"
+	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/handler"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 
 	"github.com/btcsuite/btcd/chaincfg"
@@ -363,4 +365,234 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	node, err := dbTx.TreeNode.Get(ctx, treeNode.ID)
 	require.NoError(t, err)
 	require.Equal(t, schematype.TreeNodeStatusExited, node.Status)
+}
+
+func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	ctx, _ := db.NewTestSQLiteContext(t)
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	// Create a parent node transaction that will be confirmed in this block
+	parentNodeTx := wire.MsgTx{
+		Version: 1,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut:   []*wire.TxOut{{Value: 10000}},
+	}
+	var parentNodeTxBuf bytes.Buffer
+	err = parentNodeTx.Serialize(&parentNodeTxBuf)
+	require.NoError(t, err)
+	rawParentNodeTx := parentNodeTxBuf.Bytes()
+
+	// Create a refund transaction for the parent node
+	parentRefundTx := wire.MsgTx{
+		Version: 1,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut:   []*wire.TxOut{{Value: 9500}},
+	}
+	var parentRefundTxBuf bytes.Buffer
+	err = parentRefundTx.Serialize(&parentRefundTxBuf)
+	require.NoError(t, err)
+	rawParentRefundTx := parentRefundTxBuf.Bytes()
+
+	// Create child node transactions
+	childNodeTx1 := wire.MsgTx{
+		Version: 1,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut:   []*wire.TxOut{{Value: 5000}},
+	}
+	var childNodeTxBuf1 bytes.Buffer
+	err = childNodeTx1.Serialize(&childNodeTxBuf1)
+	require.NoError(t, err)
+	rawChildNodeTx1 := childNodeTxBuf1.Bytes()
+
+	childNodeTx2 := wire.MsgTx{
+		Version: 1,
+		TxIn:    []*wire.TxIn{{}},
+		TxOut:   []*wire.TxOut{{Value: 4500}},
+	}
+	var childNodeTxBuf2 bytes.Buffer
+	err = childNodeTx2.Serialize(&childNodeTxBuf2)
+	require.NoError(t, err)
+	rawChildNodeTx2 := childNodeTxBuf2.Bytes()
+
+	// Generate test keys
+	ownerIDPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	signingPublicKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	// Create a tree
+	tree, err := dbTx.Tree.Create().
+		SetStatus(schematype.TreeStatusAvailable).
+		SetBaseTxid([]byte("tree_base_txid")).
+		SetOwnerIdentityPubkey(ownerIDPubKey).
+		SetNetwork(common.SchemaNetwork(common.Testnet)).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create signing keyshare
+	signingKeyshare, err := dbTx.SigningKeyshare.Create().
+		SetPublicKey(signingPublicKey).
+		SetSecretShare(secretShare).
+		SetMinSigners(1).
+		SetPublicShares(map[string]keys.Public{}).
+		SetStatus(schematype.KeyshareStatusAvailable).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create parent tree node
+	parentNode, err := dbTx.TreeNode.Create().
+		SetRawRefundTx(rawParentRefundTx).
+		SetDirectRefundTx(rawParentRefundTx).
+		SetDirectTx(rawParentNodeTx).
+		SetDirectFromCpfpRefundTx(rawParentRefundTx).
+		SetStatus(schematype.TreeNodeStatusAvailable).
+		SetOwnerIdentityPubkey(ownerIDPubKey).
+		SetRawTx(rawParentNodeTx).
+		SetTree(tree).
+		SetValue(10000).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetOwnerSigningPubkey(ownerIDPubKey).
+		SetVout(0).
+		SetSigningKeyshare(signingKeyshare).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create child nodes
+	childNode1, err := dbTx.TreeNode.Create().
+		SetRawRefundTx(rawChildNodeTx1). // Using the same tx for simplicity
+		SetDirectRefundTx(rawChildNodeTx1).
+		SetDirectTx(rawChildNodeTx1).
+		SetDirectFromCpfpRefundTx(rawChildNodeTx1).
+		SetStatus(schematype.TreeNodeStatusAvailable).
+		SetOwnerIdentityPubkey(ownerIDPubKey).
+		SetRawTx(rawChildNodeTx1).
+		SetTree(tree).
+		SetParent(parentNode).
+		SetValue(5000).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetOwnerSigningPubkey(ownerIDPubKey).
+		SetVout(0).
+		SetSigningKeyshare(signingKeyshare).
+		Save(ctx)
+	require.NoError(t, err)
+
+	childNode2, err := dbTx.TreeNode.Create().
+		SetRawRefundTx(rawChildNodeTx2).
+		SetDirectRefundTx(rawChildNodeTx2).
+		SetDirectTx(rawChildNodeTx2).
+		SetDirectFromCpfpRefundTx(rawChildNodeTx2).
+		SetStatus(schematype.TreeNodeStatusAvailable).
+		SetOwnerIdentityPubkey(ownerIDPubKey).
+		SetRawTx(rawChildNodeTx2).
+		SetTree(tree).
+		SetParent(parentNode).
+		SetValue(4500).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetOwnerSigningPubkey(ownerIDPubKey).
+		SetVout(0).
+		SetSigningKeyshare(signingKeyshare).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create test transfer
+	senderIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	transfer, err := dbTx.Transfer.Create().
+		SetStatus(schematype.TransferStatusSenderInitiated).
+		SetType(schematype.TransferTypeTransfer).
+		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+		SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
+		SetTotalValue(1000).
+		SetExpiryTime(time.Now().Add(24 * time.Hour)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create a block with tree node node transaction
+	blockTxs := []wire.MsgTx{parentNodeTx}
+
+	// Create mock config
+	config := so.Config{
+		SupportedNetworks: []common.Network{common.Testnet},
+		BitcoindConfigs: map[string]so.BitcoindConfig{
+			"testnet": {
+				ProcessNodesForWatchtowers: func() *bool { b := true; return &b }(),
+			},
+		},
+		Lrc20Configs: map[string]so.Lrc20Config{
+			common.Testnet.String(): {
+				DisableRpcs: true,
+			},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+
+	// Create a mock bitcoin client
+	connCfg := &rpcclient.ConnConfig{DisableTLS: true, HTTPPostMode: true}
+	bitcoinClient, err := rpcclient.New(connCfg, nil)
+	require.NoError(t, err)
+
+	blockHeight := int64(500)
+
+	// Call handleBlock
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, common.Testnet)
+	require.NoError(t, err)
+
+	// Verify parent node status is updated to OnChain
+	updatedParentNode, err := dbTx.TreeNode.Get(ctx, parentNode.ID)
+	require.NoError(t, err)
+	assert.Equal(t, schematype.TreeNodeStatusOnChain, updatedParentNode.Status)
+	assert.Equal(t, uint64(blockHeight), updatedParentNode.NodeConfirmationHeight)
+
+	// Verify child nodes are marked as ParentExited
+	updatedChildNode1, err := dbTx.TreeNode.Get(ctx, childNode1.ID)
+	require.NoError(t, err)
+	assert.Equal(t, schematype.TreeNodeStatusParentExited, updatedChildNode1.Status)
+
+	updatedChildNode2, err := dbTx.TreeNode.Get(ctx, childNode2.ID)
+	require.NoError(t, err)
+	assert.Equal(t, schematype.TreeNodeStatusParentExited, updatedChildNode2.Status)
+
+	// Verify all 3 are not available for transfer
+	baseHandler := handler.NewBaseTransferHandler(&config)
+	for _, treeNode := range []*ent.TreeNode{updatedParentNode, updatedChildNode1, updatedChildNode2} {
+		err = baseHandler.LeafAvailableToTransfer(ctx, treeNode, transfer)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "is not available to transfer")
+	}
+
+	// Create a block with tree node refund transaction
+	blockTxs = []wire.MsgTx{parentRefundTx}
+
+	blockHeight = int64(505)
+
+	// Call handleBlock
+	err = handleBlock(ctx, &config, dbTx, bitcoinClient, blockTxs, blockHeight, common.Testnet)
+	require.NoError(t, err)
+
+	// Verify parent node status is updated to Exited
+	updatedParentNode, err = dbTx.TreeNode.Get(ctx, parentNode.ID)
+	require.NoError(t, err)
+	assert.Equal(t, schematype.TreeNodeStatusExited, updatedParentNode.Status)
+	assert.Equal(t, uint64(blockHeight), updatedParentNode.RefundConfirmationHeight)
+
+	// Verify child nodes are still marked as ParentExited
+	updatedChildNode1, err = dbTx.TreeNode.Get(ctx, childNode1.ID)
+	require.NoError(t, err)
+	assert.Equal(t, schematype.TreeNodeStatusParentExited, updatedChildNode1.Status)
+
+	updatedChildNode2, err = dbTx.TreeNode.Get(ctx, childNode2.ID)
+	require.NoError(t, err)
+	assert.Equal(t, schematype.TreeNodeStatusParentExited, updatedChildNode2.Status)
+
+	// Verify all 3 still not available for transfer
+	for _, treeNode := range []*ent.TreeNode{updatedParentNode, updatedChildNode1, updatedChildNode2} {
+		err = baseHandler.LeafAvailableToTransfer(ctx, treeNode, transfer)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "is not available to transfer")
+	}
+
 }

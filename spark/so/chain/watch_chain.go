@@ -438,6 +438,9 @@ func processTransactions(txs []wire.MsgTx, networkParams *chaincfg.Params) (map[
 	return confirmedTxHashSet, slices.Collect(maps.Keys(creditedAddresses)), addressToUtxoMap, nil
 }
 
+// Attempts to process all transactions in the block and update the block
+// height. If an error occurs, none of the transactions are processed and the block
+// height is not updated so the block can be retried.
 func handleBlock(
 	ctx context.Context,
 	config *so.Config,
@@ -466,6 +469,7 @@ func handleBlock(
 		return err
 	}
 
+	// Find transactions with expired timelocks and broadcast them if needed
 	processNodesForWatchtowers := true
 	if bitcoinConfig, ok := config.BitcoindConfigs[strings.ToLower(network.String())]; ok {
 		if bitcoinConfig.ProcessNodesForWatchtowers != nil {
