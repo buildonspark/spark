@@ -1020,7 +1020,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
         status: TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
       },
     });
-    expect(claim1.length).toBe(0);
+    expect(claim1.length).toBe(1);
 
     const claim2 = await (sdk2 as any).claimTransfer({
       transfer: {
@@ -1028,16 +1028,19 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
         status: TransferStatus.TRANSFER_STATUS_RECEIVER_KEY_TWEAKED,
       },
     });
-    expect(claim2.length).toBe(0);
+    expect(claim2.length).toBe(1);
 
     const claim3 = await (sdk2 as any).claimTransfer({
       transfer,
     });
 
-    expect(claim3.length).toBe(0);
+    expect(claim3.length).toBe(1);
 
     // Expect 3 because we call claimTransfer 3 times and we expect there to be 0 retries
     expect(claimTransferCoreSpy).toHaveBeenCalledTimes(3);
+
+    const balanceAfterMultipleClaims = await sdk2.getBalance();
+    expect(balanceAfterMultipleClaims.balance).toBe(1000n);
   });
 
   it(`${name} - test querying updated transfer after error`, async () => {

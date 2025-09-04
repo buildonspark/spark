@@ -114,7 +114,6 @@ function getSigningJobProto(
     signingNonceCommitment: signingJob.signingNonceCommitment.commitment,
   };
 }
-
 export class BaseTransferService {
   protected readonly config: WalletConfigService;
   protected readonly connectionManager: ConnectionManager;

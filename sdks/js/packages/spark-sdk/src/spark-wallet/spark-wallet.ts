@@ -3135,16 +3135,29 @@ export class SparkWallet extends EventEmitter {
     emit?: boolean;
     optimize?: boolean;
   }) {
-    const onError = (
+    const onError = async (
       context: RetryContext<TreeNode[], Transfer>,
-    ): TreeNode[] | undefined => {
+    ): Promise<TreeNode[] | undefined> => {
       const error = context.error;
       if (
         error instanceof RPCError &&
         error.originalError instanceof ClientError &&
         error.originalError.code === Status.ALREADY_EXISTS
       ) {
-        return [];
+        const transferToUse = context.data || transfer;
+        const updatedTransfer = await this.transferService.queryTransfer(
+          transferToUse.id,
+        );
+
+        if (!updatedTransfer) {
+          return undefined;
+        }
+
+        const leaves = updatedTransfer.leaves.flatMap((leaf) =>
+          leaf.leaf ? [leaf.leaf] : [],
+        );
+
+        return leaves;
       }
       return;
     };
