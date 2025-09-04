@@ -1,6 +1,7 @@
 package grpctest
 
 import (
+	"crypto/sha256"
 	"math/big"
 	"math/rand/v2"
 	"sync"
@@ -894,7 +895,7 @@ func TestDoubleClaimTransfer(t *testing.T) {
 }
 
 func TestValidSparkInvoiceTransfer(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{})
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
 	amountToSend := uint64(amountSatsToSend)
@@ -942,7 +943,7 @@ func TestValidSparkInvoiceTransfer(t *testing.T) {
 }
 
 func TestValidSparkInvoiceTransferEmptySenderPublicKey(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{})
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
 	amountSats := uint64(amountSatsToSend)
@@ -986,7 +987,7 @@ func TestValidSparkInvoiceTransferEmptySenderPublicKey(t *testing.T) {
 }
 
 func TestValidSparkInvoiceTransferEmptyExpiry(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{})
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
 	amountSats := uint64(amountSatsToSend)
@@ -1029,7 +1030,7 @@ func TestValidSparkInvoiceTransferEmptyExpiry(t *testing.T) {
 }
 
 func TestValidSparkInvoiceTransferEmptyMemo(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{})
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
 	amountSats := uint64(amountSatsToSend)
@@ -1072,7 +1073,7 @@ func TestValidSparkInvoiceTransferEmptyMemo(t *testing.T) {
 }
 
 func TestValidSparkInvoiceTransferEmptyAmount(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{})
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -1115,7 +1116,7 @@ func TestValidSparkInvoiceTransferEmptyAmount(t *testing.T) {
 }
 
 func TestValidSparkInvoiceTransferEmptySignature(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{})
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
 	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -1153,7 +1154,7 @@ func TestValidSparkInvoiceTransferEmptySignature(t *testing.T) {
 
 func TestNonCanonicalInvoiceShouldError(t *testing.T) {
 	nonCanonicalInvoice := "sprt1pgssx2ndesmr2cm86s6ylgsx7rqed58p5l4skcw69e2kzqqxgg79j2fszgsqsqgjzqqe364u4mehdy9wur7lc64al4sjypqg5zxsv2syw3jhxaq6gpanrus3aq8sy6c27zj008mjas6x7akw2pt7expuhmsnpmxrakjmrjeep56gqehrh6gwvq9g9nlcy2587n2m9kehdq446t483nnyar5rgasyvl"
-	rng := rand.NewChaCha8([32]byte{})
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	decoded, err := common.DecodeSparkAddress(nonCanonicalInvoice)
 	require.NoError(t, err)
 	reEncoded, err := common.EncodeSparkAddressWithSignature(
@@ -1172,7 +1173,7 @@ func TestNonCanonicalInvoiceShouldError(t *testing.T) {
 }
 
 func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedSender(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{})
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
 	amountToSend := uint64(amountSatsToSend)
@@ -1211,7 +1212,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedSender(t *testing.T
 }
 
 func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedReceiver(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{})
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
 	amountToSend := uint64(amountSatsToSend)
@@ -1251,7 +1252,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedReceiver(t *testing
 }
 
 func TestInvalidSparkInvoiceTransferShouldErrorWithInvoiceAmountLessThanSentAmount(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{})
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
 	memo := "test memo"
@@ -1290,7 +1291,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithInvoiceAmountLessThanSentAmou
 }
 
 func TestInvalidSparkInvoiceTransferShouldErrorWithInvoiceAmountGreaterThanSentAmount(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{})
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
 	memo := "test memo"
@@ -1329,7 +1330,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithInvoiceAmountGreaterThanSentA
 }
 
 func TestInvalidSparkInvoiceTransferShouldErrorWithExpiredInvoice(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{})
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
 	amountToSend := uint64(amountSatsToSend)
@@ -1368,7 +1369,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithExpiredInvoice(t *testing.T) 
 }
 
 func TestInvalidSparkInvoiceTransferShouldErrorWithInvalidSignature(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{})
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
 	amountToSend := uint64(amountSatsToSend)
@@ -1408,7 +1409,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithInvalidSignature(t *testing.T
 }
 
 func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedNetwork(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{})
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
 	amountToSend := uint64(amountSatsToSend)
@@ -1447,7 +1448,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedNetwork(t *testing.
 }
 
 func TestInvalidSparkInvoiceTransferShouldErrorWithTokensInvoice(t *testing.T) {
-	rng := rand.NewChaCha8([32]byte{})
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	invoiceUUID, err := uuid.NewV7FromReader(rng)
 	require.NoError(t, err)
 	amountToSend := uint64(amountSatsToSend)
@@ -1567,4 +1568,9 @@ func sendTransferWithInvoice(
 		invoice,
 	)
 	return senderTransfer, rootNode, newLeafPrivKey, err
+}
+
+func deterministicSeedFromTestName(testName string) [32]byte {
+	hash := sha256.Sum256([]byte(testName))
+	return hash
 }
