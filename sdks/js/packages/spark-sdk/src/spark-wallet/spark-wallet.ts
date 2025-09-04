@@ -122,6 +122,7 @@ import {
   encodeSparkAddressWithSignature,
   SparkAddressFormat,
   validateSparkInvoiceFields,
+  isSafeForNumber,
 } from "../utils/address.js";
 import { chunkArray } from "../utils/chunkArray.js";
 import { getFetch } from "../utils/fetch.js";
@@ -144,6 +145,12 @@ import type {
   TokenOutputsMap,
   TransferParams,
   UserTokenMetadata,
+  TransferWithInvoiceParams,
+  TransferWithInvoiceOutcome,
+  FulfillSparkInvoiceResponse,
+  TokenInvoice,
+  InvalidInvoice,
+  GroupSparkInvoicesResult,
 } from "./types.js";
 
 /**
@@ -577,9 +584,14 @@ export class SparkWallet extends EventEmitter {
     return equalBytes(addPublicKeys(pubkey1, pubkey2), verifyingKey);
   }
 
+  private popOrThrow<T>(arr: T[] | undefined, msg: string): T {
+    if (!arr || arr.length === 0) throw new ValidationError(msg);
+    return arr.pop() as T;
+  }
+
   private async selectLeaves(
     targetAmounts: number[],
-  ): Promise<Map<number, TreeNode[]>> {
+  ): Promise<Map<number, TreeNode[][]>> {
     if (targetAmounts.length === 0) {
       throw new ValidationError("Target amounts must be non-empty", {
         field: "targetAmounts",
@@ -625,7 +637,7 @@ export class SparkWallet extends EventEmitter {
       leaves: TreeNode[],
     ) => {
       const usedLeaves = new Set<string>();
-      const results: Map<number, TreeNode[]> = new Map();
+      const results: Map<number, TreeNode[][]> = new Map();
       let totalAmount = 0;
 
       for (const targetAmount of targetAmounts) {
@@ -645,7 +657,11 @@ export class SparkWallet extends EventEmitter {
         }
 
         totalAmount += amount;
-        results.set(targetAmount, nodes);
+        if (results.has(targetAmount)) {
+          results.get(targetAmount)!.push(nodes);
+        } else {
+          results.set(targetAmount, [nodes]);
+        }
       }
 
       return {
@@ -816,7 +832,51 @@ export class SparkWallet extends EventEmitter {
     senderPublicKey?: string;
     expiryTime?: Date;
   }): Promise<SparkAddressFormat> {
-    throw new NotImplementedError("sats invoices are not yet supported.");
+    const MAX_SATS_AMOUNT = 2_100_000_000_000_000; // 21_000_000 BTC * 100_000_000 sats/BTC
+    if (amount && (amount < 0 || amount > MAX_SATS_AMOUNT)) {
+      throw new ValidationError(
+        `Amount must be between 0 and ${MAX_SATS_AMOUNT} sats`,
+        {
+          field: "amount",
+          value: amount,
+          expected: `less than or equal to ${MAX_SATS_AMOUNT}`,
+        },
+      );
+    }
+    const protoPayment = {
+      $case: "satsPayment",
+      satsPayment: {
+        amount: amount,
+      },
+    } as const;
+    const invoiceFields = {
+      version: 1,
+      id: uuidv7obj().bytes,
+      paymentType: protoPayment,
+      memo: memo,
+      senderPublicKey: senderPublicKey
+        ? hexToBytes(senderPublicKey)
+        : undefined,
+      expiryTime: expiryTime ?? undefined,
+    };
+    validateSparkInvoiceFields(invoiceFields);
+
+    const identityPublicKey = await this.config.signer.getIdentityPublicKey();
+    const hash = HashSparkInvoice(
+      invoiceFields,
+      identityPublicKey,
+      this.config.getNetworkType(),
+    );
+    const signature = await this.config.signer.signSchnorrWithIdentityKey(hash);
+
+    return encodeSparkAddressWithSignature(
+      {
+        identityPublicKey: bytesToHex(identityPublicKey),
+        network: this.config.getNetworkType(),
+        sparkInvoiceFields: invoiceFields,
+      },
+      signature,
+    );
   }
 
   /**
@@ -2694,76 +2754,168 @@ export class SparkWallet extends EventEmitter {
       );
     }
 
-    if (!Number.isSafeInteger(amountSats)) {
-      throw new ValidationError("Sats amount must be less than 2^53", {
-        field: "amountSats",
-        value: amountSats,
-        expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
-      });
+    const [outcome] = await this.transferWithInvoice([
+      {
+        amountSats,
+        receiverIdentityPubkey: hexToBytes(receiverAddress.identityPublicKey),
+      },
+    ]);
+    if (!outcome) throw new Error("no transfer created");
+    if (!outcome.ok) throw outcome.error;
+    return outcome.transfer;
+  }
+
+  /**
+   * Transfers with optional invoices.
+   * Does not parse/validate invoices or enforce amount-vs-invoice.
+   * If an invoice is provided, the caller must pass in the correct:
+   *  - amountSats
+   *  - receiverIdentityPubkey
+   *
+   * @param {TransferWithInvoiceParams[]} params - The parameters for the transfers
+   * @returns {Promise<TransferWithInvoiceOutcome[]>} The outcomes of the transfers
+   * @private
+   */
+  private async transferWithInvoice(
+    params: TransferWithInvoiceParams[],
+  ): Promise<TransferWithInvoiceOutcome[]> {
+    const amountSatsArray: number[] = [];
+    for (const param of params) {
+      const { amountSats } = param;
+      if (!Number.isSafeInteger(amountSats)) {
+        throw new ValidationError("Sats amount must be less than 2^53", {
+          field: "amountSats",
+          value: amountSats,
+          expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
+        });
+      }
+      if (amountSats <= 0) {
+        throw new ValidationError("Amount must be greater than 0", {
+          field: "amountSats",
+          value: amountSats,
+        });
+      }
+      amountSatsArray.push(amountSats);
     }
 
-    if (amountSats <= 0) {
-      throw new ValidationError("Amount must be greater than 0", {
-        field: "amountSats",
-        value: amountSats,
+    const transferJobs = await this.withLeaves(async () => {
+      const selectLeavesToSendMap: Map<number, TreeNode[][]> =
+        await this.selectLeaves(amountSatsArray);
+
+      for (const [amount, selection] of selectLeavesToSendMap) {
+        for (let groupIndex = 0; groupIndex < selection.length; groupIndex++) {
+          const group = selection[groupIndex];
+          if (!group) {
+            throw new ValidationError(
+              `TreeNode group at index ${groupIndex} not found for amount ${amount} after selection`,
+            );
+          }
+          let available = await this.checkRefreshTimelockNodes(group);
+          available = await this.checkExtendTimeLockNodes(available);
+
+          if (available.length < group.length) {
+            throw new Error(
+              `Not enough available nodes after refresh/extend. Expected ${group.length}, got ${available.length}`,
+            );
+          }
+          selection[groupIndex] = available;
+        }
+      }
+
+      const tweaksByAmount = this.buildTweaksByAmount(selectLeavesToSendMap);
+
+      const idsToRemove = new Set<string>();
+      const jobs = params.map((param) => {
+        const { amountSats, receiverIdentityPubkey, sparkInvoice } = param;
+        const leafKeyTweaks = this.popOrThrow(
+          tweaksByAmount.get(amountSats),
+          `no leaves key tweaks for ${amountSats}`,
+        );
+
+        for (const tweak of leafKeyTweaks) {
+          idsToRemove.add(tweak.leaf.id);
+        }
+        return { leafKeyTweaks, receiverIdentityPubkey, sparkInvoice, param };
       });
-    }
+      if (idsToRemove.size > 0) {
+        this.leaves = this.leaves.filter((leaf) => !idsToRemove.has(leaf.id));
+      }
+
+      return jobs;
+    });
 
     const signerIdentityPublicKey =
       await this.config.signer.getIdentityPublicKey();
 
-    const isSelfTransfer = equalBytes(
-      signerIdentityPublicKey,
-      hexToBytes(receiverAddress.identityPublicKey),
-    );
-
-    return await this.withLeaves(async () => {
-      let leavesToSend = (await this.selectLeaves([amountSats])).get(
-        amountSats,
-      )!;
-
-      leavesToSend = await this.checkRefreshTimelockNodes(leavesToSend);
-      leavesToSend = await this.checkExtendTimeLockNodes(leavesToSend);
-
-      const leafKeyTweaks: LeafKeyTweak[] = await Promise.all(
-        leavesToSend.map(async (leaf) => ({
-          leaf,
-          keyDerivation: {
-            type: KeyDerivationType.LEAF,
-            path: leaf.id,
-          },
-          newKeyDerivation: {
-            type: KeyDerivationType.RANDOM,
-          },
-        })),
-      );
-
-      const transfer = await this.transferService.sendTransferWithKeyTweaks(
-        leafKeyTweaks,
-        hexToBytes(receiverAddress.identityPublicKey),
-      );
-
-      const leavesToRemove = new Set(leavesToSend.map((leaf) => leaf.id));
-      this.leaves = this.leaves.filter((leaf) => !leavesToRemove.has(leaf.id));
-
-      // If this is a self-transfer, lets claim it immediately
-      if (isSelfTransfer) {
-        const transactionId = transfer.id;
-        const pendingTransfer =
-          await this.transferService.queryTransfer(transactionId);
-        if (pendingTransfer) {
-          await this.claimTransfer({
-            transfer: pendingTransfer,
-            optimize: true,
-          });
+    const outcomes = await Promise.all(
+      transferJobs.map(async (job) => {
+        try {
+          const transfer = await this.transferService.sendTransferWithKeyTweaks(
+            job.leafKeyTweaks,
+            job.receiverIdentityPubkey,
+            job.sparkInvoice,
+          );
+          const isSelfTransfer = equalBytes(
+            signerIdentityPublicKey,
+            job.receiverIdentityPubkey,
+          );
+          if (isSelfTransfer) {
+            const pending = await this.transferService.queryTransfer(
+              transfer.id,
+            );
+            if (pending) {
+              await this.claimTransfer({ transfer: pending, optimize: true });
+            }
+          }
+          return {
+            ok: true as const,
+            transfer: mapTransferToWalletTransfer(
+              transfer,
+              bytesToHex(await this.config.signer.getIdentityPublicKey()),
+            ),
+            param: job.param,
+          };
+        } catch (error) {
+          return {
+            ok: false as const,
+            error: error instanceof Error ? error : new Error(String(error)),
+            param: job.param,
+          };
         }
-      }
+      }),
+    );
+    return outcomes;
+  }
 
-      return mapTransferToWalletTransfer(
-        transfer,
-        bytesToHex(await this.config.signer.getIdentityPublicKey()),
-      );
-    });
+  private buildTweaksByAmount(
+    selectedByAmount: Map<number, TreeNode[][]>,
+  ): Map<number, LeafKeyTweak[][]> {
+    const tweaksByAmount = new Map<number, LeafKeyTweak[][]>();
+    for (const [amount, treeNodes] of selectedByAmount) {
+      const keyTweaksForAmount: LeafKeyTweak[][] = [];
+      for (const nodes of treeNodes) {
+        const batch: LeafKeyTweak[] = [];
+        for (let i = 0; i < nodes.length; i++) {
+          if (!nodes[i]) {
+            throw new ValidationError(
+              `TreeNode at index ${i} not found for amount ${amount} while building key tweaks by amount`,
+            );
+          }
+          batch.push(this.toSendTweak(nodes[i]!));
+        }
+        keyTweaksForAmount.push(batch);
+      }
+      tweaksByAmount.set(amount, keyTweaksForAmount);
+    }
+    return tweaksByAmount;
+  }
+
+  private toSendTweak(node: TreeNode): LeafKeyTweak {
+    return {
+      leaf: node,
+      keyDerivation: { type: KeyDerivationType.LEAF, path: node.id },
+      newKeyDerivation: { type: KeyDerivationType.RANDOM },
+    };
   }
 
   private async checkExtendTimeLockNodes(
@@ -3374,8 +3526,13 @@ export class SparkWallet extends EventEmitter {
         });
       }
 
-      let leaves = (await this.selectLeaves([totalAmount])).get(totalAmount)!;
-
+      const selectedLeaves = (await this.selectLeaves([totalAmount])).get(
+        totalAmount,
+      )!;
+      let leaves = this.popOrThrow(
+        selectedLeaves,
+        `no leaves for ${totalAmount}`,
+      );
       leaves = await this.checkRefreshTimelockNodes(leaves);
       leaves = await this.checkExtendTimeLockNodes(leaves);
 
@@ -3438,7 +3595,7 @@ export class SparkWallet extends EventEmitter {
       invoice: SparkAddressFormat;
       amount?: bigint;
     }[],
-  ): Promise<string> {
+  ): Promise<FulfillSparkInvoiceResponse> {
     if (!Array.isArray(sparkInvoices) || sparkInvoices.length === 0) {
       throw new ValidationError("No Spark invoices provided", {
         field: "sparkInvoices",
@@ -3446,122 +3603,260 @@ export class SparkWallet extends EventEmitter {
         expected: "Non-empty array",
       });
     }
+    const satsTransactionSuccess: {
+      invoice: SparkAddressFormat;
+      transferResponse: WalletTransfer;
+    }[] = [];
+    const satsTransactionErrors: {
+      invoice: string;
+      error: Error;
+    }[] = [];
+    const tokenTransactionSuccess: {
+      tokenIdentifier: Bech32mTokenIdentifier;
+      txid: string;
+    }[] = [];
+    const tokenTransactionErrors: {
+      tokenIdentifier: Bech32mTokenIdentifier;
+      error: Error;
+    }[] = [];
+
+    const { satsInvoices, tokenInvoices, invalidInvoices } =
+      await this.groupSparkInvoicesByPaymentType(sparkInvoices);
+    if (invalidInvoices.length > 0) {
+      return {
+        satsTransactionSuccess,
+        satsTransactionErrors,
+        tokenTransactionSuccess,
+        tokenTransactionErrors,
+        invalidInvoices,
+      };
+    }
+
+    if (tokenInvoices.size > 0) {
+      await this.syncTokenOutputs();
+      const tokenTransferTasks: Promise<
+        | { ok: true; tokenIdentifier: Bech32mTokenIdentifier; txid: string }
+        | { ok: false; tokenIdentifier: Bech32mTokenIdentifier; error: Error }
+      >[] = [];
+      for (const [identifierHex, decodedInvoices] of tokenInvoices.entries()) {
+        const tokenIdentifier = hexToBytes(identifierHex);
+        const tokenIdB32 = encodeBech32mTokenIdentifier({
+          tokenIdentifier,
+          network: this.config.getNetworkType(),
+        }) as Bech32mTokenIdentifier;
+
+        const receiverOutputs = decodedInvoices.map((d) => ({
+          tokenIdentifier: tokenIdB32,
+          tokenAmount: d.amount!,
+          receiverSparkAddress: d.invoice,
+        }));
+
+        tokenTransferTasks.push(
+          this.tokenTransactionService
+            .tokenTransfer({ tokenOutputs: this.tokenOutputs, receiverOutputs })
+            .then((txid) => ({
+              ok: true as const,
+              tokenIdentifier: tokenIdB32,
+              txid,
+            }))
+            .catch((e: any) => ({
+              ok: false as const,
+              tokenIdentifier: tokenIdB32,
+              error: e instanceof Error ? e : new Error(String(e)),
+            })),
+        );
+      }
+      const results = await Promise.all(tokenTransferTasks);
+      for (const r of results) {
+        if (r.ok) {
+          tokenTransactionSuccess.push({
+            tokenIdentifier: r.tokenIdentifier,
+            txid: r.txid,
+          });
+        } else {
+          tokenTransactionErrors.push({
+            tokenIdentifier: r.tokenIdentifier,
+            error: r.error,
+          });
+        }
+      }
+    }
+
+    if (satsInvoices.length > 0) {
+      const transfers = await this.transferWithInvoice(satsInvoices);
+      for (const transfer of transfers) {
+        if (transfer.ok) {
+          satsTransactionSuccess.push({
+            invoice: transfer.param.sparkInvoice ?? ("" as SparkAddressFormat),
+            transferResponse: transfer.transfer,
+          });
+        } else {
+          satsTransactionErrors.push({
+            invoice: transfer.param.sparkInvoice ?? ("" as SparkAddressFormat),
+            error: transfer.error,
+          });
+        }
+      }
+    }
+
+    return {
+      satsTransactionSuccess,
+      satsTransactionErrors,
+      tokenTransactionSuccess,
+      tokenTransactionErrors,
+      invalidInvoices,
+    };
+  }
+
+  private async groupSparkInvoicesByPaymentType(
+    sparkInvoices: {
+      invoice: SparkAddressFormat;
+      amount?: bigint;
+    }[],
+  ): Promise<GroupSparkInvoicesResult> {
+    const satsInvoices: TransferWithInvoiceParams[] = [];
+    const tokenInvoices: Map<string, TokenInvoice[]> = new Map();
+    const invalidInvoices: InvalidInvoice[] = [];
 
     const identityPublicKey = await this.getIdentityPublicKey();
 
-    let firstTokenIdentifierHexSeen: string | undefined;
-
-    const decoded = sparkInvoices.map((input, index) => {
+    sparkInvoices.forEach((input) => {
       const { invoice, amount } = input;
-
       const addressData = decodeSparkAddress(
         invoice,
         this.config.getNetworkType(),
       );
-
       if (!addressData.sparkInvoiceFields) {
-        throw new ValidationError("Spark invoice not present", {
-          field: "sparkInvoice",
-          value: invoice,
-          index,
+        invalidInvoices.push({
+          invoice,
+          error: new ValidationError("Missing invoice fields", {
+            field: "invoice",
+            value: invoice,
+            expected: "Valid invoice fields",
+          }),
         });
+        return;
       }
 
       const fields = addressData.sparkInvoiceFields;
 
-      if (fields.paymentType?.type === "sats") {
-        throw new NotImplementedError("Sats payments are not supported yet");
-      }
-
       if (fields.expiryTime) {
         if (fields.expiryTime.getTime() <= Date.now()) {
-          throw new ValidationError("Spark invoice is expired", {
-            field: "expiryTime",
-            value: fields.expiryTime,
-            index,
-            expected: "future date",
+          invalidInvoices.push({
+            invoice,
+            error: new ValidationError("Invoice expired", {
+              field: "invoice",
+              value: fields.expiryTime.getTime(),
+              expected: "Expiry time in the future",
+            }),
           });
+          return;
         }
       }
-
-      if (fields.paymentType?.type !== "tokens") {
-        throw new ValidationError("Invalid payment type", {
-          field: "paymentType",
-          value: fields.paymentType,
-          expected: "tokens",
-          index,
-        });
-      }
-
       if (
         fields.senderPublicKey &&
         fields.senderPublicKey !== identityPublicKey
       ) {
-        throw new ValidationError("Sender public key does not match", {
-          field: "senderPublicKey",
+        invalidInvoices.push({
+          invoice,
+          error: new ValidationError("Sender public key mismatch", {
+            field: "invoice",
+            value: fields.senderPublicKey,
+            expected: identityPublicKey,
+          }),
+        });
+        return;
+      }
+
+      if (fields.paymentType?.type === "sats") {
+        const encodedAmount = fields.paymentType.amount;
+        if (amount && !isSafeForNumber(amount)) {
+          invalidInvoices.push({
+            invoice,
+            error: new ValidationError("Invalid amount", {
+              field: "invoice",
+              value: amount,
+              expected: "Safe for number",
+            }),
+          });
+          return;
+        }
+        if (!encodedAmount && !amount) {
+          invalidInvoices.push({
+            invoice,
+            error: new ValidationError(
+              "No amount passed for nil amount invoice",
+              {
+                field: "invoice",
+                expected:
+                  "Amount to fulfill passed to function for nil amount invoice",
+              },
+            ),
+          });
+          return;
+        }
+        satsInvoices.push({
+          amountSats: encodedAmount ?? Number(amount!),
+          receiverIdentityPubkey: hexToBytes(addressData.identityPublicKey),
+          sparkInvoice: invoice as SparkAddressFormat,
+        });
+      } else if (fields.paymentType?.type === "tokens") {
+        const tokenIdentifierHex = fields.paymentType.tokenIdentifier;
+        const encodedAmount = fields.paymentType.amount;
+        if (!tokenIdentifierHex) {
+          invalidInvoices.push({
+            invoice,
+            error: new ValidationError(
+              "No token identifier passed for tokens invoice",
+              {
+                field: "invoice",
+                value: invoice,
+                expected: "Token identifier passed",
+              },
+            ),
+          });
+          return;
+        }
+        if (!encodedAmount && !amount) {
+          invalidInvoices.push({
+            invoice,
+            error: new ValidationError(
+              "No amount passed for nil amount invoice",
+              {
+                field: "invoice",
+                expected:
+                  "Amount to fulfill passed to function for nil amount invoice",
+              },
+            ),
+          });
+          return;
+        }
+        if (!tokenInvoices.has(tokenIdentifierHex)) {
+          tokenInvoices.set(tokenIdentifierHex, [
+            {
+              invoice,
+              identifierHex: tokenIdentifierHex,
+              amount: encodedAmount ?? amount!,
+            },
+          ]);
+        } else {
+          tokenInvoices.get(tokenIdentifierHex)!.push({
+            invoice,
+            identifierHex: tokenIdentifierHex,
+            amount: encodedAmount ?? amount!,
+          });
+        }
+      } else {
+        invalidInvoices.push({
+          invoice,
+          error: new ValidationError("Invalid payment type", {
+            field: "invoice",
+            expected: "sats or tokens invoice",
+          }),
         });
       }
-
-      const tokenIdentifierHex = fields.paymentType.tokenIdentifier;
-      if (!tokenIdentifierHex) {
-        throw new ValidationError("Token identifier missing in invoice", {
-          field: "paymentType.tokenIdentifier",
-          value: tokenIdentifierHex,
-          index,
-        });
-      }
-
-      if (!firstTokenIdentifierHexSeen) {
-        firstTokenIdentifierHexSeen = tokenIdentifierHex;
-      } else if (tokenIdentifierHex !== firstTokenIdentifierHexSeen) {
-        throw new ValidationError(
-          "All spark invoices must have the same token identifier",
-          {
-            field: "sparkInvoices",
-            value: sparkInvoices,
-            expected: "All invoices reference the same token identifier",
-            index,
-          },
-        );
-      }
-
-      let tokenAmount: bigint =
-        (fields.paymentType.amount as bigint | undefined) ?? amount!;
-
-      if (!tokenAmount) {
-        throw new ValidationError(
-          "Missing token amount. Provide an amount in the invoice or as a parameter.",
-          {
-            field: "amount",
-            index,
-          },
-        );
-      }
-
-      return {
-        invoice,
-        tokenIdentifierHex,
-        tokenAmount,
-      };
     });
-
-    await this.syncTokenOutputs();
-
-    const bech32mTokenIdentifier = encodeBech32mTokenIdentifier({
-      tokenIdentifier: hexToBytes(firstTokenIdentifierHexSeen!),
-      network: this.config.getNetworkType(),
-    }) as Bech32mTokenIdentifier;
-
-    const receiverOutputs = decoded.map((d) => ({
-      tokenIdentifier: bech32mTokenIdentifier,
-      tokenAmount: d.tokenAmount,
-      receiverSparkAddress: d.invoice,
-    }));
-
-    return this.tokenTransactionService.tokenTransfer({
-      tokenOutputs: this.tokenOutputs,
-      receiverOutputs,
-    });
+    return { satsInvoices, tokenInvoices, invalidInvoices };
   }
 
   /**
@@ -3689,7 +3984,12 @@ export class SparkWallet extends EventEmitter {
 
     if (deductFeeFromWithdrawalAmount) {
       leavesToSendToSsp = targetAmountSats
-        ? (await this.selectLeaves([targetAmountSats])).get(targetAmountSats)!
+        ? this.popOrThrow(
+            (await this.selectLeaves([targetAmountSats])).get(
+              targetAmountSats,
+            )!,
+            `no leaves for ${targetAmountSats}`,
+          )
         : this.leaves;
 
       if (fee > leavesToSendToSsp.reduce((acc, leaf) => acc + leaf.value, 0)) {
@@ -3716,8 +4016,14 @@ export class SparkWallet extends EventEmitter {
 
       const leaves = await this.selectLeaves([targetAmountSats, fee]);
 
-      const leavesForTargetAmount = leaves.get(targetAmountSats);
-      const leavesForFee = leaves.get(fee);
+      const leavesForTargetAmount = this.popOrThrow(
+        leaves.get(targetAmountSats)!,
+        `failed to get leaves leaves for targetAmount, val: ${targetAmountSats}`,
+      );
+      const leavesForFee = this.popOrThrow(
+        leaves.get(fee)!,
+        `failed to get leaves leaves for fee, val: ${fee}`,
+      );
 
       if (!leavesForTargetAmount || !leavesForFee) {
         throw new Error("Failed to select leaves for target amount and fee");
@@ -3830,7 +4136,10 @@ export class SparkWallet extends EventEmitter {
       });
     }
 
-    let leaves = (await this.selectLeaves([amountSats])).get(amountSats)!;
+    let leaves = this.popOrThrow(
+      (await this.selectLeaves([amountSats])).get(amountSats)!,
+      `no leaves for ${amountSats}`,
+    );
 
     leaves = await this.checkRefreshTimelockNodes(leaves);
     leaves = await this.checkExtendTimeLockNodes(leaves);

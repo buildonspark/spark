@@ -5,6 +5,8 @@ import { ConfigOptions } from "../services/wallet-config.js";
 import type { SparkSigner } from "../signer/signer.js";
 import { KeyDerivation } from "../signer/types.js";
 import { Bech32mTokenIdentifier } from "../utils/token-identifier.js";
+import { SparkAddressFormat } from "../utils/address.js";
+import { WalletTransfer } from "../types/index.js";
 
 export type CreateLightningInvoiceParams = {
   amountSats: number;
@@ -25,6 +27,56 @@ export type PayLightningInvoiceParams = {
 export type TransferParams = {
   amountSats: number;
   receiverSparkAddress: string;
+};
+
+export type TransferWithInvoiceParams = {
+  amountSats: number;
+  receiverIdentityPubkey: Uint8Array;
+  sparkInvoice?: SparkAddressFormat;
+};
+
+export type TransferWithInvoiceOutcome =
+  | { ok: true; transfer: WalletTransfer; param: TransferWithInvoiceParams }
+  | { ok: false; error: Error; param: TransferWithInvoiceParams };
+
+export type FulfillSparkInvoiceResponse = {
+  satsTransactionSuccess: {
+    invoice: SparkAddressFormat;
+    transferResponse: WalletTransfer;
+  }[];
+  tokenTransactionSuccess: {
+    tokenIdentifier: Bech32mTokenIdentifier;
+    txid: string;
+  }[];
+  satsTransactionErrors: {
+    invoice: string;
+    error: Error;
+  }[];
+  tokenTransactionErrors: {
+    tokenIdentifier: Bech32mTokenIdentifier;
+    error: Error;
+  }[];
+  invalidInvoices: {
+    invoice: string;
+    error: Error;
+  }[];
+};
+
+export type TokenInvoice = {
+  invoice: string;
+  identifierHex: string;
+  amount: bigint;
+};
+
+export type InvalidInvoice = {
+  invoice: string;
+  error: Error;
+};
+
+export type GroupSparkInvoicesResult = {
+  satsInvoices: TransferWithInvoiceParams[];
+  tokenInvoices: Map<string, TokenInvoice[]>;
+  invalidInvoices: InvalidInvoice[];
 };
 
 export type DepositParams = {

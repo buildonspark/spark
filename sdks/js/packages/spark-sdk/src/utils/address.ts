@@ -458,3 +458,10 @@ function encodeSparkInvoiceFieldsV1Canonical(
   }
   return w.finish();
 }
+
+export function isSafeForNumber(bi: bigint): boolean {
+  return (
+    bi >= BigInt(Number.MIN_SAFE_INTEGER) &&
+    bi <= BigInt(Number.MAX_SAFE_INTEGER)
+  );
+}

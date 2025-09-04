@@ -42,6 +42,7 @@ import {
   KeyDerivationType,
   SigningCommitmentWithOptionalNonce,
 } from "../signer/types.js";
+import { SparkAddressFormat } from "../utils/address.js";
 import {
   getSigHashFromTx,
   getTxFromRawTxBytes,
@@ -243,6 +244,7 @@ export class BaseTransferService {
   async sendTransferWithKeyTweaks(
     leaves: LeafKeyTweak[],
     receiverIdentityPubkey: Uint8Array,
+    sparkInvoice?: SparkAddressFormat,
   ): Promise<Transfer> {
     const transferID = uuidv7();
 
@@ -274,6 +276,7 @@ export class BaseTransferService {
         ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
         receiverIdentityPublicKey: receiverIdentityPubkey,
         transferPackage,
+        sparkInvoice,
       });
     } catch (error) {
       throw new NetworkError(

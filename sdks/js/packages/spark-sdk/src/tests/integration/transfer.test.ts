@@ -1197,3 +1197,313 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     await bobTransferService.claimTransfer(transfer!, claimingNodes);
   });
 });
+
+describe.each(walletTypes)(
+  "fulfill spark invoice",
+  ({ name, Signer, createTree }) => {
+    jest.setTimeout(25_000);
+
+    it(`${name} - test multiple valid transfers with invoice and nil amount invoice`, async () => {
+      const faucet = BitcoinFaucet.getInstance();
+
+      const options: ConfigOptions = {
+        network: "LOCAL",
+      };
+
+      const { wallet: sdk } = await SparkWalletTesting.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+      const depositAddrOne = await sdk.getSingleUseDepositAddress();
+      if (!depositAddrOne) {
+        throw new RPCError("Deposit address not found", {
+          method: "getDepositAddress",
+        });
+      }
+      const depositAddrTwo = await sdk.getSingleUseDepositAddress();
+      if (!depositAddrTwo) {
+        throw new RPCError("Deposit address not found", {
+          method: "getDepositAddress",
+        });
+      }
+      const depositAddrThree = await sdk.getSingleUseDepositAddress();
+      if (!depositAddrThree) {
+        throw new RPCError("Deposit address not found", {
+          method: "getDepositAddress",
+        });
+      }
+
+      const oneThousand = await faucet.sendToAddress(depositAddrOne, 1_000n);
+      const twoThousand = await faucet.sendToAddress(depositAddrTwo, 2_000n);
+      const threeThousand = await faucet.sendToAddress(
+        depositAddrThree,
+        3_000n,
+      );
+
+      await sdk.claimDeposit(oneThousand.id);
+      await sdk.claimDeposit(twoThousand.id);
+      await sdk.claimDeposit(threeThousand.id);
+
+      const balance = await sdk.getBalance();
+      expect(balance.balance).toBe(6_000n);
+
+      const { wallet: sdk2 } = await SparkWalletTesting.initialize({
+        options: {
+          network: "LOCAL",
+        },
+        signer: new Signer(),
+      });
+
+      const receiverConfigService = new WalletConfigService(
+        options,
+        sdk2.getSigner(),
+      );
+      const receiverConnectionManager = new ConnectionManager(
+        receiverConfigService,
+      );
+      const receiverSigningService = new SigningService(receiverConfigService);
+      const receiverTransferService = new TransferService(
+        receiverConfigService,
+        receiverConnectionManager,
+        receiverSigningService,
+      );
+      const tomorrow = new Date(Date.now() + 1000 * 60 * 60 * 24);
+      const invoice1000 = await sdk2.createSatsInvoice({
+        amount: 1_000,
+        memo: "Test invoice",
+        expiryTime: tomorrow,
+      });
+      const invoice2000 = await sdk2.createSatsInvoice({
+        amount: 2_000,
+        memo: "Test invoice",
+        expiryTime: tomorrow,
+      });
+      const invoiceNilAmount = await sdk2.createSatsInvoice({
+        memo: "Test invoice",
+        expiryTime: tomorrow,
+      });
+
+      const transferResults = await sdk.fulfillSparkInvoice([
+        { invoice: invoice1000 },
+        { invoice: invoice2000 },
+        { invoice: invoiceNilAmount, amount: 3_000n },
+      ]);
+
+      const { satsTransactionSuccess, satsTransactionErrors } = transferResults;
+      expect(satsTransactionSuccess.length).toBe(3);
+      expect(satsTransactionErrors.length).toBe(0);
+
+      const pendingTransfers = await sdk2.queryPendingTransfers();
+      expect(pendingTransfers.transfers.length).toBe(3);
+
+      for (const transfer of pendingTransfers.transfers) {
+        const leaves: LeafKeyTweak[] = transfer.leaves.map((leaf) => ({
+          leaf: {
+            ...leaf.leaf!,
+            refundTx: leaf.intermediateRefundTx,
+            directRefundTx: leaf.intermediateDirectRefundTx,
+            directFromCpfpRefundTx: leaf.intermediateDirectFromCpfpRefundTx,
+          },
+          keyDerivation: {
+            type: KeyDerivationType.ECIES,
+            path: leaf.secretCipher,
+          },
+          newKeyDerivation: {
+            type: KeyDerivationType.LEAF,
+            path: leaf.leaf!.id,
+          },
+        }));
+        await receiverTransferService.claimTransferTweakKeys(transfer, leaves);
+        const beforeClaimBalance = await sdk2.getBalance();
+
+        const res = await (sdk2 as any).claimTransfer({ transfer });
+        expect(res.length).toBe(1);
+
+        const newBalance = await sdk2.getBalance();
+        expect(newBalance.balance).toBe(
+          beforeClaimBalance.balance + BigInt(transfer.totalValue),
+        );
+      }
+    });
+
+    it(`${name} - should reject invalid invoice: mismatched sender`, async () => {
+      const faucet = BitcoinFaucet.getInstance();
+
+      const options: ConfigOptions = {
+        network: "LOCAL",
+      };
+
+      const { wallet: sdk } = await SparkWalletTesting.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+      const depositAddr = await sdk.getSingleUseDepositAddress();
+      if (!depositAddr) {
+        throw new RPCError("Deposit address not found", {
+          method: "getDepositAddress",
+        });
+      }
+
+      const oneThousand = await faucet.sendToAddress(depositAddr, 1_000n);
+
+      await sdk.claimDeposit(oneThousand.id);
+      const balance = await sdk.getBalance();
+      expect(balance.balance).toBe(1_000n);
+
+      const { wallet: sdk2 } = await SparkWalletTesting.initialize({
+        options: {
+          network: "LOCAL",
+        },
+        signer: new Signer(),
+      });
+
+      const receiverConfigService = new WalletConfigService(
+        options,
+        sdk2.getSigner(),
+      );
+      const receiverConnectionManager = new ConnectionManager(
+        receiverConfigService,
+      );
+      const receiverSigningService = new SigningService(receiverConfigService);
+      const receiverTransferService = new TransferService(
+        receiverConfigService,
+        receiverConnectionManager,
+        receiverSigningService,
+      );
+      const tomorrow = new Date(Date.now() + 1000 * 60 * 60 * 24);
+      const invoice1000 = await sdk2.createSatsInvoice({
+        amount: 1_000,
+        memo: "Test invoice",
+        expiryTime: tomorrow,
+        senderPublicKey: await sdk2.getIdentityPublicKey(), // invalid sender public key - receiver as sender
+      });
+
+      const transferResults = await sdk.fulfillSparkInvoice([
+        { invoice: invoice1000 },
+      ]);
+      const { invalidInvoices } = transferResults;
+      expect(invalidInvoices.length).toBe(1);
+    });
+
+    it(`${name} - should reject invalid invoice: expired invoice`, async () => {
+      const faucet = BitcoinFaucet.getInstance();
+
+      const options: ConfigOptions = {
+        network: "LOCAL",
+      };
+
+      const { wallet: sdk } = await SparkWalletTesting.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+      const depositAddr = await sdk.getSingleUseDepositAddress();
+      if (!depositAddr) {
+        throw new RPCError("Deposit address not found", {
+          method: "getDepositAddress",
+        });
+      }
+
+      const oneThousand = await faucet.sendToAddress(depositAddr, 1_000n);
+
+      await sdk.claimDeposit(oneThousand.id);
+      const balance = await sdk.getBalance();
+      expect(balance.balance).toBe(1_000n);
+
+      const { wallet: sdk2 } = await SparkWalletTesting.initialize({
+        options: {
+          network: "LOCAL",
+        },
+        signer: new Signer(),
+      });
+
+      const receiverConfigService = new WalletConfigService(
+        options,
+        sdk2.getSigner(),
+      );
+      const receiverConnectionManager = new ConnectionManager(
+        receiverConfigService,
+      );
+      const receiverSigningService = new SigningService(receiverConfigService);
+      const receiverTransferService = new TransferService(
+        receiverConfigService,
+        receiverConnectionManager,
+        receiverSigningService,
+      );
+      const yesterday = new Date(Date.now() - 1000 * 60 * 60 * 24);
+      const invoice1000 = await sdk.createSatsInvoice({
+        // invalid receiver public key - sdk as receiver
+        amount: 1_000,
+        memo: "Test invoice",
+        expiryTime: yesterday,
+        senderPublicKey: await sdk.getIdentityPublicKey(),
+      });
+
+      const transferResults = await sdk.fulfillSparkInvoice([
+        { invoice: invoice1000 },
+      ]);
+      const { invalidInvoices } = transferResults;
+      expect(invalidInvoices.length).toBe(1);
+    });
+
+    it(`${name} - should error when paying the same invoice twice`, async () => {
+      const faucet = BitcoinFaucet.getInstance();
+
+      const options: ConfigOptions = {
+        network: "LOCAL",
+      };
+
+      const { wallet: sdk } = await SparkWalletTesting.initialize({
+        options,
+        signer: new Signer(),
+      });
+
+      const depositAddr = await sdk.getSingleUseDepositAddress();
+      if (!depositAddr) {
+        throw new RPCError("Deposit address not found", {
+          method: "getDepositAddress",
+        });
+      }
+      const depositAddrTwo = await sdk.getSingleUseDepositAddress();
+      if (!depositAddrTwo) {
+        throw new RPCError("Deposit address not found", {
+          method: "getDepositAddress",
+        });
+      }
+
+      const deposit = await faucet.sendToAddress(depositAddr, 1_000n);
+      const depositTwo = await faucet.sendToAddress(depositAddrTwo, 1_000n);
+
+      await sdk.claimDeposit(deposit.id);
+      await sdk.claimDeposit(depositTwo.id);
+
+      const balance = await sdk.getBalance();
+      expect(balance.balance).toBe(2_000n);
+
+      const { wallet: sdk2 } = await SparkWalletTesting.initialize({
+        options: {
+          network: "LOCAL",
+        },
+        signer: new Signer(),
+      });
+
+      const tomorrow = new Date(Date.now() + 1000 * 60 * 60 * 24);
+      const invoice1000 = await sdk2.createSatsInvoice({
+        amount: 1_000,
+        memo: "Test invoice",
+        expiryTime: tomorrow,
+        senderPublicKey: await sdk.getIdentityPublicKey(),
+      });
+
+      await sdk.fulfillSparkInvoice([{ invoice: invoice1000 }]);
+
+      const secondAttempt = await sdk.fulfillSparkInvoice([
+        { invoice: invoice1000 },
+      ]);
+      const { satsTransactionErrors } = secondAttempt;
+      expect(satsTransactionErrors.length).toBe(1);
+    });
+  },
+);

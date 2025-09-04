@@ -1079,8 +1079,11 @@ export interface StartTransferRequest {
     | Date
     | undefined;
   /** If this field is set, the leaves_to_send and key_tweak_proofs will be ignored. */
-  transferPackage: TransferPackage | undefined;
-  sparkPaymentIntent: string;
+  transferPackage:
+    | TransferPackage
+    | undefined;
+  /** The invoice this transfer pays. */
+  sparkInvoice: string;
 }
 
 export interface StartTransferResponse {
@@ -1160,6 +1163,7 @@ export interface Transfer {
   createdTime: Date | undefined;
   updatedTime: Date | undefined;
   type: TransferType;
+  sparkInvoice: string;
 }
 
 export interface TransferLeaf {
@@ -8639,7 +8643,7 @@ function createBaseStartTransferRequest(): StartTransferRequest {
     receiverIdentityPublicKey: new Uint8Array(0),
     expiryTime: undefined,
     transferPackage: undefined,
-    sparkPaymentIntent: "",
+    sparkInvoice: "",
   };
 }
 
@@ -8663,8 +8667,8 @@ export const StartTransferRequest: MessageFns<StartTransferRequest> = {
     if (message.transferPackage !== undefined) {
       TransferPackage.encode(message.transferPackage, writer.uint32(58).fork()).join();
     }
-    if (message.sparkPaymentIntent !== "") {
-      writer.uint32(74).string(message.sparkPaymentIntent);
+    if (message.sparkInvoice !== "") {
+      writer.uint32(82).string(message.sparkInvoice);
     }
     return writer;
   },
@@ -8724,12 +8728,12 @@ export const StartTransferRequest: MessageFns<StartTransferRequest> = {
           message.transferPackage = TransferPackage.decode(reader, reader.uint32());
           continue;
         }
-        case 9: {
-          if (tag !== 74) {
+        case 10: {
+          if (tag !== 82) {
             break;
           }
 
-          message.sparkPaymentIntent = reader.string();
+          message.sparkInvoice = reader.string();
           continue;
         }
       }
@@ -8755,7 +8759,7 @@ export const StartTransferRequest: MessageFns<StartTransferRequest> = {
         : new Uint8Array(0),
       expiryTime: isSet(object.expiryTime) ? fromJsonTimestamp(object.expiryTime) : undefined,
       transferPackage: isSet(object.transferPackage) ? TransferPackage.fromJSON(object.transferPackage) : undefined,
-      sparkPaymentIntent: isSet(object.sparkPaymentIntent) ? globalThis.String(object.sparkPaymentIntent) : "",
+      sparkInvoice: isSet(object.sparkInvoice) ? globalThis.String(object.sparkInvoice) : "",
     };
   },
 
@@ -8779,8 +8783,8 @@ export const StartTransferRequest: MessageFns<StartTransferRequest> = {
     if (message.transferPackage !== undefined) {
       obj.transferPackage = TransferPackage.toJSON(message.transferPackage);
     }
-    if (message.sparkPaymentIntent !== "") {
-      obj.sparkPaymentIntent = message.sparkPaymentIntent;
+    if (message.sparkInvoice !== "") {
+      obj.sparkInvoice = message.sparkInvoice;
     }
     return obj;
   },
@@ -8798,7 +8802,7 @@ export const StartTransferRequest: MessageFns<StartTransferRequest> = {
     message.transferPackage = (object.transferPackage !== undefined && object.transferPackage !== null)
       ? TransferPackage.fromPartial(object.transferPackage)
       : undefined;
-    message.sparkPaymentIntent = object.sparkPaymentIntent ?? "";
+    message.sparkInvoice = object.sparkInvoice ?? "";
     return message;
   },
 };
@@ -9747,6 +9751,7 @@ function createBaseTransfer(): Transfer {
     createdTime: undefined,
     updatedTime: undefined,
     type: 0,
+    sparkInvoice: "",
   };
 }
 
@@ -9781,6 +9786,9 @@ export const Transfer: MessageFns<Transfer> = {
     }
     if (message.type !== 0) {
       writer.uint32(80).int32(message.type);
+    }
+    if (message.sparkInvoice !== "") {
+      writer.uint32(90).string(message.sparkInvoice);
     }
     return writer;
   },
@@ -9872,6 +9880,14 @@ export const Transfer: MessageFns<Transfer> = {
           message.type = reader.int32() as any;
           continue;
         }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.sparkInvoice = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -9897,6 +9913,7 @@ export const Transfer: MessageFns<Transfer> = {
       createdTime: isSet(object.createdTime) ? fromJsonTimestamp(object.createdTime) : undefined,
       updatedTime: isSet(object.updatedTime) ? fromJsonTimestamp(object.updatedTime) : undefined,
       type: isSet(object.type) ? transferTypeFromJSON(object.type) : 0,
+      sparkInvoice: isSet(object.sparkInvoice) ? globalThis.String(object.sparkInvoice) : "",
     };
   },
 
@@ -9932,6 +9949,9 @@ export const Transfer: MessageFns<Transfer> = {
     if (message.type !== 0) {
       obj.type = transferTypeToJSON(message.type);
     }
+    if (message.sparkInvoice !== "") {
+      obj.sparkInvoice = message.sparkInvoice;
+    }
     return obj;
   },
 
@@ -9950,6 +9970,7 @@ export const Transfer: MessageFns<Transfer> = {
     message.createdTime = object.createdTime ?? undefined;
     message.updatedTime = object.updatedTime ?? undefined;
     message.type = object.type ?? 0;
+    message.sparkInvoice = object.sparkInvoice ?? "";
     return message;
   },
 };
