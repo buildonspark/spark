@@ -1,0 +1,63 @@
+config:
+  target: "http://localhost"
+  engines:
+    spark: {}
+  phases:
+    - duration: 1
+      arrivalRate: 25
+      maxVusers: 25
+
+scenarios:
+  # First scenario: Select wallets, mint tokens with loops
+  - name: "Token Mint from Issuer to Recipient"
+    weight: 1
+    engine: spark
+
+    before:
+      - initializePools:
+          pools:
+            - name: "issuer-pool"
+              mnemonicsFile: "./mnemonics/batch-source-wallets.txt"
+              useWalletStateCache: false
+              randomSelection: true
+              lockWallets: true
+              namedWallets:
+                - { name: "issuer", lock: true, minBalance: 0 }
+
+            - name: "recipient-pool"
+              mnemonicsFile: "./mnemonics/batch-recipient-wallets.txt"
+              useWalletStateCache: false
+              randomSelection: true
+              lockWallets: true
+              namedWallets:
+                - { name: "recipient", lock: true, minBalance: 0 }
+
+    flow:
+      - mintToken:
+          walletName: "issuer"
+          amount: 10
+
+      - loop:
+          count: 20
+          actions:
+            - transferToken:
+                walletName: "issuer"
+                receiverName: "recipient"
+                amount: 1
+            - transferToken:
+                walletName: "recipient"
+                receiverName: "issuer"
+                amount: 1
+            - transferToken:
+                walletName: "issuer"
+                receiverName: "recipient"
+                amount: 2
+            - transferToken:
+                walletName: "recipient"
+                receiverName: "issuer"
+                amount: 2
+
+    after:
+      # Unlock the wallets and close connections
+      - unlockWallets:
+          wallets: ["issuer", "recipient"]

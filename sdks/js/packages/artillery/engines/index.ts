@@ -1,4 +1,5 @@
 import { WalletActions } from "./wallet-actions";
+import { TokenActions } from "./token-actions";
 import { beforeTest, beforeScenario, afterScenario, afterTest } from "./hooks";
 
 import type {
@@ -14,12 +15,18 @@ import { TransferActions } from "./transfer";
 export class SparkEngine {
   private script: ArtilleryScript;
   private walletActions: WalletActions;
+  private tokenActions: TokenActions;
   private transferActions: TransferActions;
+
   private scenarioEE: ArtilleryEventEmitter | null = null;
 
   private readonly stepActions = {
     initializePools: (params?: any) => this.walletActions.initializePools(params),
     cleanupPools: () => this.walletActions.cleanupPools(),
+    unlockWallets: (params?: any) => this.walletActions.unlockWallets(params),
+
+    mintToken: (params?: any) => this.tokenActions.mintToken(params),
+    transferToken: (params?: any) => this.tokenActions.transferToken(params),
     distributeAndRebalance: (params?: any) => this.walletActions.distributeAndRebalance(params),
 
     getBalance: (params?: any) => this.walletActions.getBalance(params),
@@ -39,6 +46,7 @@ export class SparkEngine {
     this.script = script;
 
     this.walletActions = new WalletActions(ee, this);
+    this.tokenActions = new TokenActions(ee, this);
     this.transferActions = new TransferActions(ee, this);
 
     this.initializationPromise = this.processBeforeTestActions();
