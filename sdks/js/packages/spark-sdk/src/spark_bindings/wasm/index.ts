@@ -46,15 +46,35 @@ export function signFrost({
   statechainCommitments,
   adaptorPubKey,
 }: SignFrostParams): Uint8Array {
-  SparkSdkLogger.get(LOGGER_NAMES.wasm).trace("signFrost", {
+  const logMsg = JSON.stringify({
     message: bytesToHex(message),
-    keyPackage: keyPackage,
-    nonce: nonce,
-    selfCommitment: selfCommitment,
-    statechainCommitments: statechainCommitments,
+    keyPackage: {
+      secretKey: bytesToHex(keyPackage.secretKey),
+      publicKey: bytesToHex(keyPackage.publicKey),
+      verifyingKey: bytesToHex(keyPackage.verifyingKey),
+    },
+    nonce: {
+      hiding: bytesToHex(nonce.hiding),
+      binding: bytesToHex(nonce.binding),
+    },
+    selfCommitment: {
+      hiding: bytesToHex(selfCommitment.hiding),
+      binding: bytesToHex(selfCommitment.binding),
+    },
+    statechainCommitments: Object.fromEntries(
+      Object.entries(statechainCommitments ?? {}).map(([k, v]) => [
+        k,
+        {
+          hiding: bytesToHex(v.hiding),
+          binding: bytesToHex(v.binding),
+        },
+      ]),
+    ),
     adaptorPubKey: adaptorPubKey ? bytesToHex(adaptorPubKey) : undefined,
   });
-  return wasm_sign_frost(
+
+  SparkSdkLogger.get(LOGGER_NAMES.wasm).trace("signFrost", logMsg);
+  const result = wasm_sign_frost(
     message,
     createKeyPackage(keyPackage),
     createSigningNonce(nonce),
@@ -62,6 +82,12 @@ export function signFrost({
     statechainCommitments,
     adaptorPubKey,
   );
+  SparkSdkLogger.get(LOGGER_NAMES.wasm).trace(
+    "signFrost result",
+    bytesToHex(result),
+  );
+
+  return result;
 }
 
 export function aggregateFrost({
@@ -75,18 +101,40 @@ export function aggregateFrost({
   verifyingKey,
   adaptorPubKey,
 }: AggregateFrostParams): Uint8Array {
-  SparkSdkLogger.get(LOGGER_NAMES.wasm).trace("aggregateFrost", {
+  const logMsg = JSON.stringify({
     message: bytesToHex(message),
-    statechainCommitments: statechainCommitments,
-    selfCommitment: selfCommitment,
-    statechainSignatures: statechainSignatures,
+    statechainCommitments: Object.fromEntries(
+      Object.entries(statechainCommitments ?? {}).map(([k, v]) => [
+        k,
+        {
+          hiding: bytesToHex(v.hiding),
+          binding: bytesToHex(v.binding),
+        },
+      ]),
+    ),
+    selfCommitment: {
+      hiding: bytesToHex(selfCommitment.hiding),
+      binding: bytesToHex(selfCommitment.binding),
+    },
+    statechainSignatures: Object.fromEntries(
+      Object.entries(statechainSignatures ?? {}).map(([k, v]) => [
+        k,
+        bytesToHex(v),
+      ]),
+    ),
     selfSignature: bytesToHex(selfSignature),
-    statechainPublicKeys: statechainPublicKeys,
+    statechainPublicKeys: Object.fromEntries(
+      Object.entries(statechainPublicKeys ?? {}).map(([k, v]) => [
+        k,
+        bytesToHex(v),
+      ]),
+    ),
     selfPublicKey: bytesToHex(selfPublicKey),
     verifyingKey: bytesToHex(verifyingKey),
     adaptorPubKey: adaptorPubKey ? bytesToHex(adaptorPubKey) : undefined,
   });
-  return wasm_aggregate_frost(
+  SparkSdkLogger.get(LOGGER_NAMES.wasm).trace("aggregateFrost", logMsg);
+  const result = wasm_aggregate_frost(
     message,
     statechainCommitments,
     createSigningCommitment(selfCommitment),
@@ -97,6 +145,11 @@ export function aggregateFrost({
     verifyingKey,
     adaptorPubKey,
   );
+  SparkSdkLogger.get(LOGGER_NAMES.wasm).trace(
+    "aggregateFrost result",
+    bytesToHex(result),
+  );
+  return result;
 }
 
 export function createDummyTx({
