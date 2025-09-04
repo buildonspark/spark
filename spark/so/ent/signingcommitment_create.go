@@ -92,7 +92,9 @@ func (scc *SigningCommitmentCreate) Mutation() *SigningCommitmentMutation {
 
 // Save creates the SigningCommitment in the database.
 func (scc *SigningCommitmentCreate) Save(ctx context.Context) (*SigningCommitment, error) {
-	scc.defaults()
+	if err := scc.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, scc.sqlSave, scc.mutation, scc.hooks)
 }
 
@@ -119,19 +121,29 @@ func (scc *SigningCommitmentCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (scc *SigningCommitmentCreate) defaults() {
+func (scc *SigningCommitmentCreate) defaults() error {
 	if _, ok := scc.mutation.CreateTime(); !ok {
+		if signingcommitment.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized signingcommitment.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := signingcommitment.DefaultCreateTime()
 		scc.mutation.SetCreateTime(v)
 	}
 	if _, ok := scc.mutation.UpdateTime(); !ok {
+		if signingcommitment.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized signingcommitment.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := signingcommitment.DefaultUpdateTime()
 		scc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := scc.mutation.ID(); !ok {
+		if signingcommitment.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized signingcommitment.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := signingcommitment.DefaultID()
 		scc.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

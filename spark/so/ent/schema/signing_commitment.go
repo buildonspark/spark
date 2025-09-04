@@ -16,6 +16,7 @@ type SigningCommitment struct {
 func (SigningCommitment) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
+		NotifyMixin{},
 	}
 }
 

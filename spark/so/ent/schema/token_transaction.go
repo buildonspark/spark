@@ -17,6 +17,7 @@ type TokenTransaction struct {
 func (TokenTransaction) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
+		NotifyMixin{},
 	}
 }
 

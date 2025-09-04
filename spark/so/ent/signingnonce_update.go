@@ -53,7 +53,9 @@ func (snu *SigningNonceUpdate) Mutation() *SigningNonceMutation {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (snu *SigningNonceUpdate) Save(ctx context.Context) (int, error) {
-	snu.defaults()
+	if err := snu.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, snu.sqlSave, snu.mutation, snu.hooks)
 }
 
@@ -80,11 +82,15 @@ func (snu *SigningNonceUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (snu *SigningNonceUpdate) defaults() {
+func (snu *SigningNonceUpdate) defaults() error {
 	if _, ok := snu.mutation.UpdateTime(); !ok {
+		if signingnonce.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized signingnonce.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := signingnonce.UpdateDefaultUpdateTime()
 		snu.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 func (snu *SigningNonceUpdate) sqlSave(ctx context.Context) (n int, err error) {
@@ -163,7 +169,9 @@ func (snuo *SigningNonceUpdateOne) Select(field string, fields ...string) *Signi
 
 // Save executes the query and returns the updated SigningNonce entity.
 func (snuo *SigningNonceUpdateOne) Save(ctx context.Context) (*SigningNonce, error) {
-	snuo.defaults()
+	if err := snuo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, snuo.sqlSave, snuo.mutation, snuo.hooks)
 }
 
@@ -190,11 +198,15 @@ func (snuo *SigningNonceUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (snuo *SigningNonceUpdateOne) defaults() {
+func (snuo *SigningNonceUpdateOne) defaults() error {
 	if _, ok := snuo.mutation.UpdateTime(); !ok {
+		if signingnonce.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized signingnonce.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := signingnonce.UpdateDefaultUpdateTime()
 		snuo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 func (snuo *SigningNonceUpdateOne) sqlSave(ctx context.Context) (_node *SigningNonce, err error) {

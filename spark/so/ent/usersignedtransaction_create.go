@@ -121,7 +121,9 @@ func (ustc *UserSignedTransactionCreate) Mutation() *UserSignedTransactionMutati
 
 // Save creates the UserSignedTransaction in the database.
 func (ustc *UserSignedTransactionCreate) Save(ctx context.Context) (*UserSignedTransaction, error) {
-	ustc.defaults()
+	if err := ustc.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, ustc.sqlSave, ustc.mutation, ustc.hooks)
 }
 
@@ -148,19 +150,29 @@ func (ustc *UserSignedTransactionCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (ustc *UserSignedTransactionCreate) defaults() {
+func (ustc *UserSignedTransactionCreate) defaults() error {
 	if _, ok := ustc.mutation.CreateTime(); !ok {
+		if usersignedtransaction.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized usersignedtransaction.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := usersignedtransaction.DefaultCreateTime()
 		ustc.mutation.SetCreateTime(v)
 	}
 	if _, ok := ustc.mutation.UpdateTime(); !ok {
+		if usersignedtransaction.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized usersignedtransaction.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := usersignedtransaction.DefaultUpdateTime()
 		ustc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := ustc.mutation.ID(); !ok {
+		if usersignedtransaction.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized usersignedtransaction.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := usersignedtransaction.DefaultID()
 		ustc.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

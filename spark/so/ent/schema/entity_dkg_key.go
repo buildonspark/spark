@@ -16,6 +16,7 @@ type EntityDkgKey struct {
 func (EntityDkgKey) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
+		NotifyMixin{},
 	}
 }
 

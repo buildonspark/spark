@@ -122,7 +122,9 @@ func (uc *UtxoCreate) Mutation() *UtxoMutation {
 
 // Save creates the Utxo in the database.
 func (uc *UtxoCreate) Save(ctx context.Context) (*Utxo, error) {
-	uc.defaults()
+	if err := uc.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, uc.sqlSave, uc.mutation, uc.hooks)
 }
 
@@ -149,19 +151,29 @@ func (uc *UtxoCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (uc *UtxoCreate) defaults() {
+func (uc *UtxoCreate) defaults() error {
 	if _, ok := uc.mutation.CreateTime(); !ok {
+		if utxo.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized utxo.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := utxo.DefaultCreateTime()
 		uc.mutation.SetCreateTime(v)
 	}
 	if _, ok := uc.mutation.UpdateTime(); !ok {
+		if utxo.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized utxo.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := utxo.DefaultUpdateTime()
 		uc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := uc.mutation.ID(); !ok {
+		if utxo.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized utxo.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := utxo.DefaultID()
 		uc.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

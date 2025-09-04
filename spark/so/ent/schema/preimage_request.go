@@ -17,6 +17,7 @@ type PreimageRequest struct {
 func (PreimageRequest) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
+		NotifyMixin{},
 	}
 }
 

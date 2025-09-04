@@ -180,7 +180,9 @@ func (tc *TransferCreate) Mutation() *TransferMutation {
 
 // Save creates the Transfer in the database.
 func (tc *TransferCreate) Save(ctx context.Context) (*Transfer, error) {
-	tc.defaults()
+	if err := tc.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, tc.sqlSave, tc.mutation, tc.hooks)
 }
 
@@ -207,19 +209,29 @@ func (tc *TransferCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tc *TransferCreate) defaults() {
+func (tc *TransferCreate) defaults() error {
 	if _, ok := tc.mutation.CreateTime(); !ok {
+		if transfer.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized transfer.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := transfer.DefaultCreateTime()
 		tc.mutation.SetCreateTime(v)
 	}
 	if _, ok := tc.mutation.UpdateTime(); !ok {
+		if transfer.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized transfer.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := transfer.DefaultUpdateTime()
 		tc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := tc.mutation.ID(); !ok {
+		if transfer.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized transfer.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := transfer.DefaultID()
 		tc.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

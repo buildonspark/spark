@@ -14,6 +14,7 @@ type Gossip struct {
 func (Gossip) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
+		NotifyMixin{},
 	}
 }
 

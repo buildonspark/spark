@@ -99,7 +99,9 @@ func (edkc *EntityDkgKeyCreate) Mutation() *EntityDkgKeyMutation {
 
 // Save creates the EntityDkgKey in the database.
 func (edkc *EntityDkgKeyCreate) Save(ctx context.Context) (*EntityDkgKey, error) {
-	edkc.defaults()
+	if err := edkc.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, edkc.sqlSave, edkc.mutation, edkc.hooks)
 }
 
@@ -126,12 +128,18 @@ func (edkc *EntityDkgKeyCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (edkc *EntityDkgKeyCreate) defaults() {
+func (edkc *EntityDkgKeyCreate) defaults() error {
 	if _, ok := edkc.mutation.CreateTime(); !ok {
+		if entitydkgkey.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized entitydkgkey.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := entitydkgkey.DefaultCreateTime()
 		edkc.mutation.SetCreateTime(v)
 	}
 	if _, ok := edkc.mutation.UpdateTime(); !ok {
+		if entitydkgkey.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized entitydkgkey.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := entitydkgkey.DefaultUpdateTime()
 		edkc.mutation.SetUpdateTime(v)
 	}
@@ -140,9 +148,13 @@ func (edkc *EntityDkgKeyCreate) defaults() {
 		edkc.mutation.SetKeyType(v)
 	}
 	if _, ok := edkc.mutation.ID(); !ok {
+		if entitydkgkey.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized entitydkgkey.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := entitydkgkey.DefaultID()
 		edkc.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

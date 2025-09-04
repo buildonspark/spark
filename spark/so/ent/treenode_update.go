@@ -295,7 +295,9 @@ func (tnu *TreeNodeUpdate) RemoveChildren(t ...*TreeNode) *TreeNodeUpdate {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (tnu *TreeNodeUpdate) Save(ctx context.Context) (int, error) {
-	tnu.defaults()
+	if err := tnu.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, tnu.sqlSave, tnu.mutation, tnu.hooks)
 }
 
@@ -322,11 +324,15 @@ func (tnu *TreeNodeUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tnu *TreeNodeUpdate) defaults() {
+func (tnu *TreeNodeUpdate) defaults() error {
 	if _, ok := tnu.mutation.UpdateTime(); !ok {
+		if treenode.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized treenode.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := treenode.UpdateDefaultUpdateTime()
 		tnu.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -863,7 +869,9 @@ func (tnuo *TreeNodeUpdateOne) Select(field string, fields ...string) *TreeNodeU
 
 // Save executes the query and returns the updated TreeNode entity.
 func (tnuo *TreeNodeUpdateOne) Save(ctx context.Context) (*TreeNode, error) {
-	tnuo.defaults()
+	if err := tnuo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, tnuo.sqlSave, tnuo.mutation, tnuo.hooks)
 }
 
@@ -890,11 +898,15 @@ func (tnuo *TreeNodeUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tnuo *TreeNodeUpdateOne) defaults() {
+func (tnuo *TreeNodeUpdateOne) defaults() error {
 	if _, ok := tnuo.mutation.UpdateTime(); !ok {
+		if treenode.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized treenode.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := treenode.UpdateDefaultUpdateTime()
 		tnuo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

@@ -15,6 +15,7 @@ type TokenTransactionPeerSignature struct {
 func (TokenTransactionPeerSignature) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
+		NotifyMixin{},
 	}
 }
 

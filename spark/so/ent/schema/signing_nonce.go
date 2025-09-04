@@ -15,6 +15,7 @@ type SigningNonce struct {
 func (SigningNonce) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
+		NotifyMixin{},
 	}
 }
 

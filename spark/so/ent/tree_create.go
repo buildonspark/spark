@@ -139,7 +139,9 @@ func (tc *TreeCreate) Mutation() *TreeMutation {
 
 // Save creates the Tree in the database.
 func (tc *TreeCreate) Save(ctx context.Context) (*Tree, error) {
-	tc.defaults()
+	if err := tc.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, tc.sqlSave, tc.mutation, tc.hooks)
 }
 
@@ -166,19 +168,29 @@ func (tc *TreeCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tc *TreeCreate) defaults() {
+func (tc *TreeCreate) defaults() error {
 	if _, ok := tc.mutation.CreateTime(); !ok {
+		if tree.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized tree.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := tree.DefaultCreateTime()
 		tc.mutation.SetCreateTime(v)
 	}
 	if _, ok := tc.mutation.UpdateTime(); !ok {
+		if tree.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized tree.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := tree.DefaultUpdateTime()
 		tc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := tc.mutation.ID(); !ok {
+		if tree.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized tree.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := tree.DefaultID()
 		tc.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

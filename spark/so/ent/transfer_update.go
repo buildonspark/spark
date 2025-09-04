@@ -201,7 +201,9 @@ func (tu *TransferUpdate) ClearSparkInvoice() *TransferUpdate {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (tu *TransferUpdate) Save(ctx context.Context) (int, error) {
-	tu.defaults()
+	if err := tu.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, tu.sqlSave, tu.mutation, tu.hooks)
 }
 
@@ -228,11 +230,15 @@ func (tu *TransferUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tu *TransferUpdate) defaults() {
+func (tu *TransferUpdate) defaults() error {
 	if _, ok := tu.mutation.UpdateTime(); !ok {
+		if transfer.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized transfer.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := transfer.UpdateDefaultUpdateTime()
 		tu.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -587,7 +593,9 @@ func (tuo *TransferUpdateOne) Select(field string, fields ...string) *TransferUp
 
 // Save executes the query and returns the updated Transfer entity.
 func (tuo *TransferUpdateOne) Save(ctx context.Context) (*Transfer, error) {
-	tuo.defaults()
+	if err := tuo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, tuo.sqlSave, tuo.mutation, tuo.hooks)
 }
 
@@ -614,11 +622,15 @@ func (tuo *TransferUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tuo *TransferUpdateOne) defaults() {
+func (tuo *TransferUpdateOne) defaults() error {
 	if _, ok := tuo.mutation.UpdateTime(); !ok {
+		if transfer.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized transfer.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := transfer.UpdateDefaultUpdateTime()
 		tuo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

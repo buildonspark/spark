@@ -17,6 +17,7 @@ type SigningKeyshare struct {
 func (SigningKeyshare) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
+		NotifyMixin{},
 	}
 }
 

@@ -15,6 +15,7 @@ type CooperativeExit struct {
 func (CooperativeExit) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
+		NotifyMixin{},
 	}
 }
 

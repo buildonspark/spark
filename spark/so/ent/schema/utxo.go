@@ -19,6 +19,7 @@ type Utxo struct {
 func (Utxo) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
+		NotifyMixin{},
 	}
 }
 

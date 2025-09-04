@@ -56,7 +56,9 @@ func (scu *SigningCommitmentUpdate) Mutation() *SigningCommitmentMutation {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (scu *SigningCommitmentUpdate) Save(ctx context.Context) (int, error) {
-	scu.defaults()
+	if err := scu.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, scu.sqlSave, scu.mutation, scu.hooks)
 }
 
@@ -83,11 +85,15 @@ func (scu *SigningCommitmentUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (scu *SigningCommitmentUpdate) defaults() {
+func (scu *SigningCommitmentUpdate) defaults() error {
 	if _, ok := scu.mutation.UpdateTime(); !ok {
+		if signingcommitment.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized signingcommitment.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := signingcommitment.UpdateDefaultUpdateTime()
 		scu.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -178,7 +184,9 @@ func (scuo *SigningCommitmentUpdateOne) Select(field string, fields ...string) *
 
 // Save executes the query and returns the updated SigningCommitment entity.
 func (scuo *SigningCommitmentUpdateOne) Save(ctx context.Context) (*SigningCommitment, error) {
-	scuo.defaults()
+	if err := scuo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, scuo.sqlSave, scuo.mutation, scuo.hooks)
 }
 
@@ -205,11 +213,15 @@ func (scuo *SigningCommitmentUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (scuo *SigningCommitmentUpdateOne) defaults() {
+func (scuo *SigningCommitmentUpdateOne) defaults() error {
 	if _, ok := scuo.mutation.UpdateTime(); !ok {
+		if signingcommitment.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized signingcommitment.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := signingcommitment.UpdateDefaultUpdateTime()
 		scuo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

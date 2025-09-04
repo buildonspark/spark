@@ -237,7 +237,9 @@ func (usu *UtxoSwapUpdate) ClearTransfer() *UtxoSwapUpdate {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (usu *UtxoSwapUpdate) Save(ctx context.Context) (int, error) {
-	usu.defaults()
+	if err := usu.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, usu.sqlSave, usu.mutation, usu.hooks)
 }
 
@@ -264,11 +266,15 @@ func (usu *UtxoSwapUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (usu *UtxoSwapUpdate) defaults() {
+func (usu *UtxoSwapUpdate) defaults() error {
 	if _, ok := usu.mutation.UpdateTime(); !ok {
+		if utxoswap.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized utxoswap.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := utxoswap.UpdateDefaultUpdateTime()
 		usu.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -635,7 +641,9 @@ func (usuo *UtxoSwapUpdateOne) Select(field string, fields ...string) *UtxoSwapU
 
 // Save executes the query and returns the updated UtxoSwap entity.
 func (usuo *UtxoSwapUpdateOne) Save(ctx context.Context) (*UtxoSwap, error) {
-	usuo.defaults()
+	if err := usuo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, usuo.sqlSave, usuo.mutation, usuo.hooks)
 }
 
@@ -662,11 +670,15 @@ func (usuo *UtxoSwapUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (usuo *UtxoSwapUpdateOne) defaults() {
+func (usuo *UtxoSwapUpdateOne) defaults() error {
 	if _, ok := usuo.mutation.UpdateTime(); !ok {
+		if utxoswap.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized utxoswap.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := utxoswap.UpdateDefaultUpdateTime()
 		usuo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

@@ -42,6 +42,8 @@ import (
 // to their package variables.
 func init() {
 	blockheightMixin := schema.BlockHeight{}.Mixin()
+	blockheightMixinHooks1 := blockheightMixin[1].Hooks()
+	blockheight.Hooks[0] = blockheightMixinHooks1[0]
 	blockheightMixinFields0 := blockheightMixin[0].Fields()
 	_ = blockheightMixinFields0
 	blockheightFields := schema.BlockHeight{}.Fields()
@@ -61,6 +63,8 @@ func init() {
 	// blockheight.DefaultID holds the default value on creation for the id field.
 	blockheight.DefaultID = blockheightDescID.Default.(func() uuid.UUID)
 	cooperativeexitMixin := schema.CooperativeExit{}.Mixin()
+	cooperativeexitMixinHooks1 := cooperativeexitMixin[1].Hooks()
+	cooperativeexit.Hooks[0] = cooperativeexitMixinHooks1[0]
 	cooperativeexitMixinFields0 := cooperativeexitMixin[0].Fields()
 	_ = cooperativeexitMixinFields0
 	cooperativeexitFields := schema.CooperativeExit{}.Fields()
@@ -80,6 +84,8 @@ func init() {
 	// cooperativeexit.DefaultID holds the default value on creation for the id field.
 	cooperativeexit.DefaultID = cooperativeexitDescID.Default.(func() uuid.UUID)
 	depositaddressMixin := schema.DepositAddress{}.Mixin()
+	depositaddressMixinHooks1 := depositaddressMixin[1].Hooks()
+	depositaddress.Hooks[0] = depositaddressMixinHooks1[0]
 	depositaddressMixinFields0 := depositaddressMixin[0].Fields()
 	_ = depositaddressMixinFields0
 	depositaddressFields := schema.DepositAddress{}.Fields()
@@ -115,6 +121,8 @@ func init() {
 	// depositaddress.DefaultID holds the default value on creation for the id field.
 	depositaddress.DefaultID = depositaddressDescID.Default.(func() uuid.UUID)
 	entitydkgkeyMixin := schema.EntityDkgKey{}.Mixin()
+	entitydkgkeyMixinHooks1 := entitydkgkeyMixin[1].Hooks()
+	entitydkgkey.Hooks[0] = entitydkgkeyMixinHooks1[0]
 	entitydkgkeyMixinFields0 := entitydkgkeyMixin[0].Fields()
 	_ = entitydkgkeyMixinFields0
 	entitydkgkeyFields := schema.EntityDkgKey{}.Fields()
@@ -138,6 +146,8 @@ func init() {
 	// entitydkgkey.DefaultID holds the default value on creation for the id field.
 	entitydkgkey.DefaultID = entitydkgkeyDescID.Default.(func() uuid.UUID)
 	gossipMixin := schema.Gossip{}.Mixin()
+	gossipMixinHooks1 := gossipMixin[1].Hooks()
+	gossip.Hooks[0] = gossipMixinHooks1[0]
 	gossipMixinFields0 := gossipMixin[0].Fields()
 	_ = gossipMixinFields0
 	gossipFields := schema.Gossip{}.Fields()
@@ -161,6 +171,8 @@ func init() {
 	// gossip.DefaultID holds the default value on creation for the id field.
 	gossip.DefaultID = gossipDescID.Default.(func() uuid.UUID)
 	l1tokencreateMixin := schema.L1TokenCreate{}.Mixin()
+	l1tokencreateMixinHooks2 := l1tokencreateMixin[2].Hooks()
+	l1tokencreate.Hooks[0] = l1tokencreateMixinHooks2[0]
 	l1tokencreateMixinFields0 := l1tokencreateMixin[0].Fields()
 	_ = l1tokencreateMixinFields0
 	l1tokencreateMixinFields1 := l1tokencreateMixin[1].Fields()
@@ -206,8 +218,10 @@ func init() {
 	// l1tokencreate.DefaultID holds the default value on creation for the id field.
 	l1tokencreate.DefaultID = l1tokencreateDescID.Default.(func() uuid.UUID)
 	paymentintentMixin := schema.PaymentIntent{}.Mixin()
+	paymentintentMixinHooks1 := paymentintentMixin[1].Hooks()
 	paymentintentHooks := schema.PaymentIntent{}.Hooks()
-	paymentintent.Hooks[0] = paymentintentHooks[0]
+	paymentintent.Hooks[0] = paymentintentMixinHooks1[0]
+	paymentintent.Hooks[1] = paymentintentHooks[0]
 	paymentintentMixinFields0 := paymentintentMixin[0].Fields()
 	_ = paymentintentMixinFields0
 	paymentintentFields := schema.PaymentIntent{}.Fields()
@@ -231,6 +245,8 @@ func init() {
 	// paymentintent.DefaultID holds the default value on creation for the id field.
 	paymentintent.DefaultID = paymentintentDescID.Default.(func() uuid.UUID)
 	preimagerequestMixin := schema.PreimageRequest{}.Mixin()
+	preimagerequestMixinHooks1 := preimagerequestMixin[1].Hooks()
+	preimagerequest.Hooks[0] = preimagerequestMixinHooks1[0]
 	preimagerequestMixinFields0 := preimagerequestMixin[0].Fields()
 	_ = preimagerequestMixinFields0
 	preimagerequestFields := schema.PreimageRequest{}.Fields()
@@ -254,6 +270,8 @@ func init() {
 	// preimagerequest.DefaultID holds the default value on creation for the id field.
 	preimagerequest.DefaultID = preimagerequestDescID.Default.(func() uuid.UUID)
 	preimageshareMixin := schema.PreimageShare{}.Mixin()
+	preimageshareMixinHooks1 := preimageshareMixin[1].Hooks()
+	preimageshare.Hooks[0] = preimageshareMixinHooks1[0]
 	preimageshareMixinFields0 := preimageshareMixin[0].Fields()
 	_ = preimageshareMixinFields0
 	preimageshareFields := schema.PreimageShare{}.Fields()
@@ -289,6 +307,8 @@ func init() {
 	// preimageshare.DefaultID holds the default value on creation for the id field.
 	preimageshare.DefaultID = preimageshareDescID.Default.(func() uuid.UUID)
 	signingcommitmentMixin := schema.SigningCommitment{}.Mixin()
+	signingcommitmentMixinHooks1 := signingcommitmentMixin[1].Hooks()
+	signingcommitment.Hooks[0] = signingcommitmentMixinHooks1[0]
 	signingcommitmentMixinFields0 := signingcommitmentMixin[0].Fields()
 	_ = signingcommitmentMixinFields0
 	signingcommitmentFields := schema.SigningCommitment{}.Fields()
@@ -308,6 +328,8 @@ func init() {
 	// signingcommitment.DefaultID holds the default value on creation for the id field.
 	signingcommitment.DefaultID = signingcommitmentDescID.Default.(func() uuid.UUID)
 	signingkeyshareMixin := schema.SigningKeyshare{}.Mixin()
+	signingkeyshareMixinHooks1 := signingkeyshareMixin[1].Hooks()
+	signingkeyshare.Hooks[0] = signingkeyshareMixinHooks1[0]
 	signingkeyshareMixinFields0 := signingkeyshareMixin[0].Fields()
 	_ = signingkeyshareMixinFields0
 	signingkeyshareFields := schema.SigningKeyshare{}.Fields()
@@ -327,6 +349,8 @@ func init() {
 	// signingkeyshare.DefaultID holds the default value on creation for the id field.
 	signingkeyshare.DefaultID = signingkeyshareDescID.Default.(func() uuid.UUID)
 	signingnonceMixin := schema.SigningNonce{}.Mixin()
+	signingnonceMixinHooks1 := signingnonceMixin[1].Hooks()
+	signingnonce.Hooks[0] = signingnonceMixinHooks1[0]
 	signingnonceMixinFields0 := signingnonceMixin[0].Fields()
 	_ = signingnonceMixinFields0
 	signingnonceFields := schema.SigningNonce{}.Fields()
@@ -346,6 +370,8 @@ func init() {
 	// signingnonce.DefaultID holds the default value on creation for the id field.
 	signingnonce.DefaultID = signingnonceDescID.Default.(func() uuid.UUID)
 	sparkinvoiceMixin := schema.SparkInvoice{}.Mixin()
+	sparkinvoiceMixinHooks1 := sparkinvoiceMixin[1].Hooks()
+	sparkinvoice.Hooks[0] = sparkinvoiceMixinHooks1[0]
 	sparkinvoiceMixinFields0 := sparkinvoiceMixin[0].Fields()
 	_ = sparkinvoiceMixinFields0
 	sparkinvoiceFields := schema.SparkInvoice{}.Fields()
@@ -369,6 +395,8 @@ func init() {
 	// sparkinvoice.DefaultID holds the default value on creation for the id field.
 	sparkinvoice.DefaultID = sparkinvoiceDescID.Default.(func() uuid.UUID)
 	tokencreateMixin := schema.TokenCreate{}.Mixin()
+	tokencreateMixinHooks2 := tokencreateMixin[2].Hooks()
+	tokencreate.Hooks[0] = tokencreateMixinHooks2[0]
 	tokencreateMixinFields0 := tokencreateMixin[0].Fields()
 	_ = tokencreateMixinFields0
 	tokencreateMixinFields1 := tokencreateMixin[1].Fields()
@@ -418,6 +446,8 @@ func init() {
 	// tokencreate.DefaultID holds the default value on creation for the id field.
 	tokencreate.DefaultID = tokencreateDescID.Default.(func() uuid.UUID)
 	tokenfreezeMixin := schema.TokenFreeze{}.Mixin()
+	tokenfreezeMixinHooks1 := tokenfreezeMixin[1].Hooks()
+	tokenfreeze.Hooks[0] = tokenfreezeMixinHooks1[0]
 	tokenfreezeMixinFields0 := tokenfreezeMixin[0].Fields()
 	_ = tokenfreezeMixinFields0
 	tokenfreezeFields := schema.TokenFreeze{}.Fields()
@@ -445,6 +475,8 @@ func init() {
 	// tokenfreeze.DefaultID holds the default value on creation for the id field.
 	tokenfreeze.DefaultID = tokenfreezeDescID.Default.(func() uuid.UUID)
 	tokenmintMixin := schema.TokenMint{}.Mixin()
+	tokenmintMixinHooks1 := tokenmintMixin[1].Hooks()
+	tokenmint.Hooks[0] = tokenmintMixinHooks1[0]
 	tokenmintMixinFields0 := tokenmintMixin[0].Fields()
 	_ = tokenmintMixinFields0
 	tokenmintFields := schema.TokenMint{}.Fields()
@@ -472,6 +504,8 @@ func init() {
 	// tokenmint.DefaultID holds the default value on creation for the id field.
 	tokenmint.DefaultID = tokenmintDescID.Default.(func() uuid.UUID)
 	tokenoutputMixin := schema.TokenOutput{}.Mixin()
+	tokenoutputMixinHooks1 := tokenoutputMixin[1].Hooks()
+	tokenoutput.Hooks[0] = tokenoutputMixinHooks1[0]
 	tokenoutputMixinFields0 := tokenoutputMixin[0].Fields()
 	_ = tokenoutputMixinFields0
 	tokenoutputFields := schema.TokenOutput{}.Fields()
@@ -499,6 +533,8 @@ func init() {
 	// tokenoutput.DefaultID holds the default value on creation for the id field.
 	tokenoutput.DefaultID = tokenoutputDescID.Default.(func() uuid.UUID)
 	tokenpartialrevocationsecretshareMixin := schema.TokenPartialRevocationSecretShare{}.Mixin()
+	tokenpartialrevocationsecretshareMixinHooks1 := tokenpartialrevocationsecretshareMixin[1].Hooks()
+	tokenpartialrevocationsecretshare.Hooks[0] = tokenpartialrevocationsecretshareMixinHooks1[0]
 	tokenpartialrevocationsecretshareMixinFields0 := tokenpartialrevocationsecretshareMixin[0].Fields()
 	_ = tokenpartialrevocationsecretshareMixinFields0
 	tokenpartialrevocationsecretshareFields := schema.TokenPartialRevocationSecretShare{}.Fields()
@@ -526,6 +562,8 @@ func init() {
 	// tokenpartialrevocationsecretshare.DefaultID holds the default value on creation for the id field.
 	tokenpartialrevocationsecretshare.DefaultID = tokenpartialrevocationsecretshareDescID.Default.(func() uuid.UUID)
 	tokentransactionMixin := schema.TokenTransaction{}.Mixin()
+	tokentransactionMixinHooks1 := tokentransactionMixin[1].Hooks()
+	tokentransaction.Hooks[0] = tokentransactionMixinHooks1[0]
 	tokentransactionMixinFields0 := tokentransactionMixin[0].Fields()
 	_ = tokentransactionMixinFields0
 	tokentransactionFields := schema.TokenTransaction{}.Fields()
@@ -559,6 +597,8 @@ func init() {
 	// tokentransaction.DefaultID holds the default value on creation for the id field.
 	tokentransaction.DefaultID = tokentransactionDescID.Default.(func() uuid.UUID)
 	tokentransactionpeersignatureMixin := schema.TokenTransactionPeerSignature{}.Mixin()
+	tokentransactionpeersignatureMixinHooks1 := tokentransactionpeersignatureMixin[1].Hooks()
+	tokentransactionpeersignature.Hooks[0] = tokentransactionpeersignatureMixinHooks1[0]
 	tokentransactionpeersignatureMixinFields0 := tokentransactionpeersignatureMixin[0].Fields()
 	_ = tokentransactionpeersignatureMixinFields0
 	tokentransactionpeersignatureFields := schema.TokenTransactionPeerSignature{}.Fields()
@@ -586,6 +626,8 @@ func init() {
 	// tokentransactionpeersignature.DefaultID holds the default value on creation for the id field.
 	tokentransactionpeersignature.DefaultID = tokentransactionpeersignatureDescID.Default.(func() uuid.UUID)
 	transferMixin := schema.Transfer{}.Mixin()
+	transferMixinHooks1 := transferMixin[1].Hooks()
+	transfer.Hooks[0] = transferMixinHooks1[0]
 	transferMixinFields0 := transferMixin[0].Fields()
 	_ = transferMixinFields0
 	transferFields := schema.Transfer{}.Fields()
@@ -613,6 +655,8 @@ func init() {
 	// transfer.DefaultID holds the default value on creation for the id field.
 	transfer.DefaultID = transferDescID.Default.(func() uuid.UUID)
 	transferleafMixin := schema.TransferLeaf{}.Mixin()
+	transferleafMixinHooks1 := transferleafMixin[1].Hooks()
+	transferleaf.Hooks[0] = transferleafMixinHooks1[0]
 	transferleafMixinFields0 := transferleafMixin[0].Fields()
 	_ = transferleafMixinFields0
 	transferleafFields := schema.TransferLeaf{}.Fields()
@@ -640,6 +684,8 @@ func init() {
 	// transferleaf.DefaultID holds the default value on creation for the id field.
 	transferleaf.DefaultID = transferleafDescID.Default.(func() uuid.UUID)
 	treeMixin := schema.Tree{}.Mixin()
+	treeMixinHooks1 := treeMixin[1].Hooks()
+	tree.Hooks[0] = treeMixinHooks1[0]
 	treeMixinFields0 := treeMixin[0].Fields()
 	_ = treeMixinFields0
 	treeFields := schema.Tree{}.Fields()
@@ -671,6 +717,8 @@ func init() {
 	// tree.DefaultID holds the default value on creation for the id field.
 	tree.DefaultID = treeDescID.Default.(func() uuid.UUID)
 	treenodeMixin := schema.TreeNode{}.Mixin()
+	treenodeMixinHooks1 := treenodeMixin[1].Hooks()
+	treenode.Hooks[0] = treenodeMixinHooks1[0]
 	treenodeMixinFields0 := treenodeMixin[0].Fields()
 	_ = treenodeMixinFields0
 	treenodeFields := schema.TreeNode{}.Fields()
@@ -706,6 +754,8 @@ func init() {
 	// treenode.DefaultID holds the default value on creation for the id field.
 	treenode.DefaultID = treenodeDescID.Default.(func() uuid.UUID)
 	usersignedtransactionMixin := schema.UserSignedTransaction{}.Mixin()
+	usersignedtransactionMixinHooks1 := usersignedtransactionMixin[1].Hooks()
+	usersignedtransaction.Hooks[0] = usersignedtransactionMixinHooks1[0]
 	usersignedtransactionMixinFields0 := usersignedtransactionMixin[0].Fields()
 	_ = usersignedtransactionMixinFields0
 	usersignedtransactionFields := schema.UserSignedTransaction{}.Fields()
@@ -741,6 +791,8 @@ func init() {
 	// usersignedtransaction.DefaultID holds the default value on creation for the id field.
 	usersignedtransaction.DefaultID = usersignedtransactionDescID.Default.(func() uuid.UUID)
 	utxoMixin := schema.Utxo{}.Mixin()
+	utxoMixinHooks1 := utxoMixin[1].Hooks()
+	utxo.Hooks[0] = utxoMixinHooks1[0]
 	utxoMixinFields0 := utxoMixin[0].Fields()
 	_ = utxoMixinFields0
 	utxoFields := schema.Utxo{}.Fields()
@@ -764,6 +816,8 @@ func init() {
 	// utxo.DefaultID holds the default value on creation for the id field.
 	utxo.DefaultID = utxoDescID.Default.(func() uuid.UUID)
 	utxoswapMixin := schema.UtxoSwap{}.Mixin()
+	utxoswapMixinHooks1 := utxoswapMixin[1].Hooks()
+	utxoswap.Hooks[0] = utxoswapMixinHooks1[0]
 	utxoswapMixinFields0 := utxoswapMixin[0].Fields()
 	_ = utxoswapMixinFields0
 	utxoswapFields := schema.UtxoSwap{}.Fields()

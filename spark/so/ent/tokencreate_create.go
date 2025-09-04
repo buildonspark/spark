@@ -222,7 +222,9 @@ func (tcc *TokenCreateCreate) Mutation() *TokenCreateMutation {
 
 // Save creates the TokenCreate in the database.
 func (tcc *TokenCreateCreate) Save(ctx context.Context) (*TokenCreate, error) {
-	tcc.defaults()
+	if err := tcc.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, tcc.sqlSave, tcc.mutation, tcc.hooks)
 }
 
@@ -249,19 +251,29 @@ func (tcc *TokenCreateCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tcc *TokenCreateCreate) defaults() {
+func (tcc *TokenCreateCreate) defaults() error {
 	if _, ok := tcc.mutation.CreateTime(); !ok {
+		if tokencreate.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized tokencreate.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := tokencreate.DefaultCreateTime()
 		tcc.mutation.SetCreateTime(v)
 	}
 	if _, ok := tcc.mutation.UpdateTime(); !ok {
+		if tokencreate.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized tokencreate.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := tokencreate.DefaultUpdateTime()
 		tcc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := tcc.mutation.ID(); !ok {
+		if tokencreate.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized tokencreate.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := tokencreate.DefaultID()
 		tcc.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

@@ -218,7 +218,9 @@ func (dac *DepositAddressCreate) Mutation() *DepositAddressMutation {
 
 // Save creates the DepositAddress in the database.
 func (dac *DepositAddressCreate) Save(ctx context.Context) (*DepositAddress, error) {
-	dac.defaults()
+	if err := dac.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, dac.sqlSave, dac.mutation, dac.hooks)
 }
 
@@ -245,12 +247,18 @@ func (dac *DepositAddressCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (dac *DepositAddressCreate) defaults() {
+func (dac *DepositAddressCreate) defaults() error {
 	if _, ok := dac.mutation.CreateTime(); !ok {
+		if depositaddress.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized depositaddress.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := depositaddress.DefaultCreateTime()
 		dac.mutation.SetCreateTime(v)
 	}
 	if _, ok := dac.mutation.UpdateTime(); !ok {
+		if depositaddress.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized depositaddress.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := depositaddress.DefaultUpdateTime()
 		dac.mutation.SetUpdateTime(v)
 	}
@@ -259,9 +267,13 @@ func (dac *DepositAddressCreate) defaults() {
 		dac.mutation.SetIsStatic(v)
 	}
 	if _, ok := dac.mutation.ID(); !ok {
+		if depositaddress.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized depositaddress.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := depositaddress.DefaultID()
 		dac.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

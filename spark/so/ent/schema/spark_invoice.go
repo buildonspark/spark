@@ -14,6 +14,7 @@ type SparkInvoice struct {
 func (SparkInvoice) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
+		NotifyMixin{},
 	}
 }
 

@@ -15,6 +15,7 @@ type TokenMint struct {
 func (TokenMint) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
+		NotifyMixin{},
 	}
 }
 

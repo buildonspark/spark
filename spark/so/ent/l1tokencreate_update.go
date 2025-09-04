@@ -41,7 +41,9 @@ func (lcu *L1TokenCreateUpdate) Mutation() *L1TokenCreateMutation {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (lcu *L1TokenCreateUpdate) Save(ctx context.Context) (int, error) {
-	lcu.defaults()
+	if err := lcu.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, lcu.sqlSave, lcu.mutation, lcu.hooks)
 }
 
@@ -68,11 +70,15 @@ func (lcu *L1TokenCreateUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (lcu *L1TokenCreateUpdate) defaults() {
+func (lcu *L1TokenCreateUpdate) defaults() error {
 	if _, ok := lcu.mutation.UpdateTime(); !ok {
+		if l1tokencreate.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized l1tokencreate.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := l1tokencreate.UpdateDefaultUpdateTime()
 		lcu.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 func (lcu *L1TokenCreateUpdate) sqlSave(ctx context.Context) (n int, err error) {
@@ -133,7 +139,9 @@ func (lcuo *L1TokenCreateUpdateOne) Select(field string, fields ...string) *L1To
 
 // Save executes the query and returns the updated L1TokenCreate entity.
 func (lcuo *L1TokenCreateUpdateOne) Save(ctx context.Context) (*L1TokenCreate, error) {
-	lcuo.defaults()
+	if err := lcuo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, lcuo.sqlSave, lcuo.mutation, lcuo.hooks)
 }
 
@@ -160,11 +168,15 @@ func (lcuo *L1TokenCreateUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (lcuo *L1TokenCreateUpdateOne) defaults() {
+func (lcuo *L1TokenCreateUpdateOne) defaults() error {
 	if _, ok := lcuo.mutation.UpdateTime(); !ok {
+		if l1tokencreate.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized l1tokencreate.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := l1tokencreate.UpdateDefaultUpdateTime()
 		lcuo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 func (lcuo *L1TokenCreateUpdateOne) sqlSave(ctx context.Context) (_node *L1TokenCreate, err error) {

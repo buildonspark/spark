@@ -538,7 +538,8 @@ func (c *BlockHeightClient) GetX(ctx context.Context, id uuid.UUID) *BlockHeight
 
 // Hooks returns the client hooks.
 func (c *BlockHeightClient) Hooks() []Hook {
-	return c.hooks.BlockHeight
+	hooks := c.hooks.BlockHeight
+	return append(hooks[:len(hooks):len(hooks)], blockheight.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -687,7 +688,8 @@ func (c *CooperativeExitClient) QueryTransfer(ce *CooperativeExit) *TransferQuer
 
 // Hooks returns the client hooks.
 func (c *CooperativeExitClient) Hooks() []Hook {
-	return c.hooks.CooperativeExit
+	hooks := c.hooks.CooperativeExit
+	return append(hooks[:len(hooks):len(hooks)], cooperativeexit.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -868,7 +870,8 @@ func (c *DepositAddressClient) QueryUtxoswaps(da *DepositAddress) *UtxoSwapQuery
 
 // Hooks returns the client hooks.
 func (c *DepositAddressClient) Hooks() []Hook {
-	return c.hooks.DepositAddress
+	hooks := c.hooks.DepositAddress
+	return append(hooks[:len(hooks):len(hooks)], depositaddress.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -1017,7 +1020,8 @@ func (c *EntityDkgKeyClient) QuerySigningKeyshare(edk *EntityDkgKey) *SigningKey
 
 // Hooks returns the client hooks.
 func (c *EntityDkgKeyClient) Hooks() []Hook {
-	return c.hooks.EntityDkgKey
+	hooks := c.hooks.EntityDkgKey
+	return append(hooks[:len(hooks):len(hooks)], entitydkgkey.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -1150,7 +1154,8 @@ func (c *GossipClient) GetX(ctx context.Context, id uuid.UUID) *Gossip {
 
 // Hooks returns the client hooks.
 func (c *GossipClient) Hooks() []Hook {
-	return c.hooks.Gossip
+	hooks := c.hooks.Gossip
+	return append(hooks[:len(hooks):len(hooks)], gossip.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -1283,7 +1288,8 @@ func (c *L1TokenCreateClient) GetX(ctx context.Context, id uuid.UUID) *L1TokenCr
 
 // Hooks returns the client hooks.
 func (c *L1TokenCreateClient) Hooks() []Hook {
-	return c.hooks.L1TokenCreate
+	hooks := c.hooks.L1TokenCreate
+	return append(hooks[:len(hooks):len(hooks)], l1tokencreate.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -1630,7 +1636,8 @@ func (c *PreimageRequestClient) QueryTransfers(pr *PreimageRequest) *TransferQue
 
 // Hooks returns the client hooks.
 func (c *PreimageRequestClient) Hooks() []Hook {
-	return c.hooks.PreimageRequest
+	hooks := c.hooks.PreimageRequest
+	return append(hooks[:len(hooks):len(hooks)], preimagerequest.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -1779,7 +1786,8 @@ func (c *PreimageShareClient) QueryPreimageRequest(ps *PreimageShare) *PreimageR
 
 // Hooks returns the client hooks.
 func (c *PreimageShareClient) Hooks() []Hook {
-	return c.hooks.PreimageShare
+	hooks := c.hooks.PreimageShare
+	return append(hooks[:len(hooks):len(hooks)], preimageshare.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -1912,7 +1920,8 @@ func (c *SigningCommitmentClient) GetX(ctx context.Context, id uuid.UUID) *Signi
 
 // Hooks returns the client hooks.
 func (c *SigningCommitmentClient) Hooks() []Hook {
-	return c.hooks.SigningCommitment
+	hooks := c.hooks.SigningCommitment
+	return append(hooks[:len(hooks):len(hooks)], signingcommitment.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -2045,7 +2054,8 @@ func (c *SigningKeyshareClient) GetX(ctx context.Context, id uuid.UUID) *Signing
 
 // Hooks returns the client hooks.
 func (c *SigningKeyshareClient) Hooks() []Hook {
-	return c.hooks.SigningKeyshare
+	hooks := c.hooks.SigningKeyshare
+	return append(hooks[:len(hooks):len(hooks)], signingkeyshare.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -2178,7 +2188,8 @@ func (c *SigningNonceClient) GetX(ctx context.Context, id uuid.UUID) *SigningNon
 
 // Hooks returns the client hooks.
 func (c *SigningNonceClient) Hooks() []Hook {
-	return c.hooks.SigningNonce
+	hooks := c.hooks.SigningNonce
+	return append(hooks[:len(hooks):len(hooks)], signingnonce.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -2343,7 +2354,8 @@ func (c *SparkInvoiceClient) QueryTransfer(si *SparkInvoice) *TransferQuery {
 
 // Hooks returns the client hooks.
 func (c *SparkInvoiceClient) Hooks() []Hook {
-	return c.hooks.SparkInvoice
+	hooks := c.hooks.SparkInvoice
+	return append(hooks[:len(hooks):len(hooks)], sparkinvoice.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -2540,7 +2552,8 @@ func (c *TokenCreateClient) QueryTokenFreeze(tc *TokenCreate) *TokenFreezeQuery 
 
 // Hooks returns the client hooks.
 func (c *TokenCreateClient) Hooks() []Hook {
-	return c.hooks.TokenCreate
+	hooks := c.hooks.TokenCreate
+	return append(hooks[:len(hooks):len(hooks)], tokencreate.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -2689,7 +2702,8 @@ func (c *TokenFreezeClient) QueryTokenCreate(tf *TokenFreeze) *TokenCreateQuery 
 
 // Hooks returns the client hooks.
 func (c *TokenFreezeClient) Hooks() []Hook {
-	return c.hooks.TokenFreeze
+	hooks := c.hooks.TokenFreeze
+	return append(hooks[:len(hooks):len(hooks)], tokenfreeze.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -2838,7 +2852,8 @@ func (c *TokenMintClient) QueryTokenTransaction(tm *TokenMint) *TokenTransaction
 
 // Hooks returns the client hooks.
 func (c *TokenMintClient) Hooks() []Hook {
-	return c.hooks.TokenMint
+	hooks := c.hooks.TokenMint
+	return append(hooks[:len(hooks):len(hooks)], tokenmint.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -3067,7 +3082,8 @@ func (c *TokenOutputClient) QueryTokenCreate(to *TokenOutput) *TokenCreateQuery 
 
 // Hooks returns the client hooks.
 func (c *TokenOutputClient) Hooks() []Hook {
-	return c.hooks.TokenOutput
+	hooks := c.hooks.TokenOutput
+	return append(hooks[:len(hooks):len(hooks)], tokenoutput.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -3216,7 +3232,8 @@ func (c *TokenPartialRevocationSecretShareClient) QueryTokenOutput(tprss *TokenP
 
 // Hooks returns the client hooks.
 func (c *TokenPartialRevocationSecretShareClient) Hooks() []Hook {
-	return c.hooks.TokenPartialRevocationSecretShare
+	hooks := c.hooks.TokenPartialRevocationSecretShare
+	return append(hooks[:len(hooks):len(hooks)], tokenpartialrevocationsecretshare.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -3477,7 +3494,8 @@ func (c *TokenTransactionClient) QuerySparkInvoice(tt *TokenTransaction) *SparkI
 
 // Hooks returns the client hooks.
 func (c *TokenTransactionClient) Hooks() []Hook {
-	return c.hooks.TokenTransaction
+	hooks := c.hooks.TokenTransaction
+	return append(hooks[:len(hooks):len(hooks)], tokentransaction.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -3626,7 +3644,8 @@ func (c *TokenTransactionPeerSignatureClient) QueryTokenTransaction(ttps *TokenT
 
 // Hooks returns the client hooks.
 func (c *TokenTransactionPeerSignatureClient) Hooks() []Hook {
-	return c.hooks.TokenTransactionPeerSignature
+	hooks := c.hooks.TokenTransactionPeerSignature
+	return append(hooks[:len(hooks):len(hooks)], tokentransactionpeersignature.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -3807,7 +3826,8 @@ func (c *TransferClient) QuerySparkInvoice(t *Transfer) *SparkInvoiceQuery {
 
 // Hooks returns the client hooks.
 func (c *TransferClient) Hooks() []Hook {
-	return c.hooks.Transfer
+	hooks := c.hooks.Transfer
+	return append(hooks[:len(hooks):len(hooks)], transfer.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -3972,7 +3992,8 @@ func (c *TransferLeafClient) QueryLeaf(tl *TransferLeaf) *TreeNodeQuery {
 
 // Hooks returns the client hooks.
 func (c *TransferLeafClient) Hooks() []Hook {
-	return c.hooks.TransferLeaf
+	hooks := c.hooks.TransferLeaf
+	return append(hooks[:len(hooks):len(hooks)], transferleaf.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -4137,7 +4158,8 @@ func (c *TreeClient) QueryNodes(t *Tree) *TreeNodeQuery {
 
 // Hooks returns the client hooks.
 func (c *TreeClient) Hooks() []Hook {
-	return c.hooks.Tree
+	hooks := c.hooks.Tree
+	return append(hooks[:len(hooks):len(hooks)], tree.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -4334,7 +4356,8 @@ func (c *TreeNodeClient) QueryChildren(tn *TreeNode) *TreeNodeQuery {
 
 // Hooks returns the client hooks.
 func (c *TreeNodeClient) Hooks() []Hook {
-	return c.hooks.TreeNode
+	hooks := c.hooks.TreeNode
+	return append(hooks[:len(hooks):len(hooks)], treenode.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -4499,7 +4522,8 @@ func (c *UserSignedTransactionClient) QueryPreimageRequest(ust *UserSignedTransa
 
 // Hooks returns the client hooks.
 func (c *UserSignedTransactionClient) Hooks() []Hook {
-	return c.hooks.UserSignedTransaction
+	hooks := c.hooks.UserSignedTransaction
+	return append(hooks[:len(hooks):len(hooks)], usersignedtransaction.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -4648,7 +4672,8 @@ func (c *UtxoClient) QueryDepositAddress(u *Utxo) *DepositAddressQuery {
 
 // Hooks returns the client hooks.
 func (c *UtxoClient) Hooks() []Hook {
-	return c.hooks.Utxo
+	hooks := c.hooks.Utxo
+	return append(hooks[:len(hooks):len(hooks)], utxo.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -4813,7 +4838,8 @@ func (c *UtxoSwapClient) QueryTransfer(us *UtxoSwap) *TransferQuery {
 
 // Hooks returns the client hooks.
 func (c *UtxoSwapClient) Hooks() []Hook {
-	return c.hooks.UtxoSwap
+	hooks := c.hooks.UtxoSwap
+	return append(hooks[:len(hooks):len(hooks)], utxoswap.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.

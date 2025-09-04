@@ -168,7 +168,9 @@ func (tlu *TransferLeafUpdate) ClearLeaf() *TransferLeafUpdate {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (tlu *TransferLeafUpdate) Save(ctx context.Context) (int, error) {
-	tlu.defaults()
+	if err := tlu.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, tlu.sqlSave, tlu.mutation, tlu.hooks)
 }
 
@@ -195,11 +197,15 @@ func (tlu *TransferLeafUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tlu *TransferLeafUpdate) defaults() {
+func (tlu *TransferLeafUpdate) defaults() error {
 	if _, ok := tlu.mutation.UpdateTime(); !ok {
+		if transferleaf.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized transferleaf.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := transferleaf.UpdateDefaultUpdateTime()
 		tlu.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -512,7 +518,9 @@ func (tluo *TransferLeafUpdateOne) Select(field string, fields ...string) *Trans
 
 // Save executes the query and returns the updated TransferLeaf entity.
 func (tluo *TransferLeafUpdateOne) Save(ctx context.Context) (*TransferLeaf, error) {
-	tluo.defaults()
+	if err := tluo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, tluo.sqlSave, tluo.mutation, tluo.hooks)
 }
 
@@ -539,11 +547,15 @@ func (tluo *TransferLeafUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tluo *TransferLeafUpdateOne) defaults() {
+func (tluo *TransferLeafUpdateOne) defaults() error {
 	if _, ok := tluo.mutation.UpdateTime(); !ok {
+		if transferleaf.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized transferleaf.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := transferleaf.UpdateDefaultUpdateTime()
 		tluo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

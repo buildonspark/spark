@@ -68,7 +68,9 @@ func (psu *PreimageShareUpdate) ClearPreimageRequest() *PreimageShareUpdate {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (psu *PreimageShareUpdate) Save(ctx context.Context) (int, error) {
-	psu.defaults()
+	if err := psu.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, psu.sqlSave, psu.mutation, psu.hooks)
 }
 
@@ -95,11 +97,15 @@ func (psu *PreimageShareUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (psu *PreimageShareUpdate) defaults() {
+func (psu *PreimageShareUpdate) defaults() error {
 	if _, ok := psu.mutation.UpdateTime(); !ok {
+		if preimageshare.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized preimageshare.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := preimageshare.UpdateDefaultUpdateTime()
 		psu.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 func (psu *PreimageShareUpdate) sqlSave(ctx context.Context) (n int, err error) {
@@ -214,7 +220,9 @@ func (psuo *PreimageShareUpdateOne) Select(field string, fields ...string) *Prei
 
 // Save executes the query and returns the updated PreimageShare entity.
 func (psuo *PreimageShareUpdateOne) Save(ctx context.Context) (*PreimageShare, error) {
-	psuo.defaults()
+	if err := psuo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, psuo.sqlSave, psuo.mutation, psuo.hooks)
 }
 
@@ -241,11 +249,15 @@ func (psuo *PreimageShareUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (psuo *PreimageShareUpdateOne) defaults() {
+func (psuo *PreimageShareUpdateOne) defaults() error {
 	if _, ok := psuo.mutation.UpdateTime(); !ok {
+		if preimageshare.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized preimageshare.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := preimageshare.UpdateDefaultUpdateTime()
 		psuo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 func (psuo *PreimageShareUpdateOne) sqlSave(ctx context.Context) (_node *PreimageShare, err error) {

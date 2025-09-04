@@ -116,7 +116,9 @@ func (siu *SparkInvoiceUpdate) RemoveTransfer(t ...*Transfer) *SparkInvoiceUpdat
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (siu *SparkInvoiceUpdate) Save(ctx context.Context) (int, error) {
-	siu.defaults()
+	if err := siu.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, siu.sqlSave, siu.mutation, siu.hooks)
 }
 
@@ -143,11 +145,15 @@ func (siu *SparkInvoiceUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (siu *SparkInvoiceUpdate) defaults() {
+func (siu *SparkInvoiceUpdate) defaults() error {
 	if _, ok := siu.mutation.UpdateTime(); !ok {
+		if sparkinvoice.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized sparkinvoice.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := sparkinvoice.UpdateDefaultUpdateTime()
 		siu.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 func (siu *SparkInvoiceUpdate) sqlSave(ctx context.Context) (n int, err error) {
@@ -373,7 +379,9 @@ func (siuo *SparkInvoiceUpdateOne) Select(field string, fields ...string) *Spark
 
 // Save executes the query and returns the updated SparkInvoice entity.
 func (siuo *SparkInvoiceUpdateOne) Save(ctx context.Context) (*SparkInvoice, error) {
-	siuo.defaults()
+	if err := siuo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, siuo.sqlSave, siuo.mutation, siuo.hooks)
 }
 
@@ -400,11 +408,15 @@ func (siuo *SparkInvoiceUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (siuo *SparkInvoiceUpdateOne) defaults() {
+func (siuo *SparkInvoiceUpdateOne) defaults() error {
 	if _, ok := siuo.mutation.UpdateTime(); !ok {
+		if sparkinvoice.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized sparkinvoice.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := sparkinvoice.UpdateDefaultUpdateTime()
 		siuo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 func (siuo *SparkInvoiceUpdateOne) sqlSave(ctx context.Context) (_node *SparkInvoice, err error) {

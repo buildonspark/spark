@@ -128,7 +128,9 @@ func (lcc *L1TokenCreateCreate) Mutation() *L1TokenCreateMutation {
 
 // Save creates the L1TokenCreate in the database.
 func (lcc *L1TokenCreateCreate) Save(ctx context.Context) (*L1TokenCreate, error) {
-	lcc.defaults()
+	if err := lcc.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, lcc.sqlSave, lcc.mutation, lcc.hooks)
 }
 
@@ -155,19 +157,29 @@ func (lcc *L1TokenCreateCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (lcc *L1TokenCreateCreate) defaults() {
+func (lcc *L1TokenCreateCreate) defaults() error {
 	if _, ok := lcc.mutation.CreateTime(); !ok {
+		if l1tokencreate.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized l1tokencreate.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := l1tokencreate.DefaultCreateTime()
 		lcc.mutation.SetCreateTime(v)
 	}
 	if _, ok := lcc.mutation.UpdateTime(); !ok {
+		if l1tokencreate.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized l1tokencreate.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := l1tokencreate.DefaultUpdateTime()
 		lcc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := lcc.mutation.ID(); !ok {
+		if l1tokencreate.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized l1tokencreate.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := l1tokencreate.DefaultID()
 		lcc.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

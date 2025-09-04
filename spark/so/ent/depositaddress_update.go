@@ -242,7 +242,9 @@ func (dau *DepositAddressUpdate) RemoveUtxoswaps(u ...*UtxoSwap) *DepositAddress
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (dau *DepositAddressUpdate) Save(ctx context.Context) (int, error) {
-	dau.defaults()
+	if err := dau.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, dau.sqlSave, dau.mutation, dau.hooks)
 }
 
@@ -269,11 +271,15 @@ func (dau *DepositAddressUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (dau *DepositAddressUpdate) defaults() {
+func (dau *DepositAddressUpdate) defaults() error {
 	if _, ok := dau.mutation.UpdateTime(); !ok {
+		if depositaddress.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized depositaddress.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := depositaddress.UpdateDefaultUpdateTime()
 		dau.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -679,7 +685,9 @@ func (dauo *DepositAddressUpdateOne) Select(field string, fields ...string) *Dep
 
 // Save executes the query and returns the updated DepositAddress entity.
 func (dauo *DepositAddressUpdateOne) Save(ctx context.Context) (*DepositAddress, error) {
-	dauo.defaults()
+	if err := dauo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, dauo.sqlSave, dauo.mutation, dauo.hooks)
 }
 
@@ -706,11 +714,15 @@ func (dauo *DepositAddressUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (dauo *DepositAddressUpdateOne) defaults() {
+func (dauo *DepositAddressUpdateOne) defaults() error {
 	if _, ok := dauo.mutation.UpdateTime(); !ok {
+		if depositaddress.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized depositaddress.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := depositaddress.UpdateDefaultUpdateTime()
 		dauo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

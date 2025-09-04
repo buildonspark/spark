@@ -17,6 +17,7 @@ type TreeNode struct {
 func (TreeNode) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
+		NotifyMixin{},
 	}
 }
 

@@ -163,7 +163,9 @@ func (tlc *TransferLeafCreate) Mutation() *TransferLeafMutation {
 
 // Save creates the TransferLeaf in the database.
 func (tlc *TransferLeafCreate) Save(ctx context.Context) (*TransferLeaf, error) {
-	tlc.defaults()
+	if err := tlc.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, tlc.sqlSave, tlc.mutation, tlc.hooks)
 }
 
@@ -190,19 +192,29 @@ func (tlc *TransferLeafCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tlc *TransferLeafCreate) defaults() {
+func (tlc *TransferLeafCreate) defaults() error {
 	if _, ok := tlc.mutation.CreateTime(); !ok {
+		if transferleaf.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized transferleaf.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := transferleaf.DefaultCreateTime()
 		tlc.mutation.SetCreateTime(v)
 	}
 	if _, ok := tlc.mutation.UpdateTime(); !ok {
+		if transferleaf.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized transferleaf.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := transferleaf.DefaultUpdateTime()
 		tlc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := tlc.mutation.ID(); !ok {
+		if transferleaf.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized transferleaf.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := transferleaf.DefaultID()
 		tlc.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

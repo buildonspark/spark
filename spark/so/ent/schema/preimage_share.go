@@ -16,6 +16,7 @@ type PreimageShare struct {
 func (PreimageShare) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
+		NotifyMixin{},
 	}
 }
 

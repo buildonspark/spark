@@ -116,7 +116,9 @@ func (sku *SigningKeyshareUpdate) Mutation() *SigningKeyshareMutation {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (sku *SigningKeyshareUpdate) Save(ctx context.Context) (int, error) {
-	sku.defaults()
+	if err := sku.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, sku.sqlSave, sku.mutation, sku.hooks)
 }
 
@@ -143,11 +145,15 @@ func (sku *SigningKeyshareUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (sku *SigningKeyshareUpdate) defaults() {
+func (sku *SigningKeyshareUpdate) defaults() error {
 	if _, ok := sku.mutation.UpdateTime(); !ok {
+		if signingkeyshare.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized signingkeyshare.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := signingkeyshare.UpdateDefaultUpdateTime()
 		sku.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -319,7 +325,9 @@ func (skuo *SigningKeyshareUpdateOne) Select(field string, fields ...string) *Si
 
 // Save executes the query and returns the updated SigningKeyshare entity.
 func (skuo *SigningKeyshareUpdateOne) Save(ctx context.Context) (*SigningKeyshare, error) {
-	skuo.defaults()
+	if err := skuo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, skuo.sqlSave, skuo.mutation, skuo.hooks)
 }
 
@@ -346,11 +354,15 @@ func (skuo *SigningKeyshareUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (skuo *SigningKeyshareUpdateOne) defaults() {
+func (skuo *SigningKeyshareUpdateOne) defaults() error {
 	if _, ok := skuo.mutation.UpdateTime(); !ok {
+		if signingkeyshare.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized signingkeyshare.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := signingkeyshare.UpdateDefaultUpdateTime()
 		skuo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

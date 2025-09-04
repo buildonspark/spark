@@ -292,7 +292,9 @@ func (ttc *TokenTransactionCreate) Mutation() *TokenTransactionMutation {
 
 // Save creates the TokenTransaction in the database.
 func (ttc *TokenTransactionCreate) Save(ctx context.Context) (*TokenTransaction, error) {
-	ttc.defaults()
+	if err := ttc.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, ttc.sqlSave, ttc.mutation, ttc.hooks)
 }
 
@@ -319,12 +321,18 @@ func (ttc *TokenTransactionCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (ttc *TokenTransactionCreate) defaults() {
+func (ttc *TokenTransactionCreate) defaults() error {
 	if _, ok := ttc.mutation.CreateTime(); !ok {
+		if tokentransaction.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized tokentransaction.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := tokentransaction.DefaultCreateTime()
 		ttc.mutation.SetCreateTime(v)
 	}
 	if _, ok := ttc.mutation.UpdateTime(); !ok {
+		if tokentransaction.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized tokentransaction.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := tokentransaction.DefaultUpdateTime()
 		ttc.mutation.SetUpdateTime(v)
 	}
@@ -333,9 +341,13 @@ func (ttc *TokenTransactionCreate) defaults() {
 		ttc.mutation.SetVersion(v)
 	}
 	if _, ok := ttc.mutation.ID(); !ok {
+		if tokentransaction.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized tokentransaction.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := tokentransaction.DefaultID()
 		ttc.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

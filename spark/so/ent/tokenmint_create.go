@@ -119,7 +119,9 @@ func (tmc *TokenMintCreate) Mutation() *TokenMintMutation {
 
 // Save creates the TokenMint in the database.
 func (tmc *TokenMintCreate) Save(ctx context.Context) (*TokenMint, error) {
-	tmc.defaults()
+	if err := tmc.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, tmc.sqlSave, tmc.mutation, tmc.hooks)
 }
 
@@ -146,19 +148,29 @@ func (tmc *TokenMintCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tmc *TokenMintCreate) defaults() {
+func (tmc *TokenMintCreate) defaults() error {
 	if _, ok := tmc.mutation.CreateTime(); !ok {
+		if tokenmint.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized tokenmint.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := tokenmint.DefaultCreateTime()
 		tmc.mutation.SetCreateTime(v)
 	}
 	if _, ok := tmc.mutation.UpdateTime(); !ok {
+		if tokenmint.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized tokenmint.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := tokenmint.DefaultUpdateTime()
 		tmc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := tmc.mutation.ID(); !ok {
+		if tokenmint.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized tokenmint.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := tokenmint.DefaultID()
 		tmc.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

@@ -131,7 +131,9 @@ func (sic *SparkInvoiceCreate) Mutation() *SparkInvoiceMutation {
 
 // Save creates the SparkInvoice in the database.
 func (sic *SparkInvoiceCreate) Save(ctx context.Context) (*SparkInvoice, error) {
-	sic.defaults()
+	if err := sic.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, sic.sqlSave, sic.mutation, sic.hooks)
 }
 
@@ -158,19 +160,29 @@ func (sic *SparkInvoiceCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (sic *SparkInvoiceCreate) defaults() {
+func (sic *SparkInvoiceCreate) defaults() error {
 	if _, ok := sic.mutation.CreateTime(); !ok {
+		if sparkinvoice.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized sparkinvoice.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := sparkinvoice.DefaultCreateTime()
 		sic.mutation.SetCreateTime(v)
 	}
 	if _, ok := sic.mutation.UpdateTime(); !ok {
+		if sparkinvoice.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized sparkinvoice.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := sparkinvoice.DefaultUpdateTime()
 		sic.mutation.SetUpdateTime(v)
 	}
 	if _, ok := sic.mutation.ID(); !ok {
+		if sparkinvoice.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized sparkinvoice.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := sparkinvoice.DefaultID()
 		sic.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

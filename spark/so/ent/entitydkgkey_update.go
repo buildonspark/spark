@@ -41,7 +41,9 @@ func (edku *EntityDkgKeyUpdate) Mutation() *EntityDkgKeyMutation {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (edku *EntityDkgKeyUpdate) Save(ctx context.Context) (int, error) {
-	edku.defaults()
+	if err := edku.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, edku.sqlSave, edku.mutation, edku.hooks)
 }
 
@@ -68,11 +70,15 @@ func (edku *EntityDkgKeyUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (edku *EntityDkgKeyUpdate) defaults() {
+func (edku *EntityDkgKeyUpdate) defaults() error {
 	if _, ok := edku.mutation.UpdateTime(); !ok {
+		if entitydkgkey.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized entitydkgkey.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := entitydkgkey.UpdateDefaultUpdateTime()
 		edku.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -144,7 +150,9 @@ func (edkuo *EntityDkgKeyUpdateOne) Select(field string, fields ...string) *Enti
 
 // Save executes the query and returns the updated EntityDkgKey entity.
 func (edkuo *EntityDkgKeyUpdateOne) Save(ctx context.Context) (*EntityDkgKey, error) {
-	edkuo.defaults()
+	if err := edkuo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, edkuo.sqlSave, edkuo.mutation, edkuo.hooks)
 }
 
@@ -171,11 +179,15 @@ func (edkuo *EntityDkgKeyUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (edkuo *EntityDkgKeyUpdateOne) defaults() {
+func (edkuo *EntityDkgKeyUpdateOne) defaults() error {
 	if _, ok := edkuo.mutation.UpdateTime(); !ok {
+		if entitydkgkey.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized entitydkgkey.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := entitydkgkey.UpdateDefaultUpdateTime()
 		edkuo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

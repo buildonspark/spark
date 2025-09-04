@@ -91,7 +91,9 @@ func (snc *SigningNonceCreate) Mutation() *SigningNonceMutation {
 
 // Save creates the SigningNonce in the database.
 func (snc *SigningNonceCreate) Save(ctx context.Context) (*SigningNonce, error) {
-	snc.defaults()
+	if err := snc.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, snc.sqlSave, snc.mutation, snc.hooks)
 }
 
@@ -118,19 +120,29 @@ func (snc *SigningNonceCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (snc *SigningNonceCreate) defaults() {
+func (snc *SigningNonceCreate) defaults() error {
 	if _, ok := snc.mutation.CreateTime(); !ok {
+		if signingnonce.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized signingnonce.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := signingnonce.DefaultCreateTime()
 		snc.mutation.SetCreateTime(v)
 	}
 	if _, ok := snc.mutation.UpdateTime(); !ok {
+		if signingnonce.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized signingnonce.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := signingnonce.DefaultUpdateTime()
 		snc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := snc.mutation.ID(); !ok {
+		if signingnonce.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized signingnonce.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := signingnonce.DefaultID()
 		snc.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

@@ -110,7 +110,9 @@ func (skc *SigningKeyshareCreate) Mutation() *SigningKeyshareMutation {
 
 // Save creates the SigningKeyshare in the database.
 func (skc *SigningKeyshareCreate) Save(ctx context.Context) (*SigningKeyshare, error) {
-	skc.defaults()
+	if err := skc.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, skc.sqlSave, skc.mutation, skc.hooks)
 }
 
@@ -137,19 +139,29 @@ func (skc *SigningKeyshareCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (skc *SigningKeyshareCreate) defaults() {
+func (skc *SigningKeyshareCreate) defaults() error {
 	if _, ok := skc.mutation.CreateTime(); !ok {
+		if signingkeyshare.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized signingkeyshare.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := signingkeyshare.DefaultCreateTime()
 		skc.mutation.SetCreateTime(v)
 	}
 	if _, ok := skc.mutation.UpdateTime(); !ok {
+		if signingkeyshare.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized signingkeyshare.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := signingkeyshare.DefaultUpdateTime()
 		skc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := skc.mutation.ID(); !ok {
+		if signingkeyshare.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized signingkeyshare.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := signingkeyshare.DefaultID()
 		skc.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

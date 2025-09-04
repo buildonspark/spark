@@ -105,7 +105,9 @@ func (cec *CooperativeExitCreate) Mutation() *CooperativeExitMutation {
 
 // Save creates the CooperativeExit in the database.
 func (cec *CooperativeExitCreate) Save(ctx context.Context) (*CooperativeExit, error) {
-	cec.defaults()
+	if err := cec.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, cec.sqlSave, cec.mutation, cec.hooks)
 }
 
@@ -132,19 +134,29 @@ func (cec *CooperativeExitCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (cec *CooperativeExitCreate) defaults() {
+func (cec *CooperativeExitCreate) defaults() error {
 	if _, ok := cec.mutation.CreateTime(); !ok {
+		if cooperativeexit.DefaultCreateTime == nil {
+			return fmt.Errorf("ent: uninitialized cooperativeexit.DefaultCreateTime (forgotten import ent/runtime?)")
+		}
 		v := cooperativeexit.DefaultCreateTime()
 		cec.mutation.SetCreateTime(v)
 	}
 	if _, ok := cec.mutation.UpdateTime(); !ok {
+		if cooperativeexit.DefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized cooperativeexit.DefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := cooperativeexit.DefaultUpdateTime()
 		cec.mutation.SetUpdateTime(v)
 	}
 	if _, ok := cec.mutation.ID(); !ok {
+		if cooperativeexit.DefaultID == nil {
+			return fmt.Errorf("ent: uninitialized cooperativeexit.DefaultID (forgotten import ent/runtime?)")
+		}
 		v := cooperativeexit.DefaultID()
 		cec.mutation.SetID(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

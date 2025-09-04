@@ -78,7 +78,9 @@ func (ustu *UserSignedTransactionUpdate) ClearPreimageRequest() *UserSignedTrans
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (ustu *UserSignedTransactionUpdate) Save(ctx context.Context) (int, error) {
-	ustu.defaults()
+	if err := ustu.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, ustu.sqlSave, ustu.mutation, ustu.hooks)
 }
 
@@ -105,11 +107,15 @@ func (ustu *UserSignedTransactionUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (ustu *UserSignedTransactionUpdate) defaults() {
+func (ustu *UserSignedTransactionUpdate) defaults() error {
 	if _, ok := ustu.mutation.UpdateTime(); !ok {
+		if usersignedtransaction.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized usersignedtransaction.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := usersignedtransaction.UpdateDefaultUpdateTime()
 		ustu.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -276,7 +282,9 @@ func (ustuo *UserSignedTransactionUpdateOne) Select(field string, fields ...stri
 
 // Save executes the query and returns the updated UserSignedTransaction entity.
 func (ustuo *UserSignedTransactionUpdateOne) Save(ctx context.Context) (*UserSignedTransaction, error) {
-	ustuo.defaults()
+	if err := ustuo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, ustuo.sqlSave, ustuo.mutation, ustuo.hooks)
 }
 
@@ -303,11 +311,15 @@ func (ustuo *UserSignedTransactionUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (ustuo *UserSignedTransactionUpdateOne) defaults() {
+func (ustuo *UserSignedTransactionUpdateOne) defaults() error {
 	if _, ok := ustuo.mutation.UpdateTime(); !ok {
+		if usersignedtransaction.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized usersignedtransaction.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := usersignedtransaction.UpdateDefaultUpdateTime()
 		ustuo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

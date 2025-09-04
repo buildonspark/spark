@@ -14,6 +14,7 @@ func (L1TokenCreate) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
 		TokenMetadataMixin{},
+		NotifyMixin{},
 	}
 }
 

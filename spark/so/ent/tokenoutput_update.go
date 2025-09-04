@@ -276,7 +276,9 @@ func (tou *TokenOutputUpdate) RemoveTokenPartialRevocationSecretShares(t ...*Tok
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (tou *TokenOutputUpdate) Save(ctx context.Context) (int, error) {
-	tou.defaults()
+	if err := tou.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, tou.sqlSave, tou.mutation, tou.hooks)
 }
 
@@ -303,11 +305,15 @@ func (tou *TokenOutputUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tou *TokenOutputUpdate) defaults() {
+func (tou *TokenOutputUpdate) defaults() error {
 	if _, ok := tou.mutation.UpdateTime(); !ok {
+		if tokenoutput.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized tokenoutput.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := tokenoutput.UpdateDefaultUpdateTime()
 		tou.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -816,7 +822,9 @@ func (touo *TokenOutputUpdateOne) Select(field string, fields ...string) *TokenO
 
 // Save executes the query and returns the updated TokenOutput entity.
 func (touo *TokenOutputUpdateOne) Save(ctx context.Context) (*TokenOutput, error) {
-	touo.defaults()
+	if err := touo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, touo.sqlSave, touo.mutation, touo.hooks)
 }
 
@@ -843,11 +851,15 @@ func (touo *TokenOutputUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (touo *TokenOutputUpdateOne) defaults() {
+func (touo *TokenOutputUpdateOne) defaults() error {
 	if _, ok := touo.mutation.UpdateTime(); !ok {
+		if tokenoutput.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized tokenoutput.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := tokenoutput.UpdateDefaultUpdateTime()
 		touo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
