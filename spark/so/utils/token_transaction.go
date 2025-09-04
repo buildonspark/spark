@@ -121,11 +121,7 @@ func HashTokenTransactionV2(tokenTransaction *tokenpb.TokenTransaction, partialH
 		if err != nil {
 			return nil, fmt.Errorf("invalid invoice at %d: %w", i, err)
 		}
-		id, err := uuid.FromBytes(parsedInvoice.Id)
-		if err != nil {
-			return nil, fmt.Errorf("invalid invoice id at %d: %w", i, err)
-		}
-		sortedInvoices = append(sortedInvoices, keyedInvoice{id: id, raw: rawInvoice})
+		sortedInvoices = append(sortedInvoices, keyedInvoice{id: parsedInvoice.Id, raw: rawInvoice})
 	}
 	slices.SortFunc(sortedInvoices, func(a, b keyedInvoice) int { return bytes.Compare(a.id[:], b.id[:]) })
 	for _, invoice := range sortedInvoices {

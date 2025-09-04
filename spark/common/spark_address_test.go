@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 )
 
@@ -78,10 +79,12 @@ func TestEncodeDecodeSparkInvoice(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			identityPublicKey, err := hex.DecodeString("02ccb26ba79c63aaf60c9192fd874be3087ae8d8703275df0e558704a6d3a4f132")
+			identityKey, err := hex.DecodeString("02ccb26ba79c63aaf60c9192fd874be3087ae8d8703275df0e558704a6d3a4f132")
 			require.NoError(t, err)
-			senderPublicKey := make([]byte, len(identityPublicKey))
-			copy(senderPublicKey, identityPublicKey)
+			identityPublicKey, err := keys.ParsePublicKey(identityKey)
+			require.NoError(t, err)
+			senderPublicKey, err := keys.ParsePublicKey(identityKey)
+			require.NoError(t, err)
 
 			testUUID, err := uuid.NewV7()
 			if err != nil {
@@ -105,10 +108,10 @@ func TestEncodeDecodeSparkInvoice(t *testing.T) {
 				expiryTimePtr = nil
 			}
 			if tc.emptySenderPublicKey {
-				senderPublicKey = nil
+				senderPublicKey = keys.Public{}
 			}
 			if tc.emptyIdentityPublicKey {
-				identityPublicKey = nil
+				identityPublicKey = keys.Public{}
 			}
 			if tc.emptyAmount {
 				tokenAmount = nil
@@ -151,14 +154,14 @@ func TestEncodeDecodeSparkInvoice(t *testing.T) {
 				satsInvoiceFields.PaymentType = nil
 			}
 
-			tokensInvoice, err := EncodeSparkAddress(identityPublicKey, Regtest, tokenInvoiceFields)
+			tokensInvoice, err := EncodeSparkAddress(identityPublicKey.Serialize(), Regtest, tokenInvoiceFields)
 			if tc.invalidPaymentType || tc.invalidVersion || tc.invalidId || tc.emptyIdentityPublicKey {
 				require.Error(t, err, "expected error")
 			} else {
 				require.NoError(t, err, "failed to encode spark address")
 			}
 
-			satsInvoice, err := EncodeSparkAddress(identityPublicKey, Regtest, satsInvoiceFields)
+			satsInvoice, err := EncodeSparkAddress(identityPublicKey.Serialize(), Regtest, satsInvoiceFields)
 			if tc.invalidPaymentType || tc.invalidVersion || tc.invalidId || tc.emptyIdentityPublicKey || tc.overMaxSatsAmount {
 				require.Error(t, err, "expected error")
 				return // Early return to avoid decoding the invalid invoices
@@ -182,26 +185,26 @@ func TestEncodeDecodeSparkInvoice(t *testing.T) {
 			}
 
 			require.Equal(t, Regtest, decodedTokensInvoice.Network, "network does not match")
-			require.Equal(t, identityPublicKey, decodedTokensInvoice.SparkAddress.IdentityPublicKey, "identity public key does not match")
+			require.Equal(t, identityPublicKey.Serialize(), decodedTokensInvoice.SparkAddress.IdentityPublicKey, "identity public key does not match")
 			require.Equal(t, testUUID[:], decodedTokensInvoice.SparkAddress.SparkInvoiceFields.Id, "id does not match")
 			require.Equal(t, memo, *decodedTokensInvoice.SparkAddress.SparkInvoiceFields.Memo, "memo does not match")
-			require.Equal(t, senderPublicKey, decodedTokensInvoice.SparkAddress.SparkInvoiceFields.SenderPublicKey, "sender public key does not match")
+			require.Equal(t, senderPublicKey.Serialize(), decodedTokensInvoice.SparkAddress.SparkInvoiceFields.SenderPublicKey, "sender public key does not match")
 			require.Equal(t, tokenIdentifier, decodedTokensInvoice.SparkAddress.SparkInvoiceFields.PaymentType.(*pb.SparkInvoiceFields_TokensPayment).TokensPayment.TokenIdentifier, "token identifier does not match")
 			require.Equal(t, tokenAmount, decodedTokensInvoice.SparkAddress.SparkInvoiceFields.PaymentType.(*pb.SparkInvoiceFields_TokensPayment).TokensPayment.Amount, "amount does not match")
 
 			require.NoError(t, err, "failed to decode spark address")
 			require.Equal(t, Regtest, decodedSatsInvoice.Network, "network does not match")
-			require.Equal(t, identityPublicKey, decodedSatsInvoice.SparkAddress.IdentityPublicKey, "identity public key does not match")
+			require.Equal(t, identityPublicKey.Serialize(), decodedSatsInvoice.SparkAddress.IdentityPublicKey, "identity public key does not match")
 			require.Equal(t, testUUID[:], decodedSatsInvoice.SparkAddress.SparkInvoiceFields.Id, "id does not match")
 			require.Equal(t, memo, *decodedSatsInvoice.SparkAddress.SparkInvoiceFields.Memo, "memo does not match")
-			require.Equal(t, senderPublicKey, decodedSatsInvoice.SparkAddress.SparkInvoiceFields.SenderPublicKey, "sender public key does not match")
+			require.Equal(t, senderPublicKey.Serialize(), decodedSatsInvoice.SparkAddress.SparkInvoiceFields.SenderPublicKey, "sender public key does not match")
 			require.Equal(t, satsAmount, decodedSatsInvoice.SparkAddress.SparkInvoiceFields.PaymentType.(*pb.SparkInvoiceFields_SatsPayment).SatsPayment.Amount, "amount does not match")
 
 			// ==== ParseSparkInvoice Tests ====
 			parsedTokensInvoice, err := ParseSparkInvoice(tokensInvoice)
-			require.NoError(t, err, "failed to parse spark invoice")
+			require.NoError(t, err, "failed to parse spark tokens invoice")
 			parsedSatsInvoice, err := ParseSparkInvoice(satsInvoice)
-			require.NoError(t, err, "failed to parse spark invoice")
+			require.NoError(t, err, "failed to parse spark sats invoice")
 
 			if tc.emptyExpiryTime {
 				require.Nil(t, parsedTokensInvoice.ExpiryTime, "expiry time should be nil")
@@ -221,8 +224,8 @@ func TestEncodeDecodeSparkInvoice(t *testing.T) {
 				require.Equal(t, tokenAmount, parsedTokensInvoice.Payment.TokensPayment.Amount, "token amount does not match")
 			}
 
-			require.Equal(t, testUUID[:], parsedTokensInvoice.Id, "id does not match")
-			require.Equal(t, memo, *parsedTokensInvoice.Memo, "memo does not match")
+			require.Equal(t, testUUID, parsedTokensInvoice.Id, "id does not match")
+			require.Equal(t, memo, parsedTokensInvoice.Memo, "memo does not match")
 			require.Equal(t, senderPublicKey, parsedTokensInvoice.SenderPublicKey, "sender public key does not match")
 			require.Equal(t, tokenIdentifier, parsedTokensInvoice.Payment.TokensPayment.TokenIdentifier, "token identifier does not match")
 		})

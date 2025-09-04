@@ -9262,7 +9262,7 @@ func (m *StartTransferRequest) validate(all bool) error {
 		}
 	}
 
-	// no validation rules for SparkPaymentIntent
+	// no validation rules for SparkInvoice
 
 	if len(errors) > 0 {
 		return StartTransferRequestMultiError(errors)
@@ -10560,6 +10560,8 @@ func (m *Transfer) validate(all bool) error {
 	}
 
 	// no validation rules for Type
+
+	// no validation rules for SparkInvoice
 
 	if len(errors) > 0 {
 		return TransferMultiError(errors)

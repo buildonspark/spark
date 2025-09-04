@@ -1,21 +1,27 @@
 package grpctest
 
 import (
+	"math/big"
+	"math/rand/v2"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/lightsparkdev/spark/common"
 	pbmock "github.com/lightsparkdev/spark/proto/mock"
 	"github.com/lightsparkdev/spark/proto/spark"
-	"github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+const amountSatsToSend = 100_000
 
 func TestTransfer(t *testing.T) {
 	// Sender initiates transfer
@@ -24,7 +30,7 @@ func TestTransfer(t *testing.T) {
 
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
-	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
+	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
 	require.NoError(t, err, "failed to create new tree")
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -80,12 +86,12 @@ func TestTransfer(t *testing.T) {
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
-	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
 	res, err := wallet.ClaimTransfer(
 		receiverCtx,
 		receiverTransfer,
 		receiverConfig,
-		leavesToClaim[:],
+		leavesToClaim,
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
 	require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
@@ -97,7 +103,7 @@ func TestQueryPendingTransferByNetwork(t *testing.T) {
 
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
-	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
+	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
 	require.NoError(t, err, "failed to create new tree")
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -156,7 +162,7 @@ func TestTransferInterrupt(t *testing.T) {
 
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
-	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
+	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
 	require.NoError(t, err, "failed to create new tree")
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -218,12 +224,12 @@ func TestTransferInterrupt(t *testing.T) {
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
-	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
 	_, err = wallet.ClaimTransfer(
 		receiverCtx,
 		receiverTransfer,
 		receiverConfig,
-		leavesToClaim[:],
+		leavesToClaim,
 	)
 	require.Error(t, err, "expected error when claiming transfer")
 
@@ -251,7 +257,7 @@ func TestTransferRecoverFinalizeSignatures(t *testing.T) {
 
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
-	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
+	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
 	require.NoError(t, err, "failed to create new tree")
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -299,12 +305,12 @@ func TestTransferRecoverFinalizeSignatures(t *testing.T) {
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
-	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
 	_, err = wallet.ClaimTransferWithoutFinalizeSignatures(
 		receiverCtx,
 		receiverTransfer,
 		receiverConfig,
-		leavesToClaim[:],
+		leavesToClaim,
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
 
@@ -318,7 +324,7 @@ func TestTransferRecoverFinalizeSignatures(t *testing.T) {
 		receiverCtx,
 		receiverTransfer,
 		receiverConfig,
-		leavesToClaim[:],
+		leavesToClaim,
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
 	require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
@@ -349,7 +355,7 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
-	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
+	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
 	require.NoError(t, err, "failed to create new tree")
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -397,13 +403,13 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
-	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
 
 	_, err = wallet.ClaimTransferTweakKeys(
 		receiverCtx,
 		receiverTransfer,
 		receiverConfig,
-		leavesToClaim[:],
+		leavesToClaim,
 	)
 	require.NoError(t, err, "failed to ClaimTransferTweakKeys")
 
@@ -420,7 +426,7 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 		receiverCtx,
 		receiverTransfer,
 		receiverConfig,
-		leavesToClaim[:],
+		leavesToClaim,
 		nil,
 	)
 	require.NoError(t, err, "failed to ClaimTransferSignRefunds")
@@ -433,7 +439,7 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 		receiverCtx,
 		receiverTransfer,
 		receiverConfig,
-		leavesToClaim[:],
+		leavesToClaim,
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
 }
@@ -445,7 +451,7 @@ func TestCancelTransfer(t *testing.T) {
 
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
-	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
+	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
 	require.NoError(t, err, "failed to create new tree")
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -512,12 +518,11 @@ func TestCancelTransfer(t *testing.T) {
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
-	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
 	_, err = wallet.ClaimTransfer(
 		receiverCtx,
 		receiverTransfer,
 		receiverConfig,
-		leavesToClaim[:],
+		[]wallet.LeafKeyTweak{claimingNode},
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
 }
@@ -529,7 +534,7 @@ func TestCancelTransferAfterTweak(t *testing.T) {
 
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
-	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
+	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
 	require.NoError(t, err, "failed to create new tree")
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -569,7 +574,7 @@ func TestQueryTransfers(t *testing.T) {
 
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
-	senderRootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, senderLeafPrivKey, 100_000)
+	senderRootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, senderLeafPrivKey, amountSatsToSend)
 	require.NoError(t, err, "failed to create new tree")
 
 	// Initiate receiver
@@ -578,7 +583,7 @@ func TestQueryTransfers(t *testing.T) {
 
 	receiverLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
-	receiverRootNode, err := sparktesting.CreateNewTree(receiverConfig, faucet, receiverLeafPrivKey, 100_000)
+	receiverRootNode, err := sparktesting.CreateNewTree(receiverConfig, faucet, receiverLeafPrivKey, amountSatsToSend)
 	require.NoError(t, err, "failed to create new tree")
 
 	// Sender initiates transfer
@@ -706,12 +711,11 @@ func TestQueryTransfers(t *testing.T) {
 		SigningPrivKey:    senderNewLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
-	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
 	_, err = wallet.ClaimTransfer(
 		receiverCtx,
 		receiverPendingTransfer,
 		receiverConfig,
-		leavesToClaim[:],
+		[]wallet.LeafKeyTweak{claimingNode},
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
 
@@ -744,12 +748,11 @@ func TestQueryTransfers(t *testing.T) {
 		SigningPrivKey:    receiverNewLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
-	leavesToClaim = [1]wallet.LeafKeyTweak{claimingNode}
 	_, err = wallet.ClaimTransfer(
 		senderCtx,
 		senderPendingTransfer,
 		senderConfig,
-		leavesToClaim[:],
+		[]wallet.LeafKeyTweak{claimingNode},
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
 
@@ -794,7 +797,7 @@ func TestDoubleClaimTransfer(t *testing.T) {
 
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
-	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
+	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
 	require.NoError(t, err, "failed to create new tree")
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -840,7 +843,7 @@ func TestDoubleClaimTransfer(t *testing.T) {
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
-	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
 
 	errCount := 0
 	wg := sync.WaitGroup{}
@@ -848,7 +851,7 @@ func TestDoubleClaimTransfer(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err = wallet.ClaimTransfer(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim[:])
+			_, err = wallet.ClaimTransfer(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim)
 			if err != nil {
 				errCount++
 			}
@@ -867,7 +870,7 @@ func TestDoubleClaimTransfer(t *testing.T) {
 			receiverCtx,
 			receiverTransfer,
 			receiverConfig,
-			leavesToClaim[:],
+			leavesToClaim,
 		)
 		if err != nil {
 			// if the claim failed, the transfer should revert back to sender key tweaked status
@@ -881,11 +884,687 @@ func TestDoubleClaimTransfer(t *testing.T) {
 				receiverCtx,
 				receiverTransfer,
 				receiverConfig,
-				leavesToClaim[:],
+				leavesToClaim,
 			)
 			require.NoError(t, err, "failed to ClaimTransfer")
 		}
 
 		require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
 	}
+}
+
+func TestValidSparkInvoiceTransfer(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	invoiceUUID, err := uuid.NewV7FromReader(rng)
+	require.NoError(t, err)
+	amountToSend := uint64(amountSatsToSend)
+	memoString := "test memo"
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderPublicKey := senderPrivKey.Public()
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPublicKey := receiverPrivKey.Public()
+	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
+	network := common.Regtest
+
+	amountSats := &amountToSend
+	expiryTime := &tenMinutesFromNow
+	memo := &memoString
+
+	invoiceFields := common.CreateSatsSparkInvoiceFields(
+		invoiceUUID[:],
+		amountSats,
+		memo,
+		senderPublicKey,
+		expiryTime,
+	)
+
+	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
+	require.NoError(t, err)
+	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
+	require.NoError(t, err)
+	sigBytes := sig.Serialize()
+
+	invoice, err := common.EncodeSparkAddressWithSignature(
+		receiverPublicKey.Serialize(),
+		network,
+		invoiceFields,
+		sigBytes,
+	)
+	require.NoError(t, err)
+
+	// Should succeed on first attempt.
+	testTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+
+	// Single Use Invoice.
+	// Should fail on second attempt.
+	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+	require.Error(t, err)
+}
+
+func TestValidSparkInvoiceTransferEmptySenderPublicKey(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	invoiceUUID, err := uuid.NewV7FromReader(rng)
+	require.NoError(t, err)
+	amountSats := uint64(amountSatsToSend)
+	memo := "test memo"
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPublicKey := receiverPrivKey.Public()
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
+	network := common.Regtest
+
+	emptySenderPublicKey := keys.Public{}
+	invoiceFields := common.CreateSatsSparkInvoiceFields(
+		invoiceUUID[:],
+		&amountSats,
+		&memo,
+		emptySenderPublicKey,
+		&tenMinutesFromNow,
+	)
+
+	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
+	require.NoError(t, err)
+	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
+	require.NoError(t, err)
+	sigBytes := sig.Serialize()
+
+	invoice, err := common.EncodeSparkAddressWithSignature(
+		receiverPublicKey.Serialize(),
+		network,
+		invoiceFields,
+		sigBytes,
+	)
+	require.NoError(t, err)
+
+	// Should succeed on first attempt.
+	testTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+
+	// Single Use Invoice.
+	// Should fail on second attempt.
+	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+	require.Error(t, err)
+}
+
+func TestValidSparkInvoiceTransferEmptyExpiry(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	invoiceUUID, err := uuid.NewV7FromReader(rng)
+	require.NoError(t, err)
+	amountSats := uint64(amountSatsToSend)
+	memo := "test memo"
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPublicKey := receiverPrivKey.Public()
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderPublicKey := senderPrivKey.Public()
+	network := common.Regtest
+
+	invoiceFields := common.CreateSatsSparkInvoiceFields(
+		invoiceUUID[:],
+		&amountSats,
+		&memo,
+		senderPublicKey,
+		nil,
+	)
+
+	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
+	require.NoError(t, err)
+	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
+	require.NoError(t, err)
+	sigBytes := sig.Serialize()
+
+	invoice, err := common.EncodeSparkAddressWithSignature(
+		receiverPublicKey.Serialize(),
+		network,
+		invoiceFields,
+		sigBytes,
+	)
+	require.NoError(t, err)
+
+	// Should succeed on first attempt.
+	testTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+
+	// Single Use Invoice.
+	// Should fail on second attempt.
+	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+	require.Error(t, err)
+}
+
+func TestValidSparkInvoiceTransferEmptyMemo(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	invoiceUUID, err := uuid.NewV7FromReader(rng)
+	require.NoError(t, err)
+	amountSats := uint64(amountSatsToSend)
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPublicKey := receiverPrivKey.Public()
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderPublicKey := senderPrivKey.Public()
+	network := common.Regtest
+	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
+
+	invoiceFields := common.CreateSatsSparkInvoiceFields(
+		invoiceUUID[:],
+		&amountSats,
+		nil,
+		senderPublicKey,
+		&tenMinutesFromNow,
+	)
+
+	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
+	require.NoError(t, err)
+	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
+	require.NoError(t, err)
+	sigBytes := sig.Serialize()
+
+	invoice, err := common.EncodeSparkAddressWithSignature(
+		receiverPublicKey.Serialize(),
+		network,
+		invoiceFields,
+		sigBytes,
+	)
+	require.NoError(t, err)
+
+	// Should succeed on first attempt.
+	testTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+
+	// Single Use Invoice.
+	// Should fail on second attempt.
+	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+	require.Error(t, err)
+}
+
+func TestValidSparkInvoiceTransferEmptyAmount(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	invoiceUUID, err := uuid.NewV7FromReader(rng)
+	require.NoError(t, err)
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPublicKey := receiverPrivKey.Public()
+	memoString := "test memo"
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderPublicKey := senderPrivKey.Public()
+	network := common.Regtest
+	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
+
+	invoiceFields := common.CreateSatsSparkInvoiceFields(
+		invoiceUUID[:],
+		nil,
+		&memoString,
+		senderPublicKey,
+		&tenMinutesFromNow,
+	)
+
+	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
+	require.NoError(t, err)
+	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
+	require.NoError(t, err)
+	sigBytes := sig.Serialize()
+
+	invoice, err := common.EncodeSparkAddressWithSignature(
+		receiverPublicKey.Serialize(),
+		network,
+		invoiceFields,
+		sigBytes,
+	)
+	require.NoError(t, err)
+
+	// Should succeed on first attempt.
+	testTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+
+	// Single Use Invoice.
+	// Should fail on second attempt.
+	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+	require.Error(t, err)
+}
+
+func TestValidSparkInvoiceTransferEmptySignature(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	invoiceUUID, err := uuid.NewV7FromReader(rng)
+	require.NoError(t, err)
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPublicKey := receiverPrivKey.Public()
+	memoString := "test memo"
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderPublicKey := senderPrivKey.Public()
+	network := common.Regtest
+	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
+
+	invoiceFields := common.CreateSatsSparkInvoiceFields(
+		invoiceUUID[:],
+		nil,
+		&memoString,
+		senderPublicKey,
+		&tenMinutesFromNow,
+	)
+
+	invoice, err := common.EncodeSparkAddressWithSignature(
+		receiverPublicKey.Serialize(),
+		network,
+		invoiceFields,
+		nil,
+	)
+	require.NoError(t, err)
+
+	// Should succeed on first attempt.
+	testTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+
+	// Single Use Invoice.
+	// Should fail on second attempt.
+	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+	require.Error(t, err)
+}
+
+func TestNonCanonicalInvoiceShouldError(t *testing.T) {
+	nonCanonicalInvoice := "sprt1pgssx2ndesmr2cm86s6ylgsx7rqed58p5l4skcw69e2kzqqxgg79j2fszgsqsqgjzqqe364u4mehdy9wur7lc64al4sjypqg5zxsv2syw3jhxaq6gpanrus3aq8sy6c27zj008mjas6x7akw2pt7expuhmsnpmxrakjmrjeep56gqehrh6gwvq9g9nlcy2587n2m9kehdq446t483nnyar5rgasyvl"
+	rng := rand.NewChaCha8([32]byte{})
+	decoded, err := common.DecodeSparkAddress(nonCanonicalInvoice)
+	require.NoError(t, err)
+	reEncoded, err := common.EncodeSparkAddressWithSignature(
+		decoded.SparkAddress.IdentityPublicKey,
+		decoded.Network,
+		decoded.SparkAddress.SparkInvoiceFields,
+		decoded.SparkAddress.Signature,
+	)
+	require.NoError(t, err)
+	require.NotEqual(t, nonCanonicalInvoice, reEncoded)
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	_, _, _, err = sendTransferWithInvoice(t, nonCanonicalInvoice, senderPrivKey, receiverPrivKey)
+	require.Error(t, err)
+}
+
+func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedSender(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	invoiceUUID, err := uuid.NewV7FromReader(rng)
+	require.NoError(t, err)
+	amountToSend := uint64(amountSatsToSend)
+	amountSats := &amountToSend
+	memo := "test memo"
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPublicKey := receiverPrivKey.Public()
+	expiryTime := time.Now().Add(10 * time.Minute)
+	network := common.Regtest
+
+	mismatchedSender := keys.MustGeneratePrivateKeyFromRand(rng)
+	invoiceFields := common.CreateSatsSparkInvoiceFields(
+		invoiceUUID[:],
+		amountSats,
+		&memo,
+		mismatchedSender.Public(),
+		&expiryTime,
+	)
+
+	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
+	require.NoError(t, err)
+	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
+	require.NoError(t, err)
+
+	invoice, err := common.EncodeSparkAddressWithSignature(
+		receiverPublicKey.Serialize(),
+		network,
+		invoiceFields,
+		sig.Serialize(),
+	)
+	require.NoError(t, err)
+
+	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+	require.Error(t, err)
+}
+
+func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedReceiver(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	invoiceUUID, err := uuid.NewV7FromReader(rng)
+	require.NoError(t, err)
+	amountToSend := uint64(amountSatsToSend)
+	amountSats := &amountToSend
+	memo := "test memo"
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderPublicKey := senderPrivKey.Public()
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPublicKey := receiverPrivKey.Public()
+	expiryTime := time.Now().Add(10 * time.Minute)
+	network := common.Regtest
+
+	invoiceFields := common.CreateSatsSparkInvoiceFields(
+		invoiceUUID[:],
+		amountSats,
+		&memo,
+		senderPublicKey,
+		&expiryTime,
+	)
+
+	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
+	require.NoError(t, err)
+	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
+	require.NoError(t, err)
+
+	mismatchedReceiver := keys.MustGeneratePrivateKeyFromRand(rng)
+	invoice, err := common.EncodeSparkAddressWithSignature(
+		mismatchedReceiver.Public().Serialize(),
+		network,
+		invoiceFields,
+		sig.Serialize(),
+	)
+	require.NoError(t, err)
+
+	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+	require.Error(t, err)
+}
+
+func TestInvalidSparkInvoiceTransferShouldErrorWithInvoiceAmountLessThanSentAmount(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	invoiceUUID, err := uuid.NewV7FromReader(rng)
+	require.NoError(t, err)
+	memo := "test memo"
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderPublicKey := senderPrivKey.Public()
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPublicKey := receiverPrivKey.Public()
+	expiryTime := time.Now().Add(10 * time.Minute)
+	network := common.Regtest
+
+	lessThanSentAmount := uint64(amountSatsToSend - 1)
+
+	invoiceFields := common.CreateSatsSparkInvoiceFields(
+		invoiceUUID[:],
+		&lessThanSentAmount,
+		&memo,
+		senderPublicKey,
+		&expiryTime,
+	)
+
+	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
+	require.NoError(t, err)
+	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
+	require.NoError(t, err)
+
+	invoice, err := common.EncodeSparkAddressWithSignature(
+		receiverPublicKey.Serialize(),
+		network,
+		invoiceFields,
+		sig.Serialize(),
+	)
+	require.NoError(t, err)
+
+	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+	require.Error(t, err)
+}
+
+func TestInvalidSparkInvoiceTransferShouldErrorWithInvoiceAmountGreaterThanSentAmount(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	invoiceUUID, err := uuid.NewV7FromReader(rng)
+	require.NoError(t, err)
+	memo := "test memo"
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderPublicKey := senderPrivKey.Public()
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPublicKey := receiverPrivKey.Public()
+	expiryTime := time.Now().Add(10 * time.Minute)
+	network := common.Regtest
+
+	greaterThanSentAmount := uint64(amountSatsToSend + 1)
+
+	invoiceFields := common.CreateSatsSparkInvoiceFields(
+		invoiceUUID[:],
+		&greaterThanSentAmount,
+		&memo,
+		senderPublicKey,
+		&expiryTime,
+	)
+
+	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
+	require.NoError(t, err)
+	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
+	require.NoError(t, err)
+
+	invoice, err := common.EncodeSparkAddressWithSignature(
+		receiverPublicKey.Serialize(),
+		network,
+		invoiceFields,
+		sig.Serialize(),
+	)
+	require.NoError(t, err)
+
+	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+	require.Error(t, err)
+}
+
+func TestInvalidSparkInvoiceTransferShouldErrorWithExpiredInvoice(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	invoiceUUID, err := uuid.NewV7FromReader(rng)
+	require.NoError(t, err)
+	amountToSend := uint64(amountSatsToSend)
+	amountSats := &amountToSend
+	memo := "test memo"
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderPublicKey := senderPrivKey.Public()
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPublicKey := receiverPrivKey.Public()
+	network := common.Regtest
+
+	expiryInThePast := time.Now().Add(-10 * time.Minute)
+	invoiceFields := common.CreateSatsSparkInvoiceFields(
+		invoiceUUID[:],
+		amountSats,
+		&memo,
+		senderPublicKey,
+		&expiryInThePast,
+	)
+
+	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
+	require.NoError(t, err)
+	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
+	require.NoError(t, err)
+
+	invoice, err := common.EncodeSparkAddressWithSignature(
+		receiverPublicKey.Serialize(),
+		network,
+		invoiceFields,
+		sig.Serialize(),
+	)
+	require.NoError(t, err)
+
+	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+	require.Error(t, err)
+}
+
+func TestInvalidSparkInvoiceTransferShouldErrorWithInvalidSignature(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	invoiceUUID, err := uuid.NewV7FromReader(rng)
+	require.NoError(t, err)
+	amountToSend := uint64(amountSatsToSend)
+	amountSats := &amountToSend
+	memo := "test memo"
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderPublicKey := senderPrivKey.Public()
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPublicKey := receiverPrivKey.Public()
+	expiryTime := time.Now().Add(10 * time.Minute)
+	network := common.Regtest
+
+	invoiceFields := common.CreateSatsSparkInvoiceFields(
+		invoiceUUID[:],
+		amountSats,
+		&memo,
+		senderPublicKey,
+		&expiryTime,
+	)
+
+	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
+	require.NoError(t, err)
+	// Sign with sender instead of receiver private key.
+	sig, err := schnorr.Sign(senderPrivKey.ToBTCEC(), invoiceHash)
+	require.NoError(t, err)
+
+	invoice, err := common.EncodeSparkAddressWithSignature(
+		receiverPublicKey.Serialize(),
+		network,
+		invoiceFields,
+		sig.Serialize(),
+	)
+	require.NoError(t, err)
+
+	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+	require.Error(t, err)
+}
+
+func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedNetwork(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	invoiceUUID, err := uuid.NewV7FromReader(rng)
+	require.NoError(t, err)
+	amountToSend := uint64(amountSatsToSend)
+	amountSats := &amountToSend
+	memo := "test memo"
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderPublicKey := senderPrivKey.Public()
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPublicKey := receiverPrivKey.Public()
+	expiryTime := time.Now().Add(10 * time.Minute)
+	mismatchedNetwork := common.Mainnet
+
+	invoiceFields := common.CreateSatsSparkInvoiceFields(
+		invoiceUUID[:],
+		amountSats,
+		&memo,
+		senderPublicKey,
+		&expiryTime,
+	)
+
+	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, mismatchedNetwork, receiverPublicKey)
+	require.NoError(t, err)
+	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
+	require.NoError(t, err)
+
+	invoice, err := common.EncodeSparkAddressWithSignature(
+		receiverPublicKey.Serialize(),
+		mismatchedNetwork,
+		invoiceFields,
+		sig.Serialize(),
+	)
+	require.NoError(t, err)
+
+	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+	require.Error(t, err)
+}
+
+func TestInvalidSparkInvoiceTransferShouldErrorWithTokensInvoice(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
+	invoiceUUID, err := uuid.NewV7FromReader(rng)
+	require.NoError(t, err)
+	amountToSend := uint64(amountSatsToSend)
+	amountSats := &amountToSend
+	memo := "test memo"
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderPublicKey := senderPrivKey.Public()
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPublicKey := receiverPrivKey.Public()
+	expiryTime := time.Now().Add(10 * time.Minute)
+	network := common.Regtest
+
+	amountBytes := new(big.Int).SetUint64(*amountSats).Bytes()
+	invoiceFields := common.CreateTokenSparkInvoiceFields(
+		invoiceUUID[:],
+		[]byte{},
+		amountBytes,
+		&memo,
+		senderPublicKey,
+		&expiryTime,
+	)
+
+	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
+	require.NoError(t, err)
+	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
+	require.NoError(t, err)
+
+	invoice, err := common.EncodeSparkAddressWithSignature(
+		receiverPublicKey.Serialize(),
+		network,
+		invoiceFields,
+		sig.Serialize(),
+	)
+	require.NoError(t, err)
+
+	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+	require.Error(t, err)
+}
+
+func testTransferWithInvoice(t *testing.T, invoice string, senderPrivKey keys.Private, receiverPrivKey keys.Private) {
+	senderTransfer, rootNode, newLeafPrivKey, err := sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
+	require.NoError(t, err, "failed to send transfer with invoice")
+
+	// Receiver queries pending transfer
+	receiverConfig, err := sparktesting.TestWalletConfigWithIdentityKey(receiverPrivKey)
+	require.NoError(t, err, "failed to create wallet config")
+	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
+	require.NoError(t, err, "failed to authenticate receiver")
+	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
+	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+	require.NoError(t, err, "failed to query pending transfers")
+	require.Len(t, pendingTransfer.Transfers, 1)
+	receiverTransfer := pendingTransfer.Transfers[0]
+	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+	require.Equal(t, spark.TransferType_TRANSFER, receiverTransfer.Type)
+	require.Equal(t, invoice, receiverTransfer.GetSparkInvoice())
+
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
+	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+
+	finalLeafPrivKey, err := keys.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create new node signing private key")
+	claimingNode := wallet.LeafKeyTweak{
+		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey,
+		NewSigningPrivKey: finalLeafPrivKey,
+	}
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
+	res, err := wallet.ClaimTransfer(
+		receiverCtx,
+		receiverTransfer,
+		receiverConfig,
+		leavesToClaim,
+	)
+	require.NoError(t, err, "failed to ClaimTransfer")
+	require.Equal(t, res[0].Id, claimingNode.Leaf.Id)
+}
+
+func sendTransferWithInvoice(
+	t *testing.T,
+	invoice string,
+	senderPrivKey keys.Private,
+	receiverPrivKey keys.Private,
+) (senderTransfer *spark.Transfer, rootNode *spark.TreeNode, newLeafPrivKey keys.Private, err error) {
+	senderConfig, err := sparktesting.TestWalletConfigWithIdentityKey(senderPrivKey)
+	require.NoError(t, err, "failed to create sender wallet config")
+
+	// Sender initiates transfer
+	leafPrivKey, err := keys.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create node signing private key")
+	rootNode, err = sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
+	require.NoError(t, err, "failed to create new tree")
+
+	newLeafPrivKey, err = keys.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create new node signing private key")
+	transferNode := wallet.LeafKeyTweak{
+		Leaf:              rootNode,
+		SigningPrivKey:    leafPrivKey,
+		NewSigningPrivKey: newLeafPrivKey,
+	}
+	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+
+	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(senderConfig.CoordinatorAddress(), nil)
+	require.NoError(t, err, "failed to create grpc connection")
+	defer conn.Close()
+
+	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
+	require.NoError(t, err, "failed to authenticate sender")
+	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
+
+	senderTransfer, err = wallet.SendTransferWithKeyTweaksAndInvoice(
+		senderCtx,
+		senderConfig,
+		leavesToTransfer[:],
+		receiverPrivKey.Public(),
+		time.Now().Add(10*time.Minute),
+		invoice,
+	)
+	return senderTransfer, rootNode, newLeafPrivKey, err
 }

@@ -735,6 +735,7 @@ message StartUserSignedTransferRequest {
 
 message StartTransferRequest {
     reserved 6;
+    reserved 9;
 
     string transfer_id = 1;
     bytes owner_identity_public_key = 2;
@@ -743,7 +744,8 @@ message StartTransferRequest {
     google.protobuf.Timestamp expiry_time = 5;
     // If this field is set, the leaves_to_send and key_tweak_proofs will be ignored.
     TransferPackage transfer_package = 7;
-    string spark_payment_intent = 9;
+    // The invoice this transfer pays.
+    string spark_invoice = 10;
 }
 
 message StartTransferResponse {
@@ -841,6 +843,7 @@ message Transfer {
     google.protobuf.Timestamp created_time = 8;
     google.protobuf.Timestamp updated_time = 9;
     TransferType type = 10;
+    string spark_invoice = 11;
 }
 
 message TransferLeaf {

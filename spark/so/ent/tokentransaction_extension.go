@@ -307,18 +307,10 @@ func prepareSparkInvoiceCreates(ctx context.Context, tokenTransaction *tokenpb.T
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to decode spark invoice: %w", err)
 		}
-		sparkInvoiceID, err := uuid.FromBytes(parsedInvoice.Id)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to parse spark invoice ID: %w", err)
-		}
-		receiverPublicKey, err := keys.ParsePublicKey(parsedInvoice.ReceiverPublicKey)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to parse receiver public key: %w", err)
-		}
 		invoiceToCreate := db.SparkInvoice.Create().
-			SetID(sparkInvoiceID).
+			SetID(parsedInvoice.Id).
 			SetSparkInvoice(invoiceAttachment.SparkInvoice).
-			SetReceiverPublicKey(receiverPublicKey.Serialize()).
+			SetReceiverPublicKey(parsedInvoice.ReceiverPublicKey.Serialize()).
 			AddTokenTransactionIDs(tokenTransactionEnt.ID)
 		if expiry := parsedInvoice.ExpiryTime; expiry != nil {
 			invoiceToCreate = invoiceToCreate.SetExpiryTime(expiry.AsTime())
@@ -327,7 +319,7 @@ func prepareSparkInvoiceCreates(ctx context.Context, tokenTransaction *tokenpb.T
 			invoiceCreates,
 			invoiceToCreate,
 		)
-		invoiceIDs[sparkInvoiceID] = struct{}{}
+		invoiceIDs[parsedInvoice.Id] = struct{}{}
 	}
 	return invoiceIDs, invoiceCreates, nil
 }

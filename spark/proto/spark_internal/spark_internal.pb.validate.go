@@ -2552,6 +2552,8 @@ func (m *InitiateTransferRequest) validate(all bool) error {
 
 	// no validation rules for DirectFromCpfpRefundSignatures
 
+	// no validation rules for SparkInvoice
+
 	if len(errors) > 0 {
 		return InitiateTransferRequestMultiError(errors)
 	}

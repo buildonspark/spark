@@ -218,6 +218,8 @@ message InitiateTransferRequest {
     map<string, bytes> direct_refund_signatures = 10;
     // The finalized signatures for the direct from cpfp refund transactions.
     map<string, bytes> direct_from_cpfp_refund_signatures = 11;
+    // The invoice this transfer pays.
+    string spark_invoice = 12;
 }
 
 message DeliverSenderKeyTweakRequest {

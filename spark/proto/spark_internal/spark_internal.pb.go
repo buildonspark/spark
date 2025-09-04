@@ -1196,8 +1196,10 @@ type InitiateTransferRequest struct {
 	DirectRefundSignatures map[string][]byte `protobuf:"bytes,10,rep,name=direct_refund_signatures,json=directRefundSignatures,proto3" json:"direct_refund_signatures,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// The finalized signatures for the direct from cpfp refund transactions.
 	DirectFromCpfpRefundSignatures map[string][]byte `protobuf:"bytes,11,rep,name=direct_from_cpfp_refund_signatures,json=directFromCpfpRefundSignatures,proto3" json:"direct_from_cpfp_refund_signatures,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields                  protoimpl.UnknownFields
-	sizeCache                      protoimpl.SizeCache
+	// The invoice this transfer pays.
+	SparkInvoice  string `protobuf:"bytes,12,opt,name=spark_invoice,json=sparkInvoice,proto3" json:"spark_invoice,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *InitiateTransferRequest) Reset() {
@@ -1305,6 +1307,13 @@ func (x *InitiateTransferRequest) GetDirectFromCpfpRefundSignatures() map[string
 		return x.DirectFromCpfpRefundSignatures
 	}
 	return nil
+}
+
+func (x *InitiateTransferRequest) GetSparkInvoice() string {
+	if x != nil {
+		return x.SparkInvoice
+	}
+	return ""
 }
 
 type DeliverSenderKeyTweakRequest struct {
@@ -3216,7 +3225,8 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\aleaf_id\x18\x01 \x01(\tR\x06leafId\x12\"\n" +
 	"\rraw_refund_tx\x18\x02 \x01(\fR\vrawRefundTx\x12(\n" +
 	"\x10direct_refund_tx\x18\x03 \x01(\fR\x0edirectRefundTx\x12:\n" +
-	"\x1adirect_from_cpfp_refund_tx\x18\x04 \x01(\fR\x16directFromCpfpRefundTx\"\xde\t\n" +
+	"\x1adirect_from_cpfp_refund_tx\x18\x04 \x01(\fR\x16directFromCpfpRefundTx\"\x83\n" +
+	"\n" +
 	"\x17InitiateTransferRequest\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
 	"transferId\x12;\n" +
@@ -3231,7 +3241,8 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x11refund_signatures\x18\t \x03(\v2=.spark_internal.InitiateTransferRequest.RefundSignaturesEntryR\x10refundSignatures\x12}\n" +
 	"\x18direct_refund_signatures\x18\n" +
 	" \x03(\v2C.spark_internal.InitiateTransferRequest.DirectRefundSignaturesEntryR\x16directRefundSignatures\x12\x97\x01\n" +
-	"\"direct_from_cpfp_refund_signatures\x18\v \x03(\v2K.spark_internal.InitiateTransferRequest.DirectFromCpfpRefundSignaturesEntryR\x1edirectFromCpfpRefundSignatures\x1a[\n" +
+	"\"direct_from_cpfp_refund_signatures\x18\v \x03(\v2K.spark_internal.InitiateTransferRequest.DirectFromCpfpRefundSignaturesEntryR\x1edirectFromCpfpRefundSignatures\x12#\n" +
+	"\rspark_invoice\x18\f \x01(\tR\fsparkInvoice\x1a[\n" +
 	"\x19SenderKeyTweakProofsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12(\n" +
 	"\x05value\x18\x02 \x01(\v2\x12.spark.SecretProofR\x05value:\x028\x01\x1aC\n" +

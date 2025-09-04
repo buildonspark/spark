@@ -844,14 +844,10 @@ func validateInvoiceAttachmentsNotInFlightOrFinalized(ctx context.Context, token
 		if err != nil {
 			return fmt.Errorf("failed to parse spark invoice ID in invoice %s: %w", sparkInvoice, err)
 		}
-		invoiceID, err := uuid.FromBytes(parsedInvoice.Id)
-		if err != nil {
-			return fmt.Errorf("failed to parse spark invoice ID in invoice %s: %w", sparkInvoice, err)
+		if _, exists := sparkInvoiceIDs[parsedInvoice.Id]; exists {
+			return fmt.Errorf("duplicate spark invoice ID found in invoice %s: %s", sparkInvoice, parsedInvoice.Id)
 		}
-		if _, exists := sparkInvoiceIDs[invoiceID]; exists {
-			return fmt.Errorf("duplicate spark invoice ID found in invoice %s: %s", sparkInvoice, invoiceID)
-		}
-		sparkInvoiceIDs[invoiceID] = struct{}{}
+		sparkInvoiceIDs[parsedInvoice.Id] = struct{}{}
 	}
 	sparkInvoiceIDsToQuery := make([]uuid.UUID, 0, len(sparkInvoiceIDs))
 	for sparkInvoiceID := range sparkInvoiceIDs {

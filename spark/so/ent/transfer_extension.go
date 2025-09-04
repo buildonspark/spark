@@ -10,6 +10,7 @@ import (
 )
 
 // MarshalProto converts a Transfer to a spark protobuf Transfer.
+// To marshal the spark invoice, the edge must be pre-loaded via Transfer.WithSparkInvoice().
 func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 	leaves, err := t.QueryTransferLeaves().All(ctx)
 	if err != nil {
@@ -32,6 +33,10 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 	if err != nil {
 		return nil, err
 	}
+	invoice := ""
+	if inv := t.Edges.SparkInvoice; inv != nil {
+		invoice = inv.SparkInvoice
+	}
 	return &pb.Transfer{
 		Id:                        t.ID.String(),
 		SenderIdentityPublicKey:   t.SenderIdentityPubkey,
@@ -43,6 +48,7 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 		CreatedTime:               timestamppb.New(t.CreateTime),
 		UpdatedTime:               timestamppb.New(t.UpdateTime),
 		Type:                      *transferType,
+		SparkInvoice:              invoice,
 	}, nil
 }
 

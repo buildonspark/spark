@@ -36,15 +36,11 @@ func (h *SparkInvoiceHandler) QuerySparkInvoices(ctx context.Context, req *spark
 		if err != nil {
 			return nil, err
 		}
-		id, err := uuid.FromBytes(parsedInvoice.Id)
-		if err != nil {
-			return nil, err
-		}
 		switch parsedInvoice.Payment.Kind {
 		case common.PaymentKindSats:
-			satsInvoiceIds = append(satsInvoiceIds, id)
+			satsInvoiceIds = append(satsInvoiceIds, parsedInvoice.Id)
 		case common.PaymentKindTokens:
-			tokensInvoiceIds = append(tokensInvoiceIds, id)
+			tokensInvoiceIds = append(tokensInvoiceIds, parsedInvoice.Id)
 		default:
 			return nil, fmt.Errorf("unknown payment kind: %d", parsedInvoice.Payment.Kind)
 		}

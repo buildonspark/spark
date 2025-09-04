@@ -149,6 +149,21 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	if err != nil {
 		return nil, fmt.Errorf("invalid receiver identity public key: %w", err)
 	}
+	if len(req.SparkInvoice) > 0 {
+		leafIDsToSend := make([]uuid.UUID, len(req.TransferPackage.LeavesToSend))
+		for i, leaf := range req.TransferPackage.LeavesToSend {
+			leafID, err := uuid.Parse(leaf.LeafId)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse leaf id: %w", err)
+			}
+			leafIDsToSend[i] = leafID
+		}
+		err = validateSatsSparkInvoice(ctx, req.SparkInvoice, req.ReceiverIdentityPublicKey, req.OwnerIdentityPublicKey, leafIDsToSend, true)
+		if err != nil {
+			return nil, fmt.Errorf("failed to validate sats spark invoice: %s for transfer id: %s. error: %w", req.SparkInvoice, req.TransferId, err)
+		}
+	}
+
 	transfer, leafMap, err := h.createTransfer(
 		ctx,
 		req.TransferId,
@@ -162,6 +177,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		leafTweakMap,
 		TransferRoleCoordinator,
 		requireDirectTx,
+		req.SparkInvoice,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transfer for transfer %s: %w", req.TransferId, err)
@@ -1663,7 +1679,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		transferPredicate = append(transferPredicate, enttransfer.StatusIn(statuses...))
 	}
 
-	baseQuery := db.Transfer.Query()
+	baseQuery := db.Transfer.Query().WithSparkInvoice()
 	if len(transferPredicate) > 0 {
 		baseQuery = baseQuery.Where(enttransfer.And(transferPredicate...))
 	}

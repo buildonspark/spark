@@ -77,6 +77,17 @@ func SendTransferWithKeyTweaks(
 	receiverIdentityPubkey keys.Public,
 	expiryTime time.Time,
 ) (*pb.Transfer, error) {
+	return SendTransferWithKeyTweaksAndInvoice(ctx, config, leaves, receiverIdentityPubkey, expiryTime, "")
+}
+
+func SendTransferWithKeyTweaksAndInvoice(
+	ctx context.Context,
+	config *TestWalletConfig,
+	leaves []LeafKeyTweak,
+	receiverIdentityPubkey keys.Public,
+	expiryTime time.Time,
+	invoice string,
+) (*pb.Transfer, error) {
 	sparkConn, err := config.NewCoordinatorGRPCConnection()
 	if err != nil {
 		return nil, err
@@ -106,6 +117,7 @@ func SendTransferWithKeyTweaks(
 		ReceiverIdentityPublicKey: receiverIdentityPubkey.Serialize(),
 		ExpiryTime:                timestamppb.New(expiryTime),
 		TransferPackage:           transferPackage,
+		SparkInvoice:              invoice,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to start transfer: %w", err)

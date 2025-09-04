@@ -1,9 +1,11 @@
 package common
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -12,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -23,7 +26,7 @@ func EncodeSparkAddress(identityPublicKey []byte, network Network, sparkInvoiceF
 // EncodeSparkAddressWithSignature encodes a SparkAddress including optional signature bytes.
 // If signature is nil or empty, the resulting address will have no signature.
 func EncodeSparkAddressWithSignature(identityPublicKey []byte, network Network, sparkInvoiceFields *pb.SparkInvoiceFields, signature []byte) (string, error) {
-	if identityPublicKey == nil {
+	if len(identityPublicKey) == 0 {
 		return "", fmt.Errorf("identity public key is required")
 	}
 	if sparkInvoiceFields != nil {
@@ -98,9 +101,9 @@ func DecodeSparkAddress(address string) (*DecodedSparkAddress, error) {
 		return nil, err
 	}
 
-	network, err := HrpToNetwork(hrp)
-	if err != nil {
-		return nil, err
+	network := HrpToNetwork(hrp)
+	if network == Unspecified {
+		return nil, sparkerrors.InvalidUserInputErrorf("unknown network: %s", hrp)
 	}
 
 	// Convert 5-bit bech32 data to 8-bit bytes
@@ -135,30 +138,49 @@ type ParsedPayment struct {
 
 type ParsedSparkInvoice struct {
 	Version           uint32
-	Id                []byte
-	ReceiverPublicKey []byte
+	Id                uuid.UUID
+	ReceiverPublicKey keys.Public
 	Payment           ParsedPayment
-	Memo              *string
-	SenderPublicKey   []byte
+	Memo              string
+	SenderPublicKey   keys.Public
 	ExpiryTime        *timestamppb.Timestamp
 	Signature         []byte
+	Network           Network
 }
 
 func ParseSparkInvoice(addr string) (*ParsedSparkInvoice, error) {
 	decoded, err := DecodeSparkAddress(addr)
 	if err != nil {
-		return nil, err
+		return nil, sparkerrors.InvalidUserInputErrorf("failed to decode spark address: %w", err)
 	}
-	var (
-		payment ParsedPayment
-	)
 	if decoded.SparkAddress == nil || decoded.SparkAddress.SparkInvoiceFields == nil {
 		return nil, fmt.Errorf("spark address or invoice fields are nil")
 	}
+
+	if err = enforceCanonicalBytes(addr, decoded.SparkAddress); err != nil {
+		return nil, err
+	}
+
+	// version is required
+	if decoded.SparkAddress.SparkInvoiceFields.Version != 1 {
+		return nil, sparkerrors.InvalidUserInputErrorf("invoice version is not supported, expected: 1, got: %d", decoded.SparkAddress.SparkInvoiceFields.Version)
+	}
+	// receiver public key is required
+	receiverPublicKey, err := keys.ParsePublicKey(decoded.SparkAddress.IdentityPublicKey)
+	if err != nil {
+		return nil, sparkerrors.InvalidUserInputErrorf("failed to parse receiver public key: %w", err)
+	}
+	// id is required
+	decodedUUID, err := uuid.FromBytes(decoded.SparkAddress.SparkInvoiceFields.Id)
+	if err != nil {
+		return nil, sparkerrors.InvalidUserInputErrorf("failed to parse invoice id: %w", err)
+	}
+
+	var payment ParsedPayment
 	switch pt := decoded.SparkAddress.SparkInvoiceFields.PaymentType.(type) {
 	case *pb.SparkInvoiceFields_TokensPayment:
 		if pt.TokensPayment == nil {
-			return nil, fmt.Errorf("tokens payment is nil")
+			return nil, sparkerrors.InvalidUserInputErrorf("tokens payment is nil")
 		}
 		payment = ParsedPayment{
 			Kind:          PaymentKindTokens,
@@ -166,30 +188,91 @@ func ParseSparkInvoice(addr string) (*ParsedSparkInvoice, error) {
 		}
 	case *pb.SparkInvoiceFields_SatsPayment:
 		if pt.SatsPayment == nil {
-			return nil, fmt.Errorf("sats payment is nil")
+			return nil, sparkerrors.InvalidUserInputErrorf("sats payment is nil")
 		}
 		payment = ParsedPayment{
 			Kind:        PaymentKindSats,
 			SatsPayment: pt.SatsPayment,
 		}
 	default:
-		return nil, fmt.Errorf("unknown payment type in invoice")
+		return nil, sparkerrors.InvalidUserInputErrorf("unknown payment type in invoice")
+	}
+	// sender public key is optional
+	var senderPublicKey keys.Public
+	if len(decoded.SparkAddress.SparkInvoiceFields.SenderPublicKey) > 0 {
+		senderPublicKey, err = keys.ParsePublicKey(decoded.SparkAddress.SparkInvoiceFields.SenderPublicKey)
+		if err != nil {
+			return nil, sparkerrors.InvalidUserInputErrorf("failed to parse sender public key: %w", err)
+		}
+	}
+	// signature is optional. validate if present
+	if len(decoded.SparkAddress.Signature) > 0 {
+		err = VerifySparkAddressSignature(decoded.SparkAddress, decoded.Network)
+		if err != nil {
+			return nil, sparkerrors.InvalidUserInputErrorf("invalid spark invoice signature: %w", err)
+		}
+	}
+	memo := ""
+	if m := decoded.SparkAddress.SparkInvoiceFields.Memo; m != nil {
+		memo = *m
 	}
 
 	return &ParsedSparkInvoice{
 		Version:           decoded.SparkAddress.SparkInvoiceFields.Version,
-		Id:                decoded.SparkAddress.SparkInvoiceFields.Id,
-		ReceiverPublicKey: decoded.SparkAddress.IdentityPublicKey,
+		Id:                decodedUUID,
+		ReceiverPublicKey: receiverPublicKey,
 		Payment:           payment,
-		Memo:              decoded.SparkAddress.SparkInvoiceFields.Memo,
-		SenderPublicKey:   decoded.SparkAddress.SparkInvoiceFields.SenderPublicKey,
+		Memo:              memo,
+		SenderPublicKey:   senderPublicKey,
 		ExpiryTime:        decoded.SparkAddress.SparkInvoiceFields.ExpiryTime,
 		Signature:         decoded.SparkAddress.Signature,
+		Network:           decoded.Network,
 	}, nil
 }
 
+func enforceCanonicalBytes(address string, decodedSparkAddr *pb.SparkAddress) error {
+	decodedHrp, addrData, err := bech32.DecodeNoLimit(address)
+	if err != nil {
+		return sparkerrors.InvalidUserInputErrorf("failed to decode spark address: %v", err)
+	}
+	decodedNetwork := HrpToNetwork(decodedHrp)
+	if decodedNetwork == Unspecified {
+		return sparkerrors.InvalidUserInputErrorf("unknown network: %s", decodedHrp)
+	}
+	canonBytes, err := proto.MarshalOptions{Deterministic: true}.Marshal(decodedSparkAddr)
+	if err != nil {
+		return fmt.Errorf("failed to encode invoice: %w", err)
+	}
+	canonData, err := bech32.ConvertBits(canonBytes, 8, 5, true)
+	if err != nil {
+		return fmt.Errorf("failed to encode invoice: %w", err)
+	}
+	canonHrp, err := NetworkToHrp(decodedNetwork)
+	if err != nil {
+		return fmt.Errorf("failed to map network: %w", err)
+	}
+	canonStr, err := bech32.EncodeM(canonHrp, canonData)
+	if err != nil {
+		return fmt.Errorf("failed to encode invoice: %w", err)
+	}
+	if !bytes.Equal(canonData, addrData) {
+		return sparkerrors.InvalidUserInputErrorf("invoice does not adhere to canonical encoding: original: %s, re-encoded: %s", address, canonStr)
+	}
+
+	// The spl1 prefix for local invoices is not canonical and maps to regtest.
+	// Skip the check on the full string for local invoices.
+	lower := strings.ToLower(address)
+	if !strings.HasPrefix(lower, "spl1") && lower != canonStr {
+		return sparkerrors.InvalidUserInputErrorf(
+			"invoice does not adhere to canonical encoding: original: %s, re-encoded: %s",
+			address, canonStr,
+		)
+	}
+	return nil
+}
+
 // CreateTokenSparkInvoiceFields creates SparkInvoiceFields for token payments
-func CreateTokenSparkInvoiceFields(id []byte, tokenIdentifier []byte, amount []byte, memo *string, senderPublicKey []byte, expiryTime *time.Time) *pb.SparkInvoiceFields {
+func CreateTokenSparkInvoiceFields(id []byte, tokenIdentifier []byte, amount []byte, memo *string, senderPublicKey keys.Public, expiryTime *time.Time) *pb.SparkInvoiceFields {
 	sparkInvoiceFields := &pb.SparkInvoiceFields{
 		Version: 1,
 		Id:      id,
@@ -200,7 +283,7 @@ func CreateTokenSparkInvoiceFields(id []byte, tokenIdentifier []byte, amount []b
 			},
 		},
 		Memo:            memo,
-		SenderPublicKey: senderPublicKey,
+		SenderPublicKey: senderPublicKey.Serialize(),
 	}
 	if expiryTime != nil {
 		sparkInvoiceFields.ExpiryTime = timestamppb.New(*expiryTime)
@@ -209,7 +292,7 @@ func CreateTokenSparkInvoiceFields(id []byte, tokenIdentifier []byte, amount []b
 }
 
 // CreateSatsSparkInvoiceFields creates SparkInvoiceFields for sats payments
-func CreateSatsSparkInvoiceFields(id []byte, amount *uint64, memo *string, senderPublicKey []byte, expiryTime *time.Time) *pb.SparkInvoiceFields {
+func CreateSatsSparkInvoiceFields(id []byte, amount *uint64, memo *string, senderPublicKey keys.Public, expiryTime *time.Time) *pb.SparkInvoiceFields {
 	sparkInvoiceFields := &pb.SparkInvoiceFields{
 		Version: 1,
 		Id:      id,
@@ -219,7 +302,7 @@ func CreateSatsSparkInvoiceFields(id []byte, amount *uint64, memo *string, sende
 			},
 		},
 		Memo:            memo,
-		SenderPublicKey: senderPublicKey,
+		SenderPublicKey: senderPublicKey.Serialize(),
 	}
 	if expiryTime != nil {
 		sparkInvoiceFields.ExpiryTime = timestamppb.New(*expiryTime)
@@ -227,20 +310,20 @@ func CreateSatsSparkInvoiceFields(id []byte, amount *uint64, memo *string, sende
 	return sparkInvoiceFields
 }
 
-func HrpToNetwork(hrp string) (Network, error) {
+func HrpToNetwork(hrp string) Network {
 	switch hrp {
 	case "spl": // for local testing
-		return Regtest, nil
+		return Regtest
 	case "sprt":
-		return Regtest, nil
+		return Regtest
 	case "spt":
-		return Testnet, nil
+		return Testnet
 	case "sps":
-		return Signet, nil
+		return Signet
 	case "sp":
-		return Mainnet, nil
+		return Mainnet
 	}
-	return Unspecified, nil
+	return Unspecified
 }
 
 func NetworkToHrp(network Network) (string, error) {

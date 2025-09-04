@@ -3,12 +3,14 @@ package handler
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"fmt"
-	"github.com/lightsparkdev/spark/common/keys"
+	"time"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -16,7 +18,9 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
+	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -177,6 +181,22 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 		return err
 	}
 
+	if len(req.SparkInvoice) > 0 {
+		transferLeaves := req.TransferPackage.LeavesToSend
+		leafIDs := make([]uuid.UUID, len(transferLeaves))
+		for i, leaf := range transferLeaves {
+			leafID, err := uuid.Parse(leaf.LeafId)
+			if err != nil {
+				return fmt.Errorf("failed to parse leaf id: %w", err)
+			}
+			leafIDs[i] = leafID
+		}
+		err = validateSatsSparkInvoice(ctx, req.SparkInvoice, req.ReceiverIdentityPublicKey, req.SenderIdentityPublicKey, leafIDs, false)
+		if err != nil {
+			return fmt.Errorf("failed to validate sats spark invoice: %s for transfer id: %s. error: %w", req.SparkInvoice, req.TransferId, err)
+		}
+	}
+
 	if req.RefundSignatures != nil {
 		cpfpLeafRefundMap, err = applySignatures(ctx, cpfpLeafRefundMap, req.RefundSignatures, false)
 		if err != nil {
@@ -206,6 +226,7 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 		keyTweakMap,
 		TransferRoleParticipant,
 		false,
+		req.SparkInvoice,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initiate transfer for transfer id: %s and error: %w", req.TransferId, err)
@@ -342,6 +363,7 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 		nil,
 		TransferRoleParticipant,
 		false,
+		"",
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initiate cooperative exit for transfer id: %s and error: %w", transferReq.TransferId, err)
@@ -463,4 +485,102 @@ func compareTxs(rawTx1, rawTx2 []byte) (bool, error) {
 	}
 
 	return true, nil
+}
+
+func validateSatsSparkInvoice(ctx context.Context, invoice string, receiverIdentityPublicKey []byte, senderIdentityPublicKey []byte, leafIDsToSend []uuid.UUID, checkExpiry bool) error {
+	now := time.Now().UTC()
+	dedupLeafIDs := dedupUUIDs(leafIDsToSend)
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get or create current tx for request: %w", err)
+	}
+	receiverPublicKey, err := keys.ParsePublicKey(receiverIdentityPublicKey)
+	if err != nil {
+		return sparkerrors.InvalidUserInputErrorf("failed to parse receiver identity public key: %w", err)
+	}
+	senderPublicKey, err := keys.ParsePublicKey(senderIdentityPublicKey)
+	if err != nil {
+		return sparkerrors.InvalidUserInputErrorf("failed to parse sender identity public key: %w", err)
+	}
+
+	decodedInvoice, err := common.ParseSparkInvoice(invoice)
+	if err != nil {
+		return fmt.Errorf("failed to decode spark invoice: %s, error: %w", invoice, err)
+	}
+	if decodedInvoice.Payment.Kind != common.PaymentKindSats {
+		return sparkerrors.InvalidUserInputErrorf("invoice must be a sats invoice")
+	}
+	if decodedInvoice.ReceiverPublicKey != receiverPublicKey {
+		return sparkerrors.InvalidUserInputErrorf("receiver identity public key does not match the invoice identity public key, expected: %x, got: %x", receiverPublicKey.Serialize(), decodedInvoice.ReceiverPublicKey.Serialize())
+	}
+	if !decodedInvoice.SenderPublicKey.IsZero() && decodedInvoice.SenderPublicKey != senderPublicKey {
+		return sparkerrors.InvalidUserInputErrorf("sender identity public key does not match the invoice sender public key, expected: %x, got: %x", senderPublicKey.Serialize(), decodedInvoice.SenderPublicKey.Serialize())
+	}
+
+	if checkExpiry {
+		if ts := decodedInvoice.ExpiryTime; ts != nil && ts.IsValid() {
+			exp := ts.AsTime()
+			if exp.Before(now) {
+				return sparkerrors.InvalidUserInputErrorf(
+					"invoice has expired. decoded expiry(UTC): %s, now(UTC): %s",
+					exp.UTC().Format(time.RFC3339),
+					now.UTC().Format(time.RFC3339),
+				)
+			}
+		}
+	}
+
+	// Check if the invoice amount matches the amount in the leaves to send.
+	invoiceAmount := decodedInvoice.Payment.SatsPayment.Amount
+	schemaNetwork, err := common.SchemaNetworkFromNetwork(decodedInvoice.Network)
+	if err != nil {
+		return sparkerrors.InvalidUserInputErrorf("failed to get schema network: %w", err)
+	}
+	var agg []struct {
+		Count int
+		Sum   sql.NullInt64
+	}
+	err = db.TreeNode.
+		Query().
+		Where(treenode.IDIn(dedupLeafIDs...)).
+		Where(treenode.HasTreeWith(
+			tree.NetworkEQ(schemaNetwork),
+		)).
+		Aggregate(
+			ent.As(ent.Count(), "count"),
+			ent.As(ent.Sum(treenode.FieldValue), "sum"),
+		).
+		Scan(ctx, &agg)
+	if err != nil {
+		return fmt.Errorf("failed to query leaves: %w", err)
+	}
+	if agg[0].Count != len(dedupLeafIDs) {
+		// Either the leaf ID was not found, or there was a network mismatch.
+		return sparkerrors.InvalidUserInputErrorf("one or more leaves not found on expected network: %s", schemaNetwork)
+	}
+	if invoiceAmount != nil {
+		totalAmount := uint64(0)
+		if agg[0].Sum.Valid {
+			if agg[0].Sum.Int64 < 0 {
+				return fmt.Errorf("invalid negative leaf sum: %d", agg[0].Sum.Int64)
+			}
+			totalAmount = uint64(agg[0].Sum.Int64)
+		}
+		if totalAmount != *invoiceAmount {
+			return sparkerrors.InvalidUserInputErrorf("invoice amount does not match the transfer package amount got: %d, expected: %d", totalAmount, *invoiceAmount)
+		}
+	}
+	return nil
+}
+
+func dedupUUIDs(in []uuid.UUID) []uuid.UUID {
+	m := make(map[uuid.UUID]struct{}, len(in))
+	out := make([]uuid.UUID, 0, len(in))
+	for _, id := range in {
+		if _, ok := m[id]; !ok {
+			m[id] = struct{}{}
+			out = append(out, id)
+		}
+	}
+	return out
 }

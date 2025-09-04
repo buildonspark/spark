@@ -4506,10 +4506,11 @@ type StartTransferRequest struct {
 	ReceiverIdentityPublicKey []byte                    `protobuf:"bytes,4,opt,name=receiver_identity_public_key,json=receiverIdentityPublicKey,proto3" json:"receiver_identity_public_key,omitempty"`
 	ExpiryTime                *timestamppb.Timestamp    `protobuf:"bytes,5,opt,name=expiry_time,json=expiryTime,proto3" json:"expiry_time,omitempty"`
 	// If this field is set, the leaves_to_send and key_tweak_proofs will be ignored.
-	TransferPackage    *TransferPackage `protobuf:"bytes,7,opt,name=transfer_package,json=transferPackage,proto3" json:"transfer_package,omitempty"`
-	SparkPaymentIntent string           `protobuf:"bytes,9,opt,name=spark_payment_intent,json=sparkPaymentIntent,proto3" json:"spark_payment_intent,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	TransferPackage *TransferPackage `protobuf:"bytes,7,opt,name=transfer_package,json=transferPackage,proto3" json:"transfer_package,omitempty"`
+	// The invoice this transfer pays.
+	SparkInvoice  string `protobuf:"bytes,10,opt,name=spark_invoice,json=sparkInvoice,proto3" json:"spark_invoice,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StartTransferRequest) Reset() {
@@ -4585,9 +4586,9 @@ func (x *StartTransferRequest) GetTransferPackage() *TransferPackage {
 	return nil
 }
 
-func (x *StartTransferRequest) GetSparkPaymentIntent() string {
+func (x *StartTransferRequest) GetSparkInvoice() string {
 	if x != nil {
-		return x.SparkPaymentIntent
+		return x.SparkInvoice
 	}
 	return ""
 }
@@ -5058,6 +5059,7 @@ type Transfer struct {
 	CreatedTime               *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=created_time,json=createdTime,proto3" json:"created_time,omitempty"`
 	UpdatedTime               *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=updated_time,json=updatedTime,proto3" json:"updated_time,omitempty"`
 	Type                      TransferType           `protobuf:"varint,10,opt,name=type,proto3,enum=spark.TransferType" json:"type,omitempty"`
+	SparkInvoice              string                 `protobuf:"bytes,11,opt,name=spark_invoice,json=sparkInvoice,proto3" json:"spark_invoice,omitempty"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -5160,6 +5162,13 @@ func (x *Transfer) GetType() TransferType {
 		return x.Type
 	}
 	return TransferType_PREIMAGE_SWAP
+}
+
+func (x *Transfer) GetSparkInvoice() string {
+	if x != nil {
+		return x.SparkInvoice
+	}
+	return ""
 }
 
 type TransferLeaf struct {
@@ -10374,7 +10383,7 @@ const file_spark_proto_rawDesc = "" +
 	"\vexpiry_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"expiryTime\x12P\n" +
 	"\x15direct_leaves_to_send\x18\x06 \x03(\v2\x1d.spark.UserSignedTxSigningJobR\x12directLeavesToSend\x12b\n" +
-	"\x1fdirect_from_cpfp_leaves_to_send\x18\a \x03(\v2\x1d.spark.UserSignedTxSigningJobR\x1adirectFromCpfpLeavesToSend\"\xb4\x03\n" +
+	"\x1fdirect_from_cpfp_leaves_to_send\x18\a \x03(\v2\x1d.spark.UserSignedTxSigningJobR\x1adirectFromCpfpLeavesToSend\"\xad\x03\n" +
 	"\x14StartTransferRequest\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
 	"transferId\x129\n" +
@@ -10383,8 +10392,10 @@ const file_spark_proto_rawDesc = "" +
 	"\x1creceiver_identity_public_key\x18\x04 \x01(\fR\x19receiverIdentityPublicKey\x12;\n" +
 	"\vexpiry_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"expiryTime\x12A\n" +
-	"\x10transfer_package\x18\a \x01(\v2\x16.spark.TransferPackageR\x0ftransferPackage\x120\n" +
-	"\x14spark_payment_intent\x18\t \x01(\tR\x12sparkPaymentIntentJ\x04\b\x06\x10\a\"\x8f\x01\n" +
+	"\x10transfer_package\x18\a \x01(\v2\x16.spark.TransferPackageR\x0ftransferPackage\x12#\n" +
+	"\rspark_invoice\x18\n" +
+	" \x01(\tR\fsparkInvoiceJ\x04\b\x06\x10\aJ\x04\b\t\x10\n" +
+	"\"\x8f\x01\n" +
 	"\x15StartTransferResponse\x12+\n" +
 	"\btransfer\x18\x01 \x01(\v2\x0f.spark.TransferR\btransfer\x12I\n" +
 	"\x0fsigning_results\x18\x02 \x03(\v2 .spark.LeafRefundTxSigningResultR\x0esigningResults\"\xd0\x03\n" +
@@ -10423,7 +10434,7 @@ const file_spark_proto_rawDesc = "" +
 	"\x19owner_identity_public_key\x18\x02 \x01(\fR\x16ownerIdentityPublicKey\x12A\n" +
 	"\x10transfer_package\x18\x03 \x01(\v2\x16.spark.TransferPackageR\x0ftransferPackage\"G\n" +
 	"\x18FinalizeTransferResponse\x12+\n" +
-	"\btransfer\x18\x01 \x01(\v2\x0f.spark.TransferR\btransfer\"\xf9\x03\n" +
+	"\btransfer\x18\x01 \x01(\v2\x0f.spark.TransferR\btransfer\"\x9e\x04\n" +
 	"\bTransfer\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12;\n" +
 	"\x1asender_identity_public_key\x18\x02 \x01(\fR\x17senderIdentityPublicKey\x12?\n" +
@@ -10437,7 +10448,8 @@ const file_spark_proto_rawDesc = "" +
 	"\fcreated_time\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\vcreatedTime\x12=\n" +
 	"\fupdated_time\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\vupdatedTime\x12'\n" +
 	"\x04type\x18\n" +
-	" \x01(\x0e2\x13.spark.TransferTypeR\x04type\"\x84\x03\n" +
+	" \x01(\x0e2\x13.spark.TransferTypeR\x04type\x12#\n" +
+	"\rspark_invoice\x18\v \x01(\tR\fsparkInvoice\"\x84\x03\n" +
 	"\fTransferLeaf\x12#\n" +
 	"\x04leaf\x18\x01 \x01(\v2\x0f.spark.TreeNodeR\x04leaf\x12#\n" +
 	"\rsecret_cipher\x18\x02 \x01(\fR\fsecretCipher\x12\x1c\n" +

@@ -3,6 +3,8 @@ package handler
 import (
 	"bytes"
 	"context"
+	dbSql "database/sql"
+	"errors"
 	"fmt"
 	"math/big"
 	"slices"
@@ -27,10 +29,11 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
-	"github.com/lightsparkdev/spark/so/errors"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	events "github.com/lightsparkdev/spark/so/stream"
@@ -233,6 +236,7 @@ func (h *BaseTransferHandler) createTransfer(
 	leafTweakMap map[string]*pbspark.SendLeafKeyTweak,
 	role TransferRole,
 	requireDirectTx bool,
+	sparkInvoice string,
 ) (*ent.Transfer, map[string]*ent.TreeNode, error) {
 	transferUUID, err := uuid.Parse(transferID)
 	if err != nil {
@@ -259,21 +263,85 @@ func (h *BaseTransferHandler) createTransfer(
 		return nil, nil, fmt.Errorf("unable to get database transaction: %w", err)
 	}
 
-	transfer, err := db.Transfer.Create().
+	invoiceID := uuid.Nil
+	if len(sparkInvoice) > 0 {
+		decoded, err := common.ParseSparkInvoice(sparkInvoice)
+		if err != nil {
+			return nil, nil, fmt.Errorf("unable to parse spark invoice: %w", err)
+		}
+		invoiceID = decoded.Id
+		var expiry *time.Time
+		if decoded.ExpiryTime != nil && decoded.ExpiryTime.IsValid() {
+			t := decoded.ExpiryTime.AsTime()
+			expiry = &t
+		}
+		err = db.SparkInvoice.Create().
+			SetID(invoiceID).
+			SetSparkInvoice(sparkInvoice).
+			SetReceiverPublicKey(decoded.ReceiverPublicKey.Serialize()).
+			SetNillableExpiryTime(expiry).
+			OnConflictColumns(sparkinvoice.FieldID).
+			DoNothing().
+			Exec(ctx)
+		// Do not update an invoice if one already exists with the same ID.
+		// Ent Create expects a returning row, but ON CONFLICT DO NOTHING returns 0 rows.
+		// As 0 rows is expected in conflict cases, ignore dbSql.ErrNoRows.
+		if err != nil && !errors.Is(err, dbSql.ErrNoRows) {
+			return nil, nil, fmt.Errorf("unable to create spark invoice: %w", err)
+		}
+
+		storedInvoice, err := db.SparkInvoice.
+			Query().
+			Where(sparkinvoice.IDEQ(invoiceID)).
+			ForUpdate().
+			Only(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("lock invoice: %w", err)
+		}
+		if storedInvoice.SparkInvoice != sparkInvoice {
+			return nil, nil, sparkerrors.InvalidUserInputErrorf("Conflicting invoices found for id: %s. Decoded request invoice: %s", invoiceID.String(), sparkInvoice)
+		}
+
+		// Check if an existing transfer is in flight or paid with this invoice.
+		paidOrInFlightTransferExists, err := db.Transfer.
+			Query().
+			Where(
+				enttransfer.HasSparkInvoiceWith(sparkinvoice.IDEQ(invoiceID)),
+				enttransfer.StatusNotIn(
+					// If an invoice has an edge to a transfer in any other state
+					// that invoice is considered paid or in flight. Do not pay it again.
+					st.TransferStatusReturned,
+				),
+			).
+			Exist(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to query transfer: %w", err)
+		}
+		if paidOrInFlightTransferExists {
+			return nil, nil, sparkerrors.InvalidUserInputErrorf("invoice has already been paid")
+		}
+	}
+
+	transferCreate := db.Transfer.Create().
 		SetID(transferUUID).
 		SetSenderIdentityPubkey(senderIdentityPubKey.Serialize()).
 		SetReceiverIdentityPubkey(receiverIdentityPubKey.Serialize()).
 		SetStatus(status).
 		SetTotalValue(0).
 		SetExpiryTime(expiryTime).
-		SetType(transferType).
-		Save(ctx)
+		SetType(transferType)
+
+	if len(sparkInvoice) > 0 && invoiceID != uuid.Nil {
+		transferCreate = transferCreate.SetSparkInvoiceID(invoiceID)
+	}
+
+	transfer, err := transferCreate.Save(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create transfer: %w", err)
 	}
 
 	if len(leafCpfpRefundMap) == 0 {
-		return nil, nil, errors.InvalidUserInputErrorf("must provide at least one leaf for transfer")
+		return nil, nil, sparkerrors.InvalidUserInputErrorf("must provide at least one leaf for transfer")
 	}
 
 	leaves, err := loadLeavesWithLock(ctx, db, leafCpfpRefundMap)
@@ -609,7 +677,7 @@ func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.C
 		return nil, fmt.Errorf("encountered error when fetching preimage request for transfer id %s: %w", req.TransferId, err)
 	}
 	if preimageRequest != nil && preimageRequest.Status == st.PreimageRequestStatusPreimageShared {
-		return nil, errors.FailedPreconditionErrorf("Cannot cancel an invoice whose preimage has already been revealed")
+		return nil, sparkerrors.FailedPreconditionErrorf("Cannot cancel an invoice whose preimage has already been revealed")
 	}
 
 	err = h.CreateCancelTransferGossipMessage(ctx, req.TransferId)

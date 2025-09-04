@@ -96,8 +96,8 @@ var testData = testTokenTransactionData{
 	prevTxHash:       sha256.Sum256([]byte("previous transaction")),
 	tokenIdentifier:  bytes.Repeat([]byte{0x07}, 32),
 	invoiceAttachments: []*tokenpb.InvoiceAttachment{
-		{SparkInvoice: "sprt1pgssypkrjhrpzt2hw0ggrmndanmm035ley75nxu3gejaju4wx9nq86lwzfjqsqgjzqqe3zul2fm8a24y576t0ne2ehup5fg2yz4r6hxlhatyu9kpw09s2fk36ta5j0k85qascf6snpuy4sp0rp4ezyspvs4qgmt9d4hnyggzqmpet3s394th85ypaek7eaahc60uj02fnwg5vewew2hrzesra0hqflc0vn"},
-		{SparkInvoice: "sprt1pgssypkrjhrpzt2hw0ggrmndanmm035ley75nxu3gejaju4wx9nq86lwzf5ssqgjzqqe3zulcs6h42v0kqkdsv9utxyp5fs2yz4r6hxlhatyu9kpw09s2fk36ta5j0k85qascf6snpuy4sp0rp4ezyszq86z5zryd9nxvmt9d4hnyggzqmpet3s394th85ypaek7eaahc60uj02fnwg5vewew2hrzesra0hql7r5ne"},
+		{SparkInvoice: "sprt1pgssypkrjhrpzt2hw0ggrmndanmm035ley75nxu3gejaju4wx9nq86lwzfjqsqgjzqqe3zul2fm8a24y576t0ne2ehuz5prdv4kk7v3pqgrv89wxzyk4wu7ss8hxmm8hklrfljfafxdez3n9m9e2uvtxq047ux39pgs2502um7l4vnskc9eukpfx68f0kjf7c7srkrp82zv8sjkq9uvxhygjq9jqlznxq7"},
+		{SparkInvoice: "sprt1pgssypkrjhrpzt2hw0ggrmndanmm035ley75nxu3gejaju4wx9nq86lwzf5ssqgjzqqe3zulcs6h42v0kqkdsv9utxyz5zryd9nxvmt9d4hnyggzqmpet3s394th85ypaek7eaahc60uj02fnwg5vewew2hrzesra0hp5fs2yz4r6hxlhatyu9kpw09s2fk36ta5j0k85qascf6snpuy4sp0rp4ezyszq86q75d2u6"},
 	},
 }
 
@@ -2243,8 +2243,7 @@ func TestHashTokenTransactionTransferV2(t *testing.T) {
 	hash, err := HashTokenTransactionV2(transferTransaction, false)
 	require.NoError(t, err)
 	want := []byte{
-		0x91, 0x17, 0x1d, 0x32, 0xff, 0xb1, 0xc1, 0x16, 0xe6, 0xec, 0xe5, 0xaa, 0xaf, 0xf7, 0xe0, 0x62,
-		0xe8, 0x47, 0xa7, 0x8a, 0xbf, 0x52, 0x34, 0x58, 0x1c, 0x8b, 0xa0, 0x80, 0x62, 0x83, 0x6, 0x8c,
+		0xf4, 0xa0, 0x71, 0xf0, 0x1, 0x1c, 0x54, 0xf1, 0x67, 0x58, 0x77, 0x3b, 0xd4, 0xf8, 0x61, 0x59, 0xa8, 0xe3, 0x82, 0x3a, 0x82, 0xff, 0x14, 0x67, 0xb8, 0x9f, 0xd2, 0xa6, 0xb7, 0xe6, 0x76, 0xec,
 	}
 	assert.Equal(t, want, hash)
 }
