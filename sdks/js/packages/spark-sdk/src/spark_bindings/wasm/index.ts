@@ -52,6 +52,7 @@ export function signFrost({
     nonce: nonce,
     selfCommitment: selfCommitment,
     statechainCommitments: statechainCommitments,
+    adaptorPubKey: adaptorPubKey ? bytesToHex(adaptorPubKey) : undefined,
   });
   return wasm_sign_frost(
     message,
