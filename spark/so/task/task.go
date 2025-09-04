@@ -565,7 +565,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 func AllStartupTasks() []StartupTaskSpec {
 	entityDkgTaskTimeout := 5 * time.Minute
 	entityDkgRetryInterval := 10 * time.Second
-	backfillTokenOutputInterval := 10 * time.Minute
+	backfillTokenOutputTimeout := 10 * time.Minute
 
 	return []StartupTaskSpec{
 		{
@@ -647,9 +647,9 @@ func AllStartupTasks() []StartupTaskSpec {
 			},
 		},
 		{
-			RetryInterval: &backfillTokenOutputInterval,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "backfill_spent_token_transaction_history",
+				Timeout:      &backfillTokenOutputTimeout,
 				RunInTestEnv: true,
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					logger := logging.GetLoggerFromContext(ctx)
@@ -701,8 +701,6 @@ func AllStartupTasks() []StartupTaskSpec {
 								}
 							}
 						}
-
-						processed += len(outputs)
 
 						// Progress logging every 10k records
 						if processed%10000 == 0 {
