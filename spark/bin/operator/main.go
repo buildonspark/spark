@@ -304,6 +304,18 @@ func main() {
 	}
 	defer connector.Close()
 
+	logger := slog.Default().With("component", "dbevents")
+	dbEvents, err := db.NewDBEvents(errCtx, connector, logger)
+	if err != nil {
+		log.Fatalf("Failed to create db events: %v", err)
+	}
+
+	if config.Database.DBEventsEnabled != nil && *config.Database.DBEventsEnabled {
+		errGrp.Go(func() error {
+			return dbEvents.Start()
+		})
+	}
+
 	for _, op := range config.SigningOperatorMap {
 		op.SetTimeoutProvider(knobs.NewKnobsTimeoutProvider(knobsService, config.GRPC.ClientTimeout))
 	}

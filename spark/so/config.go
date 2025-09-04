@@ -53,6 +53,7 @@ var (
 	// < 0 means disable timeouts
 	// > 0 means enable timeouts with the specified value
 	defaultGRPCClientTimeout = -1 * time.Second
+	defaultDBEventsEnabled   = true
 )
 
 // Config is the configuration for the signing operator.
@@ -247,6 +248,7 @@ type DatabaseConfig struct {
 	PoolHealthCheckPeriod     *time.Duration `yaml:"pool_health_check_period"`
 	PoolMaxConnLifetimeJitter *time.Duration `yaml:"pool_max_conn_lifetime_jitter"`
 	NewTxTimeout              *time.Duration `yaml:"new_tx_timeout"`
+	DBEventsEnabled           *bool          `yaml:"dbevents_enabled"`
 }
 
 // RateLimiterConfig is the configuration for the rate limiter
@@ -356,6 +358,10 @@ func NewConfig(
 	// "enable," then use the operator config as the final override.
 	if operatorConfig.RateLimiter.Enabled {
 		rateLimiter = operatorConfig.RateLimiter
+	}
+
+	if operatorConfig.Database.DBEventsEnabled == nil {
+		operatorConfig.Database.DBEventsEnabled = &defaultDBEventsEnabled
 	}
 
 	conf := &Config{

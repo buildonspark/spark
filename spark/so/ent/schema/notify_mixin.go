@@ -2,6 +2,8 @@ package schema
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -78,7 +80,13 @@ func (n NotifyMixin) buildPayload(v ent.Value) map[string]any {
 
 	for _, f := range n.AdditionalFields {
 		if val, ok := fields[f]; ok {
-			payload[f] = val
+			if decoded, err := base64.StdEncoding.DecodeString(val.(string)); err == nil {
+				payload[f] = hex.EncodeToString(decoded)
+			} else if bytes, ok := val.([]byte); ok {
+				payload[f] = hex.EncodeToString(bytes)
+			} else {
+				payload[f] = val
+			}
 		}
 	}
 

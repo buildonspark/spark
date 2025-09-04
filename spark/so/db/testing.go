@@ -2,15 +2,21 @@ package db
 
 import (
 	"context"
+	"log/slog"
 	"net"
+	"os/signal"
+	"syscall"
 	"testing"
 
 	epg "github.com/fergusstrange/embedded-postgres"
 	_ "github.com/lib/pq" // postgres driver
+	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/enttest"
+	"github.com/lightsparkdev/spark/so/knobs"
 	_ "github.com/mattn/go-sqlite3" // sqlite3 driver
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
 // TestSessionFactory is a SessionFactory for returning a specific Session, useful for testing.
@@ -130,4 +136,49 @@ func SetUpPostgresTestContext(t *testing.T) (context.Context, *TestContext) {
 	t.Cleanup(func() { sessionCtx.Close() })
 
 	return ctx, sessionCtx
+}
+
+// SetupDBEventsTestContext creates a complete test environment with PostgreSQL, DBConnector, and DBEvents
+// ready for testing. It returns all the necessary components and cleanup functions.
+func SetupDBEventsTestContext(t *testing.T) (*TestContext, *so.DBConnector, *DBEvents) {
+	dsn, stop := SpinUpPostgres(t)
+
+	ctx := t.Context()
+	ctx, sessionCtx, err := NewTestContext(t, ctx, "postgres", dsn)
+	require.NoError(t, err)
+	require.NoError(t, sessionCtx.Client.Schema.Create(ctx))
+
+	config := &so.Config{
+		DatabasePath: dsn,
+	}
+
+	knobsService := knobs.New(nil)
+
+	connector, err := so.NewDBConnector(ctx, config, knobsService)
+	require.NoError(t, err)
+
+	sigCtx, done := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	defer done()
+
+	errGrp, _ := errgroup.WithContext(sigCtx)
+
+	logger := slog.Default().With("component", "dbevents")
+	dbEvents, err := NewDBEvents(t.Context(), connector, logger)
+	require.NoError(t, err)
+
+	errGrp.Go(func() error {
+		return dbEvents.Start()
+	})
+
+	require.NoError(t, err)
+
+	cleanup := func() {
+		connector.Close()
+		sessionCtx.Close()
+		stop()
+	}
+
+	t.Cleanup(cleanup)
+
+	return sessionCtx, connector, dbEvents
 }
