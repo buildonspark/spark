@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
 )
@@ -29,6 +30,7 @@ type TransferQuery struct {
 	predicates         []predicate.Transfer
 	withTransferLeaves *TransferLeafQuery
 	withPaymentIntent  *PaymentIntentQuery
+	withSparkInvoice   *SparkInvoiceQuery
 	withFKs            bool
 	modifiers          []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
@@ -104,6 +106,28 @@ func (tq *TransferQuery) QueryPaymentIntent() *PaymentIntentQuery {
 			sqlgraph.From(transfer.Table, transfer.FieldID, selector),
 			sqlgraph.To(paymentintent.Table, paymentintent.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, transfer.PaymentIntentTable, transfer.PaymentIntentColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QuerySparkInvoice chains the current query on the "spark_invoice" edge.
+func (tq *TransferQuery) QuerySparkInvoice() *SparkInvoiceQuery {
+	query := (&SparkInvoiceClient{config: tq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := tq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := tq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transfer.Table, transfer.FieldID, selector),
+			sqlgraph.To(sparkinvoice.Table, sparkinvoice.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, transfer.SparkInvoiceTable, transfer.SparkInvoiceColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
 		return fromU, nil
@@ -305,6 +329,7 @@ func (tq *TransferQuery) Clone() *TransferQuery {
 		predicates:         append([]predicate.Transfer{}, tq.predicates...),
 		withTransferLeaves: tq.withTransferLeaves.Clone(),
 		withPaymentIntent:  tq.withPaymentIntent.Clone(),
+		withSparkInvoice:   tq.withSparkInvoice.Clone(),
 		// clone intermediate query.
 		sql:  tq.sql.Clone(),
 		path: tq.path,
@@ -330,6 +355,17 @@ func (tq *TransferQuery) WithPaymentIntent(opts ...func(*PaymentIntentQuery)) *T
 		opt(query)
 	}
 	tq.withPaymentIntent = query
+	return tq
+}
+
+// WithSparkInvoice tells the query-builder to eager-load the nodes that are connected to
+// the "spark_invoice" edge. The optional arguments are used to configure the query builder of the edge.
+func (tq *TransferQuery) WithSparkInvoice(opts ...func(*SparkInvoiceQuery)) *TransferQuery {
+	query := (&SparkInvoiceClient{config: tq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	tq.withSparkInvoice = query
 	return tq
 }
 
@@ -412,12 +448,13 @@ func (tq *TransferQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tra
 		nodes       = []*Transfer{}
 		withFKs     = tq.withFKs
 		_spec       = tq.querySpec()
-		loadedTypes = [2]bool{
+		loadedTypes = [3]bool{
 			tq.withTransferLeaves != nil,
 			tq.withPaymentIntent != nil,
+			tq.withSparkInvoice != nil,
 		}
 	)
-	if tq.withPaymentIntent != nil {
+	if tq.withPaymentIntent != nil || tq.withSparkInvoice != nil {
 		withFKs = true
 	}
 	if withFKs {
@@ -454,6 +491,12 @@ func (tq *TransferQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tra
 	if query := tq.withPaymentIntent; query != nil {
 		if err := tq.loadPaymentIntent(ctx, query, nodes, nil,
 			func(n *Transfer, e *PaymentIntent) { n.Edges.PaymentIntent = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := tq.withSparkInvoice; query != nil {
+		if err := tq.loadSparkInvoice(ctx, query, nodes, nil,
+			func(n *Transfer, e *SparkInvoice) { n.Edges.SparkInvoice = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -516,6 +559,38 @@ func (tq *TransferQuery) loadPaymentIntent(ctx context.Context, query *PaymentIn
 		nodes, ok := nodeids[n.ID]
 		if !ok {
 			return fmt.Errorf(`unexpected foreign-key "transfer_payment_intent" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (tq *TransferQuery) loadSparkInvoice(ctx context.Context, query *SparkInvoiceQuery, nodes []*Transfer, init func(*Transfer), assign func(*Transfer, *SparkInvoice)) error {
+	ids := make([]uuid.UUID, 0, len(nodes))
+	nodeids := make(map[uuid.UUID][]*Transfer)
+	for i := range nodes {
+		if nodes[i].transfer_spark_invoice == nil {
+			continue
+		}
+		fk := *nodes[i].transfer_spark_invoice
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(sparkinvoice.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "transfer_spark_invoice" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)

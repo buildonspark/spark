@@ -339,6 +339,29 @@ func HasTokenTransactionWith(preds ...predicate.TokenTransaction) predicate.Spar
 	})
 }
 
+// HasTransfer applies the HasEdge predicate on the "transfer" edge.
+func HasTransfer() predicate.SparkInvoice {
+	return predicate.SparkInvoice(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, TransferTable, TransferColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasTransferWith applies the HasEdge predicate on the "transfer" edge with a given conditions (other predicates).
+func HasTransferWith(preds ...predicate.Transfer) predicate.SparkInvoice {
+	return predicate.SparkInvoice(func(s *sql.Selector) {
+		step := newTransferStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.SparkInvoice) predicate.SparkInvoice {
 	return predicate.SparkInvoice(sql.AndPredicates(predicates...))

@@ -2325,6 +2325,22 @@ func (c *SparkInvoiceClient) QueryTokenTransaction(si *SparkInvoice) *TokenTrans
 	return query
 }
 
+// QueryTransfer queries the transfer edge of a SparkInvoice.
+func (c *SparkInvoiceClient) QueryTransfer(si *SparkInvoice) *TransferQuery {
+	query := (&TransferClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := si.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(sparkinvoice.Table, sparkinvoice.FieldID, id),
+			sqlgraph.To(transfer.Table, transfer.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, sparkinvoice.TransferTable, sparkinvoice.TransferColumn),
+		)
+		fromV = sqlgraph.Neighbors(si.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *SparkInvoiceClient) Hooks() []Hook {
 	return c.hooks.SparkInvoice
@@ -3766,6 +3782,22 @@ func (c *TransferClient) QueryPaymentIntent(t *Transfer) *PaymentIntentQuery {
 			sqlgraph.From(transfer.Table, transfer.FieldID, id),
 			sqlgraph.To(paymentintent.Table, paymentintent.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, transfer.PaymentIntentTable, transfer.PaymentIntentColumn),
+		)
+		fromV = sqlgraph.Neighbors(t.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QuerySparkInvoice queries the spark_invoice edge of a Transfer.
+func (c *TransferClient) QuerySparkInvoice(t *Transfer) *SparkInvoiceQuery {
+	query := (&SparkInvoiceClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := t.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transfer.Table, transfer.FieldID, id),
+			sqlgraph.To(sparkinvoice.Table, sparkinvoice.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, transfer.SparkInvoiceTable, transfer.SparkInvoiceColumn),
 		)
 		fromV = sqlgraph.Neighbors(t.driver.Dialect(), step)
 		return fromV, nil

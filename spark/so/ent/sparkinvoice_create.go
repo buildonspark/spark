@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	"github.com/lightsparkdev/spark/so/ent/transfer"
 )
 
 // SparkInvoiceCreate is the builder for creating a SparkInvoice entity.
@@ -106,6 +107,21 @@ func (sic *SparkInvoiceCreate) AddTokenTransaction(t ...*TokenTransaction) *Spar
 		ids[i] = t[i].ID
 	}
 	return sic.AddTokenTransactionIDs(ids...)
+}
+
+// AddTransferIDs adds the "transfer" edge to the Transfer entity by IDs.
+func (sic *SparkInvoiceCreate) AddTransferIDs(ids ...uuid.UUID) *SparkInvoiceCreate {
+	sic.mutation.AddTransferIDs(ids...)
+	return sic
+}
+
+// AddTransfer adds the "transfer" edges to the Transfer entity.
+func (sic *SparkInvoiceCreate) AddTransfer(t ...*Transfer) *SparkInvoiceCreate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return sic.AddTransferIDs(ids...)
 }
 
 // Mutation returns the SparkInvoiceMutation object of the builder.
@@ -241,6 +257,22 @@ func (sic *SparkInvoiceCreate) createSpec() (*SparkInvoice, *sqlgraph.CreateSpec
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := sic.mutation.TransferIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   sparkinvoice.TransferTable,
+			Columns: []string{sparkinvoice.TransferColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 )
 
@@ -42,6 +43,7 @@ type Transfer struct {
 	// The values are being populated by the TransferQuery when eager-loading is set.
 	Edges                   TransferEdges `json:"edges"`
 	transfer_payment_intent *uuid.UUID
+	transfer_spark_invoice  *uuid.UUID
 	selectValues            sql.SelectValues
 }
 
@@ -51,9 +53,11 @@ type TransferEdges struct {
 	TransferLeaves []*TransferLeaf `json:"transfer_leaves,omitempty"`
 	// PaymentIntent holds the value of the payment_intent edge.
 	PaymentIntent *PaymentIntent `json:"payment_intent,omitempty"`
+	// Invoice that this transfer pays. Only set for transfers that paid an invoice.
+	SparkInvoice *SparkInvoice `json:"spark_invoice,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // TransferLeavesOrErr returns the TransferLeaves value or an error if the edge
@@ -76,6 +80,17 @@ func (e TransferEdges) PaymentIntentOrErr() (*PaymentIntent, error) {
 	return nil, &NotLoadedError{edge: "payment_intent"}
 }
 
+// SparkInvoiceOrErr returns the SparkInvoice value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e TransferEdges) SparkInvoiceOrErr() (*SparkInvoice, error) {
+	if e.SparkInvoice != nil {
+		return e.SparkInvoice, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: sparkinvoice.Label}
+	}
+	return nil, &NotLoadedError{edge: "spark_invoice"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*Transfer) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -92,6 +107,8 @@ func (*Transfer) scanValues(columns []string) ([]any, error) {
 		case transfer.FieldID:
 			values[i] = new(uuid.UUID)
 		case transfer.ForeignKeys[0]: // transfer_payment_intent
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
+		case transfer.ForeignKeys[1]: // transfer_spark_invoice
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
@@ -176,6 +193,13 @@ func (t *Transfer) assignValues(columns []string, values []any) error {
 				t.transfer_payment_intent = new(uuid.UUID)
 				*t.transfer_payment_intent = *value.S.(*uuid.UUID)
 			}
+		case transfer.ForeignKeys[1]:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field transfer_spark_invoice", values[i])
+			} else if value.Valid {
+				t.transfer_spark_invoice = new(uuid.UUID)
+				*t.transfer_spark_invoice = *value.S.(*uuid.UUID)
+			}
 		default:
 			t.selectValues.Set(columns[i], values[i])
 		}
@@ -197,6 +221,11 @@ func (t *Transfer) QueryTransferLeaves() *TransferLeafQuery {
 // QueryPaymentIntent queries the "payment_intent" edge of the Transfer entity.
 func (t *Transfer) QueryPaymentIntent() *PaymentIntentQuery {
 	return NewTransferClient(t.config).QueryPaymentIntent(t)
+}
+
+// QuerySparkInvoice queries the "spark_invoice" edge of the Transfer entity.
+func (t *Transfer) QuerySparkInvoice() *SparkInvoiceQuery {
+	return NewTransferClient(t.config).QuerySparkInvoice(t)
 }
 
 // Update returns a builder for updating this Transfer.

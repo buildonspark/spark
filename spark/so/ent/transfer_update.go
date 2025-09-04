@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
 )
@@ -141,6 +142,25 @@ func (tu *TransferUpdate) SetPaymentIntent(p *PaymentIntent) *TransferUpdate {
 	return tu.SetPaymentIntentID(p.ID)
 }
 
+// SetSparkInvoiceID sets the "spark_invoice" edge to the SparkInvoice entity by ID.
+func (tu *TransferUpdate) SetSparkInvoiceID(id uuid.UUID) *TransferUpdate {
+	tu.mutation.SetSparkInvoiceID(id)
+	return tu
+}
+
+// SetNillableSparkInvoiceID sets the "spark_invoice" edge to the SparkInvoice entity by ID if the given value is not nil.
+func (tu *TransferUpdate) SetNillableSparkInvoiceID(id *uuid.UUID) *TransferUpdate {
+	if id != nil {
+		tu = tu.SetSparkInvoiceID(*id)
+	}
+	return tu
+}
+
+// SetSparkInvoice sets the "spark_invoice" edge to the SparkInvoice entity.
+func (tu *TransferUpdate) SetSparkInvoice(s *SparkInvoice) *TransferUpdate {
+	return tu.SetSparkInvoiceID(s.ID)
+}
+
 // Mutation returns the TransferMutation object of the builder.
 func (tu *TransferUpdate) Mutation() *TransferMutation {
 	return tu.mutation
@@ -170,6 +190,12 @@ func (tu *TransferUpdate) RemoveTransferLeaves(t ...*TransferLeaf) *TransferUpda
 // ClearPaymentIntent clears the "payment_intent" edge to the PaymentIntent entity.
 func (tu *TransferUpdate) ClearPaymentIntent() *TransferUpdate {
 	tu.mutation.ClearPaymentIntent()
+	return tu
+}
+
+// ClearSparkInvoice clears the "spark_invoice" edge to the SparkInvoice entity.
+func (tu *TransferUpdate) ClearSparkInvoice() *TransferUpdate {
+	tu.mutation.ClearSparkInvoice()
 	return tu
 }
 
@@ -331,6 +357,35 @@ func (tu *TransferUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if tu.mutation.SparkInvoiceCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   transfer.SparkInvoiceTable,
+			Columns: []string{transfer.SparkInvoiceColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(sparkinvoice.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tu.mutation.SparkInvoiceIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   transfer.SparkInvoiceTable,
+			Columns: []string{transfer.SparkInvoiceColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(sparkinvoice.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, tu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{transfer.Label}
@@ -460,6 +515,25 @@ func (tuo *TransferUpdateOne) SetPaymentIntent(p *PaymentIntent) *TransferUpdate
 	return tuo.SetPaymentIntentID(p.ID)
 }
 
+// SetSparkInvoiceID sets the "spark_invoice" edge to the SparkInvoice entity by ID.
+func (tuo *TransferUpdateOne) SetSparkInvoiceID(id uuid.UUID) *TransferUpdateOne {
+	tuo.mutation.SetSparkInvoiceID(id)
+	return tuo
+}
+
+// SetNillableSparkInvoiceID sets the "spark_invoice" edge to the SparkInvoice entity by ID if the given value is not nil.
+func (tuo *TransferUpdateOne) SetNillableSparkInvoiceID(id *uuid.UUID) *TransferUpdateOne {
+	if id != nil {
+		tuo = tuo.SetSparkInvoiceID(*id)
+	}
+	return tuo
+}
+
+// SetSparkInvoice sets the "spark_invoice" edge to the SparkInvoice entity.
+func (tuo *TransferUpdateOne) SetSparkInvoice(s *SparkInvoice) *TransferUpdateOne {
+	return tuo.SetSparkInvoiceID(s.ID)
+}
+
 // Mutation returns the TransferMutation object of the builder.
 func (tuo *TransferUpdateOne) Mutation() *TransferMutation {
 	return tuo.mutation
@@ -489,6 +563,12 @@ func (tuo *TransferUpdateOne) RemoveTransferLeaves(t ...*TransferLeaf) *Transfer
 // ClearPaymentIntent clears the "payment_intent" edge to the PaymentIntent entity.
 func (tuo *TransferUpdateOne) ClearPaymentIntent() *TransferUpdateOne {
 	tuo.mutation.ClearPaymentIntent()
+	return tuo
+}
+
+// ClearSparkInvoice clears the "spark_invoice" edge to the SparkInvoice entity.
+func (tuo *TransferUpdateOne) ClearSparkInvoice() *TransferUpdateOne {
+	tuo.mutation.ClearSparkInvoice()
 	return tuo
 }
 
@@ -673,6 +753,35 @@ func (tuo *TransferUpdateOne) sqlSave(ctx context.Context) (_node *Transfer, err
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(paymentintent.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if tuo.mutation.SparkInvoiceCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   transfer.SparkInvoiceTable,
+			Columns: []string{transfer.SparkInvoiceColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(sparkinvoice.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tuo.mutation.SparkInvoiceIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   transfer.SparkInvoiceTable,
+			Columns: []string{transfer.SparkInvoiceColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(sparkinvoice.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

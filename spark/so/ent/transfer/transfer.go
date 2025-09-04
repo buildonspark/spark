@@ -39,6 +39,8 @@ const (
 	EdgeTransferLeaves = "transfer_leaves"
 	// EdgePaymentIntent holds the string denoting the payment_intent edge name in mutations.
 	EdgePaymentIntent = "payment_intent"
+	// EdgeSparkInvoice holds the string denoting the spark_invoice edge name in mutations.
+	EdgeSparkInvoice = "spark_invoice"
 	// Table holds the table name of the transfer in the database.
 	Table = "transfers"
 	// TransferLeavesTable is the table that holds the transfer_leaves relation/edge.
@@ -55,6 +57,13 @@ const (
 	PaymentIntentInverseTable = "payment_intents"
 	// PaymentIntentColumn is the table column denoting the payment_intent relation/edge.
 	PaymentIntentColumn = "transfer_payment_intent"
+	// SparkInvoiceTable is the table that holds the spark_invoice relation/edge.
+	SparkInvoiceTable = "transfers"
+	// SparkInvoiceInverseTable is the table name for the SparkInvoice entity.
+	// It exists in this package in order to avoid circular dependency with the "sparkinvoice" package.
+	SparkInvoiceInverseTable = "spark_invoices"
+	// SparkInvoiceColumn is the table column denoting the spark_invoice relation/edge.
+	SparkInvoiceColumn = "transfer_spark_invoice"
 )
 
 // Columns holds all SQL columns for transfer fields.
@@ -75,6 +84,7 @@ var Columns = []string{
 // table and are not defined as standalone fields in the schema.
 var ForeignKeys = []string{
 	"transfer_payment_intent",
+	"transfer_spark_invoice",
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -190,6 +200,13 @@ func ByPaymentIntentField(field string, opts ...sql.OrderTermOption) OrderOption
 		sqlgraph.OrderByNeighborTerms(s, newPaymentIntentStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// BySparkInvoiceField orders the results by spark_invoice field.
+func BySparkInvoiceField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSparkInvoiceStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newTransferLeavesStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -202,5 +219,12 @@ func newPaymentIntentStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(PaymentIntentInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, false, PaymentIntentTable, PaymentIntentColumn),
+	)
+}
+func newSparkInvoiceStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(SparkInvoiceInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, SparkInvoiceTable, SparkInvoiceColumn),
 	)
 }

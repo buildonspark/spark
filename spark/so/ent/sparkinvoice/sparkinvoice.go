@@ -27,6 +27,8 @@ const (
 	FieldReceiverPublicKey = "receiver_public_key"
 	// EdgeTokenTransaction holds the string denoting the token_transaction edge name in mutations.
 	EdgeTokenTransaction = "token_transaction"
+	// EdgeTransfer holds the string denoting the transfer edge name in mutations.
+	EdgeTransfer = "transfer"
 	// Table holds the table name of the sparkinvoice in the database.
 	Table = "spark_invoices"
 	// TokenTransactionTable is the table that holds the token_transaction relation/edge. The primary key declared below.
@@ -34,6 +36,13 @@ const (
 	// TokenTransactionInverseTable is the table name for the TokenTransaction entity.
 	// It exists in this package in order to avoid circular dependency with the "tokentransaction" package.
 	TokenTransactionInverseTable = "token_transactions"
+	// TransferTable is the table that holds the transfer relation/edge.
+	TransferTable = "transfers"
+	// TransferInverseTable is the table name for the Transfer entity.
+	// It exists in this package in order to avoid circular dependency with the "transfer" package.
+	TransferInverseTable = "transfers"
+	// TransferColumn is the table column denoting the transfer relation/edge.
+	TransferColumn = "transfer_spark_invoice"
 )
 
 // Columns holds all SQL columns for sparkinvoice fields.
@@ -116,10 +125,31 @@ func ByTokenTransaction(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption 
 		sqlgraph.OrderByNeighborTerms(s, newTokenTransactionStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByTransferCount orders the results by transfer count.
+func ByTransferCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newTransferStep(), opts...)
+	}
+}
+
+// ByTransfer orders the results by transfer terms.
+func ByTransfer(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newTransferStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newTokenTransactionStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(TokenTransactionInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2M, true, TokenTransactionTable, TokenTransactionPrimaryKey...),
+	)
+}
+func newTransferStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(TransferInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, true, TransferTable, TransferColumn),
 	)
 }

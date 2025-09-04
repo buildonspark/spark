@@ -36,11 +36,13 @@ type SparkInvoice struct {
 
 // SparkInvoiceEdges holds the relations/edges for other nodes in the graph.
 type SparkInvoiceEdges struct {
-	// TokenTransaction holds the value of the token_transaction edge.
+	// The token transaction this invoice paid. Only set for invoices that paid a token transaction.
 	TokenTransaction []*TokenTransaction `json:"token_transaction,omitempty"`
+	// The sats transfer this invoice paid. Only set for invoices that paid a sats transfer.
+	Transfer []*Transfer `json:"transfer,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [2]bool
 }
 
 // TokenTransactionOrErr returns the TokenTransaction value or an error if the edge
@@ -50,6 +52,15 @@ func (e SparkInvoiceEdges) TokenTransactionOrErr() ([]*TokenTransaction, error) 
 		return e.TokenTransaction, nil
 	}
 	return nil, &NotLoadedError{edge: "token_transaction"}
+}
+
+// TransferOrErr returns the Transfer value or an error if the edge
+// was not loaded in eager-loading.
+func (e SparkInvoiceEdges) TransferOrErr() ([]*Transfer, error) {
+	if e.loadedTypes[1] {
+		return e.Transfer, nil
+	}
+	return nil, &NotLoadedError{edge: "transfer"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -132,6 +143,11 @@ func (si *SparkInvoice) Value(name string) (ent.Value, error) {
 // QueryTokenTransaction queries the "token_transaction" edge of the SparkInvoice entity.
 func (si *SparkInvoice) QueryTokenTransaction() *TokenTransactionQuery {
 	return NewSparkInvoiceClient(si.config).QueryTokenTransaction(si)
+}
+
+// QueryTransfer queries the "transfer" edge of the SparkInvoice entity.
+func (si *SparkInvoice) QueryTransfer() *TransferQuery {
+	return NewSparkInvoiceClient(si.config).QueryTransfer(si)
 }
 
 // Update returns a builder for updating this SparkInvoice.

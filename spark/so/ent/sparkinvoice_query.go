@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	"github.com/lightsparkdev/spark/so/ent/transfer"
 )
 
 // SparkInvoiceQuery is the builder for querying SparkInvoice entities.
@@ -27,6 +28,7 @@ type SparkInvoiceQuery struct {
 	inters               []Interceptor
 	predicates           []predicate.SparkInvoice
 	withTokenTransaction *TokenTransactionQuery
+	withTransfer         *TransferQuery
 	modifiers            []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
@@ -79,6 +81,28 @@ func (siq *SparkInvoiceQuery) QueryTokenTransaction() *TokenTransactionQuery {
 			sqlgraph.From(sparkinvoice.Table, sparkinvoice.FieldID, selector),
 			sqlgraph.To(tokentransaction.Table, tokentransaction.FieldID),
 			sqlgraph.Edge(sqlgraph.M2M, true, sparkinvoice.TokenTransactionTable, sparkinvoice.TokenTransactionPrimaryKey...),
+		)
+		fromU = sqlgraph.SetNeighbors(siq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryTransfer chains the current query on the "transfer" edge.
+func (siq *SparkInvoiceQuery) QueryTransfer() *TransferQuery {
+	query := (&TransferClient{config: siq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := siq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := siq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(sparkinvoice.Table, sparkinvoice.FieldID, selector),
+			sqlgraph.To(transfer.Table, transfer.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, sparkinvoice.TransferTable, sparkinvoice.TransferColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(siq.driver.Dialect(), step)
 		return fromU, nil
@@ -279,6 +303,7 @@ func (siq *SparkInvoiceQuery) Clone() *SparkInvoiceQuery {
 		inters:               append([]Interceptor{}, siq.inters...),
 		predicates:           append([]predicate.SparkInvoice{}, siq.predicates...),
 		withTokenTransaction: siq.withTokenTransaction.Clone(),
+		withTransfer:         siq.withTransfer.Clone(),
 		// clone intermediate query.
 		sql:  siq.sql.Clone(),
 		path: siq.path,
@@ -293,6 +318,17 @@ func (siq *SparkInvoiceQuery) WithTokenTransaction(opts ...func(*TokenTransactio
 		opt(query)
 	}
 	siq.withTokenTransaction = query
+	return siq
+}
+
+// WithTransfer tells the query-builder to eager-load the nodes that are connected to
+// the "transfer" edge. The optional arguments are used to configure the query builder of the edge.
+func (siq *SparkInvoiceQuery) WithTransfer(opts ...func(*TransferQuery)) *SparkInvoiceQuery {
+	query := (&TransferClient{config: siq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	siq.withTransfer = query
 	return siq
 }
 
@@ -374,8 +410,9 @@ func (siq *SparkInvoiceQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([
 	var (
 		nodes       = []*SparkInvoice{}
 		_spec       = siq.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [2]bool{
 			siq.withTokenTransaction != nil,
+			siq.withTransfer != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -405,6 +442,13 @@ func (siq *SparkInvoiceQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([
 			func(n *SparkInvoice, e *TokenTransaction) {
 				n.Edges.TokenTransaction = append(n.Edges.TokenTransaction, e)
 			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := siq.withTransfer; query != nil {
+		if err := siq.loadTransfer(ctx, query, nodes,
+			func(n *SparkInvoice) { n.Edges.Transfer = []*Transfer{} },
+			func(n *SparkInvoice, e *Transfer) { n.Edges.Transfer = append(n.Edges.Transfer, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -469,6 +513,37 @@ func (siq *SparkInvoiceQuery) loadTokenTransaction(ctx context.Context, query *T
 		for kn := range nodes {
 			assign(kn, n)
 		}
+	}
+	return nil
+}
+func (siq *SparkInvoiceQuery) loadTransfer(ctx context.Context, query *TransferQuery, nodes []*SparkInvoice, init func(*SparkInvoice), assign func(*SparkInvoice, *Transfer)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*SparkInvoice)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	query.Where(predicate.Transfer(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(sparkinvoice.TransferColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.transfer_spark_invoice
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "transfer_spark_invoice" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "transfer_spark_invoice" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
 	}
 	return nil
 }

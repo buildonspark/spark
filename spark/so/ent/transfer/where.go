@@ -488,6 +488,29 @@ func HasPaymentIntentWith(preds ...predicate.PaymentIntent) predicate.Transfer {
 	})
 }
 
+// HasSparkInvoice applies the HasEdge predicate on the "spark_invoice" edge.
+func HasSparkInvoice() predicate.Transfer {
+	return predicate.Transfer(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, SparkInvoiceTable, SparkInvoiceColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasSparkInvoiceWith applies the HasEdge predicate on the "spark_invoice" edge with a given conditions (other predicates).
+func HasSparkInvoiceWith(preds ...predicate.SparkInvoice) predicate.Transfer {
+	return predicate.Transfer(func(s *sql.Selector) {
+		step := newSparkInvoiceStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.Transfer) predicate.Transfer {
 	return predicate.Transfer(sql.AndPredicates(predicates...))

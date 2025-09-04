@@ -36,6 +36,11 @@ func (SparkInvoice) Fields() []ent.Field {
 
 func (SparkInvoice) Edges() []ent.Edge {
 	return []ent.Edge{
-		edge.From("token_transaction", TokenTransaction.Type).Ref("spark_invoice"),
+		edge.From("token_transaction", TokenTransaction.Type).
+			Ref("spark_invoice").
+			Comment("The token transaction this invoice paid. Only set for invoices that paid a token transaction."),
+		edge.From("transfer", Transfer.Type).
+			Ref("spark_invoice").
+			Comment("The sats transfer this invoice paid. Only set for invoices that paid a sats transfer."),
 	}
 }

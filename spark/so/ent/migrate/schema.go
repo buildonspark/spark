@@ -716,6 +716,7 @@ var (
 		{Name: "expiry_time", Type: field.TypeTime},
 		{Name: "completion_time", Type: field.TypeTime, Nullable: true},
 		{Name: "transfer_payment_intent", Type: field.TypeUUID, Nullable: true},
+		{Name: "transfer_spark_invoice", Type: field.TypeUUID, Nullable: true},
 	}
 	// TransfersTable holds the schema information for the "transfers" table.
 	TransfersTable = &schema.Table{
@@ -727,6 +728,12 @@ var (
 				Symbol:     "transfers_payment_intents_payment_intent",
 				Columns:    []*schema.Column{TransfersColumns[10]},
 				RefColumns: []*schema.Column{PaymentIntentsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "transfers_spark_invoices_spark_invoice",
+				Columns:    []*schema.Column{TransfersColumns[11]},
+				RefColumns: []*schema.Column{SparkInvoicesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 		},
@@ -1161,6 +1168,7 @@ func init() {
 	TokenTransactionsTable.ForeignKeys[2].RefTable = PaymentIntentsTable
 	TokenTransactionPeerSignaturesTable.ForeignKeys[0].RefTable = TokenTransactionsTable
 	TransfersTable.ForeignKeys[0].RefTable = PaymentIntentsTable
+	TransfersTable.ForeignKeys[1].RefTable = SparkInvoicesTable
 	TransferLeafsTable.ForeignKeys[0].RefTable = TransfersTable
 	TransferLeafsTable.ForeignKeys[1].RefTable = TreeNodesTable
 	TreesTable.ForeignKeys[0].RefTable = TreeNodesTable

@@ -41,6 +41,9 @@ func (Transfer) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.From("transfer_leaves", TransferLeaf.Type).Ref("transfer"),
 		edge.To("payment_intent", PaymentIntent.Type).Unique(),
+		edge.To("spark_invoice", SparkInvoice.Type).
+			Unique().
+			Comment("Invoice that this transfer pays. Only set for transfers that paid an invoice."),
 	}
 }
 

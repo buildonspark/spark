@@ -8756,6 +8756,9 @@ type SparkInvoiceMutation struct {
 	token_transaction        map[uuid.UUID]struct{}
 	removedtoken_transaction map[uuid.UUID]struct{}
 	clearedtoken_transaction bool
+	transfer                 map[uuid.UUID]struct{}
+	removedtransfer          map[uuid.UUID]struct{}
+	clearedtransfer          bool
 	done                     bool
 	oldValue                 func(context.Context) (*SparkInvoice, error)
 	predicates               []predicate.SparkInvoice
@@ -9112,6 +9115,60 @@ func (m *SparkInvoiceMutation) ResetTokenTransaction() {
 	m.removedtoken_transaction = nil
 }
 
+// AddTransferIDs adds the "transfer" edge to the Transfer entity by ids.
+func (m *SparkInvoiceMutation) AddTransferIDs(ids ...uuid.UUID) {
+	if m.transfer == nil {
+		m.transfer = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.transfer[ids[i]] = struct{}{}
+	}
+}
+
+// ClearTransfer clears the "transfer" edge to the Transfer entity.
+func (m *SparkInvoiceMutation) ClearTransfer() {
+	m.clearedtransfer = true
+}
+
+// TransferCleared reports if the "transfer" edge to the Transfer entity was cleared.
+func (m *SparkInvoiceMutation) TransferCleared() bool {
+	return m.clearedtransfer
+}
+
+// RemoveTransferIDs removes the "transfer" edge to the Transfer entity by IDs.
+func (m *SparkInvoiceMutation) RemoveTransferIDs(ids ...uuid.UUID) {
+	if m.removedtransfer == nil {
+		m.removedtransfer = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.transfer, ids[i])
+		m.removedtransfer[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedTransfer returns the removed IDs of the "transfer" edge to the Transfer entity.
+func (m *SparkInvoiceMutation) RemovedTransferIDs() (ids []uuid.UUID) {
+	for id := range m.removedtransfer {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// TransferIDs returns the "transfer" edge IDs in the mutation.
+func (m *SparkInvoiceMutation) TransferIDs() (ids []uuid.UUID) {
+	for id := range m.transfer {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetTransfer resets all changes to the "transfer" edge.
+func (m *SparkInvoiceMutation) ResetTransfer() {
+	m.transfer = nil
+	m.clearedtransfer = false
+	m.removedtransfer = nil
+}
+
 // Where appends a list predicates to the SparkInvoiceMutation builder.
 func (m *SparkInvoiceMutation) Where(ps ...predicate.SparkInvoice) {
 	m.predicates = append(m.predicates, ps...)
@@ -9322,9 +9379,12 @@ func (m *SparkInvoiceMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *SparkInvoiceMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.token_transaction != nil {
 		edges = append(edges, sparkinvoice.EdgeTokenTransaction)
+	}
+	if m.transfer != nil {
+		edges = append(edges, sparkinvoice.EdgeTransfer)
 	}
 	return edges
 }
@@ -9339,15 +9399,24 @@ func (m *SparkInvoiceMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case sparkinvoice.EdgeTransfer:
+		ids := make([]ent.Value, 0, len(m.transfer))
+		for id := range m.transfer {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *SparkInvoiceMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.removedtoken_transaction != nil {
 		edges = append(edges, sparkinvoice.EdgeTokenTransaction)
+	}
+	if m.removedtransfer != nil {
+		edges = append(edges, sparkinvoice.EdgeTransfer)
 	}
 	return edges
 }
@@ -9362,15 +9431,24 @@ func (m *SparkInvoiceMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case sparkinvoice.EdgeTransfer:
+		ids := make([]ent.Value, 0, len(m.removedtransfer))
+		for id := range m.removedtransfer {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *SparkInvoiceMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.clearedtoken_transaction {
 		edges = append(edges, sparkinvoice.EdgeTokenTransaction)
+	}
+	if m.clearedtransfer {
+		edges = append(edges, sparkinvoice.EdgeTransfer)
 	}
 	return edges
 }
@@ -9381,6 +9459,8 @@ func (m *SparkInvoiceMutation) EdgeCleared(name string) bool {
 	switch name {
 	case sparkinvoice.EdgeTokenTransaction:
 		return m.clearedtoken_transaction
+	case sparkinvoice.EdgeTransfer:
+		return m.clearedtransfer
 	}
 	return false
 }
@@ -9399,6 +9479,9 @@ func (m *SparkInvoiceMutation) ResetEdge(name string) error {
 	switch name {
 	case sparkinvoice.EdgeTokenTransaction:
 		m.ResetTokenTransaction()
+		return nil
+	case sparkinvoice.EdgeTransfer:
+		m.ResetTransfer()
 		return nil
 	}
 	return fmt.Errorf("unknown SparkInvoice edge %s", name)
@@ -17260,6 +17343,8 @@ type TransferMutation struct {
 	clearedtransfer_leaves   bool
 	payment_intent           *uuid.UUID
 	clearedpayment_intent    bool
+	spark_invoice            *uuid.UUID
+	clearedspark_invoice     bool
 	done                     bool
 	oldValue                 func(context.Context) (*Transfer, error)
 	predicates               []predicate.Transfer
@@ -17819,6 +17904,45 @@ func (m *TransferMutation) ResetPaymentIntent() {
 	m.clearedpayment_intent = false
 }
 
+// SetSparkInvoiceID sets the "spark_invoice" edge to the SparkInvoice entity by id.
+func (m *TransferMutation) SetSparkInvoiceID(id uuid.UUID) {
+	m.spark_invoice = &id
+}
+
+// ClearSparkInvoice clears the "spark_invoice" edge to the SparkInvoice entity.
+func (m *TransferMutation) ClearSparkInvoice() {
+	m.clearedspark_invoice = true
+}
+
+// SparkInvoiceCleared reports if the "spark_invoice" edge to the SparkInvoice entity was cleared.
+func (m *TransferMutation) SparkInvoiceCleared() bool {
+	return m.clearedspark_invoice
+}
+
+// SparkInvoiceID returns the "spark_invoice" edge ID in the mutation.
+func (m *TransferMutation) SparkInvoiceID() (id uuid.UUID, exists bool) {
+	if m.spark_invoice != nil {
+		return *m.spark_invoice, true
+	}
+	return
+}
+
+// SparkInvoiceIDs returns the "spark_invoice" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// SparkInvoiceID instead. It exists only for internal usage by the builders.
+func (m *TransferMutation) SparkInvoiceIDs() (ids []uuid.UUID) {
+	if id := m.spark_invoice; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetSparkInvoice resets all changes to the "spark_invoice" edge.
+func (m *TransferMutation) ResetSparkInvoice() {
+	m.spark_invoice = nil
+	m.clearedspark_invoice = false
+}
+
 // Where appends a list predicates to the TransferMutation builder.
 func (m *TransferMutation) Where(ps ...predicate.Transfer) {
 	m.predicates = append(m.predicates, ps...)
@@ -18112,12 +18236,15 @@ func (m *TransferMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *TransferMutation) AddedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.transfer_leaves != nil {
 		edges = append(edges, transfer.EdgeTransferLeaves)
 	}
 	if m.payment_intent != nil {
 		edges = append(edges, transfer.EdgePaymentIntent)
+	}
+	if m.spark_invoice != nil {
+		edges = append(edges, transfer.EdgeSparkInvoice)
 	}
 	return edges
 }
@@ -18136,13 +18263,17 @@ func (m *TransferMutation) AddedIDs(name string) []ent.Value {
 		if id := m.payment_intent; id != nil {
 			return []ent.Value{*id}
 		}
+	case transfer.EdgeSparkInvoice:
+		if id := m.spark_invoice; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *TransferMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.removedtransfer_leaves != nil {
 		edges = append(edges, transfer.EdgeTransferLeaves)
 	}
@@ -18165,12 +18296,15 @@ func (m *TransferMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *TransferMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.clearedtransfer_leaves {
 		edges = append(edges, transfer.EdgeTransferLeaves)
 	}
 	if m.clearedpayment_intent {
 		edges = append(edges, transfer.EdgePaymentIntent)
+	}
+	if m.clearedspark_invoice {
+		edges = append(edges, transfer.EdgeSparkInvoice)
 	}
 	return edges
 }
@@ -18183,6 +18317,8 @@ func (m *TransferMutation) EdgeCleared(name string) bool {
 		return m.clearedtransfer_leaves
 	case transfer.EdgePaymentIntent:
 		return m.clearedpayment_intent
+	case transfer.EdgeSparkInvoice:
+		return m.clearedspark_invoice
 	}
 	return false
 }
@@ -18193,6 +18329,9 @@ func (m *TransferMutation) ClearEdge(name string) error {
 	switch name {
 	case transfer.EdgePaymentIntent:
 		m.ClearPaymentIntent()
+		return nil
+	case transfer.EdgeSparkInvoice:
+		m.ClearSparkInvoice()
 		return nil
 	}
 	return fmt.Errorf("unknown Transfer unique edge %s", name)
@@ -18207,6 +18346,9 @@ func (m *TransferMutation) ResetEdge(name string) error {
 		return nil
 	case transfer.EdgePaymentIntent:
 		m.ResetPaymentIntent()
+		return nil
+	case transfer.EdgeSparkInvoice:
+		m.ResetSparkInvoice()
 		return nil
 	}
 	return fmt.Errorf("unknown Transfer edge %s", name)

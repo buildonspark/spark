@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	"github.com/lightsparkdev/spark/so/ent/transfer"
 )
 
 // SparkInvoiceUpdate is the builder for updating SparkInvoice entities.
@@ -51,6 +52,21 @@ func (siu *SparkInvoiceUpdate) AddTokenTransaction(t ...*TokenTransaction) *Spar
 	return siu.AddTokenTransactionIDs(ids...)
 }
 
+// AddTransferIDs adds the "transfer" edge to the Transfer entity by IDs.
+func (siu *SparkInvoiceUpdate) AddTransferIDs(ids ...uuid.UUID) *SparkInvoiceUpdate {
+	siu.mutation.AddTransferIDs(ids...)
+	return siu
+}
+
+// AddTransfer adds the "transfer" edges to the Transfer entity.
+func (siu *SparkInvoiceUpdate) AddTransfer(t ...*Transfer) *SparkInvoiceUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return siu.AddTransferIDs(ids...)
+}
+
 // Mutation returns the SparkInvoiceMutation object of the builder.
 func (siu *SparkInvoiceUpdate) Mutation() *SparkInvoiceMutation {
 	return siu.mutation
@@ -75,6 +91,27 @@ func (siu *SparkInvoiceUpdate) RemoveTokenTransaction(t ...*TokenTransaction) *S
 		ids[i] = t[i].ID
 	}
 	return siu.RemoveTokenTransactionIDs(ids...)
+}
+
+// ClearTransfer clears all "transfer" edges to the Transfer entity.
+func (siu *SparkInvoiceUpdate) ClearTransfer() *SparkInvoiceUpdate {
+	siu.mutation.ClearTransfer()
+	return siu
+}
+
+// RemoveTransferIDs removes the "transfer" edge to Transfer entities by IDs.
+func (siu *SparkInvoiceUpdate) RemoveTransferIDs(ids ...uuid.UUID) *SparkInvoiceUpdate {
+	siu.mutation.RemoveTransferIDs(ids...)
+	return siu
+}
+
+// RemoveTransfer removes "transfer" edges to Transfer entities.
+func (siu *SparkInvoiceUpdate) RemoveTransfer(t ...*Transfer) *SparkInvoiceUpdate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return siu.RemoveTransferIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -173,6 +210,51 @@ func (siu *SparkInvoiceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if siu.mutation.TransferCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   sparkinvoice.TransferTable,
+			Columns: []string{sparkinvoice.TransferColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := siu.mutation.RemovedTransferIDs(); len(nodes) > 0 && !siu.mutation.TransferCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   sparkinvoice.TransferTable,
+			Columns: []string{sparkinvoice.TransferColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := siu.mutation.TransferIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   sparkinvoice.TransferTable,
+			Columns: []string{sparkinvoice.TransferColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, siu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{sparkinvoice.Label}
@@ -214,6 +296,21 @@ func (siuo *SparkInvoiceUpdateOne) AddTokenTransaction(t ...*TokenTransaction) *
 	return siuo.AddTokenTransactionIDs(ids...)
 }
 
+// AddTransferIDs adds the "transfer" edge to the Transfer entity by IDs.
+func (siuo *SparkInvoiceUpdateOne) AddTransferIDs(ids ...uuid.UUID) *SparkInvoiceUpdateOne {
+	siuo.mutation.AddTransferIDs(ids...)
+	return siuo
+}
+
+// AddTransfer adds the "transfer" edges to the Transfer entity.
+func (siuo *SparkInvoiceUpdateOne) AddTransfer(t ...*Transfer) *SparkInvoiceUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return siuo.AddTransferIDs(ids...)
+}
+
 // Mutation returns the SparkInvoiceMutation object of the builder.
 func (siuo *SparkInvoiceUpdateOne) Mutation() *SparkInvoiceMutation {
 	return siuo.mutation
@@ -238,6 +335,27 @@ func (siuo *SparkInvoiceUpdateOne) RemoveTokenTransaction(t ...*TokenTransaction
 		ids[i] = t[i].ID
 	}
 	return siuo.RemoveTokenTransactionIDs(ids...)
+}
+
+// ClearTransfer clears all "transfer" edges to the Transfer entity.
+func (siuo *SparkInvoiceUpdateOne) ClearTransfer() *SparkInvoiceUpdateOne {
+	siuo.mutation.ClearTransfer()
+	return siuo
+}
+
+// RemoveTransferIDs removes the "transfer" edge to Transfer entities by IDs.
+func (siuo *SparkInvoiceUpdateOne) RemoveTransferIDs(ids ...uuid.UUID) *SparkInvoiceUpdateOne {
+	siuo.mutation.RemoveTransferIDs(ids...)
+	return siuo
+}
+
+// RemoveTransfer removes "transfer" edges to Transfer entities.
+func (siuo *SparkInvoiceUpdateOne) RemoveTransfer(t ...*Transfer) *SparkInvoiceUpdateOne {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return siuo.RemoveTransferIDs(ids...)
 }
 
 // Where appends a list predicates to the SparkInvoiceUpdate builder.
@@ -359,6 +477,51 @@ func (siuo *SparkInvoiceUpdateOne) sqlSave(ctx context.Context) (_node *SparkInv
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(tokentransaction.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if siuo.mutation.TransferCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   sparkinvoice.TransferTable,
+			Columns: []string{sparkinvoice.TransferColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := siuo.mutation.RemovedTransferIDs(); len(nodes) > 0 && !siuo.mutation.TransferCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   sparkinvoice.TransferTable,
+			Columns: []string{sparkinvoice.TransferColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := siuo.mutation.TransferIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   sparkinvoice.TransferTable,
+			Columns: []string{sparkinvoice.TransferColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
