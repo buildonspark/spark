@@ -33,7 +33,7 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 		h.handleCancelTransferGossipMessage(ctx, cancelTransfer)
 	case *pbgossip.GossipMessage_SettleSenderKeyTweak:
 		settleSenderKeyTweak := gossipMessage.GetSettleSenderKeyTweak()
-		h.handleSettleSenderKeyTweakGossipMessage(ctx, settleSenderKeyTweak, forCoordinator)
+		h.handleSettleSenderKeyTweakGossipMessage(ctx, settleSenderKeyTweak)
 	case *pbgossip.GossipMessage_RollbackTransfer:
 		rollbackTransfer := gossipMessage.GetRollbackTransfer()
 		h.handleRollbackTransfer(ctx, rollbackTransfer)
@@ -74,9 +74,9 @@ func (h *GossipHandler) handleCancelTransferGossipMessage(ctx context.Context, c
 	}
 }
 
-func (h *GossipHandler) handleSettleSenderKeyTweakGossipMessage(ctx context.Context, settleSenderKeyTweak *pbgossip.GossipMessageSettleSenderKeyTweak, forCoordinator bool) {
+func (h *GossipHandler) handleSettleSenderKeyTweakGossipMessage(ctx context.Context, settleSenderKeyTweak *pbgossip.GossipMessageSettleSenderKeyTweak) {
 	transferHandler := NewBaseTransferHandler(h.config)
-	_, err := transferHandler.CommitSenderKeyTweaks(ctx, settleSenderKeyTweak.TransferId, settleSenderKeyTweak.SenderKeyTweakProofs, forCoordinator)
+	_, err := transferHandler.CommitSenderKeyTweaks(ctx, settleSenderKeyTweak.TransferId, settleSenderKeyTweak.SenderKeyTweakProofs)
 	if err != nil {
 		// If there's an error, it's still considered the message is delivered successfully.
 		logger := logging.GetLoggerFromContext(ctx)

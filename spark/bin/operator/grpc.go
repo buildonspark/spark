@@ -20,6 +20,7 @@ import (
 	"github.com/lightsparkdev/spark/so/dkg"
 	"github.com/lightsparkdev/spark/so/ent"
 	sparkgrpc "github.com/lightsparkdev/spark/so/grpc"
+	events "github.com/lightsparkdev/spark/so/stream"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
@@ -33,6 +34,7 @@ func RegisterGrpcServers(
 	frostClient *grpc.ClientConn,
 	sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier,
 	mockAction *common.MockAction,
+	eventsRouter *events.EventRouter,
 ) error {
 	if mockAction != nil {
 		mockServer := sparkgrpc.NewMockServer(config, mockAction, dbClient)
@@ -49,7 +51,7 @@ func RegisterGrpcServers(
 	pbinternal.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)
 
 	// Public SO endpoint
-	sparkServer := sparkgrpc.NewSparkServer(config, mockAction)
+	sparkServer := sparkgrpc.NewSparkServer(config, mockAction, eventsRouter)
 	pbspark.RegisterSparkServiceServer(grpcServer, sparkServer)
 
 	// Public SO token endpoint

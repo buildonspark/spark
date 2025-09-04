@@ -37,7 +37,6 @@ import (
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/objects"
-	events "github.com/lightsparkdev/spark/so/stream"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
@@ -1159,7 +1158,6 @@ func (h *TransferHandler) FinalizeTransfer(ctx context.Context, req *pb.Finalize
 	ctx, span := tracer.Start(ctx, "TransferHandler.FinalizeTransfer")
 	defer span.End()
 
-	logger := logging.GetLoggerFromContext(ctx)
 	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid identity public key: %w", err)
@@ -1215,21 +1213,6 @@ func (h *TransferHandler) FinalizeTransfer(ctx context.Context, req *pb.Finalize
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
-	}
-	eventRouter := events.GetDefaultRouter()
-	receiverIDPubKey, err := keys.ParsePublicKey(transfer.ReceiverIdentityPubkey)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse receiver identity public key: %w", err)
-	}
-	err = eventRouter.NotifyUser(receiverIDPubKey, &pb.SubscribeToEventsResponse{
-		Event: &pb.SubscribeToEventsResponse_Transfer{
-			Transfer: &pb.TransferEvent{
-				Transfer: transferProto,
-			},
-		},
-	})
-	if err != nil {
-		logger.Error("failed to notify user about transfer event", "error", err, "identity_public_key", receiverIDPubKey)
 	}
 
 	return &pb.FinalizeTransferResponse{Transfer: transferProto}, nil
@@ -1338,7 +1321,7 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 		if err != nil {
 			return nil, fmt.Errorf("failed to load transfer for update: %w", err)
 		}
-		transfer, err = h.commitSenderKeyTweaks(ctx, transfer, true)
+		transfer, err = h.commitSenderKeyTweaks(ctx, transfer)
 		if err != nil {
 			// Too bad, at this point there's a bug where all other SOs has tweaked the key but
 			// the coordinator failed so the fund is lost.
@@ -2506,29 +2489,9 @@ func (h *TransferHandler) ResumeSendTransfer(ctx context.Context, transfer *ent.
 	err := h.settleSenderKeyTweaks(ctx, transfer.ID.String(), pbinternal.SettleKeyTweakAction_COMMIT)
 	if err == nil {
 		// If there's no error, it means all SOs have tweaked the key. The coordinator can tweak the key here.
-		transfer, err = h.commitSenderKeyTweaks(ctx, transfer, false)
+		transfer, err = h.commitSenderKeyTweaks(ctx, transfer)
 		if err != nil {
 			return err
-		}
-		transferProto, err := transfer.MarshalProto(ctx)
-		if err != nil {
-			return fmt.Errorf("unable to marshal transfer %s: %w", transfer.ID.String(), err)
-		}
-
-		receiverIDPubKey, err := keys.ParsePublicKey(transfer.ReceiverIdentityPubkey)
-		if err != nil {
-			return fmt.Errorf("unable to parse receiver identity public key: %w", err)
-		}
-		eventRouter := events.GetDefaultRouter()
-		err = eventRouter.NotifyUser(receiverIDPubKey, &pb.SubscribeToEventsResponse{
-			Event: &pb.SubscribeToEventsResponse_Transfer{
-				Transfer: &pb.TransferEvent{
-					Transfer: transferProto,
-				},
-			},
-		})
-		if err != nil {
-			logger.Error("failed to notify user about transfer event", "error", err, "identity_public_key", receiverIDPubKey)
 		}
 	}
 

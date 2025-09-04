@@ -42,6 +42,7 @@ import (
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/middleware"
+	events "github.com/lightsparkdev/spark/so/stream"
 	"github.com/lightsparkdev/spark/so/task"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -490,6 +491,12 @@ func main() {
 		concurrencyGuard = &sparkgrpc.NoopResourceLimiter{}
 	}
 
+	var eventsRouter *events.EventRouter
+	if config.Database.DBEventsEnabled != nil && *config.Database.DBEventsEnabled {
+		eventsLogger := slog.Default().With("component", "events_router")
+		eventsRouter = events.NewEventRouter(dbClient, dbEvents, eventsLogger)
+	}
+
 	// Add Interceptors aka gRPC middleware
 	//
 	// Interceptors wrap RPC handlers so we can apply cross‑cutting concerns in one place
@@ -574,6 +581,7 @@ func main() {
 		frostConnection,
 		sessionTokenCreatorVerifier,
 		mockAction,
+		eventsRouter,
 	)
 	if err != nil {
 		log.Fatalf("Failed to register all gRPC servers: %v", err)

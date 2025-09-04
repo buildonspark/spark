@@ -36,7 +36,6 @@ import (
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
-	events "github.com/lightsparkdev/spark/so/stream"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -1095,7 +1094,7 @@ func (h *BaseTransferHandler) validateKeyTweakProofs(ctx context.Context, transf
 	return nil
 }
 
-func (h *BaseTransferHandler) CommitSenderKeyTweaks(ctx context.Context, transferID string, senderKeyTweakProofs map[string]*pbspark.SecretProof, notify bool) (*ent.Transfer, error) {
+func (h *BaseTransferHandler) CommitSenderKeyTweaks(ctx context.Context, transferID string, senderKeyTweakProofs map[string]*pbspark.SecretProof) (*ent.Transfer, error) {
 	transfer, err := h.loadTransferForUpdate(ctx, transferID)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load transfer: %w", err)
@@ -1106,10 +1105,10 @@ func (h *BaseTransferHandler) CommitSenderKeyTweaks(ctx context.Context, transfe
 		logger.Error("unable to validate key tweak proofs", "error", err, "transfer_id", transferID)
 		return nil, err
 	}
-	return h.commitSenderKeyTweaks(ctx, transfer, notify)
+	return h.commitSenderKeyTweaks(ctx, transfer)
 }
 
-func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfer *ent.Transfer, notify bool) (*ent.Transfer, error) {
+func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfer *ent.Transfer) (*ent.Transfer, error) {
 	transfer, err := h.loadTransferForUpdate(ctx, transfer.ID.String())
 	if err != nil {
 		return nil, fmt.Errorf("unable to load transfer: %w", err)
@@ -1160,28 +1159,5 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 		return nil, fmt.Errorf("unable to update transfer status: %w", err)
 	}
 
-	if notify {
-		logger.Info("Notifying user of transfer event", "transferId", transfer.ID)
-		transferProto, err := transfer.MarshalProto(ctx)
-		if err != nil {
-			logger.Error("unable to marshal transfer", "error", err, "transfer_id", transfer.ID)
-		}
-
-		receiverIDPubKey, err := keys.ParsePublicKey(transfer.ReceiverIdentityPubkey)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse receiver identity public key: %w", err)
-		}
-		eventRouter := events.GetDefaultRouter()
-		err = eventRouter.NotifyUser(receiverIDPubKey, &pb.SubscribeToEventsResponse{
-			Event: &pb.SubscribeToEventsResponse_Transfer{
-				Transfer: &pb.TransferEvent{
-					Transfer: transferProto,
-				},
-			},
-		})
-		if err != nil {
-			logger.Error("failed to notify user about transfer event", "error", err, "identity_public_key", receiverIDPubKey)
-		}
-	}
 	return transfer, nil
 }

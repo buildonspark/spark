@@ -2,15 +2,16 @@ package events
 
 import (
 	"context"
+	"log/slog"
 	"math/rand/v2"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/db"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -63,7 +64,11 @@ func (m *MockStream) SetHeader(_ metadata.MD) error {
 func (m *MockStream) SetTrailer(_ metadata.MD) {}
 
 func TestEventRouterConcurrency(t *testing.T) {
-	router := NewEventRouter()
+	ctx, _, dbEvents := db.SetupDBEventsTestContext(t)
+	dbClient := ctx.Client
+
+	logger := slog.Default().With("component", "events_router")
+	router := NewEventRouter(dbClient, dbEvents, logger)
 	rng := rand.NewChaCha8([32]byte{})
 	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
@@ -74,7 +79,22 @@ func TestEventRouterConcurrency(t *testing.T) {
 		switch i % 3 {
 		case 0:
 			// Normal stream
-			return NewMockStream(t)
+			ctx, cancel := context.WithCancel(t.Context())
+			stream := &MockStream{ctx: ctx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
+
+			go func() {
+				for {
+					stream.mu.Lock()
+					if len(stream.messages) > 0 {
+						stream.mu.Unlock()
+						break
+					}
+					stream.mu.Unlock()
+				}
+				cancel()
+			}()
+			stream.messages = make([]*pb.SubscribeToEventsResponse, 0)
+			return stream
 		case 1:
 			// Stream that errors on send
 			return &MockStream{
@@ -99,7 +119,8 @@ func TestEventRouterConcurrency(t *testing.T) {
 		go func(idx int) {
 			defer wg.Done()
 			stream := makeStream(idx)
-			err := router.RegisterStream(identityKey, stream)
+
+			err := router.SubscribeToEvents(identityKey, stream)
 			if err != nil {
 				t.Errorf("Failed to register stream: %v", err)
 			}
@@ -111,36 +132,9 @@ func TestEventRouterConcurrency(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			msg := &pb.SubscribeToEventsResponse{}
-			_ = router.NotifyUser(identityKey, msg)
+			_ = router.notifyUser(identityKey, msg)
 		}()
 	}
 
 	wg.Wait()
-}
-
-func TestEventRouterLastStreamWins(t *testing.T) {
-	router := NewEventRouter()
-	rng := rand.NewChaCha8([32]byte{})
-	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-
-	stream1 := NewMockStream(t)
-	stream2 := NewMockStream(t)
-	stream3 := NewMockStream(t)
-
-	err := router.RegisterStream(identityKey, stream1)
-	require.NoError(t, err)
-	err = router.RegisterStream(identityKey, stream2)
-	require.NoError(t, err)
-	err = router.RegisterStream(identityKey, stream3)
-	require.NoError(t, err)
-
-	testMsg := &pb.SubscribeToEventsResponse{}
-	_ = router.NotifyUser(identityKey, testMsg)
-
-	if len(stream1.messages) > 0 || len(stream2.messages) > 0 {
-		t.Error("Previous streams should not receive messages")
-	}
-	if len(stream3.messages) == 0 {
-		t.Error("Last stream should receive messages")
-	}
 }

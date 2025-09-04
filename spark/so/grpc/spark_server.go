@@ -31,13 +31,14 @@ type SparkServer struct {
 	// ResourceGuard to limit concurrent ClaimTransferSignRefunds calls for the same transfer ID. This
 	// is already enforced through row locking, but is more to prevent unnecessary load on the DB.
 	claimTransferSignRefundsTransferGuard limiter.ResourceGuard
+	eventsRouter                          *events.EventRouter
 }
 
 var emptyResponse = &emptypb.Empty{}
 
 // NewSparkServer creates a new SparkServer.
-func NewSparkServer(config *so.Config, mockAction *common.MockAction) *SparkServer {
-	return &SparkServer{config: config, mockAction: mockAction, claimTransferSignRefundsTransferGuard: limiter.NewResourceGuard()}
+func NewSparkServer(config *so.Config, mockAction *common.MockAction, eventsRouter *events.EventRouter) *SparkServer {
+	return &SparkServer{config: config, mockAction: mockAction, claimTransferSignRefundsTransferGuard: limiter.NewResourceGuard(), eventsRouter: eventsRouter}
 }
 
 // GenerateDepositAddress generates a deposit address for the given public key.
@@ -535,7 +536,12 @@ func (s *SparkServer) SubscribeToEvents(req *pb.SubscribeToEventsRequest, st pb.
 	if err != nil {
 		return fmt.Errorf("invalid identity public key: %w", err)
 	}
-	return events.SubscribeToEvents(idPubKey, st)
+
+	if s.eventsRouter == nil {
+		return nil
+	}
+
+	return s.eventsRouter.SubscribeToEvents(idPubKey, st)
 }
 
 // InitiateUtxoSwap swaps a Spark tree node in exchange for a UTXO.
