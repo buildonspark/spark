@@ -164,10 +164,10 @@ func (e *DBEvents) AddListeners(subscriptions []Subscription) (chan EventData, f
 							channelSlice = append(channelSlice[:i], channelSlice[i+1:]...)
 
 							if len(channelSlice) == 0 {
-								delete(e.listeners, subscription.EventName)
+								delete(channels, listenerKey)
 
 								if len(channels) == 0 {
-									delete(channels, listenerKey)
+									delete(e.listeners, subscription.EventName)
 									e.channelChanges = append(e.channelChanges, channelChange{
 										channel:   subscription.EventName,
 										operation: "unlisten",
