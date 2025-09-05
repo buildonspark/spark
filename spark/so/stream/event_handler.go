@@ -242,7 +242,6 @@ func (s *EventRouter) removeStream(identityPublicKey keys.Public, stream pb.Spar
 	mutex.(*sync.Mutex).Lock()
 	defer mutex.(*sync.Mutex).Unlock()
 
-	// Remove this specific stream
 	if existingStreams, exists := s.streams.Load(identityPublicKey); exists {
 		streams := existingStreams.([]pb.SparkService_SubscribeToEventsServer)
 
@@ -257,11 +256,13 @@ func (s *EventRouter) removeStream(identityPublicKey keys.Public, stream pb.Spar
 			s.streams.Delete(identityPublicKey)
 			s.mutexes.Delete(identityPublicKey)
 
+			s.mu.Lock()
 			if eventListener, exists := s.listeners[identityPublicKey]; exists {
 				eventListener.cleanup()
 			}
 
 			delete(s.listeners, identityPublicKey)
+			s.mu.Unlock()
 		} else {
 			s.streams.Store(identityPublicKey, newStreams)
 		}
