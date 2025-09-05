@@ -101,12 +101,12 @@ func (s *EventRouter) RegisterStream(identityPublicKey keys.Public, stream pb.Sp
 }
 
 func (s *EventRouter) createNotificationChannel(identityPublicKey keys.Public) chan db.EventData {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if channel, ok := s.listeners[identityPublicKey]; ok {
 		return channel.channel
 	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	notificationChan, cleanup := s.dbEvents.AddListeners([]db.Subscription{
 		{
