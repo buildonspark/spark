@@ -171,7 +171,8 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 		query = query.Where(tokenoutput.TokenIdentifierIn(params.TokenIdentifiers...))
 	}
 
-	outputs, err := query.WithOutputCreatedTokenTransaction().All(ctx)
+	// TODO: Remove limit once we have a way to paginate the results
+	outputs, err := query.Limit(500).WithOutputCreatedTokenTransaction().All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query owned outputs: %w", err)
 	}
