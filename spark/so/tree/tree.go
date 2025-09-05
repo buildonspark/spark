@@ -57,3 +57,42 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 	logger.Sugar().Infof("Leaf count (leaves: %d, public key: %x)", len(leaves), ownerIdentityPubKey)
 	return &pb.GetLeafDenominationCountsResponse{Counts: counts}, nil
 }
+
+// Marks exiting nodes with a proper status and confirmation height in batch update query to the DB.
+// It takes a list of confirmed in a bitcoin block txids and sends it to Postgres to update the tree nodes that have those txids.
+func MarkExitingNodes(ctx context.Context, dbTx *ent.Tx, confirmedTxHashSet map[[32]byte]bool, blockHeight int64) error {
+	logger := logging.GetLoggerFromContext(ctx)
+
+	confirmedTxids := make([][]byte, 0, len(confirmedTxHashSet))
+	for txid := range confirmedTxHashSet {
+		confirmedTxids = append(confirmedTxids, txid[:])
+	}
+
+	// The state goes from OnChain to Exited, so we need to mark the nodes as OnChain first.
+	count, err := dbTx.TreeNode.Update().SetStatus(st.TreeNodeStatusOnChain).
+		SetNodeConfirmationHeight(uint64(blockHeight)).
+		Where(treenode.Or(
+			treenode.RawTxidIn(confirmedTxids...),
+			treenode.DirectTxidIn(confirmedTxids...),
+		)).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to mark exiting nodes as on chain: %w", err)
+	}
+	logger.Sugar().Infof("MarkExitingNodes: marked %d nodes as %v at block height %d", count, st.TreeNodeStatusOnChain, blockHeight)
+
+	count, err = dbTx.TreeNode.Update().SetStatus(st.TreeNodeStatusExited).
+		SetRefundConfirmationHeight(uint64(blockHeight)).
+		Where(treenode.Or(
+			treenode.RawRefundTxidIn(confirmedTxids...),
+			treenode.DirectRefundTxidIn(confirmedTxids...),
+			treenode.DirectFromCpfpRefundTxidIn(confirmedTxids...),
+		)).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to mark exiting nodes as exited: %w", err)
+	}
+	logger.Sugar().Infof("MarkExitingNodes: marked %d nodes as %v at block height %d", count, st.TreeNodeStatusExited, blockHeight)
+
+	return nil
+}

@@ -31,6 +31,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/tree"
 	"github.com/lightsparkdev/spark/so/watchtower"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -471,7 +472,6 @@ func handleBlock(
 			processNodesForWatchtowers = *bitcoinConfig.ProcessNodesForWatchtowers
 		}
 	}
-
 	if processNodesForWatchtowers {
 		logger.Sugar().Infof("Started processing nodes for watchtowers at block height %d", blockHeight)
 		// Fetch only nodes that could have expired timelocks
@@ -479,138 +479,26 @@ func handleBlock(
 		if err != nil {
 			return fmt.Errorf("failed to query nodes: %w", err)
 		}
-
 		// Record number of eligible nodes for timelock checks
 		if eligibleNodesGauge != nil {
 			eligibleNodesGauge.Record(ctx, int64(len(nodes)), metric.WithAttributes(
 				attribute.String("network", network.String()),
 			))
 		}
-
 		for _, node := range nodes {
-			cpfpTx, err := common.TxFromRawTxBytes(node.RawTx)
-			if err != nil {
-				return fmt.Errorf("failed to parse node tx: %w", err)
-			}
-
-			cpfpTxid := cpfpTx.TxHash()
-			if confirmedTxHashSet[cpfpTxid] {
-				_, err = dbTx.TreeNode.UpdateOne(node).
-					SetNodeConfirmationHeight(uint64(blockHeight)).
-					SetStatus(st.TreeNodeStatusOnChain).
-					Save(ctx)
-				if err != nil {
-					return fmt.Errorf("failed to update node status: %w", err)
-				}
-				logger.Sugar().Infof(
-					"Updated tree node %s status to ON_CHAIN at block height %d (cpfp tx hash: %s)",
-					node.ID,
-					blockHeight,
-					cpfpTxid.String(),
-				)
-			}
-
-			if len(node.DirectTx) > 0 {
-				directTx, err := common.TxFromRawTxBytes(node.DirectTx)
-				if err != nil {
-					return fmt.Errorf("failed to parse direct node tx: %w", err)
-				}
-				directTxid := directTx.TxHash()
-				if confirmedTxHashSet[directTxid] {
-					_, err = dbTx.TreeNode.UpdateOne(node).
-						SetNodeConfirmationHeight(uint64(blockHeight)).
-						SetStatus(st.TreeNodeStatusOnChain).
-						Save(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to update node status: %w", err)
-					}
-					logger.Sugar().Infof(
-						"Updated tree node %s status to ON_CHAIN at block height %d (direct tx hash %s)",
-						node.ID,
-						blockHeight,
-						directTxid.String(),
-					)
-				}
-			}
-
-			if len(node.RawRefundTx) > 0 {
-				cpfpRefundTx, err := common.TxFromRawTxBytes(node.RawRefundTx)
-				if err != nil {
-					return fmt.Errorf("failed to parse cpfp refund tx: %w", err)
-				}
-
-				cpfpRefundTxid := cpfpRefundTx.TxHash()
-
-				if confirmedTxHashSet[cpfpRefundTxid] {
-					_, err = dbTx.TreeNode.UpdateOne(node).
-						SetRefundConfirmationHeight(uint64(blockHeight)).
-						SetStatus(st.TreeNodeStatusExited).
-						Save(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to update node refund status: %w", err)
-					}
-					logger.Sugar().Infof(
-						"Updated tree node %s status to EXITED at block height %d (refund tx hash: %s)",
-						node.ID,
-						blockHeight,
-						cpfpRefundTxid.String(),
-					)
-				}
-
-				if len(node.DirectRefundTx) > 0 {
-					directRefundTx, err := common.TxFromRawTxBytes(node.DirectRefundTx)
-					if err != nil {
-						return fmt.Errorf("failed to parse cpfp refund tx: %w", err)
-					}
-					directRefundTxid := directRefundTx.TxHash()
-					if confirmedTxHashSet[directRefundTxid] {
-						_, err = dbTx.TreeNode.UpdateOne(node).
-							SetRefundConfirmationHeight(uint64(blockHeight)).
-							SetStatus(st.TreeNodeStatusExited).
-							Save(ctx)
-						if err != nil {
-							return fmt.Errorf("failed to update node status: %w", err)
-						}
-						logger.Sugar().Infof(
-							"Updated tree node %s status to ON_CHAIN at block height %d (direct refund tx hash: %s)",
-							node.ID,
-							blockHeight,
-							directRefundTxid.String(),
-						)
-					}
-				}
-
-				if len(node.DirectFromCpfpRefundTx) > 0 {
-					directFromCpfpRefundTx, err := common.TxFromRawTxBytes(node.DirectFromCpfpRefundTx)
-					if err != nil {
-						return fmt.Errorf("failed to parse cpfp refund tx: %w", err)
-					}
-					directFromCpfpRefundTxid := directFromCpfpRefundTx.TxHash()
-					if confirmedTxHashSet[directFromCpfpRefundTxid] {
-						_, err = dbTx.TreeNode.UpdateOne(node).
-							SetRefundConfirmationHeight(uint64(blockHeight)).
-							SetStatus(st.TreeNodeStatusExited).
-							Save(ctx)
-						if err != nil {
-							return fmt.Errorf("failed to update node status: %w", err)
-						}
-						logger.Sugar().Info(
-							"Updated tree node %s status to ON_CHAIN at block height %d (direct from cpfp refund tx hash: %s)",
-							node.ID,
-							blockHeight,
-							directFromCpfpRefundTxid.String(),
-						)
-					}
-				}
-			}
-
-			// Check if node or refund TX timelock has expired
 			if err := watchtower.CheckExpiredTimeLocks(ctx, bitcoinClient, node, blockHeight, network); err != nil {
-				logger.Error("Failed to check expired time locks", zap.Error(err))
+				logger.Sugar().Errorf("Failed to check expired time locks for node %s: %w", node.ID.String(), err)
 			}
 		}
 	}
-	logger.Sugar().Infof("Started processing coop exits at block height %d", blockHeight)
+
+	logger.Sugar().Infof("Started processing confirmed transactions for exiting tree nodes", "height", blockHeight)
+	err = tree.MarkExitingNodes(ctx, dbTx, confirmedTxHashSet, blockHeight)
+	if err != nil {
+		return fmt.Errorf("failed to mark exiting nodes: %w", err)
+	}
+
+	logger.Sugar().Infof("Started processing coop exits", "height", blockHeight)
 	// TODO: expire pending coop exits after some time so this doesn't become too large
 	pendingCoopExits, err := dbTx.CooperativeExit.Query().Where(cooperativeexit.ConfirmationHeightIsNil()).All(ctx)
 	if err != nil {
