@@ -10,12 +10,12 @@ const TEST_UNILATERAL_TIMELOCK = 100;
 const TIME_LOCK_INTERVAL = 100;
 export const DIRECT_TIMELOCK_OFFSET = 50;
 
-export const INITIAL_SEQUENCE = (1 << 30) | INITIAL_TIMELOCK;
+export const INITIAL_SEQUENCE = INITIAL_TIMELOCK;
 export const INITIAL_DIRECT_SEQUENCE =
-  (1 << 30) | (INITIAL_TIMELOCK + DIRECT_TIMELOCK_OFFSET);
-export const TEST_UNILATERAL_SEQUENCE = (1 << 30) | TEST_UNILATERAL_TIMELOCK;
+  INITIAL_TIMELOCK + DIRECT_TIMELOCK_OFFSET;
+export const TEST_UNILATERAL_SEQUENCE = TEST_UNILATERAL_TIMELOCK;
 export const TEST_UNILATERAL_DIRECT_SEQUENCE =
-  (1 << 30) | (TEST_UNILATERAL_TIMELOCK + DIRECT_TIMELOCK_OFFSET);
+  TEST_UNILATERAL_TIMELOCK + DIRECT_TIMELOCK_OFFSET;
 
 // Default fee constants matching Go implementation
 const ESTIMATED_TX_SIZE = 191;
@@ -407,8 +407,8 @@ export function getTransactionSequence(currSequence?: number): {
 } {
   const timelock = getCurrentTimelock(currSequence);
   return {
-    nextSequence: (1 << 30) | timelock,
-    nextDirectSequence: (1 << 30) | (timelock + DIRECT_TIMELOCK_OFFSET),
+    nextSequence: timelock,
+    nextDirectSequence: timelock + DIRECT_TIMELOCK_OFFSET,
   };
 }
 
@@ -467,8 +467,8 @@ export function getNextTransactionSequence(
   }
 
   return {
-    nextSequence: (1 << 30) | nextTimelock,
-    nextDirectSequence: (1 << 30) | (nextTimelock + DIRECT_TIMELOCK_OFFSET),
+    nextSequence: nextTimelock,
+    nextDirectSequence: nextTimelock + DIRECT_TIMELOCK_OFFSET,
   };
 }
 
