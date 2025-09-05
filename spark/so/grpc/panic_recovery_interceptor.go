@@ -6,12 +6,11 @@ import (
 	"runtime/debug"
 
 	"github.com/lightsparkdev/spark/common/logging"
+	"github.com/lightsparkdev/spark/so/errors"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 var globalPanicCounter metric.Int64Counter
@@ -56,10 +55,10 @@ func PanicRecoveryInterceptor(returnDetailedPanicErrors bool) grpc.UnaryServerIn
 				if returnDetailedPanicErrors {
 					// Include details in testing/development
 					panicMsg := fmt.Sprintf("%v", r)
-					err = status.Errorf(codes.Internal, "Internal server error: %s", panicMsg)
+					err = errors.InternalErrorf("Internal server error: %s", panicMsg)
 				} else {
 					// Generic message for production
-					err = status.Error(codes.Internal, "Internal server error")
+					err = errors.InternalErrorf("Internal server error")
 				}
 				resp = nil
 			}
@@ -67,5 +66,34 @@ func PanicRecoveryInterceptor(returnDetailedPanicErrors bool) grpc.UnaryServerIn
 
 		// Pass the request on down the chain
 		return handler(ctx, req)
+	}
+}
+
+func PanicRecoveryStreamInterceptor() grpc.StreamServerInterceptor {
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) (err error) {
+		logger := logging.GetLoggerFromContext(ss.Context())
+
+		// Wrap the entire handler in a recover block
+		defer func() {
+			if r := recover(); r != nil {
+				stack := debug.Stack()
+				logger.Error("Panic in stream handler",
+					"panic", fmt.Sprintf("%v", r),
+					"stack", string(stack),
+				)
+
+				globalPanicCounter.Add(
+					ss.Context(),
+					1,
+					metric.WithAttributes(ParseFullMethod(info.FullMethod)...),
+				)
+
+				// Convert panic to error instead of re-panicking
+				err = errors.InternalErrorf("Internal server error")
+			}
+		}()
+
+		// Pass the request on down the chain
+		return handler(srv, ss)
 	}
 }
