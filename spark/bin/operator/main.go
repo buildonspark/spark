@@ -186,12 +186,12 @@ func loadArgs() (*args, error) {
 	return args, nil
 }
 
-func createRateLimiter(config *so.Config) (*middleware.RateLimiter, error) {
+func createRateLimiter(config *so.Config, opts ...middleware.RateLimiterOption) (*middleware.RateLimiter, error) {
 	if !config.RateLimiter.Enabled {
 		return nil, nil
 	}
 
-	return middleware.NewRateLimiter(config)
+	return middleware.NewRateLimiter(config, opts...)
 }
 
 type BufferedBody struct {
@@ -444,7 +444,7 @@ func main() {
 	slog.Info("Rate limiter config", "enabled", config.RateLimiter.Enabled, "window", config.RateLimiter.Window, "max_requests", config.RateLimiter.MaxRequests, "methods", config.RateLimiter.Methods)
 	if config.RateLimiter.Enabled {
 		var err error
-		rateLimiter, err = createRateLimiter(config)
+		rateLimiter, err = createRateLimiter(config, middleware.WithKnobs(knobsService))
 		if err != nil {
 			log.Fatalf("Failed to create rate limiter: %v", err)
 		}
