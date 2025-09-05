@@ -483,14 +483,7 @@ func main() {
 		Timeout: grpcKeepaliveTimeout,
 	}))
 
-	var concurrencyGuard sparkgrpc.ResourceLimiter
-	if config.GRPC.ServerConcurrencyLimitEnabled {
-		slog.Info("Concurrency limit enabled", "limit", config.GRPC.ServerConcurrencyLimit)
-		concurrencyGuard = sparkgrpc.NewConcurrencyGuard(knobsService, config.GRPC.ServerConcurrencyLimit)
-	} else {
-		slog.Info("Concurrency limit disabled")
-		concurrencyGuard = &sparkgrpc.NoopResourceLimiter{}
-	}
+	concurrencyGuard := sparkgrpc.NewConcurrencyGuard(knobsService, config.GRPC.ServerConcurrencyLimit)
 
 	var eventsRouter *events.EventRouter
 	if config.Database.DBEventsEnabled != nil && *config.Database.DBEventsEnabled {

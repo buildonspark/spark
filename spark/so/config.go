@@ -236,8 +236,6 @@ type GRPCConfig struct {
 	ClientTimeout time.Duration `yaml:"client_timeout"`
 	// ServerConcurrencyLimit controls the concurrency limit for unary RPC handlers.
 	ServerConcurrencyLimit int `yaml:"server_concurrency_limit"`
-	// ServerConcurrencyLimitEnabled controls if the concurrency limit is enabled.
-	ServerConcurrencyLimitEnabled bool `yaml:"server_concurrency_limit_enabled"`
 }
 
 type DatabaseConfig struct {
