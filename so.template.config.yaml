@@ -30,6 +30,8 @@ grpc:
   # < 0 means disable timeouts
   # > 0 means enable timeouts with the specified value
   client_timeout: 20s
+  # Concurrency limit for incoming gRPC requests overall
+  server_concurrency_limit: 0
 
 lrc20:
   regtest:

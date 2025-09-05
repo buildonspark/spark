@@ -18,54 +18,76 @@ import (
 func TestConcurrencyGuard_Acquire_WithinLimit(t *testing.T) {
 	tests := []struct {
 		name         string
-		defaultLimit int
 		targetLimit  *float64
 		target       string
 		acquisitions int
+		methodLimit  map[string]int64
+		globalLimit  int64
 	}{
 		{
-			name:         "default limit - within bounds",
-			defaultLimit: 5,
+			name:         "method limit - within bounds",
+			methodLimit:  map[string]int64{"/test.Service/TestMethod": 3},
+			acquisitions: 2,
+			globalLimit:  10,
+		},
+		{
+			name:         "method limit - at bounds",
+			methodLimit:  map[string]int64{"/test.Service/TestMethod": 3},
 			acquisitions: 3,
+			globalLimit:  10,
 		},
 		{
-			name:         "default limit - at bounds",
-			defaultLimit: 3,
-			acquisitions: 3,
+			name:         "method limit - zero limit - unlimited",
+			methodLimit:  map[string]int64{"/test.Service/TestMethod": 0},
+			acquisitions: 2,
+			globalLimit:  10,
 		},
 		{
-			name:         "zero limit - unlimited",
-			defaultLimit: 5,
-			targetLimit:  floatPtr(0),
+			name:         "method limit - negative limit - unlimited",
+			methodLimit:  map[string]int64{"/test.Service/TestMethod": -1},
 			acquisitions: 1,
+			globalLimit:  10,
 		},
 		{
-			name:         "negative limit - default limit",
-			defaultLimit: 5,
-			targetLimit:  floatPtr(-1),
+			name:         "global limit - within limit",
+			methodLimit:  map[string]int64{"/test.Service/TestMethod": -1},
 			acquisitions: 1,
+			globalLimit:  2,
+		},
+		{
+			name:         "global limit - at limit",
+			methodLimit:  map[string]int64{"/test.Service/TestMethod": -1},
+			acquisitions: 2,
+			globalLimit:  2,
+		},
+		{
+			name:         "global limit - unlimited",
+			methodLimit:  map[string]int64{"/test.Service/TestMethod": -1},
+			acquisitions: 2,
+			globalLimit:  0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			knobValues := map[string]float64{}
-			if tt.targetLimit != nil {
-				knobValues[knobs.KnobGrpcServerConcurrencyLimitLimit] = *tt.targetLimit
+			if tt.methodLimit != nil {
+				for method, limit := range tt.methodLimit {
+					knobValues[fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitMethods, method)] = float64(limit)
+				}
 			}
 			mockKnobs := knobs.NewFixedKnobs(knobValues)
-
-			guard := NewConcurrencyGuard(mockKnobs, tt.defaultLimit)
+			guard := NewConcurrencyGuard(mockKnobs, tt.globalLimit)
 
 			// Acquire multiple times
 			for i := 0; i < tt.acquisitions; i++ {
-				err := guard.TryAcquire()
+				err := guard.TryAcquireMethod("/test.Service/TestMethod")
 				require.NoError(t, err)
 			}
 
 			// Verify internal state
 			concurrencyGuard := guard.(*ConcurrencyGuard)
-			require.Equal(t, int64(tt.acquisitions), concurrencyGuard.current)
+			require.Equal(t, int64(tt.acquisitions), concurrencyGuard.counterMap["/test.Service/TestMethod"])
 		})
 	}
 }
@@ -73,48 +95,39 @@ func TestConcurrencyGuard_Acquire_WithinLimit(t *testing.T) {
 func TestConcurrencyGuard_AcquireTarget_ExceedsLimit(t *testing.T) {
 	tests := []struct {
 		name         string
-		defaultLimit int
-		targetLimit  *float64
 		target       string
 		acquisitions int
+		methodLimit  map[string]int64
+		globalLimit  int64
 	}{
 		{
-			name:         "default limit exceeded",
-			defaultLimit: 3,
+			name:         "method limit exceeded - beyond bounds",
+			methodLimit:  map[string]int64{"/test.Service/TestMethod": 3},
 			acquisitions: 4,
+			globalLimit:  10,
 		},
 		{
-			name:         "negative limit - default limit",
-			defaultLimit: 2,
-			targetLimit:  floatPtr(-1),
-			acquisitions: 3,
+			name:         "global limit exceeded",
+			methodLimit:  map[string]int64{"/test.Service/TestMethod": -1},
+			acquisitions: 2,
+			globalLimit:  1,
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			knobValues := map[string]float64{}
-			if tt.targetLimit != nil {
-				knobValues[knobs.KnobGrpcServerConcurrencyLimitLimit] = *tt.targetLimit
+			if tt.methodLimit != nil {
+				for method, limit := range tt.methodLimit {
+					knobValues[fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitMethods, method)] = float64(limit)
+				}
 			}
 			mockKnobs := knobs.NewFixedKnobs(knobValues)
+			guard := NewConcurrencyGuard(mockKnobs, tt.globalLimit)
 
-			guard := NewConcurrencyGuard(mockKnobs, tt.defaultLimit)
-
-			// Acquire up to limit
-			limit := tt.defaultLimit
-			if tt.targetLimit != nil && *tt.targetLimit > 0 {
-				limit = int(*tt.targetLimit)
+			var err error
+			for i := 0; i < tt.acquisitions; i++ {
+				err = guard.TryAcquireMethod("/test.Service/TestMethod")
 			}
-
-			// Acquire within limit first
-			for i := 0; i < limit; i++ {
-				err := guard.TryAcquire()
-				require.NoError(t, err)
-			}
-
-			// This should fail
-			err := guard.TryAcquire()
 			require.Error(t, err)
 
 			st, ok := status.FromError(err)
@@ -127,41 +140,41 @@ func TestConcurrencyGuard_AcquireTarget_ExceedsLimit(t *testing.T) {
 func TestConcurrencyGuard_Release(t *testing.T) {
 	t.Run("normal release", func(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
-		guard := NewConcurrencyGuard(mockKnobs, 5)
+		guard := NewConcurrencyGuard(mockKnobs, 10)
 
 		// Acquire some resources
 		for i := 0; i < 3; i++ {
-			err := guard.TryAcquire()
+			err := guard.TryAcquireMethod("TestMethod")
 			require.NoError(t, err)
 		}
 
 		// Verify current count
 		concurrencyGuard := guard.(*ConcurrencyGuard)
-		assert.Equal(t, int64(3), concurrencyGuard.current)
+		assert.Equal(t, int64(3), concurrencyGuard.counterMap["TestMethod"])
 
 		// Release resources
 		for i := 0; i < 3; i++ {
-			guard.Release()
+			guard.ReleaseMethod("TestMethod")
 		}
 
 		// Verify count is back to zero
-		assert.Equal(t, int64(0), concurrencyGuard.current)
+		assert.Equal(t, int64(0), concurrencyGuard.counterMap["TestMethod"])
 
 		// Release again to verify it doesn't go negative
-		guard.Release()
-		assert.Equal(t, int64(0), concurrencyGuard.current)
+		guard.ReleaseMethod("TestMethod")
+		assert.Equal(t, int64(0), concurrencyGuard.counterMap["TestMethod"])
 	})
 
 	t.Run("release can not go negative", func(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
-		guard := NewConcurrencyGuard(mockKnobs, 5)
+		guard := NewConcurrencyGuard(mockKnobs, 10)
 
 		// Release without acquiring - this will make counter negative
-		guard.Release()
+		guard.ReleaseMethod("TestMethod")
 
 		// Verify counter is still 0
 		concurrencyGuard := guard.(*ConcurrencyGuard)
-		assert.Equal(t, int64(0), concurrencyGuard.current)
+		assert.Equal(t, int64(0), concurrencyGuard.counterMap["TestMethod"])
 
 	})
 }
@@ -184,7 +197,7 @@ func TestConcurrencyGuard_ConcurrentAccess(t *testing.T) {
 
 			for j := 0; j < numOperationsPerGoroutine; j++ {
 				// Acquire
-				err := guard.TryAcquire()
+				err := guard.TryAcquireMethod("TestMethod")
 				if err != nil {
 					errors[idx] = err
 					return
@@ -194,7 +207,7 @@ func TestConcurrencyGuard_ConcurrentAccess(t *testing.T) {
 				time.Sleep(time.Microsecond)
 
 				// Release
-				guard.Release()
+				guard.ReleaseMethod("TestMethod")
 			}
 		}(i)
 	}
@@ -210,13 +223,13 @@ func TestConcurrencyGuard_ConcurrentAccess(t *testing.T) {
 
 	// Verify final state
 	concurrencyGuard := guard.(*ConcurrencyGuard)
-	assert.Equal(t, int64(0), concurrencyGuard.current, "Final count should be zero after all releases")
+	assert.Equal(t, int64(0), concurrencyGuard.counterMap["TestMethod"], "Final count should be zero after all releases")
 }
 
 func TestConcurrencyInterceptor(t *testing.T) {
 	t.Run("successful request within limit", func(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
-		guard := NewConcurrencyGuard(mockKnobs, 5)
+		guard := NewConcurrencyGuard(mockKnobs, 1)
 		interceptor := ConcurrencyInterceptor(guard)
 
 		called := false
@@ -237,7 +250,7 @@ func TestConcurrencyInterceptor(t *testing.T) {
 
 		// Verify resource was released
 		concurrencyGuard := guard.(*ConcurrencyGuard)
-		assert.Equal(t, int64(0), concurrencyGuard.current)
+		assert.Equal(t, int64(0), concurrencyGuard.counterMap["TestMethod"])
 	})
 
 	t.Run("request exceeding limit", func(t *testing.T) {
@@ -246,7 +259,7 @@ func TestConcurrencyInterceptor(t *testing.T) {
 		interceptor := ConcurrencyInterceptor(guard)
 
 		// First acquire the only slot
-		err := guard.TryAcquire()
+		err := guard.TryAcquireMethod("/test.Service/TestMethod")
 		require.NoError(t, err)
 
 		called := false
@@ -273,7 +286,7 @@ func TestConcurrencyInterceptor(t *testing.T) {
 
 	t.Run("handler panic still releases resource", func(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
-		guard := NewConcurrencyGuard(mockKnobs, 5)
+		guard := NewConcurrencyGuard(mockKnobs, 10)
 		interceptor := ConcurrencyInterceptor(guard)
 
 		handler := func(ctx context.Context, req any) (any, error) {
@@ -292,12 +305,12 @@ func TestConcurrencyInterceptor(t *testing.T) {
 
 		// Verify resource was released despite panic
 		concurrencyGuard := guard.(*ConcurrencyGuard)
-		assert.Equal(t, int64(0), concurrencyGuard.current)
+		assert.Equal(t, int64(0), concurrencyGuard.counterMap["TestMethod"])
 	})
 
 	t.Run("handler error still releases resource", func(t *testing.T) {
 		mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
-		guard := NewConcurrencyGuard(mockKnobs, 5)
+		guard := NewConcurrencyGuard(mockKnobs, 10)
 		interceptor := ConcurrencyInterceptor(guard)
 
 		expectedErr := fmt.Errorf("handler error")
@@ -317,7 +330,7 @@ func TestConcurrencyInterceptor(t *testing.T) {
 
 		// Verify resource was released
 		concurrencyGuard := guard.(*ConcurrencyGuard)
-		assert.Equal(t, int64(0), concurrencyGuard.current)
+		assert.Equal(t, int64(0), concurrencyGuard.counterMap["TestMethod"])
 	})
 
 	t.Run("with noop limiter", func(t *testing.T) {
@@ -342,7 +355,33 @@ func TestConcurrencyInterceptor(t *testing.T) {
 	})
 }
 
-// Helper function to create float64 pointer
-func floatPtr(f float64) *float64 {
-	return &f
+func TestConcurrencyGuard_AcquireAfterGlobalLimit(t *testing.T) {
+	mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
+	guard := NewConcurrencyGuard(mockKnobs, 3)
+
+	// Acquire some resources
+	for i := 0; i < 3; i++ {
+		err := guard.TryAcquireMethod("TestMethod")
+		require.NoError(t, err)
+	}
+
+	// Verify current count
+	concurrencyGuard := guard.(*ConcurrencyGuard)
+	assert.Equal(t, int64(3), concurrencyGuard.counterMap["TestMethod"])
+
+	// Acquiring again fails
+	err := guard.TryAcquireMethod("TestMethod")
+	require.Error(t, err)
+
+	// Method counter is still at 3
+	assert.Equal(t, int64(3), concurrencyGuard.counterMap["TestMethod"])
+
+	guard.ReleaseMethod("TestMethod")
+
+	// Global counter is decremented
+	assert.Equal(t, int64(2), concurrencyGuard.globalCounter)
+
+	// Acquiring after release works
+	err = guard.TryAcquireMethod("TestMethod")
+	require.NoError(t, err)
 }
