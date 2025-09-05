@@ -421,11 +421,15 @@ func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tok
 	if err != nil {
 		return nil, errors.InvalidUserInputErrorf("invalid issuer public keys: %w", err)
 	}
+	tokenIdentifiers := req.GetTokenIdentifiers()
+	if len(ownerPubKeys) == 0 && len(issuerPubKeys) == 0 && len(tokenIdentifiers) == 0 {
+		return nil, errors.InvalidUserInputErrorf("must specify owner public key, issuer public key, or token identifier")
+	}
 
 	outputs, err := ent.GetOwnedTokenOutputs(ctx, ent.GetOwnedTokenOutputsParams{
 		OwnerPublicKeys:            ownerPubKeys,
 		IssuerPublicKeys:           issuerPubKeys,
-		TokenIdentifiers:           nil,
+		TokenIdentifiers:           tokenIdentifiers,
 		IncludeExpiredTransactions: true,
 		Network:                    *network,
 	})
