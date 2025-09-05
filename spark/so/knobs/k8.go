@@ -143,15 +143,18 @@ func (k *knobsK8ValuesProvider) log(level slog.Level, msg string, args ...any) {
 }
 
 func (k *knobsK8ValuesProvider) handleConfigMap(configMap *corev1.ConfigMap) {
-	if configMap.Data == nil {
-		return
-	}
 	k.log(slog.LevelDebug, "Processing ConfigMap", "configMap", configMap.Data)
 
 	k.lock.Lock()
 	defer k.lock.Unlock()
 
 	clear(k.values)
+
+	// If no data, nothing to do.
+	if configMap == nil || configMap.Data == nil {
+		k.log(slog.LevelInfo, "No knobs found in ConfigMap")
+		return
+	}
 
 	for name, value := range configMap.Data {
 		var parsedFloat float64

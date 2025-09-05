@@ -130,11 +130,10 @@ func TestKnobsK8ValuesProvider_HandleConfigMap_NilData(t *testing.T) {
 	provider.handleConfigMap(configMap)
 
 	provider.lock.RLock()
-	value, exists := provider.values["existing_knob"]
+	_, exists := provider.values["existing_knob"]
 	provider.lock.RUnlock()
 
-	assert.True(t, exists, "Existing knob should still exist")
-	assert.InDelta(t, 42.0, value, 0.001, "Existing knob value should be unchanged")
+	assert.False(t, exists, "Existing knob should be removed")
 }
 
 func TestKnobsK8ValuesProvider_GetValue(t *testing.T) {
