@@ -14,7 +14,6 @@ import (
 	"github.com/lightsparkdev/spark"
 
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -143,7 +142,7 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	if err != nil {
 		formattedError := tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToExecuteWithNonCoordinator, req.PartialTokenTransaction, err)
 		grpcStatus, ok := status.FromError(err)
-		if ok && (grpcStatus.Code() == codes.Aborted || grpcStatus.Code() == codes.AlreadyExists) {
+		if ok {
 			formattedError = errors.WrapErrorWithGRPCCode(formattedError, grpcStatus.Code())
 		}
 		return nil, formattedError

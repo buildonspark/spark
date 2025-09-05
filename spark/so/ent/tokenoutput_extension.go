@@ -17,6 +17,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 )
 
 // FetchAndLockTokenInputs fetches the transaction whose token transaction hashes
@@ -39,7 +40,7 @@ func FetchAndLockTokenInputs(ctx context.Context, outputsToSpend []*tokenpb.Toke
 	hashBytesByKey := make(map[string][]byte)
 	for _, o := range outputsToSpend {
 		if o == nil || o.PrevTokenTransactionHash == nil {
-			return nil, fmt.Errorf("invalid output to spend: missing previous transaction hash")
+			return nil, sparkerrors.NotFoundErrorf("invalid output to spend: missing previous transaction hash")
 		}
 		key := string(o.PrevTokenTransactionHash)
 		voutsByHash[key] = append(voutsByHash[key], int32(o.PrevTokenTransactionVout))
@@ -70,14 +71,14 @@ func FetchAndLockTokenInputs(ctx context.Context, outputsToSpend []*tokenpb.Toke
 		ForUpdate().
 		All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to lock outputs for update: %w", err)
+		return nil, sparkerrors.InternalErrorf("failed to lock outputs for update: %w", err)
 	}
 
 	// Build index by (finalized_hash, vout)
 	byHashVout := make(map[string]*TokenOutput, len(lockedOutputs))
 	for _, out := range lockedOutputs {
 		if out.Edges.OutputCreatedTokenTransaction == nil || len(out.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash) == 0 {
-			return nil, fmt.Errorf("locked output missing created transaction edge or hash: %s", out.ID)
+			return nil, sparkerrors.NotFoundErrorf("locked output missing created transaction edge or hash: %s", out.ID)
 		}
 		key := fmt.Sprintf("%s:%d", hex.EncodeToString(out.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash), out.CreatedTransactionOutputVout)
 		byHashVout[key] = out
@@ -89,7 +90,7 @@ func FetchAndLockTokenInputs(ctx context.Context, outputsToSpend []*tokenpb.Toke
 		key := fmt.Sprintf("%s:%d", hex.EncodeToString(o.PrevTokenTransactionHash), int32(o.PrevTokenTransactionVout))
 		out, ok := byHashVout[key]
 		if !ok {
-			return nil, fmt.Errorf("no created output found for prev tx hash %x and vout %d", o.PrevTokenTransactionHash, o.PrevTokenTransactionVout)
+			return nil, sparkerrors.NotFoundErrorf("no created output found for prev tx hash %x and vout %d", o.PrevTokenTransactionHash, o.PrevTokenTransactionVout)
 		}
 		result[i] = out
 	}

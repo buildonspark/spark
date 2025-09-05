@@ -121,6 +121,10 @@ func AbortedErrorf(format string, args ...any) error {
 	return newGRPCError(codes.Aborted, fmt.Errorf(format, args...))
 }
 
+func InternalErrorf(format string, args ...any) error {
+	return newGRPCError(codes.Internal, fmt.Errorf(format, args...))
+}
+
 func WrapErrorWithGRPCCode(err error, originalGRPCCode codes.Code) error {
 	return newGRPCError(originalGRPCCode, err)
 }

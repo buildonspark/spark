@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 )
 
 // ValidateMintDoesNotExceedMaxSupply validates that a mint transaction doesn't exceed the token's max supply.
@@ -34,7 +35,7 @@ func ValidateMintDoesNotExceedMaxSupply(ctx context.Context, tokenTransaction *t
 		tokenIdentifier = tokenTransaction.GetMintInput().GetTokenIdentifier()
 		mintPublicKey, err := keys.ParsePublicKey(tokenTransaction.GetMintInput().GetIssuerPublicKey())
 		if err != nil {
-			return fmt.Errorf("failed to get issuer public key: %w", err)
+			return sparkerrors.InvalidUserInputErrorf("failed to get issuer public key: %w", err)
 		}
 		issuerPublicKey = mintPublicKey
 	} else if len(tokenTransaction.GetTokenOutputs()) > 0 {
@@ -42,25 +43,21 @@ func ValidateMintDoesNotExceedMaxSupply(ctx context.Context, tokenTransaction *t
 		tokenIdentifier = output.GetTokenIdentifier()
 		tokenPublicKey, err := keys.ParsePublicKey(output.GetTokenPublicKey())
 		if err != nil {
-			return fmt.Errorf("failed to get token public key: %w", err)
+			return sparkerrors.InvalidUserInputErrorf("failed to get token public key: %w", err)
 		}
 		issuerPublicKey = tokenPublicKey
 	}
 
-	network, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
+	commonNetwork, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
 	if err != nil {
-		return fmt.Errorf("failed to get network: %w", err)
+		return sparkerrors.InternalErrorf("failed to get network from proto: %w", err)
 	}
-	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+	schemaNetwork, err := common.SchemaNetworkFromNetwork(commonNetwork)
 	if err != nil {
-		return fmt.Errorf("failed to get schema network: %w", err)
+		return sparkerrors.InternalErrorf("failed to get schema network: %w", err)
 	}
 
-	err = validateMintAgainstMaxSupplyCore(ctx, mintAmount, tokenIdentifier, issuerPublicKey, schemaNetwork)
-	if err != nil {
-		return FormatErrorWithTransactionProto(err.Error(), tokenTransaction, err)
-	}
-	return nil
+	return validateMintAgainstMaxSupplyCore(ctx, mintAmount, tokenIdentifier, issuerPublicKey, schemaNetwork)
 }
 
 // ValidateMintDoesNotExceedMaxSupplyEnt validates that a mint transaction doesn't exceed the token's max supply.
@@ -73,24 +70,20 @@ func ValidateMintDoesNotExceedMaxSupplyEnt(ctx context.Context, tokenTransaction
 	}
 
 	if tokenTransaction.Edges.Mint == nil {
-		return fmt.Errorf("cannot verify max supply for mint transaction because no mint input was found")
+		return sparkerrors.NotFoundErrorf("cannot verify max supply for mint transaction because no mint input was found")
 	}
-
 	tokenIdentifier := tokenTransaction.Edges.Mint.TokenIdentifier
 	issuerPublicKey, err := keys.ParsePublicKey(tokenTransaction.Edges.Mint.IssuerPublicKey)
 	if err != nil {
-		return fmt.Errorf("failed to get issuer public key: %w", err)
+		return sparkerrors.NotFoundErrorf("failed to get issuer public key: %w", err)
 	}
 
-	network, err := tokenTransaction.GetNetworkFromEdges()
-	if err != nil {
-		return FormatErrorWithTransactionEnt("failed to get network from token transaction", tokenTransaction, err)
+	if len(tokenTransaction.Edges.CreatedOutput) == 0 {
+		return sparkerrors.NotFoundErrorf("cannot determine network for mint transaction because no outputs were found")
 	}
+	network := tokenTransaction.Edges.CreatedOutput[0].Network
 
-	if err := validateMintAgainstMaxSupplyCore(ctx, mintAmount, tokenIdentifier, issuerPublicKey, network); err != nil {
-		return FormatErrorWithTransactionEnt(err.Error(), tokenTransaction, err)
-	}
-	return nil
+	return validateMintAgainstMaxSupplyCore(ctx, mintAmount, tokenIdentifier, issuerPublicKey, network)
 }
 
 // validateMintAgainstMaxSupplyCore contains the core validation logic that both proto and Ent versions can use.
@@ -98,7 +91,7 @@ func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, 
 	logger := logging.GetLoggerFromContext(ctx)
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get or create current tx for request: %w", err)
+		return sparkerrors.InternalErrorf("failed to get or create current tx for request: %w", err)
 	}
 
 	// Get token metadata
@@ -111,14 +104,14 @@ func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, 
 		tokenCreate, err = db.TokenCreate.Query().Where(tokencreate.IssuerPublicKeyEQ(issuerPublicKey.Serialize()), tokencreate.NetworkEQ(network)).First(ctx)
 		identifierInfo = fmt.Sprintf("issuer public key: %v", issuerPublicKey)
 	} else {
-		return fmt.Errorf("no token identifier or issuer public key provided")
+		return sparkerrors.InvalidUserInputErrorf("no token identifier or issuer public key provided")
 	}
 	if ent.IsNotFound(err) {
 		logger.Info("Token metadata not found - minting not allowed", "identifier_info", identifierInfo)
-		return fmt.Errorf("minting not allowed because a created token was not found for %s", identifierInfo)
+		return sparkerrors.NotFoundErrorf("minting not allowed because a created token was not found for %s", identifierInfo)
 	}
 	if err != nil {
-		return fmt.Errorf("failed to get token metadata for %s: %w", identifierInfo, err)
+		return sparkerrors.InternalErrorf("failed to get token metadata for %s: %w", identifierInfo, err)
 	}
 
 	maxSupply := new(big.Int).SetBytes(tokenCreate.MaxSupply)
@@ -135,13 +128,13 @@ func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, 
 		currentSupply, err = calculateCurrentSupplyByIssuerKey(ctx, issuerPublicKey)
 	}
 	if err != nil {
-		return fmt.Errorf("failed to calculate current minted supply: %w", err)
+		return sparkerrors.InternalErrorf("failed to calculate current minted supply: %w", err)
 	}
 
 	// Validate against max supply
 	newTotalSupply := new(big.Int).Add(currentSupply, mintAmount)
 	if newTotalSupply.Cmp(maxSupply) > 0 {
-		return fmt.Errorf("mint would exceed max supply: total supply after mint (%s) would exceed max supply (%s)",
+		return sparkerrors.FailedPreconditionErrorf("mint would exceed max supply: total supply after mint (%s) would exceed max supply (%s)",
 			newTotalSupply.String(), maxSupply.String())
 	}
 
@@ -176,7 +169,7 @@ func calculateCurrentSupply(ctx context.Context, whereClause func(*ent.TokenOutp
 		)).
 		All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch signed mint outputs: %w", err)
+		return nil, sparkerrors.InternalErrorf("failed to fetch signed mint outputs: %w", err)
 	}
 
 	totalMinted := new(big.Int)

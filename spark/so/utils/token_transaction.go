@@ -19,6 +19,7 @@ import (
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/protoconverter"
 )
 
@@ -65,7 +66,7 @@ func (t TokenTransactionType) String() string {
 // If partialHash is true generate a partial hash even if the provided transaction is final.
 func HashTokenTransaction(tokenTransaction *tokenpb.TokenTransaction, partialHash bool) ([]byte, error) {
 	if tokenTransaction == nil {
-		return nil, fmt.Errorf("token transaction cannot be nil")
+		return nil, sparkerrors.InternalErrorf("token transaction cannot be nil")
 	}
 
 	switch tokenTransaction.Version {
@@ -73,7 +74,7 @@ func HashTokenTransaction(tokenTransaction *tokenpb.TokenTransaction, partialHas
 		{
 			sparkTx, err := protoconverter.SparkTokenTransactionFromTokenProto(tokenTransaction)
 			if err != nil {
-				return nil, fmt.Errorf("failed to convert token transaction: %w", err)
+				return nil, sparkerrors.InternalErrorf("failed to convert token transaction: %w", err)
 			}
 			return HashTokenTransactionV0(sparkTx, partialHash)
 		}
@@ -82,7 +83,7 @@ func HashTokenTransaction(tokenTransaction *tokenpb.TokenTransaction, partialHas
 	case 2:
 		return HashTokenTransactionV2(tokenTransaction, partialHash)
 	default:
-		return nil, fmt.Errorf("unsupported token transaction version: %d", tokenTransaction.Version)
+		return nil, sparkerrors.InternalErrorf("unsupported token transaction version: %d", tokenTransaction.Version)
 	}
 }
 
@@ -735,7 +736,7 @@ func hashNetwork(h hash.Hash, network pb.Network) ([]byte, error) {
 // by concatenating hashes of the transaction hash and operator public key.
 func HashOperatorSpecificTokenTransactionSignablePayload(payload *sparkpb.OperatorSpecificTokenTransactionSignablePayload) ([]byte, error) {
 	if payload == nil {
-		return nil, fmt.Errorf("operator specific token transaction signable payload cannot be nil")
+		return nil, sparkerrors.InvalidUserInputErrorf("operator specific token transaction signable payload cannot be nil")
 	}
 
 	h := sha256.New()
@@ -745,7 +746,7 @@ func HashOperatorSpecificTokenTransactionSignablePayload(payload *sparkpb.Operat
 	h.Reset()
 	if txHash := payload.GetFinalTokenTransactionHash(); txHash != nil {
 		if len(txHash) != 32 {
-			return nil, fmt.Errorf("invalid final transaction hash length: expected 32 bytes, got %d", len(txHash))
+			return nil, sparkerrors.InvalidUserInputErrorf("invalid final transaction hash length: expected 32 bytes, got %d", len(txHash))
 		}
 		h.Write(txHash)
 	}
@@ -756,7 +757,7 @@ func HashOperatorSpecificTokenTransactionSignablePayload(payload *sparkpb.Operat
 	h.Reset()
 	pubKey := payload.GetOperatorIdentityPublicKey()
 	if len(pubKey) == 0 {
-		return nil, fmt.Errorf("operator identity public key cannot be empty")
+		return nil, sparkerrors.InvalidUserInputErrorf("operator identity public key cannot be empty")
 	}
 	h.Write(pubKey)
 	allHashes = append(allHashes, h.Sum(nil)...)
@@ -1191,13 +1192,13 @@ func validateBaseTokenOutputs(tokenTransaction *tokenpb.TokenTransaction, requir
 // It supports both ECDSA DER signatures and Schnorr signatures.
 func ValidateOwnershipSignature(signature []byte, hash []byte, issuerOrOwnerPublicKey keys.Public) error {
 	if signature == nil {
-		return fmt.Errorf("ownership signature cannot be nil")
+		return sparkerrors.InvalidUserInputErrorf("ownership signature cannot be nil")
 	}
 	if hash == nil {
-		return fmt.Errorf("hash to verify cannot be nil")
+		return sparkerrors.InvalidUserInputErrorf("hash to verify cannot be nil")
 	}
 	if issuerOrOwnerPublicKey.IsZero() {
-		return fmt.Errorf("owner public key cannot be zero")
+		return sparkerrors.InvalidUserInputErrorf("owner public key cannot be zero")
 	}
 
 	// Check if it's a Schnorr signature
@@ -1212,14 +1213,14 @@ func ValidateOwnershipSignature(signature []byte, hash []byte, issuerOrOwnerPubl
 	// Try to parse as ECDSA DER signature
 	sig, err := ecdsa.ParseDERSignature(signature)
 	if err != nil {
-		return fmt.Errorf("failed to parse signature as either Schnorr or DER: %w", err)
+		return sparkerrors.InvalidUserInputErrorf("failed to parse signature as either Schnorr or DER: %w", err)
 	}
 	if sig == nil {
-		return fmt.Errorf("parsed signature is nil")
+		return sparkerrors.InvalidUserInputErrorf("parsed signature is nil")
 	}
 
 	if !sig.Verify(hash, issuerOrOwnerPublicKey.ToBTCEC()) {
-		return fmt.Errorf("invalid ownership signature")
+		return sparkerrors.FailedPreconditionErrorf("invalid ownership signature")
 	}
 	return nil
 }

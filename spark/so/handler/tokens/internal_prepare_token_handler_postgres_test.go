@@ -1,3 +1,6 @@
+//go:build postgres
+// +build postgres
+
 package tokens
 
 import (

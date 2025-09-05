@@ -23,6 +23,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/protoconverter"
 	"github.com/lightsparkdev/spark/so/utils"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -73,17 +74,17 @@ func CreateStartedTransactionEntities(
 	var tokenTransactionEnt *TokenTransaction
 	tokenTransactionType, err := utils.InferTokenTransactionType(tokenTransaction)
 	if err != nil {
-		return nil, fmt.Errorf("failed to infer token transaction type: %w", err)
+		return nil, sparkerrors.InternalErrorf("failed to infer token transaction type: %w", err)
 	}
 	switch tokenTransactionType {
 	case utils.TokenTransactionTypeCreate:
 		tokenMetadata, err := common.NewTokenMetadataFromCreateInput(tokenTransaction.GetCreateInput(), tokenTransaction.Network)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create token metadata: %w", err)
+			return nil, sparkerrors.InternalErrorf("failed to create token metadata: %w", err)
 		}
 		computedTokenIdentifier, err := tokenMetadata.ComputeTokenIdentifierV1()
 		if err != nil {
-			return nil, fmt.Errorf("failed to compute token identifier: %w", err)
+			return nil, sparkerrors.InternalErrorf("failed to compute token identifier: %w", err)
 		}
 
 		tokenCreateEnt, err := db.TokenCreate.Create().
@@ -99,7 +100,7 @@ func CreateStartedTransactionEntities(
 			SetTokenIdentifier(computedTokenIdentifier).
 			Save(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create token create ent, likely due to attempting to restart a create transaction with a different operator: %w", err)
+			return nil, sparkerrors.InternalErrorf("failed to create token create ent, likely due to attempting to restart a create transaction with a different operator: %w", err)
 		}
 		txBuilder := db.TokenTransaction.Create().
 			SetPartialTokenTransactionHash(partialTokenTransactionHash).
@@ -113,7 +114,7 @@ func CreateStartedTransactionEntities(
 		}
 		tokenTransactionEnt, err = txBuilder.Save(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create create token transaction: %w", err)
+			return nil, sparkerrors.InternalErrorf("failed to create create token transaction: %w", err)
 		}
 	case utils.TokenTransactionTypeMint:
 		tokenMintEnt, err := db.TokenMint.Create().
@@ -124,7 +125,7 @@ func CreateStartedTransactionEntities(
 			SetTokenIdentifier(tokenTransaction.GetMintInput().GetTokenIdentifier()).
 			Save(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create token mint ent, likely due to attempting to restart a mint transaction with a different operator: %w", err)
+			return nil, sparkerrors.InternalErrorf("failed to create token mint ent, likely due to attempting to restart a mint transaction with a different operator: %w", err)
 		}
 		txMintBuilder := db.TokenTransaction.Create().
 			SetPartialTokenTransactionHash(partialTokenTransactionHash).
@@ -139,11 +140,11 @@ func CreateStartedTransactionEntities(
 		}
 		tokenTransactionEnt, err = txMintBuilder.Save(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create mint token transaction: %w", err)
+			return nil, sparkerrors.InternalErrorf("failed to create mint token transaction: %w", err)
 		}
 	case utils.TokenTransactionTypeTransfer:
 		if len(signaturesWithIndex) != len(orderedOutputToSpendEnts) {
-			return nil, fmt.Errorf(
+			return nil, sparkerrors.InternalErrorf(
 				"number of signatures %d doesn't match number of outputs to spend %d",
 				len(signaturesWithIndex),
 				len(orderedOutputToSpendEnts),
@@ -161,7 +162,7 @@ func CreateStartedTransactionEntities(
 		}
 		tokenTransactionEnt, err = txTransferBuilder.Save(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create transfer token transaction: %w", err)
+			return nil, sparkerrors.InternalErrorf("failed to create transfer token transaction: %w", err)
 		}
 		for outputIndex, outputToSpendEnt := range orderedOutputToSpendEnts {
 			_, err = db.TokenOutput.UpdateOne(outputToSpendEnt).
@@ -172,17 +173,17 @@ func CreateStartedTransactionEntities(
 				SetSpentTransactionInputVout(int32(outputIndex)).
 				Save(ctx)
 			if err != nil {
-				return nil, fmt.Errorf("failed to update output to spend: %w", err)
+				return nil, sparkerrors.InternalErrorf("failed to update output to spend: %w", err)
 			}
 		}
 	case utils.TokenTransactionTypeUnknown:
 	default:
-		return nil, fmt.Errorf("token transaction type unknown")
+		return nil, sparkerrors.InternalErrorf("token transaction type unknown")
 	}
 	if tokenTransaction.Version >= 2 && tokenTransaction.GetInvoiceAttachments() != nil {
 		sparkInvoiceIDs, sparkInvoicesToCreate, err := prepareSparkInvoiceCreates(ctx, tokenTransaction, tokenTransactionEnt)
 		if err != nil {
-			return nil, fmt.Errorf("failed to prepare spark invoices: %w", err)
+			return nil, sparkerrors.InternalErrorf("failed to prepare spark invoices: %w", err)
 		}
 		if len(sparkInvoicesToCreate) > 0 {
 			err = db.SparkInvoice.CreateBulk(sparkInvoicesToCreate...).
@@ -190,7 +191,7 @@ func CreateStartedTransactionEntities(
 				DoNothing().
 				Exec(ctx)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create spark invoices: %w", err)
+				return nil, sparkerrors.InternalErrorf("failed to create spark invoices: %w", err)
 			}
 			sparkInvoiceIDsToAdd := make([]uuid.UUID, 0, len(sparkInvoiceIDs))
 			for sparkInvoiceID := range sparkInvoiceIDs {
@@ -207,7 +208,7 @@ func CreateStartedTransactionEntities(
 				AddTokenTransactionIDs(tokenTransactionEnt.ID).
 				Exec(ctx)
 			if err != nil {
-				return nil, fmt.Errorf("failed to attach token transaction edge: %w", err)
+				return nil, sparkerrors.InternalErrorf("failed to attach token transaction edge: %w", err)
 			}
 		}
 	}
