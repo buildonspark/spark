@@ -187,3 +187,54 @@ func TestDBEventsReconnect(t *testing.T) {
 		t.Fatal("Timeout waiting for notification")
 	}
 }
+
+func TestMultipleListenersReceiveNotification(t *testing.T) {
+	_, connector, dbEvents := SetupDBEventsTestContext(t)
+
+	channel1, cleanupListener := dbEvents.AddListeners([]Subscription{
+		{
+			EventName: "test",
+			Field:     "id",
+			Value:     "test-id",
+		},
+	})
+	defer cleanupListener()
+
+	channel2, cleanupListener2 := dbEvents.AddListeners([]Subscription{
+		{
+			EventName: "test",
+			Field:     "id",
+			Value:     "test-id",
+		},
+	})
+	defer cleanupListener2()
+
+	time.Sleep(100 * time.Millisecond)
+
+	testPayload := map[string]any{
+		"id": "test-id",
+	}
+
+	payloadJSON, err := json.Marshal(testPayload)
+	require.NoError(t, err)
+
+	query := fmt.Sprintf("NOTIFY test, '%s'", payloadJSON)
+	_, err = connector.Pool().Exec(t.Context(), query)
+	require.NoError(t, err)
+
+	var received1, received2 bool
+	timeout := time.After(6 * time.Second)
+
+	for !received1 || !received2 {
+		select {
+		case receivedPayload := <-channel1:
+			require.JSONEq(t, string(payloadJSON), receivedPayload.Payload)
+			received1 = true
+		case receivedPayload := <-channel2:
+			require.JSONEq(t, string(payloadJSON), receivedPayload.Payload)
+			received2 = true
+		case <-timeout:
+			t.Fatalf("Timeout waiting for notification. received1: %v, received2: %v", received1, received2)
+		}
+	}
+}
