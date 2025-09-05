@@ -47,7 +47,6 @@ func DatabaseSessionMiddleware(factory db.SessionFactory, txBeginTimeout *time.D
 					if dberr := tx.Rollback(); dberr != nil {
 						logger.Error("Failed to rollback transaction", "error", dberr)
 					}
-					logger.Info("Transaction rolled back")
 				}
 				panic(r)
 			}
@@ -57,23 +56,19 @@ func DatabaseSessionMiddleware(factory db.SessionFactory, txBeginTimeout *time.D
 		resp, err := handler(ctx, req)
 		// Handle transaction commit/rollback
 		if err != nil {
-			logger.Info("Rolling back transaction")
 			if tx := session.GetTxIfExists(); tx != nil {
 				if dberr := tx.Rollback(); dberr != nil {
 					logger.Error("Failed to rollback transaction", "error", dberr)
 				}
 			}
-			logger.Info("Transaction rolled back")
 			return nil, err
 		}
 
 		if tx := session.GetTxIfExists(); tx != nil {
-			logger.Info("Committing transaction")
 			if dberr := tx.Commit(); dberr != nil {
 				logger.Error("Failed to commit transaction", "error", dberr)
 				return nil, dberr
 			}
-			logger.Info("Transaction committed")
 		}
 
 		return resp, nil
