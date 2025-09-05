@@ -78,6 +78,53 @@ func LogInterceptor(tableLogger *logging.TableLogger) grpc.UnaryServerIntercepto
 	}
 }
 
+type WrappedServerStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func WrapServerStream(ctx context.Context, stream grpc.ServerStream) grpc.ServerStream {
+	return &WrappedServerStream{
+		ServerStream: stream,
+		ctx:          ctx,
+	}
+}
+
+func (w *WrappedServerStream) Context() context.Context {
+	return w.ctx
+}
+
+func StreamLogInterceptor() grpc.StreamServerInterceptor {
+	return func(
+		srv any,
+		ss grpc.ServerStream,
+		info *grpc.StreamServerInfo,
+		handler grpc.StreamHandler,
+	) error {
+		// Ignore health check requests, these are noisy and we don't care about logging them.
+		if strings.HasPrefix(info.FullMethod, "/grpc.health.v1.Health") {
+			return handler(srv, ss)
+		}
+
+		requestID := uuid.New().String()
+
+		logger := slog.Default().With(
+			"request_id", requestID,
+			"method", info.FullMethod,
+			"component", "grpc",
+		)
+
+		ctx := logging.Inject(ss.Context(), logger)
+
+		err := handler(srv, WrapServerStream(ctx, ss))
+		if err != nil {
+			logger.Error("error in grpc stream", "error", err)
+		}
+
+		return err
+	}
+}
+
 type GRPCClientInfoProvider struct {
 	xffClientIpPosition int
 }

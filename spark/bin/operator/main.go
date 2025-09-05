@@ -542,6 +542,7 @@ func main() {
 		)),
 		grpc.StreamInterceptor(grpcmiddleware.ChainStreamServer(
 			sparkerrors.ErrorWrappingStreamingInterceptor(),
+			sparkgrpc.StreamLogInterceptor(),
 			authn.NewInterceptor(sessionTokenCreatorVerifier).StreamAuthnInterceptor,
 			authz.NewAuthzInterceptor(authz.NewAuthzConfig(
 				authz.WithMode(config.ServiceAuthz.Mode),
