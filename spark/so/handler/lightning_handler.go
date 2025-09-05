@@ -1408,6 +1408,7 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvideP
 	return &pb.ProvidePreimageResponse{Transfer: transferProto}, nil
 }
 
+// TODO(LIG-8166): Remove this public facing func and use the internal func instead
 func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.ReturnLightningPaymentRequest, internal bool) (*emptypb.Empty, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 	if !internal {
