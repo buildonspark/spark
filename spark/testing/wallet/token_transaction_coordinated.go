@@ -47,13 +47,6 @@ func StartTokenTransactionCoordinated(
 	tmpCtx := ContextWithToken(ctx, token)
 	sparkClient := tokenpb.NewSparkTokenServiceClient(sparkConn)
 
-	// Attach operator public keys to the transaction
-	var operatorKeys [][]byte
-	for _, operator := range config.SigningOperators {
-		operatorKeys = append(operatorKeys, operator.IdentityPublicKey.Serialize())
-	}
-	tokenTransaction.SparkOperatorIdentityPublicKeys = operatorKeys
-
 	// Hash the partial token transaction
 	partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
 	if err != nil {

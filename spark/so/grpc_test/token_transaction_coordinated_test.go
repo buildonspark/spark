@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand/v2"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -41,6 +43,7 @@ const (
 	TooShortValidityDurationSecs  = 0
 	TokenTransactionVersion1      = 1
 	TokenTransactionVersion2      = 2
+	TokenTransactionVersion3      = 3
 )
 
 // Parameter structs for WithParams functions
@@ -53,6 +56,7 @@ type tokenTransactionParams struct {
 	OutputAmounts                  []uint64 // Exact amounts for each output (must match NumOutputs length)
 	MintToSelf                     bool
 	InvoiceAttachments             []*tokenpb.InvoiceAttachment
+	Version                        int // Optional explicit token transaction version (defaults to V2 if 0)
 }
 
 type createNativeSparkTokenParams struct {
@@ -1314,8 +1318,12 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 	}
 
 	now := time.Now()
+	version := uint32(TokenTransactionVersion2)
+	if params.Version != 0 {
+		version = uint32(params.Version)
+	}
 	mintTokenTransaction := &tokenpb.TokenTransaction{
-		Version: TokenTransactionVersion2,
+		Version: version,
 		TokenInputs: &tokenpb.TokenTransaction_MintInput{
 			MintInput: &tokenpb.TokenMintInput{
 				IssuerPublicKey: params.TokenIdentityPubKey.Serialize(),
@@ -1325,6 +1333,12 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 		Network:                         config.ProtoNetwork(),
 		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeyBytes(config),
 		ClientCreatedTimestamp:          timestamppb.New(now),
+	}
+
+	if version >= 3 {
+		sort.Slice(mintTokenTransaction.SparkOperatorIdentityPublicKeys, func(i, j int) bool {
+			return bytes.Compare(mintTokenTransaction.SparkOperatorIdentityPublicKeys[i], mintTokenTransaction.SparkOperatorIdentityPublicKeys[j]) < 0
+		})
 	}
 
 	if params.UseTokenIdentifier {
@@ -1366,8 +1380,12 @@ func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *w
 	}
 	userOutput3PubKeyBytes := userOutput3PrivKey.Public().Serialize()
 
+	version := uint32(TokenTransactionVersion2)
+	if params.Version != 0 {
+		version = uint32(params.Version)
+	}
 	transferTokenTransaction := &tokenpb.TokenTransaction{
-		Version: TokenTransactionVersion2,
+		Version: version,
 		TokenInputs: &tokenpb.TokenTransaction_TransferInput{
 			TransferInput: &tokenpb.TokenTransferInput{
 				OutputsToSpend: []*tokenpb.TokenOutputToSpend{
@@ -1393,6 +1411,12 @@ func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *w
 		SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeyBytes(config),
 		ClientCreatedTimestamp:          timestamppb.New(time.Now()),
 		InvoiceAttachments:              params.InvoiceAttachments,
+	}
+
+	if version >= 3 {
+		sort.Slice(transferTokenTransaction.SparkOperatorIdentityPublicKeys, func(i, j int) bool {
+			return bytes.Compare(transferTokenTransaction.SparkOperatorIdentityPublicKeys[i], transferTokenTransaction.SparkOperatorIdentityPublicKeys[j]) < 0
+		})
 	}
 
 	if params.UseTokenIdentifier {
@@ -3425,6 +3449,187 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 			)
 
 			require.ErrorContains(t, err, tc.expectedErrorSubstr, "error message should contain expected substring")
+		})
+	}
+}
+
+// TestCoordinatedTokenMintV3 tests token minting using V3 transactions
+func TestCoordinatedTokenMintV3(t *testing.T) {
+	for _, tc := range signatureTypeTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			issuerPrivKey := getRandomPrivateKey(t)
+			config, err := sparktesting.TestWalletConfigWithIdentityKey(issuerPrivKey)
+			require.NoError(t, err, "failed to create wallet config")
+
+			err = testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
+				IssuerPrivateKey: issuerPrivKey,
+				Name:             TestTokenName,
+				Ticker:           TestTokenTicker,
+				MaxSupply:        TestTokenMaxSupply,
+			})
+			require.NoError(t, err, "failed to create native spark token")
+
+			// Create a V3 mint transaction
+			issueTokenTransaction, userPrivKeys, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+				TokenIdentityPubKey: issuerPrivKey.Public(),
+				IsNativeSparkToken:  true,
+				UseTokenIdentifier:  true,
+				NumOutputs:          2,
+				OutputAmounts:       []uint64{uint64(TestIssueOutput1Amount), uint64(TestIssueOutput2Amount)},
+				Version:             TokenTransactionVersion3,
+			})
+			require.NoError(t, err, "failed to create test token issuance transaction")
+			require.Len(t, userPrivKeys, 2)
+			userOutput1PrivKey := userPrivKeys[0]
+			userOutput2PrivKey := userPrivKeys[1]
+
+			finalIssueTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+				t.Context(), config, issueTokenTransaction,
+				[]keys.Private{issuerPrivKey},
+			)
+			require.NoError(t, err, "failed to broadcast V3 issuance token transaction")
+			require.Len(t, finalIssueTokenTransaction.TokenOutputs, 2, "expected 2 created outputs in V3 mint transaction")
+			require.Equal(t, TokenTransactionVersion3, int(finalIssueTokenTransaction.Version), "final transaction should be V3")
+
+			userOneConfig, err := sparktesting.TestWalletConfigWithIdentityKey(userOutput1PrivKey)
+			require.NoError(t, err, "failed to create user one wallet config")
+
+			userTwoConfig, err := sparktesting.TestWalletConfigWithIdentityKey(userOutput2PrivKey)
+			require.NoError(t, err, "failed to create user two wallet config")
+
+			userOneBalance, err := wallet.QueryTokenOutputsV2(
+				t.Context(),
+				userOneConfig,
+				[]keys.Public{userOneConfig.IdentityPublicKey()},
+				[]keys.Public{issuerPrivKey.Public()},
+			)
+			require.NoError(t, err, "failed to query user one token outputs")
+
+			userTwoBalance, err := wallet.QueryTokenOutputsV2(
+				t.Context(),
+				userTwoConfig,
+				[]keys.Public{userTwoConfig.IdentityPublicKey()},
+				[]keys.Public{issuerPrivKey.Public()},
+			)
+			require.NoError(t, err, "failed to query user two token outputs")
+
+			require.Len(t, userOneBalance.OutputsWithPreviousTransactionData, 1, "expected one output for user one")
+			userOneAmount := bytesToBigInt(userOneBalance.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
+			require.Equal(t, uint64ToBigInt(TestIssueOutput1Amount), userOneAmount,
+				"user one should have correct token amount")
+
+			require.Len(t, userTwoBalance.OutputsWithPreviousTransactionData, 1, "expected one output for user two")
+			userTwoAmount := bytesToBigInt(userTwoBalance.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
+			require.Equal(t, uint64ToBigInt(TestIssueOutput2Amount), userTwoAmount,
+				"user two should have correct token amount")
+		})
+	}
+}
+
+// TestCoordinatedTokenTransferV3 tests token transfers using V3 transactions
+func TestCoordinatedTokenTransferV3(t *testing.T) {
+	for _, tc := range signatureTypeTestCases {
+		t.Run(tc.name, func(t *testing.T) {
+			issuerPrivKey := getRandomPrivateKey(t)
+			config, err := sparktesting.TestWalletConfigWithIdentityKey(issuerPrivKey)
+			require.NoError(t, err, "failed to create wallet config")
+
+			err = testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
+				IssuerPrivateKey: issuerPrivKey,
+				Name:             TestTokenName,
+				Ticker:           TestTokenTicker,
+				MaxSupply:        TestTokenMaxSupply,
+			})
+			require.NoError(t, err, "failed to create native spark token")
+
+			issueTokenTransaction, userPrivKeys, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+				TokenIdentityPubKey: issuerPrivKey.Public(),
+				IsNativeSparkToken:  true,
+				UseTokenIdentifier:  true,
+				NumOutputs:          2,
+				OutputAmounts:       []uint64{uint64(TestIssueOutput1Amount), uint64(TestIssueOutput2Amount)},
+				Version:             TokenTransactionVersion3,
+			})
+			require.NoError(t, err, "failed to create test token issuance transaction")
+			require.Len(t, userPrivKeys, 2)
+			userOutput1PrivKey := userPrivKeys[0]
+			userOutput2PrivKey := userPrivKeys[1]
+
+			finalIssueTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+				t.Context(), config, issueTokenTransaction,
+				[]keys.Private{issuerPrivKey},
+			)
+			require.NoError(t, err, "failed to broadcast V3 issuance token transaction")
+
+			finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
+			require.NoError(t, err, "failed to hash final issuance token transaction")
+
+			transferTokenTransaction, userOutput3PrivKey, err := createTestTokenTransferTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+				TokenIdentityPubKey:            issuerPrivKey.Public(),
+				UseTokenIdentifier:             true,
+				FinalIssueTokenTransactionHash: finalIssueTokenTransactionHash,
+				Version:                        TokenTransactionVersion3,
+			})
+			require.NoError(t, err, "failed to create test token transfer transaction")
+
+			// Add a valid spark invoice attachment for V3 testing. We use one invoice to
+			// match the single created output in this transfer transaction.
+			{
+				output := transferTokenTransaction.TokenOutputs[0]
+				receiverPubKey, err := keys.ParsePublicKey(output.GetOwnerPublicKey())
+				require.NoError(t, err, "failed to parse receiver public key")
+				createParams := createSparkInvoiceParams{
+					Version:           1,
+					ReceiverPublicKey: receiverPubKey,
+					Amount:            nil, // nil amount allowed; validated against created outputs
+					ExpiryTime:        timestamppb.New(time.Now().Add(10 * time.Minute)),
+					Memo:              nil,
+					TokenIdentifier:   output.GetTokenIdentifier(),
+					Network:           config.Network,
+					SatsPayment:       false,
+				}
+				inv, err := createSparkInvoice(createParams)
+				require.NoError(t, err, "failed to create spark invoice")
+				transferTokenTransaction.InvoiceAttachments = []*tokenpb.InvoiceAttachment{{SparkInvoice: inv}}
+			}
+
+			// Verify V3 version is set
+			require.Equal(t, TokenTransactionVersion3, int(transferTokenTransaction.Version), "expected V3 version")
+
+			// Verify invoice attachments are sorted
+			invoices := transferTokenTransaction.InvoiceAttachments
+			require.NotEmpty(t, invoices, "expected invoice attachments")
+			for i := 1; i < len(invoices); i++ {
+				require.Negative(t, strings.Compare(invoices[i-1].GetSparkInvoice(), invoices[i].GetSparkInvoice()),
+					"invoice attachments must be in ascending order for V3")
+			}
+
+			transferTokenTransactionResponse, err := wallet.BroadcastCoordinatedTokenTransfer(
+				t.Context(), config, transferTokenTransaction,
+				[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
+			)
+			require.NoError(t, err, "failed to broadcast V3 transfer token transaction")
+
+			// Verify that the transaction was processed with V3 version
+			require.Equal(t, TokenTransactionVersion3, int(transferTokenTransactionResponse.Version), "final transfer transaction should be V3")
+
+			require.Len(t, transferTokenTransactionResponse.TokenOutputs, 1, "expected 1 created output in V3 transfer transaction")
+
+			userThreeConfig, err := sparktesting.TestWalletConfigWithIdentityKey(userOutput3PrivKey)
+			require.NoError(t, err, "failed to create user three wallet config")
+
+			userThreeBalance, err := wallet.QueryTokenOutputsV2(
+				t.Context(),
+				userThreeConfig,
+				[]keys.Public{userThreeConfig.IdentityPublicKey()},
+				[]keys.Public{issuerPrivKey.Public()},
+			)
+			require.NoError(t, err, "failed to query user three token outputs")
+
+			require.Len(t, userThreeBalance.OutputsWithPreviousTransactionData, 1, "expected one output for user three")
+			userThreeAmount := bytesToBigInt(userThreeBalance.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
+			require.Equal(t, uint64ToBigInt(TestTransferOutput1Amount), userThreeAmount,
+				"user three should have correct token amount from V3 transfer")
 		})
 	}
 }

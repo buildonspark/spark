@@ -1,6 +1,7 @@
 package ent
 
 import (
+	"bytes"
 	"cmp"
 	"context"
 	"encoding/hex"
@@ -825,6 +826,18 @@ func (t *TokenTransaction) MarshalProto(config *so.Config) (*tokenpb.TokenTransa
 			SparkInvoice: invoice.SparkInvoice,
 		})
 	}
+
+	// V3 deterministic ordering: sort operator keys and invoices
+	if uint32(t.Version) == 3 {
+		// Sort operator keys bytewise ascending
+		slices.SortFunc(operatorPublicKeys, func(a, b []byte) int { return bytes.Compare(a, b) })
+
+		// Sort invoices lexicographically by the invoice attachment string
+		slices.SortFunc(invoiceAttachments, func(a, b *tokenpb.InvoiceAttachment) int {
+			return cmp.Compare(a.GetSparkInvoice(), b.GetSparkInvoice())
+		})
+	}
+
 	tokenTransaction := &tokenpb.TokenTransaction{
 		Version:      uint32(t.Version),
 		TokenOutputs: make([]*tokenpb.TokenOutput, len(t.Edges.CreatedOutput)),
