@@ -371,10 +371,15 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 									tokentransaction.StatusNotIn(st.TokenTransactionStatusFinalized),
 								),
 							),
+							tokentransaction.UpdateTimeLT(
+								time.Now().Add(-5*time.Minute).UTC(),
+							),
 						).
 						WithPeerSignatures().
 						WithSpentOutput(func(q *ent.TokenOutputQuery) {
 							q.WithOutputCreatedTokenTransaction()
+							q.WithTokenPartialRevocationSecretShares()
+							q.WithRevocationKeyshare()
 						}).
 						WithCreatedOutput().
 						All(ctx)
@@ -382,11 +387,11 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						return err
 					}
 					logger.Info(fmt.Sprintf("[cron] Found %d token transactions to finalize", len(tokenTransactions)))
+					internalSignTokenHandler := tokens.NewInternalSignTokenHandler(config)
 					for _, tokenTransaction := range tokenTransactions {
 						var spentOutputs []*tokenpb.TokenOutputToSpend
 						var createdOutputs []*tokenpb.TokenOutput
 						signaturesPackage := make(map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse)
-
 						if tokenTransaction.Edges.SpentOutput != nil {
 							for _, spentOutput := range tokenTransaction.Edges.SpentOutput {
 								spentOutputs = append(spentOutputs, &tokenpb.TokenOutputToSpend{
@@ -395,6 +400,18 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 								})
 							}
 						}
+						finalized, err := internalSignTokenHandler.RecoverFullRevocationSecretsAndFinalize(ctx, tokenTransaction)
+						if err != nil {
+							return fmt.Errorf("failed to recover full revocation secrets and finalize token transaction with id: %s, hash: %x: %w", tokenTransaction.ID, tokenTransaction.FinalizedTokenTransactionHash, err)
+						}
+						if finalized {
+							logger.Info("Successfully finalized token transaction",
+								"transaction_id", tokenTransaction.ID,
+								"transaction_hash", hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash),
+							)
+							continue
+						}
+
 						if tokenTransaction.Edges.CreatedOutput != nil {
 							for _, createdOutput := range tokenTransaction.Edges.CreatedOutput {
 								idStr := createdOutput.ID.String()

@@ -2,7 +2,6 @@ package tokens
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -489,7 +488,6 @@ func (h *InternalSignTokenHandler) persistPartialRevocationSecretShares(
 	if err != nil {
 		return false, tokens.FormatErrorWithTransactionEnt("input token outputs do not match spent token outputs", tx, err)
 	}
-
 	revocationKeyshares := make(map[uuid.UUID]*ent.SigningKeyshare)
 	for _, spentOutput := range tx.Edges.SpentOutput {
 		if revocationKeyshare := spentOutput.Edges.RevocationKeyshare; revocationKeyshare != nil {
@@ -608,50 +606,56 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecretsAndFinalize(ctx c
 		}
 	}
 
+	return h.RecoverFullRevocationSecretsAndFinalize(ctx, tokenTransaction)
+}
+
+func (h *InternalSignTokenHandler) RecoverFullRevocationSecretsAndFinalize(ctx context.Context, tokenTransaction *ent.TokenTransaction) (finalized bool, err error) {
+	if canRecover, err := h.canRecoverAndFinalizeTransaction(tokenTransaction); err != nil {
+		return false, fmt.Errorf("failed to check if can recover and finalize transaction: %w", err)
+	} else if !canRecover {
+		return false, nil
+	}
+
+	outputRecoveredSecrets, outputToSpendRevocationCommitments, err := h.recoverFullRevocationSecrets(tokenTransaction)
+	if err != nil {
+		return false, fmt.Errorf("failed to recover full revocation secrets: %w", err)
+	}
+
+	recoveredSecretsToValidate := make([]keys.Private, len(outputRecoveredSecrets))
+	for i, secret := range outputRecoveredSecrets {
+		recoveredSecretsToValidate[i] = secret.RevocationSecret
+	}
+	if err := utils.ValidateRevocationKeys(recoveredSecretsToValidate, outputToSpendRevocationCommitments); err != nil {
+		return false, tokens.FormatErrorWithTransactionEnt("invalid revocation keys found", tokenTransaction, err)
+	}
+
+	internalFinalizeHandler := NewInternalFinalizeTokenHandler(h.config)
+	err = internalFinalizeHandler.FinalizeCoordinatedTokenTransactionInternal(ctx, tokenTransaction.FinalizedTokenTransactionHash, outputRecoveredSecrets)
+	if err != nil {
+		return false, tokens.FormatErrorWithTransactionEnt("failed to finalize token transaction", tokenTransaction, err)
+	}
+	return true, nil
+}
+
+func (h *InternalSignTokenHandler) canRecoverAndFinalizeTransaction(tokenTransaction *ent.TokenTransaction) (canRecoverAndFinalize bool, err error) {
 	minCountOutputPartialRevocationSecretSharesForAllOutputs := len(h.config.SigningOperatorMap)
-	for _, output := range tokenTransaction.Edges.SpentOutput {
-		if output.Edges.RevocationKeyshare == nil {
+	for _, spentOutput := range tokenTransaction.Edges.SpentOutput {
+		if spentOutput.Edges.RevocationKeyshare == nil {
 			return false, tokens.FormatErrorWithTransactionEnt(
 				"missing revocation key-share on output", tokenTransaction, nil)
 		}
-		if output.Edges.RevocationKeyshare.SecretShare == nil {
+		if spentOutput.Edges.RevocationKeyshare.SecretShare == nil {
 			return false, tokens.FormatErrorWithTransactionEnt(
 				"nil revocation secret share on output", tokenTransaction, nil)
 		}
 		minCountOutputPartialRevocationSecretSharesForAllOutputs = min(
 			minCountOutputPartialRevocationSecretSharesForAllOutputs,
-			len(output.Edges.TokenPartialRevocationSecretShares),
+			len(spentOutput.Edges.TokenPartialRevocationSecretShares),
 		)
 	}
-	// min count of partial revocation secret shares + this server's share >= threshold, for all outputs
 	requiredOperators := h.getRequiredParticipatingOperatorsCount()
-
-	logger.Info("Checking if enough shares for finalization",
-		"tx_hash", hex.EncodeToString(tokenTransactionHash),
-		"min_shares", minCountOutputPartialRevocationSecretSharesForAllOutputs,
-		"with_coordinator", minCountOutputPartialRevocationSecretSharesForAllOutputs+1,
-		"required", requiredOperators,
-		"operator_count", len(h.config.SigningOperatorMap))
-
+	// min count of partial revocation secret shares + this server's share must be >= threshold, for all outputs
 	if minCountOutputPartialRevocationSecretSharesForAllOutputs+1 >= requiredOperators {
-		outputRecoveredSecrets, outputToSpendRevocationCommitments, err := h.recoverFullRevocationSecrets(tokenTransaction)
-		if err != nil {
-			return false, tokens.FormatErrorWithTransactionEnt("failed to recover full revocation secrets", tokenTransaction, err)
-		}
-
-		recoveredSecretsToValidate := make([]keys.Private, len(outputRecoveredSecrets))
-		for i, secret := range outputRecoveredSecrets {
-			recoveredSecretsToValidate[i] = secret.RevocationSecret
-		}
-		if err := utils.ValidateRevocationKeys(recoveredSecretsToValidate, outputToSpendRevocationCommitments); err != nil {
-			return false, tokens.FormatErrorWithTransactionEnt("invalid revocation keys found", tokenTransaction, err)
-		}
-
-		internalFinalizeHandler := NewInternalFinalizeTokenHandler(h.config)
-		err = internalFinalizeHandler.FinalizeCoordinatedTokenTransactionInternal(ctx, tokenTransactionHash, outputRecoveredSecrets)
-		if err != nil {
-			return false, tokens.FormatErrorWithTransactionEnt("failed to finalize token transaction", tokenTransaction, err)
-		}
 		return true, nil
 	}
 	return false, nil
@@ -665,6 +669,12 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(tokenTransaction
 		commitment, err := keys.ParsePublicKey(output.WithdrawRevocationCommitment)
 		if err != nil {
 			return nil, nil, err
+		}
+		if output.Edges.RevocationKeyshare == nil {
+			return nil, nil, tokens.FormatErrorWithTransactionEnt("missing revocation key-share edge on output. load the edge.", tokenTransaction, nil)
+		}
+		if output.Edges.RevocationKeyshare.SecretShare == nil {
+			return nil, nil, tokens.FormatErrorWithTransactionEnt("nil revocation secret share on output", tokenTransaction, nil)
 		}
 		outputToSpendRevocationCommitments = append(outputToSpendRevocationCommitments, commitment)
 		outputShares := make([]*secretsharing.SecretShare, 0, len(output.Edges.TokenPartialRevocationSecretShares)+1)

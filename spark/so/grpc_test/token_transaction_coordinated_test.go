@@ -279,6 +279,45 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealed(t *testing.T) {
 	require.Equal(t, st.TokenTransactionStatusFinalized, tokenTransactionAfterFinalizeRevealedTransactions.Status)
 	for _, tokenOutput := range tokenTransactionAfterFinalizeRevealedTransactions.Edges.SpentOutput {
 		require.Equal(t, len(tokenOutput.Edges.TokenPartialRevocationSecretShares), len(config.SigningOperators)-1, "should have exactly numOperators-1 secret shares")
+		require.Equal(t, st.TokenOutputStatusSpentFinalized, tokenOutput.Status)
+	}
+	for _, tokenOutput := range tokenTransactionAfterFinalizeRevealedTransactions.Edges.CreatedOutput {
+		require.Equal(t, st.TokenOutputStatusCreatedFinalized, tokenOutput.Status)
+	}
+}
+
+func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealedWithAllFieldsButStatusRevealed(t *testing.T) {
+	ctx := t.Context()
+	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+	require.NoError(t, err, "failed to create transfer token transaction")
+
+	entClient := sparktesting.NewPostgresEntClient(t, config.CoordinatorDatabaseURI)
+	defer entClient.Close()
+
+	setAndValidateSuccessfulTokenTransactionToRevealedWithoutDeletingRevocationSecretShares(t, ctx, entClient, finalTransferTokenTransactionHash)
+
+	conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000001"].NewOperatorGRPCConnection()
+	require.NoError(t, err)
+	mockClient := pbmock.NewMockServiceClient(conn)
+	_, err = mockClient.TriggerTask(t.Context(), &pbmock.TriggerTaskRequest{TaskName: "finalize_revealed_token_transactions"})
+	require.NoError(t, err)
+	conn.Close()
+
+	// ==== Verify the transaction is finalized ====
+	tokenTransactionAfterFinalizeRevealedTransactions, err := entClient.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)).
+		WithPeerSignatures().
+		WithSpentOutput(
+			func(to *ent.TokenOutputQuery) {
+				to.WithTokenPartialRevocationSecretShares()
+			},
+		).
+		WithCreatedOutput().
+		Only(ctx)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenTransactionStatusFinalized, tokenTransactionAfterFinalizeRevealedTransactions.Status)
+	for _, tokenOutput := range tokenTransactionAfterFinalizeRevealedTransactions.Edges.SpentOutput {
+		require.Equal(t, len(tokenOutput.Edges.TokenPartialRevocationSecretShares), len(config.SigningOperators)-1, "should have exactly numOperators-1 secret shares")
 	}
 }
 
@@ -494,6 +533,78 @@ func setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t *testing.T,
 		require.Empty(t, output.Edges.TokenPartialRevocationSecretShares, "should have 0 secret shares")
 	}
 	for _, output := range tokenTransaction.Edges.CreatedOutput {
+		require.Equal(t, st.TokenOutputStatusCreatedSigned, output.Status, "created output %s should be signed", output.ID)
+	}
+}
+
+func setAndValidateSuccessfulTokenTransactionToRevealedWithoutDeletingRevocationSecretShares(t *testing.T, ctx context.Context, entClient *ent.Client, finalTransferTokenTransactionHash []byte) {
+	tx, err := entClient.Tx(ctx)
+	require.NoError(t, err)
+
+	tokenTransaction, err := tx.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)).
+		WithSpentOutput(
+			func(to *ent.TokenOutputQuery) {
+				to.WithTokenPartialRevocationSecretShares()
+			},
+		).
+		WithCreatedOutput().
+		Only(ctx)
+	require.NoError(t, err)
+	createdIDs := make([]uuid.UUID, 0, len(tokenTransaction.Edges.CreatedOutput))
+	for _, o := range tokenTransaction.Edges.CreatedOutput {
+		createdIDs = append(createdIDs, o.ID)
+	}
+
+	spentIDs := make([]uuid.UUID, 0, len(tokenTransaction.Edges.SpentOutput))
+	for _, o := range tokenTransaction.Edges.SpentOutput {
+		fmt.Println("spent output", o.ID)
+		spentIDs = append(spentIDs, o.ID)
+	}
+
+	err = tx.TokenOutput.
+		Update().
+		Where(tokenoutput.IDIn(createdIDs...)).
+		SetStatus(st.TokenOutputStatusCreatedSigned).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	err = tx.TokenOutput.
+		Update().
+		Where(tokenoutput.IDIn(spentIDs...)).
+		SetStatus(st.TokenOutputStatusSpentSigned).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	err = tx.TokenTransaction.Update().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)).
+		SetStatus(st.TokenTransactionStatusRevealed).
+		SetUpdateTime(time.Now().Add(-25 * time.Minute).UTC()).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	err = tx.Commit()
+	require.NoError(t, err)
+
+	updatedTokenTx, err := entClient.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)).
+		WithPeerSignatures().
+		WithSpentOutput(
+			func(to *ent.TokenOutputQuery) {
+				to.WithTokenPartialRevocationSecretShares()
+			},
+		).
+		WithCreatedOutput().
+		Only(ctx)
+	require.NoError(t, err)
+
+	require.Equal(t, st.TokenTransactionStatusRevealed, updatedTokenTx.Status, "token transaction status should be revealed")
+	require.Greater(t, time.Now().In(time.UTC).Sub(updatedTokenTx.UpdateTime.In(time.UTC)), 5*time.Minute, "update time should be more than 5 minutes before now")
+	for i, output := range updatedTokenTx.Edges.SpentOutput {
+		require.Equal(t, st.TokenOutputStatusSpentSigned, output.Status, "spent output %s should be signed", output.ID)
+		require.Len(t, output.Edges.TokenPartialRevocationSecretShares, len(tokenTransaction.Edges.SpentOutput[i].Edges.TokenPartialRevocationSecretShares), "should have the same amount of keyshares as the original transaction")
+	}
+	for _, output := range updatedTokenTx.Edges.CreatedOutput {
 		require.Equal(t, st.TokenOutputStatusCreatedSigned, output.Status, "created output %s should be signed", output.ID)
 	}
 }
