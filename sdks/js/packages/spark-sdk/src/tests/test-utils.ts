@@ -15,6 +15,7 @@ import { getP2TRAddressFromPublicKey } from "../utils/bitcoin.js";
 import { getNetwork, Network } from "../utils/network.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
+import { sha256 } from "@noble/hashes/sha2";
 
 export { BitcoinFaucet };
 
@@ -160,3 +161,9 @@ export const walletTypes = [
     createTree: createNewTreeWithoutDirectTx,
   },
 ];
+
+export function createDeterministicKeys(seed: string) {
+  const privateKey = sha256(new TextEncoder().encode(seed));
+  const publicKey = secp256k1.getPublicKey(privateKey, true);
+  return { privateKey, publicKey };
+}

@@ -29,7 +29,11 @@ import {
 } from "../proto/spark_token.js";
 import { TokenOutputsMap } from "../spark-wallet/types.js";
 import { SparkCallOptions } from "../types/grpc.js";
-import { decodeSparkAddress, SparkAddressFormat } from "../utils/address.js";
+import {
+  decodeSparkAddress,
+  SparkAddressFormat,
+  isValidPublicKey,
+} from "../utils/address.js";
 import { collectResponses } from "../utils/response-validation.js";
 import {
   hashOperatorSpecificTokenTransactionSignablePayload,
@@ -979,6 +983,38 @@ export class TokenTransactionService {
   public async fetchOwnedTokenOutputs(
     params: FetchOwnedTokenOutputsParams,
   ): Promise<OutputWithPreviousTransactionData[]> {
+    const {
+      ownerPublicKeys,
+      issuerPublicKeys = [],
+      tokenIdentifiers = [],
+    } = params;
+
+    if (ownerPublicKeys.length === 0) {
+      throw new ValidationError("Owner public keys cannot be empty", {
+        field: "ownerPublicKeys",
+        value: ownerPublicKeys,
+        expected: "Non-empty array",
+      });
+    }
+    for (const ownerPublicKey of ownerPublicKeys) {
+      isValidPublicKey(bytesToHex(ownerPublicKey));
+    }
+    for (const issuerPublicKey of issuerPublicKeys) {
+      isValidPublicKey(bytesToHex(issuerPublicKey));
+    }
+    for (const tokenIdentifier of tokenIdentifiers) {
+      if (tokenIdentifier.length !== 32) {
+        throw new ValidationError(
+          "Token identifier must be 32 bytes (64 hex characters) long.",
+          {
+            field: "tokenIdentifier",
+            value: tokenIdentifier,
+            expected: "32 bytes",
+          },
+        );
+      }
+    }
+
     if (this.config.getTokenTransactionVersion() === "V0") {
       return this.fetchOwnedTokenOutputsV0(params);
     } else {
