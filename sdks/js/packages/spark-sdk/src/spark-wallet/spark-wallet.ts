@@ -3588,7 +3588,7 @@ export class SparkWallet extends EventEmitter {
 
       const sspResponse = await sspClient.requestLightningSend({
         encodedInvoice: invoice,
-        idempotencyKey: paymentHash,
+        idempotencyKey: uuidv7(),
         amountSats: isZeroAmountInvoice ? amountSatsToSend! : undefined,
       });
 
