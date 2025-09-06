@@ -1500,9 +1500,18 @@ func testTransferWithInvoice(t *testing.T, invoice string, senderPrivKey keys.Pr
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
 	pendingTransfer, err := wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
 	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pendingTransfer.Transfers, 1)
-	receiverTransfer := pendingTransfer.Transfers[0]
-	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+	require.NotEmpty(t, pendingTransfer.Transfers)
+	// With deterministic private key generation, when the test is retried on failure,
+	// transfers from the previous failed run will come back as a pending transfer.
+	// Find the one that matches this run so we can pass retry.
+	var receiverTransfer *spark.Transfer
+	for _, t := range pendingTransfer.Transfers {
+		if t.Id == senderTransfer.Id {
+			receiverTransfer = t
+			break
+		}
+	}
+	require.NotNil(t, receiverTransfer)
 	require.Equal(t, spark.TransferType_TRANSFER, receiverTransfer.Type)
 	require.Equal(t, invoice, receiverTransfer.GetSparkInvoice())
 
