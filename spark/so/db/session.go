@@ -44,7 +44,7 @@ func initMetrics() error {
 
 	var err error
 	txDurationHistogram, err = meter.Float64Histogram(
-		"transaction_duration_ms",
+		"db_transaction_duration",
 		metric.WithDescription("Database transaction duration in milliseconds"),
 		metric.WithUnit("ms"),
 		metric.WithExplicitBucketBoundaries(
@@ -58,7 +58,7 @@ func initMetrics() error {
 	}
 
 	txCounter, err = meter.Int64Counter(
-		"transactions_total",
+		"db_transactions_total",
 		metric.WithDescription("Total number of database transactions"),
 	)
 	if err != nil {
@@ -66,7 +66,7 @@ func initMetrics() error {
 	}
 
 	txActiveGauge, err = meter.Int64UpDownCounter(
-		"transactions_active",
+		"db_transactions_active",
 		metric.WithDescription("Number of currently active database transactions"),
 	)
 	if err != nil {
@@ -178,15 +178,11 @@ type Session struct {
 	ctx context.Context
 	// TxProvider is used to create a new transaction when needed.
 	provider ent.TxProvider
-	// Mutex for ensuring thread-safe access to `currentTx` and `timer`.
+	// Mutex for ensuring thread-safe access to `currentTx`.
 	mu sync.Mutex
 	// The current transaction being tracked by this session if a transaction has been started. When
 	// the tracked transaction is committed or rolled back successfully, this field is set back to nil.
 	currentTx *ent.Tx
-	// A timer for tracking how long a transaction is held. If a transaction is held for more than
-	// a set amount of time, we log a warning. This is useful for tracking down long running
-	// transactions.
-	timer *time.Timer
 	// startTime is the time when the current transaction was started.
 	startTime time.Time
 }
@@ -201,7 +197,7 @@ func NewSession(ctx context.Context, dbClient *ent.Client, opts ...SessionOption
 	)
 
 	return &Session{
-		sessionConfig: newSessionConfig(opts...),
+		sessionConfig: sessionConfig,
 		ctx:           ctx,
 		provider:      provider,
 		currentTx:     nil,
@@ -235,9 +231,6 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 		}
 		s.currentTx = tx
 		s.startTime = time.Now()
-		s.timer = time.AfterFunc(30*time.Second, func() {
-			logger.Info("Transaction is held for more than 30 seconds")
-		})
 
 		addTraceEvent(ctx, "begin", 0, nil)
 
@@ -266,8 +259,6 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				}
 
 				if err == nil || errors.Is(err, sql.ErrTxDone) || errors.Is(err, context.Canceled) {
-					s.timer.Stop()
-					s.timer = nil
 					s.currentTx = nil
 				}
 
@@ -297,8 +288,6 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				txDurationHistogram.Record(ctx, duration, metric.WithAttributes(attrs...))
 				txCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
 				txActiveGauge.Add(ctx, -1, metric.WithAttributes(s.getGaugeAttributes(attrOperationRollback)...))
-				s.timer.Stop()
-				s.timer = nil
 				s.currentTx = nil
 				return err
 			})
