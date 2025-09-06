@@ -429,11 +429,12 @@ func main() {
 		}
 		scheduler.Start()
 		defer scheduler.Shutdown() //nolint:errcheck
-	}
 
-	errGrp.Go(func() error {
-		return task.RunStartupTasks(config, dbClient, args.RunningLocally, knobsService)
-	})
+		// Run startup tasks
+		errGrp.Go(func() error {
+			return task.RunStartupTasks(config, dbClient, args.RunningLocally, knobsService)
+		})
+	}
 
 	sessionTokenCreatorVerifier, err := authninternal.NewSessionTokenCreatorVerifier(config.IdentityPrivateKey, nil)
 	if err != nil {
