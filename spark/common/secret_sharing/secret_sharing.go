@@ -79,8 +79,11 @@ type VerifiableSecretShare struct {
 
 // MarshalProto marshals the VerifiableSecretShare to a protobuf message.
 func (v *VerifiableSecretShare) MarshalProto() *pb.SecretShare {
+	secretShare := make([]byte, 32)
+	v.Share.FillBytes(secretShare)
+
 	return &pb.SecretShare{
-		SecretShare: v.Share.Bytes(),
+		SecretShare: secretShare,
 		Proofs:      v.Proofs,
 	}
 }
