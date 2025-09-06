@@ -19,6 +19,7 @@ const (
 	KnobRateLimitMethods                 = "spark.so.ratelimit.methods"
 	KnobSoRollbackUtxoSwapUsingGossip    = "spark.so.rollback_utxo_swap_using_gossip"
 	KnobSoTransferLimit                  = "spark.so.transfer_limit"
+	KnobGrpcServerMethodEnabled          = "spark.so.grpc.server.method.enabled"
 	KnobGrpcServerConnectionTimeout      = "spark.so.grpc.server.connection_timeout"
 	KnobGrpcServerKeepaliveTime          = "spark.so.grpc.server.keepalive_time"
 	KnobGrpcServerKeepaliveTimeout       = "spark.so.grpc.server.keepalive_timeout"

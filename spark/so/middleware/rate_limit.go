@@ -138,6 +138,14 @@ func NewRateLimiter(configOrProvider any, opts ...RateLimiterOption) (*RateLimit
 
 func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		// Check if the method is enabled.
+		if r.knobs != nil {
+			methodEnabled := r.knobs.RolloutRandomTarget(knobs.KnobGrpcServerMethodEnabled, &info.FullMethod, 100)
+			if !methodEnabled {
+				return nil, errors.UnavailableErrorf("The method is currently unavailable, please try again later.")
+			}
+		}
+
 		shouldLimit := slices.Contains(r.config.Methods, info.FullMethod)
 		if r.knobs != nil {
 			// A value of > 0 means to enforce rate limiting for the given method.
