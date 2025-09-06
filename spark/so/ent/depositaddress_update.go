@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
-	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 )
@@ -35,26 +34,6 @@ func (dau *DepositAddressUpdate) Where(ps ...predicate.DepositAddress) *DepositA
 // SetUpdateTime sets the "update_time" field.
 func (dau *DepositAddressUpdate) SetUpdateTime(t time.Time) *DepositAddressUpdate {
 	dau.mutation.SetUpdateTime(t)
-	return dau
-}
-
-// SetNetwork sets the "network" field.
-func (dau *DepositAddressUpdate) SetNetwork(s schematype.Network) *DepositAddressUpdate {
-	dau.mutation.SetNetwork(s)
-	return dau
-}
-
-// SetNillableNetwork sets the "network" field if the given value is not nil.
-func (dau *DepositAddressUpdate) SetNillableNetwork(s *schematype.Network) *DepositAddressUpdate {
-	if s != nil {
-		dau.SetNetwork(*s)
-	}
-	return dau
-}
-
-// ClearNetwork clears the value of the "network" field.
-func (dau *DepositAddressUpdate) ClearNetwork() *DepositAddressUpdate {
-	dau.mutation.ClearNetwork()
 	return dau
 }
 
@@ -298,11 +277,6 @@ func (dau *DepositAddressUpdate) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (dau *DepositAddressUpdate) check() error {
-	if v, ok := dau.mutation.Network(); ok {
-		if err := depositaddress.NetworkValidator(v); err != nil {
-			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "DepositAddress.network": %w`, err)}
-		}
-	}
 	if dau.mutation.SigningKeyshareCleared() && len(dau.mutation.SigningKeyshareIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "DepositAddress.signing_keyshare"`)
 	}
@@ -323,9 +297,6 @@ func (dau *DepositAddressUpdate) sqlSave(ctx context.Context) (n int, err error)
 	}
 	if value, ok := dau.mutation.UpdateTime(); ok {
 		_spec.SetField(depositaddress.FieldUpdateTime, field.TypeTime, value)
-	}
-	if value, ok := dau.mutation.Network(); ok {
-		_spec.SetField(depositaddress.FieldNetwork, field.TypeEnum, value)
 	}
 	if dau.mutation.NetworkCleared() {
 		_spec.ClearField(depositaddress.FieldNetwork, field.TypeEnum)
@@ -482,26 +453,6 @@ type DepositAddressUpdateOne struct {
 // SetUpdateTime sets the "update_time" field.
 func (dauo *DepositAddressUpdateOne) SetUpdateTime(t time.Time) *DepositAddressUpdateOne {
 	dauo.mutation.SetUpdateTime(t)
-	return dauo
-}
-
-// SetNetwork sets the "network" field.
-func (dauo *DepositAddressUpdateOne) SetNetwork(s schematype.Network) *DepositAddressUpdateOne {
-	dauo.mutation.SetNetwork(s)
-	return dauo
-}
-
-// SetNillableNetwork sets the "network" field if the given value is not nil.
-func (dauo *DepositAddressUpdateOne) SetNillableNetwork(s *schematype.Network) *DepositAddressUpdateOne {
-	if s != nil {
-		dauo.SetNetwork(*s)
-	}
-	return dauo
-}
-
-// ClearNetwork clears the value of the "network" field.
-func (dauo *DepositAddressUpdateOne) ClearNetwork() *DepositAddressUpdateOne {
-	dauo.mutation.ClearNetwork()
 	return dauo
 }
 
@@ -758,11 +709,6 @@ func (dauo *DepositAddressUpdateOne) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (dauo *DepositAddressUpdateOne) check() error {
-	if v, ok := dauo.mutation.Network(); ok {
-		if err := depositaddress.NetworkValidator(v); err != nil {
-			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "DepositAddress.network": %w`, err)}
-		}
-	}
 	if dauo.mutation.SigningKeyshareCleared() && len(dauo.mutation.SigningKeyshareIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "DepositAddress.signing_keyshare"`)
 	}
@@ -800,9 +746,6 @@ func (dauo *DepositAddressUpdateOne) sqlSave(ctx context.Context) (_node *Deposi
 	}
 	if value, ok := dauo.mutation.UpdateTime(); ok {
 		_spec.SetField(depositaddress.FieldUpdateTime, field.TypeTime, value)
-	}
-	if value, ok := dauo.mutation.Network(); ok {
-		_spec.SetField(depositaddress.FieldNetwork, field.TypeEnum, value)
 	}
 	if dauo.mutation.NetworkCleared() {
 		_spec.ClearField(depositaddress.FieldNetwork, field.TypeEnum)

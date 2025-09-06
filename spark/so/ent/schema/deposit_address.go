@@ -44,6 +44,7 @@ func (DepositAddress) Fields() []ent.Field {
 			Unique().
 			Comment("P2TR address string that pays to the combined public key of SOs and the owner's signing public key."),
 		field.Enum("network").GoType(st.Network("")).
+			Immutable().
 			Comment("Network on which the deposit address is valid.").
 			Optional(),
 		field.Bytes("owner_identity_pubkey").
