@@ -788,10 +788,14 @@ func prepareClaimLeafKeyTweaks(config *TestWalletConfig, leaf LeafKeyTweak) (map
 		if share == nil {
 			return nil, nil, fmt.Errorf("failed to find share for operator %d", operator.ID)
 		}
+
+		secretShareBytes := make([]byte, 32)
+		share.Share.FillBytes(secretShareBytes)
+
 		leafTweaksMap[identifier] = &pb.ClaimLeafKeyTweak{
 			LeafId: leaf.Leaf.Id,
 			SecretShareTweak: &pb.SecretShare{
-				SecretShare: share.Share.Bytes(),
+				SecretShare: secretShareBytes,
 				Proofs:      share.Proofs,
 			},
 			PubkeySharesTweak: pubkeySharesTweak,
