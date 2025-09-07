@@ -20,12 +20,12 @@ export default function Index() {
 
       const handleTransferClaimed = (
         transferId: string,
-        updatedBalance: number
+        updatedBalance: number,
       ) => {
         console.log(
           "Transfer claimed event received!",
           transferId,
-          updatedBalance
+          updatedBalance,
         );
         setBalance(updatedBalance);
       };
@@ -49,12 +49,12 @@ export default function Index() {
 
       const handleTransferClaimed = (
         transferId: string,
-        updatedBalance: number
+        updatedBalance: number,
       ) => {
         console.log(
           "Transfer claimed event received!",
           transferId,
-          updatedBalance
+          updatedBalance,
         );
         setBalance1(updatedBalance);
       };
@@ -80,7 +80,7 @@ export default function Index() {
     (async () => {
       const dummyTx = await createDummyTx(
         "bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te",
-        65536n
+        65536n,
       );
       setDummyTx(dummyTx.txid);
     })();

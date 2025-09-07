@@ -13,8 +13,8 @@
     "cli:dev:mainnet": "cross-env NODE_ENV=development NETWORK=mainnet CONFIG_FILE=config/dev-mainnet-config.json tsx src/cli.ts",
     "cli:loadtest": "cross-env NODE_ENV=development NETWORK=regtest CONFIG_FILE=config/loadtest-regtest-config.json tsx src/cli.ts",
     "clean": "rm -rf dist",
-    "format:fix": "prettier src --write",
-    "format": "prettier src --check",
+    "format:fix": "prettier . --write",
+    "format": "prettier . --check",
     "build": "tsc",
     "types": "tsc"
   },
@@ -24,7 +24,7 @@
   "devDependencies": {
     "@types/node": "^22.13.2",
     "cross-env": "^7.0.3",
-    "prettier": "^3.5.1",
+    "prettier": "^3.6.2",
     "typescript": "^5.7.3"
   },
   "dependencies": {

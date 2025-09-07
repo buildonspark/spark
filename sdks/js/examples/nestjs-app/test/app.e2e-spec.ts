@@ -1,9 +1,9 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
-import { AppModule } from './../src/app.module';
+import { Test, TestingModule } from "@nestjs/testing";
+import { INestApplication } from "@nestjs/common";
+import * as request from "supertest";
+import { AppModule } from "./../src/app.module";
 
-describe('AppController (e2e)', () => {
+describe("AppController (e2e)", () => {
   let app: INestApplication;
 
   beforeEach(async () => {
@@ -20,24 +20,28 @@ describe('AppController (e2e)', () => {
     done();
   });
 
-  it('/ (GET)', () => {
+  it("/ (GET)", () => {
     return request(app.getHttpServer())
-      .get('/')
+      .get("/")
       .expect(200)
-      .expect('Hello World!');
+      .expect("Hello World!");
   });
 
-  it('/create-spark-wallet (GET)', () => {
+  it("/create-spark-wallet (GET)", () => {
     return request(app.getHttpServer())
-      .get('/create-spark-wallet')
+      .get("/create-spark-wallet")
       .expect(200)
-      .expect("Spark Wallet Identity Public Key: 02a81f113befc188d45030511e5a4c9d9f83a515b0f594d3f8d53b1989109d85d5");
+      .expect(
+        "Spark Wallet Identity Public Key: 02a81f113befc188d45030511e5a4c9d9f83a515b0f594d3f8d53b1989109d85d5",
+      );
   });
 
-  it('/test-wasm (GET)', () => {
+  it("/test-wasm (GET)", () => {
     return request(app.getHttpServer())
-      .get('/test-wasm')
+      .get("/test-wasm")
       .expect(200)
-      .expect("2ed5c588ed2a2999344b4c8d60869bcf02a0aa4f7cf0856fddf189f1ff927cdb");
+      .expect(
+        "2ed5c588ed2a2999344b4c8d60869bcf02a0aa4f7cf0856fddf189f1ff927cdb",
+      );
   });
 });

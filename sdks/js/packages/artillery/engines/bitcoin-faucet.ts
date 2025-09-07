@@ -7,10 +7,14 @@ import { taprootTweakPrivKey } from "@scure/btc-signer/utils";
 
 // Static keys for deterministic testing
 // P2TRAddress: bcrt1p2uy9zw5ltayucsuzl4tet6ckelzawp08qrtunacscsszflye907q62uqhl
-const STATIC_FAUCET_KEY = hexToBytes("deadbeef1337cafe4242424242424242deadbeef1337cafe4242424242424242");
+const STATIC_FAUCET_KEY = hexToBytes(
+  "deadbeef1337cafe4242424242424242deadbeef1337cafe4242424242424242",
+);
 
 // P2TRAddress: bcrt1pwr5k38p68ceyrnm2tvrp50dvmg3grh6uvayjl3urwtxejhd3dw4swz6p58
-const STATIC_MINING_KEY = hexToBytes("1337cafe4242deadbeef4242424242421337cafe4242deadbeef424242424242");
+const STATIC_MINING_KEY = hexToBytes(
+  "1337cafe4242deadbeef4242424242421337cafe4242deadbeef424242424242",
+);
 const SATS_PER_BTC = 100_000_000;
 
 export type FaucetCoin = {
@@ -65,19 +69,30 @@ export class BitcoinFaucet {
   private constructor(
     url: string = "http://127.0.0.1:8332",
     username: string = "testutil",
-    password: string = "testutilpassword"
+    password: string = "testutilpassword",
   ) {
     this.url = url;
     this.username = username;
     this.password = password;
-    this.miningAddress = getP2TRAddressFromPublicKey(secp256k1.getPublicKey(STATIC_MINING_KEY));
-    console.log(`BitcoinFaucet initialized with URL: ${this.url} in process ${process.pid}`);
+    this.miningAddress = getP2TRAddressFromPublicKey(
+      secp256k1.getPublicKey(STATIC_MINING_KEY),
+    );
+    console.log(
+      `BitcoinFaucet initialized with URL: ${this.url} in process ${process.pid}`,
+    );
   }
 
-  static getInstance(url?: string, username?: string, password?: string): BitcoinFaucet {
-    const faucetUrl = url || process.env.BITCOIN_RPC_URL || "http://127.0.0.1:8332";
-    const faucetUsername = username || process.env.BITCOIN_RPC_USER || "testutil";
-    const faucetPassword = password || process.env.BITCOIN_RPC_PASSWORD || "testutilpassword";
+  static getInstance(
+    url?: string,
+    username?: string,
+    password?: string,
+  ): BitcoinFaucet {
+    const faucetUrl =
+      url || process.env.BITCOIN_RPC_URL || "http://127.0.0.1:8332";
+    const faucetUsername =
+      username || process.env.BITCOIN_RPC_USER || "testutil";
+    const faucetPassword =
+      password || process.env.BITCOIN_RPC_PASSWORD || "testutilpassword";
 
     return new BitcoinFaucet(faucetUrl, faucetUsername, faucetPassword);
   }
@@ -102,8 +117,15 @@ export class BitcoinFaucet {
           try {
             await this.refill();
           } catch (error: any) {
-            if (error.message?.includes("Transaction outputs already in utxo set") && retries > 1) {
-              console.log("[BitcoinFaucet] Refill failed due to race condition, retrying...");
+            if (
+              error.message?.includes(
+                "Transaction outputs already in utxo set",
+              ) &&
+              retries > 1
+            ) {
+              console.log(
+                "[BitcoinFaucet] Refill failed due to race condition, retrying...",
+              );
               retries--;
               await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second
               continue;
@@ -133,7 +155,10 @@ export class BitcoinFaucet {
     const minerPubKey = secp256k1.getPublicKey(STATIC_MINING_KEY);
     const address = getP2TRAddressFromPublicKey(minerPubKey);
 
-    const scanResult = await this.call("scantxoutset", ["start", [`addr(${address})`]]);
+    const scanResult = await this.call("scantxoutset", [
+      "start",
+      [`addr(${address})`],
+    ]);
 
     let selectedUtxo;
     let selectedUtxoAmountSats;
@@ -154,7 +179,9 @@ export class BitcoinFaucet {
       selectedUtxoAmountSats = BigInt(selectedUtxo.amount);
     } else {
       selectedUtxo = scanResult.unspents.find((utxo) => {
-        const isValueEnough = BigInt(Math.floor(utxo.amount * SATS_PER_BTC)) >= COIN_AMOUNT + FEE_AMOUNT;
+        const isValueEnough =
+          BigInt(Math.floor(utxo.amount * SATS_PER_BTC)) >=
+          COIN_AMOUNT + FEE_AMOUNT;
         const isMature = scanResult.height - utxo.height >= 100;
         return isValueEnough && isMature;
       });
@@ -162,15 +189,19 @@ export class BitcoinFaucet {
       if (!selectedUtxo) {
         throw new Error("No UTXO large enough to create even one faucet coin");
       }
-      selectedUtxoAmountSats = BigInt(Math.floor(selectedUtxo.amount * SATS_PER_BTC));
+      selectedUtxoAmountSats = BigInt(
+        Math.floor(selectedUtxo.amount * SATS_PER_BTC),
+      );
     }
 
-    const maxPossibleCoins = Number((selectedUtxoAmountSats - FEE_AMOUNT) / COIN_AMOUNT);
+    const maxPossibleCoins = Number(
+      (selectedUtxoAmountSats - FEE_AMOUNT) / COIN_AMOUNT,
+    );
     const numCoinsToCreate = Math.min(maxPossibleCoins, TARGET_NUM_COINS);
 
     if (numCoinsToCreate < 1) {
       throw new Error(
-        `Selected UTXO (${selectedUtxoAmountSats} sats) is too small to create even one faucet coin of ${COIN_AMOUNT} sats`
+        `Selected UTXO (${selectedUtxoAmountSats} sats) is too small to create even one faucet coin of ${COIN_AMOUNT} sats`,
       );
     }
 
@@ -189,7 +220,10 @@ export class BitcoinFaucet {
       });
     }
 
-    const remainingValue = selectedUtxoAmountSats - COIN_AMOUNT * BigInt(numCoinsToCreate) - FEE_AMOUNT;
+    const remainingValue =
+      selectedUtxoAmountSats -
+      COIN_AMOUNT * BigInt(numCoinsToCreate) -
+      FEE_AMOUNT;
     const minerScript = getP2TRScriptFromPublicKey(minerPubKey);
     if (remainingValue > 0n) {
       splitTx.addOutput({
@@ -204,14 +238,16 @@ export class BitcoinFaucet {
         amount: selectedUtxoAmountSats,
         script: minerScript,
       },
-      STATIC_MINING_KEY
+      STATIC_MINING_KEY,
     );
 
     try {
       await this.broadcastTx(bytesToHex(signedSplitTx.extract()));
     } catch (error: any) {
       if (error.message?.includes("Transaction outputs already in utxo set")) {
-        console.log("[BitcoinFaucet] Transaction already broadcast, likely by another process. Continuing...");
+        console.log(
+          "[BitcoinFaucet] Transaction already broadcast, likely by another process. Continuing...",
+        );
         return;
       }
       throw error;
@@ -245,9 +281,17 @@ export class BitcoinFaucet {
 
     sendToPubKeyTx.addInput(coinToSend.outpoint);
 
-    sendToPubKeyTx.addOutputAddress(p2wpkhAddress, COIN_AMOUNT - FEE_AMOUNT, NETWORK_CONFIG);
+    sendToPubKeyTx.addOutputAddress(
+      p2wpkhAddress,
+      COIN_AMOUNT - FEE_AMOUNT,
+      NETWORK_CONFIG,
+    );
 
-    const signedTx = await this.signFaucetCoin(sendToPubKeyTx, coinToSend.txout, coinToSend.key);
+    const signedTx = await this.signFaucetCoin(
+      sendToPubKeyTx,
+      coinToSend.txout,
+      coinToSend.key,
+    );
 
     await this.broadcastTx(bytesToHex(signedTx.extract()));
   }
@@ -255,7 +299,7 @@ export class BitcoinFaucet {
   async signFaucetCoin(
     unsignedTx: Transaction,
     fundingTxOut: TransactionOutput,
-    key: Uint8Array
+    key: Uint8Array,
   ): Promise<Transaction> {
     const pubKey = secp256k1.getPublicKey(key);
     const internalKey = pubKey.slice(1);
@@ -274,12 +318,13 @@ export class BitcoinFaucet {
       0,
       new Array(unsignedTx.inputsLength).fill(script),
       SigHash.DEFAULT,
-      new Array(unsignedTx.inputsLength).fill(fundingTxOut.amount!)
+      new Array(unsignedTx.inputsLength).fill(fundingTxOut.amount!),
     );
 
     const merkleRoot = new Uint8Array();
     const tweakedKey = taprootTweakPrivKey(key, merkleRoot);
-    if (!tweakedKey) throw new Error("Invalid private key for taproot tweaking");
+    if (!tweakedKey)
+      throw new Error("Invalid private key for taproot tweaking");
 
     const signature = schnorr.sign(sighash, tweakedKey);
 
@@ -299,7 +344,9 @@ export class BitcoinFaucet {
   private async call(method: string, params: any[]) {
     try {
       if (!this || !this.url) {
-        throw new Error(`BitcoinFaucet not properly initialized. this.url is undefined`);
+        throw new Error(
+          `BitcoinFaucet not properly initialized. this.url is undefined`,
+        );
       }
       const response = await fetch(this.url, {
         method: "POST",
@@ -349,8 +396,12 @@ export class BitcoinFaucet {
   }
 
   async sendToAddress(address: string, amount: bigint): Promise<string> {
-    console.log(`[BitcoinFaucet.sendToAddress] Called with address: ${address}, amount: ${amount}`);
-    console.log(`[BitcoinFaucet.sendToAddress] this.url: ${this.url}, process: ${process.pid}`);
+    console.log(
+      `[BitcoinFaucet.sendToAddress] Called with address: ${address}, amount: ${amount}`,
+    );
+    console.log(
+      `[BitcoinFaucet.sendToAddress] this.url: ${this.url}, process: ${process.pid}`,
+    );
 
     const coin = await this.fund();
     if (!coin) {

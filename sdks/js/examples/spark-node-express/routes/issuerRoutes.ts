@@ -7,7 +7,7 @@ const ISSUER_MNEMONIC_PATH = ".issuer-mnemonic";
 
 const { router, getWallet, checkWalletInitialized } = createSparkRouter(
   IssuerSparkWallet,
-  ISSUER_MNEMONIC_PATH
+  ISSUER_MNEMONIC_PATH,
 );
 
 /**
@@ -32,7 +32,7 @@ router.get(
       const errorMsg = isError(error) ? error.message : "Unknown error";
       res.status(500).json({ error: errorMsg });
     }
-  }
+  },
 );
 
 /**
@@ -63,7 +63,7 @@ router.get(
       const errorMsg = isError(error) ? error.message : "Unknown error";
       res.status(500).json({ error: errorMsg });
     }
-  }
+  },
 );
 
 /**
@@ -84,7 +84,7 @@ router.post(
     try {
       const { tokenAmount } = req.body as { tokenAmount: number };
       const tokenTransactionHash = await wallet!.mintTokens(
-        BigInt(tokenAmount)
+        BigInt(tokenAmount),
       );
       res.json({
         data: { tokenTransactionHash },
@@ -94,7 +94,7 @@ router.post(
       const errorMsg = isError(error) ? error.message : "Unknown error";
       res.status(500).json({ error: errorMsg });
     }
-  }
+  },
 );
 
 /**
@@ -123,7 +123,7 @@ router.post(
       const errorMsg = isError(error) ? error.message : "Unknown error";
       res.status(500).json({ error: errorMsg });
     }
-  }
+  },
 );
 
 /**
@@ -157,7 +157,7 @@ router.post(
       const errorMsg = isError(error) ? error.message : "Unknown error";
       res.status(500).json({ error: errorMsg });
     }
-  }
+  },
 );
 
 /**
@@ -190,7 +190,7 @@ router.post(
       const errorMsg = isError(error) ? error.message : "Unknown error";
       res.status(500).json({ error: errorMsg });
     }
-  }
+  },
 );
 
 export default router;

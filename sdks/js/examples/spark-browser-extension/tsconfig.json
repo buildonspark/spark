@@ -12,4 +12,4 @@
     "outDir": "dist"
   },
   "include": ["src/**/*"]
-} 
+}

@@ -2587,7 +2587,7 @@ __metadata:
     btoa: "npm:^1.2.1"
     depcheck: "npm:^1.4.7"
     madge: "npm:^8.0.0"
-    prettier: "npm:^3.5.1"
+    prettier: "npm:^3.6.2"
     publint: "npm:^0.3.9"
     tsup: "npm:^8.4.0"
     typescript: "npm:^5.7.3"
@@ -2610,7 +2610,7 @@ __metadata:
     jest: "npm:^29.7.0"
     madge: "npm:^8.0.0"
     node-fetch: "npm:^3.3.2"
-    prettier: "npm:^3.5.1"
+    prettier: "npm:^3.6.2"
     publint: "npm:^0.3.9"
     ts-jest: "npm:^29.2.5"
     tsup: "npm:^8.4.0"
@@ -2657,7 +2657,7 @@ __metadata:
     eslint-config-prettier: "npm:^9.0.0"
     eslint-plugin-prettier: "npm:^5.0.0"
     jest: "npm:^29.7.0"
-    prettier: "npm:^3.5.1"
+    prettier: "npm:^3.6.2"
     reflect-metadata: "npm:^0.2.0"
     rxjs: "npm:^7.8.1"
     source-map-support: "npm:^0.5.21"
@@ -2681,7 +2681,7 @@ __metadata:
     "@types/jest": "npm:^29.5.14"
     "@types/node": "npm:^22.13.2"
     jest: "npm:^29.7.0"
-    prettier: "npm:^3.5.1"
+    prettier: "npm:^3.6.2"
     ts-jest: "npm:^29.2.5"
     tsx: "npm:^4.19.3"
     typescript: "npm:^5.7.3"
@@ -2714,6 +2714,7 @@ __metadata:
     bare-utils: "npm:^1.4.0"
     bare-worker: "npm:^3.0.0"
     bare-ws: "npm:^2.0.3"
+    prettier: "npm:^3.6.2"
   languageName: unknown
   linkType: soft
 
@@ -2731,7 +2732,7 @@ __metadata:
     expo-linking: "npm:^7.1.5"
     expo-router: "npm:~5.1.1"
     expo-system-ui: "npm:~5.0.9"
-    prettier: "npm:^3.5.1"
+    prettier: "npm:^3.6.2"
     prettier-config-standard: "npm:^7.0.0"
     react: "npm:19.0.0"
     react-dom: "npm:19.0.0"
@@ -2750,7 +2751,7 @@ __metadata:
     "@buildonspark/spark-sdk": "npm:0.2.13"
     "@types/node": "npm:^22.13.2"
     cross-env: "npm:^7.0.3"
-    prettier: "npm:^3.5.1"
+    prettier: "npm:^3.6.2"
     tsx: "npm:^4.19.3"
     typescript: "npm:^5.7.3"
     yargs: "npm:^18.0.0"
@@ -2786,6 +2787,7 @@ __metadata:
     expo-symbols: "npm:~0.4.5"
     expo-system-ui: "npm:~5.0.9"
     expo-web-browser: "npm:~14.2.0"
+    prettier: "npm:^3.6.2"
     react: "npm:19.0.0"
     react-dom: "npm:19.0.0"
     react-native: "npm:0.79.4"
@@ -2813,7 +2815,7 @@ __metadata:
     cmake-bare: "npm:^1.6.5"
     cmake-cargo: "npm:^0.0.5"
     cmake-npm: "npm:^1.1.0"
-    prettier: "npm:^3.5.1"
+    prettier: "npm:^3.6.2"
     prettier-config-standard: "npm:^7.0.0"
   languageName: unknown
   linkType: soft
@@ -2843,7 +2845,7 @@ __metadata:
     "@types/text-encoding": "npm:^0"
     eslint: "npm:^9.25.0"
     jest: "npm:^29.7.0"
-    prettier: "npm:^3.5.1"
+    prettier: "npm:^3.6.2"
     react: "npm:19.0.0"
     react-native: "npm:0.79.4"
     react-native-get-random-values: "npm:^1.11.0"
@@ -2899,7 +2901,7 @@ __metadata:
     nice-grpc-opentelemetry: "npm:^0.1.18"
     nice-grpc-web: "npm:^3.3.7"
     node-fetch: "npm:^3.3.2"
-    prettier: "npm:^3.5.1"
+    prettier: "npm:^3.6.2"
     publint: "npm:^0.3.9"
     react: "npm:19.0.0"
     react-native: "npm:0.79.4"
@@ -2931,7 +2933,7 @@ __metadata:
     "@buildonspark/lrc20-sdk": "npm:^0.0.54"
     "@types/node": "npm:^22.13.2"
     node-fetch: "npm:^3.3.2"
-    prettier: "npm:^3.5.1"
+    prettier: "npm:^3.6.2"
     tsx: "npm:^4.19.3"
     typescript: "npm:^5.7.3"
   bin:
@@ -2948,6 +2950,7 @@ __metadata:
     "@types/react-dom": "npm:^19.1.5"
     "@vitejs/plugin-react": "npm:^4.3.4"
     globals: "npm:^15.15.0"
+    prettier: "npm:^3.6.2"
     react: "npm:19.0.0"
     react-dom: "npm:19.0.0"
     typescript: "npm:^5.7.3"
@@ -10378,7 +10381,7 @@ __metadata:
     depcheck: "npm:^1.4.7"
     eslint: "npm:^9.25.0"
     madge: "npm:^8.0.0"
-    prettier: "npm:^3.5.1"
+    prettier: "npm:^3.6.2"
     typescript: "npm:^5.7.3"
   peerDependencies:
     artillery: ^2.0.0
@@ -22411,7 +22414,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prettier@npm:^3.5.1":
+"prettier@npm:^3.6.2":
   version: 3.6.2
   resolution: "prettier@npm:3.6.2"
   bin:
@@ -24598,7 +24601,7 @@ __metadata:
     "@buildonspark/spark-sdk": "npm:0.2.13"
     "@types/chrome": "npm:^0.0.276"
     esbuild: "npm:^0.20.0"
-    prettier: "npm:^3.5.1"
+    prettier: "npm:^3.6.2"
     typescript: "npm:^5.7.3"
   languageName: unknown
   linkType: soft
@@ -24616,6 +24619,7 @@ __metadata:
     eslint: "npm:^9.25.0"
     eslint-config-next: "npm:15.3.2"
     next: "npm:15.3.2"
+    prettier: "npm:^3.6.2"
     react: "npm:19.0.0"
     react-dom: "npm:19.0.0"
     tailwindcss: "npm:^4"
@@ -24636,6 +24640,7 @@ __metadata:
     cross-env: "npm:^7.0.3"
     express: "npm:^4.21.2"
     nodemon: "npm:^3.1.9"
+    prettier: "npm:^3.6.2"
     ts-node: "npm:^10.9.2"
     tslib: "npm:^2.8.1"
     typescript: "npm:^5.7.3"
@@ -24653,6 +24658,7 @@ __metadata:
     babel-loader: "npm:^10.0.0"
     css-loader: "npm:^7.1.2"
     html-webpack-plugin: "npm:^5.6.3"
+    prettier: "npm:^3.6.2"
     react: "npm:19.0.0"
     react-dom: "npm:19.0.0"
     style-loader: "npm:^4.0.0"

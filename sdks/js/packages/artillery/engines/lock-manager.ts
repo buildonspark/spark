@@ -10,7 +10,9 @@ export class LockManager {
   private cleanupInterval: NodeJS.Timeout | null = null;
 
   private constructor() {
-    const dbDir = process.env.ARTILLERY_LOCK_DB_DIR || path.join(process.cwd(), ".artillery-locks-db");
+    const dbDir =
+      process.env.ARTILLERY_LOCK_DB_DIR ||
+      path.join(process.cwd(), ".artillery-locks-db");
 
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
@@ -57,9 +59,11 @@ export class LockManager {
   private startCleanupTask(): void {
     this.cleanupInterval = setInterval(
       () => {
-        this.cleanupStaleLocks().catch((err) => console.error("Periodic cleanup failed:", err));
+        this.cleanupStaleLocks().catch((err) =>
+          console.error("Periodic cleanup failed:", err),
+        );
       },
-      5 * 60 * 1000
+      5 * 60 * 1000,
     );
   }
 
@@ -114,11 +118,15 @@ export class LockManager {
     const cutoffTime = Date.now() - maxAge;
 
     try {
-      const selectStmt = this.db.prepare("SELECT address FROM locks WHERE locked_at < ?");
+      const selectStmt = this.db.prepare(
+        "SELECT address FROM locks WHERE locked_at < ?",
+      );
       const staleLocks = selectStmt.all(cutoffTime);
 
       if (staleLocks.length > 0) {
-        const deleteStmt = this.db.prepare("DELETE FROM locks WHERE locked_at < ?");
+        const deleteStmt = this.db.prepare(
+          "DELETE FROM locks WHERE locked_at < ?",
+        );
         const result = deleteStmt.run(cutoffTime);
 
         console.log(`Cleaned up ${result.changes} stale locks`);
@@ -160,7 +168,9 @@ export class LockManager {
         }
 
         if (removedCount > 0) {
-          console.log(`Cleaned up ${removedCount} locks from ${deadPids.length} dead processes`);
+          console.log(
+            `Cleaned up ${removedCount} locks from ${deadPids.length} dead processes`,
+          );
         }
       }
     } catch (error) {
@@ -222,7 +232,10 @@ export class LockManager {
     }
   }
 
-  async tryLockOneOf(addresses: string[], metadata: any = {}): Promise<string | null> {
+  async tryLockOneOf(
+    addresses: string[],
+    metadata: any = {},
+  ): Promise<string | null> {
     const db = this.db;
     const startTime = Date.now();
 
@@ -250,7 +263,7 @@ export class LockManager {
           const insertTime = Date.now() - insertStartTime;
           const totalTxTime = Date.now() - txStartTime;
           console.log(
-            `    [LOCK TIMING] Successfully locked address after ${attempts} attempts. Insert: ${insertTime}ms, Total TX: ${totalTxTime}ms`
+            `    [LOCK TIMING] Successfully locked address after ${attempts} attempts. Insert: ${insertTime}ms, Total TX: ${totalTxTime}ms`,
           );
 
           return address;
@@ -264,7 +277,7 @@ export class LockManager {
 
       const totalTxTime = Date.now() - txStartTime;
       console.log(
-        `    [LOCK TIMING] Failed to lock any address after ${attempts} attempts. Total TX: ${totalTxTime}ms`
+        `    [LOCK TIMING] Failed to lock any address after ${attempts} attempts. Total TX: ${totalTxTime}ms`,
       );
 
       return null;
@@ -275,17 +288,22 @@ export class LockManager {
       const totalTime = Date.now() - startTime;
 
       if (result) {
-        console.log(`    [LOCK TIMING] tryLockOneOf completed successfully. Total time: ${totalTime}ms`);
+        console.log(
+          `    [LOCK TIMING] tryLockOneOf completed successfully. Total time: ${totalTime}ms`,
+        );
       } else {
         console.log(
-          `    [LOCK TIMING] tryLockOneOf failed (all addresses locked). Total time: ${totalTime}ms for ${addresses.length} addresses`
+          `    [LOCK TIMING] tryLockOneOf failed (all addresses locked). Total time: ${totalTime}ms for ${addresses.length} addresses`,
         );
       }
 
       return result;
     } catch (error) {
       const totalTime = Date.now() - startTime;
-      console.error(`Failed to atomically lock addresses (${totalTime}ms):`, error);
+      console.error(
+        `Failed to atomically lock addresses (${totalTime}ms):`,
+        error,
+      );
       return null;
     }
   }

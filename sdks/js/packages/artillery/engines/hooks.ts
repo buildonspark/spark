@@ -8,7 +8,10 @@ import { LockManager } from "./lock-manager";
 
 const lockManager = LockManager.getInstance();
 
-export async function createLockFile(address: string, metadata: any = {}): Promise<boolean> {
+export async function createLockFile(
+  address: string,
+  metadata: any = {},
+): Promise<boolean> {
   return lockManager.createLock(address, metadata);
 }
 
@@ -20,11 +23,16 @@ export async function isLocked(address: string): Promise<boolean> {
   return lockManager.isLocked(address);
 }
 
-export async function tryLockOneOf(addresses: string[], metadata: any = {}): Promise<string | null> {
+export async function tryLockOneOf(
+  addresses: string[],
+  metadata: any = {},
+): Promise<string | null> {
   return lockManager.tryLockOneOf(addresses, metadata);
 }
 
-export async function getUnlockedAddresses(addresses: string[]): Promise<string[]> {
+export async function getUnlockedAddresses(
+  addresses: string[],
+): Promise<string[]> {
   return lockManager.getUnlockedAddresses(addresses);
 }
 
@@ -113,7 +121,9 @@ interface LockWalletsConfig {
   maxAttempts?: number;
 }
 
-function getWalletsToLockConfig(lockWalletsConfig: LockWalletsConfig | undefined): {
+function getWalletsToLockConfig(
+  lockWalletsConfig: LockWalletsConfig | undefined,
+): {
   walletsToLock: LockWalletConfig[];
   pollInterval: number;
   pollMaxAttempts: number;
@@ -131,11 +141,14 @@ function getWalletsToLockConfig(lockWalletsConfig: LockWalletsConfig | undefined
 
 async function lockWalletByConfig(
   lockConfig: LockWalletConfig,
-  walletPoolsParam: Map<string, { wallets: IssuerSparkWallet[]; available: IssuerSparkWallet[] }>,
+  walletPoolsParam: Map<
+    string,
+    { wallets: IssuerSparkWallet[]; available: IssuerSparkWallet[] }
+  >,
   lockedWalletsParam: Map<string, { wallet: IssuerSparkWallet; pool: string }>,
   context: SparkContext,
   pollInterval: number,
-  pollMaxAttempts: number
+  pollMaxAttempts: number,
 ): Promise<{ name: string; success: boolean; error?: string }> {
   let name: string;
   let poolName: string;
@@ -144,7 +157,8 @@ async function lockWalletByConfig(
     poolName = Array.from(walletPoolsParam.keys())[0] || "default";
   } else {
     name = lockConfig.walletName;
-    poolName = lockConfig.pool || Array.from(walletPoolsParam.keys())[0] || "default";
+    poolName =
+      lockConfig.pool || Array.from(walletPoolsParam.keys())[0] || "default";
   }
   // Get the pool (fall back to default if specific pool not found)
   let pool = walletPoolsParam.get(poolName);
@@ -152,7 +166,11 @@ async function lockWalletByConfig(
   if (!pool) {
     pool = walletPoolsParam.get("default");
     if (!pool) {
-      return { name, success: false, error: `No pools available for wallet "${name}"` };
+      return {
+        name,
+        success: false,
+        error: `No pools available for wallet "${name}"`,
+      };
     }
     actualPoolName = "default";
   }
@@ -208,7 +226,8 @@ async function lockWalletByConfig(
                 wallet = candidateWallet;
                 actualPoolName = otherPoolName;
                 // Remove from available array if it's there
-                const availableIndex = otherPool.available.indexOf(candidateWallet);
+                const availableIndex =
+                  otherPool.available.indexOf(candidateWallet);
                 if (availableIndex > -1) {
                   otherPool.available.splice(availableIndex, 1);
                 }
@@ -251,8 +270,11 @@ async function lockWalletByConfig(
 
 async function lockDefaultWallets(
   context: SparkContext,
-  walletPoolsParam: Map<string, { wallets: IssuerSparkWallet[]; available: IssuerSparkWallet[] }>,
-  lockedWalletsParam: Map<string, { wallet: IssuerSparkWallet; pool: string }>
+  walletPoolsParam: Map<
+    string,
+    { wallets: IssuerSparkWallet[]; available: IssuerSparkWallet[] }
+  >,
+  lockedWalletsParam: Map<string, { wallet: IssuerSparkWallet; pool: string }>,
 ) {
   const namesToLock = WALLET_NAMES.slice(0, Math.floor(Math.random() * 3) + 2);
   for (const name of namesToLock) {
@@ -307,7 +329,7 @@ async function lockDefaultWallets(
 export async function beforeTest(
   context: SparkContext & { _script?: any; script?: any },
   ee: ArtilleryEventEmitter,
-  done: (error?: Error) => void
+  done: (error?: Error) => void,
 ) {
   try {
     console.log(`BeforeTest hook called!`);
@@ -317,27 +339,40 @@ export async function beforeTest(
       return;
     }
 
-    const network = (process.env.SPARK_NETWORK || "LOCAL") as "MAINNET" | "REGTEST" | "TESTNET" | "SIGNET" | "LOCAL";
+    const network = (process.env.SPARK_NETWORK || "LOCAL") as
+      | "MAINNET"
+      | "REGTEST"
+      | "TESTNET"
+      | "SIGNET"
+      | "LOCAL";
 
     // Check if there's an initializePools configuration in the script
     const script = context._script || context.script || context;
     console.log(`BeforeTest: Script keys:`, Object.keys(script || {}));
-    const beforeTestActions = script?.config?.beforeTest || script?.beforeTest || [];
-    console.log(`BeforeTest: Found ${beforeTestActions.length} beforeTest actions`);
-
-    const initializePoolsAction = (beforeTestActions as InitializePoolsAction[]).find(
-      (action) => action.initializePools !== undefined
+    const beforeTestActions =
+      script?.config?.beforeTest || script?.beforeTest || [];
+    console.log(
+      `BeforeTest: Found ${beforeTestActions.length} beforeTest actions`,
     );
 
-    const poolConfigs: PoolConfig[] = initializePoolsAction?.initializePools?.pools ?? defaultPoolConfigs;
+    const initializePoolsAction = (
+      beforeTestActions as InitializePoolsAction[]
+    ).find((action) => action.initializePools !== undefined);
+
+    const poolConfigs: PoolConfig[] =
+      initializePoolsAction?.initializePools?.pools ?? defaultPoolConfigs;
 
     // Create each pool
     for (const poolConfig of poolConfigs) {
       const poolName = poolConfig.name;
       const amount = poolConfig.amount;
 
-      const batchSize = (poolConfig as PoolConfig).batchSize || parseInt(process.env.WALLET_INIT_BATCH_SIZE || "10");
-      console.log(`Creating pool "${poolName}" with ${amount} wallets (batch size: ${batchSize})...`);
+      const batchSize =
+        (poolConfig as PoolConfig).batchSize ||
+        parseInt(process.env.WALLET_INIT_BATCH_SIZE || "10");
+      console.log(
+        `Creating pool "${poolName}" with ${amount} wallets (batch size: ${batchSize})...`,
+      );
 
       const wallets: IssuerSparkWallet[] = [];
       const available: IssuerSparkWallet[] = [];
@@ -346,23 +381,28 @@ export async function beforeTest(
       for (let i = 0; i < amount; i += batchSize) {
         const currentBatchSize = Math.min(batchSize, amount - i);
         const batchStartTime = Date.now();
-        const batchPromises = Array.from({ length: currentBatchSize }, async (_, idx) => {
-          const walletStartTime = Date.now();
-          console.log(`  Starting initialization of wallet ${i + idx + 1}/${amount} in pool "${poolName}"`);
-          const { wallet } = await IssuerSparkWalletNoEvents.initialize({
-            options: {
-              network,
-              threshold: 3, // Set threshold to match the number of operators
-              tokenTransactionVersion: "V1" as const,
-              tokenSignatures: "SCHNORR" as const,
-            },
-          });
-          const walletEndTime = Date.now();
-          console.log(
-            `  Wallet ${i + idx + 1}/${amount} in pool "${poolName}" initialized in ${walletEndTime - walletStartTime}ms`
-          );
-          return wallet;
-        });
+        const batchPromises = Array.from(
+          { length: currentBatchSize },
+          async (_, idx) => {
+            const walletStartTime = Date.now();
+            console.log(
+              `  Starting initialization of wallet ${i + idx + 1}/${amount} in pool "${poolName}"`,
+            );
+            const { wallet } = await IssuerSparkWalletNoEvents.initialize({
+              options: {
+                network,
+                threshold: 3, // Set threshold to match the number of operators
+                tokenTransactionVersion: "V1" as const,
+                tokenSignatures: "SCHNORR" as const,
+              },
+            });
+            const walletEndTime = Date.now();
+            console.log(
+              `  Wallet ${i + idx + 1}/${amount} in pool "${poolName}" initialized in ${walletEndTime - walletStartTime}ms`,
+            );
+            return wallet;
+          },
+        );
 
         const batchWallets = await Promise.all(batchPromises);
         wallets.push(...batchWallets);
@@ -370,7 +410,7 @@ export async function beforeTest(
 
         const batchEndTime = Date.now();
         console.log(
-          `  Generated ${i + currentBatchSize}/${amount} wallets for pool "${poolName}" in ${batchEndTime - batchStartTime}ms`
+          `  Generated ${i + currentBatchSize}/${amount} wallets for pool "${poolName}" in ${batchEndTime - batchStartTime}ms`,
         );
       }
 
@@ -379,10 +419,9 @@ export async function beforeTest(
     }
 
     console.log(
-      `BeforeTest: Created ${walletPools.size} pools with total ${Array.from(walletPools.values()).reduce(
-        (sum, pool) => sum + pool.wallets.length,
-        0
-      )} wallets`
+      `BeforeTest: Created ${walletPools.size} pools with total ${Array.from(
+        walletPools.values(),
+      ).reduce((sum, pool) => sum + pool.wallets.length, 0)} wallets`,
     );
     done();
   } catch (error) {
@@ -391,13 +430,20 @@ export async function beforeTest(
   }
 }
 
-export async function beforeScenario(context: SparkContext, ee: ArtilleryEventEmitter, done: (error?: Error) => void) {
+export async function beforeScenario(
+  context: SparkContext,
+  ee: ArtilleryEventEmitter,
+  done: (error?: Error) => void,
+) {
   try {
     console.log("BeforeScenario: Locking wallets with names...");
-    const scenarioSpec: { lockWallets?: LockWalletsConfig } = context?._scenarioSpec || context?.scenario;
-    const lockWalletsConfig: LockWalletsConfig | undefined = scenarioSpec?.lockWallets;
+    const scenarioSpec: { lockWallets?: LockWalletsConfig } =
+      context?._scenarioSpec || context?.scenario;
+    const lockWalletsConfig: LockWalletsConfig | undefined =
+      scenarioSpec?.lockWallets;
     context.scenarioLockedWallets = context.scenarioLockedWallets || [];
-    const { walletsToLock, pollInterval, pollMaxAttempts } = getWalletsToLockConfig(lockWalletsConfig);
+    const { walletsToLock, pollInterval, pollMaxAttempts } =
+      getWalletsToLockConfig(lockWalletsConfig);
     if (walletsToLock.length > 0) {
       const requiredWallets: string[] = [];
       const failedWallets: string[] = [];
@@ -408,7 +454,7 @@ export async function beforeScenario(context: SparkContext, ee: ArtilleryEventEm
           lockedWallets,
           context,
           pollInterval,
-          pollMaxAttempts
+          pollMaxAttempts,
         );
         requiredWallets.push(result.name);
         if (!result.success) {
@@ -418,7 +464,7 @@ export async function beforeScenario(context: SparkContext, ee: ArtilleryEventEm
       }
       if (failedWallets.length > 0) {
         const error = new Error(
-          `Failed to lock required wallets: ${failedWallets.join(", ")}. Scenario requires ${requiredWallets.length} wallets but only ${requiredWallets.length - failedWallets.length} were locked.`
+          `Failed to lock required wallets: ${failedWallets.join(", ")}. Scenario requires ${requiredWallets.length} wallets but only ${requiredWallets.length - failedWallets.length} were locked.`,
         );
         console.error(error.message);
         done(error);
@@ -430,7 +476,7 @@ export async function beforeScenario(context: SparkContext, ee: ArtilleryEventEm
     context.vars = context.vars || {};
     context.vars.lockedWalletNames = Array.from(lockedWallets.keys());
     console.log(
-      `BeforeScenario: Locked ${lockedWallets.size} wallets with names: ${context.vars.lockedWalletNames.join(", ")}`
+      `BeforeScenario: Locked ${lockedWallets.size} wallets with names: ${context.vars.lockedWalletNames.join(", ")}`,
     );
     done();
   } catch (error) {
@@ -439,7 +485,11 @@ export async function beforeScenario(context: SparkContext, ee: ArtilleryEventEm
   }
 }
 
-export async function afterScenario(context: SparkContext, ee: ArtilleryEventEmitter, done: (error?: Error) => void) {
+export async function afterScenario(
+  context: SparkContext,
+  ee: ArtilleryEventEmitter,
+  done: (error?: Error) => void,
+) {
   try {
     console.log("AfterScenario: Unlocking wallets...");
 
@@ -464,13 +514,18 @@ export async function afterScenario(context: SparkContext, ee: ArtilleryEventEmi
             console.log(`Closed connections for wallet "${name}"`);
           }
         } catch (error) {
-          console.warn(`Failed to close connections for wallet "${name}":`, error);
+          console.warn(
+            `Failed to close connections for wallet "${name}":`,
+            error,
+          );
         }
 
         const pool = walletPools.get(lockedInfo.pool);
         if (pool) {
           pool.available.push(lockedInfo.wallet);
-          console.log(`Unlocked wallet "${name}" back to pool "${lockedInfo.pool}"`);
+          console.log(
+            `Unlocked wallet "${name}" back to pool "${lockedInfo.pool}"`,
+          );
         }
         lockedWallets.delete(name);
         globalNamedWallets.delete(name);
@@ -480,7 +535,9 @@ export async function afterScenario(context: SparkContext, ee: ArtilleryEventEmi
     context.scenarioLockedWallets = [];
 
     for (const [poolName, pool] of walletPools.entries()) {
-      console.log(`Pool "${poolName}": ${pool.available.length}/${pool.wallets.length} available`);
+      console.log(
+        `Pool "${poolName}": ${pool.available.length}/${pool.wallets.length} available`,
+      );
     }
 
     done();
@@ -490,7 +547,11 @@ export async function afterScenario(context: SparkContext, ee: ArtilleryEventEmi
   }
 }
 
-export async function afterTest(context: SparkContext, ee: ArtilleryEventEmitter, done: (error?: Error) => void) {
+export async function afterTest(
+  context: SparkContext,
+  ee: ArtilleryEventEmitter,
+  done: (error?: Error) => void,
+) {
   try {
     console.log("AfterTest: Cleaning up wallet pools...");
 

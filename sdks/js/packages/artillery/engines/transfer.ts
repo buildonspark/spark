@@ -1,28 +1,42 @@
 // @ts-nocheck
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
-import { TransferParams, SparkContext, EngineStep, ArtilleryEventEmitter } from "./types/index.js";
+import {
+  TransferParams,
+  SparkContext,
+  EngineStep,
+  ArtilleryEventEmitter,
+} from "./types/index.js";
 
 export class TransferActions {
   private engine: any; // Reference to parent engine
 
   constructor(
     private ee: ArtilleryEventEmitter,
-    engine?: any
+    engine?: any,
   ) {
     this.engine = engine;
   }
 
-  transfer(params: { walletName?: string; receiverName?: string; amount?: number }): EngineStep {
+  transfer(params: {
+    walletName?: string;
+    receiverName?: string;
+    amount?: number;
+  }): EngineStep {
     return async (context: SparkContext, callback) => {
       const startTime = Date.now();
 
       if (context.vars.$loopCount) {
-        console.log(` Action in loop. Iteration number: ${context.vars.$loopCount}`);
+        console.log(
+          ` Action in loop. Iteration number: ${context.vars.$loopCount}`,
+        );
       }
       try {
         // Check if amount is specified
         let amount = params.amountSats || params.amount;
-        if (amount === undefined && context.vars?.transferAmount !== undefined) {
+        if (
+          amount === undefined &&
+          context.vars?.transferAmount !== undefined
+        ) {
           amount = context.vars.transferAmount;
         }
 
@@ -30,9 +44,13 @@ export class TransferActions {
           throw new Error("Transfer amount must be specified");
         }
 
-        const senderWalletInfo = params.walletName ? context.vars?.[params.walletName] : context.sparkWallet;
+        const senderWalletInfo = params.walletName
+          ? context.vars?.[params.walletName]
+          : context.sparkWallet;
         if (!senderWalletInfo) {
-          throw new Error(`Sender wallet ${params.walletName || "default"} not found`);
+          throw new Error(
+            `Sender wallet ${params.walletName || "default"} not found`,
+          );
         }
 
         // Get receiver address
@@ -42,7 +60,9 @@ export class TransferActions {
           // Check if we have a wallet name mapping (for concurrent scenarios)
           const receiverInfo = context.vars?.[params.receiverName];
           if (!receiverInfo) {
-            throw new Error(`Receiver wallet ${params.receiverName} not found. It should be locked in beforeScenario`);
+            throw new Error(
+              `Receiver wallet ${params.receiverName} not found. It should be locked in beforeScenario`,
+            );
           }
           receiverAddress = receiverInfo.address;
           receiverWallet = receiverInfo.wallet;
@@ -55,17 +75,21 @@ export class TransferActions {
         }
 
         console.log(
-          `${senderWalletInfo.name} transferring ${amount} sats to ${params.receiverName || receiverAddress}...`
+          `${senderWalletInfo.name} transferring ${amount} sats to ${params.receiverName || receiverAddress}...`,
         );
 
         console.log(`\n Receiver spark address: ${receiverAddress}\n`);
 
-        const result = await (senderWalletInfo.wallet as IssuerSparkWallet).transfer({
+        const result = await (
+          senderWalletInfo.wallet as IssuerSparkWallet
+        ).transfer({
           amountSats: amount,
           receiverSparkAddress: receiverAddress,
         });
 
-        console.log(`Transfer from ${senderWalletInfo.name} completed: ${amount} sats`);
+        console.log(
+          `Transfer from ${senderWalletInfo.name} completed: ${amount} sats`,
+        );
 
         const transferTime = Date.now() - startTime;
         console.log(`Transfer operation took ${transferTime}ms`);
@@ -82,7 +106,9 @@ export class TransferActions {
         // Emit metrics to the scenario event emitter if available
         const scenarioEE = this.engine?.scenarioEE;
         if (scenarioEE) {
-          console.log(`Emitting metrics to scenario EE: transfer_time=${transferTime}, amount=${amount} sats`);
+          console.log(
+            `Emitting metrics to scenario EE: transfer_time=${transferTime}, amount=${amount} sats`,
+          );
           scenarioEE.emit("histogram", "spark.transfer_time", transferTime);
           scenarioEE.emit("counter", "spark.transfer_success", 1);
           scenarioEE.emit("counter", "spark.sats_transferred", amount);
@@ -129,8 +155,13 @@ export class TransferActions {
         } = context.vars?.[params.walletName + "_transferInfo"];
 
         if (!walletInfo || !walletInfo.receiverWallet) {
-          console.error(`  ERROR: Wallet "${params.walletName}" not found in context`);
-          console.error(`  context.vars keys:`, context.vars ? Object.keys(context.vars) : "undefined");
+          console.error(
+            `  ERROR: Wallet "${params.walletName}" not found in context`,
+          );
+          console.error(
+            `  context.vars keys:`,
+            context.vars ? Object.keys(context.vars) : "undefined",
+          );
           throw new Error(`Wallet ${params.walletName} not found`);
         }
 
@@ -139,10 +170,14 @@ export class TransferActions {
         const sparkAddress = await receiverWallet.getSparkAddress();
 
         const { balance: balanceBefore } = await receiverWallet.getBalance();
-        console.log(`   Balance before transfer claim for wallet ${sparkAddress.substring(0, 10)}: ${balanceBefore}`);
+        console.log(
+          `   Balance before transfer claim for wallet ${sparkAddress.substring(0, 10)}: ${balanceBefore}`,
+        );
 
         const receiverTransferService = (receiverWallet as any).transferService;
-        let pendingTransfer = await receiverTransferService.queryTransfer(walletInfo.transferID);
+        let pendingTransfer = await receiverTransferService.queryTransfer(
+          walletInfo.transferID,
+        );
 
         if (!pendingTransfer) {
           console.log(` Transfer not found (ID: ${q.transferId})`);
@@ -169,15 +204,26 @@ export class TransferActions {
         const transferTime = Date.now() - startTime;
 
         context.vars = context.vars || {};
-        console.log(`   Balance after transfer claim for wallet ${sparkAddress.substring(0, 10)}: ${balanceAfter}`);
+        console.log(
+          `   Balance after transfer claim for wallet ${sparkAddress.substring(0, 10)}: ${balanceAfter}`,
+        );
         console.log(`   Transfer operation took ${transferTime}ms`);
-        console.log(`   Transfer claimed successfully for wallet ${sparkAddress.substring(0, 10)}`);
+        console.log(
+          `   Transfer claimed successfully for wallet ${sparkAddress.substring(0, 10)}`,
+        );
 
-        ee.emit("histogram", "spark.claim_transfer_time", Date.now() - startTime);
+        ee.emit(
+          "histogram",
+          "spark.claim_transfer_time",
+          Date.now() - startTime,
+        );
         ee.emit("counter", "spark.claim_transfer_success", 1);
         callback(null, context);
       } catch (error) {
-        console.error(`failed to claim transfer ${params.walletName}:`, error.message);
+        console.error(
+          `failed to claim transfer ${params.walletName}:`,
+          error.message,
+        );
         ee.emit("counter", "spark.claim_transfer_failed", 1);
         callback(error);
       }

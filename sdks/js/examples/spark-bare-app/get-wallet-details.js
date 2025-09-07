@@ -26,7 +26,7 @@ async function getWalletDetails(mnemonicInit) {
 const args = process.argv.slice(2);
 if (args.length > 1) {
   console.error(
-    "Too many arguments, please provide a mnemonic as a string, e.g. 'your mnemonic here'"
+    "Too many arguments, please provide a mnemonic as a string, e.g. 'your mnemonic here'",
   );
   process.exit(1);
 }

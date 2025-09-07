@@ -7,8 +7,8 @@
     "build": "yarn tsc && rm -rf dist && yarn build:chrome",
     "build:chrome": "node build.mjs",
     "watch:chrome": "node build.mjs --watch",
-    "format:fix": "prettier src --write",
-    "format": "prettier src --check"
+    "format:fix": "prettier . --write",
+    "format": "prettier . --check"
   },
   "dependencies": {
     "@buildonspark/spark-sdk": "0.2.13"
@@ -16,7 +16,7 @@
   "devDependencies": {
     "@types/chrome": "^0.0.276",
     "esbuild": "^0.20.0",
-    "prettier": "^3.5.1",
+    "prettier": "^3.6.2",
     "typescript": "^5.7.3"
   }
 }

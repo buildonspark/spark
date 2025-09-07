@@ -13,19 +13,26 @@ export class IssuerSparkWalletNoEvents extends IssuerSparkWallet {
     this.disableEvents = disableEvents;
   }
 
-  static async initialize(props: SparkWalletProps & { skipBackgroundStream?: boolean }): Promise<{
+  static async initialize(
+    props: SparkWalletProps & { skipBackgroundStream?: boolean },
+  ): Promise<{
     mnemonic?: string;
     wallet: IssuerSparkWalletNoEvents;
   }> {
     const { skipBackgroundStream = false, ...walletProps } = props;
     const wallet = new IssuerSparkWalletNoEvents(walletProps, true);
 
-    const result = await wallet.initWallet(walletProps.mnemonicOrSeed, walletProps.accountNumber);
+    const result = await wallet.initWallet(
+      walletProps.mnemonicOrSeed,
+      walletProps.accountNumber,
+    );
 
     // Note: skipBackgroundStream is handled by disableEvents in the constructor
     // The background stream setup is controlled by the setupBackgroundStream override below
     if (skipBackgroundStream) {
-      console.log(`[IssuerWallet] Background stream disabled (skipBackgroundStream=true)`);
+      console.log(
+        `[IssuerWallet] Background stream disabled (skipBackgroundStream=true)`,
+      );
     }
 
     return {
@@ -69,8 +76,10 @@ export class IssuerSparkWalletNoEvents extends IssuerSparkWallet {
               refundTx: leaf.intermediateRefundTx,
             },
             signingPubKey: leafPubKey,
-            newSigningPubKey: await (this as any).config.signer.generatePublicKey(
-              (await import("@noble/hashes/sha256")).sha256(leaf.leaf.id)
+            newSigningPubKey: await (
+              this as any
+            ).config.signer.generatePublicKey(
+              (await import("@noble/hashes/sha256")).sha256(leaf.leaf.id),
             ),
           });
         }
@@ -80,7 +89,9 @@ export class IssuerSparkWalletNoEvents extends IssuerSparkWallet {
     await (this as any).transferService.claimTransfer(transfer, claimingNodes);
   }
 
-  public async verifyPendingTransfer(transfer: any): Promise<Map<string, Uint8Array>> {
+  public async verifyPendingTransfer(
+    transfer: any,
+  ): Promise<Map<string, Uint8Array>> {
     return await (this as any).transferService.verifyPendingTransfer(transfer);
   }
 }

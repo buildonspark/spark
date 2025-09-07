@@ -24,7 +24,7 @@ app.use((req, res, next) => {
           return bytesToHex(value);
         }
         return value;
-      })
+      }),
     );
   };
   next();

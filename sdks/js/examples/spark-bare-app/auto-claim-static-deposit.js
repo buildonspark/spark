@@ -45,7 +45,7 @@ if (!transactionId) {
 try {
   const claimDepositResult = await autoclaimStaticDeposit(
     config.mnemonic,
-    transactionId
+    transactionId,
   );
   console.log("Claimed static deposit:", claimDepositResult);
   process.exit(0);

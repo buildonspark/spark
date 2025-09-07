@@ -1,7 +1,10 @@
 /* Import node libs to polyfill browser objects */
 import crypto from "crypto";
 import { TextDecoder, TextEncoder } from "util";
-import nodeFetch, { RequestInit as NodeFetchRequestInit, Response } from "node-fetch";
+import nodeFetch, {
+  RequestInit as NodeFetchRequestInit,
+  Response,
+} from "node-fetch";
 import fs from "fs";
 import { fileURLToPath } from "url";
 

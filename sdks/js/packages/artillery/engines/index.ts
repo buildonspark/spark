@@ -21,28 +21,39 @@ export class SparkEngine {
   private scenarioEE: ArtilleryEventEmitter | null = null;
 
   private readonly stepActions = {
-    initializePools: (params?: any) => this.walletActions.initializePools(params),
+    initializePools: (params?: any) =>
+      this.walletActions.initializePools(params),
     cleanupPools: () => this.walletActions.cleanupPools(),
     unlockWallets: (params?: any) => this.walletActions.unlockWallets(params),
 
     mintToken: (params?: any) => this.tokenActions.mintToken(params),
     transferToken: (params?: any) => this.tokenActions.transferToken(params),
-    distributeAndRebalance: (params?: any) => this.walletActions.distributeAndRebalance(params),
+    distributeAndRebalance: (params?: any) =>
+      this.walletActions.distributeAndRebalance(params),
 
     getBalance: (params?: any) => this.walletActions.getBalance(params),
     claimTransfer: (params?: any) => this.transferActions.claimTransfer(params),
     transfer: (params?: any) => this.transferActions.transfer(params),
-    getStaticAddress: (params?: any) => this.walletActions.getStaticAddress(params),
-    printWalletInfo: (params?: any) => this.walletActions.printWalletInfo(params),
-    claimStaticDeposit: (params?: any) => this.walletActions.claimStaticDeposit(params),
+    getStaticAddress: (params?: any) =>
+      this.walletActions.getStaticAddress(params),
+    printWalletInfo: (params?: any) =>
+      this.walletActions.printWalletInfo(params),
+    claimStaticDeposit: (params?: any) =>
+      this.walletActions.claimStaticDeposit(params),
     withdraw: (params?: any) => this.walletActions.withdraw(params),
   } as const;
 
-  public readonly availableActions = Object.keys(this.stepActions) as Array<keyof typeof this.stepActions>;
+  public readonly availableActions = Object.keys(this.stepActions) as Array<
+    keyof typeof this.stepActions
+  >;
 
   private initializationPromise: Promise<void> | null = null;
 
-  constructor(script: ArtilleryScript, ee: ArtilleryEventEmitter, _helpers: ArtilleryHelpers) {
+  constructor(
+    script: ArtilleryScript,
+    ee: ArtilleryEventEmitter,
+    _helpers: ArtilleryHelpers,
+  ) {
     this.script = script;
 
     this.walletActions = new WalletActions(ee, this);
@@ -53,7 +64,10 @@ export class SparkEngine {
   }
 
   private async processBeforeTestActions() {
-    const beforeTestActions = (this.script as any).config?.beforeTest || (this.script as any).beforeTest || [];
+    const beforeTestActions =
+      (this.script as any).config?.beforeTest ||
+      (this.script as any).beforeTest ||
+      [];
     if (beforeTestActions.length > 0) {
       for (const action of beforeTestActions) {
         const actionKeys = Object.keys(action);
@@ -68,7 +82,8 @@ export class SparkEngine {
           continue;
         }
 
-        const actionCreator = this.stepActions[actionType as keyof typeof this.stepActions];
+        const actionCreator =
+          this.stepActions[actionType as keyof typeof this.stepActions];
         if (actionCreator) {
           const actionStep = actionCreator(actionParams);
           await new Promise((resolve, reject) => {
@@ -101,11 +116,15 @@ export class SparkEngine {
 
       // Define all functions before use
       const executeMainFlow = (context: SparkContext) => {
-        const steps = scenarioSpec.flow.map((step: any) => this.createStep(step));
+        const steps = scenarioSpec.flow.map((step: any) =>
+          this.createStep(step),
+        );
         let currentStepIndex = 0;
 
         const executeAfterSteps = (context: SparkContext) => {
-          const afterSteps = scenarioSpec.after.map((step: any) => this.createStep(step));
+          const afterSteps = scenarioSpec.after.map((step: any) =>
+            this.createStep(step),
+          );
           let afterStepIndex = 0;
 
           const executeAfterStep = (ctx: SparkContext): void => {
@@ -117,12 +136,15 @@ export class SparkEngine {
             afterStepIndex++;
 
             try {
-              currentAfterStep(ctx, (error: any, updatedContext?: SparkContext) => {
-                if (error) {
-                  return callback(error);
-                }
-                executeAfterStep(updatedContext || ctx);
-              });
+              currentAfterStep(
+                ctx,
+                (error: any, updatedContext?: SparkContext) => {
+                  if (error) {
+                    return callback(error);
+                  }
+                  executeAfterStep(updatedContext || ctx);
+                },
+              );
             } catch (error) {
               callback(error);
             }
@@ -162,7 +184,9 @@ export class SparkEngine {
 
       const executeScenarioBefore = (context: SparkContext) => {
         if (scenarioSpec.before && Array.isArray(scenarioSpec.before)) {
-          const beforeSteps = scenarioSpec.before.map((step: any) => this.createStep(step));
+          const beforeSteps = scenarioSpec.before.map((step: any) =>
+            this.createStep(step),
+          );
           let beforeStepIndex = 0;
 
           const executeBeforeStep = (ctx: SparkContext): void => {
@@ -175,12 +199,15 @@ export class SparkEngine {
             beforeStepIndex++;
 
             try {
-              currentBeforeStep(ctx, (error: any, updatedContext?: SparkContext) => {
-                if (error) {
-                  return callback(error);
-                }
-                executeBeforeStep(updatedContext || ctx);
-              });
+              currentBeforeStep(
+                ctx,
+                (error: any, updatedContext?: SparkContext) => {
+                  if (error) {
+                    return callback(error);
+                  }
+                  executeBeforeStep(updatedContext || ctx);
+                },
+              );
             } catch (error) {
               callback(error);
             }
@@ -193,11 +220,15 @@ export class SparkEngine {
       };
 
       const proceedWithScenario = () => {
-        const runGlobalBefore = !(this.script as any).__globalBeforeExecuted && (this.script as any).before;
+        const runGlobalBefore =
+          !(this.script as any).__globalBeforeExecuted &&
+          (this.script as any).before;
 
         if (runGlobalBefore) {
           (this.script as any).__globalBeforeExecuted = true;
-          const globalBeforeSteps = (this.script as any).before.map((step: any) => this.createStep(step));
+          const globalBeforeSteps = (this.script as any).before.map(
+            (step: any) => this.createStep(step),
+          );
 
           let globalStepIndex = 0;
           const executeGlobalStep = (ctx: SparkContext): void => {
@@ -260,9 +291,12 @@ export class SparkEngine {
       return this.createLoopStep(actionParams);
     }
 
-    const actionCreator = this.stepActions[actionType as keyof typeof this.stepActions];
+    const actionCreator =
+      this.stepActions[actionType as keyof typeof this.stepActions];
     if (!actionCreator) {
-      throw new Error(`Unknown action: ${actionType}. Available actions: ${this.availableActions.join(", ")}`);
+      throw new Error(
+        `Unknown action: ${actionType}. Available actions: ${this.availableActions.join(", ")}`,
+      );
     }
 
     return actionCreator(actionParams);
@@ -275,7 +309,10 @@ export class SparkEngine {
     };
   }
 
-  private processTemplateString(template: string, context: SparkContext): string {
+  private processTemplateString(
+    template: string,
+    context: SparkContext,
+  ): string {
     if (typeof template !== "string") return template;
 
     return template.replace(/\{\{\s*([^}]+)\s*\}\}/g, (match, expression) => {
@@ -312,7 +349,10 @@ export class SparkEngine {
         const result = new Function(functionBody)();
         return String(result);
       } catch (e) {
-        console.warn(`Failed to evaluate template expression: ${expression}`, e);
+        console.warn(
+          `Failed to evaluate template expression: ${expression}`,
+          e,
+        );
         return match;
       }
     });
@@ -357,8 +397,12 @@ export class SparkEngine {
           context.vars = context.vars || {};
           context.vars.$loopCount = loopIndex + 1;
 
-          const processedActions = actions.map((action) => this.processTemplateObject(action, context));
-          const iterationSteps = processedActions.map((action: any) => this.createStep(action));
+          const processedActions = actions.map((action) =>
+            this.processTemplateObject(action, context),
+          );
+          const iterationSteps = processedActions.map((action: any) =>
+            this.createStep(action),
+          );
 
           let actionIndex = 0;
 
@@ -398,8 +442,12 @@ export class SparkEngine {
           context.vars.$loopElement = items[itemIndex];
           context.vars.$loopCount = itemIndex + 1;
 
-          const processedActions = actions.map((action) => this.processTemplateObject(action, context));
-          const iterationSteps = processedActions.map((action: any) => this.createStep(action));
+          const processedActions = actions.map((action) =>
+            this.processTemplateObject(action, context),
+          );
+          const iterationSteps = processedActions.map((action: any) =>
+            this.createStep(action),
+          );
 
           let actionIndex = 0;
 
@@ -430,8 +478,12 @@ export class SparkEngine {
         return callback(new Error("whileTrue loops are not yet implemented"));
       } else {
         const executeLoopIteration = () => {
-          const processedActions = actions.map((action) => this.processTemplateObject(action, context));
-          const iterationSteps = processedActions.map((action: any) => this.createStep(action));
+          const processedActions = actions.map((action) =>
+            this.processTemplateObject(action, context),
+          );
+          const iterationSteps = processedActions.map((action: any) =>
+            this.createStep(action),
+          );
 
           let actionIndex = 0;
 
@@ -466,7 +518,11 @@ export type StepActionType = keyof SparkEngine["stepActions"];
 
 let globalEE: ArtilleryEventEmitter | null = null;
 
-function createSparkEngine(script: ArtilleryScript, ee: ArtilleryEventEmitter, helpers: ArtilleryHelpers) {
+function createSparkEngine(
+  script: ArtilleryScript,
+  ee: ArtilleryEventEmitter,
+  helpers: ArtilleryHelpers,
+) {
   globalEE = ee;
   return new SparkEngine(script, ee, helpers);
 }

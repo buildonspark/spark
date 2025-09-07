@@ -4,6 +4,8 @@
   "version": "1.0.8",
   "type": "module",
   "scripts": {
+    "format:fix": "prettier . --write",
+    "format": "prettier . --check",
     "start": "expo start",
     "build": "yarn tsc",
     "reset-project": "node ./scripts/reset-project.js",
@@ -50,6 +52,7 @@
     "@types/react-native-get-random-values": "^1",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
+    "prettier": "^3.6.2",
     "typescript": "^5.7.3"
   },
   "private": true

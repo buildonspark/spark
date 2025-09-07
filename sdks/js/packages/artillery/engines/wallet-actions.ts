@@ -15,7 +15,12 @@ import {
   removeLockFile as removeLockFileFromHooks,
   isLocked as isLockedFromHooks,
 } from "./hooks";
-import type { SparkContext, ArtilleryEventEmitter, EngineStep, WalletParams } from "./types";
+import type {
+  SparkContext,
+  ArtilleryEventEmitter,
+  EngineStep,
+  WalletParams,
+} from "./types";
 import { randomUUID } from "crypto";
 import { walletPools } from "./hooks";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
@@ -26,7 +31,9 @@ const createLockFile = createLockFileFromHooks;
 const removeLockFile = removeLockFileFromHooks;
 const isLocked = isLockedFromHooks;
 
-async function safeGetBalance(wallet: IssuerSparkWallet): Promise<{ balance: bigint }> {
+async function safeGetBalance(
+  wallet: IssuerSparkWallet,
+): Promise<{ balance: bigint }> {
   let retries = 8;
   let lastError: any = null;
 
@@ -41,7 +48,9 @@ async function safeGetBalance(wallet: IssuerSparkWallet): Promise<{ balance: big
         error.message?.includes("No connection established") ||
         error.message?.includes("Authentication connection error")
       ) {
-        console.warn(`Connection error during balance check (${retries} retries left): ${error.message}`);
+        console.warn(
+          `Connection error during balance check (${retries} retries left): ${error.message}`,
+        );
         if (retries > 1) {
           await new Promise((resolve) => setTimeout(resolve, 2000));
           retries--;
@@ -54,7 +63,9 @@ async function safeGetBalance(wallet: IssuerSparkWallet): Promise<{ balance: big
         error.message?.includes("claimTransfer") ||
         error.context?.operation === "claimTransfer"
       ) {
-        console.warn(`Warning: Failed to claim transfer during balance check: ${error.message}`);
+        console.warn(
+          `Warning: Failed to claim transfer during balance check: ${error.message}`,
+        );
         await new Promise((resolve) => setTimeout(resolve, 1000));
         return await wallet.getBalance();
       }
@@ -69,13 +80,15 @@ async function safeGetBalance(wallet: IssuerSparkWallet): Promise<{ balance: big
 async function initializeWalletWithRetry<T extends WalletType>(
   initFunction: () => Promise<{ wallet: T; mnemonic?: string }>,
   maxRetries: number = 8,
-  retryDelay: number = 5000
+  retryDelay: number = 5000,
 ): Promise<{ wallet: T; mnemonic?: string }> {
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`  Wallet initialization attempt ${attempt}/${maxRetries}...`);
+      console.log(
+        `  Wallet initialization attempt ${attempt}/${maxRetries}...`,
+      );
       const result = await initFunction();
       return result;
     } catch (error: any) {
@@ -86,7 +99,9 @@ async function initializeWalletWithRetry<T extends WalletType>(
         error.message?.includes("No connection established") ||
         error.message?.includes("Authentication connection error")
       ) {
-        console.warn(`  Connection error on attempt ${attempt}/${maxRetries}: ${error.message}`);
+        console.warn(
+          `  Connection error on attempt ${attempt}/${maxRetries}: ${error.message}`,
+        );
 
         if (attempt < maxRetries) {
           console.log(`  Will retry with fresh connection in 2 seconds...`);
@@ -97,7 +112,9 @@ async function initializeWalletWithRetry<T extends WalletType>(
         error.message?.includes("Authentication failed") ||
         error.context?.reason?.includes("verify_challenge timed out")
       ) {
-        console.warn(`  Authentication timeout on attempt ${attempt}/${maxRetries}: ${error.message}`);
+        console.warn(
+          `  Authentication timeout on attempt ${attempt}/${maxRetries}: ${error.message}`,
+        );
 
         if (attempt < maxRetries) {
           console.log(`  Waiting ${retryDelay}ms before retry...`);
@@ -111,7 +128,9 @@ async function initializeWalletWithRetry<T extends WalletType>(
     }
   }
 
-  throw new Error(`Failed to initialize wallet after ${maxRetries} attempts. Last error: ${lastError?.message}`);
+  throw new Error(
+    `Failed to initialize wallet after ${maxRetries} attempts. Last error: ${lastError?.message}`,
+  );
 }
 
 export class WalletActions {
@@ -120,13 +139,15 @@ export class WalletActions {
 
   constructor(
     private ee: ArtilleryEventEmitter,
-    engine?: any
+    engine?: any,
   ) {
     this.poolManager = WalletPoolManager.getInstance();
     this.engine = engine;
   }
 
-  initNamedWallet(params: { name: string; mnemonic?: string } = { name: "" }): EngineStep {
+  initNamedWallet(
+    params: { name: string; mnemonic?: string } = { name: "" },
+  ): EngineStep {
     const ee = this.ee;
     const poolManager = this.poolManager;
 
@@ -152,30 +173,44 @@ export class WalletActions {
           IssuerSparkWallet.initialize({
             mnemonicOrSeed: mnemonic,
             options: {
-              network: (process.env.SPARK_NETWORK || "LOCAL") as "REGTEST" | "MAINNET" | "TESTNET" | "SIGNET" | "LOCAL",
+              network: (process.env.SPARK_NETWORK || "LOCAL") as
+                | "REGTEST"
+                | "MAINNET"
+                | "TESTNET"
+                | "SIGNET"
+                | "LOCAL",
               threshold: 3,
               tokenTransactionVersion: "V1" as const,
               tokenSignatures: "SCHNORR" as const,
             },
-          })
+          }),
         );
 
         const walletInitEndTime = Date.now();
-        console.log(`Named wallet ${params.name} initialization took ${walletInitEndTime - walletInitStartTime}ms`);
+        console.log(
+          `Named wallet ${params.name} initialization took ${walletInitEndTime - walletInitStartTime}ms`,
+        );
 
         await poolManager.registerNamedWallet(params.name, wallet, mnemonic);
 
         const walletInfo = poolManager.getNamedWallet(params.name)!;
         console.log(
-          `Named wallet ${params.name} initialized: ${walletInfo.address.substring(0, 10)}... in ${walletInitEndTime - walletInitStartTime}ms`
+          `Named wallet ${params.name} initialized: ${walletInfo.address.substring(0, 10)}... in ${walletInitEndTime - walletInitStartTime}ms`,
         );
 
-        ee.emit("histogram", "spark.named_wallet_init_time", Date.now() - startTime);
+        ee.emit(
+          "histogram",
+          "spark.named_wallet_init_time",
+          Date.now() - startTime,
+        );
         ee.emit("counter", "spark.named_wallet_initialized", 1);
 
         callback(null, context);
       } catch (error) {
-        console.error(`Named wallet initialization failed for ${params.name}:`, error.message);
+        console.error(
+          `Named wallet initialization failed for ${params.name}:`,
+          error.message,
+        );
         ee.emit("counter", "spark.named_wallet_init_failed", 1);
         callback(error);
       }
@@ -187,14 +222,20 @@ export class WalletActions {
 
     return async function (context: SparkContext, callback) {
       try {
-        const walletInfo = params.walletName ? context.vars?.[params.walletName] : context.sparkWallet;
+        const walletInfo = params.walletName
+          ? context.vars?.[params.walletName]
+          : context.sparkWallet;
         if (!walletInfo) {
           throw new Error(`Wallet ${params.walletName || "default"} not found`);
         }
 
-        console.log(`Funding ${walletInfo.name} wallet with ${params.amount} sats...`);
+        console.log(
+          `Funding ${walletInfo.name} wallet with ${params.amount} sats...`,
+        );
 
-        console.log(`Please fund wallet ${walletInfo.name} with ${params.amount} sats using external means`);
+        console.log(
+          `Please fund wallet ${walletInfo.name} with ${params.amount} sats using external means`,
+        );
 
         const balance = await safeGetBalance(walletInfo.wallet);
         console.log(`${walletInfo.wallet} balance: ${balance.balance} sats`);
@@ -218,7 +259,8 @@ export class WalletActions {
   lockWallets(params?: any): EngineStep {
     return async function (context: SparkContext, callback) {
       try {
-        const vuId = (context as any)._uid || context.vars?.$uuid || randomUUID();
+        const vuId =
+          (context as any)._uid || context.vars?.$uuid || randomUUID();
 
         const modifiedParams = { ...params };
         if (modifiedParams?.wallets && Array.isArray(modifiedParams.wallets)) {
@@ -247,13 +289,18 @@ export class WalletActions {
         }
 
         context._scenarioSpec = context._scenarioSpec || {};
-        context._scenarioSpec.lockWallets = modifiedParams || context._scenarioSpec?.lockWallets;
+        context._scenarioSpec.lockWallets =
+          modifiedParams || context._scenarioSpec?.lockWallets;
 
         await new Promise((resolve, reject) => {
-          lockWalletsHook(context, {} as ArtilleryEventEmitter, (error: any) => {
-            if (error) reject(error);
-            else resolve(undefined);
-          });
+          lockWalletsHook(
+            context,
+            {} as ArtilleryEventEmitter,
+            (error: any) => {
+              if (error) reject(error);
+              else resolve(undefined);
+            },
+          );
         });
 
         callback(null, context);
@@ -268,9 +315,12 @@ export class WalletActions {
 
     return async function (context: SparkContext, callback) {
       try {
-        console.log("UnlockWallets: Unlocking wallets and closing connections...");
+        console.log(
+          "UnlockWallets: Unlocking wallets and closing connections...",
+        );
 
-        const walletsToUnlock = params?.wallets || context.scenarioLockedWallets || [];
+        const walletsToUnlock =
+          params?.wallets || context.scenarioLockedWallets || [];
 
         for (const walletName of walletsToUnlock) {
           const namedWallet = context.vars?.[walletName];
@@ -280,18 +330,24 @@ export class WalletActions {
             const address = await lockedInfo.wallet.getSparkAddress();
 
             if (await removeLockFile(address)) {
-              console.log(`  Removed lock file for wallet "${walletName}" (${address.substring(0, 10)}...)`);
+              console.log(
+                `  Removed lock file for wallet "${walletName}" (${address.substring(0, 10)}...)`,
+              );
             }
 
             const pool = walletPools.get(lockedInfo.pool);
             if (pool) {
               pool.available.push(lockedInfo.wallet);
-              console.log(`  Returned wallet "${walletName}" to pool "${lockedInfo.pool}"`);
+              console.log(
+                `  Returned wallet "${walletName}" to pool "${lockedInfo.pool}"`,
+              );
 
               try {
                 await poolManager.unlockWallet(lockedInfo.wallet);
               } catch (error) {
-                console.log(`  Note: Wallet state not saved (not managed by pool manager)`);
+                console.log(
+                  `  Note: Wallet state not saved (not managed by pool manager)`,
+                );
               }
             }
 
@@ -305,11 +361,13 @@ export class WalletActions {
 
         if (context.scenarioLockedWallets) {
           context.scenarioLockedWallets = context.scenarioLockedWallets.filter(
-            (name) => !walletsToUnlock.includes(name)
+            (name) => !walletsToUnlock.includes(name),
           );
         }
 
-        console.log(`UnlockWallets: Unlocked ${walletsToUnlock.length} wallets`);
+        console.log(
+          `UnlockWallets: Unlocked ${walletsToUnlock.length} wallets`,
+        );
         callback(null, context);
       } catch (error) {
         console.error("UnlockWallets failed:", error);
@@ -322,10 +380,14 @@ export class WalletActions {
     const ee = this.ee;
     return async function (context: SparkContext, callback) {
       try {
-        const walletInfo = params?.walletName ? context.vars?.[params.walletName] : context.sparkWallet;
+        const walletInfo = params?.walletName
+          ? context.vars?.[params.walletName]
+          : context.sparkWallet;
 
         if (!walletInfo || !walletInfo.wallet) {
-          throw new Error(`Wallet ${params?.walletName || "default"} not found. Initialize it first with initWallet`);
+          throw new Error(
+            `Wallet ${params?.walletName || "default"} not found. Initialize it first with initWallet`,
+          );
         }
 
         const { balance } = await safeGetBalance(walletInfo.wallet);
@@ -338,7 +400,7 @@ export class WalletActions {
         console.log(
           `${walletInfo.name || params?.walletName || "Wallet"}, 
           ((${walletInfo.address})) (${await walletInfo.wallet.getTokenL1Address()}) 
-          balance: ${balance} sats${params?.storeAs ? ` (stored as ${params.storeAs})` : ""}`
+          balance: ${balance} sats${params?.storeAs ? ` (stored as ${params.storeAs})` : ""}`,
         );
 
         ee.emit("counter", "spark.balance_check", 1);
@@ -351,14 +413,21 @@ export class WalletActions {
     };
   }
 
-  getIdentityPublicKey(params?: { walletName?: string; storeAs?: string }): EngineStep {
+  getIdentityPublicKey(params?: {
+    walletName?: string;
+    storeAs?: string;
+  }): EngineStep {
     const ee = this.ee;
     return async function (context: SparkContext, callback) {
       try {
-        const walletInfo = params?.walletName ? context.vars?.[params.walletName] : context.sparkWallet;
+        const walletInfo = params?.walletName
+          ? context.vars?.[params.walletName]
+          : context.sparkWallet;
 
         if (!walletInfo || !walletInfo.wallet) {
-          throw new Error(`Wallet ${params?.walletName || "default"} not found. Initialize it first with initWallet`);
+          throw new Error(
+            `Wallet ${params?.walletName || "default"} not found. Initialize it first with initWallet`,
+          );
         }
 
         const publicKeyHex = await walletInfo.wallet.getIdentityPublicKey();
@@ -369,7 +438,7 @@ export class WalletActions {
         }
 
         console.log(
-          `${walletInfo.name || params?.walletName || "Wallet"} identity public key: ${publicKeyHex}${params?.storeAs ? ` (stored as ${params.storeAs})` : ""}`
+          `${walletInfo.name || params?.walletName || "Wallet"} identity public key: ${publicKeyHex}${params?.storeAs ? ` (stored as ${params.storeAs})` : ""}`,
         );
 
         ee.emit("counter", "spark.identity_pubkey_retrieved", 1);
@@ -393,7 +462,9 @@ export class WalletActions {
     return async function (context: SparkContext, callback) {
       try {
         console.log(`SelectWallets: Selecting wallets from pools...`);
-        console.log(`  Available pools: ${Array.from(walletPools.keys()).join(", ") || "none"}`);
+        console.log(
+          `  Available pools: ${Array.from(walletPools.keys()).join(", ") || "none"}`,
+        );
 
         const walletConfigs = params?.wallets || [];
         if (walletConfigs.length === 0) {
@@ -407,7 +478,12 @@ export class WalletActions {
         const vuId = context.vars?.__vuId || `vu-${Date.now()}`;
 
         for (const walletConfig of walletConfigs) {
-          const { walletName, pool: poolName = "transfer-pool", lock = false, minBalance = 0 } = walletConfig;
+          const {
+            walletName,
+            pool: poolName = "transfer-pool",
+            lock = false,
+            minBalance = 0,
+          } = walletConfig;
 
           const pool = walletPools.get(poolName);
           if (!pool || pool.wallets.length === 0) {
@@ -422,10 +498,15 @@ export class WalletActions {
 
           const { isLocked } = await import("./hooks");
 
-          const availableWallets: { wallet: IssuerSparkWallet; index: number; address: string; balance: bigint }[] = [];
+          const availableWallets: {
+            wallet: IssuerSparkWallet;
+            index: number;
+            address: string;
+            balance: bigint;
+          }[] = [];
 
           console.log(
-            `  Checking wallets in pool "${poolName}" for "${walletName}" (minimum balance: ${minBalance} sats)...`
+            `  Checking wallets in pool "${poolName}" for "${walletName}" (minimum balance: ${minBalance} sats)...`,
           );
 
           for (let i = 0; i < pool.wallets.length; i++) {
@@ -440,18 +521,32 @@ export class WalletActions {
                     const balance = balanceInfo.balance || 0n;
 
                     if (balance >= BigInt(minBalance)) {
-                      availableWallets.push({ wallet, index: i, address, balance });
-                      console.log(`    Wallet ${address.substring(0, 10)}... has ${balance} sats (eligible)`);
+                      availableWallets.push({
+                        wallet,
+                        index: i,
+                        address,
+                        balance,
+                      });
+                      console.log(
+                        `    Wallet ${address.substring(0, 10)}... has ${balance} sats (eligible)`,
+                      );
                     } else {
-                      console.log(`    Wallet ${address.substring(0, 10)}... has ${balance} sats (below minimum)`);
+                      console.log(
+                        `    Wallet ${address.substring(0, 10)}... has ${balance} sats (below minimum)`,
+                      );
                     }
                   } catch (error) {
                     console.error(
-                      `    Failed to check balance for wallet ${address.substring(0, 10)}...: ${error.message}`
+                      `    Failed to check balance for wallet ${address.substring(0, 10)}...: ${error.message}`,
                     );
                   }
                 } else {
-                  availableWallets.push({ wallet, index: i, address, balance: 0n });
+                  availableWallets.push({
+                    wallet,
+                    index: i,
+                    address,
+                    balance: 0n,
+                  });
                 }
               }
             }
@@ -489,7 +584,9 @@ export class WalletActions {
             throw new Error(errorMsg);
           }
 
-          const randomIndex = Math.floor(Math.random() * availableWallets.length);
+          const randomIndex = Math.floor(
+            Math.random() * availableWallets.length,
+          );
           const selected = availableWallets[randomIndex];
           const selectedWallet = selected.wallet;
           const address = selected.address;
@@ -508,19 +605,25 @@ export class WalletActions {
 
             if (await createLockFile(address, lockMetadata)) {
               console.log(
-                `  Selected (random) and LOCKED wallet from pool "${poolName}" as "${walletName}" (${address.substring(0, 10)}..., balance: ${selected.balance} sats)`
+                `  Selected (random) and LOCKED wallet from pool "${poolName}" as "${walletName}" (${address.substring(0, 10)}..., balance: ${selected.balance} sats)`,
               );
 
-              context.scenarioLockedWallets = context.scenarioLockedWallets || [];
+              context.scenarioLockedWallets =
+                context.scenarioLockedWallets || [];
               context.scenarioLockedWallets.push(walletName);
 
-              lockedWallets.set(walletName, { wallet: selectedWallet, pool: poolName });
+              lockedWallets.set(walletName, {
+                wallet: selectedWallet,
+                pool: poolName,
+              });
             } else {
-              throw new Error(`Failed to lock wallet "${walletName}" - it may have been locked by another process`);
+              throw new Error(
+                `Failed to lock wallet "${walletName}" - it may have been locked by another process`,
+              );
             }
           } else {
             console.log(
-              `  Selected (random) wallet from pool "${poolName}" as "${walletName}" (${address.substring(0, 10)}..., balance: ${selected.balance} sats)`
+              `  Selected (random) wallet from pool "${poolName}" as "${walletName}" (${address.substring(0, 10)}..., balance: ${selected.balance} sats)`,
             );
           }
 
@@ -534,7 +637,9 @@ export class WalletActions {
           };
         }
 
-        console.log(`SelectWallets: Successfully selected ${walletConfigs.length} wallets`);
+        console.log(
+          `SelectWallets: Successfully selected ${walletConfigs.length} wallets`,
+        );
         callback(null, context);
       } catch (error) {
         console.error("SelectWallets failed:", error);
@@ -567,7 +672,7 @@ export class WalletActions {
     namedWallet?: { name: string; lock?: boolean; minBalance?: number },
     walletStateDir?: string,
     useRandomSelection: boolean = true,
-    skipBackgroundStream?: boolean
+    skipBackgroundStream?: boolean,
   ): Promise<{
     wallet: WalletType;
     index: number;
@@ -584,7 +689,7 @@ export class WalletActions {
       namedWallet,
       walletStateDir,
       useRandomSelection,
-      skipBackgroundStream
+      skipBackgroundStream,
     );
   }
 
@@ -597,7 +702,7 @@ export class WalletActions {
     namedWallet?: { name: string; lock?: boolean; minBalance?: number },
     walletStateDir?: string,
     useRandomSelection: boolean = true,
-    skipBackgroundStream?: boolean
+    skipBackgroundStream?: boolean,
   ): Promise<{
     wallet: WalletType;
     index: number;
@@ -606,22 +711,28 @@ export class WalletActions {
     publicKey: Uint8Array;
   } | null> {
     console.log(
-      `      findAvailableWalletAtomic called with startIndex=${startIndex}, mnemonics.length=${mnemonics.length}, useRandomSelection=${useRandomSelection}`
+      `      findAvailableWalletAtomic called with startIndex=${startIndex}, mnemonics.length=${mnemonics.length}, useRandomSelection=${useRandomSelection}`,
     );
 
     if (mnemonics.length === 0) {
-      console.error(`      ERROR: No mnemonics provided to findAvailableWalletAtomic`);
+      console.error(
+        `      ERROR: No mnemonics provided to findAvailableWalletAtomic`,
+      );
       return null;
     }
 
     if (startIndex >= mnemonics.length) {
-      console.log(`      startIndex ${startIndex} is beyond mnemonics array length ${mnemonics.length}, wrapping to 0`);
+      console.log(
+        `      startIndex ${startIndex} is beyond mnemonics array length ${mnemonics.length}, wrapping to 0`,
+      );
       startIndex = 0;
     }
     const { tryLockOneOf, removeLockFile } = await import("./hooks");
     const BATCH_SIZE = 3;
 
-    console.log(`    Using atomic wallet selection (random: ${useRandomSelection}) from index ${startIndex}...`);
+    console.log(
+      `    Using atomic wallet selection (random: ${useRandomSelection}) from index ${startIndex}...`,
+    );
 
     let searchedIndices = 0;
     let currentStart = startIndex;
@@ -629,7 +740,10 @@ export class WalletActions {
     const maxSearchAttempts = Math.ceil(mnemonics.length / BATCH_SIZE) * 2;
     let searchAttempts = 0;
 
-    while (searchedIndices < mnemonics.length && searchAttempts < maxSearchAttempts) {
+    while (
+      searchedIndices < mnemonics.length &&
+      searchAttempts < maxSearchAttempts
+    ) {
       searchAttempts++;
 
       if (currentStart >= mnemonics.length) {
@@ -637,7 +751,9 @@ export class WalletActions {
           console.log(`    Completed full wrap-around search`);
           break;
         }
-        console.log(`    Reached end of mnemonics list at index ${currentStart}, wrapping around to beginning...`);
+        console.log(
+          `    Reached end of mnemonics list at index ${currentStart}, wrapping around to beginning...`,
+        );
         currentStart = 0;
         wrapped = true;
       }
@@ -661,7 +777,10 @@ export class WalletActions {
       if (useRandomSelection) {
         for (let i = batchIndices.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
-          [batchIndices[i], batchIndices[j]] = [batchIndices[j], batchIndices[i]];
+          [batchIndices[i], batchIndices[j]] = [
+            batchIndices[j],
+            batchIndices[i],
+          ];
         }
       }
 
@@ -682,7 +801,9 @@ export class WalletActions {
         const mnemonic = mnemonics[lockedIndex]?.trim();
 
         if (!mnemonic) {
-          console.warn(`    No mnemonic at locked index ${lockedIndex}, unlocking...`);
+          console.warn(
+            `    No mnemonic at locked index ${lockedIndex}, unlocking...`,
+          );
           await removeLockFile(lockedKey);
           continue;
         }
@@ -693,14 +814,16 @@ export class WalletActions {
           console.log(`  Using REGTEST network (loadtest environment)`);
           const networkConfig = getLoadtestNetworkConfig();
 
-          console.log(`      Initializing wallet with mnemonic index ${lockedIndex}...`);
+          console.log(
+            `      Initializing wallet with mnemonic index ${lockedIndex}...`,
+          );
           const initStartTime = Date.now();
           const { wallet } = await initializeWalletWithRetry(() =>
             IssuerSparkWalletNoEvents.initialize({
               skipBackgroundStream,
               options: networkConfig,
               mnemonicOrSeed: mnemonic,
-            })
+            }),
           );
 
           const initTime = Date.now() - initStartTime;
@@ -715,14 +838,14 @@ export class WalletActions {
 
             if (balance < minBalance) {
               console.log(
-                `    Wallet ${lockedIndex} has insufficient balance (${balance} < ${minBalance} sats), unlocking...`
+                `    Wallet ${lockedIndex} has insufficient balance (${balance} < ${minBalance} sats), unlocking...`,
               );
               await removeLockFile(lockedKey);
               continue;
             }
 
             console.log(
-              `    Found and locked wallet ${lockedIndex} (${address.substring(0, 10)}..., balance: ${balance} sats)`
+              `    Found and locked wallet ${lockedIndex} (${address.substring(0, 10)}..., balance: ${balance} sats)`,
             );
             return {
               wallet,
@@ -732,7 +855,9 @@ export class WalletActions {
               publicKey,
             };
           } else {
-            console.log(`    Found and locked wallet ${lockedIndex} (${address.substring(0, 10)}...)`);
+            console.log(
+              `    Found and locked wallet ${lockedIndex} (${address.substring(0, 10)}...)`,
+            );
             return {
               wallet,
               index: lockedIndex,
@@ -742,13 +867,15 @@ export class WalletActions {
             };
           }
         } catch (error) {
-          console.error(`    Failed to initialize locked wallet at index ${lockedIndex}: ${error.message}`);
+          console.error(
+            `    Failed to initialize locked wallet at index ${lockedIndex}: ${error.message}`,
+          );
           await removeLockFile(lockedKey);
           continue;
         }
       } else {
         console.log(
-          `    All ${lockKeys.length} wallet indices in batch ${currentStart}-${batchEnd} are locked, moving to next batch...`
+          `    All ${lockKeys.length} wallet indices in batch ${currentStart}-${batchEnd} are locked, moving to next batch...`,
         );
       }
 
@@ -756,11 +883,13 @@ export class WalletActions {
     }
 
     if (searchAttempts >= maxSearchAttempts) {
-      console.log(`    Exhausted search attempts (${searchAttempts}) - too many locked wallets`);
+      console.log(
+        `    Exhausted search attempts (${searchAttempts}) - too many locked wallets`,
+      );
     }
 
     console.log(
-      `    No available wallets found after ${searchAttempts} attempts, searched ${searchedIndices} indices (started from index ${startIndex})`
+      `    No available wallets found after ${searchAttempts} attempts, searched ${searchedIndices} indices (started from index ${startIndex})`,
     );
     return null;
   }
@@ -802,12 +931,15 @@ export class WalletActions {
           | "LOCAL";
 
         const isLoadtestEnvironment = true;
-        const effectiveNetwork = network === "LOCAL" && isLoadtestEnvironment ? "REGTEST" : network;
+        const effectiveNetwork =
+          network === "LOCAL" && isLoadtestEnvironment ? "REGTEST" : network;
 
         const poolConfigs = params?.pools || [];
 
         if (poolConfigs.length === 0) {
-          console.log(`InitializePools: No pools specified, skipping initialization`);
+          console.log(
+            `InitializePools: No pools specified, skipping initialization`,
+          );
           callback(null, context);
           return;
         }
@@ -821,7 +953,9 @@ export class WalletActions {
           const useWalletStateCache = poolConfig.useWalletStateCache || false;
 
           if (walletPools.has(poolName)) {
-            console.log(`Pool "${poolName}" already exists, re-establishing named wallets in context...`);
+            console.log(
+              `Pool "${poolName}" already exists, re-establishing named wallets in context...`,
+            );
 
             const existingPool = walletPools.get(poolName);
             if (!existingPool) {
@@ -833,7 +967,8 @@ export class WalletActions {
                 const lockedWallet = lockedWallets.get(namedWallet.name);
                 if (lockedWallet && lockedWallet.pool === poolName) {
                   const address = await lockedWallet.wallet.getSparkAddress();
-                  const publicKey = await lockedWallet.wallet.getIdentityPublicKey();
+                  const publicKey =
+                    await lockedWallet.wallet.getIdentityPublicKey();
                   const balance = await lockedWallet.wallet.getBalance();
 
                   context.vars = context.vars || {};
@@ -841,21 +976,28 @@ export class WalletActions {
                     wallet: lockedWallet.wallet,
                     name: namedWallet.name,
                     address: address,
-                    publicKey: typeof publicKey === "string" ? publicKey : bytesToHex(publicKey),
+                    publicKey:
+                      typeof publicKey === "string"
+                        ? publicKey
+                        : bytesToHex(publicKey),
                     balance: balance,
                   };
                   console.log(
-                    `  Re-established locked wallet "${namedWallet.name}" in scenario context (address: ${address.substring(0, 10)}...)`
+                    `  Re-established locked wallet "${namedWallet.name}" in scenario context (address: ${address.substring(0, 10)}...)`,
                   );
                 } else {
                   console.log(
-                    `  Named wallet "${namedWallet.name}" not found in locked wallets, initializing new wallet...`
+                    `  Named wallet "${namedWallet.name}" not found in locked wallets, initializing new wallet...`,
                   );
                   let mnemonics: string[] = [];
                   if (poolConfig.mnemonicsFile) {
                     try {
-                      mnemonics = await self.loadMnemonicsFromFile(poolConfig.mnemonicsFile);
-                      console.log(`    Loaded ${mnemonics.length} mnemonics for finding unlocked wallet`);
+                      mnemonics = await self.loadMnemonicsFromFile(
+                        poolConfig.mnemonicsFile,
+                      );
+                      console.log(
+                        `    Loaded ${mnemonics.length} mnemonics for finding unlocked wallet`,
+                      );
                     } catch (error) {
                       console.error(`    Failed to load mnemonics: ${error}`);
                       continue;
@@ -868,9 +1010,12 @@ export class WalletActions {
                     | "TESTNET"
                     | "SIGNET"
                     | "LOCAL";
-                  const effectiveNetwork = network === "LOCAL" ? "REGTEST" : network;
+                  const effectiveNetwork =
+                    network === "LOCAL" ? "REGTEST" : network;
 
-                  const startIndex = Math.floor(Math.random() * mnemonics.length);
+                  const startIndex = Math.floor(
+                    Math.random() * mnemonics.length,
+                  );
                   const walletInfo = await self.findAvailableWallet(
                     mnemonics,
                     startIndex,
@@ -880,12 +1025,12 @@ export class WalletActions {
                     namedWallet,
                     undefined,
                     true,
-                    poolConfig.skipBackgroundStream
+                    poolConfig.skipBackgroundStream,
                   );
 
                   if (walletInfo) {
                     console.log(
-                      `    Successfully initialized wallet for "${namedWallet.name}" at address: ${walletInfo.address.substring(0, 10)}...`
+                      `    Successfully initialized wallet for "${namedWallet.name}" at address: ${walletInfo.address.substring(0, 10)}...`,
                     );
 
                     existingPool.wallets.push(walletInfo.wallet);
@@ -898,12 +1043,20 @@ export class WalletActions {
                       timestamp: new Date().toISOString(),
                     };
 
-                    if (await createLockFile(walletInfo.address, lockMetadata)) {
-                      console.log(`    Locked wallet for "${namedWallet.name}"`);
+                    if (
+                      await createLockFile(walletInfo.address, lockMetadata)
+                    ) {
+                      console.log(
+                        `    Locked wallet for "${namedWallet.name}"`,
+                      );
 
-                      lockedWallets.set(namedWallet.name, { wallet: walletInfo.wallet, pool: poolName });
+                      lockedWallets.set(namedWallet.name, {
+                        wallet: walletInfo.wallet,
+                        pool: poolName,
+                      });
 
-                      context.scenarioLockedWallets = context.scenarioLockedWallets || [];
+                      context.scenarioLockedWallets =
+                        context.scenarioLockedWallets || [];
                       context.scenarioLockedWallets.push(namedWallet.name);
                     }
 
@@ -916,11 +1069,11 @@ export class WalletActions {
                       balance: walletInfo.balance,
                     };
                     console.log(
-                      `  Established "${namedWallet.name}" in scenario context (address: ${walletInfo.address.substring(0, 10)}...)`
+                      `  Established "${namedWallet.name}" in scenario context (address: ${walletInfo.address.substring(0, 10)}...)`,
                     );
                   } else {
                     console.error(
-                      `  ERROR: Could not initialize wallet for "${namedWallet.name}" - all wallets may be locked`
+                      `  ERROR: Could not initialize wallet for "${namedWallet.name}" - all wallets may be locked`,
                     );
                   }
                 }
@@ -942,18 +1095,24 @@ export class WalletActions {
           if (poolConfig.amountEnvName) {
             const envValue = process.env[poolConfig.amountEnvName];
             if (!envValue) {
-              throw new Error(`Environment variable ${poolConfig.amountEnvName} not found for pool "${poolName}"`);
+              throw new Error(
+                `Environment variable ${poolConfig.amountEnvName} not found for pool "${poolName}"`,
+              );
             }
             targetAmount = parseInt(envValue, 10);
             if (isNaN(targetAmount) || targetAmount <= 0) {
-              throw new Error(`Invalid pool size from env var ${poolConfig.amountEnvName}: ${envValue}`);
+              throw new Error(
+                `Invalid pool size from env var ${poolConfig.amountEnvName}: ${envValue}`,
+              );
             }
           } else if (poolConfig.amount !== undefined) {
             targetAmount = poolConfig.amount;
           } else if (namedWallets.length > 0) {
             targetAmount = namedWallets.length;
           } else {
-            targetAmount = parseInt(process.env.SPARK_DEFAULT_POOL_SIZE || "50");
+            targetAmount = parseInt(
+              process.env.SPARK_DEFAULT_POOL_SIZE || "50",
+            );
           }
 
           console.log(`\nInitializing pool "${poolName}"`);
@@ -962,7 +1121,9 @@ export class WalletActions {
             console.log(`  Minimum balance required: ${minBalance} sats`);
           }
           if (namedWallets.length > 0) {
-            console.log(`  Named wallets: ${namedWallets.map((w) => w.name).join(", ")}`);
+            console.log(
+              `  Named wallets: ${namedWallets.map((w) => w.name).join(", ")}`,
+            );
           }
 
           const wallets: IssuerSparkWallet[] = [];
@@ -970,12 +1131,21 @@ export class WalletActions {
 
           let mnemonics: string[] = [];
           if (poolConfig.mnemonicsFile) {
-            console.log(`  Loading mnemonics from: ${poolConfig.mnemonicsFile}`);
+            console.log(
+              `  Loading mnemonics from: ${poolConfig.mnemonicsFile}`,
+            );
             try {
-              mnemonics = await self.loadMnemonicsFromFile(poolConfig.mnemonicsFile);
-              console.log(`  Successfully loaded ${mnemonics.length} mnemonics`);
+              mnemonics = await self.loadMnemonicsFromFile(
+                poolConfig.mnemonicsFile,
+              );
+              console.log(
+                `  Successfully loaded ${mnemonics.length} mnemonics`,
+              );
             } catch (error) {
-              console.error(`  Failed to load mnemonics from ${poolConfig.mnemonicsFile}:`, error);
+              console.error(
+                `  Failed to load mnemonics from ${poolConfig.mnemonicsFile}:`,
+                error,
+              );
               throw error;
             }
           } else {
@@ -987,11 +1157,20 @@ export class WalletActions {
           let lockedCount = 0;
 
           const batchSize = poolConfig.batchSize || 5;
-          console.log(`  Using batch size: ${batchSize} for parallel wallet initialization`);
+          console.log(
+            `  Using batch size: ${batchSize} for parallel wallet initialization`,
+          );
 
           if (namedWallets.length > 0) {
-            for (let i = 0; i < namedWallets.length && successfulWallets < targetAmount; i += batchSize) {
-              const batch = namedWallets.slice(i, Math.min(i + batchSize, namedWallets.length));
+            for (
+              let i = 0;
+              i < namedWallets.length && successfulWallets < targetAmount;
+              i += batchSize
+            ) {
+              const batch = namedWallets.slice(
+                i,
+                Math.min(i + batchSize, namedWallets.length),
+              );
 
               const batchPromises = batch.map(async (namedWallet) => {
                 if (successfulWallets >= targetAmount) return null;
@@ -1000,7 +1179,7 @@ export class WalletActions {
 
                 try {
                   console.log(
-                    `    Attempting to initialize wallet for "${namedWallet.name}" from pool "${poolName}" (index: ${mnemonicIndex}/${mnemonics.length})`
+                    `    Attempting to initialize wallet for "${namedWallet.name}" from pool "${poolName}" (index: ${mnemonicIndex}/${mnemonics.length})`,
                   );
                   const walletInfo = await self.findAvailableWallet(
                     mnemonics,
@@ -1011,32 +1190,40 @@ export class WalletActions {
                     namedWallet,
                     walletStateDir,
                     poolConfig.randomSelection !== false,
-                    poolConfig.skipBackgroundStream
+                    poolConfig.skipBackgroundStream,
                   );
 
                   if (!walletInfo) {
-                    const requiredBalance = namedWallet.minBalance || minBalance;
-                    console.error(`    ERROR: findAvailableWallet returned null for "${namedWallet.name}"`);
+                    const requiredBalance =
+                      namedWallet.minBalance || minBalance;
                     console.error(
-                      `    Pool: ${poolName}, mnemonics: ${mnemonics.length}, startIndex: ${mnemonicIndex}`
+                      `    ERROR: findAvailableWallet returned null for "${namedWallet.name}"`,
+                    );
+                    console.error(
+                      `    Pool: ${poolName}, mnemonics: ${mnemonics.length}, startIndex: ${mnemonicIndex}`,
                     );
                     throw new Error(
-                      `Could not find available wallet for "${namedWallet.name}" in pool "${poolName}"${requiredBalance ? ` with minimum balance ${requiredBalance} sats` : ""}`
+                      `Could not find available wallet for "${namedWallet.name}" in pool "${poolName}"${requiredBalance ? ` with minimum balance ${requiredBalance} sats` : ""}`,
                     );
                   }
 
                   console.log(
-                    `    Successfully found wallet for "${namedWallet.name}" at address: ${walletInfo.address.substring(0, 10)}...`
+                    `    Successfully found wallet for "${namedWallet.name}" at address: ${walletInfo.address.substring(0, 10)}...`,
                   );
                   return { walletInfo, namedWallet };
                 } catch (error) {
-                  console.error(`Failed to initialize wallet for "${namedWallet.name}":`, error);
+                  console.error(
+                    `Failed to initialize wallet for "${namedWallet.name}":`,
+                    error,
+                  );
                   throw error;
                 }
               });
 
               const batchResults = await Promise.all(batchPromises);
-              console.log(`    Batch completed with ${batchResults.length} results`);
+              console.log(
+                `    Batch completed with ${batchResults.length} results`,
+              );
 
               for (const result of batchResults) {
                 if (!result) {
@@ -1065,9 +1252,13 @@ export class WalletActions {
                     lockedCount++;
                     console.log(`    Locked wallet for "${namedWallet.name}"`);
 
-                    lockedWallets.set(namedWallet.name, { wallet: walletInfo.wallet, pool: poolName });
+                    lockedWallets.set(namedWallet.name, {
+                      wallet: walletInfo.wallet,
+                      pool: poolName,
+                    });
 
-                    context.scenarioLockedWallets = context.scenarioLockedWallets || [];
+                    context.scenarioLockedWallets =
+                      context.scenarioLockedWallets || [];
                     context.scenarioLockedWallets.push(namedWallet.name);
                   }
                 } else {
@@ -1083,18 +1274,25 @@ export class WalletActions {
                   balance: walletInfo.balance,
                 };
                 console.log(
-                  `    Added "${namedWallet.name}" to scenario context (address: ${walletInfo.address.substring(0, 10)}...)`
+                  `    Added "${namedWallet.name}" to scenario context (address: ${walletInfo.address.substring(0, 10)}...)`,
                 );
               }
             }
           }
 
-          while (successfulWallets < targetAmount && mnemonicIndex < mnemonics.length) {
+          while (
+            successfulWallets < targetAmount &&
+            mnemonicIndex < mnemonics.length
+          ) {
             const remainingNeeded = targetAmount - successfulWallets;
             const currentBatchSize = Math.min(batchSize, remainingNeeded);
 
             const batchPromises = [];
-            for (let i = 0; i < currentBatchSize && mnemonicIndex < mnemonics.length; i++) {
+            for (
+              let i = 0;
+              i < currentBatchSize && mnemonicIndex < mnemonics.length;
+              i++
+            ) {
               const currentIndex = mnemonicIndex + i;
 
               batchPromises.push(
@@ -1108,19 +1306,27 @@ export class WalletActions {
                     undefined,
                     walletStateDir,
                     poolConfig.randomSelection !== false,
-                    poolConfig.skipBackgroundStream
+                    poolConfig.skipBackgroundStream,
                   )
-                  .then((walletInfo) => ({ walletInfo, attemptedIndex: currentIndex }))
+                  .then((walletInfo) => ({
+                    walletInfo,
+                    attemptedIndex: currentIndex,
+                  }))
                   .catch((error) => {
-                    console.warn(`Failed to initialize wallet at index ${currentIndex}:`, error);
+                    console.warn(
+                      `Failed to initialize wallet at index ${currentIndex}:`,
+                      error,
+                    );
                     return { walletInfo: null, attemptedIndex: currentIndex };
-                  })
+                  }),
               );
             }
 
             const batchResults = await Promise.all(batchPromises);
 
-            const attemptedIndices = batchResults.filter((r) => r !== null).map((r) => r.attemptedIndex);
+            const attemptedIndices = batchResults
+              .filter((r) => r !== null)
+              .map((r) => r.attemptedIndex);
 
             if (attemptedIndices.length > 0) {
               const maxAttemptedIndex = Math.max(...attemptedIndices);
@@ -1156,9 +1362,13 @@ export class WalletActions {
                   lockedCount++;
                   console.log(`    Locked as "${walletName}"`);
 
-                  lockedWallets.set(walletName, { wallet: walletInfo.wallet, pool: poolName });
+                  lockedWallets.set(walletName, {
+                    wallet: walletInfo.wallet,
+                    pool: poolName,
+                  });
 
-                  context.scenarioLockedWallets = context.scenarioLockedWallets || [];
+                  context.scenarioLockedWallets =
+                    context.scenarioLockedWallets || [];
                   context.scenarioLockedWallets.push(walletName);
                 }
               } else {
@@ -1168,12 +1378,15 @@ export class WalletActions {
 
             if (batchSuccessCount === 0) {
               console.warn(
-                `  Could not find more available wallets. mnemonicIndex=${mnemonicIndex}, mnemonics.length=${mnemonics.length}`
+                `  Could not find more available wallets. mnemonicIndex=${mnemonicIndex}, mnemonics.length=${mnemonics.length}`,
               );
               break;
             }
 
-            if (successfulWallets < targetAmount && mnemonicIndex < mnemonics.length) {
+            if (
+              successfulWallets < targetAmount &&
+              mnemonicIndex < mnemonics.length
+            ) {
               await new Promise((resolve) => setTimeout(resolve, 100));
             }
           }
@@ -1186,13 +1399,17 @@ export class WalletActions {
           console.log(`    Available (unlocked): ${available.length}`);
           console.log(`    Locked by this session: ${lockedCount}`);
           if (useWalletStateCache) {
-            console.log(`    Wallet state caching: ENABLED (${walletStateDir})`);
+            console.log(
+              `    Wallet state caching: ENABLED (${walletStateDir})`,
+            );
           }
           if (minBalance) {
             console.log(`    All wallets have at least ${minBalance} sats`);
           }
           if (mnemonics.length > 0) {
-            console.log(`    Checked ${mnemonicIndex} of ${mnemonics.length} mnemonics from file`);
+            console.log(
+              `    Checked ${mnemonicIndex} of ${mnemonics.length} mnemonics from file`,
+            );
           }
 
           return { poolName, successfulWallets, totalPoolsCreated: 1 };
@@ -1220,16 +1437,24 @@ export class WalletActions {
         const scenarioEE = self.engine?.scenarioEE;
         if (scenarioEE) {
           console.log(
-            `Emitting metrics to scenario EE: initialize_pools_time=${initTime}, pools_created=${totalPoolsCreated}, wallets_initialized=${totalWalletsInitialized}`
+            `Emitting metrics to scenario EE: initialize_pools_time=${initTime}, pools_created=${totalPoolsCreated}, wallets_initialized=${totalWalletsInitialized}`,
           );
           scenarioEE.emit("histogram", "spark.initialize_pools_time", initTime);
           scenarioEE.emit("counter", "spark.pools_created", totalPoolsCreated);
-          scenarioEE.emit("counter", "spark.wallets_initialized", totalWalletsInitialized);
+          scenarioEE.emit(
+            "counter",
+            "spark.wallets_initialized",
+            totalWalletsInitialized,
+          );
           scenarioEE.emit("counter", "spark.initialize_pools_success", 1);
         } else {
           self.ee.emit("histogram", "spark.initialize_pools_time", initTime);
           self.ee.emit("counter", "spark.pools_created", totalPoolsCreated);
-          self.ee.emit("counter", "spark.wallets_initialized", totalWalletsInitialized);
+          self.ee.emit(
+            "counter",
+            "spark.wallets_initialized",
+            totalWalletsInitialized,
+          );
           self.ee.emit("counter", "spark.initialize_pools_success", 1);
         }
 
@@ -1249,7 +1474,12 @@ export class WalletActions {
     };
   }
 
-  setTransferAmount(params?: { amount?: number; min?: number; max?: number; storeAs?: string }): EngineStep {
+  setTransferAmount(params?: {
+    amount?: number;
+    min?: number;
+    max?: number;
+    storeAs?: string;
+  }): EngineStep {
     const ee = this.ee;
 
     return async function (context: SparkContext, callback) {
@@ -1259,7 +1489,9 @@ export class WalletActions {
         if (params?.amount !== undefined) {
           amount = params.amount;
         } else if (params?.min !== undefined && params?.max !== undefined) {
-          amount = Math.floor(Math.random() * (params.max - params.min + 1)) + params.min;
+          amount =
+            Math.floor(Math.random() * (params.max - params.min + 1)) +
+            params.min;
         } else {
           amount = Math.floor(Math.random() * 99001) + 1000;
         }
@@ -1279,7 +1511,11 @@ export class WalletActions {
     };
   }
 
-  collectFundsToPool(params?: { targetPool: string; sourcePools?: string[]; leaveAmount?: number }): EngineStep {
+  collectFundsToPool(params?: {
+    targetPool: string;
+    sourcePools?: string[];
+    leaveAmount?: number;
+  }): EngineStep {
     const ee = this.ee;
 
     return async function (context: SparkContext, callback) {
@@ -1290,33 +1526,41 @@ export class WalletActions {
 
         const targetPool = walletPools.get(params.targetPool);
         if (!targetPool || targetPool.wallets.length === 0) {
-          throw new Error(`Target pool "${params.targetPool}" not found or empty`);
+          throw new Error(
+            `Target pool "${params.targetPool}" not found or empty`,
+          );
         }
 
         let sourcePools: string[];
         if (params.sourcePools && params.sourcePools.length > 0) {
           sourcePools = params.sourcePools;
         } else {
-          sourcePools = Array.from(walletPools.keys()).filter((name) => name !== params.targetPool);
+          sourcePools = Array.from(walletPools.keys()).filter(
+            (name) => name !== params.targetPool,
+          );
         }
 
         const leaveAmount = params.leaveAmount || 0;
 
         console.log(
-          `CollectFundsToPool: Collecting funds from pools [${sourcePools.join(", ")}] to "${params.targetPool}"`
+          `CollectFundsToPool: Collecting funds from pools [${sourcePools.join(", ")}] to "${params.targetPool}"`,
         );
         if (leaveAmount > 0) {
           console.log(`  Leaving ${leaveAmount} sats in each source wallet`);
         }
 
         if (targetPool.available.length === 0) {
-          throw new Error(`No available wallets in target pool "${params.targetPool}"`);
+          throw new Error(
+            `No available wallets in target pool "${params.targetPool}"`,
+          );
         }
 
         const collectorWallet = targetPool.available[0];
         const collectorAddress = await collectorWallet.getSparkAddress();
 
-        console.log(`  Using collector wallet: ${collectorAddress.substring(0, 10)}...`);
+        console.log(
+          `  Using collector wallet: ${collectorAddress.substring(0, 10)}...`,
+        );
 
         let totalCollected = 0;
         let walletsProcessed = 0;
@@ -1328,7 +1572,9 @@ export class WalletActions {
             continue;
           }
 
-          console.log(`  Processing ${pool.wallets.length} wallets from pool "${poolName}"...`);
+          console.log(
+            `  Processing ${pool.wallets.length} wallets from pool "${poolName}"...`,
+          );
 
           for (const wallet of pool.wallets) {
             try {
@@ -1340,10 +1586,15 @@ export class WalletActions {
               const balanceInfo = await safeGetBalance(wallet);
               const balance = balanceInfo.balance || 0n;
 
-              const transferAmount = balance > BigInt(leaveAmount) ? balance - BigInt(leaveAmount) : 0n;
+              const transferAmount =
+                balance > BigInt(leaveAmount)
+                  ? balance - BigInt(leaveAmount)
+                  : 0n;
 
               if (transferAmount > 0) {
-                console.log(`    Transferring ${transferAmount} sats from ${walletAddress.substring(0, 10)}...`);
+                console.log(
+                  `    Transferring ${transferAmount} sats from ${walletAddress.substring(0, 10)}...`,
+                );
 
                 try {
                   const transferResult = await wallet.transfer({
@@ -1351,14 +1602,20 @@ export class WalletActions {
                     receiverSparkAddress: collectorAddress,
                   });
 
-                  console.log(`    ✓ Transfer successful (ID: ${transferResult.id})`);
+                  console.log(
+                    `    ✓ Transfer successful (ID: ${transferResult.id})`,
+                  );
                   totalCollected += Number(transferAmount);
                   walletsProcessed++;
                 } catch (error) {
-                  console.error(`    ✗ Failed to transfer from ${walletAddress.substring(0, 10)}...: ${error.message}`);
+                  console.error(
+                    `    ✗ Failed to transfer from ${walletAddress.substring(0, 10)}...: ${error.message}`,
+                  );
                 }
               } else {
-                console.log(`    Skipping ${walletAddress.substring(0, 10)}... (balance: ${balance} sats)`);
+                console.log(
+                  `    Skipping ${walletAddress.substring(0, 10)}... (balance: ${balance} sats)`,
+                );
               }
             } catch (error) {
               console.error(`    Error processing wallet: ${error.message}`);
@@ -1368,12 +1625,18 @@ export class WalletActions {
 
         try {
           const finalBalance = await safeGetBalance(collectorWallet);
-          console.log(`  Collector wallet final balance: ${finalBalance.balance} sats`);
+          console.log(
+            `  Collector wallet final balance: ${finalBalance.balance} sats`,
+          );
         } catch (error) {
-          console.warn(`  Could not get final collector balance: ${error.message}`);
+          console.warn(
+            `  Could not get final collector balance: ${error.message}`,
+          );
         }
 
-        console.log(`CollectFundsToPool: Collected ${totalCollected} sats from ${walletsProcessed} wallets`);
+        console.log(
+          `CollectFundsToPool: Collected ${totalCollected} sats from ${walletsProcessed} wallets`,
+        );
 
         context.vars = context.vars || {};
         context.vars.totalCollected = totalCollected;
@@ -1402,32 +1665,44 @@ export class WalletActions {
     return async function (context: SparkContext, callback) {
       try {
         if (!params?.sourcePool || !params?.targetPool) {
-          throw new Error("Both sourcePool and targetPool are required for transferPoolFunds");
+          throw new Error(
+            "Both sourcePool and targetPool are required for transferPoolFunds",
+          );
         }
 
         const sourcePool = walletPools.get(params.sourcePool);
         const targetPool = walletPools.get(params.targetPool);
 
         if (!sourcePool || sourcePool.wallets.length === 0) {
-          throw new Error(`Source pool "${params.sourcePool}" not found or empty`);
+          throw new Error(
+            `Source pool "${params.sourcePool}" not found or empty`,
+          );
         }
 
         if (!targetPool || targetPool.wallets.length === 0) {
-          throw new Error(`Target pool "${params.targetPool}" not found or empty`);
+          throw new Error(
+            `Target pool "${params.targetPool}" not found or empty`,
+          );
         }
 
         const leaveAmount = params.leaveAmount || 0;
         const distributeEvenly = params.distributeEvenly || false;
 
         let totalAvailable = 0n;
-        const sourceBalances: Map<string, { wallet: IssuerSparkWallet; balance: bigint }> = new Map();
+        const sourceBalances: Map<
+          string,
+          { wallet: IssuerSparkWallet; balance: bigint }
+        > = new Map();
 
         for (const wallet of sourcePool.wallets) {
           try {
             const address = await wallet.getSparkAddress();
             const balanceInfo = await safeGetBalance(wallet);
             const balance = balanceInfo.balance || 0n;
-            const transferable = balance > BigInt(leaveAmount) ? balance - BigInt(leaveAmount) : 0n;
+            const transferable =
+              balance > BigInt(leaveAmount)
+                ? balance - BigInt(leaveAmount)
+                : 0n;
 
             if (transferable > 0) {
               sourceBalances.set(address, { wallet, balance: transferable });
@@ -1441,7 +1716,10 @@ export class WalletActions {
           return;
         }
 
-        const targetWallets: Array<{ wallet: IssuerSparkWallet; address: string }> = [];
+        const targetWallets: Array<{
+          wallet: IssuerSparkWallet;
+          address: string;
+        }> = [];
         for (const wallet of targetPool.wallets) {
           const address = await wallet.getSparkAddress();
           targetWallets.push({ wallet, address });
@@ -1454,7 +1732,11 @@ export class WalletActions {
           const amountPerWallet = totalAvailable / BigInt(targetWallets.length);
           const remainder = totalAvailable % BigInt(targetWallets.length);
 
-          const transfers: Array<{ from: IssuerSparkWallet; to: string; amount: bigint }> = [];
+          const transfers: Array<{
+            from: IssuerSparkWallet;
+            to: string;
+            amount: bigint;
+          }> = [];
           let targetIndex = 0;
           let remainingAmount = totalAvailable;
 
@@ -1463,8 +1745,12 @@ export class WalletActions {
 
             while (walletRemaining > 0n && targetIndex < targetWallets.length) {
               const targetWallet = targetWallets[targetIndex];
-              const targetAmount = targetIndex < Number(remainder) ? amountPerWallet + 1n : amountPerWallet;
-              const transferAmount = walletRemaining < targetAmount ? walletRemaining : targetAmount;
+              const targetAmount =
+                targetIndex < Number(remainder)
+                  ? amountPerWallet + 1n
+                  : amountPerWallet;
+              const transferAmount =
+                walletRemaining < targetAmount ? walletRemaining : targetAmount;
 
               transfers.push({
                 from: sourceWallet,
@@ -1475,7 +1761,10 @@ export class WalletActions {
               walletRemaining -= transferAmount;
               remainingAmount -= transferAmount;
 
-              if (remainingAmount <= BigInt(targetWallets.length - targetIndex - 1) * amountPerWallet) {
+              if (
+                remainingAmount <=
+                BigInt(targetWallets.length - targetIndex - 1) * amountPerWallet
+              ) {
                 targetIndex++;
               }
             }
@@ -1497,7 +1786,10 @@ export class WalletActions {
         } else {
           const collectorWallet = targetWallets[0];
 
-          for (const [address, { wallet: sourceWallet, balance }] of sourceBalances) {
+          for (const [
+            address,
+            { wallet: sourceWallet, balance },
+          ] of sourceBalances) {
             if (balance > 0) {
               try {
                 const result = await sourceWallet.transfer({
@@ -1527,7 +1819,10 @@ export class WalletActions {
     };
   }
 
-  unlockPoolWallets(params?: { pools?: string[]; force?: boolean }): EngineStep {
+  unlockPoolWallets(params?: {
+    pools?: string[];
+    force?: boolean;
+  }): EngineStep {
     const ee = this.ee;
 
     return async function (context: SparkContext, callback) {
@@ -1535,9 +1830,13 @@ export class WalletActions {
         const poolsToUnlock = params?.pools || Array.from(walletPools.keys());
         const forceUnlock = params?.force || false;
 
-        console.log(`UnlockPoolWallets: Unlocking wallets from pools: [${poolsToUnlock.join(", ")}]`);
+        console.log(
+          `UnlockPoolWallets: Unlocking wallets from pools: [${poolsToUnlock.join(", ")}]`,
+        );
         if (forceUnlock) {
-          console.log(`  Force mode enabled - will unlock all wallets regardless of owner`);
+          console.log(
+            `  Force mode enabled - will unlock all wallets regardless of owner`,
+          );
         }
 
         let unlockedCount = 0;
@@ -1550,7 +1849,9 @@ export class WalletActions {
             continue;
           }
 
-          console.log(`  Processing pool "${poolName}" with ${pool.wallets.length} wallets...`);
+          console.log(
+            `  Processing pool "${poolName}" with ${pool.wallets.length} wallets...`,
+          );
 
           for (const wallet of pool.wallets) {
             try {
@@ -1559,12 +1860,16 @@ export class WalletActions {
               if (await isLocked(address)) {
                 if (!forceUnlock) {
                   // TODO: Add scenario ownership check to lock manager
-                  console.log(`    Skipping ${address.substring(0, 10)}... - locked`);
+                  console.log(
+                    `    Skipping ${address.substring(0, 10)}... - locked`,
+                  );
                   continue;
                 }
 
                 if (await removeLockFile(address)) {
-                  console.log(`    Unlocked wallet ${address.substring(0, 10)}...`);
+                  console.log(
+                    `    Unlocked wallet ${address.substring(0, 10)}...`,
+                  );
                   unlockedCount++;
 
                   for (const [walletName, lockedInfo] of lockedWallets) {
@@ -1578,7 +1883,9 @@ export class WalletActions {
                     }
                   }
                 } else {
-                  console.error(`    Failed to unlock wallet ${address.substring(0, 10)}...`);
+                  console.error(
+                    `    Failed to unlock wallet ${address.substring(0, 10)}...`,
+                  );
                   failedCount++;
                 }
               }
@@ -1619,33 +1926,56 @@ export class WalletActions {
     return async function (context: SparkContext, callback) {
       try {
         if (!params?.sourceMnemonicsFile || !params?.targetMnemonicsFile) {
-          throw new Error("Both sourceMnemonicsFile and targetMnemonicsFile are required");
+          throw new Error(
+            "Both sourceMnemonicsFile and targetMnemonicsFile are required",
+          );
         }
 
         const leaveAmount = params.leaveAmount || 0;
 
-        console.log(`TransferAllFunds: Loading source wallets from ${params.sourceMnemonicsFile}...`);
+        console.log(
+          `TransferAllFunds: Loading source wallets from ${params.sourceMnemonicsFile}...`,
+        );
 
-        const sourceMnemonics = await self.loadMnemonicsFromFile(params.sourceMnemonicsFile);
+        const sourceMnemonics = await self.loadMnemonicsFromFile(
+          params.sourceMnemonicsFile,
+        );
         console.log(`  Loaded ${sourceMnemonics.length} source mnemonics`);
 
-        const targetMnemonics = await self.loadMnemonicsFromFile(params.targetMnemonicsFile);
+        const targetMnemonics = await self.loadMnemonicsFromFile(
+          params.targetMnemonicsFile,
+        );
         console.log(`  Loaded ${targetMnemonics.length} target mnemonics`);
 
         console.log(`  Using REGTEST network (loadtest environment)`);
         const networkConfig = getLoadtestNetworkConfig();
 
-        console.log(`  Initializing ${sourceMnemonics.length} source wallets in batches of 50...`);
-        const sourceWallets: { wallet: IssuerSparkWallet; mnemonic: string; address: string }[] = [];
+        console.log(
+          `  Initializing ${sourceMnemonics.length} source wallets in batches of 50...`,
+        );
+        const sourceWallets: {
+          wallet: IssuerSparkWallet;
+          mnemonic: string;
+          address: string;
+        }[] = [];
         const sourceInitStartTime = Date.now();
         const BATCH_SIZE = 50;
 
-        for (let batchStart = 0; batchStart < sourceMnemonics.length; batchStart += BATCH_SIZE) {
-          const batchEnd = Math.min(batchStart + BATCH_SIZE, sourceMnemonics.length);
+        for (
+          let batchStart = 0;
+          batchStart < sourceMnemonics.length;
+          batchStart += BATCH_SIZE
+        ) {
+          const batchEnd = Math.min(
+            batchStart + BATCH_SIZE,
+            sourceMnemonics.length,
+          );
           const batchNumber = Math.floor(batchStart / BATCH_SIZE) + 1;
           const totalBatches = Math.ceil(sourceMnemonics.length / BATCH_SIZE);
 
-          console.log(`    Processing batch ${batchNumber}/${totalBatches} (wallets ${batchStart + 1}-${batchEnd})...`);
+          console.log(
+            `    Processing batch ${batchNumber}/${totalBatches} (wallets ${batchStart + 1}-${batchEnd})...`,
+          );
           const batchStartTime = Date.now();
 
           const batchPromises = [];
@@ -1660,16 +1990,18 @@ export class WalletActions {
                     IssuerSparkWallet.initialize({
                       mnemonicOrSeed: mnemonic,
                       options: networkConfig,
-                    })
+                    }),
                   );
 
                   const address = await wallet.getSparkAddress();
                   return { wallet, mnemonic, address, index: walletIndex };
                 } catch (error) {
-                  console.error(`      Failed to initialize source wallet ${walletIndex}: ${error.message}`);
+                  console.error(
+                    `      Failed to initialize source wallet ${walletIndex}: ${error.message}`,
+                  );
                   return null;
                 }
-              })()
+              })(),
             );
           }
 
@@ -1677,48 +2009,82 @@ export class WalletActions {
 
           for (const result of batchResults) {
             if (result) {
-              sourceWallets.push({ wallet: result.wallet, mnemonic: result.mnemonic, address: result.address });
+              sourceWallets.push({
+                wallet: result.wallet,
+                mnemonic: result.mnemonic,
+                address: result.address,
+              });
             }
           }
 
           const batchEndTime = Date.now();
           const batchTime = batchEndTime - batchStartTime;
-          const avgTimePerWallet = Math.floor(batchTime / (batchEnd - batchStart));
+          const avgTimePerWallet = Math.floor(
+            batchTime / (batchEnd - batchStart),
+          );
 
-          console.log(`    Batch ${batchNumber} completed in ${batchTime}ms (avg ${avgTimePerWallet}ms/wallet)`);
-          console.log(`    Total progress: ${sourceWallets.length}/${sourceMnemonics.length} wallets initialized`);
+          console.log(
+            `    Batch ${batchNumber} completed in ${batchTime}ms (avg ${avgTimePerWallet}ms/wallet)`,
+          );
+          console.log(
+            `    Total progress: ${sourceWallets.length}/${sourceMnemonics.length} wallets initialized`,
+          );
         }
 
         const totalInitTime = Date.now() - sourceInitStartTime;
-        console.log(`  All ${sourceWallets.length} source wallets initialized in ${Math.floor(totalInitTime / 1000)}s`);
+        console.log(
+          `  All ${sourceWallets.length} source wallets initialized in ${Math.floor(totalInitTime / 1000)}s`,
+        );
 
         console.log(`  Getting balances for source wallets in batches...`);
         let totalAvailable = 0n;
-        const fundedSourceWallets: { wallet: IssuerSparkWallet; address: string; balance: bigint }[] = [];
+        const fundedSourceWallets: {
+          wallet: IssuerSparkWallet;
+          address: string;
+          balance: bigint;
+        }[] = [];
         const balanceCheckStartTime = Date.now();
 
-        for (let batchStart = 0; batchStart < sourceWallets.length; batchStart += BATCH_SIZE) {
-          const batchEnd = Math.min(batchStart + BATCH_SIZE, sourceWallets.length);
+        for (
+          let batchStart = 0;
+          batchStart < sourceWallets.length;
+          batchStart += BATCH_SIZE
+        ) {
+          const batchEnd = Math.min(
+            batchStart + BATCH_SIZE,
+            sourceWallets.length,
+          );
           const batchNumber = Math.floor(batchStart / BATCH_SIZE) + 1;
           const totalBatches = Math.ceil(sourceWallets.length / BATCH_SIZE);
 
-          console.log(`    Checking balances batch ${batchNumber}/${totalBatches}...`);
+          console.log(
+            `    Checking balances batch ${batchNumber}/${totalBatches}...`,
+          );
 
-          const batchPromises = sourceWallets.slice(batchStart, batchEnd).map(async ({ wallet, address }) => {
-            try {
-              const { balance } = await safeGetBalance(wallet);
-              const transferable = balance > BigInt(leaveAmount) ? balance - BigInt(leaveAmount) : 0n;
+          const batchPromises = sourceWallets
+            .slice(batchStart, batchEnd)
+            .map(async ({ wallet, address }) => {
+              try {
+                const { balance } = await safeGetBalance(wallet);
+                const transferable =
+                  balance > BigInt(leaveAmount)
+                    ? balance - BigInt(leaveAmount)
+                    : 0n;
 
-              if (transferable > 0) {
-                console.log(`      ${address.substring(0, 10)}... has ${transferable} sats available`);
-                return { wallet, address, balance: transferable };
+                if (transferable > 0) {
+                  console.log(
+                    `      ${address.substring(0, 10)}... has ${transferable} sats available`,
+                  );
+                  return { wallet, address, balance: transferable };
+                }
+                return null;
+              } catch (error) {
+                console.error(
+                  `      Failed to get balance for ${address.substring(0, 10)}...: ${error.message}`,
+                );
+                return null;
               }
-              return null;
-            } catch (error) {
-              console.error(`      Failed to get balance for ${address.substring(0, 10)}...: ${error.message}`);
-              return null;
-            }
-          });
+            });
 
           const batchResults = await Promise.all(batchPromises);
 
@@ -1730,12 +2096,14 @@ export class WalletActions {
           }
 
           const fundedInBatch = batchResults.filter((r) => r !== null).length;
-          console.log(`    Batch ${batchNumber} completed: ${fundedInBatch} funded wallets found`);
+          console.log(
+            `    Batch ${batchNumber} completed: ${fundedInBatch} funded wallets found`,
+          );
         }
 
         const balanceCheckTime = Date.now() - balanceCheckStartTime;
         console.log(
-          `  Total available funds: ${totalAvailable} sats from ${fundedSourceWallets.length} wallets (checked in ${Math.floor(balanceCheckTime / 1000)}s)`
+          `  Total available funds: ${totalAvailable} sats from ${fundedSourceWallets.length} wallets (checked in ${Math.floor(balanceCheckTime / 1000)}s)`,
         );
 
         if (totalAvailable === 0n) {
@@ -1744,14 +2112,23 @@ export class WalletActions {
           return;
         }
 
-        const targetCount = Math.min(targetMnemonics.length, fundedSourceWallets.length);
+        const targetCount = Math.min(
+          targetMnemonics.length,
+          fundedSourceWallets.length,
+        );
         console.log(`  Initializing ${targetCount} target wallets...`);
 
-        const targetWallets: { wallet: IssuerSparkWallet; address: string }[] = [];
+        const targetWallets: { wallet: IssuerSparkWallet; address: string }[] =
+          [];
         const usedTargetIndices = new Set<number>();
 
-        while (targetWallets.length < targetCount && usedTargetIndices.size < targetMnemonics.length) {
-          const randomIndex = Math.floor(Math.random() * targetMnemonics.length);
+        while (
+          targetWallets.length < targetCount &&
+          usedTargetIndices.size < targetMnemonics.length
+        ) {
+          const randomIndex = Math.floor(
+            Math.random() * targetMnemonics.length,
+          );
           if (usedTargetIndices.has(randomIndex)) continue;
 
           usedTargetIndices.add(randomIndex);
@@ -1761,14 +2138,16 @@ export class WalletActions {
             IssuerSparkWallet.initialize({
               mnemonicOrSeed: mnemonic,
               options: networkConfig,
-            })
+            }),
           );
 
           const address = await wallet.getSparkAddress();
           targetWallets.push({ wallet, address });
 
           if (targetWallets.length % 10 === 0) {
-            console.log(`    Initialized ${targetWallets.length}/${targetCount} target wallets`);
+            console.log(
+              `    Initialized ${targetWallets.length}/${targetCount} target wallets`,
+            );
           }
         }
 
@@ -1777,14 +2156,22 @@ export class WalletActions {
         console.log(`  Starting transfers...`);
         let totalTransferred = 0;
         let successfulTransfers = 0;
-        const targetTransfers: Map<string, { wallet: IssuerSparkWallet; transferCount: number }> = new Map();
+        const targetTransfers: Map<
+          string,
+          { wallet: IssuerSparkWallet; transferCount: number }
+        > = new Map();
 
-        for (const { wallet: sourceWallet, address: sourceAddress, balance } of fundedSourceWallets) {
-          const targetWallet = targetWallets[Math.floor(Math.random() * targetWallets.length)];
+        for (const {
+          wallet: sourceWallet,
+          address: sourceAddress,
+          balance,
+        } of fundedSourceWallets) {
+          const targetWallet =
+            targetWallets[Math.floor(Math.random() * targetWallets.length)];
 
           try {
             console.log(
-              `    ${sourceAddress.substring(0, 10)}... -> ${targetWallet.address.substring(0, 10)}...: ${balance} sats`
+              `    ${sourceAddress.substring(0, 10)}... -> ${targetWallet.address.substring(0, 10)}...: ${balance} sats`,
             );
 
             await sourceWallet.transfer({
@@ -1806,9 +2193,13 @@ export class WalletActions {
           }
         }
 
-        console.log(`  Completed ${successfulTransfers} transfers, total ${totalTransferred} sats`);
+        console.log(
+          `  Completed ${successfulTransfers} transfers, total ${totalTransferred} sats`,
+        );
 
-        console.log(`  Querying and claiming transfers for ${targetTransfers.size} target wallets...`);
+        console.log(
+          `  Querying and claiming transfers for ${targetTransfers.size} target wallets...`,
+        );
 
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
@@ -1824,10 +2215,16 @@ export class WalletActions {
         };
 
         console.log(`TransferAllFunds: Complete!`);
-        console.log(`  Total: ${totalTransferred} sats transferred in ${successfulTransfers} transactions`);
+        console.log(
+          `  Total: ${totalTransferred} sats transferred in ${successfulTransfers} transactions`,
+        );
 
         ee.emit("counter", "spark.transfer_all_funds_complete", 1);
-        ee.emit("histogram", "spark.transfer_all_funds_total", totalTransferred);
+        ee.emit(
+          "histogram",
+          "spark.transfer_all_funds_total",
+          totalTransferred,
+        );
 
         callback(null, context);
       } catch (error) {
@@ -1853,7 +2250,9 @@ export class WalletActions {
             const address = await lockedInfo.wallet.getSparkAddress();
 
             if (await removeLockFile(address)) {
-              console.log(`  Removed lock file for wallet ${name} (${address})`);
+              console.log(
+                `  Removed lock file for wallet ${name} (${address})`,
+              );
             }
 
             const pool = walletPools.get(lockedInfo.pool);
@@ -1916,7 +2315,10 @@ export class WalletActions {
     };
   }
 
-  getStaticAddress(params: { walletName: string; storeAs: string }): EngineStep {
+  getStaticAddress(params: {
+    walletName: string;
+    storeAs: string;
+  }): EngineStep {
     const ee = this.ee;
 
     return async function (context: SparkContext, callback) {
@@ -1924,14 +2326,21 @@ export class WalletActions {
 
       console.log(`Getting static address for wallet ${params.walletName}...`);
       try {
-        const walletInfo = params.walletName ? context.vars?.[params.walletName] : context.sparkWallet;
+        const walletInfo = params.walletName
+          ? context.vars?.[params.walletName]
+          : context.sparkWallet;
         if (!walletInfo) {
           throw new Error(`Wallet ${params.walletName || "default"} not found`);
         }
 
         if (!walletInfo) {
-          console.error(`  ERROR: Wallet "${params.walletName || "default"}" not found in context`);
-          console.error(`  context.vars keys:`, context.vars ? Object.keys(context.vars) : "undefined");
+          console.error(
+            `  ERROR: Wallet "${params.walletName || "default"}" not found in context`,
+          );
+          console.error(
+            `  context.vars keys:`,
+            context.vars ? Object.keys(context.vars) : "undefined",
+          );
           throw new Error(`Wallet ${params.walletName || "default"} not found`);
         }
 
@@ -1944,10 +2353,14 @@ export class WalletActions {
         const staticAddresses = await wallet.queryStaticDepositAddresses();
         let staticDepostAddress: string;
         if (staticAddresses && staticAddresses.length > 0) {
-          console.log(`Static address already exists for wallet ${walletInfo.name}: ${staticAddresses[0]}`);
+          console.log(
+            `Static address already exists for wallet ${walletInfo.name}: ${staticAddresses[0]}`,
+          );
           staticDepostAddress = staticAddresses[0];
         } else {
-          console.log(`Creating new static address for wallet ${walletInfo.name}...`);
+          console.log(
+            `Creating new static address for wallet ${walletInfo.name}...`,
+          );
           staticDepostAddress = await wallet.getStaticDepositAddress();
           console.log(`New static address created: ${staticDepostAddress}`);
         }
@@ -1961,11 +2374,18 @@ export class WalletActions {
           balance: balance,
         };
 
-        ee.emit("histogram", "spark.get_static_address_time", Date.now() - startTime);
+        ee.emit(
+          "histogram",
+          "spark.get_static_address_time",
+          Date.now() - startTime,
+        );
         ee.emit("counter", "spark.get_static_address_success", 1);
         callback(null, context);
       } catch (error) {
-        console.error(`failed to get static address for ${params.walletName}:`, error.message);
+        console.error(
+          `failed to get static address for ${params.walletName}:`,
+          error.message,
+        );
         ee.emit("counter", "spark.get_static_address_failed", 1);
         callback(error);
       }
@@ -1987,8 +2407,13 @@ export class WalletActions {
         } = context.vars?.[params.storedName];
 
         if (!walletInfo) {
-          console.error(`  ERROR: Wallet "${params.storedName}" not found in context`);
-          console.error(`  context.vars keys:`, context.vars ? Object.keys(context.vars) : "undefined");
+          console.error(
+            `  ERROR: Wallet "${params.storedName}" not found in context`,
+          );
+          console.error(
+            `  context.vars keys:`,
+            context.vars ? Object.keys(context.vars) : "undefined",
+          );
           throw new Error(`Wallet ${params.storedName} not found`);
         }
 
@@ -1998,11 +2423,18 @@ export class WalletActions {
         console.log(`  Static Address: ${walletInfo.staticAddress}`);
         console.log(`  Balance: ${walletInfo.balance} sats`);
 
-        ee.emit("histogram", "spark.print_wallet_info_time", Date.now() - startTime);
+        ee.emit(
+          "histogram",
+          "spark.print_wallet_info_time",
+          Date.now() - startTime,
+        );
         ee.emit("counter", "spark.print_wallet_info_success", 1);
         callback(null, context);
       } catch (error) {
-        console.error(`failed to print wallet info from store with name ${params.storedName}:`, error.message);
+        console.error(
+          `failed to print wallet info from store with name ${params.storedName}:`,
+          error.message,
+        );
         ee.emit("counter", "spark.print_wallet_info_failed", 1);
         callback(error);
       }
@@ -2021,21 +2453,36 @@ export class WalletActions {
         } = context.vars?.[params.walletName];
 
         if (!walletInfo) {
-          console.error(`  ERROR: Wallet "${params.walletName}" not found in context`);
-          console.error(`  context.vars keys:`, context.vars ? Object.keys(context.vars) : "undefined");
+          console.error(
+            `  ERROR: Wallet "${params.walletName}" not found in context`,
+          );
+          console.error(
+            `  context.vars keys:`,
+            context.vars ? Object.keys(context.vars) : "undefined",
+          );
           throw new Error(`Wallet ${params.walletName} not found`);
         }
 
-        const quote = await walletInfo.wallet.getClaimStaticDepositQuote(walletInfo.txId);
+        const quote = await walletInfo.wallet.getClaimStaticDepositQuote(
+          walletInfo.txId,
+        );
         if (!quote) {
-          console.error(`  ERROR: No quote found for static deposit claim in wallet ${params.walletName}`);
-          throw new Error(`No quote found for static deposit claim in wallet ${params.walletName}`);
+          console.error(
+            `  ERROR: No quote found for static deposit claim in wallet ${params.walletName}`,
+          );
+          throw new Error(
+            `No quote found for static deposit claim in wallet ${params.walletName}`,
+          );
         }
 
         await new Promise((resolve) => setTimeout(resolve, 30000));
 
-        console.log(`  Quote for static deposit claim: ${JSON.stringify(quote)}`);
-        console.log(`  Claiming static deposit for wallet ${params.walletName}...`);
+        console.log(
+          `  Quote for static deposit claim: ${JSON.stringify(quote)}`,
+        );
+        console.log(
+          `  Claiming static deposit for wallet ${params.walletName}...`,
+        );
         const q = await walletInfo.wallet.claimStaticDeposit({
           transactionId: walletInfo.txId,
           creditAmountSats: quote.creditAmountSats,
@@ -2044,7 +2491,9 @@ export class WalletActions {
 
         await new Promise((resolve) => setTimeout(resolve, 60000)); // Wait for 60 seconds to ensure claim is processed
 
-        let pendingTransfer = await (walletInfo.wallet as any).transferService.queryTransfer(q.transferId);
+        let pendingTransfer = await (
+          walletInfo.wallet as any
+        ).transferService.queryTransfer(q.transferId);
 
         console.log(` Transfer status: ${pendingTransfer.status}\n\n`);
 
@@ -2059,22 +2508,37 @@ export class WalletActions {
         });
 
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        const { balance: balanceAfterClaim } = await walletInfo.wallet.getBalance();
+        const { balance: balanceAfterClaim } =
+          await walletInfo.wallet.getBalance();
 
         console.log(`\n\n New Balance: ${balanceAfterClaim}\n\n`);
-        console.log(`  Static deposit claimed successfully for wallet ${params.walletName}`);
-        ee.emit("histogram", "spark.claim_static_deposit_time", Date.now() - startTime);
+        console.log(
+          `  Static deposit claimed successfully for wallet ${params.walletName}`,
+        );
+        ee.emit(
+          "histogram",
+          "spark.claim_static_deposit_time",
+          Date.now() - startTime,
+        );
         ee.emit("counter", "spark.claim_static_deposit_success", 1);
         callback(null, context);
       } catch (error) {
-        console.error(`failed to claim static depost ${params.walletName}:`, error.message);
+        console.error(
+          `failed to claim static depost ${params.walletName}:`,
+          error.message,
+        );
         ee.emit("counter", "spark.claim_static_deposit_failed", 1);
         callback(error);
       }
     };
   }
 
-  withdraw(params?: { senderWallet: string; receiverWallet: string; storeAs: string; amount: number }): EngineStep {
+  withdraw(params?: {
+    senderWallet: string;
+    receiverWallet: string;
+    storeAs: string;
+    amount: number;
+  }): EngineStep {
     const ee = this.ee;
 
     return async function (context, callback) {
@@ -2084,23 +2548,29 @@ export class WalletActions {
         // get sender wallet instance
         let namedWalletInfo = context.vars?.[params.senderWallet];
         if (!namedWalletInfo) {
-          throw new Error(`Wallet "${params.senderWallet}" not found. Make sure it's locked first.`);
+          throw new Error(
+            `Wallet "${params.senderWallet}" not found. Make sure it's locked first.`,
+          );
         }
 
         const sendWallet: IssuerSparkWallet = namedWalletInfo.wallet;
 
         const { balance } = await safeGetBalance(sendWallet);
-        console.log(`${params.senderWallet} balance is ${balance.toString()} sats...`);
+        console.log(
+          `${params.senderWallet} balance is ${balance.toString()} sats...`,
+        );
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         if (balance.valueOf() <= params.amount) {
           throw new Error(
-            `${params.senderWallet} balance is insuficcient: ${balance.toString()} sats, withrawal amount: ${params.amount} sats...`
+            `${params.senderWallet} balance is insuficcient: ${balance.toString()} sats, withrawal amount: ${params.amount} sats...`,
           );
         }
         namedWalletInfo = context.vars?.[params.receiverWallet];
         if (!namedWalletInfo) {
-          throw new Error(`Wallet "${params.receiverWallet}" not found. Make sure it's locked first.`);
+          throw new Error(
+            `Wallet "${params.receiverWallet}" not found. Make sure it's locked first.`,
+          );
         }
         const receiverWallet: IssuerSparkWallet = namedWalletInfo.wallet;
         const staticReceiverAddress = namedWalletInfo.staticAddress;
@@ -2113,7 +2583,9 @@ export class WalletActions {
 
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        const userFee = feeQuote.userFeeSlow.originalValue + feeQuote.l1BroadcastFeeSlow.originalValue;
+        const userFee =
+          feeQuote.userFeeSlow.originalValue +
+          feeQuote.l1BroadcastFeeSlow.originalValue;
         console.log(`Fee quote for withdrawal is: ${userFee} sats...`);
 
         if (userFee >= params.amount) {
@@ -2150,7 +2622,10 @@ export class WalletActions {
     };
   }
 
-  distributeAndRebalance(params?: { pools?: string[]; minAmount?: number }): EngineStep {
+  distributeAndRebalance(params?: {
+    pools?: string[];
+    minAmount?: number;
+  }): EngineStep {
     const ee = this.ee;
 
     return async function (context: SparkContext, callback) {
@@ -2163,15 +2638,32 @@ export class WalletActions {
         // Phase 1: Analyze current balances
         const walletBalances: Map<
           string,
-          { wallet: IssuerSparkWallet; balance: bigint; pool: string; address: string }
+          {
+            wallet: IssuerSparkWallet;
+            balance: bigint;
+            pool: string;
+            address: string;
+          }
         > = new Map();
-        const needsFunding: Array<{ wallet: IssuerSparkWallet; deficit: bigint; pool: string; address: string }> = [];
-        const hasSurplus: Array<{ wallet: IssuerSparkWallet; surplus: bigint; pool: string; address: string }> = [];
+        const needsFunding: Array<{
+          wallet: IssuerSparkWallet;
+          deficit: bigint;
+          pool: string;
+          address: string;
+        }> = [];
+        const hasSurplus: Array<{
+          wallet: IssuerSparkWallet;
+          surplus: bigint;
+          pool: string;
+          address: string;
+        }> = [];
 
         let totalDeficit = 0n;
         let totalSurplus = 0n;
 
-        console.log(`  Analyzing wallet balances (minimum required: ${minAmount} sats)...`);
+        console.log(
+          `  Analyzing wallet balances (minimum required: ${minAmount} sats)...`,
+        );
 
         // Check all wallets in specified pools
         for (const poolName of poolNames) {
@@ -2181,7 +2673,9 @@ export class WalletActions {
             continue;
           }
 
-          console.log(`  Checking pool "${poolName}" with ${pool.wallets.length} wallets...`);
+          console.log(
+            `  Checking pool "${poolName}" with ${pool.wallets.length} wallets...`,
+          );
 
           for (const wallet of pool.wallets) {
             try {
@@ -2189,22 +2683,33 @@ export class WalletActions {
               const balanceResult = await safeGetBalance(wallet);
               const balance = BigInt(balanceResult.balance);
 
-              walletBalances.set(address, { wallet, balance, pool: poolName, address });
+              walletBalances.set(address, {
+                wallet,
+                balance,
+                pool: poolName,
+                address,
+              });
 
               if (balance < BigInt(minAmount)) {
                 const deficit = BigInt(minAmount) - balance;
                 needsFunding.push({ wallet, deficit, pool: poolName, address });
                 totalDeficit += deficit;
-                console.log(`    Wallet ${address.substring(0, 10)}... needs ${deficit} sats (current: ${balance})`);
+                console.log(
+                  `    Wallet ${address.substring(0, 10)}... needs ${deficit} sats (current: ${balance})`,
+                );
               } else if (balance > BigInt(minAmount)) {
                 const surplus = balance - BigInt(minAmount);
                 hasSurplus.push({ wallet, surplus, pool: poolName, address });
                 totalSurplus += surplus;
               } else {
-                console.log(`    Wallet ${address.substring(0, 10)} have sats: ${balance})`);
+                console.log(
+                  `    Wallet ${address.substring(0, 10)} have sats: ${balance})`,
+                );
               }
             } catch (error) {
-              console.error(`    Failed to check wallet balance: ${error.message}`);
+              console.error(
+                `    Failed to check wallet balance: ${error.message}`,
+              );
             }
           }
         }
@@ -2216,7 +2721,9 @@ export class WalletActions {
         console.log(`    - Total surplus: ${totalSurplus} sats`);
 
         if (needsFunding.length === 0) {
-          console.log("  All wallets have sufficient balance. No rebalancing needed.");
+          console.log(
+            "  All wallets have sufficient balance. No rebalancing needed.",
+          );
           callback(null, context);
           return;
         }
@@ -2243,26 +2750,37 @@ export class WalletActions {
         }
 
         // Check if we have enough funds
-        const totalAvailable = fundingSources.reduce((sum, source) => sum + source.availableAmount, 0n);
+        const totalAvailable = fundingSources.reduce(
+          (sum, source) => sum + source.availableAmount,
+          0n,
+        );
 
         if (totalAvailable < totalDeficit) {
           console.warn(
-            `  WARNING: Not enough funds available. Need ${totalDeficit} sats but only have ${totalAvailable} sats.`
+            `  WARNING: Not enough funds available. Need ${totalDeficit} sats but only have ${totalAvailable} sats.`,
           );
 
           // Phase 2b: Use faucet to get additional funds
           const fundingNeeded = totalDeficit - totalAvailable;
-          console.log(`\n  Attempting to get ${fundingNeeded} sats from faucet...`);
+          console.log(
+            `\n  Attempting to get ${fundingNeeded} sats from faucet...`,
+          );
 
           // Find wallets to use for faucet funding - prioritize those with lowest balances
-          const allWallets: Array<{ wallet: IssuerSparkWallet; balance: bigint; pool: string }> = [];
+          const allWallets: Array<{
+            wallet: IssuerSparkWallet;
+            balance: bigint;
+            pool: string;
+          }> = [];
 
           // Collect all wallets and their balances
           for (const poolName of poolNames) {
             const pool = walletPools.get(poolName);
             if (pool) {
               for (const wallet of pool.wallets) {
-                const balanceInfo = walletBalances.get(await wallet.getSparkAddress());
+                const balanceInfo = walletBalances.get(
+                  await wallet.getSparkAddress(),
+                );
                 if (balanceInfo) {
                   allWallets.push({
                     wallet,
@@ -2296,10 +2814,15 @@ export class WalletActions {
           let currentWalletIndex = 0;
           const startTime = Date.now();
 
-          while (totalFaucetReceived < fundingNeeded && currentWalletIndex < faucetWallets.length) {
+          while (
+            totalFaucetReceived < fundingNeeded &&
+            currentWalletIndex < faucetWallets.length
+          ) {
             const elapsedTime = Date.now() - startTime;
             if (elapsedTime > maxRetryDuration) {
-              console.warn(`  Faucet timeout reached after ${maxRetryDuration / 1000} seconds`);
+              console.warn(
+                `  Faucet timeout reached after ${maxRetryDuration / 1000} seconds`,
+              );
               break;
             }
 
@@ -2315,7 +2838,10 @@ export class WalletActions {
               i++
             ) {
               const remainingNeeded = fundingNeeded - totalFaucetReceived;
-              const amountToRequest = remainingNeeded < maxPerTransaction ? remainingNeeded : maxPerTransaction;
+              const amountToRequest =
+                remainingNeeded < maxPerTransaction
+                  ? remainingNeeded
+                  : maxPerTransaction;
 
               batchWallets.push(faucetWallets[currentWalletIndex]);
               batchAmounts.push(amountToRequest);
@@ -2323,7 +2849,9 @@ export class WalletActions {
             }
 
             // Execute faucet requests for this batch
-            console.log(`  Faucet batch ${faucetAttempts + 1}: Requesting funds for ${batchWallets.length} wallets...`);
+            console.log(
+              `  Faucet batch ${faucetAttempts + 1}: Requesting funds for ${batchWallets.length} wallets...`,
+            );
 
             let encounteredRateLimit = false;
 
@@ -2333,36 +2861,56 @@ export class WalletActions {
 
               try {
                 const address = await wallet.getSparkAddress();
-                console.log(`    Requesting ${amount} sats for wallet ${address.substring(0, 10)}...`);
+                console.log(
+                  `    Requesting ${amount} sats for wallet ${address.substring(0, 10)}...`,
+                );
 
                 // Import faucet function
-                const { fundWalletFromGraphQL } = await import("./bitcoin-faucet-wrapper");
+                const { fundWalletFromGraphQL } = await import(
+                  "./bitcoin-faucet-wrapper"
+                );
 
                 // Get deposit address
-                const depositAddress = await wallet.getSingleUseDepositAddress();
+                const depositAddress =
+                  await wallet.getSingleUseDepositAddress();
                 console.log(`    Deposit address: ${depositAddress}`);
 
                 // Faucet request
                 let txId: string;
                 try {
-                  txId = await fundWalletFromGraphQL(depositAddress, Number(amount));
-                  console.log(`    ✓ Funded with ${amount} sats, txId: ${txId}`);
+                  txId = await fundWalletFromGraphQL(
+                    depositAddress,
+                    Number(amount),
+                  );
+                  console.log(
+                    `    ✓ Funded with ${amount} sats, txId: ${txId}`,
+                  );
                 } catch (faucetError: any) {
-                  console.error(`    ✗ Faucet request failed: ${faucetError.message}`);
+                  console.error(
+                    `    ✗ Faucet request failed: ${faucetError.message}`,
+                  );
 
                   // Check if rate limited
                   if (
                     faucetError.message &&
-                    (faucetError.message.includes("rate") || faucetError.message.includes("429"))
+                    (faucetError.message.includes("rate") ||
+                      faucetError.message.includes("429"))
                   ) {
-                    console.log(`    Rate limited - waiting ${retryInterval / 1000} seconds before retry...`);
+                    console.log(
+                      `    Rate limited - waiting ${retryInterval / 1000} seconds before retry...`,
+                    );
                     ee.emit("counter", "spark.faucet_rate_limited", 1);
 
                     // Move back the wallet index to retry these wallets
-                    currentWalletIndex = Math.max(0, currentWalletIndex - batchWallets.length + i);
+                    currentWalletIndex = Math.max(
+                      0,
+                      currentWalletIndex - batchWallets.length + i,
+                    );
 
                     // Wait before retrying
-                    await new Promise((resolve) => setTimeout(resolve, retryInterval));
+                    await new Promise((resolve) =>
+                      setTimeout(resolve, retryInterval),
+                    );
                     encounteredRateLimit = true;
                     break;
                   }
@@ -2377,7 +2925,9 @@ export class WalletActions {
                 try {
                   const leaves = await wallet.claimDeposit(txId);
                   if (leaves && leaves.length > 0) {
-                    console.log(`    ✓ Successfully deposited ${amount} sats to Spark`);
+                    console.log(
+                      `    ✓ Successfully deposited ${amount} sats to Spark`,
+                    );
                     totalFaucetReceived += amount;
 
                     // Find which pool this wallet belongs to
@@ -2399,9 +2949,15 @@ export class WalletActions {
                     });
 
                     ee.emit("counter", "spark.faucet_deposit_success", 1);
-                    ee.emit("counter", "spark.faucet_amount_received", Number(amount));
+                    ee.emit(
+                      "counter",
+                      "spark.faucet_amount_received",
+                      Number(amount),
+                    );
                   } else {
-                    console.warn(`    ⚠ No leaves returned from claim deposit`);
+                    console.warn(
+                      `    ⚠ No leaves returned from claim deposit`,
+                    );
                     ee.emit("counter", "spark.faucet_deposit_failed", 1);
                   }
                 } catch (claimError: any) {
@@ -2409,7 +2965,9 @@ export class WalletActions {
                     !claimError.message.includes("already claimed") &&
                     !claimError.message.includes("already processed")
                   ) {
-                    console.error(`    ✗ Failed to claim deposit: ${claimError.message}`);
+                    console.error(
+                      `    ✗ Failed to claim deposit: ${claimError.message}`,
+                    );
                     ee.emit("counter", "spark.faucet_deposit_failed", 1);
                   } else {
                     console.log(`    ℹ Deposit already claimed`);
@@ -2448,16 +3006,25 @@ export class WalletActions {
               currentWalletIndex < faucetWallets.length &&
               totalFaucetReceived < fundingNeeded
             ) {
-              console.log(`  Waiting ${batchDelayMs / 1000} seconds before next faucet batch...`);
+              console.log(
+                `  Waiting ${batchDelayMs / 1000} seconds before next faucet batch...`,
+              );
               await new Promise((resolve) => setTimeout(resolve, batchDelayMs));
             }
           }
 
-          console.log(`  Faucet funding complete: Received ${totalFaucetReceived} sats of ${fundingNeeded} needed`);
+          console.log(
+            `  Faucet funding complete: Received ${totalFaucetReceived} sats of ${fundingNeeded} needed`,
+          );
 
           // Update total available after faucet
-          const newTotalAvailable = fundingSources.reduce((sum, source) => sum + source.availableAmount, 0n);
-          console.log(`  Total available after faucet: ${newTotalAvailable} sats`);
+          const newTotalAvailable = fundingSources.reduce(
+            (sum, source) => sum + source.availableAmount,
+            0n,
+          );
+          console.log(
+            `  Total available after faucet: ${newTotalAvailable} sats`,
+          );
         }
 
         // Phase 3: Execute transfers (minimize transactions)
@@ -2479,11 +3046,13 @@ export class WalletActions {
             if (source.address === recipient.address) continue;
 
             const transferAmount =
-              remainingDeficit < source.availableAmount ? remainingDeficit : source.availableAmount;
+              remainingDeficit < source.availableAmount
+                ? remainingDeficit
+                : source.availableAmount;
 
             try {
               console.log(
-                `    Transferring ${transferAmount} sats from ${source.address.substring(0, 10)}... to ${recipient.address.substring(0, 10)}...`
+                `    Transferring ${transferAmount} sats from ${source.address.substring(0, 10)}... to ${recipient.address.substring(0, 10)}...`,
               );
 
               const transferResult = await source.wallet.transfer({
@@ -2494,7 +3063,9 @@ export class WalletActions {
               await new Promise((resolve) => setTimeout(resolve, 2000));
 
               const transactionId = transferResult.id;
-              const pendingTransfer = await (recipient.wallet as any).transferService.queryTransfer(transactionId);
+              const pendingTransfer = await (
+                recipient.wallet as any
+              ).transferService.queryTransfer(transactionId);
               if (pendingTransfer) {
                 await (recipient.wallet as any).claimTransfer({
                   transfer: pendingTransfer,
@@ -2511,9 +3082,15 @@ export class WalletActions {
               source.availableAmount -= transferAmount;
               remainingDeficit -= transferAmount;
 
-              console.log(`    ✓ Transfer successful (ID: ${transferResult.id})`);
+              console.log(
+                `    ✓ Transfer successful (ID: ${transferResult.id})`,
+              );
               ee.emit("counter", "spark.rebalance_transfer_success", 1);
-              ee.emit("counter", "spark.rebalance_amount_transferred", Number(transferAmount));
+              ee.emit(
+                "counter",
+                "spark.rebalance_amount_transferred",
+                Number(transferAmount),
+              );
             } catch (error) {
               ee.emit("counter", "spark.rebalance_transfer_failed", 1);
             }
@@ -2521,7 +3098,7 @@ export class WalletActions {
 
           if (remainingDeficit > 0n) {
             console.warn(
-              `    Could not fully fund ${recipient.address.substring(0, 10)}... (${remainingDeficit} sats short)`
+              `    Could not fully fund ${recipient.address.substring(0, 10)}... (${remainingDeficit} sats short)`,
             );
           }
         }

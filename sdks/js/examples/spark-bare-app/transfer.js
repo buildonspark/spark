@@ -52,7 +52,7 @@ try {
   const transferResult = await transfer(
     config.mnemonic,
     receiverSparkAddress,
-    amountSats
+    amountSats,
   );
   console.log("Transfer result:", transferResult);
   process.exit(0);

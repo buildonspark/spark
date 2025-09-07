@@ -21,7 +21,11 @@ export class WalletPoolManager {
     return WalletPoolManager.instance;
   }
 
-  async initializePool(name: string, size: number, options?: { mnemonics?: string[] }): Promise<void> {
+  async initializePool(
+    name: string,
+    size: number,
+    options?: { mnemonics?: string[] },
+  ): Promise<void> {
     if (this.pools.has(name)) {
       console.log(`Pool ${name} already initialized`);
       return;
@@ -43,7 +47,9 @@ export class WalletPoolManager {
     const walletPromises = Array.from({ length: size }, async (_, i) => {
       const walletStartTime = Date.now();
 
-      console.log(`Starting initialization of wallet ${i + 1}/${size} in pool ${name}`);
+      console.log(
+        `Starting initialization of wallet ${i + 1}/${size} in pool ${name}`,
+      );
 
       const { wallet } = await IssuerSparkWalletNoEvents.initialize({
         options: config,
@@ -51,7 +57,9 @@ export class WalletPoolManager {
       });
 
       const walletEndTime = Date.now();
-      console.log(`Wallet ${i + 1}/${size} in pool ${name} initialized in ${walletEndTime - walletStartTime}ms`);
+      console.log(
+        `Wallet ${i + 1}/${size} in pool ${name} initialized in ${walletEndTime - walletStartTime}ms`,
+      );
 
       return wallet;
     });
@@ -64,18 +72,28 @@ export class WalletPoolManager {
     this.pools.set(name, pool);
 
     const poolEndTime = Date.now();
-    console.log(`Pool ${name} initialized with ${size} wallets in ${poolEndTime - poolStartTime}ms`);
+    console.log(
+      `Pool ${name} initialized with ${size} wallets in ${poolEndTime - poolStartTime}ms`,
+    );
   }
 
-  async initializePoolFromEnv(name: string, amountEnvName: string, options?: { mnemonics?: string[] }): Promise<void> {
+  async initializePoolFromEnv(
+    name: string,
+    amountEnvName: string,
+    options?: { mnemonics?: string[] },
+  ): Promise<void> {
     const envValue = process.env[amountEnvName];
     if (!envValue) {
-      throw new Error(`Environment variable ${amountEnvName} not found for pool "${name}"`);
+      throw new Error(
+        `Environment variable ${amountEnvName} not found for pool "${name}"`,
+      );
     }
 
     const amount = parseInt(envValue, 10);
     if (isNaN(amount) || amount <= 0) {
-      throw new Error(`Invalid pool amount from env var ${amountEnvName}: ${envValue}`);
+      throw new Error(
+        `Invalid pool amount from env var ${amountEnvName}: ${envValue}`,
+      );
     }
 
     console.log(`Using pool amount ${amount} from env var ${amountEnvName}`);
@@ -122,7 +140,11 @@ export class WalletPoolManager {
     await Promise.all(unlockPromises);
   }
 
-  async registerNamedWallet(name: string, wallet: WalletType, mnemonic?: string): Promise<void> {
+  async registerNamedWallet(
+    name: string,
+    wallet: WalletType,
+    mnemonic?: string,
+  ): Promise<void> {
     const address = await wallet.getSparkAddress();
     const publicKey = await wallet.getIdentityPublicKey();
     const { balance } = await wallet.getBalance();

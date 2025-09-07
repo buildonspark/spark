@@ -31,7 +31,7 @@ const SPARK_MNEMONIC_PATH = ".spark-mnemonic";
 
 export const createSparkRouter = (
   walletClass: typeof SparkWallet | typeof IssuerSparkWallet,
-  mnemonicPath: string
+  mnemonicPath: string,
 ) => {
   const router: Router = Router();
 
@@ -81,7 +81,7 @@ export const createSparkRouter = (
   const checkWalletInitialized = (
     req: Request,
     res: Response,
-    next: NextFunction
+    next: NextFunction,
   ): void => {
     const wallet = getWallet();
     if (!wallet) {
@@ -166,7 +166,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -193,7 +193,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -220,7 +220,7 @@ export const createSparkRouter = (
               [...balance.tokenBalances].map(([key, value]) => [
                 key,
                 { balance: value.balance },
-              ])
+              ]),
             )
           : {};
 
@@ -258,10 +258,10 @@ export const createSparkRouter = (
       };
       const transfers = await wallet!.getTransfers(
         Number(limit),
-        Number(offset)
+        Number(offset),
       );
       const transferResponse = transfers.transfers.map(
-        (transfer: WalletTransfer) => formatTransferResponse(transfer)
+        (transfer: WalletTransfer) => formatTransferResponse(transfer),
       );
       res.json({
         data: {
@@ -304,7 +304,7 @@ export const createSparkRouter = (
         };
         const signedMessage = await wallet!.signMessageWithIdentityKey(
           message,
-          compactEncoding
+          compactEncoding,
         );
         res.json({
           data: { signedMessage },
@@ -314,7 +314,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -352,7 +352,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -392,7 +392,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -426,7 +426,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -456,7 +456,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -486,7 +486,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -523,7 +523,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -550,7 +550,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -577,7 +577,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -649,7 +649,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -709,7 +709,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -754,7 +754,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -784,7 +784,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -824,7 +824,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**
@@ -851,7 +851,7 @@ export const createSparkRouter = (
         const errorMsg = isError(error) ? error.message : "Unknown error";
         res.status(500).json({ error: errorMsg });
       }
-    }
+    },
   );
 
   /**

@@ -31,38 +31,47 @@ yarn artillery:install
 ### Pool Management Actions
 
 #### `initializePools`
+
 Creates wallet pools before test execution.
+
 ```yaml
 - initializePools:
     pools:
-      - name: "main"           # Pool identifier
-        amount: 100            # Number of wallets
-        amountEnvName: "SIZE"  # Environment variable for pool size
-        mnemonicsFile: "./mnemonics/test.txt"  # Deterministic wallets
+      - name: "main" # Pool identifier
+        amount: 100 # Number of wallets
+        amountEnvName: "SIZE" # Environment variable for pool size
+        mnemonicsFile: "./mnemonics/test.txt" # Deterministic wallets
 ```
 
 #### `fundPoolsInBatchL1`
+
 Funds multiple wallets in one transaction.
+
 ```yaml
 - fundPoolsInBatchL1:
-    amountPerWallet: 1000000   # Satoshis per wallet
+    amountPerWallet: 1000000 # Satoshis per wallet
     poolNames: ["main", "hot"] # Specific pools to fund
 ```
 
 #### `mineBlocks`
+
 Mines blocks for confirmations.
+
 ```yaml
 - mineBlocks:
-    blocks: 6  # Number of blocks to mine
+    blocks: 6 # Number of blocks to mine
 ```
 
 #### `cleanupPools`
+
 Cleans up all wallet pools after tests.
 
 ### Wallet Actions
 
 #### `lockWallets`
+
 Locks wallets from specific pools for exclusive use during the scenario.
+
 ```yaml
 before:
   - lockWallets:
@@ -72,21 +81,25 @@ before:
 ```
 
 #### `getBalance`
+
 Gets balance with optional verification.
+
 ```yaml
 - getBalance:
-    name: "alice"           # Wallet name (optional)
-    expectedAmount: 50000   # Expected balance (optional)
-    storeAs: "balance"     # Variable name to store result
+    name: "alice" # Wallet name (optional)
+    expectedAmount: 50000 # Expected balance (optional)
+    storeAs: "balance" # Variable name to store result
 ```
 
 #### `setTransferAmount`
+
 Sets dynamic transfer amounts.
+
 ```yaml
 # Fixed amount
 - setTransferAmount:
     amount: 50000
-    
+
 # Random amount
 - setTransferAmount:
     min: 10000
@@ -95,43 +108,54 @@ Sets dynamic transfer amounts.
 ```
 
 #### `lockWallets`/`unlockWallets`
+
 Manages wallet locking for scenarios.
 
 ### Transfer Actions
 
 #### `transfer`
+
 Executes transfers using amount from context or parameters.
+
 ```yaml
 - transfer:
-    amount: 50000          # Fixed amount
-    name: "alice"         # Sender name (optional)
-    receiverName: "bob"   # Receiver name (optional)
+    amount: 50000 # Fixed amount
+    name: "alice" # Sender name (optional)
+    receiverName: "bob" # Receiver name (optional)
 ```
 
 ### SDK Wrapper Actions
 
 #### `setupVirtualUser`
+
 Initialize virtual user with pool wallet.
 
 #### `simpleTransfer`
+
 Basic transfer operation.
 
 #### `simpleDeposit`
+
 Generate deposit address.
 
 #### `queryPending`
+
 Query pending transfers.
 
 #### `claimPending`
+
 Claim pending transfers.
 
 #### `switchToReceiverWallet`/`switchToSenderWallet`
+
 Switch wallet context.
 
 ### Named Wallet Actions
 
 #### `initNamedWallet`
+
 Create globally accessible named wallet.
+
 ```yaml
 - initNamedWallet:
     name: "treasury"
@@ -139,19 +163,21 @@ Create globally accessible named wallet.
 ```
 
 #### `transferToNamed`
+
 Transfer to named wallet.
 
 #### `queryPendingNamed`
+
 Query pending for named wallet.
 
 #### `claimPendingNamed`
+
 Claim pending for named wallet.
 
 ## Available Scenarios
 
 - **transfer-simple.yml** - Basic sat transfers with balance verification
 - **token-simple.yml** - Basic token operations (announcement, mint, transfer)
-
 
 You can run scenario from directory `sdks/js/packages/artillery` with command (specify necessary scenario):
 

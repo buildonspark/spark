@@ -1,9 +1,8 @@
-dist
-node_modules
-.yarn
+dist/
 
 # Ignore generated files
-src/proto
-src/wasm
-src/graphql/objects
+wasm/
+src/proto/
+src/wasm/
+src/graphql/objects/
 src/examples/example.js

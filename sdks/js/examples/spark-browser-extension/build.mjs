@@ -41,7 +41,7 @@ try {
 
   writeFileSync(
     path.join(outdir, "manifest.json"),
-    JSON.stringify(manifest, null, 2)
+    JSON.stringify(manifest, null, 2),
   );
   console.log(`✔ Wrote manifest.json to ${outdir}/`);
 } catch (err) {

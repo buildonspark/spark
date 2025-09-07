@@ -17,8 +17,8 @@
     "artillery:install": "yarn build && npm link",
     "test:transfer-simple": "yarn build && yarn artillery run ./config/scenarios/transfer-simple.yml",
     "test:token-simple": "yarn build && yarn artillery run ./config/scenarios/token-simple.yml",
-    "format": "prettier --check \"engines/**/*.ts\" \"config/**/*.yml\"",
-    "format:fix": "prettier --write \"engines/**/*.ts\" \"config/**/*.yml\"",
+    "format": "prettier . --check",
+    "format:fix": "prettier . --write",
     "lint": "eslint engines --ext .ts",
     "lint:fix": "eslint engines --ext .ts --fix",
     "depcheck": "depcheck --ignores=buffer,ts-proto,jest,ts-jest,publint",
@@ -43,7 +43,7 @@
     "depcheck": "^1.4.7",
     "eslint": "^9.25.0",
     "madge": "^8.0.0",
-    "prettier": "^3.5.1",
+    "prettier": "^3.6.2",
     "typescript": "^5.7.3"
   },
   "peerDependencies": {

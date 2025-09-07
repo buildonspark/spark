@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "format:fix": "prettier . --write",
+    "format": "prettier . --check",
     "get-wallet-details": "bare get-wallet-details.js",
     "create-lightning-invoice": "bare create-lightning-invoice.js 1000"
   },
@@ -30,5 +32,8 @@
     "bare-utils": "^1.4.0",
     "bare-worker": "^3.0.0",
     "bare-ws": "^2.0.3"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2"
   }
 }

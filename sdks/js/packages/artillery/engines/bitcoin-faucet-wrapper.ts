@@ -5,7 +5,9 @@ let processInstance: BitcoinFaucet | null = null;
 
 export function getBitcoinFaucet(): BitcoinFaucet {
   if (!processInstance) {
-    console.log(`[bitcoin-faucet-wrapper] Creating new BitcoinFaucet instance for process ${process.pid}`);
+    console.log(
+      `[bitcoin-faucet-wrapper] Creating new BitcoinFaucet instance for process ${process.pid}`,
+    );
 
     const url = process.env.BITCOIN_RPC_URL || "http://127.0.0.1:8332";
     const username = process.env.BITCOIN_RPC_USER || "testutil";
@@ -14,18 +16,27 @@ export function getBitcoinFaucet(): BitcoinFaucet {
     processInstance = BitcoinFaucet.getInstance(url, username, password);
 
     if (!processInstance) {
-      throw new Error(`Failed to create BitcoinFaucet instance in process ${process.pid}`);
+      throw new Error(
+        `Failed to create BitcoinFaucet instance in process ${process.pid}`,
+      );
     }
 
-    console.log(`[bitcoin-faucet-wrapper] BitcoinFaucet instance created successfully`);
+    console.log(
+      `[bitcoin-faucet-wrapper] BitcoinFaucet instance created successfully`,
+    );
   }
 
   return processInstance;
 }
 
-export async function sendToAddress(address: string, amount: bigint): Promise<string> {
+export async function sendToAddress(
+  address: string,
+  amount: bigint,
+): Promise<string> {
   const faucet = getBitcoinFaucet();
-  console.log(`[bitcoin-faucet-wrapper] Calling sendToAddress for ${address} with ${amount} sats`);
+  console.log(
+    `[bitcoin-faucet-wrapper] Calling sendToAddress for ${address} with ${amount} sats`,
+  );
   return await faucet.sendToAddress(address, amount);
 }
 
@@ -39,7 +50,7 @@ export async function fundWalletFromGraphQL(
   amountSats: number,
   options?: {
     onRateLimit?: () => Promise<boolean>; // Callback to check if we should skip the faucet
-  }
+  },
 ): Promise<string> {
   const requestBody = {
     operationName: "ArtilleryFaucet",
@@ -51,7 +62,9 @@ export async function fundWalletFromGraphQL(
       "mutation ArtilleryFaucet($amount_sats: Long!, $bitcoin_address: String!) { request_regtest_funds( input: { amount_sats: $amount_sats, address: $bitcoin_address } ) { transaction_hash } }",
   };
 
-  console.log(`[bitcoin-faucet-wrapper] Funding wallet ${bitcoinAddress} with ${amountSats} sats via GraphQL`);
+  console.log(
+    `[bitcoin-faucet-wrapper] Funding wallet ${bitcoinAddress} with ${amountSats} sats via GraphQL`,
+  );
 
   const maxRetries = 5;
   const baseDelay = 30000; // Start with 30 seconds
@@ -65,10 +78,12 @@ export async function fundWalletFromGraphQL(
 
       if (!authId || !authSecret) {
         throw new Error(
-          "GRAPHQL_FAUCET_ID, GRAPHQL_FAUCET_SECRET and GRAPHQL_FAUCET_URL environment variables must be set"
+          "GRAPHQL_FAUCET_ID, GRAPHQL_FAUCET_SECRET and GRAPHQL_FAUCET_URL environment variables must be set",
         );
       }
-      const basicAuth = Buffer.from(`${authId}:${authSecret}`).toString("base64");
+      const basicAuth = Buffer.from(`${authId}:${authSecret}`).toString(
+        "base64",
+      );
 
       const headers = {
         "Content-Type": "application/json",
@@ -86,9 +101,12 @@ export async function fundWalletFromGraphQL(
       if (!response.ok) {
         // Check if it's a rate limit error
         if (response.status === 429) {
-          const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
+          const delay = Math.min(
+            baseDelay * Math.pow(2, attempt - 1),
+            maxDelay,
+          );
           console.warn(
-            `[bitcoin-faucet-wrapper] Rate limited (429). Attempt ${attempt}/${maxRetries}. Retrying in ${delay}ms...`
+            `[bitcoin-faucet-wrapper] Rate limited (429). Attempt ${attempt}/${maxRetries}. Retrying in ${delay}ms...`,
           );
 
           if (attempt < maxRetries) {
@@ -96,7 +114,9 @@ export async function fundWalletFromGraphQL(
             continue;
           }
         }
-        throw new Error(`GraphQL request failed with status ${response.status}: ${responseText}`);
+        throw new Error(
+          `GraphQL request failed with status ${response.status}: ${responseText}`,
+        );
       }
 
       const data = JSON.parse(responseText);
@@ -107,13 +127,16 @@ export async function fundWalletFromGraphQL(
           (error) =>
             error.message?.includes("429") ||
             error.message?.includes("Rate limited") ||
-            error.extensions?.error_name === "RateLimitException"
+            error.extensions?.error_name === "RateLimitException",
         );
 
         if (hasRateLimitError && attempt < maxRetries) {
-          const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
+          const delay = Math.min(
+            baseDelay * Math.pow(2, attempt - 1),
+            maxDelay,
+          );
           console.warn(
-            `[bitcoin-faucet-wrapper] GraphQL rate limit error. Attempt ${attempt}/${maxRetries}. Retrying in ${delay}ms...`
+            `[bitcoin-faucet-wrapper] GraphQL rate limit error. Attempt ${attempt}/${maxRetries}. Retrying in ${delay}ms...`,
           );
           await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
@@ -122,21 +145,22 @@ export async function fundWalletFromGraphQL(
         throw new Error(`GraphQL errors: ${JSON.stringify(data.errors)}`);
       }
 
-      const transactionHash = data.data?.request_regtest_funds?.transaction_hash;
+      const transactionHash =
+        data.data?.request_regtest_funds?.transaction_hash;
 
       if (!transactionHash) {
         throw new Error("No transaction hash returned from GraphQL faucet");
       }
 
       console.log(
-        `[bitcoin-faucet-wrapper] Successfully funded wallet via GraphQL, transaction hash: ${transactionHash}`
+        `[bitcoin-faucet-wrapper] Successfully funded wallet via GraphQL, transaction hash: ${transactionHash}`,
       );
       return transactionHash;
     } catch (error) {
       if (attempt === maxRetries) {
         console.error(
           `[bitcoin-faucet-wrapper] Failed to fund wallet via GraphQL after ${maxRetries} attempts:`,
-          error
+          error,
         );
         throw error;
       }
@@ -144,7 +168,7 @@ export async function fundWalletFromGraphQL(
       const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
       console.warn(
         `[bitcoin-faucet-wrapper] Error on attempt ${attempt}/${maxRetries}. Retrying in ${delay}ms...`,
-        error.message
+        error.message,
       );
       await new Promise((resolve) => setTimeout(resolve, delay));
     }

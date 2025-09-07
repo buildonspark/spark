@@ -9,7 +9,7 @@ export class TokenActions {
 
   constructor(
     private ee: ArtilleryEventEmitter,
-    engine?: any
+    engine?: any,
   ) {
     this.poolManager = WalletPoolManager.getInstance();
     this.engine = engine;
@@ -26,21 +26,37 @@ export class TokenActions {
       const startTime = Date.now();
 
       try {
-        console.log(`MintToken: Looking for wallet "${params.walletName || "default"}"`);
-        console.log(`  Available wallets in context.vars:`, context.vars ? Object.keys(context.vars) : "undefined");
+        console.log(
+          `MintToken: Looking for wallet "${params.walletName || "default"}"`,
+        );
+        console.log(
+          `  Available wallets in context.vars:`,
+          context.vars ? Object.keys(context.vars) : "undefined",
+        );
 
-        const walletInfo = params.walletName ? context.vars?.[params.walletName] : context.sparkWallet;
+        const walletInfo = params.walletName
+          ? context.vars?.[params.walletName]
+          : context.sparkWallet;
         if (!walletInfo) {
-          console.error(`  ERROR: Wallet "${params.walletName || "default"}" not found in context`);
-          console.error(`  context.vars keys:`, context.vars ? Object.keys(context.vars) : "undefined");
+          console.error(
+            `  ERROR: Wallet "${params.walletName || "default"}" not found in context`,
+          );
+          console.error(
+            `  context.vars keys:`,
+            context.vars ? Object.keys(context.vars) : "undefined",
+          );
           throw new Error(`Wallet ${params.walletName || "default"} not found`);
         }
 
         // Note: IssuerSparkWallet tracks its own token, no need for tokenId
-        console.log(`Minting ${params.amount} tokens from ${walletInfo.name}...`);
+        console.log(
+          `Minting ${params.amount} tokens from ${walletInfo.name}...`,
+        );
 
         // Mint the tokens (mints to self only)
-        const mintResult = await walletInfo.wallet.mintTokens(BigInt(params.amount));
+        const mintResult = await walletInfo.wallet.mintTokens(
+          BigInt(params.amount),
+        );
 
         // Get token balance to retrieve tokenIdentifier for V2 flow
         const tokenBalance = await walletInfo.wallet.getIssuerTokenBalance();
@@ -67,11 +83,15 @@ export class TokenActions {
         const scenarioEE = this.engine?.scenarioEE;
         if (scenarioEE) {
           console.log(
-            `Emitting metrics to scenario EE: mint_token_time=${mintTime}, tokens_minted=1, amount=${params.amount}`
+            `Emitting metrics to scenario EE: mint_token_time=${mintTime}, tokens_minted=1, amount=${params.amount}`,
           );
           scenarioEE.emit("histogram", "spark.mint_token_time", mintTime);
           scenarioEE.emit("counter", "spark.tokens_minted", 1);
-          scenarioEE.emit("counter", "spark.tokens_minted_amount", params.amount);
+          scenarioEE.emit(
+            "counter",
+            "spark.tokens_minted_amount",
+            params.amount,
+          );
           scenarioEE.emit("counter", "spark.mint_token_success", 1);
         } else {
           console.warn("No scenario event emitter available for metrics");
@@ -112,7 +132,9 @@ export class TokenActions {
       const startTime = Date.now();
 
       try {
-        const walletInfo = params.walletName ? context.vars?.[params.walletName] : context.sparkWallet;
+        const walletInfo = params.walletName
+          ? context.vars?.[params.walletName]
+          : context.sparkWallet;
         if (!walletInfo) {
           throw new Error(`Wallet ${params.walletName || "default"} not found`);
         }
@@ -126,11 +148,15 @@ export class TokenActions {
             throw new Error(`Receiver wallet ${params.receiverName} not found`);
           }
           receiverAddress = await receiverWallet.getSparkAddress();
-          console.log(`Transferring tokens to named wallet: ${params.receiverName}`);
+          console.log(
+            `Transferring tokens to named wallet: ${params.receiverName}`,
+          );
         } else if (params.receiverAddress) {
           receiverAddress = params.receiverAddress;
         } else {
-          throw new Error("No receiver specified. Provide receiverName or receiverAddress");
+          throw new Error(
+            "No receiver specified. Provide receiverName or receiverAddress",
+          );
         }
         const senderWallet: IssuerSparkWallet = walletInfo.wallet;
 
@@ -140,29 +166,34 @@ export class TokenActions {
           senderTokenBalance = await receiverWallet.getIssuerTokenBalance();
 
           if (!senderTokenBalance.tokenIdentifier) {
-            throw new Error("Token identifier not found. Make sure the token is created and you have a balance.");
+            throw new Error(
+              "Token identifier not found. Make sure the token is created and you have a balance.",
+            );
           }
         }
 
         console.log(
-          `Transferring ${params.amount} tokens from ${walletInfo.name} to ${receiverAddress.substring(0, 10)}...`
+          `Transferring ${params.amount} tokens from ${walletInfo.name} to ${receiverAddress.substring(0, 10)}...`,
         );
 
-        const { tokenBalances: receiverTokenBalances } = await receiverWallet.getBalance();
+        const { tokenBalances: receiverTokenBalances } =
+          await receiverWallet.getBalance();
 
         let tokenBalanceForReceiver: {
           balance: bigint;
           tokenMetadata?: UserTokenMetadata;
         };
         if (receiverTokenBalances.has(senderTokenBalance.tokenIdentifier)) {
-          tokenBalanceForReceiver = receiverTokenBalances.get(senderTokenBalance.tokenIdentifier);
+          tokenBalanceForReceiver = receiverTokenBalances.get(
+            senderTokenBalance.tokenIdentifier,
+          );
         } else {
           tokenBalanceForReceiver = {
             balance: 0n,
           };
         }
         console.log(
-          ` Token balance before token (Token ID: ${senderTokenBalance.tokenIdentifier}) transfer: ${tokenBalanceForReceiver.balance}`
+          ` Token balance before token (Token ID: ${senderTokenBalance.tokenIdentifier}) transfer: ${tokenBalanceForReceiver.balance}`,
         );
 
         // Transfer the tokens using V2 flow with tokenIdentifier
@@ -185,15 +216,18 @@ export class TokenActions {
         });
 
         if (tokenTxs.tokenTransactionsWithStatus.length == 0) {
-          throw new Error(`Failed to get token transaction status for TX with ID: ${transferResult}`);
+          throw new Error(
+            `Failed to get token transaction status for TX with ID: ${transferResult}`,
+          );
         }
 
         console.log(` Token transfer tx status: ${tokenTxs[0]} `);
 
-        const { tokenBalances: newReceiverTokenBalances } = await receiverWallet.getBalance();
+        const { tokenBalances: newReceiverTokenBalances } =
+          await receiverWallet.getBalance();
 
         console.log(
-          ` Token balance after token transfer: ${newReceiverTokenBalances.get(senderTokenBalance.tokenIdentifier).balance}`
+          ` Token balance after token transfer: ${newReceiverTokenBalances.get(senderTokenBalance.tokenIdentifier).balance}`,
         );
         // Store metrics in context for processor to pick up
         context.vars.transferTime = transferTime;
@@ -203,9 +237,13 @@ export class TokenActions {
         const scenarioEE = this.engine?.scenarioEE;
         if (scenarioEE) {
           console.log(
-            `Emitting metrics to scenario EE: token_transfer_time=${transferTime}, tokens_transferred=${params.amount}`
+            `Emitting metrics to scenario EE: token_transfer_time=${transferTime}, tokens_transferred=${params.amount}`,
           );
-          scenarioEE.emit("histogram", "spark.token_transfer_time", transferTime);
+          scenarioEE.emit(
+            "histogram",
+            "spark.token_transfer_time",
+            transferTime,
+          );
           scenarioEE.emit("counter", "spark.token_transfer_success", 1);
           scenarioEE.emit("counter", "spark.tokens_transferred", params.amount);
         } else {

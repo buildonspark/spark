@@ -21,7 +21,7 @@ async function getStaticDepositAddress(mnemonicInit) {
 const args = process.argv.slice(2);
 if (args.length > 1) {
   console.error(
-    "Too many arguments, please provide a mnemonic as a string, e.g. 'your mnemonic here'"
+    "Too many arguments, please provide a mnemonic as a string, e.g. 'your mnemonic here'",
   );
   process.exit(1);
 }
@@ -34,7 +34,7 @@ const config = args.length
 
 if (!config.mnemonic) {
   console.error(
-    "No mnemonic provided in wallet-config.js or command line arguments."
+    "No mnemonic provided in wallet-config.js or command line arguments.",
   );
   process.exit(1);
 }
