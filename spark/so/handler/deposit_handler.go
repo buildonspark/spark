@@ -894,15 +894,13 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	if err != nil {
 		return nil, err
 	}
-	if len(onChainTx.TxOut) <= int(req.OnChainUtxo.Vout) {
-		return nil, fmt.Errorf("utxo index out of bounds")
-	}
 
 	// Verify that the on chain utxo is paid to the registered deposit address
 	if len(onChainTx.TxOut) <= int(req.OnChainUtxo.Vout) {
 		return nil, fmt.Errorf("utxo index out of bounds")
 	}
 	onChainOutput := onChainTx.TxOut[req.OnChainUtxo.Vout]
+
 	network, err := common.NetworkFromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
 		return nil, err
@@ -919,10 +917,13 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).First(ctx)
+	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			err = errors.NotFoundErrorf("The requested deposit address could not be found.")
+		}
+		if ent.IsNotSingular(err) {
+			return nil, fmt.Errorf("multiple deposit addresses found for address: %s", *utxoAddress)
 		}
 		return nil, err
 	}
