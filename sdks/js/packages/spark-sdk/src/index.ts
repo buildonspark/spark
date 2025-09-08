@@ -5,8 +5,8 @@ import { setCrypto } from "./utils/crypto.js";
 const cryptoImpl =
   typeof window !== "undefined" && window.crypto
     ? window.crypto
-    : typeof global !== "undefined" && global.crypto
-      ? global.crypto
+    : typeof globalThis !== "undefined" && globalThis.crypto
+      ? globalThis.crypto
       : null;
 
 setCrypto(cryptoImpl);
