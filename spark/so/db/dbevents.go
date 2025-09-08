@@ -94,7 +94,7 @@ func (e *DBEvents) listenForEvents() error {
 func (e *DBEvents) waitForNotification() error {
 	e.processChannelChanges()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(e.ctx)
 	defer cancel()
 
 	e.mu.Lock()
@@ -260,7 +260,7 @@ func (e *DBEvents) processChannelChanges() {
 }
 
 func (e *DBEvents) startListening(channel string) error {
-	_, err := e.conn.Exec(context.Background(), "LISTEN "+channel)
+	_, err := e.conn.Exec(e.ctx, "LISTEN "+channel)
 	if err != nil {
 		return err
 	}
@@ -269,7 +269,7 @@ func (e *DBEvents) startListening(channel string) error {
 }
 
 func (e *DBEvents) stopListening(channel string) error {
-	_, err := e.conn.Exec(context.Background(), "UNLISTEN "+channel)
+	_, err := e.conn.Exec(e.ctx, "UNLISTEN "+channel)
 	if err != nil {
 		return err
 	}
