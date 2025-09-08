@@ -43,7 +43,7 @@ let fetchImpl: SparkFetch | null =
   typeof window !== "undefined" && window.fetch
     ? (window.fetch.bind(window) as SparkFetch)
     : globalThis.fetch
-      ? (globalThis.fetch as SparkFetch)
+      ? (globalThis.fetch.bind(globalThis) as SparkFetch)
       : null;
 let Headers: SparkHeadersConstructor | null = globalThis.Headers ?? null;
 
