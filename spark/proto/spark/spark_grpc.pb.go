@@ -43,6 +43,7 @@ const (
 	SparkService_CounterLeafSwap_FullMethodName                     = "/spark.SparkService/counter_leaf_swap"
 	SparkService_RefreshTimelock_FullMethodName                     = "/spark.SparkService/refresh_timelock"
 	SparkService_ExtendLeaf_FullMethodName                          = "/spark.SparkService/extend_leaf"
+	SparkService_RenewLeaf_FullMethodName                           = "/spark.SparkService/renew_leaf"
 	SparkService_GetSigningOperatorList_FullMethodName              = "/spark.SparkService/get_signing_operator_list"
 	SparkService_QueryNodes_FullMethodName                          = "/spark.SparkService/query_nodes"
 	SparkService_QueryNodesDistribution_FullMethodName              = "/spark.SparkService/query_nodes_distribution"
@@ -113,6 +114,12 @@ type SparkServiceClient interface {
 	CounterLeafSwap(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error)
 	RefreshTimelock(ctx context.Context, in *RefreshTimelockRequest, opts ...grpc.CallOption) (*RefreshTimelockResponse, error)
 	ExtendLeaf(ctx context.Context, in *ExtendLeafRequest, opts ...grpc.CallOption) (*ExtendLeafResponse, error)
+	// Resets the timelocks for a leaf's transactions. Can be used to reset the
+	// refund transaction timelock for a leaf (when the node transaction
+	// timelock is still > 300) or reset the node and refund transaction
+	// timelock. Returns an error if a leaf is not yet eligible to renew the
+	// timelocks, see RenewLeafRequest for more details.
+	RenewLeaf(ctx context.Context, in *RenewLeafRequest, opts ...grpc.CallOption) (*RenewLeafResponse, error)
 	GetSigningOperatorList(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetSigningOperatorListResponse, error)
 	QueryNodes(ctx context.Context, in *QueryNodesRequest, opts ...grpc.CallOption) (*QueryNodesResponse, error)
 	QueryNodesDistribution(ctx context.Context, in *QueryNodesDistributionRequest, opts ...grpc.CallOption) (*QueryNodesDistributionResponse, error)
@@ -392,6 +399,16 @@ func (c *sparkServiceClient) ExtendLeaf(ctx context.Context, in *ExtendLeafReque
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ExtendLeafResponse)
 	err := c.cc.Invoke(ctx, SparkService_ExtendLeaf_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) RenewLeaf(ctx context.Context, in *RenewLeafRequest, opts ...grpc.CallOption) (*RenewLeafResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RenewLeafResponse)
+	err := c.cc.Invoke(ctx, SparkService_RenewLeaf_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -746,6 +763,12 @@ type SparkServiceServer interface {
 	CounterLeafSwap(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error)
 	RefreshTimelock(context.Context, *RefreshTimelockRequest) (*RefreshTimelockResponse, error)
 	ExtendLeaf(context.Context, *ExtendLeafRequest) (*ExtendLeafResponse, error)
+	// Resets the timelocks for a leaf's transactions. Can be used to reset the
+	// refund transaction timelock for a leaf (when the node transaction
+	// timelock is still > 300) or reset the node and refund transaction
+	// timelock. Returns an error if a leaf is not yet eligible to renew the
+	// timelocks, see RenewLeafRequest for more details.
+	RenewLeaf(context.Context, *RenewLeafRequest) (*RenewLeafResponse, error)
 	GetSigningOperatorList(context.Context, *emptypb.Empty) (*GetSigningOperatorListResponse, error)
 	QueryNodes(context.Context, *QueryNodesRequest) (*QueryNodesResponse, error)
 	QueryNodesDistribution(context.Context, *QueryNodesDistributionRequest) (*QueryNodesDistributionResponse, error)
@@ -866,6 +889,9 @@ func (UnimplementedSparkServiceServer) RefreshTimelock(context.Context, *Refresh
 }
 func (UnimplementedSparkServiceServer) ExtendLeaf(context.Context, *ExtendLeafRequest) (*ExtendLeafResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ExtendLeaf not implemented")
+}
+func (UnimplementedSparkServiceServer) RenewLeaf(context.Context, *RenewLeafRequest) (*RenewLeafResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RenewLeaf not implemented")
 }
 func (UnimplementedSparkServiceServer) GetSigningOperatorList(context.Context, *emptypb.Empty) (*GetSigningOperatorListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSigningOperatorList not implemented")
@@ -1388,6 +1414,24 @@ func _SparkService_ExtendLeaf_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkServiceServer).ExtendLeaf(ctx, req.(*ExtendLeafRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_RenewLeaf_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RenewLeafRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).RenewLeaf(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_RenewLeaf_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).RenewLeaf(ctx, req.(*RenewLeafRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2023,6 +2067,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "extend_leaf",
 			Handler:    _SparkService_ExtendLeaf_Handler,
+		},
+		{
+			MethodName: "renew_leaf",
+			Handler:    _SparkService_RenewLeaf_Handler,
 		},
 		{
 			MethodName: "get_signing_operator_list",

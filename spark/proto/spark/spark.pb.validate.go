@@ -2410,6 +2410,1231 @@ var _ interface {
 	ErrorName() string
 } = SigningResultValidationError{}
 
+// Validate checks the field values on RenewLeafRequest with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *RenewLeafRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RenewLeafRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RenewLeafRequestMultiError, or nil if none found.
+func (m *RenewLeafRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RenewLeafRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for LeafId
+
+	// no validation rules for OwnerIdentityPublicKey
+
+	switch v := m.SigningJobs.(type) {
+	case *RenewLeafRequest_RenewNodeTimelockSigningJob:
+		if v == nil {
+			err := RenewLeafRequestValidationError{
+				field:  "SigningJobs",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetRenewNodeTimelockSigningJob()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, RenewLeafRequestValidationError{
+						field:  "RenewNodeTimelockSigningJob",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, RenewLeafRequestValidationError{
+						field:  "RenewNodeTimelockSigningJob",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetRenewNodeTimelockSigningJob()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return RenewLeafRequestValidationError{
+					field:  "RenewNodeTimelockSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *RenewLeafRequest_RenewRefundTimelockSigningJob:
+		if v == nil {
+			err := RenewLeafRequestValidationError{
+				field:  "SigningJobs",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetRenewRefundTimelockSigningJob()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, RenewLeafRequestValidationError{
+						field:  "RenewRefundTimelockSigningJob",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, RenewLeafRequestValidationError{
+						field:  "RenewRefundTimelockSigningJob",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetRenewRefundTimelockSigningJob()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return RenewLeafRequestValidationError{
+					field:  "RenewRefundTimelockSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return RenewLeafRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// RenewLeafRequestMultiError is an error wrapping multiple validation errors
+// returned by RenewLeafRequest.ValidateAll() if the designated constraints
+// aren't met.
+type RenewLeafRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RenewLeafRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RenewLeafRequestMultiError) AllErrors() []error { return m }
+
+// RenewLeafRequestValidationError is the validation error returned by
+// RenewLeafRequest.Validate if the designated constraints aren't met.
+type RenewLeafRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RenewLeafRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RenewLeafRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RenewLeafRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RenewLeafRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RenewLeafRequestValidationError) ErrorName() string { return "RenewLeafRequestValidationError" }
+
+// Error satisfies the builtin error interface
+func (e RenewLeafRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRenewLeafRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RenewLeafRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RenewLeafRequestValidationError{}
+
+// Validate checks the field values on RenewNodeTimelockSigningJob with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RenewNodeTimelockSigningJob) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RenewNodeTimelockSigningJob with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RenewNodeTimelockSigningJobMultiError, or nil if none found.
+func (m *RenewNodeTimelockSigningJob) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RenewNodeTimelockSigningJob) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetSplitNodeTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RenewNodeTimelockSigningJobValidationError{
+					field:  "SplitNodeTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RenewNodeTimelockSigningJobValidationError{
+					field:  "SplitNodeTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSplitNodeTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RenewNodeTimelockSigningJobValidationError{
+				field:  "SplitNodeTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetSplitNodeDirectTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RenewNodeTimelockSigningJobValidationError{
+					field:  "SplitNodeDirectTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RenewNodeTimelockSigningJobValidationError{
+					field:  "SplitNodeDirectTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSplitNodeDirectTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RenewNodeTimelockSigningJobValidationError{
+				field:  "SplitNodeDirectTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetNodeTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RenewNodeTimelockSigningJobValidationError{
+					field:  "NodeTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RenewNodeTimelockSigningJobValidationError{
+					field:  "NodeTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetNodeTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RenewNodeTimelockSigningJobValidationError{
+				field:  "NodeTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetRefundTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RenewNodeTimelockSigningJobValidationError{
+					field:  "RefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RenewNodeTimelockSigningJobValidationError{
+					field:  "RefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetRefundTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RenewNodeTimelockSigningJobValidationError{
+				field:  "RefundTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetDirectNodeTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RenewNodeTimelockSigningJobValidationError{
+					field:  "DirectNodeTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RenewNodeTimelockSigningJobValidationError{
+					field:  "DirectNodeTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetDirectNodeTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RenewNodeTimelockSigningJobValidationError{
+				field:  "DirectNodeTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetDirectRefundTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RenewNodeTimelockSigningJobValidationError{
+					field:  "DirectRefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RenewNodeTimelockSigningJobValidationError{
+					field:  "DirectRefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetDirectRefundTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RenewNodeTimelockSigningJobValidationError{
+				field:  "DirectRefundTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetDirectFromCpfpRefundTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RenewNodeTimelockSigningJobValidationError{
+					field:  "DirectFromCpfpRefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RenewNodeTimelockSigningJobValidationError{
+					field:  "DirectFromCpfpRefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetDirectFromCpfpRefundTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RenewNodeTimelockSigningJobValidationError{
+				field:  "DirectFromCpfpRefundTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return RenewNodeTimelockSigningJobMultiError(errors)
+	}
+
+	return nil
+}
+
+// RenewNodeTimelockSigningJobMultiError is an error wrapping multiple
+// validation errors returned by RenewNodeTimelockSigningJob.ValidateAll() if
+// the designated constraints aren't met.
+type RenewNodeTimelockSigningJobMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RenewNodeTimelockSigningJobMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RenewNodeTimelockSigningJobMultiError) AllErrors() []error { return m }
+
+// RenewNodeTimelockSigningJobValidationError is the validation error returned
+// by RenewNodeTimelockSigningJob.Validate if the designated constraints
+// aren't met.
+type RenewNodeTimelockSigningJobValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RenewNodeTimelockSigningJobValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RenewNodeTimelockSigningJobValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RenewNodeTimelockSigningJobValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RenewNodeTimelockSigningJobValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RenewNodeTimelockSigningJobValidationError) ErrorName() string {
+	return "RenewNodeTimelockSigningJobValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RenewNodeTimelockSigningJobValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRenewNodeTimelockSigningJob.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RenewNodeTimelockSigningJobValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RenewNodeTimelockSigningJobValidationError{}
+
+// Validate checks the field values on RenewRefundTimelockSigningJob with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RenewRefundTimelockSigningJob) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RenewRefundTimelockSigningJob with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// RenewRefundTimelockSigningJobMultiError, or nil if none found.
+func (m *RenewRefundTimelockSigningJob) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RenewRefundTimelockSigningJob) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetNodeTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RenewRefundTimelockSigningJobValidationError{
+					field:  "NodeTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RenewRefundTimelockSigningJobValidationError{
+					field:  "NodeTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetNodeTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RenewRefundTimelockSigningJobValidationError{
+				field:  "NodeTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetRefundTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RenewRefundTimelockSigningJobValidationError{
+					field:  "RefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RenewRefundTimelockSigningJobValidationError{
+					field:  "RefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetRefundTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RenewRefundTimelockSigningJobValidationError{
+				field:  "RefundTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetDirectNodeTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RenewRefundTimelockSigningJobValidationError{
+					field:  "DirectNodeTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RenewRefundTimelockSigningJobValidationError{
+					field:  "DirectNodeTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetDirectNodeTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RenewRefundTimelockSigningJobValidationError{
+				field:  "DirectNodeTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetDirectRefundTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RenewRefundTimelockSigningJobValidationError{
+					field:  "DirectRefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RenewRefundTimelockSigningJobValidationError{
+					field:  "DirectRefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetDirectRefundTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RenewRefundTimelockSigningJobValidationError{
+				field:  "DirectRefundTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetDirectFromCpfpRefundTxSigningJob()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RenewRefundTimelockSigningJobValidationError{
+					field:  "DirectFromCpfpRefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RenewRefundTimelockSigningJobValidationError{
+					field:  "DirectFromCpfpRefundTxSigningJob",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetDirectFromCpfpRefundTxSigningJob()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RenewRefundTimelockSigningJobValidationError{
+				field:  "DirectFromCpfpRefundTxSigningJob",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return RenewRefundTimelockSigningJobMultiError(errors)
+	}
+
+	return nil
+}
+
+// RenewRefundTimelockSigningJobMultiError is an error wrapping multiple
+// validation errors returned by RenewRefundTimelockSigningJob.ValidateAll()
+// if the designated constraints aren't met.
+type RenewRefundTimelockSigningJobMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RenewRefundTimelockSigningJobMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RenewRefundTimelockSigningJobMultiError) AllErrors() []error { return m }
+
+// RenewRefundTimelockSigningJobValidationError is the validation error
+// returned by RenewRefundTimelockSigningJob.Validate if the designated
+// constraints aren't met.
+type RenewRefundTimelockSigningJobValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RenewRefundTimelockSigningJobValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RenewRefundTimelockSigningJobValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RenewRefundTimelockSigningJobValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RenewRefundTimelockSigningJobValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RenewRefundTimelockSigningJobValidationError) ErrorName() string {
+	return "RenewRefundTimelockSigningJobValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RenewRefundTimelockSigningJobValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRenewRefundTimelockSigningJob.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RenewRefundTimelockSigningJobValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RenewRefundTimelockSigningJobValidationError{}
+
+// Validate checks the field values on RenewLeafResponse with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *RenewLeafResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RenewLeafResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RenewLeafResponseMultiError, or nil if none found.
+func (m *RenewLeafResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RenewLeafResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	switch v := m.RenewResult.(type) {
+	case *RenewLeafResponse_ExtendResult:
+		if v == nil {
+			err := RenewLeafResponseValidationError{
+				field:  "RenewResult",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetExtendResult()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, RenewLeafResponseValidationError{
+						field:  "ExtendResult",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, RenewLeafResponseValidationError{
+						field:  "ExtendResult",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetExtendResult()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return RenewLeafResponseValidationError{
+					field:  "ExtendResult",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *RenewLeafResponse_RefreshResult:
+		if v == nil {
+			err := RenewLeafResponseValidationError{
+				field:  "RenewResult",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetRefreshResult()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, RenewLeafResponseValidationError{
+						field:  "RefreshResult",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, RenewLeafResponseValidationError{
+						field:  "RefreshResult",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetRefreshResult()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return RenewLeafResponseValidationError{
+					field:  "RefreshResult",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	default:
+		_ = v // ensures v is used
+	}
+
+	if len(errors) > 0 {
+		return RenewLeafResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// RenewLeafResponseMultiError is an error wrapping multiple validation errors
+// returned by RenewLeafResponse.ValidateAll() if the designated constraints
+// aren't met.
+type RenewLeafResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RenewLeafResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RenewLeafResponseMultiError) AllErrors() []error { return m }
+
+// RenewLeafResponseValidationError is the validation error returned by
+// RenewLeafResponse.Validate if the designated constraints aren't met.
+type RenewLeafResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RenewLeafResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RenewLeafResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RenewLeafResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RenewLeafResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RenewLeafResponseValidationError) ErrorName() string {
+	return "RenewLeafResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RenewLeafResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRenewLeafResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RenewLeafResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RenewLeafResponseValidationError{}
+
+// Validate checks the field values on RenewNodeTimelockResult with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RenewNodeTimelockResult) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RenewNodeTimelockResult with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RenewNodeTimelockResultMultiError, or nil if none found.
+func (m *RenewNodeTimelockResult) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RenewNodeTimelockResult) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetSplitNode()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RenewNodeTimelockResultValidationError{
+					field:  "SplitNode",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RenewNodeTimelockResultValidationError{
+					field:  "SplitNode",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSplitNode()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RenewNodeTimelockResultValidationError{
+				field:  "SplitNode",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetNode()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RenewNodeTimelockResultValidationError{
+					field:  "Node",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RenewNodeTimelockResultValidationError{
+					field:  "Node",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetNode()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RenewNodeTimelockResultValidationError{
+				field:  "Node",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return RenewNodeTimelockResultMultiError(errors)
+	}
+
+	return nil
+}
+
+// RenewNodeTimelockResultMultiError is an error wrapping multiple validation
+// errors returned by RenewNodeTimelockResult.ValidateAll() if the designated
+// constraints aren't met.
+type RenewNodeTimelockResultMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RenewNodeTimelockResultMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RenewNodeTimelockResultMultiError) AllErrors() []error { return m }
+
+// RenewNodeTimelockResultValidationError is the validation error returned by
+// RenewNodeTimelockResult.Validate if the designated constraints aren't met.
+type RenewNodeTimelockResultValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RenewNodeTimelockResultValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RenewNodeTimelockResultValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RenewNodeTimelockResultValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RenewNodeTimelockResultValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RenewNodeTimelockResultValidationError) ErrorName() string {
+	return "RenewNodeTimelockResultValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RenewNodeTimelockResultValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRenewNodeTimelockResult.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RenewNodeTimelockResultValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RenewNodeTimelockResultValidationError{}
+
+// Validate checks the field values on RenewRefundTimelockResult with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RenewRefundTimelockResult) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RenewRefundTimelockResult with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RenewRefundTimelockResultMultiError, or nil if none found.
+func (m *RenewRefundTimelockResult) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RenewRefundTimelockResult) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetNode()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, RenewRefundTimelockResultValidationError{
+					field:  "Node",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, RenewRefundTimelockResultValidationError{
+					field:  "Node",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetNode()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return RenewRefundTimelockResultValidationError{
+				field:  "Node",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return RenewRefundTimelockResultMultiError(errors)
+	}
+
+	return nil
+}
+
+// RenewRefundTimelockResultMultiError is an error wrapping multiple validation
+// errors returned by RenewRefundTimelockResult.ValidateAll() if the
+// designated constraints aren't met.
+type RenewRefundTimelockResultMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RenewRefundTimelockResultMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RenewRefundTimelockResultMultiError) AllErrors() []error { return m }
+
+// RenewRefundTimelockResultValidationError is the validation error returned by
+// RenewRefundTimelockResult.Validate if the designated constraints aren't met.
+type RenewRefundTimelockResultValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RenewRefundTimelockResultValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RenewRefundTimelockResultValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RenewRefundTimelockResultValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RenewRefundTimelockResultValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RenewRefundTimelockResultValidationError) ErrorName() string {
+	return "RenewRefundTimelockResultValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RenewRefundTimelockResultValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRenewRefundTimelockResult.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RenewRefundTimelockResultValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RenewRefundTimelockResultValidationError{}
+
 // Validate checks the field values on NodeSignatureShares with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.

@@ -51,6 +51,13 @@ service SparkService {
     rpc refresh_timelock(RefreshTimelockRequest) returns (RefreshTimelockResponse) {}
     rpc extend_leaf(ExtendLeafRequest) returns (ExtendLeafResponse) {}
 
+    // Resets the timelocks for a leaf's transactions. Can be used to reset the
+    // refund transaction timelock for a leaf (when the node transaction
+    // timelock is still > 300) or reset the node and refund transaction
+    // timelock. Returns an error if a leaf is not yet eligible to renew the
+    // timelocks, see RenewLeafRequest for more details.
+    rpc renew_leaf(RenewLeafRequest) returns (RenewLeafResponse) {}
+
     rpc get_signing_operator_list(google.protobuf.Empty) returns (GetSigningOperatorListResponse) {}
 
     rpc query_nodes(QueryNodesRequest) returns (QueryNodesResponse) {}
@@ -308,6 +315,75 @@ message SigningResult {
     map<string, bytes> signature_shares = 3;
     // The keyshare information of the SE keyshare group.
     SigningKeyshare signing_keyshare = 4;
+}
+
+message RenewLeafRequest {
+    string leaf_id = 1;
+    bytes owner_identity_public_key = 2;
+
+    oneof signing_jobs {
+      // Resets the node transaction timelock and refund transaction timelock
+      // for a leaf to 2000. The old node transaction is invalidated by
+      // introducing a "split node" with zero timelock that spends to a new
+      // node transaction. Takes in the signing jobs for the updated
+      // node, refund, and split node transactions with the new timelocks.
+      // Requires that the existing node transaction timelock is <= 300
+      // at the time this function is called. Returns an error if these
+      // conditions are not met.
+      RenewNodeTimelockSigningJob renew_node_timelock_signing_job = 3;
+
+      // Resets the refund transaction timelock for a leaf to 2000. Takes in
+      // the signing jobs for the updated transactions with the new timelocks.
+      // Requires that the existing refund transaction timelock is <= 300 and
+      // the node transaction timelock > 300 at the time this function is
+      // called. Returns an error if these conditions are not met.
+      RenewRefundTimelockSigningJob renew_refund_timelock_signing_job = 4;
+    }
+}
+
+message RenewNodeTimelockSigningJob {
+    // Signing job with the new "split node" transaction. This spends the
+    // inputs of the old node transaction and its outputs are spent by the new
+    // node transaction. Timelock of split node transaction must be 0.
+    UserSignedTxSigningJob split_node_tx_signing_job = 1;
+    UserSignedTxSigningJob split_node_direct_tx_signing_job = 2;
+
+    // Signing job with the updated node transaction. The updated transaction is
+    // expected to have a timelock of 2000.
+    UserSignedTxSigningJob node_tx_signing_job = 3;
+    UserSignedTxSigningJob refund_tx_signing_job = 4;
+    UserSignedTxSigningJob direct_node_tx_signing_job = 5;
+    UserSignedTxSigningJob direct_refund_tx_signing_job = 6;
+    UserSignedTxSigningJob direct_from_cpfp_refund_tx_signing_job = 7;
+}
+
+message RenewRefundTimelockSigningJob {
+    // Signing job with the updated node transaction. The updated transaction is
+    // expected to have a timelock of 100 less than the existing node transaction.
+    UserSignedTxSigningJob node_tx_signing_job = 1;
+
+    // Signing job with the updated refund transaction. This updated transaction
+    // must have a timelock of 2000.
+    UserSignedTxSigningJob refund_tx_signing_job = 2;
+    UserSignedTxSigningJob direct_node_tx_signing_job = 3;
+    UserSignedTxSigningJob direct_refund_tx_signing_job = 4;
+    UserSignedTxSigningJob direct_from_cpfp_refund_tx_signing_job = 5;
+}
+
+message RenewLeafResponse {
+    oneof renew_result {
+      RenewNodeTimelockResult extend_result = 1;
+      RenewRefundTimelockResult refresh_result = 2;
+    }
+}
+
+message RenewNodeTimelockResult {
+    TreeNode split_node = 1;
+    TreeNode node = 2;
+}
+
+message RenewRefundTimelockResult {
+    TreeNode node = 1;
 }
 
 /**
