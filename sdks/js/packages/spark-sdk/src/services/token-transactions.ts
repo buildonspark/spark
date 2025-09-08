@@ -11,6 +11,7 @@ import {
   ValidationError,
 } from "../errors/types.js";
 import {
+  Direction,
   OperatorSpecificOwnerSignature,
   OperatorSpecificTokenTransactionSignablePayload,
   OutputWithPreviousTransactionData,
@@ -61,6 +62,7 @@ import { ConnectionManager } from "./connection.js";
 import { SigningOperator } from "./wallet-config.js";
 
 const MAX_TOKEN_OUTPUTS = 500;
+const QUERY_TOKEN_OUTPUTS_PAGE_SIZE = 100;
 
 export interface FetchOwnedTokenOutputsParams {
   ownerPublicKeys: Uint8Array[];
@@ -1081,14 +1083,34 @@ export class TokenTransactionService {
     );
 
     try {
-      const result = await tokenClient.query_token_outputs({
-        ownerPublicKeys,
-        issuerPublicKeys,
-        tokenIdentifiers,
-        network: this.config.getNetworkProto(),
-      });
+      const allOutputs: OutputWithPreviousTransactionData[] = [];
+      let after: string | undefined = undefined;
 
-      return result.outputsWithPreviousTransactionData;
+      do {
+        const result = await tokenClient.query_token_outputs({
+          ownerPublicKeys,
+          issuerPublicKeys,
+          tokenIdentifiers,
+          network: this.config.getNetworkProto(),
+          pageRequest: {
+            pageSize: QUERY_TOKEN_OUTPUTS_PAGE_SIZE,
+            cursor: after,
+            direction: Direction.NEXT,
+          },
+        });
+
+        if (Array.isArray(result.outputsWithPreviousTransactionData)) {
+          allOutputs.push(...result.outputsWithPreviousTransactionData);
+        }
+
+        if (result.pageResponse?.hasNextPage) {
+          after = result.pageResponse.nextCursor;
+        } else {
+          break;
+        }
+      } while (after);
+
+      return allOutputs;
     } catch (error) {
       throw new NetworkError(
         "Failed to fetch owned token outputs",

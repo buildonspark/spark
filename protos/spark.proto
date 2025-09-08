@@ -143,6 +143,24 @@ enum Network {
     SIGNET = 4;
 }
 
+message PageRequest {
+    int32 page_size = 1;
+    string cursor = 2;
+    Direction direction = 3;
+}
+
+enum Direction {
+    NEXT = 0;
+    PREVIOUS = 1;
+}
+
+message PageResponse {
+    bool has_next_page = 1;
+    bool has_previous_page = 2;
+    string next_cursor = 3;
+    string previous_cursor = 4;
+}
+
 /**
  * DepositAddressProof is the proof of possession of the deposit address.
  * When a user wants to generate a deposit address, they are sending their public key to the SE,

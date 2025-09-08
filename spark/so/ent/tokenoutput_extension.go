@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/lightsparkdev/spark/so/ent/predicate"
@@ -105,9 +106,22 @@ type GetOwnedTokenOutputsParams struct {
 	TokenIdentifiers           [][]byte
 	IncludeExpiredTransactions bool
 	Network                    common.Network
+	// Pagination parameters.
+	// For forward pagination: If AfterID is provided, results will include items with ID greater than AfterID.
+	// For backward pagination: If BeforeID is provided, results will include items with ID less than BeforeID.
+	// AfterID and BeforeID are mutually exclusive.
+	// Limit controls the maximum number of items returned. If zero, defaults to 500 for legacy behavior.
+	AfterID  *uuid.UUID
+	BeforeID *uuid.UUID
+	Limit    int
 }
 
 func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams) ([]*TokenOutput, error) {
+	// Validate pagination parameters
+	if params.AfterID != nil && params.BeforeID != nil {
+		return nil, fmt.Errorf("AfterID and BeforeID are mutually exclusive")
+	}
+
 	schemaNetwork, err := common.SchemaNetworkFromNetwork(params.Network)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
@@ -171,8 +185,18 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 		query = query.Where(tokenoutput.TokenIdentifierIn(params.TokenIdentifiers...))
 	}
 
-	// TODO: Remove limit once we have a way to paginate the results
-	outputs, err := query.Limit(500).WithOutputCreatedTokenTransaction().All(ctx)
+	// Check for unsupported backward pagination
+	if params.BeforeID != nil {
+		return nil, fmt.Errorf("backward pagination with 'before' cursor is not currently supported")
+	}
+
+	// Forward pagination: standard ascending order
+	query = query.Order(tokenoutput.ByID())
+	if params.AfterID != nil {
+		query = query.Where(tokenoutput.IDGT(*params.AfterID))
+	}
+
+	outputs, err := query.Limit(params.Limit).WithOutputCreatedTokenTransaction().All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query owned outputs: %w", err)
 	}

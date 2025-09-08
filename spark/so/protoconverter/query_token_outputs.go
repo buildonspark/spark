@@ -12,6 +12,11 @@ func TokenProtoQueryTokenOutputsRequestFromSpark(req *sparkpb.QueryTokenOutputsR
 		IssuerPublicKeys: req.TokenPublicKeys, // Field name change: TokenPublicKeys -> IssuerPublicKeys
 		TokenIdentifiers: req.TokenIdentifiers,
 		Network:          req.Network, // Convert enum
+		PageRequest: &sparkpb.PageRequest{
+			PageSize:  500,
+			Cursor:    "",
+			Direction: sparkpb.Direction_NEXT,
+		},
 	}
 }
 

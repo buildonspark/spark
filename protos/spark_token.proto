@@ -203,6 +203,8 @@ message QueryTokenOutputsRequest {
     repeated bytes issuer_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
     repeated bytes token_identifiers = 4 [(validate.rules).repeated.items.bytes.len = 32];
     spark.Network network = 3; // defaults to mainnet when no network is provided.
+    // For pagination
+    spark.PageRequest page_request = 5;
 }
 
 // Request constraints are combined using an AND relation.
@@ -234,6 +236,7 @@ message OutputWithPreviousTransactionData {
 
 message QueryTokenOutputsResponse {
     repeated OutputWithPreviousTransactionData outputs_with_previous_transaction_data = 1;
+    spark.PageResponse page_response = 2;
 }
 
 enum TokenTransactionStatus {

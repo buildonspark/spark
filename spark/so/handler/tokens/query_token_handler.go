@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common/keys"
@@ -24,6 +25,11 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/tokens"
+)
+
+const (
+	DefaultTokenOutputPageSize = 500
+	MaxTokenOutputPageSize     = 500
 )
 
 type QueryTokenHandler struct {
@@ -426,18 +432,71 @@ func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tok
 		return nil, errors.InvalidUserInputErrorf("must specify owner public key, issuer public key, or token identifier")
 	}
 
+	var afterID *uuid.UUID
+	var beforeID *uuid.UUID
+
+	pageRequest := req.GetPageRequest()
+	var direction sparkpb.Direction
+	var cursor string
+
+	if pageRequest != nil {
+		direction = pageRequest.GetDirection()
+		cursor = pageRequest.GetCursor()
+	}
+
+	// Handle cursor based on direction
+	if cursor != "" {
+		cursorBytes, err := base64.RawURLEncoding.DecodeString(cursor)
+		if err != nil {
+			cursorBytes, err = base64.URLEncoding.DecodeString(cursor)
+			if err != nil {
+				return nil, errors.InvalidUserInputErrorf("invalid cursor: %v", err)
+			}
+		}
+		id, err := uuid.FromBytes(cursorBytes)
+		if err != nil {
+			return nil, errors.InvalidUserInputErrorf("invalid cursor: %v", err)
+		}
+
+		if direction == sparkpb.Direction_PREVIOUS {
+			beforeID = &id
+		} else {
+			afterID = &id
+		}
+	}
+
+	limit := DefaultTokenOutputPageSize
+	if pageRequest != nil && pageRequest.GetPageSize() > 0 {
+		limit = int(pageRequest.GetPageSize())
+	}
+	if limit > MaxTokenOutputPageSize {
+		limit = MaxTokenOutputPageSize
+	}
+
+	// Check for unsupported backward pagination
+	if direction == sparkpb.Direction_PREVIOUS {
+		return nil, errors.InvalidUserInputErrorf("backward pagination with 'previous' direction is not currently supported")
+	}
+
+	queryLimit := limit + 1
 	outputs, err := ent.GetOwnedTokenOutputs(ctx, ent.GetOwnedTokenOutputsParams{
 		OwnerPublicKeys:            ownerPubKeys,
 		IssuerPublicKeys:           issuerPubKeys,
 		TokenIdentifiers:           tokenIdentifiers,
 		IncludeExpiredTransactions: true,
 		Network:                    *network,
+		AfterID:                    afterID,
+		BeforeID:                   beforeID,
+		Limit:                      queryLimit,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", tokens.ErrFailedToGetOwnedOutputStats, err)
 	}
 	var ownedTokenOutputs []*tokenpb.OutputWithPreviousTransactionData
-	for _, output := range outputs {
+	for i, output := range outputs {
+		if i >= limit {
+			break
+		}
 		idStr := output.ID.String()
 		ownedTokenOutputs = append(ownedTokenOutputs, &tokenpb.OutputWithPreviousTransactionData{
 			Output: &tokenpb.TokenOutput{
@@ -454,8 +513,41 @@ func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tok
 			PreviousTransactionVout: uint32(output.CreatedTransactionOutputVout),
 		})
 	}
+	pageResponse := &sparkpb.PageResponse{}
+
+	hasMoreResults := len(outputs) > limit
+
+	if afterID != nil {
+		// Forward pagination: we know there's a previous page, check if there's a next page
+		pageResponse.HasPreviousPage = true
+		pageResponse.HasNextPage = hasMoreResults
+	} else {
+		// No pagination: no previous page, check if there's a next page
+		pageResponse.HasPreviousPage = false
+		pageResponse.HasNextPage = hasMoreResults
+	}
+
+	// Set previous cursor (first item's ID) - for going backward from this page
+	if len(ownedTokenOutputs) > 0 {
+		if first := ownedTokenOutputs[0]; first != nil && first.Output != nil && first.Output.Id != nil {
+			if firstUUID, err := uuid.Parse(*first.Output.Id); err == nil {
+				pageResponse.PreviousCursor = base64.RawURLEncoding.EncodeToString(firstUUID[:])
+			}
+		}
+	}
+
+	// Set next cursor (last item's ID) - for going forward from this page
+	if len(ownedTokenOutputs) > 0 {
+		if last := ownedTokenOutputs[len(ownedTokenOutputs)-1]; last != nil && last.Output != nil && last.Output.Id != nil {
+			if lastUUID, err := uuid.Parse(*last.Output.Id); err == nil {
+				pageResponse.NextCursor = base64.RawURLEncoding.EncodeToString(lastUUID[:])
+			}
+		}
+	}
+
 	return &tokenpb.QueryTokenOutputsResponse{
 		OutputsWithPreviousTransactionData: ownedTokenOutputs,
+		PageResponse:                       pageResponse,
 	}, nil
 }
 

@@ -5,7 +5,7 @@ import {
   WalletConfig,
 } from "@buildonspark/spark-sdk";
 import { jest } from "@jest/globals";
-import { bytesToHex } from "@noble/curves/utils";
+import { hexToBytes, bytesToHex } from "@noble/curves/utils";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "@buildonspark/spark-sdk/test-utils";

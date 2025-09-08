@@ -65,6 +65,39 @@ export function networkToJSON(object: Network): string {
   }
 }
 
+export enum Direction {
+  NEXT = 0,
+  PREVIOUS = 1,
+  UNRECOGNIZED = -1,
+}
+
+export function directionFromJSON(object: any): Direction {
+  switch (object) {
+    case 0:
+    case "NEXT":
+      return Direction.NEXT;
+    case 1:
+    case "PREVIOUS":
+      return Direction.PREVIOUS;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return Direction.UNRECOGNIZED;
+  }
+}
+
+export function directionToJSON(object: Direction): string {
+  switch (object) {
+    case Direction.NEXT:
+      return "NEXT";
+    case Direction.PREVIOUS:
+      return "PREVIOUS";
+    case Direction.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export enum TokenTransactionStatus {
   TOKEN_TRANSACTION_STARTED = 0,
   TOKEN_TRANSACTION_SIGNED = 1,
@@ -410,6 +443,19 @@ export interface TransferEvent {
 
 export interface DepositEvent {
   deposit: TreeNode | undefined;
+}
+
+export interface PageRequest {
+  pageSize: number;
+  cursor: string;
+  direction: Direction;
+}
+
+export interface PageResponse {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  nextCursor: string;
+  previousCursor: string;
 }
 
 /**
@@ -2123,6 +2169,206 @@ export const DepositEvent: MessageFns<DepositEvent> = {
     message.deposit = (object.deposit !== undefined && object.deposit !== null)
       ? TreeNode.fromPartial(object.deposit)
       : undefined;
+    return message;
+  },
+};
+
+function createBasePageRequest(): PageRequest {
+  return { pageSize: 0, cursor: "", direction: 0 };
+}
+
+export const PageRequest: MessageFns<PageRequest> = {
+  encode(message: PageRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.pageSize !== 0) {
+      writer.uint32(8).int32(message.pageSize);
+    }
+    if (message.cursor !== "") {
+      writer.uint32(18).string(message.cursor);
+    }
+    if (message.direction !== 0) {
+      writer.uint32(24).int32(message.direction);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PageRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePageRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.pageSize = reader.int32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.cursor = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.direction = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PageRequest {
+    return {
+      pageSize: isSet(object.pageSize) ? globalThis.Number(object.pageSize) : 0,
+      cursor: isSet(object.cursor) ? globalThis.String(object.cursor) : "",
+      direction: isSet(object.direction) ? directionFromJSON(object.direction) : 0,
+    };
+  },
+
+  toJSON(message: PageRequest): unknown {
+    const obj: any = {};
+    if (message.pageSize !== 0) {
+      obj.pageSize = Math.round(message.pageSize);
+    }
+    if (message.cursor !== "") {
+      obj.cursor = message.cursor;
+    }
+    if (message.direction !== 0) {
+      obj.direction = directionToJSON(message.direction);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<PageRequest>): PageRequest {
+    return PageRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<PageRequest>): PageRequest {
+    const message = createBasePageRequest();
+    message.pageSize = object.pageSize ?? 0;
+    message.cursor = object.cursor ?? "";
+    message.direction = object.direction ?? 0;
+    return message;
+  },
+};
+
+function createBasePageResponse(): PageResponse {
+  return { hasNextPage: false, hasPreviousPage: false, nextCursor: "", previousCursor: "" };
+}
+
+export const PageResponse: MessageFns<PageResponse> = {
+  encode(message: PageResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.hasNextPage !== false) {
+      writer.uint32(8).bool(message.hasNextPage);
+    }
+    if (message.hasPreviousPage !== false) {
+      writer.uint32(16).bool(message.hasPreviousPage);
+    }
+    if (message.nextCursor !== "") {
+      writer.uint32(26).string(message.nextCursor);
+    }
+    if (message.previousCursor !== "") {
+      writer.uint32(34).string(message.previousCursor);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PageResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePageResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.hasNextPage = reader.bool();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.hasPreviousPage = reader.bool();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.nextCursor = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.previousCursor = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PageResponse {
+    return {
+      hasNextPage: isSet(object.hasNextPage) ? globalThis.Boolean(object.hasNextPage) : false,
+      hasPreviousPage: isSet(object.hasPreviousPage) ? globalThis.Boolean(object.hasPreviousPage) : false,
+      nextCursor: isSet(object.nextCursor) ? globalThis.String(object.nextCursor) : "",
+      previousCursor: isSet(object.previousCursor) ? globalThis.String(object.previousCursor) : "",
+    };
+  },
+
+  toJSON(message: PageResponse): unknown {
+    const obj: any = {};
+    if (message.hasNextPage !== false) {
+      obj.hasNextPage = message.hasNextPage;
+    }
+    if (message.hasPreviousPage !== false) {
+      obj.hasPreviousPage = message.hasPreviousPage;
+    }
+    if (message.nextCursor !== "") {
+      obj.nextCursor = message.nextCursor;
+    }
+    if (message.previousCursor !== "") {
+      obj.previousCursor = message.previousCursor;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<PageResponse>): PageResponse {
+    return PageResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<PageResponse>): PageResponse {
+    const message = createBasePageResponse();
+    message.hasNextPage = object.hasNextPage ?? false;
+    message.hasPreviousPage = object.hasPreviousPage ?? false;
+    message.nextCursor = object.nextCursor ?? "";
+    message.previousCursor = object.previousCursor ?? "";
     return message;
   },
 };

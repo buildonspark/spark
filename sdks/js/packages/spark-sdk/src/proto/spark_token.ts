@@ -8,7 +8,7 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import type { CallContext, CallOptions } from "nice-grpc-common";
 import { Timestamp } from "./google/protobuf/timestamp.js";
-import { Network, networkFromJSON, networkToJSON, SigningKeyshare } from "./spark.js";
+import { Network, networkFromJSON, networkToJSON, PageRequest, PageResponse, SigningKeyshare } from "./spark.js";
 
 export const protobufPackage = "spark_token";
 
@@ -343,6 +343,8 @@ export interface QueryTokenOutputsRequest {
   tokenIdentifiers: Uint8Array[];
   /** defaults to mainnet when no network is provided. */
   network: Network;
+  /** For pagination */
+  pageRequest: PageRequest | undefined;
 }
 
 /** Request constraints are combined using an AND relation. */
@@ -374,6 +376,7 @@ export interface OutputWithPreviousTransactionData {
 
 export interface QueryTokenOutputsResponse {
   outputsWithPreviousTransactionData: OutputWithPreviousTransactionData[];
+  pageResponse: PageResponse | undefined;
 }
 
 export interface SpentTokenOutputMetadata {
@@ -2283,7 +2286,7 @@ export const QueryTokenMetadataResponse: MessageFns<QueryTokenMetadataResponse> 
 };
 
 function createBaseQueryTokenOutputsRequest(): QueryTokenOutputsRequest {
-  return { ownerPublicKeys: [], issuerPublicKeys: [], tokenIdentifiers: [], network: 0 };
+  return { ownerPublicKeys: [], issuerPublicKeys: [], tokenIdentifiers: [], network: 0, pageRequest: undefined };
 }
 
 export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
@@ -2299,6 +2302,9 @@ export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
     }
     if (message.network !== 0) {
       writer.uint32(24).int32(message.network);
+    }
+    if (message.pageRequest !== undefined) {
+      PageRequest.encode(message.pageRequest, writer.uint32(42).fork()).join();
     }
     return writer;
   },
@@ -2342,6 +2348,14 @@ export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
           message.network = reader.int32() as any;
           continue;
         }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.pageRequest = PageRequest.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2363,6 +2377,7 @@ export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
         ? object.tokenIdentifiers.map((e: any) => bytesFromBase64(e))
         : [],
       network: isSet(object.network) ? networkFromJSON(object.network) : 0,
+      pageRequest: isSet(object.pageRequest) ? PageRequest.fromJSON(object.pageRequest) : undefined,
     };
   },
 
@@ -2380,6 +2395,9 @@ export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
     if (message.network !== 0) {
       obj.network = networkToJSON(message.network);
     }
+    if (message.pageRequest !== undefined) {
+      obj.pageRequest = PageRequest.toJSON(message.pageRequest);
+    }
     return obj;
   },
 
@@ -2392,6 +2410,9 @@ export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
     message.issuerPublicKeys = object.issuerPublicKeys?.map((e) => e) || [];
     message.tokenIdentifiers = object.tokenIdentifiers?.map((e) => e) || [];
     message.network = object.network ?? 0;
+    message.pageRequest = (object.pageRequest !== undefined && object.pageRequest !== null)
+      ? PageRequest.fromPartial(object.pageRequest)
+      : undefined;
     return message;
   },
 };
@@ -2750,13 +2771,16 @@ export const OutputWithPreviousTransactionData: MessageFns<OutputWithPreviousTra
 };
 
 function createBaseQueryTokenOutputsResponse(): QueryTokenOutputsResponse {
-  return { outputsWithPreviousTransactionData: [] };
+  return { outputsWithPreviousTransactionData: [], pageResponse: undefined };
 }
 
 export const QueryTokenOutputsResponse: MessageFns<QueryTokenOutputsResponse> = {
   encode(message: QueryTokenOutputsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     for (const v of message.outputsWithPreviousTransactionData) {
       OutputWithPreviousTransactionData.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.pageResponse !== undefined) {
+      PageResponse.encode(message.pageResponse, writer.uint32(18).fork()).join();
     }
     return writer;
   },
@@ -2778,6 +2802,14 @@ export const QueryTokenOutputsResponse: MessageFns<QueryTokenOutputsResponse> = 
           );
           continue;
         }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.pageResponse = PageResponse.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -2792,6 +2824,7 @@ export const QueryTokenOutputsResponse: MessageFns<QueryTokenOutputsResponse> = 
       outputsWithPreviousTransactionData: globalThis.Array.isArray(object?.outputsWithPreviousTransactionData)
         ? object.outputsWithPreviousTransactionData.map((e: any) => OutputWithPreviousTransactionData.fromJSON(e))
         : [],
+      pageResponse: isSet(object.pageResponse) ? PageResponse.fromJSON(object.pageResponse) : undefined,
     };
   },
 
@@ -2801,6 +2834,9 @@ export const QueryTokenOutputsResponse: MessageFns<QueryTokenOutputsResponse> = 
       obj.outputsWithPreviousTransactionData = message.outputsWithPreviousTransactionData.map((e) =>
         OutputWithPreviousTransactionData.toJSON(e)
       );
+    }
+    if (message.pageResponse !== undefined) {
+      obj.pageResponse = PageResponse.toJSON(message.pageResponse);
     }
     return obj;
   },
@@ -2812,6 +2848,9 @@ export const QueryTokenOutputsResponse: MessageFns<QueryTokenOutputsResponse> = 
     const message = createBaseQueryTokenOutputsResponse();
     message.outputsWithPreviousTransactionData =
       object.outputsWithPreviousTransactionData?.map((e) => OutputWithPreviousTransactionData.fromPartial(e)) || [];
+    message.pageResponse = (object.pageResponse !== undefined && object.pageResponse !== null)
+      ? PageResponse.fromPartial(object.pageResponse)
+      : undefined;
     return message;
   },
 };
