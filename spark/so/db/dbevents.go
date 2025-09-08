@@ -12,6 +12,10 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/puddle/v2"
 	"github.com/lightsparkdev/spark/so"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 )
 
 type listenerKey struct {
@@ -41,7 +45,46 @@ type DBEvents struct {
 	listeners      map[string]map[listenerKey]([]chan EventData)
 	channelChanges []channelChange
 
-	logger *slog.Logger
+	logger  *slog.Logger
+	metrics DBEventMetrics
+}
+
+type DBEventMetrics struct {
+	listenCount  metric.Int64Counter
+	forwardCount metric.Int64Counter
+}
+
+func NewDBEventMetrics() DBEventMetrics {
+	meter := otel.Meter("spark.db")
+
+	listenCount, err := meter.Int64Counter(
+		"spark_dbevents_received_per_channel",
+		metric.WithDescription("Number of events received per channel"),
+		metric.WithUnit("{count}"),
+	)
+	if err != nil {
+		otel.Handle(err)
+		if listenCount == nil {
+			listenCount = noop.Int64Counter{}
+		}
+	}
+
+	forwardCount, err := meter.Int64Counter(
+		"spark_dbevents_forwarded_per_channel",
+		metric.WithDescription("Number of events forwarded to listeners per channel"),
+		metric.WithUnit("{count}"),
+	)
+	if err != nil {
+		otel.Handle(err)
+		if forwardCount == nil {
+			forwardCount = noop.Int64Counter{}
+		}
+	}
+
+	return DBEventMetrics{
+		listenCount:  listenCount,
+		forwardCount: forwardCount,
+	}
 }
 
 func NewDBEvents(ctx context.Context, connector *so.DBConnector, logger *slog.Logger) (*DBEvents, error) {
@@ -59,6 +102,7 @@ func NewDBEvents(ctx context.Context, connector *so.DBConnector, logger *slog.Lo
 		conn:           rawConn,
 		channelChanges: []channelChange{},
 		logger:         logger,
+		metrics:        NewDBEventMetrics(),
 	}
 
 	return events, nil
@@ -71,7 +115,6 @@ func (e *DBEvents) Start() error {
 func (e *DBEvents) listenForEvents() error {
 	for {
 		err := e.waitForNotification()
-
 		if err != nil {
 			e.logger.Error("error waiting for notification", "error", err)
 
@@ -201,6 +244,8 @@ func (e *DBEvents) processNotification(notification *pgconn.Notification) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	e.metrics.listenCount.Add(e.ctx, 1, metric.WithAttributes(attribute.String("channel", notification.Channel)))
+
 	if c, exists := e.listeners[notification.Channel]; exists {
 		var payload map[string]any
 		if err := json.Unmarshal([]byte(notification.Payload), &payload); err != nil {
@@ -215,11 +260,26 @@ func (e *DBEvents) processNotification(notification *pgconn.Notification) {
 					Payload: notification.Payload,
 				}
 				for _, channel := range listeners {
-
 					select {
 					case channel <- eventData:
+						e.metrics.forwardCount.Add(
+							e.ctx,
+							1,
+							metric.WithAttributes(
+								attribute.String("channel", notification.Channel),
+								attribute.String("result", "success"),
+							),
+						)
 					default:
 						e.logger.Warn("Listener channel is full", "field", field, "value", value)
+						e.metrics.forwardCount.Add(
+							e.ctx,
+							1,
+							metric.WithAttributes(
+								attribute.String("channel", notification.Channel),
+								attribute.String("result", "failure"),
+							),
+						)
 					}
 				}
 			}
