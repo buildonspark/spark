@@ -264,60 +264,9 @@ func (h *BaseTransferHandler) createTransfer(
 
 	invoiceID := uuid.Nil
 	if len(sparkInvoice) > 0 {
-		decoded, err := common.ParseSparkInvoice(sparkInvoice)
+		invoiceID, err = createAndLockSparkInvoice(ctx, sparkInvoice)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to parse spark invoice: %w", err)
-		}
-		invoiceID = decoded.Id
-		var expiry *time.Time
-		if decoded.ExpiryTime != nil && decoded.ExpiryTime.IsValid() {
-			t := decoded.ExpiryTime.AsTime()
-			expiry = &t
-		}
-		err = db.SparkInvoice.Create().
-			SetID(invoiceID).
-			SetSparkInvoice(sparkInvoice).
-			SetReceiverPublicKey(decoded.ReceiverPublicKey.Serialize()).
-			SetNillableExpiryTime(expiry).
-			OnConflictColumns(sparkinvoice.FieldID).
-			DoNothing().
-			Exec(ctx)
-		// Do not update an invoice if one already exists with the same ID.
-		// Ent Create expects a returning row, but ON CONFLICT DO NOTHING returns 0 rows.
-		// As 0 rows is expected in conflict cases, ignore dbSql.ErrNoRows.
-		if err != nil && !errors.Is(err, dbSql.ErrNoRows) {
-			return nil, nil, fmt.Errorf("unable to create spark invoice: %w", err)
-		}
-
-		storedInvoice, err := db.SparkInvoice.
-			Query().
-			Where(sparkinvoice.IDEQ(invoiceID)).
-			ForUpdate().
-			Only(ctx)
-		if err != nil {
-			return nil, nil, fmt.Errorf("lock invoice: %w", err)
-		}
-		if storedInvoice.SparkInvoice != sparkInvoice {
-			return nil, nil, sparkerrors.InvalidUserInputErrorf("Conflicting invoices found for id: %s. Decoded request invoice: %s", invoiceID.String(), sparkInvoice)
-		}
-
-		// Check if an existing transfer is in flight or paid with this invoice.
-		paidOrInFlightTransferExists, err := db.Transfer.
-			Query().
-			Where(
-				enttransfer.HasSparkInvoiceWith(sparkinvoice.IDEQ(invoiceID)),
-				enttransfer.StatusNotIn(
-					// If an invoice has an edge to a transfer in any other state
-					// that invoice is considered paid or in flight. Do not pay it again.
-					st.TransferStatusReturned,
-				),
-			).
-			Exist(ctx)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to query transfer: %w", err)
-		}
-		if paidOrInFlightTransferExists {
-			return nil, nil, sparkerrors.InvalidUserInputErrorf("invoice has already been paid")
+			return nil, nil, fmt.Errorf("unable to create and lock spark invoice: %w", err)
 		}
 	}
 
@@ -383,6 +332,68 @@ func (h *BaseTransferHandler) createTransfer(
 	}
 
 	return transfer, leafMap, nil
+}
+
+func createAndLockSparkInvoice(ctx context.Context, sparkInvoice string) (uuid.UUID, error) {
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("unable to get database transaction: %w", err)
+	}
+	decoded, err := common.ParseSparkInvoice(sparkInvoice)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("unable to parse spark invoice: %w", err)
+	}
+	var expiry *time.Time
+	if decoded.ExpiryTime != nil && decoded.ExpiryTime.IsValid() {
+		t := decoded.ExpiryTime.AsTime()
+		expiry = &t
+	}
+	err = db.SparkInvoice.Create().
+		SetID(decoded.Id).
+		SetSparkInvoice(sparkInvoice).
+		SetReceiverPublicKey(decoded.ReceiverPublicKey.Serialize()).
+		SetNillableExpiryTime(expiry).
+		OnConflictColumns(sparkinvoice.FieldID).
+		DoNothing().
+		Exec(ctx)
+	// Do not update an invoice if one already exists with the same ID.
+	// Ent Create expects a returning row, but ON CONFLICT DO NOTHING returns 0 rows.
+	// As 0 rows is expected in conflict cases, ignore dbSql.ErrNoRows.
+	if err != nil && !errors.Is(err, dbSql.ErrNoRows) {
+		return uuid.Nil, fmt.Errorf("unable to create spark invoice: %w", err)
+	}
+
+	storedInvoice, err := db.SparkInvoice.
+		Query().
+		Where(sparkinvoice.IDEQ(decoded.Id)).
+		ForUpdate().
+		Only(ctx)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("lock invoice: %w", err)
+	}
+	if storedInvoice.SparkInvoice != sparkInvoice {
+		return uuid.Nil, sparkerrors.InvalidUserInputErrorf("Conflicting invoices found for id: %s. Decoded request invoice: %s", storedInvoice.ID.String(), sparkInvoice)
+	}
+
+	// Check if an existing transfer is in flight or paid with this invoice.
+	paidOrInFlightTransferExists, err := db.Transfer.
+		Query().
+		Where(
+			enttransfer.HasSparkInvoiceWith(sparkinvoice.IDEQ(storedInvoice.ID)),
+			enttransfer.StatusNotIn(
+				// If an invoice has an edge to a transfer in any other state
+				// that invoice is considered paid or in flight. Do not pay it again.
+				st.TransferStatusReturned,
+			),
+		).
+		Exist(ctx)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("failed to query transfer: %w", err)
+	}
+	if paidOrInFlightTransferExists {
+		return uuid.Nil, sparkerrors.InvalidUserInputErrorf("invoice has already been paid")
+	}
+	return storedInvoice.ID, nil
 }
 
 func loadLeavesWithLock(ctx context.Context, db *ent.Tx, leafRefundMap map[string][]byte) ([]*ent.TreeNode, error) {
