@@ -57,8 +57,8 @@ func TestQueryStaticDepositAddresses(t *testing.T) {
 	require.NoError(t, err)
 	_, err = tx.DepositAddress.Create().
 		SetAddress("bcrt1qfpk6cxxfr49wtvzxd72ahe2xtu7gj6vx7m0ksy").
-		SetOwnerIdentityPubkey(identityPubKey.Serialize()).
-		SetOwnerSigningPubkey(randomPrivKey1.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPubKey).
+		SetOwnerSigningPubkey(randomPrivKey1.Public()).
 		SetSigningKeyshare(signingKeyshare1).
 		SetNetwork(st.NetworkRegtest).
 		SetIsStatic(true).
@@ -66,8 +66,8 @@ func TestQueryStaticDepositAddresses(t *testing.T) {
 	require.NoError(t, err)
 	_, err = tx.DepositAddress.Create().
 		SetAddress("bcrt1q043w4fkg4w0jl6fxrx0kd4ww3rsq2tm4mtmv9e").
-		SetOwnerIdentityPubkey(identityPubKey.Serialize()).
-		SetOwnerSigningPubkey(randomPrivKey2.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPubKey).
+		SetOwnerSigningPubkey(randomPrivKey2.Public()).
 		SetSigningKeyshare(signingKeyshare2).
 		SetNetwork(st.NetworkRegtest).
 		SetIsStatic(true).
@@ -76,8 +76,8 @@ func TestQueryStaticDepositAddresses(t *testing.T) {
 	// This is a different identity pubkey, so it should not be returned
 	_, err = tx.DepositAddress.Create().
 		SetAddress("bcrt1q043w4fkg4w0jl6fxrx0kd4ww3rsq2tm4mtmv9d").
-		SetOwnerIdentityPubkey(identityPubKey2.Serialize()).
-		SetOwnerSigningPubkey(randomPrivKey2.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPubKey2).
+		SetOwnerSigningPubkey(randomPrivKey2.Public()).
 		SetSigningKeyshare(signingKeyshare3).
 		SetNetwork(st.NetworkRegtest).
 		SetIsStatic(true).

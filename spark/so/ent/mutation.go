@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
@@ -1241,8 +1242,8 @@ type DepositAddressMutation struct {
 	update_time             *time.Time
 	address                 *string
 	network                 *schematype.Network
-	owner_identity_pubkey   *[]byte
-	owner_signing_pubkey    *[]byte
+	owner_identity_pubkey   *keys.Public
+	owner_signing_pubkey    *keys.Public
 	confirmation_height     *int64
 	addconfirmation_height  *int64
 	confirmation_txid       *string
@@ -1526,12 +1527,12 @@ func (m *DepositAddressMutation) ResetNetwork() {
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (m *DepositAddressMutation) SetOwnerIdentityPubkey(b []byte) {
-	m.owner_identity_pubkey = &b
+func (m *DepositAddressMutation) SetOwnerIdentityPubkey(k keys.Public) {
+	m.owner_identity_pubkey = &k
 }
 
 // OwnerIdentityPubkey returns the value of the "owner_identity_pubkey" field in the mutation.
-func (m *DepositAddressMutation) OwnerIdentityPubkey() (r []byte, exists bool) {
+func (m *DepositAddressMutation) OwnerIdentityPubkey() (r keys.Public, exists bool) {
 	v := m.owner_identity_pubkey
 	if v == nil {
 		return
@@ -1542,7 +1543,7 @@ func (m *DepositAddressMutation) OwnerIdentityPubkey() (r []byte, exists bool) {
 // OldOwnerIdentityPubkey returns the old "owner_identity_pubkey" field's value of the DepositAddress entity.
 // If the DepositAddress object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *DepositAddressMutation) OldOwnerIdentityPubkey(ctx context.Context) (v []byte, err error) {
+func (m *DepositAddressMutation) OldOwnerIdentityPubkey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOwnerIdentityPubkey is only allowed on UpdateOne operations")
 	}
@@ -1562,12 +1563,12 @@ func (m *DepositAddressMutation) ResetOwnerIdentityPubkey() {
 }
 
 // SetOwnerSigningPubkey sets the "owner_signing_pubkey" field.
-func (m *DepositAddressMutation) SetOwnerSigningPubkey(b []byte) {
-	m.owner_signing_pubkey = &b
+func (m *DepositAddressMutation) SetOwnerSigningPubkey(k keys.Public) {
+	m.owner_signing_pubkey = &k
 }
 
 // OwnerSigningPubkey returns the value of the "owner_signing_pubkey" field in the mutation.
-func (m *DepositAddressMutation) OwnerSigningPubkey() (r []byte, exists bool) {
+func (m *DepositAddressMutation) OwnerSigningPubkey() (r keys.Public, exists bool) {
 	v := m.owner_signing_pubkey
 	if v == nil {
 		return
@@ -1578,7 +1579,7 @@ func (m *DepositAddressMutation) OwnerSigningPubkey() (r []byte, exists bool) {
 // OldOwnerSigningPubkey returns the old "owner_signing_pubkey" field's value of the DepositAddress entity.
 // If the DepositAddress object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *DepositAddressMutation) OldOwnerSigningPubkey(ctx context.Context) (v []byte, err error) {
+func (m *DepositAddressMutation) OldOwnerSigningPubkey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOwnerSigningPubkey is only allowed on UpdateOne operations")
 	}
@@ -2220,14 +2221,14 @@ func (m *DepositAddressMutation) SetField(name string, value ent.Value) error {
 		m.SetNetwork(v)
 		return nil
 	case depositaddress.FieldOwnerIdentityPubkey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOwnerIdentityPubkey(v)
 		return nil
 	case depositaddress.FieldOwnerSigningPubkey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

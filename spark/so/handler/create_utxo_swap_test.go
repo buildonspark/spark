@@ -5,13 +5,15 @@ package handler
 
 import (
 	"encoding/hex"
+	"math/rand/v2"
 	"testing"
 	"time"
 
 	"github.com/btcsuite/btcd/wire"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/distributed-lab/gripmock"
+	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -28,10 +30,10 @@ func TestCreateUtxoSwap_ErrorIfNotCoordinator(t *testing.T) {
 		_ = gripmock.Clear()
 	}()
 
-	ctx, sessionCtx := setupPgTestContext(t)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 	defer sessionCtx.Close()
 
-	cfg := setupTestConfigWithRegtestNoAuthz(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 
 	// Find other operator (non-coordinator)
 	var nonCoordinatorID string
@@ -51,48 +53,47 @@ func TestCreateUtxoSwap_ErrorIfNotCoordinator(t *testing.T) {
 	handler := NewInternalDepositHandler(cfg)
 
 	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerIdentityPubKey := ownerIdentityPrivKey.Public()
 
-	ownerIdentityPrivKey, ownerIdentityPub := generateFixedKeyPair(1)
-	_, ownerSigningPub := generateFixedKeyPair(2)
-
-	keyshare := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
-	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPub, ownerSigningPub)
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPrivKey.Public())
 	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
 
-	spendTxBytes := createValidBitcoinTxBytes(ownerIdentityPub)
+	spendTxBytes := createValidBitcoinTxBytes(t, ownerIdentityPubKey)
 	testSspSignature, _ := hex.DecodeString("abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab")
 
-	ownerIdentityPrivKeySecp := secp256k1.PrivKeyFromBytes(ownerIdentityPrivKey)
-	userSignature, err := createValidUserSignatureForTest(
+	userSignature := createValidUserSignatureForTest(
 		utxo.Txid,
-		uint32(utxo.Vout),
+		utxo.Vout,
 		common.Regtest,
 		pb.UtxoSwapRequestType_Fixed,
 		1000,
 		testSspSignature,
-		ownerIdentityPrivKeySecp,
+		ownerIdentityPrivKey,
 	)
-	require.NoError(t, err)
 
 	req := &pb.InitiateUtxoSwapRequest{
 		OnChainUtxo: &pb.UTXO{
 			Txid:    utxo.Txid,
-			Vout:    uint32(utxo.Vout),
+			Vout:    utxo.Vout,
 			Network: pb.Network_REGTEST,
 		},
 		RequestType:   pb.UtxoSwapRequestType_Fixed,
 		SspSignature:  testSspSignature,
 		UserSignature: userSignature,
 		Transfer: &pb.StartTransferRequest{
-			TransferId:                testTransferID(),
-			OwnerIdentityPublicKey:    ownerIdentityPub,
-			ReceiverIdentityPublicKey: ownerIdentityPub,
+			TransferId:                testTransferID.String(),
+			OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+			ReceiverIdentityPublicKey: ownerIdentityPubKey.Serialize(),
 			ExpiryTime:                timestamppb.New(time.Now().Add(24 * time.Hour)),
 		},
 		SpendTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       ownerSigningPub,
+			SigningPublicKey:       ownerSigningPrivKey.Public().Serialize(),
 			RawTx:                  spendTxBytes,
-			SigningNonceCommitment: createTestSigningCommitment(),
+			SigningNonceCommitment: createTestSigningCommitment(rng),
 		},
 	}
 
@@ -100,8 +101,7 @@ func TestCreateUtxoSwap_ErrorIfNotCoordinator(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = handler.CreateUtxoSwap(ctx, cfg, createRequest)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "coordinator")
+	require.ErrorContains(t, err, "coordinator")
 }
 
 func TestCreateUtxoSwap_InvalidUserSignature(t *testing.T) {
@@ -109,49 +109,48 @@ func TestCreateUtxoSwap_InvalidUserSignature(t *testing.T) {
 		_ = gripmock.Clear()
 	}()
 
-	ctx, sessionCtx := setupPgTestContext(t)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 	defer sessionCtx.Close()
 
-	cfg := setupTestConfigWithRegtestNoAuthz(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
 	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerIdentityPubKey := ownerIdentityPrivKey.Public()
+	ownerSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 
-	ownerIdentityPrivKey, ownerIdentityPub := generateFixedKeyPair(1)
-	_, ownerSigningPub := generateFixedKeyPair(2)
-
-	keyshare := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
-	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPub, ownerSigningPub)
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPrivKey.Public())
 	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
 
 	// Create valid signature for a different message (invalid in this case)
 	testSspSignature := []byte("valid_ssp_signature")
-	ownerIdentityPrivKeySecp := secp256k1.PrivKeyFromBytes(ownerIdentityPrivKey)
 
 	// Create signature for a wrong message
 	wrongMessage := []byte("wrong_message_for_signature")
-	wrongSignature := ecdsa.Sign(ownerIdentityPrivKeySecp, wrongMessage)
-	invalidUserSignature := wrongSignature.Serialize()
+	invalidUserSignature := ecdsa.Sign(ownerIdentityPrivKey.ToBTCEC(), wrongMessage).Serialize()
 
 	req := &pb.InitiateUtxoSwapRequest{
 		OnChainUtxo: &pb.UTXO{
 			Txid:    utxo.Txid,
-			Vout:    uint32(utxo.Vout),
+			Vout:    utxo.Vout,
 			Network: pb.Network_REGTEST,
 		},
 		RequestType:   pb.UtxoSwapRequestType_Refund,
 		SspSignature:  testSspSignature,
 		UserSignature: invalidUserSignature, // Valid signature for a wrong message
 		Transfer: &pb.StartTransferRequest{
-			TransferId:                testTransferID(),
-			OwnerIdentityPublicKey:    ownerIdentityPub,
-			ReceiverIdentityPublicKey: ownerIdentityPub,
+			TransferId:                testTransferID.String(),
+			OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+			ReceiverIdentityPublicKey: ownerIdentityPubKey.Serialize(),
 			ExpiryTime:                timestamppb.New(time.Now().Add(24 * time.Hour)),
 		},
 		SpendTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       ownerSigningPub,
-			RawTx:                  createValidBitcoinTxBytes(ownerIdentityPub),
-			SigningNonceCommitment: createTestSigningCommitment(),
+			SigningPublicKey:       ownerSigningPrivKey.Public().Serialize(),
+			RawTx:                  createValidBitcoinTxBytes(t, ownerIdentityPubKey),
+			SigningNonceCommitment: createTestSigningCommitment(rng),
 		},
 	}
 
@@ -159,15 +158,15 @@ func TestCreateUtxoSwap_InvalidUserSignature(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = handler.CreateUtxoSwap(ctx, cfg, createRequest)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "signature")
+	require.ErrorContains(t, err, "signature")
 }
 
 func TestCreateUtxoSwap_UtxoNotConfirmed(t *testing.T) {
-	ctx, sessionCtx := setupPgTestContext(t)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 	defer sessionCtx.Close()
+	rng := rand.NewChaCha8([32]byte{})
 
-	cfg := setupTestConfigWithRegtestNoAuthz(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	// Set high confirmation threshold
 	cfg.BitcoindConfigs["regtest"] = so.BitcoindConfig{
 		DepositConfirmationThreshold: 100,
@@ -177,47 +176,46 @@ func TestCreateUtxoSwap_UtxoNotConfirmed(t *testing.T) {
 
 	createTestBlockHeight(t, ctx, sessionCtx.Client, 150)
 
-	ownerIdentityPrivKey, ownerIdentityPub := generateFixedKeyPair(1)
-	_, ownerSigningPub := generateFixedKeyPair(2)
-
-	keyshare := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
-	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPub, ownerSigningPub)
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerSigningPubKey := ownerSigningPrivKey.Public()
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
 
 	// Create UTXO with insufficient confirmations (150 - 52 + 1 = 99 < 100)
 	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 52)
 
 	testSspSignature, _ := hex.DecodeString("abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab")
-	ownerIdentityPrivKeySecp := secp256k1.PrivKeyFromBytes(ownerIdentityPrivKey)
-	userSignature, err := createValidUserSignatureForTest(
+
+	userSignature := createValidUserSignatureForTest(
 		utxo.Txid,
-		uint32(utxo.Vout),
+		utxo.Vout,
 		common.Regtest,
 		pb.UtxoSwapRequestType_Fixed,
 		1000,
 		testSspSignature,
-		ownerIdentityPrivKeySecp,
+		ownerSigningPrivKey,
 	)
-	require.NoError(t, err)
 
 	req := &pb.InitiateUtxoSwapRequest{
 		OnChainUtxo: &pb.UTXO{
 			Txid:    utxo.Txid,
-			Vout:    uint32(utxo.Vout),
+			Vout:    utxo.Vout,
 			Network: pb.Network_REGTEST,
 		},
 		RequestType:   pb.UtxoSwapRequestType_Fixed,
 		SspSignature:  testSspSignature,
 		UserSignature: userSignature,
 		Transfer: &pb.StartTransferRequest{
-			TransferId:                testTransferID(),
-			OwnerIdentityPublicKey:    ownerIdentityPub,
-			ReceiverIdentityPublicKey: ownerIdentityPub,
+			TransferId:                testTransferID.String(),
+			OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+			ReceiverIdentityPublicKey: ownerIdentityPubKey.Serialize(),
 			ExpiryTime:                timestamppb.New(time.Now().Add(24 * time.Hour)),
 		},
 		SpendTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       ownerSigningPub,
-			RawTx:                  createValidBitcoinTxBytes(ownerIdentityPub),
-			SigningNonceCommitment: createTestSigningCommitment(),
+			SigningPublicKey:       ownerSigningPubKey.Serialize(),
+			RawTx:                  createValidBitcoinTxBytes(t, ownerIdentityPubKey),
+			SigningNonceCommitment: createTestSigningCommitment(rng),
 		},
 	}
 
@@ -225,61 +223,60 @@ func TestCreateUtxoSwap_UtxoNotConfirmed(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = handler.CreateUtxoSwap(ctx, cfg, createRequest)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "confirmations")
+	require.ErrorContains(t, err, "confirmations")
 }
 
 func TestCreateUtxoSwap_InvalidTransferWrongAmount(t *testing.T) {
-	ctx, sessionCtx := setupPgTestContext(t)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 	defer sessionCtx.Close()
 
-	cfg := setupTestConfigWithRegtestNoAuthz(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
 	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
 
-	ownerIdentityPrivKey, ownerIdentityPub := generateFixedKeyPair(1)
-	_, ownerSigningPub := generateFixedKeyPair(2)
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerIdentityPubKey := ownerIdentityPrivKey.Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	keyshare := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
-	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPub, ownerSigningPub)
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
 	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
 
 	testSspSignature, _ := hex.DecodeString("abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab")
-	ownerIdentityPrivKeySecp := secp256k1.PrivKeyFromBytes(ownerIdentityPrivKey)
 
 	// Use wrong amount in user signature (different from spend tx amount)
 	wrongAmount := uint64(9999) // Different from actual spend tx amount
-	userSignature, err := createValidUserSignatureForTest(
+	userSignature := createValidUserSignatureForTest(
 		utxo.Txid,
-		uint32(utxo.Vout),
+		utxo.Vout,
 		common.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		wrongAmount,
 		testSspSignature,
-		ownerIdentityPrivKeySecp,
+		ownerIdentityPrivKey,
 	)
-	require.NoError(t, err)
 
 	req := &pb.InitiateUtxoSwapRequest{
 		OnChainUtxo: &pb.UTXO{
 			Txid:    utxo.Txid,
-			Vout:    uint32(utxo.Vout),
+			Vout:    utxo.Vout,
 			Network: pb.Network_REGTEST,
 		},
 		RequestType:   pb.UtxoSwapRequestType_Refund,
 		SspSignature:  testSspSignature,
 		UserSignature: userSignature,
 		Transfer: &pb.StartTransferRequest{
-			TransferId:                testTransferID(),
-			OwnerIdentityPublicKey:    ownerIdentityPub,
-			ReceiverIdentityPublicKey: ownerIdentityPub,
+			TransferId:                testTransferID.String(),
+			OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+			ReceiverIdentityPublicKey: ownerIdentityPubKey.Serialize(),
 			ExpiryTime:                timestamppb.New(time.Now().Add(24 * time.Hour)),
 		},
 		SpendTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       ownerSigningPub,
-			RawTx:                  createValidBitcoinTxBytes(ownerIdentityPub),
-			SigningNonceCommitment: createTestSigningCommitment(),
+			SigningPublicKey:       ownerSigningPubKey.Serialize(),
+			RawTx:                  createValidBitcoinTxBytes(t, ownerIdentityPubKey),
+			SigningNonceCommitment: createTestSigningCommitment(rng),
 		},
 	}
 
@@ -287,61 +284,59 @@ func TestCreateUtxoSwap_InvalidTransferWrongAmount(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = handler.CreateUtxoSwap(ctx, cfg, createRequest)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "signature")
+	require.ErrorContains(t, err, "signature")
 }
 
 func TestCreateUtxoSwap_InvalidTransferWrongRecipient(t *testing.T) {
-	ctx, sessionCtx := setupPgTestContext(t)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 	defer sessionCtx.Close()
 
-	cfg := setupTestConfigWithRegtestNoAuthz(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
 	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
 
-	_, ownerIdentityPub := generateFixedKeyPair(1)
-	_, ownerSigningPub := generateFixedKeyPair(2)
-	wrongRecipientPrivKey, wrongRecipientPub := generateFixedKeyPair(99) // Wrong recipient
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	wrongRecipientPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 
-	keyshare := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
-	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPub, ownerSigningPub)
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
 	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
 
 	testSspSignature, _ := hex.DecodeString("abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab")
 
 	// Create signature for the wrong recipient
-	wrongRecipientPrivKeySecp := secp256k1.PrivKeyFromBytes(wrongRecipientPrivKey)
-	userSignature, err := createValidUserSignatureForTest(
+	userSignature := createValidUserSignatureForTest(
 		utxo.Txid,
-		uint32(utxo.Vout),
+		utxo.Vout,
 		common.Regtest,
 		pb.UtxoSwapRequestType_Refund,
-		uint64(utxo.Amount),
+		utxo.Amount,
 		testSspSignature,
-		wrongRecipientPrivKeySecp, // use wrong recipient's private key
+		wrongRecipientPrivKey,
 	)
-	require.NoError(t, err)
 
 	req := &pb.InitiateUtxoSwapRequest{
 		OnChainUtxo: &pb.UTXO{
 			Txid:    utxo.Txid,
-			Vout:    uint32(utxo.Vout),
+			Vout:    utxo.Vout,
 			Network: pb.Network_REGTEST,
 		},
 		RequestType:   pb.UtxoSwapRequestType_Refund,
 		SspSignature:  testSspSignature,
 		UserSignature: userSignature,
 		Transfer: &pb.StartTransferRequest{
-			TransferId:                testTransferID(),
-			OwnerIdentityPublicKey:    ownerIdentityPub,
-			ReceiverIdentityPublicKey: wrongRecipientPub, // Wrong recipient
+			TransferId:                testTransferID.String(),
+			OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+			ReceiverIdentityPublicKey: wrongRecipientPrivKey.Public().Serialize(), // Wrong recipient
 			ExpiryTime:                timestamppb.New(time.Now().Add(24 * time.Hour)),
 		},
 		SpendTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       ownerSigningPub,
-			RawTx:                  createValidBitcoinTxBytes(ownerIdentityPub),
-			SigningNonceCommitment: createTestSigningCommitment(),
+			SigningPublicKey:       ownerSigningPubKey.Serialize(),
+			RawTx:                  createValidBitcoinTxBytes(t, ownerIdentityPubKey),
+			SigningNonceCommitment: createTestSigningCommitment(rng),
 		},
 	}
 
@@ -349,58 +344,58 @@ func TestCreateUtxoSwap_InvalidTransferWrongRecipient(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = handler.CreateUtxoSwap(ctx, cfg, createRequest)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "signature")
+	require.Error(t, err, "signature")
 }
 
 func TestCreateUtxoSwap_InvalidTransferWrongNetwork(t *testing.T) {
-	ctx, sessionCtx := setupPgTestContext(t)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 	defer sessionCtx.Close()
 
-	cfg := setupTestConfigWithRegtestNoAuthz(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
 	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
 
-	ownerIdentityPrivKey, ownerIdentityPub := generateFixedKeyPair(1)
-	_, ownerSigningPub := generateFixedKeyPair(2)
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerIdentityPubKey := ownerIdentityPrivKey.Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	keyshare := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
-	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPub, ownerSigningPub)
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
 	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
 
 	testSspSignature, _ := hex.DecodeString("abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab")
-	ownerIdentityPrivKeySecp := secp256k1.PrivKeyFromBytes(ownerIdentityPrivKey)
-	userSignature, err := createValidUserSignatureForTest(
+
+	userSignature := createValidUserSignatureForTest(
 		utxo.Txid,
-		uint32(utxo.Vout),
+		utxo.Vout,
 		common.Regtest,
 		pb.UtxoSwapRequestType_Refund,
-		uint64(utxo.Amount),
+		utxo.Amount,
 		testSspSignature,
-		ownerIdentityPrivKeySecp,
+		ownerIdentityPrivKey,
 	)
-	require.NoError(t, err)
 
 	req := &pb.InitiateUtxoSwapRequest{
 		OnChainUtxo: &pb.UTXO{
 			Txid:    utxo.Txid,
-			Vout:    uint32(utxo.Vout),
+			Vout:    utxo.Vout,
 			Network: pb.Network_MAINNET, // Wrong network, should be REGTEST
 		},
 		RequestType:   pb.UtxoSwapRequestType_Refund,
 		SspSignature:  testSspSignature,
 		UserSignature: userSignature,
 		Transfer: &pb.StartTransferRequest{
-			TransferId:                testTransferID(),
-			OwnerIdentityPublicKey:    ownerIdentityPub,
-			ReceiverIdentityPublicKey: ownerIdentityPub,
+			TransferId:                testTransferID.String(),
+			OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+			ReceiverIdentityPublicKey: ownerIdentityPubKey.Serialize(),
 			ExpiryTime:                timestamppb.New(time.Now().Add(24 * time.Hour)),
 		},
 		SpendTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       ownerSigningPub,
-			RawTx:                  createValidBitcoinTxBytes(ownerIdentityPub),
-			SigningNonceCommitment: createTestSigningCommitment(),
+			SigningPublicKey:       ownerSigningPubKey.Serialize(),
+			RawTx:                  createValidBitcoinTxBytes(t, ownerIdentityPubKey),
+			SigningNonceCommitment: createTestSigningCommitment(rng),
 		},
 	}
 
@@ -408,54 +403,53 @@ func TestCreateUtxoSwap_InvalidTransferWrongNetwork(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = handler.CreateUtxoSwap(ctx, cfg, createRequest)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "network")
+	require.ErrorContains(t, err, "network")
 }
 
 func TestCreateUtxoSwap_ErrorNoUtxoSwapCreated(t *testing.T) {
-	ctx, sessionCtx := setupPgTestContext(t)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 	defer sessionCtx.Close()
 
-	cfg := setupTestConfigWithRegtestNoAuthz(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
 	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
 
-	ownerIdentityPrivKey, ownerIdentityPub := generateFixedKeyPair(1)
-	_, ownerSigningPub := generateFixedKeyPair(2)
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerIdentityPubKey := ownerIdentityPrivKey.Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	keyshare := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
-	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPub, ownerSigningPub)
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
 	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
 
 	// Create invalid signature
 	testSspSignature, _ := hex.DecodeString("abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab")
-	ownerIdentityPrivKeySecp := secp256k1.PrivKeyFromBytes(ownerIdentityPrivKey)
 
 	// Create a signature for a wrong message
 	wrongMessage := []byte("definitely_wrong_message_that_will_fail_validation")
-	wrongSig := ecdsa.Sign(ownerIdentityPrivKeySecp, wrongMessage)
-	invalidUserSignature := wrongSig.Serialize()
+	invalidUserSignature := ecdsa.Sign(ownerIdentityPrivKey.ToBTCEC(), wrongMessage).Serialize()
 
 	req := &pb.InitiateUtxoSwapRequest{
 		OnChainUtxo: &pb.UTXO{
 			Txid:    utxo.Txid,
-			Vout:    uint32(utxo.Vout),
+			Vout:    utxo.Vout,
 			Network: pb.Network_REGTEST,
 		},
 		RequestType:   pb.UtxoSwapRequestType_Refund,
 		SspSignature:  testSspSignature,
-		UserSignature: invalidUserSignature, // Invalid signature
+		UserSignature: invalidUserSignature,
 		Transfer: &pb.StartTransferRequest{
-			TransferId:                testTransferID(),
-			OwnerIdentityPublicKey:    ownerIdentityPub,
-			ReceiverIdentityPublicKey: ownerIdentityPub,
+			TransferId:                testTransferID.String(),
+			OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+			ReceiverIdentityPublicKey: ownerIdentityPubKey.Serialize(),
 			ExpiryTime:                timestamppb.New(time.Now().Add(24 * time.Hour)),
 		},
 		SpendTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       ownerSigningPub,
-			RawTx:                  createValidBitcoinTxBytes(ownerIdentityPub),
-			SigningNonceCommitment: createTestSigningCommitment(),
+			SigningPublicKey:       ownerSigningPubKey.Serialize(),
+			RawTx:                  createValidBitcoinTxBytes(t, ownerIdentityPubKey),
+			SigningNonceCommitment: createTestSigningCommitment(rng),
 		},
 	}
 
@@ -470,16 +464,13 @@ func TestCreateUtxoSwap_ErrorNoUtxoSwapCreated(t *testing.T) {
 
 	// This should fail with signature validation error
 	_, err = handler.CreateUtxoSwap(ctx, cfg, createRequest)
-	t.Logf("CreateUtxoSwap returned error: %v", err)
-	assert.Error(t, err, "Expected error for invalid signature")
-	assert.Contains(t, err.Error(), "signature")
+	require.ErrorContains(t, err, "signature")
 
 	// Verify no UtxoSwap was created after the error (transaction should be rolled back)
 	utxoSwaps, err = sessionCtx.Client.UtxoSwap.Query().All(ctx)
 	require.NoError(t, err)
 	finalCount := len(utxoSwaps)
 
-	t.Logf("Final UtxoSwap count: %d", finalCount)
 	assert.Equal(t, initialCount, finalCount, "No UtxoSwap should be created when there's a validation error")
 }
 
@@ -489,28 +480,30 @@ func TestCreateUtxoSwap_SuccessfulCallCreatesUtxoSwap(t *testing.T) {
 	}()
 
 	// Setup success stubs
-	successStub := map[string]interface{}{
+	successStub := map[string]any{
 		"UtxoDepositAddress": "bc1ptest_static_deposit_address_for_testing",
 	}
 	err := gripmock.AddStub("spark_internal.SparkInternalService", "create_utxo_swap", nil, successStub)
 	require.NoError(t, err)
 
-	ctx, sessionCtx := setupPgTestContext(t)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 	defer sessionCtx.Close()
 
-	cfg := setupTestConfigWithRegtestNoAuthz(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
 	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
 
-	ownerIdentityPrivKey, ownerIdentityPub := generateFixedKeyPair(1)
-	_, ownerSigningPub := generateFixedKeyPair(2)
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerIdentityPubKey := ownerIdentityPrivKey.Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	keyshare := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
-	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPub, ownerSigningPub)
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
 	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
 
-	spendTxBytes := createValidBitcoinTxBytes(ownerIdentityPub)
+	spendTxBytes := createValidBitcoinTxBytes(t, ownerIdentityPubKey)
 	spendTx, err := common.TxFromRawTxBytes(spendTxBytes)
 	require.NoError(t, err)
 
@@ -524,38 +517,35 @@ func TestCreateUtxoSwap_SuccessfulCallCreatesUtxoSwap(t *testing.T) {
 	spendTxSighash, err := common.SigHashFromTx(spendTx, 0, onChainTxOut)
 	require.NoError(t, err)
 
-	ownerIdentityPrivKeySecp := secp256k1.PrivKeyFromBytes(ownerIdentityPrivKey)
-
-	userSignature, err := createValidUserSignatureForTest(
+	userSignature := createValidUserSignatureForTest(
 		utxo.Txid,
-		uint32(utxo.Vout),
+		utxo.Vout,
 		common.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		spendTxAmount,
 		spendTxSighash,
-		ownerIdentityPrivKeySecp,
+		ownerIdentityPrivKey,
 	)
-	require.NoError(t, err)
 
 	req := &pb.InitiateUtxoSwapRequest{
 		OnChainUtxo: &pb.UTXO{
 			Txid:    utxo.Txid,
-			Vout:    uint32(utxo.Vout),
+			Vout:    utxo.Vout,
 			Network: pb.Network_REGTEST,
 		},
 		RequestType:   pb.UtxoSwapRequestType_Refund,
 		SspSignature:  spendTxSighash,
 		UserSignature: userSignature,
 		Transfer: &pb.StartTransferRequest{
-			TransferId:                testTransferID(),
-			OwnerIdentityPublicKey:    ownerIdentityPub,
-			ReceiverIdentityPublicKey: ownerIdentityPub,
+			TransferId:                testTransferID.String(),
+			OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
+			ReceiverIdentityPublicKey: ownerIdentityPubKey.Serialize(),
 			ExpiryTime:                timestamppb.New(time.Now().Add(24 * time.Hour)),
 		},
 		SpendTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       ownerSigningPub,
+			SigningPublicKey:       ownerSigningPubKey.Serialize(),
 			RawTx:                  spendTxBytes,
-			SigningNonceCommitment: createTestSigningCommitment(),
+			SigningNonceCommitment: createTestSigningCommitment(rng),
 		},
 	}
 
@@ -563,40 +553,25 @@ func TestCreateUtxoSwap_SuccessfulCallCreatesUtxoSwap(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify no UtxoSwap exists before
-	utxoSwaps, err := sessionCtx.Client.UtxoSwap.Query().All(ctx)
+	initialCount, err := sessionCtx.Client.UtxoSwap.Query().Count(ctx)
 	require.NoError(t, err)
-	initialCount := len(utxoSwaps)
-	t.Logf("Initial UtxoSwap count: %d", initialCount)
 
 	resp, err := handler.CreateUtxoSwap(ctx, cfg, createRequest)
-	t.Logf("CreateUtxoSwap result - error: %v, response: %v", err, resp)
-
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, resp)
+	// Verify deposit address is assigned
+	assert.Equal(t, "bc1ptest_static_deposit_address_for_testing", resp.GetUtxoDepositAddress())
 
 	// Commit tx before checking the result
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-	err = tx.Commit()
-	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
 
 	// Verify UtxoSwap was created
-	utxoSwaps, err = sessionCtx.Client.UtxoSwap.Query().All(t.Context())
+	utxoSwaps, err := sessionCtx.Client.UtxoSwap.Query().All(t.Context())
 	require.NoError(t, err)
-	finalCount := len(utxoSwaps)
-	t.Logf("Final UtxoSwap count: %d", finalCount)
+	require.Len(t, utxoSwaps, initialCount+1, "One UtxoSwap should be created")
+	createdUtxoSwap := utxoSwaps[len(utxoSwaps)-1]
+	assert.Equal(t, st.UtxoSwapStatusCreated, createdUtxoSwap.Status)
 
-	assert.Equal(t, initialCount+1, finalCount, "One UtxoSwap should be created")
-
-	// Verify the created UtxoSwap has correct properties (only if created)
-	if finalCount > 0 {
-		createdUtxoSwap := utxoSwaps[finalCount-1]
-		assert.Equal(t, st.UtxoSwapStatusCreated, createdUtxoSwap.Status)
-		t.Logf("Created UtxoSwap: %+v", createdUtxoSwap)
-	}
-
-	// Verify deposit address is assigned
-	if resp != nil {
-		assert.Equal(t, "bc1ptest_static_deposit_address_for_testing", resp.UtxoDepositAddress)
-	}
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -135,15 +136,11 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 		}
 	}
 
-	query := db.TreeNode.Query()
-	query = query.
-		Where(treenode.HasTreeWith(
-			tree.NetworkEQ(network),
-		)).
+	nodes, err := db.TreeNode.Query().
+		Where(treenode.HasTreeWith(tree.NetworkEQ(network))).
 		Where(treenode.StatusEQ(st.TreeNodeStatusAvailable)).
-		Where(treenode.OwnerIdentityPubkey(req.GetIdentityPublicKey()))
-
-	nodes, err := query.All(ctx)
+		Where(treenode.OwnerIdentityPubkey(req.GetIdentityPublicKey())).
+		All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -202,9 +199,12 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	query := db.DepositAddress.Query()
-	query = query.
-		Where(depositaddress.OwnerIdentityPubkey(req.GetIdentityPublicKey())).
+	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse identity public key: %w", err)
+	}
+	query := db.DepositAddress.Query().
+		Where(depositaddress.OwnerIdentityPubkey(idPubKey)).
 		// Exclude static deposit addresses, because they always can be used,
 		// whereas express deposit addresses can be used only once
 		Where(depositaddress.IsStatic(false)).
@@ -245,20 +245,21 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 		}
 	}
 
-	unusedDepositAddresses := make([]*pb.DepositAddressQueryResult, 0)
+	var unusedDepositAddresses []*pb.DepositAddressQueryResult
 	for _, depositAddress := range depositAddresses {
 		treeNodes, err := db.TreeNode.Query().Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(depositAddress.Edges.SigningKeyshare.ID))).All(ctx)
 		if len(treeNodes) == 0 || ent.IsNotFound(err) {
-			verifyingPublicKey, err := common.AddPublicKeys(depositAddress.OwnerSigningPubkey, depositAddress.Edges.SigningKeyshare.PublicKey)
+			signingKeySharePubKey, err := keys.ParsePublicKey(depositAddress.Edges.SigningKeyshare.PublicKey)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse signing key share public key: %w", err)
 			}
+			verifyingPublicKey := depositAddress.OwnerSigningPubkey.Add(signingKeySharePubKey)
 			nodeIDStr := depositAddress.NodeID.String()
 			if utils.IsBitcoinAddressForNetwork(depositAddress.Address, network) {
 				unusedDepositAddresses = append(unusedDepositAddresses, &pb.DepositAddressQueryResult{
 					DepositAddress:       depositAddress.Address,
-					UserSigningPublicKey: depositAddress.OwnerSigningPubkey,
-					VerifyingPublicKey:   verifyingPublicKey,
+					UserSigningPublicKey: depositAddress.OwnerSigningPubkey.Serialize(),
+					VerifyingPublicKey:   verifyingPublicKey.Serialize(),
 					LeafId:               &nodeIDStr,
 				})
 			}
@@ -287,15 +288,16 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 	if limit < 0 || offset < 0 {
 		return nil, fmt.Errorf("expect non-negative offset and limit")
 	}
-	if limit > 100 {
-		limit = 100
-	} else if limit == 0 {
+	if limit > 100 || limit == 0 {
 		limit = 100
 	}
 
-	query := db.DepositAddress.Query()
-	query = query.
-		Where(depositaddress.OwnerIdentityPubkey(req.GetIdentityPublicKey())).
+	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse identity public key: %w", err)
+	}
+	query := db.DepositAddress.Query().
+		Where(depositaddress.OwnerIdentityPubkey(idPubKey)).
 		Where(depositaddress.IsStatic(true)).
 		Order(ent.Desc(depositaddress.FieldID)).
 		WithSigningKeyshare().
@@ -320,7 +322,7 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 		}
 	}
 
-	staticDepositAddresses := make([]*pb.DepositAddressQueryResult, 0)
+	var staticDepositAddresses []*pb.DepositAddressQueryResult
 	for _, depositAddress := range depositAddresses {
 		if utils.IsBitcoinAddressForNetwork(depositAddress.Address, network) {
 			queryResult, err := h.depositAddressToQueryResult(ctx, depositAddress)
@@ -334,18 +336,17 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 		}
 	}
 
-	return &pb.QueryStaticDepositAddressesResponse{
-		DepositAddresses: staticDepositAddresses,
-	}, nil
+	return &pb.QueryStaticDepositAddressesResponse{DepositAddresses: staticDepositAddresses}, nil
 }
 
 func (h *TreeQueryHandler) depositAddressToQueryResult(ctx context.Context, depositAddress *ent.DepositAddress) (*pb.DepositAddressQueryResult, error) {
 	nodeIDStr := depositAddress.NodeID.String()
-	verifyingPublicKey, err := common.AddPublicKeys(depositAddress.OwnerSigningPubkey, depositAddress.Edges.SigningKeyshare.PublicKey)
+	signingKeySharePubKey, err := keys.ParsePublicKey(depositAddress.Edges.SigningKeyshare.PublicKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse signing key share public key: %w", err)
 	}
 
+	verifyingPublicKey := depositAddress.OwnerSigningPubkey.Add(signingKeySharePubKey)
 	// Get local keyshare for the deposit address.
 	keyshare, err := depositAddress.Edges.SigningKeyshareOrErr()
 	if err != nil {
@@ -378,8 +379,8 @@ func (h *TreeQueryHandler) depositAddressToQueryResult(ctx context.Context, depo
 
 	return &pb.DepositAddressQueryResult{
 		DepositAddress:       depositAddress.Address,
-		UserSigningPublicKey: depositAddress.OwnerSigningPubkey,
-		VerifyingPublicKey:   verifyingPublicKey,
+		UserSigningPublicKey: depositAddress.OwnerSigningPubkey.Serialize(),
+		VerifyingPublicKey:   verifyingPublicKey.Serialize(),
 		LeafId:               &nodeIDStr,
 		ProofOfPossession:    proofOfPossession,
 	}, nil
@@ -415,9 +416,7 @@ func (h *TreeQueryHandler) QueryNodesDistribution(ctx context.Context, req *pb.Q
 		resultMap[result.Value] = uint64(result.Count)
 	}
 
-	return &pb.QueryNodesDistributionResponse{
-		NodeDistribution: resultMap,
-	}, nil
+	return &pb.QueryNodesDistributionResponse{NodeDistribution: resultMap}, nil
 }
 
 func (h *TreeQueryHandler) QueryNodesByValue(ctx context.Context, req *pb.QueryNodesByValueRequest) (*pb.QueryNodesByValueResponse, error) {
@@ -432,22 +431,18 @@ func (h *TreeQueryHandler) QueryNodesByValue(ctx context.Context, req *pb.QueryN
 	if limit < 0 || offset < 0 {
 		return nil, fmt.Errorf("expect non-negative offset and limit")
 	}
+	if limit > 100 || limit == 0 {
+		limit = 100
+	}
 
-	query := db.TreeNode.Query()
-	query = query.
+	nodes, err := db.TreeNode.Query().
 		Where(treenode.OwnerIdentityPubkey(req.GetOwnerIdentityPublicKey())).
 		Where(treenode.StatusEQ(st.TreeNodeStatusAvailable)).
 		Where(treenode.ValueEQ(uint64(req.GetValue()))).
-		Order(ent.Desc(treenode.FieldID))
-
-	if limit > 100 {
-		limit = 100
-	} else if limit == 0 {
-		limit = 100
-	}
-	query = query.Offset(offset).Limit(limit)
-
-	nodes, err := query.All(ctx)
+		Order(ent.Desc(treenode.FieldID)).
+		Offset(offset).
+		Limit(limit).
+		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tree nodes: %w", err)
 	}
@@ -460,9 +455,7 @@ func (h *TreeQueryHandler) QueryNodesByValue(ctx context.Context, req *pb.QueryN
 		}
 	}
 
-	response := &pb.QueryNodesByValueResponse{
-		Nodes: protoNodeMap,
-	}
+	response := &pb.QueryNodesByValueResponse{Nodes: protoNodeMap}
 
 	nextOffset := -1
 	if len(nodes) == limit {

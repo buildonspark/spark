@@ -126,10 +126,6 @@ var (
 	UpdateDefaultUpdateTime func() time.Time
 	// AddressValidator is a validator for the "address" field. It is called by the builders before save.
 	AddressValidator func(string) error
-	// OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
-	OwnerIdentityPubkeyValidator func([]byte) error
-	// OwnerSigningPubkeyValidator is a validator for the "owner_signing_pubkey" field. It is called by the builders before save.
-	OwnerSigningPubkeyValidator func([]byte) error
 	// DefaultIsStatic holds the default value on creation for the "is_static" field.
 	DefaultIsStatic bool
 	// DefaultID holds the default value on creation for the "id" field.

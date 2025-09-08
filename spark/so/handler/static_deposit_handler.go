@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -203,11 +202,12 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 		if err != nil {
 			return nil, fmt.Errorf("failed to get deposit address: %w", err)
 		}
-		if utxoSwap.Status == st.UtxoSwapStatusCompleted && utxoSwap.RequestType == st.UtxoSwapRequestTypeRefund && bytes.Equal(utxoSwap.UserIdentityPublicKey, depositAddress.OwnerIdentityPubkey) {
-			userIDPubKey, err := keys.ParsePublicKey(utxoSwap.UserIdentityPublicKey)
-			if err != nil {
-				return nil, fmt.Errorf("invalid identity public key: %w", err)
-			}
+		userIDPubKey, err := keys.ParsePublicKey(utxoSwap.UserIdentityPublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("invalid identity public key: %w", err)
+		}
+
+		if utxoSwap.Status == st.UtxoSwapStatusCompleted && utxoSwap.RequestType == st.UtxoSwapRequestTypeRefund && userIDPubKey.Equals(depositAddress.OwnerIdentityPubkey) {
 			if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, userIDPubKey); err != nil {
 				return nil, fmt.Errorf("utxo swap is already completed by another user")
 			}

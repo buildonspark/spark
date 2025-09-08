@@ -177,8 +177,8 @@ func TestMultipleListenersReceiveNotification(t *testing.T) {
 	require.NoError(t, err)
 
 	depositAddr, err := dbClient.DepositAddress.Create().
-		SetOwnerIdentityPubkey(identityKey.Serialize()).
-		SetOwnerSigningPubkey(identityKey.Serialize()).
+		SetOwnerIdentityPubkey(identityKey).
+		SetOwnerSigningPubkey(identityKey).
 		SetSigningKeyshare(signingKeyshare).
 		SetAddress("test-address").
 		SetNodeID(uuid.New()).

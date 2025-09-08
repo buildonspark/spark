@@ -195,7 +195,7 @@ func TestStaticDepositSSPLegacy(t *testing.T) {
 
 	// User signature authorizing the SSP to claim the deposit
 	// in return for a transfer of a fixed amount
-	userSignature, err := createUserSignature(
+	userSignature := createUserSignature(
 		signedDepositTx.TxHash().String(),
 		uint32(vout),
 		common.Regtest,
@@ -204,7 +204,6 @@ func TestStaticDepositSSPLegacy(t *testing.T) {
 		sspSignature,
 		aliceConfig.IdentityPrivateKey,
 	)
-	require.NoError(t, err)
 	// *********************************************************************************
 	// Create a Transfer from SSP to Alice
 	// *********************************************************************************
@@ -494,7 +493,7 @@ func TestStaticDepositUserRefundLegacy(t *testing.T) {
 		signedDepositTx.TxOut[vout],
 	)
 	require.NoError(t, err)
-	userSignature, err := createUserSignature(
+	userSignature := createUserSignature(
 		signedDepositTx.TxHash().String(),
 		uint32(vout),
 		common.Regtest,
@@ -503,7 +502,6 @@ func TestStaticDepositUserRefundLegacy(t *testing.T) {
 		spendTxSighash[:],
 		aliceConfig.IdentityPrivateKey,
 	)
-	require.NoError(t, err)
 
 	// *********************************************************************************
 	// Refund Static Deposit
@@ -579,23 +577,10 @@ func createUserSignature(
 	creditAmountSats uint64,
 	sspSignature []byte,
 	identityPrivateKey keys.Private,
-) ([]byte, error) {
-	hash, err := handler.CreateUserStatement(
-		transactionID,
-		outputIndex,
-		network,
-		requestType,
-		creditAmountSats,
-		sspSignature,
-	)
-	if err != nil {
-		return nil, err
-	}
-
+) []byte {
+	hash := handler.CreateUserStatement(transactionID, outputIndex, network, requestType, creditAmountSats, sspSignature)
 	// Sign the hash of the payload using ECDSA
-	signature := ecdsa.Sign(identityPrivateKey.ToBTCEC(), hash)
-
-	return signature.Serialize(), nil
+	return ecdsa.Sign(identityPrivateKey.ToBTCEC(), hash).Serialize()
 }
 
 func createSspFixedQuoteSignature(
@@ -730,7 +715,7 @@ func TestStaticDepositSSP(t *testing.T) {
 
 	// User signature authorizing the SSP to claim the deposit
 	// in return for a transfer of a fixed amount
-	userSignature, err := createUserSignature(
+	userSignature := createUserSignature(
 		signedDepositTx.TxHash().String(),
 		uint32(vout),
 		common.Regtest,
@@ -739,7 +724,6 @@ func TestStaticDepositSSP(t *testing.T) {
 		sspSignature,
 		aliceConfig.IdentityPrivateKey,
 	)
-	require.NoError(t, err)
 	// *********************************************************************************
 	// Create a Transfer from SSP to Alice
 	// *********************************************************************************
@@ -1105,7 +1089,7 @@ func TestStaticDepositSSPV1WrongTransferAmount(t *testing.T) {
 
 	// User signature authorizing the SSP to claim the deposit
 	// in return for a transfer of a fixed amount
-	userSignature, err := createUserSignature(
+	userSignature := createUserSignature(
 		signedDepositTx.TxHash().String(),
 		uint32(vout),
 		common.Regtest,
@@ -1114,7 +1098,6 @@ func TestStaticDepositSSPV1WrongTransferAmount(t *testing.T) {
 		sspSignature,
 		aliceConfig.IdentityPrivateKey,
 	)
-	require.NoError(t, err)
 	// *********************************************************************************
 	// Create a Transfer from SSP to Alice
 	// *********************************************************************************
@@ -1279,16 +1262,15 @@ func TestStaticDepositUserRefund(t *testing.T) {
 		signedDepositTx.TxOut[vout],
 	)
 	require.NoError(t, err)
-	userSignature, err := createUserSignature(
+	userSignature := createUserSignature(
 		signedDepositTx.TxHash().String(),
 		uint32(vout),
 		common.Regtest,
 		pb.UtxoSwapRequestType_Refund,
 		quoteAmount,
-		spendTxSighash[:],
+		spendTxSighash,
 		aliceConfig.IdentityPrivateKey,
 	)
-	require.NoError(t, err)
 
 	// *********************************************************************************
 	// Refund Static Deposit
@@ -1327,16 +1309,15 @@ func TestStaticDepositUserRefund(t *testing.T) {
 		require.NoError(t, err)
 		bobCtx := wallet.ContextWithToken(t.Context(), bobConnectionToken)
 
-		userSignature, err := createUserSignature(
+		userSignature := createUserSignature(
 			signedDepositTx.TxHash().String(),
 			uint32(vout),
 			common.Regtest,
 			pb.UtxoSwapRequestType_Refund,
 			quoteAmount,
-			spendTxSighash[:],
+			spendTxSighash,
 			bobConfig.IdentityPrivateKey,
 		)
-		require.NoError(t, err)
 
 		_, err = wallet.RefundStaticDeposit(
 			bobCtx,
@@ -1396,16 +1377,15 @@ func TestStaticDepositUserRefund(t *testing.T) {
 
 		spendTxSighash2, err := common.SigHashFromTx(spendTx2, 0, signedDepositTx.TxOut[vout])
 		require.NoError(t, err)
-		userSignature2, err := createUserSignature(
+		userSignature2 := createUserSignature(
 			signedDepositTx.TxHash().String(),
 			uint32(vout),
 			common.Regtest,
 			pb.UtxoSwapRequestType_Refund,
 			quoteAmount,
-			spendTxSighash2[:],
+			spendTxSighash2,
 			aliceConfig.IdentityPrivateKey,
 		)
-		require.NoError(t, err)
 
 		signedSpendTx2, err := wallet.RefundStaticDeposit(
 			aliceCtx,
@@ -1591,7 +1571,7 @@ func TestStaticDepositUserRefundAfterFailedClaim(t *testing.T) {
 
 	// User signature authorizing the SSP to claim the deposit
 	// in return for a transfer of a fixed amount
-	userSignature, err := createUserSignature(
+	userSignature := createUserSignature(
 		signedDepositTx.TxHash().String(),
 		uint32(vout),
 		common.Regtest,
@@ -1600,7 +1580,6 @@ func TestStaticDepositUserRefundAfterFailedClaim(t *testing.T) {
 		sspSignature,
 		aliceConfig.IdentityPrivateKey,
 	)
-	require.NoError(t, err)
 	// *********************************************************************************
 	// Create a Transfer from SSP to Alice
 	// *********************************************************************************
@@ -1676,16 +1655,15 @@ func TestStaticDepositUserRefundAfterFailedClaim(t *testing.T) {
 			signedDepositTx.TxOut[vout],
 		)
 		require.NoError(t, err)
-		userSignature, err := createUserSignature(
+		userSignature := createUserSignature(
 			signedDepositTx.TxHash().String(),
 			uint32(vout),
 			common.Regtest,
 			pb.UtxoSwapRequestType_Refund,
 			quoteAmount,
-			spendTxSighash[:],
+			spendTxSighash,
 			aliceConfig.IdentityPrivateKey,
 		)
-		require.NoError(t, err)
 		signedSpendTx, err := wallet.RefundStaticDeposit(
 			aliceCtx,
 			aliceConfig,
@@ -1827,7 +1805,7 @@ func TestStaticDepositSSPConcurrent(t *testing.T) {
 
 	// User signature authorizing the SSP to claim the deposit
 	// in return for a transfer of a fixed amount
-	userSignature, err := createUserSignature(
+	userSignature := createUserSignature(
 		signedDepositTx.TxHash().String(),
 		uint32(vout),
 		common.Regtest,
@@ -1836,7 +1814,6 @@ func TestStaticDepositSSPConcurrent(t *testing.T) {
 		sspSignature,
 		aliceConfig.IdentityPrivateKey,
 	)
-	require.NoError(t, err)
 
 	// *********************************************************************************
 	// Create spend tx from Alice's deposit to SSP L1 Wallet Address

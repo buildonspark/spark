@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -154,18 +153,17 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse transfer receiver public key: %w", err)
 	}
-
-	depositOwnerIdentityPubKey, err := keys.ParsePublicKey(depositAddress.OwnerIdentityPubkey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse deposit owner identity public key: %w", err)
-	}
-	if !depositOwnerIdentityPubKey.Equals(reqTransferReceiverIdentityPubKey) {
+	if !depositAddress.OwnerIdentityPubkey.Equals(reqTransferReceiverIdentityPubKey) {
 		return nil, fmt.Errorf("transfer is not to the recepient of the deposit")
 	}
 
 	// Validate that the deposit key provided by the user matches what's in the DB.
 	// SSP should generate the deposit public key from a deposit secret key provided by the customer.
-	if !bytes.Equal(depositAddress.OwnerSigningPubkey, req.SpendTxSigningJob.SigningPublicKey) {
+	spendTXSigningPubKey, err := keys.ParsePublicKey(req.SpendTxSigningJob.SigningPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse spend signing public key: %w", err)
+	}
+	if !depositAddress.OwnerSigningPubkey.Equals(spendTXSigningPubKey) {
 		return nil, fmt.Errorf("deposit address owner signing pubkey does not match the signing public key")
 	}
 
@@ -342,18 +340,14 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 	}
 
 	// Validate user statement
-	depositOwnerIDPubKey, err := keys.ParsePublicKey(depositAddress.OwnerIdentityPubkey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse deposit owner identity public key: %w", err)
-	}
-	if err = validateUserSignature(depositOwnerIDPubKey, req.UserSignature, spendTxSighash, pb.UtxoSwapRequestType_Refund, network, targetUtxo.Txid, targetUtxo.Vout, totalAmount); err != nil {
+	if err = validateUserSignature(depositAddress.OwnerIdentityPubkey, req.UserSignature, spendTxSighash, pb.UtxoSwapRequestType_Refund, network, targetUtxo.Txid, targetUtxo.Vout, totalAmount); err != nil {
 		return nil, fmt.Errorf("user signature validation failed: %w", err)
 	}
 
 	logger.Info(
 		"Creating UTXO swap record",
 		"request_type", pb.UtxoSwapRequestType_Refund,
-		"user_identity_public_key", depositOwnerIDPubKey,
+		"user_identity_public_key", depositAddress.OwnerIdentityPubkey,
 		"txid", hex.EncodeToString(targetUtxo.Txid),
 		"vout", targetUtxo.Vout,
 		"network", network,
@@ -369,8 +363,8 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		SetCreditAmountSats(totalAmount).
 		// quote signing bytes are the sighash of the spend tx if SSP is not used
 		SetSspSignature(spendTxSighash).
-		SetSspIdentityPublicKey(depositOwnerIDPubKey.Serialize()).
-		SetUserIdentityPublicKey(depositOwnerIDPubKey.Serialize()).
+		SetSspIdentityPublicKey(depositAddress.OwnerIdentityPubkey.Serialize()).
+		SetUserIdentityPublicKey(depositAddress.OwnerIdentityPubkey.Serialize()).
 		SetCoordinatorIdentityPublicKey(reqWithSignature.CoordinatorPublicKey).
 		Save(ctx)
 	if err != nil {

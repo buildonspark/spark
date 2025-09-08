@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
@@ -77,14 +78,14 @@ func (dac *DepositAddressCreate) SetNillableNetwork(s *schematype.Network) *Depo
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (dac *DepositAddressCreate) SetOwnerIdentityPubkey(b []byte) *DepositAddressCreate {
-	dac.mutation.SetOwnerIdentityPubkey(b)
+func (dac *DepositAddressCreate) SetOwnerIdentityPubkey(k keys.Public) *DepositAddressCreate {
+	dac.mutation.SetOwnerIdentityPubkey(k)
 	return dac
 }
 
 // SetOwnerSigningPubkey sets the "owner_signing_pubkey" field.
-func (dac *DepositAddressCreate) SetOwnerSigningPubkey(b []byte) *DepositAddressCreate {
-	dac.mutation.SetOwnerSigningPubkey(b)
+func (dac *DepositAddressCreate) SetOwnerSigningPubkey(k keys.Public) *DepositAddressCreate {
+	dac.mutation.SetOwnerSigningPubkey(k)
 	return dac
 }
 
@@ -300,18 +301,8 @@ func (dac *DepositAddressCreate) check() error {
 	if _, ok := dac.mutation.OwnerIdentityPubkey(); !ok {
 		return &ValidationError{Name: "owner_identity_pubkey", err: errors.New(`ent: missing required field "DepositAddress.owner_identity_pubkey"`)}
 	}
-	if v, ok := dac.mutation.OwnerIdentityPubkey(); ok {
-		if err := depositaddress.OwnerIdentityPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "DepositAddress.owner_identity_pubkey": %w`, err)}
-		}
-	}
 	if _, ok := dac.mutation.OwnerSigningPubkey(); !ok {
 		return &ValidationError{Name: "owner_signing_pubkey", err: errors.New(`ent: missing required field "DepositAddress.owner_signing_pubkey"`)}
-	}
-	if v, ok := dac.mutation.OwnerSigningPubkey(); ok {
-		if err := depositaddress.OwnerSigningPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "owner_signing_pubkey", err: fmt.Errorf(`ent: validator failed for field "DepositAddress.owner_signing_pubkey": %w`, err)}
-		}
 	}
 	if _, ok := dac.mutation.IsStatic(); !ok {
 		return &ValidationError{Name: "is_static", err: errors.New(`ent: missing required field "DepositAddress.is_static"`)}

@@ -138,11 +138,7 @@ func (h *TreeCreationHandler) getSigningKeyshareFromOutput(ctx context.Context, 
 		return keys.Public{}, nil, err
 	}
 
-	pubKey, err := keys.ParsePublicKey(depositAddress.OwnerSigningPubkey)
-	if err != nil {
-		return keys.Public{}, nil, err
-	}
-	return pubKey, keyshare, nil
+	return depositAddress.OwnerSigningPubkey, keyshare, nil
 }
 
 func (h *TreeCreationHandler) findParentPublicKeys(ctx context.Context, network common.Network, req *pb.PrepareTreeAddressRequest) (keys.Public, *ent.SigningKeyshare, error) {
@@ -292,8 +288,8 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(
 		}
 		_, err = db.DepositAddress.Create().
 			SetSigningKeyshareID(signingKeyshare.ID).
-			SetOwnerIdentityPubkey(userIdentityPubKey.Serialize()).
-			SetOwnerSigningPubkey(nodeUserPubKey.Serialize()).
+			SetOwnerIdentityPubkey(userIdentityPubKey).
+			SetOwnerSigningPubkey(nodeUserPubKey).
 			SetAddress(depositAddress).
 			SetNetwork(schemaNetwork).
 			Save(ctx)
@@ -500,10 +496,6 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	if err != nil {
 		return nil, nil, err
 	}
-	userPublicKey, err := keys.ParsePublicKey(depositAddress.OwnerSigningPubkey)
-	if err != nil {
-		return nil, nil, err
-	}
 	unchainUtxo := req.GetOnChainUtxo()
 	onChain := depositAddress.ConfirmationHeight != 0
 	if depositAddress.ConfirmationTxid != "" && unchainUtxo != nil {
@@ -515,7 +507,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	queue := []*element{{
 		output:     parentOutput,
 		node:       req.Node,
-		userPubKey: userPublicKey,
+		userPubKey: depositAddress.OwnerSigningPubkey,
 		keyshare:   keyshare,
 		parentNode: parentNode,
 		vout:       vout,

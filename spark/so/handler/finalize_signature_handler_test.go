@@ -23,10 +23,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	rng = rand.NewChaCha8([32]byte{1})
-)
-
 func TestNewFinalizeSignatureHandler(t *testing.T) {
 	t.Parallel()
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
@@ -38,9 +34,8 @@ func TestNewFinalizeSignatureHandler(t *testing.T) {
 
 func TestFinalizeSignatureHandler_FinalizeNodeSignatures_EmptyRequest(t *testing.T) {
 	t.Parallel()
-	ctx := t.Context()
 
-	ctx, dbCtx := db.NewTestSQLiteContext(t, ctx)
+	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
 
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
@@ -196,9 +191,10 @@ func createTestTree(t *testing.T, ctx context.Context, network st.Network, statu
 	require.NoError(t, err)
 
 	testID := uuid.New()
-	baseTxid := append([]byte("base_txid_"), []byte(testID.String())...)
-
+	baseTxid := []byte("base_txid_" + testID.String())
+	rng := rand.NewChaCha8([32]byte{})
 	ownerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
+	verifyingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	ownerSigningKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
 	publicShare1 := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -231,11 +227,11 @@ func createTestTree(t *testing.T, ctx context.Context, network st.Network, statu
 		SetTree(tree).
 		SetSigningKeyshare(keyshare).
 		SetValue(1000).
-		SetVerifyingPubkey(append([]byte("verifying_pubkey_"), []byte(testID.String())...)).
+		SetVerifyingPubkey(verifyingPrivKey.Public().Serialize()).
 		SetOwnerIdentityPubkey(ownerIdentity.Public().Serialize()).
 		SetOwnerSigningPubkey(ownerSigningKey.Public().Serialize()).
-		SetRawTx(append([]byte("raw_tx_"), []byte(testID.String())...)).
-		SetRawRefundTx(append([]byte("raw_refund_tx_"), []byte(testID.String())...)).
+		SetRawTx([]byte("raw_tx_" + testID.String())).
+		SetRawRefundTx([]byte("raw_refund_tx_" + testID.String())).
 		SetVout(0).
 		SetStatus(st.TreeNodeStatusCreating).
 		Save(ctx)
@@ -331,16 +327,16 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignaturesV2_RequireDirectTx(t *te
 // Regression test for https://linear.app/lightsparkdev/issue/LIG-8094
 func TestFinalizeSignatureHandler_UpdateNode_NodeWithChildrenStatus(t *testing.T) {
 	ctx := t.Context()
-
 	ctx, dbCtx := db.NewTestSQLiteContext(t, ctx)
 	defer dbCtx.Close()
+	rng := rand.NewChaCha8([32]byte{})
 
 	config := &so.Config{}
 	handler := NewFinalizeSignatureHandler(config)
 
 	tree, parentNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusAvailable)
 
-	db, err := ent.GetDbFromContext(ctx)
+	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
 	keyshare, err := parentNode.QuerySigningKeyshare().Only(ctx)
@@ -350,7 +346,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithChildrenStatus(t *testing.T
 	childOwnerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
 	childOwnerSigning := keys.MustGeneratePrivateKeyFromRand(rng)
 
-	childNode, err := db.TreeNode.Create().
+	childNode, err := dbTx.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
 		SetSigningKeyshare(keyshare).
@@ -379,7 +375,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithChildrenStatus(t *testing.T
 	assert.NotNil(t, internalNode)
 
 	// Verify that parent node status is Splitted because it has children
-	updatedParent, err := db.TreeNode.Query().
+	updatedParent, err := dbTx.TreeNode.Query().
 		Where(treenode.IDEQ(parentNode.ID)).
 		WithChildren().
 		Only(ctx)
@@ -398,7 +394,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithChildrenStatus(t *testing.T
 	assert.NotNil(t, childInternalNode)
 
 	// Verify that child node status is Available because it has no children and has refund tx
-	updatedChild, err := db.TreeNode.Query().
+	updatedChild, err := dbTx.TreeNode.Query().
 		Where(func(s *sql.Selector) {
 			s.Where(sql.EQ("id", childNode.ID))
 		}).
@@ -420,7 +416,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithoutRefundTxStatus(t *testin
 
 	_, leafNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusAvailable)
 
-	db, err := ent.GetDbFromContext(ctx)
+	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
 	leafNode, err = leafNode.Update().
@@ -440,7 +436,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithoutRefundTxStatus(t *testin
 	assert.NotNil(t, internalNode)
 
 	// Verify that node status is Splitted because it has no refund tx
-	updatedNode, err := db.TreeNode.Get(ctx, leafNode.ID)
+	updatedNode, err := dbTx.TreeNode.Get(ctx, leafNode.ID)
 	require.NoError(t, err)
 	assert.Equal(t, st.TreeNodeStatusSplitted, updatedNode.Status, "Node without refund tx should be set to Splitted status")
 }
@@ -456,8 +452,8 @@ func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testi
 	handler := NewFinalizeSignatureHandler(config)
 
 	tree, parentNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusAvailable)
-
-	db, err := ent.GetDbFromContext(ctx)
+	rng := rand.NewChaCha8([32]byte{})
+	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
 	keyshare, err := parentNode.QuerySigningKeyshare().Only(ctx)
@@ -467,7 +463,7 @@ func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testi
 	child1OwnerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
 	child1OwnerSigning := keys.MustGeneratePrivateKeyFromRand(rng)
 
-	child1, err := db.TreeNode.Create().
+	child1, err := dbTx.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
 		SetSigningKeyshare(keyshare).
@@ -487,7 +483,7 @@ func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testi
 	child2OwnerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
 	child2OwnerSigning := keys.MustGeneratePrivateKeyFromRand(rng)
 
-	child2, err := db.TreeNode.Create().
+	child2, err := dbTx.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
 		SetSigningKeyshare(keyshare).
@@ -515,7 +511,7 @@ func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testi
 	assert.NotNil(t, internalNode)
 
 	// Verify that parent node with 2 children is set to Splitted
-	updatedParent, err := db.TreeNode.Query().
+	updatedParent, err := dbTx.TreeNode.Query().
 		Where(func(s *sql.Selector) {
 			s.Where(sql.EQ("id", parentNode.ID))
 		}).
@@ -558,9 +554,9 @@ func TestFinalizeSignatureHandler_UpdateNode_TreeNotAvailableStatus(t *testing.T
 	assert.NotNil(t, internalNode)
 
 	// Verify that node status remains unchanged (Creating) because tree is not Available
-	db, err := ent.GetDbFromContext(ctx)
+	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-	updatedNode, err := db.TreeNode.Get(ctx, leafNode.ID)
+	updatedNode, err := dbTx.TreeNode.Get(ctx, leafNode.ID)
 	require.NoError(t, err)
 	assert.Equal(t, st.TreeNodeStatusCreating, updatedNode.Status, "Node status should remain unchanged when tree is not Available")
 }
@@ -568,6 +564,7 @@ func TestFinalizeSignatureHandler_UpdateNode_TreeNotAvailableStatus(t *testing.T
 // Regression test for https://linear.app/lightsparkdev/issue/LIG-8045
 func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 	t.Parallel()
+	rng := rand.NewChaCha8([32]byte{})
 
 	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
 	defer dbCtx.Close()
@@ -594,15 +591,14 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 	keyshare, err := rootNode.QuerySigningKeyshare().Only(ctx)
 	require.NoError(t, err)
 
-	// Create unique identifiers for this test to avoid conflicts with shared database
-	testID := uuid.New().String()
+	testID := uuid.Must(uuid.NewRandomFromReader(rng)).String()
 
+	// Create a child node in the tree - this represents a non-root node
+	// that can receive deposits independently of the root node
 	childVerifyingKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	childOwnerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
 	childOwnerSigning := keys.MustGeneratePrivateKeyFromRand(rng)
 
-	// Create a child node in the tree - this represents a non-root node
-	// that can receive deposits independently of the root node
 	childNode, err := dbTX.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
@@ -623,8 +619,8 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 	depositAddress, err := dbTX.DepositAddress.Create().
 		SetID(uuid.New()).
 		SetAddress("child_deposit_address_" + testID).
-		SetOwnerIdentityPubkey(childOwnerIdentity.Public().Serialize()).
-		SetOwnerSigningPubkey(childOwnerSigning.Public().Serialize()).
+		SetOwnerIdentityPubkey(childOwnerIdentity.Public()).
+		SetOwnerSigningPubkey(childOwnerSigning.Public()).
 		SetConfirmationHeight(100).
 		// This txid is different from the tree's base txid, which is the core of the issue.
 		SetConfirmationTxid("other_non_root_deposit_txid_" + testID).

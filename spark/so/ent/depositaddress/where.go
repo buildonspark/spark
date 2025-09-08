@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -73,12 +74,12 @@ func Address(v string) predicate.DepositAddress {
 }
 
 // OwnerIdentityPubkey applies equality check predicate on the "owner_identity_pubkey" field. It's identical to OwnerIdentityPubkeyEQ.
-func OwnerIdentityPubkey(v []byte) predicate.DepositAddress {
+func OwnerIdentityPubkey(v keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerSigningPubkey applies equality check predicate on the "owner_signing_pubkey" field. It's identical to OwnerSigningPubkeyEQ.
-func OwnerSigningPubkey(v []byte) predicate.DepositAddress {
+func OwnerSigningPubkey(v keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldOwnerSigningPubkey, v))
 }
 
@@ -293,82 +294,82 @@ func NetworkNotNil() predicate.DepositAddress {
 }
 
 // OwnerIdentityPubkeyEQ applies the EQ predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyEQ(v []byte) predicate.DepositAddress {
+func OwnerIdentityPubkeyEQ(v keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerIdentityPubkeyNEQ applies the NEQ predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyNEQ(v []byte) predicate.DepositAddress {
+func OwnerIdentityPubkeyNEQ(v keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldNEQ(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerIdentityPubkeyIn applies the In predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyIn(vs ...[]byte) predicate.DepositAddress {
+func OwnerIdentityPubkeyIn(vs ...keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldIn(FieldOwnerIdentityPubkey, vs...))
 }
 
 // OwnerIdentityPubkeyNotIn applies the NotIn predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyNotIn(vs ...[]byte) predicate.DepositAddress {
+func OwnerIdentityPubkeyNotIn(vs ...keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldNotIn(FieldOwnerIdentityPubkey, vs...))
 }
 
 // OwnerIdentityPubkeyGT applies the GT predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyGT(v []byte) predicate.DepositAddress {
+func OwnerIdentityPubkeyGT(v keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldGT(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerIdentityPubkeyGTE applies the GTE predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyGTE(v []byte) predicate.DepositAddress {
+func OwnerIdentityPubkeyGTE(v keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldGTE(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerIdentityPubkeyLT applies the LT predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyLT(v []byte) predicate.DepositAddress {
+func OwnerIdentityPubkeyLT(v keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldLT(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerIdentityPubkeyLTE applies the LTE predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyLTE(v []byte) predicate.DepositAddress {
+func OwnerIdentityPubkeyLTE(v keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldLTE(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerSigningPubkeyEQ applies the EQ predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyEQ(v []byte) predicate.DepositAddress {
+func OwnerSigningPubkeyEQ(v keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldEQ(FieldOwnerSigningPubkey, v))
 }
 
 // OwnerSigningPubkeyNEQ applies the NEQ predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyNEQ(v []byte) predicate.DepositAddress {
+func OwnerSigningPubkeyNEQ(v keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldNEQ(FieldOwnerSigningPubkey, v))
 }
 
 // OwnerSigningPubkeyIn applies the In predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyIn(vs ...[]byte) predicate.DepositAddress {
+func OwnerSigningPubkeyIn(vs ...keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldIn(FieldOwnerSigningPubkey, vs...))
 }
 
 // OwnerSigningPubkeyNotIn applies the NotIn predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyNotIn(vs ...[]byte) predicate.DepositAddress {
+func OwnerSigningPubkeyNotIn(vs ...keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldNotIn(FieldOwnerSigningPubkey, vs...))
 }
 
 // OwnerSigningPubkeyGT applies the GT predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyGT(v []byte) predicate.DepositAddress {
+func OwnerSigningPubkeyGT(v keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldGT(FieldOwnerSigningPubkey, v))
 }
 
 // OwnerSigningPubkeyGTE applies the GTE predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyGTE(v []byte) predicate.DepositAddress {
+func OwnerSigningPubkeyGTE(v keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldGTE(FieldOwnerSigningPubkey, v))
 }
 
 // OwnerSigningPubkeyLT applies the LT predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyLT(v []byte) predicate.DepositAddress {
+func OwnerSigningPubkeyLT(v keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldLT(FieldOwnerSigningPubkey, v))
 }
 
 // OwnerSigningPubkeyLTE applies the LTE predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyLTE(v []byte) predicate.DepositAddress {
+func OwnerSigningPubkeyLTE(v keys.Public) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.FieldLTE(FieldOwnerSigningPubkey, v))
 }
 

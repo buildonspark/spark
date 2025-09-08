@@ -22,6 +22,7 @@ func PublicKeyFromInts(x, y *big.Int) *secp256k1.PublicKey {
 }
 
 // AddPublicKeysRaw adds two secp256k1 public keys using group addition.
+// Deprecated: Use [github.com/lightsparkdev/spark/common/keys.Public.Add]
 func AddPublicKeysRaw(a, b *secp256k1.PublicKey) *secp256k1.PublicKey {
 	curve := secp256k1.S256()
 	sumX, sumY := curve.Add(a.X(), a.Y(), b.X(), b.Y())
@@ -31,6 +32,7 @@ func AddPublicKeysRaw(a, b *secp256k1.PublicKey) *secp256k1.PublicKey {
 // AddPublicKeys adds two secp256k1 public keys using group addition.
 // The input public keys must be 33 bytes.
 // The result is a 33 byte compressed secp256k1 public key.
+// Deprecated: Use [github.com/lightsparkdev/spark/common/keys.Public.Add]
 func AddPublicKeys(a, b []byte) ([]byte, error) {
 	if len(a) != 33 || len(b) != 33 {
 		return nil, fmt.Errorf("pubkeys must be 33 bytes")
@@ -53,6 +55,7 @@ func AddPublicKeys(a, b []byte) ([]byte, error) {
 // AddPublicKeysList adds a list of secp256k1 public keys using group addition.
 // The input public keys must be 33 bytes.
 // The result is a 33 byte compressed secp256k1 public key.
+// Deprecated: Use [github.com/lightsparkdev/spark/common/keys.SumPublicKeys]
 func AddPublicKeysList(keys [][]byte) ([]byte, error) {
 	if len(keys) == 0 {
 		return nil, fmt.Errorf("no keys to add")
@@ -79,6 +82,7 @@ func AddPublicKeysList(keys [][]byte) ([]byte, error) {
 
 // ApplyAdditiveTweakToPublicKey applies a tweak to a public key.
 // The result key is pubkey + tweak * G.
+// Deprecated: Use [github.com/lightsparkdev/spark/common/keys.Public.AddTweak]
 func ApplyAdditiveTweakToPublicKey(pubkey []byte, tweak []byte) ([]byte, error) {
 	if len(pubkey) != 33 {
 		return nil, fmt.Errorf("pubkey must be 33 bytes")
@@ -102,6 +106,7 @@ func ApplyAdditiveTweakToPublicKey(pubkey []byte, tweak []byte) ([]byte, error) 
 // SubtractPublicKeys subtracts two secp256k1 public keys using group subtraction.
 // The input public keys must be 33 bytes.
 // The result is a 33 byte compressed secp256k1 public key.
+// Deprecated: Use [github.com/lightsparkdev/spark/common/keys.Public.Sub]
 func SubtractPublicKeys(a, b []byte) ([]byte, error) {
 	if len(a) != 33 || len(b) != 33 {
 		return nil, fmt.Errorf("pubkeys must be 33 bytes")
@@ -125,6 +130,7 @@ func SubtractPublicKeys(a, b []byte) ([]byte, error) {
 
 // PrivateKeyFromBytes creates a secp256k1 private key from a byte slice. The bytes slice must be
 // 32 bytes.
+// Deprecated: Use [github.com/lightsparkdev/spark/common/keys.ParsePrivateKey]
 func PrivateKeyFromBytes(privKeyBytes []byte) (*secp256k1.PrivateKey, error) {
 	if len(privKeyBytes) != 32 {
 		return nil, fmt.Errorf("private key must be 32 bytes")
@@ -145,6 +151,7 @@ func PrivateKeyFromBigInt(privKeyInt *big.Int) (*secp256k1.PrivateKey, error) {
 }
 
 // AddPrivateKeysRaw adds two secp256k1 private keys using field addition.
+// Deprecated: Use [github.com/lightsparkdev/spark/common/keys.Private.Add]
 func AddPrivateKeysRaw(a, b *secp256k1.PrivateKey) *secp256k1.PrivateKey {
 	curve := secp256k1.S256()
 	aInt := new(big.Int).SetBytes(a.Serialize())
@@ -157,6 +164,7 @@ func AddPrivateKeysRaw(a, b *secp256k1.PrivateKey) *secp256k1.PrivateKey {
 // AddPrivateKeys adds two secp256k1 private keys using field addition.
 // The input private keys must be 32 bytes.
 // The result is a 32 byte private key.
+// Deprecated: Use [github.com/lightsparkdev/spark/common/keys.Private.Add]
 func AddPrivateKeys(a, b []byte) ([]byte, error) {
 	if len(a) != 32 || len(b) != 32 {
 		return nil, fmt.Errorf("private keys must be 32 bytes")
@@ -173,6 +181,7 @@ func AddPrivateKeys(a, b []byte) ([]byte, error) {
 // SubtractPrivateKeys subtracts two secp256k1 private keys using field subtraction.
 // The input private keys must be 32 bytes.
 // The result is a 32 byte private key.
+// Deprecated: Use [github.com/lightsparkdev/spark/common/keys.Private.Sub]
 func SubtractPrivateKeys(a, b []byte) ([]byte, error) {
 	if len(a) != 32 || len(b) != 32 {
 		return nil, fmt.Errorf("private keys must be 32 bytes")

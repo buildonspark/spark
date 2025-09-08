@@ -6,6 +6,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
@@ -44,12 +45,12 @@ func (DepositAddress) Fields() []ent.Field {
 			Comment("Network on which the deposit address is valid.").
 			Optional(),
 		field.Bytes("owner_identity_pubkey").
-			NotEmpty().
 			Immutable().
+			GoType(keys.Public{}).
 			Comment("Identity public key of the owner of the deposit address."),
 		field.Bytes("owner_signing_pubkey").
-			NotEmpty().
 			Immutable().
+			GoType(keys.Public{}).
 			Comment("Signing public key of the owner of the deposit address."),
 		field.Int64("confirmation_height").
 			Optional().

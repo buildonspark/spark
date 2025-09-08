@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
@@ -73,18 +72,23 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
-	depositAddressMutator := db.DepositAddress.Create().
-		SetSigningKeyshareID(keyshareID).
-		SetOwnerIdentityPubkey(req.OwnerIdentityPublicKey).
-		SetOwnerSigningPubkey(req.OwnerSigningPublicKey).
-		SetNetwork(schemaNetwork).
-		SetAddress(req.Address)
 
-	if req.IsStatic != nil && *req.IsStatic {
-		depositAddressMutator.SetIsStatic(true)
+	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
 	}
-
-	_, err = depositAddressMutator.Save(ctx)
+	ownerSigningPubKey, err := keys.ParsePublicKey(req.GetOwnerSigningPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner signing public key: %w", err)
+	}
+	_, err = db.DepositAddress.Create().
+		SetSigningKeyshareID(keyshareID).
+		SetOwnerIdentityPubkey(ownerIDPubKey).
+		SetOwnerSigningPubkey(ownerSigningPubKey).
+		SetNetwork(schemaNetwork).
+		SetAddress(req.Address).
+		SetIsStatic(req.GetIsStatic()).
+		Save(ctx)
 	if err != nil {
 		logger.Error("Failed to link keyshare to deposit address", "error", err)
 		return nil, err
@@ -114,11 +118,15 @@ func (h *InternalDepositHandler) GenerateStaticDepositAddressProofs(ctx context.
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
+	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owned identity public key: %w", err)
+	}
 	depositAddress, err := db.DepositAddress.Query().
 		Where(depositaddress.AddressEQ(req.Address)).
 		Where(depositaddress.IsStaticEQ(true)).
 		Where(depositaddress.HasSigningKeyshareWith(signingkeyshare.IDEQ(keyshareID))).
-		Where(depositaddress.OwnerIdentityPubkeyEQ(req.OwnerIdentityPublicKey)).
+		Where(depositaddress.OwnerIdentityPubkeyEQ(ownerIDPubKey)).
 		WithSigningKeyshare().
 		Only(ctx)
 	if err != nil && !ent.IsNotFound(err) {
@@ -126,7 +134,7 @@ func (h *InternalDepositHandler) GenerateStaticDepositAddressProofs(ctx context.
 	}
 
 	if depositAddress == nil {
-		return nil, errors.NotFoundErrorf("no static deposit address found for keyshare %s, address %s and identity public key %s", keyshareID, req.Address, hex.EncodeToString(req.OwnerIdentityPublicKey))
+		return nil, errors.NotFoundErrorf("no static deposit address found for keyshare %s, address %s and identity public key %s", keyshareID, req.Address, ownerIDPubKey)
 	}
 
 	logger.Info("Generating proofs of possession for static deposit address generated from keyshare", "keyshare_id", req.KeyshareId, "address", req.Address)
@@ -523,12 +531,16 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 	if err != nil {
 		return nil, fmt.Errorf("unable to add utxo swap to deposit address: %w", err)
 	}
-	if !bytes.Equal(depositAddress.OwnerIdentityPubkey, req.Transfer.ReceiverIdentityPublicKey) {
+	if !depositAddress.OwnerIdentityPubkey.Equals(receiverIDPubKey) {
 		return nil, fmt.Errorf("transfer is not to the recepient of the deposit")
 	}
 	// Validate that the deposit key provided by the user matches what's in the DB.
 	// SSP should generate the deposit public key from a deposit secret key provide by the customer.
-	if !bytes.Equal(depositAddress.OwnerSigningPubkey, req.SpendTxSigningJob.SigningPublicKey) {
+	spendTXSigningPubKey, err := keys.ParsePublicKey(req.GetSpendTxSigningJob().GetSigningPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse spend tx signing public key: %w", err)
+	}
+	if !depositAddress.OwnerSigningPubkey.Equals(spendTXSigningPubKey) {
 		return nil, fmt.Errorf("deposit address owner signing pubkey does not match the signing public key")
 	}
 
@@ -570,23 +582,12 @@ func validateTransfer(transferRequest *pb.StartTransferRequest) error {
 
 // validateUserSignature verifies that the user has authorized the UTXO swap by validating their signature.
 func validateUserSignature(userIdentityPubKey keys.Public, userSignature []byte, sspSignature []byte, requestType pb.UtxoSwapRequestType, network common.Network, txid []byte, vout uint32, totalAmount uint64) error {
-	if userSignature == nil {
+	if len(userSignature) == 0 {
 		return fmt.Errorf("user signature is required")
 	}
 
 	// Create user statement to authorize the UTXO swap
-	messageHash, err := CreateUserStatement(
-		hex.EncodeToString(txid),
-		vout,
-		network,
-		requestType,
-		totalAmount,
-		sspSignature,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create user statement: %w", err)
-	}
-
+	messageHash := CreateUserStatement(hex.EncodeToString(txid), vout, network, requestType, totalAmount, sspSignature)
 	return common.VerifyECDSASignature(userIdentityPubKey, userSignature, messageHash)
 }
 
@@ -607,35 +608,13 @@ func CreateUserStatement(
 	requestType pb.UtxoSwapRequestType,
 	creditAmountSats uint64,
 	sspSignature []byte,
-) ([]byte, error) {
-	// Create a buffer to hold all the data
-	var payload bytes.Buffer
+) []byte {
+	payload := sha256.New()
+	_, _ = payload.Write([]byte("claim_static_deposit"))        // Action name
+	_, _ = payload.Write([]byte(network.String()))              // Network value as UTF-8 bytes
+	_, _ = payload.Write([]byte(transactionID))                 // Transaction ID as UTF-8 bytes
+	_ = binary.Write(payload, binary.LittleEndian, outputIndex) // Output index as 4-byte unsigned integer (little-endian)
 
-	// Add action name
-	_, err := payload.WriteString("claim_static_deposit")
-	if err != nil {
-		return nil, err
-	}
-
-	// Add network value as UTF-8 bytes
-	_, err = payload.WriteString(network.String())
-	if err != nil {
-		return nil, err
-	}
-
-	// Add transaction ID as UTF-8 bytes
-	_, err = payload.WriteString(transactionID)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add output index as 4-byte unsigned integer (little-endian)
-	err = binary.Write(&payload, binary.LittleEndian, outputIndex)
-	if err != nil {
-		return nil, err
-	}
-
-	// Request type
 	requestTypeInt := uint8(0)
 	switch requestType {
 	case pb.UtxoSwapRequestType_Fixed:
@@ -645,28 +624,10 @@ func CreateUserStatement(
 	case pb.UtxoSwapRequestType_Refund:
 		requestTypeInt = uint8(2)
 	}
-
-	err = binary.Write(&payload, binary.LittleEndian, requestTypeInt)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add credit amount as 8-byte unsigned integer (little-endian)
-	err = binary.Write(&payload, binary.LittleEndian, creditAmountSats)
-	if err != nil {
-		return nil, err
-	}
-
-	// Add SSP signature as UTF-8 bytes
-	_, err = payload.Write(sspSignature)
-	if err != nil {
-		return nil, err
-	}
-
-	// Hash the payload with SHA-256
-	hash := sha256.Sum256(payload.Bytes())
-
-	return hash[:], nil
+	_ = binary.Write(payload, binary.LittleEndian, requestTypeInt)   // Request type
+	_ = binary.Write(payload, binary.LittleEndian, creditAmountSats) // Credit amount as 8-byte unsigned integer (little-endian)
+	_, _ = payload.Write(sspSignature)                               // SSP signature as UTF-8 bytes
+	return payload.Sum(nil)
 }
 
 func CancelUtxoSwap(ctx context.Context, utxoSwap *ent.UtxoSwap) error {

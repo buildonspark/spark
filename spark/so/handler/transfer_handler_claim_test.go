@@ -5,8 +5,11 @@ package handler
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"io"
+	"math/rand/v2"
 	"os"
 	"testing"
 	"time"
@@ -15,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/distributed-lab/gripmock"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -38,45 +40,42 @@ func TestMain(m *testing.M) {
 }
 
 var (
-	frostRound1StubOutput = map[string]interface{}{
-		"signing_commitments": []map[string]interface{}{
+	bindingCommitment     = base64.StdEncoding.EncodeToString([]byte("\x02test_binding_commitment_33___\x00\x00\x00"))
+	hidingCommitment      = base64.StdEncoding.EncodeToString([]byte("\x02test_binding_commitment_33___\x00\x00\x00"))
+	frostRound1StubOutput = map[string]any{
+		"signing_commitments": []map[string]any{
 			{
-				"binding": "AnRlc3RfYmluZGluZ19jb21taXRtZW50XzMzX19fAAAA",
-				"hiding":  "AnRlc3RfaGlkaW5nX2NvbW1pdG1lbnRfMzNfX19fAAAA",
+				"binding": bindingCommitment,
+				"hiding":  hidingCommitment,
 			},
 			{
-				"binding": "AnRlc3RfYmluZGluZ19jb21taXRtZW50XzMzX19fAAAA",
-				"hiding":  "AnRlc3RfaGlkaW5nX2NvbW1pdG1lbnRfMzNfX19fAAAA",
+				"binding": bindingCommitment,
+				"hiding":  hidingCommitment,
 			},
 			{
-				"binding": "AnRlc3RfYmluZGluZ19jb21taXRtZW50XzMzX19fAAAA",
-				"hiding":  "AnRlc3RfaGlkaW5nX2NvbW1pdG1lbnRfMzNfX19fAAAA",
+				"binding": bindingCommitment,
+				"hiding":  hidingCommitment,
 			},
 		},
 	}
 
-	frostRound2StubOutput = map[string]interface{}{
-		"results": map[string]interface{}{
-			"operator1": map[string]interface{}{
-				"signature_share": "dGVzdF9zaWduYXR1cmVfc2hhcmU=",
+	signatureShare = base64.StdEncoding.EncodeToString([]byte("test_signature_share"))
+
+	frostRound2StubOutput = map[string]any{
+		"results": map[string]any{
+			"operator1": map[string]any{
+				"signature_share": signatureShare,
 			},
-			"operator2": map[string]interface{}{
-				"signature_share": "dGVzdF9zaWduYXR1cmVfc2hhcmU=",
+			"operator2": map[string]any{
+				"signature_share": signatureShare,
 			},
 		},
 	}
 )
 
-func createValidBitcoinTxBytes(receiverPubKey []byte) []byte {
-	pubkey, err := secp256k1.ParsePubKey(receiverPubKey)
-	if err != nil {
-		panic(err)
-	}
-
-	p2trScript, err := common.P2TRScriptFromPubKey(keys.PublicKeyFromKey(*pubkey))
-	if err != nil {
-		panic(err)
-	}
+func createValidBitcoinTxBytes(t *testing.T, receiverPubKey keys.Public) []byte {
+	p2trScript, err := common.P2TRScriptFromPubKey(receiverPubKey)
+	require.NoError(t, err)
 
 	// sequence = 9000 = 0x2328 (little-endian: 28 23 00 00)
 	scriptLen := fmt.Sprintf("%02x", len(p2trScript))
@@ -88,52 +87,15 @@ func createValidBitcoinTxBytes(receiverPubKey []byte) []byte {
 	return bytes
 }
 
-func generateFixedKeyPair(idx byte) (privKey32 []byte, pubKey33 []byte) {
-	seed := [32]byte{
-		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-		0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
-		0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
-		0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, idx,
-	}
-	priv := secp256k1.PrivKeyFromBytes(seed[:])
-	return priv.Serialize(), priv.PubKey().SerializeCompressed()
-}
-
-func make33ByteKey(prefix string) []byte {
-	key := make([]byte, 33)
-	key[0] = 0x02
-	copy(key[1:], []byte(prefix))
-	return key
-}
-
-func make32ByteKey(prefix string) []byte {
-	key := make([]byte, 32)
-	copy(key, []byte(prefix))
-	return key
-}
-
-func setupPgTestContext(t *testing.T) (context.Context, *db.TestContext) {
-	dsn, stop := db.SpinUpPostgres(t)
-	t.Cleanup(stop)
-
-	ctx := context.Background()
-	ctx, sessionCtx, err := db.NewPgTestContext(t, ctx, dsn)
-	require.NoError(t, err)
-	t.Cleanup(sessionCtx.Close)
-
-	return ctx, sessionCtx
-}
-
-func createTestSigningKeyshare(t *testing.T, ctx context.Context, client *ent.Client) *ent.SigningKeyshare {
-	_, keysharePub := generateFixedKeyPair(3)
-	keysharePriv, _ := generateFixedKeyPair(3)
-	_, pubSharePub := generateFixedKeyPair(4)
+func createTestSigningKeyshare(t *testing.T, ctx context.Context, rng io.Reader, client *ent.Client) *ent.SigningKeyshare {
+	keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	pubSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 
 	signingKeyshare, err := client.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusInUse).
-		SetSecretShare(keysharePriv).
-		SetPublicShares(map[string][]byte{"operator1": pubSharePub}).
-		SetPublicKey(keysharePub).
+		SetSecretShare(keysharePrivKey.Serialize()).
+		SetPublicShares(map[string][]byte{"operator1": pubSharePrivKey.Public().Serialize()}).
+		SetPublicKey(keysharePrivKey.Public().Serialize()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
 		Save(ctx)
@@ -141,13 +103,11 @@ func createTestSigningKeyshare(t *testing.T, ctx context.Context, client *ent.Cl
 	return signingKeyshare
 }
 
-func createTestTreeForClaim(t *testing.T, ctx context.Context, client *ent.Client) *ent.Tree {
-	_, ownerPub := generateFixedKeyPair(1)
-
+func createTestTreeForClaim(t *testing.T, ctx context.Context, ownerIdentityPubKey keys.Public, client *ent.Client) *ent.Tree {
 	tree, err := client.Tree.Create().
 		SetStatus(st.TreeStatusAvailable).
 		SetNetwork(st.NetworkRegtest).
-		SetOwnerIdentityPubkey(ownerPub).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey.Serialize()).
 		SetBaseTxid([]byte("test_base_txid")).
 		SetVout(0).
 		Save(ctx)
@@ -155,21 +115,22 @@ func createTestTreeForClaim(t *testing.T, ctx context.Context, client *ent.Clien
 	return tree
 }
 
-func createTestTreeNode(t *testing.T, ctx context.Context, client *ent.Client, tree *ent.Tree, keyshare *ent.SigningKeyshare) *ent.TreeNode {
-	_, verifyingPub := generateFixedKeyPair(5)
-	_, ownerPub := generateFixedKeyPair(1)
-	_, ownerSigningPub := generateFixedKeyPair(2)
+func createTestTreeNode(t *testing.T, ctx context.Context, rng io.Reader, client *ent.Client, tree *ent.Tree, keyshare *ent.SigningKeyshare) *ent.TreeNode {
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerSigningPubKey := ownerSigningPrivKey.Public()
 
-	validTx := createOldBitcoinTxBytes(ownerPub)
+	validTx := createOldBitcoinTxBytes(t, ownerPubKey)
 
 	leaf, err := client.TreeNode.Create().
 		SetStatus(st.TreeNodeStatusTransferLocked).
 		SetTree(tree).
 		SetSigningKeyshare(keyshare).
 		SetValue(1000).
-		SetVerifyingPubkey(verifyingPub).
-		SetOwnerIdentityPubkey(ownerPub).
-		SetOwnerSigningPubkey(ownerSigningPub).
+		SetVerifyingPubkey(verifyingPubKey.Serialize()).
+		SetOwnerIdentityPubkey(ownerPubKey.Serialize()).
+		SetOwnerSigningPubkey(ownerSigningPubKey.Serialize()).
 		SetRawTx(validTx).
 		SetRawRefundTx(validTx).
 		SetDirectTx(validTx).
@@ -181,15 +142,15 @@ func createTestTreeNode(t *testing.T, ctx context.Context, client *ent.Client, t
 	return leaf
 }
 
-func createTestTransfer(t *testing.T, ctx context.Context, client *ent.Client, status st.TransferStatus) *ent.Transfer {
-	_, senderPub := generateFixedKeyPair(2)
-	_, receiverPub := generateFixedKeyPair(1)
+func createTestTransfer(t *testing.T, ctx context.Context, rng io.Reader, client *ent.Client, status st.TransferStatus) *ent.Transfer {
+	senderPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	transfer, err := client.Transfer.Create().
 		SetStatus(status).
 		SetType(st.TransferTypeTransfer).
-		SetSenderIdentityPubkey(senderPub).
-		SetReceiverIdentityPubkey(receiverPub).
+		SetSenderIdentityPubkey(senderPubKey.Serialize()).
+		SetReceiverIdentityPubkey(receiverPubKey.Serialize()).
 		SetTotalValue(1000).
 		SetExpiryTime(time.Now().Add(24 * time.Hour)).
 		Save(ctx)
@@ -208,33 +169,34 @@ func createTestTransferLeaf(t *testing.T, ctx context.Context, client *ent.Clien
 	return transferLeaf
 }
 
-func createTestSigningCommitment() *pbcommon.SigningCommitment {
+func createTestSigningCommitment(rng io.Reader) *pbcommon.SigningCommitment {
 	return &pbcommon.SigningCommitment{
-		Binding: make33ByteKey("test_binding_commitment_33___"),
-		Hiding:  make33ByteKey("test_hiding_commitment_33____"),
+		Binding: keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
+		Hiding:  keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
 	}
 }
 
-func createTestLeafRefundTxSigningJob(leaf *ent.TreeNode) *pb.LeafRefundTxSigningJob {
-	receiverPubKey := leaf.OwnerIdentityPubkey
-	validTxBytes := createValidBitcoinTxBytes(receiverPubKey)
+func createTestLeafRefundTxSigningJob(t *testing.T, rng io.Reader, leaf *ent.TreeNode) *pb.LeafRefundTxSigningJob {
+	receiverPubKey, err := keys.ParsePublicKey(leaf.OwnerIdentityPubkey)
+	require.NoError(t, err)
+	validTxBytes := createValidBitcoinTxBytes(t, receiverPubKey)
 
 	return &pb.LeafRefundTxSigningJob{
 		LeafId: leaf.ID.String(),
 		RefundTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       make33ByteKey("test_signing_pubkey_33_bytes"),
+			SigningPublicKey:       keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
 			RawTx:                  validTxBytes,
-			SigningNonceCommitment: createTestSigningCommitment(),
+			SigningNonceCommitment: createTestSigningCommitment(rng),
 		},
 		DirectRefundTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       make33ByteKey("test_direct_signing_33_bytes"),
+			SigningPublicKey:       keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
 			RawTx:                  validTxBytes,
-			SigningNonceCommitment: createTestSigningCommitment(),
+			SigningNonceCommitment: createTestSigningCommitment(rng),
 		},
 		DirectFromCpfpRefundTxSigningJob: &pb.SigningJob{
-			SigningPublicKey:       make33ByteKey("test_direct_cpfp_signing_33"),
+			SigningPublicKey:       keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
 			RawTx:                  validTxBytes,
-			SigningNonceCommitment: createTestSigningCommitment(),
+			SigningNonceCommitment: createTestSigningCommitment(rng),
 		},
 	}
 }
@@ -252,24 +214,26 @@ func TestClaimTransferSignRefunds_Success(t *testing.T) {
 	err = gripmock.AddStub("spark_internal.SparkInternalService", "frost_round2", nil, frostRound2StubOutput)
 	require.NoError(t, err, "Failed to add frost_round2 stub")
 
-	ctx, sessionCtx := setupPgTestContext(t)
-
-	keyshare := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
-	tree := createTestTreeForClaim(t, ctx, sessionCtx.Client)
-	leaf := createTestTreeNode(t, ctx, sessionCtx.Client, tree, keyshare)
-	transfer := createTestTransfer(t, ctx, sessionCtx.Client, st.TransferStatusReceiverKeyTweaked)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
+	rng := rand.NewChaCha8([32]byte{})
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	tree := createTestTreeForClaim(t, ctx, ownerIdentityPrivKey.Public(), sessionCtx.Client)
+	leaf := createTestTreeNode(t, ctx, rng, sessionCtx.Client, tree, keyshare)
+	transfer := createTestTransfer(t, ctx, rng, sessionCtx.Client, st.TransferStatusReceiverKeyTweaked)
 	transferLeaf := createTestTransferLeaf(t, ctx, sessionCtx.Client, transfer, leaf)
 
-	tweakPriv, tweakPub := generateFixedKeyPair(17)
-	_, pubkeyShareTweakPub := generateFixedKeyPair(18)
+	tweakPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	tweakPubKey := tweakPrivKey.Public()
+	pubkeyShareTweakPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	claimKeyTweak := &pb.ClaimLeafKeyTweak{
 		SecretShareTweak: &pb.SecretShare{
-			SecretShare: tweakPriv,
-			Proofs:      [][]byte{tweakPub},
+			SecretShare: tweakPrivKey.Serialize(),
+			Proofs:      [][]byte{tweakPubKey.Serialize()},
 		},
 		PubkeySharesTweak: map[string][]byte{
-			"operator1": pubkeyShareTweakPub,
+			"operator1": pubkeyShareTweakPubKey.Serialize(),
 		},
 	}
 
@@ -288,15 +252,13 @@ func TestClaimTransferSignRefunds_Success(t *testing.T) {
 		TransferId:             transfer.ID.String(),
 		OwnerIdentityPublicKey: transfer.ReceiverIdentityPubkey,
 		SigningJobs: []*pb.LeafRefundTxSigningJob{
-			createTestLeafRefundTxSigningJob(leaf),
+			createTestLeafRefundTxSigningJob(t, rng, leaf),
 		},
 	}
 
 	resp, err := handler.ClaimTransferSignRefunds(ctx, req)
 
-	t.Logf("Response: %v, Error: %v", resp, err)
-
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, resp)
 
 	updatedTransfer, err := sessionCtx.Client.Transfer.Get(ctx, transfer.ID)

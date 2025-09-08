@@ -26,17 +26,13 @@ func NewInternalTreeCreationHandler(config *so.Config) *InternalTreeCreationHand
 }
 
 func (h *InternalTreeCreationHandler) markExistingSigningKeysharesAsUsed(ctx context.Context, req *pbinternal.PrepareTreeAddressRequest) (map[string]*ent.SigningKeyshare, error) {
-	var keyshareIDs []uuid.UUID
-
 	parentKeyshardID, err := uuid.Parse(req.TargetKeyshareId)
 	if err != nil {
 		return nil, err
 	}
 
-	keyshareIDs = append(keyshareIDs, parentKeyshardID)
-
-	var nodeQueue []*pbinternal.PrepareTreeAddressNode
-	nodeQueue = append(nodeQueue, req.Node)
+	keyshareIDs := []uuid.UUID{parentKeyshardID}
+	nodeQueue := []*pbinternal.PrepareTreeAddressNode{req.Node}
 
 	for len(nodeQueue) > 0 {
 		node := nodeQueue[0]
@@ -103,8 +99,8 @@ func (h *InternalTreeCreationHandler) generateAndStoreDepositAddress(
 		}
 		_, err = db.DepositAddress.Create().
 			SetSigningKeyshareID(seKeyshare.ID).
-			SetOwnerIdentityPubkey(identityPubKey.Serialize()).
-			SetOwnerSigningPubkey(userPubkey.Serialize()).
+			SetOwnerIdentityPubkey(identityPubKey).
+			SetOwnerSigningPubkey(userPubkey).
 			SetAddress(address).
 			SetNetwork(schemaNetwork).
 			Save(ctx)

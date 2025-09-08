@@ -133,7 +133,7 @@ func SetUpPostgresTestContext(t *testing.T) (context.Context, *TestContext) {
 
 	ctx, sessionCtx, err := NewPgTestContext(t, t.Context(), dsn)
 	require.NoError(t, err)
-	t.Cleanup(func() { sessionCtx.Close() })
+	t.Cleanup(sessionCtx.Close)
 
 	return ctx, sessionCtx
 }

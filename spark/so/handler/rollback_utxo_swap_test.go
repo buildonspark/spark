@@ -4,8 +4,11 @@
 package handler
 
 import (
+	"math/rand/v2"
 	"testing"
 
+	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -21,10 +24,10 @@ func TestRollbackUtxoSwap_InvalidStatement(t *testing.T) {
 		_ = gripmock.Clear()
 	}()
 
-	ctx, sessionCtx := setupPgTestContext(t)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 	defer sessionCtx.Close()
 
-	cfg := setupTestConfigWithRegtestNoAuthz(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
 	// Create request with invalid signature
@@ -39,15 +42,14 @@ func TestRollbackUtxoSwap_InvalidStatement(t *testing.T) {
 	}
 
 	_, err := handler.RollbackUtxoSwap(ctx, cfg, req)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "signature")
+	require.ErrorContains(t, err, "signature")
 }
 
 func TestRollbackUtxoSwap_UtxoDoesNotExist(t *testing.T) {
-	ctx, sessionCtx := setupPgTestContext(t)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 	defer sessionCtx.Close()
 
-	cfg := setupTestConfigWithRegtestNoAuthz(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
 	// Generate valid rollback request for non-existent UTXO
@@ -60,8 +62,7 @@ func TestRollbackUtxoSwap_UtxoDoesNotExist(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = handler.RollbackUtxoSwap(ctx, cfg, rollbackRequest)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not found")
+	require.ErrorContains(t, err, "not found")
 }
 
 func TestRollbackUtxoSwap_NoErrorIfUtxoSwapDoesNotExist(t *testing.T) {
@@ -72,31 +73,32 @@ func TestRollbackUtxoSwap_NoErrorIfUtxoSwapDoesNotExist(t *testing.T) {
 	err := gripmock.AddStub("spark_internal.SparkInternalService", "rollback_utxo_swap", nil, nil)
 	require.NoError(t, err)
 
-	ctx, sessionCtx := setupPgTestContext(t)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 	defer sessionCtx.Close()
 
-	cfg := setupTestConfigWithRegtestNoAuthz(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
 	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
 
-	_, ownerIdentityPub := generateFixedKeyPair(1)
-	_, ownerSigningPub := generateFixedKeyPair(2)
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	keyshare := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
-	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPub, ownerSigningPub)
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
 	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
 
 	// Don't create UtxoSwap - it doesn't exist
 	rollbackRequest, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, cfg, &pb.UTXO{
 		Txid:    utxo.Txid,
-		Vout:    uint32(utxo.Vout),
+		Vout:    utxo.Vout,
 		Network: pb.Network_REGTEST,
 	})
 	require.NoError(t, err)
 
 	_, err = handler.RollbackUtxoSwap(ctx, cfg, rollbackRequest)
-	assert.NoError(t, err) // Should not error if UtxoSwap doesn't exist
+	require.NoError(t, err) // Should not error if UtxoSwap doesn't exist
 }
 
 func TestRollbackUtxoSwap_NoErrorIfUtxoSwapCancelled(t *testing.T) {
@@ -107,33 +109,33 @@ func TestRollbackUtxoSwap_NoErrorIfUtxoSwapCancelled(t *testing.T) {
 	err := gripmock.AddStub("spark_internal.SparkInternalService", "rollback_utxo_swap", nil, nil)
 	require.NoError(t, err)
 
-	ctx, sessionCtx := setupPgTestContext(t)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 	defer sessionCtx.Close()
 
-	cfg := setupTestConfigWithRegtestNoAuthz(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
 	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	_, ownerIdentityPub := generateFixedKeyPair(1)
-	_, ownerSigningPub := generateFixedKeyPair(2)
-
-	keyshare := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
-	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPub, ownerSigningPub)
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
 	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
 
 	// Create cancelled UtxoSwap
-	_ = createTestUtxoSwap(t, ctx, sessionCtx.Client, utxo, st.UtxoSwapStatusCancelled)
+	_ = createTestUtxoSwap(t, ctx, rng, sessionCtx.Client, utxo, st.UtxoSwapStatusCancelled)
 
 	rollbackRequest, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, cfg, &pb.UTXO{
 		Txid:    utxo.Txid,
-		Vout:    uint32(utxo.Vout),
+		Vout:    utxo.Vout,
 		Network: pb.Network_REGTEST,
 	})
 	require.NoError(t, err)
 
 	_, err = handler.RollbackUtxoSwap(ctx, cfg, rollbackRequest)
-	assert.NoError(t, err) // Should not error for cancelled UtxoSwap
+	require.NoError(t, err) // Should not error for cancelled UtxoSwap
 }
 
 func TestRollbackUtxoSwap_NoErrorIfUtxoSwapCreated(t *testing.T) {
@@ -144,19 +146,19 @@ func TestRollbackUtxoSwap_NoErrorIfUtxoSwapCreated(t *testing.T) {
 	err := gripmock.AddStub("spark_internal.SparkInternalService", "rollback_utxo_swap", nil, nil)
 	require.NoError(t, err)
 
-	ctx, sessionCtx := setupPgTestContext(t)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 	defer sessionCtx.Close()
 
-	cfg := setupTestConfigWithRegtestNoAuthz(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
 	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	_, ownerIdentityPub := generateFixedKeyPair(1)
-	_, ownerSigningPub := generateFixedKeyPair(2)
-
-	keyshare := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
-	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPub, ownerSigningPub)
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
 	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
 
 	utxoSwap, err := sessionCtx.Client.UtxoSwap.Create().
@@ -165,27 +167,26 @@ func TestRollbackUtxoSwap_NoErrorIfUtxoSwapCreated(t *testing.T) {
 		SetRequestType(st.UtxoSwapRequestTypeRefund).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
-		SetSspIdentityPublicKey(ownerIdentityPub).
-		SetUserIdentityPublicKey(ownerIdentityPub).
+		SetSspIdentityPublicKey(ownerIdentityPubKey.Serialize()).
+		SetUserIdentityPublicKey(ownerIdentityPubKey.Serialize()).
 		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey().Serialize()).
 		Save(ctx)
 	require.NoError(t, err)
 
 	rollbackRequest, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, cfg, &pb.UTXO{
 		Txid:    utxo.Txid,
-		Vout:    uint32(utxo.Vout),
+		Vout:    utxo.Vout,
 		Network: pb.Network_REGTEST,
 	})
 	require.NoError(t, err)
 
 	_, err = handler.RollbackUtxoSwap(ctx, cfg, rollbackRequest)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Commit tx before checking the result
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-	err = tx.Commit()
-	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
 
 	// Verify UtxoSwap is now cancelled (use fresh context)
 	updatedUtxoSwap, err := sessionCtx.Client.UtxoSwap.Get(t.Context(), utxoSwap.ID)
@@ -194,19 +195,19 @@ func TestRollbackUtxoSwap_NoErrorIfUtxoSwapCreated(t *testing.T) {
 }
 
 func TestRollbackUtxoSwap_ErrorIfUtxoSwapCompleted(t *testing.T) {
-	ctx, sessionCtx := setupPgTestContext(t)
+	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 	defer sessionCtx.Close()
 
-	cfg := setupTestConfigWithRegtestNoAuthz(t)
+	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
 	createTestBlockHeight(t, ctx, sessionCtx.Client, 100)
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	_, ownerIdentityPub := generateFixedKeyPair(1)
-	_, ownerSigningPub := generateFixedKeyPair(2)
-
-	keyshare := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
-	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPub, ownerSigningPub)
+	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	depositAddress := createTestStaticDepositAddress(t, ctx, sessionCtx.Client, keyshare, ownerIdentityPubKey, ownerSigningPubKey)
 	utxo := createTestUtxo(t, ctx, sessionCtx.Client, depositAddress, 100)
 
 	// Create completed UtxoSwap
@@ -216,24 +217,19 @@ func TestRollbackUtxoSwap_ErrorIfUtxoSwapCompleted(t *testing.T) {
 		SetRequestType(st.UtxoSwapRequestTypeRefund).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
-		SetSspIdentityPublicKey(ownerIdentityPub).
-		SetUserIdentityPublicKey(ownerIdentityPub).
+		SetSspIdentityPublicKey(ownerIdentityPubKey.Serialize()).
+		SetUserIdentityPublicKey(ownerIdentityPubKey.Serialize()).
 		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey().Serialize()).
 		Save(ctx)
 	require.NoError(t, err)
 
 	rollbackRequest, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, cfg, &pb.UTXO{
 		Txid:    utxo.Txid,
-		Vout:    uint32(utxo.Vout),
+		Vout:    utxo.Vout,
 		Network: pb.Network_REGTEST,
 	})
 	require.NoError(t, err)
 
 	_, err = handler.RollbackUtxoSwap(ctx, cfg, rollbackRequest)
-	assert.Error(t, err)
-
-	// Check that error message contains "completed"
-	if err != nil {
-		assert.Contains(t, err.Error(), "completed")
-	}
+	require.ErrorContains(t, err, "completed")
 }

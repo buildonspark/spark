@@ -412,9 +412,8 @@ func TestGetSigningKeyshareFromOutput_Invalid_Errors(t *testing.T) {
 	handler := createTestHandler()
 
 	tests := []struct {
-		name    string
-		output  *wire.TxOut
-		network common.Network
+		name   string
+		output *wire.TxOut
 	}{
 		{
 			// Will fail because P2TRAddressFromPkScript won't work with this script
@@ -423,7 +422,6 @@ func TestGetSigningKeyshareFromOutput_Invalid_Errors(t *testing.T) {
 				Value:    100000,
 				PkScript: []byte{0x00, 0x14, 0x75, 0x1e, 0x76, 0xe8, 0x19, 0x91, 0x96, 0xd4, 0x54, 0x94, 0x1c, 0x45, 0xd1, 0xb3, 0xa3, 0x23, 0xf1, 0x43, 0x3b, 0xd6}, // P2WPKH script
 			},
-			network: common.Regtest,
 		},
 		{
 			name: "invalid pkScript",
@@ -431,13 +429,12 @@ func TestGetSigningKeyshareFromOutput_Invalid_Errors(t *testing.T) {
 				Value:    100000,
 				PkScript: []byte{0x01, 0x02}, // invalid script
 			},
-			network: common.Regtest,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			userPubKey, keyshare, err := handler.getSigningKeyshareFromOutput(ctx, tt.network, tt.output)
+			userPubKey, keyshare, err := handler.getSigningKeyshareFromOutput(ctx, common.Regtest, tt.output)
 
 			require.Error(t, err)
 			assert.Zero(t, userPubKey)
@@ -824,8 +821,8 @@ func TestPrepareSigningJobs_EnsureConfTxidMatchesUtxoId(t *testing.T) {
 	// Create a deposit address that's confirmed with the LEGITIMATE transaction
 	_, err = dbTX.DepositAddress.Create().
 		SetAddress(*outputAddress).
-		SetOwnerIdentityPubkey(identityPrivKey.Public().Serialize()).
-		SetOwnerSigningPubkey(signingPrivKey.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPrivKey.Public()).
+		SetOwnerSigningPubkey(signingPrivKey.Public()).
 		SetSigningKeyshare(signingKeyshare).
 		SetConfirmationHeight(100).                     // Confirmed at height 100
 		SetConfirmationTxid(legitimateTxHash.String()). // CONFIRMED with legitimate TX
@@ -960,8 +957,8 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 
 			_, err = dbTx.DepositAddress.Create().
 				SetAddress(*parentAddress).
-				SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
-				SetOwnerSigningPubkey(signingPrivkey.Public().Serialize()).
+				SetOwnerIdentityPubkey(identityPrivkey.Public()).
+				SetOwnerSigningPubkey(signingPrivkey.Public()).
 				SetSigningKeyshare(signingKeyshare).
 				SetConfirmationHeight(0). // Not confirmed, so no txid validation
 				// Don't set confirmation txid to bypass the validation
@@ -982,11 +979,12 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 
 			var childrenSigningJobs []*pb.CreationNode
 			for _, childValue := range tt.childrenValues {
+				childKeysharePubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 				childKeyshare, err := dbTx.SigningKeyshare.Create().
 					SetStatus(st.KeyshareStatusAvailable).
 					SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
 					SetPublicShares(map[string][]byte{"test": publicSharePrivkey.Public().Serialize()}).
-					SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
+					SetPublicKey(childKeysharePubKey.Serialize()).
 					SetMinSigners(2).
 					SetCoordinatorIndex(0).
 					Save(ctx)
@@ -1004,8 +1002,8 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 
 				_, err = dbTx.DepositAddress.Create().
 					SetAddress(*childAddress).
-					SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
-					SetOwnerSigningPubkey(childKeyshare.PublicKey).
+					SetOwnerIdentityPubkey(identityPrivkey.Public()).
+					SetOwnerSigningPubkey(childKeysharePubKey).
 					SetSigningKeyshare(childKeyshare).
 					SetNetwork(st.NetworkRegtest).
 					Save(ctx)

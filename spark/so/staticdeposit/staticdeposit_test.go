@@ -2,9 +2,12 @@ package staticdeposit
 
 import (
 	"context"
+	"io"
+	"math/rand/v2"
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -13,7 +16,7 @@ import (
 )
 
 // Helper function to create test entities with required dependencies
-func createTestEntities(t *testing.T, ctx context.Context, tx *ent.Tx, utxoSwapStatus st.UtxoSwapStatus) (*ent.Utxo, *ent.UtxoSwap) {
+func createTestEntities(t *testing.T, ctx context.Context, rng io.Reader, tx *ent.Tx, utxoSwapStatus st.UtxoSwapStatus) (*ent.Utxo, *ent.UtxoSwap) {
 	// Create a SigningKeyshare (required for DepositAddress)
 	keyshare, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
@@ -25,11 +28,13 @@ func createTestEntities(t *testing.T, ctx context.Context, tx *ent.Tx, utxoSwapS
 		Save(ctx)
 	require.NoError(t, err)
 
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	// Create a DepositAddress (required for Utxo)
 	depositAddress, err := tx.DepositAddress.Create().
 		SetAddress("bc1ptest_static_deposit_address_for_testing").
-		SetOwnerIdentityPubkey([]byte("test_owner_identity_pubkey")).
-		SetOwnerSigningPubkey([]byte("test_owner_signing_pubkey")).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey).
+		SetOwnerSigningPubkey(ownerSigningPubKey).
 		SetSigningKeyshare(keyshare).
 		SetIsStatic(true).
 		Save(ctx)
@@ -67,6 +72,7 @@ func createTestEntities(t *testing.T, ctx context.Context, tx *ent.Tx, utxoSwapS
 
 func TestGetRegisteredUtxoSwapForUtxo(t *testing.T) {
 	ctx := t.Context()
+	rng := rand.NewChaCha8([32]byte{})
 
 	testCases := []struct {
 		name           string
@@ -77,7 +83,7 @@ func TestGetRegisteredUtxoSwapForUtxo(t *testing.T) {
 		{
 			name: "returns UtxoSwap when found with CREATED status",
 			setupData: func(client *ent.Tx) (*ent.Utxo, *ent.UtxoSwap) {
-				return createTestEntities(t, ctx, client, st.UtxoSwapStatusCreated)
+				return createTestEntities(t, ctx, rng, client, st.UtxoSwapStatusCreated)
 			},
 			expectNil:      false,
 			expectedStatus: st.UtxoSwapStatusCreated,
@@ -85,7 +91,7 @@ func TestGetRegisteredUtxoSwapForUtxo(t *testing.T) {
 		{
 			name: "returns UtxoSwap when found with COMPLETED status",
 			setupData: func(client *ent.Tx) (*ent.Utxo, *ent.UtxoSwap) {
-				return createTestEntities(t, ctx, client, st.UtxoSwapStatusCompleted)
+				return createTestEntities(t, ctx, rng, client, st.UtxoSwapStatusCompleted)
 			},
 			expectNil:      false,
 			expectedStatus: st.UtxoSwapStatusCompleted,
@@ -94,7 +100,7 @@ func TestGetRegisteredUtxoSwapForUtxo(t *testing.T) {
 			name: "returns nil when no UtxoSwap exists for UTXO",
 			setupData: func(client *ent.Tx) (*ent.Utxo, *ent.UtxoSwap) {
 				// Create a test UTXO but no UtxoSwap
-				return createTestEntities(t, ctx, client, "")
+				return createTestEntities(t, ctx, rng, client, "")
 			},
 			expectNil: true,
 		},
@@ -102,7 +108,7 @@ func TestGetRegisteredUtxoSwapForUtxo(t *testing.T) {
 			name: "returns nil when UtxoSwap exists but has CANCELLED status",
 			setupData: func(client *ent.Tx) (*ent.Utxo, *ent.UtxoSwap) {
 				// Create entities with CANCELLED status - should be filtered out
-				return createTestEntities(t, ctx, client, st.UtxoSwapStatusCancelled)
+				return createTestEntities(t, ctx, rng, client, st.UtxoSwapStatusCancelled)
 			},
 			expectNil: true,
 		},

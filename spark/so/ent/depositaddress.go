@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
@@ -30,9 +31,9 @@ type DepositAddress struct {
 	// Network on which the deposit address is valid.
 	Network schematype.Network `json:"network,omitempty"`
 	// Identity public key of the owner of the deposit address.
-	OwnerIdentityPubkey []byte `json:"owner_identity_pubkey,omitempty"`
+	OwnerIdentityPubkey keys.Public `json:"owner_identity_pubkey,omitempty"`
 	// Signing public key of the owner of the deposit address.
-	OwnerSigningPubkey []byte `json:"owner_signing_pubkey,omitempty"`
+	OwnerSigningPubkey keys.Public `json:"owner_signing_pubkey,omitempty"`
 	// Height of the block that confirmed the deposit address.
 	ConfirmationHeight int64 `json:"confirmation_height,omitempty"`
 	// Transaction ID of the block that confirmed the deposit address.
@@ -99,8 +100,10 @@ func (*DepositAddress) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case depositaddress.FieldOwnerIdentityPubkey, depositaddress.FieldOwnerSigningPubkey, depositaddress.FieldAddressSignatures, depositaddress.FieldPossessionSignature:
+		case depositaddress.FieldAddressSignatures, depositaddress.FieldPossessionSignature:
 			values[i] = new([]byte)
+		case depositaddress.FieldOwnerIdentityPubkey, depositaddress.FieldOwnerSigningPubkey:
+			values[i] = new(keys.Public)
 		case depositaddress.FieldIsStatic:
 			values[i] = new(sql.NullBool)
 		case depositaddress.FieldConfirmationHeight:
@@ -159,13 +162,13 @@ func (da *DepositAddress) assignValues(columns []string, values []any) error {
 				da.Network = schematype.Network(value.String)
 			}
 		case depositaddress.FieldOwnerIdentityPubkey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field owner_identity_pubkey", values[i])
 			} else if value != nil {
 				da.OwnerIdentityPubkey = *value
 			}
 		case depositaddress.FieldOwnerSigningPubkey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field owner_signing_pubkey", values[i])
 			} else if value != nil {
 				da.OwnerSigningPubkey = *value

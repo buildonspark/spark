@@ -26,8 +26,7 @@ func createTestTxBytes(t *testing.T, value int64) []byte {
 	require.NoError(t, err)
 	tx.AddTxOut(wire.NewTxOut(value, pkScript))
 	var buf bytes.Buffer
-	err = tx.Serialize(&buf)
-	require.NoError(t, err)
+	require.NoError(t, tx.Serialize(&buf))
 	return buf.Bytes()
 }
 

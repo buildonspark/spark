@@ -21,7 +21,7 @@ func TestValidateUserSignature(t *testing.T) {
 	// Create test data
 	network := common.Regtest
 	txidStr := "378dd9b575ef72e28f0addbf6c1f4371d1f33b96ffc9aa9c74fb52b31ec7147d"
-	txid, err := hex.DecodeString(txidStr)
+	txID, err := hex.DecodeString(txidStr)
 	require.NoError(t, err)
 	vout := uint32(1)
 	sspSignature := "304502210080012f5565ff92bceb130d793eedd5eb7516ca16e21cb4eaa19a238a412679a10220367f78f4de21d377f61c6970968d5af52959d8df3c312878ac7af422e4a0245e"
@@ -37,9 +37,6 @@ func TestValidateUserSignature(t *testing.T) {
 		userPubKey     keys.Public
 		userSignature  []byte
 		sspSignature   []byte
-		network        common.Network
-		txid           []byte
-		vout           uint32
 		totalAmount    uint64
 		expectedErrMsg string
 	}{
@@ -48,9 +45,6 @@ func TestValidateUserSignature(t *testing.T) {
 			userPubKey:     userIdentityPubKey,
 			userSignature:  userSignatureBytes,
 			sspSignature:   sspSignatureBytes,
-			network:        network,
-			txid:           txid,
-			vout:           vout,
 			totalAmount:    90000,
 			expectedErrMsg: "",
 		},
@@ -59,9 +53,6 @@ func TestValidateUserSignature(t *testing.T) {
 			userPubKey:     userIdentityPubKey,
 			userSignature:  nil,
 			sspSignature:   sspSignatureBytes,
-			network:        network,
-			txid:           txid,
-			vout:           vout,
 			totalAmount:    90000,
 			expectedErrMsg: "user signature is required",
 		},
@@ -70,9 +61,6 @@ func TestValidateUserSignature(t *testing.T) {
 			userPubKey:     userIdentityPubKey,
 			userSignature:  []byte("invalid"),
 			sspSignature:   sspSignatureBytes,
-			network:        network,
-			txid:           txid,
-			vout:           vout,
 			totalAmount:    90000,
 			expectedErrMsg: "invalid signature format: malformed DER signature",
 		},
@@ -81,9 +69,6 @@ func TestValidateUserSignature(t *testing.T) {
 			userPubKey:     userIdentityPubKey,
 			userSignature:  sspSignatureBytes, // Using SSP signature as user signature should fail
 			sspSignature:   sspSignatureBytes,
-			network:        network,
-			txid:           txid,
-			vout:           vout,
 			totalAmount:    90000,
 			expectedErrMsg: "invalid signature",
 		},
@@ -92,21 +77,17 @@ func TestValidateUserSignature(t *testing.T) {
 			userPubKey:     userIdentityPubKey,
 			userSignature:  userSignatureBytes,
 			sspSignature:   sspSignatureBytes,
-			network:        network,
-			txid:           txid,
-			vout:           vout,
 			totalAmount:    1000, // wrong amount
 			expectedErrMsg: "invalid signature",
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateUserSignature(tt.userPubKey, tt.userSignature, tt.sspSignature, pb.UtxoSwapRequestType_Fixed, tt.network, tt.txid, tt.vout, tt.totalAmount)
-			if tt.expectedErrMsg != "" {
-				require.ErrorContains(t, err, tt.expectedErrMsg)
-			} else {
+			err := validateUserSignature(tt.userPubKey, tt.userSignature, tt.sspSignature, pb.UtxoSwapRequestType_Fixed, network, txID, vout, tt.totalAmount)
+			if tt.expectedErrMsg == "" {
 				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tt.expectedErrMsg)
 			}
 		})
 	}
