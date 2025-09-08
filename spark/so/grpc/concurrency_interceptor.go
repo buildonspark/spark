@@ -4,7 +4,11 @@ import (
 	"context"
 	"sync"
 
+	"github.com/lightsparkdev/spark/so/grpcutil"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -101,6 +105,24 @@ func (n *NoopResourceLimiter) TryAcquireMethod(string) error {
 func (n *NoopResourceLimiter) ReleaseMethod(string) {
 }
 
+var (
+	methodConcurrencyGauge metric.Int64UpDownCounter
+)
+
+func init() {
+	meter := otel.GetMeterProvider().Meter("spark.grpc")
+	newMethodConcurrencyGauge, err := meter.Int64UpDownCounter(
+		"rpc.server.active_requests_per_rpc",
+		metric.WithDescription("Number of currently active gRPCrequests"),
+		metric.WithUnit("{count}"),
+	)
+	if err != nil {
+		otel.Handle(err)
+		newMethodConcurrencyGauge = noop.Int64UpDownCounter{}
+	}
+	methodConcurrencyGauge = newMethodConcurrencyGauge
+}
+
 // Creates a unary server interceptor that enforces a concurrency limit on incoming gRPC requests
 func ConcurrencyInterceptor(guard ResourceLimiter) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
@@ -108,6 +130,11 @@ func ConcurrencyInterceptor(guard ResourceLimiter) grpc.UnaryServerInterceptor {
 			return nil, err
 		}
 		defer guard.ReleaseMethod(info.FullMethod)
+
+		otelAttrs := metric.WithAttributes(grpcutil.ParseFullMethod(info.FullMethod)...)
+		methodConcurrencyGauge.Add(ctx, 1, otelAttrs)
+		defer methodConcurrencyGauge.Add(ctx, -1, otelAttrs)
+
 		return handler(ctx, req)
 	}
 }
