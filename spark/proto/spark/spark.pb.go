@@ -4675,11 +4675,13 @@ type StartTransferRequest struct {
 	state                  protoimpl.MessageState `protogen:"open.v1"`
 	TransferId             string                 `protobuf:"bytes,1,opt,name=transfer_id,json=transferId,proto3" json:"transfer_id,omitempty"`
 	OwnerIdentityPublicKey []byte                 `protobuf:"bytes,2,opt,name=owner_identity_public_key,json=ownerIdentityPublicKey,proto3" json:"owner_identity_public_key,omitempty"`
-	// Deprecated: Marked as deprecated in spark.proto.
+	// This field is used for swap and coop exits. Regular transfers must use
+	// the transfer_package field.
 	LeavesToSend              []*LeafRefundTxSigningJob `protobuf:"bytes,3,rep,name=leaves_to_send,json=leavesToSend,proto3" json:"leaves_to_send,omitempty"`
 	ReceiverIdentityPublicKey []byte                    `protobuf:"bytes,4,opt,name=receiver_identity_public_key,json=receiverIdentityPublicKey,proto3" json:"receiver_identity_public_key,omitempty"`
 	ExpiryTime                *timestamppb.Timestamp    `protobuf:"bytes,5,opt,name=expiry_time,json=expiryTime,proto3" json:"expiry_time,omitempty"`
-	// If this field is set, the leaves_to_send and key_tweak_proofs will be ignored.
+	// This field is required for transfers of type "transfer". If this field
+	// is set, the leaves_to_send and key_tweak_proofs will be ignored.
 	TransferPackage *TransferPackage `protobuf:"bytes,7,opt,name=transfer_package,json=transferPackage,proto3" json:"transfer_package,omitempty"`
 	// The invoice this transfer pays.
 	SparkInvoice  string `protobuf:"bytes,10,opt,name=spark_invoice,json=sparkInvoice,proto3" json:"spark_invoice,omitempty"`
@@ -4731,7 +4733,6 @@ func (x *StartTransferRequest) GetOwnerIdentityPublicKey() []byte {
 	return nil
 }
 
-// Deprecated: Marked as deprecated in spark.proto.
 func (x *StartTransferRequest) GetLeavesToSend() []*LeafRefundTxSigningJob {
 	if x != nil {
 		return x.LeavesToSend
@@ -10567,12 +10568,12 @@ const file_spark_proto_rawDesc = "" +
 	"\vexpiry_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"expiryTime\x12P\n" +
 	"\x15direct_leaves_to_send\x18\x06 \x03(\v2\x1d.spark.UserSignedTxSigningJobR\x12directLeavesToSend\x12b\n" +
-	"\x1fdirect_from_cpfp_leaves_to_send\x18\a \x03(\v2\x1d.spark.UserSignedTxSigningJobR\x1adirectFromCpfpLeavesToSend\"\xad\x03\n" +
+	"\x1fdirect_from_cpfp_leaves_to_send\x18\a \x03(\v2\x1d.spark.UserSignedTxSigningJobR\x1adirectFromCpfpLeavesToSend\"\xa9\x03\n" +
 	"\x14StartTransferRequest\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
 	"transferId\x129\n" +
-	"\x19owner_identity_public_key\x18\x02 \x01(\fR\x16ownerIdentityPublicKey\x12G\n" +
-	"\x0eleaves_to_send\x18\x03 \x03(\v2\x1d.spark.LeafRefundTxSigningJobB\x02\x18\x01R\fleavesToSend\x12?\n" +
+	"\x19owner_identity_public_key\x18\x02 \x01(\fR\x16ownerIdentityPublicKey\x12C\n" +
+	"\x0eleaves_to_send\x18\x03 \x03(\v2\x1d.spark.LeafRefundTxSigningJobR\fleavesToSend\x12?\n" +
 	"\x1creceiver_identity_public_key\x18\x04 \x01(\fR\x19receiverIdentityPublicKey\x12;\n" +
 	"\vexpiry_time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"expiryTime\x12A\n" +

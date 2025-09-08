@@ -84,7 +84,7 @@ service SparkService {
     rpc initiate_static_deposit_utxo_refund(InitiateStaticDepositUtxoRefundRequest) returns (InitiateStaticDepositUtxoRefundResponse) {}
 
     // DEPRECATED: This unified method is being split for better clarity and type safety
-    // 
+    //
     // For swap operations: Use spark_ssp_internal.initiate_static_deposit_utxo_swap()
     // For refund operations: Use initiate_static_deposit_utxo_refund()
     rpc initiate_utxo_swap(InitiateUtxoSwapRequest) returns (InitiateUtxoSwapResponse) {
@@ -453,7 +453,7 @@ message TokenOutput {
     optional bytes revocation_commitment = 3 [(validate.rules).bytes.len = 33];
     optional uint64 withdraw_bond_sats = 4;
     optional uint64 withdraw_relative_block_locktime = 5;
-    optional bytes token_public_key = 6 [(validate.rules).bytes = {len: 33}]; 
+    optional bytes token_public_key = 6 [(validate.rules).bytes = {len: 33}];
     optional bytes token_identifier = 8 [(validate.rules).bytes.len = 32];
     bytes token_amount = 7 [(validate.rules).bytes.len = 16];  // Decoded uint128
 }
@@ -466,7 +466,7 @@ message TokenTransaction {
         TokenMintInput mint_input = 1;
         TokenTransferInput transfer_input = 2;
         TokenCreateInput create_input = 5;
-    }   
+    }
     repeated TokenOutput token_outputs = 3;
     repeated bytes spark_operator_identity_public_keys = 4 [(validate.rules).repeated.items.bytes.len = 33];
     Network network = 10 [(validate.rules).enum = {not_in: [0]}];
@@ -757,10 +757,13 @@ message StartTransferRequest {
 
     string transfer_id = 1;
     bytes owner_identity_public_key = 2;
-    repeated LeafRefundTxSigningJob leaves_to_send = 3 [deprecated = true];
+    // This field is used for swap and coop exits. Regular transfers must use
+    // the transfer_package field.
+    repeated LeafRefundTxSigningJob leaves_to_send = 3;
     bytes receiver_identity_public_key = 4;
     google.protobuf.Timestamp expiry_time = 5;
-    // If this field is set, the leaves_to_send and key_tweak_proofs will be ignored.
+    // This field is required for transfers of type "transfer". If this field
+    // is set, the leaves_to_send and key_tweak_proofs will be ignored.
     TransferPackage transfer_package = 7;
     // The invoice this transfer pays.
     string spark_invoice = 10;
@@ -1239,13 +1242,13 @@ message SparkAddress {
 
 message SparkInvoiceFields {
     uint32 version = 1;
-    bytes id = 2 [(validate.rules).bytes.len = 16]; 
+    bytes id = 2 [(validate.rules).bytes.len = 16];
     oneof payment_type {
         TokensPayment tokens_payment = 3;
         SatsPayment sats_payment = 4;
     }
     optional string memo = 5 [(validate.rules).string.max_bytes = 120];
-    optional bytes sender_public_key = 6 [(validate.rules).bytes.len = 33];  
+    optional bytes sender_public_key = 6 [(validate.rules).bytes.len = 33];
     optional google.protobuf.Timestamp expiry_time = 7;
 }
 
