@@ -7,7 +7,6 @@ import "google/protobuf/empty.proto";
 
 service MockService {
     rpc clean_up_preimage_share(CleanUpPreimageShareRequest) returns (google.protobuf.Empty) {}
-    rpc interrupt_coop_exit(InterruptCoopExitRequest) returns (google.protobuf.Empty) {}
     rpc update_nodes_status(UpdateNodesStatusRequest) returns (google.protobuf.Empty) {}
     // Triggers the execution of a scheduled task immediately by name. Used by hermetic tests
     rpc trigger_task(TriggerTaskRequest) returns (google.protobuf.Empty) {}
@@ -25,14 +24,4 @@ message UpdateNodesStatusRequest {
 // TriggerTaskRequest is used to trigger a scheduled task immediately in hermetic tests.
 message TriggerTaskRequest {
     string task_name = 1;
-}
-
-message InterruptCoopExitRequest {
-    enum InterruptCoopExitAction {
-        NONE      = 0;
-        INTERRUPT = 1;
-        RESUME    = 2;
-    }
-    InterruptCoopExitAction action           = 1;
-    string                  target_operator  = 2; // optional, defaults to MockAction.TargetOperatorID
 }

@@ -5,7 +5,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/lightsparkdev/spark/common"
 	pbdkg "github.com/lightsparkdev/spark/proto/dkg"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbmock "github.com/lightsparkdev/spark/proto/mock"
@@ -33,11 +32,10 @@ func RegisterGrpcServers(
 	dbClient *ent.Client,
 	frostClient *grpc.ClientConn,
 	sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier,
-	mockAction *common.MockAction,
 	eventsRouter *events.EventRouter,
 ) error {
-	if mockAction != nil {
-		mockServer := sparkgrpc.NewMockServer(config, mockAction, dbClient)
+	if args.RunningLocally {
+		mockServer := sparkgrpc.NewMockServer(config, dbClient)
 		pbmock.RegisterMockServiceServer(grpcServer, mockServer)
 	}
 
@@ -51,7 +49,7 @@ func RegisterGrpcServers(
 	pbinternal.RegisterSparkInternalServiceServer(grpcServer, sparkInternalServer)
 
 	// Public SO endpoint
-	sparkServer := sparkgrpc.NewSparkServer(config, mockAction, eventsRouter)
+	sparkServer := sparkgrpc.NewSparkServer(config, eventsRouter)
 	pbspark.RegisterSparkServiceServer(grpcServer, sparkServer)
 
 	// Public SO token endpoint

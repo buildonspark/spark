@@ -48,8 +48,7 @@ import (
 // TransferHandler is a helper struct to handle leaves transfer request.
 type TransferHandler struct {
 	BaseTransferHandler
-	config     *so.Config
-	mockAction *common.MockAction
+	config *so.Config
 }
 
 var transferTypeKey = attribute.Key("transfer_type")
@@ -57,10 +56,6 @@ var transferTypeKey = attribute.Key("transfer_type")
 // NewTransferHandler creates a new TransferHandler.
 func NewTransferHandler(config *so.Config) *TransferHandler {
 	return &TransferHandler{BaseTransferHandler: NewBaseTransferHandler(config), config: config}
-}
-
-func (h *TransferHandler) SetMockAction(mockAction *common.MockAction) {
-	h.mockAction = mockAction
 }
 
 func (h *TransferHandler) loadCpfpLeafRefundMap(req *pb.StartTransferRequest) map[string][]byte {

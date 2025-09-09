@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/knobs"
@@ -27,13 +26,12 @@ import (
 type MockServer struct {
 	config *so.Config
 	pbmock.UnimplementedMockServiceServer
-	mockAction *common.MockAction
 	rootClient *ent.Client
 }
 
 // NewMockServer creates a new MockServer.
-func NewMockServer(config *so.Config, mockAction *common.MockAction, rootClient *ent.Client) *MockServer {
-	return &MockServer{config: config, mockAction: mockAction, rootClient: rootClient}
+func NewMockServer(config *so.Config, rootClient *ent.Client) *MockServer {
+	return &MockServer{config: config, rootClient: rootClient}
 }
 
 // CleanUpPreimageShare cleans up the preimage share for the given payment hash.
@@ -115,20 +113,5 @@ func (o *MockServer) TriggerTask(_ context.Context, req *pbmock.TriggerTaskReque
 		return nil, status.Errorf(codes.Internal, "task %s failed: %v", taskName, err)
 	}
 
-	return &emptypb.Empty{}, nil
-}
-
-func (o *MockServer) InterruptCoopExit(_ context.Context, req *pbmock.InterruptCoopExitRequest) (*emptypb.Empty, error) {
-	switch req.Action {
-	case pbmock.InterruptCoopExitRequest_INTERRUPT:
-		o.mockAction.InterruptCoopExit = true
-		if req.TargetOperator != "" {
-			o.mockAction.TargetOperatorID = req.TargetOperator
-		}
-	case pbmock.InterruptCoopExitRequest_RESUME:
-		o.mockAction.InterruptCoopExit = false
-	default:
-		return nil, status.Errorf(codes.InvalidArgument, "invalid interrupt coop-exit action: %v", req.Action)
-	}
 	return &emptypb.Empty{}, nil
 }

@@ -563,11 +563,6 @@ func main() {
 	serverOpts = append(serverOpts, grpc.Creds(creds))
 	grpcServer := grpc.NewServer(serverOpts...)
 
-	var mockAction *common.MockAction
-	if args.RunningLocally {
-		mockAction = common.NewMockAction()
-	}
-
 	err = RegisterGrpcServers(
 		grpcServer,
 		args,
@@ -575,7 +570,6 @@ func main() {
 		dbClient,
 		frostConnection,
 		sessionTokenCreatorVerifier,
-		mockAction,
 		eventsRouter,
 	)
 	if err != nil {

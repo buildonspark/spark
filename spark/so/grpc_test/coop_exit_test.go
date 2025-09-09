@@ -10,7 +10,6 @@ import (
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common"
-	pbmock "github.com/lightsparkdev/spark/proto/mock"
 	"github.com/lightsparkdev/spark/proto/spark"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/handler"
@@ -489,12 +488,6 @@ func TestCoopExitFailureToSync(t *testing.T) {
 	require.NoError(t, err, "failed to create grpc connection")
 	defer conn.Close()
 
-	mockClient := pbmock.NewMockServiceClient(conn)
-	_, err = mockClient.InterruptCoopExit(t.Context(), &pbmock.InterruptCoopExitRequest{
-		Action: pbmock.InterruptCoopExitRequest_INTERRUPT,
-	})
-	require.NoError(t, err)
-
 	authToken, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err, "failed to authenticate sender")
 	tmpCtx := wallet.ContextWithToken(t.Context(), authToken)
@@ -532,6 +525,12 @@ func TestCoopExitFailureToSync(t *testing.T) {
 		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
 	)
 
+	soController := sparktesting.NewSparkOperatorController(t)
+	err = soController.DisableOperator(t, 2)
+	if err != nil {
+		t.Fatalf("failed to disable operator 2: %v", err)
+	}
+
 	// User creates transfer to SSP on the condition that the tx is confirmed
 	exitTxID, err := hex.DecodeString(exitTx.TxID())
 	require.NoError(t, err)
@@ -546,9 +545,10 @@ func TestCoopExitFailureToSync(t *testing.T) {
 	)
 	require.Error(t, err)
 
-	_, _ = mockClient.InterruptCoopExit(t.Context(), &pbmock.InterruptCoopExitRequest{
-		Action: pbmock.InterruptCoopExitRequest_RESUME,
-	})
+	err = soController.EnableOperator(t, 2)
+	if err != nil {
+		t.Fatalf("failed to enable operator 2: %v", err)
+	}
 
 	// Verify that any new transfers created during this test have the correct status
 	for id, op := range config.SigningOperators {

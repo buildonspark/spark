@@ -26,8 +26,7 @@ import (
 // It will be used by the user or Spark service provider.
 type SparkServer struct {
 	pb.UnimplementedSparkServiceServer
-	config     *so.Config
-	mockAction *common.MockAction
+	config *so.Config
 
 	// ResourceGuard to limit concurrent ClaimTransferSignRefunds calls for the same transfer ID. This
 	// is already enforced through row locking, but is more to prevent unnecessary load on the DB.
@@ -38,8 +37,8 @@ type SparkServer struct {
 var emptyResponse = &emptypb.Empty{}
 
 // NewSparkServer creates a new SparkServer.
-func NewSparkServer(config *so.Config, mockAction *common.MockAction, eventsRouter *events.EventRouter) *SparkServer {
-	return &SparkServer{config: config, mockAction: mockAction, claimTransferSignRefundsTransferGuard: limiter.NewResourceGuard(), eventsRouter: eventsRouter}
+func NewSparkServer(config *so.Config, eventsRouter *events.EventRouter) *SparkServer {
+	return &SparkServer{config: config, claimTransferSignRefundsTransferGuard: limiter.NewResourceGuard(), eventsRouter: eventsRouter}
 }
 
 // GenerateDepositAddress generates a deposit address for the given public key.
@@ -246,9 +245,6 @@ func (s *SparkServer) CooperativeExit(ctx context.Context, req *pb.CooperativeEx
 	}
 	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	coopExitHandler := handler.NewCooperativeExitHandler(s.config)
-	if s.mockAction != nil {
-		coopExitHandler.SetMockAction(s.mockAction)
-	}
 	return coopExitHandler.CooperativeExit(ctx, req)
 }
 
@@ -260,9 +256,6 @@ func (s *SparkServer) CooperativeExitV2(ctx context.Context, req *pb.Cooperative
 	}
 	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	coopExitHandler := handler.NewCooperativeExitHandler(s.config)
-	if s.mockAction != nil {
-		coopExitHandler.SetMockAction(s.mockAction)
-	}
 	return coopExitHandler.CooperativeExit(ctx, req)
 }
 

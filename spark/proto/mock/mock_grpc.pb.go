@@ -21,7 +21,6 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	MockService_CleanUpPreimageShare_FullMethodName = "/mock.MockService/clean_up_preimage_share"
-	MockService_InterruptCoopExit_FullMethodName    = "/mock.MockService/interrupt_coop_exit"
 	MockService_UpdateNodesStatus_FullMethodName    = "/mock.MockService/update_nodes_status"
 	MockService_TriggerTask_FullMethodName          = "/mock.MockService/trigger_task"
 )
@@ -31,7 +30,6 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type MockServiceClient interface {
 	CleanUpPreimageShare(ctx context.Context, in *CleanUpPreimageShareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	InterruptCoopExit(ctx context.Context, in *InterruptCoopExitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	UpdateNodesStatus(ctx context.Context, in *UpdateNodesStatusRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// Triggers the execution of a scheduled task immediately by name. Used by hermetic tests
 	TriggerTask(ctx context.Context, in *TriggerTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -49,16 +47,6 @@ func (c *mockServiceClient) CleanUpPreimageShare(ctx context.Context, in *CleanU
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, MockService_CleanUpPreimageShare_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *mockServiceClient) InterruptCoopExit(ctx context.Context, in *InterruptCoopExitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, MockService_InterruptCoopExit_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +78,6 @@ func (c *mockServiceClient) TriggerTask(ctx context.Context, in *TriggerTaskRequ
 // for forward compatibility.
 type MockServiceServer interface {
 	CleanUpPreimageShare(context.Context, *CleanUpPreimageShareRequest) (*emptypb.Empty, error)
-	InterruptCoopExit(context.Context, *InterruptCoopExitRequest) (*emptypb.Empty, error)
 	UpdateNodesStatus(context.Context, *UpdateNodesStatusRequest) (*emptypb.Empty, error)
 	// Triggers the execution of a scheduled task immediately by name. Used by hermetic tests
 	TriggerTask(context.Context, *TriggerTaskRequest) (*emptypb.Empty, error)
@@ -106,9 +93,6 @@ type UnimplementedMockServiceServer struct{}
 
 func (UnimplementedMockServiceServer) CleanUpPreimageShare(context.Context, *CleanUpPreimageShareRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CleanUpPreimageShare not implemented")
-}
-func (UnimplementedMockServiceServer) InterruptCoopExit(context.Context, *InterruptCoopExitRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method InterruptCoopExit not implemented")
 }
 func (UnimplementedMockServiceServer) UpdateNodesStatus(context.Context, *UpdateNodesStatusRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateNodesStatus not implemented")
@@ -151,24 +135,6 @@ func _MockService_CleanUpPreimageShare_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(MockServiceServer).CleanUpPreimageShare(ctx, req.(*CleanUpPreimageShareRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _MockService_InterruptCoopExit_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(InterruptCoopExitRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(MockServiceServer).InterruptCoopExit(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: MockService_InterruptCoopExit_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MockServiceServer).InterruptCoopExit(ctx, req.(*InterruptCoopExitRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -219,10 +185,6 @@ var MockService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "clean_up_preimage_share",
 			Handler:    _MockService_CleanUpPreimageShare_Handler,
-		},
-		{
-			MethodName: "interrupt_coop_exit",
-			Handler:    _MockService_InterruptCoopExit_Handler,
 		},
 		{
 			MethodName: "update_nodes_status",

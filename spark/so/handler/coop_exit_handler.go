@@ -7,7 +7,6 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -21,8 +20,7 @@ import (
 // CooperativeExitHandler tracks transfers
 // and on-chain txs events for cooperative exits.
 type CooperativeExitHandler struct {
-	config     *so.Config
-	mockAction *common.MockAction
+	config *so.Config
 }
 
 // NewCooperativeExitHandler creates a new CooperativeExitHandler.
@@ -30,11 +28,6 @@ func NewCooperativeExitHandler(config *so.Config) *CooperativeExitHandler {
 	return &CooperativeExitHandler{
 		config: config,
 	}
-}
-
-// SetMockAction sets the mock action for the CooperativeExitHandler.
-func (h *CooperativeExitHandler) SetMockAction(mockAction *common.MockAction) {
-	h.mockAction = mockAction
 }
 
 // CooperativeExit signs refund transactions for leaves, spending connector outputs.
@@ -59,9 +52,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 	}
 
 	transferHandler := NewTransferHandler(h.config)
-	if h.mockAction != nil {
-		transferHandler.SetMockAction(h.mockAction)
-	}
+
 	cpfpLeafRefundMap := make(map[string][]byte)
 	directLeafRefundMap := make(map[string][]byte)
 	directFromCpfpLeafRefundMap := make(map[string][]byte)
@@ -185,11 +176,6 @@ func (h *TransferHandler) syncCoopExitInit(ctx context.Context, req *pb.Cooperat
 		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
-		if h.mockAction != nil && h.mockAction.InterruptCoopExit {
-			if h.mockAction.TargetOperatorID == operator.Identifier {
-				return nil, fmt.Errorf("cooperative exit interrupted")
-			}
-		}
 		logger := logging.GetLoggerFromContext(ctx)
 
 		conn, err := operator.NewOperatorGRPCConnection()
