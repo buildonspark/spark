@@ -59,7 +59,6 @@ runs:
       if: inputs.enable-corepack == 'true'
       shell: bash
       working-directory: ${{ inputs.cwd }}
-      #  echo tmp corepack enable, enable corepack, and echo inputs.enable-corepack value:
       run: corepack enable
 
     - name: ⚙️ Expose yarn config as "$GITHUB_OUTPUT"
