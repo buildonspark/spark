@@ -150,17 +150,36 @@ export interface SparkWalletProps {
   options?: ConfigOptions;
 }
 
+export const SparkWalletEvent = {
+  All: "*",
+  TransferClaimed: "transfer:claimed",
+  DepositConfirmed: "deposit:confirmed",
+  StreamConnected: "stream:connected",
+  StreamDisconnected: "stream:disconnected",
+  StreamReconnecting: "stream:reconnecting",
+} as const;
+
+export type SparkWalletEventType =
+  (typeof SparkWalletEvent)[keyof typeof SparkWalletEvent];
+
 export interface SparkWalletEvents {
+  [SparkWalletEvent.All]: (eventName: string, ...args: unknown[]) => void;
   /** Emitted when an incoming transfer is successfully claimed. Includes the transfer ID and new total balance. */
-  "transfer:claimed": (transferId: string, updatedBalance: number) => void;
+  [SparkWalletEvent.TransferClaimed]: (
+    transferId: string,
+    updatedBalance: bigint,
+  ) => void;
   /** Emitted when a deposit is marked as available. Includes the deposit ID and new total balance. */
-  "deposit:confirmed": (depositId: string, updatedBalance: number) => void;
+  [SparkWalletEvent.DepositConfirmed]: (
+    depositId: string,
+    updatedBalance: bigint,
+  ) => void;
   /** Emitted when the stream is connected */
-  "stream:connected": () => void;
+  [SparkWalletEvent.StreamConnected]: () => void;
   /** Emitted when the stream disconnects and fails to reconnect after max attempts */
-  "stream:disconnected": (reason: string) => void;
+  [SparkWalletEvent.StreamDisconnected]: (reason: string) => void;
   /** Emitted when attempting to reconnect the stream */
-  "stream:reconnecting": (
+  [SparkWalletEvent.StreamReconnecting]: (
     attempt: number,
     maxAttempts: number,
     delayMs: number,

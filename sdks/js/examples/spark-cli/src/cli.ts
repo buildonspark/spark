@@ -20,6 +20,7 @@ import {
   SparkSdkLogger,
   validateSparkInvoiceSignature,
   WalletConfig,
+  SparkWalletEvent,
 } from "@buildonspark/spark-sdk";
 import {
   TokenTransactionStatus,
@@ -992,8 +993,8 @@ async function runCLI() {
             console.log("Mnemonic:", newMnemonic);
             console.log("Network:", options.network);
             wallet.on(
-              "deposit:confirmed",
-              (depositId: string, balance: number) => {
+              SparkWalletEvent.DepositConfirmed,
+              (depositId: string, balance: bigint) => {
                 console.log(
                   `Deposit ${depositId} marked as available. New balance: ${balance}`,
                 );
@@ -1001,18 +1002,18 @@ async function runCLI() {
             );
 
             wallet.on(
-              "transfer:claimed",
-              (transferId: string, balance: number) => {
+              SparkWalletEvent.TransferClaimed,
+              (transferId: string, balance: bigint) => {
                 console.log(
                   `Transfer ${transferId} claimed. New balance: ${balance}`,
                 );
               },
             );
-            wallet.on("stream:connected", () => {
+            wallet.on(SparkWalletEvent.StreamConnected, () => {
               console.log("Stream connected");
             });
             wallet.on(
-              "stream:reconnecting",
+              SparkWalletEvent.StreamReconnecting,
               (
                 attempt: number,
                 maxAttempts: number,
@@ -1028,7 +1029,7 @@ async function runCLI() {
                 );
               },
             );
-            wallet.on("stream:disconnected", (reason: string) => {
+            wallet.on(SparkWalletEvent.StreamDisconnected, (reason: string) => {
               console.log("Stream disconnected", reason);
             });
           } catch (error: any) {

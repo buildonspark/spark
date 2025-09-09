@@ -4,7 +4,11 @@ import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { uuidv7 } from "uuidv7";
 import { RPCError } from "../../errors/types.js";
-import { KeyDerivation, KeyDerivationType } from "../../index.js";
+import {
+  KeyDerivation,
+  KeyDerivationType,
+  SparkWalletEvent,
+} from "../../index.js";
 import { TransferStatus } from "../../proto/spark.js";
 import { WalletConfigService } from "../../services/config.js";
 import { ConnectionManager } from "../../services/connection.js";
@@ -566,7 +570,10 @@ describe.each(walletTypes)(
       ): Promise<{ transferId: string; balance: bigint }> {
         return new Promise((resolve, reject) => {
           const timeout = setTimeout(() => {
-            receiverWallet.removeListener("transfer:claimed", handler);
+            receiverWallet.removeListener(
+              SparkWalletEvent.TransferClaimed,
+              handler,
+            );
             reject(
               new Error(
                 `Timeout waiting for transfer ${transferId} to be claimed`,
@@ -577,12 +584,15 @@ describe.each(walletTypes)(
           const handler = (claimedTransferId: string, balance: bigint) => {
             if (claimedTransferId === transferId) {
               clearTimeout(timeout);
-              receiverWallet.removeListener("transfer:claimed", handler);
+              receiverWallet.removeListener(
+                SparkWalletEvent.TransferClaimed,
+                handler,
+              );
               resolve({ transferId: claimedTransferId, balance });
             }
           };
 
-          receiverWallet.on("transfer:claimed", handler);
+          receiverWallet.on(SparkWalletEvent.TransferClaimed, handler);
         });
       }
 

@@ -1,14 +1,15 @@
 import {
   ReactNativeSparkSigner,
   SparkWallet,
+  SparkWalletEvent,
 } from "@buildonspark/spark-sdk/native";
 import { createDummyTx } from "@buildonspark/spark-sdk/native/spark-frost";
 import { useEffect, useState } from "react";
 import { Button, Text, View } from "react-native";
 
 export default function Index() {
-  const [balance, setBalance] = useState(0);
-  const [balance1, setBalance1] = useState(0);
+  const [balance, setBalance] = useState(0n);
+  const [balance1, setBalance1] = useState(0n);
   const [invoice, setInvoice] = useState<string | null>(null);
   const [wallet, setWallet] = useState<SparkWallet | null>(null);
   const [wallet1, setWallet1] = useState<SparkWallet | null>(null);
@@ -20,7 +21,7 @@ export default function Index() {
 
       const handleTransferClaimed = (
         transferId: string,
-        updatedBalance: number,
+        updatedBalance: bigint,
       ) => {
         console.log(
           "Transfer claimed event received!",
@@ -31,14 +32,17 @@ export default function Index() {
       };
 
       // Log all events to see what's happening
-      wallet.on("transfer:claimed", handleTransferClaimed);
-      wallet.on("*", (eventName: string, ...args: any[]) => {
+      wallet.on(SparkWalletEvent.TransferClaimed, handleTransferClaimed);
+      wallet.on(SparkWalletEvent.All, (eventName: string, ...args: any[]) => {
         console.log("Wallet event received:", eventName, args);
       });
 
       return () => {
         console.log("Cleaning up event listeners");
-        wallet.removeListener("transfer:claimed", handleTransferClaimed);
+        wallet.removeListener(
+          SparkWalletEvent.TransferClaimed,
+          handleTransferClaimed,
+        );
       };
     }
   }, [wallet]);
@@ -49,7 +53,7 @@ export default function Index() {
 
       const handleTransferClaimed = (
         transferId: string,
-        updatedBalance: number,
+        updatedBalance: bigint,
       ) => {
         console.log(
           "Transfer claimed event received!",
@@ -60,18 +64,21 @@ export default function Index() {
       };
 
       // Add listener for transfer:claimed
-      wallet1.on("transfer:claimed", handleTransferClaimed);
+      wallet1.on(SparkWalletEvent.TransferClaimed, handleTransferClaimed);
 
       // Add listener for all events to debug
       const handleAllEvents = (eventName: string, ...args: any[]) => {
         console.log("Wallet event received:", eventName, args);
       };
-      wallet1.on("*", handleAllEvents);
+      wallet1.on(SparkWalletEvent.All, handleAllEvents);
 
       return () => {
         console.log("Cleaning up event listeners");
-        wallet1.removeListener("transfer:claimed", handleTransferClaimed);
-        wallet1.removeListener("*", handleAllEvents);
+        wallet1.removeListener(
+          SparkWalletEvent.TransferClaimed,
+          handleTransferClaimed,
+        );
+        wallet1.removeListener(SparkWalletEvent.All, handleAllEvents);
       };
     }
   }, [wallet1]);
@@ -102,7 +109,7 @@ export default function Index() {
 
       // Update all states in a single batch
       setWallet(wallet.wallet);
-      setBalance(Number(balance.balance));
+      setBalance(balance.balance);
 
       const wallet1 = await SparkWallet.initialize({
         mnemonicOrSeed:
@@ -115,7 +122,7 @@ export default function Index() {
 
       const balance1 = await wallet1.wallet.getBalance();
       setWallet1(wallet1.wallet);
-      setBalance1(Number(balance1.balance));
+      setBalance1(balance1.balance);
     } catch (error) {
       console.error("Error initializing wallet:", error);
     }

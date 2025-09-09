@@ -150,14 +150,16 @@ import type {
   TransferWithInvoiceOutcome,
   TransferWithInvoiceParams,
   UserTokenMetadata,
+  SparkWalletEvents,
 } from "./types.js";
+import { SparkWalletEvent } from "./types.js";
 
 /**
  * The SparkWallet class is the primary interface for interacting with the Spark network.
  * It provides methods for creating and managing wallets, handling deposits, executing transfers,
  * and interacting with the Lightning Network.
  */
-export class SparkWallet extends EventEmitter {
+export class SparkWallet extends EventEmitter<SparkWalletEvents> {
   protected config: WalletConfigService;
 
   protected connectionManager: ConnectionManager;
@@ -304,7 +306,7 @@ export class SparkWallet extends EventEmitter {
           path: deposit.id,
         });
         this.emit(
-          "deposit:confirmed",
+          SparkWalletEvent.DepositConfirmed,
           deposit.id,
           (await this.getBalance()).balance,
         );
@@ -397,7 +399,7 @@ export class SparkWallet extends EventEmitter {
             }
 
             if (data.event?.$case === "connected") {
-              this.emit("stream:connected");
+              this.emit(SparkWalletEvent.StreamConnected);
               retryCount = 0;
             }
 
@@ -426,7 +428,7 @@ export class SparkWallet extends EventEmitter {
         if (retryCount < MAX_RETRIES) {
           retryCount++;
           this.emit(
-            "stream:reconnecting",
+            SparkWalletEvent.StreamReconnecting,
             retryCount,
             MAX_RETRIES,
             backoffDelay,
@@ -446,7 +448,10 @@ export class SparkWallet extends EventEmitter {
             }
           }
         } else {
-          this.emit("stream:disconnected", "Max reconnection attempts reached");
+          this.emit(
+            SparkWalletEvent.StreamDisconnected,
+            "Max reconnection attempts reached",
+          );
           break;
         }
       }
@@ -3110,7 +3115,7 @@ export class SparkWallet extends EventEmitter {
 
     if (emit) {
       this.emit(
-        "transfer:claimed",
+        SparkWalletEvent.TransferClaimed,
         transfer.id,
         (await this.getBalance()).balance,
       );
