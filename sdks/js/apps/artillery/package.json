@@ -54,14 +54,6 @@
       "spark": "."
     }
   },
-  "keywords": [
-    "artillery",
-    "artillery-engine",
-    "engine",
-    "spark",
-    "load-testing",
-    "performance-testing"
-  ],
   "files": [
     "../../node_modules/**/*",
     "dist/**/*",

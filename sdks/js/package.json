@@ -31,8 +31,9 @@
     "types": "turbo run types"
   },
   "workspaces": [
-    "packages/*",
-    "examples/*"
+    "apps/*",
+    "examples/*",
+    "packages/*"
   ],
   "devDependencies": {
     "@changesets/cli": "^2.27.1",
