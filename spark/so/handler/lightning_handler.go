@@ -901,6 +901,23 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("transfer is required")
 	}
 
+	if req.Transfer.OwnerIdentityPublicKey == nil {
+		return nil, fmt.Errorf("owner identity public key is required")
+	}
+	ownerIDPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse owner identity public key: %w", err)
+	}
+
+	err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, ownerIDPubKey)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.Transfer == nil {
+		return nil, fmt.Errorf("transfer is required")
+	}
+
 	if len(req.Transfer.LeavesToSend) == 0 {
 		return nil, fmt.Errorf("at least one cpfp leaf tx must be provided")
 	}
@@ -950,7 +967,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		}
 	}
 
-	err := h.ValidateDuplicateLeaves(ctx, req.Transfer.LeavesToSend, req.Transfer.DirectLeavesToSend, req.Transfer.DirectFromCpfpLeavesToSend)
+	err = h.ValidateDuplicateLeaves(ctx, req.Transfer.LeavesToSend, req.Transfer.DirectLeavesToSend, req.Transfer.DirectFromCpfpLeavesToSend)
 	if err != nil {
 		return nil, fmt.Errorf("unable to validate duplicate leaves: %w", err)
 	}
@@ -997,10 +1014,6 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 	}
 
 	transferHandler := NewTransferHandler(h.config)
-	ownerIDPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse owner identity public key: %w", err)
-	}
 	transfer, _, err := transferHandler.createTransfer(
 		ctx,
 		req.Transfer.TransferId,

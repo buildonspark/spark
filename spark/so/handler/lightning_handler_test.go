@@ -627,7 +627,8 @@ func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 			setUpRequest: func() *pb.InitiatePreimageSwapRequest {
 				return &pb.InitiatePreimageSwapRequest{
 					Transfer: &pb.StartUserSignedTransferRequest{
-						LeavesToSend: []*pb.UserSignedTxSigningJob{}, // empty
+						LeavesToSend:           []*pb.UserSignedTxSigningJob{}, // empty
+						OwnerIdentityPublicKey: ownerIdentityPubKey.Serialize(),
 					},
 				}
 			},
@@ -1074,6 +1075,8 @@ func TestSendLightningLeafDuplicationBug(t *testing.T) {
 		// Duplicate the same leaf to artificially double the amount
 		duplicatedLeaf := createMockSigningJob(leafID, 1000)
 
+		rng := rand.NewChaCha8([32]byte{})
+		ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		// Create request with duplicated leaves
 		req := &pb.InitiatePreimageSwapRequest{
 			PaymentHash: []byte("payment_hash_32_bytes_long______"),
@@ -1083,7 +1086,7 @@ func TestSendLightningLeafDuplicationBug(t *testing.T) {
 					originalLeaf,
 					duplicatedLeaf, // Same leaf ID - this should be rejected but currently isn't
 				},
-				OwnerIdentityPublicKey:    []byte("owner_identity_key_32_bytes_long"),
+				OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
 				ReceiverIdentityPublicKey: []byte("receiver_identity_key_32_bytes__"),
 			},
 			InvoiceAmount: &pb.InvoiceAmount{
