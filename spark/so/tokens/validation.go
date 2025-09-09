@@ -98,10 +98,16 @@ func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, 
 	var tokenCreate *ent.TokenCreate
 	var identifierInfo string
 	if tokenIdentifier != nil {
-		tokenCreate, err = db.TokenCreate.Query().Where(tokencreate.TokenIdentifierEQ(tokenIdentifier)).First(ctx)
+		tokenCreate, err = db.TokenCreate.Query().
+			Where(tokencreate.TokenIdentifierEQ(tokenIdentifier)).
+			ForUpdate().
+			First(ctx)
 		identifierInfo = fmt.Sprintf("token identifier: %x", tokenIdentifier)
 	} else if !issuerPublicKey.IsZero() {
-		tokenCreate, err = db.TokenCreate.Query().Where(tokencreate.IssuerPublicKeyEQ(issuerPublicKey.Serialize()), tokencreate.NetworkEQ(network)).First(ctx)
+		tokenCreate, err = db.TokenCreate.Query().
+			Where(tokencreate.IssuerPublicKeyEQ(issuerPublicKey.Serialize()), tokencreate.NetworkEQ(network)).
+			ForUpdate().
+			First(ctx)
 		identifierInfo = fmt.Sprintf("issuer public key: %v", issuerPublicKey)
 	} else {
 		return sparkerrors.InvalidUserInputErrorf("no token identifier or issuer public key provided")
