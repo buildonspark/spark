@@ -16,7 +16,6 @@ import { uuidv7, uuidv7obj } from "uuidv7";
 import {
   ConfigurationError,
   NetworkError,
-  NotImplementedError,
   RPCError,
   ValidationError,
 } from "../errors/types.js";
@@ -120,9 +119,9 @@ import {
   decodeSparkAddress,
   encodeSparkAddress,
   encodeSparkAddressWithSignature,
+  isSafeForNumber,
   SparkAddressFormat,
   validateSparkInvoiceFields,
-  isSafeForNumber,
 } from "../utils/address.js";
 import { chunkArray } from "../utils/chunkArray.js";
 import { getFetch } from "../utils/fetch.js";
@@ -137,20 +136,20 @@ import {
 import type {
   CreateLightningInvoiceParams,
   DepositParams,
+  FulfillSparkInvoiceResponse,
+  GroupSparkInvoicesResult,
   InitWalletResponse,
+  InvalidInvoice,
   PayLightningInvoiceParams,
   SparkWalletProps,
   TokenBalanceMap,
+  TokenInvoice,
   TokenMetadataMap,
   TokenOutputsMap,
   TransferParams,
-  UserTokenMetadata,
-  TransferWithInvoiceParams,
   TransferWithInvoiceOutcome,
-  FulfillSparkInvoiceResponse,
-  TokenInvoice,
-  InvalidInvoice,
-  GroupSparkInvoicesResult,
+  TransferWithInvoiceParams,
+  UserTokenMetadata,
 } from "./types.js";
 
 /**
@@ -5016,6 +5015,10 @@ export class SparkWallet extends EventEmitter {
 
       offset += pageSize;
     }
+  }
+
+  public async isOptimizationInProgress() {
+    return this.optimizationInProgress;
   }
 
   protected getOtelTraceUrls() {
