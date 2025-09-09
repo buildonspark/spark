@@ -74,18 +74,6 @@ func (o *MockServer) CleanUpPreimageShare(ctx context.Context, req *pbmock.Clean
 	return &emptypb.Empty{}, nil
 }
 
-func (o *MockServer) InterruptTransfer(_ context.Context, req *pbmock.InterruptTransferRequest) (*emptypb.Empty, error) {
-	switch req.Action {
-	case pbmock.InterruptTransferRequest_INTERRUPT:
-		o.mockAction.InterruptTransfer = true
-	case pbmock.InterruptTransferRequest_RESUME:
-		o.mockAction.InterruptTransfer = false
-	default:
-		return nil, status.Errorf(codes.InvalidArgument, "invalid interrupt transfer action: %v", req.Action)
-	}
-	return &emptypb.Empty{}, nil
-}
-
 func (o *MockServer) UpdateNodesStatus(ctx context.Context, req *pbmock.UpdateNodesStatusRequest) (*emptypb.Empty, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {

@@ -178,9 +178,6 @@ func (s *SparkServer) ClaimTransferSignRefundsV2(ctx context.Context, req *pb.Cl
 	}
 	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	transferHander := handler.NewTransferHandler(s.config)
-	if s.mockAction != nil {
-		transferHander.SetMockAction(s.mockAction)
-	}
 	return transferHander.ClaimTransferSignRefundsV2(ctx, req)
 }
 
@@ -198,9 +195,6 @@ func (s *SparkServer) ClaimTransferSignRefunds(ctx context.Context, req *pb.Clai
 	defer s.claimTransferSignRefundsTransferGuard.Release(req.TransferId)
 
 	transferHander := handler.NewTransferHandler(s.config)
-	if s.mockAction != nil {
-		transferHander.SetMockAction(s.mockAction)
-	}
 	return transferHander.ClaimTransferSignRefunds(ctx, req)
 }
 

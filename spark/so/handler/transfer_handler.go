@@ -2030,12 +2030,6 @@ func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *
 		action = pbinternal.SettleKeyTweakAction_ROLLBACK
 	}
 
-	if h.mockAction != nil {
-		if h.mockAction.InterruptTransfer {
-			return fmt.Errorf("transfer interrupted")
-		}
-	}
-
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {

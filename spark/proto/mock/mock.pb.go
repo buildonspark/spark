@@ -22,55 +22,6 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type InterruptTransferRequest_InterruptTransferAction int32
-
-const (
-	InterruptTransferRequest_NONE      InterruptTransferRequest_InterruptTransferAction = 0
-	InterruptTransferRequest_INTERRUPT InterruptTransferRequest_InterruptTransferAction = 1
-	InterruptTransferRequest_RESUME    InterruptTransferRequest_InterruptTransferAction = 2
-)
-
-// Enum value maps for InterruptTransferRequest_InterruptTransferAction.
-var (
-	InterruptTransferRequest_InterruptTransferAction_name = map[int32]string{
-		0: "NONE",
-		1: "INTERRUPT",
-		2: "RESUME",
-	}
-	InterruptTransferRequest_InterruptTransferAction_value = map[string]int32{
-		"NONE":      0,
-		"INTERRUPT": 1,
-		"RESUME":    2,
-	}
-)
-
-func (x InterruptTransferRequest_InterruptTransferAction) Enum() *InterruptTransferRequest_InterruptTransferAction {
-	p := new(InterruptTransferRequest_InterruptTransferAction)
-	*p = x
-	return p
-}
-
-func (x InterruptTransferRequest_InterruptTransferAction) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (InterruptTransferRequest_InterruptTransferAction) Descriptor() protoreflect.EnumDescriptor {
-	return file_mock_proto_enumTypes[0].Descriptor()
-}
-
-func (InterruptTransferRequest_InterruptTransferAction) Type() protoreflect.EnumType {
-	return &file_mock_proto_enumTypes[0]
-}
-
-func (x InterruptTransferRequest_InterruptTransferAction) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use InterruptTransferRequest_InterruptTransferAction.Descriptor instead.
-func (InterruptTransferRequest_InterruptTransferAction) EnumDescriptor() ([]byte, []int) {
-	return file_mock_proto_rawDescGZIP(), []int{1, 0}
-}
-
 type InterruptCoopExitRequest_InterruptCoopExitAction int32
 
 const (
@@ -104,11 +55,11 @@ func (x InterruptCoopExitRequest_InterruptCoopExitAction) String() string {
 }
 
 func (InterruptCoopExitRequest_InterruptCoopExitAction) Descriptor() protoreflect.EnumDescriptor {
-	return file_mock_proto_enumTypes[1].Descriptor()
+	return file_mock_proto_enumTypes[0].Descriptor()
 }
 
 func (InterruptCoopExitRequest_InterruptCoopExitAction) Type() protoreflect.EnumType {
-	return &file_mock_proto_enumTypes[1]
+	return &file_mock_proto_enumTypes[0]
 }
 
 func (x InterruptCoopExitRequest_InterruptCoopExitAction) Number() protoreflect.EnumNumber {
@@ -117,7 +68,7 @@ func (x InterruptCoopExitRequest_InterruptCoopExitAction) Number() protoreflect.
 
 // Deprecated: Use InterruptCoopExitRequest_InterruptCoopExitAction.Descriptor instead.
 func (InterruptCoopExitRequest_InterruptCoopExitAction) EnumDescriptor() ([]byte, []int) {
-	return file_mock_proto_rawDescGZIP(), []int{4, 0}
+	return file_mock_proto_rawDescGZIP(), []int{3, 0}
 }
 
 type CleanUpPreimageShareRequest struct {
@@ -164,50 +115,6 @@ func (x *CleanUpPreimageShareRequest) GetPaymentHash() []byte {
 	return nil
 }
 
-type InterruptTransferRequest struct {
-	state         protoimpl.MessageState                           `protogen:"open.v1"`
-	Action        InterruptTransferRequest_InterruptTransferAction `protobuf:"varint,1,opt,name=action,proto3,enum=mock.InterruptTransferRequest_InterruptTransferAction" json:"action,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *InterruptTransferRequest) Reset() {
-	*x = InterruptTransferRequest{}
-	mi := &file_mock_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *InterruptTransferRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*InterruptTransferRequest) ProtoMessage() {}
-
-func (x *InterruptTransferRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mock_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use InterruptTransferRequest.ProtoReflect.Descriptor instead.
-func (*InterruptTransferRequest) Descriptor() ([]byte, []int) {
-	return file_mock_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *InterruptTransferRequest) GetAction() InterruptTransferRequest_InterruptTransferAction {
-	if x != nil {
-		return x.Action
-	}
-	return InterruptTransferRequest_NONE
-}
-
 type UpdateNodesStatusRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	NodeIds       []string               `protobuf:"bytes,1,rep,name=node_ids,json=nodeIds,proto3" json:"node_ids,omitempty"`
@@ -218,7 +125,7 @@ type UpdateNodesStatusRequest struct {
 
 func (x *UpdateNodesStatusRequest) Reset() {
 	*x = UpdateNodesStatusRequest{}
-	mi := &file_mock_proto_msgTypes[2]
+	mi := &file_mock_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -230,7 +137,7 @@ func (x *UpdateNodesStatusRequest) String() string {
 func (*UpdateNodesStatusRequest) ProtoMessage() {}
 
 func (x *UpdateNodesStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mock_proto_msgTypes[2]
+	mi := &file_mock_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -243,7 +150,7 @@ func (x *UpdateNodesStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateNodesStatusRequest.ProtoReflect.Descriptor instead.
 func (*UpdateNodesStatusRequest) Descriptor() ([]byte, []int) {
-	return file_mock_proto_rawDescGZIP(), []int{2}
+	return file_mock_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *UpdateNodesStatusRequest) GetNodeIds() []string {
@@ -270,7 +177,7 @@ type TriggerTaskRequest struct {
 
 func (x *TriggerTaskRequest) Reset() {
 	*x = TriggerTaskRequest{}
-	mi := &file_mock_proto_msgTypes[3]
+	mi := &file_mock_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -282,7 +189,7 @@ func (x *TriggerTaskRequest) String() string {
 func (*TriggerTaskRequest) ProtoMessage() {}
 
 func (x *TriggerTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mock_proto_msgTypes[3]
+	mi := &file_mock_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -295,7 +202,7 @@ func (x *TriggerTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TriggerTaskRequest.ProtoReflect.Descriptor instead.
 func (*TriggerTaskRequest) Descriptor() ([]byte, []int) {
-	return file_mock_proto_rawDescGZIP(), []int{3}
+	return file_mock_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *TriggerTaskRequest) GetTaskName() string {
@@ -315,7 +222,7 @@ type InterruptCoopExitRequest struct {
 
 func (x *InterruptCoopExitRequest) Reset() {
 	*x = InterruptCoopExitRequest{}
-	mi := &file_mock_proto_msgTypes[4]
+	mi := &file_mock_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -327,7 +234,7 @@ func (x *InterruptCoopExitRequest) String() string {
 func (*InterruptCoopExitRequest) ProtoMessage() {}
 
 func (x *InterruptCoopExitRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mock_proto_msgTypes[4]
+	mi := &file_mock_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -340,7 +247,7 @@ func (x *InterruptCoopExitRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InterruptCoopExitRequest.ProtoReflect.Descriptor instead.
 func (*InterruptCoopExitRequest) Descriptor() ([]byte, []int) {
-	return file_mock_proto_rawDescGZIP(), []int{4}
+	return file_mock_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *InterruptCoopExitRequest) GetAction() InterruptCoopExitRequest_InterruptCoopExitAction {
@@ -364,14 +271,7 @@ const file_mock_proto_rawDesc = "" +
 	"\n" +
 	"mock.proto\x12\x04mock\x1a\x1bgoogle/protobuf/empty.proto\"@\n" +
 	"\x1bCleanUpPreimageShareRequest\x12!\n" +
-	"\fpayment_hash\x18\x01 \x01(\fR\vpaymentHash\"\xaa\x01\n" +
-	"\x18InterruptTransferRequest\x12N\n" +
-	"\x06action\x18\x01 \x01(\x0e26.mock.InterruptTransferRequest.InterruptTransferActionR\x06action\">\n" +
-	"\x17InterruptTransferAction\x12\b\n" +
-	"\x04NONE\x10\x00\x12\r\n" +
-	"\tINTERRUPT\x10\x01\x12\n" +
-	"\n" +
-	"\x06RESUME\x10\x02\"M\n" +
+	"\fpayment_hash\x18\x01 \x01(\fR\vpaymentHash\"M\n" +
 	"\x18UpdateNodesStatusRequest\x12\x19\n" +
 	"\bnode_ids\x18\x01 \x03(\tR\anodeIds\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\"1\n" +
@@ -384,10 +284,9 @@ const file_mock_proto_rawDesc = "" +
 	"\x04NONE\x10\x00\x12\r\n" +
 	"\tINTERRUPT\x10\x01\x12\n" +
 	"\n" +
-	"\x06RESUME\x10\x022\x9b\x03\n" +
+	"\x06RESUME\x10\x022\xcb\x02\n" +
 	"\vMockService\x12V\n" +
-	"\x17clean_up_preimage_share\x12!.mock.CleanUpPreimageShareRequest\x1a\x16.google.protobuf.Empty\"\x00\x12N\n" +
-	"\x12interrupt_transfer\x12\x1e.mock.InterruptTransferRequest\x1a\x16.google.protobuf.Empty\"\x00\x12O\n" +
+	"\x17clean_up_preimage_share\x12!.mock.CleanUpPreimageShareRequest\x1a\x16.google.protobuf.Empty\"\x00\x12O\n" +
 	"\x13interrupt_coop_exit\x12\x1e.mock.InterruptCoopExitRequest\x1a\x16.google.protobuf.Empty\"\x00\x12O\n" +
 	"\x13update_nodes_status\x12\x1e.mock.UpdateNodesStatusRequest\x1a\x16.google.protobuf.Empty\"\x00\x12B\n" +
 	"\ftrigger_task\x12\x18.mock.TriggerTaskRequest\x1a\x16.google.protobuf.Empty\"\x00B+Z)github.com/lightsparkdev/spark/proto/mockb\x06proto3"
@@ -404,36 +303,31 @@ func file_mock_proto_rawDescGZIP() []byte {
 	return file_mock_proto_rawDescData
 }
 
-var file_mock_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_mock_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_mock_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_mock_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_mock_proto_goTypes = []any{
-	(InterruptTransferRequest_InterruptTransferAction)(0), // 0: mock.InterruptTransferRequest.InterruptTransferAction
-	(InterruptCoopExitRequest_InterruptCoopExitAction)(0), // 1: mock.InterruptCoopExitRequest.InterruptCoopExitAction
-	(*CleanUpPreimageShareRequest)(nil),                   // 2: mock.CleanUpPreimageShareRequest
-	(*InterruptTransferRequest)(nil),                      // 3: mock.InterruptTransferRequest
-	(*UpdateNodesStatusRequest)(nil),                      // 4: mock.UpdateNodesStatusRequest
-	(*TriggerTaskRequest)(nil),                            // 5: mock.TriggerTaskRequest
-	(*InterruptCoopExitRequest)(nil),                      // 6: mock.InterruptCoopExitRequest
-	(*emptypb.Empty)(nil),                                 // 7: google.protobuf.Empty
+	(InterruptCoopExitRequest_InterruptCoopExitAction)(0), // 0: mock.InterruptCoopExitRequest.InterruptCoopExitAction
+	(*CleanUpPreimageShareRequest)(nil),                   // 1: mock.CleanUpPreimageShareRequest
+	(*UpdateNodesStatusRequest)(nil),                      // 2: mock.UpdateNodesStatusRequest
+	(*TriggerTaskRequest)(nil),                            // 3: mock.TriggerTaskRequest
+	(*InterruptCoopExitRequest)(nil),                      // 4: mock.InterruptCoopExitRequest
+	(*emptypb.Empty)(nil),                                 // 5: google.protobuf.Empty
 }
 var file_mock_proto_depIdxs = []int32{
-	0, // 0: mock.InterruptTransferRequest.action:type_name -> mock.InterruptTransferRequest.InterruptTransferAction
-	1, // 1: mock.InterruptCoopExitRequest.action:type_name -> mock.InterruptCoopExitRequest.InterruptCoopExitAction
-	2, // 2: mock.MockService.clean_up_preimage_share:input_type -> mock.CleanUpPreimageShareRequest
-	3, // 3: mock.MockService.interrupt_transfer:input_type -> mock.InterruptTransferRequest
-	6, // 4: mock.MockService.interrupt_coop_exit:input_type -> mock.InterruptCoopExitRequest
-	4, // 5: mock.MockService.update_nodes_status:input_type -> mock.UpdateNodesStatusRequest
-	5, // 6: mock.MockService.trigger_task:input_type -> mock.TriggerTaskRequest
-	7, // 7: mock.MockService.clean_up_preimage_share:output_type -> google.protobuf.Empty
-	7, // 8: mock.MockService.interrupt_transfer:output_type -> google.protobuf.Empty
-	7, // 9: mock.MockService.interrupt_coop_exit:output_type -> google.protobuf.Empty
-	7, // 10: mock.MockService.update_nodes_status:output_type -> google.protobuf.Empty
-	7, // 11: mock.MockService.trigger_task:output_type -> google.protobuf.Empty
-	7, // [7:12] is the sub-list for method output_type
-	2, // [2:7] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0, // 0: mock.InterruptCoopExitRequest.action:type_name -> mock.InterruptCoopExitRequest.InterruptCoopExitAction
+	1, // 1: mock.MockService.clean_up_preimage_share:input_type -> mock.CleanUpPreimageShareRequest
+	4, // 2: mock.MockService.interrupt_coop_exit:input_type -> mock.InterruptCoopExitRequest
+	2, // 3: mock.MockService.update_nodes_status:input_type -> mock.UpdateNodesStatusRequest
+	3, // 4: mock.MockService.trigger_task:input_type -> mock.TriggerTaskRequest
+	5, // 5: mock.MockService.clean_up_preimage_share:output_type -> google.protobuf.Empty
+	5, // 6: mock.MockService.interrupt_coop_exit:output_type -> google.protobuf.Empty
+	5, // 7: mock.MockService.update_nodes_status:output_type -> google.protobuf.Empty
+	5, // 8: mock.MockService.trigger_task:output_type -> google.protobuf.Empty
+	5, // [5:9] is the sub-list for method output_type
+	1, // [1:5] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_mock_proto_init() }
@@ -446,8 +340,8 @@ func file_mock_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mock_proto_rawDesc), len(file_mock_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   5,
+			NumEnums:      1,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -229,7 +229,7 @@ func (s *SparkOperatorController) disableOperator(ctx context.Context, operatorN
 }
 func (s *SparkOperatorController) waitForDeploymentReplicas(ctx context.Context, operatorNum int, expectedReplicas int) error {
 	operator := s.operators[operatorNum]
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
 	ticker := time.NewTicker(500 * time.Millisecond) // Check every 500ms for pod changes

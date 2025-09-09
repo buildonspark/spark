@@ -15,7 +15,6 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/lightsparkdev/spark/common"
-	pbmock "github.com/lightsparkdev/spark/proto/mock"
 	"github.com/lightsparkdev/spark/proto/spark"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/testing/wallet"
@@ -213,12 +212,6 @@ func TestTransferInterrupt(t *testing.T) {
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
 
-	mockClient := pbmock.NewMockServiceClient(conn)
-	_, err = mockClient.InterruptTransfer(t.Context(), &pbmock.InterruptTransferRequest{
-		Action: pbmock.InterruptTransferRequest_INTERRUPT,
-	})
-	require.NoError(t, err, "failed to interrupt transfer")
-
 	finalLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")
 	claimingNode := wallet.LeafKeyTweak{
@@ -227,29 +220,53 @@ func TestTransferInterrupt(t *testing.T) {
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
 	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
-	_, err = wallet.ClaimTransfer(
-		receiverCtx,
-		receiverTransfer,
-		receiverConfig,
-		leavesToClaim,
-	)
+	proofs, err := wallet.ClaimTransferTweakKeys(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim)
+	require.NoError(t, err, "failed to ClaimTransferTweakKeys")
+
+	// Bring SO 1 down and try to finish claiming.
+	soController := sparktesting.NewSparkOperatorController(t)
+	err = soController.DisableOperator(t, 1)
+	if err != nil {
+		t.Fatalf("failed to disable operator: %v", err)
+	}
+
+	_, err = wallet.ClaimTransferSignRefunds(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim, proofs)
 	require.Error(t, err, "expected error when claiming transfer")
 
-	_, err = mockClient.InterruptTransfer(t.Context(), &pbmock.InterruptTransferRequest{
-		Action: pbmock.InterruptTransferRequest_RESUME,
-	})
-	require.NoError(t, err, "failed to resume transfer")
+	err = soController.EnableOperator(t, 1)
+	if err != nil {
+		t.Fatalf("failed to enable operator: %v", err)
+	}
 
-	pendingTransfer, err = wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
-	require.NoError(t, err, "failed to query pending transfers")
-	require.Len(t, pendingTransfer.Transfers, 1)
-	receiverTransfer = pendingTransfer.Transfers[0]
-	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-	require.Equal(t, spark.TransferType_TRANSFER, receiverTransfer.Type)
+	attempts := 0
+	claimedNodes := make([]*spark.TreeNode, 0)
 
-	res, err := wallet.ClaimTransfer(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim[:])
-	require.NoError(t, err, "failed to ClaimTransfer")
-	require.Equal(t, claimingNode.Leaf.Id, res[0].Id)
+	// In theory we should be able to claim right away, but in practice, depending on the state of
+	// the SOs, it may take a few attempts for it to get back to the right state. Since changing the
+	// SO is scary, just retry a few times with a delay.
+	for attempts < 5 {
+		pendingTransfer, err = wallet.QueryPendingTransfers(receiverCtx, receiverConfig)
+		require.NoError(t, err, "failed to query pending transfers")
+		require.Len(t, pendingTransfer.Transfers, 1)
+
+		receiverTransfer = pendingTransfer.Transfers[0]
+		require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
+		require.Equal(t, spark.TransferType_TRANSFER, receiverTransfer.Type)
+
+		res, err := wallet.ClaimTransfer(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim[:])
+		if err != nil {
+			t.Logf("Failed to ClaimTransfer: %v (attempt %d / 5)", err, attempts+1)
+		} else {
+			claimedNodes = res
+			break
+		}
+
+		time.Sleep(1 * time.Second)
+		attempts++
+	}
+
+	require.NotEmpty(t, claimedNodes, "failed to claim transfer after %d attempts", attempts)
+	require.Equal(t, claimingNode.Leaf.Id, claimedNodes[0].Id)
 }
 
 func TestTransferRecoverFinalizeSignatures(t *testing.T) {

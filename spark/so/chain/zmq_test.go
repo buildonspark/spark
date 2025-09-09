@@ -94,12 +94,10 @@ func TestZmqSubscribe(t *testing.T) {
 	attempts := 0
 	received := false
 	for attempts < 5 && !received {
-		attempts++
-
 		err = zmqPub.SendMessage("rawblock", "TESTTESTTEST")
 		require.NoError(t, err, "Failed to send message through ZMQ publisher")
 
-		t.Logf("Waiting for message (attempt %d / 5)...", attempts)
+		t.Logf("Waiting for message (attempt %d / 5)...", attempts+1)
 		select {
 		case <-subscribeChan:
 			received = true
