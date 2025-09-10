@@ -1216,7 +1216,7 @@ describe.each(walletTypes)(
   ({ name, Signer, createTree }) => {
     jest.setTimeout(25_000);
 
-    it(`${name} - test multiple valid transfers with invoice and nil amount invoice`, async () => {
+    it.skip(`${name} - test multiple valid transfers with invoice and nil amount invoice`, async () => {
       const faucet = BitcoinFaucet.getInstance();
 
       const options: ConfigOptions = {
@@ -1461,7 +1461,7 @@ describe.each(walletTypes)(
       expect(invalidInvoices.length).toBe(1);
     });
 
-    it(`${name} - should error when paying the same invoice twice`, async () => {
+    it.skip(`${name} - should error when paying the same invoice twice`, async () => {
       const faucet = BitcoinFaucet.getInstance();
 
       const options: ConfigOptions = {

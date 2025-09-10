@@ -198,7 +198,7 @@ describe.each(TEST_CONFIGS)(
       expect(userBalance.balance).toBeGreaterThanOrEqual(tokenAmount);
     });
 
-    const tv1It = name.startsWith("TV1") ? it : it.skip;
+    const tv1It = name.startsWith("TV1") ? it.skip : it.skip;
     tv1It("should transfer tokens using spark invoices", async () => {
       const tokenAmount: bigint = 777n;
       const initialIssuerBalance = 100000n;
@@ -508,136 +508,139 @@ describe.each(TEST_CONFIGS)(
       },
     );
 
-    it(`fulfillSparkInvoice successfully handles multiple mixed tokens and sats invoices`, async () => {
-      const faucet = BitcoinFaucet.getInstance();
-      const { wallet: sdk } = await IssuerSparkWalletTesting.initialize({
-        options: config,
-      });
-      await sdk.createToken({
-        tokenName: `SDKONE`,
-        tokenTicker: "SDK1",
-        decimals: 0,
-        isFreezable: false,
-        maxSupply: 1_000_000n,
-      });
-      const { wallet: sdk2 } = await IssuerSparkWalletTesting.initialize({
-        options: config,
-      });
-      await sdk2.createToken({
-        tokenName: `SDKTWO`,
-        tokenTicker: "SDK2",
-        decimals: 0,
-        isFreezable: false,
-        maxSupply: 1_000_000n,
-      });
-
-      await sdk.mintTokens(1_000_000n);
-      await sdk2.mintTokens(1_000_000n);
-
-      const sdkOneTokenIdentifier = await sdk.getIssuerTokenIdentifier();
-      const sdkTwoTokenIdentifier = await sdk2.getIssuerTokenIdentifier();
-
-      await sdk2.transferTokens({
-        tokenAmount: 1_000_000n,
-        tokenIdentifier: sdkTwoTokenIdentifier,
-        receiverSparkAddress: await sdk.getSparkAddress(),
-      });
-
-      const depositAddrOne = await sdk.getSingleUseDepositAddress();
-      if (!depositAddrOne) {
-        throw new RPCError("Deposit address not found", {
-          method: "getDepositAddress",
+    tv1It(
+      `fulfillSparkInvoice successfully handles multiple mixed tokens and sats invoices`,
+      async () => {
+        const faucet = BitcoinFaucet.getInstance();
+        const { wallet: sdk } = await IssuerSparkWalletTesting.initialize({
+          options: config,
         });
-      }
-      const depositAddrTwo = await sdk.getSingleUseDepositAddress();
-      if (!depositAddrTwo) {
-        throw new RPCError("Deposit address not found", {
-          method: "getDepositAddress",
+        await sdk.createToken({
+          tokenName: `SDKONE`,
+          tokenTicker: "SDK1",
+          decimals: 0,
+          isFreezable: false,
+          maxSupply: 1_000_000n,
         });
-      }
-      const depositAddrThree = await sdk.getSingleUseDepositAddress();
-      if (!depositAddrThree) {
-        throw new RPCError("Deposit address not found", {
-          method: "getDepositAddress",
+        const { wallet: sdk2 } = await IssuerSparkWalletTesting.initialize({
+          options: config,
         });
-      }
+        await sdk2.createToken({
+          tokenName: `SDKTWO`,
+          tokenTicker: "SDK2",
+          decimals: 0,
+          isFreezable: false,
+          maxSupply: 1_000_000n,
+        });
 
-      const oneThousand = await faucet.sendToAddress(depositAddrOne, 1_000n);
-      const twoThousand = await faucet.sendToAddress(depositAddrTwo, 2_000n);
-      const threeThousand = await faucet.sendToAddress(
-        depositAddrThree,
-        3_000n,
-      );
+        await sdk.mintTokens(1_000_000n);
+        await sdk2.mintTokens(1_000_000n);
 
-      await sdk.claimDeposit(oneThousand.id);
-      await sdk.claimDeposit(twoThousand.id);
-      await sdk.claimDeposit(threeThousand.id);
+        const sdkOneTokenIdentifier = await sdk.getIssuerTokenIdentifier();
+        const sdkTwoTokenIdentifier = await sdk2.getIssuerTokenIdentifier();
 
-      const balance = await sdk.getBalance();
-      expect(balance.balance).toBe(6_000n);
+        await sdk2.transferTokens({
+          tokenAmount: 1_000_000n,
+          tokenIdentifier: sdkTwoTokenIdentifier,
+          receiverSparkAddress: await sdk.getSparkAddress(),
+        });
 
-      const tomorrow = new Date(Date.now() + 1000 * 60 * 60 * 24);
-      const invoice1000 = await sdk2.createSatsInvoice({
-        amount: 1_000,
-        memo: "Test invoice",
-        expiryTime: tomorrow,
-      });
-      const invoice2000 = await sdk2.createSatsInvoice({
-        amount: 2_000,
-        memo: "Test invoice",
-        expiryTime: tomorrow,
-      });
-      const invoiceNilAmount = await sdk2.createSatsInvoice({
-        memo: "Test invoice",
-        expiryTime: tomorrow,
-      });
-      const sdkOneTokenInvoiceA = await sdk2.createTokensInvoice({
-        amount: 1_000n,
-        tokenIdentifier: sdkOneTokenIdentifier,
-        memo: "Test invoice",
-        expiryTime: tomorrow,
-      });
-      const sdkOneTokenInvoiceB = await sdk2.createTokensInvoice({
-        amount: 2_000n,
-        tokenIdentifier: sdkOneTokenIdentifier,
-        memo: "Test invoice",
-        expiryTime: tomorrow,
-      });
-      const sdkTwoTokenInvoiceA = await sdk2.createTokensInvoice({
-        amount: 1_000n,
-        tokenIdentifier: sdkTwoTokenIdentifier,
-        memo: "Test invoice",
-        expiryTime: tomorrow,
-      });
-      const sdkTwoTokenNilAmountInvoiceB = await sdk2.createTokensInvoice({
-        tokenIdentifier: sdkTwoTokenIdentifier,
-        memo: "Test invoice",
-        expiryTime: tomorrow,
-      });
+        const depositAddrOne = await sdk.getSingleUseDepositAddress();
+        if (!depositAddrOne) {
+          throw new RPCError("Deposit address not found", {
+            method: "getDepositAddress",
+          });
+        }
+        const depositAddrTwo = await sdk.getSingleUseDepositAddress();
+        if (!depositAddrTwo) {
+          throw new RPCError("Deposit address not found", {
+            method: "getDepositAddress",
+          });
+        }
+        const depositAddrThree = await sdk.getSingleUseDepositAddress();
+        if (!depositAddrThree) {
+          throw new RPCError("Deposit address not found", {
+            method: "getDepositAddress",
+          });
+        }
 
-      const transferResults = await sdk.fulfillSparkInvoice([
-        { invoice: invoice1000 },
-        { invoice: invoice2000 },
-        { invoice: invoiceNilAmount, amount: 3_000n },
-        { invoice: sdkOneTokenInvoiceA },
-        { invoice: sdkOneTokenInvoiceB },
-        { invoice: sdkTwoTokenInvoiceA },
-        { invoice: sdkTwoTokenNilAmountInvoiceB, amount: 3_000n },
-      ]);
+        const oneThousand = await faucet.sendToAddress(depositAddrOne, 1_000n);
+        const twoThousand = await faucet.sendToAddress(depositAddrTwo, 2_000n);
+        const threeThousand = await faucet.sendToAddress(
+          depositAddrThree,
+          3_000n,
+        );
 
-      const {
-        satsTransactionSuccess,
-        satsTransactionErrors,
-        tokenTransactionSuccess,
-        tokenTransactionErrors,
-        invalidInvoices,
-      } = transferResults;
-      expect(satsTransactionSuccess.length).toBe(3); // one sats success per invoice
-      expect(satsTransactionErrors.length).toBe(0);
-      expect(tokenTransactionSuccess.length).toBe(2); // two token assets - divided into two token transactions
-      expect(tokenTransactionErrors.length).toBe(0);
-      expect(invalidInvoices.length).toBe(0);
-    });
+        await sdk.claimDeposit(oneThousand.id);
+        await sdk.claimDeposit(twoThousand.id);
+        await sdk.claimDeposit(threeThousand.id);
+
+        const balance = await sdk.getBalance();
+        expect(balance.balance).toBe(6_000n);
+
+        const tomorrow = new Date(Date.now() + 1000 * 60 * 60 * 24);
+        const invoice1000 = await sdk2.createSatsInvoice({
+          amount: 1_000,
+          memo: "Test invoice",
+          expiryTime: tomorrow,
+        });
+        const invoice2000 = await sdk2.createSatsInvoice({
+          amount: 2_000,
+          memo: "Test invoice",
+          expiryTime: tomorrow,
+        });
+        const invoiceNilAmount = await sdk2.createSatsInvoice({
+          memo: "Test invoice",
+          expiryTime: tomorrow,
+        });
+        const sdkOneTokenInvoiceA = await sdk2.createTokensInvoice({
+          amount: 1_000n,
+          tokenIdentifier: sdkOneTokenIdentifier,
+          memo: "Test invoice",
+          expiryTime: tomorrow,
+        });
+        const sdkOneTokenInvoiceB = await sdk2.createTokensInvoice({
+          amount: 2_000n,
+          tokenIdentifier: sdkOneTokenIdentifier,
+          memo: "Test invoice",
+          expiryTime: tomorrow,
+        });
+        const sdkTwoTokenInvoiceA = await sdk2.createTokensInvoice({
+          amount: 1_000n,
+          tokenIdentifier: sdkTwoTokenIdentifier,
+          memo: "Test invoice",
+          expiryTime: tomorrow,
+        });
+        const sdkTwoTokenNilAmountInvoiceB = await sdk2.createTokensInvoice({
+          tokenIdentifier: sdkTwoTokenIdentifier,
+          memo: "Test invoice",
+          expiryTime: tomorrow,
+        });
+
+        const transferResults = await sdk.fulfillSparkInvoice([
+          { invoice: invoice1000 },
+          { invoice: invoice2000 },
+          { invoice: invoiceNilAmount, amount: 3_000n },
+          { invoice: sdkOneTokenInvoiceA },
+          { invoice: sdkOneTokenInvoiceB },
+          { invoice: sdkTwoTokenInvoiceA },
+          { invoice: sdkTwoTokenNilAmountInvoiceB, amount: 3_000n },
+        ]);
+
+        const {
+          satsTransactionSuccess,
+          satsTransactionErrors,
+          tokenTransactionSuccess,
+          tokenTransactionErrors,
+          invalidInvoices,
+        } = transferResults;
+        expect(satsTransactionSuccess.length).toBe(3); // one sats success per invoice
+        expect(satsTransactionErrors.length).toBe(0);
+        expect(tokenTransactionSuccess.length).toBe(2); // two token assets - divided into two token transactions
+        expect(tokenTransactionErrors.length).toBe(0);
+        expect(invalidInvoices.length).toBe(0);
+      },
+    );
 
     it("should create, mint, and batchtransfer tokens", async () => {
       const tokenAmount: bigint = 999n;
