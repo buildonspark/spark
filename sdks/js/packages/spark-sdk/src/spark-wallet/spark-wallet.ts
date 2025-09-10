@@ -122,7 +122,6 @@ import {
   isSafeForNumber,
   SparkAddressFormat,
   validateSparkInvoiceFields,
-  isLegacySparkAddress,
 } from "../utils/address.js";
 import { chunkArray } from "../utils/chunkArray.js";
 import { getFetch } from "../utils/fetch.js";
@@ -822,19 +821,19 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * @param {Object} params - Parameters for the sats payment
    * @param {number} params.amount - The amount of sats to receive
    * @param {string} [params.memo] - The memo for the payment
-   * @param {string} [params.senderSparkAddress] - The spark address of the expected sender
+   * @param {string} [params.senderPublicKey] - The public key of the expected sender
    * @param {Date} [params.expiryTime] - The expiry time of the payment
-   * @returns {Promise<SparkAddressFormat>} The Spark invoice for the sats payment
+   * @returns {Promise<SparkAddressFormat>} The Spark address for the sats payment
    */
   public async createSatsInvoice({
     amount,
     memo,
-    senderSparkAddress,
+    senderPublicKey,
     expiryTime,
   }: {
     amount?: number;
     memo?: string;
-    senderSparkAddress?: SparkAddressFormat;
+    senderPublicKey?: string;
     expiryTime?: Date;
   }): Promise<SparkAddressFormat> {
     const MAX_SATS_AMOUNT = 2_100_000_000_000_000; // 21_000_000 BTC * 100_000_000 sats/BTC
@@ -854,18 +853,14 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
         amount: amount,
       },
     } as const;
-    const senderPublicKey = senderSparkAddress
-      ? hexToBytes(
-          decodeSparkAddress(senderSparkAddress, this.config.getNetworkType())
-            .identityPublicKey,
-        )
-      : undefined;
     const invoiceFields = {
       version: 1,
       id: uuidv7obj().bytes,
       paymentType: protoPayment,
       memo: memo,
-      senderPublicKey,
+      senderPublicKey: senderPublicKey
+        ? hexToBytes(senderPublicKey)
+        : undefined,
       expiryTime: expiryTime ?? undefined,
     };
     validateSparkInvoiceFields(invoiceFields);
@@ -895,21 +890,21 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * @param {bigint} [params.amount] - The amount of tokens to receive
    * @param {Bech32mTokenIdentifier} [params.tokenIdentifier] - The token identifier
    * @param {string} [params.memo] - The memo for the payment
-   * @param {string} [params.senderSparkAddress] - The spark address of the expected sender
+   * @param {string} [params.senderPublicKey] - The public key of the expected sender
    * @param {Date} [params.expiryTime] - The expiry time of the payment
-   * @returns {Promise<SparkAddressFormat>} The Spark invoice for the tokens payment
+   * @returns {Promise<SparkAddressFormat>} The Spark address for the tokens payment
    */
   public async createTokensInvoice({
     amount,
     tokenIdentifier,
     memo,
-    senderSparkAddress,
+    senderPublicKey,
     expiryTime,
   }: {
     tokenIdentifier?: Bech32mTokenIdentifier;
     amount?: bigint;
     memo?: string;
-    senderSparkAddress?: SparkAddressFormat;
+    senderPublicKey?: string;
     expiryTime?: Date;
   }): Promise<SparkAddressFormat> {
     const MAX_UINT128 = BigInt(2 ** 128 - 1);
@@ -935,18 +930,14 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
         amount: amount ? numberToVarBytesBE(amount) : undefined,
       },
     } as const;
-    const senderPublicKey = senderSparkAddress
-      ? hexToBytes(
-          decodeSparkAddress(senderSparkAddress, this.config.getNetworkType())
-            .identityPublicKey,
-        )
-      : undefined;
     const invoiceFields = {
       version: 1,
       id: uuidv7obj().bytes,
       paymentType: protoPayment,
       memo: memo ?? undefined,
-      senderPublicKey,
+      senderPublicKey: senderPublicKey
+        ? hexToBytes(senderPublicKey)
+        : undefined,
       expiryTime: expiryTime ?? undefined,
     };
     validateSparkInvoiceFields(invoiceFields);
@@ -3634,17 +3625,15 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
       transferResponse: WalletTransfer;
     }[] = [];
     const satsTransactionErrors: {
-      invoice: SparkAddressFormat;
+      invoice: string;
       error: Error;
     }[] = [];
     const tokenTransactionSuccess: {
       tokenIdentifier: Bech32mTokenIdentifier;
-      invoices: SparkAddressFormat[];
       txid: string;
     }[] = [];
     const tokenTransactionErrors: {
       tokenIdentifier: Bech32mTokenIdentifier;
-      invoices: SparkAddressFormat[];
       error: Error;
     }[] = [];
 
@@ -3663,18 +3652,8 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
     if (tokenInvoices.size > 0) {
       await this.syncTokenOutputs();
       const tokenTransferTasks: Promise<
-        | {
-            ok: true;
-            tokenIdentifier: Bech32mTokenIdentifier;
-            invoices: SparkAddressFormat[];
-            txid: string;
-          }
-        | {
-            ok: false;
-            tokenIdentifier: Bech32mTokenIdentifier;
-            invoices: SparkAddressFormat[];
-            error: Error;
-          }
+        | { ok: true; tokenIdentifier: Bech32mTokenIdentifier; txid: string }
+        | { ok: false; tokenIdentifier: Bech32mTokenIdentifier; error: Error }
       >[] = [];
       for (const [identifierHex, decodedInvoices] of tokenInvoices.entries()) {
         const tokenIdentifier = hexToBytes(identifierHex);
@@ -3689,23 +3668,17 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
           receiverSparkAddress: d.invoice,
         }));
 
-        const invoices = decodedInvoices.map(
-          (d) => d.invoice as SparkAddressFormat,
-        );
-
         tokenTransferTasks.push(
           this.tokenTransactionService
             .tokenTransfer({ tokenOutputs: this.tokenOutputs, receiverOutputs })
             .then((txid) => ({
               ok: true as const,
               tokenIdentifier: tokenIdB32,
-              invoices,
               txid,
             }))
             .catch((e: any) => ({
               ok: false as const,
               tokenIdentifier: tokenIdB32,
-              invoices,
               error: e instanceof Error ? e : new Error(String(e)),
             })),
         );
@@ -3715,13 +3688,11 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
         if (r.ok) {
           tokenTransactionSuccess.push({
             tokenIdentifier: r.tokenIdentifier,
-            invoices: r.invoices,
             txid: r.txid,
           });
         } else {
           tokenTransactionErrors.push({
             tokenIdentifier: r.tokenIdentifier,
-            invoices: r.invoices,
             error: r.error,
           });
         }
@@ -3768,18 +3739,6 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     sparkInvoices.forEach((input) => {
       const { invoice, amount } = input;
-      if (isLegacySparkAddress(invoice)) {
-        invalidInvoices.push({
-          invoice,
-          error: new ValidationError("Deprecated spark invoice format", {
-            field: "invoice",
-            value: invoice,
-            expected:
-              "Modern spark invoice format. Deprecated formats are not supported.",
-          }),
-        });
-        return;
-      }
       const addressData = decodeSparkAddress(
         invoice,
         this.config.getNetworkType(),

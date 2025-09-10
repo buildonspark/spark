@@ -18,13 +18,6 @@ import { NetworkType } from "./network.js";
 const BECH32M_LIMIT = 1024;
 
 const AddressNetwork: Record<NetworkType, string> = {
-  MAINNET: "spark",
-  TESTNET: "sparkt",
-  REGTEST: "sparkrt",
-  SIGNET: "sparks",
-  LOCAL: "sparkl",
-} as const;
-const LegacyAddressNetwork: Record<NetworkType, string> = {
   MAINNET: "sp",
   TESTNET: "spt",
   REGTEST: "sprt",
@@ -32,11 +25,8 @@ const LegacyAddressNetwork: Record<NetworkType, string> = {
   LOCAL: "spl",
 } as const;
 
-type Bech32String = `${string}1${string}`;
 export type SparkAddressFormat =
   `${(typeof AddressNetwork)[keyof typeof AddressNetwork]}1${string}`;
-export type LegacySparkAddressFormat =
-  `${(typeof LegacyAddressNetwork)[keyof typeof LegacyAddressNetwork]}1${string}`;
 
 export interface SparkAddressData {
   identityPublicKey: string;
@@ -120,11 +110,11 @@ export function decodeSparkAddress(
   try {
     const decoded = bech32mDecode(address as SparkAddressFormat);
 
-    if (network !== getNetworkFromSparkAddress(address)) {
+    if (decoded.prefix !== AddressNetwork[network]) {
       throw new ValidationError("Invalid Spark address prefix", {
         field: "address",
         value: address,
-        expected: `prefix='${AddressNetwork[network]}' or '${LegacyAddressNetwork[network]}'`,
+        expected: `prefix='${AddressNetwork[network]}'`,
       });
     }
 
@@ -189,40 +179,20 @@ export function decodeSparkAddress(
   }
 }
 
-const PrefixToNetwork: Record<string, NetworkType> = Object.fromEntries(
-  Object.entries(AddressNetwork).map(([k, v]) => [v, k as NetworkType]),
-) as Record<string, NetworkType>;
-const LegacyPrefixToNetwork: Record<string, NetworkType> = Object.fromEntries(
-  Object.entries(LegacyAddressNetwork).map(([k, v]) => [v, k as NetworkType]),
-) as Record<string, NetworkType>;
-
-export function getNetworkFromSparkAddress(address: string): NetworkType {
-  const { prefix } = bech32mDecode(address);
-  const network = PrefixToNetwork[prefix] ?? LegacyPrefixToNetwork[prefix];
-  if (!network) {
-    throw new ValidationError("Invalid Spark address prefix", {
-      field: "network",
-      value: address,
-      expected:
-        "prefix='spark1', 'sparkt1', 'sparkrt1', 'sparks1', 'sparkl1' or legacy ('sp1', 'spt1', 'sprt1', 'sps1', 'spl1')",
-    });
-  }
-  return network;
-}
-// Checks if a string is a legacy spark address.
-export function isLegacySparkAddress(
-  address: string,
-): address is LegacySparkAddressFormat {
-  try {
-    const { prefix } = bech32mDecode(address);
-    return prefix in LegacyPrefixToNetwork;
-  } catch (error) {
-    return false;
-  }
-}
 export function isValidSparkAddress(address: string) {
   try {
-    const network = getNetworkFromSparkAddress(address);
+    const network = Object.entries(AddressNetwork).find(([_, prefix]) =>
+      address.startsWith(prefix),
+    )?.[0] as NetworkType | undefined;
+
+    if (!network) {
+      throw new ValidationError("Invalid Spark address network", {
+        field: "network",
+        value: address,
+        expected: Object.values(AddressNetwork),
+      });
+    }
+
     decodeSparkAddress(address, network);
     return true;
   } catch (error) {
@@ -427,20 +397,30 @@ export function validateSparkInvoiceSignature(invoice: SparkAddressFormat) {
   }
 }
 
+export function getNetworkFromSparkAddress(address: SparkAddressFormat) {
+  const { prefix } = bech32mDecode(address as SparkAddressFormat);
+  const network = Object.entries(AddressNetwork).find(
+    ([, p]) => p === prefix,
+  )?.[0] as NetworkType | undefined;
+  if (!network) {
+    throw new ValidationError("Invalid Spark address network", {
+      field: "network",
+      value: address,
+      expected: Object.values(AddressNetwork),
+    });
+  }
+  return network;
+}
+
 export function toProtoTimestamp(date: Date) {
   const ms = date.getTime();
   return { seconds: Math.floor(ms / 1000), nanos: (ms % 1000) * 1_000_000 };
 }
 
-export function assertBech32(s: string): asserts s is Bech32String {
-  const i = s.lastIndexOf("1");
-  if (i <= 0 || i >= s.length - 1) throw new Error("invalid bech32 string");
-}
-
-export function bech32mDecode(address: string) {
-  assertBech32(address);
+export function bech32mDecode(address: SparkAddressFormat) {
   return bech32m.decode(address, BECH32M_LIMIT);
 }
+
 function bech32mEncode(prefix: string, words: number[] | Uint8Array) {
   return bech32m.encode(prefix, words, BECH32M_LIMIT) as SparkAddressFormat;
 }

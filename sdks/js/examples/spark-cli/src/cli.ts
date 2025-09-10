@@ -371,7 +371,7 @@ interface CreateSparkInvoiceArgs {
   asset?: string;
   amount?: string;
   memo?: string;
-  senderSparkAddress?: string;
+  senderPublicKey?: string;
   expiryTime?: string;
 }
 
@@ -530,7 +530,7 @@ function parseCreateSparkInvoiceArgsWithYargs(
 
     const parsed = yargs(args)
       .command(
-        "$0 <asset> [amount] [memo] [senderSparkAddress] [expiryTime]",
+        "$0 <asset> [amount] [memo] [senderPublicKey] [expiryTime]",
         false,
         (y) =>
           y
@@ -546,7 +546,7 @@ function parseCreateSparkInvoiceArgsWithYargs(
               describe: "Optional memo, use _ for empty",
               type: "string",
             })
-            .positional("senderSparkAddress", {
+            .positional("senderPublicKey", {
               describe: "Optional sender public key, use _ for empty",
               type: "string",
             })
@@ -564,12 +564,12 @@ function parseCreateSparkInvoiceArgsWithYargs(
       asset: underscore(parsed.asset as string),
       amount: underscore(parsed.amount as string),
       memo: underscore(parsed.memo as string),
-      senderSparkAddress: underscore(parsed.senderSparkAddress as string),
+      senderPublicKey: underscore(parsed.senderPublicKey as string),
       expiryTime: underscore(parsed.expiryTime as string),
     };
   } catch (err) {
     console.error(
-      "Error: createsparkinvoice <asset> [amount] [memo] [senderSparkAddress] [expiryTime]",
+      "Error: createsparkinvoice <asset> [amount] [memo] [senderPublicKey] [expiryTime]",
       err,
     );
     throw err;
@@ -1290,7 +1290,7 @@ async function runCLI() {
             console.log("Please initialize a wallet first");
             break;
           }
-          const { asset, amount, memo, senderSparkAddress, expiryTime } =
+          const { asset, amount, memo, senderPublicKey, expiryTime } =
             parseCreateSparkInvoiceArgsWithYargs(args) || {};
           if (args.includes("--help")) {
             break;
@@ -1308,7 +1308,7 @@ async function runCLI() {
             sparkInvoice = await wallet.createSatsInvoice({
               amount: amount ? parseInt(amount) : undefined,
               memo,
-              senderSparkAddress: senderSparkAddress as SparkAddressFormat,
+              senderPublicKey: senderPublicKey,
               expiryTime: expiryDate,
             });
           } else {
@@ -1316,7 +1316,7 @@ async function runCLI() {
               tokenIdentifier: asset as Bech32mTokenIdentifier,
               amount: amount ? BigInt(amount) : undefined,
               memo,
-              senderSparkAddress: senderSparkAddress as SparkAddressFormat,
+              senderPublicKey,
               expiryTime: expiryDate,
             });
           }
@@ -1471,42 +1471,8 @@ async function runCLI() {
           }
 
           try {
-            const response = await wallet.fulfillSparkInvoice(
-              sparkInvoices as any,
-            );
-            for (const tx of response.satsTransactionSuccess) {
-              console.log("--------------------------------");
-              console.log("Sats invoice success:", tx.invoice);
-              console.log("Transaction ID:", tx.transferResponse.id);
-            }
-            for (const tx of response.tokenTransactionSuccess) {
-              console.log("--------------------------------");
-              console.log("Tokens identifier success:", tx.tokenIdentifier);
-              console.log(
-                "Invoices:",
-                tx.invoices.length ? tx.invoices.join(", ") : "(none)",
-              );
-              console.log("Token transaction ID:", tx.txid);
-            }
-            for (const tx of response.satsTransactionErrors) {
-              console.log("--------------------------------");
-              console.log("Sats Transaction Error for invoice:", tx.invoice);
-              console.log("Error:", tx.error.message);
-            }
-            for (const tx of response.tokenTransactionErrors) {
-              console.log("--------------------------------");
-              console.log("Token identifier error:", tx.tokenIdentifier);
-              console.log(
-                "Invoices:",
-                tx.invoices.length ? tx.invoices.join(", ") : "(none)",
-              );
-              console.log("Error:", tx.error.message);
-            }
-            for (const tx of response.invalidInvoices) {
-              console.log("--------------------------------");
-              console.log("Invalid Invoice:", tx.invoice);
-              console.log("Error:", tx.error.message);
-            }
+            const txId = await wallet.fulfillSparkInvoice(sparkInvoices as any);
+            console.log("Fulfill Spark Invoice Transaction ID:", txId);
           } catch (error) {
             let errorMsg = "Unknown error";
             if (error instanceof Error) {
