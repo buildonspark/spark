@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.3.2
+
+### Patch Changes
+
+- - Ensure android/build folder excluded from publish
+
 ## 0.3.1
 
 ### Patch Changes

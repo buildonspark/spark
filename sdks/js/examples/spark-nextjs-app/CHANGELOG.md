@@ -1,5 +1,12 @@
 # spark-nextjs-app
 
+## 0.1.36
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.3.2
+
 ## 0.1.35
 
 ### Patch Changes
