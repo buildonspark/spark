@@ -314,9 +314,6 @@ export class BaseTransferService {
   async signRefunds(
     leafDataMap: Map<string, LeafRefundSigningData>,
     operatorSigningResults: LeafRefundTxSigningResult[],
-    cpfpAdaptorPubKey?: Uint8Array,
-    directAdaptorPubKey?: Uint8Array,
-    directFromCpfpAdaptorPubKey?: Uint8Array,
   ): Promise<NodeSignatures[]> {
     const nodeSignatures: NodeSignatures[] = [];
     for (const operatorSigningResult of operatorSigningResults) {
@@ -355,7 +352,6 @@ export class BaseTransferService {
         selfCommitment: leafData.signingNonceCommitment,
         statechainCommitments:
           operatorSigningResult.refundTxSigningResult?.signingNonceCommitments,
-        adaptorPubKey: cpfpAdaptorPubKey,
         verifyingKey: operatorSigningResult.verifyingKey,
       });
 
@@ -371,7 +367,6 @@ export class BaseTransferService {
         selfCommitment: leafData.signingNonceCommitment,
         publicKey,
         selfSignature: cpfpUserSignature,
-        adaptorPubKey: cpfpAdaptorPubKey,
       });
 
       // Sign direct refund transaction
@@ -396,7 +391,6 @@ export class BaseTransferService {
             statechainCommitments:
               operatorSigningResult.directRefundTxSigningResult
                 ?.signingNonceCommitments,
-            adaptorPubKey: directAdaptorPubKey,
             verifyingKey: operatorSigningResult.verifyingKey,
           });
 
@@ -414,7 +408,6 @@ export class BaseTransferService {
             selfCommitment: leafData.directSigningNonceCommitment,
             publicKey,
             selfSignature: directUserSignature,
-            adaptorPubKey: directAdaptorPubKey,
           });
         }
 
@@ -435,7 +428,6 @@ export class BaseTransferService {
               statechainCommitments:
                 operatorSigningResult.directFromCpfpRefundTxSigningResult
                   ?.signingNonceCommitments,
-              adaptorPubKey: directFromCpfpAdaptorPubKey,
               verifyingKey: operatorSigningResult.verifyingKey,
             });
 
@@ -456,7 +448,6 @@ export class BaseTransferService {
                 leafData.directFromCpfpRefundSigningNonceCommitment,
               publicKey,
               selfSignature: directFromCpfpUserSignature,
-              adaptorPubKey: directFromCpfpAdaptorPubKey,
             });
         }
       }
@@ -811,40 +802,11 @@ export class TransferService extends BaseTransferService {
     };
   }
 
-  async counterSwapSignRefund(
-    leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
-    expiryTime: Date,
-    cpfpAdaptorPubKey?: Uint8Array,
-    directAdaptorPubKey?: Uint8Array,
-    directFromCpfpAdaptorPubKey?: Uint8Array,
-  ): Promise<{
-    transfer: Transfer;
-    signatureMap: Map<string, Uint8Array>;
-    directSignatureMap: Map<string, Uint8Array>;
-    directFromCpfpSignatureMap: Map<string, Uint8Array>;
-    leafDataMap: Map<string, LeafRefundSigningData>;
-    signingResults: LeafRefundTxSigningResult[];
-  }> {
-    return this.sendTransferSignRefundInternal(
-      leaves,
-      receiverIdentityPubkey,
-      expiryTime,
-      true,
-      cpfpAdaptorPubKey,
-      directAdaptorPubKey,
-      directFromCpfpAdaptorPubKey,
-    );
-  }
-
   async sendTransferSignRefundInternal(
     leaves: LeafKeyTweak[],
     receiverIdentityPubkey: Uint8Array,
     expiryTime: Date,
     forSwap: boolean,
-    cpfpAdaptorPubKey?: Uint8Array,
-    directAdaptorPubKey?: Uint8Array,
-    directFromCpfpAdaptorPubKey?: Uint8Array,
   ): Promise<{
     transfer: Transfer;
     signatureMap: Map<string, Uint8Array>;
@@ -899,33 +861,14 @@ export class TransferService extends BaseTransferService {
       leaves,
       leafDataMap,
     );
-    // 0197d19f-7419-7d51-9d2b-247127b5ab0a
+
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
 
     let response: CounterLeafSwapResponse;
     try {
-      if (
-        cpfpAdaptorPubKey !== undefined ||
-        directAdaptorPubKey !== undefined ||
-        directFromCpfpAdaptorPubKey !== undefined
-      ) {
-        response = await sparkClient.counter_leaf_swap_v2({
-          transfer: {
-            transferId,
-            leavesToSend: signingJobs,
-            ownerIdentityPublicKey:
-              await this.config.signer.getIdentityPublicKey(),
-            receiverIdentityPublicKey: receiverIdentityPubkey,
-            expiryTime: expiryTime,
-          },
-          swapId: uuidv7(),
-          adaptorPublicKey: cpfpAdaptorPubKey,
-          directAdaptorPublicKey: directAdaptorPubKey,
-          directFromCpfpAdaptorPublicKey: directFromCpfpAdaptorPubKey,
-        });
-      } else if (forSwap) {
+      if (forSwap) {
         response = await sparkClient.start_leaf_swap_v2({
           transferId,
           leavesToSend: signingJobs,
@@ -955,9 +898,6 @@ export class TransferService extends BaseTransferService {
     const signatures = await this.signRefunds(
       leafDataMap,
       response.signingResults,
-      cpfpAdaptorPubKey,
-      directAdaptorPubKey,
-      directFromCpfpAdaptorPubKey,
     );
 
     const cpfpSignatureMap = new Map<string, Uint8Array>();
