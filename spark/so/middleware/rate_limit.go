@@ -81,11 +81,23 @@ func (c *realClock) Now() time.Time {
 }
 
 type MemoryStore interface {
+	Get(ctx context.Context, key string) (tokens uint64, remaining uint64, err error)
+	Set(ctx context.Context, key string, tokens uint64, interval time.Duration) error
 	Take(ctx context.Context, key string) (tokens uint64, remaining uint64, reset uint64, ok bool, err error)
 }
 
 type realMemoryStore struct {
+	// TODO: Update this to use the Redis store instead of the memory store.
+	// See https://linear.app/lightsparkdev/issue/LIG-8247
 	store limiter.Store
+}
+
+func (s *realMemoryStore) Get(ctx context.Context, key string) (tokens uint64, remaining uint64, err error) {
+	return s.store.Get(ctx, key)
+}
+
+func (s *realMemoryStore) Set(ctx context.Context, key string, tokens uint64, interval time.Duration) error {
+	return s.store.Set(ctx, key, tokens, interval)
 }
 
 func (s *realMemoryStore) Take(ctx context.Context, key string) (tokens uint64, remaining uint64, reset uint64, ok bool, err error) {
@@ -106,20 +118,16 @@ func NewRateLimiter(configOrProvider any, opts ...RateLimiterOption) (*RateLimit
 	rateLimiter := &RateLimiter{
 		config: config,
 		clock:  &realClock{},
-		knobs:  nil,
+		knobs:  knobs.New(nil),
 	}
 
 	for _, opt := range opts {
 		opt(rateLimiter)
 	}
 
-	interval := config.Window
-	maxRequests := uint64(config.MaxRequests)
 	// Knob values should not be set to negative values—they will be cast to uint64.
-	if rateLimiter.knobs != nil {
-		interval = time.Duration(uint64(rateLimiter.knobs.GetValue(knobs.KnobRateLimitPeriod, float64(config.Window)))) * time.Second
-		maxRequests = uint64(rateLimiter.knobs.GetValue(knobs.KnobRateLimitLimit, float64(config.MaxRequests)))
-	}
+	interval := knobs.GetDurationSeconds(rateLimiter.knobs, knobs.KnobRateLimitPeriod, config.Window)
+	maxRequests := uint64(rateLimiter.knobs.GetValue(knobs.KnobRateLimitLimit, float64(config.MaxRequests)))
 
 	if rateLimiter.store == nil {
 		defaultStore, err := memorystore.New(&memorystore.Config{
@@ -139,24 +147,20 @@ func NewRateLimiter(configOrProvider any, opts ...RateLimiterOption) (*RateLimit
 func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		// Check if the method is enabled.
-		if r.knobs != nil {
-			methodEnabled := r.knobs.RolloutRandomTarget(knobs.KnobGrpcServerMethodEnabled, &info.FullMethod, 100)
-			if !methodEnabled {
-				return nil, errors.UnavailableErrorf("The method is currently unavailable, please try again later.")
-			}
+		methodEnabled := r.knobs.RolloutRandomTarget(knobs.KnobGrpcServerMethodEnabled, &info.FullMethod, 100)
+		if !methodEnabled {
+			return nil, errors.UnavailableErrorf("The method is currently unavailable, please try again later.")
 		}
 
 		shouldLimit := slices.Contains(r.config.Methods, info.FullMethod)
-		if r.knobs != nil {
-			// A value of > 0 means to enforce rate limiting for the given method.
-			// A value of 0 means to not enforce the limit for the given method.
-			// Any other value means use the default configuration.
-			methodLimitEnabled := int(r.knobs.GetValueTarget(knobs.KnobRateLimitMethods, &info.FullMethod, -1))
-			if methodLimitEnabled > 0 {
-				shouldLimit = true
-			} else if methodLimitEnabled == 0 {
-				shouldLimit = false
-			}
+		// A value of > 0 means to enforce rate limiting for the given method.
+		// A value of 0 means to not enforce the limit for the given method.
+		// Any other value means use the default configuration.
+		methodLimitEnabled := int(r.knobs.GetValueTarget(knobs.KnobRateLimitMethods, &info.FullMethod, -1))
+		if methodLimitEnabled > 0 {
+			shouldLimit = true
+		} else if methodLimitEnabled == 0 {
+			shouldLimit = false
 		}
 
 		if !shouldLimit {
@@ -169,6 +173,30 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 		}
 
 		key := sanitizeKey(fmt.Sprintf("rl:%s:%s", info.FullMethod, ip))
+
+		// Methods can also have specific rate limits and intervals set for
+		// them, so we need to check for that here. That should override the
+		// default values, if they exist.
+		methodMaxRequests := uint64(r.config.MaxRequests)
+		rawMethodMaxRequests := int(r.knobs.GetValueTarget(knobs.KnobRateLimitLimit, &info.FullMethod, float64(r.config.MaxRequests)))
+
+		if rawMethodMaxRequests == 0 {
+			return handler(ctx, req)
+		} else if rawMethodMaxRequests > 0 {
+			methodMaxRequests = uint64(rawMethodMaxRequests)
+		}
+
+		// We only do the update if there's a change since it has the side
+		// effect of reseting the bucket and thus the current rate limit status,
+		// which we don't want to do in general.
+		curMaxRequests, _, err := r.store.Get(ctx, key)
+		if err != nil || curMaxRequests != methodMaxRequests {
+			// We ignore the error because, in the end, there's nothing we can
+			// do about it. Additionally, in practice, the underlying real store
+			// doesn't actually ever return an error.
+			_ = r.store.Set(ctx, key, methodMaxRequests, r.config.Window)
+		}
+
 		_, _, _, ok, err := r.store.Take(ctx, key)
 		if err != nil {
 			return nil, fmt.Errorf("rate limit error: %w", err)
