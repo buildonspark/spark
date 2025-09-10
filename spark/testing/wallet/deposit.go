@@ -436,7 +436,7 @@ func CreateTreeRoot(
 		return nil, err
 	}
 
-	return sparkClient.FinalizeNodeSignaturesV2(context.Background(), &pb.FinalizeNodeSignaturesRequest{
+	return sparkClient.FinalizeNodeSignaturesV2(ctx, &pb.FinalizeNodeSignaturesRequest{
 		Intent: pbcommon.SignatureIntent_CREATION,
 		NodeSignatures: []*pb.NodeSignatures{
 			{

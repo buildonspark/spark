@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"time"
@@ -14,6 +15,7 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -49,6 +51,10 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest, requireDirectTx bool) (*pb.FinalizeNodeSignaturesResponse, error) {
 	if len(req.NodeSignatures) == 0 {
 		return &pb.FinalizeNodeSignaturesResponse{Nodes: []*pb.TreeNode{}}, nil
+	}
+
+	if err := o.validateNodeOwnership(ctx, req); err != nil {
+		return nil, err
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
@@ -210,6 +216,42 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 		return nil, fmt.Errorf("invalid intent %s", req.Intent)
 	}
 	return &pb.FinalizeNodeSignaturesResponse{Nodes: nodes}, nil
+}
+
+func (o *FinalizeSignatureHandler) validateNodeOwnership(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest) error {
+	if !o.config.IsAuthzEnforced() {
+		return nil
+	}
+
+	nodeIDs := make([]uuid.UUID, 0, len(req.NodeSignatures))
+	for _, nodeSignatures := range req.NodeSignatures {
+		nodeID, err := uuid.Parse(nodeSignatures.NodeId)
+		if err != nil {
+			return fmt.Errorf("invalid node id in request: %w", err)
+		}
+		nodeIDs = append(nodeIDs, nodeID)
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get or create current tx for request: %w", err)
+	}
+
+	nodes, err := db.TreeNode.Query().Where(treenode.IDIn(nodeIDs...)).All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get nodes: %w", err)
+	}
+
+	session, err := authn.GetSessionFromContext(ctx)
+	if err != nil {
+		return err
+	}
+	for _, node := range nodes {
+		if !bytes.Equal(node.OwnerIdentityPubkey, session.IdentityPublicKey().Serialize()) {
+			return fmt.Errorf("node %s is not owned by the authenticated identity public key %x", node.ID.String(), session.IdentityPublicKey().Serialize())
+		}
+	}
+	return nil
 }
 
 func (o *FinalizeSignatureHandler) verifyAndUpdateTransfer(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest) (*ent.Transfer, error) {

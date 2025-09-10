@@ -602,7 +602,7 @@ func CreateTree(
 		return nil, err
 	}
 
-	return client.FinalizeNodeSignaturesV2(context.Background(), &pb.FinalizeNodeSignaturesRequest{
+	return client.FinalizeNodeSignaturesV2(ctx, &pb.FinalizeNodeSignaturesRequest{
 		NodeSignatures: nodeSignatures,
 	})
 }
