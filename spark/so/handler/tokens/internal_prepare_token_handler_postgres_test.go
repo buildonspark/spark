@@ -1,10 +1,6 @@
-//go:build postgres
-// +build postgres
-
 package tokens
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -27,27 +23,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-// setup helper mirroring sign handler's postgres setup
-func setupInternalPrepareTokenTestHandlerPostgres(t *testing.T) (*InternalPrepareTokenHandler, context.Context, func()) {
-	t.Helper()
-	cfg, err := sparktesting.TestConfig()
-	require.NoError(t, err)
-
-	// Start Postgres and open ent client/tx via db helpers
-	dsn, stopPg := db.SpinUpPostgres(t)
-	baseCtx := t.Context()
-	ctx, testCtx, err := db.NewPgTestContext(t, baseCtx, dsn)
-	require.NoError(t, err)
-
-	handler := NewInternalPrepareTokenHandler(cfg)
-
-	cleanup := func() {
-		testCtx.Close()
-		stopPg()
-	}
-	return handler, ctx, cleanup
-}
 
 // TestPrepareTokenTransactionInternal_NetworkValidation ensures we correctly validate network matching.
 func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
@@ -83,17 +58,21 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 		},
 	}
 
+	cfg, err := sparktesting.TestConfig()
+	require.NoError(t, err)
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			handler, ctx, cleanup := setupInternalPrepareTokenTestHandlerPostgres(t)
-			defer cleanup()
+			t.Parallel()
+			ctx, _ := db.ConnectToTestPostgres(t)
+			dbtx, err := ent.GetDbFromContext(ctx)
+			require.NoError(t, err)
+			handler := NewInternalPrepareTokenHandler(cfg)
 
 			// Arrange: create a TokenCreate on tokenNet
 			issuerPriv, err := keys.GeneratePrivateKey()
 			require.NoError(t, err)
 
-			dbtx, err := ent.GetDbFromContext(ctx)
-			require.NoError(t, err)
 			tokenCreate := dbtx.TokenCreate.Create().
 				SetIssuerPublicKey(issuerPriv.Public().Serialize()).
 				SetTokenName("TT").
@@ -179,8 +158,7 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 			_, err = handler.PrepareTokenTransactionInternal(ctx, req)
 
 			if tc.expectError {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), fmt.Sprintf("transaction network %s does not match token network %s", strings.ToLower(string(tc.txNet)), strings.ToLower(string(tc.tokenNet))))
+				require.ErrorContains(t, err, fmt.Sprintf("transaction network %s does not match token network %s", strings.ToLower(string(tc.txNet)), strings.ToLower(string(tc.tokenNet))))
 			} else {
 				require.NoError(t, err)
 			}

@@ -31,7 +31,7 @@ func createTestTxBytes(t *testing.T, value int64) []byte {
 }
 
 func TestFinalizeTransfer(t *testing.T) {
-	ctx, dbCtx := db.SetUpPostgresTestContext(t)
+	ctx, dbCtx := db.ConnectToTestPostgres(t)
 
 	config := &so.Config{
 		BitcoindConfigs: map[string]so.BitcoindConfig{

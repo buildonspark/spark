@@ -1,6 +1,3 @@
-//go:build gripmock
-// +build gripmock
-
 package handler
 
 import (
@@ -14,6 +11,7 @@ import (
 	"github.com/distributed-lab/gripmock"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
+	testutil "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -26,13 +24,7 @@ import (
 )
 
 func TestCreateUtxoSwap_ErrorIfNotCoordinator(t *testing.T) {
-	defer func() {
-		_ = gripmock.Clear()
-	}()
-
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
-
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 
 	// Find other operator (non-coordinator)
@@ -105,12 +97,7 @@ func TestCreateUtxoSwap_ErrorIfNotCoordinator(t *testing.T) {
 }
 
 func TestCreateUtxoSwap_InvalidUserSignature(t *testing.T) {
-	defer func() {
-		_ = gripmock.Clear()
-	}()
-
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
@@ -162,10 +149,8 @@ func TestCreateUtxoSwap_InvalidUserSignature(t *testing.T) {
 }
 
 func TestCreateUtxoSwap_UtxoNotConfirmed(t *testing.T) {
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	rng := rand.NewChaCha8([32]byte{})
-
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	// Set high confirmation threshold
 	cfg.BitcoindConfigs["regtest"] = so.BitcoindConfig{
@@ -227,9 +212,7 @@ func TestCreateUtxoSwap_UtxoNotConfirmed(t *testing.T) {
 }
 
 func TestCreateUtxoSwap_InvalidTransferWrongAmount(t *testing.T) {
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
-
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
@@ -288,9 +271,7 @@ func TestCreateUtxoSwap_InvalidTransferWrongAmount(t *testing.T) {
 }
 
 func TestCreateUtxoSwap_InvalidTransferWrongRecipient(t *testing.T) {
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
-
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
@@ -348,8 +329,7 @@ func TestCreateUtxoSwap_InvalidTransferWrongRecipient(t *testing.T) {
 }
 
 func TestCreateUtxoSwap_InvalidTransferWrongNetwork(t *testing.T) {
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
@@ -407,8 +387,7 @@ func TestCreateUtxoSwap_InvalidTransferWrongNetwork(t *testing.T) {
 }
 
 func TestCreateUtxoSwap_ErrorNoUtxoSwapCreated(t *testing.T) {
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
@@ -475,6 +454,7 @@ func TestCreateUtxoSwap_ErrorNoUtxoSwapCreated(t *testing.T) {
 }
 
 func TestCreateUtxoSwap_SuccessfulCallCreatesUtxoSwap(t *testing.T) {
+	testutil.RequireGripMock(t)
 	defer func() {
 		_ = gripmock.Clear()
 	}()
@@ -486,8 +466,7 @@ func TestCreateUtxoSwap_SuccessfulCallCreatesUtxoSwap(t *testing.T) {
 	err := gripmock.AddStub("spark_internal.SparkInternalService", "create_utxo_swap", nil, successStub)
 	require.NoError(t, err)
 
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)

@@ -228,6 +228,7 @@ func TestTxProviderWithTimeout_Success(t *testing.T) {
 }
 
 func TestTxProviderWithTimeout_Timeout(t *testing.T) {
+	t.Parallel()
 	timeout := 200 * time.Millisecond
 	provider := NewTxProviderWithTimeout(&NeverTxProvider{}, timeout)
 
@@ -235,15 +236,8 @@ func TestTxProviderWithTimeout_Timeout(t *testing.T) {
 	require.ErrorIs(t, err, ErrTxBeginTimeout)
 }
 
-func TestTxProviderWithTimeout_CancelledContext(t *testing.T) {
-	timeout := 5 * time.Second
-	provider := NewTxProviderWithTimeout(&NeverTxProvider{}, timeout)
-
-	_, err := provider.GetOrBeginTx(t.Context())
-	require.ErrorIs(t, err, ErrTxBeginTimeout)
-}
-
 func TestTxProviderWithTimeout_SlowProvider(t *testing.T) {
+	t.Parallel()
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 
@@ -282,6 +276,7 @@ func TestTxProviderWithTimeout_SlowProvider(t *testing.T) {
 }
 
 func TestTxProviderWithTimeout_NoTimeout(t *testing.T) {
+	t.Parallel()
 	dbClient := NewTestSQLiteClient(t)
 	defer dbClient.Close()
 

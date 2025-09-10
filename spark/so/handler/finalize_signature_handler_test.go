@@ -1,6 +1,3 @@
-//go:build postgres
-// +build postgres
-
 package handler
 
 import (

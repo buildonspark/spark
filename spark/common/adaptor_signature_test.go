@@ -12,8 +12,7 @@ import (
 )
 
 func TestAdaptorSignature(t *testing.T) {
-	failures := 0
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		privKey, err := btcec.NewPrivateKey()
 		require.NoError(t, err)
 		pubkey := privKey.PubKey()
@@ -41,6 +40,4 @@ func TestAdaptorSignature(t *testing.T) {
 
 		assert.True(t, newSig.Verify(hash[:], pubkey))
 	}
-
-	assert.Zero(t, failures)
 }

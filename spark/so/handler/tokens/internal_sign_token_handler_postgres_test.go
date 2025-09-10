@@ -1,6 +1,3 @@
-//go:build postgres
-// +build postgres
-
 package tokens
 
 import (
@@ -23,26 +20,11 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
-// Helper to spin up Postgres-backed handler
-func setupInternalSignTokenTestHandlerPostgres(t *testing.T) (*InternalSignTokenHandler, context.Context, func()) {
-	t.Helper()
+func TestMain(m *testing.M) {
+	stop := db.StartPostgresServer()
+	defer stop()
 
-	cfg, err := sparktesting.TestConfig()
-	require.NoError(t, err)
-
-	baseCtx := t.Context()
-	dsn, stopPg := db.SpinUpPostgres(t)
-	ctx, pgCtx, err := db.NewPgTestContext(t, baseCtx, dsn)
-	require.NoError(t, err)
-
-	handler := &InternalSignTokenHandler{config: cfg}
-
-	cleanup := func() {
-		pgCtx.Close()
-		stopPg()
-	}
-
-	return handler, ctx, cleanup
+	m.Run()
 }
 
 // createTestSpentOutputWithShares creates a spent output with one partial share and returns it.
@@ -90,19 +72,21 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.
 }
 
 func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *testing.T) {
-	handler, ctx, cleanup := setupInternalSignTokenTestHandlerPostgres(t)
-	defer cleanup()
+	cfg, err := sparktesting.TestConfig()
+	require.NoError(t, err)
 
+	handler := &InternalSignTokenHandler{config: cfg}
+	ctx, _ := db.ConnectToTestPostgres(t)
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
 	// Configure 3 operators, threshold 2.
 	limitedOps := make(map[string]*so.SigningOperator)
-	ids := make([]string, 0, 3)
-	for i := 0; i < 3; i++ {
+	ids := make([]string, 3)
+	for i := range ids {
 		id := fmt.Sprintf("%064x", i+1)
 		limitedOps[id] = handler.config.SigningOperatorMap[id]
-		ids = append(ids, id)
+		ids[i] = id
 	}
 	handler.config.SigningOperatorMap = limitedOps
 	handler.config.Threshold = 2
@@ -127,26 +111,26 @@ func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *te
 
 	output := createTestSpentOutputWithShares(t, ctx, tx, handler, tokenCreate.ID, priv, shares, ids)
 	hash := bytes.Repeat([]byte{0x24}, 32)
-	tokenTx := tx.TokenTransaction.Create().
+	_ = tx.TokenTransaction.Create().
 		SetCreateID(tokenCreate.ID).
 		SetPartialTokenTransactionHash(hash).
 		SetFinalizedTokenTransactionHash(hash).
 		SetStatus(st.TokenTransactionStatusSigned).
+		AddSpentOutput(output).
 		SaveX(ctx)
-	tokenTx.Update().AddSpentOutput(output).ExecX(ctx)
 
 	// Commit so data visible in new transaction.
 	require.NoError(t, tx.Commit())
 	t.Run("flag false does not finalize when threshold requirement disabled", func(t *testing.T) {
 		handler.config.Token.RequireThresholdOperators = false
 		finalized, err := handler.recoverFullRevocationSecretsAndFinalize(ctx, hash)
-		assert.False(t, finalized)
 		require.NoError(t, err)
+		assert.False(t, finalized)
 	})
 	t.Run("flag true finalizes when threshold requirement enabled", func(t *testing.T) {
 		handler.config.Token.RequireThresholdOperators = true
 		finalized, err := handler.recoverFullRevocationSecretsAndFinalize(ctx, hash)
-		assert.True(t, finalized)
 		require.NoError(t, err)
+		assert.True(t, finalized)
 	})
 }

@@ -9,14 +9,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMain(m *testing.M) {
+	stop := StartPostgresServer()
+	defer stop()
+
+	m.Run()
+}
+
 func TestRegisteringListeners(t *testing.T) {
-	_, _, dbEvents := SetupDBEventsTestContext(t)
+	t.Parallel()
+	_, _, dbEvents := SetUpDBEventsTestContext(t)
 
 	_, cleanupListener := dbEvents.AddListeners([]Subscription{
 		{
 			EventName: "test",
 			Field:     "id",
-			Value:     "test-id",
+			Value:     "test_id",
 		},
 	})
 	defer cleanupListener()
@@ -25,14 +33,14 @@ func TestRegisteringListeners(t *testing.T) {
 	require.Len(t, dbEvents.listeners["test"], 1)
 	require.Len(t, dbEvents.listeners["test"][listenerKey{
 		Field: "id",
-		Value: "test-id",
+		Value: "test_id",
 	}], 1)
 
 	_, cleanupListener2 := dbEvents.AddListeners([]Subscription{
 		{
 			EventName: "test",
 			Field:     "id",
-			Value:     "test-id",
+			Value:     "test_id",
 		},
 	})
 	defer cleanupListener2()
@@ -41,14 +49,14 @@ func TestRegisteringListeners(t *testing.T) {
 	require.Len(t, dbEvents.listeners["test"], 1)
 	require.Len(t, dbEvents.listeners["test"][listenerKey{
 		Field: "id",
-		Value: "test-id",
+		Value: "test_id",
 	}], 2)
 
 	_, cleanupListener3 := dbEvents.AddListeners([]Subscription{
 		{
 			EventName: "test",
 			Field:     "id",
-			Value:     "test-id-1",
+			Value:     "test_id_1",
 		},
 	})
 	defer cleanupListener3()
@@ -57,48 +65,49 @@ func TestRegisteringListeners(t *testing.T) {
 	require.Len(t, dbEvents.listeners["test"], 2)
 	require.Len(t, dbEvents.listeners["test"][listenerKey{
 		Field: "id",
-		Value: "test-id",
+		Value: "test_id",
 	}], 2)
 	require.Len(t, dbEvents.listeners["test"][listenerKey{
 		Field: "id",
-		Value: "test-id-1",
+		Value: "test_id_1",
 	}], 1)
 
 	_, cleanupListener4 := dbEvents.AddListeners([]Subscription{
 		{
-			EventName: "test-1",
+			EventName: "test_1",
 			Field:     "id",
-			Value:     "test-id-2",
+			Value:     "test_id_2",
 		},
 		{
-			EventName: "test-2",
+			EventName: "test_2",
 			Field:     "id",
-			Value:     "test-id-3",
+			Value:     "test_id_3",
 		},
 	})
 	defer cleanupListener4()
 
 	require.Len(t, dbEvents.listeners, 3)
-	require.Len(t, dbEvents.listeners["test-1"], 1)
-	require.Len(t, dbEvents.listeners["test-1"][listenerKey{
+	require.Len(t, dbEvents.listeners["test_1"], 1)
+	require.Len(t, dbEvents.listeners["test_1"][listenerKey{
 		Field: "id",
-		Value: "test-id-2",
+		Value: "test_id_2",
 	}], 1)
-	require.Len(t, dbEvents.listeners["test-2"], 1)
-	require.Len(t, dbEvents.listeners["test-2"][listenerKey{
+	require.Len(t, dbEvents.listeners["test_2"], 1)
+	require.Len(t, dbEvents.listeners["test_2"][listenerKey{
 		Field: "id",
-		Value: "test-id-3",
+		Value: "test_id_3",
 	}], 1)
 }
 
 func TestCleaningUpListeners(t *testing.T) {
-	_, _, dbEvents := SetupDBEventsTestContext(t)
+	t.Parallel()
+	_, _, dbEvents := SetUpDBEventsTestContext(t)
 
 	_, cleanupListener := dbEvents.AddListeners([]Subscription{
 		{
 			EventName: "test",
 			Field:     "id",
-			Value:     "test-id",
+			Value:     "test_id",
 		},
 	})
 
@@ -106,7 +115,7 @@ func TestCleaningUpListeners(t *testing.T) {
 	require.Len(t, dbEvents.listeners["test"], 1)
 	require.Len(t, dbEvents.listeners["test"][listenerKey{
 		Field: "id",
-		Value: "test-id",
+		Value: "test_id",
 	}], 1)
 
 	cleanupListener()
@@ -115,23 +124,24 @@ func TestCleaningUpListeners(t *testing.T) {
 	require.Empty(t, dbEvents.listeners["test"])
 	require.Empty(t, dbEvents.listeners["test"][listenerKey{
 		Field: "id",
-		Value: "test-id",
+		Value: "test_id",
 	}])
 }
 
 func TestDBEvents(t *testing.T) {
-	_, connector, dbEvents := SetupDBEventsTestContext(t)
+	t.Parallel()
+	_, connector, dbEvents := SetUpDBEventsTestContext(t)
 
 	channel, _ := dbEvents.AddListeners([]Subscription{
 		{
 			EventName: "test",
 			Field:     "id",
-			Value:     "test-id",
+			Value:     "test_id",
 		},
 	})
 
 	testPayload := map[string]any{
-		"id": "test-id",
+		"id": "test_id",
 	}
 
 	payloadJSON, err := json.Marshal(testPayload)
@@ -160,13 +170,13 @@ func TestDBEvents(t *testing.T) {
 }
 
 func TestDBEventsReconnect(t *testing.T) {
-	_, connector, dbEvents := SetupDBEventsTestContext(t)
+	_, connector, dbEvents := SetUpDBEventsTestContext(t)
 
 	channel, _ := dbEvents.AddListeners([]Subscription{
 		{
 			EventName: "test",
 			Field:     "id",
-			Value:     "test-id",
+			Value:     "test_id",
 		},
 	})
 
@@ -178,7 +188,7 @@ func TestDBEventsReconnect(t *testing.T) {
 	}, 5*time.Second, 100*time.Millisecond, "Connection should be reestablished")
 
 	testPayload := map[string]any{
-		"id": "test-id",
+		"id": "test_id",
 	}
 
 	payloadJSON, err := json.Marshal(testPayload)
@@ -197,13 +207,13 @@ func TestDBEventsReconnect(t *testing.T) {
 }
 
 func TestMultipleListenersReceiveNotification(t *testing.T) {
-	_, connector, dbEvents := SetupDBEventsTestContext(t)
+	_, connector, dbEvents := SetUpDBEventsTestContext(t)
 
 	channel1, cleanupListener := dbEvents.AddListeners([]Subscription{
 		{
 			EventName: "test",
 			Field:     "id",
-			Value:     "test-id",
+			Value:     "test_id",
 		},
 	})
 	defer cleanupListener()
@@ -212,7 +222,7 @@ func TestMultipleListenersReceiveNotification(t *testing.T) {
 		{
 			EventName: "test",
 			Field:     "id",
-			Value:     "test-id",
+			Value:     "test_id",
 		},
 	})
 	defer cleanupListener2()
@@ -220,7 +230,7 @@ func TestMultipleListenersReceiveNotification(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	testPayload := map[string]any{
-		"id": "test-id",
+		"id": "test_id",
 	}
 
 	payloadJSON, err := json.Marshal(testPayload)

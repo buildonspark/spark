@@ -33,6 +33,8 @@ require (
 	github.com/nbd-wtf/ln-decodepay v1.13.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/pebbe/zmq4 v1.2.11
+	github.com/peterldowns/pgtestdb v0.1.1
+	github.com/peterldowns/pgtestdb/migrators/atlasmigrator v0.1.1
 	github.com/prometheus/client_golang v1.21.1
 	github.com/sethvargo/go-limiter v1.0.0
 	github.com/stretchr/testify v1.10.0

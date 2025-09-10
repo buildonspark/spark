@@ -42,7 +42,7 @@ type DBEvents struct {
 	waitForNotificationCancel context.CancelFunc
 	mu                        sync.RWMutex
 
-	listeners      map[string]map[listenerKey]([]chan EventData)
+	listeners      map[string]map[listenerKey][]chan EventData
 	channelChanges []channelChange
 
 	logger  *slog.Logger
@@ -321,20 +321,12 @@ func (e *DBEvents) processChannelChanges() {
 
 func (e *DBEvents) startListening(channel string) error {
 	_, err := e.conn.Exec(e.ctx, "LISTEN "+channel)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (e *DBEvents) stopListening(channel string) error {
 	_, err := e.conn.Exec(e.ctx, "UNLISTEN "+channel)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (e *DBEvents) reconnect() error {
@@ -342,7 +334,7 @@ func (e *DBEvents) reconnect() error {
 	defer e.mu.Unlock()
 
 	backoff := 100 * time.Millisecond
-	maxBackoff := 60 * time.Second
+	const maxBackoff = time.Minute
 
 	for {
 		if e.conn != nil {

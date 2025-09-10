@@ -1,6 +1,3 @@
-//go:build gripmock
-// +build gripmock
-
 package handler
 
 import (
@@ -10,6 +7,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -21,12 +19,7 @@ import (
 )
 
 func TestRollbackUtxoSwap_InvalidStatement(t *testing.T) {
-	defer func() {
-		_ = gripmock.Clear()
-	}()
-
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
+	ctx, _ := db.ConnectToTestPostgres(t)
 
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
@@ -47,9 +40,7 @@ func TestRollbackUtxoSwap_InvalidStatement(t *testing.T) {
 }
 
 func TestRollbackUtxoSwap_UtxoDoesNotExist(t *testing.T) {
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
-
+	ctx, _ := db.ConnectToTestPostgres(t)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
@@ -67,16 +58,13 @@ func TestRollbackUtxoSwap_UtxoDoesNotExist(t *testing.T) {
 }
 
 func TestRollbackUtxoSwap_NoErrorIfUtxoSwapDoesNotExist(t *testing.T) {
-	defer func() {
-		_ = gripmock.Clear()
-	}()
+	sparktesting.RequireGripMock(t)
+	defer func() { _ = gripmock.Clear() }()
 
 	err := gripmock.AddStub("spark_internal.SparkInternalService", "rollback_utxo_swap", nil, nil)
 	require.NoError(t, err)
 
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
-
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
@@ -103,16 +91,13 @@ func TestRollbackUtxoSwap_NoErrorIfUtxoSwapDoesNotExist(t *testing.T) {
 }
 
 func TestRollbackUtxoSwap_NoErrorIfUtxoSwapCancelled(t *testing.T) {
-	defer func() {
-		_ = gripmock.Clear()
-	}()
+	sparktesting.RequireGripMock(t)
+	defer func() { _ = gripmock.Clear() }()
 
 	err := gripmock.AddStub("spark_internal.SparkInternalService", "rollback_utxo_swap", nil, nil)
 	require.NoError(t, err)
 
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
-
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
@@ -140,16 +125,13 @@ func TestRollbackUtxoSwap_NoErrorIfUtxoSwapCancelled(t *testing.T) {
 }
 
 func TestRollbackUtxoSwap_NoErrorIfUtxoSwapCreated(t *testing.T) {
-	defer func() {
-		_ = gripmock.Clear()
-	}()
+	sparktesting.RequireGripMock(t)
+	defer func() { _ = gripmock.Clear() }()
 
 	err := gripmock.AddStub("spark_internal.SparkInternalService", "rollback_utxo_swap", nil, nil)
 	require.NoError(t, err)
 
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
-
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 
@@ -196,9 +178,7 @@ func TestRollbackUtxoSwap_NoErrorIfUtxoSwapCreated(t *testing.T) {
 }
 
 func TestRollbackUtxoSwap_ErrorIfUtxoSwapCompleted(t *testing.T) {
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
-
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewInternalDepositHandler(cfg)
 

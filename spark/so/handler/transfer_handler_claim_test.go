@@ -1,6 +1,3 @@
-//go:build gripmock
-// +build gripmock
-
 package handler
 
 import (
@@ -10,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"math/rand/v2"
-	"os"
 	"testing"
 	"time"
 
@@ -26,17 +22,22 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	testutil "github.com/lightsparkdev/spark/testing"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
 func TestMain(m *testing.M) {
-	err := gripmock.InitEmbeddedGripmock("../../../protos", []int{8535, 8536, 8537, 8538, 8539})
-	if err != nil {
-		panic(fmt.Sprintf("Failed to init embedded gripmock: %v", err))
+	if sparktesting.GripMockEnabled() {
+		err := gripmock.InitEmbeddedGripmock("../../../protos", []int{8535, 8536, 8537, 8538, 8539})
+		if err != nil {
+			panic(fmt.Sprintf("Failed to init embedded gripmock: %v", err))
+		}
+		defer gripmock.StopEmbeddedGripmock()
 	}
-	defer gripmock.StopEmbeddedGripmock()
 
-	os.Exit(m.Run())
+	stop := db.StartPostgresServer()
+	defer stop()
+
+	m.Run()
 }
 
 var (
@@ -118,8 +119,7 @@ func createTestTreeForClaim(t *testing.T, ctx context.Context, ownerIdentityPubK
 func createTestTreeNode(t *testing.T, ctx context.Context, rng io.Reader, client *ent.Client, tree *ent.Tree, keyshare *ent.SigningKeyshare) *ent.TreeNode {
 	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	ownerSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
-	ownerSigningPubKey := ownerSigningPrivKey.Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	validTx := createOldBitcoinTxBytes(t, ownerPubKey)
 
@@ -202,6 +202,9 @@ func createTestLeafRefundTxSigningJob(t *testing.T, rng io.Reader, leaf *ent.Tre
 }
 
 func TestClaimTransferSignRefunds_Success(t *testing.T) {
+	sparktesting.RequireGripMock(t)
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+
 	err := gripmock.AddStub("spark_internal.SparkInternalService", "initiate_settle_receiver_key_tweak", nil, nil)
 	require.NoError(t, err, "Failed to add initiate_settle_receiver_key_tweak stub")
 
@@ -214,7 +217,6 @@ func TestClaimTransferSignRefunds_Success(t *testing.T) {
 	err = gripmock.AddStub("spark_internal.SparkInternalService", "frost_round2", nil, frostRound2StubOutput)
 	require.NoError(t, err, "Failed to add frost_round2 stub")
 
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
 	rng := rand.NewChaCha8([32]byte{})
 	keyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
 	ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -243,10 +245,8 @@ func TestClaimTransferSignRefunds_Success(t *testing.T) {
 	_, err = transferLeaf.Update().SetKeyTweak(claimKeyTweakBytes).Save(ctx)
 	require.NoError(t, err)
 
-	cfg, err := testutil.TestConfig()
+	cfg, err := sparktesting.TestConfig()
 	require.NoError(t, err)
-
-	handler := NewTransferHandler(cfg)
 
 	req := &pb.ClaimTransferSignRefundsRequest{
 		TransferId:             transfer.ID.String(),
@@ -255,7 +255,7 @@ func TestClaimTransferSignRefunds_Success(t *testing.T) {
 			createTestLeafRefundTxSigningJob(t, rng, leaf),
 		},
 	}
-
+	handler := NewTransferHandler(cfg)
 	resp, err := handler.ClaimTransferSignRefunds(ctx, req)
 
 	require.NoError(t, err)

@@ -20,21 +20,21 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type MockStream struct {
+func TestMain(m *testing.M) {
+	stop := db.StartPostgresServer()
+	defer stop()
+
+	m.Run()
+}
+
+type mockStream struct {
 	ctx      context.Context
 	messages []*pb.SubscribeToEventsResponse
 	mu       sync.Mutex
 	sendErr  error
 }
 
-func NewMockStream(t *testing.T) *MockStream {
-	return &MockStream{
-		ctx:      t.Context(),
-		messages: make([]*pb.SubscribeToEventsResponse, 0),
-	}
-}
-
-func (m *MockStream) Send(msg *pb.SubscribeToEventsResponse) error {
+func (m *mockStream) Send(msg *pb.SubscribeToEventsResponse) error {
 	if m.sendErr != nil {
 		return m.sendErr
 	}
@@ -44,30 +44,30 @@ func (m *MockStream) Send(msg *pb.SubscribeToEventsResponse) error {
 	return nil
 }
 
-func (m *MockStream) RecvMsg(_ any) error {
+func (m *mockStream) RecvMsg(_ any) error {
 	return nil
 }
 
-func (m *MockStream) Context() context.Context {
+func (m *mockStream) Context() context.Context {
 	return m.ctx
 }
 
-func (m *MockStream) SendHeader(_ metadata.MD) error {
+func (m *mockStream) SendHeader(_ metadata.MD) error {
 	return nil
 }
 
-func (m *MockStream) SendMsg(_ any) error {
+func (m *mockStream) SendMsg(_ any) error {
 	return nil
 }
 
-func (m *MockStream) SetHeader(_ metadata.MD) error {
+func (m *mockStream) SetHeader(_ metadata.MD) error {
 	return nil
 }
 
-func (m *MockStream) SetTrailer(_ metadata.MD) {}
+func (m *mockStream) SetTrailer(_ metadata.MD) {}
 
 func TestEventRouterConcurrency(t *testing.T) {
-	ctx, _, dbEvents := db.SetupDBEventsTestContext(t)
+	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
 	dbClient := ctx.Client
 
 	logger := slog.Default().With("component", "events_router")
@@ -78,12 +78,12 @@ func TestEventRouterConcurrency(t *testing.T) {
 	const numGoroutines = 100
 	var wg sync.WaitGroup
 
-	makeStream := func(i int) *MockStream {
+	makeStream := func(i int) *mockStream {
 		switch i % 3 {
 		case 0:
 			// Normal stream
 			ctx, cancel := context.WithCancel(t.Context())
-			stream := &MockStream{ctx: ctx, messages: make([]*pb.SubscribeToEventsResponse, 0)}
+			stream := &mockStream{ctx: ctx}
 
 			go func() {
 				for {
@@ -96,18 +96,18 @@ func TestEventRouterConcurrency(t *testing.T) {
 				}
 				cancel()
 			}()
-			stream.messages = make([]*pb.SubscribeToEventsResponse, 0)
+			stream.messages = nil
 			return stream
 		case 1:
 			// Stream that errors on send
-			return &MockStream{
+			return &mockStream{
 				ctx:     t.Context(),
 				sendErr: status.Error(codes.Unavailable, "stream closed"),
 			}
 		default:
 			// Stream with cancellable context
 			ctx, cancel := context.WithCancel(t.Context())
-			stream := &MockStream{ctx: ctx}
+			stream := &mockStream{ctx: ctx}
 			// Cancel after a short delay
 			go func() {
 				time.Sleep(time.Millisecond)
@@ -134,7 +134,7 @@ func TestEventRouterConcurrency(t *testing.T) {
 }
 
 func TestMultipleListenersReceiveNotification(t *testing.T) {
-	ctx, _, dbEvents := db.SetupDBEventsTestContext(t)
+	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
 	dbClient := ctx.Client
 
 	logger := slog.Default().With("component", "events_router")
@@ -144,11 +144,11 @@ func TestMultipleListenersReceiveNotification(t *testing.T) {
 
 	ctx1, cancel1 := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel1()
-	stream1 := &MockStream{ctx: ctx1, messages: make([]*pb.SubscribeToEventsResponse, 0)}
+	stream1 := &mockStream{ctx: ctx1, messages: make([]*pb.SubscribeToEventsResponse, 0)}
 
 	ctx2, cancel2 := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel2()
-	stream2 := &MockStream{ctx: ctx2, messages: make([]*pb.SubscribeToEventsResponse, 0)}
+	stream2 := &mockStream{ctx: ctx2, messages: make([]*pb.SubscribeToEventsResponse, 0)}
 
 	var wg sync.WaitGroup
 	var stream1Err, stream2Err error

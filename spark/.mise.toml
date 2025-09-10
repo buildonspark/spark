@@ -8,13 +8,6 @@ test-unit = """
     --format testname \
     $(go list ./... | grep -v -E 'so/grpc_test|so/tree')
 """
-test-unit-with-postgres = """
-  gotestsum \
-    --format testname \
-    -- \
-    -tags=postgres \
-    $(go list ./... | grep -v -E 'so/grpc_test|so/tree')
-"""
 test-grpc = """
   gotestsum \
     --format testname \
@@ -22,3 +15,5 @@ test-grpc = """
     --rerun-fails-max-failures=1000 \
     --packages=./so/grpc_test/...
 """
+[env]
+GRIPMOCK = true

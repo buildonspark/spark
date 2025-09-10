@@ -1,6 +1,3 @@
-//go:build gripmock
-// +build gripmock
-
 package handler
 
 import (
@@ -11,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -72,11 +70,10 @@ func createMockInitiateStaticDepositUtxoRefundRequest(
 }
 
 func TestCreateStaticDepositUtxoRefundWithRollback_Success(t *testing.T) {
-	defer func() {
-		_ = gripmock.Clear()
-	}()
+	sparktesting.RequireGripMock(t)
+	defer func() { _ = gripmock.Clear() }()
 
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewStaticDepositHandler(cfg)
 
@@ -152,13 +149,10 @@ func TestCreateStaticDepositUtxoRefundWithRollback_Success(t *testing.T) {
 }
 
 func TestInitiateStaticDepositUtxoRefund_ErrorIfUtxoNotToStaticDepositAddress(t *testing.T) {
-	defer func() {
-		_ = gripmock.Clear()
-	}()
+	sparktesting.RequireGripMock(t)
+	defer func() { _ = gripmock.Clear() }()
 
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
-
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewStaticDepositHandler(cfg)
 
@@ -192,8 +186,7 @@ func TestInitiateStaticDepositUtxoRefund_ErrorIfUtxoNotToStaticDepositAddress(t 
 }
 
 func TestInitiateStaticDepositUtxoRefund_UtxoNotConfirmed(t *testing.T) {
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	// Set high confirmation threshold
@@ -221,8 +214,7 @@ func TestInitiateStaticDepositUtxoRefund_UtxoNotConfirmed(t *testing.T) {
 }
 
 func TestInitiateStaticDepositUtxoRefund_ErrorIfUtxoSwapAlreadyInProgress(t *testing.T) {
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewStaticDepositHandler(cfg)
@@ -247,8 +239,7 @@ func TestInitiateStaticDepositUtxoRefund_ErrorIfUtxoSwapAlreadyInProgress(t *tes
 }
 
 func TestInitiateStaticDepositUtxoRefund_ErrorIfUtxoSwapAlreadyCompletedAsClaim(t *testing.T) {
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewStaticDepositHandler(cfg)
@@ -289,9 +280,8 @@ func TestInitiateStaticDepositUtxoRefund_ErrorIfUtxoSwapAlreadyCompletedAsClaim(
 }
 
 func TestInitiateStaticDepositUtxoRefund_CanRefundAgainIfAlreadyRefinedBySameCaller(t *testing.T) {
-	defer func() {
-		_ = gripmock.Clear()
-	}()
+	sparktesting.RequireGripMock(t)
+	defer func() { _ = gripmock.Clear() }()
 
 	// Mock successful signing
 	err := gripmock.AddStub("spark_internal.SparkInternalService", "frost_round1", nil, frostRound1StubOutput)
@@ -306,8 +296,7 @@ func TestInitiateStaticDepositUtxoRefund_CanRefundAgainIfAlreadyRefinedBySameCal
 	err = gripmock.AddStub("frost.FrostService", "aggregate_frost", nil, aggregateFrostStubOutput)
 	require.NoError(t, err)
 
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewStaticDepositHandler(cfg)
@@ -350,9 +339,8 @@ func TestInitiateStaticDepositUtxoRefund_CanRefundAgainIfAlreadyRefinedBySameCal
 }
 
 func TestInitiateStaticDepositUtxoRefund_CanRefundEvenWithPreviousFailedAttempts(t *testing.T) {
-	defer func() {
-		_ = gripmock.Clear()
-	}()
+	sparktesting.RequireGripMock(t)
+	defer func() { _ = gripmock.Clear() }()
 
 	// Mock successful refund creation
 	successStub := map[string]any{
@@ -376,9 +364,7 @@ func TestInitiateStaticDepositUtxoRefund_CanRefundEvenWithPreviousFailedAttempts
 	err = gripmock.AddStub("frost.FrostService", "aggregate_frost", nil, aggregateFrostStubOutput)
 	require.NoError(t, err)
 
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
-
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewStaticDepositHandler(cfg)
 
@@ -446,9 +432,8 @@ func TestInitiateStaticDepositUtxoRefund_CanRefundEvenWithPreviousFailedAttempts
 }
 
 func TestInitiateStaticDepositUtxoRefund_SuccessfulRefundCreatesCompletedUtxoSwap(t *testing.T) {
-	defer func() {
-		_ = gripmock.Clear()
-	}()
+	sparktesting.RequireGripMock(t)
+	defer func() { _ = gripmock.Clear() }()
 
 	// Mock successful refund creation
 	successStub := map[string]any{
@@ -475,9 +460,7 @@ func TestInitiateStaticDepositUtxoRefund_SuccessfulRefundCreatesCompletedUtxoSwa
 	err = gripmock.AddStub("frost.FrostService", "aggregate_frost", nil, aggregateFrostStubOutput)
 	require.NoError(t, err)
 
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
-
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewStaticDepositHandler(cfg)
 
@@ -530,9 +513,8 @@ func TestInitiateStaticDepositUtxoRefund_SuccessfulRefundCreatesCompletedUtxoSwa
 }
 
 func TestInitiateStaticDepositUtxoRefund_CanSignDifferentRefundTxMultipleTimes(t *testing.T) {
-	defer func() {
-		_ = gripmock.Clear()
-	}()
+	sparktesting.RequireGripMock(t)
+	defer func() { _ = gripmock.Clear() }()
 
 	// Mock successful signing
 	err := gripmock.AddStub("spark_internal.SparkInternalService", "frost_round1", nil, frostRound1StubOutput)
@@ -547,9 +529,7 @@ func TestInitiateStaticDepositUtxoRefund_CanSignDifferentRefundTxMultipleTimes(t
 	err = gripmock.AddStub("frost.FrostService", "aggregate_frost", nil, aggregateFrostStubOutput)
 	require.NoError(t, err)
 
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
-	defer sessionCtx.Close()
-
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg := setUpTestConfigWithRegtestNoAuthz(t)
 	handler := NewStaticDepositHandler(cfg)
 

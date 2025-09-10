@@ -1,6 +1,3 @@
-//go:build postgres
-// +build postgres
-
 package task
 
 import (
@@ -54,7 +51,7 @@ type mockSparkInternalServiceServer struct {
 	expectedKeyshareID string
 }
 
-func (s *mockSparkInternalServiceServer) ReserveEntityDkgKey(ctx context.Context, req *spark_internal.ReserveEntityDkgKeyRequest) (*emptypb.Empty, error) {
+func (s *mockSparkInternalServiceServer) ReserveEntityDkgKey(_ context.Context, req *spark_internal.ReserveEntityDkgKeyRequest) (*emptypb.Empty, error) {
 	if s.errToReturn != nil {
 		return nil, s.errToReturn
 	}
@@ -62,6 +59,12 @@ func (s *mockSparkInternalServiceServer) ReserveEntityDkgKey(ctx context.Context
 		return nil, status.Errorf(codes.InvalidArgument, "expected keyshare %s, got %s", s.expectedKeyshareID, req.KeyshareId)
 	}
 	return &emptypb.Empty{}, nil
+}
+
+func TestMain(m *testing.M) {
+	stop := db.StartPostgresServer()
+	defer stop()
+	m.Run()
 }
 
 func TestReserveEntityDkg_OperatorDown(t *testing.T) {
@@ -81,16 +84,9 @@ func TestReserveEntityDkg_OperatorDown(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			dsn, stop := db.SpinUpPostgres(t)
-			defer stop()
-
-			client := db.NewPgTestClient(t, dsn)
-			defer client.Close()
-
-			ctx, sessionCtx, err := db.NewTestContext(t, t.Context(), "postgres", dsn)
-			require.NoError(t, err)
-			require.NoError(t, sessionCtx.Client.Schema.Create(ctx))
-			defer sessionCtx.Close()
+			t.Parallel()
+			ctx, sessionCtx := db.ConnectToTestPostgres(t)
+			client := sessionCtx.Client
 
 			cfg, err := sparktesting.TestConfig()
 			require.NoError(t, err)
@@ -104,7 +100,7 @@ func TestReserveEntityDkg_OperatorDown(t *testing.T) {
 				}
 			}
 
-			servers := []*grpc.Server{}
+			var servers []*grpc.Server
 			for id, operator := range cfg.SigningOperatorMap {
 				if id == cfg.Identifier {
 					continue
@@ -145,37 +141,24 @@ func TestReserveEntityDkg_OperatorDown(t *testing.T) {
 			err = reserveTask.RunOnce(cfg, client, knobs.NewFixedKnobs(map[string]float64{}))
 
 			if tc.failOneOperator {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), "Unavailable")
-
+				require.ErrorContains(t, err, "Unavailable")
 				// EntityDkgKey should still exist due to earlier commit.
-				edkg, qerr := client.EntityDkgKey.Query().WithSigningKeyshare().Only(ctx)
-				require.NoError(t, qerr)
-				require.NotNil(t, edkg.Edges.SigningKeyshare)
-				assert.Equal(t, sk.ID, edkg.Edges.SigningKeyshare.ID)
 			} else {
 				require.NoError(t, err)
-				edkg, qerr := client.EntityDkgKey.Query().WithSigningKeyshare().Only(ctx)
-				require.NoError(t, qerr)
-				require.NotNil(t, edkg.Edges.SigningKeyshare)
-				assert.Equal(t, sk.ID, edkg.Edges.SigningKeyshare.ID)
 			}
+			edkg, qerr := client.EntityDkgKey.Query().WithSigningKeyshare().Only(ctx)
+			require.NoError(t, qerr)
+			require.NotNil(t, edkg.Edges.SigningKeyshare)
+			assert.Equal(t, sk.ID, edkg.Edges.SigningKeyshare.ID)
 		})
 	}
 }
 
 // TestReserveEntityDkg_Idempotent ensures running the task twice is safe.
 func TestReserveEntityDkg_Idempotent(t *testing.T) {
-	dsn, stop := db.SpinUpPostgres(t)
-	defer stop()
-
-	client := db.NewPgTestClient(t, dsn)
-	defer client.Close()
-
-	ctx, sessionCtx, err := db.NewTestContext(t, t.Context(), "postgres", dsn)
-	require.NoError(t, err)
-	require.NoError(t, sessionCtx.Client.Schema.Create(ctx))
-	defer sessionCtx.Close()
+	t.Parallel()
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	client := sessionCtx.Client
 
 	cfg, err := sparktesting.TestConfig()
 	require.NoError(t, err)
@@ -214,16 +197,9 @@ func TestReserveEntityDkg_Idempotent(t *testing.T) {
 // TestReserveEntityDkg_NonCoordinator verifies that non-coordinator operators
 // do not attempt to reserve an entity DKG key.
 func TestReserveEntityDkg_NonCoordinator(t *testing.T) {
-	dsn, stop := db.SpinUpPostgres(t)
-	defer stop()
-
-	client := db.NewPgTestClient(t, dsn)
-	defer client.Close()
-
-	ctx, sessionCtx, err := db.NewTestContext(t, t.Context(), "postgres", dsn)
-	require.NoError(t, err)
-	require.NoError(t, sessionCtx.Client.Schema.Create(ctx))
-	defer sessionCtx.Close()
+	t.Parallel()
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
+	client := sessionCtx.Client
 
 	cfg, err := sparktesting.TestConfig()
 	require.NoError(t, err)

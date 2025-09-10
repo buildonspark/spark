@@ -486,7 +486,7 @@ func NewDBConnector(ctx context.Context, soConfig *Config, knobsService knobs.Kn
 	}
 
 	// Only create pool for PostgreSQL
-	if strings.HasPrefix(soConfig.DatabasePath, "postgresql") {
+	if strings.HasPrefix(soConfig.DatabasePath, "postgres") {
 		conf, err := pgxpool.ParseConfig(soConfig.DatabasePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse pool config: %w", err)

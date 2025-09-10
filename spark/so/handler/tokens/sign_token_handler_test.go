@@ -1,6 +1,3 @@
-//go:build postgres
-// +build postgres
-
 package tokens
 
 import (
@@ -62,7 +59,7 @@ type mockSparkTokenInternalServiceServer struct {
 }
 
 func (s *mockSparkTokenInternalServiceServer) SignTokenTransactionFromCoordination(
-	ctx context.Context,
+	_ context.Context,
 	req *tokeninternalpb.SignTokenTransactionFromCoordinationRequest,
 ) (*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, error) {
 	if s.errToReturn != nil {
@@ -75,8 +72,8 @@ func (s *mockSparkTokenInternalServiceServer) SignTokenTransactionFromCoordinati
 }
 
 func (s *mockSparkTokenInternalServiceServer) ExchangeRevocationSecretsShares(
-	ctx context.Context,
-	req *tokeninternalpb.ExchangeRevocationSecretsSharesRequest,
+	_ context.Context,
+	_ *tokeninternalpb.ExchangeRevocationSecretsSharesRequest,
 ) (*tokeninternalpb.ExchangeRevocationSecretsSharesResponse, error) {
 	if s.errToReturn != nil {
 		return nil, s.errToReturn
@@ -102,12 +99,7 @@ func startMockGRPCServer(t *testing.T, mockServer *mockSparkTokenInternalService
 			t.Logf("Mock gRPC server error: %v", err)
 		}
 	}()
-
-	stop := func() {
-		server.Stop()
-	}
-
-	return addr, stop
+	return addr, server.Stop
 }
 
 func createTestSigningKeyshare(_ *testing.T, ctx context.Context, client *ent.Client) *ent.SigningKeyshare {
@@ -147,9 +139,9 @@ type testSetupCommon struct {
 	stopMockServer      func()
 }
 
-// setupCommonTest sets up common test infrastructure
-func setupCommonTest(t *testing.T) *testSetupCommon {
-	ctx, sessionCtx := db.SetUpPostgresTestContext(t)
+// setUpCommonTest sets up common test infrastructure
+func setUpCommonTest(t *testing.T) *testSetupCommon {
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 
 	cfg, err := sparktesting.TestConfig()
 	require.NoError(t, err)
@@ -210,8 +202,6 @@ func setupCommonTest(t *testing.T) *testSetupCommon {
 func createCreateTokenTransactionProto(t *testing.T, setup *testSetupCommon) (*tokenpb.TokenTransaction, []byte, []byte, []byte) {
 	creationEntityPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	creationEntityPubKeyBytes := creationEntityPrivKey.Public().Serialize()
-
 	createInput := &tokenpb.TokenCreateInput{
 		TokenName:               testTokenName,
 		TokenTicker:             testTokenTicker,
@@ -219,7 +209,7 @@ func createCreateTokenTransactionProto(t *testing.T, setup *testSetupCommon) (*t
 		MaxSupply:               testTokenMaxSupplyBytes,
 		IsFreezable:             testTokenIsFreezable,
 		IssuerPublicKey:         setup.pubKey.Serialize(),
-		CreationEntityPublicKey: creationEntityPubKeyBytes,
+		CreationEntityPublicKey: creationEntityPrivKey.Public().Serialize(),
 	}
 
 	metadata, err := common.NewTokenMetadataFromCreateInput(createInput, sparkpb.Network_REGTEST)
@@ -291,8 +281,8 @@ type transferTestData struct {
 	prevTokenTx      *ent.TokenTransaction
 }
 
-// setupTransferTestData creates the prerequisite data for transfer transaction tests
-func setupTransferTestData(t *testing.T, setup *testSetupCommon) *transferTestData {
+// setUpTransferTestData creates the prerequisite data for transfer transaction tests
+func setUpTransferTestData(t *testing.T, setup *testSetupCommon) *transferTestData {
 	// Create a token identifier for the transfer
 	createInput := &tokenpb.TokenCreateInput{
 		TokenName:               testTokenName,
@@ -335,10 +325,9 @@ func setupTransferTestData(t *testing.T, setup *testSetupCommon) *transferTestDa
 			SetNetwork(common.SchemaNetwork(common.Regtest)).
 			SetTokenIdentifier(tokenIdentifier).
 			Save(setup.ctx)
-		require.NoError(t, err)
-	} else {
-		require.NoError(t, err)
+
 	}
+	require.NoError(t, err)
 
 	// Create the previous token outputs that will be spent
 	prevTokenOutput1, err := setup.sessionCtx.Client.TokenOutput.Create().
@@ -483,10 +472,8 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 			SetNetwork(common.SchemaNetwork(common.Regtest)).
 			SetTokenIdentifier(transferData.tokenIdentifier).
 			Save(setup.ctx)
-		require.NoError(t, err)
-	} else {
-		require.NoError(t, err)
 	}
+	require.NoError(t, err)
 
 	// Create the new token outputs for the transfer
 	dbTokenOutput1, err := setup.sessionCtx.Client.TokenOutput.Create().
@@ -589,7 +576,7 @@ func createInputTtxoSignatures(t *testing.T, setup *testSetupCommon, finalTxHash
 }
 
 func TestCommitTransaction_CreateTransaction_Retry_AfterInternalSignFailed(t *testing.T) {
-	setup := setupCommonTest(t)
+	setup := setUpCommonTest(t)
 	tokenTxProto, partialTxHash, finalTxHash, tokenIdentifier := createCreateTokenTransactionProto(t, setup)
 	setupDBCreateTokenTransactionInternalSignFailedScenario(t, setup, tokenTxProto, partialTxHash, finalTxHash, tokenIdentifier)
 	req := &tokenpb.CommitTransactionRequest{
@@ -613,8 +600,8 @@ func TestCommitTransaction_CreateTransaction_Retry_AfterInternalSignFailed(t *te
 }
 
 func TestCommitTransaction_TransferTransaction_Retry_AfterInternalSignFailed(t *testing.T) {
-	setup := setupCommonTest(t)
-	transferData := setupTransferTestData(t, setup)
+	setup := setUpCommonTest(t)
+	transferData := setUpTransferTestData(t, setup)
 	tokenTxProto, partialTxHash, finalTxHash := createTransferTokenTransactionProto(t, setup, transferData)
 	setupDBTransferTokenTransactionInternalSignFailedScenario(t, setup, transferData, tokenTxProto, partialTxHash, finalTxHash)
 
@@ -641,8 +628,8 @@ func TestCommitTransaction_TransferTransaction_Retry_AfterInternalSignFailed(t *
 }
 
 func TestCommitTransaction_TransferTransaction_Retry_AfterInternalFinalizeFailed(t *testing.T) {
-	setup := setupCommonTest(t)
-	transferData := setupTransferTestData(t, setup)
+	setup := setUpCommonTest(t)
+	transferData := setUpTransferTestData(t, setup)
 	tokenTxProto, partialTxHash, finalTxHash := createTransferTokenTransactionProto(t, setup, transferData)
 	setupDBTransferTokenTransactionInternalSignFailedScenario(t, setup, transferData, tokenTxProto, partialTxHash, finalTxHash)
 

@@ -14,6 +14,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/db"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
@@ -182,7 +183,7 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 			finalTransferTokenTransactionHash, err := utils.HashTokenTransaction(transferTokenTransactionResponse, false)
 			require.NoError(t, err, "failed to hash transfer token transaction")
 
-			entClient := sparktesting.NewPostgresEntClient(t, config.CoordinatorDatabaseURI)
+			entClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
 			defer entClient.Close()
 
 			numOperators := len(config.SigningOperators)
@@ -252,7 +253,7 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealed(t *testing.T) {
 	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
 
-	entClient := sparktesting.NewPostgresEntClient(t, config.CoordinatorDatabaseURI)
+	entClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
 	defer entClient.Close()
 
 	setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t, ctx, entClient, finalTransferTokenTransactionHash)
@@ -291,7 +292,7 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealedWithAllFieldsButS
 	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
 	require.NoError(t, err, "failed to create transfer token transaction")
 
-	entClient := sparktesting.NewPostgresEntClient(t, config.CoordinatorDatabaseURI)
+	entClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
 	defer entClient.Close()
 
 	setAndValidateSuccessfulTokenTransactionToRevealedWithoutDeletingRevocationSecretShares(t, ctx, entClient, finalTransferTokenTransactionHash)
@@ -327,12 +328,12 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesStarted(t *testing.T) {
 	require.NoError(t, err, "failed to create transfer token transaction")
 
 	var coordinatorEntClient, nonCoordEntClient *ent.Client
-	coordinatorEntClient = sparktesting.NewPostgresEntClient(t, config.CoordinatorDatabaseURI)
+	coordinatorEntClient = db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
 	defer coordinatorEntClient.Close()
 
 	nonCoordOperatorConfig, err := sparktesting.SpecificOperatorTestConfig(1)
 	require.NoError(t, err, "failed to get non-coordinator operator config")
-	nonCoordEntClient = sparktesting.NewPostgresEntClient(t, nonCoordOperatorConfig.DatabasePath)
+	nonCoordEntClient = db.NewPostgresEntClientForIntegrationTest(t, nonCoordOperatorConfig.DatabasePath)
 	defer nonCoordEntClient.Close()
 
 	setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t, ctx, nonCoordEntClient, finalTransferTokenTransactionHash)
@@ -369,12 +370,12 @@ func TestRevocationExchangeCronJobDoesNotFinalizeStartedIfSignatureIsInvalid(t *
 	require.NoError(t, err, "failed to create transfer token transaction")
 
 	var coordinatorEntClient, nonCoordEntClient *ent.Client
-	coordinatorEntClient = sparktesting.NewPostgresEntClient(t, config.CoordinatorDatabaseURI)
+	coordinatorEntClient = db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
 	defer coordinatorEntClient.Close()
 
 	nonCoordOperatorConfig, err := sparktesting.SpecificOperatorTestConfig(1)
 	require.NoError(t, err, "failed to get non-coordinator operator config")
-	nonCoordEntClient = sparktesting.NewPostgresEntClient(t, nonCoordOperatorConfig.DatabasePath)
+	nonCoordEntClient = db.NewPostgresEntClientForIntegrationTest(t, nonCoordOperatorConfig.DatabasePath)
 	defer nonCoordEntClient.Close()
 
 	setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t, ctx, nonCoordEntClient, finalTransferTokenTransactionHash)

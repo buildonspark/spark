@@ -1,15 +1,10 @@
-//go:build postgres
-// +build postgres
-
 package handler_test
 
 import (
 	"context"
 	"crypto/rand"
-	"net"
 	"testing"
 
-	epg "github.com/fergusstrange/embedded-postgres"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
@@ -22,42 +17,6 @@ import (
 	"github.com/lightsparkdev/spark/so/handler"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
-
-// newPgTestClient opens an ent Client on the given DSN and ensures the schema exists.
-func newPgTestClient(t *testing.T, dsn string) *ent.Client {
-	client, err := ent.Open("postgres", dsn)
-	require.NoError(t, err)
-
-	require.NoError(t, client.Schema.Create(t.Context()))
-
-	return client
-}
-
-// spinUpPostgres starts an ephemeral postgres and returns a DSN and a stop func.
-func spinUpPostgres(t *testing.T) (dsn string, stop func()) {
-	// pick a free TCP port for each test
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	port := l.Addr().(*net.TCPAddr).Port
-	_ = l.Close()
-
-	// give each test its own runtime dir so parallel runs don't clash
-	tmpDir := t.TempDir()
-
-	cfg := epg.DefaultConfig().
-		Username("postgres").
-		Password("postgres").
-		Database("spark_test").
-		RuntimePath(tmpDir). // binaries & data
-		Port(uint32(port))
-
-	pg := epg.NewDatabase(cfg)
-	require.NoError(t, pg.Start())
-	stop = func() { _ = pg.Stop() }
-
-	dsn = cfg.GetConnectionURL() + "?sslmode=disable"
-	return
-}
 
 // createTestSigningKeyshare creates a test signing keyshare for use in tests.
 func createTestSigningKeyshare(t *testing.T, ctx context.Context, client *ent.Client) *ent.SigningKeyshare {
@@ -76,15 +35,7 @@ func createTestSigningKeyshare(t *testing.T, ctx context.Context, client *ent.Cl
 }
 
 func TestReserveEntityDkgKey_Success(t *testing.T) {
-	dsn, stop := spinUpPostgres(t)
-	defer stop()
-
-	ctx := t.Context()
-	ctx, sessionCtx, err := db.NewTestContext(t, ctx, "postgres", dsn)
-	require.NoError(t, err)
-	require.NoError(t, sessionCtx.Client.Schema.Create(ctx))
-	defer sessionCtx.Close()
-
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg, err := sparktesting.TestConfig()
 	require.NoError(t, err)
 
@@ -102,8 +53,7 @@ func TestReserveEntityDkgKey_Success(t *testing.T) {
 	// Commit the transaction to persist changes
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-	err = tx.Commit()
-	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
 
 	// Verify entity DKG key was created
 	entityDkgKey, err := sessionCtx.Client.EntityDkgKey.Query().WithSigningKeyshare().Only(ctx)
@@ -117,15 +67,7 @@ func TestReserveEntityDkgKey_Success(t *testing.T) {
 }
 
 func TestReserveEntityDkgKey_Idempotent(t *testing.T) {
-	dsn, stop := spinUpPostgres(t)
-	defer stop()
-
-	ctx := t.Context()
-	ctx, sessionCtx, err := db.NewTestContext(t, ctx, "postgres", dsn)
-	require.NoError(t, err)
-	require.NoError(t, sessionCtx.Client.Schema.Create(ctx))
-	defer sessionCtx.Close()
-
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg, err := sparktesting.TestConfig()
 	require.NoError(t, err)
 
@@ -147,8 +89,7 @@ func TestReserveEntityDkgKey_Idempotent(t *testing.T) {
 	// Commit the transaction to persist changes
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-	err = tx.Commit()
-	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
 
 	// Verify only one entity DKG key exists
 	count, err := sessionCtx.Client.EntityDkgKey.Query().Count(ctx)
@@ -157,15 +98,7 @@ func TestReserveEntityDkgKey_Idempotent(t *testing.T) {
 }
 
 func TestReserveEntityDkgKey_ConflictingKeyshareID(t *testing.T) {
-	dsn, stop := spinUpPostgres(t)
-	defer stop()
-
-	ctx := t.Context()
-	ctx, sessionCtx, err := db.NewTestContext(t, ctx, "postgres", dsn)
-	require.NoError(t, err)
-	require.NoError(t, sessionCtx.Client.Schema.Create(ctx))
-	defer sessionCtx.Close()
-
+	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg, err := sparktesting.TestConfig()
 	require.NoError(t, err)
 
@@ -192,22 +125,14 @@ func TestReserveEntityDkgKey_ConflictingKeyshareID(t *testing.T) {
 		KeyshareId: signingKeyshare2.ID.String(),
 	}
 	err = handler.ReserveEntityDkgKey(ctx, req2)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "entity DKG key already reserved with different keyshare ID")
+	require.ErrorContains(t, err, "entity DKG key already reserved with different keyshare ID")
 }
 
 func TestReserveEntityDkgKey_InvalidUUID(t *testing.T) {
-	dsn, stop := spinUpPostgres(t)
-	defer stop()
-
-	ctx := t.Context()
-	ctx, sessionCtx, err := db.NewTestContext(t, ctx, "postgres", dsn)
-	require.NoError(t, err)
-	require.NoError(t, sessionCtx.Client.Schema.Create(ctx))
-	defer sessionCtx.Close()
-
+	ctx, _ := db.ConnectToTestPostgres(t)
 	cfg, err := sparktesting.TestConfig()
 	require.NoError(t, err)
+
 	handler := handler.NewEntityDkgKeyHandler(cfg)
 
 	// Test with invalid UUID format
@@ -216,8 +141,7 @@ func TestReserveEntityDkgKey_InvalidUUID(t *testing.T) {
 	}
 
 	err = handler.ReserveEntityDkgKey(ctx, req)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid DKG key ID format")
+	require.ErrorContains(t, err, "invalid DKG key ID format")
 }
 
 func TestReserveEntityDkgKey_DatabaseContextError(t *testing.T) {
@@ -233,6 +157,5 @@ func TestReserveEntityDkgKey_DatabaseContextError(t *testing.T) {
 	}
 
 	err = handler.ReserveEntityDkgKey(ctx, req)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to get or create current tx for request")
+	require.ErrorContains(t, err, "failed to get or create current tx for request")
 }
