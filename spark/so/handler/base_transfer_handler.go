@@ -137,8 +137,12 @@ func validateSendLeafRefundTxs(leaf *ent.TreeNode, rawTx []byte, directTx []byte
 		if err != nil {
 			return fmt.Errorf("unable to load new direct from cpfprefund tx: %w", err)
 		}
-		if len(newDirectRefundTx.TxIn) == 0 || len(newDirectFromCpfpRefundTx.TxIn) == 0 {
-			return fmt.Errorf("new direct refund tx or new direct from cpfp refund tx has no inputs")
+		if len(newDirectRefundTx.TxIn) == 0 {
+			return fmt.Errorf("new direct refund tx has no inputs")
+		}
+		if len(newDirectFromCpfpRefundTx.TxIn) == 0 {
+			return fmt.Errorf("new direct from cpfp refund tx has no inputs")
+
 		}
 		if len(leaf.DirectRefundTx) > 0 && len(leaf.DirectFromCpfpRefundTx) > 0 {
 			oldDirectRefundTx, err := common.TxFromRawTxBytes(leaf.DirectRefundTx)
@@ -149,8 +153,11 @@ func validateSendLeafRefundTxs(leaf *ent.TreeNode, rawTx []byte, directTx []byte
 			if err != nil {
 				return fmt.Errorf("unable to load old direct from cpfp refund tx: %w", err)
 			}
-			if len(oldDirectRefundTx.TxIn) == 0 || len(oldDirectFromCpfpRefundTx.TxIn) == 0 {
-				return fmt.Errorf("old direct refund tx or old direct from cpfp refund tx has no inputs")
+			if len(oldDirectRefundTx.TxIn) == 0 {
+				return fmt.Errorf("old direct refund tx has no inputs")
+			}
+			if len(oldDirectFromCpfpRefundTx.TxIn) == 0 {
+				return fmt.Errorf("old direct from cpfp refund tx has no inputs")
 			}
 			oldDirectRefundTxIn := oldDirectRefundTx.TxIn[0]
 			leafDirectOutPoint = wire.OutPoint{
@@ -439,9 +446,8 @@ func (h *BaseTransferHandler) validateCooperativeExitLeaves(ctx context.Context,
 		directRefundTx := leafDirectRefundMap[leaf.ID.String()]
 		intermediateDirectFromCpfpRefundTx := leafDirectFromCpfpRefundMap[leaf.ID.String()]
 
-		var exist bool
-		var rawRefundTx []byte
-		if rawRefundTx, exist = leafCpfpRefundMap[leaf.ID.String()]; !exist {
+		rawRefundTx, exist := leafCpfpRefundMap[leaf.ID.String()]
+		if !exist {
 			return fmt.Errorf("leaf %s not found in cpfp refund map", leaf.ID)
 		}
 
@@ -471,9 +477,8 @@ func (h *BaseTransferHandler) validateUtxoSwapLeaves(
 		directRefundTx := leafDirectRefundMap[leaf.ID.String()]
 		intermediateDirectFromCpfpRefundTx := leafDirectFromCpfpRefundMap[leaf.ID.String()]
 
-		var exist bool
-		var rawRefundTx []byte
-		if rawRefundTx, exist = leafCpfpRefundMap[leaf.ID.String()]; !exist {
+		rawRefundTx, exist := leafCpfpRefundMap[leaf.ID.String()]
+		if !exist {
 			return fmt.Errorf("leaf %s not found in cpfp refund map", leaf.ID)
 		}
 
@@ -503,9 +508,8 @@ func (h *BaseTransferHandler) validateTransferLeaves(
 		directRefundTx := leafDirectRefundMap[leaf.ID.String()]
 		intermediateDirectFromCpfpRefundTx := leafDirectFromCpfpRefundMap[leaf.ID.String()]
 
-		var exist bool
-		var rawRefundTx []byte
-		if rawRefundTx, exist = leafCpfpRefundMap[leaf.ID.String()]; !exist {
+		rawRefundTx, exist := leafCpfpRefundMap[leaf.ID.String()]
+		if !exist {
 			return fmt.Errorf("leaf %s not found in cpfp refund map", leaf.ID)
 		}
 

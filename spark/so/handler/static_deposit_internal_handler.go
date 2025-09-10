@@ -125,8 +125,12 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	if err != nil {
 		return nil, err
 	}
-
-	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	// Validate the on-chain UTXO
+	onChainUtxoTxId, err := NewValidatedTxID(req.OnChainUtxo.Txid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate on-chain UTXO txid: %w", err)
+	}
+	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, onChainUtxoTxId, req.OnChainUtxo.Vout)
 	if err != nil {
 		return nil, err
 	}
@@ -308,9 +312,13 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 	if err != nil {
 		return nil, err
 	}
-
+	// Validate the on-chain UTXO
+	onChainUtxoTxId, err := NewValidatedTxID(req.OnChainUtxo.Txid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate on-chain UTXO txid: %w", err)
+	}
 	// Validate UTXO
-	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, onChainUtxoTxId, req.OnChainUtxo.Vout)
 	if err != nil {
 		return nil, err
 	}

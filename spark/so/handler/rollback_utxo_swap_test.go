@@ -7,6 +7,7 @@ import (
 	"math/rand/v2"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/stretchr/testify/assert"
@@ -53,7 +54,7 @@ func TestRollbackUtxoSwap_UtxoDoesNotExist(t *testing.T) {
 	handler := NewInternalDepositHandler(cfg)
 
 	// Generate valid rollback request for non-existent UTXO
-	nonExistentTxid := []byte("nonexistent_txid_for_testing_12345")
+	nonExistentTxid := chainhash.DoubleHashB([]byte("nonexistent_txid_for_testing_12345"))
 	rollbackRequest, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(ctx, cfg, &pb.UTXO{
 		Txid:    nonExistentTxid,
 		Vout:    0,

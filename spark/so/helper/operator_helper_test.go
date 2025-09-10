@@ -188,3 +188,38 @@ func TestExecuteTaskWithAllOperators_Error(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, errMsg, err.Error())
 }
+
+func TestOperatorList_EmptyOperatorsMap(t *testing.T) {
+	config := &so.Config{
+		SigningOperatorMap: map[string]*so.SigningOperator{},
+	}
+	errMsg := "no signing operators configured"
+	operatorSelection := helper.OperatorSelection{
+		Option: helper.OperatorSelectionOptionPreSelected,
+	}
+
+	tests := []struct {
+		name   string
+		config *so.Config
+	}{
+		{
+			name:   "WithNilConfig",
+			config: nil,
+		},
+		{
+			name: "WithEmptyOperatorsMap",
+			config: &so.Config{
+				SigningOperatorMap: map[string]*so.SigningOperator{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := operatorSelection.OperatorList(config)
+			require.ErrorContains(t, err, errMsg)
+		})
+	}
+}

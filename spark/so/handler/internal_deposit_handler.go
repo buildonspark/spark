@@ -205,6 +205,9 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if err != nil {
 			return err
 		}
+		if len(nodeTx.TxIn) == 0 {
+			return fmt.Errorf("node tx has no inputs")
+		}
 		txid := nodeTx.TxIn[0].PreviousOutPoint.Hash
 
 		schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
@@ -390,7 +393,11 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 		return nil, err
 	}
 
-	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	onChainUtxoTxId, err := NewValidatedTxID(req.OnChainUtxo.Txid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate on-chain UTXO txid: %w", err)
+	}
+	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, onChainUtxoTxId, req.OnChainUtxo.Vout)
 	if err != nil {
 		return nil, err
 	}
@@ -733,7 +740,12 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 	if err != nil {
 		return nil, fmt.Errorf("unable to get schema network: %w", err)
 	}
-	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+
+	onChainUtxoTxId, err := NewValidatedTxID(req.OnChainUtxo.Txid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate on-chain UTXO txid: %w", err)
+	}
+	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, onChainUtxoTxId, req.OnChainUtxo.Vout)
 	if err != nil {
 		return nil, err
 	}
@@ -817,7 +829,11 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 	if err != nil {
 		return nil, fmt.Errorf("unable to get schema network: %w", err)
 	}
-	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	onChainUtxoTxId, err := NewValidatedTxID(req.OnChainUtxo.Txid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate on-chain UTXO txid: %w", err)
+	}
+	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, onChainUtxoTxId, req.OnChainUtxo.Vout)
 	if err != nil {
 		return nil, err
 	}

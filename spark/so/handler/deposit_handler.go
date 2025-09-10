@@ -770,6 +770,9 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	if err != nil {
 		return nil, err
 	}
+	if len(signingResults) < 2 {
+		return nil, fmt.Errorf("expected at least 2 signing results, got %d", len(signingResults))
+	}
 
 	cpfpNodeTxSigningResult, err := signingResults[0].MarshalProto()
 	if err != nil {
@@ -782,6 +785,12 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 
 	var directNodeTxSigningResult, directRefundTxSigningResult, directFromCpfpRefundTxSigningResult *pb.SigningResult
 	if req.GetDirectRootTxSigningJob() != nil && req.GetDirectRefundTxSigningJob() != nil && req.GetDirectFromCpfpRefundTxSigningJob() != nil {
+		// First 2 signing results are always for cpfpNodeTx and cpfpRefundTx.
+		// If all three direct jobs (root, refund, fromCpfpRefund) are present,
+		// they produce 3 additional signing results (indexes 2, 3, 4), so the total must be at least 5.
+		if len(signingResults) < 5 {
+			return nil, fmt.Errorf("expected at least 5 signing results, got %d", len(signingResults))
+		}
 		directNodeTxSigningResult, err = signingResults[2].MarshalProto()
 		if err != nil {
 			return nil, err
@@ -1096,6 +1105,9 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	if err != nil {
 		return nil, err
 	}
+	if len(signingResults) < 2 {
+		return nil, fmt.Errorf("expected at least 2 signing results, got %d", len(signingResults))
+	}
 
 	cpfpNodeTxSigningResult, err := signingResults[0].MarshalProto()
 	if err != nil {
@@ -1341,7 +1353,11 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 		return nil, err
 	}
 
-	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	onChainUtxoTxId, err := NewValidatedTxID(req.OnChainUtxo.Txid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate on-chain UTXO txid: %w", err)
+	}
+	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, onChainUtxoTxId, req.OnChainUtxo.Vout)
 	if err != nil {
 		return nil, err
 	}
@@ -1522,8 +1538,20 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 	}, nil
 }
 
-// VerifiedTargetUtxo verifies that an UTXO is confirmed on the blockchain and has sufficient confirmations.
-func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Tx, schemaNetwork st.Network, txid []byte, vout uint32) (*ent.Utxo, error) {
+// validatedTxID is a 32-byte Bitcoin transaction ID (txid) that has passed basic format checks.
+// "Validated" means only the length is verified; no cryptographic or blockchain existence checks are performed.
+type validatedTxID [32]byte
+
+// NewValidatedTxID returns a validatedTxID if b is exactly 32 bytes long.
+func NewValidatedTxID(b []byte) (validatedTxID, error) {
+	if len(b) != 32 {
+		return validatedTxID{}, fmt.Errorf("invalid txid length: got %d, want 32", len(b))
+	}
+	return validatedTxID(b), nil
+}
+
+// Verifies that an UTXO is confirmed on the blockchain and has sufficient confirmations.
+func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Tx, schemaNetwork st.Network, txid validatedTxID, vout uint32) (*ent.Utxo, error) {
 	blockHeight, err := db.BlockHeight.Query().Where(
 		blockheight.NetworkEQ(schemaNetwork),
 	).Only(ctx)
@@ -1532,12 +1560,12 @@ func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Tx, sche
 	}
 	targetUtxo, err := db.Utxo.Query().
 		Where(utxo.NetworkEQ(schemaNetwork)).
-		Where(utxo.Txid(txid)).
+		Where(utxo.Txid(txid[:])).
 		Where(utxo.Vout(vout)).
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, errors.FailedPreconditionErrorf("utxo not found: txid: %s vout: %d", hex.EncodeToString(txid), vout)
+			return nil, errors.FailedPreconditionErrorf("utxo not found: txid: %s vout: %d", hex.EncodeToString(txid[:]), vout)
 		}
 		return nil, fmt.Errorf("failed to get target utxo: %w", err)
 	}
@@ -1595,6 +1623,9 @@ func getSpendTxSigningResult(ctx context.Context, config *so.Config, depositAddr
 	if err != nil {
 		return keys.Public{}, nil, fmt.Errorf("failed to sign spend tx: %w", err)
 	}
+	if len(signingResults) == 0 {
+		return keys.Public{}, nil, fmt.Errorf("no signing results returned for spend tx")
+	}
 
 	spendTxSigningResult, err := signingResults[0].MarshalProto()
 	if err != nil {
@@ -1617,13 +1648,28 @@ func GetTxSigningInfo(ctx context.Context, targetUtxo *ent.Utxo, spendTxRaw []by
 		return nil, 0, fmt.Errorf("failed to get spend tx sig hash: %w", err)
 	}
 
-	totalAmount := int64(0)
-	for _, txOut := range spendTx.TxOut {
-		totalAmount += txOut.Value
+	const maxSats uint64 = 21_000_000 * 100_000_000
+
+	var total uint64
+	for i, o := range spendTx.TxOut {
+		if o.Value < 0 {
+			return nil, 0, fmt.Errorf("txout[%d]: negative value %d", i, o.Value)
+		}
+		v := uint64(o.Value)
+		if v > maxSats {
+			return nil, 0, fmt.Errorf("txout[%d]: value %d exceeds %d", i, v, maxSats)
+		}
+		if total > maxSats-v {
+			return nil, 0, fmt.Errorf("total amount overflow: %d + %d", total, v)
+		}
+		total += v
 	}
 
+	if total > maxSats {
+		return nil, 0, fmt.Errorf("total amount %d exceeds %d", total, maxSats)
+	}
 	logger.Debug("spendTxSigHash", "spendTxSigHash", hex.EncodeToString(spendTxSigHash))
-	return spendTxSigHash, uint64(totalAmount), nil
+	return spendTxSigHash, total, nil
 }
 
 func GetSpendTxSigningResult(ctx context.Context, config *so.Config, utxo *pb.UTXO, spendTxSigningJob *pb.SigningJob) (*pb.SigningResult, *pb.DepositAddressQueryResult, error) {
@@ -1638,7 +1684,12 @@ func GetSpendTxSigningResult(ctx context.Context, config *so.Config, utxo *pb.UT
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get schema network: %w", err)
 	}
-	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, utxo.Txid, utxo.Vout)
+
+	targetUtxoTxId, err := NewValidatedTxID(utxo.Txid)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to validate UTXO txid: %w", err)
+	}
+	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, targetUtxoTxId, utxo.Vout)
 	if err != nil {
 		return nil, nil, err
 	}

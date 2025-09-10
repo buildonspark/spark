@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -33,7 +34,8 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 
 	// Create test data
 	blockHeight := 100
-	txid := []byte("test_txid")
+	txid, err := NewValidatedTxID(chainhash.DoubleHashB([]byte("test_txid")))
+	require.NoError(t, err)
 	vout := uint32(0)
 
 	// Create block height records for both networks
@@ -91,7 +93,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		utxoBlockHeight := blockHeight - int(config.BitcoindConfigs["regtest"].DepositConfirmationThreshold) + 1
 		utxo, err := tx.Utxo.Create().
 			SetNetwork(st.NetworkRegtest).
-			SetTxid(txid).
+			SetTxid(txid[:]).
 			SetVout(vout).
 			SetBlockHeight(int64(utxoBlockHeight)).
 			SetAmount(1000).
@@ -148,19 +150,22 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 			Save(ctx)
 		require.NoError(t, err)
 
+		testTxid2, err := NewValidatedTxID(chainhash.DoubleHashB([]byte("test_txid2")))
+		require.NoError(t, err)
+
 		// Test verification with not yet mined utxo
-		_, err = VerifiedTargetUtxo(ctx, config, tx, st.NetworkRegtest, []byte("test_txid2"), 1)
+		_, err = VerifiedTargetUtxo(ctx, config, tx, st.NetworkRegtest, testTxid2, 1)
 		require.Error(t, err)
 		grpcError, ok := status.FromError(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.FailedPrecondition, grpcError.Code())
-		assert.Equal(t, fmt.Sprintf("utxo not found: txid: %s vout: 1", hex.EncodeToString([]byte("test_txid2"))), grpcError.Message())
+		assert.Equal(t, fmt.Sprintf("utxo not found: txid: %s vout: 1", hex.EncodeToString(testTxid2[:])), grpcError.Message())
 
 		// Create UTXO with insufficient confirmations
 		utxoBlockHeight := blockHeight - int(config.BitcoindConfigs["regtest"].DepositConfirmationThreshold) + 2
 		_, err = tx.Utxo.Create().
 			SetNetwork(st.NetworkRegtest).
-			SetTxid([]byte("test_txid2")).
+			SetTxid(testTxid2[:]).
 			SetVout(1).
 			SetBlockHeight(int64(utxoBlockHeight)).
 			SetAmount(1000).
@@ -170,8 +175,9 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test verification
-		_, err = VerifiedTargetUtxo(ctx, config, tx, st.NetworkRegtest, []byte("test_txid2"), 1)
-		require.ErrorContains(t, err, "deposit tx doesn't have enough confirmations")
+		_, err = VerifiedTargetUtxo(ctx, config, tx, st.NetworkRegtest, testTxid2, 1)
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "deposit tx doesn't have enough confirmations")
 	})
 }
 

@@ -4,6 +4,7 @@ import (
 	"math/rand/v2"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/lightsparkdev/spark/so/db"
@@ -115,4 +116,68 @@ func TestTweakLeafKey(t *testing.T) {
 		expectedNewPublicShares[operator] = shareKey.Add(pubkeyShareTweakPub).Serialize()
 	}
 	assert.Equal(t, expectedNewPublicShares, updatedKeyshare.PublicShares)
+}
+
+func TestTweakLeafKey_EmptySecretShareTweakProofsList(t *testing.T) {
+	ctx, client := db.NewTestSQLiteContext(t, t.Context())
+	defer client.Close()
+	dbTx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	rng := rand.NewChaCha8([32]byte{})
+	ownerPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	baseTxid := chainhash.DoubleHashB([]byte("base-tx-id"))
+	keysharePriv := keys.MustGeneratePrivateKeyFromRand(rng)
+	keysharePub := keysharePriv.Public()
+	pubSharePub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	tweakPriv := keys.MustGeneratePrivateKeyFromRand(rng)
+	pubkeyShareTweakPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	tree, err := dbTx.Tree.Create().
+		SetOwnerIdentityPubkey(ownerPub.Serialize()).
+		SetStatus(schematype.TreeStatusAvailable).
+		SetNetwork(schematype.NetworkMainnet).
+		SetBaseTxid(baseTxid).
+		SetVout(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keyshare, err := dbTx.SigningKeyshare.Create().
+		SetStatus(schematype.KeyshareStatusInUse).
+		SetSecretShare(keysharePriv.Serialize()).
+		SetPublicShares(map[string][]byte{"operator1": pubSharePub.Serialize()}).
+		SetPublicKey(keysharePub.Serialize()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	leaf, err := dbTx.TreeNode.Create().
+		SetTree(tree).
+		SetValue(1000).
+		SetStatus(schematype.TreeNodeStatusAvailable).
+		SetVerifyingPubkey(verifyingPub.Serialize()).
+		SetOwnerIdentityPubkey(ownerPub.Serialize()).
+		SetOwnerSigningPubkey(ownerSigningPub.Serialize()).
+		SetRawTx(baseTxid).
+		SetVout(0).
+		SetSigningKeyshare(keyshare).
+		Save(ctx)
+	require.NoError(t, err)
+
+	req := &spark.SendLeafKeyTweak{
+		LeafId: leaf.ID.String(),
+		SecretShareTweak: &spark.SecretShare{
+			SecretShare: tweakPriv.Serialize(),
+			Proofs:      [][]byte{},
+		},
+		PubkeySharesTweak: map[string][]byte{
+			"operator1": pubkeyShareTweakPub.Serialize(),
+		},
+	}
+
+	_, err = helper.TweakLeafKeyUpdate(ctx, leaf, req)
+	require.ErrorContains(t, err, "no proofs provided for secret share tweak for leaf")
 }

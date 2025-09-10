@@ -184,8 +184,12 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 	if err != nil {
 		return nil, err
 	}
-
-	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
+	// Validate the on-chain UTXO
+	onChainUtxoTxId, err := NewValidatedTxID(req.OnChainUtxo.Txid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate on-chain UTXO txid: %w", err)
+	}
+	targetUtxo, err := VerifiedTargetUtxo(ctx, config, db, schemaNetwork, onChainUtxoTxId, req.OnChainUtxo.Vout)
 	if err != nil {
 		return nil, err
 	}
