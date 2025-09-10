@@ -1133,6 +1133,11 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		}
 
 		return nil, fmt.Errorf("recovered preimage did not match payment hash: %x and transfer id: %s", req.PaymentHash, transfer.ID.String())
+	} else {
+		err = h.sendPreimageGossipMessage(ctx, secretBytes, req.PaymentHash)
+		if err != nil {
+			logger.Error("InitiatePreimageSwap: unable to send preimage gossip message", "error", err, "payment_hash", hex.EncodeToString(req.PaymentHash))
+		}
 	}
 
 	err = preimageRequest.Update().SetStatus(st.PreimageRequestStatusPreimageShared).Exec(ctx)
@@ -1141,6 +1146,28 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 	}
 
 	return &pb.InitiatePreimageSwapResponse{Preimage: secretBytes, Transfer: transferProto}, nil
+}
+
+func (h *LightningHandler) sendPreimageGossipMessage(ctx context.Context, preimage []byte, paymentHash []byte) error {
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	participants, err := selection.OperatorIdentifierList(h.config)
+	if err != nil {
+		return fmt.Errorf("unable to get operator list: %w", err)
+	}
+
+	sendGossipHandler := NewSendGossipHandler(h.config)
+	_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
+		Message: &pbgossip.GossipMessage_Preimage{
+			Preimage: &pbgossip.GossipMessagePreimage{
+				Preimage:    preimage,
+				PaymentHash: paymentHash,
+			},
+		},
+	}, participants)
+	if err != nil {
+		return fmt.Errorf("unable to create and send gossip message: %w", err)
+	}
+	return nil
 }
 
 // UpdatePreimageRequest updates the preimage request.

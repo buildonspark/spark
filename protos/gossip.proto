@@ -26,6 +26,7 @@ message GossipMessage {
         GossipMessageFinalizeExtendLeaf finalize_extend_leaf = 10;
         GossipMessageRollbackUtxoSwap rollback_utxo_swap = 11;
         GossipMessageDepositCleanup deposit_cleanup = 12;
+        GossipMessagePreimage preimage = 13;
     }
 }
 
@@ -85,4 +86,9 @@ message GossipMessageRollbackUtxoSwap {
 
 message GossipMessageDepositCleanup {
     string tree_id = 1;
+}
+
+message GossipMessagePreimage {
+    bytes preimage = 1;
+    bytes payment_hash = 2;
 }

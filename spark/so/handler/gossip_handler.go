@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -10,6 +13,7 @@ import (
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
@@ -58,6 +62,9 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 	case *pbgossip.GossipMessage_DepositCleanup:
 		depositCleanup := gossipMessage.GetDepositCleanup()
 		h.handleDepositCleanupGossipMessage(ctx, depositCleanup)
+	case *pbgossip.GossipMessage_Preimage:
+		preimage := gossipMessage.GetPreimage()
+		h.handlePreimageGossipMessage(ctx, preimage, forCoordinator)
 	default:
 		return fmt.Errorf("unsupported gossip message type: %T", gossipMessage.Message)
 	}
@@ -268,5 +275,38 @@ func (h *GossipHandler) handleRollbackUtxoSwapGossipMessage(ctx context.Context,
 	})
 	if err != nil {
 		logger.Error("failed to rollback utxo swap with gossip message, will not retry, on-call to intervene", "error", err)
+	}
+}
+
+func (h *GossipHandler) handlePreimageGossipMessage(ctx context.Context, gossip *pbgossip.GossipMessagePreimage, forCoordinator bool) {
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Info("Handling preimage gossip message")
+
+	if forCoordinator {
+		return
+	}
+
+	calculatedHash := sha256.Sum256(gossip.Preimage)
+	if !bytes.Equal(calculatedHash[:], gossip.PaymentHash) {
+		logger.Error("Preimage hash mismatch", "calculated_hash", hex.EncodeToString(calculatedHash[:]), "payment_hash", hex.EncodeToString(gossip.PaymentHash))
+		return
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		logger.Error("Failed to get or create current tx for request", "error", err)
+		return
+	}
+
+	preimageRequests, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(gossip.PaymentHash)).ForUpdate().All(ctx)
+	if err != nil {
+		logger.Error("Failed to get preimage request", "error", err, "payment_hash", gossip.PaymentHash)
+	}
+
+	for _, preimageRequest := range preimageRequests {
+		preimageRequest, err = preimageRequest.Update().SetPreimage(gossip.Preimage).Save(ctx)
+		if err != nil {
+			logger.Error("Failed to update preimage request", "error", err, "payment_hash", gossip.PaymentHash)
+		}
 	}
 }
