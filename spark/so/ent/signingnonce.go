@@ -27,8 +27,12 @@ type SigningNonce struct {
 	// NonceCommitment holds the value of the "nonce_commitment" field.
 	NonceCommitment []byte `json:"nonce_commitment,omitempty"`
 	// Message holds the value of the "message" field.
-	Message      []byte `json:"message,omitempty"`
-	selectValues sql.SelectValues
+	//
+	// Deprecated: Field "message" was marked as deprecated in the schema.
+	Message []byte `json:"message,omitempty"`
+	// RetryFingerprint holds the value of the "retry_fingerprint" field.
+	RetryFingerprint []byte `json:"retry_fingerprint,omitempty"`
+	selectValues     sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -36,7 +40,7 @@ func (*SigningNonce) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case signingnonce.FieldNonce, signingnonce.FieldNonceCommitment, signingnonce.FieldMessage:
+		case signingnonce.FieldNonce, signingnonce.FieldNonceCommitment, signingnonce.FieldMessage, signingnonce.FieldRetryFingerprint:
 			values[i] = new([]byte)
 		case signingnonce.FieldCreateTime, signingnonce.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -93,6 +97,12 @@ func (sn *SigningNonce) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				sn.Message = *value
 			}
+		case signingnonce.FieldRetryFingerprint:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field retry_fingerprint", values[i])
+			} else if value != nil {
+				sn.RetryFingerprint = *value
+			}
 		default:
 			sn.selectValues.Set(columns[i], values[i])
 		}
@@ -143,6 +153,9 @@ func (sn *SigningNonce) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("message=")
 	builder.WriteString(fmt.Sprintf("%v", sn.Message))
+	builder.WriteString(", ")
+	builder.WriteString("retry_fingerprint=")
+	builder.WriteString(fmt.Sprintf("%v", sn.RetryFingerprint))
 	builder.WriteByte(')')
 	return builder.String()
 }

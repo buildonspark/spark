@@ -341,6 +341,7 @@ var (
 		{Name: "nonce", Type: field.TypeBytes},
 		{Name: "nonce_commitment", Type: field.TypeBytes},
 		{Name: "message", Type: field.TypeBytes, Nullable: true},
+		{Name: "retry_fingerprint", Type: field.TypeBytes, Nullable: true},
 	}
 	// SigningNoncesTable holds the schema information for the "signing_nonces" table.
 	SigningNoncesTable = &schema.Table{

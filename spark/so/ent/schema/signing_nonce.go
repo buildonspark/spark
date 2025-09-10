@@ -34,6 +34,9 @@ func (SigningNonce) Fields() []ent.Field {
 		field.Bytes("nonce_commitment").
 			Immutable(),
 		field.Bytes("message").
+			Optional().
+			Deprecated(),
+		field.Bytes("retry_fingerprint").
 			Optional(),
 	}
 }

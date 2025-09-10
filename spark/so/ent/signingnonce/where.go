@@ -80,6 +80,11 @@ func Message(v []byte) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldEQ(FieldMessage, v))
 }
 
+// RetryFingerprint applies equality check predicate on the "retry_fingerprint" field. It's identical to RetryFingerprintEQ.
+func RetryFingerprint(v []byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldEQ(FieldRetryFingerprint, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldEQ(FieldCreateTime, v))
@@ -288,6 +293,56 @@ func MessageIsNil() predicate.SigningNonce {
 // MessageNotNil applies the NotNil predicate on the "message" field.
 func MessageNotNil() predicate.SigningNonce {
 	return predicate.SigningNonce(sql.FieldNotNull(FieldMessage))
+}
+
+// RetryFingerprintEQ applies the EQ predicate on the "retry_fingerprint" field.
+func RetryFingerprintEQ(v []byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldEQ(FieldRetryFingerprint, v))
+}
+
+// RetryFingerprintNEQ applies the NEQ predicate on the "retry_fingerprint" field.
+func RetryFingerprintNEQ(v []byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldNEQ(FieldRetryFingerprint, v))
+}
+
+// RetryFingerprintIn applies the In predicate on the "retry_fingerprint" field.
+func RetryFingerprintIn(vs ...[]byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldIn(FieldRetryFingerprint, vs...))
+}
+
+// RetryFingerprintNotIn applies the NotIn predicate on the "retry_fingerprint" field.
+func RetryFingerprintNotIn(vs ...[]byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldNotIn(FieldRetryFingerprint, vs...))
+}
+
+// RetryFingerprintGT applies the GT predicate on the "retry_fingerprint" field.
+func RetryFingerprintGT(v []byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldGT(FieldRetryFingerprint, v))
+}
+
+// RetryFingerprintGTE applies the GTE predicate on the "retry_fingerprint" field.
+func RetryFingerprintGTE(v []byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldGTE(FieldRetryFingerprint, v))
+}
+
+// RetryFingerprintLT applies the LT predicate on the "retry_fingerprint" field.
+func RetryFingerprintLT(v []byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldLT(FieldRetryFingerprint, v))
+}
+
+// RetryFingerprintLTE applies the LTE predicate on the "retry_fingerprint" field.
+func RetryFingerprintLTE(v []byte) predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldLTE(FieldRetryFingerprint, v))
+}
+
+// RetryFingerprintIsNil applies the IsNil predicate on the "retry_fingerprint" field.
+func RetryFingerprintIsNil() predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldIsNull(FieldRetryFingerprint))
+}
+
+// RetryFingerprintNotNil applies the NotNil predicate on the "retry_fingerprint" field.
+func RetryFingerprintNotNil() predicate.SigningNonce {
+	return predicate.SigningNonce(sql.FieldNotNull(FieldRetryFingerprint))
 }
 
 // And groups predicates with the AND operator between them.

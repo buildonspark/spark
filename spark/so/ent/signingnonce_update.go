@@ -46,6 +46,18 @@ func (snu *SigningNonceUpdate) ClearMessage() *SigningNonceUpdate {
 	return snu
 }
 
+// SetRetryFingerprint sets the "retry_fingerprint" field.
+func (snu *SigningNonceUpdate) SetRetryFingerprint(b []byte) *SigningNonceUpdate {
+	snu.mutation.SetRetryFingerprint(b)
+	return snu
+}
+
+// ClearRetryFingerprint clears the value of the "retry_fingerprint" field.
+func (snu *SigningNonceUpdate) ClearRetryFingerprint() *SigningNonceUpdate {
+	snu.mutation.ClearRetryFingerprint()
+	return snu
+}
+
 // Mutation returns the SigningNonceMutation object of the builder.
 func (snu *SigningNonceUpdate) Mutation() *SigningNonceMutation {
 	return snu.mutation
@@ -111,6 +123,12 @@ func (snu *SigningNonceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if snu.mutation.MessageCleared() {
 		_spec.ClearField(signingnonce.FieldMessage, field.TypeBytes)
 	}
+	if value, ok := snu.mutation.RetryFingerprint(); ok {
+		_spec.SetField(signingnonce.FieldRetryFingerprint, field.TypeBytes, value)
+	}
+	if snu.mutation.RetryFingerprintCleared() {
+		_spec.ClearField(signingnonce.FieldRetryFingerprint, field.TypeBytes)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, snu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{signingnonce.Label}
@@ -146,6 +164,18 @@ func (snuo *SigningNonceUpdateOne) SetMessage(b []byte) *SigningNonceUpdateOne {
 // ClearMessage clears the value of the "message" field.
 func (snuo *SigningNonceUpdateOne) ClearMessage() *SigningNonceUpdateOne {
 	snuo.mutation.ClearMessage()
+	return snuo
+}
+
+// SetRetryFingerprint sets the "retry_fingerprint" field.
+func (snuo *SigningNonceUpdateOne) SetRetryFingerprint(b []byte) *SigningNonceUpdateOne {
+	snuo.mutation.SetRetryFingerprint(b)
+	return snuo
+}
+
+// ClearRetryFingerprint clears the value of the "retry_fingerprint" field.
+func (snuo *SigningNonceUpdateOne) ClearRetryFingerprint() *SigningNonceUpdateOne {
+	snuo.mutation.ClearRetryFingerprint()
 	return snuo
 }
 
@@ -243,6 +273,12 @@ func (snuo *SigningNonceUpdateOne) sqlSave(ctx context.Context) (_node *SigningN
 	}
 	if snuo.mutation.MessageCleared() {
 		_spec.ClearField(signingnonce.FieldMessage, field.TypeBytes)
+	}
+	if value, ok := snuo.mutation.RetryFingerprint(); ok {
+		_spec.SetField(signingnonce.FieldRetryFingerprint, field.TypeBytes, value)
+	}
+	if snuo.mutation.RetryFingerprintCleared() {
+		_spec.ClearField(signingnonce.FieldRetryFingerprint, field.TypeBytes)
 	}
 	_node = &SigningNonce{config: snuo.config}
 	_spec.Assign = _node.assignValues

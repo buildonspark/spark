@@ -70,6 +70,12 @@ func (snc *SigningNonceCreate) SetMessage(b []byte) *SigningNonceCreate {
 	return snc
 }
 
+// SetRetryFingerprint sets the "retry_fingerprint" field.
+func (snc *SigningNonceCreate) SetRetryFingerprint(b []byte) *SigningNonceCreate {
+	snc.mutation.SetRetryFingerprint(b)
+	return snc
+}
+
 // SetID sets the "id" field.
 func (snc *SigningNonceCreate) SetID(u uuid.UUID) *SigningNonceCreate {
 	snc.mutation.SetID(u)
@@ -215,6 +221,10 @@ func (snc *SigningNonceCreate) createSpec() (*SigningNonce, *sqlgraph.CreateSpec
 		_spec.SetField(signingnonce.FieldMessage, field.TypeBytes, value)
 		_node.Message = value
 	}
+	if value, ok := snc.mutation.RetryFingerprint(); ok {
+		_spec.SetField(signingnonce.FieldRetryFingerprint, field.TypeBytes, value)
+		_node.RetryFingerprint = value
+	}
 	return _node, _spec
 }
 
@@ -294,6 +304,24 @@ func (u *SigningNonceUpsert) UpdateMessage() *SigningNonceUpsert {
 // ClearMessage clears the value of the "message" field.
 func (u *SigningNonceUpsert) ClearMessage() *SigningNonceUpsert {
 	u.SetNull(signingnonce.FieldMessage)
+	return u
+}
+
+// SetRetryFingerprint sets the "retry_fingerprint" field.
+func (u *SigningNonceUpsert) SetRetryFingerprint(v []byte) *SigningNonceUpsert {
+	u.Set(signingnonce.FieldRetryFingerprint, v)
+	return u
+}
+
+// UpdateRetryFingerprint sets the "retry_fingerprint" field to the value that was provided on create.
+func (u *SigningNonceUpsert) UpdateRetryFingerprint() *SigningNonceUpsert {
+	u.SetExcluded(signingnonce.FieldRetryFingerprint)
+	return u
+}
+
+// ClearRetryFingerprint clears the value of the "retry_fingerprint" field.
+func (u *SigningNonceUpsert) ClearRetryFingerprint() *SigningNonceUpsert {
+	u.SetNull(signingnonce.FieldRetryFingerprint)
 	return u
 }
 
@@ -386,6 +414,27 @@ func (u *SigningNonceUpsertOne) UpdateMessage() *SigningNonceUpsertOne {
 func (u *SigningNonceUpsertOne) ClearMessage() *SigningNonceUpsertOne {
 	return u.Update(func(s *SigningNonceUpsert) {
 		s.ClearMessage()
+	})
+}
+
+// SetRetryFingerprint sets the "retry_fingerprint" field.
+func (u *SigningNonceUpsertOne) SetRetryFingerprint(v []byte) *SigningNonceUpsertOne {
+	return u.Update(func(s *SigningNonceUpsert) {
+		s.SetRetryFingerprint(v)
+	})
+}
+
+// UpdateRetryFingerprint sets the "retry_fingerprint" field to the value that was provided on create.
+func (u *SigningNonceUpsertOne) UpdateRetryFingerprint() *SigningNonceUpsertOne {
+	return u.Update(func(s *SigningNonceUpsert) {
+		s.UpdateRetryFingerprint()
+	})
+}
+
+// ClearRetryFingerprint clears the value of the "retry_fingerprint" field.
+func (u *SigningNonceUpsertOne) ClearRetryFingerprint() *SigningNonceUpsertOne {
+	return u.Update(func(s *SigningNonceUpsert) {
+		s.ClearRetryFingerprint()
 	})
 }
 
@@ -645,6 +694,27 @@ func (u *SigningNonceUpsertBulk) UpdateMessage() *SigningNonceUpsertBulk {
 func (u *SigningNonceUpsertBulk) ClearMessage() *SigningNonceUpsertBulk {
 	return u.Update(func(s *SigningNonceUpsert) {
 		s.ClearMessage()
+	})
+}
+
+// SetRetryFingerprint sets the "retry_fingerprint" field.
+func (u *SigningNonceUpsertBulk) SetRetryFingerprint(v []byte) *SigningNonceUpsertBulk {
+	return u.Update(func(s *SigningNonceUpsert) {
+		s.SetRetryFingerprint(v)
+	})
+}
+
+// UpdateRetryFingerprint sets the "retry_fingerprint" field to the value that was provided on create.
+func (u *SigningNonceUpsertBulk) UpdateRetryFingerprint() *SigningNonceUpsertBulk {
+	return u.Update(func(s *SigningNonceUpsert) {
+		s.UpdateRetryFingerprint()
+	})
+}
+
+// ClearRetryFingerprint clears the value of the "retry_fingerprint" field.
+func (u *SigningNonceUpsertBulk) ClearRetryFingerprint() *SigningNonceUpsertBulk {
+	return u.Update(func(s *SigningNonceUpsert) {
+		s.ClearRetryFingerprint()
 	})
 }
 

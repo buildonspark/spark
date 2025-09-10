@@ -3,8 +3,13 @@ package signing_handler
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"hash"
+	"maps"
+	"slices"
 
 	"github.com/google/uuid"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
@@ -125,12 +130,18 @@ func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRoun
 		}
 		nonceEnt := nonces[commitment.Key()]
 		// TODO(zhenlu): Add a test for this (LIG-7596).
-		if len(nonceEnt.Message) > 0 {
+		jobRetryFingerprint := retryFingerprint(job)
+		if len(nonceEnt.RetryFingerprint) > 0 {
+			if !bytes.Equal(nonceEnt.RetryFingerprint, jobRetryFingerprint) {
+				return nil, fmt.Errorf("this signing nonce is already used for a different signing job, cannot use it for this signing job")
+			}
+		} else if len(nonceEnt.Message) > 0 {
+			// TODO: Probably remove this branch later after the retry fingerprint branch is deployed.
 			if !bytes.Equal(nonceEnt.Message, job.Message) {
 				return nil, fmt.Errorf("this signing nonce is already used for a different message %s, cannot use it for this message %s", hex.EncodeToString(nonceEnt.Message), hex.EncodeToString(job.Message))
 			}
 		} else {
-			_, err = nonceEnt.Update().SetMessage(job.Message).Save(ctx)
+			_, err = nonceEnt.Update().SetRetryFingerprint(jobRetryFingerprint).Save(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -176,4 +187,34 @@ func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRoun
 	return &pb.FrostRound2Response{
 		Results: round2Response.Results,
 	}, nil
+}
+
+func retryFingerprint(job *pb.SigningJob) []byte {
+	hashState := sha256.New()
+
+	writeBytesCollisionResistant(hashState, job.Message)
+
+	if job.UserCommitments != nil {
+		writeBytesCollisionResistant(hashState, job.UserCommitments.Hiding)
+		writeBytesCollisionResistant(hashState, job.UserCommitments.Binding)
+	}
+
+	hashState.Write(binary.BigEndian.AppendUint64(nil, uint64(len(job.Commitments))))
+
+	for _, operatorIdentifier := range slices.Sorted(maps.Keys(job.Commitments)) {
+		writeBytesCollisionResistant(hashState, []byte(operatorIdentifier))
+
+		com := job.Commitments[operatorIdentifier]
+		if com != nil {
+			writeBytesCollisionResistant(hashState, com.Hiding)
+			writeBytesCollisionResistant(hashState, com.Binding)
+		}
+	}
+
+	return hashState.Sum(nil)
+}
+
+func writeBytesCollisionResistant(hashState hash.Hash, b []byte) {
+	hashState.Write(binary.BigEndian.AppendUint64(nil, uint64(len(b))))
+	hashState.Write(b)
 }

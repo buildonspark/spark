@@ -25,6 +25,8 @@ const (
 	FieldNonceCommitment = "nonce_commitment"
 	// FieldMessage holds the string denoting the message field in the database.
 	FieldMessage = "message"
+	// FieldRetryFingerprint holds the string denoting the retry_fingerprint field in the database.
+	FieldRetryFingerprint = "retry_fingerprint"
 	// Table holds the table name of the signingnonce in the database.
 	Table = "signing_nonces"
 )
@@ -36,13 +38,18 @@ var Columns = []string{
 	FieldUpdateTime,
 	FieldNonce,
 	FieldNonceCommitment,
-	FieldMessage,
+	FieldRetryFingerprint,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
 	for i := range Columns {
 		if column == Columns[i] {
+			return true
+		}
+	}
+	for _, f := range [...]string{FieldMessage} {
+		if column == f {
 			return true
 		}
 	}

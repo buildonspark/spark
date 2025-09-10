@@ -8229,18 +8229,19 @@ func (m *SigningKeyshareMutation) ResetEdge(name string) error {
 // SigningNonceMutation represents an operation that mutates the SigningNonce nodes in the graph.
 type SigningNonceMutation struct {
 	config
-	op               Op
-	typ              string
-	id               *uuid.UUID
-	create_time      *time.Time
-	update_time      *time.Time
-	nonce            *[]byte
-	nonce_commitment *[]byte
-	message          *[]byte
-	clearedFields    map[string]struct{}
-	done             bool
-	oldValue         func(context.Context) (*SigningNonce, error)
-	predicates       []predicate.SigningNonce
+	op                Op
+	typ               string
+	id                *uuid.UUID
+	create_time       *time.Time
+	update_time       *time.Time
+	nonce             *[]byte
+	nonce_commitment  *[]byte
+	message           *[]byte
+	retry_fingerprint *[]byte
+	clearedFields     map[string]struct{}
+	done              bool
+	oldValue          func(context.Context) (*SigningNonce, error)
+	predicates        []predicate.SigningNonce
 }
 
 var _ ent.Mutation = (*SigningNonceMutation)(nil)
@@ -8540,6 +8541,55 @@ func (m *SigningNonceMutation) ResetMessage() {
 	delete(m.clearedFields, signingnonce.FieldMessage)
 }
 
+// SetRetryFingerprint sets the "retry_fingerprint" field.
+func (m *SigningNonceMutation) SetRetryFingerprint(b []byte) {
+	m.retry_fingerprint = &b
+}
+
+// RetryFingerprint returns the value of the "retry_fingerprint" field in the mutation.
+func (m *SigningNonceMutation) RetryFingerprint() (r []byte, exists bool) {
+	v := m.retry_fingerprint
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRetryFingerprint returns the old "retry_fingerprint" field's value of the SigningNonce entity.
+// If the SigningNonce object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SigningNonceMutation) OldRetryFingerprint(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRetryFingerprint is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRetryFingerprint requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRetryFingerprint: %w", err)
+	}
+	return oldValue.RetryFingerprint, nil
+}
+
+// ClearRetryFingerprint clears the value of the "retry_fingerprint" field.
+func (m *SigningNonceMutation) ClearRetryFingerprint() {
+	m.retry_fingerprint = nil
+	m.clearedFields[signingnonce.FieldRetryFingerprint] = struct{}{}
+}
+
+// RetryFingerprintCleared returns if the "retry_fingerprint" field was cleared in this mutation.
+func (m *SigningNonceMutation) RetryFingerprintCleared() bool {
+	_, ok := m.clearedFields[signingnonce.FieldRetryFingerprint]
+	return ok
+}
+
+// ResetRetryFingerprint resets all changes to the "retry_fingerprint" field.
+func (m *SigningNonceMutation) ResetRetryFingerprint() {
+	m.retry_fingerprint = nil
+	delete(m.clearedFields, signingnonce.FieldRetryFingerprint)
+}
+
 // Where appends a list predicates to the SigningNonceMutation builder.
 func (m *SigningNonceMutation) Where(ps ...predicate.SigningNonce) {
 	m.predicates = append(m.predicates, ps...)
@@ -8574,7 +8624,7 @@ func (m *SigningNonceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SigningNonceMutation) Fields() []string {
-	fields := make([]string, 0, 5)
+	fields := make([]string, 0, 6)
 	if m.create_time != nil {
 		fields = append(fields, signingnonce.FieldCreateTime)
 	}
@@ -8589,6 +8639,9 @@ func (m *SigningNonceMutation) Fields() []string {
 	}
 	if m.message != nil {
 		fields = append(fields, signingnonce.FieldMessage)
+	}
+	if m.retry_fingerprint != nil {
+		fields = append(fields, signingnonce.FieldRetryFingerprint)
 	}
 	return fields
 }
@@ -8608,6 +8661,8 @@ func (m *SigningNonceMutation) Field(name string) (ent.Value, bool) {
 		return m.NonceCommitment()
 	case signingnonce.FieldMessage:
 		return m.Message()
+	case signingnonce.FieldRetryFingerprint:
+		return m.RetryFingerprint()
 	}
 	return nil, false
 }
@@ -8627,6 +8682,8 @@ func (m *SigningNonceMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldNonceCommitment(ctx)
 	case signingnonce.FieldMessage:
 		return m.OldMessage(ctx)
+	case signingnonce.FieldRetryFingerprint:
+		return m.OldRetryFingerprint(ctx)
 	}
 	return nil, fmt.Errorf("unknown SigningNonce field %s", name)
 }
@@ -8671,6 +8728,13 @@ func (m *SigningNonceMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetMessage(v)
 		return nil
+	case signingnonce.FieldRetryFingerprint:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRetryFingerprint(v)
+		return nil
 	}
 	return fmt.Errorf("unknown SigningNonce field %s", name)
 }
@@ -8704,6 +8768,9 @@ func (m *SigningNonceMutation) ClearedFields() []string {
 	if m.FieldCleared(signingnonce.FieldMessage) {
 		fields = append(fields, signingnonce.FieldMessage)
 	}
+	if m.FieldCleared(signingnonce.FieldRetryFingerprint) {
+		fields = append(fields, signingnonce.FieldRetryFingerprint)
+	}
 	return fields
 }
 
@@ -8720,6 +8787,9 @@ func (m *SigningNonceMutation) ClearField(name string) error {
 	switch name {
 	case signingnonce.FieldMessage:
 		m.ClearMessage()
+		return nil
+	case signingnonce.FieldRetryFingerprint:
+		m.ClearRetryFingerprint()
 		return nil
 	}
 	return fmt.Errorf("unknown SigningNonce nullable field %s", name)
@@ -8743,6 +8813,9 @@ func (m *SigningNonceMutation) ResetField(name string) error {
 		return nil
 	case signingnonce.FieldMessage:
 		m.ResetMessage()
+		return nil
+	case signingnonce.FieldRetryFingerprint:
+		m.ResetRetryFingerprint()
 		return nil
 	}
 	return fmt.Errorf("unknown SigningNonce field %s", name)
