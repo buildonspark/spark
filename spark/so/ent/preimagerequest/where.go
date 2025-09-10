@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -73,7 +74,7 @@ func PaymentHash(v []byte) predicate.PreimageRequest {
 }
 
 // ReceiverIdentityPubkey applies equality check predicate on the "receiver_identity_pubkey" field. It's identical to ReceiverIdentityPubkeyEQ.
-func ReceiverIdentityPubkey(v []byte) predicate.PreimageRequest {
+func ReceiverIdentityPubkey(v keys.Public) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldEQ(FieldReceiverIdentityPubkey, v))
 }
 
@@ -233,42 +234,42 @@ func StatusNotIn(vs ...schematype.PreimageRequestStatus) predicate.PreimageReque
 }
 
 // ReceiverIdentityPubkeyEQ applies the EQ predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyEQ(v []byte) predicate.PreimageRequest {
+func ReceiverIdentityPubkeyEQ(v keys.Public) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldEQ(FieldReceiverIdentityPubkey, v))
 }
 
 // ReceiverIdentityPubkeyNEQ applies the NEQ predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyNEQ(v []byte) predicate.PreimageRequest {
+func ReceiverIdentityPubkeyNEQ(v keys.Public) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldNEQ(FieldReceiverIdentityPubkey, v))
 }
 
 // ReceiverIdentityPubkeyIn applies the In predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyIn(vs ...[]byte) predicate.PreimageRequest {
+func ReceiverIdentityPubkeyIn(vs ...keys.Public) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldIn(FieldReceiverIdentityPubkey, vs...))
 }
 
 // ReceiverIdentityPubkeyNotIn applies the NotIn predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyNotIn(vs ...[]byte) predicate.PreimageRequest {
+func ReceiverIdentityPubkeyNotIn(vs ...keys.Public) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldNotIn(FieldReceiverIdentityPubkey, vs...))
 }
 
 // ReceiverIdentityPubkeyGT applies the GT predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyGT(v []byte) predicate.PreimageRequest {
+func ReceiverIdentityPubkeyGT(v keys.Public) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldGT(FieldReceiverIdentityPubkey, v))
 }
 
 // ReceiverIdentityPubkeyGTE applies the GTE predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyGTE(v []byte) predicate.PreimageRequest {
+func ReceiverIdentityPubkeyGTE(v keys.Public) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldGTE(FieldReceiverIdentityPubkey, v))
 }
 
 // ReceiverIdentityPubkeyLT applies the LT predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyLT(v []byte) predicate.PreimageRequest {
+func ReceiverIdentityPubkeyLT(v keys.Public) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldLT(FieldReceiverIdentityPubkey, v))
 }
 
 // ReceiverIdentityPubkeyLTE applies the LTE predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyLTE(v []byte) predicate.PreimageRequest {
+func ReceiverIdentityPubkeyLTE(v keys.Public) predicate.PreimageRequest {
 	return predicate.PreimageRequest(sql.FieldLTE(FieldReceiverIdentityPubkey, v))
 }
 

@@ -5,6 +5,7 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
@@ -37,7 +38,8 @@ func (PreimageRequest) Fields() []ent.Field {
 		field.Enum("status").
 			GoType(st.PreimageRequestStatus("")),
 		field.Bytes("receiver_identity_pubkey").
-			Optional(),
+			Optional().
+			GoType(keys.Public{}),
 		field.Bytes("preimage").
 			Optional(),
 	}

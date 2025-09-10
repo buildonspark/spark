@@ -5260,7 +5260,7 @@ type PreimageRequestMutation struct {
 	update_time              *time.Time
 	payment_hash             *[]byte
 	status                   *schematype.PreimageRequestStatus
-	receiver_identity_pubkey *[]byte
+	receiver_identity_pubkey *keys.Public
 	preimage                 *[]byte
 	clearedFields            map[string]struct{}
 	transactions             map[uuid.UUID]struct{}
@@ -5524,12 +5524,12 @@ func (m *PreimageRequestMutation) ResetStatus() {
 }
 
 // SetReceiverIdentityPubkey sets the "receiver_identity_pubkey" field.
-func (m *PreimageRequestMutation) SetReceiverIdentityPubkey(b []byte) {
-	m.receiver_identity_pubkey = &b
+func (m *PreimageRequestMutation) SetReceiverIdentityPubkey(k keys.Public) {
+	m.receiver_identity_pubkey = &k
 }
 
 // ReceiverIdentityPubkey returns the value of the "receiver_identity_pubkey" field in the mutation.
-func (m *PreimageRequestMutation) ReceiverIdentityPubkey() (r []byte, exists bool) {
+func (m *PreimageRequestMutation) ReceiverIdentityPubkey() (r keys.Public, exists bool) {
 	v := m.receiver_identity_pubkey
 	if v == nil {
 		return
@@ -5540,7 +5540,7 @@ func (m *PreimageRequestMutation) ReceiverIdentityPubkey() (r []byte, exists boo
 // OldReceiverIdentityPubkey returns the old "receiver_identity_pubkey" field's value of the PreimageRequest entity.
 // If the PreimageRequest object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PreimageRequestMutation) OldReceiverIdentityPubkey(ctx context.Context) (v []byte, err error) {
+func (m *PreimageRequestMutation) OldReceiverIdentityPubkey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldReceiverIdentityPubkey is only allowed on UpdateOne operations")
 	}
@@ -5885,7 +5885,7 @@ func (m *PreimageRequestMutation) SetField(name string, value ent.Value) error {
 		m.SetStatus(v)
 		return nil
 	case preimagerequest.FieldReceiverIdentityPubkey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

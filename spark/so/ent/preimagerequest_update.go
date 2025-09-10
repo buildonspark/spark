@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
@@ -60,8 +61,16 @@ func (pru *PreimageRequestUpdate) SetNillableStatus(srs *schematype.PreimageRequ
 }
 
 // SetReceiverIdentityPubkey sets the "receiver_identity_pubkey" field.
-func (pru *PreimageRequestUpdate) SetReceiverIdentityPubkey(b []byte) *PreimageRequestUpdate {
-	pru.mutation.SetReceiverIdentityPubkey(b)
+func (pru *PreimageRequestUpdate) SetReceiverIdentityPubkey(k keys.Public) *PreimageRequestUpdate {
+	pru.mutation.SetReceiverIdentityPubkey(k)
+	return pru
+}
+
+// SetNillableReceiverIdentityPubkey sets the "receiver_identity_pubkey" field if the given value is not nil.
+func (pru *PreimageRequestUpdate) SetNillableReceiverIdentityPubkey(k *keys.Public) *PreimageRequestUpdate {
+	if k != nil {
+		pru.SetReceiverIdentityPubkey(*k)
+	}
 	return pru
 }
 
@@ -414,8 +423,16 @@ func (pruo *PreimageRequestUpdateOne) SetNillableStatus(srs *schematype.Preimage
 }
 
 // SetReceiverIdentityPubkey sets the "receiver_identity_pubkey" field.
-func (pruo *PreimageRequestUpdateOne) SetReceiverIdentityPubkey(b []byte) *PreimageRequestUpdateOne {
-	pruo.mutation.SetReceiverIdentityPubkey(b)
+func (pruo *PreimageRequestUpdateOne) SetReceiverIdentityPubkey(k keys.Public) *PreimageRequestUpdateOne {
+	pruo.mutation.SetReceiverIdentityPubkey(k)
+	return pruo
+}
+
+// SetNillableReceiverIdentityPubkey sets the "receiver_identity_pubkey" field if the given value is not nil.
+func (pruo *PreimageRequestUpdateOne) SetNillableReceiverIdentityPubkey(k *keys.Public) *PreimageRequestUpdateOne {
+	if k != nil {
+		pruo.SetReceiverIdentityPubkey(*k)
+	}
 	return pruo
 }
 

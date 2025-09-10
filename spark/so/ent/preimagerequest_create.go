@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -69,8 +70,16 @@ func (prc *PreimageRequestCreate) SetStatus(srs schematype.PreimageRequestStatus
 }
 
 // SetReceiverIdentityPubkey sets the "receiver_identity_pubkey" field.
-func (prc *PreimageRequestCreate) SetReceiverIdentityPubkey(b []byte) *PreimageRequestCreate {
-	prc.mutation.SetReceiverIdentityPubkey(b)
+func (prc *PreimageRequestCreate) SetReceiverIdentityPubkey(k keys.Public) *PreimageRequestCreate {
+	prc.mutation.SetReceiverIdentityPubkey(k)
+	return prc
+}
+
+// SetNillableReceiverIdentityPubkey sets the "receiver_identity_pubkey" field if the given value is not nil.
+func (prc *PreimageRequestCreate) SetNillableReceiverIdentityPubkey(k *keys.Public) *PreimageRequestCreate {
+	if k != nil {
+		prc.SetReceiverIdentityPubkey(*k)
+	}
 	return prc
 }
 
@@ -430,7 +439,7 @@ func (u *PreimageRequestUpsert) UpdateStatus() *PreimageRequestUpsert {
 }
 
 // SetReceiverIdentityPubkey sets the "receiver_identity_pubkey" field.
-func (u *PreimageRequestUpsert) SetReceiverIdentityPubkey(v []byte) *PreimageRequestUpsert {
+func (u *PreimageRequestUpsert) SetReceiverIdentityPubkey(v keys.Public) *PreimageRequestUpsert {
 	u.Set(preimagerequest.FieldReceiverIdentityPubkey, v)
 	return u
 }
@@ -559,7 +568,7 @@ func (u *PreimageRequestUpsertOne) UpdateStatus() *PreimageRequestUpsertOne {
 }
 
 // SetReceiverIdentityPubkey sets the "receiver_identity_pubkey" field.
-func (u *PreimageRequestUpsertOne) SetReceiverIdentityPubkey(v []byte) *PreimageRequestUpsertOne {
+func (u *PreimageRequestUpsertOne) SetReceiverIdentityPubkey(v keys.Public) *PreimageRequestUpsertOne {
 	return u.Update(func(s *PreimageRequestUpsert) {
 		s.SetReceiverIdentityPubkey(v)
 	})
@@ -861,7 +870,7 @@ func (u *PreimageRequestUpsertBulk) UpdateStatus() *PreimageRequestUpsertBulk {
 }
 
 // SetReceiverIdentityPubkey sets the "receiver_identity_pubkey" field.
-func (u *PreimageRequestUpsertBulk) SetReceiverIdentityPubkey(v []byte) *PreimageRequestUpsertBulk {
+func (u *PreimageRequestUpsertBulk) SetReceiverIdentityPubkey(v keys.Public) *PreimageRequestUpsertBulk {
 	return u.Update(func(s *PreimageRequestUpsert) {
 		s.SetReceiverIdentityPubkey(v)
 	})

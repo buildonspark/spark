@@ -646,7 +646,7 @@ func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 					},
 				}
 			},
-			expectedErrMsg: "owner identity public key is required",
+			expectedErrMsg: "unable to parse owner identity public key",
 		},
 		{
 			name: "nil receiver identity public key",

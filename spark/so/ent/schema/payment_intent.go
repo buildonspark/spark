@@ -15,7 +15,6 @@ type PaymentIntent struct {
 	ent.Schema
 }
 
-// The ID field from the Base Mixin must be overridden by the ID decoded from the payment intent string.
 func (PaymentIntent) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},

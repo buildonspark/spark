@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -30,7 +31,7 @@ type PreimageRequest struct {
 	// Status holds the value of the "status" field.
 	Status schematype.PreimageRequestStatus `json:"status,omitempty"`
 	// ReceiverIdentityPubkey holds the value of the "receiver_identity_pubkey" field.
-	ReceiverIdentityPubkey []byte `json:"receiver_identity_pubkey,omitempty"`
+	ReceiverIdentityPubkey keys.Public `json:"receiver_identity_pubkey,omitempty"`
 	// Preimage holds the value of the "preimage" field.
 	Preimage []byte `json:"preimage,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -89,8 +90,10 @@ func (*PreimageRequest) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case preimagerequest.FieldPaymentHash, preimagerequest.FieldReceiverIdentityPubkey, preimagerequest.FieldPreimage:
+		case preimagerequest.FieldPaymentHash, preimagerequest.FieldPreimage:
 			values[i] = new([]byte)
+		case preimagerequest.FieldReceiverIdentityPubkey:
+			values[i] = new(keys.Public)
 		case preimagerequest.FieldStatus:
 			values[i] = new(sql.NullString)
 		case preimagerequest.FieldCreateTime, preimagerequest.FieldUpdateTime:
@@ -145,7 +148,7 @@ func (pr *PreimageRequest) assignValues(columns []string, values []any) error {
 				pr.Status = schematype.PreimageRequestStatus(value.String)
 			}
 		case preimagerequest.FieldReceiverIdentityPubkey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field receiver_identity_pubkey", values[i])
 			} else if value != nil {
 				pr.ReceiverIdentityPubkey = *value

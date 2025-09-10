@@ -331,7 +331,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 	// Check for existing preimage requests (duplicate prevention)
 	preimageRequests, err := tx.PreimageRequest.Query().Where(
 		preimagerequest.PaymentHashEQ(paymentHash),
-		preimagerequest.ReceiverIdentityPubkeyEQ(destinationPubKey.Serialize()),
+		preimagerequest.ReceiverIdentityPubkeyEQ(destinationPubKey),
 		preimagerequest.StatusNEQ(st.PreimageRequestStatusReturned),
 	).All(ctx)
 	if err != nil {
@@ -650,7 +650,7 @@ func (h *LightningHandler) storeUserSignedTransactions(
 	}
 	preimageRequestMutator := tx.PreimageRequest.Create().
 		SetPaymentHash(paymentHash).
-		SetReceiverIdentityPubkey(receiverIdentityPubKey.Serialize()).
+		SetReceiverIdentityPubkey(receiverIdentityPubKey).
 		SetTransfers(transfer).
 		SetStatus(status)
 	if preimageShare != nil {
@@ -798,7 +798,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		return nil, fmt.Errorf("unable to validate duplicate leaves: %w", err)
 	}
 
-	receiverIDPubKey, err := keys.ParsePublicKey(req.ReceiverIdentityPublicKey)
+	receiverIdentityPubKey, err := keys.ParsePublicKey(req.ReceiverIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse receiver identity public key: %w", err)
 	}
@@ -809,7 +809,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		req.Transfer.DirectLeavesToSend,
 		req.Transfer.DirectFromCpfpLeavesToSend,
 		invoiceAmount,
-		receiverIDPubKey,
+		receiverIdentityPubKey,
 		req.FeeSats,
 		req.Reason,
 		false,
@@ -835,7 +835,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 	}
 
 	transferHandler := NewTransferHandler(h.config)
-	ownerIDPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
+	ownerIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse owner identity public key: %w", err)
 	}
@@ -844,8 +844,8 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		req.Transfer.TransferId,
 		st.TransferTypePreimageSwap,
 		req.Transfer.ExpiryTime.AsTime(),
-		ownerIDPubKey,
-		receiverIDPubKey,
+		ownerIdentityPubKey,
+		receiverIdentityPubKey,
 		cpfpLeafRefundMap,
 		directLeafRefundMap,
 		directFromCpfpLeafRefundMap,
@@ -873,7 +873,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		req.Transfer.DirectFromCpfpLeavesToSend,
 		transfer,
 		status,
-		receiverIDPubKey,
+		receiverIdentityPubKey,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store user signed transactions: %w", err)
@@ -901,29 +901,17 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("transfer is required")
 	}
 
-	if req.Transfer.OwnerIdentityPublicKey == nil {
-		return nil, fmt.Errorf("owner identity public key is required")
-	}
-	ownerIDPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
+	ownerIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse owner identity public key: %w", err)
 	}
 
-	err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, ownerIDPubKey)
-	if err != nil {
+	if err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, ownerIdentityPubKey); err != nil {
 		return nil, err
-	}
-
-	if req.Transfer == nil {
-		return nil, fmt.Errorf("transfer is required")
 	}
 
 	if len(req.Transfer.LeavesToSend) == 0 {
 		return nil, fmt.Errorf("at least one cpfp leaf tx must be provided")
-	}
-
-	if req.Transfer.OwnerIdentityPublicKey == nil {
-		return nil, fmt.Errorf("owner identity public key is required")
 	}
 
 	if req.Transfer.ReceiverIdentityPublicKey == nil {
@@ -972,7 +960,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("unable to validate duplicate leaves: %w", err)
 	}
 
-	receiverIDPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
+	receiverIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse receiver identity public key: %w", err)
 	}
@@ -983,7 +971,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		req.Transfer.DirectLeavesToSend,
 		req.Transfer.DirectFromCpfpLeavesToSend,
 		invoiceAmount,
-		receiverIDPubKey,
+		receiverIdentityPubKey,
 		req.FeeSats,
 		req.Reason,
 		true,
@@ -1019,8 +1007,8 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		req.Transfer.TransferId,
 		st.TransferTypePreimageSwap,
 		req.Transfer.ExpiryTime.AsTime(),
-		ownerIDPubKey,
-		receiverIDPubKey,
+		ownerIdentityPubKey,
+		receiverIdentityPubKey,
 		cpfpLeafRefundMap,
 		directLeafRefundMap,
 		directFromCpfpLeafRefundMap,
@@ -1048,7 +1036,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		req.Transfer.DirectFromCpfpLeavesToSend,
 		transfer,
 		status,
-		receiverIDPubKey,
+		receiverIdentityPubKey,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store user signed transactions for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID.String(), err)
@@ -1177,18 +1165,20 @@ func (h *LightningHandler) UpdatePreimageRequest(ctx context.Context, req *pbint
 	if err != nil {
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
+	reqIdentityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
+	if err != nil {
+		return fmt.Errorf("invalid identity public key: %w", err)
+	}
 
 	paymentHash := sha256.Sum256(req.Preimage)
 	preimageRequest, err := tx.PreimageRequest.Query().Where(
-		preimagerequest.And(
-			preimagerequest.PaymentHashEQ(paymentHash[:]),
-			preimagerequest.ReceiverIdentityPubkeyEQ(req.IdentityPublicKey),
-			preimagerequest.StatusEQ(st.PreimageRequestStatusWaitingForPreimage),
-		),
+		preimagerequest.PaymentHashEQ(paymentHash[:]),
+		preimagerequest.ReceiverIdentityPubkeyEQ(reqIdentityPubKey),
+		preimagerequest.StatusEQ(st.PreimageRequestStatusWaitingForPreimage),
 	).First(ctx)
 	if err != nil {
-		logger.Error("UpdatePreimageRequest: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(paymentHash[:]), "identityPublicKey", hex.EncodeToString(req.IdentityPublicKey))
-		return fmt.Errorf("UpdatePreimageRequest:unable to get preimage request: %w", err)
+		logger.Error("UpdatePreimageRequest: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(paymentHash[:]), "identityPublicKey", reqIdentityPubKey)
+		return fmt.Errorf("updatePreimageRequest: unable to get preimage request: %w", err)
 	}
 
 	err = preimageRequest.Update().SetStatus(st.PreimageRequestStatusPreimageShared).Exec(ctx)
@@ -1205,16 +1195,18 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
+	reqIdentityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
 
 	preimageRequest, err := tx.PreimageRequest.Query().Where(
-		preimagerequest.And(
-			preimagerequest.PaymentHashEQ(req.PaymentHash),
-			preimagerequest.ReceiverIdentityPubkeyEQ(req.IdentityPublicKey),
-			preimagerequest.StatusEQ(st.PreimageRequestStatusWaitingForPreimage),
-		),
+		preimagerequest.PaymentHashEQ(req.PaymentHash),
+		preimagerequest.ReceiverIdentityPubkeyEQ(reqIdentityPubKey),
+		preimagerequest.StatusEQ(st.PreimageRequestStatusWaitingForPreimage),
 	).First(ctx)
 	if err != nil {
-		logger.Error("QueryUserSignedRefunds: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", hex.EncodeToString(req.IdentityPublicKey))
+		logger.Error("QueryUserSignedRefunds: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", reqIdentityPubKey)
 		return nil, fmt.Errorf("QueryUserSignedRefunds: unable to get preimage request: %w", err)
 	}
 
@@ -1304,22 +1296,22 @@ func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pb.Provide
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-
-	// Validate preimage produces the correct payment hash
+	reqIdentityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
 	calculatedPaymentHash := sha256.Sum256(req.Preimage)
 	if !bytes.Equal(calculatedPaymentHash[:], req.PaymentHash) {
 		return nil, fmt.Errorf("invalid preimage")
 	}
 
 	preimageRequest, err := tx.PreimageRequest.Query().Where(
-		preimagerequest.And(
-			preimagerequest.PaymentHashEQ(req.PaymentHash),
-			preimagerequest.ReceiverIdentityPubkeyEQ(req.IdentityPublicKey),
-			preimagerequest.StatusIn(st.PreimageRequestStatusWaitingForPreimage, st.PreimageRequestStatusPreimageShared),
-		),
+		preimagerequest.PaymentHashEQ(req.PaymentHash),
+		preimagerequest.ReceiverIdentityPubkeyEQ(reqIdentityPubKey),
+		preimagerequest.StatusIn(st.PreimageRequestStatusWaitingForPreimage, st.PreimageRequestStatusPreimageShared),
 	).First(ctx)
 	if err != nil {
-		logger.Error("ProvidePreimage: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", hex.EncodeToString(req.IdentityPublicKey))
+		logger.Error("ProvidePreimage: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", reqIdentityPubKey)
 		return nil, fmt.Errorf("ProvidePreimage: unable to get preimage request: %w", err)
 	}
 
@@ -1451,12 +1443,12 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvideP
 // TODO(LIG-8166): Remove this public facing func and use the internal func instead
 func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.ReturnLightningPaymentRequest, internal bool) (*emptypb.Empty, error) {
 	logger := logging.GetLoggerFromContext(ctx)
+	reqUserIdentityPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
 	if !internal {
-		reqUserIDPubKey, err := keys.ParsePublicKey(req.UserIdentityPublicKey)
-		if err != nil {
-			return nil, fmt.Errorf("invalid identity public key: %w", err)
-		}
-		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqUserIDPubKey); err != nil {
+		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqUserIdentityPubKey); err != nil {
 			return nil, err
 		}
 	}
@@ -1471,14 +1463,12 @@ func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.R
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 	preimageRequest, err := tx.PreimageRequest.Query().Where(
-		preimagerequest.And(
-			preimagerequest.PaymentHashEQ(req.PaymentHash),
-			preimagerequest.ReceiverIdentityPubkeyEQ(req.UserIdentityPublicKey),
-			preimagerequest.StatusIn(preimageRequestStatuses...),
-		),
+		preimagerequest.PaymentHashEQ(req.PaymentHash),
+		preimagerequest.ReceiverIdentityPubkeyEQ(reqUserIdentityPubKey),
+		preimagerequest.StatusIn(preimageRequestStatuses...),
 	).First(ctx)
 	if err != nil {
-		logger.Error("ReturnLightningPayment: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", hex.EncodeToString(req.UserIdentityPublicKey))
+		logger.Error("ReturnLightningPayment: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", reqUserIdentityPubKey)
 		return nil, fmt.Errorf("ReturnLightningPayment: unable to get preimage request: %w", err)
 	}
 

@@ -7,7 +7,7 @@ import (
 	"entgo.io/ent/schema/index"
 )
 
-// Represents a reserve DKG key used to identify the entire Spark Entity.
+// EntityDkgKey represents a reserve DKG key used to identify the entire Spark Entity.
 // Should only have one entry and should stay immutable for the lifetime of the entity.
 type EntityDkgKey struct {
 	ent.Schema
