@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 
 	"github.com/lightsparkdev/spark/common/keys"
@@ -20,6 +21,7 @@ import (
 )
 
 // TODO: signcrypt or something from the sending SO (in h.config) to the recipient SO (specified in the message)
+const operatorIndexOffset = 1
 
 type FixKeyshareArgs struct {
 	badKeyshare   *ent.SigningKeyshare
@@ -204,22 +206,28 @@ func (h FixKeyshareHandler) createConfig(args FixKeyshareArgs) (*secretsharing.I
 
 	alphas := make(map[secretsharing.PartyIndex]*curve.Scalar)
 	for identifier, operator := range args.goodOperators {
-		// TODO: Don't hardcode the magic (+ 1) mapping
-		// TODO: Somehow avoid unsafe cast
-		alpha := curve.ScalarFromInt(uint32(operator.ID) + 1)
-
+		operatorId, err := operatorIndexFromID(operator.ID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid operator id: %w", err)
+		}
+		alpha := curve.ScalarFromInt(operatorId + operatorIndexOffset)
 		alphas[identifier] = &alpha
 	}
 
-	// TODO: Don't hardcode the magic (+ 1) mapping
-	// TODO: Somehow avoid unsafe cast
-	badAlpha := curve.ScalarFromInt(uint32(args.badOperator.ID) + 1)
-	alphas[args.badOperator.Identifier] = &badAlpha
+	badOperatorId, err := operatorIndexFromID(args.badOperator.ID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid bad operator id: %w", err)
+	}
+	alpha := curve.ScalarFromInt(badOperatorId + operatorIndexOffset)
+	alphas[args.badOperator.Identifier] = &alpha
 
+	if h.config.Threshold > math.MaxInt {
+		return nil, fmt.Errorf("config threshold value %d overflows int", h.config.Threshold)
+	}
 	config := secretsharing.IssueConfig{
 		IssueRequest: request,
 		Sid:          []byte("unused"),
-		T:            int(h.config.Threshold), // TODO: Somehow avoid unsafe cast
+		T:            int(h.config.Threshold),
 		Alphas:       alphas,
 	}
 
@@ -241,7 +249,10 @@ func (h FixKeyshareHandler) createSender(args FixKeyshareArgs) (*secretsharing.I
 	var pubShareEvals []polynomial.PointEval
 
 	for goodIdentifier, goodOperator := range args.goodOperators {
-		publicShareCompressed := args.badKeyshare.PublicShares[goodIdentifier]
+		publicShareCompressed, exists := args.badKeyshare.PublicShares[goodIdentifier]
+		if !exists {
+			return nil, fmt.Errorf("bad keyshare ID %s is not a known public share", goodIdentifier)
+		}
 
 		sharePubKey, err := keys.ParsePublicKey(publicShareCompressed)
 		if err != nil {
@@ -249,10 +260,14 @@ func (h FixKeyshareHandler) createSender(args FixKeyshareArgs) (*secretsharing.I
 		}
 
 		sharePoint := curve.NewPointFromPublicKey(sharePubKey)
+
+		goodOperatorId, err := operatorIndexFromID(goodOperator.ID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid good operator id: %w", err)
+		}
+
 		eval := polynomial.PointEval{
-			// TODO: Don't hardcode the magic (+ 1) mapping
-			// TODO: Somehow avoid unsafe cast
-			X: curve.ScalarFromInt(uint32(goodOperator.ID) + 1),
+			X: curve.ScalarFromInt(goodOperatorId + operatorIndexOffset),
 			Y: sharePoint,
 		}
 
@@ -428,10 +443,12 @@ func (h FixKeyshareHandler) updateWithFixed(ctx context.Context, outPayload *sec
 	// Recover the public shares.
 	pubShares := make(map[string]keys.Public)
 	for identifier, operator := range h.config.SigningOperatorMap {
-		// TODO: Don't hardcode the magic (+ 1) mapping
-		// TODO: Somehow avoid unsafe cast
-		alpha := curve.ScalarFromInt(uint32(operator.ID) + 1)
+		operatorId, err := operatorIndexFromID(operator.ID)
+		if err != nil {
+			return fmt.Errorf("invalid operator id: %w", err)
+		}
 
+		alpha := curve.ScalarFromInt(operatorId + operatorIndexOffset)
 		pubShare, err := pubSharesPoly.Eval(alpha).ToPublicKey()
 		if err != nil {
 			return fmt.Errorf("invalid public share: %w", err)
@@ -462,4 +479,12 @@ func (h FixKeyshareHandler) updateWithFixed(ctx context.Context, outPayload *sec
 	}
 
 	return nil
+}
+
+func operatorIndexFromID(operatorId uint64) (uint32, error) {
+	if operatorId > math.MaxUint32-operatorIndexOffset {
+		return 0, fmt.Errorf("operator ID %d overflows uint32 with offset", operatorId)
+	}
+
+	return uint32(operatorId), nil
 }
