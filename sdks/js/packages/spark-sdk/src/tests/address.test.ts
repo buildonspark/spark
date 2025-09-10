@@ -227,11 +227,23 @@ describe("Spark Invoice Encode/Decode", () => {
 describe("getNetworkFromSparkAddress", () => {
   test("REGTEST", () => {
     const network = getNetworkFromSparkAddress(
+      "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnxxdy83",
+    );
+    expect(network).toBe("REGTEST");
+  });
+  test("Legacy REGTEST", () => {
+    const network = getNetworkFromSparkAddress(
       "sprt1pgssx63fa5g6uyv450rajp5ndwy9laxzpsp9e37su58jddmcdsvhgm5n7y0ud6",
     );
     expect(network).toBe("REGTEST");
   });
   test("MAINNET", () => {
+    const network = getNetworkFromSparkAddress(
+      "spark1pgss9qg3vdslzmt2name9v550skuvlu6lj5xt9sly90k7p0gxughlqv023jqmc",
+    );
+    expect(network).toBe("MAINNET");
+  });
+  test("Legacy MAINNET", () => {
     const network = getNetworkFromSparkAddress(
       "sp1pgssxwh6hznfdc3c0cuqrhgttder539d52a0rqcf34amge69huh664gd2ew787",
     );
@@ -240,9 +252,29 @@ describe("getNetworkFromSparkAddress", () => {
 });
 
 describe("knownSparkAddress", () => {
+  test("spark address encodes known identity public key", () => {
+    const address =
+      "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnxxdy83";
+    const network = getNetworkFromSparkAddress(address);
+    expect(network).toBe("REGTEST");
+    const decoded = decodeSparkAddress(address, network);
+    expect(decoded.identityPublicKey).toBe(
+      "0353908bac090ba741de6147a540a665537006911590f93249b2823dbe187d3213",
+    );
+  });
+  test("legacy spark address encodes known identity public key", () => {
+    const address =
+      "sprt1pgssx63fa5g6uyv450rajp5ndwy9laxzpsp9e37su58jddmcdsvhgm5n7y0ud6";
+    const network = getNetworkFromSparkAddress(address);
+    expect(network).toBe("REGTEST");
+    const decoded = decodeSparkAddress(address, network);
+    expect(decoded.identityPublicKey).toBe(
+      "036a29ed11ae1195a3c7d906936b885ff4c20c025cc7d0e50f26b7786c19746e93",
+    );
+  });
   test("known spark address decodes and encodes to the same address", () => {
     const address =
-      "sprt1pgss8stv8nfkamyea7mtc8werley55anfnnpgtnglff0wmxwm52mkyk6zfeqsqgjzqqe3dvr6e48l2alnpagf7ny3vlj5pr5v4ehgv3pqwd7wxx3awkku9p3epk73na6hcf9220h8kue2tmlkqx8tcrfpsf5ywsvpzgd9px9qcgvpzy8ecp35fg2yq4r39r4njq3slgcul7laarh9sndex9uejz7vwrcrz4g7n4egvwt5yspvsdyped46sflczvrzh0jzksgqnvaqlk02cz4vkwjrkwuep9zsrz5vmjp7mqxq7762tfjczy07at2fvzd7cgk2sqsxrmqdxnpy464rmq2nzdqzpuhme";
+      "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnzffssqgjzqqejta89sa8su5f05g0vunfzzkj5zr5v4ehgnt9d4hnyggr2wgghtqfpwn5rhnpg7j5pfn92dcqdyg4jrunyjdjsg7muxraxgfn5zcgs8dcr3sxzrqdetshygps36q8rfqg49d0p0447trnpyxh9f76kt9cwrfx4342jym5emx049chkfsz6j9qc0z8cl7ymmsckx42k76c2qm5f5n5kfvyd26x78eyw0ygs502vg42n8ls";
     const decoded = bech32mDecode(address as SparkAddressFormat);
     const payload = SparkAddress.decode(bech32m.fromWords(decoded.words));
 
@@ -262,40 +294,39 @@ describe("knownSparkAddress", () => {
 
   test("known spark address decodes to expected fields", () => {
     const address =
-      "sprt1pgss8stv8nfkamyea7mtc8werley55anfnnpgtnglff0wmxwm52mkyk6zfeqsqgjzqqe3dvr6e48l2alnpagf7ny3vl35fg2yq4r39r4njq3slgcul7laarh9sndex9uejz7vwrcrz4g7n4egvwt5yspvs4qgar9wd6ryggrn0n3350t44hpgvwgdh5vlw47zf2jnaeahx2j7lasp367q6gvzdpr5rqgjrfgf3gxzrqg3p7wqvdyped46sflczvrzh0jzksgqnvaqlk02cz4vkwjrkwuep9zsrz5vmjp7mqxq7762tfjczy07at2fvzd7cgk2sqsxrmqdxnpy464rmq2nzdqneal34";
-
+      "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnzfmssqgjzqqejtaxmwj8ms9rn58574nvlq4j5zr5v4ehgnt9d4hnyggr2wgghtqfpwn5rhnpg7j5pfn92dcqdyg4jrunyjdjsg7muxraxgfn5rqgandgr3sxzrqdmew8qydzvz3qpylysylkgcaw9vpm2jzspls0qtr5kfmlwz244rvuk25w5w2sgc2pyqsraqdyp8tf57a6cn2egttaas9ms3whssenmjqt8wag3lgyvdzjskfeupt8xwwdx4agxdm9f0wefzj28jmdxqeudwcwdj9vfl9sdr65x06r0tasf5fwz2";
     const decoded = decodeSparkAddress(address, "REGTEST");
 
     expect(decoded.network).toBe("REGTEST");
     expect(decoded.identityPublicKey).toBe(
-      "03c16c3cd36eec99efb6bc1dd91ff24a53b34ce6142e68fa52f76ccedd15bb12da",
+      "0353908bac090ba741de6147a540a665537006911590f93249b2823dbe187d3213",
     );
 
     const f = decoded.sparkInvoiceFields!;
     expect(f.version).toBe(1);
-    expect(f.id).toBe("0198b583-d66a-7fab-bf98-7a84fa648b3f");
+    expect(f.id).toBe("01992fa6-dba4-7dc0-a39d-0f4f566cf82b");
 
     expect(f.paymentType?.type).toBe("tokens");
     expect(
       f.paymentType && "tokenIdentifier" in f.paymentType
         ? f.paymentType.tokenIdentifier
         : undefined,
-    ).toBe("2a3894759c81187d18e7fdfef4772c26dc98bccc85e6387818aa8f4eb9431cba");
+    ).toBe("093e4813f6463ae2b03b548500fe0f02c74b277f70955a8d9cb2a8ea39504614");
     expect(
       f.paymentType && "amount" in f.paymentType
         ? f.paymentType.amount
         : undefined,
-    ).toBe(100n);
+    ).toBe(1000n);
 
-    expect(f.memo).toBe("test");
+    expect(f.memo).toBe("testMemo");
     expect(f.senderPublicKey).toBe(
-      "039be718d1ebad6e1431c86de8cfbabe125529f73db9952f7fb00c75e0690c1342",
+      "0353908bac090ba741de6147a540a665537006911590f93249b2823dbe187d3213",
     );
 
-    expect(f.expiryTime?.toISOString()).toBe("2025-08-17T00:57:52.969Z");
+    expect(f.expiryTime?.toISOString()).toBe("2025-09-09T18:09:48.419Z");
 
     expect(decoded.signature).toBe(
-      "e5b5d413fc098315df215a0804d9d07ecf56055659d21d9dcc84a280c5466e41f6c0607bda52d32c088ff756a4b04df61165401030f6069a61257551ec0a989a",
+      "9d69a7bbac4d5942d7dec0bb845d784333dc80b3bba88fd046345285939e0567339cd357a8337654bdd948a4a3cb6d3033c6bb0e6c8ac4fcb068f5433f437afb",
     );
   });
 });

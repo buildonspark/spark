@@ -198,7 +198,7 @@ describe.each(TEST_CONFIGS)(
       expect(userBalance.balance).toBeGreaterThanOrEqual(tokenAmount);
     });
 
-    const tv1It = name.startsWith("TV1") ? it.skip : it.skip;
+    const tv1It = name.startsWith("TV1") ? it : it.skip;
     tv1It("should transfer tokens using spark invoices", async () => {
       const tokenAmount: bigint = 777n;
       const initialIssuerBalance = 100000n;
@@ -234,8 +234,9 @@ describe.each(TEST_CONFIGS)(
         expiryTime: new Date(Date.now() + 1000 * 60 * 60 * 24),
       });
 
-      const { tokenTransactionSuccess } =
+      const { tokenTransactionSuccess, tokenTransactionErrors } =
         await issuerWallet.fulfillSparkInvoice([{ invoice }]);
+      expect(tokenTransactionErrors.length).toBe(0);
       expect(tokenTransactionSuccess.length).toBe(1);
       expect(tokenTransactionSuccess[0].txid).toBeDefined();
       expect(tokenTransactionSuccess[0].txid.length).toBeGreaterThan(0);
@@ -309,12 +310,13 @@ describe.each(TEST_CONFIGS)(
         expiryTime: new Date(Date.now() + 1000 * 60 * 60 * 24),
       });
 
-      const { tokenTransactionSuccess } =
+      const { tokenTransactionSuccess, tokenTransactionErrors } =
         await issuerWallet.fulfillSparkInvoice([
           { invoice: invoice1 },
           { invoice: invoice2 },
           { invoice: invoice3 },
         ]);
+      expect(tokenTransactionErrors.length).toBe(0);
       expect(tokenTransactionSuccess.length).toBe(1);
       expect(tokenTransactionSuccess[0].txid).toBeDefined();
       expect(tokenTransactionSuccess[0].txid.length).toBeGreaterThan(0);
@@ -428,10 +430,11 @@ describe.each(TEST_CONFIGS)(
         expiryTime: null as unknown as Date,
       });
 
-      const { tokenTransactionSuccess } =
+      const { tokenTransactionSuccess, tokenTransactionErrors } =
         await issuerWallet.fulfillSparkInvoice([
           { invoice: nullExpiryInvoice },
         ]);
+      expect(tokenTransactionErrors.length).toBe(0);
       expect(tokenTransactionSuccess.length).toBe(1);
       expect(tokenTransactionSuccess[0].txid).toBeDefined();
       expect(tokenTransactionSuccess[0].txid.length).toBeGreaterThan(0);
@@ -485,10 +488,11 @@ describe.each(TEST_CONFIGS)(
           expiryTime: new Date(Date.now() + 1000 * 60 * 60 * 24),
         });
 
-        const { tokenTransactionSuccess } =
+        const { tokenTransactionSuccess, tokenTransactionErrors } =
           await issuerWallet.fulfillSparkInvoice([
             { invoice: invoiceWithoutAmount, amount: tokenAmount },
           ]);
+        expect(tokenTransactionErrors.length).toBe(0);
         expect(tokenTransactionSuccess.length).toBe(1);
         expect(tokenTransactionSuccess[0].txid).toBeDefined();
         expect(tokenTransactionSuccess[0].txid.length).toBeGreaterThan(0);
@@ -634,10 +638,10 @@ describe.each(TEST_CONFIGS)(
           tokenTransactionErrors,
           invalidInvoices,
         } = transferResults;
-        expect(satsTransactionSuccess.length).toBe(3); // one sats success per invoice
         expect(satsTransactionErrors.length).toBe(0);
-        expect(tokenTransactionSuccess.length).toBe(2); // two token assets - divided into two token transactions
         expect(tokenTransactionErrors.length).toBe(0);
+        expect(satsTransactionSuccess.length).toBe(3); // one sats success per invoice
+        expect(tokenTransactionSuccess.length).toBe(2); // two token assets - divided into two token transactions
         expect(invalidInvoices.length).toBe(0);
       },
     );

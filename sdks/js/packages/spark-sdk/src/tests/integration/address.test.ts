@@ -12,7 +12,7 @@ describe("address", () => {
   ])(
     ".seedOrMnemonic(%s)",
     (seedOrMnemonic) => {
-      test.each([["LOCAL", "spl", "bcrt"]])(
+      test.each([["LOCAL", "sparkl", "bcrt"]])(
         `.network(%s)`,
         async (network, sparkAddressPrefix, blockchainAddressPrefix) => {
           const options: ConfigOptions = {

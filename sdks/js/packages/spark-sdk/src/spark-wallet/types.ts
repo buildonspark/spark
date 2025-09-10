@@ -46,30 +46,29 @@ export type FulfillSparkInvoiceResponse = {
   }[];
   tokenTransactionSuccess: {
     tokenIdentifier: Bech32mTokenIdentifier;
+    invoices: SparkAddressFormat[];
     txid: string;
   }[];
   satsTransactionErrors: {
-    invoice: string;
+    invoice: SparkAddressFormat;
     error: Error;
   }[];
   tokenTransactionErrors: {
     tokenIdentifier: Bech32mTokenIdentifier;
+    invoices: SparkAddressFormat[];
     error: Error;
   }[];
-  invalidInvoices: {
-    invoice: string;
-    error: Error;
-  }[];
+  invalidInvoices: InvalidInvoice[];
 };
 
 export type TokenInvoice = {
-  invoice: string;
+  invoice: SparkAddressFormat;
   identifierHex: string;
   amount: bigint;
 };
 
 export type InvalidInvoice = {
-  invoice: string;
+  invoice: SparkAddressFormat;
   error: Error;
 };
 

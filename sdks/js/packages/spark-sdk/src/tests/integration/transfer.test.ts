@@ -1216,7 +1216,7 @@ describe.each(walletTypes)(
   ({ name, Signer, createTree }) => {
     jest.setTimeout(25_000);
 
-    it.skip(`${name} - test multiple valid transfers with invoice and nil amount invoice`, async () => {
+    it(`${name} - test multiple valid transfers with invoice and nil amount invoice`, async () => {
       const faucet = BitcoinFaucet.getInstance();
 
       const options: ConfigOptions = {
@@ -1390,7 +1390,7 @@ describe.each(walletTypes)(
         amount: 1_000,
         memo: "Test invoice",
         expiryTime: tomorrow,
-        senderPublicKey: await sdk2.getIdentityPublicKey(), // invalid sender public key - receiver as sender
+        senderSparkAddress: await sdk2.getSparkAddress(), // invalid sender public key - receiver as sender
       });
 
       const transferResults = await sdk.fulfillSparkInvoice([
@@ -1451,7 +1451,7 @@ describe.each(walletTypes)(
         amount: 1_000,
         memo: "Test invoice",
         expiryTime: yesterday,
-        senderPublicKey: await sdk.getIdentityPublicKey(),
+        senderSparkAddress: await sdk.getSparkAddress(),
       });
 
       const transferResults = await sdk.fulfillSparkInvoice([
@@ -1461,7 +1461,7 @@ describe.each(walletTypes)(
       expect(invalidInvoices.length).toBe(1);
     });
 
-    it.skip(`${name} - should error when paying the same invoice twice`, async () => {
+    it(`${name} - should error when paying the same invoice twice`, async () => {
       const faucet = BitcoinFaucet.getInstance();
 
       const options: ConfigOptions = {
@@ -1507,7 +1507,7 @@ describe.each(walletTypes)(
         amount: 1_000,
         memo: "Test invoice",
         expiryTime: tomorrow,
-        senderPublicKey: await sdk.getIdentityPublicKey(),
+        senderSparkAddress: await sdk.getSparkAddress(),
       });
 
       await sdk.fulfillSparkInvoice([{ invoice: invoice1000 }]);

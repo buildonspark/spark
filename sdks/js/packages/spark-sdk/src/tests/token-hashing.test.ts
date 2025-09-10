@@ -31,11 +31,11 @@ const TEST_OPERATOR_PUB_KEY = new Uint8Array([
 const TEST_INVOICE_ATTACHMENTS = [
   {
     sparkInvoice:
-      "sprt1pgssypkrjhrpzt2hw0ggrmndanmm035ley75nxu3gejaju4wx9nq86lwzfjqsqgjzqqe3zul2fm8a24y576t0ne2ehup5fg2yz4r6hxlhatyu9kpw09s2fk36ta5j0k85qascf6snpuy4sp0rp4ezyspvs4qgmt9d4hnyggzqmpet3s394th85ypaek7eaahc60uj02fnwg5vewew2hrzesra0hqflc0vn",
+      "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnzfmssqgjzqqejtaxmwj8ms9rn58574nvlq4j5zr5v4ehgnt9d4hnyggr2wgghtqfpwn5rhnpg7j5pfn92dcqdyg4jrunyjdjsg7muxraxgfn5rqgandgr3sxzrqdmew8qydzvz3qpylysylkgcaw9vpm2jzspls0qtr5kfmlwz244rvuk25w5w2sgc2pyqsraqdyp8tf57a6cn2egttaas9ms3whssenmjqt8wag3lgyvdzjskfeupt8xwwdx4agxdm9f0wefzj28jmdxqeudwcwdj9vfl9sdr65x06r0tasf5fwz2",
   },
   {
     sparkInvoice:
-      "sprt1pgssypkrjhrpzt2hw0ggrmndanmm035ley75nxu3gejaju4wx9nq86lwzf5ssqgjzqqe3zulcs6h42v0kqkdsv9utxyp5fs2yz4r6hxlhatyu9kpw09s2fk36ta5j0k85qascf6snpuy4sp0rp4ezyszq86z5zryd9nxvmt9d4hnyggzqmpet3s394th85ypaek7eaahc60uj02fnwg5vewew2hrzesra0hql7r5ne",
+      "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnzfmqsqgjzqqejtavuhf8n5uh9a74zw66kqaz5zr5v4ehgnt9d4hnyggr2wgghtqfpwn5rhnpg7j5pfn92dcqdyg4jrunyjdjsg7muxraxgfn5zcglrwcr3sxzzqt3wrjrgnq5gqf8eyp8ajx8t3tqw65s5q0urczca9jwlmsj4dgm89j4r4rj5zxzsfqyqlgrfqw9ucldgmfzs5zmkekj90thwzmn6ps55gdjnz23aarjkf245608yg0v2x6xdpdrz6m8xjlhtru0kygcu4zhqwlth9duadfqpruuzx4tc7fdckn",
   },
 ];
 
@@ -415,6 +415,7 @@ describe("hash token transaction", () => {
   });
 
   it("should produce the exact same hash for transfer v2 with invoice attachments", () => {
+    // this is a token hashing test. below would be an invalid transaction - outputs and invoices do not match.
     const tokenTransaction = {
       version: 2,
       tokenInputs: {
@@ -447,10 +448,9 @@ describe("hash token transaction", () => {
     };
 
     const hash = hashTokenTransactionV2(tokenTransaction, false);
-
     expect(Array.from(hash)).toEqual([
-      139, 4, 220, 112, 69, 32, 149, 81, 90, 67, 151, 101, 240, 182, 13, 123,
-      70, 4, 153, 159, 172, 225, 15, 120, 71, 219, 154, 27, 72, 167, 2, 149,
+      19, 39, 37, 63, 91, 26, 243, 192, 252, 18, 74, 19, 59, 241, 142, 11, 20,
+      6, 129, 246, 162, 133, 158, 123, 133, 98, 169, 100, 172, 163, 231, 32,
     ]);
   });
 });
