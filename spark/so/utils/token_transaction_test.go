@@ -96,8 +96,8 @@ var testData = testTokenTransactionData{
 	prevTxHash:       sha256.Sum256([]byte("previous transaction")),
 	tokenIdentifier:  bytes.Repeat([]byte{0x07}, 32),
 	invoiceAttachments: []*tokenpb.InvoiceAttachment{
-		{SparkInvoice: "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnzfmssqgjzqqejtaxmwj8ms9rn58574nvlq4j5zr5v4ehgnt9d4hnyggr2wgghtqfpwn5rhnpg7j5pfn92dcqdyg4jrunyjdjsg7muxraxgfn5rqgandgr3sxzrqdmew8qydzvz3qpylysylkgcaw9vpm2jzspls0qtr5kfmlwz244rvuk25w5w2sgc2pyqsraqdyp8tf57a6cn2egttaas9ms3whssenmjqt8wag3lgyvdzjskfeupt8xwwdx4agxdm9f0wefzj28jmdxqeudwcwdj9vfl9sdr65x06r0tasf5fwz2"},
-		{SparkInvoice: "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnzfmqsqgjzqqejtavuhf8n5uh9a74zw66kqaz5zr5v4ehgnt9d4hnyggr2wgghtqfpwn5rhnpg7j5pfn92dcqdyg4jrunyjdjsg7muxraxgfn5zcglrwcr3sxzzqt3wrjrgnq5gqf8eyp8ajx8t3tqw65s5q0urczca9jwlmsj4dgm89j4r4rj5zxzsfqyqlgrfqw9ucldgmfzs5zmkekj90thwzmn6ps55gdjnz23aarjkf245608yg0v2x6xdpdrz6m8xjlhtru0kygcu4zhqwlth9duadfqpruuzx4tc7fdckn"},
+		{SparkInvoice: "sprt1pgssypkrjhrpzt2hw0ggrmndanmm035ley75nxu3gejaju4wx9nq86lwzfjqsqgjzqqe3zul2fm8a24y576t0ne2ehuz5prdv4kk7v3pqgrv89wxzyk4wu7ss8hxmm8hklrfljfafxdez3n9m9e2uvtxq047ux39pgs2502um7l4vnskc9eukpfx68f0kjf7c7srkrp82zv8sjkq9uvxhygjq9jqlznxq7"},
+		{SparkInvoice: "sprt1pgssypkrjhrpzt2hw0ggrmndanmm035ley75nxu3gejaju4wx9nq86lwzf5ssqgjzqqe3zulcs6h42v0kqkdsv9utxyz5zryd9nxvmt9d4hnyggzqmpet3s394th85ypaek7eaahc60uj02fnwg5vewew2hrzesra0hp5fs2yz4r6hxlhatyu9kpw09s2fk36ta5j0k85qascf6snpuy4sp0rp4ezyszq86q75d2u6"},
 	},
 }
 
@@ -2243,8 +2243,7 @@ func TestHashTokenTransactionTransferV2(t *testing.T) {
 	hash, err := HashTokenTransactionV2(transferTransaction, false)
 	require.NoError(t, err)
 	want := []byte{
-		0xb0, 0x98, 0xdc, 0x22, 0x8a, 0xd, 0x82, 0x64, 0x25, 0x4a, 0x2d, 0xef, 0x34, 0x42, 0x5c, 0xab,
-		0xe2, 0x23, 0xd, 0x4f, 0x7b, 0xa4, 0x3c, 0xf2, 0xa3, 0x2c, 0x27, 0xf0, 0x31, 0xae, 0x8, 0x83,
+		0xf4, 0xa0, 0x71, 0xf0, 0x1, 0x1c, 0x54, 0xf1, 0x67, 0x58, 0x77, 0x3b, 0xd4, 0xf8, 0x61, 0x59, 0xa8, 0xe3, 0x82, 0x3a, 0x82, 0xff, 0x14, 0x67, 0xb8, 0x9f, 0xd2, 0xa6, 0xb7, 0xe6, 0x76, 0xec,
 	}
 	assert.Equal(t, want, hash)
 }

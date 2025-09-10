@@ -100,6 +100,7 @@ func DecodeSparkAddress(address string) (*DecodedSparkAddress, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	network := HrpToNetwork(hrp)
 	if network == Unspecified {
 		return nil, sparkerrors.InvalidUserInputErrorf("unknown network: %s", hrp)
@@ -258,10 +259,10 @@ func enforceCanonicalBytes(address string, decodedSparkAddr *pb.SparkAddress) er
 		return sparkerrors.InvalidUserInputErrorf("invoice does not adhere to canonical encoding: original: %s, re-encoded: %s", address, canonStr)
 	}
 
-	// The sparkl1 prefix for local invoices is not canonical and maps to regtest.
+	// The spl1 prefix for local invoices is not canonical and maps to regtest.
 	// Skip the check on the full string for local invoices.
 	lower := strings.ToLower(address)
-	if !strings.HasPrefix(lower, "sparkl1") && lower != canonStr {
+	if !strings.HasPrefix(lower, "spl1") && lower != canonStr {
 		return sparkerrors.InvalidUserInputErrorf(
 			"invoice does not adhere to canonical encoding: original: %s, re-encoded: %s",
 			address, canonStr,
@@ -311,15 +312,15 @@ func CreateSatsSparkInvoiceFields(id []byte, amount *uint64, memo *string, sende
 
 func HrpToNetwork(hrp string) Network {
 	switch hrp {
-	case "sparkl", "spl": // for local testing
+	case "spl": // for local testing
 		return Regtest
-	case "sparkrt", "sprt":
+	case "sprt":
 		return Regtest
-	case "sparkt", "spt":
+	case "spt":
 		return Testnet
-	case "sparks", "sps":
+	case "sps":
 		return Signet
-	case "spark", "sp":
+	case "sp":
 		return Mainnet
 	}
 	return Unspecified
@@ -328,13 +329,13 @@ func HrpToNetwork(hrp string) Network {
 func NetworkToHrp(network Network) (string, error) {
 	switch network {
 	case Regtest:
-		return "sparkrt", nil
+		return "sprt", nil
 	case Testnet:
-		return "sparkt", nil
+		return "spt", nil
 	case Signet:
-		return "sparks", nil
+		return "sps", nil
 	case Mainnet:
-		return "spark", nil
+		return "sp", nil
 	default:
 		return "", fmt.Errorf("unknown network: %v", network)
 	}
