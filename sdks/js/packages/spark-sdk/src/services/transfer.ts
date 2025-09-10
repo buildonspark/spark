@@ -21,7 +21,6 @@ import {
   ClaimLeafKeyTweak,
   ClaimTransferSignRefundsResponse,
   CounterLeafSwapResponse,
-  FinalizeTransferResponse,
   LeafRefundTxSigningJob,
   LeafRefundTxSigningResult,
   NodeSignatures,
@@ -68,7 +67,6 @@ import { getTransferPackageSigningPayload } from "../utils/transfer_package.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection.js";
 import { SigningService } from "./signing.js";
-import { SigningOperator } from "./wallet-config.js";
 const DEFAULT_EXPIRY_TIME = 10 * 60 * 1000;
 
 export type LeafKeyTweak = {
@@ -127,65 +125,6 @@ export class BaseTransferService {
     this.config = config;
     this.connectionManager = connectionManager;
     this.signingService = signingService;
-  }
-
-  async sendTransferTweakKey(
-    transfer: Transfer,
-    leaves: LeafKeyTweak[],
-    cpfpRefundSignatureMap: Map<string, Uint8Array>,
-    directRefundSignatureMap: Map<string, Uint8Array>,
-    directFromCpfpRefundSignatureMap: Map<string, Uint8Array>,
-  ): Promise<Transfer> {
-    const keyTweakInputMap = await this.prepareSendTransferKeyTweaks(
-      transfer.id,
-      transfer.receiverIdentityPublicKey,
-      leaves,
-      cpfpRefundSignatureMap,
-      directRefundSignatureMap,
-      directFromCpfpRefundSignatureMap,
-    );
-
-    let updatedTransfer: Transfer | undefined;
-
-    const coordinatorOperator =
-      this.config.getSigningOperators()[this.config.getCoordinatorIdentifier()];
-    if (!coordinatorOperator) {
-      throw new ValidationError("Coordinator operator not found", {
-        field: "coordinator",
-      });
-    }
-
-    for (const [identifier, operator] of Object.entries(
-      this.config.getSigningOperators(),
-    ).filter(([_, op]) => op.address !== this.config.getCoordinatorAddress())) {
-      updatedTransfer = await this.finalizeTransfer(
-        operator,
-        identifier,
-        keyTweakInputMap,
-        transfer,
-        updatedTransfer,
-      );
-    }
-
-    updatedTransfer = await this.finalizeTransfer(
-      coordinatorOperator,
-      this.config.getCoordinatorIdentifier(),
-      keyTweakInputMap,
-      transfer,
-      updatedTransfer,
-    );
-
-    if (!updatedTransfer) {
-      throw new ValidationError(
-        "No transfer response received from any operator",
-        {
-          field: "operators",
-          value: Object.keys(this.config.getSigningOperators()).length,
-        },
-      );
-    }
-
-    return updatedTransfer;
   }
 
   async deliverTransferPackage(
@@ -370,66 +309,6 @@ export class BaseTransferService {
     transferPackage.userSignature = new Uint8Array(signature);
 
     return transferPackage;
-  }
-
-  private async finalizeTransfer(
-    operator: SigningOperator,
-    identifier: string,
-    keyTweakInputMap: Map<string, SendLeafKeyTweak[]>,
-    transfer: Transfer,
-    updatedTransfer: Transfer | undefined,
-  ) {
-    const sparkClient = await this.connectionManager.createSparkClient(
-      operator.address,
-    );
-
-    const leavesToSend = keyTweakInputMap.get(identifier);
-    if (!leavesToSend) {
-      throw new ValidationError("No leaves to send for operator", {
-        field: "operator",
-        value: identifier,
-      });
-    }
-    let transferResp: FinalizeTransferResponse;
-
-    try {
-      transferResp = await sparkClient.finalize_transfer({
-        transferId: transfer.id,
-        ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
-        leavesToSend,
-      });
-    } catch (error) {
-      throw new NetworkError(
-        "Failed to finalize transfer",
-        {
-          method: "POST",
-        },
-        error as Error,
-      );
-    }
-
-    if (!updatedTransfer) {
-      updatedTransfer = transferResp.transfer;
-    } else {
-      if (!transferResp.transfer) {
-        throw new ValidationError("No transfer response from operator", {
-          field: "transfer",
-          value: transfer.id,
-        });
-      }
-
-      if (!this.compareTransfers(updatedTransfer, transferResp.transfer)) {
-        throw new ValidationError(
-          "Inconsistent transfer response from operators",
-          {
-            field: "transfer",
-            value: transfer.id,
-          },
-        );
-      }
-    }
-
-    return updatedTransfer;
   }
 
   async signRefunds(
@@ -739,36 +618,6 @@ export class TransferService extends BaseTransferService {
     signingService: SigningService,
   ) {
     super(config, connectionManager, signingService);
-  }
-
-  /**
-   * @deprecated Use sendTransferWithKeyTweaks instead
-   * Deprecated in v0.1.32
-   */
-  async sendTransfer(
-    leaves: LeafKeyTweak[],
-    receiverIdentityPubkey: Uint8Array,
-  ): Promise<Transfer> {
-    const {
-      transfer,
-      signatureMap,
-      directSignatureMap,
-      directFromCpfpSignatureMap,
-    } = await this.sendTransferSignRefund(
-      leaves,
-      receiverIdentityPubkey,
-      new Date(Date.now() + DEFAULT_EXPIRY_TIME),
-    );
-
-    const transferWithTweakedKeys = await this.sendTransferTweakKey(
-      transfer,
-      leaves,
-      signatureMap,
-      directSignatureMap,
-      directFromCpfpSignatureMap,
-    );
-
-    return transferWithTweakedKeys;
   }
 
   async claimTransfer(transfer: Transfer, leaves: LeafKeyTweak[]) {
