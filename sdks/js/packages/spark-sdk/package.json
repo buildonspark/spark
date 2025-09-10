@@ -13,7 +13,8 @@
   "files": [
     "dist",
     "src",
-    "android",
+    "android/src",
+    "android/build.gradle",
     "ios",
     "*.podspec",
     "CHANGELOG.md"
