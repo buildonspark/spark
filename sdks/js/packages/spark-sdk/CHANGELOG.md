@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.3.1
+
+### Patch Changes
+
+- - Temporarily revert address prefix change
+
 ## 0.3.0
 
 ### Minor Changes
