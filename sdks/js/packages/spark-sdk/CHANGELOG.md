@@ -1,5 +1,21 @@
 # @buildonspark/spark-sdk
 
+## 0.3.0
+
+### Minor Changes
+
+- - Update the spark address prefix to spark1
+  - Breaking: SparkWallet.fulfillSparkInvoice return type and multi-invoice support: returns FulfillSparkInvoiceResponse; supports sats and multiple token assets.
+    - Extends the functionality of fulfillSparkInvoice to support multiple concurrent sats transfers and add support for multiple fulfilling invoices for multiple assets. A user can pass as many invoices to fulfillSparkInvoice as they want and the function will attempt to fulfill all of them.
+    - For token transactions, it will batch the token transactions by token identifier.
+    - For sats transactions, it will pre-select the leaves, build the transfers, and send them all off to the SO concurrently.
+  - Create Spark invoices from the wallet
+    SparkWallet.createSatsInvoice(...), SparkWallet.createTokensInvoice(...)
+  - transfer(...) now throws if given a Spark invoice address, with guidance to use fulfillSparkInvoice
+  - Fix: Recover leaves if a transfer was already claimed
+  - Timelock sequence fix. Removed setting the 30th bit in sequence values; corrected locktime behavior
+  - Browser extension fixes: globalThis.crypto reference fix; globalThis.fetch now bound correctly
+
 ## 0.2.13
 
 ### Patch Changes
