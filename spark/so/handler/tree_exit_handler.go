@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/lightsparkdev/spark/common/keys"
 
@@ -27,6 +28,11 @@ type TreeExitHandler struct {
 	config *so.Config
 }
 
+type cachedRoot struct {
+	index int
+	value *ent.TreeNode
+}
+
 // NewTreeExitHandler creates a new TreeExitHandler.
 func NewTreeExitHandler(config *so.Config) *TreeExitHandler {
 	return &TreeExitHandler{config: config}
@@ -41,19 +47,34 @@ func (h *TreeExitHandler) ExitSingleNodeTrees(ctx context.Context, req *pb.ExitS
 		return nil, err
 	}
 
-	var trees []*ent.Tree
+	treeUUIDs := make([]uuid.UUID, len(req.ExitingTrees))
+	exitingTreeMap := make(map[uuid.UUID]*pb.ExitingTree, len(req.ExitingTrees))
 	var network *st.Network
-	for _, exitingTree := range req.ExitingTrees {
-		tree, err := h.validateSingleNodeTree(ctx, exitingTree.TreeId, reqOwnerIDPubKey)
+	for i, exitingTree := range req.ExitingTrees {
+		treeUUID, err := uuid.Parse(exitingTree.TreeId)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("unable to parse tree_id %s: %w", exitingTree.TreeId, err)
 		}
+
+		treeUUIDs[i] = treeUUID
+		exitingTreeMap[treeUUID] = exitingTree
+	}
+
+	trees, err := h.validateNodeTrees(ctx, treeUUIDs, req.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid node tree: %w", err)
+	}
+
+	// Perform ascending sorting to guarantee similar order of trees
+	sortTrees(trees)
+	req.ExitingTrees = sortExitingTrees(exitingTreeMap)
+
+	for _, tree := range trees {
 		if network == nil {
 			network = &tree.Network
 		} else if *network != tree.Network {
 			return nil, fmt.Errorf("all trees must be on the same network")
 		}
-		trees = append(trees, tree)
 	}
 
 	signingResults, err := h.signExitTransaction(ctx, req.ExitingTrees, req.RawTx, req.PreviousOutputs, trees)
@@ -141,12 +162,19 @@ func (h *TreeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 	}
 
 	var signingJobs []*helper.SigningJob
+	cachedRootsMap := make(map[uuid.UUID]*cachedRoot, len(exitingTrees))
 	for i, exitingTree := range exitingTrees {
 		tree := trees[i]
 		root, err := tree.GetRoot(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get root of tree %s: %w", tree.ID.String(), err)
 		}
+
+		cachedRootsMap[tree.ID] = &cachedRoot{
+			index: i,
+			value: root,
+		}
+
 		txSigHash, err := common.SigHashFromMultiPrevOutTx(tx, int(exitingTree.Vin), prevOuts)
 		if err != nil {
 			return nil, fmt.Errorf("unable to calculate sighash from tx: %w", err)
@@ -159,15 +187,18 @@ func (h *TreeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 		if err != nil {
 			return nil, err
 		}
+
 		jobID := uuid.New().String()
 		signingKeyshare, err := root.QuerySigningKeyshare().Only(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
 		}
+
 		rootVerifyingPubKey, err := keys.ParsePublicKey(root.VerifyingPubkey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse root verifying public key: %w", err)
 		}
+
 		signingJobs = append(
 			signingJobs,
 			&helper.SigningJob{
@@ -190,68 +221,97 @@ func (h *TreeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 	}
 
 	var pbSigningResults []*pb.ExitSingleNodeTreeSigningResult
-	for i, tree := range trees {
-		signingResultProto, err := jobIDToSigningResult[signingJobs[i].JobID].MarshalProto()
+	for id, root := range cachedRootsMap {
+		signingResultProto, err := jobIDToSigningResult[signingJobs[root.index].JobID].MarshalProto()
 		if err != nil {
 			return nil, err
 		}
-		root, err := tree.GetRoot(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get root of tree %s: %w", tree.ID.String(), err)
-		}
 		pbSigningResults = append(pbSigningResults, &pb.ExitSingleNodeTreeSigningResult{
-			TreeId:        tree.ID.String(),
+			TreeId:        id.String(),
 			SigningResult: signingResultProto,
-			VerifyingKey:  root.VerifyingPubkey,
+			VerifyingKey:  root.value.VerifyingPubkey,
 		})
 	}
+
 	return pbSigningResults, nil
 }
 
-func (h *TreeExitHandler) validateSingleNodeTree(ctx context.Context, treeID string, ownerIdentityPubKey keys.Public) (*ent.Tree, error) {
-	treeUUID, err := uuid.Parse(treeID)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse tree_id %s: %w", treeID, err)
-	}
-
+func (h *TreeExitHandler) validateNodeTrees(ctx context.Context, treeUUIDs []uuid.UUID, ownerIdentityPublicKey []byte) ([]*ent.Tree, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-	tree, err := db.Tree.
+	trees, err := db.Tree.
 		Query().
-		Where(enttree.ID(treeUUID)).
-		ForUpdate().
-		Only(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get tree %s: %w", treeID, err)
-	}
-
-	if tree.Status != st.TreeStatusAvailable && tree.Status != st.TreeStatusExited {
-		return nil, fmt.Errorf("tree %s is in a status not eligible to exit", treeID)
-	}
-
-	leaves, err := db.TreeNode.
-		Query().
-		Where(
-			enttreenode.HasTreeWith(enttree.ID(treeUUID)),
-			enttreenode.Not(enttreenode.HasChildren()),
-		).
+		Where(enttree.IDIn(treeUUIDs...)).
 		ForUpdate().
 		All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get leaves of tree %s: %w", treeID, err)
+		return nil, fmt.Errorf("unable to get trees %s: %w", treeUUIDs, err)
 	}
 
-	if len(leaves) != 1 {
-		return nil, fmt.Errorf("tree %s is not a single node tree", treeID)
-	}
-	if !bytes.Equal(leaves[0].OwnerIdentityPubkey, ownerIdentityPubKey.Serialize()) {
-		return nil, fmt.Errorf("not the owner of the tree %s", treeID)
-	}
-	if leaves[0].Status != st.TreeNodeStatusAvailable && leaves[0].Status != st.TreeNodeStatusExited {
-		return nil, fmt.Errorf("tree %s is not eligible for exit because leaf %s is in status %s", treeID, leaves[0].ID.String(), leaves[0].Status)
+	treeMap := make(map[string]struct{}, len(trees))
+	for _, tree := range trees {
+		_, ok := treeMap[tree.ID.String()]
+
+		if !ok {
+			treeMap[tree.ID.String()] = struct{}{}
+		} else {
+			return nil, fmt.Errorf("tree with id: %s, already exists", tree.ID.String())
+		}
+
+		if tree.Status != st.TreeStatusAvailable && tree.Status != st.TreeStatusExited {
+			return nil, fmt.Errorf("tree %s is in a status not eligible to exit", tree.ID.String())
+		}
+
+		leaves, err := db.TreeNode.
+			Query().
+			Where(
+				enttreenode.HasTreeWith(enttree.ID(tree.ID)),
+				enttreenode.Not(enttreenode.HasChildren()),
+			).
+			ForUpdate().
+			All(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get leaves of tree %s: %w", tree.ID.String(), err)
+		}
+
+		if len(leaves) != 1 {
+			return nil, fmt.Errorf("tree %s is not a single node tree", tree.ID.String())
+		}
+		if !bytes.Equal(leaves[0].OwnerIdentityPubkey, ownerIdentityPublicKey) {
+			return nil, fmt.Errorf("not the owner of the tree %s", tree.ID.String())
+		}
+
+		if leaves[0].Status != st.TreeNodeStatusAvailable && leaves[0].Status != st.TreeNodeStatusExited {
+			return nil, fmt.Errorf("tree %s is not eligible for exit because leaf %s is in status %s",
+				tree.ID.String(), leaves[0].ID.String(), leaves[0].Status)
+		}
 	}
 
-	return tree, nil
+	return trees, nil
+}
+
+func sortTrees(trees []*ent.Tree) {
+	slices.SortFunc(trees, func(a, b *ent.Tree) int {
+		return bytes.Compare(a.ID[:], b.ID[:])
+	})
+}
+
+func sortExitingTrees(treeMap map[uuid.UUID]*pb.ExitingTree) []*pb.ExitingTree {
+	treeKeys := make([]uuid.UUID, 0, len(treeMap))
+	for key := range treeMap {
+		treeKeys = append(treeKeys, key)
+	}
+
+	slices.SortFunc(treeKeys, func(a, b uuid.UUID) int {
+		return bytes.Compare(a[:], b[:])
+	})
+
+	sorted := make([]*pb.ExitingTree, len(treeMap))
+	for i, key := range treeKeys {
+		sorted[i] = treeMap[key]
+	}
+
+	return sorted
 }
