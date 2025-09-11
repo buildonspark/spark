@@ -17,3 +17,8 @@ func RequireGripMock(t testing.TB) {
 func GripMockEnabled() bool {
 	return os.Getenv("GRIPMOCK") == "true"
 }
+
+// PostgresTestsEnabled returns true if the SKIP_POSTGRES_TESTS environment variable is not set.
+func PostgresTestsEnabled() bool {
+	return os.Getenv("SKIP_POSTGRES_TESTS") != "true"
+}

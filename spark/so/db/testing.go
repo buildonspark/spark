@@ -20,6 +20,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/enttest"
 	"github.com/lightsparkdev/spark/so/knobs"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 	_ "github.com/mattn/go-sqlite3" // sqlite3 driver
 	"github.com/peterldowns/pgtestdb"
 	"github.com/peterldowns/pgtestdb/migrators/atlasmigrator"
@@ -96,6 +97,9 @@ var postgresPort string
 //
 // Then, in your actual tests, call [ConnectToTestPostgres].
 func StartPostgresServer() (stop func()) {
+	if !sparktesting.PostgresTestsEnabled() {
+		return func() {}
+	}
 	port, err := findFreePort()
 	if err != nil {
 		panic(err)
@@ -136,6 +140,10 @@ func findFreePort() (port int, err error) {
 // test database, fully migrated and ready for you to query. There's no need to manually close the returned values.
 func ConnectToTestPostgres(t testing.TB) (context.Context, *TestContext) {
 	t.Helper()
+	if !sparktesting.PostgresTestsEnabled() {
+		t.Skipf("skipping %s because it's a Postgres test and SKIP_POSTGRES_TESTS is true", t.Name())
+		return nil, nil
+	}
 	conf := pgtestdb.Config{
 		DriverName:                "pgx",
 		User:                      "postgres",
