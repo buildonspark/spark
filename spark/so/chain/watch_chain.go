@@ -768,7 +768,7 @@ func storeStaticDeposits(ctx context.Context, dbTx *ent.Tx, creditedAddresses []
 				if err != nil {
 					return fmt.Errorf("unable to store a new utxo: %w", err)
 				}
-				logger.Debug("Stored an L1 utxo to a static deposit address", "address", address.Address, "txid", hex.EncodeToString(txidBytes), "amount", utxo.amount)
+				logger.Debug("Stored an L1 utxo to a static deposit address", "address", address.Address, "txid", hex.EncodeToString(txidBytes), "vout", utxo.idx, "amount", utxo.amount)
 			}
 		}
 	}
