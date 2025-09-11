@@ -5,40 +5,24 @@ import {
   WalletConfig,
 } from "@buildonspark/spark-sdk";
 import { jest } from "@jest/globals";
-import { hexToBytes, bytesToHex } from "@noble/curves/utils";
+import { bytesToHex } from "@noble/curves/utils";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "@buildonspark/spark-sdk/test-utils";
 
-export const TOKENS_V0_SCHNORR_CONFIG: Required<ConfigOptions> = {
+export const TOKENS_SCHNORR_CONFIG: Required<ConfigOptions> = {
   ...WalletConfig.LOCAL,
-  tokenTransactionVersion: "V0",
   tokenSignatures: "SCHNORR",
 };
 
-export const TOKENS_V1_SCHNORR_CONFIG: Required<ConfigOptions> = {
-  ...WalletConfig.LOCAL,
-  tokenTransactionVersion: "V1",
-  tokenSignatures: "SCHNORR",
-};
-
-export const TOKENS_V0_ECDSA_CONFIG: Required<ConfigOptions> = {
+export const TOKENS_ECDSA_CONFIG: Required<ConfigOptions> = {
   ...WalletConfig.LOCAL,
   tokenSignatures: "ECDSA",
-  tokenTransactionVersion: "V0",
-};
-
-export const TOKENS_V1_ECDSA_CONFIG: Required<ConfigOptions> = {
-  ...WalletConfig.LOCAL,
-  tokenSignatures: "ECDSA",
-  tokenTransactionVersion: "V1",
 };
 
 const TEST_CONFIGS = [
-  { name: "TV0E", config: TOKENS_V0_ECDSA_CONFIG },
-  { name: "TV0S", config: TOKENS_V0_SCHNORR_CONFIG },
-  { name: "TV1E", config: TOKENS_V1_ECDSA_CONFIG },
-  { name: "TV1S", config: TOKENS_V1_SCHNORR_CONFIG },
+  { name: "TE", config: TOKENS_ECDSA_CONFIG },
+  { name: "TS", config: TOKENS_SCHNORR_CONFIG },
 ];
 
 const brokenTestFn = process.env.GITHUB_ACTIONS ? it.skip : it;

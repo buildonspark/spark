@@ -12,11 +12,7 @@ import {
   ValidationError,
   type ConfigOptions,
 } from "@buildonspark/spark-sdk";
-import {
-  OutputWithPreviousTransactionData,
-  TokenTransaction as TokenTransactionV0,
-} from "@buildonspark/spark-sdk/proto/spark";
-import { TokenTransaction } from "@buildonspark/spark-sdk/proto/spark_token";
+import { OutputWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
 import { bytesToHex, bytesToNumberBE, hexToBytes } from "@noble/curves/utils";
 import { TokenFreezeService } from "../services/freeze.js";
 import { IssuerTokenTransactionService } from "../services/token-transactions.js";
@@ -241,27 +237,18 @@ export class IssuerSparkWallet extends SparkWallet {
    * @returns The transaction ID of the mint operation
    */
   public async mintTokens(tokenAmount: bigint): Promise<string> {
-    let tokenTransaction: TokenTransactionV0 | TokenTransaction;
     const issuerTokenPublicKey = await super.getIdentityPublicKey();
     const issuerTokenPublicKeyBytes = hexToBytes(issuerTokenPublicKey);
 
     const tokenMetadata = await this.getIssuerTokenMetadata();
     const rawTokenIdentifier: Uint8Array = tokenMetadata.rawTokenIdentifier;
 
-    if (this.config.getTokenTransactionVersion() === "V0") {
-      tokenTransaction =
-        await this.issuerTokenTransactionService.constructMintTokenTransactionV0(
-          issuerTokenPublicKeyBytes,
-          tokenAmount,
-        );
-    } else {
-      tokenTransaction =
-        await this.issuerTokenTransactionService.constructMintTokenTransaction(
-          rawTokenIdentifier,
-          issuerTokenPublicKeyBytes,
-          tokenAmount,
-        );
-    }
+    const tokenTransaction =
+      await this.issuerTokenTransactionService.constructMintTokenTransaction(
+        rawTokenIdentifier,
+        issuerTokenPublicKeyBytes,
+        tokenAmount,
+      );
 
     return await this.issuerTokenTransactionService.broadcastTokenTransaction(
       tokenTransaction,

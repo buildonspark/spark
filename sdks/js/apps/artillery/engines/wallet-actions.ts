@@ -180,7 +180,6 @@ export class WalletActions {
                 | "SIGNET"
                 | "LOCAL",
               threshold: 3,
-              tokenTransactionVersion: "V1" as const,
               tokenSignatures: "SCHNORR" as const,
             },
           }),

@@ -392,7 +392,6 @@ export async function beforeTest(
               options: {
                 network,
                 threshold: 3, // Set threshold to match the number of operators
-                tokenTransactionVersion: "V1" as const,
                 tokenSignatures: "SCHNORR" as const,
               },
             });

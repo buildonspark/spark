@@ -14,7 +14,6 @@ describe.each(walletTypes)(
       const userWallet = await SparkWalletTesting.initialize({
         options: {
           network: "LOCAL",
-          tokenTransactionVersion: "V1",
         },
         signer: new Signer(),
       });

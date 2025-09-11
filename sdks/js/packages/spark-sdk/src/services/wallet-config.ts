@@ -108,7 +108,6 @@ export type ConfigOptions = MayHaveSspClientOptions & {
   readonly threshold?: number;
   readonly tokenSignatures?: "ECDSA" | "SCHNORR";
   readonly tokenValidityDurationSeconds?: number;
-  readonly tokenTransactionVersion?: "V0" | "V1";
   readonly electrsUrl?: string;
   readonly sspClientOptions?: SspClientOptions;
   readonly expectedWithdrawBondSats?: number;
@@ -135,7 +134,6 @@ const BASE_CONFIG: Required<ConfigOptions> = {
   threshold: 2,
   signingOperators: getLocalSigningOperators(),
   tokenSignatures: "SCHNORR",
-  tokenTransactionVersion: "V1",
   tokenValidityDurationSeconds: 180,
   electrsUrl: getElectrsUrl("LOCAL"),
   expectedWithdrawBondSats: 10000,
