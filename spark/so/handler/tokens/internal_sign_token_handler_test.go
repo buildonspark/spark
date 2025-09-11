@@ -30,10 +30,7 @@ func setupInternalSignTokenTestHandler(t *testing.T) (*InternalSignTokenHandler,
 
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	t.Cleanup(dbCtx.Close)
-
+	ctx, _ := db.NewTestSQLiteContext(t)
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 

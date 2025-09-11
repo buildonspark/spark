@@ -2,7 +2,6 @@ package grpctest
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
@@ -261,12 +260,8 @@ func TestStaticDepositSSPLegacy(t *testing.T) {
 
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)
+	ctx, dbCtx := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
-	ctx, dbCtx, err := db.NewTestContext(t, t.Context(), config.DatabaseDriver(), config.DatabasePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer dbCtx.Close()
 	schemaNetwork, err := common.SchemaNetworkFromProtoNetwork(pb.Network_REGTEST)
 	require.NoError(t, err)
 
@@ -863,29 +858,21 @@ func TestStaticDepositSSP(t *testing.T) {
 		t.Run("Verify spend tx can be broadcasted", func(t *testing.T) {
 			config, err := sparktesting.TestConfig()
 			require.NoError(t, err)
-
-			ctx, cancel := context.WithCancel(t.Context())
-			defer cancel()
-
-			_, dbCtx, err := db.NewTestContext(t, ctx, config.DatabaseDriver(), config.DatabasePath)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer dbCtx.Close()
+			_, dbTx := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 			schemaNetwork, err := common.SchemaNetworkFromProtoNetwork(pb.Network_REGTEST)
 			require.NoError(t, err)
 
 			depositTxID, err := hex.DecodeString(spendTx.TxIn[0].PreviousOutPoint.Hash.String())
 			require.NoError(t, err)
-			targetUtxo, err := dbCtx.Client.Utxo.Query().
+			targetUtxo, err := dbTx.Client.Utxo.Query().
 				Where(utxo.NetworkEQ(schemaNetwork)).
 				Where(utxo.Txid(depositTxID)).
 				Where(utxo.Vout(depositOutPoint.Index)).
 				Only(aliceCtx)
 			require.NoError(t, err)
 
-			utxoSwap, err := dbCtx.Client.UtxoSwap.Query().Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).Only(aliceCtx)
+			utxoSwap, err := dbTx.Client.UtxoSwap.Query().Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).Only(aliceCtx)
 			require.NoError(t, err)
 			assert.Equal(t, st.UtxoSwapStatusCompleted, utxoSwap.Status)
 			dbTransferSspToAlice, err := utxoSwap.QueryTransfer().Only(aliceCtx)

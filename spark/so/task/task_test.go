@@ -22,8 +22,7 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 		_, _ = seededRand.Read(b)
 		return b
 	}
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)

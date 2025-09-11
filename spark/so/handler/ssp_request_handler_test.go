@@ -19,8 +19,7 @@ import (
 )
 
 func TestGetStuckLightningPayments(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
 
 	config := &so.Config{

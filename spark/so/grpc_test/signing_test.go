@@ -32,9 +32,7 @@ func TestFrostSign(t *testing.T) {
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)
 
-	ctx, dbCtx, err := db.NewTestContext(t, t.Context(), config.DatabaseDriver(), config.DatabasePath)
-	require.NoError(t, err)
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 	msg := []byte("hello")
 	msgHash := sha256.Sum256(msg)
@@ -190,9 +188,7 @@ func TestFrostWithoutUserSign(t *testing.T) {
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)
 
-	ctx, dbCtx, err := db.NewTestContext(t, t.Context(), config.DatabaseDriver(), config.DatabasePath)
-	require.NoError(t, err)
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 	msg := []byte("hello")
 	msgHash := sha256.Sum256(msg)
@@ -269,9 +265,7 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)
 
-	ctx, dbCtx, err := db.NewTestContext(t, t.Context(), config.DatabaseDriver(), config.DatabasePath)
-	require.NoError(t, err)
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 	// Step 2: Get operator key share
 	operatorKeyShares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
@@ -381,9 +375,7 @@ func TestFrostRound1(t *testing.T) {
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)
 
-	ctx, dbCtx, err := db.NewTestContext(t, t.Context(), config.DatabaseDriver(), config.DatabasePath)
-	require.NoError(t, err)
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 	operatorKeyShares, err := ent.GetUnusedSigningKeyshares(ctx, config, 5)
 	require.NoError(t, err)
@@ -418,9 +410,7 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)
 
-	ctx, dbCtx, err := db.NewTestContext(t, t.Context(), config.DatabaseDriver(), config.DatabasePath)
-	require.NoError(t, err)
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 	msg := []byte("hello")
 	msgHash := sha256.Sum256(msg)

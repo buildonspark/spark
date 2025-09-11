@@ -2,10 +2,11 @@ package tree_test
 
 import (
 	"context"
-	"github.com/lightsparkdev/spark/common/keys"
 	"math/rand/v2"
 	"strings"
 	"testing"
+
+	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/lightsparkdev/spark/proto/spark"
@@ -192,8 +193,7 @@ func TestGetLeafDenominationCounts(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-			defer dbCtx.Close()
+			ctx, _ := db.NewTestSQLiteContext(t)
 
 			seedTreeNode(t, ctx, st.NetworkMainnet, tc.nodes...)
 

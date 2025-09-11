@@ -62,9 +62,7 @@ func TestNewTreeCreationHandler(t *testing.T) {
 }
 
 func TestFindParentOutputFromUtxo(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
-
+	ctx, _ := db.NewTestSQLiteContext(t)
 	handler := createTestHandler()
 	testTx := createTestTx()
 
@@ -145,13 +143,8 @@ func TestFindParentOutputFromUtxo(t *testing.T) {
 
 func TestFindParentOutputFromNodeOutput(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
-
+	ctx, _ := db.NewTestSQLiteContext(t)
 	handler := createTestHandler()
-
-	// Setup test data
 	dbTX, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
@@ -161,7 +154,6 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 	signingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	verifyingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 
-	// Create a signing keyshare
 	signingKeyshare, err := dbTX.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
 		SetSecretShare(keysharePrivKey.Serialize()).
@@ -288,9 +280,7 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 }
 
 func TestFindParentOutputFromPrepareTreeAddressRequest(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
-
+	ctx, _ := db.NewTestSQLiteContext(t)
 	handler := createTestHandler()
 	testTx := createTestTx()
 	txBuf, err := common.SerializeTx(testTx)
@@ -347,9 +337,7 @@ func TestFindParentOutputFromPrepareTreeAddressRequest(t *testing.T) {
 }
 
 func TestFindParentOutputFromCreateTreeRequest(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
-
+	ctx, _ := db.NewTestSQLiteContext(t)
 	handler := createTestHandler()
 	testTx := createTestTx()
 	txBuf, err := common.SerializeTx(testTx)
@@ -406,9 +394,7 @@ func TestFindParentOutputFromCreateTreeRequest(t *testing.T) {
 }
 
 func TestGetSigningKeyshareFromOutput_Invalid_Errors(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
-
+	ctx, _ := db.NewTestSQLiteContext(t)
 	handler := createTestHandler()
 
 	tests := []struct {
@@ -445,10 +431,7 @@ func TestGetSigningKeyshareFromOutput_Invalid_Errors(t *testing.T) {
 
 func TestValidateAndCountTreeAddressNodes(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
-
+	ctx, _ := db.NewTestSQLiteContext(t)
 	handler := createTestHandler()
 
 	parentPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -511,12 +494,8 @@ func TestValidateAndCountTreeAddressNodes(t *testing.T) {
 
 func TestCreatePrepareTreeAddressNodeFromAddressNode(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
-
+	ctx, _ := db.NewTestSQLiteContext(t)
 	handler := createTestHandler()
-
 	privKey := keys.MustGeneratePrivateKeyFromRand(rng)
 
 	tests := []struct {
@@ -566,13 +545,8 @@ func TestCreatePrepareTreeAddressNodeFromAddressNode(t *testing.T) {
 
 func TestUpdateParentNodeStatus(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
-
+	ctx, _ := db.NewTestSQLiteContext(t)
 	handler := createTestHandler()
-
-	// Setup test data
 	dbTX, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
@@ -582,7 +556,6 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	signingPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
 	verifyingPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
 
-	// Create a signing keyshare
 	signingKeyshare, err := dbTX.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
 		SetSecretShare(keysharePrivkey.Serialize()).
@@ -728,9 +701,7 @@ func TestCreateTestHelpers(t *testing.T) {
 }
 
 func TestEdgeCases(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
-
+	ctx, _ := db.NewTestSQLiteContext(t)
 	handler := createTestHandler()
 
 	t.Run("findParentOutputFromUtxo with malformed transaction", func(t *testing.T) {
@@ -763,12 +734,8 @@ func TestEdgeCases(t *testing.T) {
 // Regression test for https://linear.app/lightsparkdev/issue/LIG-8038
 func TestPrepareSigningJobs_EnsureConfTxidMatchesUtxoId(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
-
+	ctx, _ := db.NewTestSQLiteContext(t)
 	handler := createTestHandler()
-
 	dbTX, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
@@ -911,15 +878,11 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := t.Context()
-
-			ctx, dbCtx := db.NewTestSQLiteContext(t, ctx)
-			defer dbCtx.Close()
-
-			handler := createTestHandler()
-
+			ctx, _ := db.NewTestSQLiteContext(t)
 			dbTx, err := ent.GetDbFromContext(ctx)
 			require.NoError(t, err)
+
+			handler := createTestHandler()
 
 			keysharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
 			publicSharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)

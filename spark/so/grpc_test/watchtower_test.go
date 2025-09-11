@@ -51,11 +51,7 @@ func TestTimelockExpirationHappyPath(t *testing.T) {
 	}
 	require.LessOrEqual(t, getCurrentTimelock(rootNode), int64(spark.TimeLockInterval*2))
 
-	ctx, dbCtx, err := db.NewTestContext(t, t.Context(), config.DatabaseDriver(), config.DatabasePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer dbCtx.Close()
+	ctx, dbCtx := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 	// Broadcast the node transaction
 	nodeTx, err := common.TxFromRawTxBytes(rootNode.GetNodeTx())
@@ -238,11 +234,7 @@ func TestTimelockExpirationTransferredNode(t *testing.T) {
 		return int64(tx.TxIn[0].Sequence & 0xFFFF)
 	}
 
-	ctx, dbCtx, err := db.NewTestContext(t, t.Context(), config.DatabaseDriver(), config.DatabasePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer dbCtx.Close()
+	ctx, dbCtx := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 	// Serialize the node transaction for database queries
 	nodeTx, err := common.TxFromRawTxBytes(transferredNode.GetNodeTx())
@@ -391,11 +383,7 @@ func TestTimelockExpirationMultiLevelTree(t *testing.T) {
 	}
 	require.LessOrEqual(t, getCurrentTimelock(leafNode.NodeTx), int64(spark.TimeLockInterval*2))
 
-	ctx, dbCtx, err := db.NewTestContext(t, t.Context(), config.DatabaseDriver(), config.DatabasePath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer dbCtx.Close()
+	ctx, dbCtx := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 	// Serialize transactions for database queries
 	rootNodeTx, err := common.TxFromRawTxBytes(rootNode.GetNodeTx())
@@ -664,9 +652,7 @@ func TestTimelockExpirationAfterLightningTransfer(t *testing.T) {
 	}
 	require.LessOrEqual(t, getCurrentTimelock(transferredNode.RefundTx), int64(spark.TimeLockInterval*2))
 
-	ctx, dbCtx, err := db.NewTestContext(t, t.Context(), config.DatabaseDriver(), config.DatabasePath)
-	require.NoError(t, err)
-	defer dbCtx.Close()
+	ctx, dbCtx := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 	// Serialize the node transaction for database queries
 	nodeTx, err := common.TxFromRawTxBytes(transferredNode.GetNodeTx())

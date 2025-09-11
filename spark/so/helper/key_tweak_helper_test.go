@@ -19,8 +19,7 @@ import (
 )
 
 func TestTweakLeafKey(t *testing.T) {
-	ctx, client := db.NewTestSQLiteContext(t, t.Context())
-	defer client.Close()
+	ctx, client := db.NewTestSQLiteContext(t)
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 	rng := rand.NewChaCha8([32]byte{})
@@ -119,8 +118,7 @@ func TestTweakLeafKey(t *testing.T) {
 }
 
 func TestTweakLeafKey_EmptySecretShareTweakProofsList(t *testing.T) {
-	ctx, client := db.NewTestSQLiteContext(t, t.Context())
-	defer client.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 

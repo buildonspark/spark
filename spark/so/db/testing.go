@@ -43,7 +43,7 @@ type TestContext struct {
 	databasePath string
 }
 
-func (tc *TestContext) Close() {
+func (tc *TestContext) close() {
 	if tc.Session.currentTx != nil {
 		if tc.t.Failed() {
 			if err := tc.Session.currentTx.Rollback(); err != nil {
@@ -61,26 +61,29 @@ func (tc *TestContext) Close() {
 	}
 }
 
-func NewTestContext(t *testing.T, ctx context.Context, driver string, path string) (context.Context, *TestContext, error) {
+func NewTestContext(tb testing.TB, driver string, path string) (context.Context, *TestContext) {
+	tb.Helper()
 	dbClient, err := ent.Open(driver, path)
-	if err != nil {
-		return nil, nil, err
-	}
+	require.NoError(tb, err, "failed to open database connection")
 
-	dbSession := NewDefaultSessionFactory(dbClient).NewSession(ctx)
-	return ent.Inject(ctx, dbSession), &TestContext{t: t, Client: dbClient, Session: dbSession, databasePath: path}, nil
+	dbSession := NewDefaultSessionFactory(dbClient).NewSession(tb.Context())
+	tc := &TestContext{t: tb, Client: dbClient, Session: dbSession, databasePath: path}
+	tb.Cleanup(tc.close)
+	return ent.Inject(tb.Context(), dbSession), tc
 }
 
 const sqlitePath = "file:ent?mode=memory&_fk=1"
 
-func NewTestSQLiteContext(t *testing.T, ctx context.Context) (context.Context, *TestContext) {
-	dbClient := NewTestSQLiteClient(t)
-	session := NewSession(ctx, dbClient)
-	return ent.Inject(ctx, session), &TestContext{t: t, Client: dbClient, Session: session, databasePath: sqlitePath}
+func NewTestSQLiteContext(tb testing.TB) (context.Context, *TestContext) {
+	dbClient := NewTestSQLiteClient(tb)
+	session := NewSession(tb.Context(), dbClient)
+	tc := &TestContext{t: tb, Client: dbClient, Session: session, databasePath: sqlitePath}
+	tb.Cleanup(tc.close)
+	return ent.Inject(tb.Context(), session), tc
 }
 
-func NewTestSQLiteClient(t *testing.T) *ent.Client {
-	return enttest.Open(t, "sqlite3", sqlitePath)
+func NewTestSQLiteClient(tb testing.TB) *ent.Client {
+	return enttest.Open(tb, "sqlite3", sqlitePath)
 }
 
 var postgresPort string
@@ -167,7 +170,7 @@ func ConnectToTestPostgres(t testing.TB) (context.Context, *TestContext) {
 	ctx := t.Context()
 	session := NewSession(ctx, client)
 	tc := &TestContext{t: t, Client: client, Session: session, databasePath: dbConn.URL()}
-	t.Cleanup(tc.Close)
+	t.Cleanup(tc.close)
 	return ent.Inject(ctx, session), tc
 }
 

@@ -18,9 +18,7 @@ import (
 func TestTimeoutMiddleware_TestSlowTask(t *testing.T) {
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	timeout := 200 * time.Millisecond
 	task := BaseTaskSpec{
@@ -46,9 +44,7 @@ func TestTimeoutMiddleware_TestSlowTask(t *testing.T) {
 func TestTimeoutMiddleware_TestTaskFinishes(t *testing.T) {
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	timeout := 10 * time.Second
 	task := BaseTaskSpec{
@@ -74,9 +70,7 @@ func TestTimeoutMiddleware_TestTaskFinishes(t *testing.T) {
 func TestTimeoutMiddleware_TestContextCancelled(t *testing.T) {
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	timeout := 10 * time.Second
 	task := BaseTaskSpec{
@@ -298,9 +292,7 @@ func TestDatabaseMiddleware_TestTaskCanCommitTransaction(t *testing.T) {
 func TestPanicRecoveryInterceptor_TestNoPanic(t *testing.T) {
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	task := BaseTaskSpec{
 		Name:    "Test",
@@ -319,9 +311,7 @@ func TestPanicRecoveryInterceptor_TestNoPanic(t *testing.T) {
 func TestPanicRecoveryInterceptor_TestPanic(t *testing.T) {
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	task := BaseTaskSpec{
 		Name:    "Test",

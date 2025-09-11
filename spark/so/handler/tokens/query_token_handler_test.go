@@ -25,7 +25,6 @@ type queryTokenTestFixture struct {
 	Handler *QueryTokenHandler
 	Ctx     context.Context
 	Tx      *ent.Tx
-	Cleanup func()
 }
 
 func setUpQueryTokenTestHandler(t *testing.T) *queryTokenTestFixture {
@@ -33,8 +32,7 @@ func setUpQueryTokenTestHandler(t *testing.T) *queryTokenTestFixture {
 
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)
-
-	ctx, dbContext := db.NewTestSQLiteContext(t, t.Context())
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	handler := &QueryTokenHandler{
 		config:                     config,
@@ -44,7 +42,6 @@ func setUpQueryTokenTestHandler(t *testing.T) *queryTokenTestFixture {
 	return &queryTokenTestFixture{
 		Handler: handler,
 		Ctx:     ctx,
-		Cleanup: dbContext.Close,
 	}
 }
 
@@ -102,8 +99,6 @@ func createTestTokenOutputs(t *testing.T, ctx context.Context, tx *ent.Tx, count
 
 func TestExpiredOutputBeforeFinalization(t *testing.T) {
 	setup := setUpQueryTokenTestHandler(t)
-	defer setup.Cleanup()
-
 	handler := setup.Handler
 	ctx := setup.Ctx
 
@@ -234,8 +229,6 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 
 func TestQueryTokenOutputsPagination(t *testing.T) {
 	setup := setUpQueryTokenTestHandler(t)
-	defer setup.Cleanup()
-
 	handler := setup.Handler
 	ctx := setup.Ctx
 

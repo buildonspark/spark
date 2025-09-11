@@ -31,9 +31,7 @@ func TestNewFinalizeSignatureHandler(t *testing.T) {
 
 func TestFinalizeSignatureHandler_FinalizeNodeSignatures_EmptyRequest(t *testing.T) {
 	t.Parallel()
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	handler := NewFinalizeSignatureHandler(config)
@@ -51,9 +49,7 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignatures_EmptyRequest(t *testing
 
 func TestFinalizeSignatureHandler_FinalizeNodeSignaturesV2_EmptyRequest(t *testing.T) {
 	t.Parallel()
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	handler := NewFinalizeSignatureHandler(config)
@@ -167,10 +163,7 @@ func TestFinalizeSignatureHandler_ErrorCases(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-
-			ctx := t.Context()
-			ctx, dbCtx := db.NewTestSQLiteContext(t, ctx)
-			defer dbCtx.Close()
+			ctx, _ := db.NewTestSQLiteContext(t)
 
 			config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 			handler := NewFinalizeSignatureHandler(config)
@@ -239,9 +232,7 @@ func createTestTree(t *testing.T, ctx context.Context, network st.Network, statu
 
 func TestFinalizeSignatureHandler_FinalizeNodeSignatures_InvalidIntent(t *testing.T) {
 	t.Parallel()
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{
 		SigningOperatorMap: map[string]*so.SigningOperator{
@@ -274,8 +265,7 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignatures_InvalidIntent(t *testin
 }
 
 func TestFinalizeSignatureHandler_FinalizeNodeSignatures_EmptyOperatorsMap(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{
 		SigningOperatorMap: map[string]*so.SigningOperator{},
@@ -301,10 +291,7 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignatures_EmptyOperatorsMap(t *te
 
 func TestFinalizeSignatureHandler_FinalizeNodeSignaturesV2_RequireDirectTx(t *testing.T) {
 	t.Parallel()
-	ctx := t.Context()
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, ctx)
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	handler := NewFinalizeSignatureHandler(config)
@@ -323,9 +310,7 @@ func TestFinalizeSignatureHandler_FinalizeNodeSignaturesV2_RequireDirectTx(t *te
 // Test that nodes with children are not set to Available status even with refund tx
 // Regression test for https://linear.app/lightsparkdev/issue/LIG-8094
 func TestFinalizeSignatureHandler_UpdateNode_NodeWithChildrenStatus(t *testing.T) {
-	ctx := t.Context()
-	ctx, dbCtx := db.NewTestSQLiteContext(t, ctx)
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
 
 	config := &so.Config{}
@@ -403,10 +388,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithChildrenStatus(t *testing.T
 
 // Test that nodes without refund tx are set to Splitted regardless of children
 func TestFinalizeSignatureHandler_UpdateNode_NodeWithoutRefundTxStatus(t *testing.T) {
-	ctx := t.Context()
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, ctx)
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{}
 	handler := NewFinalizeSignatureHandler(config)
@@ -440,10 +422,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithoutRefundTxStatus(t *testin
 
 // Regression test for https://linear.app/lightsparkdev/issue/LIG-8094
 func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testing.T) {
-	ctx := t.Context()
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, ctx)
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{}
 	handler := NewFinalizeSignatureHandler(config)
@@ -528,10 +507,7 @@ func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testi
 
 // Test edge case: Tree not in Available status should not trigger status logic
 func TestFinalizeSignatureHandler_UpdateNode_TreeNotAvailableStatus(t *testing.T) {
-	ctx := t.Context()
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, ctx)
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{}
 	handler := NewFinalizeSignatureHandler(config)
@@ -562,9 +538,7 @@ func TestFinalizeSignatureHandler_UpdateNode_TreeNotAvailableStatus(t *testing.T
 func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 	t.Parallel()
 	rng := rand.NewChaCha8([32]byte{})
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{
 		SigningOperatorMap: map[string]*so.SigningOperator{

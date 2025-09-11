@@ -41,15 +41,11 @@ func TestFrostSigningHandler_GenerateRandomNonces(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Use SQLite for faster tests - no need to start PostgreSQL containers
-			ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-			defer dbCtx.Close()
+			ctx, _ := db.NewTestSQLiteContext(t)
 
-			// Create handler
 			config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 			handler := NewFrostSigningHandler(config)
 
-			// Call the function
 			resp, err := handler.GenerateRandomNonces(ctx, tt.count)
 
 			if tt.expectError {
@@ -91,11 +87,8 @@ func TestFrostSigningHandler_GenerateRandomNonces(t *testing.T) {
 }
 
 func TestFrostSigningHandler_GenerateRandomNonces_UniqueCommitments(t *testing.T) {
-	// Use SQLite for faster tests
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
-	// Create handler
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	handler := NewFrostSigningHandler(config)
 

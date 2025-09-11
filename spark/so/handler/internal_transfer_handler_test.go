@@ -258,8 +258,7 @@ func TestFinalizeTransfer(t *testing.T) {
 
 func TestApplySignatures(t *testing.T) {
 	t.Parallel()
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, dbCtx := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{
 		BitcoindConfigs: map[string]so.BitcoindConfig{

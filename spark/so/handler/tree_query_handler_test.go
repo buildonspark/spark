@@ -14,9 +14,7 @@ import (
 )
 
 func TestQueryStaticDepositAddresses(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
-
+	ctx, _ := db.NewTestSQLiteContext(t)
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 	rng := rand.NewChaCha8([32]byte{})

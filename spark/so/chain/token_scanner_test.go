@@ -3,10 +3,11 @@ package chain
 import (
 	"context"
 	"encoding/binary"
-	"github.com/lightsparkdev/spark/common/keys"
 	"math/rand/v2"
 	"slices"
 	"testing"
+
+	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/stretchr/testify/require"
@@ -31,13 +32,7 @@ var (
 // This ensures complete isolation between test runs without manual cleanup.
 // It also sets up a basic EntityDkgKey required for token operations.
 func setupIsolatedTest(t *testing.T) (context.Context, *ent.Tx) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-
-	// Setup automatic cleanup
-	t.Cleanup(func() {
-		dbCtx.Close()
-	})
-
+	ctx, _ := db.NewTestSQLiteContext(t)
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
@@ -474,8 +469,7 @@ func verifyTokenDifferences(t *testing.T, ctx context.Context, dbTx *ent.Tx) {
 }
 
 func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config, err := sparktesting.TestConfig()
 	require.NoError(t, err)

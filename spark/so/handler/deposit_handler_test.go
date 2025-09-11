@@ -25,8 +25,7 @@ import (
 )
 
 func TestVerifiedTargetUtxo(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
 
 	tx, err := ent.GetDbFromContext(ctx)
@@ -182,8 +181,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 }
 
 func TestGenerateDepositAddress(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
 
 	testIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -289,8 +287,7 @@ func TestGenerateDepositAddress(t *testing.T) {
 }
 
 func TestGenerateStaticDepositAddress(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
 
 	testIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -339,8 +336,7 @@ func TestGenerateStaticDepositAddressReturnsDefaultAddress(t *testing.T) {
 			common.Mainnet,
 		},
 	}
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
@@ -415,8 +411,7 @@ func TestGenerateStaticDepositAddressReturnsDefaultAddress(t *testing.T) {
 }
 
 func TestGetUtxosFromAddress(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 	rng := rand.NewChaCha8([32]byte{})

@@ -113,8 +113,7 @@ func TestValidateUserSignature(t *testing.T) {
 
 func TestFinalizeTreeCreationErrorCases(t *testing.T) {
 	t.Parallel()
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{
 		SigningOperatorMap: map[string]*so.SigningOperator{

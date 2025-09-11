@@ -176,8 +176,7 @@ func TestProcessTransactions(t *testing.T) {
 
 func TestHandleBlock_MixedTransactions(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
-	ctx, client := db.NewTestSQLiteContext(t, t.Context())
-	defer client.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 

@@ -71,61 +71,45 @@ func createTestEntities(t *testing.T, ctx context.Context, rng io.Reader, tx *en
 }
 
 func TestGetRegisteredUtxoSwapForUtxo(t *testing.T) {
-	ctx := t.Context()
 	rng := rand.NewChaCha8([32]byte{})
 
 	testCases := []struct {
 		name           string
-		setupData      func(*ent.Tx) (*ent.Utxo, *ent.UtxoSwap)
+		swapStatus     st.UtxoSwapStatus
 		expectNil      bool
 		expectedStatus st.UtxoSwapStatus
 	}{
 		{
-			name: "returns UtxoSwap when found with CREATED status",
-			setupData: func(client *ent.Tx) (*ent.Utxo, *ent.UtxoSwap) {
-				return createTestEntities(t, ctx, rng, client, st.UtxoSwapStatusCreated)
-			},
+			name:           "returns UtxoSwap when found with CREATED status",
+			swapStatus:     st.UtxoSwapStatusCreated,
 			expectNil:      false,
 			expectedStatus: st.UtxoSwapStatusCreated,
 		},
 		{
-			name: "returns UtxoSwap when found with COMPLETED status",
-			setupData: func(client *ent.Tx) (*ent.Utxo, *ent.UtxoSwap) {
-				return createTestEntities(t, ctx, rng, client, st.UtxoSwapStatusCompleted)
-			},
+			name:           "returns UtxoSwap when found with COMPLETED status",
+			swapStatus:     st.UtxoSwapStatusCompleted,
 			expectNil:      false,
 			expectedStatus: st.UtxoSwapStatusCompleted,
 		},
 		{
-			name: "returns nil when no UtxoSwap exists for UTXO",
-			setupData: func(client *ent.Tx) (*ent.Utxo, *ent.UtxoSwap) {
-				// Create a test UTXO but no UtxoSwap
-				return createTestEntities(t, ctx, rng, client, "")
-			},
-			expectNil: true,
+			name:       "returns nil when no UtxoSwap exists for UTXO",
+			swapStatus: "", // Create a test UTXO but no UtxoSwap
+			expectNil:  true,
 		},
 		{
-			name: "returns nil when UtxoSwap exists but has CANCELLED status",
-			setupData: func(client *ent.Tx) (*ent.Utxo, *ent.UtxoSwap) {
-				// Create entities with CANCELLED status - should be filtered out
-				return createTestEntities(t, ctx, rng, client, st.UtxoSwapStatusCancelled)
-			},
-			expectNil: true,
+			name:       "returns nil when UtxoSwap exists but has CANCELLED status",
+			swapStatus: st.UtxoSwapStatusCancelled, // Create entities with CANCELLED status - should be filtered out
+			expectNil:  true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-			defer dbCtx.Close()
-
+			ctx, _ := db.NewTestSQLiteContext(t)
 			tx, err := ent.GetDbFromContext(ctx)
 			require.NoError(t, err)
+			targetUtxo, expectedUtxoSwap := createTestEntities(t, ctx, rng, tx, tc.swapStatus)
 
-			// Setup test data
-			targetUtxo, expectedUtxoSwap := tc.setupData(tx)
-
-			// Call the function under test
 			result, err := GetRegisteredUtxoSwapForUtxo(ctx, tx, targetUtxo)
 			require.NoError(t, err)
 

@@ -77,8 +77,7 @@ func (m *mockFrostServiceClient) ValidateSignatureShare(ctx context.Context, in 
 }
 
 func TestValidateDuplicateLeaves(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	lightningHandler := NewLightningHandler(config)
@@ -274,8 +273,7 @@ func TestValidateDuplicateLeaves(t *testing.T) {
 // Note: StorePreimageShare requires complex cryptographic validation
 // that's difficult to mock in unit tests. These tests focus on basic validation.
 func TestStorePreimageShareEdgeCases(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{
 		Threshold:                  2,
@@ -312,8 +310,7 @@ func TestStorePreimageShareEdgeCases(t *testing.T) {
 }
 
 func TestGetSigningCommitments(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	signingOperators, err := sparktesting.GetAllSigningOperators()
 	require.NoError(t, err)
@@ -396,8 +393,7 @@ func TestGetSigningCommitments(t *testing.T) {
 
 func TestValidatePreimage_InvalidPreimage_Errors(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	lightningHandler := NewLightningHandler(config)
@@ -464,8 +460,7 @@ func TestValidatePreimage_InvalidPreimage_Errors(t *testing.T) {
 }
 
 func TestReturnLightningPayment(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	rng := rand.NewChaCha8([32]byte{})
 	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -489,9 +484,7 @@ func TestReturnLightningPayment(t *testing.T) {
 // so we test them indirectly through GetSigningCommitments which calls validateHasSession
 func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{
 		SignerAddress:              "invalid_address", // This will cause connection failures
@@ -600,8 +593,7 @@ func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {
 }
 
 func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	lightningHandler := NewLightningHandler(config)
@@ -736,9 +728,7 @@ func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 // Ensure that only a node owner can initiate a preimage swap for that node.
 func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	// Valid 33-byte compressed secp256k1 public key for destination
 	validPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()
@@ -892,9 +882,7 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 // Regression test for https://linear.app/lightsparkdev/issue/LIG-8086
 func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
-
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	lightningHandler := NewLightningHandler(config)
@@ -1014,8 +1002,7 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 // since otherwise they would allow double-spending of Spark leaves via
 // Lightning.
 func TestSendLightningLeafDuplicationBug(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
+	ctx, _ := db.NewTestSQLiteContext(t)
 
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	lightningHandler := NewLightningHandler(config)

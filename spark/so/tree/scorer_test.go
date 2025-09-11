@@ -2,9 +2,10 @@ package tree
 
 import (
 	"context"
-	"github.com/lightsparkdev/spark/common/keys"
 	"math/rand/v2"
 	"testing"
+
+	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/proto/spark_tree"
@@ -69,8 +70,7 @@ func TestPolarityScorer_Score(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			_, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-			defer dbCtx.Close()
+			_, dbCtx := db.NewTestSQLiteContext(t)
 
 			scorer := NewPolarityScorer(dbCtx.Client)
 			scorer.probPubKeyCanClaim = tc.setupScores
@@ -82,9 +82,7 @@ func TestPolarityScorer_Score(t *testing.T) {
 }
 
 func TestPolarityScorer_UpdateLeaves(t *testing.T) {
-	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-	defer dbCtx.Close()
-
+	ctx, _ := db.NewTestSQLiteContext(t)
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
@@ -226,8 +224,7 @@ func TestPolarityScorer_FetchPolarityScores(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
-			defer dbCtx.Close()
+			ctx, dbCtx := db.NewTestSQLiteContext(t)
 
 			scorer := NewPolarityScorer(dbCtx.Client)
 			scorer.probPubKeyCanClaim = tt.setupScores
