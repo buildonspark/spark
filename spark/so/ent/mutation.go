@@ -6116,7 +6116,7 @@ type PreimageShareMutation struct {
 	preimage_share          *[]byte
 	threshold               *int32
 	addthreshold            *int32
-	owner_identity_pubkey   *[]byte
+	owner_identity_pubkey   *keys.Public
 	invoice_string          *string
 	clearedFields           map[string]struct{}
 	preimage_request        *uuid.UUID
@@ -6431,12 +6431,12 @@ func (m *PreimageShareMutation) ResetThreshold() {
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (m *PreimageShareMutation) SetOwnerIdentityPubkey(b []byte) {
-	m.owner_identity_pubkey = &b
+func (m *PreimageShareMutation) SetOwnerIdentityPubkey(k keys.Public) {
+	m.owner_identity_pubkey = &k
 }
 
 // OwnerIdentityPubkey returns the value of the "owner_identity_pubkey" field in the mutation.
-func (m *PreimageShareMutation) OwnerIdentityPubkey() (r []byte, exists bool) {
+func (m *PreimageShareMutation) OwnerIdentityPubkey() (r keys.Public, exists bool) {
 	v := m.owner_identity_pubkey
 	if v == nil {
 		return
@@ -6447,7 +6447,7 @@ func (m *PreimageShareMutation) OwnerIdentityPubkey() (r []byte, exists bool) {
 // OldOwnerIdentityPubkey returns the old "owner_identity_pubkey" field's value of the PreimageShare entity.
 // If the PreimageShare object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PreimageShareMutation) OldOwnerIdentityPubkey(ctx context.Context) (v []byte, err error) {
+func (m *PreimageShareMutation) OldOwnerIdentityPubkey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOwnerIdentityPubkey is only allowed on UpdateOne operations")
 	}
@@ -6687,7 +6687,7 @@ func (m *PreimageShareMutation) SetField(name string, value ent.Value) error {
 		m.SetThreshold(v)
 		return nil
 	case preimageshare.FieldOwnerIdentityPubkey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

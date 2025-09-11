@@ -1077,6 +1077,7 @@ func TestSendLightningLeafDuplicationBug(t *testing.T) {
 
 		rng := rand.NewChaCha8([32]byte{})
 		ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		// Create request with duplicated leaves
 		req := &pb.InitiatePreimageSwapRequest{
 			PaymentHash: []byte("payment_hash_32_bytes_long______"),
@@ -1087,7 +1088,7 @@ func TestSendLightningLeafDuplicationBug(t *testing.T) {
 					duplicatedLeaf, // Same leaf ID - this should be rejected but currently isn't
 				},
 				OwnerIdentityPublicKey:    ownerIdentityPubKey.Serialize(),
-				ReceiverIdentityPublicKey: []byte("receiver_identity_key_32_bytes__"),
+				ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
 			},
 			InvoiceAmount: &pb.InvoiceAmount{
 				ValueSats: 1000, // Invoice is for 1000 sats, but we're attempting to send 2000 sats due to duplication

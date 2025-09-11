@@ -290,10 +290,6 @@ func init() {
 	preimageshareDescPreimageShare := preimageshareFields[1].Descriptor()
 	// preimageshare.PreimageShareValidator is a validator for the "preimage_share" field. It is called by the builders before save.
 	preimageshare.PreimageShareValidator = preimageshareDescPreimageShare.Validators[0].(func([]byte) error)
-	// preimageshareDescOwnerIdentityPubkey is the schema descriptor for owner_identity_pubkey field.
-	preimageshareDescOwnerIdentityPubkey := preimageshareFields[3].Descriptor()
-	// preimageshare.OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
-	preimageshare.OwnerIdentityPubkeyValidator = preimageshareDescOwnerIdentityPubkey.Validators[0].(func([]byte) error)
 	// preimageshareDescInvoiceString is the schema descriptor for invoice_string field.
 	preimageshareDescInvoiceString := preimageshareFields[4].Descriptor()
 	// preimageshare.InvoiceStringValidator is a validator for the "invoice_string" field. It is called by the builders before save.

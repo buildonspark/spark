@@ -5,6 +5,7 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/lightsparkdev/spark/common/keys"
 )
 
 // PreimageShare is the schema for the preimage shares table.
@@ -33,7 +34,7 @@ func (PreimageShare) Fields() []ent.Field {
 		field.Bytes("payment_hash").NotEmpty().Immutable().Unique(),
 		field.Bytes("preimage_share").NotEmpty().Immutable(),
 		field.Int32("threshold").Immutable(),
-		field.Bytes("owner_identity_pubkey").NotEmpty().Immutable(),
+		field.Bytes("owner_identity_pubkey").Immutable().GoType(keys.Public{}),
 		field.String("invoice_string").NotEmpty().Immutable(),
 	}
 }

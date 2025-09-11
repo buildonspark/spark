@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 )
@@ -30,7 +31,7 @@ type PreimageShare struct {
 	// Threshold holds the value of the "threshold" field.
 	Threshold int32 `json:"threshold,omitempty"`
 	// OwnerIdentityPubkey holds the value of the "owner_identity_pubkey" field.
-	OwnerIdentityPubkey []byte `json:"owner_identity_pubkey,omitempty"`
+	OwnerIdentityPubkey keys.Public `json:"owner_identity_pubkey,omitempty"`
 	// InvoiceString holds the value of the "invoice_string" field.
 	InvoiceString string `json:"invoice_string,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -65,8 +66,10 @@ func (*PreimageShare) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case preimageshare.FieldPaymentHash, preimageshare.FieldPreimageShare, preimageshare.FieldOwnerIdentityPubkey:
+		case preimageshare.FieldPaymentHash, preimageshare.FieldPreimageShare:
 			values[i] = new([]byte)
+		case preimageshare.FieldOwnerIdentityPubkey:
+			values[i] = new(keys.Public)
 		case preimageshare.FieldThreshold:
 			values[i] = new(sql.NullInt64)
 		case preimageshare.FieldInvoiceString:
@@ -129,7 +132,7 @@ func (ps *PreimageShare) assignValues(columns []string, values []any) error {
 				ps.Threshold = int32(value.Int64)
 			}
 		case preimageshare.FieldOwnerIdentityPubkey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field owner_identity_pubkey", values[i])
 			} else if value != nil {
 				ps.OwnerIdentityPubkey = *value

@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 )
@@ -72,8 +73,8 @@ func (psc *PreimageShareCreate) SetThreshold(i int32) *PreimageShareCreate {
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (psc *PreimageShareCreate) SetOwnerIdentityPubkey(b []byte) *PreimageShareCreate {
-	psc.mutation.SetOwnerIdentityPubkey(b)
+func (psc *PreimageShareCreate) SetOwnerIdentityPubkey(k keys.Public) *PreimageShareCreate {
+	psc.mutation.SetOwnerIdentityPubkey(k)
 	return psc
 }
 
@@ -206,11 +207,6 @@ func (psc *PreimageShareCreate) check() error {
 	}
 	if _, ok := psc.mutation.OwnerIdentityPubkey(); !ok {
 		return &ValidationError{Name: "owner_identity_pubkey", err: errors.New(`ent: missing required field "PreimageShare.owner_identity_pubkey"`)}
-	}
-	if v, ok := psc.mutation.OwnerIdentityPubkey(); ok {
-		if err := preimageshare.OwnerIdentityPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "PreimageShare.owner_identity_pubkey": %w`, err)}
-		}
 	}
 	if _, ok := psc.mutation.InvoiceString(); !ok {
 		return &ValidationError{Name: "invoice_string", err: errors.New(`ent: missing required field "PreimageShare.invoice_string"`)}

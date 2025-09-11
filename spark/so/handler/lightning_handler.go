@@ -94,12 +94,16 @@ func (h *LightningHandler) StorePreimageShare(ctx context.Context, req *pb.Store
 	if err != nil {
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
+	userIdentityPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
+	if err != nil {
+		return fmt.Errorf("unable to parse user identity public key: %w", err)
+	}
 	_, err = tx.PreimageShare.Create().
 		SetPaymentHash(req.PaymentHash).
 		SetPreimageShare(req.PreimageShare.SecretShare).
 		SetThreshold(int32(req.Threshold)).
 		SetInvoiceString(req.InvoiceString).
-		SetOwnerIdentityPubkey(req.UserIdentityPublicKey).
+		SetOwnerIdentityPubkey(userIdentityPubKey).
 		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to store preimage share: %w", err)
@@ -765,6 +769,10 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 	}
 
 	var preimageShare *ent.PreimageShare
+	receiverIdentityPubKey, err := keys.ParsePublicKey(req.GetReceiverIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse receiver identity public key: %w", err)
+	}
 	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		tx, err := ent.GetDbFromContext(ctx)
 		if err != nil {
@@ -774,12 +782,12 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		if err != nil {
 			return nil, fmt.Errorf("unable to get preimage share: %w", err)
 		}
-		if !bytes.Equal(preimageShare.OwnerIdentityPubkey, req.ReceiverIdentityPublicKey) {
+		if !preimageShare.OwnerIdentityPubkey.Equals(receiverIdentityPubKey) {
 			return nil, fmt.Errorf("preimage share owner identity public key mismatch")
 		}
 	}
 
-	invoiceAmount := req.InvoiceAmount
+	invoiceAmount := req.GetInvoiceAmount()
 	if preimageShare != nil {
 		bolt11, err := decodepay.Decodepay(preimageShare.InvoiceString)
 		if err != nil {
@@ -792,16 +800,11 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 			},
 		}
 	}
-
-	err := h.ValidateDuplicateLeaves(ctx, req.Transfer.LeavesToSend, req.Transfer.DirectLeavesToSend, req.Transfer.DirectFromCpfpLeavesToSend)
+	err = h.ValidateDuplicateLeaves(ctx, req.Transfer.LeavesToSend, req.Transfer.DirectLeavesToSend, req.Transfer.DirectFromCpfpLeavesToSend)
 	if err != nil {
 		return nil, fmt.Errorf("unable to validate duplicate leaves: %w", err)
 	}
 
-	receiverIdentityPubKey, err := keys.ParsePublicKey(req.ReceiverIdentityPublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse receiver identity public key: %w", err)
-	}
 	err = h.ValidateGetPreimageRequest(
 		ctx,
 		req.PaymentHash,
@@ -835,7 +838,7 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 	}
 
 	transferHandler := NewTransferHandler(h.config)
-	ownerIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.OwnerIdentityPublicKey)
+	ownerIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse owner identity public key: %w", err)
 	}
@@ -922,6 +925,11 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("fee is not allowed for receive preimage swap")
 	}
 
+	receiverIdentityPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetReceiverIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse receiver identity public key: %w", err)
+	}
+
 	logger := logging.GetLoggerFromContext(ctx)
 
 	var preimageShare *ent.PreimageShare
@@ -934,7 +942,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		if err != nil {
 			return nil, fmt.Errorf("unable to get preimage share for payment hash: %x: %w", req.PaymentHash, err)
 		}
-		if !bytes.Equal(preimageShare.OwnerIdentityPubkey, req.ReceiverIdentityPublicKey) {
+		if !preimageShare.OwnerIdentityPubkey.Equals(receiverIdentityPubKey) {
 			return nil, fmt.Errorf("preimage share owner identity public key mismatch for payment hash: %x", req.PaymentHash)
 		}
 	}
@@ -960,10 +968,6 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("unable to validate duplicate leaves: %w", err)
 	}
 
-	receiverIdentityPubKey, err := keys.ParsePublicKey(req.Transfer.ReceiverIdentityPublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse receiver identity public key: %w", err)
-	}
 	err = h.ValidateGetPreimageRequest(
 		ctx,
 		req.PaymentHash,

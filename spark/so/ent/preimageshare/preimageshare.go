@@ -93,8 +93,6 @@ var (
 	PaymentHashValidator func([]byte) error
 	// PreimageShareValidator is a validator for the "preimage_share" field. It is called by the builders before save.
 	PreimageShareValidator func([]byte) error
-	// OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
-	OwnerIdentityPubkeyValidator func([]byte) error
 	// InvoiceStringValidator is a validator for the "invoice_string" field. It is called by the builders before save.
 	InvoiceStringValidator func(string) error
 	// DefaultID holds the default value on creation for the "id" field.
