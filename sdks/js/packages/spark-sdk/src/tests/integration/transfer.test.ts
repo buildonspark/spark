@@ -9,7 +9,7 @@ import {
   KeyDerivationType,
   SparkWalletEvent,
 } from "../../index.js";
-import { TransferStatus } from "../../proto/spark.js";
+import { TransferStatus, InvoiceStatus } from "../../proto/spark.js";
 import { WalletConfigService } from "../../services/config.js";
 import { ConnectionManager } from "../../services/connection.js";
 import { SigningService } from "../../services/signing.js";
@@ -1338,6 +1338,19 @@ describe.each(walletTypes)(
           beforeClaimBalance.balance + BigInt(transfer.totalValue),
         );
       }
+
+      const res = await (sdk2 as any).querySparkInvoices([
+        invoice1000,
+        invoice2000,
+        invoiceNilAmount,
+      ]);
+      expect(res.invoiceStatuses.length).toBe(3);
+      expect(res.invoiceStatuses[0].invoice).toBe(invoice1000);
+      expect(res.invoiceStatuses[1].invoice).toBe(invoice2000);
+      expect(res.invoiceStatuses[2].invoice).toBe(invoiceNilAmount);
+      expect(res.invoiceStatuses[0].status).toBe(InvoiceStatus.FINALIZED);
+      expect(res.invoiceStatuses[1].status).toBe(InvoiceStatus.FINALIZED);
+      expect(res.invoiceStatuses[2].status).toBe(InvoiceStatus.FINALIZED);
     });
 
     it(`${name} - should reject invalid invoice: mismatched sender`, async () => {

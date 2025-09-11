@@ -382,7 +382,7 @@ export enum InvoiceStatus {
   NOT_FOUND = 0,
   PENDING = 1,
   FINALIZED = 2,
-  EXPIRED = 3,
+  RETURNED = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -397,9 +397,9 @@ export function invoiceStatusFromJSON(object: any): InvoiceStatus {
     case 2:
     case "FINALIZED":
       return InvoiceStatus.FINALIZED;
-    case 3:
-    case "EXPIRED":
-      return InvoiceStatus.EXPIRED;
+    case 4:
+    case "RETURNED":
+      return InvoiceStatus.RETURNED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -415,8 +415,8 @@ export function invoiceStatusToJSON(object: InvoiceStatus): string {
       return "PENDING";
     case InvoiceStatus.FINALIZED:
       return "FINALIZED";
-    case InvoiceStatus.EXPIRED:
-      return "EXPIRED";
+    case InvoiceStatus.RETURNED:
+      return "RETURNED";
     case InvoiceStatus.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -624,6 +624,89 @@ export interface SigningResult_SigningNonceCommitmentsEntry {
 export interface SigningResult_SignatureSharesEntry {
   key: string;
   value: Uint8Array;
+}
+
+export interface RenewLeafRequest {
+  leafId: string;
+  ownerIdentityPublicKey: Uint8Array;
+  signingJobs?:
+    | //
+    /**
+     * Resets the node transaction timelock and refund transaction timelock
+     * for a leaf to 2000. The old node transaction is invalidated by
+     * introducing a "split node" with zero timelock that spends to a new
+     * node transaction. Takes in the signing jobs for the updated
+     * node, refund, and split node transactions with the new timelocks.
+     * Requires that the existing node transaction timelock is <= 300
+     * at the time this function is called. Returns an error if these
+     * conditions are not met.
+     */
+    { $case: "renewNodeTimelockSigningJob"; renewNodeTimelockSigningJob: RenewNodeTimelockSigningJob }
+    | //
+    /**
+     * Resets the refund transaction timelock for a leaf to 2000. Takes in
+     * the signing jobs for the updated transactions with the new timelocks.
+     * Requires that the existing refund transaction timelock is <= 300 and
+     * the node transaction timelock > 300 at the time this function is
+     * called. Returns an error if these conditions are not met.
+     */
+    { $case: "renewRefundTimelockSigningJob"; renewRefundTimelockSigningJob: RenewRefundTimelockSigningJob }
+    | undefined;
+}
+
+export interface RenewNodeTimelockSigningJob {
+  /**
+   * Signing job with the new "split node" transaction. This spends the
+   * inputs of the old node transaction and its outputs are spent by the new
+   * node transaction. Timelock of split node transaction must be 0.
+   */
+  splitNodeTxSigningJob: UserSignedTxSigningJob | undefined;
+  splitNodeDirectTxSigningJob:
+    | UserSignedTxSigningJob
+    | undefined;
+  /**
+   * Signing job with the updated node transaction. The updated transaction is
+   * expected to have a timelock of 2000.
+   */
+  nodeTxSigningJob: UserSignedTxSigningJob | undefined;
+  refundTxSigningJob: UserSignedTxSigningJob | undefined;
+  directNodeTxSigningJob: UserSignedTxSigningJob | undefined;
+  directRefundTxSigningJob: UserSignedTxSigningJob | undefined;
+  directFromCpfpRefundTxSigningJob: UserSignedTxSigningJob | undefined;
+}
+
+export interface RenewRefundTimelockSigningJob {
+  /**
+   * Signing job with the updated node transaction. The updated transaction is
+   * expected to have a timelock of 100 less than the existing node transaction.
+   */
+  nodeTxSigningJob:
+    | UserSignedTxSigningJob
+    | undefined;
+  /**
+   * Signing job with the updated refund transaction. This updated transaction
+   * must have a timelock of 2000.
+   */
+  refundTxSigningJob: UserSignedTxSigningJob | undefined;
+  directNodeTxSigningJob: UserSignedTxSigningJob | undefined;
+  directRefundTxSigningJob: UserSignedTxSigningJob | undefined;
+  directFromCpfpRefundTxSigningJob: UserSignedTxSigningJob | undefined;
+}
+
+export interface RenewLeafResponse {
+  renewResult?: { $case: "extendResult"; extendResult: RenewNodeTimelockResult } | {
+    $case: "refreshResult";
+    refreshResult: RenewRefundTimelockResult;
+  } | undefined;
+}
+
+export interface RenewNodeTimelockResult {
+  splitNode: TreeNode | undefined;
+  node: TreeNode | undefined;
+}
+
+export interface RenewRefundTimelockResult {
+  node: TreeNode | undefined;
 }
 
 /**
@@ -1118,13 +1201,19 @@ export interface StartUserSignedTransferRequest {
 export interface StartTransferRequest {
   transferId: string;
   ownerIdentityPublicKey: Uint8Array;
-  /** @deprecated */
+  /**
+   * This field is used for swap and coop exits. Regular transfers must use
+   * the transfer_package field.
+   */
   leavesToSend: LeafRefundTxSigningJob[];
   receiverIdentityPublicKey: Uint8Array;
   expiryTime:
     | Date
     | undefined;
-  /** If this field is set, the leaves_to_send and key_tweak_proofs will be ignored. */
+  /**
+   * This field is required for transfers of type "transfer". If this field
+   * is set, the leaves_to_send and key_tweak_proofs will be ignored.
+   */
   transferPackage:
     | TransferPackage
     | undefined;
@@ -1833,6 +1922,18 @@ export interface QuerySparkInvoicesResponse {
 export interface InvoiceResponse {
   invoice: string;
   status: InvoiceStatus;
+  transferType?: { $case: "satsTransfer"; satsTransfer: SatsTransfer } | {
+    $case: "tokenTransfer";
+    tokenTransfer: TokenTransfer;
+  } | undefined;
+}
+
+export interface SatsTransfer {
+  transferId: Uint8Array;
+}
+
+export interface TokenTransfer {
+  finalTokenTransactionHash: Uint8Array;
 }
 
 function createBaseSubscribeToEventsRequest(): SubscribeToEventsRequest {
@@ -3920,6 +4021,758 @@ export const SigningResult_SignatureSharesEntry: MessageFns<SigningResult_Signat
     const message = createBaseSigningResult_SignatureSharesEntry();
     message.key = object.key ?? "";
     message.value = object.value ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseRenewLeafRequest(): RenewLeafRequest {
+  return { leafId: "", ownerIdentityPublicKey: new Uint8Array(0), signingJobs: undefined };
+}
+
+export const RenewLeafRequest: MessageFns<RenewLeafRequest> = {
+  encode(message: RenewLeafRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.leafId !== "") {
+      writer.uint32(10).string(message.leafId);
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.ownerIdentityPublicKey);
+    }
+    switch (message.signingJobs?.$case) {
+      case "renewNodeTimelockSigningJob":
+        RenewNodeTimelockSigningJob.encode(message.signingJobs.renewNodeTimelockSigningJob, writer.uint32(26).fork())
+          .join();
+        break;
+      case "renewRefundTimelockSigningJob":
+        RenewRefundTimelockSigningJob.encode(
+          message.signingJobs.renewRefundTimelockSigningJob,
+          writer.uint32(34).fork(),
+        ).join();
+        break;
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RenewLeafRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRenewLeafRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.leafId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.ownerIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.signingJobs = {
+            $case: "renewNodeTimelockSigningJob",
+            renewNodeTimelockSigningJob: RenewNodeTimelockSigningJob.decode(reader, reader.uint32()),
+          };
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.signingJobs = {
+            $case: "renewRefundTimelockSigningJob",
+            renewRefundTimelockSigningJob: RenewRefundTimelockSigningJob.decode(reader, reader.uint32()),
+          };
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RenewLeafRequest {
+    return {
+      leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : "",
+      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+        ? bytesFromBase64(object.ownerIdentityPublicKey)
+        : new Uint8Array(0),
+      signingJobs: isSet(object.renewNodeTimelockSigningJob)
+        ? {
+          $case: "renewNodeTimelockSigningJob",
+          renewNodeTimelockSigningJob: RenewNodeTimelockSigningJob.fromJSON(object.renewNodeTimelockSigningJob),
+        }
+        : isSet(object.renewRefundTimelockSigningJob)
+        ? {
+          $case: "renewRefundTimelockSigningJob",
+          renewRefundTimelockSigningJob: RenewRefundTimelockSigningJob.fromJSON(object.renewRefundTimelockSigningJob),
+        }
+        : undefined,
+    };
+  },
+
+  toJSON(message: RenewLeafRequest): unknown {
+    const obj: any = {};
+    if (message.leafId !== "") {
+      obj.leafId = message.leafId;
+    }
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
+    }
+    if (message.signingJobs?.$case === "renewNodeTimelockSigningJob") {
+      obj.renewNodeTimelockSigningJob = RenewNodeTimelockSigningJob.toJSON(
+        message.signingJobs.renewNodeTimelockSigningJob,
+      );
+    } else if (message.signingJobs?.$case === "renewRefundTimelockSigningJob") {
+      obj.renewRefundTimelockSigningJob = RenewRefundTimelockSigningJob.toJSON(
+        message.signingJobs.renewRefundTimelockSigningJob,
+      );
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RenewLeafRequest>): RenewLeafRequest {
+    return RenewLeafRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RenewLeafRequest>): RenewLeafRequest {
+    const message = createBaseRenewLeafRequest();
+    message.leafId = object.leafId ?? "";
+    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
+    switch (object.signingJobs?.$case) {
+      case "renewNodeTimelockSigningJob": {
+        if (
+          object.signingJobs?.renewNodeTimelockSigningJob !== undefined &&
+          object.signingJobs?.renewNodeTimelockSigningJob !== null
+        ) {
+          message.signingJobs = {
+            $case: "renewNodeTimelockSigningJob",
+            renewNodeTimelockSigningJob: RenewNodeTimelockSigningJob.fromPartial(
+              object.signingJobs.renewNodeTimelockSigningJob,
+            ),
+          };
+        }
+        break;
+      }
+      case "renewRefundTimelockSigningJob": {
+        if (
+          object.signingJobs?.renewRefundTimelockSigningJob !== undefined &&
+          object.signingJobs?.renewRefundTimelockSigningJob !== null
+        ) {
+          message.signingJobs = {
+            $case: "renewRefundTimelockSigningJob",
+            renewRefundTimelockSigningJob: RenewRefundTimelockSigningJob.fromPartial(
+              object.signingJobs.renewRefundTimelockSigningJob,
+            ),
+          };
+        }
+        break;
+      }
+    }
+    return message;
+  },
+};
+
+function createBaseRenewNodeTimelockSigningJob(): RenewNodeTimelockSigningJob {
+  return {
+    splitNodeTxSigningJob: undefined,
+    splitNodeDirectTxSigningJob: undefined,
+    nodeTxSigningJob: undefined,
+    refundTxSigningJob: undefined,
+    directNodeTxSigningJob: undefined,
+    directRefundTxSigningJob: undefined,
+    directFromCpfpRefundTxSigningJob: undefined,
+  };
+}
+
+export const RenewNodeTimelockSigningJob: MessageFns<RenewNodeTimelockSigningJob> = {
+  encode(message: RenewNodeTimelockSigningJob, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.splitNodeTxSigningJob !== undefined) {
+      UserSignedTxSigningJob.encode(message.splitNodeTxSigningJob, writer.uint32(10).fork()).join();
+    }
+    if (message.splitNodeDirectTxSigningJob !== undefined) {
+      UserSignedTxSigningJob.encode(message.splitNodeDirectTxSigningJob, writer.uint32(18).fork()).join();
+    }
+    if (message.nodeTxSigningJob !== undefined) {
+      UserSignedTxSigningJob.encode(message.nodeTxSigningJob, writer.uint32(26).fork()).join();
+    }
+    if (message.refundTxSigningJob !== undefined) {
+      UserSignedTxSigningJob.encode(message.refundTxSigningJob, writer.uint32(34).fork()).join();
+    }
+    if (message.directNodeTxSigningJob !== undefined) {
+      UserSignedTxSigningJob.encode(message.directNodeTxSigningJob, writer.uint32(42).fork()).join();
+    }
+    if (message.directRefundTxSigningJob !== undefined) {
+      UserSignedTxSigningJob.encode(message.directRefundTxSigningJob, writer.uint32(50).fork()).join();
+    }
+    if (message.directFromCpfpRefundTxSigningJob !== undefined) {
+      UserSignedTxSigningJob.encode(message.directFromCpfpRefundTxSigningJob, writer.uint32(58).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RenewNodeTimelockSigningJob {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRenewNodeTimelockSigningJob();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.splitNodeTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.splitNodeDirectTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.nodeTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.refundTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.directNodeTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.directRefundTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.directFromCpfpRefundTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RenewNodeTimelockSigningJob {
+    return {
+      splitNodeTxSigningJob: isSet(object.splitNodeTxSigningJob)
+        ? UserSignedTxSigningJob.fromJSON(object.splitNodeTxSigningJob)
+        : undefined,
+      splitNodeDirectTxSigningJob: isSet(object.splitNodeDirectTxSigningJob)
+        ? UserSignedTxSigningJob.fromJSON(object.splitNodeDirectTxSigningJob)
+        : undefined,
+      nodeTxSigningJob: isSet(object.nodeTxSigningJob)
+        ? UserSignedTxSigningJob.fromJSON(object.nodeTxSigningJob)
+        : undefined,
+      refundTxSigningJob: isSet(object.refundTxSigningJob)
+        ? UserSignedTxSigningJob.fromJSON(object.refundTxSigningJob)
+        : undefined,
+      directNodeTxSigningJob: isSet(object.directNodeTxSigningJob)
+        ? UserSignedTxSigningJob.fromJSON(object.directNodeTxSigningJob)
+        : undefined,
+      directRefundTxSigningJob: isSet(object.directRefundTxSigningJob)
+        ? UserSignedTxSigningJob.fromJSON(object.directRefundTxSigningJob)
+        : undefined,
+      directFromCpfpRefundTxSigningJob: isSet(object.directFromCpfpRefundTxSigningJob)
+        ? UserSignedTxSigningJob.fromJSON(object.directFromCpfpRefundTxSigningJob)
+        : undefined,
+    };
+  },
+
+  toJSON(message: RenewNodeTimelockSigningJob): unknown {
+    const obj: any = {};
+    if (message.splitNodeTxSigningJob !== undefined) {
+      obj.splitNodeTxSigningJob = UserSignedTxSigningJob.toJSON(message.splitNodeTxSigningJob);
+    }
+    if (message.splitNodeDirectTxSigningJob !== undefined) {
+      obj.splitNodeDirectTxSigningJob = UserSignedTxSigningJob.toJSON(message.splitNodeDirectTxSigningJob);
+    }
+    if (message.nodeTxSigningJob !== undefined) {
+      obj.nodeTxSigningJob = UserSignedTxSigningJob.toJSON(message.nodeTxSigningJob);
+    }
+    if (message.refundTxSigningJob !== undefined) {
+      obj.refundTxSigningJob = UserSignedTxSigningJob.toJSON(message.refundTxSigningJob);
+    }
+    if (message.directNodeTxSigningJob !== undefined) {
+      obj.directNodeTxSigningJob = UserSignedTxSigningJob.toJSON(message.directNodeTxSigningJob);
+    }
+    if (message.directRefundTxSigningJob !== undefined) {
+      obj.directRefundTxSigningJob = UserSignedTxSigningJob.toJSON(message.directRefundTxSigningJob);
+    }
+    if (message.directFromCpfpRefundTxSigningJob !== undefined) {
+      obj.directFromCpfpRefundTxSigningJob = UserSignedTxSigningJob.toJSON(message.directFromCpfpRefundTxSigningJob);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RenewNodeTimelockSigningJob>): RenewNodeTimelockSigningJob {
+    return RenewNodeTimelockSigningJob.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RenewNodeTimelockSigningJob>): RenewNodeTimelockSigningJob {
+    const message = createBaseRenewNodeTimelockSigningJob();
+    message.splitNodeTxSigningJob =
+      (object.splitNodeTxSigningJob !== undefined && object.splitNodeTxSigningJob !== null)
+        ? UserSignedTxSigningJob.fromPartial(object.splitNodeTxSigningJob)
+        : undefined;
+    message.splitNodeDirectTxSigningJob =
+      (object.splitNodeDirectTxSigningJob !== undefined && object.splitNodeDirectTxSigningJob !== null)
+        ? UserSignedTxSigningJob.fromPartial(object.splitNodeDirectTxSigningJob)
+        : undefined;
+    message.nodeTxSigningJob = (object.nodeTxSigningJob !== undefined && object.nodeTxSigningJob !== null)
+      ? UserSignedTxSigningJob.fromPartial(object.nodeTxSigningJob)
+      : undefined;
+    message.refundTxSigningJob = (object.refundTxSigningJob !== undefined && object.refundTxSigningJob !== null)
+      ? UserSignedTxSigningJob.fromPartial(object.refundTxSigningJob)
+      : undefined;
+    message.directNodeTxSigningJob =
+      (object.directNodeTxSigningJob !== undefined && object.directNodeTxSigningJob !== null)
+        ? UserSignedTxSigningJob.fromPartial(object.directNodeTxSigningJob)
+        : undefined;
+    message.directRefundTxSigningJob =
+      (object.directRefundTxSigningJob !== undefined && object.directRefundTxSigningJob !== null)
+        ? UserSignedTxSigningJob.fromPartial(object.directRefundTxSigningJob)
+        : undefined;
+    message.directFromCpfpRefundTxSigningJob =
+      (object.directFromCpfpRefundTxSigningJob !== undefined && object.directFromCpfpRefundTxSigningJob !== null)
+        ? UserSignedTxSigningJob.fromPartial(object.directFromCpfpRefundTxSigningJob)
+        : undefined;
+    return message;
+  },
+};
+
+function createBaseRenewRefundTimelockSigningJob(): RenewRefundTimelockSigningJob {
+  return {
+    nodeTxSigningJob: undefined,
+    refundTxSigningJob: undefined,
+    directNodeTxSigningJob: undefined,
+    directRefundTxSigningJob: undefined,
+    directFromCpfpRefundTxSigningJob: undefined,
+  };
+}
+
+export const RenewRefundTimelockSigningJob: MessageFns<RenewRefundTimelockSigningJob> = {
+  encode(message: RenewRefundTimelockSigningJob, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.nodeTxSigningJob !== undefined) {
+      UserSignedTxSigningJob.encode(message.nodeTxSigningJob, writer.uint32(10).fork()).join();
+    }
+    if (message.refundTxSigningJob !== undefined) {
+      UserSignedTxSigningJob.encode(message.refundTxSigningJob, writer.uint32(18).fork()).join();
+    }
+    if (message.directNodeTxSigningJob !== undefined) {
+      UserSignedTxSigningJob.encode(message.directNodeTxSigningJob, writer.uint32(26).fork()).join();
+    }
+    if (message.directRefundTxSigningJob !== undefined) {
+      UserSignedTxSigningJob.encode(message.directRefundTxSigningJob, writer.uint32(34).fork()).join();
+    }
+    if (message.directFromCpfpRefundTxSigningJob !== undefined) {
+      UserSignedTxSigningJob.encode(message.directFromCpfpRefundTxSigningJob, writer.uint32(42).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RenewRefundTimelockSigningJob {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRenewRefundTimelockSigningJob();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.nodeTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.refundTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.directNodeTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.directRefundTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.directFromCpfpRefundTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RenewRefundTimelockSigningJob {
+    return {
+      nodeTxSigningJob: isSet(object.nodeTxSigningJob)
+        ? UserSignedTxSigningJob.fromJSON(object.nodeTxSigningJob)
+        : undefined,
+      refundTxSigningJob: isSet(object.refundTxSigningJob)
+        ? UserSignedTxSigningJob.fromJSON(object.refundTxSigningJob)
+        : undefined,
+      directNodeTxSigningJob: isSet(object.directNodeTxSigningJob)
+        ? UserSignedTxSigningJob.fromJSON(object.directNodeTxSigningJob)
+        : undefined,
+      directRefundTxSigningJob: isSet(object.directRefundTxSigningJob)
+        ? UserSignedTxSigningJob.fromJSON(object.directRefundTxSigningJob)
+        : undefined,
+      directFromCpfpRefundTxSigningJob: isSet(object.directFromCpfpRefundTxSigningJob)
+        ? UserSignedTxSigningJob.fromJSON(object.directFromCpfpRefundTxSigningJob)
+        : undefined,
+    };
+  },
+
+  toJSON(message: RenewRefundTimelockSigningJob): unknown {
+    const obj: any = {};
+    if (message.nodeTxSigningJob !== undefined) {
+      obj.nodeTxSigningJob = UserSignedTxSigningJob.toJSON(message.nodeTxSigningJob);
+    }
+    if (message.refundTxSigningJob !== undefined) {
+      obj.refundTxSigningJob = UserSignedTxSigningJob.toJSON(message.refundTxSigningJob);
+    }
+    if (message.directNodeTxSigningJob !== undefined) {
+      obj.directNodeTxSigningJob = UserSignedTxSigningJob.toJSON(message.directNodeTxSigningJob);
+    }
+    if (message.directRefundTxSigningJob !== undefined) {
+      obj.directRefundTxSigningJob = UserSignedTxSigningJob.toJSON(message.directRefundTxSigningJob);
+    }
+    if (message.directFromCpfpRefundTxSigningJob !== undefined) {
+      obj.directFromCpfpRefundTxSigningJob = UserSignedTxSigningJob.toJSON(message.directFromCpfpRefundTxSigningJob);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RenewRefundTimelockSigningJob>): RenewRefundTimelockSigningJob {
+    return RenewRefundTimelockSigningJob.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RenewRefundTimelockSigningJob>): RenewRefundTimelockSigningJob {
+    const message = createBaseRenewRefundTimelockSigningJob();
+    message.nodeTxSigningJob = (object.nodeTxSigningJob !== undefined && object.nodeTxSigningJob !== null)
+      ? UserSignedTxSigningJob.fromPartial(object.nodeTxSigningJob)
+      : undefined;
+    message.refundTxSigningJob = (object.refundTxSigningJob !== undefined && object.refundTxSigningJob !== null)
+      ? UserSignedTxSigningJob.fromPartial(object.refundTxSigningJob)
+      : undefined;
+    message.directNodeTxSigningJob =
+      (object.directNodeTxSigningJob !== undefined && object.directNodeTxSigningJob !== null)
+        ? UserSignedTxSigningJob.fromPartial(object.directNodeTxSigningJob)
+        : undefined;
+    message.directRefundTxSigningJob =
+      (object.directRefundTxSigningJob !== undefined && object.directRefundTxSigningJob !== null)
+        ? UserSignedTxSigningJob.fromPartial(object.directRefundTxSigningJob)
+        : undefined;
+    message.directFromCpfpRefundTxSigningJob =
+      (object.directFromCpfpRefundTxSigningJob !== undefined && object.directFromCpfpRefundTxSigningJob !== null)
+        ? UserSignedTxSigningJob.fromPartial(object.directFromCpfpRefundTxSigningJob)
+        : undefined;
+    return message;
+  },
+};
+
+function createBaseRenewLeafResponse(): RenewLeafResponse {
+  return { renewResult: undefined };
+}
+
+export const RenewLeafResponse: MessageFns<RenewLeafResponse> = {
+  encode(message: RenewLeafResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    switch (message.renewResult?.$case) {
+      case "extendResult":
+        RenewNodeTimelockResult.encode(message.renewResult.extendResult, writer.uint32(10).fork()).join();
+        break;
+      case "refreshResult":
+        RenewRefundTimelockResult.encode(message.renewResult.refreshResult, writer.uint32(18).fork()).join();
+        break;
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RenewLeafResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRenewLeafResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.renewResult = {
+            $case: "extendResult",
+            extendResult: RenewNodeTimelockResult.decode(reader, reader.uint32()),
+          };
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.renewResult = {
+            $case: "refreshResult",
+            refreshResult: RenewRefundTimelockResult.decode(reader, reader.uint32()),
+          };
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RenewLeafResponse {
+    return {
+      renewResult: isSet(object.extendResult)
+        ? { $case: "extendResult", extendResult: RenewNodeTimelockResult.fromJSON(object.extendResult) }
+        : isSet(object.refreshResult)
+        ? { $case: "refreshResult", refreshResult: RenewRefundTimelockResult.fromJSON(object.refreshResult) }
+        : undefined,
+    };
+  },
+
+  toJSON(message: RenewLeafResponse): unknown {
+    const obj: any = {};
+    if (message.renewResult?.$case === "extendResult") {
+      obj.extendResult = RenewNodeTimelockResult.toJSON(message.renewResult.extendResult);
+    } else if (message.renewResult?.$case === "refreshResult") {
+      obj.refreshResult = RenewRefundTimelockResult.toJSON(message.renewResult.refreshResult);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RenewLeafResponse>): RenewLeafResponse {
+    return RenewLeafResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RenewLeafResponse>): RenewLeafResponse {
+    const message = createBaseRenewLeafResponse();
+    switch (object.renewResult?.$case) {
+      case "extendResult": {
+        if (object.renewResult?.extendResult !== undefined && object.renewResult?.extendResult !== null) {
+          message.renewResult = {
+            $case: "extendResult",
+            extendResult: RenewNodeTimelockResult.fromPartial(object.renewResult.extendResult),
+          };
+        }
+        break;
+      }
+      case "refreshResult": {
+        if (object.renewResult?.refreshResult !== undefined && object.renewResult?.refreshResult !== null) {
+          message.renewResult = {
+            $case: "refreshResult",
+            refreshResult: RenewRefundTimelockResult.fromPartial(object.renewResult.refreshResult),
+          };
+        }
+        break;
+      }
+    }
+    return message;
+  },
+};
+
+function createBaseRenewNodeTimelockResult(): RenewNodeTimelockResult {
+  return { splitNode: undefined, node: undefined };
+}
+
+export const RenewNodeTimelockResult: MessageFns<RenewNodeTimelockResult> = {
+  encode(message: RenewNodeTimelockResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.splitNode !== undefined) {
+      TreeNode.encode(message.splitNode, writer.uint32(10).fork()).join();
+    }
+    if (message.node !== undefined) {
+      TreeNode.encode(message.node, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RenewNodeTimelockResult {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRenewNodeTimelockResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.splitNode = TreeNode.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.node = TreeNode.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RenewNodeTimelockResult {
+    return {
+      splitNode: isSet(object.splitNode) ? TreeNode.fromJSON(object.splitNode) : undefined,
+      node: isSet(object.node) ? TreeNode.fromJSON(object.node) : undefined,
+    };
+  },
+
+  toJSON(message: RenewNodeTimelockResult): unknown {
+    const obj: any = {};
+    if (message.splitNode !== undefined) {
+      obj.splitNode = TreeNode.toJSON(message.splitNode);
+    }
+    if (message.node !== undefined) {
+      obj.node = TreeNode.toJSON(message.node);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RenewNodeTimelockResult>): RenewNodeTimelockResult {
+    return RenewNodeTimelockResult.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RenewNodeTimelockResult>): RenewNodeTimelockResult {
+    const message = createBaseRenewNodeTimelockResult();
+    message.splitNode = (object.splitNode !== undefined && object.splitNode !== null)
+      ? TreeNode.fromPartial(object.splitNode)
+      : undefined;
+    message.node = (object.node !== undefined && object.node !== null) ? TreeNode.fromPartial(object.node) : undefined;
+    return message;
+  },
+};
+
+function createBaseRenewRefundTimelockResult(): RenewRefundTimelockResult {
+  return { node: undefined };
+}
+
+export const RenewRefundTimelockResult: MessageFns<RenewRefundTimelockResult> = {
+  encode(message: RenewRefundTimelockResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.node !== undefined) {
+      TreeNode.encode(message.node, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): RenewRefundTimelockResult {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRenewRefundTimelockResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.node = TreeNode.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RenewRefundTimelockResult {
+    return { node: isSet(object.node) ? TreeNode.fromJSON(object.node) : undefined };
+  },
+
+  toJSON(message: RenewRefundTimelockResult): unknown {
+    const obj: any = {};
+    if (message.node !== undefined) {
+      obj.node = TreeNode.toJSON(message.node);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RenewRefundTimelockResult>): RenewRefundTimelockResult {
+    return RenewRefundTimelockResult.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RenewRefundTimelockResult>): RenewRefundTimelockResult {
+    const message = createBaseRenewRefundTimelockResult();
+    message.node = (object.node !== undefined && object.node !== null) ? TreeNode.fromPartial(object.node) : undefined;
     return message;
   },
 };
@@ -18667,7 +19520,7 @@ export const QuerySparkInvoicesResponse: MessageFns<QuerySparkInvoicesResponse> 
 };
 
 function createBaseInvoiceResponse(): InvoiceResponse {
-  return { invoice: "", status: 0 };
+  return { invoice: "", status: 0, transferType: undefined };
 }
 
 export const InvoiceResponse: MessageFns<InvoiceResponse> = {
@@ -18677,6 +19530,14 @@ export const InvoiceResponse: MessageFns<InvoiceResponse> = {
     }
     if (message.status !== 0) {
       writer.uint32(16).int32(message.status);
+    }
+    switch (message.transferType?.$case) {
+      case "satsTransfer":
+        SatsTransfer.encode(message.transferType.satsTransfer, writer.uint32(26).fork()).join();
+        break;
+      case "tokenTransfer":
+        TokenTransfer.encode(message.transferType.tokenTransfer, writer.uint32(34).fork()).join();
+        break;
     }
     return writer;
   },
@@ -18704,6 +19565,25 @@ export const InvoiceResponse: MessageFns<InvoiceResponse> = {
           message.status = reader.int32() as any;
           continue;
         }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.transferType = { $case: "satsTransfer", satsTransfer: SatsTransfer.decode(reader, reader.uint32()) };
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.transferType = {
+            $case: "tokenTransfer",
+            tokenTransfer: TokenTransfer.decode(reader, reader.uint32()),
+          };
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -18717,6 +19597,11 @@ export const InvoiceResponse: MessageFns<InvoiceResponse> = {
     return {
       invoice: isSet(object.invoice) ? globalThis.String(object.invoice) : "",
       status: isSet(object.status) ? invoiceStatusFromJSON(object.status) : 0,
+      transferType: isSet(object.satsTransfer)
+        ? { $case: "satsTransfer", satsTransfer: SatsTransfer.fromJSON(object.satsTransfer) }
+        : isSet(object.tokenTransfer)
+        ? { $case: "tokenTransfer", tokenTransfer: TokenTransfer.fromJSON(object.tokenTransfer) }
+        : undefined,
     };
   },
 
@@ -18728,6 +19613,11 @@ export const InvoiceResponse: MessageFns<InvoiceResponse> = {
     if (message.status !== 0) {
       obj.status = invoiceStatusToJSON(message.status);
     }
+    if (message.transferType?.$case === "satsTransfer") {
+      obj.satsTransfer = SatsTransfer.toJSON(message.transferType.satsTransfer);
+    } else if (message.transferType?.$case === "tokenTransfer") {
+      obj.tokenTransfer = TokenTransfer.toJSON(message.transferType.tokenTransfer);
+    }
     return obj;
   },
 
@@ -18738,6 +19628,146 @@ export const InvoiceResponse: MessageFns<InvoiceResponse> = {
     const message = createBaseInvoiceResponse();
     message.invoice = object.invoice ?? "";
     message.status = object.status ?? 0;
+    switch (object.transferType?.$case) {
+      case "satsTransfer": {
+        if (object.transferType?.satsTransfer !== undefined && object.transferType?.satsTransfer !== null) {
+          message.transferType = {
+            $case: "satsTransfer",
+            satsTransfer: SatsTransfer.fromPartial(object.transferType.satsTransfer),
+          };
+        }
+        break;
+      }
+      case "tokenTransfer": {
+        if (object.transferType?.tokenTransfer !== undefined && object.transferType?.tokenTransfer !== null) {
+          message.transferType = {
+            $case: "tokenTransfer",
+            tokenTransfer: TokenTransfer.fromPartial(object.transferType.tokenTransfer),
+          };
+        }
+        break;
+      }
+    }
+    return message;
+  },
+};
+
+function createBaseSatsTransfer(): SatsTransfer {
+  return { transferId: new Uint8Array(0) };
+}
+
+export const SatsTransfer: MessageFns<SatsTransfer> = {
+  encode(message: SatsTransfer, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transferId.length !== 0) {
+      writer.uint32(10).bytes(message.transferId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SatsTransfer {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSatsTransfer();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transferId = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SatsTransfer {
+    return { transferId: isSet(object.transferId) ? bytesFromBase64(object.transferId) : new Uint8Array(0) };
+  },
+
+  toJSON(message: SatsTransfer): unknown {
+    const obj: any = {};
+    if (message.transferId.length !== 0) {
+      obj.transferId = base64FromBytes(message.transferId);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SatsTransfer>): SatsTransfer {
+    return SatsTransfer.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SatsTransfer>): SatsTransfer {
+    const message = createBaseSatsTransfer();
+    message.transferId = object.transferId ?? new Uint8Array(0);
+    return message;
+  },
+};
+
+function createBaseTokenTransfer(): TokenTransfer {
+  return { finalTokenTransactionHash: new Uint8Array(0) };
+}
+
+export const TokenTransfer: MessageFns<TokenTransfer> = {
+  encode(message: TokenTransfer, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.finalTokenTransactionHash.length !== 0) {
+      writer.uint32(10).bytes(message.finalTokenTransactionHash);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): TokenTransfer {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTokenTransfer();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.finalTokenTransactionHash = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TokenTransfer {
+    return {
+      finalTokenTransactionHash: isSet(object.finalTokenTransactionHash)
+        ? bytesFromBase64(object.finalTokenTransactionHash)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: TokenTransfer): unknown {
+    const obj: any = {};
+    if (message.finalTokenTransactionHash.length !== 0) {
+      obj.finalTokenTransactionHash = base64FromBytes(message.finalTokenTransactionHash);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TokenTransfer>): TokenTransfer {
+    return TokenTransfer.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TokenTransfer>): TokenTransfer {
+    const message = createBaseTokenTransfer();
+    message.finalTokenTransactionHash = object.finalTokenTransactionHash ?? new Uint8Array(0);
     return message;
   },
 };
@@ -18952,6 +19982,21 @@ export const SparkServiceDefinition = {
       requestType: ExtendLeafRequest,
       requestStream: false,
       responseType: ExtendLeafResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * Resets the timelocks for a leaf's transactions. Can be used to reset the
+     * refund transaction timelock for a leaf (when the node transaction
+     * timelock is still > 300) or reset the node and refund transaction
+     * timelock. Returns an error if a leaf is not yet eligible to renew the
+     * timelocks, see RenewLeafRequest for more details.
+     */
+    renew_leaf: {
+      name: "renew_leaf",
+      requestType: RenewLeafRequest,
+      requestStream: false,
+      responseType: RenewLeafResponse,
       responseStream: false,
       options: {},
     },
@@ -19334,6 +20379,14 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: ExtendLeafRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<ExtendLeafResponse>>;
+  /**
+   * Resets the timelocks for a leaf's transactions. Can be used to reset the
+   * refund transaction timelock for a leaf (when the node transaction
+   * timelock is still > 300) or reset the node and refund transaction
+   * timelock. Returns an error if a leaf is not yet eligible to renew the
+   * timelocks, see RenewLeafRequest for more details.
+   */
+  renew_leaf(request: RenewLeafRequest, context: CallContext & CallContextExt): Promise<DeepPartial<RenewLeafResponse>>;
   get_signing_operator_list(
     request: Empty,
     context: CallContext & CallContextExt,
@@ -19592,6 +20645,17 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<ExtendLeafRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<ExtendLeafResponse>;
+  /**
+   * Resets the timelocks for a leaf's transactions. Can be used to reset the
+   * refund transaction timelock for a leaf (when the node transaction
+   * timelock is still > 300) or reset the node and refund transaction
+   * timelock. Returns an error if a leaf is not yet eligible to renew the
+   * timelocks, see RenewLeafRequest for more details.
+   */
+  renew_leaf(
+    request: DeepPartial<RenewLeafRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<RenewLeafResponse>;
   get_signing_operator_list(
     request: DeepPartial<Empty>,
     options?: CallOptions & CallOptionsExt,

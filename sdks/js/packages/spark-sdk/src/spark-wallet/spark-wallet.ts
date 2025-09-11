@@ -40,6 +40,7 @@ import {
   OutputWithPreviousTransactionData,
   QueryNodesRequest,
   QueryNodesResponse,
+  QuerySparkInvoicesResponse,
   SigningJob,
   SubscribeToEventsResponse,
   Transfer,
@@ -3874,6 +3875,17 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
       }
     });
     return { satsInvoices, tokenInvoices, invalidInvoices };
+  }
+
+  public async querySparkInvoices(
+    invoices: string[],
+  ): Promise<QuerySparkInvoicesResponse> {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+    return await sparkClient.query_spark_invoices({
+      invoice: invoices,
+    });
   }
 
   /**

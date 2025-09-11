@@ -9,6 +9,7 @@ import { bytesToHex } from "@noble/curves/utils";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "@buildonspark/spark-sdk/test-utils";
+import { InvoiceStatus } from "@buildonspark/spark-sdk/proto/spark";
 
 export const TOKENS_SCHNORR_CONFIG: Required<ConfigOptions> = {
   ...WalletConfig.LOCAL,
@@ -623,6 +624,26 @@ describe.each(TEST_CONFIGS)(
         expect(tokenTransactionSuccess.length).toBe(2); // two token assets - divided into two token transactions
         expect(tokenTransactionErrors.length).toBe(0);
         expect(invalidInvoices.length).toBe(0);
+        const invoicesToQuery = [
+          invoice1000,
+          invoice2000,
+          invoiceNilAmount,
+          sdkOneTokenInvoiceA,
+          sdkOneTokenInvoiceB,
+          sdkTwoTokenInvoiceA,
+          sdkTwoTokenNilAmountInvoiceB,
+        ];
+        const queryInvoiceResponse = await (sdk as any).querySparkInvoices(
+          invoicesToQuery,
+        );
+        expect(queryInvoiceResponse.invoiceStatuses.length).toBe(7);
+        for (let i = 0; i < queryInvoiceResponse.invoiceStatuses.length; i++) {
+          const response = queryInvoiceResponse.invoiceStatuses[i];
+          const invoiceStatus = response.status;
+          expect(invoiceStatus).toBeDefined();
+          expect(invoiceStatus).toBe(InvoiceStatus.FINALIZED);
+          expect(response.invoice).toBe(invoicesToQuery[i]);
+        }
       },
     );
 

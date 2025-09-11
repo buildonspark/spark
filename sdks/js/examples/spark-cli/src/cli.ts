@@ -25,6 +25,7 @@ import {
 import {
   TokenTransactionStatus,
   TreeNode,
+  InvoiceStatus,
 } from "@buildonspark/spark-sdk/proto/spark";
 import { CoopExitFeeQuote, ExitSpeed } from "@buildonspark/spark-sdk/types";
 import { LoggingLevel } from "@lightsparkdev/core";
@@ -354,6 +355,7 @@ const commands = [
   "testonly_expiretimelock",
 
   "fulfillsparkinvoice",
+  "querysparkinvoices",
   "validateinvoicesig",
 
   "enablelogging",
@@ -654,15 +656,17 @@ async function runCLI() {
   getlightningsendrequest <requestId>                                 - Get a lightning send request by ID
   getlightningreceiverequest <requestId>                              - Get a lightning receive request by ID
   getcoopexitrequest <requestId>                                      - Get a coop exit request by ID
-  unilateralexit [testmode=true]                                     - Interactive unilateral exit flow (normal mode: timelocks must be naturally expired, test mode: automatically expires timelocks)
+  unilateralexit [testmode=true]                                      - Interactive unilateral exit flow (normal mode: timelocks must be naturally expired, test mode: automatically expires timelocks)
   generatefeebumppackagetobroadcast <feeRate> <utxo1:txid:vout:value:script:publicKey> [utxo2:...] [nodeHexString1] [nodeHexString2 ...] - Get fee bump packages for unilateral exit transactions (if no nodes provided, uses all wallet leaves)
-  signfeebump <feeBumpPsbt> <privateKey>                                - Sign a fee bump package with the utxo private key
-  testonly_generateexternalwallet                              - Generate test wallet to fund utxos for fee bumping
-  testonly_generateutxostring <txid> <vout> <value> <publicKey>                      - Generate correctly formatted UTXO string from your public key
+  signfeebump <feeBumpPsbt> <privateKey>                              - Sign a fee bump package with the utxo private key
+  testonly_generateexternalwallet                                     - Generate test wallet to fund utxos for fee bumping
+  testonly_generateutxostring <txid> <vout> <value> <publicKey>       - Generate correctly formatted UTXO string from your public key
   checktimelock <leafId>                                              - Get the remaining timelock for a given leaf
-  testonly_expiretimelock <leafId>                                            - Refresh the timelock for a given leaf
-  leafidtohex <leafId1> [leafId2] [leafId3] ...                              - Convert leaf ID to hex string for unilateral exit
+  testonly_expiretimelock <leafId>                                    - Refresh the timelock for a given leaf
+  leafidtohex <leafId1> [leafId2] [leafId3] ...                       - Convert leaf ID to hex string for unilateral exit
   getleaves                                                           - Get all leaves owned by the wallet
+  fulfillsparkinvoice <invoice1[:amount1]> <invoice2[:amount2]> ...   - Fulfill one or more Spark token invoices (append :amount if invoice has no preset amount)
+  querysparkinvoices <invoice1> <invoice2> ...                          - Query Spark token invoices raw invoice strings
 
   💡 Simplified Unilateral Exit Flow:
   'unilateralexit' for interactive exit flow (normal mode - timelocks must be naturally expired).
@@ -673,7 +677,6 @@ async function runCLI() {
   Token Holder Commands:
     transfertokens <tokenIdentifier> <receiverAddress> <amount>        - Transfer tokens
     batchtransfertokens <tokenIdentifier> <receiverAddress1:amount1> <receiverAddress2:amount2> ... - Transfer tokens with multiple outputs
-    fulfillsparkinvoice <invoice1[:amount1]> <invoice2[:amount2]> ... - Fulfill one or more Spark token invoices (append :amount if invoice has no preset amount)
     querytokentransactions [--ownerPublicKeys] [--issuerPublicKeys] [--tokenTransactionHashes] [--tokenIdentifiers] [--outputIds] - Query token transaction history
 
   Token Issuer Commands:
@@ -1479,6 +1482,49 @@ async function runCLI() {
               errorMsg = error.message;
             }
             console.error(`Failed to fulfill spark invoice(s): ${errorMsg}`);
+          }
+          break;
+        }
+        case "querysparkinvoices": {
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          if (args.length < 1) {
+            console.log("Usage: querysparkinvoices <invoice1> <invoice2> ...");
+            break;
+          }
+          const sparkInvoices = args;
+
+          try {
+            const res = await wallet.querySparkInvoices(sparkInvoices as any);
+            for (const invoice of res.invoiceStatuses) {
+              console.log("--------------------------------");
+              console.log("Invoice:", invoice.invoice);
+              console.log("Status:", InvoiceStatus[invoice.status]);
+              const transferType = invoice.transferType;
+              if (transferType) {
+                if (transferType?.$case === "satsTransfer") {
+                  console.log(
+                    "Transfer ID:",
+                    bytesToHex(transferType.satsTransfer.transferId),
+                  );
+                } else if (transferType?.$case === "tokenTransfer") {
+                  console.log(
+                    "Token Transaction Hash:",
+                    bytesToHex(
+                      transferType.tokenTransfer.finalTokenTransactionHash,
+                    ),
+                  );
+                }
+              }
+            }
+          } catch (error) {
+            let errorMsg = "Unknown error";
+            if (error instanceof Error) {
+              errorMsg = error.message;
+            }
+            console.error(`Failed to query spark invoice(s): ${errorMsg}`);
           }
           break;
         }
