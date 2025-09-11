@@ -106,6 +106,20 @@ func (tc *TransferCreate) SetNillableCompletionTime(t *time.Time) *TransferCreat
 	return tc
 }
 
+// SetSparkInvoiceID sets the "spark_invoice_id" field.
+func (tc *TransferCreate) SetSparkInvoiceID(u uuid.UUID) *TransferCreate {
+	tc.mutation.SetSparkInvoiceID(u)
+	return tc
+}
+
+// SetNillableSparkInvoiceID sets the "spark_invoice_id" field if the given value is not nil.
+func (tc *TransferCreate) SetNillableSparkInvoiceID(u *uuid.UUID) *TransferCreate {
+	if u != nil {
+		tc.SetSparkInvoiceID(*u)
+	}
+	return tc
+}
+
 // SetID sets the "id" field.
 func (tc *TransferCreate) SetID(u uuid.UUID) *TransferCreate {
 	tc.mutation.SetID(u)
@@ -152,20 +166,6 @@ func (tc *TransferCreate) SetNillablePaymentIntentID(id *uuid.UUID) *TransferCre
 // SetPaymentIntent sets the "payment_intent" edge to the PaymentIntent entity.
 func (tc *TransferCreate) SetPaymentIntent(p *PaymentIntent) *TransferCreate {
 	return tc.SetPaymentIntentID(p.ID)
-}
-
-// SetSparkInvoiceID sets the "spark_invoice" edge to the SparkInvoice entity by ID.
-func (tc *TransferCreate) SetSparkInvoiceID(id uuid.UUID) *TransferCreate {
-	tc.mutation.SetSparkInvoiceID(id)
-	return tc
-}
-
-// SetNillableSparkInvoiceID sets the "spark_invoice" edge to the SparkInvoice entity by ID if the given value is not nil.
-func (tc *TransferCreate) SetNillableSparkInvoiceID(id *uuid.UUID) *TransferCreate {
-	if id != nil {
-		tc = tc.SetSparkInvoiceID(*id)
-	}
-	return tc
 }
 
 // SetSparkInvoice sets the "spark_invoice" edge to the SparkInvoice entity.
@@ -399,7 +399,7 @@ func (tc *TransferCreate) createSpec() (*Transfer, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.transfer_spark_invoice = &nodes[0]
+		_node.SparkInvoiceID = nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
@@ -523,6 +523,24 @@ func (u *TransferUpsert) UpdateCompletionTime() *TransferUpsert {
 // ClearCompletionTime clears the value of the "completion_time" field.
 func (u *TransferUpsert) ClearCompletionTime() *TransferUpsert {
 	u.SetNull(transfer.FieldCompletionTime)
+	return u
+}
+
+// SetSparkInvoiceID sets the "spark_invoice_id" field.
+func (u *TransferUpsert) SetSparkInvoiceID(v uuid.UUID) *TransferUpsert {
+	u.Set(transfer.FieldSparkInvoiceID, v)
+	return u
+}
+
+// UpdateSparkInvoiceID sets the "spark_invoice_id" field to the value that was provided on create.
+func (u *TransferUpsert) UpdateSparkInvoiceID() *TransferUpsert {
+	u.SetExcluded(transfer.FieldSparkInvoiceID)
+	return u
+}
+
+// ClearSparkInvoiceID clears the value of the "spark_invoice_id" field.
+func (u *TransferUpsert) ClearSparkInvoiceID() *TransferUpsert {
+	u.SetNull(transfer.FieldSparkInvoiceID)
 	return u
 }
 
@@ -667,6 +685,27 @@ func (u *TransferUpsertOne) UpdateCompletionTime() *TransferUpsertOne {
 func (u *TransferUpsertOne) ClearCompletionTime() *TransferUpsertOne {
 	return u.Update(func(s *TransferUpsert) {
 		s.ClearCompletionTime()
+	})
+}
+
+// SetSparkInvoiceID sets the "spark_invoice_id" field.
+func (u *TransferUpsertOne) SetSparkInvoiceID(v uuid.UUID) *TransferUpsertOne {
+	return u.Update(func(s *TransferUpsert) {
+		s.SetSparkInvoiceID(v)
+	})
+}
+
+// UpdateSparkInvoiceID sets the "spark_invoice_id" field to the value that was provided on create.
+func (u *TransferUpsertOne) UpdateSparkInvoiceID() *TransferUpsertOne {
+	return u.Update(func(s *TransferUpsert) {
+		s.UpdateSparkInvoiceID()
+	})
+}
+
+// ClearSparkInvoiceID clears the value of the "spark_invoice_id" field.
+func (u *TransferUpsertOne) ClearSparkInvoiceID() *TransferUpsertOne {
+	return u.Update(func(s *TransferUpsert) {
+		s.ClearSparkInvoiceID()
 	})
 }
 
@@ -978,6 +1017,27 @@ func (u *TransferUpsertBulk) UpdateCompletionTime() *TransferUpsertBulk {
 func (u *TransferUpsertBulk) ClearCompletionTime() *TransferUpsertBulk {
 	return u.Update(func(s *TransferUpsert) {
 		s.ClearCompletionTime()
+	})
+}
+
+// SetSparkInvoiceID sets the "spark_invoice_id" field.
+func (u *TransferUpsertBulk) SetSparkInvoiceID(v uuid.UUID) *TransferUpsertBulk {
+	return u.Update(func(s *TransferUpsert) {
+		s.SetSparkInvoiceID(v)
+	})
+}
+
+// UpdateSparkInvoiceID sets the "spark_invoice_id" field to the value that was provided on create.
+func (u *TransferUpsertBulk) UpdateSparkInvoiceID() *TransferUpsertBulk {
+	return u.Update(func(s *TransferUpsert) {
+		s.UpdateSparkInvoiceID()
+	})
+}
+
+// ClearSparkInvoiceID clears the value of the "spark_invoice_id" field.
+func (u *TransferUpsertBulk) ClearSparkInvoiceID() *TransferUpsertBulk {
+	return u.Update(func(s *TransferUpsert) {
+		s.ClearSparkInvoiceID()
 	})
 }
 

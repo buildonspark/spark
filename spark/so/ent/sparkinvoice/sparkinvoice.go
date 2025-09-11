@@ -43,7 +43,7 @@ const (
 	// It exists in this package in order to avoid circular dependency with the "transfer" package.
 	TransferInverseTable = "transfers"
 	// TransferColumn is the table column denoting the transfer relation/edge.
-	TransferColumn = "transfer_spark_invoice"
+	TransferColumn = "spark_invoice_id"
 )
 
 // Columns holds all SQL columns for sparkinvoice fields.

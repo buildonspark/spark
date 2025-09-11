@@ -726,7 +726,7 @@ var (
 		{Name: "expiry_time", Type: field.TypeTime},
 		{Name: "completion_time", Type: field.TypeTime, Nullable: true},
 		{Name: "transfer_payment_intent", Type: field.TypeUUID, Nullable: true},
-		{Name: "transfer_spark_invoice", Type: field.TypeUUID, Nullable: true},
+		{Name: "spark_invoice_id", Type: field.TypeUUID, Nullable: true},
 	}
 	// TransfersTable holds the schema information for the "transfers" table.
 	TransfersTable = &schema.Table{

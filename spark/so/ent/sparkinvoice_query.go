@@ -527,6 +527,9 @@ func (siq *SparkInvoiceQuery) loadTransfer(ctx context.Context, query *TransferQ
 		}
 	}
 	query.withFKs = true
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(transfer.FieldSparkInvoiceID)
+	}
 	query.Where(predicate.Transfer(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(sparkinvoice.TransferColumn), fks...))
 	}))
@@ -535,13 +538,10 @@ func (siq *SparkInvoiceQuery) loadTransfer(ctx context.Context, query *TransferQ
 		return err
 	}
 	for _, n := range neighbors {
-		fk := n.transfer_spark_invoice
-		if fk == nil {
-			return fmt.Errorf(`foreign-key "transfer_spark_invoice" is nil for node %v`, n.ID)
-		}
-		node, ok := nodeids[*fk]
+		fk := n.SparkInvoiceID
+		node, ok := nodeids[fk]
 		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "transfer_spark_invoice" returned %v for node %v`, *fk, n.ID)
+			return fmt.Errorf(`unexpected referenced foreign-key "spark_invoice_id" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
 	}

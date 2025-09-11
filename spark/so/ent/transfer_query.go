@@ -454,7 +454,7 @@ func (tq *TransferQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tra
 			tq.withSparkInvoice != nil,
 		}
 	)
-	if tq.withPaymentIntent != nil || tq.withSparkInvoice != nil {
+	if tq.withPaymentIntent != nil {
 		withFKs = true
 	}
 	if withFKs {
@@ -570,10 +570,7 @@ func (tq *TransferQuery) loadSparkInvoice(ctx context.Context, query *SparkInvoi
 	ids := make([]uuid.UUID, 0, len(nodes))
 	nodeids := make(map[uuid.UUID][]*Transfer)
 	for i := range nodes {
-		if nodes[i].transfer_spark_invoice == nil {
-			continue
-		}
-		fk := *nodes[i].transfer_spark_invoice
+		fk := nodes[i].SparkInvoiceID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -590,7 +587,7 @@ func (tq *TransferQuery) loadSparkInvoice(ctx context.Context, query *SparkInvoi
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "transfer_spark_invoice" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "spark_invoice_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -626,6 +623,9 @@ func (tq *TransferQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != transfer.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if tq.withSparkInvoice != nil {
+			_spec.Node.AddColumnOnce(transfer.FieldSparkInvoiceID)
 		}
 	}
 	if ps := tq.predicates; len(ps) > 0 {

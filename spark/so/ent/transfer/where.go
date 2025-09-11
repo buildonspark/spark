@@ -92,6 +92,11 @@ func CompletionTime(v time.Time) predicate.Transfer {
 	return predicate.Transfer(sql.FieldEQ(FieldCompletionTime, v))
 }
 
+// SparkInvoiceID applies equality check predicate on the "spark_invoice_id" field. It's identical to SparkInvoiceIDEQ.
+func SparkInvoiceID(v uuid.UUID) predicate.Transfer {
+	return predicate.Transfer(sql.FieldEQ(FieldSparkInvoiceID, v))
+}
+
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
 func CreateTimeEQ(v time.Time) predicate.Transfer {
 	return predicate.Transfer(sql.FieldEQ(FieldCreateTime, v))
@@ -440,6 +445,36 @@ func CompletionTimeIsNil() predicate.Transfer {
 // CompletionTimeNotNil applies the NotNil predicate on the "completion_time" field.
 func CompletionTimeNotNil() predicate.Transfer {
 	return predicate.Transfer(sql.FieldNotNull(FieldCompletionTime))
+}
+
+// SparkInvoiceIDEQ applies the EQ predicate on the "spark_invoice_id" field.
+func SparkInvoiceIDEQ(v uuid.UUID) predicate.Transfer {
+	return predicate.Transfer(sql.FieldEQ(FieldSparkInvoiceID, v))
+}
+
+// SparkInvoiceIDNEQ applies the NEQ predicate on the "spark_invoice_id" field.
+func SparkInvoiceIDNEQ(v uuid.UUID) predicate.Transfer {
+	return predicate.Transfer(sql.FieldNEQ(FieldSparkInvoiceID, v))
+}
+
+// SparkInvoiceIDIn applies the In predicate on the "spark_invoice_id" field.
+func SparkInvoiceIDIn(vs ...uuid.UUID) predicate.Transfer {
+	return predicate.Transfer(sql.FieldIn(FieldSparkInvoiceID, vs...))
+}
+
+// SparkInvoiceIDNotIn applies the NotIn predicate on the "spark_invoice_id" field.
+func SparkInvoiceIDNotIn(vs ...uuid.UUID) predicate.Transfer {
+	return predicate.Transfer(sql.FieldNotIn(FieldSparkInvoiceID, vs...))
+}
+
+// SparkInvoiceIDIsNil applies the IsNil predicate on the "spark_invoice_id" field.
+func SparkInvoiceIDIsNil() predicate.Transfer {
+	return predicate.Transfer(sql.FieldIsNull(FieldSparkInvoiceID))
+}
+
+// SparkInvoiceIDNotNil applies the NotNil predicate on the "spark_invoice_id" field.
+func SparkInvoiceIDNotNil() predicate.Transfer {
+	return predicate.Transfer(sql.FieldNotNull(FieldSparkInvoiceID))
 }
 
 // HasTransferLeaves applies the HasEdge predicate on the "transfer_leaves" edge.

@@ -17939,6 +17939,55 @@ func (m *TransferMutation) ResetCompletionTime() {
 	delete(m.clearedFields, transfer.FieldCompletionTime)
 }
 
+// SetSparkInvoiceID sets the "spark_invoice_id" field.
+func (m *TransferMutation) SetSparkInvoiceID(u uuid.UUID) {
+	m.spark_invoice = &u
+}
+
+// SparkInvoiceID returns the value of the "spark_invoice_id" field in the mutation.
+func (m *TransferMutation) SparkInvoiceID() (r uuid.UUID, exists bool) {
+	v := m.spark_invoice
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSparkInvoiceID returns the old "spark_invoice_id" field's value of the Transfer entity.
+// If the Transfer object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferMutation) OldSparkInvoiceID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSparkInvoiceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSparkInvoiceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSparkInvoiceID: %w", err)
+	}
+	return oldValue.SparkInvoiceID, nil
+}
+
+// ClearSparkInvoiceID clears the value of the "spark_invoice_id" field.
+func (m *TransferMutation) ClearSparkInvoiceID() {
+	m.spark_invoice = nil
+	m.clearedFields[transfer.FieldSparkInvoiceID] = struct{}{}
+}
+
+// SparkInvoiceIDCleared returns if the "spark_invoice_id" field was cleared in this mutation.
+func (m *TransferMutation) SparkInvoiceIDCleared() bool {
+	_, ok := m.clearedFields[transfer.FieldSparkInvoiceID]
+	return ok
+}
+
+// ResetSparkInvoiceID resets all changes to the "spark_invoice_id" field.
+func (m *TransferMutation) ResetSparkInvoiceID() {
+	m.spark_invoice = nil
+	delete(m.clearedFields, transfer.FieldSparkInvoiceID)
+}
+
 // AddTransferLeafeIDs adds the "transfer_leaves" edge to the TransferLeaf entity by ids.
 func (m *TransferMutation) AddTransferLeafeIDs(ids ...uuid.UUID) {
 	if m.transfer_leaves == nil {
@@ -18032,27 +18081,15 @@ func (m *TransferMutation) ResetPaymentIntent() {
 	m.clearedpayment_intent = false
 }
 
-// SetSparkInvoiceID sets the "spark_invoice" edge to the SparkInvoice entity by id.
-func (m *TransferMutation) SetSparkInvoiceID(id uuid.UUID) {
-	m.spark_invoice = &id
-}
-
 // ClearSparkInvoice clears the "spark_invoice" edge to the SparkInvoice entity.
 func (m *TransferMutation) ClearSparkInvoice() {
 	m.clearedspark_invoice = true
+	m.clearedFields[transfer.FieldSparkInvoiceID] = struct{}{}
 }
 
 // SparkInvoiceCleared reports if the "spark_invoice" edge to the SparkInvoice entity was cleared.
 func (m *TransferMutation) SparkInvoiceCleared() bool {
-	return m.clearedspark_invoice
-}
-
-// SparkInvoiceID returns the "spark_invoice" edge ID in the mutation.
-func (m *TransferMutation) SparkInvoiceID() (id uuid.UUID, exists bool) {
-	if m.spark_invoice != nil {
-		return *m.spark_invoice, true
-	}
-	return
+	return m.SparkInvoiceIDCleared() || m.clearedspark_invoice
 }
 
 // SparkInvoiceIDs returns the "spark_invoice" edge IDs in the mutation.
@@ -18105,7 +18142,7 @@ func (m *TransferMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TransferMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 10)
 	if m.create_time != nil {
 		fields = append(fields, transfer.FieldCreateTime)
 	}
@@ -18133,6 +18170,9 @@ func (m *TransferMutation) Fields() []string {
 	if m.completion_time != nil {
 		fields = append(fields, transfer.FieldCompletionTime)
 	}
+	if m.spark_invoice != nil {
+		fields = append(fields, transfer.FieldSparkInvoiceID)
+	}
 	return fields
 }
 
@@ -18159,6 +18199,8 @@ func (m *TransferMutation) Field(name string) (ent.Value, bool) {
 		return m.ExpiryTime()
 	case transfer.FieldCompletionTime:
 		return m.CompletionTime()
+	case transfer.FieldSparkInvoiceID:
+		return m.SparkInvoiceID()
 	}
 	return nil, false
 }
@@ -18186,6 +18228,8 @@ func (m *TransferMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldExpiryTime(ctx)
 	case transfer.FieldCompletionTime:
 		return m.OldCompletionTime(ctx)
+	case transfer.FieldSparkInvoiceID:
+		return m.OldSparkInvoiceID(ctx)
 	}
 	return nil, fmt.Errorf("unknown Transfer field %s", name)
 }
@@ -18258,6 +18302,13 @@ func (m *TransferMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCompletionTime(v)
 		return nil
+	case transfer.FieldSparkInvoiceID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSparkInvoiceID(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Transfer field %s", name)
 }
@@ -18306,6 +18357,9 @@ func (m *TransferMutation) ClearedFields() []string {
 	if m.FieldCleared(transfer.FieldCompletionTime) {
 		fields = append(fields, transfer.FieldCompletionTime)
 	}
+	if m.FieldCleared(transfer.FieldSparkInvoiceID) {
+		fields = append(fields, transfer.FieldSparkInvoiceID)
+	}
 	return fields
 }
 
@@ -18322,6 +18376,9 @@ func (m *TransferMutation) ClearField(name string) error {
 	switch name {
 	case transfer.FieldCompletionTime:
 		m.ClearCompletionTime()
+		return nil
+	case transfer.FieldSparkInvoiceID:
+		m.ClearSparkInvoiceID()
 		return nil
 	}
 	return fmt.Errorf("unknown Transfer nullable field %s", name)
@@ -18357,6 +18414,9 @@ func (m *TransferMutation) ResetField(name string) error {
 		return nil
 	case transfer.FieldCompletionTime:
 		m.ResetCompletionTime()
+		return nil
+	case transfer.FieldSparkInvoiceID:
+		m.ResetSparkInvoiceID()
 		return nil
 	}
 	return fmt.Errorf("unknown Transfer field %s", name)

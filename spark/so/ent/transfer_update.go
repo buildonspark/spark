@@ -108,6 +108,26 @@ func (tu *TransferUpdate) ClearCompletionTime() *TransferUpdate {
 	return tu
 }
 
+// SetSparkInvoiceID sets the "spark_invoice_id" field.
+func (tu *TransferUpdate) SetSparkInvoiceID(u uuid.UUID) *TransferUpdate {
+	tu.mutation.SetSparkInvoiceID(u)
+	return tu
+}
+
+// SetNillableSparkInvoiceID sets the "spark_invoice_id" field if the given value is not nil.
+func (tu *TransferUpdate) SetNillableSparkInvoiceID(u *uuid.UUID) *TransferUpdate {
+	if u != nil {
+		tu.SetSparkInvoiceID(*u)
+	}
+	return tu
+}
+
+// ClearSparkInvoiceID clears the value of the "spark_invoice_id" field.
+func (tu *TransferUpdate) ClearSparkInvoiceID() *TransferUpdate {
+	tu.mutation.ClearSparkInvoiceID()
+	return tu
+}
+
 // AddTransferLeafeIDs adds the "transfer_leaves" edge to the TransferLeaf entity by IDs.
 func (tu *TransferUpdate) AddTransferLeafeIDs(ids ...uuid.UUID) *TransferUpdate {
 	tu.mutation.AddTransferLeafeIDs(ids...)
@@ -140,20 +160,6 @@ func (tu *TransferUpdate) SetNillablePaymentIntentID(id *uuid.UUID) *TransferUpd
 // SetPaymentIntent sets the "payment_intent" edge to the PaymentIntent entity.
 func (tu *TransferUpdate) SetPaymentIntent(p *PaymentIntent) *TransferUpdate {
 	return tu.SetPaymentIntentID(p.ID)
-}
-
-// SetSparkInvoiceID sets the "spark_invoice" edge to the SparkInvoice entity by ID.
-func (tu *TransferUpdate) SetSparkInvoiceID(id uuid.UUID) *TransferUpdate {
-	tu.mutation.SetSparkInvoiceID(id)
-	return tu
-}
-
-// SetNillableSparkInvoiceID sets the "spark_invoice" edge to the SparkInvoice entity by ID if the given value is not nil.
-func (tu *TransferUpdate) SetNillableSparkInvoiceID(id *uuid.UUID) *TransferUpdate {
-	if id != nil {
-		tu = tu.SetSparkInvoiceID(*id)
-	}
-	return tu
 }
 
 // SetSparkInvoice sets the "spark_invoice" edge to the SparkInvoice entity.
@@ -487,6 +493,26 @@ func (tuo *TransferUpdateOne) ClearCompletionTime() *TransferUpdateOne {
 	return tuo
 }
 
+// SetSparkInvoiceID sets the "spark_invoice_id" field.
+func (tuo *TransferUpdateOne) SetSparkInvoiceID(u uuid.UUID) *TransferUpdateOne {
+	tuo.mutation.SetSparkInvoiceID(u)
+	return tuo
+}
+
+// SetNillableSparkInvoiceID sets the "spark_invoice_id" field if the given value is not nil.
+func (tuo *TransferUpdateOne) SetNillableSparkInvoiceID(u *uuid.UUID) *TransferUpdateOne {
+	if u != nil {
+		tuo.SetSparkInvoiceID(*u)
+	}
+	return tuo
+}
+
+// ClearSparkInvoiceID clears the value of the "spark_invoice_id" field.
+func (tuo *TransferUpdateOne) ClearSparkInvoiceID() *TransferUpdateOne {
+	tuo.mutation.ClearSparkInvoiceID()
+	return tuo
+}
+
 // AddTransferLeafeIDs adds the "transfer_leaves" edge to the TransferLeaf entity by IDs.
 func (tuo *TransferUpdateOne) AddTransferLeafeIDs(ids ...uuid.UUID) *TransferUpdateOne {
 	tuo.mutation.AddTransferLeafeIDs(ids...)
@@ -519,20 +545,6 @@ func (tuo *TransferUpdateOne) SetNillablePaymentIntentID(id *uuid.UUID) *Transfe
 // SetPaymentIntent sets the "payment_intent" edge to the PaymentIntent entity.
 func (tuo *TransferUpdateOne) SetPaymentIntent(p *PaymentIntent) *TransferUpdateOne {
 	return tuo.SetPaymentIntentID(p.ID)
-}
-
-// SetSparkInvoiceID sets the "spark_invoice" edge to the SparkInvoice entity by ID.
-func (tuo *TransferUpdateOne) SetSparkInvoiceID(id uuid.UUID) *TransferUpdateOne {
-	tuo.mutation.SetSparkInvoiceID(id)
-	return tuo
-}
-
-// SetNillableSparkInvoiceID sets the "spark_invoice" edge to the SparkInvoice entity by ID if the given value is not nil.
-func (tuo *TransferUpdateOne) SetNillableSparkInvoiceID(id *uuid.UUID) *TransferUpdateOne {
-	if id != nil {
-		tuo = tuo.SetSparkInvoiceID(*id)
-	}
-	return tuo
 }
 
 // SetSparkInvoice sets the "spark_invoice" edge to the SparkInvoice entity.

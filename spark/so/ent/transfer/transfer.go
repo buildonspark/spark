@@ -36,6 +36,8 @@ const (
 	FieldExpiryTime = "expiry_time"
 	// FieldCompletionTime holds the string denoting the completion_time field in the database.
 	FieldCompletionTime = "completion_time"
+	// FieldSparkInvoiceID holds the string denoting the spark_invoice_id field in the database.
+	FieldSparkInvoiceID = "spark_invoice_id"
 	// EdgeTransferLeaves holds the string denoting the transfer_leaves edge name in mutations.
 	EdgeTransferLeaves = "transfer_leaves"
 	// EdgePaymentIntent holds the string denoting the payment_intent edge name in mutations.
@@ -64,7 +66,7 @@ const (
 	// It exists in this package in order to avoid circular dependency with the "sparkinvoice" package.
 	SparkInvoiceInverseTable = "spark_invoices"
 	// SparkInvoiceColumn is the table column denoting the spark_invoice relation/edge.
-	SparkInvoiceColumn = "transfer_spark_invoice"
+	SparkInvoiceColumn = "spark_invoice_id"
 )
 
 // Columns holds all SQL columns for transfer fields.
@@ -79,13 +81,13 @@ var Columns = []string{
 	FieldType,
 	FieldExpiryTime,
 	FieldCompletionTime,
+	FieldSparkInvoiceID,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "transfers"
 // table and are not defined as standalone fields in the schema.
 var ForeignKeys = []string{
 	"transfer_payment_intent",
-	"transfer_spark_invoice",
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -185,6 +187,11 @@ func ByExpiryTime(opts ...sql.OrderTermOption) OrderOption {
 // ByCompletionTime orders the results by the completion_time field.
 func ByCompletionTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCompletionTime, opts...).ToFunc()
+}
+
+// BySparkInvoiceID orders the results by the spark_invoice_id field.
+func BySparkInvoiceID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSparkInvoiceID, opts...).ToFunc()
 }
 
 // ByTransferLeavesCount orders the results by transfer_leaves count.

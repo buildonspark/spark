@@ -39,11 +39,12 @@ type Transfer struct {
 	ExpiryTime time.Time `json:"expiry_time,omitempty"`
 	// CompletionTime holds the value of the "completion_time" field.
 	CompletionTime *time.Time `json:"completion_time,omitempty"`
+	// Foreign key to spark_invoice
+	SparkInvoiceID uuid.UUID `json:"spark_invoice_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TransferQuery when eager-loading is set.
 	Edges                   TransferEdges `json:"edges"`
 	transfer_payment_intent *uuid.UUID
-	transfer_spark_invoice  *uuid.UUID
 	selectValues            sql.SelectValues
 }
 
@@ -104,11 +105,9 @@ func (*Transfer) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullString)
 		case transfer.FieldCreateTime, transfer.FieldUpdateTime, transfer.FieldExpiryTime, transfer.FieldCompletionTime:
 			values[i] = new(sql.NullTime)
-		case transfer.FieldID:
+		case transfer.FieldID, transfer.FieldSparkInvoiceID:
 			values[i] = new(uuid.UUID)
 		case transfer.ForeignKeys[0]: // transfer_payment_intent
-			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
-		case transfer.ForeignKeys[1]: // transfer_spark_invoice
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
@@ -186,19 +185,18 @@ func (t *Transfer) assignValues(columns []string, values []any) error {
 				t.CompletionTime = new(time.Time)
 				*t.CompletionTime = value.Time
 			}
+		case transfer.FieldSparkInvoiceID:
+			if value, ok := values[i].(*uuid.UUID); !ok {
+				return fmt.Errorf("unexpected type %T for field spark_invoice_id", values[i])
+			} else if value != nil {
+				t.SparkInvoiceID = *value
+			}
 		case transfer.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
 				return fmt.Errorf("unexpected type %T for field transfer_payment_intent", values[i])
 			} else if value.Valid {
 				t.transfer_payment_intent = new(uuid.UUID)
 				*t.transfer_payment_intent = *value.S.(*uuid.UUID)
-			}
-		case transfer.ForeignKeys[1]:
-			if value, ok := values[i].(*sql.NullScanner); !ok {
-				return fmt.Errorf("unexpected type %T for field transfer_spark_invoice", values[i])
-			} else if value.Valid {
-				t.transfer_spark_invoice = new(uuid.UUID)
-				*t.transfer_spark_invoice = *value.S.(*uuid.UUID)
 			}
 		default:
 			t.selectValues.Set(columns[i], values[i])
@@ -279,6 +277,9 @@ func (t *Transfer) String() string {
 		builder.WriteString("completion_time=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
+	builder.WriteString(", ")
+	builder.WriteString("spark_invoice_id=")
+	builder.WriteString(fmt.Sprintf("%v", t.SparkInvoiceID))
 	builder.WriteByte(')')
 	return builder.String()
 }
