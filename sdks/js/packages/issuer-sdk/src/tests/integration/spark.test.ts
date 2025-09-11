@@ -183,8 +183,10 @@ describe.each(TEST_CONFIGS)(
       expect(userBalance.balance).toBeGreaterThanOrEqual(tokenAmount);
     });
 
-    const tv1It = name.startsWith("TV1") ? it.skip : it.skip;
-    tv1It("should transfer tokens using spark invoices", async () => {
+    // const tv1It = name.startsWith("TV1") ? it.skip : it.skip;
+    // TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
+    const skipInvoiceTest = it.skip;
+    skipInvoiceTest("should transfer tokens using spark invoices", async () => {
       const tokenAmount: bigint = 777n;
       const initialIssuerBalance = 100000n;
 
@@ -239,201 +241,217 @@ describe.each(TEST_CONFIGS)(
       expect(receiverBalance.balance).toEqual(tokenAmount);
     });
 
-    tv1It("should transfer tokens using multiple spark invoices", async () => {
-      const amount1: bigint = 111n;
-      const amount2: bigint = 222n;
-      const amount3: bigint = 333n;
-      const totalAmount: bigint = amount1 + amount2 + amount3;
-      const initialIssuerBalance = 100000n;
+    skipInvoiceTest(
+      "should transfer tokens using multiple spark invoices",
+      async () => {
+        const amount1: bigint = 111n;
+        const amount2: bigint = 222n;
+        const amount3: bigint = 333n;
+        const totalAmount: bigint = amount1 + amount2 + amount3;
+        const initialIssuerBalance = 100000n;
 
-      const { wallet: issuerWallet } =
-        await IssuerSparkWalletTesting.initialize({
+        const { wallet: issuerWallet } =
+          await IssuerSparkWalletTesting.initialize({
+            options: config,
+          });
+        const { wallet: receiverWallet1 } = await SparkWalletTesting.initialize(
+          {
+            options: config,
+          },
+        );
+        const { wallet: receiverWallet2 } = await SparkWalletTesting.initialize(
+          {
+            options: config,
+          },
+        );
+
+        await issuerWallet.createToken({
+          tokenName: `${name}INVM`,
+          tokenTicker: "INM",
+          decimals: 0,
+          isFreezable: false,
+          maxSupply: 1_000_000n,
+        });
+
+        await issuerWallet.mintTokens(initialIssuerBalance);
+
+        const issuerBalanceAfterMint =
+          await issuerWallet.getIssuerTokenBalance();
+        expect(issuerBalanceAfterMint).toBeDefined();
+        expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
+        const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
+        const issuerBalanceBeforeTransfer = issuerBalanceAfterMint.balance;
+
+        const invoice1 = await receiverWallet1.createTokensInvoice({
+          amount: amount1,
+          tokenIdentifier,
+          memo: "Invoice #1",
+          expiryTime: new Date(Date.now() + 1000 * 60 * 60 * 24),
+        });
+
+        const invoice2 = await receiverWallet1.createTokensInvoice({
+          amount: amount2,
+          tokenIdentifier,
+          memo: "Invoice #2",
+          expiryTime: new Date(Date.now() + 1000 * 60 * 60 * 24),
+        });
+
+        const invoice3 = await receiverWallet2.createTokensInvoice({
+          amount: amount3,
+          tokenIdentifier,
+          memo: "Invoice #3",
+          expiryTime: new Date(Date.now() + 1000 * 60 * 60 * 24),
+        });
+
+        const { tokenTransactionSuccess } =
+          await issuerWallet.fulfillSparkInvoice([
+            { invoice: invoice1 },
+            { invoice: invoice2 },
+            { invoice: invoice3 },
+          ]);
+        expect(tokenTransactionSuccess.length).toBe(1);
+        expect(tokenTransactionSuccess[0].txid).toBeDefined();
+        expect(tokenTransactionSuccess[0].txid.length).toBeGreaterThan(0);
+
+        const issuerBalanceAfter = (await issuerWallet.getIssuerTokenBalance())
+          .balance;
+        expect(issuerBalanceAfter).toEqual(
+          issuerBalanceBeforeTransfer - totalAmount,
+        );
+
+        const receiver1BalanceObj = await receiverWallet1.getBalance();
+        const receiver1Balance = filterTokenBalanceForTokenIdentifier(
+          receiver1BalanceObj?.tokenBalances,
+          tokenIdentifier!,
+        );
+        expect(receiver1Balance.balance).toEqual(amount1 + amount2);
+
+        const receiver2BalanceObj = await receiverWallet2.getBalance();
+        const receiver2Balance = filterTokenBalanceForTokenIdentifier(
+          receiver2BalanceObj?.tokenBalances,
+          tokenIdentifier!,
+        );
+        expect(receiver2Balance.balance).toEqual(amount3);
+      },
+    );
+
+    skipInvoiceTest(
+      "should fail to fulfill an expired spark invoice",
+      async () => {
+        const tokenAmount: bigint = 123n;
+        const initialIssuerBalance = 100000n;
+
+        const { wallet: issuerWallet } =
+          await IssuerSparkWalletTesting.initialize({
+            options: config,
+          });
+        const { wallet: receiverWallet } = await SparkWalletTesting.initialize({
           options: config,
         });
-      const { wallet: receiverWallet1 } = await SparkWalletTesting.initialize({
-        options: config,
-      });
-      const { wallet: receiverWallet2 } = await SparkWalletTesting.initialize({
-        options: config,
-      });
 
-      await issuerWallet.createToken({
-        tokenName: `${name}INVM`,
-        tokenTicker: "INM",
-        decimals: 0,
-        isFreezable: false,
-        maxSupply: 1_000_000n,
-      });
+        await issuerWallet.createToken({
+          tokenName: `${name}INVEXP`,
+          tokenTicker: "INVX",
+          decimals: 0,
+          isFreezable: false,
+          maxSupply: 1_000_000n,
+        });
 
-      await issuerWallet.mintTokens(initialIssuerBalance);
+        await issuerWallet.mintTokens(initialIssuerBalance);
 
-      const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
-      expect(issuerBalanceAfterMint).toBeDefined();
-      expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
-      const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
-      const issuerBalanceBeforeTransfer = issuerBalanceAfterMint.balance;
+        const issuerBalanceAfterMint =
+          await issuerWallet.getIssuerTokenBalance();
+        expect(issuerBalanceAfterMint).toBeDefined();
+        expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
+        const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
+        const issuerBalanceBefore = issuerBalanceAfterMint.balance;
 
-      const invoice1 = await receiverWallet1.createTokensInvoice({
-        amount: amount1,
-        tokenIdentifier,
-        memo: "Invoice #1",
-        expiryTime: new Date(Date.now() + 1000 * 60 * 60 * 24),
-      });
+        const expiredInvoice = await receiverWallet.createTokensInvoice({
+          amount: tokenAmount,
+          tokenIdentifier,
+          memo: "Expired invoice",
+          expiryTime: new Date(Date.now() - 60_000),
+        });
 
-      const invoice2 = await receiverWallet1.createTokensInvoice({
-        amount: amount2,
-        tokenIdentifier,
-        memo: "Invoice #2",
-        expiryTime: new Date(Date.now() + 1000 * 60 * 60 * 24),
-      });
-
-      const invoice3 = await receiverWallet2.createTokensInvoice({
-        amount: amount3,
-        tokenIdentifier,
-        memo: "Invoice #3",
-        expiryTime: new Date(Date.now() + 1000 * 60 * 60 * 24),
-      });
-
-      const { tokenTransactionSuccess } =
-        await issuerWallet.fulfillSparkInvoice([
-          { invoice: invoice1 },
-          { invoice: invoice2 },
-          { invoice: invoice3 },
+        const { invalidInvoices } = await issuerWallet.fulfillSparkInvoice([
+          { invoice: expiredInvoice },
         ]);
-      expect(tokenTransactionSuccess.length).toBe(1);
-      expect(tokenTransactionSuccess[0].txid).toBeDefined();
-      expect(tokenTransactionSuccess[0].txid.length).toBeGreaterThan(0);
+        expect(invalidInvoices.length).toBe(1);
+        expect(invalidInvoices[0].invoice).toBe(expiredInvoice);
 
-      const issuerBalanceAfter = (await issuerWallet.getIssuerTokenBalance())
-        .balance;
-      expect(issuerBalanceAfter).toEqual(
-        issuerBalanceBeforeTransfer - totalAmount,
-      );
+        const issuerBalanceAfter = (await issuerWallet.getIssuerTokenBalance())
+          .balance;
+        expect(issuerBalanceAfter).toEqual(issuerBalanceBefore);
 
-      const receiver1BalanceObj = await receiverWallet1.getBalance();
-      const receiver1Balance = filterTokenBalanceForTokenIdentifier(
-        receiver1BalanceObj?.tokenBalances,
-        tokenIdentifier!,
-      );
-      expect(receiver1Balance.balance).toEqual(amount1 + amount2);
+        const receiverBalanceObj = await receiverWallet.getBalance();
+        const receiverBalance = filterTokenBalanceForTokenIdentifier(
+          receiverBalanceObj?.tokenBalances,
+          tokenIdentifier!,
+        );
+        expect(receiverBalance.balance).toEqual(0n);
+      },
+    );
 
-      const receiver2BalanceObj = await receiverWallet2.getBalance();
-      const receiver2Balance = filterTokenBalanceForTokenIdentifier(
-        receiver2BalanceObj?.tokenBalances,
-        tokenIdentifier!,
-      );
-      expect(receiver2Balance.balance).toEqual(amount3);
-    });
+    skipInvoiceTest(
+      "should fulfill a spark invoice with null expiry",
+      async () => {
+        const tokenAmount: bigint = 321n;
+        const initialIssuerBalance = 100000n;
 
-    tv1It("should fail to fulfill an expired spark invoice", async () => {
-      const tokenAmount: bigint = 123n;
-      const initialIssuerBalance = 100000n;
-
-      const { wallet: issuerWallet } =
-        await IssuerSparkWalletTesting.initialize({
+        const { wallet: issuerWallet } =
+          await IssuerSparkWalletTesting.initialize({
+            options: config,
+          });
+        const { wallet: receiverWallet } = await SparkWalletTesting.initialize({
           options: config,
         });
-      const { wallet: receiverWallet } = await SparkWalletTesting.initialize({
-        options: config,
-      });
 
-      await issuerWallet.createToken({
-        tokenName: `${name}INVEXP`,
-        tokenTicker: "INVX",
-        decimals: 0,
-        isFreezable: false,
-        maxSupply: 1_000_000n,
-      });
-
-      await issuerWallet.mintTokens(initialIssuerBalance);
-
-      const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
-      expect(issuerBalanceAfterMint).toBeDefined();
-      expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
-      const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
-      const issuerBalanceBefore = issuerBalanceAfterMint.balance;
-
-      const expiredInvoice = await receiverWallet.createTokensInvoice({
-        amount: tokenAmount,
-        tokenIdentifier,
-        memo: "Expired invoice",
-        expiryTime: new Date(Date.now() - 60_000),
-      });
-
-      const { invalidInvoices } = await issuerWallet.fulfillSparkInvoice([
-        { invoice: expiredInvoice },
-      ]);
-      expect(invalidInvoices.length).toBe(1);
-      expect(invalidInvoices[0].invoice).toBe(expiredInvoice);
-
-      const issuerBalanceAfter = (await issuerWallet.getIssuerTokenBalance())
-        .balance;
-      expect(issuerBalanceAfter).toEqual(issuerBalanceBefore);
-
-      const receiverBalanceObj = await receiverWallet.getBalance();
-      const receiverBalance = filterTokenBalanceForTokenIdentifier(
-        receiverBalanceObj?.tokenBalances,
-        tokenIdentifier!,
-      );
-      expect(receiverBalance.balance).toEqual(0n);
-    });
-
-    tv1It("should fulfill a spark invoice with null expiry", async () => {
-      const tokenAmount: bigint = 321n;
-      const initialIssuerBalance = 100000n;
-
-      const { wallet: issuerWallet } =
-        await IssuerSparkWalletTesting.initialize({
-          options: config,
+        await issuerWallet.createToken({
+          tokenName: `${name}INVNULL`,
+          tokenTicker: "INVN",
+          decimals: 0,
+          isFreezable: false,
+          maxSupply: 1_000_000n,
         });
-      const { wallet: receiverWallet } = await SparkWalletTesting.initialize({
-        options: config,
-      });
 
-      await issuerWallet.createToken({
-        tokenName: `${name}INVNULL`,
-        tokenTicker: "INVN",
-        decimals: 0,
-        isFreezable: false,
-        maxSupply: 1_000_000n,
-      });
+        await issuerWallet.mintTokens(initialIssuerBalance);
 
-      await issuerWallet.mintTokens(initialIssuerBalance);
+        const issuerBalanceAfterMint =
+          await issuerWallet.getIssuerTokenBalance();
+        expect(issuerBalanceAfterMint).toBeDefined();
+        expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
+        const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
+        const issuerBalanceBefore = issuerBalanceAfterMint.balance;
 
-      const issuerBalanceAfterMint = await issuerWallet.getIssuerTokenBalance();
-      expect(issuerBalanceAfterMint).toBeDefined();
-      expect(issuerBalanceAfterMint.balance).toBe(initialIssuerBalance);
-      const tokenIdentifier = issuerBalanceAfterMint.tokenIdentifier!;
-      const issuerBalanceBefore = issuerBalanceAfterMint.balance;
+        const nullExpiryInvoice = await receiverWallet.createTokensInvoice({
+          amount: tokenAmount,
+          tokenIdentifier,
+          memo: "Null expiry invoice",
+          expiryTime: null as unknown as Date,
+        });
 
-      const nullExpiryInvoice = await receiverWallet.createTokensInvoice({
-        amount: tokenAmount,
-        tokenIdentifier,
-        memo: "Null expiry invoice",
-        expiryTime: null as unknown as Date,
-      });
+        const { tokenTransactionSuccess } =
+          await issuerWallet.fulfillSparkInvoice([
+            { invoice: nullExpiryInvoice },
+          ]);
+        expect(tokenTransactionSuccess.length).toBe(1);
+        expect(tokenTransactionSuccess[0].txid).toBeDefined();
+        expect(tokenTransactionSuccess[0].txid.length).toBeGreaterThan(0);
 
-      const { tokenTransactionSuccess } =
-        await issuerWallet.fulfillSparkInvoice([
-          { invoice: nullExpiryInvoice },
-        ]);
-      expect(tokenTransactionSuccess.length).toBe(1);
-      expect(tokenTransactionSuccess[0].txid).toBeDefined();
-      expect(tokenTransactionSuccess[0].txid.length).toBeGreaterThan(0);
+        const issuerBalanceAfter = (await issuerWallet.getIssuerTokenBalance())
+          .balance;
+        expect(issuerBalanceAfter).toEqual(issuerBalanceBefore - tokenAmount);
 
-      const issuerBalanceAfter = (await issuerWallet.getIssuerTokenBalance())
-        .balance;
-      expect(issuerBalanceAfter).toEqual(issuerBalanceBefore - tokenAmount);
+        const receiverBalanceObj = await receiverWallet.getBalance();
+        const receiverBalance = filterTokenBalanceForTokenIdentifier(
+          receiverBalanceObj?.tokenBalances,
+          tokenIdentifier!,
+        );
+        expect(receiverBalance.balance).toEqual(tokenAmount);
+      },
+    );
 
-      const receiverBalanceObj = await receiverWallet.getBalance();
-      const receiverBalance = filterTokenBalanceForTokenIdentifier(
-        receiverBalanceObj?.tokenBalances,
-        tokenIdentifier!,
-      );
-      expect(receiverBalance.balance).toEqual(tokenAmount);
-    });
-
-    tv1It(
+    skipInvoiceTest(
       "should fulfill a tokens invoice without amount by passing amount parameter",
       async () => {
         const tokenAmount: bigint = 555n;
@@ -493,7 +511,7 @@ describe.each(TEST_CONFIGS)(
       },
     );
 
-    tv1It(
+    skipInvoiceTest(
       `fulfillSparkInvoice successfully handles multiple mixed tokens and sats invoices`,
       async () => {
         const faucet = BitcoinFaucet.getInstance();
