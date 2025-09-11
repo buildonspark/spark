@@ -2,6 +2,7 @@ package schema
 
 import (
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -60,17 +61,17 @@ func (Transfer) Indexes() []ent.Index {
 		index.Fields("receiver_identity_pubkey"),
 		index.Fields("status"),
 		index.Fields("update_time"),
-		// index.Fields("spark_invoice_id").
-		// 	Unique().
-		// 	Annotations(
-		// 		entsql.IndexWhere("status IN ('SENDER_KEY_TWEAK_PENDING', 'SENDER_INITIATED_COORDINATOR')"),
-		// 	).
-		// 	StorageKey("idx_transfers_spark_invoice_pending"),
-		// index.Fields("spark_invoice_id").
-		// 	Unique().
-		// 	Annotations(
-		// 		entsql.IndexWhere("status IN ('SENDER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED', 'COMPLETED')"),
-		// 	).
-		// 	StorageKey("idx_transfers_spark_invoice_completed"),
+		index.Fields("spark_invoice_id").
+			Unique().
+			Annotations(
+				entsql.IndexWhere("CAST(status AS TEXT) IN ('SENDER_KEY_TWEAK_PENDING', 'SENDER_INITIATED_COORDINATOR')"),
+			).
+			StorageKey("idx_transfers_spark_invoice_pending"),
+		index.Fields("spark_invoice_id").
+			Unique().
+			Annotations(
+				entsql.IndexWhere("CAST(status AS TEXT) IN ('SENDER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED', 'COMPLETED')"),
+			).
+			StorageKey("idx_transfers_spark_invoice_completed"),
 	}
 }

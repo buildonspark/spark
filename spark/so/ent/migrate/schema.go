@@ -768,6 +768,22 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{TransfersColumns[2]},
 			},
+			{
+				Name:    "idx_transfers_spark_invoice_pending",
+				Unique:  true,
+				Columns: []*schema.Column{TransfersColumns[11]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "CAST(status AS TEXT) IN ('SENDER_KEY_TWEAK_PENDING', 'SENDER_INITIATED_COORDINATOR')",
+				},
+			},
+			{
+				Name:    "idx_transfers_spark_invoice_completed",
+				Unique:  true,
+				Columns: []*schema.Column{TransfersColumns[11]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "CAST(status AS TEXT) IN ('SENDER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED', 'COMPLETED')",
+				},
+			},
 		},
 	}
 	// TransferLeafsColumns holds the columns for the "transfer_leafs" table.
