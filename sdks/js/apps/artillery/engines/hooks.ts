@@ -8,11 +8,14 @@ import { LockManager } from "./lock-manager";
 
 const lockManager = LockManager.getInstance();
 
+const DEFAULT_LOCK_TTL_MS = 70 * 1000;
+
 export async function createLockFile(
   address: string,
   metadata: any = {},
+  ttlMs: number = DEFAULT_LOCK_TTL_MS,
 ): Promise<boolean> {
-  return lockManager.createLock(address, metadata);
+  return lockManager.createLock(address, metadata, ttlMs);
 }
 
 export async function removeLockFile(address: string): Promise<boolean> {
@@ -26,8 +29,9 @@ export async function isLocked(address: string): Promise<boolean> {
 export async function tryLockOneOf(
   addresses: string[],
   metadata: any = {},
+  ttlMs: number = DEFAULT_LOCK_TTL_MS,
 ): Promise<string | null> {
-  return lockManager.tryLockOneOf(addresses, metadata);
+  return lockManager.tryLockOneOf(addresses, metadata, ttlMs);
 }
 
 export async function getUnlockedAddresses(

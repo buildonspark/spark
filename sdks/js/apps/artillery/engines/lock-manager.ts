@@ -44,13 +44,29 @@ export class LockManager {
         address TEXT PRIMARY KEY,
         metadata TEXT NOT NULL,
         locked_at INTEGER NOT NULL,
-        pid INTEGER NOT NULL
+        pid INTEGER NOT NULL,
+        ttl INTEGER DEFAULT NULL,
+        expires_at INTEGER DEFAULT NULL
       )
     `);
 
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_locked_at ON locks(locked_at)
     `);
+
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_expires_at ON locks(expires_at)
+    `);
+
+    // Add columns to existing table if they don't exist
+    try {
+      this.db.exec(`ALTER TABLE locks ADD COLUMN ttl INTEGER DEFAULT NULL`);
+    } catch {}
+    try {
+      this.db.exec(
+        `ALTER TABLE locks ADD COLUMN expires_at INTEGER DEFAULT NULL`,
+      );
+    } catch {}
 
     this.initialized = true;
     console.log("SQLite lock manager initialized");
@@ -67,20 +83,35 @@ export class LockManager {
     );
   }
 
-  async createLock(address: string, metadata: any = {}): Promise<boolean> {
+  async createLock(
+    address: string,
+    metadata: any = {},
+    ttlMs?: number,
+  ): Promise<boolean> {
     try {
+      const now = Date.now();
+      const expiresAt = ttlMs ? now + ttlMs : null;
+
       const stmt = this.db.prepare(`
-        INSERT INTO locks (address, metadata, locked_at, pid)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO locks (address, metadata, locked_at, pid, ttl, expires_at)
+        VALUES (?, ?, ?, ?, ?, ?)
       `);
 
       const lockData = {
         ...metadata,
         lockedAt: new Date().toISOString(),
         pid: process.pid,
+        ttl: ttlMs,
       };
 
-      stmt.run(address, JSON.stringify(lockData), Date.now(), process.pid);
+      stmt.run(
+        address,
+        JSON.stringify(lockData),
+        now,
+        process.pid,
+        ttlMs,
+        expiresAt,
+      );
 
       return true;
     } catch (error) {
@@ -105,8 +136,15 @@ export class LockManager {
 
   async isLocked(address: string): Promise<boolean> {
     try {
-      const stmt = this.db.prepare("SELECT 1 FROM locks WHERE address = ?");
-      const result = stmt.get(address);
+      // First clean up expired locks
+      this.cleanupExpiredLocks();
+
+      const stmt = this.db.prepare(`
+        SELECT 1 FROM locks 
+        WHERE address = ? 
+        AND (expires_at IS NULL OR expires_at > ?)
+      `);
+      const result = stmt.get(address, Date.now());
       return !!result;
     } catch (error) {
       console.error(`Failed to check lock for ${address}:`, error);
@@ -118,14 +156,17 @@ export class LockManager {
     const cutoffTime = Date.now() - maxAge;
 
     try {
+      // Clean up expired locks first
+      this.cleanupExpiredLocks();
+
       const selectStmt = this.db.prepare(
-        "SELECT address FROM locks WHERE locked_at < ?",
+        "SELECT address FROM locks WHERE locked_at < ? AND (ttl IS NULL OR ttl = 0)",
       );
       const staleLocks = selectStmt.all(cutoffTime);
 
       if (staleLocks.length > 0) {
         const deleteStmt = this.db.prepare(
-          "DELETE FROM locks WHERE locked_at < ?",
+          "DELETE FROM locks WHERE locked_at < ? AND (ttl IS NULL OR ttl = 0)",
         );
         const result = deleteStmt.run(cutoffTime);
 
@@ -141,6 +182,22 @@ export class LockManager {
       this.cleanupDeadProcessLocks();
     } catch (error) {
       console.error("Failed to cleanup stale locks:", error);
+    }
+  }
+
+  private cleanupExpiredLocks(): void {
+    try {
+      const now = Date.now();
+      const deleteStmt = this.db.prepare(
+        "DELETE FROM locks WHERE expires_at IS NOT NULL AND expires_at <= ?",
+      );
+      const result = deleteStmt.run(now);
+
+      if (result.changes > 0) {
+        console.log(`Cleaned up ${result.changes} expired locks`);
+      }
+    } catch (error) {
+      console.error("Failed to cleanup expired locks:", error);
     }
   }
 
@@ -235,56 +292,72 @@ export class LockManager {
   async tryLockOneOf(
     addresses: string[],
     metadata: any = {},
+    ttlMs?: number,
   ): Promise<string | null> {
+    this.cleanupExpiredLocks();
+
     const db = this.db;
     const startTime = Date.now();
 
-    const transaction = db.transaction((addrs: string[], meta: any) => {
-      const txStartTime = Date.now();
-      let attempts = 0;
+    const transaction = db.transaction(
+      (addrs: string[], meta: any, ttl?: number) => {
+        const txStartTime = Date.now();
+        let attempts = 0;
 
-      for (const address of addrs) {
-        attempts++;
-        try {
-          const insertStartTime = Date.now();
-          const stmt = db.prepare(`
-            INSERT INTO locks (address, metadata, locked_at, pid)
-            VALUES (?, ?, ?, ?)
+        for (const address of addrs) {
+          attempts++;
+          try {
+            const insertStartTime = Date.now();
+            const now = Date.now();
+            const expiresAt = ttl ? now + ttl : null;
+
+            const stmt = db.prepare(`
+            INSERT INTO locks (address, metadata, locked_at, pid, ttl, expires_at)
+            VALUES (?, ?, ?, ?, ?, ?)
           `);
 
-          const lockData = {
-            ...meta,
-            lockedAt: new Date().toISOString(),
-            pid: process.pid,
-          };
+            const lockData = {
+              ...meta,
+              lockedAt: new Date().toISOString(),
+              pid: process.pid,
+              ttl,
+            };
 
-          stmt.run(address, JSON.stringify(lockData), Date.now(), process.pid);
+            stmt.run(
+              address,
+              JSON.stringify(lockData),
+              now,
+              process.pid,
+              ttl,
+              expiresAt,
+            );
 
-          const insertTime = Date.now() - insertStartTime;
-          const totalTxTime = Date.now() - txStartTime;
-          console.log(
-            `    [LOCK TIMING] Successfully locked address after ${attempts} attempts. Insert: ${insertTime}ms, Total TX: ${totalTxTime}ms`,
-          );
+            const insertTime = Date.now() - insertStartTime;
+            const totalTxTime = Date.now() - txStartTime;
+            console.log(
+              `    [LOCK TIMING] Successfully locked address after ${attempts} attempts. Insert: ${insertTime}ms, Total TX: ${totalTxTime}ms`,
+            );
 
-          return address;
-        } catch (error) {
-          if (error.code === "SQLITE_CONSTRAINT_PRIMARYKEY") {
-            continue;
+            return address;
+          } catch (error) {
+            if (error.code === "SQLITE_CONSTRAINT_PRIMARYKEY") {
+              continue;
+            }
+            throw error;
           }
-          throw error;
         }
-      }
 
-      const totalTxTime = Date.now() - txStartTime;
-      console.log(
-        `    [LOCK TIMING] Failed to lock any address after ${attempts} attempts. Total TX: ${totalTxTime}ms`,
-      );
+        const totalTxTime = Date.now() - txStartTime;
+        console.log(
+          `    [LOCK TIMING] Failed to lock any address after ${attempts} attempts. Total TX: ${totalTxTime}ms`,
+        );
 
-      return null;
-    });
+        return null;
+      },
+    );
 
     try {
-      const result = transaction(addresses, metadata);
+      const result = transaction(addresses, metadata, ttlMs);
       const totalTime = Date.now() - startTime;
 
       if (result) {
