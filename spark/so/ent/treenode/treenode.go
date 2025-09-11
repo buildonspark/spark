@@ -32,22 +32,32 @@ const (
 	FieldOwnerIdentityPubkey = "owner_identity_pubkey"
 	// FieldOwnerSigningPubkey holds the string denoting the owner_signing_pubkey field in the database.
 	FieldOwnerSigningPubkey = "owner_signing_pubkey"
-	// FieldRawTx holds the string denoting the raw_tx field in the database.
-	FieldRawTx = "raw_tx"
 	// FieldVout holds the string denoting the vout field in the database.
 	FieldVout = "vout"
-	// FieldRawRefundTx holds the string denoting the raw_refund_tx field in the database.
-	FieldRawRefundTx = "raw_refund_tx"
 	// FieldNodeConfirmationHeight holds the string denoting the node_confirmation_height field in the database.
 	FieldNodeConfirmationHeight = "node_confirmation_height"
 	// FieldRefundConfirmationHeight holds the string denoting the refund_confirmation_height field in the database.
 	FieldRefundConfirmationHeight = "refund_confirmation_height"
-	// FieldDirectRefundTx holds the string denoting the direct_refund_tx field in the database.
-	FieldDirectRefundTx = "direct_refund_tx"
+	// FieldRawTx holds the string denoting the raw_tx field in the database.
+	FieldRawTx = "raw_tx"
 	// FieldDirectTx holds the string denoting the direct_tx field in the database.
 	FieldDirectTx = "direct_tx"
 	// FieldDirectFromCpfpRefundTx holds the string denoting the direct_from_cpfp_refund_tx field in the database.
 	FieldDirectFromCpfpRefundTx = "direct_from_cpfp_refund_tx"
+	// FieldRawTxid holds the string denoting the raw_txid field in the database.
+	FieldRawTxid = "raw_txid"
+	// FieldDirectTxid holds the string denoting the direct_txid field in the database.
+	FieldDirectTxid = "direct_txid"
+	// FieldDirectFromCpfpRefundTxid holds the string denoting the direct_from_cpfp_refund_txid field in the database.
+	FieldDirectFromCpfpRefundTxid = "direct_from_cpfp_refund_txid"
+	// FieldRawRefundTx holds the string denoting the raw_refund_tx field in the database.
+	FieldRawRefundTx = "raw_refund_tx"
+	// FieldDirectRefundTx holds the string denoting the direct_refund_tx field in the database.
+	FieldDirectRefundTx = "direct_refund_tx"
+	// FieldRawRefundTxid holds the string denoting the raw_refund_txid field in the database.
+	FieldRawRefundTxid = "raw_refund_txid"
+	// FieldDirectRefundTxid holds the string denoting the direct_refund_txid field in the database.
+	FieldDirectRefundTxid = "direct_refund_txid"
 	// EdgeTree holds the string denoting the tree edge name in mutations.
 	EdgeTree = "tree"
 	// EdgeParent holds the string denoting the parent edge name in mutations.
@@ -92,14 +102,19 @@ var Columns = []string{
 	FieldVerifyingPubkey,
 	FieldOwnerIdentityPubkey,
 	FieldOwnerSigningPubkey,
-	FieldRawTx,
 	FieldVout,
-	FieldRawRefundTx,
 	FieldNodeConfirmationHeight,
 	FieldRefundConfirmationHeight,
-	FieldDirectRefundTx,
+	FieldRawTx,
 	FieldDirectTx,
 	FieldDirectFromCpfpRefundTx,
+	FieldRawTxid,
+	FieldDirectTxid,
+	FieldDirectFromCpfpRefundTxid,
+	FieldRawRefundTx,
+	FieldDirectRefundTx,
+	FieldRawRefundTxid,
+	FieldDirectRefundTxid,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "tree_nodes"

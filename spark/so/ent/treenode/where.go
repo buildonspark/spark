@@ -87,19 +87,9 @@ func OwnerSigningPubkey(v []byte) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldOwnerSigningPubkey, v))
 }
 
-// RawTx applies equality check predicate on the "raw_tx" field. It's identical to RawTxEQ.
-func RawTx(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldEQ(FieldRawTx, v))
-}
-
 // Vout applies equality check predicate on the "vout" field. It's identical to VoutEQ.
 func Vout(v int16) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldVout, v))
-}
-
-// RawRefundTx applies equality check predicate on the "raw_refund_tx" field. It's identical to RawRefundTxEQ.
-func RawRefundTx(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldEQ(FieldRawRefundTx, v))
 }
 
 // NodeConfirmationHeight applies equality check predicate on the "node_confirmation_height" field. It's identical to NodeConfirmationHeightEQ.
@@ -112,9 +102,9 @@ func RefundConfirmationHeight(v uint64) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldRefundConfirmationHeight, v))
 }
 
-// DirectRefundTx applies equality check predicate on the "direct_refund_tx" field. It's identical to DirectRefundTxEQ.
-func DirectRefundTx(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldEQ(FieldDirectRefundTx, v))
+// RawTx applies equality check predicate on the "raw_tx" field. It's identical to RawTxEQ.
+func RawTx(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldRawTx, v))
 }
 
 // DirectTx applies equality check predicate on the "direct_tx" field. It's identical to DirectTxEQ.
@@ -125,6 +115,41 @@ func DirectTx(v []byte) predicate.TreeNode {
 // DirectFromCpfpRefundTx applies equality check predicate on the "direct_from_cpfp_refund_tx" field. It's identical to DirectFromCpfpRefundTxEQ.
 func DirectFromCpfpRefundTx(v []byte) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldDirectFromCpfpRefundTx, v))
+}
+
+// RawTxid applies equality check predicate on the "raw_txid" field. It's identical to RawTxidEQ.
+func RawTxid(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldRawTxid, v))
+}
+
+// DirectTxid applies equality check predicate on the "direct_txid" field. It's identical to DirectTxidEQ.
+func DirectTxid(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldDirectTxid, v))
+}
+
+// DirectFromCpfpRefundTxid applies equality check predicate on the "direct_from_cpfp_refund_txid" field. It's identical to DirectFromCpfpRefundTxidEQ.
+func DirectFromCpfpRefundTxid(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldDirectFromCpfpRefundTxid, v))
+}
+
+// RawRefundTx applies equality check predicate on the "raw_refund_tx" field. It's identical to RawRefundTxEQ.
+func RawRefundTx(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldRawRefundTx, v))
+}
+
+// DirectRefundTx applies equality check predicate on the "direct_refund_tx" field. It's identical to DirectRefundTxEQ.
+func DirectRefundTx(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldDirectRefundTx, v))
+}
+
+// RawRefundTxid applies equality check predicate on the "raw_refund_txid" field. It's identical to RawRefundTxidEQ.
+func RawRefundTxid(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldRawRefundTxid, v))
+}
+
+// DirectRefundTxid applies equality check predicate on the "direct_refund_txid" field. It's identical to DirectRefundTxidEQ.
+func DirectRefundTxid(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldDirectRefundTxid, v))
 }
 
 // CreateTimeEQ applies the EQ predicate on the "create_time" field.
@@ -397,46 +422,6 @@ func OwnerSigningPubkeyLTE(v []byte) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldLTE(FieldOwnerSigningPubkey, v))
 }
 
-// RawTxEQ applies the EQ predicate on the "raw_tx" field.
-func RawTxEQ(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldEQ(FieldRawTx, v))
-}
-
-// RawTxNEQ applies the NEQ predicate on the "raw_tx" field.
-func RawTxNEQ(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNEQ(FieldRawTx, v))
-}
-
-// RawTxIn applies the In predicate on the "raw_tx" field.
-func RawTxIn(vs ...[]byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldIn(FieldRawTx, vs...))
-}
-
-// RawTxNotIn applies the NotIn predicate on the "raw_tx" field.
-func RawTxNotIn(vs ...[]byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNotIn(FieldRawTx, vs...))
-}
-
-// RawTxGT applies the GT predicate on the "raw_tx" field.
-func RawTxGT(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldGT(FieldRawTx, v))
-}
-
-// RawTxGTE applies the GTE predicate on the "raw_tx" field.
-func RawTxGTE(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldGTE(FieldRawTx, v))
-}
-
-// RawTxLT applies the LT predicate on the "raw_tx" field.
-func RawTxLT(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldLT(FieldRawTx, v))
-}
-
-// RawTxLTE applies the LTE predicate on the "raw_tx" field.
-func RawTxLTE(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldLTE(FieldRawTx, v))
-}
-
 // VoutEQ applies the EQ predicate on the "vout" field.
 func VoutEQ(v int16) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldVout, v))
@@ -475,56 +460,6 @@ func VoutLT(v int16) predicate.TreeNode {
 // VoutLTE applies the LTE predicate on the "vout" field.
 func VoutLTE(v int16) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldLTE(FieldVout, v))
-}
-
-// RawRefundTxEQ applies the EQ predicate on the "raw_refund_tx" field.
-func RawRefundTxEQ(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldEQ(FieldRawRefundTx, v))
-}
-
-// RawRefundTxNEQ applies the NEQ predicate on the "raw_refund_tx" field.
-func RawRefundTxNEQ(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNEQ(FieldRawRefundTx, v))
-}
-
-// RawRefundTxIn applies the In predicate on the "raw_refund_tx" field.
-func RawRefundTxIn(vs ...[]byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldIn(FieldRawRefundTx, vs...))
-}
-
-// RawRefundTxNotIn applies the NotIn predicate on the "raw_refund_tx" field.
-func RawRefundTxNotIn(vs ...[]byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNotIn(FieldRawRefundTx, vs...))
-}
-
-// RawRefundTxGT applies the GT predicate on the "raw_refund_tx" field.
-func RawRefundTxGT(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldGT(FieldRawRefundTx, v))
-}
-
-// RawRefundTxGTE applies the GTE predicate on the "raw_refund_tx" field.
-func RawRefundTxGTE(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldGTE(FieldRawRefundTx, v))
-}
-
-// RawRefundTxLT applies the LT predicate on the "raw_refund_tx" field.
-func RawRefundTxLT(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldLT(FieldRawRefundTx, v))
-}
-
-// RawRefundTxLTE applies the LTE predicate on the "raw_refund_tx" field.
-func RawRefundTxLTE(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldLTE(FieldRawRefundTx, v))
-}
-
-// RawRefundTxIsNil applies the IsNil predicate on the "raw_refund_tx" field.
-func RawRefundTxIsNil() predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldIsNull(FieldRawRefundTx))
-}
-
-// RawRefundTxNotNil applies the NotNil predicate on the "raw_refund_tx" field.
-func RawRefundTxNotNil() predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNotNull(FieldRawRefundTx))
 }
 
 // NodeConfirmationHeightEQ applies the EQ predicate on the "node_confirmation_height" field.
@@ -627,54 +562,44 @@ func RefundConfirmationHeightNotNil() predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldNotNull(FieldRefundConfirmationHeight))
 }
 
-// DirectRefundTxEQ applies the EQ predicate on the "direct_refund_tx" field.
-func DirectRefundTxEQ(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldEQ(FieldDirectRefundTx, v))
+// RawTxEQ applies the EQ predicate on the "raw_tx" field.
+func RawTxEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldRawTx, v))
 }
 
-// DirectRefundTxNEQ applies the NEQ predicate on the "direct_refund_tx" field.
-func DirectRefundTxNEQ(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNEQ(FieldDirectRefundTx, v))
+// RawTxNEQ applies the NEQ predicate on the "raw_tx" field.
+func RawTxNEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldRawTx, v))
 }
 
-// DirectRefundTxIn applies the In predicate on the "direct_refund_tx" field.
-func DirectRefundTxIn(vs ...[]byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldIn(FieldDirectRefundTx, vs...))
+// RawTxIn applies the In predicate on the "raw_tx" field.
+func RawTxIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldRawTx, vs...))
 }
 
-// DirectRefundTxNotIn applies the NotIn predicate on the "direct_refund_tx" field.
-func DirectRefundTxNotIn(vs ...[]byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNotIn(FieldDirectRefundTx, vs...))
+// RawTxNotIn applies the NotIn predicate on the "raw_tx" field.
+func RawTxNotIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldRawTx, vs...))
 }
 
-// DirectRefundTxGT applies the GT predicate on the "direct_refund_tx" field.
-func DirectRefundTxGT(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldGT(FieldDirectRefundTx, v))
+// RawTxGT applies the GT predicate on the "raw_tx" field.
+func RawTxGT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGT(FieldRawTx, v))
 }
 
-// DirectRefundTxGTE applies the GTE predicate on the "direct_refund_tx" field.
-func DirectRefundTxGTE(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldGTE(FieldDirectRefundTx, v))
+// RawTxGTE applies the GTE predicate on the "raw_tx" field.
+func RawTxGTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGTE(FieldRawTx, v))
 }
 
-// DirectRefundTxLT applies the LT predicate on the "direct_refund_tx" field.
-func DirectRefundTxLT(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldLT(FieldDirectRefundTx, v))
+// RawTxLT applies the LT predicate on the "raw_tx" field.
+func RawTxLT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLT(FieldRawTx, v))
 }
 
-// DirectRefundTxLTE applies the LTE predicate on the "direct_refund_tx" field.
-func DirectRefundTxLTE(v []byte) predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldLTE(FieldDirectRefundTx, v))
-}
-
-// DirectRefundTxIsNil applies the IsNil predicate on the "direct_refund_tx" field.
-func DirectRefundTxIsNil() predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldIsNull(FieldDirectRefundTx))
-}
-
-// DirectRefundTxNotNil applies the NotNil predicate on the "direct_refund_tx" field.
-func DirectRefundTxNotNil() predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNotNull(FieldDirectRefundTx))
+// RawTxLTE applies the LTE predicate on the "raw_tx" field.
+func RawTxLTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLTE(FieldRawTx, v))
 }
 
 // DirectTxEQ applies the EQ predicate on the "direct_tx" field.
@@ -775,6 +700,356 @@ func DirectFromCpfpRefundTxIsNil() predicate.TreeNode {
 // DirectFromCpfpRefundTxNotNil applies the NotNil predicate on the "direct_from_cpfp_refund_tx" field.
 func DirectFromCpfpRefundTxNotNil() predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldNotNull(FieldDirectFromCpfpRefundTx))
+}
+
+// RawTxidEQ applies the EQ predicate on the "raw_txid" field.
+func RawTxidEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldRawTxid, v))
+}
+
+// RawTxidNEQ applies the NEQ predicate on the "raw_txid" field.
+func RawTxidNEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldRawTxid, v))
+}
+
+// RawTxidIn applies the In predicate on the "raw_txid" field.
+func RawTxidIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldRawTxid, vs...))
+}
+
+// RawTxidNotIn applies the NotIn predicate on the "raw_txid" field.
+func RawTxidNotIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldRawTxid, vs...))
+}
+
+// RawTxidGT applies the GT predicate on the "raw_txid" field.
+func RawTxidGT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGT(FieldRawTxid, v))
+}
+
+// RawTxidGTE applies the GTE predicate on the "raw_txid" field.
+func RawTxidGTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGTE(FieldRawTxid, v))
+}
+
+// RawTxidLT applies the LT predicate on the "raw_txid" field.
+func RawTxidLT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLT(FieldRawTxid, v))
+}
+
+// RawTxidLTE applies the LTE predicate on the "raw_txid" field.
+func RawTxidLTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLTE(FieldRawTxid, v))
+}
+
+// RawTxidIsNil applies the IsNil predicate on the "raw_txid" field.
+func RawTxidIsNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIsNull(FieldRawTxid))
+}
+
+// RawTxidNotNil applies the NotNil predicate on the "raw_txid" field.
+func RawTxidNotNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotNull(FieldRawTxid))
+}
+
+// DirectTxidEQ applies the EQ predicate on the "direct_txid" field.
+func DirectTxidEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldDirectTxid, v))
+}
+
+// DirectTxidNEQ applies the NEQ predicate on the "direct_txid" field.
+func DirectTxidNEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldDirectTxid, v))
+}
+
+// DirectTxidIn applies the In predicate on the "direct_txid" field.
+func DirectTxidIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldDirectTxid, vs...))
+}
+
+// DirectTxidNotIn applies the NotIn predicate on the "direct_txid" field.
+func DirectTxidNotIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldDirectTxid, vs...))
+}
+
+// DirectTxidGT applies the GT predicate on the "direct_txid" field.
+func DirectTxidGT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGT(FieldDirectTxid, v))
+}
+
+// DirectTxidGTE applies the GTE predicate on the "direct_txid" field.
+func DirectTxidGTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGTE(FieldDirectTxid, v))
+}
+
+// DirectTxidLT applies the LT predicate on the "direct_txid" field.
+func DirectTxidLT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLT(FieldDirectTxid, v))
+}
+
+// DirectTxidLTE applies the LTE predicate on the "direct_txid" field.
+func DirectTxidLTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLTE(FieldDirectTxid, v))
+}
+
+// DirectTxidIsNil applies the IsNil predicate on the "direct_txid" field.
+func DirectTxidIsNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIsNull(FieldDirectTxid))
+}
+
+// DirectTxidNotNil applies the NotNil predicate on the "direct_txid" field.
+func DirectTxidNotNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotNull(FieldDirectTxid))
+}
+
+// DirectFromCpfpRefundTxidEQ applies the EQ predicate on the "direct_from_cpfp_refund_txid" field.
+func DirectFromCpfpRefundTxidEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldDirectFromCpfpRefundTxid, v))
+}
+
+// DirectFromCpfpRefundTxidNEQ applies the NEQ predicate on the "direct_from_cpfp_refund_txid" field.
+func DirectFromCpfpRefundTxidNEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldDirectFromCpfpRefundTxid, v))
+}
+
+// DirectFromCpfpRefundTxidIn applies the In predicate on the "direct_from_cpfp_refund_txid" field.
+func DirectFromCpfpRefundTxidIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldDirectFromCpfpRefundTxid, vs...))
+}
+
+// DirectFromCpfpRefundTxidNotIn applies the NotIn predicate on the "direct_from_cpfp_refund_txid" field.
+func DirectFromCpfpRefundTxidNotIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldDirectFromCpfpRefundTxid, vs...))
+}
+
+// DirectFromCpfpRefundTxidGT applies the GT predicate on the "direct_from_cpfp_refund_txid" field.
+func DirectFromCpfpRefundTxidGT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGT(FieldDirectFromCpfpRefundTxid, v))
+}
+
+// DirectFromCpfpRefundTxidGTE applies the GTE predicate on the "direct_from_cpfp_refund_txid" field.
+func DirectFromCpfpRefundTxidGTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGTE(FieldDirectFromCpfpRefundTxid, v))
+}
+
+// DirectFromCpfpRefundTxidLT applies the LT predicate on the "direct_from_cpfp_refund_txid" field.
+func DirectFromCpfpRefundTxidLT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLT(FieldDirectFromCpfpRefundTxid, v))
+}
+
+// DirectFromCpfpRefundTxidLTE applies the LTE predicate on the "direct_from_cpfp_refund_txid" field.
+func DirectFromCpfpRefundTxidLTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLTE(FieldDirectFromCpfpRefundTxid, v))
+}
+
+// DirectFromCpfpRefundTxidIsNil applies the IsNil predicate on the "direct_from_cpfp_refund_txid" field.
+func DirectFromCpfpRefundTxidIsNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIsNull(FieldDirectFromCpfpRefundTxid))
+}
+
+// DirectFromCpfpRefundTxidNotNil applies the NotNil predicate on the "direct_from_cpfp_refund_txid" field.
+func DirectFromCpfpRefundTxidNotNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotNull(FieldDirectFromCpfpRefundTxid))
+}
+
+// RawRefundTxEQ applies the EQ predicate on the "raw_refund_tx" field.
+func RawRefundTxEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldRawRefundTx, v))
+}
+
+// RawRefundTxNEQ applies the NEQ predicate on the "raw_refund_tx" field.
+func RawRefundTxNEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldRawRefundTx, v))
+}
+
+// RawRefundTxIn applies the In predicate on the "raw_refund_tx" field.
+func RawRefundTxIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldRawRefundTx, vs...))
+}
+
+// RawRefundTxNotIn applies the NotIn predicate on the "raw_refund_tx" field.
+func RawRefundTxNotIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldRawRefundTx, vs...))
+}
+
+// RawRefundTxGT applies the GT predicate on the "raw_refund_tx" field.
+func RawRefundTxGT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGT(FieldRawRefundTx, v))
+}
+
+// RawRefundTxGTE applies the GTE predicate on the "raw_refund_tx" field.
+func RawRefundTxGTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGTE(FieldRawRefundTx, v))
+}
+
+// RawRefundTxLT applies the LT predicate on the "raw_refund_tx" field.
+func RawRefundTxLT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLT(FieldRawRefundTx, v))
+}
+
+// RawRefundTxLTE applies the LTE predicate on the "raw_refund_tx" field.
+func RawRefundTxLTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLTE(FieldRawRefundTx, v))
+}
+
+// RawRefundTxIsNil applies the IsNil predicate on the "raw_refund_tx" field.
+func RawRefundTxIsNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIsNull(FieldRawRefundTx))
+}
+
+// RawRefundTxNotNil applies the NotNil predicate on the "raw_refund_tx" field.
+func RawRefundTxNotNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotNull(FieldRawRefundTx))
+}
+
+// DirectRefundTxEQ applies the EQ predicate on the "direct_refund_tx" field.
+func DirectRefundTxEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldDirectRefundTx, v))
+}
+
+// DirectRefundTxNEQ applies the NEQ predicate on the "direct_refund_tx" field.
+func DirectRefundTxNEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldDirectRefundTx, v))
+}
+
+// DirectRefundTxIn applies the In predicate on the "direct_refund_tx" field.
+func DirectRefundTxIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldDirectRefundTx, vs...))
+}
+
+// DirectRefundTxNotIn applies the NotIn predicate on the "direct_refund_tx" field.
+func DirectRefundTxNotIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldDirectRefundTx, vs...))
+}
+
+// DirectRefundTxGT applies the GT predicate on the "direct_refund_tx" field.
+func DirectRefundTxGT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGT(FieldDirectRefundTx, v))
+}
+
+// DirectRefundTxGTE applies the GTE predicate on the "direct_refund_tx" field.
+func DirectRefundTxGTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGTE(FieldDirectRefundTx, v))
+}
+
+// DirectRefundTxLT applies the LT predicate on the "direct_refund_tx" field.
+func DirectRefundTxLT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLT(FieldDirectRefundTx, v))
+}
+
+// DirectRefundTxLTE applies the LTE predicate on the "direct_refund_tx" field.
+func DirectRefundTxLTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLTE(FieldDirectRefundTx, v))
+}
+
+// DirectRefundTxIsNil applies the IsNil predicate on the "direct_refund_tx" field.
+func DirectRefundTxIsNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIsNull(FieldDirectRefundTx))
+}
+
+// DirectRefundTxNotNil applies the NotNil predicate on the "direct_refund_tx" field.
+func DirectRefundTxNotNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotNull(FieldDirectRefundTx))
+}
+
+// RawRefundTxidEQ applies the EQ predicate on the "raw_refund_txid" field.
+func RawRefundTxidEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldRawRefundTxid, v))
+}
+
+// RawRefundTxidNEQ applies the NEQ predicate on the "raw_refund_txid" field.
+func RawRefundTxidNEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldRawRefundTxid, v))
+}
+
+// RawRefundTxidIn applies the In predicate on the "raw_refund_txid" field.
+func RawRefundTxidIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldRawRefundTxid, vs...))
+}
+
+// RawRefundTxidNotIn applies the NotIn predicate on the "raw_refund_txid" field.
+func RawRefundTxidNotIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldRawRefundTxid, vs...))
+}
+
+// RawRefundTxidGT applies the GT predicate on the "raw_refund_txid" field.
+func RawRefundTxidGT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGT(FieldRawRefundTxid, v))
+}
+
+// RawRefundTxidGTE applies the GTE predicate on the "raw_refund_txid" field.
+func RawRefundTxidGTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGTE(FieldRawRefundTxid, v))
+}
+
+// RawRefundTxidLT applies the LT predicate on the "raw_refund_txid" field.
+func RawRefundTxidLT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLT(FieldRawRefundTxid, v))
+}
+
+// RawRefundTxidLTE applies the LTE predicate on the "raw_refund_txid" field.
+func RawRefundTxidLTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLTE(FieldRawRefundTxid, v))
+}
+
+// RawRefundTxidIsNil applies the IsNil predicate on the "raw_refund_txid" field.
+func RawRefundTxidIsNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIsNull(FieldRawRefundTxid))
+}
+
+// RawRefundTxidNotNil applies the NotNil predicate on the "raw_refund_txid" field.
+func RawRefundTxidNotNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotNull(FieldRawRefundTxid))
+}
+
+// DirectRefundTxidEQ applies the EQ predicate on the "direct_refund_txid" field.
+func DirectRefundTxidEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldEQ(FieldDirectRefundTxid, v))
+}
+
+// DirectRefundTxidNEQ applies the NEQ predicate on the "direct_refund_txid" field.
+func DirectRefundTxidNEQ(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNEQ(FieldDirectRefundTxid, v))
+}
+
+// DirectRefundTxidIn applies the In predicate on the "direct_refund_txid" field.
+func DirectRefundTxidIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIn(FieldDirectRefundTxid, vs...))
+}
+
+// DirectRefundTxidNotIn applies the NotIn predicate on the "direct_refund_txid" field.
+func DirectRefundTxidNotIn(vs ...[]byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotIn(FieldDirectRefundTxid, vs...))
+}
+
+// DirectRefundTxidGT applies the GT predicate on the "direct_refund_txid" field.
+func DirectRefundTxidGT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGT(FieldDirectRefundTxid, v))
+}
+
+// DirectRefundTxidGTE applies the GTE predicate on the "direct_refund_txid" field.
+func DirectRefundTxidGTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldGTE(FieldDirectRefundTxid, v))
+}
+
+// DirectRefundTxidLT applies the LT predicate on the "direct_refund_txid" field.
+func DirectRefundTxidLT(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLT(FieldDirectRefundTxid, v))
+}
+
+// DirectRefundTxidLTE applies the LTE predicate on the "direct_refund_txid" field.
+func DirectRefundTxidLTE(v []byte) predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldLTE(FieldDirectRefundTxid, v))
+}
+
+// DirectRefundTxidIsNil applies the IsNil predicate on the "direct_refund_txid" field.
+func DirectRefundTxidIsNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIsNull(FieldDirectRefundTxid))
+}
+
+// DirectRefundTxidNotNil applies the NotNil predicate on the "direct_refund_txid" field.
+func DirectRefundTxidNotNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotNull(FieldDirectRefundTxid))
 }
 
 // HasTree applies the HasEdge predicate on the "tree" edge.

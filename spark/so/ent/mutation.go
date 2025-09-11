@@ -20680,17 +20680,22 @@ type TreeNodeMutation struct {
 	verifying_pubkey              *[]byte
 	owner_identity_pubkey         *[]byte
 	owner_signing_pubkey          *[]byte
-	raw_tx                        *[]byte
 	vout                          *int16
 	addvout                       *int16
-	raw_refund_tx                 *[]byte
 	node_confirmation_height      *uint64
 	addnode_confirmation_height   *int64
 	refund_confirmation_height    *uint64
 	addrefund_confirmation_height *int64
-	direct_refund_tx              *[]byte
+	raw_tx                        *[]byte
 	direct_tx                     *[]byte
 	direct_from_cpfp_refund_tx    *[]byte
+	raw_txid                      *[]byte
+	direct_txid                   *[]byte
+	direct_from_cpfp_refund_txid  *[]byte
+	raw_refund_tx                 *[]byte
+	direct_refund_tx              *[]byte
+	raw_refund_txid               *[]byte
+	direct_refund_txid            *[]byte
 	clearedFields                 map[string]struct{}
 	tree                          *uuid.UUID
 	clearedtree                   bool
@@ -21082,42 +21087,6 @@ func (m *TreeNodeMutation) ResetOwnerSigningPubkey() {
 	m.owner_signing_pubkey = nil
 }
 
-// SetRawTx sets the "raw_tx" field.
-func (m *TreeNodeMutation) SetRawTx(b []byte) {
-	m.raw_tx = &b
-}
-
-// RawTx returns the value of the "raw_tx" field in the mutation.
-func (m *TreeNodeMutation) RawTx() (r []byte, exists bool) {
-	v := m.raw_tx
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldRawTx returns the old "raw_tx" field's value of the TreeNode entity.
-// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldRawTx(ctx context.Context) (v []byte, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldRawTx is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldRawTx requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldRawTx: %w", err)
-	}
-	return oldValue.RawTx, nil
-}
-
-// ResetRawTx resets all changes to the "raw_tx" field.
-func (m *TreeNodeMutation) ResetRawTx() {
-	m.raw_tx = nil
-}
-
 // SetVout sets the "vout" field.
 func (m *TreeNodeMutation) SetVout(i int16) {
 	m.vout = &i
@@ -21172,55 +21141,6 @@ func (m *TreeNodeMutation) AddedVout() (r int16, exists bool) {
 func (m *TreeNodeMutation) ResetVout() {
 	m.vout = nil
 	m.addvout = nil
-}
-
-// SetRawRefundTx sets the "raw_refund_tx" field.
-func (m *TreeNodeMutation) SetRawRefundTx(b []byte) {
-	m.raw_refund_tx = &b
-}
-
-// RawRefundTx returns the value of the "raw_refund_tx" field in the mutation.
-func (m *TreeNodeMutation) RawRefundTx() (r []byte, exists bool) {
-	v := m.raw_refund_tx
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldRawRefundTx returns the old "raw_refund_tx" field's value of the TreeNode entity.
-// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldRawRefundTx(ctx context.Context) (v []byte, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldRawRefundTx is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldRawRefundTx requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldRawRefundTx: %w", err)
-	}
-	return oldValue.RawRefundTx, nil
-}
-
-// ClearRawRefundTx clears the value of the "raw_refund_tx" field.
-func (m *TreeNodeMutation) ClearRawRefundTx() {
-	m.raw_refund_tx = nil
-	m.clearedFields[treenode.FieldRawRefundTx] = struct{}{}
-}
-
-// RawRefundTxCleared returns if the "raw_refund_tx" field was cleared in this mutation.
-func (m *TreeNodeMutation) RawRefundTxCleared() bool {
-	_, ok := m.clearedFields[treenode.FieldRawRefundTx]
-	return ok
-}
-
-// ResetRawRefundTx resets all changes to the "raw_refund_tx" field.
-func (m *TreeNodeMutation) ResetRawRefundTx() {
-	m.raw_refund_tx = nil
-	delete(m.clearedFields, treenode.FieldRawRefundTx)
 }
 
 // SetNodeConfirmationHeight sets the "node_confirmation_height" field.
@@ -21363,53 +21283,40 @@ func (m *TreeNodeMutation) ResetRefundConfirmationHeight() {
 	delete(m.clearedFields, treenode.FieldRefundConfirmationHeight)
 }
 
-// SetDirectRefundTx sets the "direct_refund_tx" field.
-func (m *TreeNodeMutation) SetDirectRefundTx(b []byte) {
-	m.direct_refund_tx = &b
+// SetRawTx sets the "raw_tx" field.
+func (m *TreeNodeMutation) SetRawTx(b []byte) {
+	m.raw_tx = &b
 }
 
-// DirectRefundTx returns the value of the "direct_refund_tx" field in the mutation.
-func (m *TreeNodeMutation) DirectRefundTx() (r []byte, exists bool) {
-	v := m.direct_refund_tx
+// RawTx returns the value of the "raw_tx" field in the mutation.
+func (m *TreeNodeMutation) RawTx() (r []byte, exists bool) {
+	v := m.raw_tx
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldDirectRefundTx returns the old "direct_refund_tx" field's value of the TreeNode entity.
+// OldRawTx returns the old "raw_tx" field's value of the TreeNode entity.
 // If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldDirectRefundTx(ctx context.Context) (v []byte, err error) {
+func (m *TreeNodeMutation) OldRawTx(ctx context.Context) (v []byte, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldDirectRefundTx is only allowed on UpdateOne operations")
+		return v, errors.New("OldRawTx is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldDirectRefundTx requires an ID field in the mutation")
+		return v, errors.New("OldRawTx requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldDirectRefundTx: %w", err)
+		return v, fmt.Errorf("querying old value for OldRawTx: %w", err)
 	}
-	return oldValue.DirectRefundTx, nil
+	return oldValue.RawTx, nil
 }
 
-// ClearDirectRefundTx clears the value of the "direct_refund_tx" field.
-func (m *TreeNodeMutation) ClearDirectRefundTx() {
-	m.direct_refund_tx = nil
-	m.clearedFields[treenode.FieldDirectRefundTx] = struct{}{}
-}
-
-// DirectRefundTxCleared returns if the "direct_refund_tx" field was cleared in this mutation.
-func (m *TreeNodeMutation) DirectRefundTxCleared() bool {
-	_, ok := m.clearedFields[treenode.FieldDirectRefundTx]
-	return ok
-}
-
-// ResetDirectRefundTx resets all changes to the "direct_refund_tx" field.
-func (m *TreeNodeMutation) ResetDirectRefundTx() {
-	m.direct_refund_tx = nil
-	delete(m.clearedFields, treenode.FieldDirectRefundTx)
+// ResetRawTx resets all changes to the "raw_tx" field.
+func (m *TreeNodeMutation) ResetRawTx() {
+	m.raw_tx = nil
 }
 
 // SetDirectTx sets the "direct_tx" field.
@@ -21508,6 +21415,349 @@ func (m *TreeNodeMutation) DirectFromCpfpRefundTxCleared() bool {
 func (m *TreeNodeMutation) ResetDirectFromCpfpRefundTx() {
 	m.direct_from_cpfp_refund_tx = nil
 	delete(m.clearedFields, treenode.FieldDirectFromCpfpRefundTx)
+}
+
+// SetRawTxid sets the "raw_txid" field.
+func (m *TreeNodeMutation) SetRawTxid(b []byte) {
+	m.raw_txid = &b
+}
+
+// RawTxid returns the value of the "raw_txid" field in the mutation.
+func (m *TreeNodeMutation) RawTxid() (r []byte, exists bool) {
+	v := m.raw_txid
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRawTxid returns the old "raw_txid" field's value of the TreeNode entity.
+// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeNodeMutation) OldRawTxid(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRawTxid is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRawTxid requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRawTxid: %w", err)
+	}
+	return oldValue.RawTxid, nil
+}
+
+// ClearRawTxid clears the value of the "raw_txid" field.
+func (m *TreeNodeMutation) ClearRawTxid() {
+	m.raw_txid = nil
+	m.clearedFields[treenode.FieldRawTxid] = struct{}{}
+}
+
+// RawTxidCleared returns if the "raw_txid" field was cleared in this mutation.
+func (m *TreeNodeMutation) RawTxidCleared() bool {
+	_, ok := m.clearedFields[treenode.FieldRawTxid]
+	return ok
+}
+
+// ResetRawTxid resets all changes to the "raw_txid" field.
+func (m *TreeNodeMutation) ResetRawTxid() {
+	m.raw_txid = nil
+	delete(m.clearedFields, treenode.FieldRawTxid)
+}
+
+// SetDirectTxid sets the "direct_txid" field.
+func (m *TreeNodeMutation) SetDirectTxid(b []byte) {
+	m.direct_txid = &b
+}
+
+// DirectTxid returns the value of the "direct_txid" field in the mutation.
+func (m *TreeNodeMutation) DirectTxid() (r []byte, exists bool) {
+	v := m.direct_txid
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDirectTxid returns the old "direct_txid" field's value of the TreeNode entity.
+// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeNodeMutation) OldDirectTxid(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDirectTxid is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDirectTxid requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDirectTxid: %w", err)
+	}
+	return oldValue.DirectTxid, nil
+}
+
+// ClearDirectTxid clears the value of the "direct_txid" field.
+func (m *TreeNodeMutation) ClearDirectTxid() {
+	m.direct_txid = nil
+	m.clearedFields[treenode.FieldDirectTxid] = struct{}{}
+}
+
+// DirectTxidCleared returns if the "direct_txid" field was cleared in this mutation.
+func (m *TreeNodeMutation) DirectTxidCleared() bool {
+	_, ok := m.clearedFields[treenode.FieldDirectTxid]
+	return ok
+}
+
+// ResetDirectTxid resets all changes to the "direct_txid" field.
+func (m *TreeNodeMutation) ResetDirectTxid() {
+	m.direct_txid = nil
+	delete(m.clearedFields, treenode.FieldDirectTxid)
+}
+
+// SetDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field.
+func (m *TreeNodeMutation) SetDirectFromCpfpRefundTxid(b []byte) {
+	m.direct_from_cpfp_refund_txid = &b
+}
+
+// DirectFromCpfpRefundTxid returns the value of the "direct_from_cpfp_refund_txid" field in the mutation.
+func (m *TreeNodeMutation) DirectFromCpfpRefundTxid() (r []byte, exists bool) {
+	v := m.direct_from_cpfp_refund_txid
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDirectFromCpfpRefundTxid returns the old "direct_from_cpfp_refund_txid" field's value of the TreeNode entity.
+// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeNodeMutation) OldDirectFromCpfpRefundTxid(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDirectFromCpfpRefundTxid is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDirectFromCpfpRefundTxid requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDirectFromCpfpRefundTxid: %w", err)
+	}
+	return oldValue.DirectFromCpfpRefundTxid, nil
+}
+
+// ClearDirectFromCpfpRefundTxid clears the value of the "direct_from_cpfp_refund_txid" field.
+func (m *TreeNodeMutation) ClearDirectFromCpfpRefundTxid() {
+	m.direct_from_cpfp_refund_txid = nil
+	m.clearedFields[treenode.FieldDirectFromCpfpRefundTxid] = struct{}{}
+}
+
+// DirectFromCpfpRefundTxidCleared returns if the "direct_from_cpfp_refund_txid" field was cleared in this mutation.
+func (m *TreeNodeMutation) DirectFromCpfpRefundTxidCleared() bool {
+	_, ok := m.clearedFields[treenode.FieldDirectFromCpfpRefundTxid]
+	return ok
+}
+
+// ResetDirectFromCpfpRefundTxid resets all changes to the "direct_from_cpfp_refund_txid" field.
+func (m *TreeNodeMutation) ResetDirectFromCpfpRefundTxid() {
+	m.direct_from_cpfp_refund_txid = nil
+	delete(m.clearedFields, treenode.FieldDirectFromCpfpRefundTxid)
+}
+
+// SetRawRefundTx sets the "raw_refund_tx" field.
+func (m *TreeNodeMutation) SetRawRefundTx(b []byte) {
+	m.raw_refund_tx = &b
+}
+
+// RawRefundTx returns the value of the "raw_refund_tx" field in the mutation.
+func (m *TreeNodeMutation) RawRefundTx() (r []byte, exists bool) {
+	v := m.raw_refund_tx
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRawRefundTx returns the old "raw_refund_tx" field's value of the TreeNode entity.
+// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeNodeMutation) OldRawRefundTx(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRawRefundTx is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRawRefundTx requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRawRefundTx: %w", err)
+	}
+	return oldValue.RawRefundTx, nil
+}
+
+// ClearRawRefundTx clears the value of the "raw_refund_tx" field.
+func (m *TreeNodeMutation) ClearRawRefundTx() {
+	m.raw_refund_tx = nil
+	m.clearedFields[treenode.FieldRawRefundTx] = struct{}{}
+}
+
+// RawRefundTxCleared returns if the "raw_refund_tx" field was cleared in this mutation.
+func (m *TreeNodeMutation) RawRefundTxCleared() bool {
+	_, ok := m.clearedFields[treenode.FieldRawRefundTx]
+	return ok
+}
+
+// ResetRawRefundTx resets all changes to the "raw_refund_tx" field.
+func (m *TreeNodeMutation) ResetRawRefundTx() {
+	m.raw_refund_tx = nil
+	delete(m.clearedFields, treenode.FieldRawRefundTx)
+}
+
+// SetDirectRefundTx sets the "direct_refund_tx" field.
+func (m *TreeNodeMutation) SetDirectRefundTx(b []byte) {
+	m.direct_refund_tx = &b
+}
+
+// DirectRefundTx returns the value of the "direct_refund_tx" field in the mutation.
+func (m *TreeNodeMutation) DirectRefundTx() (r []byte, exists bool) {
+	v := m.direct_refund_tx
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDirectRefundTx returns the old "direct_refund_tx" field's value of the TreeNode entity.
+// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeNodeMutation) OldDirectRefundTx(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDirectRefundTx is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDirectRefundTx requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDirectRefundTx: %w", err)
+	}
+	return oldValue.DirectRefundTx, nil
+}
+
+// ClearDirectRefundTx clears the value of the "direct_refund_tx" field.
+func (m *TreeNodeMutation) ClearDirectRefundTx() {
+	m.direct_refund_tx = nil
+	m.clearedFields[treenode.FieldDirectRefundTx] = struct{}{}
+}
+
+// DirectRefundTxCleared returns if the "direct_refund_tx" field was cleared in this mutation.
+func (m *TreeNodeMutation) DirectRefundTxCleared() bool {
+	_, ok := m.clearedFields[treenode.FieldDirectRefundTx]
+	return ok
+}
+
+// ResetDirectRefundTx resets all changes to the "direct_refund_tx" field.
+func (m *TreeNodeMutation) ResetDirectRefundTx() {
+	m.direct_refund_tx = nil
+	delete(m.clearedFields, treenode.FieldDirectRefundTx)
+}
+
+// SetRawRefundTxid sets the "raw_refund_txid" field.
+func (m *TreeNodeMutation) SetRawRefundTxid(b []byte) {
+	m.raw_refund_txid = &b
+}
+
+// RawRefundTxid returns the value of the "raw_refund_txid" field in the mutation.
+func (m *TreeNodeMutation) RawRefundTxid() (r []byte, exists bool) {
+	v := m.raw_refund_txid
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRawRefundTxid returns the old "raw_refund_txid" field's value of the TreeNode entity.
+// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeNodeMutation) OldRawRefundTxid(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRawRefundTxid is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRawRefundTxid requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRawRefundTxid: %w", err)
+	}
+	return oldValue.RawRefundTxid, nil
+}
+
+// ClearRawRefundTxid clears the value of the "raw_refund_txid" field.
+func (m *TreeNodeMutation) ClearRawRefundTxid() {
+	m.raw_refund_txid = nil
+	m.clearedFields[treenode.FieldRawRefundTxid] = struct{}{}
+}
+
+// RawRefundTxidCleared returns if the "raw_refund_txid" field was cleared in this mutation.
+func (m *TreeNodeMutation) RawRefundTxidCleared() bool {
+	_, ok := m.clearedFields[treenode.FieldRawRefundTxid]
+	return ok
+}
+
+// ResetRawRefundTxid resets all changes to the "raw_refund_txid" field.
+func (m *TreeNodeMutation) ResetRawRefundTxid() {
+	m.raw_refund_txid = nil
+	delete(m.clearedFields, treenode.FieldRawRefundTxid)
+}
+
+// SetDirectRefundTxid sets the "direct_refund_txid" field.
+func (m *TreeNodeMutation) SetDirectRefundTxid(b []byte) {
+	m.direct_refund_txid = &b
+}
+
+// DirectRefundTxid returns the value of the "direct_refund_txid" field in the mutation.
+func (m *TreeNodeMutation) DirectRefundTxid() (r []byte, exists bool) {
+	v := m.direct_refund_txid
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDirectRefundTxid returns the old "direct_refund_txid" field's value of the TreeNode entity.
+// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeNodeMutation) OldDirectRefundTxid(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDirectRefundTxid is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDirectRefundTxid requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDirectRefundTxid: %w", err)
+	}
+	return oldValue.DirectRefundTxid, nil
+}
+
+// ClearDirectRefundTxid clears the value of the "direct_refund_txid" field.
+func (m *TreeNodeMutation) ClearDirectRefundTxid() {
+	m.direct_refund_txid = nil
+	m.clearedFields[treenode.FieldDirectRefundTxid] = struct{}{}
+}
+
+// DirectRefundTxidCleared returns if the "direct_refund_txid" field was cleared in this mutation.
+func (m *TreeNodeMutation) DirectRefundTxidCleared() bool {
+	_, ok := m.clearedFields[treenode.FieldDirectRefundTxid]
+	return ok
+}
+
+// ResetDirectRefundTxid resets all changes to the "direct_refund_txid" field.
+func (m *TreeNodeMutation) ResetDirectRefundTxid() {
+	m.direct_refund_txid = nil
+	delete(m.clearedFields, treenode.FieldDirectRefundTxid)
 }
 
 // SetTreeID sets the "tree" edge to the Tree entity by id.
@@ -21715,7 +21965,7 @@ func (m *TreeNodeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TreeNodeMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 20)
 	if m.create_time != nil {
 		fields = append(fields, treenode.FieldCreateTime)
 	}
@@ -21737,14 +21987,8 @@ func (m *TreeNodeMutation) Fields() []string {
 	if m.owner_signing_pubkey != nil {
 		fields = append(fields, treenode.FieldOwnerSigningPubkey)
 	}
-	if m.raw_tx != nil {
-		fields = append(fields, treenode.FieldRawTx)
-	}
 	if m.vout != nil {
 		fields = append(fields, treenode.FieldVout)
-	}
-	if m.raw_refund_tx != nil {
-		fields = append(fields, treenode.FieldRawRefundTx)
 	}
 	if m.node_confirmation_height != nil {
 		fields = append(fields, treenode.FieldNodeConfirmationHeight)
@@ -21752,14 +21996,35 @@ func (m *TreeNodeMutation) Fields() []string {
 	if m.refund_confirmation_height != nil {
 		fields = append(fields, treenode.FieldRefundConfirmationHeight)
 	}
-	if m.direct_refund_tx != nil {
-		fields = append(fields, treenode.FieldDirectRefundTx)
+	if m.raw_tx != nil {
+		fields = append(fields, treenode.FieldRawTx)
 	}
 	if m.direct_tx != nil {
 		fields = append(fields, treenode.FieldDirectTx)
 	}
 	if m.direct_from_cpfp_refund_tx != nil {
 		fields = append(fields, treenode.FieldDirectFromCpfpRefundTx)
+	}
+	if m.raw_txid != nil {
+		fields = append(fields, treenode.FieldRawTxid)
+	}
+	if m.direct_txid != nil {
+		fields = append(fields, treenode.FieldDirectTxid)
+	}
+	if m.direct_from_cpfp_refund_txid != nil {
+		fields = append(fields, treenode.FieldDirectFromCpfpRefundTxid)
+	}
+	if m.raw_refund_tx != nil {
+		fields = append(fields, treenode.FieldRawRefundTx)
+	}
+	if m.direct_refund_tx != nil {
+		fields = append(fields, treenode.FieldDirectRefundTx)
+	}
+	if m.raw_refund_txid != nil {
+		fields = append(fields, treenode.FieldRawRefundTxid)
+	}
+	if m.direct_refund_txid != nil {
+		fields = append(fields, treenode.FieldDirectRefundTxid)
 	}
 	return fields
 }
@@ -21783,22 +22048,32 @@ func (m *TreeNodeMutation) Field(name string) (ent.Value, bool) {
 		return m.OwnerIdentityPubkey()
 	case treenode.FieldOwnerSigningPubkey:
 		return m.OwnerSigningPubkey()
-	case treenode.FieldRawTx:
-		return m.RawTx()
 	case treenode.FieldVout:
 		return m.Vout()
-	case treenode.FieldRawRefundTx:
-		return m.RawRefundTx()
 	case treenode.FieldNodeConfirmationHeight:
 		return m.NodeConfirmationHeight()
 	case treenode.FieldRefundConfirmationHeight:
 		return m.RefundConfirmationHeight()
-	case treenode.FieldDirectRefundTx:
-		return m.DirectRefundTx()
+	case treenode.FieldRawTx:
+		return m.RawTx()
 	case treenode.FieldDirectTx:
 		return m.DirectTx()
 	case treenode.FieldDirectFromCpfpRefundTx:
 		return m.DirectFromCpfpRefundTx()
+	case treenode.FieldRawTxid:
+		return m.RawTxid()
+	case treenode.FieldDirectTxid:
+		return m.DirectTxid()
+	case treenode.FieldDirectFromCpfpRefundTxid:
+		return m.DirectFromCpfpRefundTxid()
+	case treenode.FieldRawRefundTx:
+		return m.RawRefundTx()
+	case treenode.FieldDirectRefundTx:
+		return m.DirectRefundTx()
+	case treenode.FieldRawRefundTxid:
+		return m.RawRefundTxid()
+	case treenode.FieldDirectRefundTxid:
+		return m.DirectRefundTxid()
 	}
 	return nil, false
 }
@@ -21822,22 +22097,32 @@ func (m *TreeNodeMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldOwnerIdentityPubkey(ctx)
 	case treenode.FieldOwnerSigningPubkey:
 		return m.OldOwnerSigningPubkey(ctx)
-	case treenode.FieldRawTx:
-		return m.OldRawTx(ctx)
 	case treenode.FieldVout:
 		return m.OldVout(ctx)
-	case treenode.FieldRawRefundTx:
-		return m.OldRawRefundTx(ctx)
 	case treenode.FieldNodeConfirmationHeight:
 		return m.OldNodeConfirmationHeight(ctx)
 	case treenode.FieldRefundConfirmationHeight:
 		return m.OldRefundConfirmationHeight(ctx)
-	case treenode.FieldDirectRefundTx:
-		return m.OldDirectRefundTx(ctx)
+	case treenode.FieldRawTx:
+		return m.OldRawTx(ctx)
 	case treenode.FieldDirectTx:
 		return m.OldDirectTx(ctx)
 	case treenode.FieldDirectFromCpfpRefundTx:
 		return m.OldDirectFromCpfpRefundTx(ctx)
+	case treenode.FieldRawTxid:
+		return m.OldRawTxid(ctx)
+	case treenode.FieldDirectTxid:
+		return m.OldDirectTxid(ctx)
+	case treenode.FieldDirectFromCpfpRefundTxid:
+		return m.OldDirectFromCpfpRefundTxid(ctx)
+	case treenode.FieldRawRefundTx:
+		return m.OldRawRefundTx(ctx)
+	case treenode.FieldDirectRefundTx:
+		return m.OldDirectRefundTx(ctx)
+	case treenode.FieldRawRefundTxid:
+		return m.OldRawRefundTxid(ctx)
+	case treenode.FieldDirectRefundTxid:
+		return m.OldDirectRefundTxid(ctx)
 	}
 	return nil, fmt.Errorf("unknown TreeNode field %s", name)
 }
@@ -21896,26 +22181,12 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetOwnerSigningPubkey(v)
 		return nil
-	case treenode.FieldRawTx:
-		v, ok := value.([]byte)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetRawTx(v)
-		return nil
 	case treenode.FieldVout:
 		v, ok := value.(int16)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetVout(v)
-		return nil
-	case treenode.FieldRawRefundTx:
-		v, ok := value.([]byte)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetRawRefundTx(v)
 		return nil
 	case treenode.FieldNodeConfirmationHeight:
 		v, ok := value.(uint64)
@@ -21931,12 +22202,12 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetRefundConfirmationHeight(v)
 		return nil
-	case treenode.FieldDirectRefundTx:
+	case treenode.FieldRawTx:
 		v, ok := value.([]byte)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetDirectRefundTx(v)
+		m.SetRawTx(v)
 		return nil
 	case treenode.FieldDirectTx:
 		v, ok := value.([]byte)
@@ -21951,6 +22222,55 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetDirectFromCpfpRefundTx(v)
+		return nil
+	case treenode.FieldRawTxid:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRawTxid(v)
+		return nil
+	case treenode.FieldDirectTxid:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDirectTxid(v)
+		return nil
+	case treenode.FieldDirectFromCpfpRefundTxid:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDirectFromCpfpRefundTxid(v)
+		return nil
+	case treenode.FieldRawRefundTx:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRawRefundTx(v)
+		return nil
+	case treenode.FieldDirectRefundTx:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDirectRefundTx(v)
+		return nil
+	case treenode.FieldRawRefundTxid:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRawRefundTxid(v)
+		return nil
+	case treenode.FieldDirectRefundTxid:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDirectRefundTxid(v)
 		return nil
 	}
 	return fmt.Errorf("unknown TreeNode field %s", name)
@@ -22033,23 +22353,38 @@ func (m *TreeNodeMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *TreeNodeMutation) ClearedFields() []string {
 	var fields []string
-	if m.FieldCleared(treenode.FieldRawRefundTx) {
-		fields = append(fields, treenode.FieldRawRefundTx)
-	}
 	if m.FieldCleared(treenode.FieldNodeConfirmationHeight) {
 		fields = append(fields, treenode.FieldNodeConfirmationHeight)
 	}
 	if m.FieldCleared(treenode.FieldRefundConfirmationHeight) {
 		fields = append(fields, treenode.FieldRefundConfirmationHeight)
 	}
-	if m.FieldCleared(treenode.FieldDirectRefundTx) {
-		fields = append(fields, treenode.FieldDirectRefundTx)
-	}
 	if m.FieldCleared(treenode.FieldDirectTx) {
 		fields = append(fields, treenode.FieldDirectTx)
 	}
 	if m.FieldCleared(treenode.FieldDirectFromCpfpRefundTx) {
 		fields = append(fields, treenode.FieldDirectFromCpfpRefundTx)
+	}
+	if m.FieldCleared(treenode.FieldRawTxid) {
+		fields = append(fields, treenode.FieldRawTxid)
+	}
+	if m.FieldCleared(treenode.FieldDirectTxid) {
+		fields = append(fields, treenode.FieldDirectTxid)
+	}
+	if m.FieldCleared(treenode.FieldDirectFromCpfpRefundTxid) {
+		fields = append(fields, treenode.FieldDirectFromCpfpRefundTxid)
+	}
+	if m.FieldCleared(treenode.FieldRawRefundTx) {
+		fields = append(fields, treenode.FieldRawRefundTx)
+	}
+	if m.FieldCleared(treenode.FieldDirectRefundTx) {
+		fields = append(fields, treenode.FieldDirectRefundTx)
+	}
+	if m.FieldCleared(treenode.FieldRawRefundTxid) {
+		fields = append(fields, treenode.FieldRawRefundTxid)
+	}
+	if m.FieldCleared(treenode.FieldDirectRefundTxid) {
+		fields = append(fields, treenode.FieldDirectRefundTxid)
 	}
 	return fields
 }
@@ -22065,23 +22400,38 @@ func (m *TreeNodeMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *TreeNodeMutation) ClearField(name string) error {
 	switch name {
-	case treenode.FieldRawRefundTx:
-		m.ClearRawRefundTx()
-		return nil
 	case treenode.FieldNodeConfirmationHeight:
 		m.ClearNodeConfirmationHeight()
 		return nil
 	case treenode.FieldRefundConfirmationHeight:
 		m.ClearRefundConfirmationHeight()
 		return nil
-	case treenode.FieldDirectRefundTx:
-		m.ClearDirectRefundTx()
-		return nil
 	case treenode.FieldDirectTx:
 		m.ClearDirectTx()
 		return nil
 	case treenode.FieldDirectFromCpfpRefundTx:
 		m.ClearDirectFromCpfpRefundTx()
+		return nil
+	case treenode.FieldRawTxid:
+		m.ClearRawTxid()
+		return nil
+	case treenode.FieldDirectTxid:
+		m.ClearDirectTxid()
+		return nil
+	case treenode.FieldDirectFromCpfpRefundTxid:
+		m.ClearDirectFromCpfpRefundTxid()
+		return nil
+	case treenode.FieldRawRefundTx:
+		m.ClearRawRefundTx()
+		return nil
+	case treenode.FieldDirectRefundTx:
+		m.ClearDirectRefundTx()
+		return nil
+	case treenode.FieldRawRefundTxid:
+		m.ClearRawRefundTxid()
+		return nil
+	case treenode.FieldDirectRefundTxid:
+		m.ClearDirectRefundTxid()
 		return nil
 	}
 	return fmt.Errorf("unknown TreeNode nullable field %s", name)
@@ -22112,14 +22462,8 @@ func (m *TreeNodeMutation) ResetField(name string) error {
 	case treenode.FieldOwnerSigningPubkey:
 		m.ResetOwnerSigningPubkey()
 		return nil
-	case treenode.FieldRawTx:
-		m.ResetRawTx()
-		return nil
 	case treenode.FieldVout:
 		m.ResetVout()
-		return nil
-	case treenode.FieldRawRefundTx:
-		m.ResetRawRefundTx()
 		return nil
 	case treenode.FieldNodeConfirmationHeight:
 		m.ResetNodeConfirmationHeight()
@@ -22127,14 +22471,35 @@ func (m *TreeNodeMutation) ResetField(name string) error {
 	case treenode.FieldRefundConfirmationHeight:
 		m.ResetRefundConfirmationHeight()
 		return nil
-	case treenode.FieldDirectRefundTx:
-		m.ResetDirectRefundTx()
+	case treenode.FieldRawTx:
+		m.ResetRawTx()
 		return nil
 	case treenode.FieldDirectTx:
 		m.ResetDirectTx()
 		return nil
 	case treenode.FieldDirectFromCpfpRefundTx:
 		m.ResetDirectFromCpfpRefundTx()
+		return nil
+	case treenode.FieldRawTxid:
+		m.ResetRawTxid()
+		return nil
+	case treenode.FieldDirectTxid:
+		m.ResetDirectTxid()
+		return nil
+	case treenode.FieldDirectFromCpfpRefundTxid:
+		m.ResetDirectFromCpfpRefundTxid()
+		return nil
+	case treenode.FieldRawRefundTx:
+		m.ResetRawRefundTx()
+		return nil
+	case treenode.FieldDirectRefundTx:
+		m.ResetDirectRefundTx()
+		return nil
+	case treenode.FieldRawRefundTxid:
+		m.ResetRawRefundTxid()
+		return nil
+	case treenode.FieldDirectRefundTxid:
+		m.ResetDirectRefundTxid()
 		return nil
 	}
 	return fmt.Errorf("unknown TreeNode field %s", name)

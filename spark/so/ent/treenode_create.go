@@ -85,21 +85,9 @@ func (tnc *TreeNodeCreate) SetOwnerSigningPubkey(b []byte) *TreeNodeCreate {
 	return tnc
 }
 
-// SetRawTx sets the "raw_tx" field.
-func (tnc *TreeNodeCreate) SetRawTx(b []byte) *TreeNodeCreate {
-	tnc.mutation.SetRawTx(b)
-	return tnc
-}
-
 // SetVout sets the "vout" field.
 func (tnc *TreeNodeCreate) SetVout(i int16) *TreeNodeCreate {
 	tnc.mutation.SetVout(i)
-	return tnc
-}
-
-// SetRawRefundTx sets the "raw_refund_tx" field.
-func (tnc *TreeNodeCreate) SetRawRefundTx(b []byte) *TreeNodeCreate {
-	tnc.mutation.SetRawRefundTx(b)
 	return tnc
 }
 
@@ -131,9 +119,9 @@ func (tnc *TreeNodeCreate) SetNillableRefundConfirmationHeight(u *uint64) *TreeN
 	return tnc
 }
 
-// SetDirectRefundTx sets the "direct_refund_tx" field.
-func (tnc *TreeNodeCreate) SetDirectRefundTx(b []byte) *TreeNodeCreate {
-	tnc.mutation.SetDirectRefundTx(b)
+// SetRawTx sets the "raw_tx" field.
+func (tnc *TreeNodeCreate) SetRawTx(b []byte) *TreeNodeCreate {
+	tnc.mutation.SetRawTx(b)
 	return tnc
 }
 
@@ -146,6 +134,48 @@ func (tnc *TreeNodeCreate) SetDirectTx(b []byte) *TreeNodeCreate {
 // SetDirectFromCpfpRefundTx sets the "direct_from_cpfp_refund_tx" field.
 func (tnc *TreeNodeCreate) SetDirectFromCpfpRefundTx(b []byte) *TreeNodeCreate {
 	tnc.mutation.SetDirectFromCpfpRefundTx(b)
+	return tnc
+}
+
+// SetRawTxid sets the "raw_txid" field.
+func (tnc *TreeNodeCreate) SetRawTxid(b []byte) *TreeNodeCreate {
+	tnc.mutation.SetRawTxid(b)
+	return tnc
+}
+
+// SetDirectTxid sets the "direct_txid" field.
+func (tnc *TreeNodeCreate) SetDirectTxid(b []byte) *TreeNodeCreate {
+	tnc.mutation.SetDirectTxid(b)
+	return tnc
+}
+
+// SetDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field.
+func (tnc *TreeNodeCreate) SetDirectFromCpfpRefundTxid(b []byte) *TreeNodeCreate {
+	tnc.mutation.SetDirectFromCpfpRefundTxid(b)
+	return tnc
+}
+
+// SetRawRefundTx sets the "raw_refund_tx" field.
+func (tnc *TreeNodeCreate) SetRawRefundTx(b []byte) *TreeNodeCreate {
+	tnc.mutation.SetRawRefundTx(b)
+	return tnc
+}
+
+// SetDirectRefundTx sets the "direct_refund_tx" field.
+func (tnc *TreeNodeCreate) SetDirectRefundTx(b []byte) *TreeNodeCreate {
+	tnc.mutation.SetDirectRefundTx(b)
+	return tnc
+}
+
+// SetRawRefundTxid sets the "raw_refund_txid" field.
+func (tnc *TreeNodeCreate) SetRawRefundTxid(b []byte) *TreeNodeCreate {
+	tnc.mutation.SetRawRefundTxid(b)
+	return tnc
+}
+
+// SetDirectRefundTxid sets the "direct_refund_txid" field.
+func (tnc *TreeNodeCreate) SetDirectRefundTxid(b []byte) *TreeNodeCreate {
+	tnc.mutation.SetDirectRefundTxid(b)
 	return tnc
 }
 
@@ -323,6 +353,9 @@ func (tnc *TreeNodeCreate) check() error {
 			return &ValidationError{Name: "owner_signing_pubkey", err: fmt.Errorf(`ent: validator failed for field "TreeNode.owner_signing_pubkey": %w`, err)}
 		}
 	}
+	if _, ok := tnc.mutation.Vout(); !ok {
+		return &ValidationError{Name: "vout", err: errors.New(`ent: missing required field "TreeNode.vout"`)}
+	}
 	if _, ok := tnc.mutation.RawTx(); !ok {
 		return &ValidationError{Name: "raw_tx", err: errors.New(`ent: missing required field "TreeNode.raw_tx"`)}
 	}
@@ -330,9 +363,6 @@ func (tnc *TreeNodeCreate) check() error {
 		if err := treenode.RawTxValidator(v); err != nil {
 			return &ValidationError{Name: "raw_tx", err: fmt.Errorf(`ent: validator failed for field "TreeNode.raw_tx": %w`, err)}
 		}
-	}
-	if _, ok := tnc.mutation.Vout(); !ok {
-		return &ValidationError{Name: "vout", err: errors.New(`ent: missing required field "TreeNode.vout"`)}
 	}
 	if len(tnc.mutation.TreeIDs()) == 0 {
 		return &ValidationError{Name: "tree", err: errors.New(`ent: missing required edge "TreeNode.tree"`)}
@@ -404,17 +434,9 @@ func (tnc *TreeNodeCreate) createSpec() (*TreeNode, *sqlgraph.CreateSpec) {
 		_spec.SetField(treenode.FieldOwnerSigningPubkey, field.TypeBytes, value)
 		_node.OwnerSigningPubkey = value
 	}
-	if value, ok := tnc.mutation.RawTx(); ok {
-		_spec.SetField(treenode.FieldRawTx, field.TypeBytes, value)
-		_node.RawTx = value
-	}
 	if value, ok := tnc.mutation.Vout(); ok {
 		_spec.SetField(treenode.FieldVout, field.TypeInt16, value)
 		_node.Vout = value
-	}
-	if value, ok := tnc.mutation.RawRefundTx(); ok {
-		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
-		_node.RawRefundTx = value
 	}
 	if value, ok := tnc.mutation.NodeConfirmationHeight(); ok {
 		_spec.SetField(treenode.FieldNodeConfirmationHeight, field.TypeUint64, value)
@@ -424,9 +446,9 @@ func (tnc *TreeNodeCreate) createSpec() (*TreeNode, *sqlgraph.CreateSpec) {
 		_spec.SetField(treenode.FieldRefundConfirmationHeight, field.TypeUint64, value)
 		_node.RefundConfirmationHeight = value
 	}
-	if value, ok := tnc.mutation.DirectRefundTx(); ok {
-		_spec.SetField(treenode.FieldDirectRefundTx, field.TypeBytes, value)
-		_node.DirectRefundTx = value
+	if value, ok := tnc.mutation.RawTx(); ok {
+		_spec.SetField(treenode.FieldRawTx, field.TypeBytes, value)
+		_node.RawTx = value
 	}
 	if value, ok := tnc.mutation.DirectTx(); ok {
 		_spec.SetField(treenode.FieldDirectTx, field.TypeBytes, value)
@@ -435,6 +457,34 @@ func (tnc *TreeNodeCreate) createSpec() (*TreeNode, *sqlgraph.CreateSpec) {
 	if value, ok := tnc.mutation.DirectFromCpfpRefundTx(); ok {
 		_spec.SetField(treenode.FieldDirectFromCpfpRefundTx, field.TypeBytes, value)
 		_node.DirectFromCpfpRefundTx = value
+	}
+	if value, ok := tnc.mutation.RawTxid(); ok {
+		_spec.SetField(treenode.FieldRawTxid, field.TypeBytes, value)
+		_node.RawTxid = value
+	}
+	if value, ok := tnc.mutation.DirectTxid(); ok {
+		_spec.SetField(treenode.FieldDirectTxid, field.TypeBytes, value)
+		_node.DirectTxid = value
+	}
+	if value, ok := tnc.mutation.DirectFromCpfpRefundTxid(); ok {
+		_spec.SetField(treenode.FieldDirectFromCpfpRefundTxid, field.TypeBytes, value)
+		_node.DirectFromCpfpRefundTxid = value
+	}
+	if value, ok := tnc.mutation.RawRefundTx(); ok {
+		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
+		_node.RawRefundTx = value
+	}
+	if value, ok := tnc.mutation.DirectRefundTx(); ok {
+		_spec.SetField(treenode.FieldDirectRefundTx, field.TypeBytes, value)
+		_node.DirectRefundTx = value
+	}
+	if value, ok := tnc.mutation.RawRefundTxid(); ok {
+		_spec.SetField(treenode.FieldRawRefundTxid, field.TypeBytes, value)
+		_node.RawRefundTxid = value
+	}
+	if value, ok := tnc.mutation.DirectRefundTxid(); ok {
+		_spec.SetField(treenode.FieldDirectRefundTxid, field.TypeBytes, value)
+		_node.DirectRefundTxid = value
 	}
 	if nodes := tnc.mutation.TreeIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -603,18 +653,6 @@ func (u *TreeNodeUpsert) UpdateOwnerSigningPubkey() *TreeNodeUpsert {
 	return u
 }
 
-// SetRawTx sets the "raw_tx" field.
-func (u *TreeNodeUpsert) SetRawTx(v []byte) *TreeNodeUpsert {
-	u.Set(treenode.FieldRawTx, v)
-	return u
-}
-
-// UpdateRawTx sets the "raw_tx" field to the value that was provided on create.
-func (u *TreeNodeUpsert) UpdateRawTx() *TreeNodeUpsert {
-	u.SetExcluded(treenode.FieldRawTx)
-	return u
-}
-
 // SetVout sets the "vout" field.
 func (u *TreeNodeUpsert) SetVout(v int16) *TreeNodeUpsert {
 	u.Set(treenode.FieldVout, v)
@@ -630,24 +668,6 @@ func (u *TreeNodeUpsert) UpdateVout() *TreeNodeUpsert {
 // AddVout adds v to the "vout" field.
 func (u *TreeNodeUpsert) AddVout(v int16) *TreeNodeUpsert {
 	u.Add(treenode.FieldVout, v)
-	return u
-}
-
-// SetRawRefundTx sets the "raw_refund_tx" field.
-func (u *TreeNodeUpsert) SetRawRefundTx(v []byte) *TreeNodeUpsert {
-	u.Set(treenode.FieldRawRefundTx, v)
-	return u
-}
-
-// UpdateRawRefundTx sets the "raw_refund_tx" field to the value that was provided on create.
-func (u *TreeNodeUpsert) UpdateRawRefundTx() *TreeNodeUpsert {
-	u.SetExcluded(treenode.FieldRawRefundTx)
-	return u
-}
-
-// ClearRawRefundTx clears the value of the "raw_refund_tx" field.
-func (u *TreeNodeUpsert) ClearRawRefundTx() *TreeNodeUpsert {
-	u.SetNull(treenode.FieldRawRefundTx)
 	return u
 }
 
@@ -699,21 +719,15 @@ func (u *TreeNodeUpsert) ClearRefundConfirmationHeight() *TreeNodeUpsert {
 	return u
 }
 
-// SetDirectRefundTx sets the "direct_refund_tx" field.
-func (u *TreeNodeUpsert) SetDirectRefundTx(v []byte) *TreeNodeUpsert {
-	u.Set(treenode.FieldDirectRefundTx, v)
+// SetRawTx sets the "raw_tx" field.
+func (u *TreeNodeUpsert) SetRawTx(v []byte) *TreeNodeUpsert {
+	u.Set(treenode.FieldRawTx, v)
 	return u
 }
 
-// UpdateDirectRefundTx sets the "direct_refund_tx" field to the value that was provided on create.
-func (u *TreeNodeUpsert) UpdateDirectRefundTx() *TreeNodeUpsert {
-	u.SetExcluded(treenode.FieldDirectRefundTx)
-	return u
-}
-
-// ClearDirectRefundTx clears the value of the "direct_refund_tx" field.
-func (u *TreeNodeUpsert) ClearDirectRefundTx() *TreeNodeUpsert {
-	u.SetNull(treenode.FieldDirectRefundTx)
+// UpdateRawTx sets the "raw_tx" field to the value that was provided on create.
+func (u *TreeNodeUpsert) UpdateRawTx() *TreeNodeUpsert {
+	u.SetExcluded(treenode.FieldRawTx)
 	return u
 }
 
@@ -750,6 +764,132 @@ func (u *TreeNodeUpsert) UpdateDirectFromCpfpRefundTx() *TreeNodeUpsert {
 // ClearDirectFromCpfpRefundTx clears the value of the "direct_from_cpfp_refund_tx" field.
 func (u *TreeNodeUpsert) ClearDirectFromCpfpRefundTx() *TreeNodeUpsert {
 	u.SetNull(treenode.FieldDirectFromCpfpRefundTx)
+	return u
+}
+
+// SetRawTxid sets the "raw_txid" field.
+func (u *TreeNodeUpsert) SetRawTxid(v []byte) *TreeNodeUpsert {
+	u.Set(treenode.FieldRawTxid, v)
+	return u
+}
+
+// UpdateRawTxid sets the "raw_txid" field to the value that was provided on create.
+func (u *TreeNodeUpsert) UpdateRawTxid() *TreeNodeUpsert {
+	u.SetExcluded(treenode.FieldRawTxid)
+	return u
+}
+
+// ClearRawTxid clears the value of the "raw_txid" field.
+func (u *TreeNodeUpsert) ClearRawTxid() *TreeNodeUpsert {
+	u.SetNull(treenode.FieldRawTxid)
+	return u
+}
+
+// SetDirectTxid sets the "direct_txid" field.
+func (u *TreeNodeUpsert) SetDirectTxid(v []byte) *TreeNodeUpsert {
+	u.Set(treenode.FieldDirectTxid, v)
+	return u
+}
+
+// UpdateDirectTxid sets the "direct_txid" field to the value that was provided on create.
+func (u *TreeNodeUpsert) UpdateDirectTxid() *TreeNodeUpsert {
+	u.SetExcluded(treenode.FieldDirectTxid)
+	return u
+}
+
+// ClearDirectTxid clears the value of the "direct_txid" field.
+func (u *TreeNodeUpsert) ClearDirectTxid() *TreeNodeUpsert {
+	u.SetNull(treenode.FieldDirectTxid)
+	return u
+}
+
+// SetDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field.
+func (u *TreeNodeUpsert) SetDirectFromCpfpRefundTxid(v []byte) *TreeNodeUpsert {
+	u.Set(treenode.FieldDirectFromCpfpRefundTxid, v)
+	return u
+}
+
+// UpdateDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field to the value that was provided on create.
+func (u *TreeNodeUpsert) UpdateDirectFromCpfpRefundTxid() *TreeNodeUpsert {
+	u.SetExcluded(treenode.FieldDirectFromCpfpRefundTxid)
+	return u
+}
+
+// ClearDirectFromCpfpRefundTxid clears the value of the "direct_from_cpfp_refund_txid" field.
+func (u *TreeNodeUpsert) ClearDirectFromCpfpRefundTxid() *TreeNodeUpsert {
+	u.SetNull(treenode.FieldDirectFromCpfpRefundTxid)
+	return u
+}
+
+// SetRawRefundTx sets the "raw_refund_tx" field.
+func (u *TreeNodeUpsert) SetRawRefundTx(v []byte) *TreeNodeUpsert {
+	u.Set(treenode.FieldRawRefundTx, v)
+	return u
+}
+
+// UpdateRawRefundTx sets the "raw_refund_tx" field to the value that was provided on create.
+func (u *TreeNodeUpsert) UpdateRawRefundTx() *TreeNodeUpsert {
+	u.SetExcluded(treenode.FieldRawRefundTx)
+	return u
+}
+
+// ClearRawRefundTx clears the value of the "raw_refund_tx" field.
+func (u *TreeNodeUpsert) ClearRawRefundTx() *TreeNodeUpsert {
+	u.SetNull(treenode.FieldRawRefundTx)
+	return u
+}
+
+// SetDirectRefundTx sets the "direct_refund_tx" field.
+func (u *TreeNodeUpsert) SetDirectRefundTx(v []byte) *TreeNodeUpsert {
+	u.Set(treenode.FieldDirectRefundTx, v)
+	return u
+}
+
+// UpdateDirectRefundTx sets the "direct_refund_tx" field to the value that was provided on create.
+func (u *TreeNodeUpsert) UpdateDirectRefundTx() *TreeNodeUpsert {
+	u.SetExcluded(treenode.FieldDirectRefundTx)
+	return u
+}
+
+// ClearDirectRefundTx clears the value of the "direct_refund_tx" field.
+func (u *TreeNodeUpsert) ClearDirectRefundTx() *TreeNodeUpsert {
+	u.SetNull(treenode.FieldDirectRefundTx)
+	return u
+}
+
+// SetRawRefundTxid sets the "raw_refund_txid" field.
+func (u *TreeNodeUpsert) SetRawRefundTxid(v []byte) *TreeNodeUpsert {
+	u.Set(treenode.FieldRawRefundTxid, v)
+	return u
+}
+
+// UpdateRawRefundTxid sets the "raw_refund_txid" field to the value that was provided on create.
+func (u *TreeNodeUpsert) UpdateRawRefundTxid() *TreeNodeUpsert {
+	u.SetExcluded(treenode.FieldRawRefundTxid)
+	return u
+}
+
+// ClearRawRefundTxid clears the value of the "raw_refund_txid" field.
+func (u *TreeNodeUpsert) ClearRawRefundTxid() *TreeNodeUpsert {
+	u.SetNull(treenode.FieldRawRefundTxid)
+	return u
+}
+
+// SetDirectRefundTxid sets the "direct_refund_txid" field.
+func (u *TreeNodeUpsert) SetDirectRefundTxid(v []byte) *TreeNodeUpsert {
+	u.Set(treenode.FieldDirectRefundTxid, v)
+	return u
+}
+
+// UpdateDirectRefundTxid sets the "direct_refund_txid" field to the value that was provided on create.
+func (u *TreeNodeUpsert) UpdateDirectRefundTxid() *TreeNodeUpsert {
+	u.SetExcluded(treenode.FieldDirectRefundTxid)
+	return u
+}
+
+// ClearDirectRefundTxid clears the value of the "direct_refund_txid" field.
+func (u *TreeNodeUpsert) ClearDirectRefundTxid() *TreeNodeUpsert {
+	u.SetNull(treenode.FieldDirectRefundTxid)
 	return u
 }
 
@@ -866,20 +1006,6 @@ func (u *TreeNodeUpsertOne) UpdateOwnerSigningPubkey() *TreeNodeUpsertOne {
 	})
 }
 
-// SetRawTx sets the "raw_tx" field.
-func (u *TreeNodeUpsertOne) SetRawTx(v []byte) *TreeNodeUpsertOne {
-	return u.Update(func(s *TreeNodeUpsert) {
-		s.SetRawTx(v)
-	})
-}
-
-// UpdateRawTx sets the "raw_tx" field to the value that was provided on create.
-func (u *TreeNodeUpsertOne) UpdateRawTx() *TreeNodeUpsertOne {
-	return u.Update(func(s *TreeNodeUpsert) {
-		s.UpdateRawTx()
-	})
-}
-
 // SetVout sets the "vout" field.
 func (u *TreeNodeUpsertOne) SetVout(v int16) *TreeNodeUpsertOne {
 	return u.Update(func(s *TreeNodeUpsert) {
@@ -898,27 +1024,6 @@ func (u *TreeNodeUpsertOne) AddVout(v int16) *TreeNodeUpsertOne {
 func (u *TreeNodeUpsertOne) UpdateVout() *TreeNodeUpsertOne {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.UpdateVout()
-	})
-}
-
-// SetRawRefundTx sets the "raw_refund_tx" field.
-func (u *TreeNodeUpsertOne) SetRawRefundTx(v []byte) *TreeNodeUpsertOne {
-	return u.Update(func(s *TreeNodeUpsert) {
-		s.SetRawRefundTx(v)
-	})
-}
-
-// UpdateRawRefundTx sets the "raw_refund_tx" field to the value that was provided on create.
-func (u *TreeNodeUpsertOne) UpdateRawRefundTx() *TreeNodeUpsertOne {
-	return u.Update(func(s *TreeNodeUpsert) {
-		s.UpdateRawRefundTx()
-	})
-}
-
-// ClearRawRefundTx clears the value of the "raw_refund_tx" field.
-func (u *TreeNodeUpsertOne) ClearRawRefundTx() *TreeNodeUpsertOne {
-	return u.Update(func(s *TreeNodeUpsert) {
-		s.ClearRawRefundTx()
 	})
 }
 
@@ -978,24 +1083,17 @@ func (u *TreeNodeUpsertOne) ClearRefundConfirmationHeight() *TreeNodeUpsertOne {
 	})
 }
 
-// SetDirectRefundTx sets the "direct_refund_tx" field.
-func (u *TreeNodeUpsertOne) SetDirectRefundTx(v []byte) *TreeNodeUpsertOne {
+// SetRawTx sets the "raw_tx" field.
+func (u *TreeNodeUpsertOne) SetRawTx(v []byte) *TreeNodeUpsertOne {
 	return u.Update(func(s *TreeNodeUpsert) {
-		s.SetDirectRefundTx(v)
+		s.SetRawTx(v)
 	})
 }
 
-// UpdateDirectRefundTx sets the "direct_refund_tx" field to the value that was provided on create.
-func (u *TreeNodeUpsertOne) UpdateDirectRefundTx() *TreeNodeUpsertOne {
+// UpdateRawTx sets the "raw_tx" field to the value that was provided on create.
+func (u *TreeNodeUpsertOne) UpdateRawTx() *TreeNodeUpsertOne {
 	return u.Update(func(s *TreeNodeUpsert) {
-		s.UpdateDirectRefundTx()
-	})
-}
-
-// ClearDirectRefundTx clears the value of the "direct_refund_tx" field.
-func (u *TreeNodeUpsertOne) ClearDirectRefundTx() *TreeNodeUpsertOne {
-	return u.Update(func(s *TreeNodeUpsert) {
-		s.ClearDirectRefundTx()
+		s.UpdateRawTx()
 	})
 }
 
@@ -1038,6 +1136,153 @@ func (u *TreeNodeUpsertOne) UpdateDirectFromCpfpRefundTx() *TreeNodeUpsertOne {
 func (u *TreeNodeUpsertOne) ClearDirectFromCpfpRefundTx() *TreeNodeUpsertOne {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.ClearDirectFromCpfpRefundTx()
+	})
+}
+
+// SetRawTxid sets the "raw_txid" field.
+func (u *TreeNodeUpsertOne) SetRawTxid(v []byte) *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetRawTxid(v)
+	})
+}
+
+// UpdateRawTxid sets the "raw_txid" field to the value that was provided on create.
+func (u *TreeNodeUpsertOne) UpdateRawTxid() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateRawTxid()
+	})
+}
+
+// ClearRawTxid clears the value of the "raw_txid" field.
+func (u *TreeNodeUpsertOne) ClearRawTxid() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearRawTxid()
+	})
+}
+
+// SetDirectTxid sets the "direct_txid" field.
+func (u *TreeNodeUpsertOne) SetDirectTxid(v []byte) *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetDirectTxid(v)
+	})
+}
+
+// UpdateDirectTxid sets the "direct_txid" field to the value that was provided on create.
+func (u *TreeNodeUpsertOne) UpdateDirectTxid() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateDirectTxid()
+	})
+}
+
+// ClearDirectTxid clears the value of the "direct_txid" field.
+func (u *TreeNodeUpsertOne) ClearDirectTxid() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearDirectTxid()
+	})
+}
+
+// SetDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field.
+func (u *TreeNodeUpsertOne) SetDirectFromCpfpRefundTxid(v []byte) *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetDirectFromCpfpRefundTxid(v)
+	})
+}
+
+// UpdateDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field to the value that was provided on create.
+func (u *TreeNodeUpsertOne) UpdateDirectFromCpfpRefundTxid() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateDirectFromCpfpRefundTxid()
+	})
+}
+
+// ClearDirectFromCpfpRefundTxid clears the value of the "direct_from_cpfp_refund_txid" field.
+func (u *TreeNodeUpsertOne) ClearDirectFromCpfpRefundTxid() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearDirectFromCpfpRefundTxid()
+	})
+}
+
+// SetRawRefundTx sets the "raw_refund_tx" field.
+func (u *TreeNodeUpsertOne) SetRawRefundTx(v []byte) *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetRawRefundTx(v)
+	})
+}
+
+// UpdateRawRefundTx sets the "raw_refund_tx" field to the value that was provided on create.
+func (u *TreeNodeUpsertOne) UpdateRawRefundTx() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateRawRefundTx()
+	})
+}
+
+// ClearRawRefundTx clears the value of the "raw_refund_tx" field.
+func (u *TreeNodeUpsertOne) ClearRawRefundTx() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearRawRefundTx()
+	})
+}
+
+// SetDirectRefundTx sets the "direct_refund_tx" field.
+func (u *TreeNodeUpsertOne) SetDirectRefundTx(v []byte) *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetDirectRefundTx(v)
+	})
+}
+
+// UpdateDirectRefundTx sets the "direct_refund_tx" field to the value that was provided on create.
+func (u *TreeNodeUpsertOne) UpdateDirectRefundTx() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateDirectRefundTx()
+	})
+}
+
+// ClearDirectRefundTx clears the value of the "direct_refund_tx" field.
+func (u *TreeNodeUpsertOne) ClearDirectRefundTx() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearDirectRefundTx()
+	})
+}
+
+// SetRawRefundTxid sets the "raw_refund_txid" field.
+func (u *TreeNodeUpsertOne) SetRawRefundTxid(v []byte) *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetRawRefundTxid(v)
+	})
+}
+
+// UpdateRawRefundTxid sets the "raw_refund_txid" field to the value that was provided on create.
+func (u *TreeNodeUpsertOne) UpdateRawRefundTxid() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateRawRefundTxid()
+	})
+}
+
+// ClearRawRefundTxid clears the value of the "raw_refund_txid" field.
+func (u *TreeNodeUpsertOne) ClearRawRefundTxid() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearRawRefundTxid()
+	})
+}
+
+// SetDirectRefundTxid sets the "direct_refund_txid" field.
+func (u *TreeNodeUpsertOne) SetDirectRefundTxid(v []byte) *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetDirectRefundTxid(v)
+	})
+}
+
+// UpdateDirectRefundTxid sets the "direct_refund_txid" field to the value that was provided on create.
+func (u *TreeNodeUpsertOne) UpdateDirectRefundTxid() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateDirectRefundTxid()
+	})
+}
+
+// ClearDirectRefundTxid clears the value of the "direct_refund_txid" field.
+func (u *TreeNodeUpsertOne) ClearDirectRefundTxid() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearDirectRefundTxid()
 	})
 }
 
@@ -1321,20 +1566,6 @@ func (u *TreeNodeUpsertBulk) UpdateOwnerSigningPubkey() *TreeNodeUpsertBulk {
 	})
 }
 
-// SetRawTx sets the "raw_tx" field.
-func (u *TreeNodeUpsertBulk) SetRawTx(v []byte) *TreeNodeUpsertBulk {
-	return u.Update(func(s *TreeNodeUpsert) {
-		s.SetRawTx(v)
-	})
-}
-
-// UpdateRawTx sets the "raw_tx" field to the value that was provided on create.
-func (u *TreeNodeUpsertBulk) UpdateRawTx() *TreeNodeUpsertBulk {
-	return u.Update(func(s *TreeNodeUpsert) {
-		s.UpdateRawTx()
-	})
-}
-
 // SetVout sets the "vout" field.
 func (u *TreeNodeUpsertBulk) SetVout(v int16) *TreeNodeUpsertBulk {
 	return u.Update(func(s *TreeNodeUpsert) {
@@ -1353,27 +1584,6 @@ func (u *TreeNodeUpsertBulk) AddVout(v int16) *TreeNodeUpsertBulk {
 func (u *TreeNodeUpsertBulk) UpdateVout() *TreeNodeUpsertBulk {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.UpdateVout()
-	})
-}
-
-// SetRawRefundTx sets the "raw_refund_tx" field.
-func (u *TreeNodeUpsertBulk) SetRawRefundTx(v []byte) *TreeNodeUpsertBulk {
-	return u.Update(func(s *TreeNodeUpsert) {
-		s.SetRawRefundTx(v)
-	})
-}
-
-// UpdateRawRefundTx sets the "raw_refund_tx" field to the value that was provided on create.
-func (u *TreeNodeUpsertBulk) UpdateRawRefundTx() *TreeNodeUpsertBulk {
-	return u.Update(func(s *TreeNodeUpsert) {
-		s.UpdateRawRefundTx()
-	})
-}
-
-// ClearRawRefundTx clears the value of the "raw_refund_tx" field.
-func (u *TreeNodeUpsertBulk) ClearRawRefundTx() *TreeNodeUpsertBulk {
-	return u.Update(func(s *TreeNodeUpsert) {
-		s.ClearRawRefundTx()
 	})
 }
 
@@ -1433,24 +1643,17 @@ func (u *TreeNodeUpsertBulk) ClearRefundConfirmationHeight() *TreeNodeUpsertBulk
 	})
 }
 
-// SetDirectRefundTx sets the "direct_refund_tx" field.
-func (u *TreeNodeUpsertBulk) SetDirectRefundTx(v []byte) *TreeNodeUpsertBulk {
+// SetRawTx sets the "raw_tx" field.
+func (u *TreeNodeUpsertBulk) SetRawTx(v []byte) *TreeNodeUpsertBulk {
 	return u.Update(func(s *TreeNodeUpsert) {
-		s.SetDirectRefundTx(v)
+		s.SetRawTx(v)
 	})
 }
 
-// UpdateDirectRefundTx sets the "direct_refund_tx" field to the value that was provided on create.
-func (u *TreeNodeUpsertBulk) UpdateDirectRefundTx() *TreeNodeUpsertBulk {
+// UpdateRawTx sets the "raw_tx" field to the value that was provided on create.
+func (u *TreeNodeUpsertBulk) UpdateRawTx() *TreeNodeUpsertBulk {
 	return u.Update(func(s *TreeNodeUpsert) {
-		s.UpdateDirectRefundTx()
-	})
-}
-
-// ClearDirectRefundTx clears the value of the "direct_refund_tx" field.
-func (u *TreeNodeUpsertBulk) ClearDirectRefundTx() *TreeNodeUpsertBulk {
-	return u.Update(func(s *TreeNodeUpsert) {
-		s.ClearDirectRefundTx()
+		s.UpdateRawTx()
 	})
 }
 
@@ -1493,6 +1696,153 @@ func (u *TreeNodeUpsertBulk) UpdateDirectFromCpfpRefundTx() *TreeNodeUpsertBulk 
 func (u *TreeNodeUpsertBulk) ClearDirectFromCpfpRefundTx() *TreeNodeUpsertBulk {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.ClearDirectFromCpfpRefundTx()
+	})
+}
+
+// SetRawTxid sets the "raw_txid" field.
+func (u *TreeNodeUpsertBulk) SetRawTxid(v []byte) *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetRawTxid(v)
+	})
+}
+
+// UpdateRawTxid sets the "raw_txid" field to the value that was provided on create.
+func (u *TreeNodeUpsertBulk) UpdateRawTxid() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateRawTxid()
+	})
+}
+
+// ClearRawTxid clears the value of the "raw_txid" field.
+func (u *TreeNodeUpsertBulk) ClearRawTxid() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearRawTxid()
+	})
+}
+
+// SetDirectTxid sets the "direct_txid" field.
+func (u *TreeNodeUpsertBulk) SetDirectTxid(v []byte) *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetDirectTxid(v)
+	})
+}
+
+// UpdateDirectTxid sets the "direct_txid" field to the value that was provided on create.
+func (u *TreeNodeUpsertBulk) UpdateDirectTxid() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateDirectTxid()
+	})
+}
+
+// ClearDirectTxid clears the value of the "direct_txid" field.
+func (u *TreeNodeUpsertBulk) ClearDirectTxid() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearDirectTxid()
+	})
+}
+
+// SetDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field.
+func (u *TreeNodeUpsertBulk) SetDirectFromCpfpRefundTxid(v []byte) *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetDirectFromCpfpRefundTxid(v)
+	})
+}
+
+// UpdateDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field to the value that was provided on create.
+func (u *TreeNodeUpsertBulk) UpdateDirectFromCpfpRefundTxid() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateDirectFromCpfpRefundTxid()
+	})
+}
+
+// ClearDirectFromCpfpRefundTxid clears the value of the "direct_from_cpfp_refund_txid" field.
+func (u *TreeNodeUpsertBulk) ClearDirectFromCpfpRefundTxid() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearDirectFromCpfpRefundTxid()
+	})
+}
+
+// SetRawRefundTx sets the "raw_refund_tx" field.
+func (u *TreeNodeUpsertBulk) SetRawRefundTx(v []byte) *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetRawRefundTx(v)
+	})
+}
+
+// UpdateRawRefundTx sets the "raw_refund_tx" field to the value that was provided on create.
+func (u *TreeNodeUpsertBulk) UpdateRawRefundTx() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateRawRefundTx()
+	})
+}
+
+// ClearRawRefundTx clears the value of the "raw_refund_tx" field.
+func (u *TreeNodeUpsertBulk) ClearRawRefundTx() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearRawRefundTx()
+	})
+}
+
+// SetDirectRefundTx sets the "direct_refund_tx" field.
+func (u *TreeNodeUpsertBulk) SetDirectRefundTx(v []byte) *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetDirectRefundTx(v)
+	})
+}
+
+// UpdateDirectRefundTx sets the "direct_refund_tx" field to the value that was provided on create.
+func (u *TreeNodeUpsertBulk) UpdateDirectRefundTx() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateDirectRefundTx()
+	})
+}
+
+// ClearDirectRefundTx clears the value of the "direct_refund_tx" field.
+func (u *TreeNodeUpsertBulk) ClearDirectRefundTx() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearDirectRefundTx()
+	})
+}
+
+// SetRawRefundTxid sets the "raw_refund_txid" field.
+func (u *TreeNodeUpsertBulk) SetRawRefundTxid(v []byte) *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetRawRefundTxid(v)
+	})
+}
+
+// UpdateRawRefundTxid sets the "raw_refund_txid" field to the value that was provided on create.
+func (u *TreeNodeUpsertBulk) UpdateRawRefundTxid() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateRawRefundTxid()
+	})
+}
+
+// ClearRawRefundTxid clears the value of the "raw_refund_txid" field.
+func (u *TreeNodeUpsertBulk) ClearRawRefundTxid() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearRawRefundTxid()
+	})
+}
+
+// SetDirectRefundTxid sets the "direct_refund_txid" field.
+func (u *TreeNodeUpsertBulk) SetDirectRefundTxid(v []byte) *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetDirectRefundTxid(v)
+	})
+}
+
+// UpdateDirectRefundTxid sets the "direct_refund_txid" field to the value that was provided on create.
+func (u *TreeNodeUpsertBulk) UpdateDirectRefundTxid() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateDirectRefundTxid()
+	})
+}
+
+// ClearDirectRefundTxid clears the value of the "direct_refund_txid" field.
+func (u *TreeNodeUpsertBulk) ClearDirectRefundTxid() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearDirectRefundTxid()
 	})
 }
 

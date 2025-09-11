@@ -29,14 +29,25 @@ func (TreeNode) Fields() []ent.Field {
 		field.Bytes("verifying_pubkey").NotEmpty().Immutable(),
 		field.Bytes("owner_identity_pubkey").NotEmpty(),
 		field.Bytes("owner_signing_pubkey").NotEmpty(),
-		field.Bytes("raw_tx").NotEmpty(),
+
 		field.Int16("vout"),
-		field.Bytes("raw_refund_tx").Optional(),
+
 		field.Uint64("node_confirmation_height").Optional(),
 		field.Uint64("refund_confirmation_height").Optional(),
-		field.Bytes("direct_refund_tx").Optional(),
+
+		// Node transactions
+		field.Bytes("raw_tx").NotEmpty(),
 		field.Bytes("direct_tx").Optional(),
 		field.Bytes("direct_from_cpfp_refund_tx").Optional(),
+		field.Bytes("raw_txid").Optional().Comment("Valid transaction ID of the stored node transaction"),
+		field.Bytes("direct_txid").Optional().Comment("Valid transaction ID of the stored direct node transaction"),
+		field.Bytes("direct_from_cpfp_refund_txid").Optional().Comment("Valid transaction ID of the stored direct from CPFP node transaction"),
+
+		// Refund transactions
+		field.Bytes("raw_refund_tx").Optional().Comment("A transaction to exit Spark unilaterally. Only leafs have this transaction."),
+		field.Bytes("direct_refund_tx").Optional(),
+		field.Bytes("raw_refund_txid").Optional().Comment("Valid transaction ID of the stored refund transaction"),
+		field.Bytes("direct_refund_txid").Optional().Comment("Valid transaction ID of the direct refund transaction"),
 	}
 }
 

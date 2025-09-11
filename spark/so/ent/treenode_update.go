@@ -64,12 +64,6 @@ func (tnu *TreeNodeUpdate) SetOwnerSigningPubkey(b []byte) *TreeNodeUpdate {
 	return tnu
 }
 
-// SetRawTx sets the "raw_tx" field.
-func (tnu *TreeNodeUpdate) SetRawTx(b []byte) *TreeNodeUpdate {
-	tnu.mutation.SetRawTx(b)
-	return tnu
-}
-
 // SetVout sets the "vout" field.
 func (tnu *TreeNodeUpdate) SetVout(i int16) *TreeNodeUpdate {
 	tnu.mutation.ResetVout()
@@ -88,18 +82,6 @@ func (tnu *TreeNodeUpdate) SetNillableVout(i *int16) *TreeNodeUpdate {
 // AddVout adds i to the "vout" field.
 func (tnu *TreeNodeUpdate) AddVout(i int16) *TreeNodeUpdate {
 	tnu.mutation.AddVout(i)
-	return tnu
-}
-
-// SetRawRefundTx sets the "raw_refund_tx" field.
-func (tnu *TreeNodeUpdate) SetRawRefundTx(b []byte) *TreeNodeUpdate {
-	tnu.mutation.SetRawRefundTx(b)
-	return tnu
-}
-
-// ClearRawRefundTx clears the value of the "raw_refund_tx" field.
-func (tnu *TreeNodeUpdate) ClearRawRefundTx() *TreeNodeUpdate {
-	tnu.mutation.ClearRawRefundTx()
 	return tnu
 }
 
@@ -157,15 +139,9 @@ func (tnu *TreeNodeUpdate) ClearRefundConfirmationHeight() *TreeNodeUpdate {
 	return tnu
 }
 
-// SetDirectRefundTx sets the "direct_refund_tx" field.
-func (tnu *TreeNodeUpdate) SetDirectRefundTx(b []byte) *TreeNodeUpdate {
-	tnu.mutation.SetDirectRefundTx(b)
-	return tnu
-}
-
-// ClearDirectRefundTx clears the value of the "direct_refund_tx" field.
-func (tnu *TreeNodeUpdate) ClearDirectRefundTx() *TreeNodeUpdate {
-	tnu.mutation.ClearDirectRefundTx()
+// SetRawTx sets the "raw_tx" field.
+func (tnu *TreeNodeUpdate) SetRawTx(b []byte) *TreeNodeUpdate {
+	tnu.mutation.SetRawTx(b)
 	return tnu
 }
 
@@ -190,6 +166,90 @@ func (tnu *TreeNodeUpdate) SetDirectFromCpfpRefundTx(b []byte) *TreeNodeUpdate {
 // ClearDirectFromCpfpRefundTx clears the value of the "direct_from_cpfp_refund_tx" field.
 func (tnu *TreeNodeUpdate) ClearDirectFromCpfpRefundTx() *TreeNodeUpdate {
 	tnu.mutation.ClearDirectFromCpfpRefundTx()
+	return tnu
+}
+
+// SetRawTxid sets the "raw_txid" field.
+func (tnu *TreeNodeUpdate) SetRawTxid(b []byte) *TreeNodeUpdate {
+	tnu.mutation.SetRawTxid(b)
+	return tnu
+}
+
+// ClearRawTxid clears the value of the "raw_txid" field.
+func (tnu *TreeNodeUpdate) ClearRawTxid() *TreeNodeUpdate {
+	tnu.mutation.ClearRawTxid()
+	return tnu
+}
+
+// SetDirectTxid sets the "direct_txid" field.
+func (tnu *TreeNodeUpdate) SetDirectTxid(b []byte) *TreeNodeUpdate {
+	tnu.mutation.SetDirectTxid(b)
+	return tnu
+}
+
+// ClearDirectTxid clears the value of the "direct_txid" field.
+func (tnu *TreeNodeUpdate) ClearDirectTxid() *TreeNodeUpdate {
+	tnu.mutation.ClearDirectTxid()
+	return tnu
+}
+
+// SetDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field.
+func (tnu *TreeNodeUpdate) SetDirectFromCpfpRefundTxid(b []byte) *TreeNodeUpdate {
+	tnu.mutation.SetDirectFromCpfpRefundTxid(b)
+	return tnu
+}
+
+// ClearDirectFromCpfpRefundTxid clears the value of the "direct_from_cpfp_refund_txid" field.
+func (tnu *TreeNodeUpdate) ClearDirectFromCpfpRefundTxid() *TreeNodeUpdate {
+	tnu.mutation.ClearDirectFromCpfpRefundTxid()
+	return tnu
+}
+
+// SetRawRefundTx sets the "raw_refund_tx" field.
+func (tnu *TreeNodeUpdate) SetRawRefundTx(b []byte) *TreeNodeUpdate {
+	tnu.mutation.SetRawRefundTx(b)
+	return tnu
+}
+
+// ClearRawRefundTx clears the value of the "raw_refund_tx" field.
+func (tnu *TreeNodeUpdate) ClearRawRefundTx() *TreeNodeUpdate {
+	tnu.mutation.ClearRawRefundTx()
+	return tnu
+}
+
+// SetDirectRefundTx sets the "direct_refund_tx" field.
+func (tnu *TreeNodeUpdate) SetDirectRefundTx(b []byte) *TreeNodeUpdate {
+	tnu.mutation.SetDirectRefundTx(b)
+	return tnu
+}
+
+// ClearDirectRefundTx clears the value of the "direct_refund_tx" field.
+func (tnu *TreeNodeUpdate) ClearDirectRefundTx() *TreeNodeUpdate {
+	tnu.mutation.ClearDirectRefundTx()
+	return tnu
+}
+
+// SetRawRefundTxid sets the "raw_refund_txid" field.
+func (tnu *TreeNodeUpdate) SetRawRefundTxid(b []byte) *TreeNodeUpdate {
+	tnu.mutation.SetRawRefundTxid(b)
+	return tnu
+}
+
+// ClearRawRefundTxid clears the value of the "raw_refund_txid" field.
+func (tnu *TreeNodeUpdate) ClearRawRefundTxid() *TreeNodeUpdate {
+	tnu.mutation.ClearRawRefundTxid()
+	return tnu
+}
+
+// SetDirectRefundTxid sets the "direct_refund_txid" field.
+func (tnu *TreeNodeUpdate) SetDirectRefundTxid(b []byte) *TreeNodeUpdate {
+	tnu.mutation.SetDirectRefundTxid(b)
+	return tnu
+}
+
+// ClearDirectRefundTxid clears the value of the "direct_refund_txid" field.
+func (tnu *TreeNodeUpdate) ClearDirectRefundTxid() *TreeNodeUpdate {
+	tnu.mutation.ClearDirectRefundTxid()
 	return tnu
 }
 
@@ -390,20 +450,11 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := tnu.mutation.OwnerSigningPubkey(); ok {
 		_spec.SetField(treenode.FieldOwnerSigningPubkey, field.TypeBytes, value)
 	}
-	if value, ok := tnu.mutation.RawTx(); ok {
-		_spec.SetField(treenode.FieldRawTx, field.TypeBytes, value)
-	}
 	if value, ok := tnu.mutation.Vout(); ok {
 		_spec.SetField(treenode.FieldVout, field.TypeInt16, value)
 	}
 	if value, ok := tnu.mutation.AddedVout(); ok {
 		_spec.AddField(treenode.FieldVout, field.TypeInt16, value)
-	}
-	if value, ok := tnu.mutation.RawRefundTx(); ok {
-		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
-	}
-	if tnu.mutation.RawRefundTxCleared() {
-		_spec.ClearField(treenode.FieldRawRefundTx, field.TypeBytes)
 	}
 	if value, ok := tnu.mutation.NodeConfirmationHeight(); ok {
 		_spec.SetField(treenode.FieldNodeConfirmationHeight, field.TypeUint64, value)
@@ -423,11 +474,8 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if tnu.mutation.RefundConfirmationHeightCleared() {
 		_spec.ClearField(treenode.FieldRefundConfirmationHeight, field.TypeUint64)
 	}
-	if value, ok := tnu.mutation.DirectRefundTx(); ok {
-		_spec.SetField(treenode.FieldDirectRefundTx, field.TypeBytes, value)
-	}
-	if tnu.mutation.DirectRefundTxCleared() {
-		_spec.ClearField(treenode.FieldDirectRefundTx, field.TypeBytes)
+	if value, ok := tnu.mutation.RawTx(); ok {
+		_spec.SetField(treenode.FieldRawTx, field.TypeBytes, value)
 	}
 	if value, ok := tnu.mutation.DirectTx(); ok {
 		_spec.SetField(treenode.FieldDirectTx, field.TypeBytes, value)
@@ -440,6 +488,48 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if tnu.mutation.DirectFromCpfpRefundTxCleared() {
 		_spec.ClearField(treenode.FieldDirectFromCpfpRefundTx, field.TypeBytes)
+	}
+	if value, ok := tnu.mutation.RawTxid(); ok {
+		_spec.SetField(treenode.FieldRawTxid, field.TypeBytes, value)
+	}
+	if tnu.mutation.RawTxidCleared() {
+		_spec.ClearField(treenode.FieldRawTxid, field.TypeBytes)
+	}
+	if value, ok := tnu.mutation.DirectTxid(); ok {
+		_spec.SetField(treenode.FieldDirectTxid, field.TypeBytes, value)
+	}
+	if tnu.mutation.DirectTxidCleared() {
+		_spec.ClearField(treenode.FieldDirectTxid, field.TypeBytes)
+	}
+	if value, ok := tnu.mutation.DirectFromCpfpRefundTxid(); ok {
+		_spec.SetField(treenode.FieldDirectFromCpfpRefundTxid, field.TypeBytes, value)
+	}
+	if tnu.mutation.DirectFromCpfpRefundTxidCleared() {
+		_spec.ClearField(treenode.FieldDirectFromCpfpRefundTxid, field.TypeBytes)
+	}
+	if value, ok := tnu.mutation.RawRefundTx(); ok {
+		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
+	}
+	if tnu.mutation.RawRefundTxCleared() {
+		_spec.ClearField(treenode.FieldRawRefundTx, field.TypeBytes)
+	}
+	if value, ok := tnu.mutation.DirectRefundTx(); ok {
+		_spec.SetField(treenode.FieldDirectRefundTx, field.TypeBytes, value)
+	}
+	if tnu.mutation.DirectRefundTxCleared() {
+		_spec.ClearField(treenode.FieldDirectRefundTx, field.TypeBytes)
+	}
+	if value, ok := tnu.mutation.RawRefundTxid(); ok {
+		_spec.SetField(treenode.FieldRawRefundTxid, field.TypeBytes, value)
+	}
+	if tnu.mutation.RawRefundTxidCleared() {
+		_spec.ClearField(treenode.FieldRawRefundTxid, field.TypeBytes)
+	}
+	if value, ok := tnu.mutation.DirectRefundTxid(); ok {
+		_spec.SetField(treenode.FieldDirectRefundTxid, field.TypeBytes, value)
+	}
+	if tnu.mutation.DirectRefundTxidCleared() {
+		_spec.ClearField(treenode.FieldDirectRefundTxid, field.TypeBytes)
 	}
 	if tnu.mutation.TreeCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -625,12 +715,6 @@ func (tnuo *TreeNodeUpdateOne) SetOwnerSigningPubkey(b []byte) *TreeNodeUpdateOn
 	return tnuo
 }
 
-// SetRawTx sets the "raw_tx" field.
-func (tnuo *TreeNodeUpdateOne) SetRawTx(b []byte) *TreeNodeUpdateOne {
-	tnuo.mutation.SetRawTx(b)
-	return tnuo
-}
-
 // SetVout sets the "vout" field.
 func (tnuo *TreeNodeUpdateOne) SetVout(i int16) *TreeNodeUpdateOne {
 	tnuo.mutation.ResetVout()
@@ -649,18 +733,6 @@ func (tnuo *TreeNodeUpdateOne) SetNillableVout(i *int16) *TreeNodeUpdateOne {
 // AddVout adds i to the "vout" field.
 func (tnuo *TreeNodeUpdateOne) AddVout(i int16) *TreeNodeUpdateOne {
 	tnuo.mutation.AddVout(i)
-	return tnuo
-}
-
-// SetRawRefundTx sets the "raw_refund_tx" field.
-func (tnuo *TreeNodeUpdateOne) SetRawRefundTx(b []byte) *TreeNodeUpdateOne {
-	tnuo.mutation.SetRawRefundTx(b)
-	return tnuo
-}
-
-// ClearRawRefundTx clears the value of the "raw_refund_tx" field.
-func (tnuo *TreeNodeUpdateOne) ClearRawRefundTx() *TreeNodeUpdateOne {
-	tnuo.mutation.ClearRawRefundTx()
 	return tnuo
 }
 
@@ -718,15 +790,9 @@ func (tnuo *TreeNodeUpdateOne) ClearRefundConfirmationHeight() *TreeNodeUpdateOn
 	return tnuo
 }
 
-// SetDirectRefundTx sets the "direct_refund_tx" field.
-func (tnuo *TreeNodeUpdateOne) SetDirectRefundTx(b []byte) *TreeNodeUpdateOne {
-	tnuo.mutation.SetDirectRefundTx(b)
-	return tnuo
-}
-
-// ClearDirectRefundTx clears the value of the "direct_refund_tx" field.
-func (tnuo *TreeNodeUpdateOne) ClearDirectRefundTx() *TreeNodeUpdateOne {
-	tnuo.mutation.ClearDirectRefundTx()
+// SetRawTx sets the "raw_tx" field.
+func (tnuo *TreeNodeUpdateOne) SetRawTx(b []byte) *TreeNodeUpdateOne {
+	tnuo.mutation.SetRawTx(b)
 	return tnuo
 }
 
@@ -751,6 +817,90 @@ func (tnuo *TreeNodeUpdateOne) SetDirectFromCpfpRefundTx(b []byte) *TreeNodeUpda
 // ClearDirectFromCpfpRefundTx clears the value of the "direct_from_cpfp_refund_tx" field.
 func (tnuo *TreeNodeUpdateOne) ClearDirectFromCpfpRefundTx() *TreeNodeUpdateOne {
 	tnuo.mutation.ClearDirectFromCpfpRefundTx()
+	return tnuo
+}
+
+// SetRawTxid sets the "raw_txid" field.
+func (tnuo *TreeNodeUpdateOne) SetRawTxid(b []byte) *TreeNodeUpdateOne {
+	tnuo.mutation.SetRawTxid(b)
+	return tnuo
+}
+
+// ClearRawTxid clears the value of the "raw_txid" field.
+func (tnuo *TreeNodeUpdateOne) ClearRawTxid() *TreeNodeUpdateOne {
+	tnuo.mutation.ClearRawTxid()
+	return tnuo
+}
+
+// SetDirectTxid sets the "direct_txid" field.
+func (tnuo *TreeNodeUpdateOne) SetDirectTxid(b []byte) *TreeNodeUpdateOne {
+	tnuo.mutation.SetDirectTxid(b)
+	return tnuo
+}
+
+// ClearDirectTxid clears the value of the "direct_txid" field.
+func (tnuo *TreeNodeUpdateOne) ClearDirectTxid() *TreeNodeUpdateOne {
+	tnuo.mutation.ClearDirectTxid()
+	return tnuo
+}
+
+// SetDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field.
+func (tnuo *TreeNodeUpdateOne) SetDirectFromCpfpRefundTxid(b []byte) *TreeNodeUpdateOne {
+	tnuo.mutation.SetDirectFromCpfpRefundTxid(b)
+	return tnuo
+}
+
+// ClearDirectFromCpfpRefundTxid clears the value of the "direct_from_cpfp_refund_txid" field.
+func (tnuo *TreeNodeUpdateOne) ClearDirectFromCpfpRefundTxid() *TreeNodeUpdateOne {
+	tnuo.mutation.ClearDirectFromCpfpRefundTxid()
+	return tnuo
+}
+
+// SetRawRefundTx sets the "raw_refund_tx" field.
+func (tnuo *TreeNodeUpdateOne) SetRawRefundTx(b []byte) *TreeNodeUpdateOne {
+	tnuo.mutation.SetRawRefundTx(b)
+	return tnuo
+}
+
+// ClearRawRefundTx clears the value of the "raw_refund_tx" field.
+func (tnuo *TreeNodeUpdateOne) ClearRawRefundTx() *TreeNodeUpdateOne {
+	tnuo.mutation.ClearRawRefundTx()
+	return tnuo
+}
+
+// SetDirectRefundTx sets the "direct_refund_tx" field.
+func (tnuo *TreeNodeUpdateOne) SetDirectRefundTx(b []byte) *TreeNodeUpdateOne {
+	tnuo.mutation.SetDirectRefundTx(b)
+	return tnuo
+}
+
+// ClearDirectRefundTx clears the value of the "direct_refund_tx" field.
+func (tnuo *TreeNodeUpdateOne) ClearDirectRefundTx() *TreeNodeUpdateOne {
+	tnuo.mutation.ClearDirectRefundTx()
+	return tnuo
+}
+
+// SetRawRefundTxid sets the "raw_refund_txid" field.
+func (tnuo *TreeNodeUpdateOne) SetRawRefundTxid(b []byte) *TreeNodeUpdateOne {
+	tnuo.mutation.SetRawRefundTxid(b)
+	return tnuo
+}
+
+// ClearRawRefundTxid clears the value of the "raw_refund_txid" field.
+func (tnuo *TreeNodeUpdateOne) ClearRawRefundTxid() *TreeNodeUpdateOne {
+	tnuo.mutation.ClearRawRefundTxid()
+	return tnuo
+}
+
+// SetDirectRefundTxid sets the "direct_refund_txid" field.
+func (tnuo *TreeNodeUpdateOne) SetDirectRefundTxid(b []byte) *TreeNodeUpdateOne {
+	tnuo.mutation.SetDirectRefundTxid(b)
+	return tnuo
+}
+
+// ClearDirectRefundTxid clears the value of the "direct_refund_txid" field.
+func (tnuo *TreeNodeUpdateOne) ClearDirectRefundTxid() *TreeNodeUpdateOne {
+	tnuo.mutation.ClearDirectRefundTxid()
 	return tnuo
 }
 
@@ -981,20 +1131,11 @@ func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, er
 	if value, ok := tnuo.mutation.OwnerSigningPubkey(); ok {
 		_spec.SetField(treenode.FieldOwnerSigningPubkey, field.TypeBytes, value)
 	}
-	if value, ok := tnuo.mutation.RawTx(); ok {
-		_spec.SetField(treenode.FieldRawTx, field.TypeBytes, value)
-	}
 	if value, ok := tnuo.mutation.Vout(); ok {
 		_spec.SetField(treenode.FieldVout, field.TypeInt16, value)
 	}
 	if value, ok := tnuo.mutation.AddedVout(); ok {
 		_spec.AddField(treenode.FieldVout, field.TypeInt16, value)
-	}
-	if value, ok := tnuo.mutation.RawRefundTx(); ok {
-		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
-	}
-	if tnuo.mutation.RawRefundTxCleared() {
-		_spec.ClearField(treenode.FieldRawRefundTx, field.TypeBytes)
 	}
 	if value, ok := tnuo.mutation.NodeConfirmationHeight(); ok {
 		_spec.SetField(treenode.FieldNodeConfirmationHeight, field.TypeUint64, value)
@@ -1014,11 +1155,8 @@ func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, er
 	if tnuo.mutation.RefundConfirmationHeightCleared() {
 		_spec.ClearField(treenode.FieldRefundConfirmationHeight, field.TypeUint64)
 	}
-	if value, ok := tnuo.mutation.DirectRefundTx(); ok {
-		_spec.SetField(treenode.FieldDirectRefundTx, field.TypeBytes, value)
-	}
-	if tnuo.mutation.DirectRefundTxCleared() {
-		_spec.ClearField(treenode.FieldDirectRefundTx, field.TypeBytes)
+	if value, ok := tnuo.mutation.RawTx(); ok {
+		_spec.SetField(treenode.FieldRawTx, field.TypeBytes, value)
 	}
 	if value, ok := tnuo.mutation.DirectTx(); ok {
 		_spec.SetField(treenode.FieldDirectTx, field.TypeBytes, value)
@@ -1031,6 +1169,48 @@ func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, er
 	}
 	if tnuo.mutation.DirectFromCpfpRefundTxCleared() {
 		_spec.ClearField(treenode.FieldDirectFromCpfpRefundTx, field.TypeBytes)
+	}
+	if value, ok := tnuo.mutation.RawTxid(); ok {
+		_spec.SetField(treenode.FieldRawTxid, field.TypeBytes, value)
+	}
+	if tnuo.mutation.RawTxidCleared() {
+		_spec.ClearField(treenode.FieldRawTxid, field.TypeBytes)
+	}
+	if value, ok := tnuo.mutation.DirectTxid(); ok {
+		_spec.SetField(treenode.FieldDirectTxid, field.TypeBytes, value)
+	}
+	if tnuo.mutation.DirectTxidCleared() {
+		_spec.ClearField(treenode.FieldDirectTxid, field.TypeBytes)
+	}
+	if value, ok := tnuo.mutation.DirectFromCpfpRefundTxid(); ok {
+		_spec.SetField(treenode.FieldDirectFromCpfpRefundTxid, field.TypeBytes, value)
+	}
+	if tnuo.mutation.DirectFromCpfpRefundTxidCleared() {
+		_spec.ClearField(treenode.FieldDirectFromCpfpRefundTxid, field.TypeBytes)
+	}
+	if value, ok := tnuo.mutation.RawRefundTx(); ok {
+		_spec.SetField(treenode.FieldRawRefundTx, field.TypeBytes, value)
+	}
+	if tnuo.mutation.RawRefundTxCleared() {
+		_spec.ClearField(treenode.FieldRawRefundTx, field.TypeBytes)
+	}
+	if value, ok := tnuo.mutation.DirectRefundTx(); ok {
+		_spec.SetField(treenode.FieldDirectRefundTx, field.TypeBytes, value)
+	}
+	if tnuo.mutation.DirectRefundTxCleared() {
+		_spec.ClearField(treenode.FieldDirectRefundTx, field.TypeBytes)
+	}
+	if value, ok := tnuo.mutation.RawRefundTxid(); ok {
+		_spec.SetField(treenode.FieldRawRefundTxid, field.TypeBytes, value)
+	}
+	if tnuo.mutation.RawRefundTxidCleared() {
+		_spec.ClearField(treenode.FieldRawRefundTxid, field.TypeBytes)
+	}
+	if value, ok := tnuo.mutation.DirectRefundTxid(); ok {
+		_spec.SetField(treenode.FieldDirectRefundTxid, field.TypeBytes, value)
+	}
+	if tnuo.mutation.DirectRefundTxidCleared() {
+		_spec.ClearField(treenode.FieldDirectRefundTxid, field.TypeBytes)
 	}
 	if tnuo.mutation.TreeCleared() {
 		edge := &sqlgraph.EdgeSpec{
