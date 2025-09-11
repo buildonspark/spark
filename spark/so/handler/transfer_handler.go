@@ -1823,7 +1823,7 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		}
 		leaf, err = leaf.Update().SetKeyTweak(leafTweakBytes).Save(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to update leaf %s: %w", leaf.ID.String(), err)
+			return fmt.Errorf("unable to update leaf %s: %w", leafTweak.LeafId, err)
 		}
 	}
 
