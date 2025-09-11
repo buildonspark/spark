@@ -1,14 +1,32 @@
 package handler
 
 import (
+	"bytes"
+	"context"
 	"encoding/hex"
+	"math"
+	"math/rand/v2"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
+	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/db"
+	"github.com/lightsparkdev/spark/so/ent"
+	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/stretchr/testify/require"
+)
+
+var (
+	rng = rand.NewChaCha8([32]byte{1})
 )
 
 func TestValidateUserSignature(t *testing.T) {
@@ -89,6 +107,102 @@ func TestValidateUserSignature(t *testing.T) {
 			} else {
 				require.ErrorContains(t, err, tt.expectedErrMsg)
 			}
+		})
+	}
+}
+
+func TestFinalizeTreeCreationErrorCases(t *testing.T) {
+	t.Parallel()
+	ctx, dbCtx := db.NewTestSQLiteContext(t, t.Context())
+	defer dbCtx.Close()
+
+	config := &so.Config{
+		SigningOperatorMap: map[string]*so.SigningOperator{
+			"test-operator": {
+				ID:         0,
+				Identifier: "test-operator",
+				AddressRpc: "localhost:8080",
+				AddressDkg: "localhost:8081",
+			},
+		},
+		SupportedNetworks:          []common.Network{common.Regtest},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+	handler := NewInternalDepositHandler(config)
+
+	brokenRawTx := wire.MsgTx{Version: 1, TxIn: []*wire.TxIn{}, TxOut: []*wire.TxOut{}}
+	var nodeTxBuf bytes.Buffer
+	err := brokenRawTx.Serialize(&nodeTxBuf)
+	require.NoError(t, err)
+	rawTx1 := nodeTxBuf.Bytes()
+	node1 := createTestNode(t, ctx, rawTx1, 0)
+
+	rawTx2 := createTestTxBytesWithIndex(t, 1000, 0)
+	node2 := createTestNode(t, ctx, rawTx2, math.MaxInt16+1)
+
+	rawTx3 := createTestTxBytesWithIndex(t, 1000, math.MaxInt16+1)
+	node3 := createTestNode(t, ctx, rawTx3, 0)
+
+	rawTx4 := createTestTxBytesWithIndex(t, 1, math.MaxInt16)
+	node4 := createTestNode(t, ctx, rawTx4, math.MaxInt16)
+
+	tests := []struct {
+		name            string
+		finalizeRequest *pbinternal.FinalizeTreeCreationRequest
+		expectedError   string
+	}{
+		{
+			name: "node with nil TxIn",
+			finalizeRequest: &pbinternal.FinalizeTreeCreationRequest{
+				Network: pb.Network_REGTEST,
+				Nodes: []*pbinternal.TreeNode{
+					node1,
+				},
+			},
+			expectedError: "failed to get node transaction",
+		},
+		{
+			name: "node with overflowing Vout value",
+			finalizeRequest: &pbinternal.FinalizeTreeCreationRequest{
+				Network: pb.Network_REGTEST,
+				Nodes: []*pbinternal.TreeNode{
+					node2,
+				},
+			},
+			expectedError: "node vout value",
+		},
+		{
+			name: "node with overflowing previous outpoint index",
+			finalizeRequest: &pbinternal.FinalizeTreeCreationRequest{
+				Network: pb.Network_REGTEST,
+				Nodes: []*pbinternal.TreeNode{
+					node3,
+				},
+			},
+			expectedError: "previous outpoint index overflows int16",
+		},
+		{
+			name: "valid node",
+			finalizeRequest: &pbinternal.FinalizeTreeCreationRequest{
+				Network: pb.Network_REGTEST,
+				Nodes: []*pbinternal.TreeNode{
+					node4,
+				},
+			},
+			expectedError: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err = handler.FinalizeTreeCreation(ctx, tt.finalizeRequest)
+
+			if tt.expectedError != "" {
+				require.ErrorContains(t, err, tt.expectedError)
+				return
+			}
+
+			require.NoError(t, err)
 		})
 	}
 }
@@ -226,4 +340,68 @@ func FuzzValidateUserSignature(f *testing.F) {
 			}
 		}
 	})
+}
+
+func createTestNode(t *testing.T, ctx context.Context, rawTx []byte, vout uint32) *pbinternal.TreeNode {
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	testID := uuid.New()
+	ownerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerSigningKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicShare1 := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicShare2 := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicShare3 := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	keyshare, err := dbTX.SigningKeyshare.Create().
+		SetID(uuid.New()).
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(secretShare.Serialize()).
+		SetPublicShares(map[string][]byte{"1": publicShare1.Public().Serialize(), "2": publicShare2.Public().Serialize(), "3": publicShare3.Public().Serialize()}).
+		SetPublicKey(secretShare.Public().Serialize()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = dbTX.DepositAddress.Create().
+		SetID(uuid.New()).
+		SetAddress("deposit_address_" + testID.String()).
+		SetOwnerIdentityPubkey(ownerIdentity.Public()).
+		SetOwnerSigningPubkey(ownerSigningKey.Public()).
+		SetConfirmationHeight(100).
+		SetConfirmationTxid("other_non_root_deposit_txid_" + testID.String()).
+		SetSigningKeyshare(keyshare).
+		Save(ctx)
+	require.NoError(t, err)
+
+	return &pbinternal.TreeNode{
+		Id:                  uuid.New().String(),
+		Value:               1000,
+		VerifyingPubkey:     append([]byte("verifying_pubkey_"), []byte(testID.String())...),
+		OwnerIdentityPubkey: ownerIdentity.Public().Serialize(),
+		OwnerSigningPubkey:  ownerSigningKey.Public().Serialize(),
+		RawTx:               rawTx,
+		RawRefundTx:         append([]byte("raw_refund_tx_"), []byte(testID.String())...),
+		TreeId:              uuid.New().String(),
+		ParentNodeId:        nil,
+		SigningKeyshareId:   keyshare.ID.String(),
+		Vout:                vout,
+	}
+}
+
+func createTestTxBytesWithIndex(t *testing.T, value int64, outpointIndex uint32) []byte {
+	tx := wire.NewMsgTx(2)
+	tx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: chainhash.Hash{1}, Index: outpointIndex}, nil, nil))
+	pkScript, err := txscript.NewScriptBuilder().AddOp(txscript.OP_TRUE).Script()
+	require.NoError(t, err)
+
+	tx.AddTxOut(wire.NewTxOut(value, pkScript))
+
+	var buf bytes.Buffer
+	err = tx.Serialize(&buf)
+	require.NoError(t, err)
+
+	return buf.Bytes()
 }

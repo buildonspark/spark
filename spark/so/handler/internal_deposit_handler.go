@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math"
 
 	"github.com/lightsparkdev/spark/common/keys"
 
@@ -203,8 +204,9 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		logger.Info(fmt.Sprintf("Marking node as available: %v", markNodeAsAvailable))
 		nodeTx, err := common.TxFromRawTxBytes(selectedNode.RawTx)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get node transaction: %w", err)
 		}
+
 		if len(nodeTx.TxIn) == 0 {
 			return fmt.Errorf("node tx has no inputs")
 		}
@@ -215,6 +217,9 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			return err
 		}
 
+		if nodeTx.TxIn[0].PreviousOutPoint.Index > math.MaxInt16 {
+			return fmt.Errorf("previous outpoint index overflows int16: %d", nodeTx.TxIn[0].PreviousOutPoint.Index)
+		}
 		treeMutator := db.Tree.
 			Create().
 			SetID(treeID).
@@ -253,6 +258,10 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		signingKeyshareID, err := uuid.Parse(node.SigningKeyshareId)
 		if err != nil {
 			return err
+		}
+
+		if node.Vout > math.MaxInt16 {
+			return fmt.Errorf("node vout value %d overflows int16", node.Vout)
 		}
 		nodeMutator := db.TreeNode.
 			Create().

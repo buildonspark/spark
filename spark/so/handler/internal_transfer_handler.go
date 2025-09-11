@@ -295,7 +295,11 @@ func applySignatures(ctx context.Context, leafRefundMap map[string][]byte, refun
 	}
 	resultMap := make(map[string][]byte)
 	for leafID, signature := range refundSignatures {
-		updatedTx, err := common.UpdateTxWithSignature(leafRefundMap[leafID], 0, signature)
+		leafRefund, exists := leafRefundMap[leafID]
+		if !exists {
+			return nil, fmt.Errorf("no leaf refund found for leaf id: %s", leafID)
+		}
+		updatedTx, err := common.UpdateTxWithSignature(leafRefund, 0, signature)
 		if err != nil {
 			return nil, fmt.Errorf("unable to update leaf signature: %w", err)
 		}
