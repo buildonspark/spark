@@ -174,3 +174,174 @@ export async function fundWalletFromGraphQL(
     }
   }
 }
+
+export async function fundMultipleWallets(
+  wallets: Array<{
+    wallet: any; // IssuerSparkWallet
+    getSparkAddress: () => Promise<string>;
+    getSingleUseDepositAddress: () => Promise<string>;
+    claimDeposit: (txId: string) => Promise<any>;
+  }>,
+  fundingNeeded: bigint,
+  options?: {
+    maxPerTransaction?: bigint;
+    maxTransactionsPerBatch?: number;
+    batchDelayMs?: number;
+    maxRetryDuration?: number;
+    retryInterval?: number;
+    onSuccess?: (wallet: any, amount: bigint, address: string) => void;
+    onError?: (error: any) => void;
+    emitEvent?: (event: string, value: number) => void;
+  },
+): Promise<{
+  totalReceived: bigint;
+  successfulWallets: Array<{ wallet: any; amount: bigint; address: string }>;
+}> {
+  const maxPerTransaction = options?.maxPerTransaction || 50000n;
+  const maxTransactionsPerBatch = options?.maxTransactionsPerBatch || 2;
+  const batchDelayMs = options?.batchDelayMs || 30000;
+  const maxRetryDuration = options?.maxRetryDuration || 120000;
+  const retryInterval = options?.retryInterval || 30000;
+
+  let totalFaucetReceived = 0n;
+  let currentWalletIndex = 0;
+  const startTime = Date.now();
+  const successfulWallets: Array<{
+    wallet: any;
+    amount: bigint;
+    address: string;
+  }> = [];
+
+  while (
+    totalFaucetReceived < fundingNeeded &&
+    currentWalletIndex < wallets.length
+  ) {
+    const elapsedTime = Date.now() - startTime;
+    if (elapsedTime > maxRetryDuration) {
+      break;
+    }
+
+    const batchWallets: typeof wallets = [];
+    const batchAmounts: bigint[] = [];
+
+    // Prepare batch
+    for (
+      let i = 0;
+      i < maxTransactionsPerBatch &&
+      currentWalletIndex < wallets.length &&
+      totalFaucetReceived < fundingNeeded;
+      i++
+    ) {
+      const remainingNeeded = fundingNeeded - totalFaucetReceived;
+      const amountToRequest =
+        remainingNeeded < maxPerTransaction
+          ? remainingNeeded
+          : maxPerTransaction;
+
+      batchWallets.push(wallets[currentWalletIndex]);
+      batchAmounts.push(amountToRequest);
+      currentWalletIndex++;
+    }
+
+    let encounteredRateLimit = false;
+
+    // Process batch
+    for (let i = 0; i < batchWallets.length; i++) {
+      const wallet = batchWallets[i];
+      const amount = batchAmounts[i];
+
+      try {
+        const address = await wallet.getSparkAddress();
+        const depositAddress = await wallet.getSingleUseDepositAddress();
+
+        // Fund wallet - this already has retry logic internally
+        const txId = await fundWalletFromGraphQL(
+          depositAddress,
+          Number(amount),
+        );
+
+        // Wait for confirmation
+        await new Promise((resolve) => setTimeout(resolve, 10000));
+
+        // Claim deposit
+        try {
+          const leaves = await wallet.claimDeposit(txId);
+          if (leaves && leaves.length > 0) {
+            totalFaucetReceived += amount;
+            successfulWallets.push({ wallet: wallet.wallet, amount, address });
+
+            if (options?.onSuccess) {
+              options.onSuccess(wallet.wallet, amount, address);
+            }
+            if (options?.emitEvent) {
+              options.emitEvent("spark.faucet_deposit_success", 1);
+              options.emitEvent("spark.faucet_amount_received", Number(amount));
+            }
+          } else {
+            if (options?.emitEvent) {
+              options.emitEvent("spark.faucet_deposit_failed", 1);
+            }
+          }
+        } catch (claimError: any) {
+          if (
+            !claimError.message.includes("already claimed") &&
+            !claimError.message.includes("already processed")
+          ) {
+            if (options?.emitEvent) {
+              options.emitEvent("spark.faucet_deposit_failed", 1);
+            }
+          } else {
+            // Already claimed means we got the funds
+            totalFaucetReceived += amount;
+            successfulWallets.push({ wallet: wallet.wallet, amount, address });
+
+            if (options?.onSuccess) {
+              options.onSuccess(wallet.wallet, amount, address);
+            }
+          }
+        }
+      } catch (error: any) {
+        // Check if rate limited
+        if (
+          error.message &&
+          (error.message.includes("rate") || error.message.includes("429"))
+        ) {
+          if (options?.emitEvent) {
+            options.emitEvent("spark.faucet_rate_limited", 1);
+          }
+
+          // Reset index to retry this batch
+          currentWalletIndex = Math.max(
+            0,
+            currentWalletIndex - batchWallets.length + i,
+          );
+
+          await new Promise((resolve) => setTimeout(resolve, retryInterval));
+          encounteredRateLimit = true;
+          break;
+        }
+
+        if (options?.onError) {
+          options.onError(error);
+        }
+        if (options?.emitEvent) {
+          options.emitEvent("spark.faucet_error", 1);
+        }
+      }
+    }
+
+    // Delay between batches if not rate limited
+    if (
+      !encounteredRateLimit &&
+      currentWalletIndex < wallets.length &&
+      totalFaucetReceived < fundingNeeded
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, batchDelayMs));
+    }
+  }
+
+  return {
+    totalReceived: totalFaucetReceived,
+    successfulWallets,
+  };
+}
