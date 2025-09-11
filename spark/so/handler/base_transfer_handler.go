@@ -270,7 +270,10 @@ func (h *BaseTransferHandler) createTransfer(
 	}
 
 	invoiceID := uuid.Nil
+	//nolint:all
 	if len(sparkInvoice) > 0 {
+		// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
+		return nil, nil, sparkerrors.UnimplementedErrorf("spark invoice support not implemented")
 		invoiceID, err = createAndLockSparkInvoice(ctx, sparkInvoice)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to create and lock spark invoice: %w", err)

@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/handler"
 	events "github.com/lightsparkdev/spark/so/stream"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -580,7 +581,10 @@ func (s *SparkServer) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxosFo
 	return depositHandler.GetUtxosForAddress(ctx, req)
 }
 
+//nolint:all
 func (s *SparkServer) QuerySparkInvoices(ctx context.Context, req *pb.QuerySparkInvoicesRequest) (*pb.QuerySparkInvoicesResponse, error) {
+	// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
+	return nil, sparkerrors.UnimplementedErrorf("not implemented")
 	invoiceHandler := handler.NewSparkInvoiceHandler(s.config)
 	return invoiceHandler.QuerySparkInvoices(ctx, req)
 }

@@ -82,7 +82,10 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 		return nil, tokens.FormatErrorWithTransactionProto("invalid final token transaction", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("invalid final token transaction: %w", err))
 	}
 
+	//nolint:all
 	if req.FinalTokenTransaction.Version >= 2 && req.FinalTokenTransaction.GetInvoiceAttachments() != nil {
+		// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
+		return nil, sparkerrors.UnimplementedErrorf("spark invoice support not implemented")
 		err = validateSparkInvoicesForTransaction(ctx, req.FinalTokenTransaction)
 		if err != nil {
 			return nil, err

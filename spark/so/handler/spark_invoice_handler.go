@@ -35,6 +35,7 @@ func NewSparkInvoiceHandler(config *so.Config) *SparkInvoiceHandler {
 func (h *SparkInvoiceHandler) QuerySparkInvoices(ctx context.Context, req *sparkpb.QuerySparkInvoicesRequest) (*sparkpb.QuerySparkInvoicesResponse, error) {
 	ctx, span := tracer.Start(ctx, "SparkInvoiceHandler.QuerySparkInvoices")
 	defer span.End()
+
 	limit := maxSparkInvoiceLimit
 	if req.Limit > 0 {
 		limit = min(maxSparkInvoiceLimit, int(req.Limit))

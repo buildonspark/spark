@@ -8,7 +8,6 @@ import (
 	"math/big"
 	"math/rand/v2"
 	"sort"
-	"strings"
 	"testing"
 	"time"
 
@@ -2510,6 +2509,8 @@ func TestCoordinatedTransferTransactionSigning(t *testing.T) {
 
 // TestCoordinatedTransferTransactionWithSparkInvoices tests various start scenarios for token transfer transactions with associated spark invoices
 func TestCoordinatedTransferTransactionWithSparkInvoices(t *testing.T) {
+	// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
+	skipIfGithubActions(t)
 	testCases := []struct {
 		name                                      string
 		batchTransfer                             bool
@@ -3707,35 +3708,41 @@ func TestCoordinatedTokenTransferV3(t *testing.T) {
 
 			// Add a valid spark invoice attachment for V3 testing. We use one invoice to
 			// match the single created output in this transfer transaction.
-			{
-				output := transferTokenTransaction.TokenOutputs[0]
-				receiverPubKey, err := keys.ParsePublicKey(output.GetOwnerPublicKey())
-				require.NoError(t, err, "failed to parse receiver public key")
-				createParams := createSparkInvoiceParams{
-					Version:           1,
-					ReceiverPublicKey: receiverPubKey,
-					Amount:            nil, // nil amount allowed; validated against created outputs
-					ExpiryTime:        timestamppb.New(time.Now().Add(10 * time.Minute)),
-					Memo:              nil,
-					TokenIdentifier:   output.GetTokenIdentifier(),
-					Network:           config.Network,
-					SatsPayment:       false,
+			// TODO: Uncomment this when we have re-enabled spark invoices
+			/*
+				{
+					output := transferTokenTransaction.TokenOutputs[0]
+					receiverPubKey, err := keys.ParsePublicKey(output.GetOwnerPublicKey())
+					require.NoError(t, err, "failed to parse receiver public key")
+					createParams := createSparkInvoiceParams{
+						Version:           1,
+						ReceiverPublicKey: receiverPubKey,
+						Amount:            nil, // nil amount allowed; validated against created outputs
+						ExpiryTime:        timestamppb.New(time.Now().Add(10 * time.Minute)),
+						Memo:              nil,
+						TokenIdentifier:   output.GetTokenIdentifier(),
+						Network:           config.Network,
+						SatsPayment:       false,
+					}
+					inv, err := createSparkInvoice(createParams)
+					require.NoError(t, err, "failed to create spark invoice")
+					transferTokenTransaction.InvoiceAttachments = []*tokenpb.InvoiceAttachment{{SparkInvoice: inv}}
 				}
-				inv, err := createSparkInvoice(createParams)
-				require.NoError(t, err, "failed to create spark invoice")
-				transferTokenTransaction.InvoiceAttachments = []*tokenpb.InvoiceAttachment{{SparkInvoice: inv}}
-			}
+			*/
 
 			// Verify V3 version is set
 			require.Equal(t, TokenTransactionVersion3, int(transferTokenTransaction.Version), "expected V3 version")
 
 			// Verify invoice attachments are sorted
-			invoices := transferTokenTransaction.InvoiceAttachments
-			require.NotEmpty(t, invoices, "expected invoice attachments")
-			for i := 1; i < len(invoices); i++ {
-				require.Negative(t, strings.Compare(invoices[i-1].GetSparkInvoice(), invoices[i].GetSparkInvoice()),
-					"invoice attachments must be in ascending order for V3")
-			}
+			// TODO: Uncomment this when we have re-enabled spark invoices
+			/*
+				invoices := transferTokenTransaction.InvoiceAttachments
+				require.NotEmpty(t, invoices, "expected invoice attachments")
+				for i := 1; i < len(invoices); i++ {
+					require.Negative(t, strings.Compare(invoices[i-1].GetSparkInvoice(), invoices[i].GetSparkInvoice()),
+						"invoice attachments must be in ascending order for V3")
+				}
+			*/
 
 			transferTokenTransactionResponse, err := wallet.BroadcastCoordinatedTokenTransfer(
 				t.Context(), config, transferTokenTransaction,

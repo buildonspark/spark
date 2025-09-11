@@ -148,7 +148,10 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	if err != nil {
 		return nil, fmt.Errorf("invalid receiver identity public key: %w", err)
 	}
+	//nolint:all
 	if len(req.SparkInvoice) > 0 {
+		// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
+		return nil, sparkerrors.UnimplementedErrorf("spark invoice support not implemented")
 		leafIDsToSend := make([]uuid.UUID, len(req.TransferPackage.LeavesToSend))
 		for i, leaf := range req.TransferPackage.LeavesToSend {
 			leafID, err := uuid.Parse(leaf.LeafId)
