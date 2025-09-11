@@ -33,7 +33,7 @@ import (
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
-	sparkerrors "github.com/lightsparkdev/spark/so/errors"
+	errors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/objects"
@@ -151,7 +151,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	//nolint:all
 	if len(req.SparkInvoice) > 0 {
 		// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
-		return nil, sparkerrors.UnimplementedErrorf("spark invoice support not implemented")
+		return nil, errors.UnimplementedErrorf("spark invoice support not implemented")
 		leafIDsToSend := make([]uuid.UUID, len(req.TransferPackage.LeavesToSend))
 		for i, leaf := range req.TransferPackage.LeavesToSend {
 			leafID, err := uuid.Parse(leaf.LeafId)
@@ -1258,7 +1258,7 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 		}
 		errorMsg := fmt.Sprintf("failed to sync deliver sender key tweak for transfer %s", req.TransferId)
 		if stat, ok := status.FromError(err); ok && stat.Code() == codes.Unavailable {
-			return nil, sparkerrors.UnavailableErrorf("%s: %w", errorMsg, err)
+			return nil, errors.UnavailableErrorf("%s: %w", errorMsg, err)
 		}
 		dbTx, dbErr = ent.GetDbFromContext(ctx)
 		if dbErr != nil {
@@ -1749,13 +1749,17 @@ func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Tx, transfer *ent.T
 		blockheight.NetworkEQ(tree.Network),
 	).Only(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to find block height: %w", err)
+		return errors.WrapErrorWithCodeAndReason(err, codes.Internal, "INTERNAL_DB_QUERY_FAILED")
 	}
 	if coopExit.ConfirmationHeight == 0 {
-		return sparkerrors.FailedPreconditionErrorf("coop exit tx hasn't been broadcasted")
+		return errors.FailedPreconditionInsufficientConfirmations(
+			fmt.Errorf("coop exit tx hasn't been broadcasted"),
+		)
 	}
 	if coopExit.ConfirmationHeight+CoopExitConfirmationThreshold-1 > blockHeight.Height {
-		return sparkerrors.FailedPreconditionErrorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", coopExit.ConfirmationHeight, blockHeight.Height)
+		return errors.FailedPreconditionInsufficientConfirmations(
+			fmt.Errorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", coopExit.ConfirmationHeight, blockHeight.Height),
+		)
 	}
 	return nil
 }
@@ -1782,14 +1786,14 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	}
 	// Validate transfer is not in terminal states
 	if transfer.Status == st.TransferStatusCompleted {
-		return sparkerrors.AlreadyExistsErrorf("transfer %s has already been claimed", req.TransferId)
+		return errors.AlreadyExistsErrorf("transfer %s has already been claimed", req.TransferId)
 	}
 	if transfer.Status == st.TransferStatusExpired ||
 		transfer.Status == st.TransferStatusReturned {
-		return sparkerrors.FailedPreconditionErrorf("transfer %s is in terminal state %s and cannot be processed", req.TransferId, transfer.Status)
+		return errors.FailedPreconditionErrorf("transfer %s is in terminal state %s and cannot be processed", req.TransferId, transfer.Status)
 	}
 	if transfer.Status != st.TransferStatusSenderKeyTweaked {
-		return sparkerrors.FailedPreconditionErrorf("please call ClaimTransferSignRefunds to claim the transfer %s, the transfer is not in SENDER_KEY_TWEAKED status. transferstatus: %s,", req.TransferId, transfer.Status)
+		return errors.FailedPreconditionErrorf("please call ClaimTransferSignRefunds to claim the transfer %s, the transfer is not in SENDER_KEY_TWEAKED status. transferstatus: %s,", req.TransferId, transfer.Status)
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
@@ -2100,7 +2104,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	case st.TransferStatusReceiverKeyTweakApplied:
 		// do nothing
 	case st.TransferStatusCompleted:
-		return nil, sparkerrors.AlreadyExistsErrorf("transfer %s has already been claimed", req.TransferId)
+		return nil, errors.AlreadyExistsErrorf("transfer %s has already been claimed", req.TransferId)
 	default:
 		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusKeyTweaked or TransferStatusReceiverRefundSigned or TransferStatusReceiverKeyTweakLocked or TransferStatusReceiverKeyTweakApplied but %s found", req.TransferId, transfer.Status)
 	}

@@ -14,7 +14,6 @@ import (
 	"github.com/lightsparkdev/spark"
 
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/google/uuid"
@@ -145,11 +144,7 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	})
 	if err != nil {
 		formattedError := tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToExecuteWithNonCoordinator, req.PartialTokenTransaction, err)
-		grpcStatus, ok := status.FromError(err)
-		if ok {
-			formattedError = errors.WrapErrorWithGRPCCode(formattedError, grpcStatus.Code())
-		}
-		return nil, formattedError
+		return nil, errors.WrapErrorWithReasonPrefix(formattedError, errors.ErrorReasonPrefixFailedWithExternalCoordinator)
 	}
 
 	// Only save in the coordinator SO after receiving confirmation from all other SOs. This ensures that if

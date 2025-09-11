@@ -199,10 +199,10 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 
 		_, _, _, ok, err := r.store.Take(ctx, key)
 		if err != nil {
-			return nil, fmt.Errorf("rate limit error: %w", err)
+			return nil, errors.InternalDependencyFailure(fmt.Errorf("rate limit error: %w", err))
 		}
 		if !ok {
-			return nil, errors.RateLimitExceededError()
+			return nil, errors.ResourceExhaustedRateLimitExceeded(fmt.Errorf("rate limit exceeded"))
 		}
 
 		return handler(ctx, req)

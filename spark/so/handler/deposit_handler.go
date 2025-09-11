@@ -1438,7 +1438,7 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 			}
 
 			logger.Error("UTXO swap rollback completed", "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout)
-			return nil, errors.WrapGRPCErrorWithMessage(originalErr, "failed to successfully execute create utxo swap task with all operators")
+			return nil, errors.WrapErrorWithMessage(originalErr, "failed to successfully execute create utxo swap task with all operators")
 		}
 	}
 	logger.Info("Created utxo swap", "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout)

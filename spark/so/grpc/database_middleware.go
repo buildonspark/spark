@@ -7,6 +7,7 @@ import (
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/grpcutil"
 	"google.golang.org/grpc"
 )
 
@@ -25,7 +26,7 @@ func DatabaseSessionMiddleware(factory db.SessionFactory, txBeginTimeout *time.D
 			opts = append(opts, db.WithTxBeginTimeout(*txBeginTimeout))
 		}
 
-		if metricAttrs := ParseFullMethod(info.FullMethod); metricAttrs != nil {
+		if metricAttrs := grpcutil.ParseFullMethod(info.FullMethod); metricAttrs != nil {
 			opts = append(opts, db.WithMetricAttributes(metricAttrs))
 		}
 

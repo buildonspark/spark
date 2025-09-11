@@ -6,6 +6,7 @@ import (
 
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
+	"github.com/lightsparkdev/spark/so/grpcutil"
 	"github.com/lightsparkdev/spark/so/utils"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -76,7 +77,7 @@ func getSparkTokenAttributes(fullMethod string, txType string) []attribute.KeyVa
 		attribute.String("token_transaction_type", txType),
 	}
 
-	attrs = append(attrs, ParseFullMethod(fullMethod)...)
+	attrs = append(attrs, grpcutil.ParseFullMethod(fullMethod)...)
 
 	return attrs
 }

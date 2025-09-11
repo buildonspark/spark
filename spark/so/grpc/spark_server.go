@@ -193,7 +193,7 @@ func (s *SparkServer) ClaimTransferSignRefunds(ctx context.Context, req *pb.Clai
 	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 
 	if !s.claimTransferSignRefundsTransferGuard.Acquire(req.TransferId) {
-		return nil, errors.ConcurrencyLimitExceededError()
+		return nil, errors.ResourceExhaustedConcurrencyLimitExceeded(fmt.Errorf("concurrency limit exceeded"))
 	}
 	defer s.claimTransferSignRefundsTransferGuard.Release(req.TransferId)
 

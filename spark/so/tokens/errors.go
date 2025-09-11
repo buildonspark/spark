@@ -7,7 +7,6 @@ import (
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/errors"
 )
 
 const (
@@ -70,6 +69,7 @@ const (
 	ErrFailedToDecodeSparkInvoice         = "failed to decode spark invoice"
 	ErrInvalidSparkInvoice                = "invalid spark invoice"
 	ErrSparkInvoiceExpired                = "spark invoice expired"
+	ErrTransactionPreempted               = "transaction preempted"
 )
 
 func FormatErrorWithTransactionEnt(msg string, tokenTransaction *ent.TokenTransaction, err error) error {
@@ -111,10 +111,10 @@ func FormatErrorWithTransactionProtoAndSparkInvoice(msg string, tokenTransaction
 
 func NewTransactionPreemptedError(tokenTransaction *tokenpb.TokenTransaction, reason, details string) error {
 	formattedError := FormatErrorWithTransactionProto(fmt.Sprintf(ErrTransactionPreemptedByExisting, reason, details), tokenTransaction, sparkerrors.AlreadyExistsErrorf("Token Transaction is already in progress"))
-	return errors.AbortedError(formattedError)
+	return sparkerrors.AbortedTransactionPreempted(formattedError)
 }
 
 func NewTokenAlreadyCreatedError(tokenTransaction *tokenpb.TokenTransaction) error {
 	formattedError := FormatErrorWithTransactionProto(ErrTokenAlreadyCreatedForIssuer, tokenTransaction, nil)
-	return errors.AlreadyExistsError(formattedError)
+	return sparkerrors.AlreadyExistsDuplicateOperation(formattedError)
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/errors"
+	"github.com/lightsparkdev/spark/so/grpcutil"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
@@ -48,7 +49,7 @@ func PanicRecoveryInterceptor(returnDetailedPanicErrors bool) grpc.UnaryServerIn
 				globalPanicCounter.Add(
 					ctx,
 					1,
-					metric.WithAttributes(ParseFullMethod(info.FullMethod)...),
+					metric.WithAttributes(grpcutil.ParseFullMethod(info.FullMethod)...),
 				)
 
 				// Convert panic to error instead of re-panicking
@@ -85,7 +86,7 @@ func PanicRecoveryStreamInterceptor() grpc.StreamServerInterceptor {
 				globalPanicCounter.Add(
 					ss.Context(),
 					1,
-					metric.WithAttributes(ParseFullMethod(info.FullMethod)...),
+					metric.WithAttributes(grpcutil.ParseFullMethod(info.FullMethod)...),
 				)
 
 				// Convert panic to error instead of re-panicking

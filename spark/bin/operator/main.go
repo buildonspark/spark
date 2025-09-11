@@ -498,9 +498,9 @@ func main() {
 	// and streaming RPCs.
 	serverOpts = append(serverOpts,
 		grpc.UnaryInterceptor(grpcmiddleware.ChainUnaryServer(
-			sparkerrors.ErrorMaskingInterceptor(config.ReturnDetailedErrors),
-			sparkerrors.ErrorWrappingInterceptor(),
+			sparkerrors.ErrorInterceptor(config.ReturnDetailedErrors),
 			sparkgrpc.LogInterceptor(tableLogger),
+			sparkgrpc.SparkTokenMetricsInterceptor(),
 			// Inject knobs into context for unary requests
 			func() grpc.UnaryServerInterceptor {
 				return func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
@@ -510,7 +510,6 @@ func main() {
 			}(),
 			sparkgrpc.ConcurrencyInterceptor(concurrencyGuard),
 			sparkgrpc.TimeoutInterceptor(knobsService, config.GRPC.ServerUnaryHandlerTimeout),
-			sparkgrpc.SparkTokenMetricsInterceptor(),
 			sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
 			func() grpc.UnaryServerInterceptor {
 				if rateLimiter != nil {
@@ -535,7 +534,7 @@ func main() {
 			sparkgrpc.ValidationInterceptor(),
 		)),
 		grpc.StreamInterceptor(grpcmiddleware.ChainStreamServer(
-			sparkerrors.ErrorWrappingStreamingInterceptor(),
+			sparkerrors.ErrorStreamingInterceptor(),
 			sparkgrpc.StreamLogInterceptor(),
 			sparkgrpc.PanicRecoveryStreamInterceptor(),
 			authn.NewInterceptor(sessionTokenCreatorVerifier).StreamAuthnInterceptor,

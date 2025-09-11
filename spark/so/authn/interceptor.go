@@ -83,7 +83,7 @@ func (i *Interceptor) authenticateContext(ctx context.Context) context.Context {
 	md, ok := metadata.FromIncomingContext(ctx)
 	logger := logging.GetLoggerFromContext(ctx)
 	if !ok {
-		err := errors.WrapErrorWithGRPCCode(fmt.Errorf("no metadata provided"), codes.Unauthenticated)
+		err := errors.WrapErrorWithCode(fmt.Errorf("no metadata provided"), codes.Unauthenticated)
 		logger.Info("Authentication error", "error", err)
 		return context.WithValue(ctx, authnContextKey, &Context{
 			Error: err,
@@ -94,7 +94,7 @@ func (i *Interceptor) authenticateContext(ctx context.Context) context.Context {
 	// Tokens are typically sent in "authorization" header
 	tokens := md.Get(authorizationHeader)
 	if len(tokens) == 0 {
-		err := errors.WrapErrorWithGRPCCode(fmt.Errorf("no authorization token provided"), codes.Unauthenticated)
+		err := errors.WrapErrorWithCode(fmt.Errorf("no authorization token provided"), codes.Unauthenticated)
 		return context.WithValue(ctx, authnContextKey, &Context{
 			Error: err,
 		})
@@ -105,7 +105,7 @@ func (i *Interceptor) authenticateContext(ctx context.Context) context.Context {
 
 	sessionInfo, err := i.sessionTokenCreatorVerifier.VerifyToken(token)
 	if err != nil {
-		wrappedErr := errors.WrapErrorWithGRPCCode(fmt.Errorf("failed to verify token: %w", err), codes.Unauthenticated)
+		wrappedErr := errors.WrapErrorWithCode(fmt.Errorf("failed to verify token: %w", err), codes.Unauthenticated)
 		logger.Info("Authentication error", "error", wrappedErr)
 		return context.WithValue(ctx, authnContextKey, &Context{
 			Error: wrappedErr,
@@ -114,7 +114,7 @@ func (i *Interceptor) authenticateContext(ctx context.Context) context.Context {
 
 	key, err := keys.ParsePublicKey(sessionInfo.PublicKey)
 	if err != nil {
-		wrappedErr := errors.WrapErrorWithGRPCCode(fmt.Errorf("failed to parse public key: %w", err), codes.Unauthenticated)
+		wrappedErr := errors.WrapErrorWithCode(fmt.Errorf("failed to parse public key: %w", err), codes.Unauthenticated)
 		logger.Info("Authentication error", "error", wrappedErr)
 		return context.WithValue(ctx, authnContextKey, &Context{
 			Error: wrappedErr,
