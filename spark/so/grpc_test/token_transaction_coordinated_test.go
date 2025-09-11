@@ -2966,6 +2966,27 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 	// match the length of the outputs since we create one spark invoice per output in batch testing
 	expectedLen := len(transferTransaction.TokenOutputs)
 	require.Len(t, tokenTransactionResponse.TokenTransactionsWithStatus[0].TokenTransaction.GetInvoiceAttachments(), expectedLen, "expected same number of outputs")
+
+	invoicesToQuery := make([]string, 0, len(invoiceAttachments))
+	for _, invoiceAttachment := range invoiceAttachments {
+		invoicesToQuery = append(invoicesToQuery, invoiceAttachment.GetSparkInvoice())
+	}
+	invoiceResponse, err := wallet.QuerySparkInvoicesByRawString(
+		t.Context(),
+		config,
+		invoicesToQuery,
+	)
+	require.NoError(t, err, "failed to query spark invoices")
+	require.Len(t, invoiceResponse.InvoiceStatuses, len(invoicesToQuery))
+	for i, invoiceResponse := range invoiceResponse.InvoiceStatuses {
+		require.Equal(t, invoiceResponse.Invoice, invoicesToQuery[i])
+		require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, invoiceResponse.Status)
+		require.Equal(t, &sparkpb.InvoiceResponse_TokenTransfer{
+			TokenTransfer: &sparkpb.TokenTransfer{
+				FinalTokenTransactionHash: finalTxHash[:],
+			},
+		}, invoiceResponse.TransferType)
+	}
 }
 
 type createSparkInvoiceParams struct {

@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	pbmock "github.com/lightsparkdev/spark/proto/mock"
 	"github.com/lightsparkdev/spark/proto/spark"
+	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1489,9 +1490,31 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithTokensInvoice(t *testing.T) {
 }
 
 func testTransferWithInvoice(t *testing.T, invoice string, senderPrivKey keys.Private, receiverPrivKey keys.Private) {
+	senderConfig, err := sparktesting.TestWalletConfigWithIdentityKey(senderPrivKey)
+	require.NoError(t, err, "failed to create sender wallet config")
+	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
+	require.NoError(t, err, "failed to authenticate sender")
+	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
+
 	senderTransfer, rootNode, newLeafPrivKey, err := sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
 	require.NoError(t, err, "failed to send transfer with invoice")
+	invoiceResponse, err := wallet.QuerySparkInvoicesByRawString(
+		senderCtx,
+		senderConfig,
+		[]string{invoice},
+	)
+	require.NoError(t, err, "failed to query spark invoices")
+	transferID, err := uuid.Parse(senderTransfer.Id)
+	require.NoError(t, err, "failed to parse transfer ID")
 
+	require.Len(t, invoiceResponse.InvoiceStatuses, 1)
+	require.Equal(t, invoice, invoiceResponse.InvoiceStatuses[0].Invoice)
+	require.Equal(t, sparkpb.InvoiceStatus_FINALIZED, invoiceResponse.InvoiceStatuses[0].Status)
+	require.Equal(t, &sparkpb.InvoiceResponse_SatsTransfer{
+		SatsTransfer: &sparkpb.SatsTransfer{
+			TransferId: transferID[:],
+		},
+	}, invoiceResponse.InvoiceStatuses[0].TransferType)
 	// Receiver queries pending transfer
 	receiverConfig, err := sparktesting.TestWalletConfigWithIdentityKey(receiverPrivKey)
 	require.NoError(t, err, "failed to create wallet config")
@@ -1563,7 +1586,6 @@ func sendTransferWithInvoice(
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(senderConfig.CoordinatorAddress(), nil)
 	require.NoError(t, err, "failed to create grpc connection")
 	defer conn.Close()
-
 	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
 	require.NoError(t, err, "failed to authenticate sender")
 	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
@@ -1577,6 +1599,60 @@ func sendTransferWithInvoice(
 		invoice,
 	)
 	return senderTransfer, rootNode, newLeafPrivKey, err
+}
+
+func TestQuerySparkInvoicesForUnknownInvoiceReturnsNotFound(t *testing.T) {
+	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
+	invoiceUUID, err := uuid.NewV7FromReader(rng)
+	require.NoError(t, err)
+	amountToSend := uint64(amountSatsToSend)
+	memoString := "test memo"
+	senderPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	senderPublicKey := senderPrivKey.Public()
+	receiverPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	receiverPublicKey := receiverPrivKey.Public()
+	tenMinutesFromNow := time.Now().Add(10 * time.Minute)
+	network := common.Regtest
+
+	amountSats := &amountToSend
+	expiryTime := &tenMinutesFromNow
+	memo := &memoString
+
+	invoiceFields := common.CreateSatsSparkInvoiceFields(
+		invoiceUUID[:],
+		amountSats,
+		memo,
+		senderPublicKey,
+		expiryTime,
+	)
+
+	invoiceHash, err := common.HashSparkInvoiceFields(invoiceFields, network, receiverPublicKey)
+	require.NoError(t, err)
+	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
+	require.NoError(t, err)
+	sigBytes := sig.Serialize()
+
+	invoice, err := common.EncodeSparkAddressWithSignature(
+		receiverPublicKey.Serialize(),
+		network,
+		invoiceFields,
+		sigBytes,
+	)
+	require.NoError(t, err)
+	senderConfig, err := sparktesting.TestWalletConfig()
+	require.NoError(t, err, "failed to create sender wallet config")
+	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
+	require.NoError(t, err, "failed to authenticate sender")
+	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
+
+	invoiceResponse, err := wallet.QuerySparkInvoicesByRawString(
+		senderCtx,
+		senderConfig,
+		[]string{invoice},
+	)
+	require.NoError(t, err, "failed to query spark invoices")
+	require.Len(t, invoiceResponse.InvoiceStatuses, 1)
+	require.Equal(t, sparkpb.InvoiceStatus_NOT_FOUND, invoiceResponse.InvoiceStatuses[0].Status)
 }
 
 func deterministicSeedFromTestName(testName string) [32]byte {

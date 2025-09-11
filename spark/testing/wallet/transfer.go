@@ -606,6 +606,22 @@ func QueryPendingTransfersBySender(
 	})
 }
 
+func QuerySparkInvoicesByRawString(
+	ctx context.Context,
+	config *TestWalletConfig,
+	invoices []string,
+) (*pb.QuerySparkInvoicesResponse, error) {
+	sparkConn, err := config.NewCoordinatorGRPCConnection()
+	if err != nil {
+		return nil, err
+	}
+	defer sparkConn.Close()
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	return sparkClient.QuerySparkInvoices(ctx, &pb.QuerySparkInvoicesRequest{
+		Invoice: invoices,
+	})
+}
+
 // VerifyPendingTransfer verifies signature and decrypt secret cipher for all leaves in the transfer.
 func VerifyPendingTransfer(_ context.Context, config *TestWalletConfig, transfer *pb.Transfer) (map[string][]byte, error) {
 	leafPrivKeyMap := make(map[string][]byte)

@@ -1478,11 +1478,26 @@ message QuerySparkInvoicesResponse {
 message InvoiceResponse {
     string invoice = 1;
     InvoiceStatus status = 2;
+    oneof transfer_type {
+        SatsTransfer sats_transfer = 3; 
+        TokenTransfer token_transfer = 4;
+    }
+}
+
+message SatsTransfer {
+    bytes transfer_id = 1 [(validate.rules).bytes.len = 16];
+}
+
+message TokenTransfer {
+    bytes final_token_transaction_hash = 1 [(validate.rules).bytes.len = 32];
 }
 
 enum InvoiceStatus {
+    reserved 3;
+
     NOT_FOUND = 0;
     PENDING = 1;
     FINALIZED = 2;
-    EXPIRED = 3;
+    RETURNED = 4;
 }
+
