@@ -48,27 +48,14 @@ func (h *ExtendLeafHandler) extendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 		return nil, fmt.Errorf("failed to enforce session identity public key matches: %w", err)
 	}
 
-	leafUUID, err := uuid.Parse(req.LeafId)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse leaf id: %w", err)
-	}
-
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	leaf, err := db.TreeNode.
-		Query().
-		Where(enttreenode.ID(leafUUID)).
-		ForUpdate().
-		Only(ctx)
+	leaf, err := getLeafById(ctx, req.LeafId, db)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get leaf node: %w", err)
-	}
-
-	if leaf.Status != st.TreeNodeStatusAvailable {
-		return nil, fmt.Errorf("leaf %s is not available, status: %s", leafUUID, leaf.Status)
+		return nil, fmt.Errorf("failed to get leaf by id: %w", err)
 	}
 
 	// Existing flow
@@ -86,6 +73,7 @@ func (h *ExtendLeafHandler) extendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse new node tx: %w", err)
 	}
+
 	newCpfpRefundTx, err := common.TxFromRawTxBytes(req.RefundTxSigningJob.RawTx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse new refund tx: %w", err)
@@ -99,6 +87,7 @@ func (h *ExtendLeafHandler) extendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new cpfp node signing job: %w", err)
 	}
+
 	cpfpRefundSigningJob, err := createSigningJob(ctx, newCpfpRefundTx, newCpfpNodeTx.TxOut[0], req.RefundTxSigningJob, leaf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create refund signing job: %w", err)
@@ -114,6 +103,7 @@ func (h *ExtendLeafHandler) extendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse leaf refund tx: %w", err)
 		}
+
 		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(leaf.DirectFromCpfpRefundTx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse leaf direct from cpfp refund tx: %w", err)
@@ -128,6 +118,7 @@ func (h *ExtendLeafHandler) extendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse new refund tx: %w", err)
 		}
+
 		newDirectFromCpfpRefundTx, err := common.TxFromRawTxBytes(req.DirectFromCpfpRefundTxSigningJob.RawTx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse new direct from cpfp refund tx: %w", err)
@@ -135,20 +126,12 @@ func (h *ExtendLeafHandler) extendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 
 		// Validate new transactions
 		// TODO: make some shared validation across different handlers
-		if newCpfpNodeTx.TxIn[0].Sequence >= directRefundTx.TxIn[0].Sequence {
-			return nil, fmt.Errorf("new node tx sequence must be less than the Direct refund tx sequence %d, got %d", directRefundTx.TxIn[0].Sequence, newCpfpNodeTx.TxIn[0].Sequence)
+		if err = validateNewTxSequence(newCpfpNodeTx, newDirectNodeTx, directRefundTx, directFromCpfpRefundTx, cpfpRefundTx); err != nil {
+			return nil, fmt.Errorf("invalid new node tx sequence: %w", err)
 		}
-		if newCpfpNodeTx.TxIn[0].Sequence >= directFromCpfpRefundTx.TxIn[0].Sequence {
-			return nil, fmt.Errorf("new node tx sequence must be less than the Direct from cpfp refund tx sequence %d, got %d", directFromCpfpRefundTx.TxIn[0].Sequence, newCpfpNodeTx.TxIn[0].Sequence)
-		}
-		if newDirectNodeTx.TxIn[0].Sequence >= cpfpRefundTx.TxIn[0].Sequence {
-			return nil, fmt.Errorf("new node tx sequence must be less than the CPFP refund tx sequence %d, got %d", cpfpRefundTx.TxIn[0].Sequence, newCpfpNodeTx.TxIn[0].Sequence)
-		}
-		if newDirectNodeTx.TxIn[0].Sequence >= directRefundTx.TxIn[0].Sequence {
-			return nil, fmt.Errorf("new node tx sequence must be less than the Direct refund tx sequence %d, got %d", directRefundTx.TxIn[0].Sequence, newCpfpNodeTx.TxIn[0].Sequence)
-		}
-		if newDirectNodeTx.TxIn[0].Sequence >= directFromCpfpRefundTx.TxIn[0].Sequence {
-			return nil, fmt.Errorf("new direct node tx sequence must be less than the Direct from cpfp refund tx sequence %d, got %d", directFromCpfpRefundTx.TxIn[0].Sequence, newDirectNodeTx.TxIn[0].Sequence)
+
+		if err = validateNewTxOutput(leaf, newCpfpNodeTx, newDirectNodeTx, cpfpRefundTx, directRefundTx, directFromCpfpRefundTx); err != nil {
+			return nil, fmt.Errorf("invalid new node tx output: %w", err)
 		}
 
 		newCpfpNodeOutPoint := newCpfpNodeTx.TxIn[0].PreviousOutPoint
@@ -157,6 +140,7 @@ func (h *ExtendLeafHandler) extendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 		if !newCpfpNodeOutPoint.Hash.IsEqual(&cpfpRefundOutPoint.Hash) || newCpfpNodeOutPoint.Index != cpfpRefundOutPoint.Index {
 			return nil, fmt.Errorf("new cpfp node tx must spend old node tx, expected %s:%d, got %s:%d", cpfpRefundOutPoint.Hash, cpfpRefundOutPoint.Index, newCpfpNodeOutPoint.Hash, newCpfpNodeOutPoint.Index)
 		}
+
 		newDirectNodeOutPoint := newDirectNodeTx.TxIn[0].PreviousOutPoint
 		if !newDirectNodeOutPoint.Hash.IsEqual(&cpfpRefundOutPoint.Hash) || newDirectNodeOutPoint.Index != cpfpRefundOutPoint.Index {
 			return nil, fmt.Errorf("new direct node tx must spend old node tx, expected %s:%d, got %s:%d", cpfpRefundOutPoint.Hash, cpfpRefundOutPoint.Index, newDirectNodeOutPoint.Hash, newDirectNodeOutPoint.Index)
@@ -182,10 +166,12 @@ func (h *ExtendLeafHandler) extendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 		if err != nil {
 			return nil, fmt.Errorf("failed to create new node signing job: %w", err)
 		}
+
 		directRefundSigningJob, err := createSigningJob(ctx, newDirectRefundTx, newDirectNodeTx.TxOut[0], req.DirectRefundTxSigningJob, leaf)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create refund signing job: %w", err)
 		}
+
 		newDirectFromCpfpRefundSigningJob, err := createSigningJob(ctx, newDirectFromCpfpRefundTx, newCpfpNodeTx.TxOut[0], req.DirectFromCpfpRefundTxSigningJob, leaf)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create direct from cpfp refund signing job: %w", err)
@@ -193,8 +179,10 @@ func (h *ExtendLeafHandler) extendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 
 		signingJobs = append(signingJobs, newDirectNodeSigningJob, directRefundSigningJob, newDirectFromCpfpRefundSigningJob)
 	} else if directNodeSigningJob != nil || directRefundSigningJob != nil || directFromCpfpRefundSigningJob != nil {
+
 		return nil, fmt.Errorf("direct node tx signing job, direct refund tx signing job, and direct from cpfp refund tx signing job must all be provided or none of them")
 	} else if requireDirectTx && len(leaf.DirectTx) > 0 {
+
 		return nil, fmt.Errorf("DirectRefundTxSigningJob and DirectFromCpfpRefundTxSigningJob are required. Please upgrade to the latest SDK version")
 	}
 
@@ -210,16 +198,19 @@ func (h *ExtendLeafHandler) extendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 	// TODO: how to get the tree and keyshare id without a query?
 	// TODO: we probably need to sync this state between the SOs
 	var directTx, directRefundTx, directFromCpfpRefundTx []byte
+
 	if req.DirectNodeTxSigningJob != nil {
 		directTx = req.DirectNodeTxSigningJob.RawTx
 	} else if requireDirectTx && len(leaf.DirectTx) > 0 {
 		return nil, fmt.Errorf("DirectNodeTxSigningJob is required. Please upgrade to the latest SDK version")
 	}
+
 	if req.DirectRefundTxSigningJob != nil {
 		directRefundTx = req.DirectRefundTxSigningJob.RawTx
 	} else if requireDirectTx && len(leaf.DirectTx) > 0 {
 		return nil, fmt.Errorf("DirectRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 	}
+
 	if req.DirectFromCpfpRefundTxSigningJob != nil {
 		directFromCpfpRefundTx = req.DirectFromCpfpRefundTxSigningJob.RawTx
 	} else if requireDirectTx && len(leaf.DirectTx) > 0 {
@@ -268,60 +259,17 @@ func (h *ExtendLeafHandler) extendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 	if len(signingResults) != len(signingJobs) {
 		return nil, fmt.Errorf("expected %d signing results, got %d", len(signingJobs), len(signingResults))
 	}
-	cpfpNodeFrostResult := signingResults[0]
-	cpfpRefundFrostResult := signingResults[1]
-	verifyingPubkey := leaf.VerifyingPubkey
 
-	// Prepare response
-	cpfpNodeSigningResultProto, err := cpfpNodeFrostResult.MarshalProto()
+	cpfpNodeSigningResult, cpfpRefundSigningResult, err := getLeafSigningResults(signingResults, leaf)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal node signing result: %w", err)
-	}
-
-	cpfpNodeSigningResult := &pb.ExtendLeafSigningResult{
-		SigningResult: cpfpNodeSigningResultProto,
-		VerifyingKey:  verifyingPubkey,
-	}
-
-	cpfpRefundSigningResultProto, err := cpfpRefundFrostResult.MarshalProto()
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal refund signing result: %w", err)
-	}
-	cpfpRefundSigningResult := &pb.ExtendLeafSigningResult{
-		SigningResult: cpfpRefundSigningResultProto,
-		VerifyingKey:  verifyingPubkey,
+		return nil, fmt.Errorf("failed to get leaf signing results: %w", err)
 	}
 
 	var directNodeSigningResult, directRefundSigningResult, directFromCpfpRefundSigningResult *pb.ExtendLeafSigningResult
 	if len(signingJobs) > 2 {
-		directNodeFrostResult := signingResults[2]
-		directRefundFrostResult := signingResults[3]
-		directFromCpfpRefundFrostResult := signingResults[4]
-
-		directNodeSigningResultProto, err := directNodeFrostResult.MarshalProto()
+		directNodeSigningResult, directRefundSigningResult, directFromCpfpRefundSigningResult, err = getDirectSigningResults(signingResults, leaf)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal node signing result: %w", err)
-		}
-		directRefundSigningResultProto, err := directRefundFrostResult.MarshalProto()
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal refund signing result: %w", err)
-		}
-		directFromCpfpRefundSigningResultProto, err := directFromCpfpRefundFrostResult.MarshalProto()
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal refund signing result: %w", err)
-		}
-
-		directNodeSigningResult = &pb.ExtendLeafSigningResult{
-			SigningResult: directNodeSigningResultProto,
-			VerifyingKey:  verifyingPubkey,
-		}
-		directRefundSigningResult = &pb.ExtendLeafSigningResult{
-			SigningResult: directRefundSigningResultProto,
-			VerifyingKey:  verifyingPubkey,
-		}
-		directFromCpfpRefundSigningResult = &pb.ExtendLeafSigningResult{
-			SigningResult: directFromCpfpRefundSigningResultProto,
-			VerifyingKey:  verifyingPubkey,
+			return nil, fmt.Errorf("failed to get direct signing results: %w", err)
 		}
 	}
 
@@ -333,6 +281,163 @@ func (h *ExtendLeafHandler) extendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 		DirectRefundTxSigningResult:         directRefundSigningResult,
 		DirectFromCpfpRefundTxSigningResult: directFromCpfpRefundSigningResult,
 	}, nil
+}
+
+func getLeafById(ctx context.Context, id string, db *ent.Tx) (*ent.TreeNode, error) {
+	leafUUID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse leaf id: %w", err)
+	}
+
+	leaf, err := db.TreeNode.
+		Query().
+		Where(enttreenode.ID(leafUUID)).
+		ForUpdate().
+		Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get leaf node: %w", err)
+	}
+
+	if leaf.Status != st.TreeNodeStatusAvailable {
+		return nil, fmt.Errorf("leaf %s is not available, status: %s", leafUUID, leaf.Status)
+	}
+
+	return leaf, nil
+}
+
+func validateNewTxSequence(newCpfpNodeTx, newDirectNodeTx, directRefundTx, directFromCpfpRefundTx,
+	cpfpRefundTx *wire.MsgTx) error {
+
+	if len(newCpfpNodeTx.TxIn) == 0 {
+		return fmt.Errorf("new cpfp node txIn is empty")
+	}
+
+	if len(newDirectNodeTx.TxIn) == 0 {
+		return fmt.Errorf("new direct node txIn is empty")
+	}
+
+	if newCpfpNodeTx.TxIn[0].Sequence >= directRefundTx.TxIn[0].Sequence {
+		return fmt.Errorf("new node tx sequence must be less than the Direct refund tx sequence %d, got %d", directRefundTx.TxIn[0].Sequence, newCpfpNodeTx.TxIn[0].Sequence)
+	}
+	if newCpfpNodeTx.TxIn[0].Sequence >= directFromCpfpRefundTx.TxIn[0].Sequence {
+		return fmt.Errorf("new node tx sequence must be less than the Direct from cpfp refund tx sequence %d, got %d", directFromCpfpRefundTx.TxIn[0].Sequence, newCpfpNodeTx.TxIn[0].Sequence)
+	}
+	if newDirectNodeTx.TxIn[0].Sequence >= cpfpRefundTx.TxIn[0].Sequence {
+		return fmt.Errorf("new node tx sequence must be less than the CPFP refund tx sequence %d, got %d", cpfpRefundTx.TxIn[0].Sequence, newCpfpNodeTx.TxIn[0].Sequence)
+	}
+	if newDirectNodeTx.TxIn[0].Sequence >= directRefundTx.TxIn[0].Sequence {
+		return fmt.Errorf("new node tx sequence must be less than the Direct refund tx sequence %d, got %d", directRefundTx.TxIn[0].Sequence, newCpfpNodeTx.TxIn[0].Sequence)
+	}
+	if newDirectNodeTx.TxIn[0].Sequence >= directFromCpfpRefundTx.TxIn[0].Sequence {
+		return fmt.Errorf("new direct node tx sequence must be less than the Direct from cpfp refund tx sequence %d, got %d", directFromCpfpRefundTx.TxIn[0].Sequence, newDirectNodeTx.TxIn[0].Sequence)
+	}
+
+	return nil
+}
+
+func validateNewTxOutput(leaf *ent.TreeNode,
+	newCpfpNodeTx, newDirectNodeTx, cpfpRefundTx, directRefundTx, directFromCpfpRefundTx *wire.MsgTx) error {
+
+	if len(newDirectNodeTx.TxOut) == 0 {
+		return fmt.Errorf("new cpfp node tx output is empty")
+	}
+	if uint64(newCpfpNodeTx.TxOut[0].Value) != leaf.Value {
+		return fmt.Errorf("new cpfp node tx output value must match leaf value, expected %d, got %d", leaf.Value, newCpfpNodeTx.TxOut[0].Value)
+	}
+
+	if len(newDirectNodeTx.TxOut) == 0 {
+		return fmt.Errorf("new direct node tx output is empty")
+	}
+	if uint64(newDirectNodeTx.TxOut[0].Value) >= leaf.Value {
+		return fmt.Errorf("new direct node tx output value must be less than leaf value, leaf value: %d, direct node tx value: %d", leaf.Value, newDirectNodeTx.TxOut[0].Value)
+	}
+
+	if len(cpfpRefundTx.TxOut) == 0 {
+		return fmt.Errorf("cpfp refund tx output is empty")
+	}
+	if uint64(cpfpRefundTx.TxOut[0].Value) != leaf.Value {
+		return fmt.Errorf("cpfp refund tx output value must match leaf value, expected %d, got %d", leaf.Value, cpfpRefundTx.TxOut[0].Value)
+	}
+
+	if len(directRefundTx.TxOut) == 0 {
+		return fmt.Errorf("direct refund tx output is empty")
+	}
+	if uint64(directRefundTx.TxOut[0].Value) >= leaf.Value {
+		return fmt.Errorf("direct refund tx output value must be less than leaf value, leaf value %d, direct refund tx value: %d", leaf.Value, cpfpRefundTx.TxOut[0].Value)
+	}
+
+	if len(directFromCpfpRefundTx.TxOut) == 0 {
+		return fmt.Errorf("direct from cpfp refund tx output is empty")
+	}
+	if uint64(directFromCpfpRefundTx.TxOut[0].Value) >= leaf.Value {
+		return fmt.Errorf("direct from cpfp refund tx output value must be less than leaf value, leaf value %d, direct from cpfp refund tx value: %d", leaf.Value, directFromCpfpRefundTx.TxOut[0].Value)
+	}
+	return nil
+}
+
+func getLeafSigningResults(signingResults []*helper.SigningResult, leaf *ent.TreeNode) (cpfpNodeSigningResult, cpfpRefundSigningResult *pb.ExtendLeafSigningResult, err error) {
+	cpfpNodeFrostResult := signingResults[0]
+	cpfpRefundFrostResult := signingResults[1]
+	verifyingPubkey := leaf.VerifyingPubkey
+
+	// Prepare response
+	cpfpNodeSigningResultProto, err := cpfpNodeFrostResult.MarshalProto()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal node signing result: %w", err)
+	}
+
+	cpfpNodeSigningResult = &pb.ExtendLeafSigningResult{
+		SigningResult: cpfpNodeSigningResultProto,
+		VerifyingKey:  verifyingPubkey,
+	}
+
+	cpfpRefundSigningResultProto, err := cpfpRefundFrostResult.MarshalProto()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal refund signing result: %w", err)
+
+	}
+
+	cpfpRefundSigningResult = &pb.ExtendLeafSigningResult{
+		SigningResult: cpfpRefundSigningResultProto,
+		VerifyingKey:  verifyingPubkey,
+	}
+
+	return cpfpNodeSigningResult, cpfpRefundSigningResult, nil
+}
+
+func getDirectSigningResults(signingResults []*helper.SigningResult,
+	leaf *ent.TreeNode) (directNodeSigningResult, directRefundSigningResult, directFromCpfpRefundSigningResult *pb.ExtendLeafSigningResult, err error) {
+	directNodeFrostResult := signingResults[2]
+	directRefundFrostResult := signingResults[3]
+	directFromCpfpRefundFrostResult := signingResults[4]
+
+	directNodeSigningResultProto, err := directNodeFrostResult.MarshalProto()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to marshal node signing result: %w", err)
+	}
+	directRefundSigningResultProto, err := directRefundFrostResult.MarshalProto()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to marshal refund signing result: %w", err)
+	}
+	directFromCpfpRefundSigningResultProto, err := directFromCpfpRefundFrostResult.MarshalProto()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to marshal refund signing result: %w", err)
+	}
+
+	directNodeSigningResult = &pb.ExtendLeafSigningResult{
+		SigningResult: directNodeSigningResultProto,
+		VerifyingKey:  leaf.VerifyingPubkey,
+	}
+	directRefundSigningResult = &pb.ExtendLeafSigningResult{
+		SigningResult: directRefundSigningResultProto,
+		VerifyingKey:  leaf.VerifyingPubkey,
+	}
+	directFromCpfpRefundSigningResult = &pb.ExtendLeafSigningResult{
+		SigningResult: directFromCpfpRefundSigningResultProto,
+		VerifyingKey:  leaf.VerifyingPubkey,
+	}
+
+	return directNodeSigningResult, directRefundSigningResult, directFromCpfpRefundSigningResult, nil
 }
 
 func createSigningJob(
