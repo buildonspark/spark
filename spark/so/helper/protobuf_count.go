@@ -1,10 +1,10 @@
 package helper
 
 import (
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
+// countMessageType counts the number of times a proto with the given name appears in msg (including msg itself).
 func countMessageType(msg protoreflect.Message, targetMessageName protoreflect.FullName) int {
 	count := 0
 
@@ -27,23 +27,17 @@ func countMessageType(msg protoreflect.Message, targetMessageName protoreflect.F
 		case fd.IsList():
 			// Handle repeated fields
 			list := v.List()
-			for i := 0; i < list.Len(); i++ {
+			for i := range list.Len() {
 				item := list.Get(i)
 				if fd.Kind() == protoreflect.MessageKind {
 					count += countMessageType(item.Message(), targetMessageName)
 				}
 			}
 		case fd.Kind() == protoreflect.MessageKind:
-			// Handle single message fields
 			count += countMessageType(v.Message(), targetMessageName)
 		}
 		return true
 	})
 
 	return count
-}
-
-// Helper function that works with proto.Message interface
-func CountMessageTypeInProto(msg proto.Message, targetMessageName string) int {
-	return countMessageType(msg.ProtoReflect(), protoreflect.FullName(targetMessageName))
 }

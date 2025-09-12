@@ -10,6 +10,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -22,8 +24,11 @@ func SigningCommitmentInterceptor(operatorMap map[string]*so.SigningOperator, kn
 		if knobs == nil || knobs.GetValue("spark.so.enable_prefetch_frost_round_1", 0) == 0 {
 			return handler(ctx, req)
 		}
-
-		signingCommitmentsCount := calculateSigningCommitmentCount(req)
+		protoReq, ok := req.(proto.Message)
+		if !ok {
+			return nil, status.Errorf(codes.Internal, "invalid request type %T", req)
+		}
+		signingCommitmentsCount := calculateSigningCommitmentCount(protoReq)
 		if signingCommitmentsCount > 0 {
 			logger := logging.GetLoggerFromContext(ctx)
 			logger.Info("Signing commitment count", "count", signingCommitmentsCount)
@@ -38,16 +43,14 @@ func SigningCommitmentInterceptor(operatorMap map[string]*so.SigningOperator, kn
 				commitments, err := ent.ReserveSigningCommitments(ctx, dbTx, uint32(signingCommitmentsCount), idx)
 				if err != nil {
 					logger.Error("Failed to get unused signing commitments", "error", err)
-					rollbackErr := dbTx.Rollback()
-					if rollbackErr != nil {
+					if rollbackErr := dbTx.Rollback(); rollbackErr != nil {
 						return nil, rollbackErr
 					}
 					return handler(ctx, req)
 				}
 				commitmentsMap[idx] = commitments
 			}
-			err = dbTx.Commit()
-			if err != nil {
+			if err := dbTx.Commit(); err != nil {
 				return nil, err
 			}
 			ctx = injectSigningCommitments(ctx, commitmentsMap)
@@ -57,20 +60,15 @@ func SigningCommitmentInterceptor(operatorMap map[string]*so.SigningOperator, kn
 	}
 }
 
-func calculateSigningCommitmentCount(req any) int {
-	getSigningCommitmentReq, ok := req.(*pbspark.GetSigningCommitmentsRequest)
-	if ok {
+func calculateSigningCommitmentCount(req proto.Message) int {
+	if getSigningCommitmentReq, ok := req.(*pbspark.GetSigningCommitmentsRequest); ok {
 		return len(getSigningCommitmentReq.NodeIds) * int(getSigningCommitmentReq.Count)
 	}
-
-	protobufMessage := req.(proto.Message)
-	count := CountMessageTypeInProto(protobufMessage, "spark.SigningJob")
-	return count
+	return countMessageType(req.ProtoReflect(), "spark.SigningJob")
 }
 
 func injectSigningCommitments(ctx context.Context, commitmentsMap map[uint][]*ent.SigningCommitment) context.Context {
-	ctx = context.WithValue(ctx, signingCommitmentsKey, commitmentsMap)
-	return ctx
+	return context.WithValue(ctx, signingCommitmentsKey, commitmentsMap)
 }
 
 func GetSigningCommitmentsFromContext(ctx context.Context, count int, operatorIndex uint) ([]*ent.SigningCommitment, error) {
@@ -78,7 +76,10 @@ func GetSigningCommitmentsFromContext(ctx context.Context, count int, operatorIn
 	if commitmentsMapValue == nil {
 		return nil, fmt.Errorf("no signing commitments found in context")
 	}
-	commitmentsMap := commitmentsMapValue.(map[uint][]*ent.SigningCommitment)
+	commitmentsMap, ok := commitmentsMapValue.(map[uint][]*ent.SigningCommitment)
+	if !ok {
+		return nil, fmt.Errorf("no signing commitments found in context")
+	}
 	commitments := commitmentsMap[operatorIndex]
 	if len(commitments) < count {
 		return nil, fmt.Errorf("not enough signing commitments for operator index %d", operatorIndex)
