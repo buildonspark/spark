@@ -2,6 +2,7 @@ package schema
 
 import (
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -77,5 +78,22 @@ func (TreeNode) Indexes() []ent.Index {
 		index.Fields("node_confirmation_height"),
 		index.Fields("refund_confirmation_height"),
 		index.Fields("update_time"),
+
+		index.Fields("raw_txid").Annotations(
+			entsql.IndexWhere("raw_txid is not null"),
+		),
+		index.Fields("direct_txid").Annotations(
+			entsql.IndexWhere("direct_txid is not null"),
+		),
+		index.Fields("direct_from_cpfp_refund_txid").Annotations(
+			entsql.IndexWhere("direct_from_cpfp_refund_txid is not null"),
+		),
+
+		index.Fields("raw_refund_txid").Annotations(
+			entsql.IndexWhere("raw_refund_txid is not null"),
+		),
+		index.Fields("direct_refund_txid").Annotations(
+			entsql.IndexWhere("direct_refund_txid is not null"),
+		),
 	}
 }

@@ -978,6 +978,46 @@ var (
 				Unique:  false,
 				Columns: []*schema.Column{TreeNodesColumns[2]},
 			},
+			{
+				Name:    "treenode_raw_txid",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[14]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "raw_txid is not null",
+				},
+			},
+			{
+				Name:    "treenode_direct_txid",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[15]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "direct_txid is not null",
+				},
+			},
+			{
+				Name:    "treenode_direct_from_cpfp_refund_txid",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[16]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "direct_from_cpfp_refund_txid is not null",
+				},
+			},
+			{
+				Name:    "treenode_raw_refund_txid",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[19]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "raw_refund_txid is not null",
+				},
+			},
+			{
+				Name:    "treenode_direct_refund_txid",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[20]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "direct_refund_txid is not null",
+				},
+			},
 		},
 	}
 	// UserSignedTransactionsColumns holds the columns for the "user_signed_transactions" table.
