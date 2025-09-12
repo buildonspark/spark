@@ -221,11 +221,7 @@ func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Co
 		if !ok {
 			return nil, tokens.FormatErrorWithTransactionProto("keyshare ID not found", finalTokenTransaction, sparkerrors.InvalidUserInputErrorf("keyshare ID not found: %s", id))
 		}
-		pubKey, err := keys.ParsePublicKey(keyshare.PublicKey)
-		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("failed to parse public key", finalTokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to parse public key: %w", err))
-		}
-		expectedRevocationPublicKeys[i] = pubKey
+		expectedRevocationPublicKeys[i] = keyshare.PublicKey
 	}
 	return expectedRevocationPublicKeys, nil
 }

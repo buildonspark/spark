@@ -157,8 +157,8 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 	signingKeyshare, err := dbTX.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
 		SetSecretShare(keysharePrivKey.Serialize()).
-		SetPublicShares(map[string][]byte{"test": publicSharePrivKey.Public().Serialize()}).
-		SetPublicKey(keysharePrivKey.Public().Serialize()).
+		SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
+		SetPublicKey(keysharePrivKey.Public()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
 		Save(ctx)
@@ -550,17 +550,17 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	dbTX, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	keysharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
-	publicSharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	identityPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
 	signingPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
 	verifyingPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
 
 	signingKeyshare, err := dbTX.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(keysharePrivkey.Serialize()).
-		SetPublicShares(map[string][]byte{"test": publicSharePrivkey.Public().Serialize()}).
-		SetPublicKey(keysharePrivkey.Public().Serialize()).
+		SetSecretShare(keysharePrivKey.Serialize()).
+		SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
+		SetPublicKey(keysharePrivKey.Public()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
 		Save(ctx)
@@ -747,8 +747,8 @@ func TestPrepareSigningJobs_EnsureConfTxidMatchesUtxoId(t *testing.T) {
 	signingKeyshare, err := dbTX.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
 		SetSecretShare(keysharePrivKey.Serialize()).
-		SetPublicShares(map[string][]byte{"test": publicSharePrivKey.Public().Serialize()}).
-		SetPublicKey(keysharePrivKey.Public().Serialize()).
+		SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
+		SetPublicKey(keysharePrivKey.Public()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
 		Save(ctx)
@@ -892,8 +892,8 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 			signingKeyshare, err := dbTx.SigningKeyshare.Create().
 				SetStatus(st.KeyshareStatusAvailable).
 				SetSecretShare(keysharePrivkey.Serialize()).
-				SetPublicShares(map[string][]byte{"test": publicSharePrivkey.Public().Serialize()}).
-				SetPublicKey(keysharePrivkey.Public().Serialize()).
+				SetPublicShares(map[string]keys.Public{"test": publicSharePrivkey.Public()}).
+				SetPublicKey(keysharePrivkey.Public()).
 				SetMinSigners(2).
 				SetCoordinatorIndex(0).
 				Save(ctx)
@@ -946,8 +946,8 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 				childKeyshare, err := dbTx.SigningKeyshare.Create().
 					SetStatus(st.KeyshareStatusAvailable).
 					SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
-					SetPublicShares(map[string][]byte{"test": publicSharePrivkey.Public().Serialize()}).
-					SetPublicKey(childKeysharePubKey.Serialize()).
+					SetPublicShares(map[string]keys.Public{"test": publicSharePrivkey.Public()}).
+					SetPublicKey(childKeysharePubKey).
 					SetMinSigners(2).
 					SetCoordinatorIndex(0).
 					Save(ctx)
@@ -966,7 +966,7 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 				_, err = dbTx.DepositAddress.Create().
 					SetAddress(*childAddress).
 					SetOwnerIdentityPubkey(identityPrivkey.Public()).
-					SetOwnerSigningPubkey(childKeysharePubKey).
+					SetOwnerSigningPubkey(childKeyshare.PublicKey).
 					SetSigningKeyshare(childKeyshare).
 					SetNetwork(st.NetworkRegtest).
 					Save(ctx)
@@ -984,7 +984,7 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 				childrenSigningJobs = append(childrenSigningJobs, &pb.CreationNode{
 					NodeTxSigningJob: &pb.SigningJob{
 						RawTx:                  childNodeTxBuf,
-						SigningPublicKey:       childKeyshare.PublicKey,
+						SigningPublicKey:       childKeyshare.PublicKey.Serialize(),
 						SigningNonceCommitment: &pbcommon.SigningCommitment{Hiding: make([]byte, 33), Binding: make([]byte, 33)},
 					},
 				})

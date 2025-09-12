@@ -7457,8 +7457,8 @@ type SigningKeyshareMutation struct {
 	update_time          *time.Time
 	status               *schematype.SigningKeyshareStatus
 	secret_share         *[]byte
-	public_shares        *map[string][]uint8
-	public_key           *[]byte
+	public_shares        *map[string]keys.Public
+	public_key           *keys.Public
 	min_signers          *int32
 	addmin_signers       *int32
 	coordinator_index    *uint64
@@ -7718,12 +7718,12 @@ func (m *SigningKeyshareMutation) ResetSecretShare() {
 }
 
 // SetPublicShares sets the "public_shares" field.
-func (m *SigningKeyshareMutation) SetPublicShares(value map[string][]uint8) {
+func (m *SigningKeyshareMutation) SetPublicShares(value map[string]keys.Public) {
 	m.public_shares = &value
 }
 
 // PublicShares returns the value of the "public_shares" field in the mutation.
-func (m *SigningKeyshareMutation) PublicShares() (r map[string][]uint8, exists bool) {
+func (m *SigningKeyshareMutation) PublicShares() (r map[string]keys.Public, exists bool) {
 	v := m.public_shares
 	if v == nil {
 		return
@@ -7734,7 +7734,7 @@ func (m *SigningKeyshareMutation) PublicShares() (r map[string][]uint8, exists b
 // OldPublicShares returns the old "public_shares" field's value of the SigningKeyshare entity.
 // If the SigningKeyshare object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SigningKeyshareMutation) OldPublicShares(ctx context.Context) (v map[string][]uint8, err error) {
+func (m *SigningKeyshareMutation) OldPublicShares(ctx context.Context) (v map[string]keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldPublicShares is only allowed on UpdateOne operations")
 	}
@@ -7754,12 +7754,12 @@ func (m *SigningKeyshareMutation) ResetPublicShares() {
 }
 
 // SetPublicKey sets the "public_key" field.
-func (m *SigningKeyshareMutation) SetPublicKey(b []byte) {
-	m.public_key = &b
+func (m *SigningKeyshareMutation) SetPublicKey(k keys.Public) {
+	m.public_key = &k
 }
 
 // PublicKey returns the value of the "public_key" field in the mutation.
-func (m *SigningKeyshareMutation) PublicKey() (r []byte, exists bool) {
+func (m *SigningKeyshareMutation) PublicKey() (r keys.Public, exists bool) {
 	v := m.public_key
 	if v == nil {
 		return
@@ -7770,7 +7770,7 @@ func (m *SigningKeyshareMutation) PublicKey() (r []byte, exists bool) {
 // OldPublicKey returns the old "public_key" field's value of the SigningKeyshare entity.
 // If the SigningKeyshare object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SigningKeyshareMutation) OldPublicKey(ctx context.Context) (v []byte, err error) {
+func (m *SigningKeyshareMutation) OldPublicKey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldPublicKey is only allowed on UpdateOne operations")
 	}
@@ -8047,14 +8047,14 @@ func (m *SigningKeyshareMutation) SetField(name string, value ent.Value) error {
 		m.SetSecretShare(v)
 		return nil
 	case signingkeyshare.FieldPublicShares:
-		v, ok := value.(map[string][]uint8)
+		v, ok := value.(map[string]keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPublicShares(v)
 		return nil
 	case signingkeyshare.FieldPublicKey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

@@ -249,11 +249,7 @@ func (h *TreeQueryHandler) QueryUnusedDepositAddresses(ctx context.Context, req 
 	for _, depositAddress := range depositAddresses {
 		treeNodes, err := db.TreeNode.Query().Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(depositAddress.Edges.SigningKeyshare.ID))).All(ctx)
 		if len(treeNodes) == 0 || ent.IsNotFound(err) {
-			signingKeySharePubKey, err := keys.ParsePublicKey(depositAddress.Edges.SigningKeyshare.PublicKey)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse signing key share public key: %w", err)
-			}
-			verifyingPublicKey := depositAddress.OwnerSigningPubkey.Add(signingKeySharePubKey)
+			verifyingPublicKey := depositAddress.OwnerSigningPubkey.Add(depositAddress.Edges.SigningKeyshare.PublicKey)
 			nodeIDStr := depositAddress.NodeID.String()
 			if utils.IsBitcoinAddressForNetwork(depositAddress.Address, network) {
 				unusedDepositAddresses = append(unusedDepositAddresses, &pb.DepositAddressQueryResult{
@@ -341,17 +337,12 @@ func (h *TreeQueryHandler) QueryStaticDepositAddresses(ctx context.Context, req 
 
 func (h *TreeQueryHandler) depositAddressToQueryResult(ctx context.Context, depositAddress *ent.DepositAddress) (*pb.DepositAddressQueryResult, error) {
 	nodeIDStr := depositAddress.NodeID.String()
-	signingKeySharePubKey, err := keys.ParsePublicKey(depositAddress.Edges.SigningKeyshare.PublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse signing key share public key: %w", err)
-	}
-
-	verifyingPublicKey := depositAddress.OwnerSigningPubkey.Add(signingKeySharePubKey)
 	// Get local keyshare for the deposit address.
 	keyshare, err := depositAddress.Edges.SigningKeyshareOrErr()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get keyshare for static deposit address: %w", err)
 	}
+	verifyingPublicKey := depositAddress.OwnerSigningPubkey.Add(keyshare.PublicKey)
 
 	// Return the proofs of possession if they are cached.
 	// Caching is done in the GenerateStaticDepositAddressResponse handler on the coordinator.

@@ -205,8 +205,8 @@ func createTestTree(t *testing.T, ctx context.Context, network st.Network, statu
 		SetID(uuid.New()).
 		SetStatus(st.KeyshareStatusAvailable).
 		SetSecretShare(secretShare.Serialize()).
-		SetPublicShares(map[string][]byte{"1": publicShare1.Public().Serialize(), "2": publicShare2.Public().Serialize(), "3": publicShare3.Public().Serialize()}).
-		SetPublicKey(secretShare.Public().Serialize()).
+		SetPublicShares(map[string]keys.Public{"1": publicShare1.Public(), "2": publicShare2.Public(), "3": publicShare3.Public()}).
+		SetPublicKey(secretShare.Public()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
 		Save(ctx)

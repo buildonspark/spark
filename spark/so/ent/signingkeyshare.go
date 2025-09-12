@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 )
@@ -29,9 +30,9 @@ type SigningKeyshare struct {
 	// The secret share of the signing keyshare held by this SO.
 	SecretShare []byte `json:"secret_share,omitempty"`
 	// A map from SO identifier to the public key of the secret share held by that SO.
-	PublicShares map[string][]uint8 `json:"public_shares,omitempty"`
+	PublicShares map[string]keys.Public `json:"public_shares,omitempty"`
 	// The public key of the combined secret represented by this signing keyshare.
-	PublicKey []byte `json:"public_key,omitempty"`
+	PublicKey keys.Public `json:"public_key,omitempty"`
 	// The minimum number of signers required to produce a valid signature using this signing keyshare.
 	MinSigners int32 `json:"min_signers,omitempty"`
 	// The SO index of the coordinator that initiated the DKG round that produced this signing keyshare. An SO can only claim a signing keyshare to mark it in-use for which it is the coordinator.
@@ -44,8 +45,10 @@ func (*SigningKeyshare) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case signingkeyshare.FieldSecretShare, signingkeyshare.FieldPublicShares, signingkeyshare.FieldPublicKey:
+		case signingkeyshare.FieldSecretShare, signingkeyshare.FieldPublicShares:
 			values[i] = new([]byte)
+		case signingkeyshare.FieldPublicKey:
+			values[i] = new(keys.Public)
 		case signingkeyshare.FieldMinSigners, signingkeyshare.FieldCoordinatorIndex:
 			values[i] = new(sql.NullInt64)
 		case signingkeyshare.FieldStatus:
@@ -108,7 +111,7 @@ func (sk *SigningKeyshare) assignValues(columns []string, values []any) error {
 				}
 			}
 		case signingkeyshare.FieldPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field public_key", values[i])
 			} else if value != nil {
 				sk.PublicKey = *value

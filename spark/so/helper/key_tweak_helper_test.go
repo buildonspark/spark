@@ -50,8 +50,8 @@ func TestTweakLeafKey(t *testing.T) {
 	keyshare, err := dbTx.SigningKeyshare.Create().
 		SetStatus(schematype.KeyshareStatusInUse).
 		SetSecretShare(keysharePriv.Serialize()).
-		SetPublicShares(map[string][]byte{"operator1": pubSharePub.Serialize()}).
-		SetPublicKey(keysharePub.Serialize()).
+		SetPublicShares(map[string]keys.Public{"operator1": pubSharePub}).
+		SetPublicKey(keysharePub).
 		SetMinSigners(2).
 		SetCoordinatorIndex(1).
 		Save(ctx)
@@ -105,14 +105,12 @@ func TestTweakLeafKey(t *testing.T) {
 
 	// The new public key should be the sum of the original and tweak public key
 	expectedNewPublicKey := keysharePub.Add(tweakPub)
-	assert.Equal(t, expectedNewPublicKey.Serialize(), updatedKeyshare.PublicKey)
+	assert.Equal(t, expectedNewPublicKey, updatedKeyshare.PublicKey)
 
 	// The new public shares should be the sum of the original and tweak public shares
-	expectedNewPublicShares := make(map[string][]byte)
+	expectedNewPublicShares := make(map[string]keys.Public)
 	for operator, originalShare := range keyshare.PublicShares {
-		shareKey, err := keys.ParsePublicKey(originalShare)
-		require.NoError(t, err)
-		expectedNewPublicShares[operator] = shareKey.Add(pubkeyShareTweakPub).Serialize()
+		expectedNewPublicShares[operator] = originalShare.Add(pubkeyShareTweakPub)
 	}
 	assert.Equal(t, expectedNewPublicShares, updatedKeyshare.PublicShares)
 }
@@ -145,8 +143,8 @@ func TestTweakLeafKey_EmptySecretShareTweakProofsList(t *testing.T) {
 	keyshare, err := dbTx.SigningKeyshare.Create().
 		SetStatus(schematype.KeyshareStatusInUse).
 		SetSecretShare(keysharePriv.Serialize()).
-		SetPublicShares(map[string][]byte{"operator1": pubSharePub.Serialize()}).
-		SetPublicKey(keysharePub.Serialize()).
+		SetPublicShares(map[string]keys.Public{"operator1": pubSharePub}).
+		SetPublicKey(keysharePub).
 		SetMinSigners(2).
 		SetCoordinatorIndex(1).
 		Save(ctx)

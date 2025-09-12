@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -63,7 +63,11 @@ func (h *InvestigationHandler) InvestigateLeaves(ctx context.Context) error {
 	badNodes := make(map[string]bool)
 	for _, leaf := range leaves {
 		for _, result := range results {
-			if !bytes.Equal(result.SigningPubkeys[leaf.ID.String()], leaf.Edges.SigningKeyshare.PublicKey) {
+			resultPubKey, err := keys.ParsePublicKey(result.SigningPubkeys[leaf.ID.String()])
+			if err != nil {
+				return fmt.Errorf("failed to parse public key for leaf %v: %w", leaf.ID, err)
+			}
+			if !resultPubKey.Equals(leaf.Edges.SigningKeyshare.PublicKey) {
 				badNodes[leaf.ID.String()] = true
 				logger := logging.GetLoggerFromContext(ctx)
 				logger.Warn("Tree Node is marked as lost", "node_id", leaf.ID)
@@ -71,8 +75,8 @@ func (h *InvestigationHandler) InvestigateLeaves(ctx context.Context) error {
 		}
 	}
 
-	badNodesArray := make([]string, 0)
-	goodNodesArray := make([]string, 0)
+	var badNodesArray []string
+	var goodNodesArray []string
 	for _, leaf := range leaves {
 		if _, ok := badNodes[leaf.ID.String()]; ok {
 			badNodesArray = append(badNodesArray, leaf.ID.String())
@@ -136,12 +140,12 @@ func (h *InvestigationHandler) QueryLeafSigningPubkeys(ctx context.Context, req 
 		return nil, err
 	}
 
-	resultMap := make(map[string][]byte)
+	signingPubKeys := make(map[string][]byte)
 	for _, leaf := range leaves {
-		resultMap[leaf.ID.String()] = leaf.Edges.SigningKeyshare.PublicKey
+		signingPubKeys[leaf.ID.String()] = leaf.Edges.SigningKeyshare.PublicKey.Serialize()
 	}
 
-	return &pbinternal.QueryLeafSigningPubkeysResponse{SigningPubkeys: resultMap}, nil
+	return &pbinternal.QueryLeafSigningPubkeysResponse{SigningPubkeys: signingPubKeys}, nil
 }
 
 func (h *InvestigationHandler) ResolveLeafInvestigation(ctx context.Context, req *pbinternal.ResolveLeafInvestigationRequest) (*emptypb.Empty, error) {

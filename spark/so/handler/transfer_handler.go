@@ -33,7 +33,7 @@ import (
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
-	errors "github.com/lightsparkdev/spark/so/errors"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/objects"
@@ -143,10 +143,10 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	if err != nil {
 		return nil, fmt.Errorf("invalid receiver identity public key: %w", err)
 	}
-	//nolint:all
+
+	//nolint:govet,revive // TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
 	if len(req.SparkInvoice) > 0 {
-		// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
-		return nil, errors.UnimplementedErrorf("spark invoice support not implemented")
+		return nil, sparkerrors.UnimplementedErrorf("spark invoice support not implemented")
 		leafIDsToSend := make([]uuid.UUID, len(req.TransferPackage.LeavesToSend))
 		for i, leaf := range req.TransferPackage.LeavesToSend {
 			leafID, err := uuid.Parse(leaf.LeafId)
@@ -829,7 +829,7 @@ func signRefundsWithPregeneratedNonce(
 		return nil, nil, nil, fmt.Errorf("transfer package is nil")
 	}
 
-	signingJobs := make([]*helper.SigningJobWithPregeneratedNonce, 0)
+	var signingJobs []*helper.SigningJobWithPregeneratedNonce
 	for _, req := range requests.TransferPackage.LeavesToSend {
 		leaf := leafMap[req.LeafId]
 		refundTx, err := common.TxFromRawTxBytes(req.RawTx)
@@ -1204,11 +1204,11 @@ func (h *TransferHandler) FinalizeTransfer(ctx context.Context, req *pb.Finalize
 	if !shouldTweakKey {
 		statusToSet = st.TransferStatusSenderKeyTweakPending
 	}
-	transfer, err = transfer.Update().SetStatus(statusToSet).Save(ctx)
+	updatedTransfer, err := transfer.Update().SetStatus(statusToSet).Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to update transfer status %s: %w", transfer.ID.String(), err)
+		return nil, fmt.Errorf("unable to update transfer status %v: %w", transfer.ID, err)
 	}
-	transferProto, err := transfer.MarshalProto(ctx)
+	transferProto, err := updatedTransfer.MarshalProto(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
 	}
@@ -1253,7 +1253,7 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 		}
 		errorMsg := fmt.Sprintf("failed to sync deliver sender key tweak for transfer %s", req.TransferId)
 		if stat, ok := status.FromError(err); ok && stat.Code() == codes.Unavailable {
-			return nil, errors.UnavailableErrorf("%s: %w", errorMsg, err)
+			return nil, sparkerrors.UnavailableErrorf("%s: %w", errorMsg, err)
 		}
 		dbTx, dbErr = ent.GetDbFromContext(ctx)
 		if dbErr != nil {
@@ -1744,17 +1744,13 @@ func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Tx, transfer *ent.T
 		blockheight.NetworkEQ(tree.Network),
 	).Only(ctx)
 	if err != nil {
-		return errors.WrapErrorWithCodeAndReason(err, codes.Internal, "INTERNAL_DB_QUERY_FAILED")
+		return fmt.Errorf("failed to find block height: %w", err)
 	}
 	if coopExit.ConfirmationHeight == 0 {
-		return errors.FailedPreconditionInsufficientConfirmations(
-			fmt.Errorf("coop exit tx hasn't been broadcasted"),
-		)
+		return sparkerrors.FailedPreconditionErrorf("coop exit tx hasn't been broadcasted")
 	}
 	if coopExit.ConfirmationHeight+CoopExitConfirmationThreshold-1 > blockHeight.Height {
-		return errors.FailedPreconditionInsufficientConfirmations(
-			fmt.Errorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", coopExit.ConfirmationHeight, blockHeight.Height),
-		)
+		return sparkerrors.FailedPreconditionErrorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", coopExit.ConfirmationHeight, blockHeight.Height)
 	}
 	return nil
 }
@@ -1781,14 +1777,14 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	}
 	// Validate transfer is not in terminal states
 	if transfer.Status == st.TransferStatusCompleted {
-		return errors.AlreadyExistsErrorf("transfer %s has already been claimed", req.TransferId)
+		return sparkerrors.AlreadyExistsErrorf("transfer %s has already been claimed", req.TransferId)
 	}
 	if transfer.Status == st.TransferStatusExpired ||
 		transfer.Status == st.TransferStatusReturned {
-		return errors.FailedPreconditionErrorf("transfer %s is in terminal state %s and cannot be processed", req.TransferId, transfer.Status)
+		return sparkerrors.FailedPreconditionErrorf("transfer %s is in terminal state %s and cannot be processed", req.TransferId, transfer.Status)
 	}
 	if transfer.Status != st.TransferStatusSenderKeyTweaked {
-		return errors.FailedPreconditionErrorf("please call ClaimTransferSignRefunds to claim the transfer %s, the transfer is not in SENDER_KEY_TWEAKED status. transferstatus: %s,", req.TransferId, transfer.Status)
+		return sparkerrors.FailedPreconditionErrorf("please call ClaimTransferSignRefunds to claim the transfer %s, the transfer is not in SENDER_KEY_TWEAKED status. transferstatus: %s,", req.TransferId, transfer.Status)
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
@@ -1823,7 +1819,7 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		if err != nil {
 			return fmt.Errorf("unable to marshal leaf tweak: %w", err)
 		}
-		leaf, err = leaf.Update().SetKeyTweak(leafTweakBytes).Save(ctx)
+		_, err = leaf.Update().SetKeyTweak(leafTweakBytes).Save(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to update leaf %s: %w", leafTweak.LeafId, err)
 		}
@@ -1832,7 +1828,7 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	// Update transfer status
 	_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweaked).Save(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID.String(), err)
+		return fmt.Errorf("unable to update transfer status %v: %w", transfer.ID, err)
 	}
 
 	return nil
@@ -1894,12 +1890,7 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 	if err != nil {
 		return fmt.Errorf("unable to parse verifying public key: %w", err)
 	}
-	tweakedPubKey, err := keys.ParsePublicKey(tweakedKeyshare.PublicKey)
-	if err != nil {
-		return fmt.Errorf("unable to parse tweaked public key: %w", err)
-	}
-
-	signingPubkey := verifyingPubKey.Sub(tweakedPubKey)
+	signingPubkey := verifyingPubKey.Sub(tweakedKeyshare.PublicKey)
 	_, err = leaf.
 		Update().
 		SetOwnerIdentityPubkey(ownerIdentityPubKey.Serialize()).
@@ -1977,12 +1968,12 @@ func (h *TransferHandler) revertClaimTransfer(ctx context.Context, transfer *ent
 
 	_, err := transfer.Update().SetStatus(st.TransferStatusSenderKeyTweaked).Save(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID.String(), err)
+		return fmt.Errorf("unable to update transfer status %v: %w", transfer.ID, err)
 	}
 	for _, leaf := range transferLeaves {
-		leaf, err := leaf.Update().SetKeyTweak(nil).Save(ctx)
+		_, err := leaf.Update().SetKeyTweak(nil).Save(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to update leaf %s: %w", leaf.ID.String(), err)
+			return fmt.Errorf("unable to update leaf %v: %w", leaf.ID, err)
 		}
 	}
 	return nil
@@ -2093,7 +2084,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	case st.TransferStatusReceiverKeyTweakApplied:
 		// do nothing
 	case st.TransferStatusCompleted:
-		return nil, errors.AlreadyExistsErrorf("transfer %s has already been claimed", req.TransferId)
+		return nil, sparkerrors.AlreadyExistsErrorf("transfer %s has already been claimed", req.TransferId)
 	default:
 		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusKeyTweaked or TransferStatusReceiverRefundSigned or TransferStatusReceiverKeyTweakLocked or TransferStatusReceiverKeyTweakApplied but %s found", req.TransferId, transfer.Status)
 	}
@@ -2314,7 +2305,11 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 		return nil
 	}
 
-	applied, err := h.checkIfKeyTweakApplied(ctx, transfer, req.UserPublicKeys)
+	userPubKeys, err := keys.ParsePublicKeyMap(req.GetUserPublicKeys())
+	if err != nil {
+		return err
+	}
+	applied, err := h.checkIfKeyTweakApplied(ctx, transfer, userPubKeys)
 	if err != nil {
 		return fmt.Errorf("unable to check if key tweak is applied: %w", err)
 	}
@@ -2368,31 +2363,34 @@ func (h *TransferHandler) InitiateSettleReceiverKeyTweak(ctx context.Context, re
 	return nil
 }
 
-func (h *TransferHandler) checkIfKeyTweakApplied(ctx context.Context, transfer *ent.Transfer, userPublicKeys map[string][]byte) (bool, error) {
+func (h *TransferHandler) checkIfKeyTweakApplied(ctx context.Context, transfer *ent.Transfer, userPublicKeys map[string]keys.Public) (bool, error) {
 	leaves, err := transfer.QueryTransferLeaves().QueryLeaf().WithSigningKeyshare().All(ctx)
 	if err != nil {
-		return false, fmt.Errorf("unable to get leaves from transfer %s: %w", transfer.ID.String(), err)
+		return false, fmt.Errorf("unable to get leaves from transfer %v: %w", transfer.ID, err)
 	}
 
-	var tweaked *bool
+	var tweaked, tweakedSet bool
 	for _, leaf := range leaves {
 		userPublicKey, ok := userPublicKeys[leaf.ID.String()]
 		if !ok {
-			return false, fmt.Errorf("user public key for leaf %s not found", leaf.ID.String())
+			return false, fmt.Errorf("user public key for leaf %v not found", leaf.ID)
 		}
 		sparkPublicKey := leaf.Edges.SigningKeyshare.PublicKey
-		combinedPublicKey, err := common.AddPublicKeys(sparkPublicKey, userPublicKey)
+		combinedPublicKey := sparkPublicKey.Add(userPublicKey)
+
+		verifyingPubKey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
 		if err != nil {
-			return false, fmt.Errorf("unable to add public keys for leaf %s: %w", leaf.ID.String(), err)
+			return false, fmt.Errorf("unable to parse verifying public key for leaf %v: %w", leaf.ID, err)
 		}
-		localTweaked := bytes.Equal(combinedPublicKey, leaf.VerifyingPubkey)
-		if tweaked == nil {
-			tweaked = &localTweaked
-		} else if *tweaked != localTweaked {
-			return false, fmt.Errorf("inconsistent key tweak status for transfer %s", transfer.ID.String())
+		localTweaked := combinedPublicKey.Equals(verifyingPubKey)
+		if !tweakedSet {
+			tweaked = localTweaked
+			tweakedSet = true
+		} else if tweaked != localTweaked {
+			return false, fmt.Errorf("inconsistent key tweak status for transfer %v", transfer.ID)
 		}
 	}
-	return *tweaked, nil
+	return tweaked, nil
 }
 
 func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbinternal.SettleReceiverKeyTweakRequest) error {

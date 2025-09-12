@@ -34,8 +34,8 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 	keyshare, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
 		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(seededRand).Serialize()).
-		SetPublicShares(map[string][]byte{}).
-		SetPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()).
+		SetPublicShares(map[string]keys.Public{}).
+		SetPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
 		SetMinSigners(1).
 		SetCoordinatorIndex(0).
 		Save(ctx)

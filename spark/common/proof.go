@@ -1,17 +1,14 @@
 package common
 
 import (
-	"bytes"
-	"crypto/sha256"
+	"slices"
+
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/lightsparkdev/spark/common/keys"
 )
 
 // ProofOfPossessionMessageHashForDepositAddress generates a hash of the proof of possession message for a deposit address.
-func ProofOfPossessionMessageHashForDepositAddress(userPubkey, operatorPubkey, depositAddress []byte) []byte {
-	proofMsg := bytes.Join([][]byte{
-		userPubkey,
-		operatorPubkey,
-		depositAddress,
-	}, nil)
-	hash := sha256.Sum256(proofMsg)
-	return hash[:]
+func ProofOfPossessionMessageHashForDepositAddress(userPubKey, operatorPubKey keys.Public, depositAddress []byte) []byte {
+	proofMsg := slices.Concat(userPubKey.Serialize(), operatorPubKey.Serialize(), depositAddress)
+	return chainhash.HashB(proofMsg)
 }

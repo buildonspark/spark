@@ -37,11 +37,12 @@ func setupIsolatedTest(t *testing.T) (context.Context, *ent.Tx) {
 	require.NoError(t, err)
 
 	// Create required EntityDkgKey for token operations
-	entityDkgPublicKey := keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()
+	secretShare := keys.MustGeneratePrivateKeyFromRand(seededRand)
+	entityDkgPublicKey := keys.MustGeneratePrivateKeyFromRand(seededRand).Public()
 	signingKeyshare, err := dbTx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare([]byte("test_secret")).
-		SetPublicShares(map[string][]byte{}).
+		SetSecretShare(secretShare.Serialize()).
+		SetPublicShares(map[string]keys.Public{}).
 		SetPublicKey(entityDkgPublicKey).
 		SetMinSigners(1).
 		SetCoordinatorIndex(0).
@@ -492,11 +493,12 @@ func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
 	}
 
 	// Create required EntityDkgKey for Spark token creation (reused across tests)
-	entityDkgPublicKey := keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()
+	secretShare := keys.MustGeneratePrivateKeyFromRand(seededRand)
+	entityDkgPublicKey := keys.MustGeneratePrivateKeyFromRand(seededRand).Public()
 	signingKeyshare, err := dbTx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare([]byte("test_secret")).
-		SetPublicShares(map[string][]byte{}).
+		SetSecretShare(secretShare.Serialize()).
+		SetPublicShares(map[string]keys.Public{}).
 		SetPublicKey(entityDkgPublicKey).
 		SetMinSigners(1).
 		SetCoordinatorIndex(0).

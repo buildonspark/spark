@@ -2,9 +2,11 @@ package task
 
 import (
 	"context"
+	"math/rand/v2"
 	"net"
 	"testing"
 
+	"github.com/lightsparkdev/spark/common/keys"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -90,6 +92,7 @@ func TestReserveEntityDkg_OperatorDown(t *testing.T) {
 
 			cfg, err := sparktesting.TestConfig()
 			require.NoError(t, err)
+			rng := rand.NewChaCha8([32]byte{})
 			cfg.Index = 0 // coordinator
 
 			var failingOperatorID string
@@ -127,11 +130,12 @@ func TestReserveEntityDkg_OperatorDown(t *testing.T) {
 			})
 
 			// Seed keyshare.
+			secret := keys.MustGeneratePrivateKeyFromRand(rng)
 			sk := client.SigningKeyshare.Create().
 				SetStatus(st.KeyshareStatusAvailable).
-				SetSecretShare([]byte("secret")).
-				SetPublicKey([]byte("pubkey")).
-				SetPublicShares(map[string][]byte{}).
+				SetSecretShare(secret.Serialize()).
+				SetPublicKey(secret.Public()).
+				SetPublicShares(map[string]keys.Public{}).
 				SetMinSigners(2).
 				SetCoordinatorIndex(0).
 				SaveX(ctx)
@@ -166,11 +170,13 @@ func TestReserveEntityDkg_Idempotent(t *testing.T) {
 	pruneOperators(cfg)
 
 	// Pre-create an EntityDkgKey and mark keyshare in use
+	rng := rand.NewChaCha8([32]byte{})
+	secret := keys.MustGeneratePrivateKeyFromRand(rng)
 	sk := client.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare([]byte("secret")).
-		SetPublicKey([]byte("pubkey")).
-		SetPublicShares(map[string][]byte{}).
+		SetSecretShare(secret.Serialize()).
+		SetPublicKey(secret.Public()).
+		SetPublicShares(map[string]keys.Public{}).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
 		SaveX(ctx)

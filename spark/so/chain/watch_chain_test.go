@@ -211,10 +211,10 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	require.NoError(t, err)
 
 	signingKeyshare, err := dbTx.SigningKeyshare.Create().
-		SetPublicKey(signingPublicKey.Serialize()).
+		SetPublicKey(signingPublicKey).
 		SetSecretShare(secretShare.Serialize()).
 		SetMinSigners(1).
-		SetPublicShares(map[string][]byte{}).
+		SetPublicShares(map[string]keys.Public{}).
 		SetStatus(schematype.KeyshareStatusAvailable).
 		SetCoordinatorIndex(0).
 		Save(ctx)

@@ -2,11 +2,13 @@ package handler_test
 
 import (
 	"context"
-	"crypto/rand"
+	"io"
+	"math/rand/v2"
 	"testing"
 
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -19,15 +21,14 @@ import (
 )
 
 // createTestSigningKeyshare creates a test signing keyshare for use in tests.
-func createTestSigningKeyshare(t *testing.T, ctx context.Context, client *ent.Client) *ent.SigningKeyshare {
-	publicKey := make([]byte, 33)
-	_, err := rand.Read(publicKey)
-	require.NoError(t, err)
+func createTestSigningKeyshare(t *testing.T, ctx context.Context, rng io.Reader, client *ent.Client) *ent.SigningKeyshare {
+	publicKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	secret := keys.MustGeneratePrivateKeyFromRand(rng)
 
 	return client.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare([]byte("test_secret_share")).
-		SetPublicShares(map[string][]byte{"test": []byte("test_public_share")}).
+		SetSecretShare(secret.Serialize()).
+		SetPublicShares(map[string]keys.Public{"test": secret.Public()}).
 		SetPublicKey(publicKey).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
@@ -38,8 +39,9 @@ func TestReserveEntityDkgKey_Success(t *testing.T) {
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg, err := sparktesting.TestConfig()
 	require.NoError(t, err)
+	rng := rand.NewChaCha8([32]byte{})
 
-	signingKeyshare := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
+	signingKeyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
 	handler := handler.NewEntityDkgKeyHandler(cfg)
 
 	// Test successful reservation
@@ -70,8 +72,8 @@ func TestReserveEntityDkgKey_Idempotent(t *testing.T) {
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg, err := sparktesting.TestConfig()
 	require.NoError(t, err)
-
-	signingKeyshare := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
+	rng := rand.NewChaCha8([32]byte{})
+	signingKeyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
 	handler := handler.NewEntityDkgKeyHandler(cfg)
 
 	req := &pbinternal.ReserveEntityDkgKeyRequest{
@@ -101,9 +103,9 @@ func TestReserveEntityDkgKey_ConflictingKeyshareID(t *testing.T) {
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	cfg, err := sparktesting.TestConfig()
 	require.NoError(t, err)
-
-	signingKeyshare1 := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
-	signingKeyshare2 := createTestSigningKeyshare(t, ctx, sessionCtx.Client)
+	rng := rand.NewChaCha8([32]byte{})
+	signingKeyshare1 := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
+	signingKeyshare2 := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
 
 	handler := handler.NewEntityDkgKeyHandler(cfg)
 

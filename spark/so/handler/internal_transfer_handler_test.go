@@ -2,18 +2,19 @@ package handler
 
 import (
 	"bytes"
+	"math/rand/v2"
 	"testing"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common/keys"
 	sparkProto "github.com/lightsparkdev/spark/proto/spark"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/lightsparkdev/spark/common/keys"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
@@ -102,11 +103,20 @@ func TestFinalizeTransfer(t *testing.T) {
 		newRawRefundTx := createTestTxBytes(t, 3001)
 
 		// Create test signing keyshare
+		rng := rand.NewChaCha8([32]byte{})
+		keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		publicSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		ownerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		verifyingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		ownerSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		senderIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		receiverIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
 		signingKeyshare, err := dbCtx.Client.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
-			SetSecretShare([]byte("test_secret_share")).
-			SetPublicShares(map[string][]byte{"test": []byte("test_public_share")}).
-			SetPublicKey([]byte("test_public_key")).
+			SetSecretShare(keysharePrivKey.Serialize()).
+			SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
+			SetPublicKey(keysharePrivKey.Public()).
 			SetMinSigners(2).
 			SetCoordinatorIndex(0).
 			Save(ctx)
@@ -116,7 +126,7 @@ func TestFinalizeTransfer(t *testing.T) {
 		tree, err := dbCtx.Client.Tree.Create().
 			SetStatus(st.TreeStatusAvailable).
 			SetNetwork(st.NetworkRegtest).
-			SetOwnerIdentityPubkey([]byte("test_owner_identity")).
+			SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public().Serialize()).
 			SetBaseTxid([]byte("test_base_txid")).
 			SetVout(0).
 			Save(ctx)
@@ -128,9 +138,9 @@ func TestFinalizeTransfer(t *testing.T) {
 			SetTree(tree).
 			SetSigningKeyshare(signingKeyshare).
 			SetValue(1000).
-			SetVerifyingPubkey([]byte("test_verifying_pubkey")).
-			SetOwnerIdentityPubkey([]byte("test_owner_identity")).
-			SetOwnerSigningPubkey([]byte("test_owner_signing")).
+			SetVerifyingPubkey(verifyingPrivKey.Public().Serialize()).
+			SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public().Serialize()).
+			SetOwnerSigningPubkey(ownerSigningPrivKey.Public().Serialize()).
 			SetRawTx(rawTx).
 			SetRawRefundTx(rawRefundTx).
 			SetDirectTx(directTx).
@@ -144,8 +154,8 @@ func TestFinalizeTransfer(t *testing.T) {
 		transfer, err := dbCtx.Client.Transfer.Create().
 			SetStatus(st.TransferStatusReceiverRefundSigned).
 			SetType(st.TransferTypeTransfer).
-			SetSenderIdentityPubkey([]byte("test_sender_identity")).
-			SetReceiverIdentityPubkey([]byte("test_receiver_identity")).
+			SetSenderIdentityPubkey(senderIdentityPrivKey.Public().Serialize()).
+			SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public().Serialize()).
 			SetTotalValue(1000).
 			SetExpiryTime(time.Now().Add(24 * time.Hour)).
 			SetCompletionTime(time.Now()).
@@ -163,12 +173,15 @@ func TestFinalizeTransfer(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create internal node for the request
+		updatedOwnerIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+		updatedOwnerSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
 		internalNode := &pbinternal.TreeNode{
 			Id:                     leaf.ID.String(),
-			Value:                  1000,                            // Must match the original value since it's immutable
-			VerifyingPubkey:        []byte("test_verifying_pubkey"), // Must match the original value since it's immutable
-			OwnerIdentityPubkey:    []byte("test_owner_identity_updated"),
-			OwnerSigningPubkey:     []byte("test_owner_signing_updated"),
+			Value:                  1000,                                  // Must match the original value since it's immutable
+			VerifyingPubkey:        verifyingPrivKey.Public().Serialize(), // Must match the original value since it's immutable
+			OwnerIdentityPubkey:    updatedOwnerIdentityPrivKey.Public().Serialize(),
+			OwnerSigningPubkey:     updatedOwnerSigningPrivKey.Public().Serialize(),
 			RawTx:                  rawTxUpdated,
 			RawRefundTx:            rawRefundTxUpdated,
 			DirectTx:               createTestTxBytes(t, 2002),
@@ -212,10 +225,10 @@ func TestFinalizeTransfer(t *testing.T) {
 		// Create another copy of the internal node for the request, but with different RawRefundTx
 		internalNode2 := &pbinternal.TreeNode{
 			Id:                     leaf.ID.String(),
-			Value:                  1000,                            // Must match the original value since it's immutable
-			VerifyingPubkey:        []byte("test_verifying_pubkey"), // Must match the original value since it's immutable
-			OwnerIdentityPubkey:    []byte("test_owner_identity_updated"),
-			OwnerSigningPubkey:     []byte("test_owner_signing_updated"),
+			Value:                  1000,                                  // Must match the original value since it's immutable
+			VerifyingPubkey:        verifyingPrivKey.Public().Serialize(), // Must match the original value since it's immutable
+			OwnerIdentityPubkey:    updatedOwnerIdentityPrivKey.Public().Serialize(),
+			OwnerSigningPubkey:     updatedOwnerSigningPrivKey.Public().Serialize(),
 			RawTx:                  rawTxUpdated,
 			RawRefundTx:            newRawRefundTx,
 			DirectTx:               createTestTxBytes(t, 2002),
@@ -259,6 +272,7 @@ func TestFinalizeTransfer(t *testing.T) {
 func TestApplySignatures(t *testing.T) {
 	t.Parallel()
 	ctx, dbCtx := db.NewTestSQLiteContext(t)
+	rng := rand.NewChaCha8([32]byte{})
 
 	config := &so.Config{
 		BitcoindConfigs: map[string]so.BitcoindConfig{
@@ -290,11 +304,13 @@ func TestApplySignatures(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create test signing keyshare
+	secret := keys.MustGeneratePrivateKeyFromRand(rng)
+	pubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	signingKeyshare, err := dbCtx.Client.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare([]byte("test_secret_share")).
-		SetPublicShares(map[string][]byte{"test": []byte("test_public_share")}).
-		SetPublicKey([]byte("test_public_key")).
+		SetSecretShare(secret.Serialize()).
+		SetPublicShares(map[string]keys.Public{"test": secret.Public()}).
+		SetPublicKey(pubKey).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
 		Save(ctx)

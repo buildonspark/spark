@@ -262,15 +262,11 @@ func (h *TreeCreationHandler) createAddressNodeFromPrepareTreeAddressNode(
 	save bool,
 ) (addressNode *pb.AddressNode, err error) {
 	signingKeyshare := keysharesMap[node.SigningKeyshareId]
-	keysharePubKey, err := keys.ParsePublicKey(signingKeyshare.PublicKey)
-	if err != nil {
-		return nil, err
-	}
 	nodeUserPubKey, err := keys.ParsePublicKey(node.UserPublicKey)
 	if err != nil {
 		return nil, err
 	}
-	combinedPublicKey := keysharePubKey.Add(nodeUserPubKey)
+	combinedPublicKey := signingKeyshare.PublicKey.Add(nodeUserPubKey)
 
 	depositAddress, err := common.P2TRAddressFromPublicKey(combinedPublicKey, network)
 	if err != nil {
@@ -579,11 +575,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			}
 			parentNodeID = &currentElement.parentNode.ID
 		}
-		currentKeysharePubKey, err := keys.ParsePublicKey(currentElement.keyshare.PublicKey)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to parse keyshare public key: %w", err)
-		}
-		verifyingKey := currentKeysharePubKey.Add(currentElement.userPubKey)
+		verifyingKey := currentElement.keyshare.PublicKey.Add(currentElement.userPubKey)
 
 		var cpfpRefundTx []byte
 		if currentElement.node.RefundTxSigningJob != nil {
@@ -676,12 +668,8 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 				if err != nil {
 					return nil, nil, err
 				}
-				signingKeysharePubKey, err := keys.ParsePublicKey(signingKeyshare.PublicKey)
-				if err != nil {
-					return nil, nil, fmt.Errorf("failed to parse signing keyshare public key: %w", err)
-				}
 				userPublicKeys = append(userPublicKeys, userSigningKey)
-				statechainPublicKeys = append(statechainPublicKeys, signingKeysharePubKey)
+				statechainPublicKeys = append(statechainPublicKeys, signingKeyshare.PublicKey)
 				queue = append(queue, &element{
 					output:     cpfpTx.TxOut[i],
 					node:       child,
@@ -704,7 +692,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			if err != nil {
 				return nil, nil, err
 			}
-			if !statechainPublicKeySum.Equals(currentKeysharePubKey) {
+			if !statechainPublicKeySum.Equals(currentElement.keyshare.PublicKey) {
 				return nil, nil, errors.New("statechain public key does not add up")
 			}
 		}

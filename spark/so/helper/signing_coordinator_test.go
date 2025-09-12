@@ -51,7 +51,7 @@ func mockTxBuf(t *testing.T, values []int64) []byte {
 func runWithRawTx(keysharePub keys.Public, protoPub keys.Public, rawTx []byte, commitment *pbcommon.SigningCommitment, prevOutputValue int64) (*helper.SigningJob, *wire.MsgTx, error) {
 	keyshare := &ent.SigningKeyshare{
 		ID:        uuid.New(),
-		PublicKey: keysharePub.Serialize(),
+		PublicKey: keysharePub,
 	}
 	proto := &pbspark.SigningJob{
 		SigningPublicKey:       protoPub.Serialize(),
@@ -1455,7 +1455,7 @@ func TestNewSigningJobEdgeCases(t *testing.T) {
 	t.Run("InvalidPrevOutput", func(t *testing.T) {
 		keyshare := &ent.SigningKeyshare{
 			ID:        uuid.New(),
-			PublicKey: pubKey.Serialize(),
+			PublicKey: pubKey,
 		}
 
 		proto := &pbspark.SigningJob{
@@ -1474,7 +1474,7 @@ func TestNewSigningJobEdgeCases(t *testing.T) {
 	t.Run("InvalidPublicKeyCombination", func(t *testing.T) {
 		keyshare := &ent.SigningKeyshare{
 			ID:        uuid.New(),
-			PublicKey: pubKey.Serialize(),
+			PublicKey: pubKey,
 		}
 
 		// Test with invalid proto public key (wrong length)

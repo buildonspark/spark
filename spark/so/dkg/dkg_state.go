@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	"github.com/lightsparkdev/spark/so"
@@ -290,13 +291,21 @@ func (s *State) Round3(ctx context.Context, requestID string, frostConnection *g
 			return err
 		}
 		keyID := deriveKeyIndex(batchID, uint16(i))
+		pubKeyMap, err := keys.ParsePublicKeyMap(key.PublicShares)
+		if err != nil {
+			return err
+		}
+		pubKey, err := keys.ParsePublicKey(key.PublicKey)
+		if err != nil {
+			return err
+		}
 		signingKeyshares[i] = db.SigningKeyshare.Create().
 			SetID(keyID).
 			SetStatus(st.KeyshareStatusAvailable).
 			SetMinSigners(int32(s.MinSigners)).
 			SetSecretShare(key.SecretShare).
-			SetPublicShares(key.PublicShares).
-			SetPublicKey(key.PublicKey).
+			SetPublicShares(pubKeyMap).
+			SetPublicKey(pubKey).
 			SetCoordinatorIndex(s.CoordinatorIndex)
 	}
 

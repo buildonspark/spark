@@ -5,10 +5,12 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"math/rand/v2"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -28,15 +30,17 @@ func TestMain(m *testing.M) {
 }
 
 // createTestSpentOutputWithShares creates a spent output with one partial share and returns it.
-func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.Tx, handler *InternalSignTokenHandler, tokenCreateID uuid.UUID, secretPriv *secp256k1.PrivateKey, shares []*secretsharing.SecretShare, operatorIDs []string) *ent.TokenOutput {
+func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.Tx, handler *InternalSignTokenHandler, tokenCreateID uuid.UUID, secretPriv keys.Private, shares []*secretsharing.SecretShare, operatorIDs []string) *ent.TokenOutput {
 	t.Helper()
-
 	coordinatorShare := shares[0] // index 1
+	secretShare, err := keys.PrivateKeyFromBigInt(coordinatorShare.Share)
+	require.NoError(t, err)
+
 	keyshare := tx.SigningKeyshare.Create().
-		SetSecretShare(coordinatorShare.Share.FillBytes(make([]byte, 32))).
-		SetPublicKey(secretPriv.PubKey().SerializeCompressed()).
+		SetSecretShare(secretShare.Serialize()).
+		SetPublicKey(secretPriv.Public()).
 		SetStatus(st.KeyshareStatusInUse).
-		SetPublicShares(map[string][]byte{}).
+		SetPublicShares(map[string]keys.Public{}).
 		SetMinSigners(1).
 		SetCoordinatorIndex(1).
 		SaveX(ctx)
@@ -52,7 +56,7 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.
 		SetStatus(st.TokenOutputStatusSpentSigned).
 		SetWithdrawBondSats(1).
 		SetWithdrawRelativeBlockLocktime(1).
-		SetWithdrawRevocationCommitment(secretPriv.PubKey().SerializeCompressed()).
+		SetWithdrawRevocationCommitment(secretPriv.Public().Serialize()).
 		SetCreatedTransactionOutputVout(0).
 		SetNetwork(st.NetworkRegtest).
 		SetTokenIdentifier([]byte("token_identifier")).
@@ -62,10 +66,12 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.
 
 	// add partial share for operator 2
 	opPub := handler.config.SigningOperatorMap[operatorIDs[1]].IdentityPublicKey
+	share1, err := keys.PrivateKeyFromBigInt(shares[1].Share)
+	require.NoError(t, err)
 	tx.TokenPartialRevocationSecretShare.Create().
 		SetTokenOutput(output).
 		SetOperatorIdentityPublicKey(opPub.Serialize()).
-		SetSecretShare(shares[1].Share.FillBytes(make([]byte, 32))).
+		SetSecretShare(share1.Serialize()).
 		SaveX(ctx)
 
 	return output
@@ -74,6 +80,7 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.
 func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *testing.T) {
 	cfg, err := sparktesting.TestConfig()
 	require.NoError(t, err)
+	rng := rand.NewChaCha8([32]byte{})
 
 	handler := &InternalSignTokenHandler{config: cfg}
 	ctx, _ := db.ConnectToTestPostgres(t)
@@ -91,8 +98,7 @@ func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *te
 	handler.config.SigningOperatorMap = limitedOps
 	handler.config.Threshold = 2
 
-	priv, err := secp256k1.GeneratePrivateKey()
-	require.NoError(t, err)
+	priv := keys.MustGeneratePrivateKeyFromRand(rng)
 	secretInt := new(big.Int).SetBytes(priv.Serialize())
 	shares, err := secretsharing.SplitSecret(secretInt, secp256k1.S256().N, 2, 3)
 	require.NoError(t, err)

@@ -57,15 +57,15 @@ func createTestTokenOutputs(t *testing.T, ctx context.Context, tx *ent.Tx, count
 		return b
 	}
 
-	var outputs []*ent.TokenOutput
-	for i := 0; i < count; i++ {
+	outputs := make([]*ent.TokenOutput, count)
+	for i := range outputs {
 		keyshare, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
 			SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
-			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
+			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetMinSigners(1).
 			SetCoordinatorIndex(0).
-			SetPublicShares(map[string][]byte{}).
+			SetPublicShares(map[string]keys.Public{}).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -91,7 +91,7 @@ func createTestTokenOutputs(t *testing.T, ctx context.Context, tx *ent.Tx, count
 			SetNetwork(st.NetworkRegtest).
 			Save(ctx)
 		require.NoError(t, err)
-		outputs = append(outputs, out)
+		outputs[i] = out
 	}
 
 	return outputs
@@ -104,7 +104,6 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-
 	rng := rand.NewChaCha8([32]byte{})
 	t.Run("return output after transaction has expired in signed state", func(t *testing.T) {
 		randomBytes := func(length int) []byte {
@@ -118,8 +117,8 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 		signKS1, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
 			SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
-			SetPublicShares(map[string][]byte{}).
-			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
+			SetPublicShares(map[string]keys.Public{}).
+			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetMinSigners(1).
 			SetCoordinatorIndex(0).
 			Save(ctx)
@@ -128,8 +127,8 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 		signKS2, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
 			SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
-			SetPublicShares(map[string][]byte{}).
-			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
+			SetPublicShares(map[string]keys.Public{}).
+			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetMinSigners(1).
 			SetCoordinatorIndex(0).
 			Save(ctx)
@@ -158,8 +157,8 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 		require.NoError(t, err)
 
 		mintTx, err := tx.TokenTransaction.Create().
-			SetPartialTokenTransactionHash(randomBytes(32)).
-			SetFinalizedTokenTransactionHash(randomBytes(32)).
+			SetPartialTokenTransactionHash(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
+			SetFinalizedTokenTransactionHash(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
 			SetStatus(st.TokenTransactionStatusFinalized).
 			SetMintID(mintEnt.ID).
 			Save(ctx)
@@ -184,8 +183,8 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 		// Create a transfer transaction (SIGNED & expired) that spends the mint output
 		expiredAt := time.Now().Add(-1 * time.Hour)
 		transferTx, err := tx.TokenTransaction.Create().
-			SetPartialTokenTransactionHash(randomBytes(32)).
-			SetFinalizedTokenTransactionHash(randomBytes(32)).
+			SetPartialTokenTransactionHash(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
+			SetFinalizedTokenTransactionHash(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
 			SetStatus(st.TokenTransactionStatusSigned).
 			SetExpiryTime(expiredAt).
 			Save(ctx)

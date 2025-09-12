@@ -79,11 +79,7 @@ func (h *InternalTreeCreationHandler) generateAndStoreDepositAddress(
 	userPubkey, identityPubKey keys.Public,
 	save bool,
 ) (string, []byte, error) {
-	keysharePubKey, err := keys.ParsePublicKey(seKeyshare.PublicKey)
-	if err != nil {
-		return "", nil, err
-	}
-	combinedPublicKey := keysharePubKey.Add(userPubkey)
+	combinedPublicKey := seKeyshare.PublicKey.Add(userPubkey)
 	address, err := common.P2TRAddressFromPublicKey(combinedPublicKey, network)
 	if err != nil {
 		return "", nil, err

@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"context"
+	"io"
 	"math/big"
 	"net"
 	"testing"
@@ -85,31 +86,33 @@ func (s *mockSparkTokenInternalServiceServer) ExchangeRevocationSecretsShares(
 }
 
 // startMockGRPCServer starts a mock gRPC server for testing inter-operator communication
-func startMockGRPCServer(t *testing.T, mockServer *mockSparkTokenInternalServiceServer) (string, func()) {
+func startMockGRPCServer(t *testing.T, mockServer *mockSparkTokenInternalServiceServer) string {
 	// Pick a free TCP port for the mock server
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	addr := l.Addr().String()
+	t.Cleanup(func() { _ = l.Close() })
 
 	server := grpc.NewServer()
 	tokeninternalpb.RegisterSparkTokenInternalServiceServer(server, mockServer)
-
 	go func() {
 		if err := server.Serve(l); err != nil {
 			t.Logf("Mock gRPC server error: %v", err)
 		}
 	}()
-	return addr, server.Stop
+	t.Cleanup(server.Stop)
+	return addr
 }
 
-func createTestSigningKeyshare(_ *testing.T, ctx context.Context, client *ent.Client) *ent.SigningKeyshare {
+func createTestSigningKeyshare(_ *testing.T, ctx context.Context, rng io.Reader, client *ent.Client) *ent.SigningKeyshare {
+	secret := keys.MustGeneratePrivateKeyFromRand(rng)
 	return client.SigningKeyshare.Create().
 		SetStatus(schematype.KeyshareStatusAvailable).
-		SetSecretShare([]byte("test")).
-		SetPublicKey([]byte("test_pubkey_12345678901234567890")).
+		SetSecretShare(secret.Serialize()).
+		SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 		SetMinSigners(1).
 		SetCoordinatorIndex(0).
-		SetPublicShares(map[string][]byte{"test": []byte("test")}).
+		SetPublicShares(map[string]keys.Public{"test": secret.Public()}).
 		SaveX(ctx)
 }
 
@@ -136,7 +139,6 @@ type testSetupCommon struct {
 	coordinatorPrivKey  keys.Private
 	coordinatorPubKey   keys.Public
 	mockAddr            string
-	stopMockServer      func()
 }
 
 // setUpCommonTest sets up common test infrastructure
@@ -163,8 +165,7 @@ func setUpCommonTest(t *testing.T) *testSetupCommon {
 	mockServer := &mockSparkTokenInternalServiceServer{
 		privKey: mockOperatorPrivKey,
 	}
-	mockAddr, stopMockServer := startMockGRPCServer(t, mockServer)
-	t.Cleanup(stopMockServer)
+	mockAddr := startMockGRPCServer(t, mockServer)
 
 	// Update signing operator config to have just one mocked non-coordinator operator.
 	cfg.SigningOperatorMap = make(map[string]*so.SigningOperator)
@@ -195,7 +196,6 @@ func setUpCommonTest(t *testing.T) *testSetupCommon {
 		coordinatorPrivKey:  coordinatorPrivKey,
 		coordinatorPubKey:   coordinatorPubKey,
 		mockAddr:            mockAddr,
-		stopMockServer:      stopMockServer,
 	}
 }
 
@@ -282,7 +282,7 @@ type transferTestData struct {
 }
 
 // setUpTransferTestData creates the prerequisite data for transfer transaction tests
-func setUpTransferTestData(t *testing.T, setup *testSetupCommon) *transferTestData {
+func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) *transferTestData {
 	// Create a token identifier for the transfer
 	createInput := &tokenpb.TokenCreateInput{
 		TokenName:               testTokenName,
@@ -299,15 +299,15 @@ func setUpTransferTestData(t *testing.T, setup *testSetupCommon) *transferTestDa
 	require.NoError(t, err)
 
 	// Create some previous token outputs to spend
-	prevTxHash := make([]byte, 32)
-	for i := 0; i < 32; i += 8 {
-		binary.LittleEndian.PutUint64(prevTxHash[i:], mathrand.Uint64())
+	prevTxHash := make([]byte, 0, 32)
+	for range 4 {
+		prevTxHash = binary.LittleEndian.AppendUint64(prevTxHash, mathrand.Uint64())
 	}
-	tokenOutputId1 := uuid.New().String()
-	tokenOutputId2 := uuid.New().String()
+	tokenOutputId1 := uuid.Must(uuid.NewRandomFromReader(rng)).String()
+	tokenOutputId2 := uuid.Must(uuid.NewRandomFromReader(rng)).String()
 
 	// Create keyshares for the token outputs (reuse for both out of convenience)
-	keyshare := createTestSigningKeyshare(t, setup.ctx, setup.sessionCtx.Client)
+	keyshare := createTestSigningKeyshare(t, setup.ctx, rng, setup.sessionCtx.Client)
 
 	// Create or fetch a TokenCreate for the token outputs
 	tokenCreate, err := setup.sessionCtx.Client.TokenCreate.Query().
@@ -336,7 +336,7 @@ func setUpTransferTestData(t *testing.T, setup *testSetupCommon) *transferTestDa
 		SetTokenAmount(testTokenAmountBytes).
 		SetStatus(schematype.TokenOutputStatusCreatedSigned).
 		SetCreatedTransactionOutputVout(0).
-		SetWithdrawRevocationCommitment(keyshare.PublicKey).
+		SetWithdrawRevocationCommitment(keyshare.PublicKey.Serialize()).
 		SetWithdrawBondSats(testWithdrawBondSats).
 		SetWithdrawRelativeBlockLocktime(testWithdrawRelativeBlockLocktime).
 		SetRevocationKeyshare(keyshare).
@@ -352,7 +352,7 @@ func setUpTransferTestData(t *testing.T, setup *testSetupCommon) *transferTestDa
 		SetTokenAmount(testTokenAmountBytes).
 		SetStatus(schematype.TokenOutputStatusCreatedSigned).
 		SetCreatedTransactionOutputVout(1).
-		SetWithdrawRevocationCommitment(keyshare.PublicKey).
+		SetWithdrawRevocationCommitment(keyshare.PublicKey.Serialize()).
 		SetWithdrawBondSats(testWithdrawBondSats).
 		SetWithdrawRelativeBlockLocktime(testWithdrawRelativeBlockLocktime).
 		SetRevocationKeyshare(keyshare).
@@ -423,7 +423,7 @@ func createTransferTokenTransactionProto(t *testing.T, setup *testSetupCommon, t
 				TokenIdentifier:               transferData.tokenIdentifier,
 				OwnerPublicKey:                setup.coordinatorPubKey.Serialize(),
 				TokenAmount:                   padBytes(big.NewInt(50).Bytes(), 16), // Half of original amount
-				RevocationCommitment:          transferData.keyshare.PublicKey,
+				RevocationCommitment:          transferData.keyshare.PublicKey.Serialize(),
 				WithdrawBondSats:              &withdrawBondSats,
 				WithdrawRelativeBlockLocktime: &withdrawRelativeBlockLocktime,
 			},
@@ -432,7 +432,7 @@ func createTransferTokenTransactionProto(t *testing.T, setup *testSetupCommon, t
 				TokenIdentifier:               transferData.tokenIdentifier,
 				OwnerPublicKey:                setup.coordinatorPubKey.Serialize(),
 				TokenAmount:                   padBytes(big.NewInt(50).Bytes(), 16), // Other half
-				RevocationCommitment:          transferData.keyshare.PublicKey,
+				RevocationCommitment:          transferData.keyshare.PublicKey.Serialize(),
 				WithdrawBondSats:              &withdrawBondSats,
 				WithdrawRelativeBlockLocktime: &withdrawRelativeBlockLocktime,
 			},
@@ -482,7 +482,7 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 		SetTokenAmount(padBytes(big.NewInt(50).Bytes(), 16)).
 		SetStatus(schematype.TokenOutputStatusCreatedSigned).
 		SetCreatedTransactionOutputVout(0).
-		SetWithdrawRevocationCommitment(transferData.keyshare.PublicKey).
+		SetWithdrawRevocationCommitment(transferData.keyshare.PublicKey.Serialize()).
 		SetWithdrawBondSats(testWithdrawBondSats).
 		SetWithdrawRelativeBlockLocktime(testWithdrawRelativeBlockLocktime).
 		SetRevocationKeyshare(transferData.keyshare).
@@ -498,7 +498,7 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 		SetTokenAmount(padBytes(big.NewInt(50).Bytes(), 16)).
 		SetStatus(schematype.TokenOutputStatusCreatedSigned).
 		SetCreatedTransactionOutputVout(1).
-		SetWithdrawRevocationCommitment(transferData.keyshare.PublicKey).
+		SetWithdrawRevocationCommitment(transferData.keyshare.PublicKey.Serialize()).
 		SetWithdrawBondSats(testWithdrawBondSats).
 		SetWithdrawRelativeBlockLocktime(testWithdrawRelativeBlockLocktime).
 		SetRevocationKeyshare(transferData.keyshare).
@@ -549,14 +549,14 @@ func createInputTtxoSignatures(t *testing.T, setup *testSetupCommon, finalTxHash
 		return ecdsa.Sign(setup.privKey.ToBTCEC(), payloadHash).Serialize()
 	}
 	coordinatorSigs := make([]*tokenpb.SignatureWithIndex, inputCount)
-	for i := 0; i < inputCount; i++ {
+	for i := range coordinatorSigs {
 		coordinatorSigs[i] = &tokenpb.SignatureWithIndex{
 			Signature:  createSignatureForOperator(setup.coordinatorPubKey.Serialize(), uint32(i)),
 			InputIndex: uint32(i),
 		}
 	}
 	mockOperatorSigs := make([]*tokenpb.SignatureWithIndex, inputCount)
-	for i := 0; i < inputCount; i++ {
+	for i := range mockOperatorSigs {
 		mockOperatorSigs[i] = &tokenpb.SignatureWithIndex{
 			Signature:  createSignatureForOperator(setup.mockOperatorPubKey.Serialize(), uint32(i)),
 			InputIndex: uint32(i),
@@ -601,7 +601,8 @@ func TestCommitTransaction_CreateTransaction_Retry_AfterInternalSignFailed(t *te
 
 func TestCommitTransaction_TransferTransaction_Retry_AfterInternalSignFailed(t *testing.T) {
 	setup := setUpCommonTest(t)
-	transferData := setUpTransferTestData(t, setup)
+	rng := mathrand.NewChaCha8([32]byte{})
+	transferData := setUpTransferTestData(t, rng, setup)
 	tokenTxProto, partialTxHash, finalTxHash := createTransferTokenTransactionProto(t, setup, transferData)
 	setupDBTransferTokenTransactionInternalSignFailedScenario(t, setup, transferData, tokenTxProto, partialTxHash, finalTxHash)
 
@@ -629,7 +630,8 @@ func TestCommitTransaction_TransferTransaction_Retry_AfterInternalSignFailed(t *
 
 func TestCommitTransaction_TransferTransaction_Retry_AfterInternalFinalizeFailed(t *testing.T) {
 	setup := setUpCommonTest(t)
-	transferData := setUpTransferTestData(t, setup)
+	rng := mathrand.NewChaCha8([32]byte{})
+	transferData := setUpTransferTestData(t, rng, setup)
 	tokenTxProto, partialTxHash, finalTxHash := createTransferTokenTransactionProto(t, setup, transferData)
 	setupDBTransferTokenTransactionInternalSignFailedScenario(t, setup, transferData, tokenTxProto, partialTxHash, finalTxHash)
 

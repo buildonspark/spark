@@ -88,9 +88,9 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 			// Create an AVAILABLE signing keyshare to be reserved by prepare handler
 			ks := dbtx.SigningKeyshare.Create().
 				SetSecretShare(make([]byte, 32)).
-				SetPublicKey(issuerPriv.Public().Serialize()).
+				SetPublicKey(issuerPriv.Public()).
 				SetStatus(st.KeyshareStatusAvailable).
-				SetPublicShares(map[string][]byte{}).
+				SetPublicShares(map[string]keys.Public{}).
 				SetMinSigners(1).
 				SetCoordinatorIndex(1).
 				SaveX(ctx)
@@ -116,7 +116,7 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 						OwnerPublicKey:       issuerPriv.Public().Serialize(),
 						TokenIdentifier:      tokenCreate.TokenIdentifier,
 						TokenAmount:          []byte{0, 0, 0, 0, 0, 0, 0, 10},
-						RevocationCommitment: ks.PublicKey,
+						RevocationCommitment: ks.PublicKey.Serialize(),
 					},
 				},
 				ExpiryTime:             timestamppb.New(now.Add(24 * time.Hour)),

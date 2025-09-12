@@ -68,8 +68,8 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		signingKeyshare, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
 			SetSecretShare(testSecretKey.Serialize()).
-			SetPublicShares(map[string][]byte{"test": testPublicKey.Serialize()}).
-			SetPublicKey(testPublicKey.Serialize()).
+			SetPublicShares(map[string]keys.Public{"test": testPublicKey}).
+			SetPublicKey(testPublicKey).
 			SetMinSigners(2).
 			SetCoordinatorIndex(0).
 			Save(ctx)
@@ -129,8 +129,8 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		signingKeyshare, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
 			SetSecretShare(testSecretKey2.Serialize()).
-			SetPublicShares(map[string][]byte{"test": testPublicKey2.Serialize()}).
-			SetPublicKey(testPublicKey2.Serialize()).
+			SetPublicShares(map[string]keys.Public{"test": testPublicKey2}).
+			SetPublicKey(testPublicKey2).
 			SetMinSigners(2).
 			SetCoordinatorIndex(0).
 			Save(ctx)
@@ -220,8 +220,8 @@ func TestGenerateDepositAddress(t *testing.T) {
 		signingKeyshare, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
 			SetSecretShare(testSecretKey.Serialize()).
-			SetPublicShares(map[string][]byte{"test": testSecretKey.Public().Serialize()}).
-			SetPublicKey(operatorPubKey2.Serialize()).
+			SetPublicShares(map[string]keys.Public{"test": testSecretKey.Public()}).
+			SetPublicKey(operatorPubKey2).
 			SetMinSigners(2).
 			SetCoordinatorIndex(0).
 			Save(ctx)
@@ -344,13 +344,14 @@ func TestGenerateStaticDepositAddressReturnsDefaultAddress(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
 	testSigningPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	testIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	secret := keys.MustGeneratePrivateKeyFromRand(rng)
 
 	keyshare1Key := keys.MustGeneratePrivateKeyFromRand(rng)
 	signingKeyshare1, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare([]byte("test_secret_share1")).
-		SetPublicShares(map[string][]byte{"test": []byte("test_public_share1")}).
-		SetPublicKey(keyshare1Key.Public().Serialize()).
+		SetSecretShare(secret.Serialize()).
+		SetPublicShares(map[string]keys.Public{"test": secret.Public()}).
+		SetPublicKey(keyshare1Key.Public()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
 		Save(ctx)
@@ -371,11 +372,12 @@ func TestGenerateStaticDepositAddressReturnsDefaultAddress(t *testing.T) {
 	require.NoError(t, err)
 
 	keyshare2Key := keys.MustGeneratePrivateKeyFromRand(rng)
+	secret2 := keys.MustGeneratePrivateKeyFromRand(rng)
 	signingKeyshare2, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare([]byte("test_secret_share2")).
-		SetPublicShares(map[string][]byte{"test": []byte("test_public_share2")}).
-		SetPublicKey(keyshare2Key.Public().Serialize()).
+		SetSecretShare(secret2.Serialize()).
+		SetPublicShares(map[string]keys.Public{"test": secret2.Public()}).
+		SetPublicKey(keyshare2Key.Public()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
 		Save(ctx)
@@ -438,8 +440,8 @@ func TestGetUtxosFromAddress(t *testing.T) {
 	signingKeyshare, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
 		SetSecretShare(secretShare.Serialize()).
-		SetPublicShares(map[string][]byte{"test": secretShare.Public().Serialize()}).
-		SetPublicKey(secretShare.Public().Serialize()).
+		SetPublicShares(map[string]keys.Public{"test": secretShare.Public()}).
+		SetPublicKey(secretShare.Public()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(0).
 		Save(ctx)

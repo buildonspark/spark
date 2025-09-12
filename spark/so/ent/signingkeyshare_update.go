@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
@@ -56,14 +57,22 @@ func (sku *SigningKeyshareUpdate) SetSecretShare(b []byte) *SigningKeyshareUpdat
 }
 
 // SetPublicShares sets the "public_shares" field.
-func (sku *SigningKeyshareUpdate) SetPublicShares(m map[string][]uint8) *SigningKeyshareUpdate {
+func (sku *SigningKeyshareUpdate) SetPublicShares(m map[string]keys.Public) *SigningKeyshareUpdate {
 	sku.mutation.SetPublicShares(m)
 	return sku
 }
 
 // SetPublicKey sets the "public_key" field.
-func (sku *SigningKeyshareUpdate) SetPublicKey(b []byte) *SigningKeyshareUpdate {
-	sku.mutation.SetPublicKey(b)
+func (sku *SigningKeyshareUpdate) SetPublicKey(k keys.Public) *SigningKeyshareUpdate {
+	sku.mutation.SetPublicKey(k)
+	return sku
+}
+
+// SetNillablePublicKey sets the "public_key" field if the given value is not nil.
+func (sku *SigningKeyshareUpdate) SetNillablePublicKey(k *keys.Public) *SigningKeyshareUpdate {
+	if k != nil {
+		sku.SetPublicKey(*k)
+	}
 	return sku
 }
 
@@ -252,14 +261,22 @@ func (skuo *SigningKeyshareUpdateOne) SetSecretShare(b []byte) *SigningKeyshareU
 }
 
 // SetPublicShares sets the "public_shares" field.
-func (skuo *SigningKeyshareUpdateOne) SetPublicShares(m map[string][]uint8) *SigningKeyshareUpdateOne {
+func (skuo *SigningKeyshareUpdateOne) SetPublicShares(m map[string]keys.Public) *SigningKeyshareUpdateOne {
 	skuo.mutation.SetPublicShares(m)
 	return skuo
 }
 
 // SetPublicKey sets the "public_key" field.
-func (skuo *SigningKeyshareUpdateOne) SetPublicKey(b []byte) *SigningKeyshareUpdateOne {
-	skuo.mutation.SetPublicKey(b)
+func (skuo *SigningKeyshareUpdateOne) SetPublicKey(k keys.Public) *SigningKeyshareUpdateOne {
+	skuo.mutation.SetPublicKey(k)
+	return skuo
+}
+
+// SetNillablePublicKey sets the "public_key" field if the given value is not nil.
+func (skuo *SigningKeyshareUpdateOne) SetNillablePublicKey(k *keys.Public) *SigningKeyshareUpdateOne {
+	if k != nil {
+		skuo.SetPublicKey(*k)
+	}
 	return skuo
 }
 

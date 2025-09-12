@@ -46,12 +46,7 @@ func TweakLeafKeyUpdate(ctx context.Context, leaf *ent.TreeNode, req *pb.SendLea
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse verifying public key: %w", err)
 	}
-	tweakedPubKey, err := keys.ParsePublicKey(keyshare.PublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse tweaked public key: %w", err)
-	}
 
-	// Update leaf
-	signingPubkey := verifyingPubKey.Sub(tweakedPubKey)
+	signingPubkey := verifyingPubKey.Sub(keyshare.PublicKey)
 	return leaf.Update().SetOwnerSigningPubkey(signingPubkey.Serialize()), nil
 }

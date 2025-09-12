@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 )
@@ -66,14 +67,14 @@ func (skc *SigningKeyshareCreate) SetSecretShare(b []byte) *SigningKeyshareCreat
 }
 
 // SetPublicShares sets the "public_shares" field.
-func (skc *SigningKeyshareCreate) SetPublicShares(m map[string][]uint8) *SigningKeyshareCreate {
+func (skc *SigningKeyshareCreate) SetPublicShares(m map[string]keys.Public) *SigningKeyshareCreate {
 	skc.mutation.SetPublicShares(m)
 	return skc
 }
 
 // SetPublicKey sets the "public_key" field.
-func (skc *SigningKeyshareCreate) SetPublicKey(b []byte) *SigningKeyshareCreate {
-	skc.mutation.SetPublicKey(b)
+func (skc *SigningKeyshareCreate) SetPublicKey(k keys.Public) *SigningKeyshareCreate {
+	skc.mutation.SetPublicKey(k)
 	return skc
 }
 
@@ -352,7 +353,7 @@ func (u *SigningKeyshareUpsert) UpdateSecretShare() *SigningKeyshareUpsert {
 }
 
 // SetPublicShares sets the "public_shares" field.
-func (u *SigningKeyshareUpsert) SetPublicShares(v map[string][]uint8) *SigningKeyshareUpsert {
+func (u *SigningKeyshareUpsert) SetPublicShares(v map[string]keys.Public) *SigningKeyshareUpsert {
 	u.Set(signingkeyshare.FieldPublicShares, v)
 	return u
 }
@@ -364,7 +365,7 @@ func (u *SigningKeyshareUpsert) UpdatePublicShares() *SigningKeyshareUpsert {
 }
 
 // SetPublicKey sets the "public_key" field.
-func (u *SigningKeyshareUpsert) SetPublicKey(v []byte) *SigningKeyshareUpsert {
+func (u *SigningKeyshareUpsert) SetPublicKey(v keys.Public) *SigningKeyshareUpsert {
 	u.Set(signingkeyshare.FieldPublicKey, v)
 	return u
 }
@@ -505,7 +506,7 @@ func (u *SigningKeyshareUpsertOne) UpdateSecretShare() *SigningKeyshareUpsertOne
 }
 
 // SetPublicShares sets the "public_shares" field.
-func (u *SigningKeyshareUpsertOne) SetPublicShares(v map[string][]uint8) *SigningKeyshareUpsertOne {
+func (u *SigningKeyshareUpsertOne) SetPublicShares(v map[string]keys.Public) *SigningKeyshareUpsertOne {
 	return u.Update(func(s *SigningKeyshareUpsert) {
 		s.SetPublicShares(v)
 	})
@@ -519,7 +520,7 @@ func (u *SigningKeyshareUpsertOne) UpdatePublicShares() *SigningKeyshareUpsertOn
 }
 
 // SetPublicKey sets the "public_key" field.
-func (u *SigningKeyshareUpsertOne) SetPublicKey(v []byte) *SigningKeyshareUpsertOne {
+func (u *SigningKeyshareUpsertOne) SetPublicKey(v keys.Public) *SigningKeyshareUpsertOne {
 	return u.Update(func(s *SigningKeyshareUpsert) {
 		s.SetPublicKey(v)
 	})
@@ -835,7 +836,7 @@ func (u *SigningKeyshareUpsertBulk) UpdateSecretShare() *SigningKeyshareUpsertBu
 }
 
 // SetPublicShares sets the "public_shares" field.
-func (u *SigningKeyshareUpsertBulk) SetPublicShares(v map[string][]uint8) *SigningKeyshareUpsertBulk {
+func (u *SigningKeyshareUpsertBulk) SetPublicShares(v map[string]keys.Public) *SigningKeyshareUpsertBulk {
 	return u.Update(func(s *SigningKeyshareUpsert) {
 		s.SetPublicShares(v)
 	})
@@ -849,7 +850,7 @@ func (u *SigningKeyshareUpsertBulk) UpdatePublicShares() *SigningKeyshareUpsertB
 }
 
 // SetPublicKey sets the "public_key" field.
-func (u *SigningKeyshareUpsertBulk) SetPublicKey(v []byte) *SigningKeyshareUpsertBulk {
+func (u *SigningKeyshareUpsertBulk) SetPublicKey(v keys.Public) *SigningKeyshareUpsertBulk {
 	return u.Update(func(s *SigningKeyshareUpsert) {
 		s.SetPublicKey(v)
 	})

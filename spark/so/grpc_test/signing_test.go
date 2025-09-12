@@ -41,15 +41,12 @@ func TestFrostSign(t *testing.T) {
 	operatorKeyShares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
 	require.NoError(t, err)
 	operatorKeyShare := operatorKeyShares[0]
-	operatorPubKey, err := keys.ParsePublicKey(operatorKeyShare.PublicKey)
-	require.NoError(t, err)
-
 	// Step 3: Get user key pubkey
 	privKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	userPubKey := privKey.Public()
 
 	// Step 4: Calculate verifying key
-	verifyingKey := operatorPubKey.Add(userPubKey)
+	verifyingKey := operatorKeyShare.PublicKey.Add(userPubKey)
 
 	// User identifier will not be used in this test, so we can use any string.
 	userIdentifier := "0000000000000000000000000000000000000000000000000000000000000063"
@@ -65,11 +62,10 @@ func TestFrostSign(t *testing.T) {
 
 	// Step 5: Generate user side of nonce.
 	hidingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
-
 	bindingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
-
 	hidingPubBytes := hidingPriv.Public().Serialize()
 	bindingPubBytes := bindingPriv.Public().Serialize()
+
 	userNonceCommitment, err := objects.NewSigningCommitment(bindingPubBytes, hidingPubBytes)
 	require.NoError(t, err)
 	userNonce, err := objects.NewSigningNonce(bindingPriv.Serialize(), hidingPriv.Serialize())
@@ -197,15 +193,12 @@ func TestFrostWithoutUserSign(t *testing.T) {
 	operatorKeyShares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
 	require.NoError(t, err)
 	operatorKeyShare := operatorKeyShares[0]
-	operatorPubKey, err := keys.ParsePublicKey(operatorKeyShare.PublicKey)
-	require.NoError(t, err)
-
 	// Step 3: Operator signing
 	signingJobs := []*helper.SigningJob{{
 		JobID:             uuid.New().String(),
 		SigningKeyshareID: operatorKeyShare.ID,
 		Message:           msgHash[:],
-		VerifyingKey:      &operatorPubKey,
+		VerifyingKey:      &operatorKeyShare.PublicKey,
 		UserCommitment:    nil,
 	}}
 	signingResult, err := helper.SignFrost(ctx, config, signingJobs)
@@ -229,7 +222,7 @@ func TestFrostWithoutUserSign(t *testing.T) {
 		Message:         msgHash[:],
 		SignatureShares: signatureShares,
 		PublicShares:    publicKeys,
-		VerifyingKey:    operatorPubKey.Serialize(),
+		VerifyingKey:    operatorKeyShare.PublicKey.Serialize(),
 		Commitments:     operatorCommitmentsProto,
 	})
 	require.NoError(t, err)
@@ -271,23 +264,20 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 	operatorKeyShares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
 	require.NoError(t, err)
 	operatorKeyShare := operatorKeyShares[0]
-	operatorPubKey, err := keys.ParsePublicKey(operatorKeyShare.PublicKey)
-	require.NoError(t, err)
 
 	// Step 3: Get user key pubkey
 	privKey := keys.MustGeneratePrivateKeyFromRand(rng)
-	userPubKey := privKey.Public()
 
 	// Step 4: Calculate verifying key
-	verifyingKey := operatorPubKey.Add(userPubKey)
+	verifyingKey := operatorKeyShare.PublicKey.Add(privKey.Public())
 
 	// User identifier will not be used in this test, so we can use any string.
 	userIdentifier := "0000000000000000000000000000000000000000000000000000000000000063"
-	userKeyPackage := pbfrost.KeyPackage{
+	userKeyPackage := &pbfrost.KeyPackage{
 		Identifier:  userIdentifier,
 		SecretShare: privKey.Serialize(),
 		PublicShares: map[string][]byte{
-			userIdentifier: userPubKey.Serialize(),
+			userIdentifier: privKey.Public().Serialize(),
 		},
 		PublicKey:  verifyingKey.Serialize(),
 		MinSigners: uint32(config.Threshold),
@@ -295,11 +285,10 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 
 	// Step 5: Generate user side of nonce.
 	hidingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
-
 	bindingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
-
 	hidingPubBytes := hidingPriv.Public().Serialize()
 	bindingPubBytes := bindingPriv.Public().Serialize()
+
 	userNonceCommitment, err := objects.NewSigningCommitment(bindingPubBytes, hidingPubBytes)
 	require.NoError(t, err)
 	userNonce, err := objects.NewSigningNonce(bindingPriv.Serialize(), hidingPriv.Serialize())
@@ -337,7 +326,7 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 	userSigningJobs := []*pbfrost.FrostSigningJob{{
 		JobId:            userJobID,
 		Message:          msgHash[:],
-		KeyPackage:       &userKeyPackage,
+		KeyPackage:       userKeyPackage,
 		VerifyingKey:     verifyingKey.Serialize(),
 		Nonce:            userNonceProto,
 		Commitments:      operatorCommitmentsProto,
@@ -360,7 +349,7 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 		VerifyingKey:       verifyingKey.Serialize(),
 		Commitments:        operatorCommitmentsProto,
 		UserCommitments:    userNonceCommitmentProto,
-		UserPublicKey:      userPubKey.Serialize(),
+		UserPublicKey:      privKey.Public().Serialize(),
 		UserSignatureShare: userSignatures.Results[userJobID].SignatureShare,
 		AdaptorPublicKey:   adaptorPub.Serialize(),
 	})
@@ -412,22 +401,18 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 
 	ctx, _ := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
-	msg := []byte("hello")
-	msgHash := sha256.Sum256(msg)
+	msgHash := sha256.Sum256([]byte("hello"))
 
 	// Step 2: Get operator key share
 	operatorKeyShares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
 	require.NoError(t, err)
 	operatorKeyShare := operatorKeyShares[0]
-	operatorPubKey, err := keys.ParsePublicKey(operatorKeyShare.PublicKey)
-	require.NoError(t, err)
 
 	// Step 3: Get user key pubkey
 	privKey := keys.MustGeneratePrivateKeyFromRand(rng)
-	userPubKey := privKey.Public()
 
 	// Step 4: Calculate verifying key
-	verifyingKey := operatorPubKey.Add(userPubKey)
+	verifyingKey := operatorKeyShare.PublicKey.Add(privKey.Public())
 
 	// User identifier will not be used in this test, so we can use any string.
 	userIdentifier := "0000000000000000000000000000000000000000000000000000000000000063"
@@ -435,7 +420,7 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 		Identifier:  userIdentifier,
 		SecretShare: privKey.Serialize(),
 		PublicShares: map[string][]byte{
-			userIdentifier: userPubKey.Serialize(),
+			userIdentifier: privKey.Public().Serialize(),
 		},
 		PublicKey:  verifyingKey.Serialize(),
 		MinSigners: uint32(config.Threshold),
@@ -444,9 +429,9 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 	// Step 5: Generate user side of nonce.
 	hidingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
 	bindingPriv := keys.MustGeneratePrivateKeyFromRand(rng)
-
 	hidingPubBytes := hidingPriv.Public().Serialize()
 	bindingPubBytes := bindingPriv.Public().Serialize()
+
 	userNonceCommitment, err := objects.NewSigningCommitment(bindingPubBytes, hidingPubBytes)
 	require.NoError(t, err)
 	userNonce, err := objects.NewSigningNonce(bindingPriv.Serialize(), hidingPriv.Serialize())
@@ -523,7 +508,7 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 		Role:            pbfrost.SigningRole_USER,
 		Message:         msgHash[:],
 		SignatureShare:  userSignatures.Results[userJobID].SignatureShare,
-		PublicShare:     userPubKey.Serialize(),
+		PublicShare:     privKey.Public().Serialize(),
 		VerifyingKey:    verifyingKey.Serialize(),
 		Commitments:     operatorCommitmentsProto,
 		UserCommitments: userNonceCommitmentProto,
@@ -540,7 +525,7 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 		VerifyingKey:       verifyingKey.Serialize(),
 		Commitments:        operatorCommitmentsProto,
 		UserCommitments:    userNonceCommitmentProto,
-		UserPublicKey:      userPubKey.Serialize(),
+		UserPublicKey:      privKey.Public().Serialize(),
 		UserSignatureShare: userSignatures.Results[userJobID].SignatureShare,
 	})
 	require.NoError(t, err)

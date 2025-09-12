@@ -3,6 +3,7 @@ package ent
 import (
 	"context"
 	"fmt"
+
 	"github.com/lightsparkdev/spark/common/keys"
 )
 
@@ -28,9 +29,5 @@ func GetEntityDkgKeyPublicKey(ctx context.Context, db *Client) (keys.Public, err
 		return keys.Public{}, fmt.Errorf("failed to get signing keyshare from entity DKG key: %w", err)
 	}
 
-	pubKey, err := keys.ParsePublicKey(signingKeyshare.PublicKey)
-	if err != nil {
-		return keys.Public{}, fmt.Errorf("failed to parse entity DKG key public key: %w", err)
-	}
-	return pubKey, nil
+	return signingKeyshare.PublicKey, nil
 }

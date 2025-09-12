@@ -253,8 +253,8 @@ func seedTreeNode(t *testing.T, ctx context.Context, network st.Network, opts ..
 	ks, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
 		SetSecretShare(irrelevantKey.Serialize()).
-		SetPublicShares(map[string][]uint8{}).
-		SetPublicKey(irrelevantKey.Public().Serialize()).
+		SetPublicShares(map[string]keys.Public{}).
+		SetPublicKey(irrelevantKey.Public()).
 		SetMinSigners(2).
 		SetCoordinatorIndex(1).
 		Save(ctx)

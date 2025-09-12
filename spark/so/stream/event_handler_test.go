@@ -166,11 +166,13 @@ func TestMultipleListenersReceiveNotification(t *testing.T) {
 
 	time.Sleep(200 * time.Millisecond)
 
+	secret := keys.MustGeneratePrivateKeyFromRand(rng)
+	pubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	signingKeyshare, err := dbClient.SigningKeyshare.Create().
 		SetStatus(schematype.KeyshareStatusAvailable).
-		SetSecretShare([]byte("test-secret-share")).
-		SetPublicShares(map[string][]byte{"so1": []byte("public-key-1")}).
-		SetPublicKey([]byte("test-public-key")).
+		SetSecretShare(secret.Serialize()).
+		SetPublicShares(map[string]keys.Public{"so1": secret.Public()}).
+		SetPublicKey(pubKey).
 		SetMinSigners(1).
 		SetCoordinatorIndex(0).
 		Save(t.Context())
@@ -181,7 +183,7 @@ func TestMultipleListenersReceiveNotification(t *testing.T) {
 		SetOwnerSigningPubkey(identityKey).
 		SetSigningKeyshare(signingKeyshare).
 		SetAddress("test-address").
-		SetNodeID(uuid.New()).
+		SetNodeID(uuid.Must(uuid.NewRandomFromReader(rng))).
 		Save(t.Context())
 	require.NoError(t, err)
 

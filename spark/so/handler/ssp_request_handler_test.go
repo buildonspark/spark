@@ -70,11 +70,12 @@ func TestGetStuckLightningPayments(t *testing.T) {
 		}
 
 		// Create a signing keyshare for the leaf node
+		secret := keys.MustGeneratePrivateKeyFromRand(rng)
 		keyshare, err := dbTx.SigningKeyshare.Create().
-			SetPublicShares(map[string][]byte{"key": []byte("value")}).
+			SetPublicShares(map[string]keys.Public{"key": secret.Public()}).
 			SetStatus(st.KeyshareStatusAvailable).
-			SetSecretShare([]byte("secret_share")).
-			SetPublicKey(publicKey.Serialize()).
+			SetSecretShare(secret.Serialize()).
+			SetPublicKey(publicKey).
 			SetMinSigners(2).
 			SetCoordinatorIndex(1).
 			Save(ctx)

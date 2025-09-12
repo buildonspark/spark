@@ -7,6 +7,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -72,7 +73,7 @@ func SecretShare(v []byte) predicate.SigningKeyshare {
 }
 
 // PublicKey applies equality check predicate on the "public_key" field. It's identical to PublicKeyEQ.
-func PublicKey(v []byte) predicate.SigningKeyshare {
+func PublicKey(v keys.Public) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldEQ(FieldPublicKey, v))
 }
 
@@ -237,42 +238,42 @@ func SecretShareLTE(v []byte) predicate.SigningKeyshare {
 }
 
 // PublicKeyEQ applies the EQ predicate on the "public_key" field.
-func PublicKeyEQ(v []byte) predicate.SigningKeyshare {
+func PublicKeyEQ(v keys.Public) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldEQ(FieldPublicKey, v))
 }
 
 // PublicKeyNEQ applies the NEQ predicate on the "public_key" field.
-func PublicKeyNEQ(v []byte) predicate.SigningKeyshare {
+func PublicKeyNEQ(v keys.Public) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldNEQ(FieldPublicKey, v))
 }
 
 // PublicKeyIn applies the In predicate on the "public_key" field.
-func PublicKeyIn(vs ...[]byte) predicate.SigningKeyshare {
+func PublicKeyIn(vs ...keys.Public) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldIn(FieldPublicKey, vs...))
 }
 
 // PublicKeyNotIn applies the NotIn predicate on the "public_key" field.
-func PublicKeyNotIn(vs ...[]byte) predicate.SigningKeyshare {
+func PublicKeyNotIn(vs ...keys.Public) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldNotIn(FieldPublicKey, vs...))
 }
 
 // PublicKeyGT applies the GT predicate on the "public_key" field.
-func PublicKeyGT(v []byte) predicate.SigningKeyshare {
+func PublicKeyGT(v keys.Public) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldGT(FieldPublicKey, v))
 }
 
 // PublicKeyGTE applies the GTE predicate on the "public_key" field.
-func PublicKeyGTE(v []byte) predicate.SigningKeyshare {
+func PublicKeyGTE(v keys.Public) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldGTE(FieldPublicKey, v))
 }
 
 // PublicKeyLT applies the LT predicate on the "public_key" field.
-func PublicKeyLT(v []byte) predicate.SigningKeyshare {
+func PublicKeyLT(v keys.Public) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldLT(FieldPublicKey, v))
 }
 
 // PublicKeyLTE applies the LTE predicate on the "public_key" field.
-func PublicKeyLTE(v []byte) predicate.SigningKeyshare {
+func PublicKeyLTE(v keys.Public) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldLTE(FieldPublicKey, v))
 }
 

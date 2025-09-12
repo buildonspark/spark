@@ -37,26 +37,17 @@ func (sk *SigningKeyshare) TweakKeyShare(ctx context.Context, shareTweak keys.Pr
 		return nil, fmt.Errorf("unable to parse secret share: %w", err)
 	}
 	newSecretShare := secretShare.Add(shareTweak)
-
-	pubKey, err := keys.ParsePublicKey(sk.PublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse public key: %w", err)
-	}
-	newPubKey := pubKey.Add(pubKeyTweak)
+	newPubKey := sk.PublicKey.Add(pubKeyTweak)
 
 	newPublicShares := make(map[string]keys.Public)
-	for id, publicShareBytes := range sk.PublicShares {
-		pubShare, err := keys.ParsePublicKey(publicShareBytes)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse public share %s: %w", id, err)
-		}
+	for id, pubShare := range sk.PublicShares {
 		newPublicShares[id] = pubShare.Add(pubKeySharesTweak[id])
 	}
 
 	return sk.Update().
 		SetSecretShare(newSecretShare.Serialize()).
-		SetPublicKey(newPubKey.Serialize()).
-		SetPublicShares(keys.ToBytesMap(newPublicShares)).
+		SetPublicKey(newPubKey).
+		SetPublicShares(newPublicShares).
 		Save(ctx)
 }
 
@@ -70,8 +61,8 @@ func (sk *SigningKeyshare) MarshalProto() *pb.SigningKeyshare {
 	return &pb.SigningKeyshare{
 		OwnerIdentifiers: ownerIdentifiers,
 		Threshold:        uint32(sk.MinSigners),
-		PublicKey:        sk.PublicKey,
-		PublicShares:     sk.PublicShares,
+		PublicKey:        sk.PublicKey.Serialize(),
+		PublicShares:     keys.ToBytesMap(sk.PublicShares),
 		UpdatedTime:      timestamppb.New(sk.UpdateTime),
 	}
 }
@@ -235,8 +226,8 @@ func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID)
 	keyPackage := &pbfrost.KeyPackage{
 		Identifier:   config.Identifier,
 		SecretShare:  keyshare.SecretShare,
-		PublicShares: keyshare.PublicShares,
-		PublicKey:    keyshare.PublicKey,
+		PublicShares: keys.ToBytesMap(keyshare.PublicShares),
+		PublicKey:    keyshare.PublicKey.Serialize(),
 		MinSigners:   uint32(keyshare.MinSigners),
 	}
 
@@ -265,8 +256,8 @@ func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.U
 		keyPackages[keyshare.ID] = &pbfrost.KeyPackage{
 			Identifier:   config.Identifier,
 			SecretShare:  keyshare.SecretShare,
-			PublicShares: keyshare.PublicShares,
-			PublicKey:    keyshare.PublicKey,
+			PublicShares: keys.ToBytesMap(keyshare.PublicShares),
+			PublicKey:    keyshare.PublicKey.Serialize(),
 			MinSigners:   uint32(keyshare.MinSigners),
 		}
 	}
@@ -330,19 +321,10 @@ func sumOfSigningKeyshares(keyshares []*SigningKeyshare) (*SigningKeyshare, erro
 			return nil, err
 		}
 		resultKeyshares.SecretShare = sum
+		resultKeyshares.PublicKey = resultKeyshares.PublicKey.Add(keyshare.PublicKey)
 
-		verifySum, err := common.AddPublicKeys(resultKeyshares.PublicKey, keyshare.PublicKey)
-		if err != nil {
-			return nil, err
-		}
-		resultKeyshares.PublicKey = verifySum
-
-		for i, publicShare := range resultKeyshares.PublicShares {
-			newShare, err := common.AddPublicKeys(publicShare, keyshare.PublicShares[i])
-			if err != nil {
-				return nil, err
-			}
-			resultKeyshares.PublicShares[i] = newShare
+		for shareID, publicShare := range resultKeyshares.PublicShares {
+			resultKeyshares.PublicShares[shareID] = publicShare.Add(keyshare.PublicShares[shareID])
 		}
 	}
 
@@ -384,26 +366,16 @@ func CalculateAndStoreLastKey(ctx context.Context, _ *so.Config, target *Signing
 		return nil, fmt.Errorf("last key verification failed")
 	}
 
-	verifyingKey, err := common.SubtractPublicKeys(target.PublicKey, sumKeyshare.PublicKey)
-	if err != nil {
-		return nil, err
-	}
+	verifyingKey := target.PublicKey.Sub(sumKeyshare.PublicKey)
+	verifyVerifyingKey := keyshares[0].PublicKey.Add(verifyingKey)
 
-	verifyVerifyingKey, err := common.AddPublicKeys(keyshares[0].PublicKey, verifyingKey)
-	if err != nil {
-		return nil, err
-	}
-	if !bytes.Equal(verifyVerifyingKey, target.PublicKey) {
+	if !verifyVerifyingKey.Equals(target.PublicKey) {
 		return nil, fmt.Errorf("verifying key verification failed")
 	}
 
-	publicShares := make(map[string][]byte)
+	publicShares := make(map[string]keys.Public)
 	for i, publicShare := range target.PublicShares {
-		newShare, err := common.SubtractPublicKeys(publicShare, sumKeyshare.PublicShares[i])
-		if err != nil {
-			return nil, err
-		}
-		publicShares[i] = newShare
+		publicShares[i] = publicShare.Sub(sumKeyshare.PublicShares[i])
 	}
 
 	db, err := GetDbFromContext(ctx)

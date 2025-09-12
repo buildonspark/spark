@@ -249,14 +249,9 @@ func (h FixKeyshareHandler) createSender(args FixKeyshareArgs) (*secretsharing.I
 	var pubShareEvals []polynomial.PointEval
 
 	for goodIdentifier, goodOperator := range args.goodOperators {
-		publicShareCompressed, exists := args.badKeyshare.PublicShares[goodIdentifier]
+		sharePubKey, exists := args.badKeyshare.PublicShares[goodIdentifier]
 		if !exists {
 			return nil, fmt.Errorf("bad keyshare ID %s is not a known public share", goodIdentifier)
-		}
-
-		sharePubKey, err := keys.ParsePublicKey(publicShareCompressed)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse public key share for operator %s: %w", goodIdentifier, err)
 		}
 
 		sharePoint := curve.NewPointFromPublicKey(sharePubKey)
@@ -471,8 +466,8 @@ func (h FixKeyshareHandler) updateWithFixed(ctx context.Context, outPayload *sec
 
 	_, err = db.SigningKeyshare.UpdateOneID(badKeyshare.ID).
 		SetSecretShare(outPayload.SIssue.Serialize()).
-		SetPublicShares(keys.ToBytesMap(pubShares)).
-		SetPublicKey(pubKey.Serialize()).
+		SetPublicShares(pubShares).
+		SetPublicKey(pubKey).
 		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to update keyshare: %w", err)

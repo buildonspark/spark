@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
+	"math/rand/v2"
+	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so"
-
-	"fmt"
-	"math/rand/v2"
-	"testing"
 
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
@@ -126,9 +125,9 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 	aliceSecret := keys.MustGeneratePrivateKeyFromRand(rng)
 	aliceSigningKeyshare := tx.SigningKeyshare.Create().
 		SetSecretShare(aliceSecret.Serialize()).
-		SetPublicKey(aliceSecret.Public().Serialize()).
+		SetPublicKey(aliceSecret.Public()).
 		SetStatus(st.KeyshareStatusInUse).
-		SetPublicShares(map[string][]byte{}).
+		SetPublicShares(map[string]keys.Public{}).
 		SetMinSigners(1).
 		SetCoordinatorIndex(1).
 		SaveX(ctx)
@@ -136,9 +135,9 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 	bobSecret := keys.MustGeneratePrivateKeyFromRand(rng)
 	bobSigningKeyshare := tx.SigningKeyshare.Create().
 		SetSecretShare(bobSecret.Serialize()).
-		SetPublicKey(bobSecret.Public().Serialize()).
+		SetPublicKey(bobSecret.Public()).
 		SetStatus(st.KeyshareStatusInUse).
-		SetPublicShares(map[string][]byte{}).
+		SetPublicShares(map[string]keys.Public{}).
 		SetMinSigners(1).
 		SetCoordinatorIndex(1).
 		SaveX(ctx)
@@ -146,9 +145,9 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 	carolSecret := keys.MustGeneratePrivateKeyFromRand(rng)
 	carolSigningKeyshare := tx.SigningKeyshare.Create().
 		SetSecretShare(carolSecret.Serialize()).
-		SetPublicKey(carolSecret.Public().Serialize()).
+		SetPublicKey(carolSecret.Public()).
 		SetStatus(st.KeyshareStatusInUse).
-		SetPublicShares(map[string][]byte{}).
+		SetPublicShares(map[string]keys.Public{}).
 		SetMinSigners(1).
 		SetCoordinatorIndex(1).
 		SaveX(ctx)

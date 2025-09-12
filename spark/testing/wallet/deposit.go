@@ -45,7 +45,7 @@ func validateDepositAddress(config *TestWalletConfig, address *pb.Address, signi
 		return err
 	}
 	operatorPubKey := verifyingKey.Sub(signingPubKey)
-	msg := common.ProofOfPossessionMessageHashForDepositAddress(config.IdentityPublicKey().Serialize(), operatorPubKey.Serialize(), []byte(address.Address))
+	msg := common.ProofOfPossessionMessageHashForDepositAddress(config.IdentityPublicKey(), operatorPubKey, []byte(address.Address))
 	sig, err := schnorr.ParseSignature(address.DepositAddressProof.ProofOfPossessionSignature)
 	if err != nil {
 		return err

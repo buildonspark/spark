@@ -812,8 +812,8 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 		keyshare, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusInUse).
 			SetSecretShare(secretShare).
-			SetPublicShares(map[string][]byte{"operator1": wrongKey.Serialize()}).
-			SetPublicKey(sessionIdentityKey.Public().Serialize()).
+			SetPublicShares(map[string]keys.Public{"operator1": wrongKey}).
+			SetPublicKey(sessionIdentityKey.Public()).
 			SetMinSigners(2).
 			SetCoordinatorIndex(1).
 			Save(authenticatedCtx)
@@ -888,6 +888,7 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	lightningHandler := NewLightningHandler(config)
 
 	validPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	paymentHash := []byte("test_payment_hash_32_bytes_long_")
 
 	tx, err := ent.GetDbFromContext(ctx)
@@ -905,8 +906,8 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	keyshare, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusInUse).
 		SetSecretShare([]byte("test_secret_share_32_bytes_long_")).
-		SetPublicShares(map[string][]byte{"operator1": validPubKey.Serialize()}).
-		SetPublicKey(validPubKey.Serialize()).
+		SetPublicShares(map[string]keys.Public{"operator1": validPubKey}).
+		SetPublicKey(validPubKey).
 		SetMinSigners(2).
 		SetCoordinatorIndex(1).
 		Save(ctx)
@@ -948,7 +949,7 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 		SetID(nodeID).
 		SetValue(500). // This is the value in the tree node, but RawTx will also have 500 sats
 		SetStatus(st.TreeNodeStatusAvailable).
-		SetVerifyingPubkey(validPubKey.Serialize()).
+		SetVerifyingPubkey(verifyingPubKey.Serialize()).
 		SetOwnerIdentityPubkey(validPubKey.Serialize()).
 		SetOwnerSigningPubkey(validPubKey.Serialize()).
 		SetRawTx(mockTx).

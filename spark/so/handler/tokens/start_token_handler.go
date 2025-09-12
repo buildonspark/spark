@@ -485,7 +485,7 @@ func (h *StartTokenTransactionHandler) constructFinalTokenTransaction(
 				}
 				idStr := id.String()
 				output.Id = &idStr
-				output.RevocationCommitment = keyshares[i].PublicKey
+				output.RevocationCommitment = keyshares[i].PublicKey.Serialize()
 				withdrawalBondSats := h.config.Lrc20Configs[network.String()].WithdrawBondSats
 				output.WithdrawBondSats = &withdrawalBondSats
 				withdrawRelativeBlockLocktime := h.config.Lrc20Configs[network.String()].WithdrawRelativeBlockLocktime

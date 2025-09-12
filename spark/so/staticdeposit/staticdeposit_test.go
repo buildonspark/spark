@@ -17,12 +17,14 @@ import (
 
 // Helper function to create test entities with required dependencies
 func createTestEntities(t *testing.T, ctx context.Context, rng io.Reader, tx *ent.Tx, utxoSwapStatus st.UtxoSwapStatus) (*ent.Utxo, *ent.UtxoSwap) {
+	secret := keys.MustGeneratePrivateKeyFromRand(rng)
+	pubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	// Create a SigningKeyshare (required for DepositAddress)
 	keyshare, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare([]byte("test_secret_share")).
-		SetPublicShares(map[string][]byte{"test": []byte("test_public_share")}).
-		SetPublicKey([]byte("test_public_key")).
+		SetSecretShare(secret.Serialize()).
+		SetPublicShares(map[string]keys.Public{"test": secret.Public()}).
+		SetPublicKey(pubKey).
 		SetCoordinatorIndex(1).
 		SetMinSigners(1).
 		Save(ctx)
@@ -54,13 +56,14 @@ func createTestEntities(t *testing.T, ctx context.Context, rng io.Reader, tx *en
 
 	// Create a UtxoSwap if status is provided
 	if utxoSwapStatus != "" {
+		coordinatorIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		utxoSwap, err := tx.UtxoSwap.Create().
 			SetStatus(utxoSwapStatus).
 			SetRequestType(st.UtxoSwapRequestTypeFixedAmount).
 			SetCreditAmountSats(900).
 			SetMaxFeeSats(100).
-			SetRequestedTransferID(uuid.New()).
-			SetCoordinatorIdentityPublicKey([]byte("test_coordinator_identity_public_key")).
+			SetRequestedTransferID(uuid.Must(uuid.NewRandomFromReader(rng))).
+			SetCoordinatorIdentityPublicKey(coordinatorIdentityPubKey.Serialize()).
 			SetUtxo(utxo).
 			Save(ctx)
 		require.NoError(t, err)

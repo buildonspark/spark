@@ -2,9 +2,6 @@ package helper
 
 import (
 	"context"
-	"fmt"
-
-	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/google/uuid"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
@@ -18,15 +15,11 @@ func GenerateProofOfPossessionSignatures(ctx context.Context, config *so.Config,
 	jobID := uuid.New().String()
 	signingJobs := make([]*SigningJob, len(messages))
 	for i, message := range messages {
-		publicKey, err := keys.ParsePublicKey(keyshares[i].PublicKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse public key: %w", err)
-		}
 		signingJob := SigningJob{
 			JobID:             jobID,
 			SigningKeyshareID: keyshares[i].ID,
 			Message:           message,
-			VerifyingKey:      &publicKey,
+			VerifyingKey:      &keyshares[i].PublicKey,
 			UserCommitment:    nil,
 		}
 		signingJobs[i] = &signingJob
@@ -54,13 +47,11 @@ func GenerateProofOfPossessionSignatures(ctx context.Context, config *so.Config,
 	client := pbfrost.NewFrostServiceClient(frostConn)
 	signatures := make([][]byte, len(messages))
 	for i, message := range messages {
-		signatureShares := signingResult[i].SignatureShares
-		publicKeys := signingResult[i].PublicKeys
 		signature, err := client.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
 			Message:         message,
-			SignatureShares: signatureShares,
-			PublicShares:    publicKeys,
-			VerifyingKey:    keyshares[i].PublicKey,
+			SignatureShares: signingResult[i].SignatureShares,
+			PublicShares:    signingResult[i].PublicKeys,
+			VerifyingKey:    keyshares[i].PublicKey.Serialize(),
 			Commitments:     operatorCommitmentsProto,
 		})
 		if err != nil {

@@ -5,6 +5,7 @@ import (
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
@@ -44,11 +45,12 @@ func (SigningKeyshare) Fields() []ent.Field {
 			Bytes("secret_share").
 			Comment("The secret share of the signing keyshare held by this SO."),
 		field.
-			JSON("public_shares", map[string][]byte{}).
+			JSON("public_shares", map[string]keys.Public{}).
 			Comment("A map from SO identifier to the public key of the secret share held by that SO."),
 		field.
 			Bytes("public_key").
 			Unique().
+			GoType(keys.Public{}).
 			Comment("The public key of the combined secret represented by this signing keyshare."),
 		field.
 			Int32("min_signers").

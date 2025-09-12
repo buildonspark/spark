@@ -335,11 +335,7 @@ func NewSigningJob(keyshare *ent.SigningKeyshare, proto *pbspark.SigningJob, pre
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to parse signing public key: %w", err)
 	}
-	keySharePublicKey, err := keys.ParsePublicKey(keyshare.PublicKey)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to parse keyshare public key: %w", err)
-	}
-	verifyingKey := protoSigningPublicKey.Add(keySharePublicKey)
+	verifyingKey := protoSigningPublicKey.Add(keyshare.PublicKey)
 
 	tx, err := common.TxFromRawTxBytes(proto.RawTx)
 	if err != nil {

@@ -115,11 +115,15 @@ func (h *SignTokenHandler) SignTokenTransaction(
 		}
 
 		// Validate that the keyshare's public key is as expected.
-		if !bytes.Equal(keyshare.PublicKey, output.WithdrawRevocationCommitment) {
+		withdrawRevocationCommitment, err := keys.ParsePublicKey(output.WithdrawRevocationCommitment)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse withdraw revocation commitment: %w", err)
+		}
+		if !keyshare.PublicKey.Equals(withdrawRevocationCommitment) {
 			return nil, fmt.Errorf(
-				"keyshare public key %x does not match output revocation commitment %x",
+				"keyshare public key %v does not match output revocation commitment %v",
 				keyshare.PublicKey,
-				output.WithdrawRevocationCommitment,
+				withdrawRevocationCommitment,
 			)
 		}
 	}
@@ -538,10 +542,13 @@ func (h *SignTokenHandler) getRevocationKeysharesForTokenTransaction(ctx context
 			return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToGetKeyshareForOutput, tokenTransaction, err)
 		}
 		// Validate that the keyshare's public key is as expected.
-		if !bytes.Equal(keyshare.PublicKey, output.WithdrawRevocationCommitment) {
+		withdrawRevocationCommitment, err := keys.ParsePublicKey(output.WithdrawRevocationCommitment)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse withdraw revocation commitment: %w", err)
+		}
+		if !keyshare.PublicKey.Equals(withdrawRevocationCommitment) {
 			return nil, tokens.FormatErrorWithTransactionEnt(
-				fmt.Sprintf("%s: %x does not match %x",
-					tokens.ErrRevocationKeyMismatch, keyshare.PublicKey, output.WithdrawRevocationCommitment),
+				fmt.Sprintf("%s: %v does not match %v", tokens.ErrRevocationKeyMismatch, keyshare.PublicKey, output.WithdrawRevocationCommitment),
 				tokenTransaction, nil)
 		}
 
