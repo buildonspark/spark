@@ -211,6 +211,7 @@ func (h *QueryTokenHandler) queryTokenTransactionsInternal(ctx context.Context, 
 		WithSpentOutput(func(slq *ent.TokenOutputQuery) {
 			slq.WithOutputCreatedTokenTransaction()
 		}).
+		WithCreate().
 		WithMint().
 		WithSparkInvoice()
 
