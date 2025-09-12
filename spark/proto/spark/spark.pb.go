@@ -1942,8 +1942,8 @@ type RenewLeafResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to RenewResult:
 	//
-	//	*RenewLeafResponse_ExtendResult
-	//	*RenewLeafResponse_RefreshResult
+	//	*RenewLeafResponse_RenewNodeTimelockResult
+	//	*RenewLeafResponse_RenewRefundTimelockResult
 	RenewResult   isRenewLeafResponse_RenewResult `protobuf_oneof:"renew_result"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1986,19 +1986,19 @@ func (x *RenewLeafResponse) GetRenewResult() isRenewLeafResponse_RenewResult {
 	return nil
 }
 
-func (x *RenewLeafResponse) GetExtendResult() *RenewNodeTimelockResult {
+func (x *RenewLeafResponse) GetRenewNodeTimelockResult() *RenewNodeTimelockResult {
 	if x != nil {
-		if x, ok := x.RenewResult.(*RenewLeafResponse_ExtendResult); ok {
-			return x.ExtendResult
+		if x, ok := x.RenewResult.(*RenewLeafResponse_RenewNodeTimelockResult); ok {
+			return x.RenewNodeTimelockResult
 		}
 	}
 	return nil
 }
 
-func (x *RenewLeafResponse) GetRefreshResult() *RenewRefundTimelockResult {
+func (x *RenewLeafResponse) GetRenewRefundTimelockResult() *RenewRefundTimelockResult {
 	if x != nil {
-		if x, ok := x.RenewResult.(*RenewLeafResponse_RefreshResult); ok {
-			return x.RefreshResult
+		if x, ok := x.RenewResult.(*RenewLeafResponse_RenewRefundTimelockResult); ok {
+			return x.RenewRefundTimelockResult
 		}
 	}
 	return nil
@@ -2008,17 +2008,17 @@ type isRenewLeafResponse_RenewResult interface {
 	isRenewLeafResponse_RenewResult()
 }
 
-type RenewLeafResponse_ExtendResult struct {
-	ExtendResult *RenewNodeTimelockResult `protobuf:"bytes,1,opt,name=extend_result,json=extendResult,proto3,oneof"`
+type RenewLeafResponse_RenewNodeTimelockResult struct {
+	RenewNodeTimelockResult *RenewNodeTimelockResult `protobuf:"bytes,1,opt,name=renew_node_timelock_result,json=renewNodeTimelockResult,proto3,oneof"`
 }
 
-type RenewLeafResponse_RefreshResult struct {
-	RefreshResult *RenewRefundTimelockResult `protobuf:"bytes,2,opt,name=refresh_result,json=refreshResult,proto3,oneof"`
+type RenewLeafResponse_RenewRefundTimelockResult struct {
+	RenewRefundTimelockResult *RenewRefundTimelockResult `protobuf:"bytes,2,opt,name=renew_refund_timelock_result,json=renewRefundTimelockResult,proto3,oneof"`
 }
 
-func (*RenewLeafResponse_ExtendResult) isRenewLeafResponse_RenewResult() {}
+func (*RenewLeafResponse_RenewNodeTimelockResult) isRenewLeafResponse_RenewResult() {}
 
-func (*RenewLeafResponse_RefreshResult) isRenewLeafResponse_RenewResult() {}
+func (*RenewLeafResponse_RenewRefundTimelockResult) isRenewLeafResponse_RenewResult() {}
 
 type RenewNodeTimelockResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -10957,10 +10957,10 @@ const file_spark_proto_rawDesc = "" +
 	"\x15refund_tx_signing_job\x18\x02 \x01(\v2\x1d.spark.UserSignedTxSigningJobR\x12refundTxSigningJob\x12Y\n" +
 	"\x1adirect_node_tx_signing_job\x18\x03 \x01(\v2\x1d.spark.UserSignedTxSigningJobR\x16directNodeTxSigningJob\x12]\n" +
 	"\x1cdirect_refund_tx_signing_job\x18\x04 \x01(\v2\x1d.spark.UserSignedTxSigningJobR\x18directRefundTxSigningJob\x12o\n" +
-	"&direct_from_cpfp_refund_tx_signing_job\x18\x05 \x01(\v2\x1d.spark.UserSignedTxSigningJobR directFromCpfpRefundTxSigningJob\"\xb5\x01\n" +
-	"\x11RenewLeafResponse\x12E\n" +
-	"\rextend_result\x18\x01 \x01(\v2\x1e.spark.RenewNodeTimelockResultH\x00R\fextendResult\x12I\n" +
-	"\x0erefresh_result\x18\x02 \x01(\v2 .spark.RenewRefundTimelockResultH\x00R\rrefreshResultB\x0e\n" +
+	"&direct_from_cpfp_refund_tx_signing_job\x18\x05 \x01(\v2\x1d.spark.UserSignedTxSigningJobR directFromCpfpRefundTxSigningJob\"\xe7\x01\n" +
+	"\x11RenewLeafResponse\x12]\n" +
+	"\x1arenew_node_timelock_result\x18\x01 \x01(\v2\x1e.spark.RenewNodeTimelockResultH\x00R\x17renewNodeTimelockResult\x12c\n" +
+	"\x1crenew_refund_timelock_result\x18\x02 \x01(\v2 .spark.RenewRefundTimelockResultH\x00R\x19renewRefundTimelockResultB\x0e\n" +
 	"\frenew_result\"n\n" +
 	"\x17RenewNodeTimelockResult\x12.\n" +
 	"\n" +
@@ -11987,8 +11987,8 @@ var file_spark_proto_depIdxs = []int32{
 	73,  // 31: spark.RenewRefundTimelockSigningJob.direct_node_tx_signing_job:type_name -> spark.UserSignedTxSigningJob
 	73,  // 32: spark.RenewRefundTimelockSigningJob.direct_refund_tx_signing_job:type_name -> spark.UserSignedTxSigningJob
 	73,  // 33: spark.RenewRefundTimelockSigningJob.direct_from_cpfp_refund_tx_signing_job:type_name -> spark.UserSignedTxSigningJob
-	31,  // 34: spark.RenewLeafResponse.extend_result:type_name -> spark.RenewNodeTimelockResult
-	32,  // 35: spark.RenewLeafResponse.refresh_result:type_name -> spark.RenewRefundTimelockResult
+	31,  // 34: spark.RenewLeafResponse.renew_node_timelock_result:type_name -> spark.RenewNodeTimelockResult
+	32,  // 35: spark.RenewLeafResponse.renew_refund_timelock_result:type_name -> spark.RenewRefundTimelockResult
 	67,  // 36: spark.RenewNodeTimelockResult.split_node:type_name -> spark.TreeNode
 	67,  // 37: spark.RenewNodeTimelockResult.node:type_name -> spark.TreeNode
 	67,  // 38: spark.RenewRefundTimelockResult.node:type_name -> spark.TreeNode
@@ -12324,8 +12324,8 @@ func file_spark_proto_init() {
 		(*RenewLeafRequest_RenewRefundTimelockSigningJob)(nil),
 	}
 	file_spark_proto_msgTypes[21].OneofWrappers = []any{
-		(*RenewLeafResponse_ExtendResult)(nil),
-		(*RenewLeafResponse_RefreshResult)(nil),
+		(*RenewLeafResponse_RenewNodeTimelockResult)(nil),
+		(*RenewLeafResponse_RenewRefundTimelockResult)(nil),
 	}
 	file_spark_proto_msgTypes[32].OneofWrappers = []any{}
 	file_spark_proto_msgTypes[33].OneofWrappers = []any{}

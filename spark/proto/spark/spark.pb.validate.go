@@ -3178,7 +3178,7 @@ func (m *RenewLeafResponse) validate(all bool) error {
 	var errors []error
 
 	switch v := m.RenewResult.(type) {
-	case *RenewLeafResponse_ExtendResult:
+	case *RenewLeafResponse_RenewNodeTimelockResult:
 		if v == nil {
 			err := RenewLeafResponseValidationError{
 				field:  "RenewResult",
@@ -3191,11 +3191,11 @@ func (m *RenewLeafResponse) validate(all bool) error {
 		}
 
 		if all {
-			switch v := interface{}(m.GetExtendResult()).(type) {
+			switch v := interface{}(m.GetRenewNodeTimelockResult()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, RenewLeafResponseValidationError{
-						field:  "ExtendResult",
+						field:  "RenewNodeTimelockResult",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -3203,23 +3203,23 @@ func (m *RenewLeafResponse) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, RenewLeafResponseValidationError{
-						field:  "ExtendResult",
+						field:  "RenewNodeTimelockResult",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetExtendResult()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetRenewNodeTimelockResult()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return RenewLeafResponseValidationError{
-					field:  "ExtendResult",
+					field:  "RenewNodeTimelockResult",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}
 			}
 		}
 
-	case *RenewLeafResponse_RefreshResult:
+	case *RenewLeafResponse_RenewRefundTimelockResult:
 		if v == nil {
 			err := RenewLeafResponseValidationError{
 				field:  "RenewResult",
@@ -3232,11 +3232,11 @@ func (m *RenewLeafResponse) validate(all bool) error {
 		}
 
 		if all {
-			switch v := interface{}(m.GetRefreshResult()).(type) {
+			switch v := interface{}(m.GetRenewRefundTimelockResult()).(type) {
 			case interface{ ValidateAll() error }:
 				if err := v.ValidateAll(); err != nil {
 					errors = append(errors, RenewLeafResponseValidationError{
-						field:  "RefreshResult",
+						field:  "RenewRefundTimelockResult",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
@@ -3244,16 +3244,16 @@ func (m *RenewLeafResponse) validate(all bool) error {
 			case interface{ Validate() error }:
 				if err := v.Validate(); err != nil {
 					errors = append(errors, RenewLeafResponseValidationError{
-						field:  "RefreshResult",
+						field:  "RenewRefundTimelockResult",
 						reason: "embedded message failed validation",
 						cause:  err,
 					})
 				}
 			}
-		} else if v, ok := interface{}(m.GetRefreshResult()).(interface{ Validate() error }); ok {
+		} else if v, ok := interface{}(m.GetRenewRefundTimelockResult()).(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
 				return RenewLeafResponseValidationError{
-					field:  "RefreshResult",
+					field:  "RenewRefundTimelockResult",
 					reason: "embedded message failed validation",
 					cause:  err,
 				}

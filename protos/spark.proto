@@ -372,8 +372,8 @@ message RenewRefundTimelockSigningJob {
 
 message RenewLeafResponse {
     oneof renew_result {
-      RenewNodeTimelockResult extend_result = 1;
-      RenewRefundTimelockResult refresh_result = 2;
+      RenewNodeTimelockResult renew_node_timelock_result = 1;
+      RenewRefundTimelockResult renew_refund_timelock_result = 2;
     }
 }
 
