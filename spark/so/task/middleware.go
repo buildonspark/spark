@@ -13,7 +13,9 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 var (
@@ -25,9 +27,15 @@ type TaskMiddleware func(context.Context, *so.Config, *BaseTaskSpec, knobs.Knobs
 
 func LogMiddleware() TaskMiddleware {
 	return func(ctx context.Context, config *so.Config, task *BaseTaskSpec, knobsService knobs.Knobs) error {
+		tracer := otel.Tracer("gocron")
+
+		ctx, span := tracer.Start(ctx, task.Name)
+		defer span.End()
+
 		logger := logging.GetLoggerFromContext(ctx).
 			With("task.name", task.Name).
-			With("task.id", uuid.New().String())
+			With("task.id", uuid.New().String()).
+			With("task.trace_id", span.SpanContext().TraceID().String())
 
 		ctx = logging.Inject(ctx, logger)
 
@@ -35,6 +43,7 @@ func LogMiddleware() TaskMiddleware {
 
 		err := task.Task(ctx, config, knobsService)
 		if err != nil {
+			span.SetStatus(codes.Error, err.Error())
 			logger.Error("Task execution failed", "error", err)
 			return err
 		}
