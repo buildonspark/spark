@@ -567,6 +567,11 @@ var (
 				Columns: []*schema.Column{TokenOutputsColumns[21]},
 			},
 			{
+				Name:    "tokenoutput_token_output_output_created_token_transaction",
+				Unique:  false,
+				Columns: []*schema.Column{TokenOutputsColumns[20]},
+			},
+			{
 				Name:    "tokenoutput_created_transaction_output_vout_token_output_output_created_token_transaction",
 				Unique:  true,
 				Columns: []*schema.Column{TokenOutputsColumns[10], TokenOutputsColumns[20]},

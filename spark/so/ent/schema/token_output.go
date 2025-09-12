@@ -82,6 +82,8 @@ func (TokenOutput) Indexes() []ent.Index {
 		index.Fields("confirmed_withdraw_block_hash"),
 		// Optimize pre-emption queries by indexing the spent transaction relationship
 		index.Edges("output_spent_token_transaction"),
+		// For finalizing token transactions
+		index.Edges("output_created_token_transaction"),
 		index.Edges("output_created_token_transaction").Fields("created_transaction_output_vout").Unique(),
 		index.Fields("token_create_id"),
 	}
