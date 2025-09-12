@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/hex"
 	"math/rand/v2"
 	"testing"
 
@@ -212,6 +213,11 @@ func createTestTree(t *testing.T, ctx context.Context, network st.Network, statu
 		Save(ctx)
 	require.NoError(t, err)
 
+	exampleTxString := "03000000000101d8966edeae1a3a05d0e5a3c971bb0a1b99bb901e76863812a40ea61fc60b87a000000000006c0700400214470000000000002251206b631936db9ab75c98e13235462f902944d9d81a45e3041bacaeec957bf7eeb700000000000000000451024e730140e06339a1f987b228843cf20f462f991264f89ca54c531c1c14d0df937d80acfd2ed9c626c6ad95106f3c9d90bc1de92b3d24aa89f03dd21974bb406e47ac84b000000000"
+	nodeRawTx, err := hex.DecodeString(exampleTxString)
+	require.NoError(t, err)
+	nodeRawRefundTx, err := hex.DecodeString(exampleTxString)
+	require.NoError(t, err)
 	node, err := dbTX.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
@@ -220,8 +226,8 @@ func createTestTree(t *testing.T, ctx context.Context, network st.Network, statu
 		SetVerifyingPubkey(verifyingPrivKey.Public().Serialize()).
 		SetOwnerIdentityPubkey(ownerIdentity.Public().Serialize()).
 		SetOwnerSigningPubkey(ownerSigningKey.Public().Serialize()).
-		SetRawTx([]byte("raw_tx_" + testID.String())).
-		SetRawRefundTx([]byte("raw_refund_tx_" + testID.String())).
+		SetRawTx(nodeRawTx).
+		SetRawRefundTx(nodeRawRefundTx).
 		SetVout(0).
 		SetStatus(st.TreeNodeStatusCreating).
 		Save(ctx)
@@ -328,6 +334,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithChildrenStatus(t *testing.T
 	childOwnerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
 	childOwnerSigning := keys.MustGeneratePrivateKeyFromRand(rng)
 
+	rawTx := createTestTxBytesWithIndex(t, 500, 0)
 	childNode, err := dbTx.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
@@ -337,8 +344,8 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithChildrenStatus(t *testing.T
 		SetVerifyingPubkey(childVerifyingKey.Public().Serialize()).
 		SetOwnerIdentityPubkey(childOwnerIdentity.Public().Serialize()).
 		SetOwnerSigningPubkey(childOwnerSigning.Public().Serialize()).
-		SetRawTx([]byte("child_raw_tx")).
-		SetRawRefundTx([]byte("child_raw_refund_tx")).
+		SetRawTx(rawTx).
+		SetRawRefundTx(rawTx).
 		SetVout(0).
 		SetStatus(st.TreeNodeStatusCreating).
 		Save(ctx)
@@ -399,7 +406,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithoutRefundTxStatus(t *testin
 	require.NoError(t, err)
 
 	leafNode, err = leafNode.Update().
-		SetRawRefundTx([]byte{}).
+		ClearRawRefundTx().
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -438,6 +445,7 @@ func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testi
 	child1OwnerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
 	child1OwnerSigning := keys.MustGeneratePrivateKeyFromRand(rng)
 
+	rawTx1 := createTestTxBytesWithIndex(t, 250, 0)
 	child1, err := dbTx.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
@@ -447,8 +455,8 @@ func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testi
 		SetVerifyingPubkey(child1VerifyingKey.Public().Serialize()).
 		SetOwnerIdentityPubkey(child1OwnerIdentity.Public().Serialize()).
 		SetOwnerSigningPubkey(child1OwnerSigning.Public().Serialize()).
-		SetRawTx([]byte("child1_raw_tx")).
-		SetRawRefundTx([]byte("child1_raw_refund_tx")).
+		SetRawTx(rawTx1).
+		SetRawRefundTx(rawTx1).
 		SetVout(0).
 		SetStatus(st.TreeNodeStatusCreating).
 		Save(ctx)
@@ -458,6 +466,7 @@ func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testi
 	child2OwnerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
 	child2OwnerSigning := keys.MustGeneratePrivateKeyFromRand(rng)
 
+	rawTx2 := createTestTxBytesWithIndex(t, 250, 0)
 	child2, err := dbTx.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
@@ -467,8 +476,8 @@ func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testi
 		SetVerifyingPubkey(child2VerifyingKey.Public().Serialize()).
 		SetOwnerIdentityPubkey(child2OwnerIdentity.Public().Serialize()).
 		SetOwnerSigningPubkey(child2OwnerSigning.Public().Serialize()).
-		SetRawTx([]byte("child2_raw_tx")).
-		SetRawRefundTx([]byte("child2_raw_refund_tx")).
+		SetRawTx(rawTx2).
+		SetRawRefundTx(rawTx2).
 		SetVout(0).
 		SetStatus(st.TreeNodeStatusCreating).
 		Save(ctx)
@@ -569,6 +578,7 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 	childOwnerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
 	childOwnerSigning := keys.MustGeneratePrivateKeyFromRand(rng)
 
+	rawTx := createTestTxBytesWithIndex(t, 65536, 0)
 	childNode, err := dbTX.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
@@ -577,8 +587,8 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 		SetVerifyingPubkey(childVerifyingKey.Public().Serialize()).
 		SetOwnerIdentityPubkey(childOwnerIdentity.Public().Serialize()).
 		SetOwnerSigningPubkey(childOwnerSigning.Public().Serialize()).
-		SetRawTx([]byte("child_raw_tx_" + testID)).
-		SetRawRefundTx([]byte("child_raw_refund_tx_" + testID)).
+		SetRawTx(rawTx).
+		SetRawRefundTx(rawTx).
 		SetVout(0).
 		SetStatus(st.TreeNodeStatusCreating).
 		Save(ctx)

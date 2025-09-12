@@ -84,6 +84,7 @@ func TestGetStuckLightningPayments(t *testing.T) {
 		}
 
 		// Create a tree node for the transfer
+		rawTx := createTestTxBytesWithIndex(t, 1000, 0)
 		treeNode, err := dbTx.TreeNode.Create().
 			SetTree(tree).
 			SetValue(1000).
@@ -91,7 +92,7 @@ func TestGetStuckLightningPayments(t *testing.T) {
 			SetVerifyingPubkey(verifyingPubKey.Serialize()).
 			SetOwnerIdentityPubkey(ownerIdentityPubKey.Serialize()).
 			SetOwnerSigningPubkey(ownerSigningPubKey.Serialize()).
-			SetRawTx([]byte("raw_tx")).
+			SetRawTx(rawTx).
 			SetVout(0).
 			SetSigningKeyshare(keyshare).
 			Save(ctx)

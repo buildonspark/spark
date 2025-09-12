@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"math/rand/v2"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -578,6 +580,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a tree node with Available status
+	rawTx := createTestTxBytesWithIndex(t, 100000, 0)
 	availableNode, err := dbTX.TreeNode.Create().
 		SetTree(tree).
 		SetStatus(st.TreeNodeStatusAvailable).
@@ -586,12 +589,13 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 		SetValue(100000).
 		SetVerifyingPubkey(verifyingPrivkey.Public().Serialize()).
 		SetSigningKeyshare(signingKeyshare).
-		SetRawTx([]byte("test_tx")).
+		SetRawTx(rawTx).
 		SetVout(0).
 		Save(ctx)
 	require.NoError(t, err)
 
 	// Create a tree node with different status
+	rawTx2 := createTestTxBytesWithIndex(t, 100000, 1)
 	creatingNode, err := dbTX.TreeNode.Create().
 		SetTree(tree).
 		SetStatus(st.TreeNodeStatusCreating).
@@ -600,7 +604,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 		SetValue(100000).
 		SetVerifyingPubkey(verifyingPrivkey.Public().Serialize()).
 		SetSigningKeyshare(signingKeyshare).
-		SetRawTx([]byte("test_tx")).
+		SetRawTx(rawTx2).
 		SetVout(1).
 		Save(ctx)
 	require.NoError(t, err)
@@ -1017,4 +1021,128 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 			require.ErrorContains(t, err, tt.exepectedErrorContent)
 		})
 	}
+}
+
+func TestTreeNodeDbHooks(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	var nodeID = uuid.New()
+	var treeID = uuid.New()
+	var signingKeyshareID = uuid.New()
+
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	nodeValue := uint64(1000)
+	nodeVerifyingPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	nodeRawTxBytes := createTestTxBytesWithIndex(t, 1000, 0)
+	nodeRawTx, err := common.TxFromRawTxBytes(nodeRawTxBytes)
+	require.NoError(t, err)
+	nodeRawTxid := nodeRawTx.TxHash()
+
+	nodeRawRefundTxBytes := createTestTxBytesWithIndex(t, 1000, 0)
+	nodeRawRefundTx, err := common.TxFromRawTxBytes(nodeRawRefundTxBytes)
+	require.NoError(t, err)
+	nodeRawRefundTxid := nodeRawRefundTx.TxHash()
+
+	nodeDirectRefundTxBytes := createTestTxBytesWithIndex(t, 1000, 0)
+	nodeDirectRefundTx, err := common.TxFromRawTxBytes(nodeDirectRefundTxBytes)
+	require.NoError(t, err)
+	nodeDirectRefundTxid := nodeDirectRefundTx.TxHash()
+
+	nodeDirectFromCpfpRefundTxBytes := createTestTxBytesWithIndex(t, 1000, 0)
+	nodeDirectFromCpfpRefundTx, err := common.TxFromRawTxBytes(nodeDirectFromCpfpRefundTxBytes)
+	require.NoError(t, err)
+	nodeDirectFromCpfpRefundTxid := nodeDirectFromCpfpRefundTx.TxHash()
+
+	_, err = tx.Tree.Create().
+		SetID(treeID).
+		SetOwnerIdentityPubkey(ownerIdentityPubkey).
+		SetNetwork(st.NetworkRegtest).
+		SetStatus(st.TreeStatusAvailable).
+		SetBaseTxid([]byte{1, 2, 3}).
+		SetVout(int16(0)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keysharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicSharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingKeyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
+		SetPublicShares(map[string]keys.Public{"test": publicSharePrivkey.Public()}).
+		SetPublicKey(keysharePrivkey.Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// OpCreate
+	treeNode, err := tx.
+		TreeNode.
+		Create().
+		SetID(nodeID).
+		SetTreeID(treeID).
+		SetStatus(st.TreeNodeStatusAvailable).
+		SetOwnerIdentityPubkey(ownerIdentityPubkey.Serialize()).
+		SetOwnerSigningPubkey(ownerSigningPubkey.Serialize()).
+		SetValue(nodeValue).
+		SetVerifyingPubkey(nodeVerifyingPubkey.Serialize()).
+		SetSigningKeyshareID(signingKeyshareID).
+		SetRawTx(nodeRawTxBytes).
+		SetRawRefundTx(nodeRawRefundTxBytes).
+		SetDirectRefundTx(nodeDirectRefundTxBytes).
+		SetDirectFromCpfpRefundTx(nodeDirectFromCpfpRefundTxBytes).
+		SetVout(int16(0)).
+		SetSigningKeyshare(signingKeyshare).
+		Save(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, treeNode.RawTxid)
+	require.True(t, bytes.Equal(treeNode.RawTxid, nodeRawTxid[:]))
+	require.NotNil(t, treeNode.RawRefundTxid)
+	require.True(t, bytes.Equal(treeNode.RawRefundTxid, nodeRawRefundTxid[:]))
+	require.NotNil(t, treeNode.DirectRefundTxid)
+	require.True(t, bytes.Equal(treeNode.DirectRefundTxid, nodeDirectRefundTxid[:]))
+	require.NotNil(t, treeNode.DirectFromCpfpRefundTxid)
+	require.True(t, bytes.Equal(treeNode.DirectFromCpfpRefundTxid, nodeDirectFromCpfpRefundTxid[:]))
+
+	// OpUpdateOne
+	treeNode, err = tx.TreeNode.
+		UpdateOneID(treeNode.ID).
+		SetRawRefundTx(nil).
+		ClearDirectRefundTx().
+		Save(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, treeNode.RawTxid)
+	require.Nil(t, treeNode.RawRefundTxid)
+	require.Nil(t, treeNode.DirectRefundTxid)
+	require.NotNil(t, treeNode.DirectFromCpfpRefundTxid)
+
+	nodeDirectRefundTxBytes2 := createTestTxBytesWithIndex(t, 1000, 0)
+	nodeDirectRefundTx2, err := common.TxFromRawTxBytes(nodeDirectRefundTxBytes2)
+	require.NoError(t, err)
+	nodeDirectRefundTxid2 := nodeDirectRefundTx2.TxHash()
+
+	// OpUpdate
+	err = tx.TreeNode.Update().
+		Where(enttreenode.ID(treeNode.ID)).
+		SetDirectRefundTx(nodeDirectRefundTxBytes2).
+		Exec(ctx)
+	require.NoError(t, err)
+	treeNode, err = tx.TreeNode.Query().
+		Where(enttreenode.ID(treeNode.ID)).
+		Only(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, treeNode.DirectRefundTxid)
+	require.True(t, bytes.Equal(treeNode.DirectRefundTxid, nodeDirectRefundTxid2[:]))
+	require.NotNil(t, treeNode.DirectRefundTx)
+
+	err = tx.TreeNode.Update().
+		Where(enttreenode.ID(treeNode.ID)).
+		SetDirectRefundTxid([]byte{1, 2, 3}).
+		Exec(ctx)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "direct_refund_txid is not allowed to be set directly")
 }

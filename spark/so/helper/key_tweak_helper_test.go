@@ -1,6 +1,7 @@
 package helper_test
 
 import (
+	"encoding/hex"
 	"math/rand/v2"
 	"testing"
 
@@ -26,6 +27,8 @@ func TestTweakLeafKey(t *testing.T) {
 
 	// Generate deterministic keys for the test
 	ownerPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	rawTxBytes, err := hex.DecodeString("030000000001017fe94b2a47dfe4c240824fadfb632086e9c0720c82f8c64cc0d4a9793e5c2df20000000000ffffffff02c0120000000000002251203c0433dfd1ce2d8dc7679c6d6a4261f4eba1469132bdfca507147828463cdf1400000000000000000451024e73014002e3a227a1940c62bd1490c02b6154b7879fe14e4fb15e9f2641db88405580264bbc1b902dab3793a1f1c83343796293bea8e1e06cdfca8ca357131c5e79898f00000000")
+	require.NoError(t, err)
 	baseTxid := make([]byte, 32)
 	_, _ = rng.Read(baseTxid)
 
@@ -64,7 +67,7 @@ func TestTweakLeafKey(t *testing.T) {
 		SetVerifyingPubkey(verifyingPub.Serialize()).
 		SetOwnerIdentityPubkey(ownerPub.Serialize()).
 		SetOwnerSigningPubkey(ownerSigningPub.Serialize()).
-		SetRawTx(baseTxid).
+		SetRawTx(rawTxBytes).
 		SetVout(0).
 		SetSigningKeyshare(keyshare).
 		Save(ctx)
@@ -122,6 +125,8 @@ func TestTweakLeafKey_EmptySecretShareTweakProofsList(t *testing.T) {
 
 	rng := rand.NewChaCha8([32]byte{})
 	ownerPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	rawTxBytes, err := hex.DecodeString("030000000001017fe94b2a47dfe4c240824fadfb632086e9c0720c82f8c64cc0d4a9793e5c2df20000000000ffffffff02c0120000000000002251203c0433dfd1ce2d8dc7679c6d6a4261f4eba1469132bdfca507147828463cdf1400000000000000000451024e73014002e3a227a1940c62bd1490c02b6154b7879fe14e4fb15e9f2641db88405580264bbc1b902dab3793a1f1c83343796293bea8e1e06cdfca8ca357131c5e79898f00000000")
+	require.NoError(t, err)
 	baseTxid := chainhash.DoubleHashB([]byte("base-tx-id"))
 	keysharePriv := keys.MustGeneratePrivateKeyFromRand(rng)
 	keysharePub := keysharePriv.Public()
@@ -157,7 +162,7 @@ func TestTweakLeafKey_EmptySecretShareTweakProofsList(t *testing.T) {
 		SetVerifyingPubkey(verifyingPub.Serialize()).
 		SetOwnerIdentityPubkey(ownerPub.Serialize()).
 		SetOwnerSigningPubkey(ownerSigningPub.Serialize()).
-		SetRawTx(baseTxid).
+		SetRawTx(rawTxBytes).
 		SetVout(0).
 		SetSigningKeyshare(keyshare).
 		Save(ctx)

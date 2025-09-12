@@ -627,6 +627,9 @@ func init() {
 	// tree.DefaultID holds the default value on creation for the id field.
 	tree.DefaultID = treeDescID.Default.(func() uuid.UUID)
 	treenodeMixin := schema.TreeNode{}.Mixin()
+	treenodeHooks := schema.TreeNode{}.Hooks()
+	treenode.Hooks[0] = treenodeHooks[0]
+	treenode.Hooks[1] = treenodeHooks[1]
 	treenodeMixinFields0 := treenodeMixin[0].Fields()
 	_ = treenodeMixinFields0
 	treenodeFields := schema.TreeNode{}.Fields()

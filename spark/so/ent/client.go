@@ -4336,7 +4336,8 @@ func (c *TreeNodeClient) QueryChildren(tn *TreeNode) *TreeNodeQuery {
 
 // Hooks returns the client hooks.
 func (c *TreeNodeClient) Hooks() []Hook {
-	return c.hooks.TreeNode
+	hooks := c.hooks.TreeNode
+	return append(hooks[:len(hooks):len(hooks)], treenode.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.

@@ -31,6 +31,7 @@ func makeP2TRFundingTx(value int64, internalPriv *btcec.PrivateKey) (txBytes []b
 	xonly := schnorr.SerializePubKey(tweakedPriv.PubKey())
 	pkScript = append([]byte{txscript.OP_1, 32}, xonly...)
 	tx := wire.NewMsgTx(2)
+	tx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: chainhash.Hash{1}, Index: 0}, nil, nil))
 	tx.AddTxOut(wire.NewTxOut(value, pkScript))
 	var buf bytes.Buffer
 	if err = tx.Serialize(&buf); err != nil {
@@ -289,6 +290,7 @@ func TestApplySignatures(t *testing.T) {
 	// Create test tx bytes
 	btcecPriv := key.ToBTCEC()
 	rawTx, outpoint, pkScript, prevAmt, tweakedPriv, err := makeP2TRFundingTx(1000, btcecPriv)
+
 	require.NoError(t, err)
 	destScript := pkScript
 	rawRefundTx, err := makeP2TRSpendTx(outpoint, pkScript, prevAmt, tweakedPriv, 900, destScript)

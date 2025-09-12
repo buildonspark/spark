@@ -382,7 +382,7 @@ func createTestNode(t *testing.T, ctx context.Context, rawTx []byte, vout uint32
 		OwnerIdentityPubkey: ownerIdentity.Public().Serialize(),
 		OwnerSigningPubkey:  ownerSigningKey.Public().Serialize(),
 		RawTx:               rawTx,
-		RawRefundTx:         append([]byte("raw_refund_tx_"), []byte(testID.String())...),
+		RawRefundTx:         rawTx,
 		TreeId:              uuid.New().String(),
 		ParentNodeId:        nil,
 		SigningKeyshareId:   keyshare.ID.String(),
