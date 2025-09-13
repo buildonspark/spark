@@ -1054,6 +1054,7 @@ message InitiatePreimageSwapRequest {
     StartUserSignedTransferRequest transfer = 4;
     bytes receiver_identity_public_key = 5;
     uint64 fee_sats = 6;
+    StartTransferRequest transfer_request = 7;
 }
 
 message InitiatePreimageSwapResponse {
