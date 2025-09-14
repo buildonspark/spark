@@ -99,6 +99,8 @@ type SparkServiceClient interface {
 	ClaimTransferTweakKeys(ctx context.Context, in *ClaimTransferTweakKeysRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ClaimTransferSignRefunds(ctx context.Context, in *ClaimTransferSignRefundsRequest, opts ...grpc.CallOption) (*ClaimTransferSignRefundsResponse, error)
 	StorePreimageShare(ctx context.Context, in *StorePreimageShareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Gets a specified number of signing commmitments for a set of nodes, which can be used as
+	// part of a transfer package.
 	GetSigningCommitments(ctx context.Context, in *GetSigningCommitmentsRequest, opts ...grpc.CallOption) (*GetSigningCommitmentsResponse, error)
 	CooperativeExit(ctx context.Context, in *CooperativeExitRequest, opts ...grpc.CallOption) (*CooperativeExitResponse, error)
 	InitiatePreimageSwap(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
@@ -748,6 +750,8 @@ type SparkServiceServer interface {
 	ClaimTransferTweakKeys(context.Context, *ClaimTransferTweakKeysRequest) (*emptypb.Empty, error)
 	ClaimTransferSignRefunds(context.Context, *ClaimTransferSignRefundsRequest) (*ClaimTransferSignRefundsResponse, error)
 	StorePreimageShare(context.Context, *StorePreimageShareRequest) (*emptypb.Empty, error)
+	// Gets a specified number of signing commmitments for a set of nodes, which can be used as
+	// part of a transfer package.
 	GetSigningCommitments(context.Context, *GetSigningCommitmentsRequest) (*GetSigningCommitmentsResponse, error)
 	CooperativeExit(context.Context, *CooperativeExitRequest) (*CooperativeExitResponse, error)
 	InitiatePreimageSwap(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)

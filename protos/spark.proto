@@ -34,6 +34,8 @@ service SparkService {
     rpc claim_transfer_tweak_keys(ClaimTransferTweakKeysRequest) returns (google.protobuf.Empty) {}
     rpc claim_transfer_sign_refunds(ClaimTransferSignRefundsRequest) returns (ClaimTransferSignRefundsResponse) {}
     rpc store_preimage_share(StorePreimageShareRequest) returns (google.protobuf.Empty) {}
+    // Gets a specified number of signing commmitments for a set of nodes, which can be used as
+    // part of a transfer package.
     rpc get_signing_commitments(GetSigningCommitmentsRequest) returns (GetSigningCommitmentsResponse) {}
     rpc cooperative_exit(CooperativeExitRequest) returns (CooperativeExitResponse) {}
     rpc initiate_preimage_swap(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
@@ -1011,15 +1013,24 @@ message RequestedSigningCommitments {
 }
 
 message GetSigningCommitmentsRequest {
+    // The node IDs for which to get signing commitments.
     repeated string node_ids = 1;
+    // The number of signing commitments to get per node ID.
     uint32 count = 2;
 }
 
 message GetSigningCommitmentsResponse {
+    // A list of signing commitments for each requested node ID. The signing commitments will be
+    // ordered in the same order as the requested node IDs, repeated for the number of commitments
+    // requested. For example, if node_ids = [A, B] and count = 2, the response will contain:
+    //
+    // [commitment_A1, commitment_B1, commitment_A2, commitment_B2]
     repeated RequestedSigningCommitments signing_commitments = 1;
 }
 
 message SigningCommitments {
+    // A map of signing operator ID (i.e. 000...01) to the signing commitment provided by that
+    // operator.
     map<string, common.SigningCommitment> signing_commitments = 1;
 }
 

@@ -6456,9 +6456,11 @@ func (x *RequestedSigningCommitments) GetSigningNonceCommitments() map[string]*c
 }
 
 type GetSigningCommitmentsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	NodeIds       []string               `protobuf:"bytes,1,rep,name=node_ids,json=nodeIds,proto3" json:"node_ids,omitempty"`
-	Count         uint32                 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The node IDs for which to get signing commitments.
+	NodeIds []string `protobuf:"bytes,1,rep,name=node_ids,json=nodeIds,proto3" json:"node_ids,omitempty"`
+	// The number of signing commitments to get per node ID.
+	Count         uint32 `protobuf:"varint,2,opt,name=count,proto3" json:"count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6508,7 +6510,12 @@ func (x *GetSigningCommitmentsRequest) GetCount() uint32 {
 }
 
 type GetSigningCommitmentsResponse struct {
-	state              protoimpl.MessageState         `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// A list of signing commitments for each requested node ID. The signing commitments will be
+	// ordered in the same order as the requested node IDs, repeated for the number of commitments
+	// requested. For example, if node_ids = [A, B] and count = 2, the response will contain:
+	//
+	// [commitment_A1, commitment_B1, commitment_A2, commitment_B2]
 	SigningCommitments []*RequestedSigningCommitments `protobuf:"bytes,1,rep,name=signing_commitments,json=signingCommitments,proto3" json:"signing_commitments,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
@@ -6552,7 +6559,9 @@ func (x *GetSigningCommitmentsResponse) GetSigningCommitments() []*RequestedSign
 }
 
 type SigningCommitments struct {
-	state              protoimpl.MessageState               `protogen:"open.v1"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// A map of signing operator ID (i.e. 000...01) to the signing commitment provided by that
+	// operator.
 	SigningCommitments map[string]*common.SigningCommitment `protobuf:"bytes,1,rep,name=signing_commitments,json=signingCommitments,proto3" json:"signing_commitments,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
