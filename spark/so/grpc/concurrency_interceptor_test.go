@@ -73,7 +73,7 @@ func TestConcurrencyGuard_Acquire_WithinLimit(t *testing.T) {
 			knobValues := map[string]float64{}
 			if tt.methodLimit != nil {
 				for method, limit := range tt.methodLimit {
-					knobValues[fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitMethods, method)] = float64(limit)
+					knobValues[fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, method)] = float64(limit)
 				}
 			}
 			mockKnobs := knobs.NewFixedKnobs(knobValues)
@@ -118,7 +118,7 @@ func TestConcurrencyGuard_AcquireTarget_ExceedsLimit(t *testing.T) {
 			knobValues := map[string]float64{}
 			if tt.methodLimit != nil {
 				for method, limit := range tt.methodLimit {
-					knobValues[fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitMethods, method)] = float64(limit)
+					knobValues[fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, method)] = float64(limit)
 				}
 			}
 			mockKnobs := knobs.NewFixedKnobs(knobValues)

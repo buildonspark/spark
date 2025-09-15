@@ -12,25 +12,28 @@ import (
 )
 
 const (
-	KnobDatabaseStatementTimeout          = "spark.database.statement_timeout"
-	KnobDatabaseLockTimeout               = "spark.database.lock_timeout"
-	KnobRateLimitPeriod                   = "spark.so.ratelimit.period"
-	KnobRateLimitLimit                    = "spark.so.ratelimit.limit"
-	KnobRateLimitMethods                  = "spark.so.ratelimit.methods"
-	KnobSoRollbackUtxoSwapUsingGossip     = "spark.so.rollback_utxo_swap_using_gossip"
-	KnobSoTransferLimit                   = "spark.so.transfer_limit"
-	KnobGrpcServerMethodEnabled           = "spark.so.grpc.server.method.enabled"
-	KnobGrpcServerConnectionTimeout       = "spark.so.grpc.server.connection_timeout"
-	KnobGrpcServerKeepaliveTime           = "spark.so.grpc.server.keepalive_time"
-	KnobGrpcServerKeepaliveTimeout        = "spark.so.grpc.server.keepalive_timeout"
-	KnobGrpcServerUnaryHandlerTimeout     = "spark.so.grpc.server.unary_handler_timeout"
-	KnobGrpcServerConcurrencyLimitLimit   = "spark.so.grpc.server.concurrency_limit.limit"
-	KnobGrpcServerConcurrencyLimitMethods = "spark.so.grpc.server.concurrency_limit.methods"
-	KnobSoGenerateStaticDepositAddressV2  = "spark.so.generate_static_deposit_address_v2"
-	KnobSoMaxTransactionsPerRequest       = "spark.so.max_transactions_per_request"
-	KnobSoMaxKeysharesPerRequest          = "spark.so.max_keyshares_per_request"
-	KnobGRPCClientTimeout                 = "spark.so.grpc.client.timeout"
-	KnobRenewLeafDisabled                 = "spark.so.grpc.server.disable_renew_leaf"
+	KnobDatabaseStatementTimeout      = "spark.database.statement_timeout"
+	KnobDatabaseLockTimeout           = "spark.database.lock_timeout"
+	KnobRateLimitPeriod               = "spark.so.ratelimit.period"
+	KnobRateLimitLimit                = "spark.so.ratelimit.limit"
+	KnobRateLimitMethods              = "spark.so.ratelimit.methods"
+	KnobSoRollbackUtxoSwapUsingGossip = "spark.so.rollback_utxo_swap_using_gossip"
+	KnobSoTransferLimit               = "spark.so.transfer_limit"
+
+	KnobGrpcServerMethodEnabled       = "spark.so.grpc.server.method.enabled"
+	KnobGrpcServerConnectionTimeout   = "spark.so.grpc.server.connection_timeout"
+	KnobGrpcServerKeepaliveTime       = "spark.so.grpc.server.keepalive_time"
+	KnobGrpcServerKeepaliveTimeout    = "spark.so.grpc.server.keepalive_timeout"
+	KnobGrpcServerUnaryHandlerTimeout = "spark.so.grpc.server.unary_handler_timeout"
+
+	// Sets the concurrency limiter value globally or, if the target is specified, per method.
+	KnobGrpcServerConcurrencyLimitLimit = "spark.so.grpc.server.concurrency_limit.limit"
+
+	KnobSoGenerateStaticDepositAddressV2 = "spark.so.generate_static_deposit_address_v2"
+	KnobSoMaxTransactionsPerRequest      = "spark.so.max_transactions_per_request"
+	KnobSoMaxKeysharesPerRequest         = "spark.so.max_keyshares_per_request"
+	KnobGRPCClientTimeout                = "spark.so.grpc.client.timeout"
+	KnobRenewLeafDisabled                = "spark.so.grpc.server.disable_renew_leaf"
 )
 
 type Config struct {

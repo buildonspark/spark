@@ -49,12 +49,9 @@ func NewConcurrencyGuard(knobsService knobs.Knobs, defaultGlobalLimit int64) Res
 // If the limit is 0, no limit is enforced.
 // If the limit is negative, the default limit is used.
 func (c *ConcurrencyGuard) TryAcquireMethod(method string) error {
-	methodLimit := int64(c.knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyLimitMethods, &method, -1))
+	methodLimit := int64(c.knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyLimitLimit, &method, -1))
 
-	globalLimit := int64(c.knobsService.GetValue(knobs.KnobGrpcServerConcurrencyLimitLimit, -1))
-	if globalLimit < 0 {
-		globalLimit = c.defaultGlobalLimit
-	}
+	globalLimit := int64(c.knobsService.GetValue(knobs.KnobGrpcServerConcurrencyLimitLimit, float64(c.defaultGlobalLimit)))
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
