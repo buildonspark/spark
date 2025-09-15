@@ -27,6 +27,8 @@ message GossipMessage {
         GossipMessageRollbackUtxoSwap rollback_utxo_swap = 11;
         GossipMessageDepositCleanup deposit_cleanup = 12;
         GossipMessagePreimage preimage = 13;
+        GossipMessageFinalizeRenewRefundTimelock finalize_refund_timelock = 14;
+        GossipMessageFinalizeRenewNodeTimelock finalize_node_timelock = 15;
     }
 }
 
@@ -70,6 +72,15 @@ message GossipMessageFinalizeRefreshTimelock {
 
 message GossipMessageFinalizeExtendLeaf {
     repeated spark_internal.TreeNode internal_nodes = 1;
+}
+
+message GossipMessageFinalizeRenewRefundTimelock {
+  spark_internal.TreeNode node = 1;
+}
+
+message GossipMessageFinalizeRenewNodeTimelock {
+  spark_internal.TreeNode split_node = 1;
+  spark_internal.TreeNode node = 2;
 }
 
 // Rollback UTXO swap is called when Create UTXO swap transaction failed to

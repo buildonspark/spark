@@ -1651,6 +1651,303 @@ var _ interface {
 	ErrorName() string
 } = FinalizeExtendLeafRequestValidationError{}
 
+// Validate checks the field values on FinalizeRenewRefundTimelockRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *FinalizeRenewRefundTimelockRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on FinalizeRenewRefundTimelockRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// FinalizeRenewRefundTimelockRequestMultiError, or nil if none found.
+func (m *FinalizeRenewRefundTimelockRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *FinalizeRenewRefundTimelockRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetNode()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, FinalizeRenewRefundTimelockRequestValidationError{
+					field:  "Node",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, FinalizeRenewRefundTimelockRequestValidationError{
+					field:  "Node",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetNode()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return FinalizeRenewRefundTimelockRequestValidationError{
+				field:  "Node",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return FinalizeRenewRefundTimelockRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// FinalizeRenewRefundTimelockRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// FinalizeRenewRefundTimelockRequest.ValidateAll() if the designated
+// constraints aren't met.
+type FinalizeRenewRefundTimelockRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m FinalizeRenewRefundTimelockRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m FinalizeRenewRefundTimelockRequestMultiError) AllErrors() []error { return m }
+
+// FinalizeRenewRefundTimelockRequestValidationError is the validation error
+// returned by FinalizeRenewRefundTimelockRequest.Validate if the designated
+// constraints aren't met.
+type FinalizeRenewRefundTimelockRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e FinalizeRenewRefundTimelockRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e FinalizeRenewRefundTimelockRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e FinalizeRenewRefundTimelockRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e FinalizeRenewRefundTimelockRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e FinalizeRenewRefundTimelockRequestValidationError) ErrorName() string {
+	return "FinalizeRenewRefundTimelockRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e FinalizeRenewRefundTimelockRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sFinalizeRenewRefundTimelockRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = FinalizeRenewRefundTimelockRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = FinalizeRenewRefundTimelockRequestValidationError{}
+
+// Validate checks the field values on FinalizeRenewNodeTimelockRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *FinalizeRenewNodeTimelockRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on FinalizeRenewNodeTimelockRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// FinalizeRenewNodeTimelockRequestMultiError, or nil if none found.
+func (m *FinalizeRenewNodeTimelockRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *FinalizeRenewNodeTimelockRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetSplitNode()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, FinalizeRenewNodeTimelockRequestValidationError{
+					field:  "SplitNode",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, FinalizeRenewNodeTimelockRequestValidationError{
+					field:  "SplitNode",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSplitNode()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return FinalizeRenewNodeTimelockRequestValidationError{
+				field:  "SplitNode",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetNode()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, FinalizeRenewNodeTimelockRequestValidationError{
+					field:  "Node",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, FinalizeRenewNodeTimelockRequestValidationError{
+					field:  "Node",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetNode()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return FinalizeRenewNodeTimelockRequestValidationError{
+				field:  "Node",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return FinalizeRenewNodeTimelockRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// FinalizeRenewNodeTimelockRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// FinalizeRenewNodeTimelockRequest.ValidateAll() if the designated
+// constraints aren't met.
+type FinalizeRenewNodeTimelockRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m FinalizeRenewNodeTimelockRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m FinalizeRenewNodeTimelockRequestMultiError) AllErrors() []error { return m }
+
+// FinalizeRenewNodeTimelockRequestValidationError is the validation error
+// returned by FinalizeRenewNodeTimelockRequest.Validate if the designated
+// constraints aren't met.
+type FinalizeRenewNodeTimelockRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e FinalizeRenewNodeTimelockRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e FinalizeRenewNodeTimelockRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e FinalizeRenewNodeTimelockRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e FinalizeRenewNodeTimelockRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e FinalizeRenewNodeTimelockRequestValidationError) ErrorName() string {
+	return "FinalizeRenewNodeTimelockRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e FinalizeRenewNodeTimelockRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sFinalizeRenewNodeTimelockRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = FinalizeRenewNodeTimelockRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = FinalizeRenewNodeTimelockRequestValidationError{}
+
 // Validate checks the field values on TreeNode with the rules defined in the
 // proto definition for this message. If any rules are violated, the first
 // error encountered is returned, or nil if there are no violations.

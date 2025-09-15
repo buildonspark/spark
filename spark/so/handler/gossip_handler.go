@@ -56,6 +56,12 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 	case *pbgossip.GossipMessage_FinalizeExtendLeaf:
 		finalizeExtendLeaf := gossipMessage.GetFinalizeExtendLeaf()
 		h.handleFinalizeExtendLeafGossipMessage(ctx, finalizeExtendLeaf, forCoordinator)
+	case *pbgossip.GossipMessage_FinalizeNodeTimelock:
+		finalizeRenewNodeTimelock := gossipMessage.GetFinalizeNodeTimelock()
+		h.handleFinalizeNodeTimelockGossipMessage(ctx, finalizeRenewNodeTimelock, forCoordinator)
+	case *pbgossip.GossipMessage_FinalizeRefundTimelock:
+		finalizeRenewRefundTimelock := gossipMessage.GetFinalizeRefundTimelock()
+		h.handleFinalizeRefundTimelockGossipMessage(ctx, finalizeRenewRefundTimelock, forCoordinator)
 	case *pbgossip.GossipMessage_RollbackUtxoSwap:
 		rollbackUtxoSwap := gossipMessage.GetRollbackUtxoSwap()
 		h.handleRollbackUtxoSwapGossipMessage(ctx, rollbackUtxoSwap)
@@ -263,6 +269,41 @@ func (h *GossipHandler) handleFinalizeExtendLeafGossipMessage(ctx context.Contex
 	err := extendLeafHandler.FinalizeExtendLeaf(ctx, &pbinternal.FinalizeExtendLeafRequest{Node: finalizeNodeSignatures.InternalNodes[0]})
 	if err != nil {
 		logger.Error("Failed to finalize extend leaf", zap.Error(err))
+	}
+}
+
+func (h *GossipHandler) handleFinalizeNodeTimelockGossipMessage(ctx context.Context, finalizeRenewNodeTimelock *pbgossip.GossipMessageFinalizeRenewNodeTimelock, forCoordinator bool) {
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Info("Handling finalize renew node timelock gossip message")
+
+	if forCoordinator {
+		return
+	}
+
+	renewLeafHandler := NewInternalRenewLeafHandler(h.config)
+	err := renewLeafHandler.FinalizeRenewNodeTimelock(ctx, &pbinternal.FinalizeRenewNodeTimelockRequest{
+		SplitNode: finalizeRenewNodeTimelock.SplitNode,
+		Node:      finalizeRenewNodeTimelock.Node,
+	})
+	if err != nil {
+		logger.Error("Failed to finalize renew node timelock", zap.Error(err))
+	}
+}
+
+func (h *GossipHandler) handleFinalizeRefundTimelockGossipMessage(ctx context.Context, finalizeRenewRefundTimelock *pbgossip.GossipMessageFinalizeRenewRefundTimelock, forCoordinator bool) {
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Info("Handling finalize renew refund timelock gossip message")
+
+	if forCoordinator {
+		return
+	}
+
+	renewLeafHandler := NewInternalRenewLeafHandler(h.config)
+	err := renewLeafHandler.FinalizeRenewRefundTimelock(ctx, &pbinternal.FinalizeRenewRefundTimelockRequest{
+		Node: finalizeRenewRefundTimelock.Node,
+	})
+	if err != nil {
+		logger.Error("Failed to finalize renew refund timelock", zap.Error(err))
 	}
 }
 

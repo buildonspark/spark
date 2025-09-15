@@ -11,6 +11,7 @@ import (
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
+	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -249,9 +250,10 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		return nil, fmt.Errorf("unable to marshal updated leaf node %s on spark: %w", leaf.ID.String(), err)
 	}
 
-	// TODO: Send gossip message to other SOs with leaves
-	// This PR is getting too big, moving this
-	// err = h.sendFinalizeRenewLeafGossipMessage(ctx, leaf, splitNode)
+	err = h.sendFinalizeNodeTimelockGossipMessage(ctx, splitNode, leaf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send gossip message: %w", err)
+	}
 
 	return &pb.RenewLeafResponse{
 		RenewResult: &pb.RenewLeafResponse_RenewNodeTimelockResult{
@@ -375,9 +377,10 @@ func (h *RenewLeafHandler) renewRefundTimelock(ctx context.Context, signingJob *
 		return nil, fmt.Errorf("unable to marshal updated leaf node %s on spark: %w", leaf.ID.String(), err)
 	}
 
-	// TODO: Send gossip message to other SOs with leaves
-	// This PR is getting too big, moving this
-	// err = h.sendFinalizeRenewLeafGossipMessage(ctx, leaf, nil)
+	err = h.sendFinalizeRefundTimelockGossipMessage(ctx, leaf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send gossip message: %w", err)
+	}
 
 	return &pb.RenewLeafResponse{
 		RenewResult: &pb.RenewLeafResponse_RenewRefundTimelockResult{
@@ -669,5 +672,70 @@ func (h *RenewLeafHandler) validateUserTransactions(userRawTxs [][]byte, expecte
 		}
 	}
 
+	return nil
+}
+
+func (h *RenewLeafHandler) sendFinalizeNodeTimelockGossipMessage(ctx context.Context, splitNode *ent.TreeNode, extendedNode *ent.TreeNode) error {
+	// Create internal nodes for the gossip message
+	splitNodeInternal, err := splitNode.MarshalInternalProto(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to marshal split node to internal proto: %w", err)
+	}
+	extendedNodeInternal, err := extendedNode.MarshalInternalProto(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to marshal extended node to internal proto: %w", err)
+	}
+	// Get operator selection to exclude self
+	selection := helper.OperatorSelection{
+		Option: helper.OperatorSelectionOptionExcludeSelf,
+	}
+	participants, err := selection.OperatorIdentifierList(h.config)
+	if err != nil {
+		return fmt.Errorf("unable to get operator list: %w", err)
+	}
+	// Create and send gossip message
+	sendGossipHandler := NewSendGossipHandler(h.config)
+	_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
+		Message: &pbgossip.GossipMessage_FinalizeNodeTimelock{
+			FinalizeNodeTimelock: &pbgossip.GossipMessageFinalizeRenewNodeTimelock{
+				SplitNode: splitNodeInternal,
+				Node:      extendedNodeInternal,
+			},
+		},
+	}, participants)
+	if err != nil {
+		return fmt.Errorf("unable to create and send gossip message: %w", err)
+	}
+	return nil
+}
+
+func (h *RenewLeafHandler) sendFinalizeRefundTimelockGossipMessage(ctx context.Context, node *ent.TreeNode) error {
+	// Create internal node for the gossip message
+	nodeInternal, err := node.MarshalInternalProto(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to marshal node to internal proto: %w", err)
+	}
+
+	// Get operator selection to exclude self
+	selection := helper.OperatorSelection{
+		Option: helper.OperatorSelectionOptionExcludeSelf,
+	}
+	participants, err := selection.OperatorIdentifierList(h.config)
+	if err != nil {
+		return fmt.Errorf("unable to get operator list: %w", err)
+	}
+
+	// Create and send gossip message
+	sendGossipHandler := NewSendGossipHandler(h.config)
+	_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
+		Message: &pbgossip.GossipMessage_FinalizeRefundTimelock{
+			FinalizeRefundTimelock: &pbgossip.GossipMessageFinalizeRenewRefundTimelock{
+				Node: nodeInternal,
+			},
+		},
+	}, participants)
+	if err != nil {
+		return fmt.Errorf("unable to create and send gossip message: %w", err)
+	}
 	return nil
 }

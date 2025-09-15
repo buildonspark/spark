@@ -110,6 +110,14 @@ func (s *SparkInternalServer) InitiatePreimageSwap(ctx context.Context, req *pbs
 	return &pb.InitiatePreimageSwapResponse{PreimageShare: preimageShare}, err
 }
 
+func (s *SparkInternalServer) FinalizeRenewRefundTimelock(ctx context.Context, req *pb.FinalizeRenewRefundTimelockRequest) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, nil
+}
+
+func (s *SparkInternalServer) FinalizeRenewNodeTimelock(ctx context.Context, req *pb.FinalizeRenewNodeTimelockRequest) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, nil
+}
+
 // UpdatePreimageRequest updates the preimage request.
 func (s *SparkInternalServer) UpdatePreimageRequest(ctx context.Context, req *pb.UpdatePreimageRequestRequest) (*emptypb.Empty, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)

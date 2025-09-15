@@ -515,6 +515,88 @@ func (m *GossipMessage) validate(all bool) error {
 			}
 		}
 
+	case *GossipMessage_FinalizeRefundTimelock:
+		if v == nil {
+			err := GossipMessageValidationError{
+				field:  "Message",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetFinalizeRefundTimelock()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "FinalizeRefundTimelock",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "FinalizeRefundTimelock",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetFinalizeRefundTimelock()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GossipMessageValidationError{
+					field:  "FinalizeRefundTimelock",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	case *GossipMessage_FinalizeNodeTimelock:
+		if v == nil {
+			err := GossipMessageValidationError{
+				field:  "Message",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetFinalizeNodeTimelock()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "FinalizeNodeTimelock",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "FinalizeNodeTimelock",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetFinalizeNodeTimelock()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GossipMessageValidationError{
+					field:  "FinalizeNodeTimelock",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -1647,6 +1729,305 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = GossipMessageFinalizeExtendLeafValidationError{}
+
+// Validate checks the field values on GossipMessageFinalizeRenewRefundTimelock
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the first error encountered is returned, or nil if
+// there are no violations.
+func (m *GossipMessageFinalizeRenewRefundTimelock) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// GossipMessageFinalizeRenewRefundTimelock with the rules defined in the
+// proto definition for this message. If any rules are violated, the result is
+// a list of violation errors wrapped in
+// GossipMessageFinalizeRenewRefundTimelockMultiError, or nil if none found.
+func (m *GossipMessageFinalizeRenewRefundTimelock) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GossipMessageFinalizeRenewRefundTimelock) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetNode()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, GossipMessageFinalizeRenewRefundTimelockValidationError{
+					field:  "Node",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, GossipMessageFinalizeRenewRefundTimelockValidationError{
+					field:  "Node",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetNode()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return GossipMessageFinalizeRenewRefundTimelockValidationError{
+				field:  "Node",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return GossipMessageFinalizeRenewRefundTimelockMultiError(errors)
+	}
+
+	return nil
+}
+
+// GossipMessageFinalizeRenewRefundTimelockMultiError is an error wrapping
+// multiple validation errors returned by
+// GossipMessageFinalizeRenewRefundTimelock.ValidateAll() if the designated
+// constraints aren't met.
+type GossipMessageFinalizeRenewRefundTimelockMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GossipMessageFinalizeRenewRefundTimelockMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GossipMessageFinalizeRenewRefundTimelockMultiError) AllErrors() []error { return m }
+
+// GossipMessageFinalizeRenewRefundTimelockValidationError is the validation
+// error returned by GossipMessageFinalizeRenewRefundTimelock.Validate if the
+// designated constraints aren't met.
+type GossipMessageFinalizeRenewRefundTimelockValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GossipMessageFinalizeRenewRefundTimelockValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GossipMessageFinalizeRenewRefundTimelockValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GossipMessageFinalizeRenewRefundTimelockValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GossipMessageFinalizeRenewRefundTimelockValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GossipMessageFinalizeRenewRefundTimelockValidationError) ErrorName() string {
+	return "GossipMessageFinalizeRenewRefundTimelockValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GossipMessageFinalizeRenewRefundTimelockValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGossipMessageFinalizeRenewRefundTimelock.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GossipMessageFinalizeRenewRefundTimelockValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GossipMessageFinalizeRenewRefundTimelockValidationError{}
+
+// Validate checks the field values on GossipMessageFinalizeRenewNodeTimelock
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the first error encountered is returned, or nil if
+// there are no violations.
+func (m *GossipMessageFinalizeRenewNodeTimelock) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on
+// GossipMessageFinalizeRenewNodeTimelock with the rules defined in the proto
+// definition for this message. If any rules are violated, the result is a
+// list of violation errors wrapped in
+// GossipMessageFinalizeRenewNodeTimelockMultiError, or nil if none found.
+func (m *GossipMessageFinalizeRenewNodeTimelock) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GossipMessageFinalizeRenewNodeTimelock) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetSplitNode()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, GossipMessageFinalizeRenewNodeTimelockValidationError{
+					field:  "SplitNode",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, GossipMessageFinalizeRenewNodeTimelockValidationError{
+					field:  "SplitNode",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetSplitNode()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return GossipMessageFinalizeRenewNodeTimelockValidationError{
+				field:  "SplitNode",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetNode()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, GossipMessageFinalizeRenewNodeTimelockValidationError{
+					field:  "Node",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, GossipMessageFinalizeRenewNodeTimelockValidationError{
+					field:  "Node",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetNode()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return GossipMessageFinalizeRenewNodeTimelockValidationError{
+				field:  "Node",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return GossipMessageFinalizeRenewNodeTimelockMultiError(errors)
+	}
+
+	return nil
+}
+
+// GossipMessageFinalizeRenewNodeTimelockMultiError is an error wrapping
+// multiple validation errors returned by
+// GossipMessageFinalizeRenewNodeTimelock.ValidateAll() if the designated
+// constraints aren't met.
+type GossipMessageFinalizeRenewNodeTimelockMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GossipMessageFinalizeRenewNodeTimelockMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GossipMessageFinalizeRenewNodeTimelockMultiError) AllErrors() []error { return m }
+
+// GossipMessageFinalizeRenewNodeTimelockValidationError is the validation
+// error returned by GossipMessageFinalizeRenewNodeTimelock.Validate if the
+// designated constraints aren't met.
+type GossipMessageFinalizeRenewNodeTimelockValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GossipMessageFinalizeRenewNodeTimelockValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GossipMessageFinalizeRenewNodeTimelockValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GossipMessageFinalizeRenewNodeTimelockValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GossipMessageFinalizeRenewNodeTimelockValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GossipMessageFinalizeRenewNodeTimelockValidationError) ErrorName() string {
+	return "GossipMessageFinalizeRenewNodeTimelockValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GossipMessageFinalizeRenewNodeTimelockValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGossipMessageFinalizeRenewNodeTimelock.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GossipMessageFinalizeRenewNodeTimelockValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GossipMessageFinalizeRenewNodeTimelockValidationError{}
 
 // Validate checks the field values on GossipMessageRollbackUtxoSwap with the
 // rules defined in the proto definition for this message. If any rules are

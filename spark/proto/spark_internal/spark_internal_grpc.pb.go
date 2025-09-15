@@ -30,6 +30,8 @@ const (
 	SparkInternalService_FinalizeTransfer_FullMethodName                   = "/spark_internal.SparkInternalService/finalize_transfer"
 	SparkInternalService_FinalizeRefreshTimelock_FullMethodName            = "/spark_internal.SparkInternalService/finalize_refresh_timelock"
 	SparkInternalService_FinalizeExtendLeaf_FullMethodName                 = "/spark_internal.SparkInternalService/finalize_extend_leaf"
+	SparkInternalService_FinalizeRenewRefundTimelock_FullMethodName        = "/spark_internal.SparkInternalService/finalize_renew_refund_timelock"
+	SparkInternalService_FinalizeRenewNodeTimelock_FullMethodName          = "/spark_internal.SparkInternalService/finalize_renew_node_timelock"
 	SparkInternalService_InitiatePreimageSwap_FullMethodName               = "/spark_internal.SparkInternalService/initiate_preimage_swap"
 	SparkInternalService_ProvidePreimage_FullMethodName                    = "/spark_internal.SparkInternalService/provide_preimage"
 	SparkInternalService_UpdatePreimageRequest_FullMethodName              = "/spark_internal.SparkInternalService/update_preimage_request"
@@ -70,6 +72,8 @@ type SparkInternalServiceClient interface {
 	FinalizeTransfer(ctx context.Context, in *FinalizeTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FinalizeRefreshTimelock(ctx context.Context, in *FinalizeRefreshTimelockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FinalizeExtendLeaf(ctx context.Context, in *FinalizeExtendLeafRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	FinalizeRenewRefundTimelock(ctx context.Context, in *FinalizeRenewRefundTimelockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	FinalizeRenewNodeTimelock(ctx context.Context, in *FinalizeRenewNodeTimelockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiatePreimageSwap(ctx context.Context, in *spark.InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(ctx context.Context, in *ProvidePreimageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	UpdatePreimageRequest(ctx context.Context, in *UpdatePreimageRequestRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -198,6 +202,26 @@ func (c *sparkInternalServiceClient) FinalizeExtendLeaf(ctx context.Context, in 
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, SparkInternalService_FinalizeExtendLeaf_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkInternalServiceClient) FinalizeRenewRefundTimelock(ctx context.Context, in *FinalizeRenewRefundTimelockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_FinalizeRenewRefundTimelock_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkInternalServiceClient) FinalizeRenewNodeTimelock(ctx context.Context, in *FinalizeRenewNodeTimelockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_FinalizeRenewNodeTimelock_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -468,6 +492,8 @@ type SparkInternalServiceServer interface {
 	FinalizeTransfer(context.Context, *FinalizeTransferRequest) (*emptypb.Empty, error)
 	FinalizeRefreshTimelock(context.Context, *FinalizeRefreshTimelockRequest) (*emptypb.Empty, error)
 	FinalizeExtendLeaf(context.Context, *FinalizeExtendLeafRequest) (*emptypb.Empty, error)
+	FinalizeRenewRefundTimelock(context.Context, *FinalizeRenewRefundTimelockRequest) (*emptypb.Empty, error)
+	FinalizeRenewNodeTimelock(context.Context, *FinalizeRenewNodeTimelockRequest) (*emptypb.Empty, error)
 	InitiatePreimageSwap(context.Context, *spark.InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(context.Context, *ProvidePreimageRequest) (*emptypb.Empty, error)
 	UpdatePreimageRequest(context.Context, *UpdatePreimageRequestRequest) (*emptypb.Empty, error)
@@ -538,6 +564,12 @@ func (UnimplementedSparkInternalServiceServer) FinalizeRefreshTimelock(context.C
 }
 func (UnimplementedSparkInternalServiceServer) FinalizeExtendLeaf(context.Context, *FinalizeExtendLeafRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FinalizeExtendLeaf not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) FinalizeRenewRefundTimelock(context.Context, *FinalizeRenewRefundTimelockRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FinalizeRenewRefundTimelock not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) FinalizeRenewNodeTimelock(context.Context, *FinalizeRenewNodeTimelockRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FinalizeRenewNodeTimelock not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) InitiatePreimageSwap(context.Context, *spark.InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InitiatePreimageSwap not implemented")
@@ -793,6 +825,42 @@ func _SparkInternalService_FinalizeExtendLeaf_Handler(srv interface{}, ctx conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkInternalServiceServer).FinalizeExtendLeaf(ctx, req.(*FinalizeExtendLeafRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkInternalService_FinalizeRenewRefundTimelock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FinalizeRenewRefundTimelockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).FinalizeRenewRefundTimelock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_FinalizeRenewRefundTimelock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).FinalizeRenewRefundTimelock(ctx, req.(*FinalizeRenewRefundTimelockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkInternalService_FinalizeRenewNodeTimelock_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FinalizeRenewNodeTimelockRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).FinalizeRenewNodeTimelock(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_FinalizeRenewNodeTimelock_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).FinalizeRenewNodeTimelock(ctx, req.(*FinalizeRenewNodeTimelockRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1289,6 +1357,14 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "finalize_extend_leaf",
 			Handler:    _SparkInternalService_FinalizeExtendLeaf_Handler,
+		},
+		{
+			MethodName: "finalize_renew_refund_timelock",
+			Handler:    _SparkInternalService_FinalizeRenewRefundTimelock_Handler,
+		},
+		{
+			MethodName: "finalize_renew_node_timelock",
+			Handler:    _SparkInternalService_FinalizeRenewNodeTimelock_Handler,
 		},
 		{
 			MethodName: "initiate_preimage_swap",

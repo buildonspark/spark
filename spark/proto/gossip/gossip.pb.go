@@ -42,6 +42,8 @@ type GossipMessage struct {
 	//	*GossipMessage_RollbackUtxoSwap
 	//	*GossipMessage_DepositCleanup
 	//	*GossipMessage_Preimage
+	//	*GossipMessage_FinalizeRefundTimelock
+	//	*GossipMessage_FinalizeNodeTimelock
 	Message       isGossipMessage_Message `protobuf_oneof:"message"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -190,6 +192,24 @@ func (x *GossipMessage) GetPreimage() *GossipMessagePreimage {
 	return nil
 }
 
+func (x *GossipMessage) GetFinalizeRefundTimelock() *GossipMessageFinalizeRenewRefundTimelock {
+	if x != nil {
+		if x, ok := x.Message.(*GossipMessage_FinalizeRefundTimelock); ok {
+			return x.FinalizeRefundTimelock
+		}
+	}
+	return nil
+}
+
+func (x *GossipMessage) GetFinalizeNodeTimelock() *GossipMessageFinalizeRenewNodeTimelock {
+	if x != nil {
+		if x, ok := x.Message.(*GossipMessage_FinalizeNodeTimelock); ok {
+			return x.FinalizeNodeTimelock
+		}
+	}
+	return nil
+}
+
 type isGossipMessage_Message interface {
 	isGossipMessage_Message()
 }
@@ -238,6 +258,14 @@ type GossipMessage_Preimage struct {
 	Preimage *GossipMessagePreimage `protobuf:"bytes,13,opt,name=preimage,proto3,oneof"`
 }
 
+type GossipMessage_FinalizeRefundTimelock struct {
+	FinalizeRefundTimelock *GossipMessageFinalizeRenewRefundTimelock `protobuf:"bytes,14,opt,name=finalize_refund_timelock,json=finalizeRefundTimelock,proto3,oneof"`
+}
+
+type GossipMessage_FinalizeNodeTimelock struct {
+	FinalizeNodeTimelock *GossipMessageFinalizeRenewNodeTimelock `protobuf:"bytes,15,opt,name=finalize_node_timelock,json=finalizeNodeTimelock,proto3,oneof"`
+}
+
 func (*GossipMessage_CancelTransfer) isGossipMessage_Message() {}
 
 func (*GossipMessage_SettleSenderKeyTweak) isGossipMessage_Message() {}
@@ -259,6 +287,10 @@ func (*GossipMessage_RollbackUtxoSwap) isGossipMessage_Message() {}
 func (*GossipMessage_DepositCleanup) isGossipMessage_Message() {}
 
 func (*GossipMessage_Preimage) isGossipMessage_Message() {}
+
+func (*GossipMessage_FinalizeRefundTimelock) isGossipMessage_Message() {}
+
+func (*GossipMessage_FinalizeNodeTimelock) isGossipMessage_Message() {}
 
 type GossipMessageCancelTransfer struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -649,6 +681,102 @@ func (x *GossipMessageFinalizeExtendLeaf) GetInternalNodes() []*spark_internal.T
 	return nil
 }
 
+type GossipMessageFinalizeRenewRefundTimelock struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Node          *spark_internal.TreeNode `protobuf:"bytes,1,opt,name=node,proto3" json:"node,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GossipMessageFinalizeRenewRefundTimelock) Reset() {
+	*x = GossipMessageFinalizeRenewRefundTimelock{}
+	mi := &file_gossip_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GossipMessageFinalizeRenewRefundTimelock) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GossipMessageFinalizeRenewRefundTimelock) ProtoMessage() {}
+
+func (x *GossipMessageFinalizeRenewRefundTimelock) ProtoReflect() protoreflect.Message {
+	mi := &file_gossip_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GossipMessageFinalizeRenewRefundTimelock.ProtoReflect.Descriptor instead.
+func (*GossipMessageFinalizeRenewRefundTimelock) Descriptor() ([]byte, []int) {
+	return file_gossip_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GossipMessageFinalizeRenewRefundTimelock) GetNode() *spark_internal.TreeNode {
+	if x != nil {
+		return x.Node
+	}
+	return nil
+}
+
+type GossipMessageFinalizeRenewNodeTimelock struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	SplitNode     *spark_internal.TreeNode `protobuf:"bytes,1,opt,name=split_node,json=splitNode,proto3" json:"split_node,omitempty"`
+	Node          *spark_internal.TreeNode `protobuf:"bytes,2,opt,name=node,proto3" json:"node,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GossipMessageFinalizeRenewNodeTimelock) Reset() {
+	*x = GossipMessageFinalizeRenewNodeTimelock{}
+	mi := &file_gossip_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GossipMessageFinalizeRenewNodeTimelock) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GossipMessageFinalizeRenewNodeTimelock) ProtoMessage() {}
+
+func (x *GossipMessageFinalizeRenewNodeTimelock) ProtoReflect() protoreflect.Message {
+	mi := &file_gossip_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GossipMessageFinalizeRenewNodeTimelock.ProtoReflect.Descriptor instead.
+func (*GossipMessageFinalizeRenewNodeTimelock) Descriptor() ([]byte, []int) {
+	return file_gossip_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GossipMessageFinalizeRenewNodeTimelock) GetSplitNode() *spark_internal.TreeNode {
+	if x != nil {
+		return x.SplitNode
+	}
+	return nil
+}
+
+func (x *GossipMessageFinalizeRenewNodeTimelock) GetNode() *spark_internal.TreeNode {
+	if x != nil {
+		return x.Node
+	}
+	return nil
+}
+
 // Rollback UTXO swap is called when Create UTXO swap transaction failed to
 // fully complete. This reverts the state back to before the swap, allowing the
 // user to initiate the UTXO swap again.
@@ -666,7 +794,7 @@ type GossipMessageRollbackUtxoSwap struct {
 
 func (x *GossipMessageRollbackUtxoSwap) Reset() {
 	*x = GossipMessageRollbackUtxoSwap{}
-	mi := &file_gossip_proto_msgTypes[9]
+	mi := &file_gossip_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -678,7 +806,7 @@ func (x *GossipMessageRollbackUtxoSwap) String() string {
 func (*GossipMessageRollbackUtxoSwap) ProtoMessage() {}
 
 func (x *GossipMessageRollbackUtxoSwap) ProtoReflect() protoreflect.Message {
-	mi := &file_gossip_proto_msgTypes[9]
+	mi := &file_gossip_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -691,7 +819,7 @@ func (x *GossipMessageRollbackUtxoSwap) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GossipMessageRollbackUtxoSwap.ProtoReflect.Descriptor instead.
 func (*GossipMessageRollbackUtxoSwap) Descriptor() ([]byte, []int) {
-	return file_gossip_proto_rawDescGZIP(), []int{9}
+	return file_gossip_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GossipMessageRollbackUtxoSwap) GetOnChainUtxo() *spark.UTXO {
@@ -724,7 +852,7 @@ type GossipMessageDepositCleanup struct {
 
 func (x *GossipMessageDepositCleanup) Reset() {
 	*x = GossipMessageDepositCleanup{}
-	mi := &file_gossip_proto_msgTypes[10]
+	mi := &file_gossip_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -736,7 +864,7 @@ func (x *GossipMessageDepositCleanup) String() string {
 func (*GossipMessageDepositCleanup) ProtoMessage() {}
 
 func (x *GossipMessageDepositCleanup) ProtoReflect() protoreflect.Message {
-	mi := &file_gossip_proto_msgTypes[10]
+	mi := &file_gossip_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -749,7 +877,7 @@ func (x *GossipMessageDepositCleanup) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GossipMessageDepositCleanup.ProtoReflect.Descriptor instead.
 func (*GossipMessageDepositCleanup) Descriptor() ([]byte, []int) {
-	return file_gossip_proto_rawDescGZIP(), []int{10}
+	return file_gossip_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GossipMessageDepositCleanup) GetTreeId() string {
@@ -769,7 +897,7 @@ type GossipMessagePreimage struct {
 
 func (x *GossipMessagePreimage) Reset() {
 	*x = GossipMessagePreimage{}
-	mi := &file_gossip_proto_msgTypes[11]
+	mi := &file_gossip_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -781,7 +909,7 @@ func (x *GossipMessagePreimage) String() string {
 func (*GossipMessagePreimage) ProtoMessage() {}
 
 func (x *GossipMessagePreimage) ProtoReflect() protoreflect.Message {
-	mi := &file_gossip_proto_msgTypes[11]
+	mi := &file_gossip_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -794,7 +922,7 @@ func (x *GossipMessagePreimage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GossipMessagePreimage.ProtoReflect.Descriptor instead.
 func (*GossipMessagePreimage) Descriptor() ([]byte, []int) {
-	return file_gossip_proto_rawDescGZIP(), []int{11}
+	return file_gossip_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GossipMessagePreimage) GetPreimage() []byte {
@@ -815,7 +943,7 @@ var File_gossip_proto protoreflect.FileDescriptor
 
 const file_gossip_proto_rawDesc = "" +
 	"\n" +
-	"\fgossip.proto\x12\x06gossip\x1a\vspark.proto\x1a\fcommon.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x14spark_internal.proto\x1a\x1bgoogle/protobuf/empty.proto\"\x83\b\n" +
+	"\fgossip.proto\x12\x06gossip\x1a\vspark.proto\x1a\fcommon.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x14spark_internal.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xd9\t\n" +
 	"\rGossipMessage\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12N\n" +
@@ -830,7 +958,9 @@ const file_gossip_proto_rawDesc = "" +
 	" \x01(\v2'.gossip.GossipMessageFinalizeExtendLeafH\x00R\x12finalizeExtendLeaf\x12U\n" +
 	"\x12rollback_utxo_swap\x18\v \x01(\v2%.gossip.GossipMessageRollbackUtxoSwapH\x00R\x10rollbackUtxoSwap\x12N\n" +
 	"\x0fdeposit_cleanup\x18\f \x01(\v2#.gossip.GossipMessageDepositCleanupH\x00R\x0edepositCleanup\x12;\n" +
-	"\bpreimage\x18\r \x01(\v2\x1d.gossip.GossipMessagePreimageH\x00R\bpreimageB\t\n" +
+	"\bpreimage\x18\r \x01(\v2\x1d.gossip.GossipMessagePreimageH\x00R\bpreimage\x12l\n" +
+	"\x18finalize_refund_timelock\x18\x0e \x01(\v20.gossip.GossipMessageFinalizeRenewRefundTimelockH\x00R\x16finalizeRefundTimelock\x12f\n" +
+	"\x16finalize_node_timelock\x18\x0f \x01(\v2..gossip.GossipMessageFinalizeRenewNodeTimelockH\x00R\x14finalizeNodeTimelockB\t\n" +
 	"\amessageJ\x04\b\x03\x10\x04\">\n" +
 	"\x1bGossipMessageCancelTransfer\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
@@ -858,7 +988,13 @@ const file_gossip_proto_rawDesc = "" +
 	"$GossipMessageFinalizeRefreshTimelock\x12?\n" +
 	"\x0einternal_nodes\x18\x01 \x03(\v2\x18.spark_internal.TreeNodeR\rinternalNodes\"b\n" +
 	"\x1fGossipMessageFinalizeExtendLeaf\x12?\n" +
-	"\x0einternal_nodes\x18\x01 \x03(\v2\x18.spark_internal.TreeNodeR\rinternalNodes\"\xa4\x01\n" +
+	"\x0einternal_nodes\x18\x01 \x03(\v2\x18.spark_internal.TreeNodeR\rinternalNodes\"X\n" +
+	"(GossipMessageFinalizeRenewRefundTimelock\x12,\n" +
+	"\x04node\x18\x01 \x01(\v2\x18.spark_internal.TreeNodeR\x04node\"\x8f\x01\n" +
+	"&GossipMessageFinalizeRenewNodeTimelock\x127\n" +
+	"\n" +
+	"split_node\x18\x01 \x01(\v2\x18.spark_internal.TreeNodeR\tsplitNode\x12,\n" +
+	"\x04node\x18\x02 \x01(\v2\x18.spark_internal.TreeNodeR\x04node\"\xa4\x01\n" +
 	"\x1dGossipMessageRollbackUtxoSwap\x12/\n" +
 	"\ron_chain_utxo\x18\x01 \x01(\v2\v.spark.UTXOR\vonChainUtxo\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\fR\tsignature\x124\n" +
@@ -883,27 +1019,29 @@ func file_gossip_proto_rawDescGZIP() []byte {
 	return file_gossip_proto_rawDescData
 }
 
-var file_gossip_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_gossip_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_gossip_proto_goTypes = []any{
-	(*GossipMessage)(nil),                        // 0: gossip.GossipMessage
-	(*GossipMessageCancelTransfer)(nil),          // 1: gossip.GossipMessageCancelTransfer
-	(*GossipMessageRollbackTransfer)(nil),        // 2: gossip.GossipMessageRollbackTransfer
-	(*GossipMessageSettleSenderKeyTweak)(nil),    // 3: gossip.GossipMessageSettleSenderKeyTweak
-	(*GossipMessageMarkTreesExited)(nil),         // 4: gossip.GossipMessageMarkTreesExited
-	(*GossipMessageFinalizeTreeCreation)(nil),    // 5: gossip.GossipMessageFinalizeTreeCreation
-	(*GossipMessageFinalizeTransfer)(nil),        // 6: gossip.GossipMessageFinalizeTransfer
-	(*GossipMessageFinalizeRefreshTimelock)(nil), // 7: gossip.GossipMessageFinalizeRefreshTimelock
-	(*GossipMessageFinalizeExtendLeaf)(nil),      // 8: gossip.GossipMessageFinalizeExtendLeaf
-	(*GossipMessageRollbackUtxoSwap)(nil),        // 9: gossip.GossipMessageRollbackUtxoSwap
-	(*GossipMessageDepositCleanup)(nil),          // 10: gossip.GossipMessageDepositCleanup
-	(*GossipMessagePreimage)(nil),                // 11: gossip.GossipMessagePreimage
-	nil,                                          // 12: gossip.GossipMessageSettleSenderKeyTweak.SenderKeyTweakProofsEntry
-	(*spark_internal.TreeNode)(nil),              // 13: spark_internal.TreeNode
-	(spark.Network)(0),                           // 14: spark.Network
-	(*timestamppb.Timestamp)(nil),                // 15: google.protobuf.Timestamp
-	(*spark.UTXO)(nil),                           // 16: spark.UTXO
-	(*spark.SecretProof)(nil),                    // 17: spark.SecretProof
-	(*emptypb.Empty)(nil),                        // 18: google.protobuf.Empty
+	(*GossipMessage)(nil),                            // 0: gossip.GossipMessage
+	(*GossipMessageCancelTransfer)(nil),              // 1: gossip.GossipMessageCancelTransfer
+	(*GossipMessageRollbackTransfer)(nil),            // 2: gossip.GossipMessageRollbackTransfer
+	(*GossipMessageSettleSenderKeyTweak)(nil),        // 3: gossip.GossipMessageSettleSenderKeyTweak
+	(*GossipMessageMarkTreesExited)(nil),             // 4: gossip.GossipMessageMarkTreesExited
+	(*GossipMessageFinalizeTreeCreation)(nil),        // 5: gossip.GossipMessageFinalizeTreeCreation
+	(*GossipMessageFinalizeTransfer)(nil),            // 6: gossip.GossipMessageFinalizeTransfer
+	(*GossipMessageFinalizeRefreshTimelock)(nil),     // 7: gossip.GossipMessageFinalizeRefreshTimelock
+	(*GossipMessageFinalizeExtendLeaf)(nil),          // 8: gossip.GossipMessageFinalizeExtendLeaf
+	(*GossipMessageFinalizeRenewRefundTimelock)(nil), // 9: gossip.GossipMessageFinalizeRenewRefundTimelock
+	(*GossipMessageFinalizeRenewNodeTimelock)(nil),   // 10: gossip.GossipMessageFinalizeRenewNodeTimelock
+	(*GossipMessageRollbackUtxoSwap)(nil),            // 11: gossip.GossipMessageRollbackUtxoSwap
+	(*GossipMessageDepositCleanup)(nil),              // 12: gossip.GossipMessageDepositCleanup
+	(*GossipMessagePreimage)(nil),                    // 13: gossip.GossipMessagePreimage
+	nil,                                              // 14: gossip.GossipMessageSettleSenderKeyTweak.SenderKeyTweakProofsEntry
+	(*spark_internal.TreeNode)(nil),                  // 15: spark_internal.TreeNode
+	(spark.Network)(0),                               // 16: spark.Network
+	(*timestamppb.Timestamp)(nil),                    // 17: google.protobuf.Timestamp
+	(*spark.UTXO)(nil),                               // 18: spark.UTXO
+	(*spark.SecretProof)(nil),                        // 19: spark.SecretProof
+	(*emptypb.Empty)(nil),                            // 20: google.protobuf.Empty
 }
 var file_gossip_proto_depIdxs = []int32{
 	1,  // 0: gossip.GossipMessage.cancel_transfer:type_name -> gossip.GossipMessageCancelTransfer
@@ -914,25 +1052,30 @@ var file_gossip_proto_depIdxs = []int32{
 	6,  // 5: gossip.GossipMessage.finalize_transfer:type_name -> gossip.GossipMessageFinalizeTransfer
 	7,  // 6: gossip.GossipMessage.finalize_refresh_timelock:type_name -> gossip.GossipMessageFinalizeRefreshTimelock
 	8,  // 7: gossip.GossipMessage.finalize_extend_leaf:type_name -> gossip.GossipMessageFinalizeExtendLeaf
-	9,  // 8: gossip.GossipMessage.rollback_utxo_swap:type_name -> gossip.GossipMessageRollbackUtxoSwap
-	10, // 9: gossip.GossipMessage.deposit_cleanup:type_name -> gossip.GossipMessageDepositCleanup
-	11, // 10: gossip.GossipMessage.preimage:type_name -> gossip.GossipMessagePreimage
-	12, // 11: gossip.GossipMessageSettleSenderKeyTweak.sender_key_tweak_proofs:type_name -> gossip.GossipMessageSettleSenderKeyTweak.SenderKeyTweakProofsEntry
-	13, // 12: gossip.GossipMessageFinalizeTreeCreation.internal_nodes:type_name -> spark_internal.TreeNode
-	14, // 13: gossip.GossipMessageFinalizeTreeCreation.proto_network:type_name -> spark.Network
-	13, // 14: gossip.GossipMessageFinalizeTransfer.internal_nodes:type_name -> spark_internal.TreeNode
-	15, // 15: gossip.GossipMessageFinalizeTransfer.completion_timestamp:type_name -> google.protobuf.Timestamp
-	13, // 16: gossip.GossipMessageFinalizeRefreshTimelock.internal_nodes:type_name -> spark_internal.TreeNode
-	13, // 17: gossip.GossipMessageFinalizeExtendLeaf.internal_nodes:type_name -> spark_internal.TreeNode
-	16, // 18: gossip.GossipMessageRollbackUtxoSwap.on_chain_utxo:type_name -> spark.UTXO
-	17, // 19: gossip.GossipMessageSettleSenderKeyTweak.SenderKeyTweakProofsEntry.value:type_name -> spark.SecretProof
-	0,  // 20: gossip.GossipService.gossip:input_type -> gossip.GossipMessage
-	18, // 21: gossip.GossipService.gossip:output_type -> google.protobuf.Empty
-	21, // [21:22] is the sub-list for method output_type
-	20, // [20:21] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	11, // 8: gossip.GossipMessage.rollback_utxo_swap:type_name -> gossip.GossipMessageRollbackUtxoSwap
+	12, // 9: gossip.GossipMessage.deposit_cleanup:type_name -> gossip.GossipMessageDepositCleanup
+	13, // 10: gossip.GossipMessage.preimage:type_name -> gossip.GossipMessagePreimage
+	9,  // 11: gossip.GossipMessage.finalize_refund_timelock:type_name -> gossip.GossipMessageFinalizeRenewRefundTimelock
+	10, // 12: gossip.GossipMessage.finalize_node_timelock:type_name -> gossip.GossipMessageFinalizeRenewNodeTimelock
+	14, // 13: gossip.GossipMessageSettleSenderKeyTweak.sender_key_tweak_proofs:type_name -> gossip.GossipMessageSettleSenderKeyTweak.SenderKeyTweakProofsEntry
+	15, // 14: gossip.GossipMessageFinalizeTreeCreation.internal_nodes:type_name -> spark_internal.TreeNode
+	16, // 15: gossip.GossipMessageFinalizeTreeCreation.proto_network:type_name -> spark.Network
+	15, // 16: gossip.GossipMessageFinalizeTransfer.internal_nodes:type_name -> spark_internal.TreeNode
+	17, // 17: gossip.GossipMessageFinalizeTransfer.completion_timestamp:type_name -> google.protobuf.Timestamp
+	15, // 18: gossip.GossipMessageFinalizeRefreshTimelock.internal_nodes:type_name -> spark_internal.TreeNode
+	15, // 19: gossip.GossipMessageFinalizeExtendLeaf.internal_nodes:type_name -> spark_internal.TreeNode
+	15, // 20: gossip.GossipMessageFinalizeRenewRefundTimelock.node:type_name -> spark_internal.TreeNode
+	15, // 21: gossip.GossipMessageFinalizeRenewNodeTimelock.split_node:type_name -> spark_internal.TreeNode
+	15, // 22: gossip.GossipMessageFinalizeRenewNodeTimelock.node:type_name -> spark_internal.TreeNode
+	18, // 23: gossip.GossipMessageRollbackUtxoSwap.on_chain_utxo:type_name -> spark.UTXO
+	19, // 24: gossip.GossipMessageSettleSenderKeyTweak.SenderKeyTweakProofsEntry.value:type_name -> spark.SecretProof
+	0,  // 25: gossip.GossipService.gossip:input_type -> gossip.GossipMessage
+	20, // 26: gossip.GossipService.gossip:output_type -> google.protobuf.Empty
+	26, // [26:27] is the sub-list for method output_type
+	25, // [25:26] is the sub-list for method input_type
+	25, // [25:25] is the sub-list for extension type_name
+	25, // [25:25] is the sub-list for extension extendee
+	0,  // [0:25] is the sub-list for field type_name
 }
 
 func init() { file_gossip_proto_init() }
@@ -952,6 +1095,8 @@ func file_gossip_proto_init() {
 		(*GossipMessage_RollbackUtxoSwap)(nil),
 		(*GossipMessage_DepositCleanup)(nil),
 		(*GossipMessage_Preimage)(nil),
+		(*GossipMessage_FinalizeRefundTimelock)(nil),
+		(*GossipMessage_FinalizeNodeTimelock)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -959,7 +1104,7 @@ func file_gossip_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_gossip_proto_rawDesc), len(file_gossip_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   15,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

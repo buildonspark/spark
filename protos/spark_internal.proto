@@ -23,6 +23,9 @@ service SparkInternalService {
 
     rpc finalize_extend_leaf(FinalizeExtendLeafRequest) returns (google.protobuf.Empty) {}
 
+   rpc finalize_renew_refund_timelock(FinalizeRenewRefundTimelockRequest) returns (google.protobuf.Empty) {}
+   rpc finalize_renew_node_timelock(FinalizeRenewNodeTimelockRequest) returns (google.protobuf.Empty) {}
+
     rpc initiate_preimage_swap(spark.InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc provide_preimage(ProvidePreimageRequest) returns (google.protobuf.Empty) {}
     rpc update_preimage_request(UpdatePreimageRequestRequest) returns (google.protobuf.Empty) {}
@@ -152,6 +155,15 @@ message FinalizeRefreshTimelockRequest {
 
 message FinalizeExtendLeafRequest {
     TreeNode node = 1;
+}
+
+message FinalizeRenewRefundTimelockRequest {
+    TreeNode node = 1;
+}
+
+message FinalizeRenewNodeTimelockRequest {
+    TreeNode split_node = 1;
+    TreeNode node = 2;
 }
 
 message TreeNode {
