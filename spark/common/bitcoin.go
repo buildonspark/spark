@@ -415,3 +415,40 @@ func NetworkFromTokenTransaction(tx *pb.TokenTransaction) (Network, error) {
 
 	return NetworkFromProtoNetwork(tx.Network)
 }
+
+// CompareTransactions compares two Bitcoin transactions for structural equality.
+// It checks version, locktime, inputs (sequence and previous outpoints), and outputs (value and pkScript).
+// This function is useful for validating that user-provided transactions match expected structure.
+func CompareTransactions(txA, txB *wire.MsgTx) error {
+	if txA.Version != txB.Version {
+		return fmt.Errorf("expected version %d, got %d", txA.Version, txB.Version)
+	}
+	if txA.LockTime != txB.LockTime {
+		return fmt.Errorf("expected locktime %d, got %d", txA.LockTime, txB.LockTime)
+	}
+	if len(txA.TxIn) != len(txB.TxIn) {
+		return fmt.Errorf("expected %d inputs, got %d", len(txA.TxIn), len(txB.TxIn))
+	}
+	for i, txInA := range txA.TxIn {
+		txInB := txB.TxIn[i]
+		if txInA.Sequence != txInB.Sequence {
+			return fmt.Errorf("expected sequence %d on input %d, got %d", txInA.Sequence, i, txInB.Sequence)
+		}
+		if txInA.PreviousOutPoint != txInB.PreviousOutPoint {
+			return fmt.Errorf("expected previous outpoint %s on input %d, got %s", txInA.PreviousOutPoint.String(), i, txInB.PreviousOutPoint.String())
+		}
+	}
+	if len(txA.TxOut) != len(txB.TxOut) {
+		return fmt.Errorf("expected %d outputs, got %d", len(txA.TxOut), len(txB.TxOut))
+	}
+	for i, txOutA := range txA.TxOut {
+		txOutB := txB.TxOut[i]
+		if txOutA.Value != txOutB.Value {
+			return fmt.Errorf("expected value %d on output %d, got %d", txOutA.Value, i, txOutB.Value)
+		}
+		if !bytes.Equal(txOutA.PkScript, txOutB.PkScript) {
+			return fmt.Errorf("expected pkscript %x on output %d, got %x", txOutA.PkScript, i, txOutB.PkScript)
+		}
+	}
+	return nil
+}

@@ -12,7 +12,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/go-playground/assert/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -136,4 +136,198 @@ func TestSerializeTx(t *testing.T) {
 	serializedTx, err := SerializeTx(tx)
 	require.NoError(t, err)
 	assert.Equal(t, txString, hex.EncodeToString(serializedTx))
+}
+
+func TestCompareTransactions(t *testing.T) {
+	// Helper function to create a basic transaction
+	createBasicTx := func() *wire.MsgTx {
+		tx := wire.NewMsgTx(2)
+
+		// Add a transaction input
+		prevHash := [32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}
+		tx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{
+				Hash:  prevHash,
+				Index: 0,
+			},
+			SignatureScript: []byte{0x01, 0x02},
+			Witness:         wire.TxWitness{[]byte{0x03, 0x04}},
+			Sequence:        0x80000000, // spark.InitialSequence() equivalent
+		})
+
+		// Add a transaction output
+		tx.AddTxOut(&wire.TxOut{
+			Value:    100000,
+			PkScript: []byte{0x76, 0xa9, 0x14, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x88, 0xac},
+		})
+
+		tx.LockTime = 500000
+
+		return tx
+	}
+
+	t.Run("identical transactions should pass", func(t *testing.T) {
+		tx1 := createBasicTx()
+		tx2 := createBasicTx()
+
+		err := CompareTransactions(tx1, tx2)
+		assert.NoError(t, err)
+	})
+
+	t.Run("identical transactions except witness and signature script should pass", func(t *testing.T) {
+		tx1 := createBasicTx()
+		tx2 := createBasicTx()
+
+		// Modify witness and signature script in tx2
+		tx2.TxIn[0].Witness = wire.TxWitness{[]byte{0x05, 0x06, 0x07}}
+		tx2.TxIn[0].SignatureScript = []byte{0x08, 0x09, 0x0a}
+
+		err := CompareTransactions(tx1, tx2)
+		assert.NoError(t, err) // transactions should be considered equal despite different witness and signature script
+	})
+
+	t.Run("different version should fail", func(t *testing.T) {
+		tx1 := createBasicTx()
+		tx2 := createBasicTx()
+		tx2.Version = 3
+
+		err := CompareTransactions(tx1, tx2)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected version 2, got 3")
+	})
+
+	t.Run("different locktime should fail", func(t *testing.T) {
+		tx1 := createBasicTx()
+		tx2 := createBasicTx()
+		tx2.LockTime = 600000
+
+		err := CompareTransactions(tx1, tx2)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected locktime 500000, got 600000")
+	})
+
+	t.Run("different length txin should fail", func(t *testing.T) {
+		tx1 := createBasicTx()
+		tx2 := createBasicTx()
+
+		// Add another input to tx2
+		prevHash2 := [32]byte{2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33}
+		tx2.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{
+				Hash:  prevHash2,
+				Index: 1,
+			},
+			Sequence: 0x80000000, // spark.InitialSequence() equivalent
+		})
+
+		err := CompareTransactions(tx1, tx2)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected 1 inputs, got 2")
+	})
+
+	t.Run("different length txout should fail", func(t *testing.T) {
+		tx1 := createBasicTx()
+		tx2 := createBasicTx()
+
+		// Add another output to tx2
+		tx2.AddTxOut(&wire.TxOut{
+			Value:    50000,
+			PkScript: []byte{0x51},
+		})
+
+		err := CompareTransactions(tx1, tx2)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected 1 outputs, got 2")
+	})
+
+	t.Run("different sequence txin should fail", func(t *testing.T) {
+		tx1 := createBasicTx()
+		tx2 := createBasicTx()
+		tx2.TxIn[0].Sequence = 123456
+
+		err := CompareTransactions(tx1, tx2)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected sequence")
+		assert.Contains(t, err.Error(), "got 123456")
+	})
+
+	t.Run("different previous outpoint txin should fail", func(t *testing.T) {
+		tx1 := createBasicTx()
+		tx2 := createBasicTx()
+
+		// Change the previous outpoint index
+		tx2.TxIn[0].PreviousOutPoint.Index = 5
+
+		err := CompareTransactions(tx1, tx2)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected previous outpoint")
+	})
+
+	t.Run("different txout value should fail", func(t *testing.T) {
+		tx1 := createBasicTx()
+		tx2 := createBasicTx()
+		tx2.TxOut[0].Value = 200000
+
+		err := CompareTransactions(tx1, tx2)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected value 100000 on output 0, got 200000")
+	})
+
+	t.Run("different txout pkscript should fail", func(t *testing.T) {
+		tx1 := createBasicTx()
+		tx2 := createBasicTx()
+		tx2.TxOut[0].PkScript = []byte{0x51, 0x52, 0x53}
+
+		err := CompareTransactions(tx1, tx2)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected pkscript")
+	})
+
+	t.Run("multiple inputs and outputs - different sequence should fail", func(t *testing.T) {
+		// Create transactions with multiple inputs and outputs
+		tx1 := wire.NewMsgTx(2)
+		tx2 := wire.NewMsgTx(2)
+
+		// Add two inputs to both transactions
+		for i := range 2 {
+			prevHash := [32]byte{}
+			prevHash[0] = byte(i + 1)
+
+			txIn1 := &wire.TxIn{
+				PreviousOutPoint: wire.OutPoint{Hash: prevHash, Index: uint32(i)},
+				Sequence:         0x80000000, // spark.InitialSequence() equivalent
+			}
+			txIn2 := &wire.TxIn{
+				PreviousOutPoint: wire.OutPoint{Hash: prevHash, Index: uint32(i)},
+				Sequence:         0x80000000, // spark.InitialSequence() equivalent
+			}
+
+			tx1.AddTxIn(txIn1)
+			tx2.AddTxIn(txIn2)
+		}
+
+		// Add two outputs to both transactions
+		for i := range 2 {
+			txOut1 := &wire.TxOut{
+				Value:    int64(100000 + i*10000),
+				PkScript: []byte{byte(0x51 + i)},
+			}
+			txOut2 := &wire.TxOut{
+				Value:    int64(100000 + i*10000),
+				PkScript: []byte{byte(0x51 + i)},
+			}
+
+			tx1.AddTxOut(txOut1)
+			tx2.AddTxOut(txOut2)
+		}
+
+		// Modify sequence on second input
+		tx2.TxIn[1].Sequence = 999999
+
+		err := CompareTransactions(tx1, tx2)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "expected sequence")
+		assert.Contains(t, err.Error(), "on input 1")
+		assert.Contains(t, err.Error(), "got 999999")
+	})
 }

@@ -87,7 +87,13 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		return nil, fmt.Errorf("failed to construct renew transactions: %w", err)
 	}
 
-	// TODO: add direct txes
+	userRawTxs := [][]byte{signingJob.SplitNodeTxSigningJob.RawTx, signingJob.NodeTxSigningJob.RawTx, signingJob.RefundTxSigningJob.RawTx}
+	expectedTxs := []*wire.MsgTx{splitNodeTx, nodeTx, refundTx}
+	err = h.validateUserTransactions(userRawTxs, expectedTxs)
+	if err != nil {
+		return nil, fmt.Errorf("user transaction validation failed: %w", err)
+	}
+
 	// Create signing jobs with pregenerated nonces
 	var signingJobs []*helper.SigningJobWithPregeneratedNonce
 
@@ -272,7 +278,13 @@ func (h *RenewLeafHandler) renewRefundTimelock(ctx context.Context, signingJob *
 		return nil, fmt.Errorf("failed to construct renew transactions: %w", err)
 	}
 
-	// TODO: add direct txes
+	userRawTxs := [][]byte{signingJob.NodeTxSigningJob.RawTx, signingJob.RefundTxSigningJob.RawTx}
+	expectedTxs := []*wire.MsgTx{nodeTx, refundTx}
+	err = h.validateUserTransactions(userRawTxs, expectedTxs)
+	if err != nil {
+		return nil, fmt.Errorf("user transaction validation failed: %w", err)
+	}
+
 	// Create signing jobs with pregenerated nonces
 	var signingJobs []*helper.SigningJobWithPregeneratedNonce
 
@@ -653,4 +665,25 @@ func (h *RenewLeafHandler) applyAndVerifySignature(tx *wire.MsgTx, signature []b
 	}
 
 	return signedTx, txBytes, nil
+}
+
+// validateUserTransactions validates that user-provided raw transaction bytes match expected wire transactions
+func (h *RenewLeafHandler) validateUserTransactions(userRawTxs [][]byte, expectedTxs []*wire.MsgTx) error {
+	if len(userRawTxs) != len(expectedTxs) {
+		return fmt.Errorf("mismatch between number of raw transactions (%d) and wire transactions (%d)", len(userRawTxs), len(expectedTxs))
+	}
+
+	for i, rawTx := range userRawTxs {
+		userTx, err := common.TxFromRawTxBytes(rawTx)
+		if err != nil {
+			return fmt.Errorf("failed to deserialize user tx at index %d: %w", i, err)
+		}
+
+		err = common.CompareTransactions(expectedTxs[i], userTx)
+		if err != nil {
+			return fmt.Errorf("user signed tx validation failed at index %d: %w", i, err)
+		}
+	}
+
+	return nil
 }
