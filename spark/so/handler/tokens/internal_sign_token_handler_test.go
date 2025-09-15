@@ -24,18 +24,15 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
-func setupInternalSignTokenTestHandler(t *testing.T) (*InternalSignTokenHandler, context.Context, *ent.Tx, func()) {
+func setUpInternalSignTokenTestHandler(t *testing.T) (*InternalSignTokenHandler, context.Context, *ent.Tx, func()) {
 	t.Helper()
 
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestSQLiteContext(t)
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	handler := &InternalSignTokenHandler{
-		config: config,
-	}
+	handler := &InternalSignTokenHandler{config: config}
 
 	cleanup := func() {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
@@ -47,7 +44,7 @@ func setupInternalSignTokenTestHandler(t *testing.T) (*InternalSignTokenHandler,
 }
 
 func TestExchangeRevocationSecretsShares(t *testing.T) {
-	handler, ctx, tx, cleanup := setupInternalSignTokenTestHandler(t)
+	handler, ctx, tx, cleanup := setUpInternalSignTokenTestHandler(t)
 	defer cleanup()
 	testHash := []byte{
 		0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
@@ -114,7 +111,7 @@ func TestExchangeRevocationSecretsShares(t *testing.T) {
 }
 
 func TestGetSecretSharesNotInInput(t *testing.T) {
-	handler, ctx, tx, cleanup := setupInternalSignTokenTestHandler(t)
+	handler, ctx, tx, cleanup := setUpInternalSignTokenTestHandler(t)
 	defer cleanup()
 	rng := rand.NewChaCha8([32]byte{})
 
@@ -238,18 +235,18 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 }
 
 func TestValidateSignaturesPackageAndPersistPeerSignatures_RequireThresholdOperators(t *testing.T) {
-	handler, ctx, tx, cleanup := setupInternalSignTokenTestHandler(t)
+	handler, ctx, tx, cleanup := setUpInternalSignTokenTestHandler(t)
 	defer cleanup()
 
 	// Limit to 3 operators and set threshold to 2.
 	limitedOperators := make(map[string]*so.SigningOperator)
-	ids := make([]string, 0, 3)
-	for i := 0; i < 3; i++ {
+	ids := make([]string, 3)
+	for i := range ids {
 		id := fmt.Sprintf("%064x", i+1)
 		op, ok := handler.config.SigningOperatorMap[id]
 		require.True(t, ok, "operator %s must exist", id)
 		limitedOperators[id] = op
-		ids = append(ids, id)
+		ids[i] = id
 	}
 	handler.config.SigningOperatorMap = limitedOperators
 	handler.config.Threshold = 2

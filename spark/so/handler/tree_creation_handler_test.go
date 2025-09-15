@@ -881,7 +881,6 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 			ctx, _ := db.NewTestSQLiteContext(t)
 			dbTx, err := ent.GetDbFromContext(ctx)
 			require.NoError(t, err)
-
 			handler := createTestHandler()
 
 			keysharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)

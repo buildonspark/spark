@@ -16,8 +16,7 @@ import (
 )
 
 func TestTimeoutMiddleware_TestSlowTask(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestSQLiteContext(t)
 
 	timeout := 200 * time.Millisecond
@@ -37,13 +36,12 @@ func TestTimeoutMiddleware_TestSlowTask(t *testing.T) {
 
 	taskWithTimeout := task.wrapMiddleware(TimeoutMiddleware())
 
-	err = taskWithTimeout.Task(ctx, config, knobs.NewFixedKnobs(map[string]float64{}))
+	err := taskWithTimeout.Task(ctx, config, knobs.NewFixedKnobs(map[string]float64{}))
 	require.ErrorIs(t, err, errTaskTimeout)
 }
 
 func TestTimeoutMiddleware_TestTaskFinishes(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestSQLiteContext(t)
 
 	timeout := 10 * time.Second
@@ -63,13 +61,12 @@ func TestTimeoutMiddleware_TestTaskFinishes(t *testing.T) {
 
 	taskWithTimeout := task.wrapMiddleware(TimeoutMiddleware())
 
-	err = taskWithTimeout.Task(ctx, config, knobs.NewFixedKnobs(map[string]float64{}))
+	err := taskWithTimeout.Task(ctx, config, knobs.NewFixedKnobs(map[string]float64{}))
 	require.NoError(t, err)
 }
 
 func TestTimeoutMiddleware_TestContextCancelled(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestSQLiteContext(t)
 
 	timeout := 10 * time.Second
@@ -121,8 +118,7 @@ func TestTimeoutMiddleware_TestContextCancelled(t *testing.T) {
 }
 
 func TestDatabaseMiddleware_TestCommitWhenTaskSuccessful(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 
 	dbClient := db.NewTestSQLiteClient(t)
 	dbSession := db.NewSession(t.Context(), dbClient)
@@ -192,8 +188,7 @@ func TestDatabaseMiddleware_TestCommitWhenTaskSuccessful(t *testing.T) {
 }
 
 func TestDatabaseMiddleware_TestRollbackWhenTaskUnsuccessful(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 
 	dbClient := db.NewTestSQLiteClient(t)
 	dbSession := db.NewSession(t.Context(), dbClient)
@@ -262,8 +257,7 @@ func TestDatabaseMiddleware_TestRollbackWhenTaskUnsuccessful(t *testing.T) {
 }
 
 func TestDatabaseMiddleware_TestTaskCanCommitTransaction(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 
 	dbClient := db.NewTestSQLiteClient(t)
 	dbSession := db.NewSession(t.Context(), dbClient)
@@ -283,15 +277,14 @@ func TestDatabaseMiddleware_TestTaskCanCommitTransaction(t *testing.T) {
 
 	taskWithDb := task.wrapMiddleware(DatabaseMiddleware(&db.TestSessionFactory{Session: dbSession}, nil))
 
-	err = taskWithDb.Task(t.Context(), config, knobs.NewFixedKnobs(map[string]float64{}))
+	err := taskWithDb.Task(t.Context(), config, knobs.NewFixedKnobs(map[string]float64{}))
 	require.NoError(t, err, "Expected task to commit transaction successfully")
 
 	require.Nil(t, dbSession.GetTxIfExists(), "Expected no current transaction after task completed.")
 }
 
 func TestPanicRecoveryInterceptor_TestNoPanic(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestSQLiteContext(t)
 
 	task := BaseTaskSpec{
@@ -304,13 +297,12 @@ func TestPanicRecoveryInterceptor_TestNoPanic(t *testing.T) {
 
 	taskWithRecovery := task.wrapMiddleware(PanicRecoveryMiddleware())
 
-	err = taskWithRecovery.Task(ctx, config, knobs.NewFixedKnobs(map[string]float64{}))
+	err := taskWithRecovery.Task(ctx, config, knobs.NewFixedKnobs(map[string]float64{}))
 	require.NoError(t, err)
 }
 
 func TestPanicRecoveryInterceptor_TestPanic(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestSQLiteContext(t)
 
 	task := BaseTaskSpec{
@@ -323,6 +315,6 @@ func TestPanicRecoveryInterceptor_TestPanic(t *testing.T) {
 
 	taskWithRecovery := task.wrapMiddleware(PanicRecoveryMiddleware())
 
-	err = taskWithRecovery.Task(ctx, config, knobs.NewFixedKnobs(map[string]float64{}))
+	err := taskWithRecovery.Task(ctx, config, knobs.NewFixedKnobs(map[string]float64{}))
 	require.ErrorIs(t, err, errTaskPanic)
 }

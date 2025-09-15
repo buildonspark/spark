@@ -26,9 +26,7 @@ import (
 )
 
 func TestGenerateDepositAddress(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestWalletConfig(t)
 	token, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 	ctx := wallet.ContextWithToken(t.Context(), token)
@@ -55,9 +53,7 @@ func TestGenerateDepositAddress(t *testing.T) {
 }
 
 func TestGenerateDepositAddressWithoutCustomLeafID(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestWalletConfig(t)
 	token, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 	ctx := wallet.ContextWithToken(t.Context(), token)
@@ -74,9 +70,7 @@ func TestGenerateDepositAddressWithoutCustomLeafID(t *testing.T) {
 }
 
 func TestGenerateDepositAddressConcurrentRequests(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestWalletConfig(t)
 	token, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 	ctx := wallet.ContextWithToken(t.Context(), token)
@@ -126,9 +120,7 @@ func TestGenerateDepositAddressConcurrentRequests(t *testing.T) {
 }
 
 func TestGenerateStaticDepositAddress(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestWalletConfig(t)
 	token, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 	ctx := wallet.ContextWithToken(t.Context(), token)
@@ -163,9 +155,7 @@ func TestGenerateStaticDepositAddress(t *testing.T) {
 }
 
 func TestGenerateStaticDepositAddressDedicatedEndpoint(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestWalletConfig(t)
 	token, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 	ctx := wallet.ContextWithToken(t.Context(), token)
@@ -202,9 +192,7 @@ func TestGenerateStaticDepositAddressDedicatedEndpoint(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationBasic(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestWalletConfig(t)
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	require.NoError(t, err)
 	defer conn.Close()
@@ -296,10 +284,7 @@ func TestStartDepositTreeCreationBasic(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationUnknownAddress(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	config := sparktesting.TestWalletConfig(t)
 
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	if err != nil {
@@ -317,7 +302,7 @@ func TestStartDepositTreeCreationUnknownAddress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	leafID := uuid.New().String()
+	leafID := uuid.NewString()
 	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
 	if err != nil {
 		t.Fatalf("failed to generate deposit address: %v", err)
@@ -396,10 +381,7 @@ func TestStartDepositTreeCreationUnknownAddress(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationWithoutCustomLeafID(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	config := sparktesting.TestWalletConfig(t)
 
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	if err != nil {
@@ -483,10 +465,7 @@ func TestStartDepositTreeCreationWithoutCustomLeafID(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	config := sparktesting.TestWalletConfig(t)
 
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	if err != nil {
@@ -643,10 +622,7 @@ func TestStartDepositTreeCreationOffchain(t *testing.T) {
 	coin, err := faucet.Fund()
 	require.NoError(t, err)
 
-	config, err := sparktesting.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	config := sparktesting.TestWalletConfig(t)
 
 	// Setup Mock tx
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
@@ -773,10 +749,7 @@ func TestStartDepositTreeCreationUnconfirmed(t *testing.T) {
 	coin, err := faucet.Fund()
 	require.NoError(t, err)
 
-	config, err := sparktesting.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	config := sparktesting.TestWalletConfig(t)
 
 	// Setup Mock tx
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
@@ -867,10 +840,7 @@ func TestStartDepositTreeCreationUnconfirmed(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationIdempotency(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	config := sparktesting.TestWalletConfig(t)
 
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	if err != nil {
@@ -987,10 +957,7 @@ func TestStartDepositTreeCreationIdempotency(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationDoubleClaim(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	config := sparktesting.TestWalletConfig(t)
 
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	if err != nil {
@@ -1101,10 +1068,7 @@ func TestStartDepositTreeCreationDoubleClaim(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationDepositCleanup(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	config := sparktesting.TestWalletConfig(t)
 
 	conn, err := config.NewCoordinatorGRPCConnection()
 	if err != nil {
@@ -1229,17 +1193,10 @@ func TestStartDepositTreeCreationDepositCleanup(t *testing.T) {
 }
 
 func TestQueryUnusedDepositAddresses(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	config := sparktesting.TestWalletConfig(t)
+	soConfig := sparktesting.TestConfig(t)
 
-	soConfig, err := sparktesting.TestConfig()
-	if err != nil {
-		t.Fatalf("failed to create SO config: %v", err)
-	}
-
-	err = dkg.GenerateKeys(t.Context(), soConfig, 500)
+	err := dkg.GenerateKeys(t.Context(), soConfig, 500)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1280,17 +1237,10 @@ func TestQueryUnusedDepositAddresses(t *testing.T) {
 }
 
 func TestQueryUnusedDepositAddressesBackwardsCompatibility(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	config := sparktesting.TestWalletConfig(t)
+	soConfig := sparktesting.TestConfig(t)
 
-	soConfig, err := sparktesting.TestConfig()
-	if err != nil {
-		t.Fatalf("failed to create SO config: %v", err)
-	}
-
-	err = dkg.GenerateKeys(t.Context(), soConfig, 500)
+	err := dkg.GenerateKeys(t.Context(), soConfig, 500)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1311,8 +1261,8 @@ func TestQueryUnusedDepositAddressesBackwardsCompatibility(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 225; i++ {
-		leafID := uuid.New().String()
+	for i := range 225 {
+		leafID := uuid.NewString()
 		_, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
 		if err != nil {
 			t.Fatalf("failed to generate deposit address %d: %v", i+1, err)

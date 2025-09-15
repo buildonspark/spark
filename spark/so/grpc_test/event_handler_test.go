@@ -22,12 +22,8 @@ func skipConnectedEvent(t *testing.T, stream pb.SparkService_SubscribeToEventsCl
 }
 
 func TestEventHandlerTransferNotification(t *testing.T) {
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
-	receiverConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	senderConfig := sparktesting.TestWalletConfig(t)
+	receiverConfig := sparktesting.TestWalletConfig(t)
 	stream, err := wallet.SubscribeToEvents(t.Context(), receiverConfig)
 	require.NoError(t, err)
 
@@ -104,9 +100,7 @@ func TestEventHandlerTransferNotification(t *testing.T) {
 }
 
 func TestEventHandlerDepositNotification(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestWalletConfig(t)
 	stream, err := wallet.SubscribeToEvents(t.Context(), config)
 	require.NoError(t, err)
 
@@ -144,12 +138,8 @@ func TestEventHandlerDepositNotification(t *testing.T) {
 }
 
 func TestMultipleSubscriptions(t *testing.T) {
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
-	receiverConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	senderConfig := sparktesting.TestWalletConfig(t)
+	receiverConfig := sparktesting.TestWalletConfig(t)
 	stream1, err := wallet.SubscribeToEvents(t.Context(), receiverConfig)
 	require.NoError(t, err)
 

@@ -92,9 +92,7 @@ func TestStaticDepositSSPLegacy(t *testing.T) {
 	// Initiate Users
 	// *********************************************************************************
 	// 1. Initiate Alice
-	aliceConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	aliceConfig := sparktesting.TestWalletConfig(t)
 	aliceLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	_, err = sparktesting.CreateNewTree(aliceConfig, faucet, aliceLeafPrivKey, 100_000)
@@ -109,9 +107,7 @@ func TestStaticDepositSSPLegacy(t *testing.T) {
 	aliceCtx := wallet.ContextWithToken(t.Context(), aliceConnectionToken)
 
 	// 2. Initiate SSP
-	sspConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	sspConfig := sparktesting.TestWalletConfig(t)
 	sspLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	sspRootNode, err := sparktesting.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 90_000)
@@ -133,7 +129,7 @@ func TestStaticDepositSSPLegacy(t *testing.T) {
 	// a Signing key using derivation schema
 	aliceDepositPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	leafID := uuid.New().String()
+	leafID := uuid.NewString()
 
 	depositResp, err := wallet.GenerateDepositAddress(
 		aliceCtx,
@@ -258,8 +254,7 @@ func TestStaticDepositSSPLegacy(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	ctx, dbCtx := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 	schemaNetwork, err := common.SchemaNetworkFromProtoNetwork(pb.Network_REGTEST)
@@ -395,9 +390,7 @@ func TestStaticDepositUserRefundLegacy(t *testing.T) {
 	// Initiate Users
 	// *********************************************************************************
 	// 1. Initiate Alice
-	aliceConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	aliceConfig := sparktesting.TestWalletConfig(t)
 	aliceLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	_, err = sparktesting.CreateNewTree(aliceConfig, faucet, aliceLeafPrivKey, 100_000)
@@ -419,7 +412,7 @@ func TestStaticDepositUserRefundLegacy(t *testing.T) {
 	// a Signing key using derivation schema
 	aliceDepositPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	leafID := uuid.New().String()
+	leafID := uuid.NewString()
 
 	depositResp, err := wallet.GenerateDepositAddress(
 		aliceCtx,
@@ -622,8 +615,7 @@ func TestStaticDepositSSP(t *testing.T) {
 	// Initiate Users
 	// *********************************************************************************
 	// 1. Initiate Alice
-	aliceConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
+	aliceConfig := sparktesting.TestWalletConfig(t)
 
 	aliceConn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(aliceConfig.CoordinatorAddress(), nil)
 	require.NoError(t, err)
@@ -634,8 +626,7 @@ func TestStaticDepositSSP(t *testing.T) {
 	aliceCtx := wallet.ContextWithToken(t.Context(), aliceConnectionToken)
 
 	// 2. Initiate SSP
-	sspConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
+	sspConfig := sparktesting.TestWalletConfig(t)
 
 	sspLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
@@ -658,7 +649,7 @@ func TestStaticDepositSSP(t *testing.T) {
 	// a Signing key using derivation schema
 	aliceDepositPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	leafID := uuid.New().String()
+	leafID := uuid.NewString()
 
 	depositResp, err := wallet.GenerateDepositAddress(
 		aliceCtx,
@@ -856,8 +847,7 @@ func TestStaticDepositSSP(t *testing.T) {
 		})
 
 		t.Run("Verify spend tx can be broadcasted", func(t *testing.T) {
-			config, err := sparktesting.TestConfig()
-			require.NoError(t, err)
+			config := sparktesting.TestConfig(t)
 			_, dbTx := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 			schemaNetwork, err := common.SchemaNetworkFromProtoNetwork(pb.Network_REGTEST)
@@ -985,8 +975,7 @@ func TestStaticDepositSSPV1WrongTransferAmount(t *testing.T) {
 	// Initiate Users
 	// *********************************************************************************
 	// 1. Initiate Alice
-	aliceConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
+	aliceConfig := sparktesting.TestWalletConfig(t)
 
 	aliceLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
@@ -1002,8 +991,7 @@ func TestStaticDepositSSPV1WrongTransferAmount(t *testing.T) {
 	aliceCtx := wallet.ContextWithToken(t.Context(), aliceConnectionToken)
 
 	// 2. Initiate SSP
-	sspConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
+	sspConfig := sparktesting.TestWalletConfig(t)
 
 	sspLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
@@ -1027,7 +1015,7 @@ func TestStaticDepositSSPV1WrongTransferAmount(t *testing.T) {
 	aliceDepositPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 
-	leafID := uuid.New().String()
+	leafID := uuid.NewString()
 
 	depositResp, err := wallet.GenerateDepositAddress(
 		aliceCtx,
@@ -1096,7 +1084,7 @@ func TestStaticDepositSSPV1WrongTransferAmount(t *testing.T) {
 		SigningPrivKey:    sspLeafPrivKey,
 		NewSigningPrivKey: newLeafPrivKey,
 	}
-	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
 	// *********************************************************************************
 	// Create spend tx from Alice's deposit to SSP L1 Wallet Address
@@ -1140,7 +1128,7 @@ func TestStaticDepositSSPV1WrongTransferAmount(t *testing.T) {
 		sspCtx,
 		sspConfig,
 		common.Regtest,
-		leavesToTransfer[:],
+		leavesToTransfer,
 		spendTx,
 		aliceDepositPrivKey,
 		userSignature,
@@ -1163,8 +1151,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 	// Initiate Users
 	// *********************************************************************************
 	// 1. Initiate Alice
-	aliceConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
+	aliceConfig := sparktesting.TestWalletConfig(t)
 
 	aliceLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
@@ -1187,7 +1174,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 	// a Signing key using derivation schema
 	aliceDepositPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	leafID := uuid.New().String()
+	leafID := uuid.NewString()
 
 	depositResp, err := wallet.GenerateDepositAddress(
 		aliceCtx,
@@ -1285,9 +1272,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 	time.Sleep(1000 * time.Millisecond)
 
 	t.Run("Refund Static Deposit by a wrong user fails", func(t *testing.T) {
-		bobConfig, err := sparktesting.TestWalletConfig()
-		require.NoError(t, err)
-
+		bobConfig := sparktesting.TestWalletConfig(t)
 		bobConn, err := bobConfig.NewCoordinatorGRPCConnection()
 		require.NoError(t, err)
 		defer bobConn.Close()
@@ -1421,9 +1406,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 	// A call to RefundStaticDeposit should fail if the caller is not the owner of the utxo swap
 	// *********************************************************************************
 	t.Run("Refund Static Deposit again if the caller is not the owner of the utxo swap fails", func(t *testing.T) {
-		bobConfig, err := sparktesting.TestWalletConfig()
-		require.NoError(t, err)
-
+		bobConfig := sparktesting.TestWalletConfig(t)
 		bobLeafPrivKey, err := keys.GeneratePrivateKey()
 		require.NoError(t, err)
 		_, err = sparktesting.CreateNewTree(bobConfig, faucet, bobLeafPrivKey, 100_000)
@@ -1466,9 +1449,7 @@ func TestStaticDepositUserRefundAfterFailedClaim(t *testing.T) {
 	// Initiate Users
 	// *********************************************************************************
 	// 1. Initiate Alice
-	aliceConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	aliceConfig := sparktesting.TestWalletConfig(t)
 	aliceLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	_, err = sparktesting.CreateNewTree(aliceConfig, faucet, aliceLeafPrivKey, 100_000)
@@ -1483,9 +1464,7 @@ func TestStaticDepositUserRefundAfterFailedClaim(t *testing.T) {
 	aliceCtx := wallet.ContextWithToken(t.Context(), aliceConnectionToken)
 
 	// 2. Initiate SSP
-	sspConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	sspConfig := sparktesting.TestWalletConfig(t)
 	sspLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	sspRootNode, err := sparktesting.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, int64(transferAmount))
@@ -1509,7 +1488,7 @@ func TestStaticDepositUserRefundAfterFailedClaim(t *testing.T) {
 	require.NoError(t, err)
 	aliceDepositPubKey := aliceDepositPrivKey.Public()
 
-	leafID := uuid.New().String()
+	leafID := uuid.NewString()
 
 	depositResp, err := wallet.GenerateDepositAddress(
 		aliceCtx,
@@ -1687,9 +1666,7 @@ func TestStaticDepositSSPConcurrent(t *testing.T) {
 	// Initiate Users
 	// *********************************************************************************
 	// 1. Initiate Alice
-	aliceConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	aliceConfig := sparktesting.TestWalletConfig(t)
 	aliceLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	_, err = sparktesting.CreateNewTree(aliceConfig, faucet, aliceLeafPrivKey, 100_000)
@@ -1704,9 +1681,7 @@ func TestStaticDepositSSPConcurrent(t *testing.T) {
 	aliceCtx := wallet.ContextWithToken(t.Context(), aliceConnectionToken)
 
 	// 2. Initiate SSP
-	sspConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	sspConfig := sparktesting.TestWalletConfig(t)
 	sspLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	sspRootNode, err := sparktesting.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 90_000)
@@ -1730,7 +1705,7 @@ func TestStaticDepositSSPConcurrent(t *testing.T) {
 	require.NoError(t, err)
 	aliceDepositPubKey := aliceDepositPrivKey.Public()
 
-	leafID := uuid.New().String()
+	leafID := uuid.NewString()
 
 	depositResp, err := wallet.GenerateDepositAddress(
 		aliceCtx,

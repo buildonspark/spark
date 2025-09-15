@@ -98,7 +98,7 @@ func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration
 
 		opts := []db.SessionOption{
 			db.WithMetricAttributes([]attribute.KeyValue{
-				TaskNameKey.String(task.Name),
+				nameKey.String(task.Name),
 			}),
 		}
 

@@ -27,8 +27,7 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	config.Token.EnableBackfillSpentTokenTransactionHistoryTask = true
 
 	keyshare, err := tx.SigningKeyshare.Create().

@@ -14,8 +14,7 @@ import (
 
 func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t *testing.T) {
 	// Create a proper test config
-	config, err := testutil.TestConfig()
-	require.NoError(t, err)
+	config := testutil.TestConfig(t)
 
 	// Test cases
 	testCases := []struct {
@@ -89,8 +88,7 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t *testing.T) {
 
 func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest_InvalidNetwork(t *testing.T) {
 	// Create a proper test config
-	config, err := testutil.TestConfig()
-	require.NoError(t, err)
+	config := testutil.TestConfig(t)
 
 	// Test with invalid network
 	utxo := &pb.UTXO{
@@ -99,15 +97,13 @@ func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest_InvalidNetwork(t *t
 		Network: pb.Network_UNSPECIFIED, // Invalid network
 	}
 
-	_, err = GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t.Context(), config, utxo)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "network is required")
+	_, err := GenerateRollbackStaticDepositUtxoSwapForUtxoRequest(t.Context(), config, utxo)
+	require.ErrorContains(t, err, "network is required")
 }
 
 func TestGenerateRollbackStaticDepositUtxoSwapForUtxoRequest_EmptyTxid(t *testing.T) {
 	// Create a proper test config
-	config, err := testutil.TestConfig()
-	require.NoError(t, err)
+	config := testutil.TestConfig(t)
 
 	// Test with empty txid
 	utxo := &pb.UTXO{

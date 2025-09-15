@@ -29,9 +29,7 @@ type queryTokenTestFixture struct {
 
 func setUpQueryTokenTestHandler(t *testing.T) *queryTokenTestFixture {
 	t.Helper()
-
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestSQLiteContext(t)
 
 	handler := &QueryTokenHandler{

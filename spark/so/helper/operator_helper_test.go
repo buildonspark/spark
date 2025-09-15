@@ -2,7 +2,7 @@ package helper_test
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"maps"
 	"slices"
 	"testing"
@@ -16,8 +16,7 @@ import (
 )
 
 func TestNewPreSelectedOperatorSelection_InvalidIDs_Errors(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	selectedIDs := []string{"not-a-real-id"}
 
 	got, err := helper.NewPreSelectedOperatorSelection(config, selectedIDs)
@@ -26,8 +25,7 @@ func TestNewPreSelectedOperatorSelection_InvalidIDs_Errors(t *testing.T) {
 }
 
 func TestOperatorList_PreSelected(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	selectedIDs := slices.Collect(maps.Keys(config.SigningOperatorMap))[:2]
 	want := make([]*so.SigningOperator, 2)
 	for i, id := range selectedIDs {
@@ -44,8 +42,7 @@ func TestOperatorList_PreSelected(t *testing.T) {
 }
 
 func TestOperatorList_OperatorSelectionAll(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	selection := helper.OperatorSelection{
 		Option: helper.OperatorSelectionOptionAll,
 	}
@@ -56,8 +53,7 @@ func TestOperatorList_OperatorSelectionAll(t *testing.T) {
 }
 
 func TestOperatorList_OptionThreshold(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	selection := helper.OperatorSelection{
 		Option:    helper.OperatorSelectionOptionThreshold,
 		Threshold: 2,
@@ -69,8 +65,7 @@ func TestOperatorList_OptionThreshold(t *testing.T) {
 }
 
 func TestOperatorList_OptionThreshold_ThresholdTooHigh_Errors(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	selection := helper.OperatorSelection{
 		Option:    helper.OperatorSelectionOptionThreshold,
 		Threshold: len(config.SigningOperatorMap) + 1, // Too high
@@ -82,8 +77,7 @@ func TestOperatorList_OptionThreshold_ThresholdTooHigh_Errors(t *testing.T) {
 }
 
 func TestOperatorList_ExcludeSelf(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	selection := helper.OperatorSelection{
 		Option: helper.OperatorSelectionOptionExcludeSelf,
 	}
@@ -99,8 +93,7 @@ func TestOperatorList_ExcludeSelf(t *testing.T) {
 }
 
 func TestOperatorList_CachesRepeatedCalls(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	preselected, _ := helper.NewPreSelectedOperatorSelection(config, []string{config.Identifier})
 
 	tests := []struct {
@@ -147,8 +140,7 @@ func TestOperatorList_CachesRepeatedCalls(t *testing.T) {
 }
 
 func TestExecuteTaskWithAllOperators(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	selection := helper.OperatorSelection{
 		Option: helper.OperatorSelectionOptionAll,
 	}
@@ -168,8 +160,7 @@ func TestExecuteTaskWithAllOperators(t *testing.T) {
 }
 
 func TestExecuteTaskWithAllOperators_Error(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
 	errMsg := "intentional error"
 	var failID string
@@ -179,12 +170,12 @@ func TestExecuteTaskWithAllOperators_Error(t *testing.T) {
 	}
 	task := func(_ context.Context, operator *so.SigningOperator) (string, error) {
 		if operator.Identifier == failID {
-			return "", fmt.Errorf("%s", errMsg)
+			return "", errors.New(errMsg)
 		}
 		return operator.Identifier, nil
 	}
 
-	_, err = helper.ExecuteTaskWithAllOperators(t.Context(), config, &selection, task)
+	_, err := helper.ExecuteTaskWithAllOperators(t.Context(), config, &selection, task)
 	require.Error(t, err)
 	assert.Equal(t, errMsg, err.Error())
 }

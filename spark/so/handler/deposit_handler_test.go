@@ -27,7 +27,6 @@ import (
 func TestVerifiedTargetUtxo(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
-
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
@@ -337,7 +336,6 @@ func TestGenerateStaticDepositAddressReturnsDefaultAddress(t *testing.T) {
 		},
 	}
 	ctx, _ := db.NewTestSQLiteContext(t)
-
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 

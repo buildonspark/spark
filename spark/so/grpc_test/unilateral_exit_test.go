@@ -121,9 +121,7 @@ func feeBumpAndConfirmTx(t *testing.T, client *rpcclient.Client, faucet *sparkte
 // a single leaf tree.
 func TestUnilateralExitSingleLeaf(t *testing.T) {
 	skipIfGithubActions(t)
-	config, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestWalletConfig(t)
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	rootNode, err := sparktesting.CreateNewTree(config, faucet, leafPrivKey, 100_000)
@@ -156,9 +154,7 @@ func TestUnilateralExitSingleLeaf(t *testing.T) {
 // Test we can unilateral exit a leaf node of a tree with multiple leaves.
 func TestUnilateralExitTreeLeaf(t *testing.T) {
 	skipIfGithubActions(t)
-	config, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestWalletConfig(t)
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(config, faucet, leafPrivKey, 100_000, 1)

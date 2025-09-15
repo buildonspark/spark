@@ -20,9 +20,7 @@ import (
 )
 
 func TestTreeCreationAddressGeneration(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestWalletConfig(t)
 	// Setup Mock tx
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	require.NoError(t, err, "failed to connect to operator")
@@ -63,9 +61,7 @@ func TestTreeCreationAddressGeneration(t *testing.T) {
 }
 
 func TestTreeCreationWithMultiLevels(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestWalletConfig(t)
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	require.NoError(t, err)
 	defer conn.Close()
@@ -158,9 +154,7 @@ func TestTreeCreationWithMultiLevels(t *testing.T) {
 }
 
 func TestTreeCreationSplitMultipleTimes(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestWalletConfig(t)
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	require.NoError(t, err)
 	defer conn.Close()

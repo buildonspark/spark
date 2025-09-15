@@ -423,7 +423,6 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithoutRefundTxStatus(t *testin
 // Regression test for https://linear.app/lightsparkdev/issue/LIG-8094
 func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-
 	config := &so.Config{}
 	handler := NewFinalizeSignatureHandler(config)
 

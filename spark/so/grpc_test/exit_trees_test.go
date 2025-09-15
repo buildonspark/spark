@@ -13,10 +13,7 @@ import (
 )
 
 func TestExitSingleNodeTrees(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	config := sparktesting.TestWalletConfig(t)
 	client := sparktesting.GetBitcoinClient()
 
 	var roots []*pb.TreeNode
@@ -37,14 +34,10 @@ func TestExitSingleNodeTrees(t *testing.T) {
 	require.NoError(t, err, "failed to create random address")
 
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
-	if err != nil {
-		t.Fatalf("failed to connect to operator: %v", err)
-	}
+	require.NoError(t, err, "failed to connect to operator")
 	defer conn.Close()
 	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
-	if err != nil {
-		t.Fatalf("failed to authenticate: %v", err)
-	}
+	require.NoError(t, err, "failed to authenticate")
 	ctx := wallet.ContextWithToken(t.Context(), token)
 	tx, err := wallet.ExitSingleNodeTrees(ctx, config, client, roots, privKeys, randomAddress, int64(float64((treeAmountSats)*len(roots))*0.8))
 	require.NoError(t, err, "failed to exit trees")

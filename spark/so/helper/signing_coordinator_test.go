@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/stretchr/testify/require"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -82,11 +83,6 @@ func expectError(t *testing.T, prevOutputValue int64, values []int64, expectedEr
 }
 
 func TestNewSigningJob(t *testing.T) {
-	_, err := sparktesting.TestConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	tests := []struct {
 		name            string
 		prevOutputValue int64
@@ -112,11 +108,6 @@ func TestNewSigningJob(t *testing.T) {
 }
 
 func TestNewSigningJob_BadLeafValues(t *testing.T) {
-	_, err := sparktesting.TestConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	tests := []struct {
 		name            string
 		prevOutputValue int64
@@ -138,18 +129,11 @@ func TestNewSigningJob_BadLeafValues(t *testing.T) {
 }
 
 func TestNewSigningJob_InvalidInputs(t *testing.T) {
-	_, err := sparktesting.TestConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
 	tx := wire.NewMsgTx(2)
 	tx.AddTxIn(&wire.TxIn{})
 	tx.AddTxOut(&wire.TxOut{Value: 1000000, PkScript: []byte("test-pkscript")})
 	buf := new(bytes.Buffer)
-	err = tx.Serialize(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, tx.Serialize(buf))
 	goodTx := buf.Bytes()
 
 	tests := []struct {
@@ -371,11 +355,6 @@ func (m *MockSparkInternalServiceClient) FixKeyshareRound2(_ context.Context, _ 
 }
 
 func TestSignFrostInternal(t *testing.T) {
-	_, err := sparktesting.TestConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// Test the core signing job creation and validation
 	t.Run("SigningJobCreation", func(t *testing.T) {
 		// Create a mock keyshare ID
@@ -486,10 +465,7 @@ func TestSignFrostInternal(t *testing.T) {
 
 	// Test the actual SignFrostInternal function
 	t.Run("SignFrost", func(t *testing.T) {
-		config, err := sparktesting.TestConfig()
-		if err != nil {
-			t.Fatal(err)
-		}
+		config := sparktesting.TestConfig(t)
 
 		// Add a mock operator to the config with identifier "operator1"
 		if config.SigningOperatorMap == nil {
@@ -582,10 +558,7 @@ func TestSignFrostInternal(t *testing.T) {
 
 	// Test error cases and edge cases
 	t.Run("ErrorCases", func(t *testing.T) {
-		config, err := sparktesting.TestConfig()
-		if err != nil {
-			t.Fatal(err)
-		}
+		config := sparktesting.TestConfig(t)
 
 		// Test with empty jobs list
 		t.Run("EmptyJobsList", func(t *testing.T) {
@@ -783,10 +756,7 @@ func TestSignFrostInternal(t *testing.T) {
 
 	// Test edge cases
 	t.Run("EdgeCases", func(t *testing.T) {
-		config, err := sparktesting.TestConfig()
-		if err != nil {
-			t.Fatal(err)
-		}
+		config := sparktesting.TestConfig(t)
 
 		// Test with multiple jobs
 		t.Run("MultipleJobs", func(t *testing.T) {
@@ -1074,10 +1044,7 @@ func TestSignFrostInternal(t *testing.T) {
 
 	// Test with context cancellation
 	t.Run("ContextCancellation", func(t *testing.T) {
-		config, err := sparktesting.TestConfig()
-		if err != nil {
-			t.Fatal(err)
-		}
+		config := sparktesting.TestConfig(t)
 
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel() // Cancel immediately
@@ -1115,7 +1082,7 @@ func TestSignFrostInternal(t *testing.T) {
 			UserCommitment:    &objects.SigningCommitment{Binding: pubKey.Serialize(), Hiding: pubKey.Serialize()},
 		}
 
-		_, err = helper.SignFrostInternal(ctx, config, []*helper.SigningJob{job}, mockGetKeyPackages, mockFrostSignerFactory)
+		_, err := helper.SignFrostInternal(ctx, config, []*helper.SigningJob{job}, mockGetKeyPackages, mockFrostSignerFactory)
 		if err == nil {
 			t.Fatal("Expected error when context is cancelled, got nil")
 		}
@@ -1124,16 +1091,8 @@ func TestSignFrostInternal(t *testing.T) {
 
 // Test SignFrostWithPregeneratedNonce tests the SignFrostWithPregeneratedNonce function
 func TestSignFrostWithPregeneratedNonce(t *testing.T) {
-	_, err := sparktesting.TestConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	t.Run("BasicFunctionality", func(t *testing.T) {
-		config, err := sparktesting.TestConfig()
-		if err != nil {
-			t.Fatal(err)
-		}
+		config := sparktesting.TestConfig(t)
 
 		// Add mock operators to the config with identifiers "operator1" and "operator2"
 		if config.SigningOperatorMap == nil {
@@ -1207,10 +1166,7 @@ func TestSignFrostWithPregeneratedNonce(t *testing.T) {
 	})
 
 	t.Run("ErrorCases", func(t *testing.T) {
-		config, err := sparktesting.TestConfig()
-		if err != nil {
-			t.Fatal(err)
-		}
+		config := sparktesting.TestConfig(t)
 
 		// Test with getKeyPackages error
 		t.Run("GetKeyPackagesError", func(t *testing.T) {
@@ -1306,16 +1262,9 @@ func TestSignFrostWithPregeneratedNonce(t *testing.T) {
 
 // TestGetSigningCommitments tests the GetSigningCommitments function
 func TestGetSigningCommitments(t *testing.T) {
-	_, err := sparktesting.TestConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	t.Run("BasicFunctionality", func(t *testing.T) {
-		config, err := sparktesting.TestConfig()
-		if err != nil {
-			t.Fatal(err)
-		}
+		config := sparktesting.TestConfig(t)
 
 		keyshareIDs := []uuid.UUID{uuid.New(), uuid.New()}
 
@@ -1350,17 +1299,14 @@ func TestGetSigningCommitments(t *testing.T) {
 		}
 
 		// Test the function with our mock
-		_, err = helper.GetSigningCommitmentsInternal(t.Context(), config, keyshareIDs, mockGetKeyPackages, 1, mockFrostSignerFactory)
+		_, err := helper.GetSigningCommitmentsInternal(t.Context(), config, keyshareIDs, mockGetKeyPackages, 1, mockFrostSignerFactory)
 		if err != nil {
 			t.Fatalf("Expected no error, got %v", err)
 		}
 	})
 
 	t.Run("ErrorCases", func(t *testing.T) {
-		config, err := sparktesting.TestConfig()
-		if err != nil {
-			t.Fatal(err)
-		}
+		config := sparktesting.TestConfig(t)
 
 		// Test with frostRound1 error
 		t.Run("FrostRound1Error", func(t *testing.T) {
@@ -1428,11 +1374,6 @@ func TestGetSigningCommitments(t *testing.T) {
 
 // TestNewSigningJobEdgeCases tests edge cases for NewSigningJob
 func TestNewSigningJobEdgeCases(t *testing.T) {
-	_, err := sparktesting.TestConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	t.Run("InvalidKeyshare", func(t *testing.T) {
 		// Test with nil keyshare
 		proto := &pbspark.SigningJob{

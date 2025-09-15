@@ -144,9 +144,7 @@ type testSetupCommon struct {
 // setUpCommonTest sets up common test infrastructure
 func setUpCommonTest(t *testing.T) *testSetupCommon {
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
-
-	cfg, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	cfg := sparktesting.TestConfig(t)
 
 	// Use the coordinator's identity key from the test config
 	privKey := cfg.IdentityPrivateKey

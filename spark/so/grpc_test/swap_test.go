@@ -17,18 +17,14 @@ import (
 
 func TestSwap(t *testing.T) {
 	// Initiate sender
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create sender wallet config")
-
+	senderConfig := sparktesting.TestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
 	senderRootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, senderLeafPrivKey, 100_000)
 	require.NoError(t, err, "failed to create new tree")
 
 	// Initiate receiver
-	receiverConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create sender wallet config")
-
+	receiverConfig := sparktesting.TestWalletConfig(t)
 	receiverLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
 	receiverRootNode, err := sparktesting.CreateNewTree(receiverConfig, faucet, receiverLeafPrivKey, 100_000)
@@ -211,18 +207,14 @@ func TestSwap(t *testing.T) {
 
 func TestSwapDeliverTransferPackageTwice(t *testing.T) {
 	// Initiate sender
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create sender wallet config")
-
+	senderConfig := sparktesting.TestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
 	senderRootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, senderLeafPrivKey, 100_000)
 	require.NoError(t, err, "failed to create new tree")
 
 	// Initiate receiver
-	receiverConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create sender wallet config")
-
+	receiverConfig := sparktesting.TestWalletConfig(t)
 	receiverLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
 	receiverRootNode, err := sparktesting.CreateNewTree(receiverConfig, faucet, receiverLeafPrivKey, 100_000)

@@ -88,9 +88,7 @@ func assertVerifiedPendingTransfer(t *testing.T, err error, leafPrivKeyMap map[s
 }
 
 func TestCreateLightningInvoice(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestWalletConfig(t)
 	fakeInvoiceCreator := NewFakeLightningInvoiceCreator()
 
 	amountSats := uint64(100)
@@ -104,9 +102,7 @@ func TestCreateLightningInvoice(t *testing.T) {
 }
 
 func TestCreateZeroAmountLightningInvoice(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestWalletConfig(t)
 	fakeInvoiceCreator := NewFakeLightningInvoiceCreator()
 
 	amountSats := uint64(0)
@@ -121,12 +117,8 @@ func TestCreateZeroAmountLightningInvoice(t *testing.T) {
 
 func TestReceiveLightningPayment(t *testing.T) {
 	// Create user and ssp configs
-	userConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
-	sspConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	userConfig := sparktesting.TestWalletConfig(t)
+	sspConfig := sparktesting.TestWalletConfig(t)
 	// User creates an invoice
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
@@ -218,12 +210,8 @@ func TestReceiveLightningPayment(t *testing.T) {
 
 func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 	// Create user and ssp configs
-	userConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
-	sspConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	userConfig := sparktesting.TestWalletConfig(t)
+	sspConfig := sparktesting.TestWalletConfig(t)
 	// User creates a 0-amount invoice
 	invoiceSats := uint64(0)
 	preimage, paymentHash := testPreimageHash(t, invoiceSats)
@@ -307,12 +295,8 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 
 func TestReceiveLightningPaymentCannotCancelAfterPreimageReveal(t *testing.T) {
 	// Create user and ssp configs
-	userConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
-	sspConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	userConfig := sparktesting.TestWalletConfig(t)
+	sspConfig := sparktesting.TestWalletConfig(t)
 	// User creates an invoice
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
@@ -361,12 +345,8 @@ func TestReceiveLightningPaymentCannotCancelAfterPreimageReveal(t *testing.T) {
 
 func TestSendLightningPayment(t *testing.T) {
 	// Create user and ssp configs
-	userConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
-	sspConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	userConfig := sparktesting.TestWalletConfig(t)
+	sspConfig := sparktesting.TestWalletConfig(t)
 	// User creates an invoice
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
@@ -449,12 +429,8 @@ func TestSendLightningPayment(t *testing.T) {
 
 func TestSendLightningPaymentV2(t *testing.T) {
 	// Create user and ssp configs
-	userConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
-	sspConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	userConfig := sparktesting.TestWalletConfig(t)
+	sspConfig := sparktesting.TestWalletConfig(t)
 	// User creates an invoice
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
@@ -537,12 +513,8 @@ func TestSendLightningPaymentV2(t *testing.T) {
 
 func TestSendLightningPaymentWithRejection(t *testing.T) {
 	// Create user and ssp configs
-	userConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
-	sspConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	userConfig := sparktesting.TestWalletConfig(t)
+	sspConfig := sparktesting.TestWalletConfig(t)
 	// User creates an invoice
 	amountSats := uint64(100)
 	_, paymentHash := testPreimageHash(t, amountSats)
@@ -624,12 +596,8 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 
 func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
 	// Create user and ssp configs
-	userConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
-	sspConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	userConfig := sparktesting.TestWalletConfig(t)
+	sspConfig := sparktesting.TestWalletConfig(t)
 	// User creates an invoice
 	amountSats := uint64(100)
 	preimage, wrongPaymentHash := testPreimageHash(t, amountSats)
@@ -684,12 +652,8 @@ func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
 
 func TestSendLightningPaymentTwice(t *testing.T) {
 	// Create user and ssp configs
-	userConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
-	sspConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
+	userConfig := sparktesting.TestWalletConfig(t)
+	sspConfig := sparktesting.TestWalletConfig(t)
 	// User creates an invoice
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)

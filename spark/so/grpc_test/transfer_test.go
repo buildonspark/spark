@@ -26,9 +26,7 @@ const amountSatsToSend = 100_000
 
 func TestTransfer(t *testing.T) {
 	// Sender initiates transfer
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create sender wallet config")
-
+	senderConfig := sparktesting.TestWalletConfig(t)
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
 	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
@@ -65,7 +63,7 @@ func TestTransfer(t *testing.T) {
 	require.NoError(t, err, "failed to transfer tree node")
 
 	// Receiver queries pending transfer
-	receiverConfig, err := sparktesting.TestWalletConfigWithIdentityKey(receiverPrivKey)
+	receiverConfig := sparktesting.TestWalletConfigWithIdentityKey(t, receiverPrivKey)
 	require.NoError(t, err, "failed to create wallet config")
 	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
 	require.NoError(t, err, "failed to authenticate receiver")
@@ -99,9 +97,7 @@ func TestTransfer(t *testing.T) {
 }
 
 func TestQueryPendingTransferByNetwork(t *testing.T) {
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create sender wallet config")
-
+	senderConfig := sparktesting.TestWalletConfig(t)
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
 	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
@@ -137,7 +133,7 @@ func TestQueryPendingTransferByNetwork(t *testing.T) {
 	)
 	require.NoError(t, err, "failed to transfer tree node")
 
-	receiverConfig, err := sparktesting.TestWalletConfigWithIdentityKey(receiverPrivKey)
+	receiverConfig := sparktesting.TestWalletConfigWithIdentityKey(t, receiverPrivKey)
 	require.NoError(t, err, "failed to create wallet config")
 	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
 	require.NoError(t, err, "failed to authenticate receiver")
@@ -158,9 +154,7 @@ func TestQueryPendingTransferByNetwork(t *testing.T) {
 
 func TestTransferInterrupt(t *testing.T) {
 	// Sender initiates transfer
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create sender wallet config")
-
+	senderConfig := sparktesting.TestWalletConfig(t)
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
 	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
@@ -197,8 +191,7 @@ func TestTransferInterrupt(t *testing.T) {
 	require.NoError(t, err, "failed to transfer tree node")
 
 	// Receiver queries pending transfer
-	receiverConfig, err := sparktesting.TestWalletConfigWithIdentityKey(receiverPrivKey)
-	require.NoError(t, err, "failed to create wallet config")
+	receiverConfig := sparktesting.TestWalletConfigWithIdentityKey(t, receiverPrivKey)
 	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
 	require.NoError(t, err, "failed to authenticate receiver")
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
@@ -271,9 +264,7 @@ func TestTransferInterrupt(t *testing.T) {
 
 func TestTransferRecoverFinalizeSignatures(t *testing.T) {
 	// Sender initiates transfer
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create sender wallet config")
-
+	senderConfig := sparktesting.TestWalletConfig(t)
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
 	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
@@ -302,8 +293,7 @@ func TestTransferRecoverFinalizeSignatures(t *testing.T) {
 	require.NoError(t, err, "failed to transfer tree node")
 
 	// Receiver queries pending transfer
-	receiverConfig, err := sparktesting.TestWalletConfigWithIdentityKey(receiverPrivKey)
-	require.NoError(t, err, "failed to create wallet config")
+	receiverConfig := sparktesting.TestWalletConfigWithIdentityKey(t, receiverPrivKey)
 	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
 	require.NoError(t, err, "failed to authenticate receiver")
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
@@ -350,9 +340,7 @@ func TestTransferRecoverFinalizeSignatures(t *testing.T) {
 }
 
 func TestTransferZeroLeaves(t *testing.T) {
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create sender wallet config: %v", err)
-
+	senderConfig := sparktesting.TestWalletConfig(t)
 	receiverPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create receiver private key: %v", err)
 
@@ -369,9 +357,7 @@ func TestTransferZeroLeaves(t *testing.T) {
 
 func TestTransferWithSeparateSteps(t *testing.T) {
 	// Sender initiates transfer
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create sender wallet config")
-
+	senderConfig := sparktesting.TestWalletConfig(t)
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
 	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
@@ -399,8 +385,7 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 	require.NoError(t, err, "failed to transfer tree node")
 
 	// Receiver queries pending transfer
-	receiverConfig, err := sparktesting.TestWalletConfigWithIdentityKey(receiverPrivKey)
-	require.NoError(t, err, "failed to create wallet config")
+	receiverConfig := sparktesting.TestWalletConfigWithIdentityKey(t, receiverPrivKey)
 	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
 	require.NoError(t, err, "failed to authenticate receiver")
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
@@ -465,9 +450,7 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 
 func TestCancelTransfer(t *testing.T) {
 	// Sender initiates transfer
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create sender wallet config")
-
+	senderConfig := sparktesting.TestWalletConfig(t)
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
 	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
@@ -516,8 +499,7 @@ func TestCancelTransfer(t *testing.T) {
 	)
 	require.NoError(t, err, "failed to transfer tree node")
 
-	receiverConfig, err := sparktesting.TestWalletConfigWithIdentityKey(receiverPrivKey)
-	require.NoError(t, err, "failed to create wallet config")
+	receiverConfig := sparktesting.TestWalletConfigWithIdentityKey(t, receiverPrivKey)
 	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
 	require.NoError(t, err, "failed to authenticate receiver")
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
@@ -548,9 +530,7 @@ func TestCancelTransfer(t *testing.T) {
 
 func TestCancelTransferAfterTweak(t *testing.T) {
 	// Sender initiates transfer
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create sender wallet config")
-
+	senderConfig := sparktesting.TestWalletConfig(t)
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
 	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
@@ -588,18 +568,14 @@ func TestCancelTransferAfterTweak(t *testing.T) {
 
 func TestQueryTransfers(t *testing.T) {
 	// Initiate sender
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create sender wallet config")
-
+	senderConfig := sparktesting.TestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
 	senderRootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, senderLeafPrivKey, amountSatsToSend)
 	require.NoError(t, err, "failed to create new tree")
 
 	// Initiate receiver
-	receiverConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create receiver wallet config")
-
+	receiverConfig := sparktesting.TestWalletConfig(t)
 	receiverLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
 	receiverRootNode, err := sparktesting.CreateNewTree(receiverConfig, faucet, receiverLeafPrivKey, amountSatsToSend)
@@ -811,9 +787,7 @@ func TestQueryTransfers(t *testing.T) {
 
 func TestDoubleClaimTransfer(t *testing.T) {
 	// Sender initiates transfer
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create sender wallet config")
-
+	senderConfig := sparktesting.TestWalletConfig(t)
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
 	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, amountSatsToSend)
@@ -841,8 +815,7 @@ func TestDoubleClaimTransfer(t *testing.T) {
 	require.NoError(t, err, "failed to transfer tree node")
 
 	// Receiver queries pending transfer
-	receiverConfig, err := sparktesting.TestWalletConfigWithIdentityKey(receiverPrivKey)
-	require.NoError(t, err, "failed to create wallet config")
+	receiverConfig := sparktesting.TestWalletConfigWithIdentityKey(t, receiverPrivKey)
 	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
 	require.NoError(t, err, "failed to authenticate receiver")
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
@@ -1540,8 +1513,7 @@ func testTransferWithInvoice(t *testing.T, invoice string, senderPrivKey keys.Pr
 	senderTransfer, rootNode, newLeafPrivKey, err := sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
 	require.NoError(t, err, "failed to send transfer with invoice")
 
-	senderConfig, err := sparktesting.TestWalletConfigWithIdentityKey(senderPrivKey)
-	require.NoError(t, err, "failed to create sender wallet config")
+	senderConfig := sparktesting.TestWalletConfigWithIdentityKey(t, senderPrivKey)
 	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
 	require.NoError(t, err, "failed to authenticate sender")
 	senderCtx := wallet.ContextWithToken(t.Context(), authToken)
@@ -1564,8 +1536,7 @@ func testTransferWithInvoice(t *testing.T, invoice string, senderPrivKey keys.Pr
 	}, invoiceResponse.InvoiceStatuses[0].TransferType)
 
 	// Receiver queries pending transfer
-	receiverConfig, err := sparktesting.TestWalletConfigWithIdentityKey(receiverPrivKey)
-	require.NoError(t, err, "failed to create wallet config")
+	receiverConfig := sparktesting.TestWalletConfigWithIdentityKey(t, receiverPrivKey)
 	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
 	require.NoError(t, err, "failed to authenticate receiver")
 	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
@@ -1613,8 +1584,7 @@ func sendTransferWithInvoice(
 	senderPrivKey keys.Private,
 	receiverPrivKey keys.Private,
 ) (senderTransfer *spark.Transfer, rootNode *spark.TreeNode, newLeafPrivKey keys.Private, err error) {
-	senderConfig, err := sparktesting.TestWalletConfigWithIdentityKey(senderPrivKey)
-	require.NoError(t, err, "failed to create sender wallet config")
+	senderConfig := sparktesting.TestWalletConfigWithIdentityKey(t, senderPrivKey)
 
 	// Sender initiates transfer
 	leafPrivKey, err := keys.GeneratePrivateKey()
@@ -1690,8 +1660,7 @@ func TestQuerySparkInvoicesForUnknownInvoiceReturnsNotFound(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err, "failed to create sender wallet config")
+	senderConfig := sparktesting.TestWalletConfig(t)
 	authToken, err := wallet.AuthenticateWithServer(t.Context(), senderConfig)
 	require.NoError(t, err, "failed to authenticate sender")
 	senderCtx := wallet.ContextWithToken(t.Context(), authToken)

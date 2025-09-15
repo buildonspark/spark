@@ -37,19 +37,18 @@ func createTestSigningKeyshare(t *testing.T, ctx context.Context, rng io.Reader,
 
 func TestReserveEntityDkgKey_Success(t *testing.T) {
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
-	cfg, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	cfg := sparktesting.TestConfig(t)
 	rng := rand.NewChaCha8([32]byte{})
 
 	signingKeyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
-	handler := handler.NewEntityDkgKeyHandler(cfg)
+	keyHandler := handler.NewEntityDkgKeyHandler(cfg)
 
 	// Test successful reservation
 	req := &pbinternal.ReserveEntityDkgKeyRequest{
 		KeyshareId: signingKeyshare.ID.String(),
 	}
 
-	err = handler.ReserveEntityDkgKey(ctx, req)
+	err := keyHandler.ReserveEntityDkgKey(ctx, req)
 	require.NoError(t, err)
 
 	// Commit the transaction to persist changes
@@ -70,22 +69,21 @@ func TestReserveEntityDkgKey_Success(t *testing.T) {
 
 func TestReserveEntityDkgKey_Idempotent(t *testing.T) {
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
-	cfg, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	cfg := sparktesting.TestConfig(t)
 	rng := rand.NewChaCha8([32]byte{})
 	signingKeyshare := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
-	handler := handler.NewEntityDkgKeyHandler(cfg)
+	keyHandler := handler.NewEntityDkgKeyHandler(cfg)
 
 	req := &pbinternal.ReserveEntityDkgKeyRequest{
 		KeyshareId: signingKeyshare.ID.String(),
 	}
 
 	// First call - should succeed and create EntityDkgKey
-	err = handler.ReserveEntityDkgKey(ctx, req)
+	err := keyHandler.ReserveEntityDkgKey(ctx, req)
 	require.NoError(t, err)
 
 	// Second call - should be idempotent and access existing EntityDkgKey
-	err = handler.ReserveEntityDkgKey(ctx, req)
+	err = keyHandler.ReserveEntityDkgKey(ctx, req)
 	require.NoError(t, err, "should not error on idempotent call")
 
 	// Commit the transaction to persist changes
@@ -101,19 +99,18 @@ func TestReserveEntityDkgKey_Idempotent(t *testing.T) {
 
 func TestReserveEntityDkgKey_ConflictingKeyshareID(t *testing.T) {
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
-	cfg, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	cfg := sparktesting.TestConfig(t)
 	rng := rand.NewChaCha8([32]byte{})
 	signingKeyshare1 := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
 	signingKeyshare2 := createTestSigningKeyshare(t, ctx, rng, sessionCtx.Client)
 
-	handler := handler.NewEntityDkgKeyHandler(cfg)
+	keyHandler := handler.NewEntityDkgKeyHandler(cfg)
 
 	// First call - create EntityDkgKey with first keyshare
 	req1 := &pbinternal.ReserveEntityDkgKeyRequest{
 		KeyshareId: signingKeyshare1.ID.String(),
 	}
-	err = handler.ReserveEntityDkgKey(ctx, req1)
+	err := keyHandler.ReserveEntityDkgKey(ctx, req1)
 	require.NoError(t, err)
 
 	// Commit the first transaction to persist changes
@@ -126,38 +123,34 @@ func TestReserveEntityDkgKey_ConflictingKeyshareID(t *testing.T) {
 	req2 := &pbinternal.ReserveEntityDkgKeyRequest{
 		KeyshareId: signingKeyshare2.ID.String(),
 	}
-	err = handler.ReserveEntityDkgKey(ctx, req2)
+	err = keyHandler.ReserveEntityDkgKey(ctx, req2)
 	require.ErrorContains(t, err, "entity DKG key already reserved with different keyshare ID")
 }
 
 func TestReserveEntityDkgKey_InvalidUUID(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
-	cfg, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	cfg := sparktesting.TestConfig(t)
 
-	handler := handler.NewEntityDkgKeyHandler(cfg)
+	keyHandler := handler.NewEntityDkgKeyHandler(cfg)
 
 	// Test with invalid UUID format
 	req := &pbinternal.ReserveEntityDkgKeyRequest{
 		KeyshareId: "invalid-uuid",
 	}
 
-	err = handler.ReserveEntityDkgKey(ctx, req)
+	err := keyHandler.ReserveEntityDkgKey(ctx, req)
 	require.ErrorContains(t, err, "invalid DKG key ID format")
 }
 
 func TestReserveEntityDkgKey_DatabaseContextError(t *testing.T) {
 	// Test with a context that doesn't have a database transaction
-	ctx := t.Context()
-
-	cfg, err := sparktesting.TestConfig()
-	require.NoError(t, err)
-	handler := handler.NewEntityDkgKeyHandler(cfg)
+	cfg := sparktesting.TestConfig(t)
+	keyHandler := handler.NewEntityDkgKeyHandler(cfg)
 
 	req := &pbinternal.ReserveEntityDkgKeyRequest{
 		KeyshareId: uuid.New().String(),
 	}
 
-	err = handler.ReserveEntityDkgKey(ctx, req)
+	err := keyHandler.ReserveEntityDkgKey(t.Context(), req)
 	require.ErrorContains(t, err, "failed to get or create current tx for request")
 }

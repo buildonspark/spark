@@ -14,10 +14,8 @@ import (
 )
 
 func TestTreeQuery(t *testing.T) {
-	config, err := sparktesting.TestWalletConfig()
-	if err != nil {
-		t.Fatalf("failed to create wallet config: %v", err)
-	}
+	config := sparktesting.TestWalletConfig(t)
+
 	// Create gRPC connection using common helper
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	if err != nil {

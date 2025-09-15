@@ -78,8 +78,7 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.
 }
 
 func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *testing.T) {
-	cfg, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	cfg := sparktesting.TestConfig(t)
 	rng := rand.NewChaCha8([32]byte{})
 
 	handler := &InternalSignTokenHandler{config: cfg}

@@ -472,8 +472,7 @@ func verifyTokenDifferences(t *testing.T, ctx context.Context, dbTx *ent.Tx) {
 func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestConfig(t)
 
 	// Get database transaction from context
 	dbTx, err := ent.GetDbFromContext(ctx)

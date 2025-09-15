@@ -6,8 +6,10 @@ import (
 	"math/rand/v2"
 	"os"
 	"strconv"
+	"testing"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
 	"github.com/lightsparkdev/spark/common"
@@ -19,14 +21,10 @@ import (
 var rng = rand.NewChaCha8([32]byte{1})
 
 const (
-	hermeticMarkerPath         = "/tmp/spark_hermetic"
-	hermeticTestEnvVar         = "HERMETIC_TEST"
-	minikubeCAFilePath         = "/tmp/minikube-ca.pem"
-	signingOperatorPrefix      = "000000000000000000000000000000000000000000000000000000000000000"
-	signingOperatorIdentifier1 = signingOperatorPrefix + "1"
-	signingOperatorIdentifier2 = signingOperatorPrefix + "2"
-	signingOperatorIdentifier3 = signingOperatorPrefix + "3"
-	gripmock                   = "GRIPMOCK"
+	hermeticMarkerPath    = "/tmp/spark_hermetic"
+	hermeticTestEnvVar    = "HERMETIC_TEST"
+	minikubeCAFilePath    = "/tmp/minikube-ca.pem"
+	signingOperatorPrefix = "000000000000000000000000000000000000000000000000000000000000000"
 )
 
 func isHermeticTest() bool {
@@ -34,9 +32,9 @@ func isHermeticTest() bool {
 	return err == nil || os.Getenv(hermeticTestEnvVar) == "true"
 }
 
+// IsGripmock returns true if the GRIPMOCK environment variable is set to true.
 func IsGripmock() bool {
-	_, err := os.Stat(gripmock)
-	return err == nil || os.Getenv(gripmock) == "true"
+	return os.Getenv("GRIPMOCK") == "true"
 }
 
 // Common pubkeys used for both hermetic and local test environments
@@ -144,46 +142,6 @@ func GetAllSigningOperators() (map[string]*so.SigningOperator, error) {
 	return operators, nil
 }
 
-func GetAllSigningOperatorsDeployed() (map[string]*so.SigningOperator, error) {
-	pubkeys := []string{
-		"03acd9a5a88db102730ff83dee69d69088cc4c9d93bbee893e90fd5051b7da9651",
-		"02d2d103cacb1d6355efeab27637c74484e2a7459e49110c3fe885210369782e23",
-		"0350f07ffc21bfd59d31e0a7a600e2995273938444447cb9bc4c75b8a895dbb853",
-	}
-
-	pubkeyBytesArray, err := decodePubKeys(pubkeys)
-	if err != nil {
-		return nil, err
-	}
-
-	return map[string]*so.SigningOperator{
-		signingOperatorIdentifier1: {
-			ID:                        0,
-			Identifier:                signingOperatorIdentifier1,
-			AddressRpc:                "dns:///0.spark.dev.dev.sparkinfra.net",
-			AddressDkg:                "dns:///0.spark.dev.dev.sparkinfra.net",
-			IdentityPublicKey:         pubkeyBytesArray[0],
-			OperatorConnectionFactory: &DangerousTestOperatorConnectionFactoryNoVerifyTLS{},
-		},
-		signingOperatorIdentifier2: {
-			ID:                        1,
-			Identifier:                signingOperatorIdentifier2,
-			AddressRpc:                "dns:///1.spark.dev.dev.sparkinfra.net",
-			AddressDkg:                "dns:///1.spark.dev.dev.sparkinfra.net",
-			IdentityPublicKey:         pubkeyBytesArray[1],
-			OperatorConnectionFactory: &DangerousTestOperatorConnectionFactoryNoVerifyTLS{},
-		},
-		signingOperatorIdentifier3: {
-			ID:                        2,
-			Identifier:                signingOperatorIdentifier3,
-			AddressRpc:                "dns:///2.spark.dev.dev.sparkinfra.net",
-			AddressDkg:                "dns:///2.spark.dev.dev.sparkinfra.net",
-			IdentityPublicKey:         pubkeyBytesArray[2],
-			OperatorConnectionFactory: &DangerousTestOperatorConnectionFactoryNoVerifyTLS{},
-		},
-	}, nil
-}
-
 func getTestDatabasePath(operatorIndex int) string {
 	if isHermeticTest() {
 		return fmt.Sprintf("postgresql://postgres@localhost:15432/sparkoperator_%d?sslmode=disable", operatorIndex)
@@ -201,8 +159,10 @@ func getLocalFrostSignerAddress() string {
 	return "unix:///tmp/frost_0.sock"
 }
 
-func TestConfig() (*so.Config, error) {
-	return SpecificOperatorTestConfig(0)
+func TestConfig(tb testing.TB) *so.Config {
+	config, err := SpecificOperatorTestConfig(0)
+	require.NoError(tb, err)
+	return config
 }
 
 func SpecificOperatorTestConfig(operatorIndex int) (*so.Config, error) {
@@ -228,7 +188,7 @@ func SpecificOperatorTestConfig(operatorIndex int) (*so.Config, error) {
 		return nil, err
 	}
 
-	identifier := fmt.Sprintf(signingOperatorPrefix+"%d", operatorIndex+1)
+	identifier := signingOperatorPrefix + strconv.Itoa(operatorIndex+1)
 	opCount := len(signingOperators)
 	threshold := (opCount + 2) / 2 // 1/1, 2/2, 2/3, 3/4, 3/5
 	config := so.Config{
@@ -247,99 +207,27 @@ func SpecificOperatorTestConfig(operatorIndex int) (*so.Config, error) {
 }
 
 // TestWalletConfig returns a wallet configuration that can be used for testing.
-func TestWalletConfig() (*wallet.TestWalletConfig, error) {
+func TestWalletConfig(tb testing.TB) *wallet.TestWalletConfig {
 	identityPrivKey, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate identity private key: %w", err)
-	}
-	return TestWalletConfigWithIdentityKey(identityPrivKey)
-}
-
-func TestWalletConfigWithTokenTransactionSchnorr() (*wallet.TestWalletConfig, error) {
-	config, err := TestWalletConfig()
-	if err != nil {
-		return nil, err
-	}
-	config.UseTokenTransactionSchnorrSignatures = true
-	return config, nil
+	require.NoError(tb, err, "failed to generate identity private key")
+	return TestWalletConfigWithIdentityKey(tb, identityPrivKey)
 }
 
 // TestWalletConfigWithIdentityKey returns a wallet configuration with specified identity key that can be used for testing.
-func TestWalletConfigWithIdentityKey(identityPrivKey keys.Private) (*wallet.TestWalletConfig, error) {
-	return TestWalletConfigWithParams(
+func TestWalletConfigWithIdentityKey(tb testing.TB, identityPrivKey keys.Private) *wallet.TestWalletConfig {
+	return TestWalletConfigWithParams(tb,
 		TestWalletConfigParams{
 			IdentityPrivateKey: identityPrivKey,
 		})
 }
 
 // TestWalletConfigWithIdentityKeyAndCoordinator returns a wallet configuration with specified identity key that can be used for testing.
-func TestWalletConfigWithIdentityKeyAndCoordinator(identityPrivKey keys.Private, coordinatorIndex int) (*wallet.TestWalletConfig, error) {
-	return TestWalletConfigWithParams(
+func TestWalletConfigWithIdentityKeyAndCoordinator(tb testing.TB, identityPrivKey keys.Private, coordinatorIndex int) *wallet.TestWalletConfig {
+	return TestWalletConfigWithParams(tb,
 		TestWalletConfigParams{
 			IdentityPrivateKey: identityPrivKey,
 			CoordinatorIndex:   coordinatorIndex,
 		})
-}
-
-func TestWalletConfigDeployed(identityPrivKeyBytes []byte) (*wallet.TestWalletConfig, error) {
-	identityPrivKey, err := keys.ParsePrivateKey(identityPrivKeyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate identity private key")
-	}
-	signingOperators, err := GetAllSigningOperatorsDeployed()
-	if err != nil {
-		return nil, err
-	}
-	sspIdentityKeyBytes, err := hex.DecodeString("028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4")
-	if err != nil {
-		return nil, err
-	}
-	sspIdentityKey, err := keys.ParsePublicKey(sspIdentityKeyBytes)
-	if err != nil {
-		return nil, err
-	}
-	return &wallet.TestWalletConfig{
-		Network:                               common.Regtest,
-		SigningOperators:                      signingOperators,
-		CoordinatorIdentifier:                 signingOperatorIdentifier1,
-		FrostSignerAddress:                    "unix:///tmp/frost_wallet.sock",
-		IdentityPrivateKey:                    identityPrivKey,
-		Threshold:                             2,
-		SparkServiceProviderIdentityPublicKey: sspIdentityKey,
-		UseTokenTransactionSchnorrSignatures:  false,
-		CoordinatorDatabaseURI:                getTestDatabasePath(0),
-	}, nil
-}
-
-func TestWalletConfigDeployedMainnet(identityPrivKeyBytes []byte) (*wallet.TestWalletConfig, error) {
-	identityPrivKey, err := keys.ParsePrivateKey(identityPrivKeyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate identity private key")
-	}
-	signingOperators, err := GetAllSigningOperatorsDeployed()
-	if err != nil {
-		return nil, err
-	}
-	sspIdentityKeyBytes, err := hex.DecodeString("02e0b8d42c5d3b5fe4c5beb6ea796ab3bc8aaf28a3d3195407482c67e0b58228a5")
-	if err != nil {
-		return nil, err
-	}
-	sspIdentityKey, err := keys.ParsePublicKey(sspIdentityKeyBytes)
-	if err != nil {
-		return nil, err
-	}
-	return &wallet.TestWalletConfig{
-		Network:                               common.Mainnet,
-		SigningOperators:                      signingOperators,
-		CoordinatorIdentifier:                 signingOperatorIdentifier1,
-		FrostSignerAddress:                    "unix:///tmp/frost_wallet.sock",
-		IdentityPrivateKey:                    identityPrivKey,
-		Threshold:                             2,
-		SparkServiceProviderIdentityPublicKey: sspIdentityKey,
-		UseTokenTransactionSchnorrSignatures:  false,
-		CoordinatorDatabaseURI:                getTestDatabasePath(0),
-		FrostGRPCConnectionFactory:            &TestGRPCConnectionFactory{},
-	}, nil
 }
 
 // TestWalletConfigParams defines optional parameters for generating a test wallet configuration.
@@ -361,7 +249,7 @@ type TestWalletConfigParams struct {
 }
 
 // TestWalletConfigWithParams creates a wallet.Config suitable for tests using the provided parameters.
-func TestWalletConfigWithParams(p TestWalletConfigParams) (*wallet.TestWalletConfig, error) {
+func TestWalletConfigWithParams(tb testing.TB, p TestWalletConfigParams) *wallet.TestWalletConfig {
 	if p.CoordinatorIndex < 0 {
 		p.CoordinatorIndex = 0
 	}
@@ -370,17 +258,13 @@ func TestWalletConfigWithParams(p TestWalletConfigParams) (*wallet.TestWalletCon
 	if p.IdentityPrivateKey.IsZero() {
 		var err error
 		privKey, err = keys.GeneratePrivateKey()
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate identity private key: %w", err)
-		}
+		require.NoError(tb, err, "failed to generate identity private key")
 	} else {
 		privKey = p.IdentityPrivateKey
 	}
 
 	signingOperators, err := GetAllSigningOperators()
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(tb, err, "failed to get signing operators")
 
 	network := common.Regtest
 	if p.Network != common.Unspecified {
@@ -399,5 +283,5 @@ func TestWalletConfigWithParams(p TestWalletConfigParams) (*wallet.TestWalletCon
 		UseTokenTransactionSchnorrSignatures:  p.UseTokenTransactionSchnorrSignatures,
 		CoordinatorDatabaseURI:                getTestDatabasePath(p.CoordinatorIndex),
 		FrostGRPCConnectionFactory:            &TestGRPCConnectionFactory{},
-	}, nil
+	}
 }

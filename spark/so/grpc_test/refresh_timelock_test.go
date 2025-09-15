@@ -13,8 +13,7 @@ import (
 )
 
 func TestRefreshTimelock(t *testing.T) {
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
+	senderConfig := sparktesting.TestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
@@ -41,8 +40,7 @@ func TestRefreshTimelock(t *testing.T) {
 }
 
 func TestExtendLeaf(t *testing.T) {
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
+	senderConfig := sparktesting.TestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)

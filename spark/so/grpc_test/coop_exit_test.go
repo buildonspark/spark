@@ -22,10 +22,8 @@ import (
 )
 
 func setupUsers(t *testing.T, amountSats int64) (*wallet.TestWalletConfig, *wallet.TestWalletConfig, wallet.LeafKeyTweak) {
-	config, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-	sspConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
+	config := sparktesting.TestWalletConfig(t)
+	sspConfig := sparktesting.TestWalletConfig(t)
 
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)

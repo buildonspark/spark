@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	TaskNameKey   = attribute.Key("task.name")
-	TaskResultKey = attribute.Key("task.result")
+	nameKey   = attribute.Key("task.name")
+	resultKey = attribute.Key("task.result")
 )
 
 type Monitor struct {
@@ -69,8 +69,8 @@ func (t *Monitor) RecordJobTimingWithStatus(startTime, endTime time.Time, id uui
 		context.Background(),
 		1,
 		metric.WithAttributes(
-			TaskNameKey.String(name),
-			TaskResultKey.String(jobStatus),
+			nameKey.String(name),
+			resultKey.String(jobStatus),
 		),
 	)
 
@@ -79,7 +79,7 @@ func (t *Monitor) RecordJobTimingWithStatus(startTime, endTime time.Time, id uui
 		context.Background(),
 		float64(duration),
 		metric.WithAttributes(
-			TaskNameKey.String(name),
+			nameKey.String(name),
 		),
 	)
 }

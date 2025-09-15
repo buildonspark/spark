@@ -21,17 +21,11 @@ import (
 
 func TestTimelockExpirationHappyPath(t *testing.T) {
 	skipIfGithubActions(t)
-	walletConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
-
+	walletConfig := sparktesting.TestWalletConfig(t)
+	config := sparktesting.TestConfig(t)
 	client := sparktesting.GetBitcoinClient()
-
 	faucet := sparktesting.GetFaucetInstance(client)
-	err = faucet.Refill()
-	require.NoError(t, err)
+	require.NoError(t, faucet.Refill())
 
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
@@ -148,17 +142,11 @@ func TestTimelockExpirationHappyPath(t *testing.T) {
 
 func TestTimelockExpirationTransferredNode(t *testing.T) {
 	skipIfGithubActions(t)
-	walletConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
-
+	walletConfig := sparktesting.TestWalletConfig(t)
+	config := sparktesting.TestConfig(t)
 	client := sparktesting.GetBitcoinClient()
-
 	faucet := sparktesting.GetFaucetInstance(client)
-	err = faucet.Refill()
-	require.NoError(t, err)
+	require.NoError(t, faucet.Refill())
 
 	// Create sender wallet and tree
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -169,8 +157,7 @@ func TestTimelockExpirationTransferredNode(t *testing.T) {
 	// Create receiver wallet
 	receiverPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	receiverConfig, err := sparktesting.TestWalletConfigWithIdentityKey(receiverPrivKey)
-	require.NoError(t, err)
+	receiverConfig := sparktesting.TestWalletConfigWithIdentityKey(t, receiverPrivKey)
 
 	// Prepare transfer - sender creates new signing key for the transfer
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -339,17 +326,11 @@ func TestTimelockExpirationTransferredNode(t *testing.T) {
 
 func TestTimelockExpirationMultiLevelTree(t *testing.T) {
 	skipIfGithubActions(t)
-	walletConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
-
+	walletConfig := sparktesting.TestWalletConfig(t)
+	config := sparktesting.TestConfig(t)
 	client := sparktesting.GetBitcoinClient()
-
 	faucet := sparktesting.GetFaucetInstance(client)
-	err = faucet.Refill()
-	require.NoError(t, err)
+	require.NoError(t, faucet.Refill())
 
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
@@ -538,20 +519,13 @@ func TestTimelockExpirationMultiLevelTree(t *testing.T) {
 func TestTimelockExpirationAfterLightningTransfer(t *testing.T) {
 	skipIfGithubActions(t)
 	// Create user and ssp configs
-	userConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
-	sspConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
-
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
-
+	userConfig := sparktesting.TestWalletConfig(t)
+	sspConfig := sparktesting.TestWalletConfig(t)
+	config := sparktesting.TestConfig(t)
 	client := sparktesting.GetBitcoinClient()
 
 	faucet := sparktesting.GetFaucetInstance(client)
-	err = faucet.Refill()
-	require.NoError(t, err)
+	require.NoError(t, faucet.Refill())
 
 	// User creates an invoice
 	invoiceSats := uint64(100)
@@ -627,12 +601,12 @@ func TestTimelockExpirationAfterLightningTransfer(t *testing.T) {
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
-	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
 	claimedNodes, err := wallet.ClaimTransfer(
 		receiverCtx,
 		receiverTransfer,
 		userConfig,
-		leavesToClaim[:],
+		leavesToClaim,
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
 	require.Len(t, claimedNodes, 1)
@@ -699,7 +673,7 @@ func TestTimelockExpirationAfterLightningTransfer(t *testing.T) {
 		}
 	}
 	require.Positive(t, broadcastedNode.NodeConfirmationHeight, "Node confirmation height should be set to a positive block height")
-	require.Equal(t, uint64(0), broadcastedNode.RefundConfirmationHeight, "Refund confirmation height should not be set yet")
+	require.Zero(t, broadcastedNode.RefundConfirmationHeight, "Refund confirmation height should not be set yet")
 	require.NotEmpty(t, broadcastedNode.RawRefundTx, "RawRefundTx should exist in the database")
 
 	// Generate blocks until refund transaction timelock expires

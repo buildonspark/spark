@@ -58,8 +58,7 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 		},
 	}
 
-	cfg, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	cfg := sparktesting.TestConfig(t)
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -69,10 +69,10 @@ func TestFrostSigningHandler_GenerateRandomNonces(t *testing.T) {
 			}
 
 			// Verify that nonces were stored in database
-			db, err := ent.GetDbFromContext(ctx)
+			dbTx, err := ent.GetDbFromContext(ctx)
 			require.NoError(t, err)
 
-			nonces, err := db.SigningNonce.Query().All(ctx)
+			nonces, err := dbTx.SigningNonce.Query().All(ctx)
 			require.NoError(t, err)
 			assert.Len(t, nonces, int(tt.count), "Expected %d nonces in database", tt.count)
 

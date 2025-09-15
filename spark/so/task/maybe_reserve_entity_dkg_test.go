@@ -90,8 +90,7 @@ func TestReserveEntityDkg_OperatorDown(t *testing.T) {
 			ctx, sessionCtx := db.ConnectToTestPostgres(t)
 			client := sessionCtx.Client
 
-			cfg, err := sparktesting.TestConfig()
-			require.NoError(t, err)
+			cfg := sparktesting.TestConfig(t)
 			rng := rand.NewChaCha8([32]byte{})
 			cfg.Index = 0 // coordinator
 
@@ -164,8 +163,7 @@ func TestReserveEntityDkg_Idempotent(t *testing.T) {
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	client := sessionCtx.Client
 
-	cfg, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	cfg := sparktesting.TestConfig(t)
 	cfg.Index = 0
 	pruneOperators(cfg)
 
@@ -207,8 +205,7 @@ func TestReserveEntityDkg_NonCoordinator(t *testing.T) {
 	ctx, sessionCtx := db.ConnectToTestPostgres(t)
 	client := sessionCtx.Client
 
-	cfg, err := sparktesting.TestConfig()
-	require.NoError(t, err)
+	cfg := sparktesting.TestConfig(t)
 	cfg.Index = 1 // non-coordinator
 	pruneOperators(cfg)
 

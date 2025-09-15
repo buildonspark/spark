@@ -26,7 +26,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	if sparktesting.GripMockEnabled() {
+	if sparktesting.IsGripmock() {
 		err := gripmock.InitEmbeddedGripmock("../../../protos", []int{8535, 8536, 8537, 8538, 8539})
 		if err != nil {
 			panic(fmt.Sprintf("Failed to init embedded gripmock: %v", err))
@@ -245,9 +245,7 @@ func TestClaimTransferSignRefunds_Success(t *testing.T) {
 	_, err = transferLeaf.Update().SetKeyTweak(claimKeyTweakBytes).Save(ctx)
 	require.NoError(t, err)
 
-	cfg, err := sparktesting.TestConfig()
-	require.NoError(t, err)
-
+	cfg := sparktesting.TestConfig(t)
 	req := &pb.ClaimTransferSignRefundsRequest{
 		TransferId:             transfer.ID.String(),
 		OwnerIdentityPublicKey: transfer.ReceiverIdentityPubkey,

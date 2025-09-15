@@ -28,10 +28,8 @@ import (
 // Since the FROST signer is a stateless signer except for DKG, it is reused for both the user and the operator.
 func TestFrostSign(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
-	// Step 1: Setup config
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
-
+	// Step 1: Set up config
+	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 	msg := []byte("hello")
@@ -181,9 +179,7 @@ func TestFrostSign(t *testing.T) {
 
 func TestFrostWithoutUserSign(t *testing.T) {
 	// Step 1: Setup config
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 	msg := []byte("hello")
@@ -255,9 +251,7 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 	require.NoError(t, err)
 
 	// Step 1: Setup config
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 	// Step 2: Get operator key share
@@ -361,9 +355,7 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 }
 
 func TestFrostRound1(t *testing.T) {
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 	operatorKeyShares, err := ent.GetUnusedSigningKeyshares(ctx, config, 5)
@@ -396,9 +388,7 @@ func TestFrostRound1(t *testing.T) {
 func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{3})
 	// Step 1: Setup config
-	config, err := sparktesting.TestConfig()
-	require.NoError(t, err)
-
+	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestContext(t, config.DatabaseDriver(), config.DatabasePath)
 
 	msgHash := sha256.Sum256([]byte("hello"))
