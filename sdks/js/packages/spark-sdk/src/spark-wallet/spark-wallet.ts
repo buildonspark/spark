@@ -5,20 +5,19 @@ import {
   bytesToNumberBE,
   equalBytes,
   hexToBytes,
-  numberToVarBytesBE,
 } from "@noble/curves/utils";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { Mutex } from "async-mutex";
-import { uuidv7, uuidv7obj } from "uuidv7";
+import { uuidv7 } from "uuidv7";
 import {
   ConfigurationError,
   NetworkError,
+  NotImplementedError,
   RPCError,
   ValidationError,
-  NotImplementedError,
 } from "../errors/types.js";
 import SspClient, { TransferWithUserRequest } from "../graphql/client.js";
 import {
@@ -120,14 +119,11 @@ import {
 import {
   decodeSparkAddress,
   encodeSparkAddress,
-  encodeSparkAddressWithSignature,
   isSafeForNumber,
   SparkAddressFormat,
-  validateSparkInvoiceFields,
 } from "../utils/address.js";
 import { chunkArray } from "../utils/chunkArray.js";
 import { getFetch } from "../utils/fetch.js";
-import { HashSparkInvoice } from "../utils/invoice-hashing.js";
 import { addPublicKeys } from "../utils/keys.js";
 import { RetryContext, withRetry } from "../utils/retry.js";
 import {
@@ -143,6 +139,7 @@ import type {
   InitWalletResponse,
   InvalidInvoice,
   PayLightningInvoiceParams,
+  SparkWalletEvents,
   SparkWalletProps,
   TokenBalanceMap,
   TokenInvoice,
@@ -152,7 +149,6 @@ import type {
   TransferWithInvoiceOutcome,
   TransferWithInvoiceParams,
   UserTokenMetadata,
-  SparkWalletEvents,
 } from "./types.js";
 import { SparkWalletEvent } from "./types.js";
 
@@ -3280,11 +3276,30 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
         throw new Error("Failed to create lightning invoice");
       }
 
+      const decodedInvoice = decodeInvoice(invoice.invoice.encodedInvoice);
+
+      if (
+        invoice.invoice.paymentHash !== bytesToHex(paymentHash) ||
+        decodedInvoice.paymentHash !== bytesToHex(paymentHash)
+      ) {
+        throw new ValidationError("Payment hash mismatch", {
+          field: "paymentHash",
+          value: invoice.invoice.paymentHash,
+          expected: bytesToHex(paymentHash),
+        });
+      }
+
+      if (decodedInvoice.amountMSats !== BigInt(amountSats * 1000)) {
+        throw new ValidationError("Amount mismatch", {
+          field: "amountMSats",
+          value: decodedInvoice.amountMSats,
+          expected: amountSats * 1000,
+        });
+      }
+
       // Validate the spark address embedded in the lightning invoice
       if (includeSparkAddress) {
-        const sparkFallbackAddress = decodeInvoice(
-          invoice.invoice.encodedInvoice,
-        ).fallbackAddress;
+        const sparkFallbackAddress = decodedInvoice.fallbackAddress;
 
         if (!sparkFallbackAddress) {
           throw new ValidationError(
@@ -3310,6 +3325,14 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
             },
           );
         }
+      } else if (decodedInvoice.fallbackAddress !== undefined) {
+        throw new ValidationError(
+          "Spark fallback address found in lightning invoice but includeSparkAddress is false",
+          {
+            field: "sparkFallbackAddress",
+            value: decodedInvoice.fallbackAddress,
+          },
+        );
       }
 
       return invoice;

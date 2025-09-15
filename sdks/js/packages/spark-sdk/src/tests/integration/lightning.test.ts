@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it } from "@jest/globals";
-import { hexToBytes } from "@noble/curves/utils";
+import { bytesToHex, hexToBytes } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import { equalBytes } from "@scure/btc-signer/utils";
 import { uuidv7 } from "uuidv7";
@@ -55,16 +55,21 @@ const fakeInvoiceCreator = async (): Promise<LightningReceiveRequest> => {
     typename: "LightningReceiveRequest",
     invoice: {
       encodedInvoice:
-        "lnbcrt123450n1pnj6uf4pp5l26hsdxssmr52vd4xmn5xran7puzx34hpr6uevaq7ta0ayzrp8esdqqcqzpgxqyz5vqrzjqtr2vd60g57hu63rdqk87u3clac6jlfhej4kldrrjvfcw3mphcw8sqqqqzp3jlj6zyqqqqqqqqqqqqqq9qsp5w22fd8aqn7sdum7hxdf59ptgk322fkv589ejxjltngvgehlcqcyq9qxpqysgqvykwsxdx64qrj0s5pgcgygmrpj8w25jsjgltwn09yp24l9nvghe3dl3y0ycy70ksrlqmcn42hxn24e0ucuy3g9fjltudvhv4lrhhamgq3stqgp",
+        "lnbcrt1u1p5vxn7cpp5l26hsdxssmr52vd4xmn5xran7puzx34hpr6uevaq7ta0ayzrp8essp5dlpmev9m3yxyak47ncnz9a0jyt2su2hulw4t97etewgkvrtjtl9sxq9z0rgqnp4qtlyk6hxw5h4hrdfdkd4nh2rv0mwyyqvdtakr3dv6m4vvsmfshvg6rzjqgp0s738klwqef7yr8yu54vv3wfuk4psv46x5laf6l6v5x4lwwahvqqqqrusum7gtyqqqqqqqqqqqqqq9qcqzpgdqq9qyyssq0evxvv962npnvsw8zxsghcty5j9du55yhkjm8qnlr760qdjvn0gsnr650wclqcvc90mpm6e493sy8ds4hxk2h0828nwlmdc64mtr87cqp9eq8w",
       bitcoinNetwork: BitcoinNetwork.REGTEST,
-      paymentHash:
-        "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c",
+      paymentHash: bytesToHex(
+        sha256(
+          hexToBytes(
+            "2d059c3ede82a107aa1452c0bea47759be3c5c6e5342be6a310f6c3a907d9f4c",
+          ),
+        ),
+      ),
       amount: {
-        originalValue: 10000,
-        originalUnit: CurrencyUnit.SATOSHI,
-        preferredCurrencyUnit: CurrencyUnit.SATOSHI,
-        preferredCurrencyValueRounded: 10000,
-        preferredCurrencyValueApprox: 10000,
+        originalValue: 100000,
+        originalUnit: CurrencyUnit.MILLISATOSHI,
+        preferredCurrencyUnit: CurrencyUnit.USD,
+        preferredCurrencyValueRounded: 11,
+        preferredCurrencyValueApprox: 11.45475372279496,
       },
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
