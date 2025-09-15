@@ -26,7 +26,7 @@ func NewEntityDkgKeyHandler(config *so.Config) *EntityDkgKeyHandler {
 // ReserveEntityDkgKey reserves an entity DKG key for the given entity
 func (h *EntityDkgKeyHandler) ReserveEntityDkgKey(ctx context.Context, req *pbinternal.ReserveEntityDkgKeyRequest) error {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("attempting to reserve entity DKG key", "dkg_key_id", req.KeyshareId)
+	logger.Sugar().Infof("Attempting to reserve entity DKG key %s", req.KeyshareId)
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -41,7 +41,7 @@ func (h *EntityDkgKeyHandler) ReserveEntityDkgKey(ctx context.Context, req *pbin
 		if existingEntityDkgKey.Edges.SigningKeyshare.ID != dkgKeyUUID {
 			return fmt.Errorf("entity DKG key already reserved with different keyshare ID")
 		}
-		logger.Info("entity DKG key already reserved in prior call, skipping reservation", "entity_dkg_key_id", existingEntityDkgKey.ID)
+		logger.Sugar().Infof("Entity DKG key %s already reserved in prior call, skipping reservation", existingEntityDkgKey.ID)
 		// Don't return an error in this case so that the caller knows it was already successfully reserved in a prior call.
 		return nil
 	}
@@ -58,6 +58,6 @@ func (h *EntityDkgKeyHandler) ReserveEntityDkgKey(ctx context.Context, req *pbin
 	if err != nil {
 		return fmt.Errorf("failed to create entity DKG key: %w", err)
 	}
-	logger.Info("successfully created entity DKG key", "entity_dkg_key_id", entityDkgKey.ID)
+	logger.Sugar().Infof("Successfully created entity DKG key %s", entityDkgKey.ID)
 	return nil
 }

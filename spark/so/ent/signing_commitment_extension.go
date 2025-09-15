@@ -16,7 +16,7 @@ import (
 // This call is supposed to be used only in the SigningCommitmentInterceptor before any grpc flows.
 func ReserveSigningCommitments(ctx context.Context, dbTx *Tx, count uint32, operatorIndex uint) ([]*SigningCommitment, error) {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("Getting unused signing commitments", "count", count, "operatorIndex", operatorIndex)
+	logger.Sugar().Infof("Getting %d unused signing commitments for operator %d", count, operatorIndex)
 	commitments, err := dbTx.SigningCommitment.Query().Where(
 		signingcommitment.And(
 			signingcommitment.StatusEQ(st.SigningCommitmentStatusAvailable),

@@ -60,7 +60,7 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 	finalTokenTransactionHash []byte,
 	operatorSpecificSignatures []*pb.OperatorSpecificOwnerSignature,
 ) ([]byte, error) {
-	ctx, span := tracer.Start(ctx, "InternalSignTokenHandler.SignAndPersistTokenTransaction", getTokenTransactionAttributesFromEnt(tokenTransaction, h.config))
+	ctx, span := tracer.Start(ctx, "InternalSignTokenHandler.SignAndPersistTokenTransaction", getTokenTransactionAttributesFromEnt(ctx, tokenTransaction, h.config))
 	defer span.End()
 
 	if tokenTransaction.Status == st.TokenTransactionStatusSigned {
@@ -133,7 +133,12 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 		if len(activeFreezes) > 0 {
 			for _, freeze := range activeFreezes {
 				logger := logging.GetLoggerFromContext(ctx)
-				logger.Info("Found active freeze", "owner", freeze.OwnerPublicKey, "token", freeze.TokenPublicKey, "freeze_timestamp", freeze.WalletProvidedFreezeTimestamp)
+				logger.Sugar().Infof(
+					"Found active freeze for owner %x (token: %x, timestamp: %d)",
+					freeze.OwnerPublicKey,
+					freeze.TokenPublicKey,
+					freeze.WalletProvidedFreezeTimestamp,
+				)
 			}
 			return nil, fmt.Errorf("at least one input is frozen. Cannot proceed with transaction")
 		}
@@ -170,7 +175,7 @@ func (h *InternalSignTokenHandler) regenerateOperatorSignatureForDuplicateReques
 	tokenTransaction *ent.TokenTransaction,
 	finalTokenTransactionHash []byte,
 ) ([]byte, error) {
-	_, logger := logging.WithAttrs(ctx, tokens.GetEntTokenTransactionAttrs(tokenTransaction))
+	_, logger := logging.WithAttrs(ctx, tokens.GetEntTokenTransactionAttrs(tokenTransaction)...)
 	logger.Debug("Regenerating response for a duplicate SignTokenTransaction() Call")
 
 	var invalidOutputs []string
@@ -215,7 +220,7 @@ type operatorSharesMap map[keys.Public][]*pbtkinternal.RevocationSecretShare
 func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.Context, req *pbtkinternal.ExchangeRevocationSecretsSharesRequest) (*pbtkinternal.ExchangeRevocationSecretsSharesResponse, error) {
 	ctx, span := tracer.Start(ctx, "InternalSignTokenHandler.ExchangeRevocationSecretsShares")
 	defer span.End()
-	ctx, logger := logging.WithAttrs(ctx, tokens.GetFinalizedTokenTransactionAttrs(req.FinalTokenTransactionHash))
+	ctx, logger := logging.WithAttrs(ctx, tokens.GetFinalizedTokenTransactionAttrs(req.FinalTokenTransactionHash)...)
 
 	if len(req.OperatorShares) == 0 {
 		return nil, fmt.Errorf("no operator shares provided in request")
@@ -225,9 +230,7 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 		return nil, fmt.Errorf("unable to parse request operator identity public key: %w", err)
 	}
 	reqOperatorIdentifier := h.config.GetOperatorIdentifierFromIdentityPublicKey(reqPubKey)
-	logger.Info("exchanging revocation secret shares with operator",
-		"operator_identity_pubkey", req.OperatorIdentityPublicKey,
-		"operator_identifier", reqOperatorIdentifier)
+	logger.Sugar().Infof("exchanging revocation secret shares with operator %d", reqOperatorIdentifier)
 
 	// Verify the incoming operator signatures package
 	operatorSignatures := make(operatorSignaturesMap)

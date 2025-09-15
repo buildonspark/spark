@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -180,7 +181,7 @@ func (h *TransferHandler) syncCoopExitInit(ctx context.Context, req *pb.Cooperat
 
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {
-			logger.Error("Failed to connect to operator", "error", err)
+			logger.Error("Failed to connect to operator", zap.Error(err))
 			return nil, err
 		}
 		defer conn.Close()

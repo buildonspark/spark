@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"net"
 	"strings"
 	"time"
@@ -12,13 +11,14 @@ import (
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/middleware"
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/protobuf/proto"
 )
 
-func LogInterceptor(tableLogger *logging.TableLogger) grpc.UnaryServerInterceptor {
+func LogInterceptor(rootLogger *zap.Logger, tableLogger *logging.TableLogger) grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
 		req any,
@@ -48,12 +48,11 @@ func LogInterceptor(tableLogger *logging.TableLogger) grpc.UnaryServerIntercepto
 			}
 		}
 
-		logger := slog.Default().With(
-			"request_id", requestID,
-			"method", info.FullMethod,
-			"x_amzn_trace_id", traceID,
-			"otel_trace_id", otelTraceID,
-			"component", "grpc",
+		logger := rootLogger.With(
+			zap.String("request_id", requestID),
+			zap.String("method", info.FullMethod),
+			zap.String("x_amzn_trace_id", traceID),
+			zap.String("otel_trace_id", otelTraceID),
 		)
 
 		ctx = logging.Inject(ctx, logger)
@@ -71,7 +70,7 @@ func LogInterceptor(tableLogger *logging.TableLogger) grpc.UnaryServerIntercepto
 		}
 
 		if err != nil {
-			logger.Error("error in grpc", "error", err, "duration", duration.Seconds())
+			logger.Error("error in grpc", zap.Error(err))
 		}
 
 		return response, err
@@ -94,7 +93,7 @@ func (w *WrappedServerStream) Context() context.Context {
 	return w.ctx
 }
 
-func StreamLogInterceptor() grpc.StreamServerInterceptor {
+func StreamLogInterceptor(rootLogger *zap.Logger) grpc.StreamServerInterceptor {
 	return func(
 		srv any,
 		ss grpc.ServerStream,
@@ -108,17 +107,16 @@ func StreamLogInterceptor() grpc.StreamServerInterceptor {
 
 		requestID := uuid.New().String()
 
-		logger := slog.Default().With(
-			"request_id", requestID,
-			"method", info.FullMethod,
-			"component", "grpc",
+		logger := rootLogger.With(
+			zap.String("request_id", requestID),
+			zap.String("method", info.FullMethod),
 		)
 
 		ctx := logging.Inject(ss.Context(), logger)
 
 		err := handler(srv, WrapServerStream(ctx, ss))
 		if err != nil {
-			logger.Error("error in grpc stream", "error", err)
+			logger.Error("error in grpc stream", zap.Error(err))
 		}
 
 		return err

@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -25,6 +24,8 @@ import (
 	"github.com/peterldowns/pgtestdb"
 	"github.com/peterldowns/pgtestdb/migrators/atlasmigrator"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 )
 
 // TestSessionFactory is a SessionFactory for returning a specific Session, useful for testing.
@@ -240,7 +241,7 @@ func SetUpDBEventsTestContext(t *testing.T) (*TestContext, *so.DBConnector, *DBE
 	connector, err := so.NewDBConnector(ctx, config, knobsService)
 	require.NoError(t, err)
 
-	logger := slog.Default().With("component", "dbevents")
+	logger := zaptest.NewLogger(t).With(zap.String("component", "dbevents"))
 	dbEvents, err := NewDBEvents(t.Context(), connector, logger)
 	require.NoError(t, err)
 

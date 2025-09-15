@@ -9,6 +9,7 @@ import (
 	"math"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
@@ -45,11 +46,11 @@ func NewInternalDepositHandler(config *so.Config) *InternalDepositHandler {
 func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Context, req *pbinternal.MarkKeyshareForDepositAddressRequest) (*pbinternal.MarkKeyshareForDepositAddressResponse, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
-	logger.Info("Marking keyshare for deposit address", "keyshare_id", req.KeyshareId)
+	logger.Sugar().Infof("Marking keyshare %s for deposit address", req.KeyshareId)
 
 	keyshareID, err := uuid.Parse(req.KeyshareId)
 	if err != nil {
-		logger.Error("Failed to parse keyshare ID", "error", err)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to parse keyshare ID %s as UUID", req.KeyshareId)
 		return nil, err
 	}
 
@@ -91,11 +92,11 @@ func (h *InternalDepositHandler) MarkKeyshareForDepositAddress(ctx context.Conte
 		SetIsStatic(req.GetIsStatic()).
 		Save(ctx)
 	if err != nil {
-		logger.Error("Failed to link keyshare to deposit address", "error", err)
+		logger.Error("Failed to link keyshare to deposit address", zap.Error(err))
 		return nil, err
 	}
 
-	logger.Info("Marked keyshare for deposit address", "keyshare_id", req.KeyshareId)
+	logger.Sugar().Infof("Marked keyshare %s for deposit address", req.KeyshareId)
 
 	signingKey := h.config.IdentityPrivateKey
 	addrHash := sha256.Sum256([]byte(req.Address))
@@ -138,7 +139,7 @@ func (h *InternalDepositHandler) GenerateStaticDepositAddressProofs(ctx context.
 		return nil, errors.NotFoundErrorf("no static deposit address found for keyshare %s, address %s and identity public key %s", keyshareID, req.Address, ownerIDPubKey)
 	}
 
-	logger.Info("Generating proofs of possession for static deposit address generated from keyshare", "keyshare_id", req.KeyshareId, "address", req.Address)
+	logger.Sugar().Infof("Generating proofs of possession for static deposit address %s generated from keyshare %s", req.Address, req.KeyshareId)
 
 	signingKey := h.config.IdentityPrivateKey
 	addrHash := sha256.Sum256([]byte(depositAddress.Address))
@@ -158,7 +159,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		treeNodeIDs[i] = node.Id
 	}
 
-	logger.Info("Finalizing tree creation", "tree_node_ids", treeNodeIDs)
+	logger.Sugar().Infof("Finalizing tree creation for tree nodes %+q", treeNodeIDs)
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -169,7 +170,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 	var selectedNode *pbinternal.TreeNode
 	for _, node := range req.Nodes {
 		if node.ParentNodeId == nil {
-			logger.Info("Selected node", "tree_node_id", node.Id)
+			logger.Sugar().Infof("Selected node %s", node.Id)
 			selectedNode = node
 			break
 		}
@@ -347,7 +348,7 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 
 	logger := logging.GetLoggerFromContext(ctx)
 	req := reqWithSignature.Request
-	logger.Info("Start CreateUtxoSwap request for on-chain utxo", "transfer_id", req.Transfer.TransferId)
+	logger.Sugar().Infof("Starting CreateUtxoSwap request for on-chain utxo (transfer: %s)", req.Transfer.TransferId)
 
 	// Verify CoordinatorPublicKey is correct. It does not actually prove that the
 	// caller is the coordinator, but that there is a message to create a swap
@@ -495,15 +496,15 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 		return nil, fmt.Errorf("utxo swap is already registered")
 	}
 
-	logger.Info(
-		"Creating UTXO swap record",
-		"request_type", req.RequestType,
-		"transfer_id", req.Transfer.TransferId,
-		"user_identity_public_key", receiverIDPubKey,
-		"txid", hex.EncodeToString(targetUtxo.Txid),
-		"vout", targetUtxo.Vout,
-		"network", network,
-		"credit_amount_sats", totalAmount,
+	logger.Sugar().Infof(
+		"Creating UTXO swap record (request type: %s, transfer: %s, user: %s, utxo: %x:%d, network: %s, credit amount: %d sats)",
+		req.RequestType,
+		req.Transfer.TransferId,
+		receiverIDPubKey,
+		targetUtxo.Txid,
+		targetUtxo.Vout,
+		network,
+		totalAmount,
 	)
 
 	// Create a utxo swap record and then a transfer. We rely on DbSessionMiddleware to
@@ -739,11 +740,19 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 		return nil, fmt.Errorf("unable to parse coordinator public key: %w", err)
 	}
 	if err := common.VerifyECDSASignature(coordinatorPubKey, req.Signature, messageHash); err != nil {
-		logger.Debug("Rollback utxo swap request signature", "signature", hex.EncodeToString(req.Signature), "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout, "network", common.Network(req.OnChainUtxo.Network).String(), "coordinator", req.CoordinatorPublicKey, "message_hash", hex.EncodeToString(messageHash))
+		logger.Sugar().Debugf(
+			"Rollback utxo swap request signature (signature: %x txid: %x vout: %d network: %s coordinator: %s message_hash: %x)",
+			req.Signature,
+			req.OnChainUtxo.Txid,
+			req.OnChainUtxo.Vout,
+			common.Network(req.OnChainUtxo.Network).String(),
+			req.CoordinatorPublicKey,
+			messageHash,
+		)
 		return nil, fmt.Errorf("unable to verify coordinator signature: %w", err)
 	}
 
-	logger.Info("Cancelling UTXO swap", "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout)
+	logger.Sugar().Infof("Cancelling UTXO swap for %x:%d", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 
 	schemaNetwork, err := common.SchemaNetworkFromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
@@ -777,7 +786,7 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 		return nil, err
 	}
 
-	logger.Info("UTXO swap cancelled", "utxo_swap_id", utxoSwap.ID, "txid", hex.EncodeToString(targetUtxo.Txid), "vout", targetUtxo.Vout)
+	logger.Sugar().Infof("UTXO swap %s for %x:%d cancelled", utxoSwap.ID, targetUtxo.Txid, targetUtxo.Vout)
 	return &pbinternal.RollbackUtxoSwapResponse{}, nil
 }
 
@@ -832,7 +841,7 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 		return nil, fmt.Errorf("unable to verify coordinator signature: %w", err)
 	}
 
-	logger.Info("Marking UTXO swap as COMPLETED", "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout)
+	logger.Sugar().Infof("Marking UTXO swap for %x:%d as COMPLETED", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 
 	schemaNetwork, err := common.SchemaNetworkFromProtoNetwork(req.OnChainUtxo.Network)
 	if err != nil {
@@ -862,7 +871,7 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 		return nil, fmt.Errorf("unable to complete utxo swap: %w", err)
 	}
 
-	logger.Info("UTXO swap marked as COMPLETED", "utxo_swap_id", utxoSwap.ID, "txid", hex.EncodeToString(targetUtxo.Txid), "vout", targetUtxo.Vout)
+	logger.Sugar().Infof("UTXO swap %s for %x:%d marked as COMPLETED", utxoSwap.ID, targetUtxo.Txid, targetUtxo.Vout)
 	return &pbinternal.UtxoSwapCompletedResponse{}, nil
 }
 
@@ -894,7 +903,7 @@ func CompleteSwapForUtxoWithOtherOperators(ctx context.Context, config *so.Confi
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, config, &helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {
-			logger.Error("Failed to connect to operator", "operator", operator.Identifier, "error", err)
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to connect to operator %s", operator.Identifier)
 			return nil, err
 		}
 		defer conn.Close()
@@ -902,7 +911,7 @@ func CompleteSwapForUtxoWithOtherOperators(ctx context.Context, config *so.Confi
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 		internalResp, err := client.UtxoSwapCompleted(ctx, request)
 		if err != nil {
-			logger.Error("Failed to execute utxo swap completed task with operator", "operator", operator.Identifier, "error", err)
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to execute utxo swap completed task with operator %s", operator.Identifier)
 			return nil, err
 		}
 		return internalResp, err
@@ -948,7 +957,7 @@ func CreateSwapForUtxoWithOtherOperators(ctx context.Context, config *so.Config,
 	_, err := helper.ExecuteTaskWithAllOperators(ctx, config, &helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {
-			logger.Error("Failed to connect to operator", "operator", operator.Identifier, "error", err)
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to connect to operator %s", operator.Identifier)
 			return nil, err
 		}
 		defer conn.Close()
@@ -956,7 +965,7 @@ func CreateSwapForUtxoWithOtherOperators(ctx context.Context, config *so.Config,
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 		internalResp, err := client.CreateUtxoSwap(ctx, request)
 		if err != nil {
-			logger.Error("Failed to execute utxo swap completed task with operator", "operator", operator.Identifier, "error", err)
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to execute utxo swap completed task with operator %s", operator.Identifier)
 			return nil, err
 		}
 		return internalResp, err
@@ -991,12 +1000,20 @@ func (h *InternalDepositHandler) RollbackSwapForAllOperators(ctx context.Context
 		return fmt.Errorf("failed to create rollback utxo swap statement: %w", err)
 	}
 	rollbackUtxoSwapRequestSignature := ecdsa.Sign(config.IdentityPrivateKey.ToBTCEC(), rollbackUtxoSwapRequestMessageHash)
-	logger.Debug("Rollback utxo swap request signature", "signature", hex.EncodeToString(rollbackUtxoSwapRequestSignature.Serialize()), "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout, "network", common.Network(req.OnChainUtxo.Network).String(), "coordinator", config.IdentityPublicKey(), "message_hash", hex.EncodeToString(rollbackUtxoSwapRequestMessageHash))
+	logger.Sugar().Debugf(
+		"Rollback utxo swap request signature (signature: %x txid: %x vout: %d network: %s coordinator: %s message: %x)",
+		rollbackUtxoSwapRequestSignature.Serialize(),
+		req.OnChainUtxo.Txid,
+		req.OnChainUtxo.Vout,
+		common.Network(req.OnChainUtxo.Network).String(),
+		config.IdentityPublicKey(),
+		rollbackUtxoSwapRequestMessageHash,
+	)
 	allSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
 	_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &allSelection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {
-			logger.Error("Failed to connect to operator for rollback utxo swap", "error", err)
+			logger.Error("Failed to connect to operator for rollback utxo swap", zap.Error(err))
 			return nil, err
 		}
 		defer conn.Close()
@@ -1008,7 +1025,12 @@ func (h *InternalDepositHandler) RollbackSwapForAllOperators(ctx context.Context
 			OnChainUtxo:          req.OnChainUtxo,
 		})
 		if err != nil {
-			logger.Error("Failed to execute rollback utxo swap task with operator", "operator", operator.Identifier, "error", err, "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout)
+			logger.With(zap.Error(err)).Sugar().Errorf(
+				"Failed to execute rollback utxo swap task with operator %s for %x:%d",
+				operator.Identifier,
+				req.OnChainUtxo.Txid,
+				req.OnChainUtxo.Vout,
+			)
 			return nil, err
 		}
 		return internalResp, err

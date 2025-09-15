@@ -2,10 +2,10 @@ package logging
 
 import (
 	"context"
-	"log/slog"
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -163,12 +163,12 @@ func (t *TableLogger) Log(
 
 	logger := GetLoggerFromContext(ctx)
 
-	attrs := make([]slog.Attr, 0, len(result))
+	attrs := make([]zap.Field, 0, len(result))
 	for key, value := range result {
-		attrs = append(attrs, slog.Any(key, value))
+		attrs = append(attrs, zap.Any(key, value))
 	}
 
-	logger.LogAttrs(context.Background(), slog.LevelInfo, "", attrs...)
+	logger.Info("", attrs...)
 }
 
 func fillDbStats(ctx context.Context, result map[string]any) {

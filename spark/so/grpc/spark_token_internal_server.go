@@ -38,7 +38,7 @@ func (s *SparkTokenInternalServer) SignTokenTransactionFromCoordination(
 	ctx context.Context,
 	req *tokeninternalpb.SignTokenTransactionFromCoordinationRequest,
 ) (*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, error) {
-	ctx, _ = logging.WithAttrs(ctx, sotokens.GetFinalizedTokenTransactionAttrs(req.FinalTokenTransactionHash))
+	ctx, _ = logging.WithAttrs(ctx, sotokens.GetFinalizedTokenTransactionAttrs(req.FinalTokenTransactionHash)...)
 	tx, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch transaction: %w", err)

@@ -6,8 +6,10 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/lightsparkdev/spark/common/keys"
 	"unicode/utf8"
+
+	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
@@ -285,11 +287,14 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbTx *ent.
 		for txOutIdx, txOut := range tx.TxOut {
 			l1TokenToCreate, err := parseTokenAnnouncement(txOut.PkScript, network)
 			if err != nil {
-				logger.Error("Failed to parse token announcement",
-					"error", err,
-					"txid", tx.TxHash(),
-					"output_idx", txOutIdx,
-					"script_hex", hex.EncodeToString(txOut.PkScript))
+				logger.With(zap.Error(err)).
+					Sugar().
+					Errorf(
+						"Failed to parse token announcement (txid: %s, idx: %s, script: %s)",
+						tx.TxHash(),
+						txOutIdx,
+						hex.EncodeToString(txOut.PkScript),
+					)
 				continue
 			}
 
@@ -310,76 +315,79 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbTx *ent.
 		if err != nil {
 			return fmt.Errorf("failed to parse issuer public key: %w", err)
 		}
-		logger.Info("Successfully parsed token announcement",
-			"txid", ann.txHash,
-			"output_idx", ann.outputIdx,
-			"token_name", ann.l1TokenToCreate.TokenName,
-			"token_ticker", ann.l1TokenToCreate.TokenTicker,
-			"issuer_public_key", announcementIssuerPubKey)
+		logger.With(zap.Stringer("issuer_public_key", announcementIssuerPubKey)).
+			Sugar().
+			Infof(
+				"Successfully parsed token announcement (txid: %s, output_idex: %d, name: %s, ticker: %s)",
+				ann.txHash,
+				ann.outputIdx,
+				ann.l1TokenToCreate.TokenName,
+				ann.l1TokenToCreate.TokenTicker,
+			)
 
 		provider := ann.l1TokenToCreate
 		tokenMetadata, err := provider.ToTokenMetadata()
 		if err != nil {
-			logger.Error("failed to get token metadata", "error", err)
+			logger.Error("failed to get token metadata", zap.Error(err))
 			continue
 		}
 
 		if err := tokenMetadata.Validate(); err != nil {
-			logger.Error("invalid token metadata", "error", err)
+			logger.Error("Invalid token metadata", zap.Error(err))
 			continue
 		}
 
 		tokenIdentifier, err := tokenMetadata.ComputeTokenIdentifierV1()
 		if err != nil {
-			logger.Error("failed to compute token identifier", "error", err)
+			logger.Error("Failed to compute token identifier", zap.Error(err))
 			continue
 		}
 
 		isDuplicate, err := isDuplicateAnnouncement(ctx, dbTx, tokenIdentifier, tokenIdentifiersAnnouncedInBlock)
 		if err != nil {
-			logger.Error("Failed to check for duplicate announcement", "error", err, "txid", ann.txHash)
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to check for duplicate announcement (txid %s)", ann.txHash)
 			continue
 		}
 		tokenIssuerPubKey, err := keys.ParsePublicKey(tokenMetadata.IssuerPublicKey)
 		if err != nil {
-			logger.Error("failed to parse issuer public key", "error", err, "txid", ann.txHash)
+			logger.With(zap.Error(err)).Sugar().Error("Failed to parse issuer public key (txid %s)", ann.txHash)
 			continue
 		}
 		if isDuplicate {
-			logger.Info("Token with this issuer public key already exists. Ignoring the announcement.",
-				"issuer_public", tokenIssuerPubKey,
-				"network", tokenMetadata.Network.String(),
-				"txid", ann.txHash)
+			logger.With(zap.Stringer("issuer_public_key", tokenIssuerPubKey)).
+				Sugar().
+				Infof("Token with this issuer public key already exists. Ignoring the announcement (txid %s)", ann.txHash)
 			continue
 		}
 
 		l1TokenCreate, err := createL1TokenEntity(ctx, dbTx, tokenMetadata, ann.txHash, tokenIdentifier)
 		if err != nil {
-			logger.Error("Failed to create l1 token create entity", "error", err, "txid", ann.txHash)
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to create l1 token create entity (txid %s)", ann.txHash)
 			continue
 		}
-		logger.Info("Successfully created L1 token entity",
-			"txid", ann.txHash,
-			"output_idx", ann.outputIdx,
-			"token_name", l1TokenCreate.TokenName,
-			"token_identifier", hex.EncodeToString(l1TokenCreate.TokenIdentifier),
-			"issuer_public_key", hex.EncodeToString(l1TokenCreate.IssuerPublicKey),
-		)
+		logger.With(zap.String("issuer_public_key", hex.EncodeToString(l1TokenCreate.IssuerPublicKey))).
+			Sugar().
+			Infof(
+				"Successfully created L1 token entity (txid %s, output_idex %d, name %s, identifier %s)",
+				ann.txHash,
+				ann.outputIdx,
+				l1TokenCreate.TokenName,
+				hex.EncodeToString(l1TokenCreate.TokenIdentifier),
+			)
 
 		if !config.Token.DisableSparkTokenCreationForL1TokenAnnouncements {
 			exists, err := issuerAlreadyHasSparkToken(ctx, dbTx, tokenIssuerPubKey, issuerPublicKeysAnnouncedInBlock)
 			if err != nil {
-				logger.Error("failed to check for existing spark token", "error", err)
+				logger.Error("Failed to check for existing spark token", zap.Error(err))
 				continue
 			}
 			if exists {
-				logger.Info("Issuer already has a Spark token. Not creating a spark native token.",
-					"issuer_public", tokenIssuerPubKey,
-					"network", tokenMetadata.Network.String(),
-					"txid", ann.txHash)
+				logger.With(zap.Stringer("issuer_public_key", tokenIssuerPubKey)).
+					Sugar().
+					Infof("Issuer already has a Spark token. Not creating a spark native token (txid %s).", ann.txHash)
 			} else {
 				if err := createNativeSparkTokenEntity(ctx, dbTx, tokenMetadata, l1TokenCreate.ID); err != nil {
-					logger.Error("failed to create spark native token create entity", "error", err, "txid", ann.txHash)
+					logger.With(zap.Error(err)).Sugar().Errorf("Failed to create spark native token create entity (txid %s)", ann.txHash)
 				}
 			}
 		}
@@ -398,9 +406,9 @@ func handleTokenUpdatesForBlock(
 	network common.Network,
 ) {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("Checking for token announcements", "height", blockHeight)
+	logger.Sugar().Infof("Checking for token announcements (block height %d)", blockHeight)
 	if err := handleTokenAnnouncements(ctx, config, dbTx, txs, network); err != nil {
-		logger.Error("Failed to handle token announcements", "error", err, "block_height", blockHeight)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to handle token announcements (block height %d)", blockHeight)
 	}
 }
 

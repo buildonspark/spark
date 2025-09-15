@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
 )
 
 var (
@@ -221,7 +222,7 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 		// to ensure the transaction can be cleaned up even if the context passed in is cancelled.
 		tx, err := s.provider.GetOrBeginTx(s.ctx)
 		if err != nil {
-			logger.Error("Failed to create new transaction", "error", err)
+			logger.Error("Failed to create new transaction", zap.Error(err))
 			// Decrement on error
 			txActiveGauge.Add(ctx, -1, metric.WithAttributes(s.getGaugeAttributes(attrOperationBegin)...))
 
@@ -245,7 +246,7 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				err := fn.Commit(ctx, tx)
 				var attrs []attribute.KeyValue
 				if err != nil {
-					logger.Error("Failed to commit transaction", "error", err)
+					logger.Error("Failed to commit transaction", zap.Error(err))
 					attrs = s.getOperationAttributes(attrOperationCommit, attrStatusError)
 					addTraceEvent(ctx, "commit", duration, err)
 				} else {
@@ -277,7 +278,7 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				err := fn.Rollback(ctx, tx)
 				var attrs []attribute.KeyValue
 				if err != nil {
-					logger.Error("Failed to rollback transaction", "error", err)
+					logger.Error("Failed to rollback transaction", zap.Error(err))
 					attrs = s.getOperationAttributes(attrOperationRollback, attrStatusError)
 					addTraceEvent(ctx, "rollback", duration, err)
 				} else {
@@ -363,7 +364,7 @@ func (t *TxProviderWithTimeout) GetOrBeginTx(ctx context.Context) (*ent.Tx, erro
 			select {
 			case errChan <- err:
 			case <-timeoutCtx.Done():
-				logger.Warn("Failed to start transaction within timeout", "error", err)
+				logger.Warn("Failed to start transaction within timeout", zap.Error(err))
 				return
 			}
 			return
@@ -376,7 +377,7 @@ func (t *TxProviderWithTimeout) GetOrBeginTx(ctx context.Context) (*ent.Tx, erro
 			// rollback the transaction so that we aren't just leaving it idle.
 			err := tx.Rollback()
 			if err != nil {
-				logger.Warn("Failed to rollback transaction after timeout", "error", err)
+				logger.Warn("Failed to rollback transaction after timeout", zap.Error(err))
 			}
 			return
 		}

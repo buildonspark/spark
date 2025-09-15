@@ -113,7 +113,7 @@ func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, 
 		return sparkerrors.InvalidUserInputErrorf("no token identifier or issuer public key provided")
 	}
 	if ent.IsNotFound(err) {
-		logger.Info("Token metadata not found - minting not allowed", "identifier_info", identifierInfo)
+		logger.Sugar().Infof("Token metadata not found - minting not allowed for %s", identifierInfo)
 		return sparkerrors.NotFoundErrorf("minting not allowed because a created token was not found for %s", identifierInfo)
 	}
 	if err != nil {

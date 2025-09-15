@@ -1,7 +1,7 @@
 package grpctest
 
 import (
-	"log/slog"
+	"fmt"
 	"os"
 	"testing"
 
@@ -13,11 +13,10 @@ import (
 var faucet *sparktesting.Faucet
 
 func TestMain(m *testing.M) {
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelWarn})))
 	// Setup
 	client, err := sparktesting.InitBitcoinClient()
 	if err != nil {
-		slog.Error("Error creating regtest client", "error", err)
+		fmt.Println("Error creating regtest client", err)
 		os.Exit(1)
 	}
 

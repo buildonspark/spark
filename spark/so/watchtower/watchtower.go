@@ -2,12 +2,11 @@ package watchtower
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
@@ -16,11 +15,13 @@ import (
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 )
 
 var (
@@ -39,7 +40,8 @@ func init() {
 		metric.WithDescription("Total number of node transactions broadcast by watchtower"),
 	)
 	if err != nil {
-		slog.Error("Failed to create node tx broadcast counter", "error", err)
+		otel.Handle(err)
+		nodeTxBroadcastCounter = noop.Int64Counter{}
 	}
 
 	refundTxBroadcastCounter, err = meter.Int64Counter(
@@ -47,7 +49,8 @@ func init() {
 		metric.WithDescription("Total number of refund transactions broadcast by watchtower"),
 	)
 	if err != nil {
-		slog.Error("Failed to create refund tx broadcast counter", "error", err)
+		otel.Handle(err)
+		refundTxBroadcastCounter = noop.Int64Counter{}
 	}
 }
 
@@ -57,23 +60,24 @@ type bitcoinClient interface {
 
 // BroadcastTransaction broadcasts a transaction to the network
 func BroadcastTransaction(ctx context.Context, btcClient bitcoinClient, nodeID string, txBytes []byte) error {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	tx, err := common.TxFromRawTxBytes(txBytes)
 	if err != nil {
 		return fmt.Errorf("watchtower failed to parse transaction for node %s: %w", nodeID, err)
 	}
 	// TODO: Broadcast Direct Refund TX.
-	slog.InfoContext(ctx, "Attempting to broadcast transaction", "tx", tx, "node_id", nodeID)
+	logger.Sugar().Infof("Attempting to broadcast transaction with txid %s for node %s", tx.TxID(), nodeID)
 	txHash, err := btcClient.SendRawTransaction(tx, false)
 	if err != nil {
 		if alreadyBroadcasted(err) {
-			slog.InfoContext(ctx, "Transaction already in mempool", "node_id", nodeID)
+			logger.Sugar().Infof("Transaction %s already in mempool for node %s", tx.TxID(), nodeID)
 			return nil
 		}
 		return fmt.Errorf("watchtower failed to broadcast transaction for node %s: %w", nodeID, err)
 	}
 
-	toString := hex.EncodeToString(txHash[:])
-	slog.InfoContext(ctx, "Successfully broadcast transaction", "tx_hash", toString, "node_id", nodeID)
+	logger.Sugar().Infof("Successfully broadcast transaction for %s (txhash: %x)", nodeID, txHash[:])
 	return nil
 }
 
@@ -150,6 +154,8 @@ func QueryNodesWithExpiredTimeLocks(ctx context.Context, dbTx *ent.Tx, blockHeig
 
 // CheckExpiredTimeLocks checks for TXs with expired time locks and broadcasts them if needed.
 func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client, node *ent.TreeNode, blockHeight int64, network common.Network) error {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	if node.NodeConfirmationHeight == 0 {
 		nodeTx, err := common.TxFromRawTxBytes(node.RawTx)
 		if err != nil {
@@ -176,7 +182,7 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 								attribute.String("result", "failure"),
 							))
 						}
-						slog.InfoContext(ctx, "Failed to broadcast node tx", "error", err, "node_id", node.ID.String())
+						logger.With(zap.Error(err)).Sugar().Infof("Failed to broadcast node tx for node %s", node.ID)
 						return fmt.Errorf("watchtower failed to broadcast node tx for node %s: %w", node.ID.String(), err)
 					}
 
@@ -209,7 +215,10 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 								attribute.String("result", "failure"),
 							))
 						}
-						slog.InfoContext(ctx, "Failed to broadcast both direct refund tx and direct from cpfp refund tx", "error", err, "node_id", node.ID.String())
+						logger.With(zap.Error(err)).Sugar().Infof(
+							"Failed to broadcast both direct refund tx and direct from cpfp refund tx for node %s",
+							node.ID,
+						)
 						return fmt.Errorf("watchtower failed to broadcast refund txs for node %s: %w", node.ID.String(), err)
 					}
 					// Record successful refund tx broadcast
@@ -228,7 +237,7 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 						attribute.String("result", "failure"),
 					))
 				}
-				slog.InfoContext(ctx, "Failed to broadcast direct refund tx", "error", err, "node_id", node.ID.String())
+				logger.With(zap.Error(err)).Sugar().Infof("Failed to broadcast direct refund tx for node %s", node.ID)
 				return fmt.Errorf("watchtower failed to broadcast refund tx for node %s: %w", node.ID.String(), err)
 			}
 

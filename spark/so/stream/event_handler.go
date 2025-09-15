@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -14,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"go.uber.org/zap"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
 )
@@ -25,11 +25,11 @@ const (
 
 type EventRouter struct {
 	dbEvents *db.DBEvents
-	logger   *slog.Logger
+	logger   *zap.Logger
 	dbClient *ent.Client
 }
 
-func NewEventRouter(dbClient *ent.Client, dbEvents *db.DBEvents, logger *slog.Logger) *EventRouter {
+func NewEventRouter(dbClient *ent.Client, dbEvents *db.DBEvents, logger *zap.Logger) *EventRouter {
 	defaultRouter := &EventRouter{
 		dbEvents: dbEvents,
 		logger:   logger,
@@ -65,7 +65,7 @@ func (s *EventRouter) SubscribeToEvents(identityPublicKey keys.Public, stream pb
 			notification, err := s.processNotification(stream.Context(), eventData, identityPublicKey)
 
 			if err != nil {
-				s.logger.Error("Failed to process notification", "error", err)
+				s.logger.With(zap.Error(err)).Error("Failed to process notification")
 			} else if notification != nil {
 				if err := stream.Send(notification); err != nil {
 					return nil
@@ -101,14 +101,14 @@ func (s *EventRouter) processNotification(ctx context.Context, eventData db.Even
 	var eventJson map[string]any
 	err := json.Unmarshal([]byte(eventData.Payload), &eventJson)
 	if err != nil {
-		s.logger.Error("Failed to unmarshal event data", "error", err)
+		s.logger.With(zap.Error(err)).Error("Failed to unmarshal event data")
 		return nil, err
 	}
 
 	idStr := eventJson["id"].(string)
 	id, err := uuid.Parse(idStr)
 	if err != nil {
-		s.logger.Error("Failed to parse ID as UUID", "error", err)
+		s.logger.With(zap.Error(err)).Error("Failed to parse ID as UUID")
 		return nil, err
 	}
 

@@ -19,6 +19,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -82,7 +83,7 @@ func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareC
 	signingKeyshares, err := GetUnusedSigningKeysharesTx(ctx, tx, config, keyshareCount)
 	if err != nil {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
-			logger.Error("Failed to rollback transaction", "error", rollbackErr)
+			logger.Error("Failed to rollback transaction", zap.Error(rollbackErr))
 		}
 		return nil, err
 	}
@@ -153,7 +154,7 @@ func GetUnusedSigningKeysharesTx(
 		if cerr := rows.Close(); cerr != nil {
 			// If ScanSlice already returned an error, we don't want to overwrite it,
 			// so just log the close error.
-			logging.GetLoggerFromContext(ctx).Error("failed to close rows", "error", cerr)
+			logging.GetLoggerFromContext(ctx).Error("failed to close rows", zap.Error(cerr))
 			span.RecordError(cerr)
 		}
 	}()
@@ -180,7 +181,7 @@ func MarkSigningKeysharesAsUsed(ctx context.Context, _ *so.Config, ids []uuid.UU
 	if err != nil {
 		return nil, err
 	}
-	logger.Info("Marking keyshares as used: %v", "keyshare_ids", ids)
+	logger.Sugar().Infof("Marking %d keyshares as used", len(ids))
 
 	keysharesMap, err := GetSigningKeysharesMap(ctx, ids)
 	if err != nil {
@@ -348,7 +349,7 @@ func CalculateAndStoreLastKey(ctx context.Context, _ *so.Config, target *Signing
 		keyshareIDs[i] = keyshare.ID
 	}
 
-	logger.Info("Calculating last key for keyshares", "keyshare_ids", keyshareIDs)
+	logger.Sugar().Infof("Calculating last key for %d keyshares", len(keyshareIDs))
 	sumKeyshare, err := sumOfSigningKeyshares(keyshares)
 	if err != nil {
 		return nil, err
@@ -465,7 +466,7 @@ func RunDKG(ctx context.Context, config *so.Config) error {
 
 	connection, err := config.SigningOperatorMap[config.Identifier].NewOperatorGRPCConnectionForDKG()
 	if err != nil {
-		logger.Error("Failed to create connection to DKG coordinator", "error", err)
+		logger.Error("Failed to create connection to DKG coordinator", zap.Error(err))
 		return err
 	}
 	defer connection.Close()
@@ -475,7 +476,7 @@ func RunDKG(ctx context.Context, config *so.Config) error {
 		Count: spark.DKGKeyCount,
 	})
 	if err != nil {
-		logger.Error("Failed to start DKG", "error", err)
+		logger.Error("Failed to start DKG", zap.Error(err))
 		return err
 	}
 

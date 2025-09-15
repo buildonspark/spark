@@ -2,8 +2,6 @@ package tree
 
 import (
 	"context"
-	"encoding/hex"
-	"log/slog"
 
 	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark_tree"
@@ -45,14 +43,11 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 	for _, leaf := range leaves {
 		// Leaves must be a power of 2 and less than or equal to the maximum denomination.
 		if leaf.Value&(leaf.Value-1) != 0 || leaf.Value > DenominationMax || leaf.Value == 0 {
-			logger.Info("invalid leaf denomination", slog.Uint64("denomination", leaf.Value),
-				slog.Bool("not_power_of_2", leaf.Value&(leaf.Value-1) != 0),
-				slog.Bool("exceeds_max", leaf.Value > DenominationMax),
-				slog.Bool("is_zero", leaf.Value == 0))
+			logger.Sugar().Infof("Invalid leaf denomination %d", leaf.Value)
 			continue
 		}
 		counts[leaf.Value]++
 	}
-	logger.Info("leaf count", slog.Int("num_leaves", len(leaves)), slog.String("public_key", hex.EncodeToString(req.OwnerIdentityPublicKey)))
+	logger.Sugar().Infof("Leaf count (leaves: %d, public key: %x)", len(leaves), req.OwnerIdentityPublicKey)
 	return &pb.GetLeafDenominationCountsResponse{Counts: counts}, nil
 }

@@ -14,6 +14,7 @@ import (
 	sogrpc "github.com/lightsparkdev/spark/common/grpc"
 	"github.com/lightsparkdev/spark/common/logging"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -71,11 +72,11 @@ func loggingUnaryClientInterceptor(
 	err := invoker(ctx, method, req, reply, cc, opts...)
 	duration := time.Since(start)
 
-	logger := logging.GetLoggerFromContext(ctx)
+	logger := logging.GetLoggerFromContext(ctx).With(zap.String("grpc_client_method", method))
 	logging.ObserveServiceCall(ctx, method, duration)
 
 	if err != nil {
-		logger.Error("gRPC client request failed", "grpc_client_method", method, "grpc_client_duration", duration.Seconds(), "error", err)
+		logger.Error("gRPC client request failed", zap.Error(err))
 	}
 	return err
 }

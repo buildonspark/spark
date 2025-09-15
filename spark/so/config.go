@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"math"
 	"net/url"
 	"os"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/logging"
 	"google.golang.org/grpc"
 
 	"github.com/XSAM/otelsql"
@@ -276,6 +276,7 @@ type ServiceAuthzConfig struct {
 
 // NewConfig creates a new config for the signing operator.
 func NewConfig(
+	ctx context.Context,
 	configFilePath string,
 	index uint64,
 	identityPrivateKeyFilePath string,
@@ -291,6 +292,8 @@ func NewConfig(
 	runDirectory string,
 	rateLimiter RateLimiterConfig,
 ) (*Config, error) {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	identityPrivateKeyHexStringBytes, err := os.ReadFile(identityPrivateKeyFilePath)
 	if err != nil {
 		return nil, err
@@ -319,7 +322,7 @@ func NewConfig(
 		return nil, err
 	}
 
-	setLrc20Defaults(operatorConfig.Lrc20)
+	setLrc20Defaults(ctx, operatorConfig.Lrc20)
 	setGrpcDefaults(&operatorConfig.GRPC)
 
 	if index > math.MaxUint32 {
@@ -328,25 +331,25 @@ func NewConfig(
 	identifier := utils.IndexToIdentifier(uint32(index))
 
 	if !operatorConfig.ServiceAuthz.Mode.Valid() {
-		slog.Warn("unset or invalid authz mode - treating authz as disabled", "mode", operatorConfig.ServiceAuthz.Mode)
+		logger.Sugar().Warnf("unset or invalid authz mode %d - treating authz as disabled", operatorConfig.ServiceAuthz.Mode)
 		operatorConfig.ServiceAuthz.Mode = authz.ModeLogOnly
 	} else if operatorConfig.ServiceAuthz.Mode == authz.ModeDisabled {
-		slog.Info("authz mode is disabled - no service authorization checks will be performed")
+		logger.Info("authz mode is disabled - no service authorization checks will be performed")
 	} else {
-		slog.Info("authz mode set", "mode", operatorConfig.ServiceAuthz.Mode)
+		logger.Sugar().Infof("authz mode %d set", operatorConfig.ServiceAuthz.Mode)
 	}
 
 	if len(operatorConfig.ServiceAuthz.IPAllowlist) == 0 {
-		slog.Warn("no IP allowlist specified for authz")
+		logger.Warn("no IP allowlist specified for authz")
 		operatorConfig.ServiceAuthz.IPAllowlist = []string{}
 	} else if operatorConfig.ServiceAuthz.Mode == authz.ModeDisabled {
-		slog.Warn("authz mode is disable, but IP allowlist is set - potential misconfiguration")
+		logger.Warn("authz mode is disable, but IP allowlist is set - potential misconfiguration")
 	} else {
-		slog.Info("authz ip allowlist set", "allowlist", operatorConfig.ServiceAuthz.IPAllowlist)
+		logger.Sugar().Infof("authz ip allowlist set (%+q)", operatorConfig.ServiceAuthz.IPAllowlist)
 	}
 
 	if operatorConfig.XffClientIpPosition < 0 {
-		slog.Warn("xff_client_ip_position is negative - using default value", "default_position", 0)
+		logger.Warn("xff_client_ip_position is negative - using default value 0")
 		operatorConfig.XffClientIpPosition = 0
 	}
 
@@ -670,10 +673,12 @@ const (
 )
 
 // setLrc20Defaults sets default values for Lrc20Config fields if they are zero.
-func setLrc20Defaults(lrc20Configs map[string]Lrc20Config) {
+func setLrc20Defaults(ctx context.Context, lrc20Configs map[string]Lrc20Config) {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	for k, v := range lrc20Configs {
 		if v.TransactionExpiryDuration == 0 {
-			slog.Info("TokenTransactionExpiryDuration not set, using default value", "default_duration", defaultTokenTransactionExpiryDuration)
+			logger.Sugar().Infof("TokenTransactionExpiryDuration not set, using default value %s", defaultTokenTransactionExpiryDuration)
 			v.TransactionExpiryDuration = defaultTokenTransactionExpiryDuration
 		}
 		lrc20Configs[k] = v

@@ -6,10 +6,10 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"log/slog"
 	"slices"
 	"time"
 
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/google/uuid"
@@ -68,7 +68,7 @@ func CreateStartedTransactionEntities(
 	var network st.Network
 	err = network.UnmarshalProto(tokenTransaction.Network)
 	if err != nil {
-		logger.Error("Failed to unmarshal network", "error", err)
+		logger.Error("Failed to unmarshal network", zap.Error(err))
 		return nil, err
 	}
 
@@ -815,7 +815,9 @@ func FetchAndLockTokenTransactionDataByHash(ctx context.Context, tokenTransactio
 
 // MarshalProto converts a TokenTransaction to a token protobuf TokenTransaction.
 // This assumes the transaction already has all its relationships loaded.
-func (t *TokenTransaction) MarshalProto(config *so.Config) (*tokenpb.TokenTransaction, error) {
+func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) (*tokenpb.TokenTransaction, error) {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	operatorPublicKeys := make([][]byte, 0, len(config.SigningOperatorMap))
 	for _, operator := range config.SigningOperatorMap {
 		operatorPublicKeys = append(operatorPublicKeys, operator.IdentityPublicKey.Serialize())
@@ -934,16 +936,18 @@ func (t *TokenTransaction) MarshalProto(config *so.Config) (*tokenpb.TokenTransa
 		// may not have successfully completed and has since had its inputs remappted.
 	} else if t.Status == st.TokenTransactionStatusStarted || t.Status == st.TokenTransactionStatusStartedCancelled ||
 		t.Status == st.TokenTransactionStatusSignedCancelled {
-		slog.Default().Warn("Started transaction does not map to input TTXOs. This is likely due to those inputs being spent and remapped to a subsequent transaction.",
-			"transaction_id", t.ID,
-			"finalized_transaction_hash",
-			hex.EncodeToString(t.FinalizedTokenTransactionHash))
+		logger.Sugar().Warnf(
+			"Started transaction %s with hash %x does not map to input TTXOs. This is likely due to those inputs being spent and remapped to a subsequent transaction.",
+			t.ID,
+			t.FinalizedTokenTransactionHash,
+		)
 	} else if t.Status == st.TokenTransactionStatusSigned && t.Version != 0 && time.Now().After(t.ExpiryTime) {
 		// Preemption logic in V1 Transactions allows the inputs on certain signed transactions to be remapped after expiry.
-		slog.Default().Warn("Signed transaction does not map to input TTXOs. This is likely due to this transaction being pre-empted and those inputs being spent and remapped to a subsequent transaction.",
-			"transaction_id", t.ID,
-			"finalized_transaction_hash",
-			hex.EncodeToString(t.FinalizedTokenTransactionHash))
+		logger.Sugar().Warnf(
+			"Signed transaction %s with hash %x does not map to input TTXOs. This is likely due to this transaction being pre-empted and those inputs being spent and remapped to a subsequent transaction.",
+			t.ID,
+			t.FinalizedTokenTransactionHash,
+		)
 	} else {
 		return nil, fmt.Errorf("Signed/Finalized transaction unexpectedly does not map to input TTXOs and cannot be marshalled: %s", t.ID)
 	}

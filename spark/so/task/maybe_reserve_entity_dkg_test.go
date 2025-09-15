@@ -142,7 +142,7 @@ func TestReserveEntityDkg_OperatorDown(t *testing.T) {
 
 			reserveTask, err := getReserveEntityDkgTask()
 			require.NoError(t, err)
-			err = reserveTask.RunOnce(cfg, client, knobs.NewFixedKnobs(map[string]float64{}))
+			err = reserveTask.RunOnce(ctx, cfg, client, knobs.NewFixedKnobs(map[string]float64{}))
 
 			if tc.failOneOperator {
 				require.ErrorContains(t, err, "Unavailable")
@@ -183,11 +183,11 @@ func TestReserveEntityDkg_Idempotent(t *testing.T) {
 
 	reserveTask, err := getReserveEntityDkgTask()
 	require.NoError(t, err)
-	err = reserveTask.RunOnce(cfg, client, knobs.NewFixedKnobs(map[string]float64{}))
+	err = reserveTask.RunOnce(ctx, cfg, client, knobs.NewFixedKnobs(map[string]float64{}))
 	require.NoError(t, err)
 
 	// Run again to ensure idempotency.
-	err = reserveTask.RunOnce(cfg, client, knobs.NewFixedKnobs(map[string]float64{}))
+	err = reserveTask.RunOnce(ctx, cfg, client, knobs.NewFixedKnobs(map[string]float64{}))
 	require.NoError(t, err)
 
 	count, err := client.EntityDkgKey.Query().Count(ctx)
@@ -214,7 +214,7 @@ func TestReserveEntityDkg_NonCoordinator(t *testing.T) {
 
 	reserveTask, err := getReserveEntityDkgTask()
 	require.NoError(t, err)
-	err = reserveTask.RunOnce(cfg, client, knobs.NewFixedKnobs(map[string]float64{}))
+	err = reserveTask.RunOnce(ctx, cfg, client, knobs.NewFixedKnobs(map[string]float64{}))
 	require.NoError(t, err)
 
 	count, err := client.EntityDkgKey.Query().Count(ctx)

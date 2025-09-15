@@ -7,6 +7,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/pebbe/zmq4"
+	"go.uber.org/zap"
 )
 
 type ZmqSubscriber struct {
@@ -51,7 +52,7 @@ func (z *ZmqSubscriber) Subscribe(ctx context.Context, endpoint string, filter s
 		return nil, nil, fmt.Errorf("failed to set ZMQ subscription filter %s: %w", filter, err)
 	}
 
-	logger := logging.GetLoggerFromContext(ctx).With("subscription", filter)
+	logger := logging.GetLoggerFromContext(ctx).With(zap.String("subscription", filter))
 
 	msgChan := make(chan struct{}, 10)
 	errChan := make(chan error)
@@ -60,7 +61,7 @@ func (z *ZmqSubscriber) Subscribe(ctx context.Context, endpoint string, filter s
 		defer func() {
 			logger.Info("[zmq] Closing subscriber socket...")
 			if err := zmqSocket.Close(); err != nil {
-				logger.Error("[zmq] Failed to close subscriber socket", "error", err)
+				logger.Error("[zmq] Failed to close subscriber socket", zap.Error(err))
 			}
 			logger.Info("[zmq] Subscriber socket closed")
 		}()
@@ -78,12 +79,12 @@ func (z *ZmqSubscriber) Subscribe(ctx context.Context, endpoint string, filter s
 				_, err := zmqSocket.RecvMessage(0)
 				if err != nil {
 					if zmq4.AsErrno(err) != zmq4.ETERM {
-						logger.Error("[zmq] Failed to receive message", "error", err)
+						logger.Error("[zmq] Failed to receive message", zap.Error(err))
 
 						select {
 						case errChan <- fmt.Errorf("failed to receive message: %w", err):
 						default:
-							logger.Warn("[zmq] No receiver for error channel, dropping error...", "error", err)
+							logger.Warn("[zmq] No receiver for error channel, dropping error...", zap.Error(err))
 						}
 					}
 

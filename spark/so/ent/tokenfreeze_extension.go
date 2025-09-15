@@ -2,7 +2,9 @@ package ent
 
 import (
 	"context"
+
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -31,7 +33,7 @@ func GetActiveFreezes(ctx context.Context, ownerPublicKeys []keys.Public, tokenC
 
 	activeFreezes, err := db.TokenFreeze.Query().Where(conditions...).All(ctx)
 	if err != nil {
-		logger.Error("Failed to fetch active freezes", "error", err, "ownerPublicKeys", ownerPublicKeys, "tokenCreateId", tokenCreateId)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to fetch active freezes for token_create_id %s and owner_public_keys %+q", tokenCreateId, ownerPublicKeys)
 		return nil, err
 	}
 	return activeFreezes, nil
@@ -51,7 +53,7 @@ func ThawActiveFreeze(ctx context.Context, activeFreezeID uuid.UUID, timestamp u
 		SetWalletProvidedThawTimestamp(timestamp).
 		Save(ctx)
 	if err != nil {
-		logger.Error("Failed to thaw active freeze", "error", err, "activeFreezeID", activeFreezeID, "timestamp", timestamp)
+		logger.With(zap.Error(err)).Sugar().Error("Failed to thaw active freeze %s at timestamp %d", activeFreezeID, timestamp)
 		return err
 	}
 	return nil
@@ -73,7 +75,15 @@ func ActivateFreeze(ctx context.Context, ownerPublicKey keys.Public, tokenCreate
 		SetIssuerSignature(issuerSignature).
 		Save(ctx)
 	if err != nil {
-		logger.Error("Failed to activate freeze", "error", err, "ownerPublicKey", ownerPublicKey, "tokenCreateID", tokenCreateID, "timestamp", timestamp, "issuerSignature", issuerSignature)
+		logger.With(zap.Error(err)).
+			Sugar().
+			Errorf(
+				"Failed to activate freeze (owner_public_key %s, token_create_id %s, timestamp %d, signature %s)",
+				ownerPublicKey,
+				tokenCreateID,
+				timestamp,
+				issuerSignature,
+			)
 		return err
 	}
 	return nil

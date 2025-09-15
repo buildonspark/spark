@@ -2,7 +2,6 @@ package errors
 
 import (
 	"context"
-	"log/slog"
 	"strings"
 
 	"github.com/lightsparkdev/spark/so/grpcutil"
@@ -67,10 +66,6 @@ func ErrorInterceptor(returnDetailedErrors bool) grpc.UnaryServerInterceptor {
 
 		// Convert any error to a gRPC error to standardize downstream handling.
 		err = asGRPCError(err)
-
-		// Log full (pre-mask) code and reason.
-		preCode, preReason := CodeAndReasonFrom(err)
-		slog.Error("RPC failed", "method", info.FullMethod, "rpc_grpc_status_code", preCode.String(), "rpc_grpc_error_reason", preReason)
 
 		// Emit metrics for the (pre-mask) error reason.
 		st := status.Convert(err)

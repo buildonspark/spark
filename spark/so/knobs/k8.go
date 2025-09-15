@@ -3,11 +3,12 @@ package knobs
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/goccy/go-yaml"
+	"github.com/lightsparkdev/spark/common/logging"
+	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -20,15 +21,17 @@ import (
 
 type knobsK8ValuesProvider struct {
 	context context.Context
-	logger  *slog.Logger
+	logger  *zap.Logger
 	lock    *sync.RWMutex
 	values  map[string]float64
 }
 
 func NewKnobsK8ValuesProvider(ctx context.Context) (*knobsK8ValuesProvider, error) {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	provider := knobsK8ValuesProvider{
 		context: ctx,
-		logger:  slog.Default().With("component", "knobs"),
+		logger:  logger.With(zap.String("component", "knobs")),
 		lock:    &sync.RWMutex{},
 		values:  make(map[string]float64),
 	}
@@ -136,14 +139,8 @@ func (k *knobsK8ValuesProvider) fetchAndUpdate() error {
 	return nil
 }
 
-func (k *knobsK8ValuesProvider) log(level slog.Level, msg string, args ...any) {
-	if k.logger != nil {
-		k.logger.Log(k.context, level, msg, args...)
-	}
-}
-
 func (k *knobsK8ValuesProvider) handleConfigMap(configMap *corev1.ConfigMap) {
-	k.log(slog.LevelDebug, "Processing ConfigMap", "configMap", configMap.Data)
+	k.logger.Sugar().Debugf("Processing ConfigMap: %v", configMap.Data)
 
 	k.lock.Lock()
 	defer k.lock.Unlock()
@@ -152,7 +149,7 @@ func (k *knobsK8ValuesProvider) handleConfigMap(configMap *corev1.ConfigMap) {
 
 	// If no data, nothing to do.
 	if configMap == nil || configMap.Data == nil {
-		k.log(slog.LevelInfo, "No knobs found in ConfigMap")
+		k.logger.Info("No knobs found in ConfigMap")
 		return
 	}
 
@@ -172,7 +169,7 @@ func (k *knobsK8ValuesProvider) handleConfigMap(configMap *corev1.ConfigMap) {
 			continue
 		}
 
-		k.log(slog.LevelWarn, "Unknown knob value type", "name", name, "value", value)
+		k.logger.Sugar().Warnf("Unknown knob value type (name: %s, value: %s)", name, value)
 	}
-	k.log(slog.LevelInfo, "Updated knobs", "knobs", k.values)
+	k.logger.Sugar().Infof("Updated knobs %v", k.values)
 }

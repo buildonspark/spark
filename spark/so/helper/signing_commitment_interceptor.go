@@ -9,6 +9,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -31,7 +32,7 @@ func SigningCommitmentInterceptor(operatorMap map[string]*so.SigningOperator, kn
 		signingCommitmentsCount := calculateSigningCommitmentCount(protoReq)
 		if signingCommitmentsCount > 0 {
 			logger := logging.GetLoggerFromContext(ctx)
-			logger.Info("Signing commitment count", "count", signingCommitmentsCount)
+			logger.Sugar().Infof("Counted %d signing commitments necessary for request", signingCommitmentsCount)
 			dbTx, err := ent.GetDbFromContext(ctx)
 			if err != nil {
 				return nil, err
@@ -42,7 +43,7 @@ func SigningCommitmentInterceptor(operatorMap map[string]*so.SigningOperator, kn
 				idx := uint(operator.ID)
 				commitments, err := ent.ReserveSigningCommitments(ctx, dbTx, uint32(signingCommitmentsCount), idx)
 				if err != nil {
-					logger.Error("Failed to get unused signing commitments", "error", err)
+					logger.Error("Failed to get unused signing commitments", zap.Error(err))
 					if rollbackErr := dbTx.Rollback(); rollbackErr != nil {
 						return nil, rollbackErr
 					}

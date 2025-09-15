@@ -5,13 +5,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log/slog"
 	"maps"
 	"slices"
 	"time"
 
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/handler/signing_handler"
@@ -118,7 +118,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							signingcommitment.StatusEQ(st.SigningCommitmentStatusAvailable),
 						).Count(ctx)
 						if err != nil {
-							logger.Error("failed to query signing commitments for operator", "operator", operator.ID, "error", err)
+							logger.With(zap.Error(err)).Sugar().Errorf("failed to query signing commitments for operator %d", operator.ID)
 							continue
 						}
 
@@ -142,7 +142,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 								RandomNonceCount: spark.SigningCommitmentBatchSize,
 							})
 							if err != nil {
-								logger.Error("failed to generate signing commitments for operator", "operator", operator.ID, "error", err)
+								logger.With(zap.Error(err)).Sugar().Errorf("failed to generate signing commitments for operator %d", operator.ID)
 								continue
 							}
 
@@ -208,10 +208,10 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					}
 
 					for _, dbTransfer := range transfers {
-						logger.Info("Cancelling transfer", "transfer_id", dbTransfer.ID)
+						logger.Sugar().Infof("Cancelling transfer %s", dbTransfer.ID)
 						err := h.CancelTransferInternal(ctx, dbTransfer.ID.String())
 						if err != nil {
-							logger.Error("failed to cancel transfer", "error", err)
+							logger.With(zap.Error(err)).Sugar().Errorf("failed to cancel transfer %s", dbTransfer.ID)
 						}
 					}
 
@@ -249,7 +249,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 
 					treeNodes, err := query.All(ctx)
 					if err != nil {
-						logger.Error("failed to query tree nodes", "error", err)
+						logger.Error("Failed to query tree nodes", zap.Error(err))
 						return err
 					}
 
@@ -269,7 +269,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 
 						numDeleted, err := tx.TreeNode.Delete().Where(treenode.IDIn(treeNodeIDs...)).Exec(ctx)
 						if err != nil {
-							logger.Error("failed to delete tree nodes", "tree_id", treeID, "error", err)
+							logger.With(zap.Error(err)).Sugar().Errorf("Failed to delete tree nodes for tree %s", treeID)
 							return err
 						}
 
@@ -278,11 +278,11 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						// Delete the associated trees
 						_, err = tx.Tree.Delete().Where(tree.IDEQ(treeID)).Exec(ctx)
 						if err != nil {
-							logger.Error("failed to delete tree", "tree_id", treeID, "error", err)
+							logger.With(zap.Error(err)).Sugar().Errorf("Failed to delete tree %s", treeID)
 							return err
 						}
 
-						logger.Info(fmt.Sprintf("Deleted tree %s.", treeID))
+						logger.Sugar().Infof("Deleted tree %s", treeID)
 					}
 
 					return nil
@@ -317,7 +317,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						if dbTransfer.Type == st.TransferTypePreimageSwap {
 							preimageRequest, err := tx.PreimageRequest.Query().Where(preimagerequest.HasTransfersWith(transfer.IDEQ(dbTransfer.ID))).Only(ctx)
 							if err != nil {
-								logger.Error("failed to get preimage request for transfer", "error", err)
+								logger.Error("Failed to get preimage request for transfer", zap.Error(err))
 								continue
 							}
 							if preimageRequest.Status != st.PreimageRequestStatusPreimageShared {
@@ -326,7 +326,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						}
 						err := h.ResumeSendTransfer(ctx, dbTransfer)
 						if err != nil {
-							logger.Error("failed to resume send transfer", "error", err)
+							logger.Error("Failed to resume send transfer", zap.Error(err))
 						}
 					}
 					return nil
@@ -400,8 +400,8 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						}
 						if finalized {
 							logger.Info("Successfully finalized token transaction",
-								"transaction_id", tokenTransaction.ID,
-								"transaction_hash", hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash),
+								zap.Stringer("transaction_id", tokenTransaction.ID),
+								zap.String("transaction_hash", hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash)),
 							)
 							continue
 						}
@@ -461,16 +461,17 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							ExpiryTime:   timestamppb.New(tokenTransaction.ExpiryTime),
 							Network:      protoNetwork,
 						}
-						logger.Info("[cron] Finalizing token transaction",
-							"num_signatures", len(signaturesPackage),
-							"operator_ids", slices.Collect(maps.Keys(signaturesPackage)),
-							"transaction_hash", hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash))
+						logger.With(zap.String("transaction_hash", hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash))).
+							Sugar().
+							Infof("[cron] Finalizing token transaction with operators %+q (signatures: %d)", slices.Collect(maps.Keys(signaturesPackage)), len(signaturesPackage))
 						signTokenHandler := tokens.NewSignTokenHandler(config)
 						commitTransactionResponse, err := signTokenHandler.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, tokenPb, signaturesPackage, tokenTransaction.FinalizedTokenTransactionHash)
 						if err != nil {
 							return fmt.Errorf("cron job failed to exchange revocation secrets and finalize if possible for token txHash: %x: %w", tokenTransaction.FinalizedTokenTransactionHash, err)
 						} else {
-							logger.Info(fmt.Sprintf("Successfully exchanged revocation secrets and finalized if possible for token txHash: %x. Commit response: %v", tokenTransaction.FinalizedTokenTransactionHash, commitTransactionResponse))
+							logger.With(zap.String("transaction_hash", hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash))).
+								Sugar().
+								Infof("Successfully exchanged revocation secrets and finalized if possible for token tx. Commit response: %v", commitTransactionResponse)
 						}
 					}
 					return nil
@@ -498,7 +499,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					for _, gossipMsg := range gossips {
 						_, err := gossipHandler.SendGossipMessage(ctx, gossipMsg)
 						if err != nil {
-							logger.Error("failed to send gossip", "error", err)
+							logger.Error("Failed to send gossip", zap.Error(err))
 						}
 					}
 					return nil
@@ -531,15 +532,15 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					for _, utxoSwap := range utxoSwaps {
 						dbTransfer, err := utxoSwap.QueryTransfer().Only(ctx)
 						if err != nil && !ent.IsNotFound(err) {
-							logger.Error("failed to get transfer for a utxo swap", "error", err)
+							logger.Error("Failed to get transfer for a utxo swap", zap.Error(err))
 							continue
 						}
 						if dbTransfer == nil && utxoSwap.RequestType != st.UtxoSwapRequestTypeRefund {
-							logger.Debug("No transfer found for a non-refund utxo swap", "utxo_swap_id", utxoSwap.ID)
+							logger.Sugar().Debugf("No transfer found for a non-refund utxo swap %s", utxoSwap.ID)
 							continue
 						}
 						if utxoSwap.RequestType == st.UtxoSwapRequestTypeRefund || dbTransfer.Status == st.TransferStatusCompleted {
-							logger.Debug("Marking utxo swap as completed", "utxo_swap_id", utxoSwap.ID)
+							logger.Sugar().Debugf("Marking utxo swap %s as completed", utxoSwap.ID)
 
 							utxo, err := utxoSwap.QueryUtxo().Only(ctx)
 							if err != nil {
@@ -557,11 +558,11 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 
 							completedUtxoSwapRequest, err := handler.CreateCompleteSwapForUtxoRequest(config, protoUtxo)
 							if err != nil {
-								logger.Warn("Failed to get complete swap for utxo request, cron task to retry", "error", err)
+								logger.Warn("Failed to get complete swap for utxo request, cron task to retry", zap.Error(err))
 							} else {
 								h := handler.NewInternalDepositHandler(config)
 								if err := h.CompleteSwapForAllOperators(ctx, config, completedUtxoSwapRequest); err != nil {
-									logger.Warn("Failed to mark a utxo swap as completed in all operators, cron task to retry", "error", err)
+									logger.Warn("Failed to mark a utxo swap as completed in all operators, cron task to retry", zap.Error(err))
 								}
 							}
 						}
@@ -635,7 +636,7 @@ func AllStartupTasks() []StartupTaskSpec {
 							return fmt.Errorf("failed to get signing keyshare from entity DKG key: %w", err)
 						}
 					}
-					logger.Info("Found available signing keyshare, proceeding with reservation on other SOs", "keyshare_id", keyshare.ID)
+					logger.Sugar().Infof("Found available signing keyshare %s, proceeding with reservation on other SOs", keyshare.ID)
 					selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 					_, err = helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
 						conn, err := operator.NewOperatorGRPCConnection()
@@ -652,7 +653,7 @@ func AllStartupTasks() []StartupTaskSpec {
 						return fmt.Errorf("failed to reserve entity DKG key with operators. This is likely due to not all SOs being ready yet. Will retry in %s: %w", entityDkgRetryInterval, err)
 					}
 
-					logger.Info("Successfully verified reserved entity DKG key in all operators", "keyshare_id", keyshare.ID)
+					logger.Sugar().Infof("Successfully verified reserved entity DKG key %s in all operators", keyshare.ID)
 					return nil
 				},
 			},
@@ -692,7 +693,6 @@ func AllStartupTasks() []StartupTaskSpec {
 							Order(ent.Asc(tokenoutput.FieldID)).
 							Limit(batchSize).
 							All(ctx)
-
 						if err != nil {
 							return fmt.Errorf("failed to fetch outputs for backfill: %w", err)
 						}
@@ -717,10 +717,11 @@ func AllStartupTasks() []StartupTaskSpec {
 						if processed%10000 == 0 {
 							elapsed := time.Since(start)
 							rate := float64(processed) / elapsed.Seconds()
-							logger.Info("Backfill progress",
-								"processed", processed,
-								"rate_per_sec", int(rate),
-								"elapsed", elapsed.Round(time.Second),
+							logger.Sugar().Infof(
+								"Backfill progress: processed %d outputs, rate %.2f/sec, elapsed %s",
+								processed,
+								rate,
+								elapsed,
 							)
 						}
 
@@ -729,10 +730,10 @@ func AllStartupTasks() []StartupTaskSpec {
 					}
 
 					elapsed := time.Since(start)
-					logger.Info("Backfill completed",
-						"total_processed", processed,
-						"duration", elapsed.Round(time.Second),
-						"rate_per_sec", int(float64(processed)/elapsed.Seconds()),
+					logger.Sugar().Infof("Backfill completed: processed %d outputs, rate %.2f/sec, total time %s",
+						processed,
+						float64(processed)/elapsed.Seconds(),
+						elapsed,
 					)
 
 					return nil
@@ -749,9 +750,7 @@ func (t *BaseTaskSpec) getTimeout() time.Duration {
 	return defaultTaskTimeout
 }
 
-func (t *BaseTaskSpec) RunOnce(config *so.Config, dbClient *ent.Client, knobsService knobs.Knobs) error {
-	ctx := context.Background()
-
+func (t *BaseTaskSpec) RunOnce(ctx context.Context, config *so.Config, dbClient *ent.Client, knobsService knobs.Knobs) error {
 	wrappedTask := t.chainMiddleware(
 		LogMiddleware(),
 		DatabaseMiddleware(db.NewDefaultSessionFactory(dbClient), config.Database.NewTxTimeout),
@@ -827,8 +826,9 @@ func (t *BaseTaskSpec) chainMiddleware(
 
 // RunStartupTasks runs startup tasks with optional retry logic.
 // Any task with a non-nil RetryInterval will be retried in the background on failure.
-func RunStartupTasks(config *so.Config, db *ent.Client, runningLocally bool, knobsService knobs.Knobs) error {
-	slog.Info("Running startup tasks...")
+func RunStartupTasks(ctx context.Context, config *so.Config, db *ent.Client, runningLocally bool, knobsService knobs.Knobs) error {
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Info("Running startup tasks...")
 
 	for _, task := range AllStartupTasks() {
 		if !runningLocally || task.RunInTestEnv {
@@ -837,7 +837,7 @@ func RunStartupTasks(config *so.Config, db *ent.Client, runningLocally bool, kno
 					retryInterval := *task.RetryInterval
 
 					for {
-						err := task.RunOnce(config, db, knobsService)
+						err := task.RunOnce(ctx, config, db, knobsService)
 						if err == nil {
 							break
 						}
@@ -846,15 +846,15 @@ func RunStartupTasks(config *so.Config, db *ent.Client, runningLocally bool, kno
 							break
 						}
 
-						slog.Warn(fmt.Sprintf("Startup task failed, retrying in %s", retryInterval), "task.name", task.Name, "error", err)
+						logger.With(zap.String("task.name", task.Name), zap.Error(err)).Sugar().Warnf("Startup task failed, retrying in %s", retryInterval)
 						time.Sleep(retryInterval)
 					}
 				}(task)
 			} else {
-				task.RunOnce(config, db, knobsService) // nolint: errcheck
+				task.RunOnce(ctx, config, db, knobsService) // nolint: errcheck
 			}
 		}
 	}
-	slog.Info("All startup tasks completed")
+	logger.Info("All startup tasks completed")
 	return nil
 }

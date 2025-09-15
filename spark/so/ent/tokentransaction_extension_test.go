@@ -53,7 +53,7 @@ func TestMarshalProto_V3_SortsOperatorKeysAndInvoices(t *testing.T) {
 	// Set status to Started so MarshalProto doesn't require mapping inputs
 	tx.Status = st.TokenTransactionStatusStarted
 
-	protoTx, err := tx.MarshalProto(cfg)
+	protoTx, err := tx.MarshalProto(t.Context(), cfg)
 	if err != nil {
 		t.Fatalf("MarshalProto failed: %v", err)
 	}

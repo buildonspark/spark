@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/proto/spark_tree"
@@ -72,7 +73,7 @@ func TestPolarityScorer_Score(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			_, dbCtx := db.NewTestSQLiteContext(t)
 
-			scorer := NewPolarityScorer(dbCtx.Client)
+			scorer := NewPolarityScorer(zap.NewNop(), dbCtx.Client)
 			scorer.probPubKeyCanClaim = tc.setupScores
 
 			score := scorer.Score(leafID, sspKey, userKey)
@@ -86,7 +87,7 @@ func TestPolarityScorer_UpdateLeaves(t *testing.T) {
 	dbTx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	scorer := NewPolarityScorer(dbTx.Client())
+	scorer := NewPolarityScorer(zap.NewNop(), dbTx.Client())
 
 	treeOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(seeded).Public()
 	tree := dbTx.Tree.Create().
@@ -225,7 +226,7 @@ func TestPolarityScorer_FetchPolarityScores(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, dbCtx := db.NewTestSQLiteContext(t)
 
-			scorer := NewPolarityScorer(dbCtx.Client)
+			scorer := NewPolarityScorer(zap.NewNop(), dbCtx.Client)
 			scorer.probPubKeyCanClaim = tt.setupScores
 
 			mockStream := &mockSparkTreeServiceFetchPolarityScoresServer{

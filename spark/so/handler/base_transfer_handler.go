@@ -12,6 +12,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -655,7 +656,7 @@ func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.C
 	transfer, err := h.loadTransferNoUpdate(ctx, req.TransferId)
 	if err != nil {
 		logger := logging.GetLoggerFromContext(ctx)
-		logger.Info("Transfer not found", "transfer_id", req.TransferId)
+		logger.Sugar().Info("Transfer %s not found", req.TransferId)
 		return &pbspark.CancelTransferResponse{}, nil
 	}
 	transferSenderIDPubKey, err := keys.ParsePublicKey(transfer.SenderIdentityPubkey)
@@ -757,7 +758,7 @@ func (h *BaseTransferHandler) executeCancelTransfer(ctx context.Context, transfe
 	// Don't error if the transfer is already returned.
 	logger := logging.GetLoggerFromContext(ctx)
 	if transfer.Status == st.TransferStatusReturned {
-		logger.Info("Transfer already returned", "transfer_id", transfer.ID.String())
+		logger.Sugar().Infof("Transfer %s already returned", transfer.ID)
 		return nil
 	}
 	// Prevent cancellation of transfers in terminal or advanced states
@@ -800,7 +801,7 @@ func (h *BaseTransferHandler) RollbackTransfer(ctx context.Context, transferID s
 	}
 
 	if transfer.Status == st.TransferStatusSenderInitiated {
-		logger.Info("Transfer already in sender initiated state", "transfer_id", transferID)
+		logger.Sugar().Infof("Transfer %s already in sender initiated state", transferID)
 		return nil
 	} else if transfer.Status != st.TransferStatusSenderKeyTweakPending && transfer.Status != st.TransferStatusSenderInitiatedCoordinator {
 		return fmt.Errorf("expected transfer %s to be in sender key tweak pending state, instead got %s", transferID, transfer.Status)
@@ -1120,7 +1121,7 @@ func (h *BaseTransferHandler) CommitSenderKeyTweaks(ctx context.Context, transfe
 	err = h.validateKeyTweakProofs(ctx, transfer, senderKeyTweakProofs)
 	if err != nil {
 		logger := logging.GetLoggerFromContext(ctx)
-		logger.Error("unable to validate key tweak proofs", "error", err, "transfer_id", transferID)
+		logger.With(zap.Error(err)).Sugar().Errorf("Unable to validate key tweak proofs for transfer %s", transferID)
 		return nil, err
 	}
 	return h.commitSenderKeyTweaks(ctx, transfer)
@@ -1132,7 +1133,7 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 		return nil, fmt.Errorf("unable to load transfer: %w", err)
 	}
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("commitSenderKeyTweaks", "transfer_id", transfer.ID.String(), "status", transfer.Status)
+	logger.Sugar().Infof("Checking commitSenderKeyTweaks for transfer %s (status: %s)", transfer.ID, transfer.Status)
 	if transfer.Status == st.TransferStatusSenderKeyTweaked {
 		return transfer, nil
 	}
@@ -1143,7 +1144,7 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 	if err != nil {
 		return nil, fmt.Errorf("unable to get transfer leaves: %w", err)
 	}
-	logger.Info("Beginning to tweak keys", "transferId", transfer.ID)
+	logger.Sugar().Infof("Beginning to tweak keys for transfer %s", transfer.ID)
 	for _, leaf := range transferLeaves {
 		keyTweak := &pbspark.SendLeafKeyTweak{}
 		err := proto.Unmarshal(leaf.KeyTweak, keyTweak)
@@ -1154,7 +1155,7 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 		if err != nil {
 			return nil, fmt.Errorf("unable to get tree node: %w", err)
 		}
-		logger.Info("Tweaking leaf", "leafId", treeNode.ID, "transferId", transfer.ID)
+		logger.Sugar().Infof("Tweaking leaf %s for transfer %s", treeNode.ID, transfer.ID)
 		treeNodeUpdate, err := helper.TweakLeafKeyUpdate(ctx, treeNode, keyTweak)
 		if err != nil {
 			return nil, fmt.Errorf("unable to tweak leaf key: %w", err)

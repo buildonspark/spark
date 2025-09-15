@@ -2,7 +2,6 @@ package helper
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -81,8 +80,7 @@ type SparkServiceFrostSignerImpl struct {
 	config *so.Config
 }
 
-type SparkServiceFrostSignerFactoryImpl struct {
-}
+type SparkServiceFrostSignerFactoryImpl struct{}
 
 func (c *SparkServiceFrostSignerFactoryImpl) NewFrostSigner(config *so.Config) (SparkServiceFrostSigner, error) {
 	return &SparkServiceFrostSignerImpl{config: config}, nil
@@ -208,7 +206,6 @@ func frostRound1(ctx context.Context, config *so.Config, signingKeyshareIDs []uu
 
 		return commitments, nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -231,8 +228,7 @@ func frostRound2(
 ) (map[string]map[string][]byte, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 	for _, job := range jobs {
-		logger.Info("FrostRound2 signing job message", "message", hex.EncodeToString(job.Message))
-		logger.Info("FrostRound2 signing job verifying key", "verifyingKey", job.VerifyingKey.ToHex())
+		logger.Sugar().Infof("FrostRound2 signing job: message %x, verifying key %s", job.Message, job.VerifyingKey)
 	}
 	operatorResult, err := ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (map[string][]byte, error) {
 		commitmentsArray := common.MapOfArrayToArrayOfMap(round1)

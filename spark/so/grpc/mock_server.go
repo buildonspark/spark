@@ -95,7 +95,7 @@ func (o *MockServer) UpdateNodesStatus(ctx context.Context, req *pbmock.UpdateNo
 }
 
 // TriggerTask executes a scheduled task immediately. Primarily used from hermetic tests to avoid relying on gocron timing.
-func (o *MockServer) TriggerTask(_ context.Context, req *pbmock.TriggerTaskRequest) (*emptypb.Empty, error) {
+func (o *MockServer) TriggerTask(ctx context.Context, req *pbmock.TriggerTaskRequest) (*emptypb.Empty, error) {
 	taskName := req.GetTaskName()
 	var selected *task.ScheduledTaskSpec
 	for _, t := range task.AllScheduledTasks() {
@@ -109,7 +109,7 @@ func (o *MockServer) TriggerTask(_ context.Context, req *pbmock.TriggerTaskReque
 	}
 	// Use the operator's root *ent.Client instead of the transactional one because RunOnce expects *ent.Client.
 	dbClient := o.rootClient
-	if err := selected.RunOnce(o.config, dbClient, knobs.NewFixedKnobs(map[string]float64{})); err != nil {
+	if err := selected.RunOnce(ctx, o.config, dbClient, knobs.NewFixedKnobs(map[string]float64{})); err != nil {
 		return nil, status.Errorf(codes.Internal, "task %s failed: %v", taskName, err)
 	}
 

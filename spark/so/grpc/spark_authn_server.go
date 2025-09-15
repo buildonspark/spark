@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -50,9 +51,7 @@ func (cnc *challengeNonceCache) markNonceUsed(ctx context.Context, nonce []byte)
 	// Add is atomic - returns nil only if the key didn't exist and was added
 	err := cnc.cache.Add(string(nonce), true, cache.DefaultExpiration)
 	if err != nil {
-		logger.Warn("nonce reuse detected",
-			"nonce", fmt.Sprintf("%x", nonce),
-			"error", err)
+		logger.With(zap.Error(err)).Sugar().Warnf("nonce reuse detected (nonce: %x)", nonce)
 		return ErrChallengeReused
 	}
 	return nil

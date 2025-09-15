@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -104,7 +105,7 @@ func (h *SignTokenHandler) SignTokenTransaction(
 	for _, output := range tokenTransaction.Edges.SpentOutput {
 		keyshare, err := output.QueryRevocationKeyshare().Only(ctx)
 		if err != nil {
-			logger.Info("Failed to get keyshare for output", "error", err)
+			logger.Info("Failed to get keyshare for output", zap.Error(err))
 			return nil, err
 		}
 		index := output.SpentTransactionInputVout
@@ -146,7 +147,7 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 	}
 
 	calculatedHash, err := utils.HashTokenTransaction(req.FinalTokenTransaction, false)
-	ctx, logger := logging.WithAttrs(ctx, tokens.GetFinalizedTokenTransactionAttrs(calculatedHash))
+	ctx, logger := logging.WithAttrs(ctx, tokens.GetFinalizedTokenTransactionAttrs(calculatedHash)...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash final token transaction: %w", err)
 	}
@@ -241,7 +242,7 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 }
 
 func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx context.Context, tokenTransactionProto *tokenpb.TokenTransaction, internalSignatures map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, tokenTransactionHash []byte) (*tokenpb.CommitTransactionResponse, error) {
-	ctx, logger := logging.WithAttrs(ctx, tokens.GetFinalizedTokenTransactionAttrs(tokenTransactionHash))
+	ctx, logger := logging.WithAttrs(ctx, tokens.GetFinalizedTokenTransactionAttrs(tokenTransactionHash)...)
 	ctx, span := tracer.Start(ctx, "SignTokenHandler.ExchangeRevocationSecretsAndFinalizeIfPossible", getTokenTransactionAttributes(tokenTransactionProto))
 	defer span.End()
 	response, err := h.exchangeRevocationSecretShares(ctx, internalSignatures, tokenTransactionProto, tokenTransactionHash)
@@ -261,7 +262,7 @@ func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx co
 	if err != nil {
 		return nil, fmt.Errorf("failed to build input operator share map for token txHash: %x: %w", tokenTransactionHash, err)
 	}
-	logger.Info("length of inputOperatorShareMap", "length", len(inputOperatorShareMap))
+	logger.Sugar().Infof("Length of inputOperatorShareMap: %d", len(inputOperatorShareMap))
 	// Persist the secret shares from all operators.
 	internalHandler := NewInternalSignTokenHandler(h.config)
 	finalized, err := internalHandler.persistPartialRevocationSecretShares(ctx, inputOperatorShareMap, tokenTransactionHash)
@@ -515,7 +516,7 @@ func (h *SignTokenHandler) localSignAndCommitTransaction(
 	finalTokenTransactionHash []byte,
 	tokenTransaction *ent.TokenTransaction,
 ) (*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, error) {
-	ctx, span := tracer.Start(ctx, "SignTokenHandler.localSignAndCommitTransaction", getTokenTransactionAttributesFromEnt(tokenTransaction, h.config))
+	ctx, span := tracer.Start(ctx, "SignTokenHandler.localSignAndCommitTransaction", getTokenTransactionAttributesFromEnt(ctx, tokenTransaction, h.config))
 	defer span.End()
 	operatorSpecificSignatures := convertTokenProtoSignaturesToOperatorSpecific(
 		foundOperatorSignatures.TtxoSignatures,
@@ -666,7 +667,7 @@ func (h *SignTokenHandler) getRevealCommitProgress(ctx context.Context, tokenTra
 	operatorSharesPerOutput := make(map[int]map[keys.Public]struct{}) // output_index -> operator_key -> has_share
 	coordinatorKey := h.config.IdentityPublicKey()
 
-	var outputsToCheck = tokenTransaction.Edges.SpentOutput
+	outputsToCheck := tokenTransaction.Edges.SpentOutput
 	if len(outputsToCheck) == 0 {
 		return nil, fmt.Errorf("no spent outputs found for transfer token transaction %x", tokenTransaction.FinalizedTokenTransactionHash)
 	}
@@ -677,10 +678,10 @@ func (h *SignTokenHandler) getRevealCommitProgress(ctx context.Context, tokenTra
 
 	for i, output := range outputsToCheck {
 		logger := logging.GetLoggerFromContext(ctx)
-		logger.Info("Checking output for revocation keyshare", "output_index", i, "has_revocation_keyshare", output.Edges.RevocationKeyshare != nil)
+		logger.Sugar().Infof("Checking output %d for revocation keyshare (has keyshare: %t)", i, output.Edges.RevocationKeyshare != nil)
 
 		if output.Edges.RevocationKeyshare != nil {
-			logger.Info("Found revocation keyshare, marking coordinator as revealed for output", "coordinator_key", coordinatorKey.ToHex(), "output_index", i)
+			logger.Sugar().Infof("Found revocation keyshare, marking coordinator %s as revealed for output %d", coordinatorKey.ToHex(), i)
 			operatorSharesPerOutput[i][coordinatorKey] = struct{}{}
 		}
 		if output.Edges.TokenPartialRevocationSecretShares != nil {

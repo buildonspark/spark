@@ -11,6 +11,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -51,7 +52,7 @@ func (h *SendGossipHandler) postSendingGossipMessage(
 
 func (h *SendGossipHandler) sendGossipMessageToParticipant(ctx context.Context, gossip *pbgossip.GossipMessage, participant string) error {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("sending gossip message to participant", "participant", participant)
+	logger.Sugar().Infof("Sending gossip message to participant %s", participant)
 	operator, ok := h.config.SigningOperatorMap[participant]
 	if !ok {
 		return fmt.Errorf("operator %s not found", participant)
@@ -67,11 +68,11 @@ func (h *SendGossipHandler) sendGossipMessageToParticipant(ctx context.Context, 
 			return err
 		}
 
-		logger.Error("gossip message sent to participant with error", "participant", participant, "error", err)
+		logger.With(zap.Error(err)).Sugar().Errorf("Gossip message sent to participant %s with error", participant)
 		return nil
 	}
 
-	logger.Info("gossip message sent to participant", "participant", participant)
+	logger.Sugar().Infof("Gossip message sent to participant", participant)
 	return nil
 }
 
@@ -98,7 +99,7 @@ func (h *SendGossipHandler) CreateAndSendGossipMessage(ctx context.Context, goss
 
 func (h *SendGossipHandler) SendGossipMessage(ctx context.Context, gossip *ent.Gossip) (*ent.Gossip, error) {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("sending gossip message", "gossip_id", gossip.ID.String())
+	logger.Sugar().Infof("Sending gossip message %s", gossip.ID.String())
 	bitMap := common.NewBitMapFromBytes(*gossip.Receipts, len(gossip.Participants))
 
 	message := &pbgossip.GossipMessage{}
@@ -118,7 +119,7 @@ func (h *SendGossipHandler) SendGossipMessage(ctx context.Context, gossip *ent.G
 			defer wg.Done()
 			err := h.sendGossipMessageToParticipant(ctx, message, participant)
 			if err != nil {
-				logger.Error("Failed to send gossip message", "error", err)
+				logger.Error("Failed to send gossip message", zap.Error(err))
 			} else {
 				success <- i
 			}

@@ -9,6 +9,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -120,7 +121,7 @@ func (o *DepositHandler) GenerateDepositAddress(ctx context.Context, config *so.
 		}
 	}
 
-	logger.Info("Generating deposit address for public key", "public_key", reqSigningPubKey, "identity_public_key", reqIDPubKey)
+	logger.Sugar().Infof("Generating deposit address for public key %s (signing %s)", reqIDPubKey, reqSigningPubKey)
 	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
 	if err != nil {
 		return nil, err
@@ -313,7 +314,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 		verifyingKey := keyshare.PublicKey.Add(depositAddress.OwnerSigningPubkey)
 
 		// Return the whole deposit address data.
-		logger.Info("Static deposit address already exists", "id", depositAddress.ID, "address", depositAddress.Address)
+		logger.Sugar().Infof("Static deposit address %s already exists with ID %s", depositAddress.Address, depositAddress.ID)
 		return &pb.GenerateStaticDepositAddressResponse{
 			DepositAddress: &pb.Address{
 				Address:      depositAddress.Address,
@@ -330,8 +331,7 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse signing public key: %w", err)
 	}
-	// If no default static deposit address exists, generate a new one.
-	logger.Info("Generating static deposit address for public key", "public_key", hex.EncodeToString(req.SigningPublicKey), "identity_public_key", idPubKey)
+	logger.Sugar().Infof("Generating static deposit address for public key %s (signing %x)", idPubKey, req.SigningPublicKey)
 
 	// Note that this method will COMMIT or ROLLBACK the DB transaction.
 	keyshares, err := ent.GetUnusedSigningKeyshares(ctx, config, 1)
@@ -440,7 +440,13 @@ func (o *DepositHandler) GenerateStaticDepositAddress(ctx context.Context, confi
 		SetPossessionSignature(proofOfPossessionSignatures[0]).
 		Save(ctx)
 	if err != nil {
-		logger.Error("failed to cache proofs for static deposit address", "error", err, "id", depositAddressRecord.ID, "address", depositAddress)
+		logger.With(zap.Error(err)).
+			Sugar().
+			Errorf(
+				"Failed to cache proofs for static deposit address %s (%s)",
+				depositAddressRecord.ID,
+				depositAddress,
+			)
 	}
 
 	return &pb.GenerateStaticDepositAddressResponse{
@@ -499,7 +505,13 @@ func generateStaticDepositAddressProofs(ctx context.Context, config *so.Config, 
 	}
 	// If not found, continue with another address.
 	if err != nil && status.Code(err) == codes.NotFound {
-		logger.Error("static deposit address does not have proofs on some or all operators", "id", depositAddress.ID, "address", depositAddress.Address, "error", err)
+		logger.With(zap.Error(err)).
+			Sugar().
+			Errorf(
+				"Static deposit address %s (%s) does not have proofs on some or all operators",
+				depositAddress.ID,
+				depositAddress.Address,
+			)
 		return nil, nil, nil
 	}
 
@@ -526,7 +538,13 @@ func generateStaticDepositAddressProofs(ctx context.Context, config *so.Config, 
 		SetPossessionSignature(proofOfPossessionSignatures[0]).
 		Save(ctx)
 	if err != nil {
-		logger.Error("failed to cache proofs for static deposit address", "error", err, "id", depositAddress.ID, "address", depositAddress.Address)
+		logger.With(zap.Error(err)).
+			Sugar().
+			Errorf(
+				"Failed to cache proofs for static deposit address %s (%s)",
+				depositAddress.ID,
+				depositAddress.Address,
+			)
 	}
 	return addressSignatures, proofOfPossessionSignatures[0], nil
 }
@@ -1127,12 +1145,12 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	}
 
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("existingTree", "existingTree", existingTree)
+
 	var entTree *ent.Tree
 	if existingTree != nil {
 		// Tree already exists, use the existing one
 		entTree = existingTree
-		logger.Info("Tree already exists", "treeId", existingTree.ID, "depositAddress", depositAddress.ID, "txid", txid)
+		logger.Sugar().Infof("Found existing tree %s for txid %s", existingTree.ID, txid)
 	} else {
 		// Create new tree
 		treeMutator := db.Tree.
@@ -1185,7 +1203,12 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		if existingRoot.Status != st.TreeNodeStatusCreating {
 			return nil, errors.FailedPreconditionErrorf("Expected tree node %s to be in creating status; got %s.", existingRoot.ID, existingRoot.Status)
 		}
-		logger.Info("Tree node already exists, updating with new transaction data", "treeNodeId", existingRoot.ID, "depositAddress", depositAddress.ID, "txid", txid)
+		logger.Sugar().Infof(
+			"Tree node %s already exists (deposit address %s), updating with new txid %s",
+			existingRoot.ID,
+			depositAddress.ID,
+			txid,
+		)
 		// Tree node already exists, update it with new transaction data
 		root, err = existingRoot.Update().
 			SetRawTx(req.RootTxSigningJob.RawTx).
@@ -1317,7 +1340,7 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 	defer span.End()
 
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("Start InitiateUtxoSwap request for on-chain utxo", "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout, "coordinator", config.Identifier)
+	logger.Sugar().Infof("Starting InitiateUtxoSwap request for on-chain utxo %x:%d with coordinator %d", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout, config.Identifier)
 
 	// Check if the swap is already completed for the caller
 	db, err := ent.GetDbFromContext(ctx)
@@ -1400,21 +1423,27 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 	// This will allow the coordinator to cancel the swap if needed.
 	createdUtxoSwapRequest, err := CreateCreateSwapForUtxoRequest(config, req)
 	if err != nil {
-		logger.Warn("Failed to get create utxo swap request, cron task to retry", "error", err)
+		logger.Warn("Failed to get create utxo swap request, cron task to retry", zap.Error(err))
 	} else {
 		if err := internalDepositHandler.CreateSwapForAllOperators(ctx, config, createdUtxoSwapRequest); err != nil {
 			originalErr := err
-			logger.Info("Failed to successfully execute create utxo swap task with all operators, rolling back", "error", originalErr, "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout)
+			logger.With(zap.Error(originalErr)).
+				Sugar().
+				Infof(
+					"Failed to successfully execute create utxo swap task for %x:%d with all operators, rolling back",
+					req.OnChainUtxo.Txid,
+					req.OnChainUtxo.Vout,
+				)
 
 			if err := internalDepositHandler.RollbackSwapForAllOperators(ctx, config, createdUtxoSwapRequest); err != nil {
-				logger.Error("Failed to rollback utxo swap", "error", err, "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout)
+				logger.With(zap.Error(err)).Sugar().Errorf("Failed to rollback utxo swap for %x:%d", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 			}
 
-			logger.Error("UTXO swap rollback completed", "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout)
+			logger.Sugar().Errorf("UTXO swap rollback completed for %x:%d", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 			return nil, errors.WrapErrorWithMessage(originalErr, "failed to successfully execute create utxo swap task with all operators")
 		}
 	}
-	logger.Info("Created utxo swap", "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout)
+	logger.Sugar().Infof("Created utxo swap for %x:%d", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 
 	utxoSwap, err = staticdeposit.GetRegisteredUtxoSwapForUtxo(ctx, db, targetUtxo)
 	if err != nil || utxoSwap == nil {
@@ -1439,7 +1468,7 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 		)
 		if err != nil {
 			if err := internalDepositHandler.RollbackSwapForAllOperators(ctx, config, createdUtxoSwapRequest); err != nil {
-				logger.Error("Failed to rollback utxo swap", "error", err)
+				logger.Error("Failed to rollback utxo swap", zap.Error(err))
 			}
 			return nil, fmt.Errorf("failed to create transfer: %w", err)
 		}
@@ -1470,7 +1499,7 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 			}
 		}
 
-		logger.Info("UTXO swap transfer created", "transfer", transfer, "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout)
+		logger.Sugar().Infof("UTXO swap transfer %s created for %x:%d", transfer.Id, req.OnChainUtxo.Txid, req.OnChainUtxo.Vout)
 	}
 
 	// **********************************************************************************************
@@ -1480,10 +1509,10 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 	// **********************************************************************************************
 	completedUtxoSwapRequest, err := CreateCompleteSwapForUtxoRequest(config, req.OnChainUtxo)
 	if err != nil {
-		logger.Warn("Failed to get complete swap for utxo request, cron task to retry", "error", err)
+		logger.Warn("Failed to get complete swap for utxo request, cron task to retry", zap.Error(err))
 	} else {
 		if err := internalDepositHandler.CompleteSwapForAllOperators(ctx, config, completedUtxoSwapRequest); err != nil {
-			logger.Warn("Failed to mark a utxo swap as completed in all operators, cron task to retry", "error", err)
+			logger.Warn("Failed to mark a utxo swap as completed in all operators, cron task to retry", zap.Error(err))
 		}
 	}
 
@@ -1492,7 +1521,7 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 	// **********************************************************************************************
 	spendTxSigningResult, depositAddressQueryResult, err := GetSpendTxSigningResult(ctx, config, req.OnChainUtxo, req.SpendTxSigningJob)
 	if err != nil {
-		logger.Warn("failed to get spend tx signing result", "error", err)
+		logger.Warn("failed to get spend tx signing result", zap.Error(err))
 	}
 	spendTxSigningResultBytes, err := proto.Marshal(spendTxSigningResult)
 	if err != nil {
@@ -1637,7 +1666,7 @@ func GetTxSigningInfo(ctx context.Context, targetUtxo *ent.Utxo, spendTxRaw []by
 	if total > maxSats {
 		return nil, 0, fmt.Errorf("total amount %d exceeds %d", total, maxSats)
 	}
-	logger.Debug("spendTxSigHash", "spendTxSigHash", hex.EncodeToString(spendTxSigHash))
+	logger.Sugar().Debugf("Retrieved %x as spend tx sighash", spendTxSigHash)
 	return spendTxSigHash, total, nil
 }
 

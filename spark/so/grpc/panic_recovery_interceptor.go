@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
@@ -40,10 +41,9 @@ func PanicRecoveryInterceptor(returnDetailedPanicErrors bool) grpc.UnaryServerIn
 		// Wrap the entire handler in a recover block
 		defer func() {
 			if r := recover(); r != nil {
-				stack := debug.Stack()
 				logger.Error("Panic in handler",
-					"panic", fmt.Sprintf("%v", r),
-					"stack", string(stack),
+					zap.String("panic", fmt.Sprintf("%v", r)),  // TODO(mhr): Probably a better way to do this.
+					zap.String("stack", string(debug.Stack())), // TODO(mhr): zap.ByteString?
 				)
 
 				globalPanicCounter.Add(
@@ -77,10 +77,9 @@ func PanicRecoveryStreamInterceptor() grpc.StreamServerInterceptor {
 		// Wrap the entire handler in a recover block
 		defer func() {
 			if r := recover(); r != nil {
-				stack := debug.Stack()
-				logger.Error("Panic in stream handler",
-					"panic", fmt.Sprintf("%v", r),
-					"stack", string(stack),
+				logger.Error("Panic in handler",
+					zap.String("panic", fmt.Sprintf("%v", r)),  // TODO(mhr): Probably a better way to do this.
+					zap.String("stack", string(debug.Stack())), // TODO(mhr): zap.ByteString?
 				)
 
 				globalPanicCounter.Add(

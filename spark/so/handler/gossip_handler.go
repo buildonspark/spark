@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -18,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"go.uber.org/zap"
 )
 
 type GossipHandler struct {
@@ -30,7 +30,7 @@ func NewGossipHandler(config *so.Config) *GossipHandler {
 
 func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *pbgossip.GossipMessage, forCoordinator bool) error {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("handling gossip message", "gossip_id", gossipMessage.MessageId)
+	logger.Sugar().Infof("Handling gossip message with ID %s", gossipMessage.MessageId)
 	switch gossipMessage.Message.(type) {
 	case *pbgossip.GossipMessage_CancelTransfer:
 		cancelTransfer := gossipMessage.GetCancelTransfer()
@@ -77,7 +77,7 @@ func (h *GossipHandler) handleCancelTransferGossipMessage(ctx context.Context, c
 	if err != nil {
 		// If there's an error, it's still considered the message is delivered successfully.
 		logger := logging.GetLoggerFromContext(ctx)
-		logger.Error("failed to cancel transfer", "error", err, "transfer_id", cancelTransfer.TransferId)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to cancel transfer %s", cancelTransfer.TransferId)
 	}
 }
 
@@ -87,30 +87,30 @@ func (h *GossipHandler) handleSettleSenderKeyTweakGossipMessage(ctx context.Cont
 	if err != nil {
 		// If there's an error, it's still considered the message is delivered successfully.
 		logger := logging.GetLoggerFromContext(ctx)
-		logger.Error("failed to settle sender key tweak", "error", err, "transfer_id", settleSenderKeyTweak.TransferId)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to settle sender key tweak for transfer %s", settleSenderKeyTweak.TransferId)
 	}
 }
 
 func (h *GossipHandler) handleRollbackTransfer(ctx context.Context, req *pbgossip.GossipMessageRollbackTransfer) {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("Handling rollback transfer gossip message", "transfer_id", req.TransferId)
+	logger.Sugar().Infof("Handling rollback transfer gossip message for transfer %s", req.TransferId)
 
 	baseHandler := NewBaseTransferHandler(h.config)
 	err := baseHandler.RollbackTransfer(ctx, req.TransferId)
 	if err != nil {
-		logger.Error("Failed to rollback transfer", "error", err, "transfer_id", req.TransferId)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to rollback transfer %s", req.TransferId)
 	}
 }
 
 func (h *GossipHandler) handleMarkTreesExited(ctx context.Context, req *pbgossip.GossipMessageMarkTreesExited) {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("Handling mark trees exited gossip message", "tree_ids", req.TreeIds)
+	logger.Sugar().Infof("Handling mark trees exited gossip message for trees %+q", req.TreeIds)
 
 	treeIDs := make([]uuid.UUID, 0)
 	for _, treeID := range req.TreeIds {
 		treeUUID, err := uuid.Parse(treeID)
 		if err != nil {
-			logger.Error("Failed to parse tree ID", "error", err, "tree_id", treeID)
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to parse tree ID %s as UUID", treeID)
 			continue
 		}
 		treeIDs = append(treeIDs, treeUUID)
@@ -118,7 +118,7 @@ func (h *GossipHandler) handleMarkTreesExited(ctx context.Context, req *pbgossip
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		logger.Error("Failed to get or create current tx for request", "error", err)
+		logger.Error("Failed to get or create current tx for request", zap.Error(err))
 		return
 	}
 
@@ -127,31 +127,31 @@ func (h *GossipHandler) handleMarkTreesExited(ctx context.Context, req *pbgossip
 		ForUpdate().
 		All(ctx)
 	if err != nil {
-		logger.Error("Failed to query trees", "error", err)
+		logger.Error("Failed to query trees", zap.Error(err))
 		return
 	}
 
 	treeExitHandler := NewTreeExitHandler(h.config)
 	err = treeExitHandler.MarkTreesExited(ctx, trees)
 	if err != nil {
-		logger.Error("failed to mark trees exited", "error", err, "tree_ids", req.TreeIds)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to mark trees %+q exited", req.TreeIds)
 	}
 }
 
 func (h *GossipHandler) handleDepositCleanupGossipMessage(ctx context.Context, req *pbgossip.GossipMessageDepositCleanup) {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("Handling deposit cleanup gossip message", "tree_id", req.TreeId)
+	logger.Sugar().Infof("Handling deposit cleanup gossip message for tree %s", req.TreeId)
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		logger.Error("Failed to get or create current tx for request", "error", err)
+		logger.Error("Failed to get or create current tx for request", zap.Error(err))
 		return
 	}
 
 	// Parse tree ID
 	treeID, err := uuid.Parse(req.TreeId)
 	if err != nil {
-		logger.Error("Failed to parse tree ID", "error", err, "tree_id", req.TreeId)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to parse tree ID %s as UUID", req.TreeId)
 		return
 	}
 
@@ -161,7 +161,7 @@ func (h *GossipHandler) handleDepositCleanupGossipMessage(ctx context.Context, r
 		ForUpdate().
 		All(ctx)
 	if err != nil {
-		logger.Error("Failed to query tree nodes", "error", err, "tree_id", req.TreeId)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to query tree nodes for tree %s", req.TreeId)
 		return
 	}
 
@@ -175,8 +175,11 @@ func (h *GossipHandler) handleDepositCleanupGossipMessage(ctx context.Context, r
 
 	// c) Throw an error if this count > 1
 	if nonSplitLockedCount > 1 {
-		logger.Error("Expected at most 1 tree node excluding extended leaves",
-			"count", nonSplitLockedCount, "tree_id", req.TreeId)
+		logger.Sugar().Errorf(
+			"Expected at most 1 tree node for tree %s excluding extended leaves (got: %d)",
+			req.TreeId,
+			nonSplitLockedCount,
+		)
 		return
 	}
 
@@ -184,25 +187,25 @@ func (h *GossipHandler) handleDepositCleanupGossipMessage(ctx context.Context, r
 	for _, node := range treeNodes {
 		err = db.TreeNode.DeleteOne(node).Exec(ctx)
 		if err != nil {
-			logger.Error("Failed to delete tree node", "error", err, "node_id", node.ID.String())
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to delete tree node %s", node.ID)
 			return
 		}
-		logger.Info("Successfully deleted tree node for deposit cleanup", "node_id", node.ID.String())
+		logger.Sugar().Infof("Successfully deleted tree node %s for deposit cleanup", node.ID)
 	}
 
 	// Delete the tree
 	err = db.Tree.DeleteOneID(treeID).Exec(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			logger.Warn("Tree not found for deposit cleanup", "tree_id", req.TreeId)
+			logger.Sugar().Warnf("Tree %s not found for deposit cleanup", req.TreeId)
 		} else {
-			logger.Error("Failed to delete tree", "error", err, "tree_id", req.TreeId)
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to delete tree %s", req.TreeId)
 		}
 		return
 	}
-	logger.Info("Successfully deleted tree for deposit cleanup", "tree_id", req.TreeId)
+	logger.Sugar().Infof("Successfully deleted tree %s for deposit cleanup", req.TreeId)
 
-	logger.Info("Completed deposit cleanup processing", "tree_id", req.TreeId)
+	logger.Sugar().Infof("Completed deposit cleanup processing for tree %s", req.TreeId)
 }
 
 func (h *GossipHandler) handleFinalizeTreeCreationGossipMessage(ctx context.Context, finalizeNodeSignatures *pbgossip.GossipMessageFinalizeTreeCreation, forCoordinator bool) {
@@ -216,7 +219,7 @@ func (h *GossipHandler) handleFinalizeTreeCreationGossipMessage(ctx context.Cont
 	depositHandler := NewInternalDepositHandler(h.config)
 	err := depositHandler.FinalizeTreeCreation(ctx, &pbinternal.FinalizeTreeCreationRequest{Nodes: finalizeNodeSignatures.InternalNodes, Network: finalizeNodeSignatures.ProtoNetwork})
 	if err != nil {
-		logger.Error("Failed to finalize tree creation", "error", err)
+		logger.Error("Failed to finalize tree creation", zap.Error(err))
 	}
 }
 
@@ -230,7 +233,7 @@ func (h *GossipHandler) handleFinalizeTransferGossipMessage(ctx context.Context,
 	transferHandler := NewInternalTransferHandler(h.config)
 	err := transferHandler.FinalizeTransfer(ctx, &pbinternal.FinalizeTransferRequest{TransferId: finalizeNodeSignatures.TransferId, Nodes: finalizeNodeSignatures.InternalNodes, Timestamp: finalizeNodeSignatures.CompletionTimestamp})
 	if err != nil {
-		logger.Error("Failed to finalize transfer", "error", err)
+		logger.Error("Failed to finalize transfer", zap.Error(err))
 	}
 }
 
@@ -245,7 +248,7 @@ func (h *GossipHandler) handleFinalizeRefreshTimelockGossipMessage(ctx context.C
 	refreshTimelockHandler := NewInternalRefreshTimelockHandler(h.config)
 	err := refreshTimelockHandler.FinalizeRefreshTimelock(ctx, &pbinternal.FinalizeRefreshTimelockRequest{Nodes: finalizeNodeSignatures.InternalNodes})
 	if err != nil {
-		logger.Error("Failed to finalize refresh timelock", "error", err)
+		logger.Error("Failed to finalize refresh timelock", zap.Error(err))
 	}
 }
 
@@ -259,7 +262,7 @@ func (h *GossipHandler) handleFinalizeExtendLeafGossipMessage(ctx context.Contex
 	extendLeafHandler := NewInternalExtendLeafHandler(h.config)
 	err := extendLeafHandler.FinalizeExtendLeaf(ctx, &pbinternal.FinalizeExtendLeafRequest{Node: finalizeNodeSignatures.InternalNodes[0]})
 	if err != nil {
-		logger.Error("Failed to finalize extend leaf", "error", err)
+		logger.Error("Failed to finalize extend leaf", zap.Error(err))
 	}
 }
 
@@ -274,7 +277,7 @@ func (h *GossipHandler) handleRollbackUtxoSwapGossipMessage(ctx context.Context,
 		CoordinatorPublicKey: rollbackUtxoSwap.CoordinatorPublicKey,
 	})
 	if err != nil {
-		logger.Error("failed to rollback utxo swap with gossip message, will not retry, on-call to intervene", "error", err)
+		logger.Error("Failed to rollback utxo swap with gossip message, will not retry, on-call to intervene", zap.Error(err))
 	}
 }
 
@@ -288,25 +291,25 @@ func (h *GossipHandler) handlePreimageGossipMessage(ctx context.Context, gossip 
 
 	calculatedHash := sha256.Sum256(gossip.Preimage)
 	if !bytes.Equal(calculatedHash[:], gossip.PaymentHash) {
-		logger.Error("Preimage hash mismatch", "calculated_hash", hex.EncodeToString(calculatedHash[:]), "payment_hash", hex.EncodeToString(gossip.PaymentHash))
+		logger.Sugar().Errorf("Preimage hash mismatch (expected %x, got %x)", calculatedHash[:], gossip.PaymentHash)
 		return
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		logger.Error("Failed to get or create current tx for request", "error", err)
+		logger.Error("Failed to get or create current tx for request", zap.Error(err))
 		return
 	}
 
 	preimageRequests, err := db.PreimageRequest.Query().Where(preimagerequest.PaymentHashEQ(gossip.PaymentHash)).ForUpdate().All(ctx)
 	if err != nil {
-		logger.Error("Failed to get preimage request", "error", err, "payment_hash", gossip.PaymentHash)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to get preimage request for %x", gossip.PaymentHash)
 	}
 
 	for _, preimageRequest := range preimageRequests {
 		preimageRequest, err = preimageRequest.Update().SetPreimage(gossip.Preimage).Save(ctx)
 		if err != nil {
-			logger.Error("Failed to update preimage request", "error", err, "payment_hash", gossip.PaymentHash)
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to update preimage request for %x", gossip.PaymentHash)
 		}
 	}
 }

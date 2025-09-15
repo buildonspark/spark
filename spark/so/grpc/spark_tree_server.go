@@ -7,6 +7,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/tree"
+	"go.uber.org/zap"
 )
 
 // SparkTreeServer is the grpc server for the Spark protocol.
@@ -18,8 +19,8 @@ type SparkTreeServer struct {
 }
 
 // NewSparkTreeServer creates a new SparkTreeServer.
-func NewSparkTreeServer(config *so.Config, dbClient *ent.Client) *SparkTreeServer {
-	scorer := tree.NewPolarityScorer(dbClient)
+func NewSparkTreeServer(config *so.Config, logger *zap.Logger, dbClient *ent.Client) *SparkTreeServer {
+	scorer := tree.NewPolarityScorer(logger, dbClient)
 	go scorer.Start(context.Background())
 	return &SparkTreeServer{config: config, scorer: scorer}
 }

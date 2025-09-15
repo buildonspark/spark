@@ -3,12 +3,12 @@ package handler
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -258,9 +258,9 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	if err != nil {
 		cancelErr := h.CreateCancelTransferGossipMessage(ctx, req.TransferId)
 		if cancelErr != nil {
-			logger.Error("failed to create cancel transfer gossip message", "error", cancelErr, "transfer_id", req.TransferId)
+			logger.With(zap.Error(cancelErr)).Sugar().Errorf("Failed to create cancel transfer gossip message for transfer %s", req.TransferId)
 		}
-		logger.Error("failed to sync transfer init for transfer", "transfer_id", req.TransferId, "error", err)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to sync transfer init for transfer %s", req.TransferId)
 		return nil, fmt.Errorf("failed to sync transfer init for transfer %s: %w", req.TransferId, err)
 	}
 
@@ -302,7 +302,10 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 			},
 		}, participants)
 		if err != nil {
-			logger.Error("failed to create and send gossip message to settle sender key tweak", "error", err, "transfer_id", req.TransferId)
+			logger.With(zap.Error(err)).Sugar().Errorf(
+				"Failed to create and send gossip message to settle sender key tweak for transfer %s",
+				req.TransferId,
+			)
 			return nil, fmt.Errorf("failed to create and send gossip message to settle sender key tweak: %w", err)
 		}
 		transfer, err = h.loadTransferForUpdate(ctx, req.TransferId)
@@ -313,7 +316,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
-		logger.Error("unable to marshal transfer", "error", err, "transfer_id", transfer.ID)
+		logger.With(zap.Error(err)).Sugar().Errorf("Unable to marshal transfer %s", transfer.ID)
 	}
 
 	return &pb.StartTransferResponse{Transfer: transferProto, SigningResults: signingResults}, nil
@@ -603,7 +606,7 @@ func (h *TransferHandler) syncDeliverSenderKeyTweak(ctx context.Context, req *pb
 		defer conn.Close()
 
 		logger := logging.GetLoggerFromContext(ctx)
-		logger.Info("Delivering key tweak", "transfer_id", req.TransferId, "so", operator.ID)
+		logger.Sugar().Infof("Delivering key tweak for transfer %s to SO %d", req.TransferId, operator.ID)
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 		return client.DeliverSenderKeyTweak(ctx, deliverSenderKeyTweakRequest)
 	})
@@ -1085,7 +1088,7 @@ func aggregateSignatures(
 	}
 	logger := logging.GetLoggerFromContext(ctx)
 	for leafID, signingResult := range cpfpSigningResultMap {
-		logger.Info("aggregating cpfp frost signature", "leaf_id", leafID, "signing_msg", hex.EncodeToString(signingResult.Message))
+		logger.Sugar().Infof("Aggregating cpfp frost signature for leaf %s (message: %x)", leafID, signingResult.Message)
 		cpfpUserSignedRefund := cpfpUserRefundMap[leafID]
 		leaf := leafMap[leafID]
 		signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
@@ -1100,13 +1103,13 @@ func aggregateSignatures(
 			AdaptorPublicKey:   cpfpAdaptorPubKey.Serialize(),
 		})
 		if err != nil {
-			logger.Error("unable to aggregate frost for cpfp results", "error", err, "leaf_id", leaf.ID)
+			logger.With(zap.Error(err)).Sugar().Errorf("Unable to aggregate frost for cpfp results for leaf %s", leaf.ID)
 			return nil, nil, nil, fmt.Errorf("unable to aggregate frost for cpfp results: %w, leaf_id: %s", err, leaf.ID)
 		}
 		finalCpfpSignatureMap[leaf.ID.String()] = signatureResult.Signature
 	}
 	for leafID, signingResult := range directSigningResultMap {
-		logger.Info("aggregating direct frost signature for direct results", "leaf_id", leafID, "signing_msg", hex.EncodeToString(signingResult.Message))
+		logger.Sugar().Infof("Aggregating direct frost signature for direct results for leaf %s (message: %x)", leafID, signingResult.Message)
 		directUserSignedRefund := directUserRefundMap[leafID]
 		leaf := leafMap[leafID]
 		signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
@@ -1121,13 +1124,17 @@ func aggregateSignatures(
 			AdaptorPublicKey:   directAdaptorPubKey.Serialize(),
 		})
 		if err != nil {
-			logger.Error("unable to aggregate frost for direct results", "error", err, "leaf_id", leaf.ID)
+			logger.With(zap.Error(err)).Sugar().Errorf("Unable to aggregate frost for direct results for leaf %s", leaf.ID)
 			return nil, nil, nil, fmt.Errorf("unable to aggregate frost for direct results: %w, leaf_id: %s", err, leaf.ID)
 		}
 		finalDirectSignatureMap[leaf.ID.String()] = signatureResult.Signature
 	}
 	for leafID, signingResult := range directFromCpfpSigningResultMap {
-		logger.Info("aggregating direct from cpfp frost signature for direct from cpfp results", "leaf_id", leafID, "signing_msg", hex.EncodeToString(signingResult.Message))
+		logger.Sugar().Infof(
+			"Aggregating direct from cpfp frost signature for direct from cpfp results for leaf %s (message: %x)",
+			leafID,
+			signingResult.Message,
+		)
 		directFromCpfpUserSignedRefund := directFromCpfpUserRefundMap[leafID]
 		leaf := leafMap[leafID]
 		signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
@@ -1142,7 +1149,7 @@ func aggregateSignatures(
 			AdaptorPublicKey:   directFromCpfpAdaptorPubKey.Serialize(),
 		})
 		if err != nil {
-			logger.Error("unable to aggregate frost for direct from cpfp results", "error", err, "leaf_id", leaf.ID)
+			logger.With(zap.Error(err)).Sugar().Errorf("Unable to aggregate frost for direct from cpfp results for leaf %s", leaf.ID)
 			return nil, nil, nil, fmt.Errorf("unable to aggregate frost for direct from cpfp results: %w, leaf_id: %s", err, leaf.ID)
 		}
 		finalDirectFromCpfpSignatureMap[leaf.ID.String()] = signatureResult.Signature
@@ -1225,17 +1232,17 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 		return nil, fmt.Errorf("transfer %s is in state %s; expected sender initiated status", req.TransferId, transfer.Status)
 	}
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("Preparing to send key tweaks to other SOs", "transfer_id", req.TransferId)
+	logger.Sugar().Infof("Preparing to send key tweaks to other SOs for transfer %s", req.TransferId)
 	err = h.syncDeliverSenderKeyTweak(ctx, req, transfer.Type)
 	if err != nil {
 		dbTx, dbErr := ent.GetDbFromContext(ctx)
 		if dbErr != nil {
-			logger.Error("failed to get db tx", "error", dbErr)
+			logger.Error("failed to get db tx", zap.Error(dbErr))
 		}
 		if dbTx != nil {
 			dbErr = dbTx.Rollback()
 			if dbErr != nil {
-				logger.Error("failed to rollback db tx", "error", dbErr)
+				logger.Error("failed to rollback db tx", zap.Error(dbErr))
 			}
 		}
 		// Counterswaps are from the SSP. We need to allow SSP to
@@ -1243,12 +1250,12 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 		if transfer.Type == st.TransferTypeCounterSwap {
 			rollbackErr := h.CreateRollbackTransferGossipMessage(ctx, req.TransferId)
 			if rollbackErr != nil {
-				logger.Error("Error when rolling back sender key tweaks", "error", rollbackErr, "transfer_id", req.TransferId)
+				logger.With(zap.Error(rollbackErr)).Sugar().Errorf("Error when rolling back sender key tweaks for transfer %s", req.TransferId)
 			}
 		} else {
 			cancelErr := h.CreateCancelTransferGossipMessage(ctx, req.TransferId)
 			if cancelErr != nil {
-				logger.Error("Error when canceling transfer", "error", cancelErr, "transfer_id", req.TransferId)
+				logger.With(zap.Error(cancelErr)).Sugar().Errorf("Error when canceling transfer %s", req.TransferId)
 			}
 		}
 		errorMsg := fmt.Sprintf("failed to sync deliver sender key tweak for transfer %s", req.TransferId)
@@ -1257,17 +1264,17 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 		}
 		dbTx, dbErr = ent.GetDbFromContext(ctx)
 		if dbErr != nil {
-			logger.Error("failed to get db tx", "error", dbErr)
+			logger.Error("failed to get db tx", zap.Error(dbErr))
 		}
 		if dbTx != nil {
 			dbErr = dbTx.Commit()
 			if dbErr != nil {
-				logger.Error("failed to commit db tx", "error", dbErr)
+				logger.Error("failed to commit db tx", zap.Error(dbErr))
 			}
 		}
 		return nil, fmt.Errorf("%s: %w", errorMsg, err)
 	}
-	logger.Info("Successfully delivered key tweaks to other SOs", "transfer_id", req.TransferId)
+	logger.Sugar().Infof("Successfully delivered key tweaks to other SOs for transfer %s", req.TransferId)
 
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -1438,11 +1445,11 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 			return fmt.Errorf("vout out of bounds")
 		}
 		if !cpfpRefundTx.HasWitness() {
-			logger.Warn("transaction has no witness", "cpfpRefundtx", cpfpRefundTx)
+			logger.Sugar().Warnf("Transaction with txid %s has no witness", cpfpRefundTx.TxID())
 		}
 		err = common.VerifySignatureSingleInput(cpfpRefundTx, 0, cpfpLeafNodeTx.TxOut[0])
 		if err != nil {
-			logger.Error("unable to verify cpfp refund tx signature", "error", err, "refundTx", cpfpRefundTx)
+			logger.With(zap.Error(err)).Sugar().Errorf("Unable to verify cpfp refund tx signature for txid %s", cpfpRefundTx.TxID())
 			return fmt.Errorf("unable to verify cpfp refund tx signature: %w", err)
 		}
 
@@ -1465,19 +1472,19 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 				return fmt.Errorf("vout out of bounds")
 			}
 			if !directRefundTx.HasWitness() {
-				logger.Warn("transaction has no witness", "directRefundTx", directRefundTx)
+				logger.Sugar().Warnf("Transaction with txid %s has no witness", directRefundTx.TxID())
 			}
 			if !directFromCpfpRefundTx.HasWitness() {
-				logger.Warn("transaction has no witness", "directFromCpfpRefundTx", directFromCpfpRefundTx)
+				logger.Sugar().Warnf("Transaction with txid %s has no witness", directFromCpfpRefundTx.TxID())
 			}
 			err = common.VerifySignatureSingleInput(directRefundTx, 0, directLeafNodeTx.TxOut[0])
 			if err != nil {
-				logger.Error("unable to verify direct refund tx signature", "error", err, "refundTx", directRefundTx)
+				logger.With(zap.Error(err)).Sugar().Errorf("Unable to verify direct refund tx signature for txid %s", directRefundTx.TxID())
 				return fmt.Errorf("unable to verify direct refund tx signature: %w", err)
 			}
 			err = common.VerifySignatureSingleInput(directFromCpfpRefundTx, 0, cpfpLeafNodeTx.TxOut[0])
 			if err != nil {
-				logger.Error("unable to verify direct from cpfp refund tx signature", "error", err, "refundTx", directFromCpfpRefundTx)
+				logger.With(zap.Error(err)).Sugar().Errorf("Unable to verify direct from cpfp refund tx signature", directFromCpfpRefundTx.TxID())
 				return fmt.Errorf("unable to verify direct from cpfp refund tx signature: %w", err)
 			}
 		}
@@ -2002,7 +2009,7 @@ func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *
 	})
 	logger := logging.GetLoggerFromContext(ctx)
 	if err != nil {
-		logger.Error("Unable to settle receiver key tweak, you might have a race condition in your implementation", "error", err.Error())
+		logger.Error("Unable to settle receiver key tweak, you might have a race condition in your implementation", zap.Error(err))
 		action = pbinternal.SettleKeyTweakAction_ROLLBACK
 	}
 
@@ -2012,7 +2019,7 @@ func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *
 		UserPublicKeys: userPublicKeys,
 	})
 	if err != nil {
-		logger.Error("Unable to settle receiver key tweak internally, you might have a race condition in your implementation", "error", err.Error())
+		logger.Error("Unable to settle receiver key tweak internally, you might have a race condition in your implementation", zap.Error(err))
 		action = pbinternal.SettleKeyTweakAction_ROLLBACK
 	}
 
@@ -2490,7 +2497,7 @@ func (h *TransferHandler) ResumeSendTransfer(ctx context.Context, transfer *ent.
 	}
 
 	// If there's an error, it means some SOs are not online. We can retry later.
-	logger.Warn("Failed to settle sender key tweaks", "error", err, "transfer_id", transfer.ID.String())
+	logger.With(zap.Error(err)).Sugar().Warnf("Failed to settle sender key tweaks for transfer %s", transfer.ID)
 	return nil
 }
 
@@ -2559,7 +2566,7 @@ func (h *TransferHandler) InvestigateLeaves(ctx context.Context, req *pb.Investi
 		}
 		_, err := node.Update().SetStatus(st.TreeNodeStatusInvestigation).Save(ctx)
 		logger := logging.GetLoggerFromContext(ctx)
-		logger.Warn("Tree Node is marked as investigation", "node_id", node.ID)
+		logger.Sugar().Warnf("Tree Node %s is marked as investigation", node.ID)
 		if err != nil {
 			return nil, err
 		}

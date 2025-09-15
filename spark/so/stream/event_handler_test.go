@@ -2,7 +2,6 @@ package events
 
 import (
 	"context"
-	"log/slog"
 	"math/rand/v2"
 	"sync"
 	"testing"
@@ -12,6 +11,8 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -70,8 +71,7 @@ func TestEventRouterConcurrency(t *testing.T) {
 	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
 	dbClient := ctx.Client
 
-	logger := slog.Default().With("component", "events_router")
-	router := NewEventRouter(dbClient, dbEvents, logger)
+	router := NewEventRouter(dbClient, dbEvents, zaptest.NewLogger(t).With(zap.String("component", "events_router")))
 	rng := rand.NewChaCha8([32]byte{})
 	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
@@ -137,8 +137,7 @@ func TestMultipleListenersReceiveNotification(t *testing.T) {
 	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
 	dbClient := ctx.Client
 
-	logger := slog.Default().With("component", "events_router")
-	router := NewEventRouter(dbClient, dbEvents, logger)
+	router := NewEventRouter(dbClient, dbEvents, zaptest.NewLogger(t).With(zap.String("component", "events_router")))
 	rng := rand.NewChaCha8([32]byte{})
 	identityKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 

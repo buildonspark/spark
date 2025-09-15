@@ -2,6 +2,7 @@ package ent
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common"
@@ -49,7 +50,7 @@ func GetTokenMetadataForTokenTransaction(ctx context.Context, tokenTransaction *
 			return nil, fmt.Errorf("error querying TokenCreate table: %w", err)
 		}
 
-		logger.Warn("no token found for token transaction by token identifier", "token_transaction", tokenTransaction)
+		logger.Sugar().Warnf("no token found for token transaction by token identifier %s", hex.EncodeToString(tokenIdentifier))
 		return nil, nil
 	}
 
@@ -71,7 +72,7 @@ func GetTokenMetadataForTokenTransaction(ctx context.Context, tokenTransaction *
 			return nil, fmt.Errorf("error querying TokenCreate table: %w", err)
 		}
 
-		logger.Warn("no token found for token transaction by issuer public key", "token_transaction", tokenTransaction)
+		logger.Sugar().Warnf("no token found for token transaction by issuer public key %s", issuerPublicKey)
 		return nil, nil
 	}
 

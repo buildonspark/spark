@@ -10,6 +10,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
+	"go.uber.org/zap"
 
 	"github.com/lightsparkdev/spark"
 
@@ -75,7 +76,7 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	}
 
 	partialTokenTransactionHash, err := utils.HashTokenTransaction(req.PartialTokenTransaction, true)
-	ctx, _ = logging.WithAttrs(ctx, tokens.GetPartialTokenTransactionAttrs(partialTokenTransactionHash))
+	ctx, _ = logging.WithAttrs(ctx, tokens.GetPartialTokenTransactionAttrs(partialTokenTransactionHash)...)
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToHashPartialTransaction, req.PartialTokenTransaction, err)
 	}
@@ -95,7 +96,7 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 			return nil, err
 		}
 		if coordinatorPubKey.Equals(h.config.IdentityPublicKey()) {
-			ctx, logger := logging.WithAttrs(ctx, tokens.GetEntTokenTransactionAttrs(previouslyCreatedTokenTransaction))
+			ctx, logger := logging.WithAttrs(ctx, tokens.GetEntTokenTransactionAttrs(previouslyCreatedTokenTransaction)...)
 			logger.Info("Found existing token transaction in started state with matching coordinator")
 			return h.regenerateStartResponseForDuplicateRequest(ctx, previouslyCreatedTokenTransaction)
 		}
@@ -124,7 +125,7 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
-	ctx, _ = logging.WithAttrs(ctx, tokens.GetFinalizedTokenTransactionAttrs(finalHash))
+	ctx, _ = logging.WithAttrs(ctx, tokens.GetFinalizedTokenTransactionAttrs(finalHash)...)
 
 	// Save the token transaction object to lock in the revocation commitments for each created output within this transaction.
 	// Note that atomicity here is very important to ensure that the unused keyshares queried above are not used by another operation.
@@ -237,7 +238,7 @@ func (h *StartTokenTransactionHandler) regenerateStartResponseForDuplicateReques
 	ctx context.Context,
 	tokenTransaction *ent.TokenTransaction,
 ) (*tokenpb.StartTransactionResponse, error) {
-	_, logger := logging.WithAttrs(ctx, tokens.GetEntTokenTransactionAttrs(tokenTransaction))
+	_, logger := logging.WithAttrs(ctx, tokens.GetEntTokenTransactionAttrs(tokenTransaction)...)
 	logger.Debug("Regenerating response for a duplicate StartTokenTransaction() Call")
 	var invalidOutputs []string
 	expectedCreatedOutputStatus := st.TokenOutputStatusCreatedStarted
@@ -255,7 +256,7 @@ func (h *StartTokenTransactionHandler) regenerateStartResponseForDuplicateReques
 	}
 
 	// Reconstruct the token transaction from the ent data.
-	transaction, err := tokenTransaction.MarshalProto(h.config)
+	transaction, err := tokenTransaction.MarshalProto(ctx, h.config)
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToMarshalTokenTransaction, tokenTransaction, err)
 	}
@@ -374,22 +375,22 @@ func preemptOrRejectTransaction(
 
 // logWillPreemptExistingTransaction logs that we will pre-empt the existing transaction
 func logWillPreemptExistingTransaction(ctx context.Context, existingTransaction *ent.TokenTransaction, reason, details string) error {
-	_, logger := logging.WithAttrs(ctx, getPreviousEntTokenTransactionAttrs(existingTransaction))
+	_, logger := logging.WithAttrs(ctx, getPreviousEntTokenTransactionAttrs(existingTransaction)...)
 	logger.Info(fmt.Sprintf("Pre-empting existing transaction with new transaction (%s: %s)", reason, details))
 	return nil
 }
 
 // rejectNewTransaction rejects the new transaction and logs the action
 func rejectNewTransaction(ctx context.Context, newTransaction *tokenpb.TokenTransaction, existingTransaction *ent.TokenTransaction, reason, details string) error {
-	_, logger := logging.WithAttrs(ctx, getPreviousEntTokenTransactionAttrs(existingTransaction))
+	_, logger := logging.WithAttrs(ctx, getPreviousEntTokenTransactionAttrs(existingTransaction)...)
 	logger.Info(fmt.Sprintf("Rejecting new transaction due to existing transaction having %s (%s)", reason, details))
 	return tokens.NewTransactionPreemptedError(newTransaction, reason, details)
 }
 
-func getPreviousEntTokenTransactionAttrs(tokenTransaction *ent.TokenTransaction) []logging.Attr {
-	return []logging.Attr{
-		{Key: "previous_transaction_uuid", Value: tokenTransaction.ID.String()},
-		{Key: "previous_transaction_hash", Value: hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash)},
+func getPreviousEntTokenTransactionAttrs(tokenTransaction *ent.TokenTransaction) []zap.Field {
+	return []zap.Field{
+		zap.Stringer("previous_transaction_uuid", tokenTransaction.ID),
+		zap.String("previous_transaction_hash", hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash)),
 	}
 }
 

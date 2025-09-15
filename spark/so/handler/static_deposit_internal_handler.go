@@ -71,7 +71,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 
 	logger := logging.GetLoggerFromContext(ctx)
 	req := reqWithSignature.Request
-	logger.Info("Start CreateStaticDepositUtxoSwap request for on-chain utxo", "txid", req.OnChainUtxo.Txid)
+	logger.Sugar().Infof("Start CreateStaticDepositUtxoSwap request for on-chain utxo %x", req.OnChainUtxo.Txid)
 
 	// Verify CoordinatorPublicKey is correct. It does not actually prove that the
 	// caller is the coordinator, but that there is a message to create a swap
@@ -141,7 +141,12 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		return nil, fmt.Errorf("unable to check if utxo swap is already registered: %w", err)
 	}
 	if utxoSwap != nil {
-		logger.Info("utxo swap is already registered", "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout, "request_type", utxoSwap.RequestType)
+		logger.Sugar().Infof(
+			"Utxo swap %x:%d is already registered (request type %s)",
+			req.OnChainUtxo.Txid,
+			req.OnChainUtxo.Vout,
+			utxoSwap.RequestType,
+		)
 		return nil, errors.AlreadyExistsErrorf("utxo swap is already registered")
 	}
 
@@ -210,15 +215,14 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		return nil, fmt.Errorf("user signature validation failed: %w", err)
 	}
 
-	logger.Info(
-		"Creating UTXO swap record",
-		"request_type", pb.UtxoSwapRequestType_Fixed,
-		"transfer_id", req.Transfer.TransferId,
-		"user_identity_public_key", reqTransferReceiverIdentityPubKey,
-		"txid", hex.EncodeToString(targetUtxo.Txid),
-		"vout", targetUtxo.Vout,
-		"network", network,
-		"credit_amount_sats", totalAmount,
+	logger.Sugar().Infof(
+		"Creating UTXO swap record (request type fixed, transfer id %s, receiver identity %s, txid %x, vout %d, network %s, credit amount %d)",
+		req.Transfer.TransferId,
+		reqTransferReceiverIdentityPubKey,
+		targetUtxo.Txid,
+		targetUtxo.Vout,
+		network,
+		totalAmount,
 	)
 
 	// Create a utxo swap record and then a transfer. We rely on DbSessionMiddleware to
@@ -262,7 +266,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 
 	logger := logging.GetLoggerFromContext(ctx)
 	req := reqWithSignature.Request
-	logger.Info("Start CreateStaticDepositUtxoRefund request for on-chain utxo", "txid", req.OnChainUtxo.Txid)
+	logger.Sugar().Infof("Start CreateStaticDepositUtxoRefund request for on-chain utxo %x", req.OnChainUtxo.Txid)
 
 	// Verify CoordinatorPublicKey is correct.
 	messageHash, err := CreateUtxoSwapStatement(
@@ -343,7 +347,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, fmt.Errorf("unable to check if utxo swap is already registered: %w", err)
 	}
 	if utxoSwap != nil {
-		logger.Info("utxo swap is already registered", "txid", hex.EncodeToString(req.OnChainUtxo.Txid), "vout", req.OnChainUtxo.Vout, "request_type", utxoSwap.Status)
+		logger.Sugar().Infof("Utxo swap is already registered for %x:%d (request type %s)", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout, utxoSwap.Status)
 		return nil, errors.AlreadyExistsErrorf("utxo swap is already registered")
 	}
 
@@ -352,14 +356,13 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, fmt.Errorf("user signature validation failed: %w", err)
 	}
 
-	logger.Info(
-		"Creating UTXO swap record",
-		"request_type", pb.UtxoSwapRequestType_Refund,
-		"user_identity_public_key", depositAddress.OwnerIdentityPubkey,
-		"txid", hex.EncodeToString(targetUtxo.Txid),
-		"vout", targetUtxo.Vout,
-		"network", network,
-		"credit_amount_sats", totalAmount,
+	logger.Sugar().Infof(
+		"Creating UTXO swap record (request type refund, public key %s, txid %x, vout %d, network %s, credit amount %d)",
+		depositAddress.OwnerIdentityPubkey,
+		targetUtxo.Txid,
+		targetUtxo.Vout,
+		network,
+		totalAmount,
 	)
 
 	utxoSwap, err = db.UtxoSwap.Create().

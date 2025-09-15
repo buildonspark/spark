@@ -135,7 +135,7 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 	sendGossipHandler := NewSendGossipHandler(o.config)
 
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("Sending finalize node signatures gossip message", "intent", req.Intent)
+	logger.Sugar().Infof("Sending finalize node signatures gossip message (intent: %s)", req.Intent)
 
 	switch req.Intent {
 	case pbcommon.SignatureIntent_CREATION:

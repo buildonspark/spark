@@ -20,6 +20,7 @@ linters:
     - testifylint # Checks that testify test assertions are correct
     - unconvert # Checks for no-op type conversions
     - forbidigo # Checks for forbidden identifiers
+    - loggercheck # Checks for key value pairs in zap.
   exclusions:
     generated: lax
     presets:
@@ -36,7 +37,9 @@ linters:
             - "!**/testing/**.go"
           deny:
             - pkg: "log$"
-              desc: "use logging.GetLoggerFromContext() or slog.Default()"
+              desc: "use logging.GetLoggerFromContext()"
+            - pkg: "log/slog$"
+              desc: "use logging.GetLoggerFromContext()"
     revive:
       # https://github.com/mgechev/revive/blob/HEAD/RULES_DESCRIPTIONS.md#context-as-argument
       rules:

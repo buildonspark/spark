@@ -1,11 +1,11 @@
 package knobs
 
 import (
-	"log/slog"
 	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -13,7 +13,7 @@ import (
 func TestKnobsK8ValuesProvider_HandleConfigMap(t *testing.T) {
 	provider := &knobsK8ValuesProvider{
 		context: t.Context(),
-		logger:  slog.Default().With("component", "knobs"),
+		logger:  zap.NewNop(),
 		lock:    &sync.RWMutex{},
 		values:  make(map[string]float64),
 	}
@@ -109,7 +109,7 @@ func TestKnobsK8ValuesProvider_HandleConfigMap(t *testing.T) {
 func TestKnobsK8ValuesProvider_HandleConfigMap_NilData(t *testing.T) {
 	provider := &knobsK8ValuesProvider{
 		context: t.Context(),
-		logger:  slog.Default().With("component", "knobs"),
+		logger:  zap.NewNop(),
 		lock:    &sync.RWMutex{},
 		values:  make(map[string]float64),
 	}
@@ -139,7 +139,7 @@ func TestKnobsK8ValuesProvider_HandleConfigMap_NilData(t *testing.T) {
 func TestKnobsK8ValuesProvider_GetValue(t *testing.T) {
 	provider := &knobsK8ValuesProvider{
 		context: t.Context(),
-		logger:  slog.Default().With("component", "knobs"),
+		logger:  zap.NewNop(),
 		lock:    &sync.RWMutex{},
 		values:  make(map[string]float64),
 	}

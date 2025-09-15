@@ -55,13 +55,13 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 	ctx, span := tracer.Start(ctx, "InternalPrepareTokenHandler.PrepareTokenTransactionInternal", getTokenTransactionAttributes(req.FinalTokenTransaction))
 	defer span.End()
 	partialTransactionHash, err := utils.HashTokenTransaction(req.FinalTokenTransaction, true)
-	ctx, logger := logging.WithAttrs(ctx, tokens.GetPartialTokenTransactionAttrs(partialTransactionHash))
+	ctx, logger := logging.WithAttrs(ctx, tokens.GetPartialTokenTransactionAttrs(partialTransactionHash)...)
 
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto("failed to compute transaction hash", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to compute transaction hash: %w", err))
 	}
 
-	logger.Info("Starting token transaction", "keyshare_ids", req.KeyshareIds, "expiry_time", req.FinalTokenTransaction.ExpiryTime.String())
+	logger.Sugar().Infof("Starting token transaction (expiry: %s, %+q)", req.FinalTokenTransaction.ExpiryTime, req.KeyshareIds)
 
 	expectedRevocationPublicKeys, err := h.validateAndReserveKeyshares(ctx, req.KeyshareIds, req.FinalTokenTransaction)
 	if err != nil {
@@ -604,9 +604,11 @@ func validateIssuerTokenNotAlreadyCreated(ctx context.Context, tokenTransaction 
 	return nil
 }
 
-type CreatedOutputAmountMap map[[33]byte]map[AmountKey]int
-type InvoiceAmountMap map[[33]byte]map[AmountKey]int
-type CountNilAmountInvoicesMap map[[33]byte]int
+type (
+	CreatedOutputAmountMap    map[[33]byte]map[AmountKey]int
+	InvoiceAmountMap          map[[33]byte]map[AmountKey]int
+	CountNilAmountInvoicesMap map[[33]byte]int
+)
 
 type AmountKey [16]byte
 

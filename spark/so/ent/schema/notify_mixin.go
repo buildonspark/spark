@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
+	"go.uber.org/zap"
 )
 
 var globalNotifyCounter metric.Int64Counter
@@ -57,7 +58,7 @@ func (n NotifyMixin) Hooks() []ent.Hook {
 				logger := logging.GetLoggerFromContext(ctx)
 
 				if err := n.sendNotification(ctx, m, value); err != nil {
-					logger.Error("Failed to send notification", "error", err)
+					logger.Error("Failed to send notification", zap.Error(err))
 				}
 
 				return value, nil

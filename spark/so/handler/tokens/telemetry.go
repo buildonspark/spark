@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"context"
 	"encoding/hex"
 
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -47,8 +48,8 @@ func getTokenTransactionAttributes(tokenTransaction *tokenpb.TokenTransaction) t
 	)
 }
 
-func getTokenTransactionAttributesFromEnt(tokenTransaction *ent.TokenTransaction, config *so.Config) trace.SpanStartEventOption {
-	tokenProto, err := tokenTransaction.MarshalProto(config)
+func getTokenTransactionAttributesFromEnt(ctx context.Context, tokenTransaction *ent.TokenTransaction, config *so.Config) trace.SpanStartEventOption {
+	tokenProto, err := tokenTransaction.MarshalProto(ctx, config)
 	if err != nil {
 		return trace.WithAttributes(transactionTypeKey.String("unknown"))
 	}

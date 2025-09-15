@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -33,6 +35,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -53,7 +56,8 @@ func init() {
 		metric.WithDescription("Number of nodes eligible for timelock expiry checks"),
 	)
 	if err != nil {
-		logging.GetLoggerFromContext(context.Background()).Error("Failed to create eligible nodes gauge", "error", err)
+		otel.Handle(err)
+		eligibleNodesGauge = noop.Int64Gauge{}
 	}
 
 	blockHeightGauge, err = meter.Int64Gauge(
@@ -61,7 +65,8 @@ func init() {
 		metric.WithDescription("Current block height processed by chain watcher"),
 	)
 	if err != nil {
-		logging.GetLoggerFromContext(context.Background()).Error("Failed to create block height gauge", "error", err)
+		otel.Handle(err)
+		blockHeightGauge = noop.Int64Gauge{}
 	}
 
 	blockHeightProcessingTimeHistogram, err = meter.Int64Histogram(
@@ -78,7 +83,8 @@ func init() {
 		),
 	)
 	if err != nil {
-		logging.GetLoggerFromContext(context.Background()).Error("Failed to create block height processing time histogram", "error", err)
+		otel.Handle(err)
+		blockHeightProcessingTimeHistogram = noop.Int64Histogram{}
 	}
 }
 
@@ -173,7 +179,10 @@ func scanChainUpdates(
 	logger := logging.GetLoggerFromContext(ctx)
 	defer func() {
 		if r := recover(); r != nil {
-			logger.Error("Panic recovered in scanChainUpdates", "panic", r, "stack", string(debug.Stack()))
+			logger.Error("Panic recovered in scanChainUpdates",
+				zap.String("panic", fmt.Sprintf("%v", r)),  // TODO(mh): Probably a better way to do this.
+				zap.String("stack", string(debug.Stack())), // TODO(mhr): zap.ByteString?
+			)
 		}
 	}()
 
@@ -186,7 +195,7 @@ func scanChainUpdates(
 		return fmt.Errorf("failed to get block hash at height %d: %w", latestBlockHeight, err)
 	}
 	latestChainTip := NewTip(latestBlockHeight, *latestBlockHash)
-	logger.Info("Latest chain tip", "height", latestBlockHeight, "hash", latestBlockHash.String())
+	logger.Sugar().Infof("Latest chain tip height: %d, hash: %s", latestBlockHeight, latestBlockHash.String())
 
 	entNetwork := common.SchemaNetwork(network)
 	dbBlockHeight, err := dbClient.BlockHeight.Query().
@@ -194,7 +203,7 @@ func scanChainUpdates(
 		Only(ctx)
 	if ent.IsNotFound(err) {
 		startHeight := max(0, latestBlockHeight-6)
-		logger.Info("Block height not found, creating new entry", "height", startHeight)
+		logger.Sugar().Infof("Block height %d not found, creating new entry", startHeight)
 		dbBlockHeight, err = dbClient.BlockHeight.Create().SetHeight(startHeight).SetNetwork(entNetwork).Save(ctx)
 	}
 	if err != nil {
@@ -206,7 +215,7 @@ func scanChainUpdates(
 	}
 
 	dbChainTip := NewTip(dbBlockHeight.Height, *dbBlockHash)
-	logger.Info("DB chain tip", "height", dbBlockHeight.Height, "hash", dbBlockHash.String())
+	logger.Sugar().Infof("DB chain tip height: %d, hash: %s", dbBlockHeight.Height, dbBlockHash.String())
 	difference, err := findDifference(dbChainTip, latestChainTip, bitcoinClient)
 	if err != nil {
 		return fmt.Errorf("failed to find difference: %w", err)
@@ -223,7 +232,7 @@ func scanChainUpdates(
 		difference.Connected,
 		network,
 	)
-	logger.Info("Connected blocks", "count", len(difference.Connected))
+	logger.Sugar().Infof("Connected %d blocks", len(difference.Connected))
 	if err != nil {
 		return fmt.Errorf("failed to connect blocks: %w", err)
 	}
@@ -261,7 +270,7 @@ func WatchChain(
 
 	err = scanChainUpdates(ctx, config, dbClient, bitcoinClient, network)
 	if err != nil {
-		logger.Error("failed to scan chain updates", "error", err)
+		logger.Error("failed to scan chain updates", zap.Error(err))
 	}
 
 	zmqSubscriber, err := NewZmqSubscriber()
@@ -272,7 +281,7 @@ func WatchChain(
 	defer func() {
 		err := zmqSubscriber.Close()
 		if err != nil {
-			logger.Warn("Failed to close ZMQ subscriber", "error", err)
+			logger.Warn("Failed to close ZMQ subscriber", zap.Error(err))
 		}
 	}()
 
@@ -285,7 +294,7 @@ func WatchChain(
 	for {
 		select {
 		case err := <-errChan:
-			logger.Error("Error receiving ZMQ message", "error", err)
+			logger.Error("Error receiving ZMQ message", zap.Error(err))
 			return err
 		case <-ctx.Done():
 			logger.Info("Context done, stopping chain watcher")
@@ -299,7 +308,7 @@ func WatchChain(
 
 		err = scanChainUpdates(ctx, config, dbClient, bitcoinClient, network)
 		if err != nil {
-			logger.Error("Failed to scan chain updates", "error", err)
+			logger.Error("Failed to scan chain updates", zap.Error(err))
 		}
 	}
 }
@@ -351,7 +360,7 @@ func connectBlocks(
 			network,
 		)
 		if err != nil {
-			logger.Error("Failed to handle block", "error", err)
+			logger.Error("Failed to handle block", zap.Error(err))
 			rollbackErr := dbTx.Rollback()
 			if rollbackErr != nil {
 				return rollbackErr
@@ -431,7 +440,7 @@ func handleBlock(
 ) error {
 	logger := logging.GetLoggerFromContext(ctx)
 	start := time.Now()
-	logger.Info("Starting to handle block", "height", blockHeight)
+	logger.Sugar().Infof("Starting to handle block at height %d", blockHeight)
 
 	networkParams := common.NetworkParams(network)
 	_, err := dbTx.BlockHeight.Update().
@@ -456,7 +465,7 @@ func handleBlock(
 	}
 
 	if processNodesForWatchtowers {
-		logger.Info("Started processing nodes for watchtowers", "height", blockHeight)
+		logger.Sugar().Infof("Started processing nodes for watchtowers at block height %d", blockHeight)
 		// Fetch only nodes that could have expired timelocks
 		nodes, err := watchtower.QueryNodesWithExpiredTimeLocks(ctx, dbTx, blockHeight, network)
 		if err != nil {
@@ -485,10 +494,12 @@ func handleBlock(
 				if err != nil {
 					return fmt.Errorf("failed to update node status: %w", err)
 				}
-				logger.Info("Updated tree node status to ON_CHAIN",
-					"node_id", node.ID,
-					"cpfp_tx_hash", cpfpTxid.String(),
-					"block_height", blockHeight)
+				logger.Sugar().Infof(
+					"Updated tree node %s status to ON_CHAIN at block height %d (cpfp tx hash: %s)",
+					node.ID,
+					blockHeight,
+					cpfpTxid.String(),
+				)
 			}
 
 			if len(node.DirectTx) > 0 {
@@ -505,10 +516,12 @@ func handleBlock(
 					if err != nil {
 						return fmt.Errorf("failed to update node status: %w", err)
 					}
-					logger.Info("Updated tree node status to ON_CHAIN",
-						"node_id", node.ID,
-						"direct_tx_hash", directTxid.String(),
-						"block_height", blockHeight)
+					logger.Sugar().Infof(
+						"Updated tree node %s status to ON_CHAIN at block height %d (direct tx hash %s)",
+						node.ID,
+						blockHeight,
+						directTxid.String(),
+					)
 				}
 			}
 
@@ -528,10 +541,12 @@ func handleBlock(
 					if err != nil {
 						return fmt.Errorf("failed to update node refund status: %w", err)
 					}
-					logger.Info("Updated tree node status to EXITED",
-						"node_id", node.ID,
-						"refund_tx_hash", cpfpRefundTxid.String(),
-						"block_height", blockHeight)
+					logger.Sugar().Infof(
+						"Updated tree node %s status to EXITED at block height %d (refund tx hash: %s)",
+						node.ID,
+						blockHeight,
+						cpfpRefundTxid.String(),
+					)
 				}
 
 				if len(node.DirectRefundTx) > 0 {
@@ -548,10 +563,12 @@ func handleBlock(
 						if err != nil {
 							return fmt.Errorf("failed to update node status: %w", err)
 						}
-						logger.Info("Updated tree node status to ON_CHAIN",
-							"node_id", node.ID,
-							"direct_refund_tx_hash", directRefundTxid.String(),
-							"block_height", blockHeight)
+						logger.Sugar().Infof(
+							"Updated tree node %s status to ON_CHAIN at block height %d (direct refund tx hash: %s)",
+							node.ID,
+							blockHeight,
+							directRefundTxid.String(),
+						)
 					}
 				}
 
@@ -569,21 +586,23 @@ func handleBlock(
 						if err != nil {
 							return fmt.Errorf("failed to update node status: %w", err)
 						}
-						logger.Info("Updated tree node status to ON_CHAIN",
-							"node_id", node.ID,
-							"direct_from_cpfp_refund_tx_hash", directFromCpfpRefundTxid.String(),
-							"block_height", blockHeight)
+						logger.Sugar().Info(
+							"Updated tree node %s status to ON_CHAIN at block height %d (direct from cpfp refund tx hash: %s)",
+							node.ID,
+							blockHeight,
+							directFromCpfpRefundTxid.String(),
+						)
 					}
 				}
 			}
 
 			// Check if node or refund TX timelock has expired
 			if err := watchtower.CheckExpiredTimeLocks(ctx, bitcoinClient, node, blockHeight, network); err != nil {
-				logger.Error("Failed to check expired time locks", "error", err)
+				logger.Error("Failed to check expired time locks", zap.Error(err))
 			}
 		}
 	}
-	logger.Info("Started processing coop exits", "height", blockHeight)
+	logger.Sugar().Infof("Started processing coop exits at block height %d", blockHeight)
 	// TODO: expire pending coop exits after some time so this doesn't become too large
 	pendingCoopExits, err := dbTx.CooperativeExit.Query().Where(cooperativeexit.ConfirmationHeightIsNil()).All(ctx)
 	if err != nil {
@@ -596,9 +615,9 @@ func handleBlock(
 		_, found := confirmedTxHashSet[[32]byte(txHash)]
 		_, reverseFound := confirmedTxHashSet[[32]byte(reversedHash)]
 		if found {
-			logger.Debug("Found BE coop exit tx.", "txHash", txHash)
+			logger.Sugar().Debug("Found BE coop exit tx at tx hash %s", txHash)
 		} else if reverseFound {
-			logger.Debug("Found LE coop exit tx.", "txHash", txHash)
+			logger.Sugar().Debugf("Found LE coop exit tx at tx hash %s", txHash)
 		} else {
 			continue
 		}
@@ -612,18 +631,18 @@ func handleBlock(
 		// since this is not critical for the block processing.
 		err = tweakKeysForCoopExit(ctx, coopExit, blockHeight)
 		if err != nil {
-			logger.Error("failed to handle coop exit confirmation", "error", err, "coop_exit_id", coopExit.ID)
+			logger.With(zap.Error(err)).Sugar().Errorf("Failed to handle coop exit confirmation for %s", coopExit.ID)
 			continue
 		}
 	}
 
-	logger.Info("Started processing static deposits", "height", blockHeight)
+	logger.Sugar().Infof("Started processing static deposits at block height %d", blockHeight)
 	err = storeStaticDeposits(ctx, dbTx, creditedAddresses, addressToUtxoMap, network, blockHeight)
 	if err != nil {
 		return fmt.Errorf("failed to store static deposits: %w", err)
 	}
 
-	logger.Info("Started processing confirmed deposits", "height", blockHeight)
+	logger.Sugar().Infof("Started processing confirmed deposits at block height %d", blockHeight)
 	confirmedDeposits, err := dbTx.DepositAddress.Query().
 		Where(depositaddress.ConfirmationHeightIsNil()).
 		Where(depositaddress.IsStaticEQ(false)).
@@ -636,11 +655,11 @@ func handleBlock(
 		// TODO: only unlock if deposit reaches X confirmations
 		utxos, ok := addressToUtxoMap[deposit.Address]
 		if !ok || len(utxos) == 0 {
-			logger.Info("UTXO not found for deposit address", "address", deposit.Address)
+			logger.Sugar().Infof("UTXO not found for deposit address %s", deposit.Address)
 			continue
 		}
 		if len(utxos) > 1 {
-			logger.Warn("Multiple UTXOs found for a single use deposit address, picking the first one", "address", deposit.Address)
+			logger.Sugar().Warnf("Multiple UTXOs found for a single use deposit address %s, picking the first one", deposit.Address)
 		}
 		utxo := utxos[0]
 		_, err = dbTx.DepositAddress.UpdateOne(deposit).
@@ -661,28 +680,28 @@ func handleBlock(
 			Where(treenode.StatusEQ(st.TreeNodeStatusCreating)).
 			Only(ctx)
 		if ent.IsNotFound(err) {
-			logger.Info("Deposit confirmed before tree creation or tree already available", "address", deposit.Address)
+			logger.Sugar().Infof("Deposit confirmed before tree creation or tree already available for address %s", deposit.Address)
 			continue
 		}
 		if err != nil {
 			return err
 		}
-		logger.Info("Found tree node", "node", treeNode.ID)
+		logger.Sugar().Infof("Found tree node %s", treeNode.ID)
 		if treeNode.Status != st.TreeNodeStatusCreating {
-			logger.Info("Expected tree node status to be creating", "status", treeNode.Status)
+			logger.Sugar().Infof("Expected tree node status to be creating (was: %s)", treeNode.Status)
 		}
 		tree, err := treeNode.QueryTree().Only(ctx)
 		if err != nil {
 			return err
 		}
 		if tree.Status != st.TreeStatusPending {
-			logger.Info("Expected tree status to be pending", "status", tree.Status)
+			logger.Sugar().Infof("Expected tree status to be pending (was: %s)", tree.Status)
 			continue
 		}
 		if _, ok := confirmedTxHashSet[[32]byte(tree.BaseTxid)]; !ok {
-			logger.Debug("Base txid not found in confirmed txids", "base_txid", hex.EncodeToString(tree.BaseTxid))
+			logger.Sugar().Debugf("Base txid %s not found in confirmed txids", hex.EncodeToString(tree.BaseTxid))
 			for txid := range confirmedTxHashSet {
-				logger.Debug("confirmed txid", "txid", hex.EncodeToString(txid[:]))
+				logger.Sugar().Debugf("Found confirmed txid %s", hex.EncodeToString(txid[:]))
 			}
 			continue
 		}
@@ -700,7 +719,7 @@ func handleBlock(
 		}
 		for _, treeNode := range treeNodes {
 			if treeNode.Status != st.TreeNodeStatusCreating {
-				logger.Debug("Tree node is not in creating status", "node", treeNode.ID)
+				logger.Sugar().Debugf("Tree node %s is not in creating status", treeNode.ID)
 				continue
 			}
 			if len(treeNode.RawRefundTx) > 0 {
@@ -709,7 +728,7 @@ func handleBlock(
 					return err
 				}
 				if !tx.HasWitness() {
-					logger.Debug("Tree node has not been signed", "node", treeNode.ID)
+					logger.Sugar().Debugf("Tree node %s has not been signed", treeNode.ID)
 					continue
 				}
 				treeNode, err = dbTx.TreeNode.UpdateOne(treeNode).
@@ -729,7 +748,7 @@ func handleBlock(
 		}
 	}
 
-	logger.Info("Finished handling block", "height", blockHeight)
+	logger.Sugar().Infof("Finished handling block height %d", blockHeight)
 	blockHeightProcessingTimeHistogram.Record(ctx, time.Since(start).Milliseconds(), metric.WithAttributes(
 		attribute.String("network", network.String()),
 	))
@@ -768,7 +787,13 @@ func storeStaticDeposits(ctx context.Context, dbTx *ent.Tx, creditedAddresses []
 				if err != nil {
 					return fmt.Errorf("unable to store a new utxo: %w", err)
 				}
-				logger.Debug("Stored an L1 utxo to a static deposit address", "address", address.Address, "txid", hex.EncodeToString(txidBytes), "vout", utxo.idx, "amount", utxo.amount)
+				logger.Sugar().Debugf(
+					"Stored an L1 utxo to a static deposit address %s (txid: %x, vout: %s, amount: %s)",
+					address.Address,
+					txidBytes,
+					utxo.idx,
+					utxo.amount,
+				)
 			}
 		}
 	}
@@ -783,12 +808,12 @@ func tweakKeysForCoopExit(ctx context.Context, coopExit *ent.CooperativeExit, bl
 	}
 
 	if transfer.ID.String() == "01981232-ad72-7cc0-bd76-0ea293cf501f" {
-		logger.Info("skipping transfer", "transfer_id", transfer.ID)
+		logger.Sugar().Infof("Skipping transfer %s", transfer.ID)
 		return nil
 	}
 
 	if transfer.Status == st.TransferStatusSenderKeyTweaked {
-		logger.Info("Transfer already tweaked, skipping", "transfer_id", transfer.ID)
+		logger.Sugar().Infof("Transfer %s already tweaked, skipping", transfer.ID)
 		return nil
 	}
 
@@ -829,6 +854,6 @@ func tweakKeysForCoopExit(ctx context.Context, coopExit *ent.CooperativeExit, bl
 		return fmt.Errorf("failed to update transfer status: %w", err)
 	}
 
-	logger.Info("Successfully tweaked key for coop exit transaction.", "txId", coopExit.ExitTxid, "blockHeight", blockHeight)
+	logger.Sugar().Infof("Successfully tweaked key for coop exit transaction %x at block height %d", coopExit.ExitTxid, blockHeight)
 	return nil
 }

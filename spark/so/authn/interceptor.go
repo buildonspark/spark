@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -84,7 +85,7 @@ func (i *Interceptor) authenticateContext(ctx context.Context) context.Context {
 	logger := logging.GetLoggerFromContext(ctx)
 	if !ok {
 		err := errors.WrapErrorWithCode(fmt.Errorf("no metadata provided"), codes.Unauthenticated)
-		logger.Info("Authentication error", "error", err)
+		logger.Info("Authentication error", zap.Error(err))
 		return context.WithValue(ctx, authnContextKey, &Context{
 			Error: err,
 		})
@@ -106,7 +107,7 @@ func (i *Interceptor) authenticateContext(ctx context.Context) context.Context {
 	sessionInfo, err := i.sessionTokenCreatorVerifier.VerifyToken(token)
 	if err != nil {
 		wrappedErr := errors.WrapErrorWithCode(fmt.Errorf("failed to verify token: %w", err), codes.Unauthenticated)
-		logger.Info("Authentication error", "error", wrappedErr)
+		logger.Info("Authentication error", zap.Error(wrappedErr))
 		return context.WithValue(ctx, authnContextKey, &Context{
 			Error: wrappedErr,
 		})
@@ -115,7 +116,7 @@ func (i *Interceptor) authenticateContext(ctx context.Context) context.Context {
 	key, err := keys.ParsePublicKey(sessionInfo.PublicKey)
 	if err != nil {
 		wrappedErr := errors.WrapErrorWithCode(fmt.Errorf("failed to parse public key: %w", err), codes.Unauthenticated)
-		logger.Info("Authentication error", "error", wrappedErr)
+		logger.Info("Authentication error", zap.Error(wrappedErr))
 		return context.WithValue(ctx, authnContextKey, &Context{
 			Error: wrappedErr,
 		})

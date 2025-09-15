@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
@@ -221,7 +222,12 @@ func (h *LightningHandler) ValidateDuplicateLeaves(
 	directFromCpfpLeavesToSend []*pb.UserSignedTxSigningJob,
 ) error {
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("validating duplicate leaves", "leavesToSend", leavesToSend, "directLeavesToSend", directLeavesToSend, "directFromCpfpLeavesToSend", directFromCpfpLeavesToSend)
+	logger.Sugar().Infof(
+		"Validating duplicate leaves (to send: %d, direct to send: %d, direct from cpfp to send: %d)",
+		len(leavesToSend),
+		len(directLeavesToSend),
+		len(directFromCpfpLeavesToSend),
+	)
 	leavesMap := make(map[string]bool)
 	directLeavesMap := make(map[string]bool)
 	directFromCpfpLeavesMap := make(map[string]bool)
@@ -430,7 +436,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return fmt.Errorf("unable to parse owner signing public key for cpfpTransaction, tree_node id: %s: %w", nodeID, err)
 		}
 		if !realUserPublicKey.Equals(ownerSigningPubKey) {
-			logger.Debug("real user public key mismatch", "expected", ownerSigningPubKey, "got", realUserPublicKey)
+			logger.Sugar().Debugf("real user public key mismatch (expected %s, got %s)", ownerSigningPubKey, realUserPublicKey)
 			node, err = node.Update().SetOwnerSigningPubkey(realUserPublicKey.Serialize()).Save(ctx)
 			if err != nil {
 				return fmt.Errorf("unable to update tree_node: %s: %w", nodeID, err)
@@ -1071,7 +1077,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		baseHandler := NewBaseTransferHandler(h.config)
 		cancelErr := baseHandler.CreateCancelTransferGossipMessage(ctx, transfer.ID.String())
 		if cancelErr != nil {
-			logger.Error("InitiatePreimageSwap: unable to cancel own send transfer", "error", cancelErr)
+			logger.Error("InitiatePreimageSwap: unable to cancel own send transfer", zap.Error(cancelErr))
 		}
 		return nil, fmt.Errorf("unable to execute task with all operators: %w", err)
 	}
@@ -1118,22 +1124,22 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		baseHandler := NewBaseTransferHandler(h.config)
 		err := baseHandler.CreateCancelTransferGossipMessage(ctx, transfer.ID.String())
 		if err != nil {
-			logger.Error("InitiatePreimageSwap: unable to cancel own send transfer",
-				"error", err,
-				"payment_hash", hex.EncodeToString(req.PaymentHash),
-				"transfer_id", transfer.ID.String())
+			logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to cancel own send transfer %s (payment_hash: %x)",
+				transfer.ID,
+				req.PaymentHash,
+			)
 		}
 
 		commitErr := ent.DbCommit(ctx)
 		if commitErr != nil {
-			logger.Error("Unable to commit transaction after canceling transfer", "error", commitErr)
+			logger.Error("Unable to commit transaction after canceling transfer", zap.Error(commitErr))
 		}
 
 		return nil, fmt.Errorf("recovered preimage did not match payment hash: %x and transfer id: %s", req.PaymentHash, transfer.ID.String())
 	} else {
 		err = h.sendPreimageGossipMessage(ctx, secretBytes, req.PaymentHash)
 		if err != nil {
-			logger.Error("InitiatePreimageSwap: unable to send preimage gossip message", "error", err, "payment_hash", hex.EncodeToString(req.PaymentHash))
+			logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to send preimage gossip message for payment hash %x")
 		}
 	}
 
@@ -1186,7 +1192,11 @@ func (h *LightningHandler) UpdatePreimageRequest(ctx context.Context, req *pbint
 		preimagerequest.StatusEQ(st.PreimageRequestStatusWaitingForPreimage),
 	).First(ctx)
 	if err != nil {
-		logger.Error("UpdatePreimageRequest: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(paymentHash[:]), "identityPublicKey", reqIdentityPubKey)
+		logger.With(zap.Error(err)).Sugar().Errorf(
+			"UpdatePreimageRequest: unable to get preimage request for receiver %x and payment hash %x",
+			req.IdentityPublicKey,
+			paymentHash[:],
+		)
 		return fmt.Errorf("updatePreimageRequest: unable to get preimage request: %w", err)
 	}
 
@@ -1215,7 +1225,11 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 		preimagerequest.StatusEQ(st.PreimageRequestStatusWaitingForPreimage),
 	).First(ctx)
 	if err != nil {
-		logger.Error("QueryUserSignedRefunds: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", reqIdentityPubKey)
+		logger.With(zap.Error(err)).Sugar().Errorf(
+			"QueryUserSignedRefunds: unable to get preimage request for public key %x and payment hash %x",
+			req.IdentityPublicKey,
+			req.PaymentHash,
+		)
 		return nil, fmt.Errorf("QueryUserSignedRefunds: unable to get preimage request: %w", err)
 	}
 
@@ -1320,7 +1334,11 @@ func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pb.Provide
 		preimagerequest.StatusIn(st.PreimageRequestStatusWaitingForPreimage, st.PreimageRequestStatusPreimageShared),
 	).First(ctx)
 	if err != nil {
-		logger.Error("ProvidePreimage: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", reqIdentityPubKey)
+		logger.With(zap.Error(err)).Sugar().Errorf(
+			"ProvidePreimage: unable to get preimage request for public key %x and payment hash %x",
+			req.IdentityPublicKey,
+			req.PaymentHash,
+		)
 		return nil, fmt.Errorf("ProvidePreimage: unable to get preimage request: %w", err)
 	}
 
@@ -1477,7 +1495,11 @@ func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.R
 		preimagerequest.StatusIn(preimageRequestStatuses...),
 	).First(ctx)
 	if err != nil {
-		logger.Error("ReturnLightningPayment: unable to get preimage request", "error", err, "paymentHash", hex.EncodeToString(req.PaymentHash), "identityPublicKey", reqUserIdentityPubKey)
+		logger.With(zap.Error(err)).Sugar().Errorf(
+			"ReturnLightningPayment: unable to get preimage request for public key %x and payment hash %x",
+			req.UserIdentityPublicKey,
+			req.PaymentHash,
+		)
 		return nil, fmt.Errorf("ReturnLightningPayment: unable to get preimage request: %w", err)
 	}
 

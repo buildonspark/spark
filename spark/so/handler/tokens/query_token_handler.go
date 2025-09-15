@@ -7,6 +7,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/errors"
+	"go.uber.org/zap"
 
 	"github.com/lightsparkdev/spark/common"
 
@@ -228,7 +229,7 @@ func (h *QueryTokenHandler) queryTokenTransactionsInternal(ctx context.Context, 
 		status := protoconverter.ConvertTokenTransactionStatusToTokenPb(transaction.Status)
 
 		// Reconstruct the token transaction from the ent data.
-		transactionProto, err := transaction.MarshalProto(h.config)
+		transactionProto, err := transaction.MarshalProto(ctx, h.config)
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToMarshalTokenTransaction, transaction, err)
 		}
@@ -347,7 +348,7 @@ func (h *QueryTokenHandler) queryTokenOutputsInternal(
 		},
 	)
 	if err != nil {
-		logger.Info("failed to query token outputs from operators", "error", err)
+		logger.Info("failed to query token outputs from operators", zap.Error(err))
 		return nil, fmt.Errorf("failed to query token outputs from operators: %w", err)
 	}
 
@@ -369,9 +370,11 @@ func (h *QueryTokenHandler) queryTokenOutputsInternal(
 
 	for outputID, countSpendableOperators := range countSpendableOperatorsForOutputID {
 		if countSpendableOperators < requiredSpendableOperators {
-			logger.Warn("token output not spendable in all operators",
-				"outputID", outputID,
-				"countSpendableOperators", countSpendableOperators,
+			logger.Sugar().Warnf(
+				"Token output %s not spendable in all operators (count %d, required %d)",
+				outputID,
+				countSpendableOperators,
+				requiredSpendableOperators,
 			)
 		}
 	}

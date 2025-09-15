@@ -8,8 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log" //nolint:depguard
-	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,6 +16,8 @@ import (
 	"time"
 
 	entsql "entgo.io/ent/dialect/sql"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/XSAM/otelsql"
@@ -144,29 +144,6 @@ func loadArgs() (*args, error) {
 	// Parse flags
 	flag.Parse()
 
-	var level slog.Level
-	switch strings.ToLower(args.LogLevel) {
-	case "debug":
-		level = slog.LevelDebug
-	case "info":
-		level = slog.LevelInfo
-	case "warn":
-		level = slog.LevelWarn
-	case "error":
-		level = slog.LevelError
-	default:
-		return nil, errors.New("invalid log level")
-	}
-
-	options := slog.HandlerOptions{AddSource: true, Level: level}
-	var handler slog.Handler
-	if args.LogJSON {
-		handler = slog.NewJSONHandler(os.Stdout, &options)
-	} else {
-		handler = slog.NewTextHandler(os.Stdout, &options)
-	}
-	slog.SetDefault(slog.New(handler))
-
 	if args.IdentityPrivateKeyFilePath == "" {
 		return nil, errors.New("identity private key file path is required")
 	}
@@ -226,10 +203,56 @@ func NewBufferedBody(bodyReader io.ReadCloser) *BufferedBody {
 func main() {
 	args, err := loadArgs()
 	if err != nil {
-		log.Fatalf("Failed to load args: %v", err)
+		fmt.Fprintf(os.Stderr, "Failed to load args: %v\n", err)
+		os.Exit(1)
 	}
 
+	logConfig := zap.NewProductionConfig()
+	logLevel, err := zap.ParseAtomicLevel(args.LogLevel)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to parse log level: %v\n", err)
+		os.Exit(1)
+	}
+
+	logConfig.Level = logLevel
+
+	if args.LogJSON {
+		logConfig.Encoding = "json"
+		logConfig.EncoderConfig = zap.NewProductionEncoderConfig()
+	} else {
+		logConfig.Encoding = "console"
+		logConfig.EncoderConfig = zap.NewDevelopmentEncoderConfig()
+	}
+
+	// Various settings to make logs more similar to slog (both so they're backwards compatible with
+	// downstream ingestion and just generally similar).
+	logConfig.EncoderConfig.TimeKey = "time"
+	logConfig.EncoderConfig.CallerKey = zapcore.OmitKey
+	logConfig.EncoderConfig.EncodeTime = zapcore.RFC3339NanoTimeEncoder
+	logConfig.EncoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+
+	// Disable sampling to ensure all logs are captured.
+	logConfig.Sampling = nil
+
+	logger, err := logConfig.Build()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to build logger: %v\n", err)
+		os.Exit(1)
+	}
+	defer logger.Sync() //nolint:errcheck
+
+	logger = logger.WithOptions(zap.WrapCore(func(core zapcore.Core) zapcore.Core {
+		return &logging.SourceCore{Core: core}
+	}))
+
+	sigCtx, done := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer done()
+
+	errGrp, errCtx := errgroup.WithContext(sigCtx)
+	errCtx = logging.Inject(errCtx, logger)
+
 	config, err := so.NewConfig(
+		errCtx,
 		args.ConfigFilePath,
 		args.Index,
 		args.IdentityPrivateKeyFilePath,
@@ -251,18 +274,13 @@ func main() {
 		},
 	)
 	if err != nil {
-		log.Fatalf("Failed to create config: %v", err)
+		logger.Fatal("Failed to create config", zap.Error(err))
 	}
-
-	sigCtx, done := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer done()
-
-	errGrp, errCtx := errgroup.WithContext(sigCtx)
 
 	// OBSERVABILITY
 	promExporter, err := otelprom.New()
 	if err != nil {
-		log.Fatalf("Failed to create prometheus exporter: %v", err)
+		logger.Fatal("Failed to create prometheus exporter", zap.Error(err))
 	}
 	meterProvider := metric.NewMeterProvider(metric.WithReader(promExporter))
 	otel.SetMeterProvider(meterProvider)
@@ -271,17 +289,17 @@ func main() {
 	if config.Tracing.Enabled {
 		shutdown, err := common.ConfigureTracing(errCtx, config.Tracing)
 		if err != nil {
-			log.Fatalf("Failed to configure tracing: %v", err)
+			logger.Fatal("Failed to configure tracing", zap.Error(err))
 		}
 		defer func() {
 			shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
 			defer shutdownRelease()
 
-			slog.Info("Shutting down tracer provider")
+			logger.Info("Shutting down tracer provider")
 			if err := shutdown(shutdownCtx); err != nil {
-				slog.Error("Error shutting down tracer provider", "error", err)
+				logger.Error("Error shutting down tracer provider", zap.Error(err))
 			} else {
-				slog.Info("Tracer provider shut down")
+				logger.Info("Tracer provider shut down")
 			}
 		}()
 	}
@@ -290,7 +308,7 @@ func main() {
 	if config.Knobs.IsEnabled() {
 		if valuesProvider, err = knobs.NewKnobsK8ValuesProvider(errCtx); err != nil {
 			// Knobs has failed to fetch the config, so the controllers will rely on the default values.
-			slog.Error("Failed to create K8 knobs", "error", err)
+			logger.Error("Failed to create K8 knobs", zap.Error(err))
 		}
 	}
 
@@ -301,14 +319,13 @@ func main() {
 	dbDriver := config.DatabaseDriver()
 	connector, err := so.NewDBConnector(errCtx, config, knobsService)
 	if err != nil {
-		log.Fatalf("Failed to create db connector: %v", err)
+		logger.Fatal("Failed to create db connector", zap.Error(err))
 	}
 	defer connector.Close()
 
-	logger := slog.Default().With("component", "dbevents")
-	dbEvents, err := db.NewDBEvents(errCtx, connector, logger)
+	dbEvents, err := db.NewDBEvents(errCtx, connector, logger.With(zap.String("component", "dbevents")))
 	if err != nil {
-		log.Fatalf("Failed to create db events: %v", err)
+		logger.Fatal("Failed to create db events", zap.Error(err))
 	}
 
 	if config.Database.DBEventsEnabled != nil && *config.Database.DBEventsEnabled {
@@ -346,17 +363,17 @@ func main() {
 	if dbDriver == "sqlite3" {
 		sqliteDb, _ := sql.Open("sqlite3", config.DatabasePath)
 		if _, err := sqliteDb.ExecContext(errCtx, "PRAGMA journal_mode=WAL;"); err != nil {
-			log.Fatalf("Failed to set journal_mode: %v", err)
+			logger.Fatal("Failed to set journal_mode", zap.Error(err))
 		}
 		if _, err := sqliteDb.ExecContext(errCtx, "PRAGMA busy_timeout=5000;"); err != nil {
-			log.Fatalf("Failed to set busy_timeout: %v", err)
+			logger.Fatal("Failed to set busy_timeout", zap.Error(err))
 		}
 		sqliteDb.Close()
 	}
 
 	frostConnection, err := config.NewFrostGRPCConnection()
 	if err != nil {
-		log.Fatalf("Failed to create frost client: %v", err)
+		logger.Fatal("Failed to create frost client", zap.Error(err))
 	}
 
 	if !args.DisableChainwatcher {
@@ -368,8 +385,8 @@ func main() {
 				chainCtx, chainCancel := context.WithCancel(errCtx)
 				defer chainCancel()
 
-				logger := slog.Default().With("component", "chainwatcher", "network", network)
-				chainCtx = logging.Inject(chainCtx, logger)
+				chainLogger := logger.With(zap.String("component", "chainwatcher"), zap.String("network", network))
+				chainCtx = logging.Inject(chainCtx, chainLogger)
 
 				err := chain.WatchChain(
 					chainCtx,
@@ -378,7 +395,7 @@ func main() {
 					bitcoindConfig,
 				)
 				if err != nil {
-					logger.Error("Error in chain watcher", "error", err)
+					logger.Error("Error in chain watcher", zap.Error(err))
 					return err
 				}
 
@@ -398,24 +415,24 @@ func main() {
 		cronCtx, cronCancel := context.WithCancel(errCtx)
 		defer cronCancel()
 
-		taskLogger := slog.Default().With("component", "cron")
+		taskLogger := logger.With(zap.String("component", "cron"))
 		cronCtx = logging.Inject(cronCtx, taskLogger)
 
 		taskLogger.Info("Starting scheduler")
 		taskMonitor, err := task.NewMonitor()
 		if err != nil {
-			log.Fatalf("Failed to create task monitor: %v", err)
+			taskLogger.Fatal("Failed to create task monitor", zap.Error(err))
 		}
 		scheduler, err := gocron.NewScheduler(
 			gocron.WithGlobalJobOptions(
 				gocron.WithContext(cronCtx),
 				gocron.WithSingletonMode(gocron.LimitModeReschedule),
 			),
-			gocron.WithLogger(taskLogger),
+			gocron.WithLogger(task.NewZapLoggerAdapter(taskLogger)),
 			gocron.WithMonitorStatus(taskMonitor),
 		)
 		if err != nil {
-			log.Fatalf("Failed to create scheduler: %v", err)
+			logger.Fatal("Failed to create scheduler", zap.Error(err))
 		}
 		for _, scheduled := range task.AllScheduledTasks() {
 			// Don't run the task if the task specifies it should not be run in
@@ -423,7 +440,7 @@ func main() {
 			if (!args.RunningLocally || scheduled.RunInTestEnv) && !scheduled.Disabled {
 				err := scheduled.Schedule(scheduler, config, dbClient, knobsService)
 				if err != nil {
-					log.Fatalf("Failed to create job: %v", err)
+					logger.Fatal("Failed to create job", zap.Error(err))
 				}
 			}
 		}
@@ -431,23 +448,36 @@ func main() {
 		defer scheduler.Shutdown() //nolint:errcheck
 
 		// Run startup tasks
+		startupCtx, startupCancel := context.WithCancel(errCtx)
+		defer startupCancel()
+
 		errGrp.Go(func() error {
-			return task.RunStartupTasks(config, dbClient, args.RunningLocally, knobsService)
+			// TODO(mhr): Do this properly, have a waitgroup in `RunStartupTasks` that waits until all tasks
+			// are done before returning.
+			startupCtx = logging.Inject(startupCtx, logger.With(zap.String("component", "startup")))
+
+			return task.RunStartupTasks(startupCtx, config, dbClient, args.RunningLocally, knobsService)
 		})
 	}
 
 	sessionTokenCreatorVerifier, err := authninternal.NewSessionTokenCreatorVerifier(config.IdentityPrivateKey, nil)
 	if err != nil {
-		log.Fatalf("Failed to create token verifier: %v", err)
+		logger.Fatal("Failed to create token verifier", zap.Error(err))
 	}
 
 	var rateLimiter *middleware.RateLimiter
-	slog.Info("Rate limiter config", "enabled", config.RateLimiter.Enabled, "window", config.RateLimiter.Window, "max_requests", config.RateLimiter.MaxRequests, "methods", config.RateLimiter.Methods)
+	logger.Sugar().Infof(
+		"Rate limiter config: enabled %t, window %s, max requests %d, methods %+q",
+		config.RateLimiter.Enabled,
+		config.RateLimiter.Window,
+		config.RateLimiter.MaxRequests,
+		config.RateLimiter.Methods,
+	)
 	if config.RateLimiter.Enabled {
 		var err error
 		rateLimiter, err = createRateLimiter(config, middleware.WithKnobs(knobsService))
 		if err != nil {
-			log.Fatalf("Failed to create rate limiter: %v", err)
+			logger.Fatal("Failed to create rate limiter", zap.Error(err))
 		}
 	}
 
@@ -487,8 +517,7 @@ func main() {
 
 	var eventsRouter *events.EventRouter
 	if config.Database.DBEventsEnabled != nil && *config.Database.DBEventsEnabled {
-		eventsLogger := slog.Default().With("component", "events_router")
-		eventsRouter = events.NewEventRouter(dbClient, dbEvents, eventsLogger)
+		eventsRouter = events.NewEventRouter(dbClient, dbEvents, logger.With(zap.String("component", "events_router")))
 	}
 
 	// Add Interceptors aka gRPC middleware
@@ -499,7 +528,7 @@ func main() {
 	serverOpts = append(serverOpts,
 		grpc.UnaryInterceptor(grpcmiddleware.ChainUnaryServer(
 			sparkerrors.ErrorInterceptor(config.ReturnDetailedErrors),
-			sparkgrpc.LogInterceptor(tableLogger),
+			sparkgrpc.LogInterceptor(logger.With(zap.String("component", "grpc")), tableLogger),
 			sparkgrpc.SparkTokenMetricsInterceptor(),
 			// Inject knobs into context for unary requests
 			func() grpc.UnaryServerInterceptor {
@@ -535,7 +564,7 @@ func main() {
 		)),
 		grpc.StreamInterceptor(grpcmiddleware.ChainStreamServer(
 			sparkerrors.ErrorStreamingInterceptor(),
-			sparkgrpc.StreamLogInterceptor(),
+			sparkgrpc.StreamLogInterceptor(logger.With(zap.String("component", "grpc"))),
 			sparkgrpc.PanicRecoveryStreamInterceptor(),
 			authn.NewInterceptor(sessionTokenCreatorVerifier).StreamAuthnInterceptor,
 			authz.NewAuthzInterceptor(authz.NewAuthzConfig(
@@ -550,7 +579,7 @@ func main() {
 
 	cert, err := tls.LoadX509KeyPair(args.ServerCertPath, args.ServerKeyPath)
 	if err != nil {
-		log.Fatalf("Failed to load server certificate: %v", err)
+		logger.Fatal("Failed to load server certificate", zap.Error(err))
 	}
 
 	tlsConfig := tls.Config{
@@ -567,13 +596,14 @@ func main() {
 		grpcServer,
 		args,
 		config,
+		logger,
 		dbClient,
 		frostConnection,
 		sessionTokenCreatorVerifier,
 		eventsRouter,
 	)
 	if err != nil {
-		log.Fatalf("Failed to register all gRPC servers: %v", err)
+		logger.Fatal("Failed to register all gRPC servers", zap.Error(err))
 	}
 
 	// Web compatibility layer
@@ -628,7 +658,7 @@ func main() {
 
 	errGrp.Go(func() error {
 		if err := server.ListenAndServeTLS("", ""); !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("HTTP server failed", "error", err)
+			logger.Error("HTTP server failed", zap.Error(err))
 			return err
 		}
 
@@ -639,26 +669,26 @@ func main() {
 	<-errCtx.Done()
 
 	if sigCtx.Err() != nil {
-		slog.Info("Received shutdown signal, shutting down gracefully...")
+		logger.Info("Received shutdown signal, shutting down gracefully...")
 	} else {
-		slog.Error("Shutting down due to error...")
+		logger.Error("Shutting down due to error...")
 	}
 
-	slog.Info("Stopping gRPC server...")
+	logger.Info("Stopping gRPC server...")
 	grpcServer.GracefulStop()
-	slog.Info("gRPC server stopped")
+	logger.Info("gRPC server stopped")
 
 	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutdownRelease()
 
-	slog.Info("Stopping HTTP server...")
+	logger.Info("Stopping HTTP server...")
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		slog.Error("HTTP server failed to shutdown gracefully", "error", err)
+		logger.Error("HTTP server failed to shutdown gracefully", zap.Error(err))
 	} else {
-		slog.Info("HTTP server stopped")
+		logger.Info("HTTP server stopped")
 	}
 
 	if err := errGrp.Wait(); err != nil {
-		slog.Error("Shutdown due to error", "error", err)
+		logger.Error("Shutdown due to error", zap.Error(err))
 	}
 }

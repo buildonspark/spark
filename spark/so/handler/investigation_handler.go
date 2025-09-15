@@ -70,7 +70,7 @@ func (h *InvestigationHandler) InvestigateLeaves(ctx context.Context) error {
 			if !resultPubKey.Equals(leaf.Edges.SigningKeyshare.PublicKey) {
 				badNodes[leaf.ID.String()] = true
 				logger := logging.GetLoggerFromContext(ctx)
-				logger.Warn("Tree Node is marked as lost", "node_id", leaf.ID)
+				logger.Sugar().Warnf("Tree Node %s is marked as lost", leaf.ID)
 			}
 		}
 	}

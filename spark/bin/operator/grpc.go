@@ -20,6 +20,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	sparkgrpc "github.com/lightsparkdev/spark/so/grpc"
 	events "github.com/lightsparkdev/spark/so/stream"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/health/grpc_health_v1"
@@ -29,6 +30,7 @@ func RegisterGrpcServers(
 	grpcServer *grpc.Server,
 	args *args,
 	config *so.Config,
+	logger *zap.Logger,
 	dbClient *ent.Client,
 	frostClient *grpc.ClientConn,
 	sessionTokenCreatorVerifier *authninternal.SessionTokenCreatorVerifier,
@@ -65,7 +67,7 @@ func RegisterGrpcServers(
 	pbtokeninternal.RegisterSparkTokenInternalServiceServer(grpcServer, sparkTokenInternalServer)
 
 	// SSP receive private/internal endpoint
-	treeServer := sparkgrpc.NewSparkTreeServer(config, dbClient)
+	treeServer := sparkgrpc.NewSparkTreeServer(config, logger, dbClient)
 	pbtree.RegisterSparkTreeServiceServer(grpcServer, treeServer)
 
 	// Public ID challenge auth endpoint

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"sync"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
+	"go.uber.org/zap"
 )
 
 type listenerKey struct {
@@ -45,7 +45,7 @@ type DBEvents struct {
 	listeners      map[string]map[listenerKey][]chan EventData
 	channelChanges []channelChange
 
-	logger  *slog.Logger
+	logger  *zap.Logger
 	metrics DBEventMetrics
 }
 
@@ -87,7 +87,7 @@ func NewDBEventMetrics() DBEventMetrics {
 	}
 }
 
-func NewDBEvents(ctx context.Context, connector *so.DBConnector, logger *slog.Logger) (*DBEvents, error) {
+func NewDBEvents(ctx context.Context, connector *so.DBConnector, logger *zap.Logger) (*DBEvents, error) {
 	conn, err := connector.Pool().Acquire(ctx)
 	if err != nil {
 		return nil, err
@@ -116,7 +116,7 @@ func (e *DBEvents) listenForEvents() error {
 	for {
 		err := e.waitForNotification()
 		if err != nil {
-			e.logger.Error("error waiting for notification", "error", err)
+			e.logger.With(zap.Error(err)).Error("error waiting for notification")
 
 			if e.ctx.Err() != nil {
 				return e.ctx.Err()
@@ -127,7 +127,7 @@ func (e *DBEvents) listenForEvents() error {
 					if errors.Is(err, context.Canceled) || errors.Is(err, puddle.ErrClosedPool) {
 						return err
 					}
-					e.logger.Error("error reconnecting", "error", err)
+					e.logger.With(zap.Error(err)).Error("error reconnecting")
 				}
 			}
 		}
@@ -271,7 +271,7 @@ func (e *DBEvents) processNotification(notification *pgconn.Notification) {
 							),
 						)
 					default:
-						e.logger.Warn("Listener channel is full", "field", field, "value", value)
+						e.logger.Sugar().Warnf("Listener channel is full (field: %s, value: %s)", field, value)
 						e.metrics.forwardCount.Add(
 							e.ctx,
 							1,
@@ -304,16 +304,16 @@ func (e *DBEvents) processChannelChanges() {
 		case "listen":
 			err := e.startListening(channelChange.channel)
 			if err != nil {
-				e.logger.Error("error listening for channel", "channel", channelChange.channel, "error", err)
+				e.logger.With(zap.Error(err)).Sugar().Errorf("error listening for channel %s", channelChange.channel)
 			}
 		case "unlisten":
 			err := e.stopListening(channelChange.channel)
 			if err != nil {
-				e.logger.Error("error unlistening for channel", "channel", channelChange.channel, "error", err)
+				e.logger.With(zap.Error(err)).Sugar().Errorf("error unlistening for channel %s", channelChange.channel)
 			}
 			delete(e.listeners, channelChange.channel)
 		default:
-			e.logger.Error("invalid channel change operation", "operation", channelChange.operation)
+			e.logger.Sugar().Errorf("invalid channel change operation %s", channelChange.operation)
 		}
 	}
 	e.channelChanges = []channelChange{}
@@ -339,7 +339,7 @@ func (e *DBEvents) reconnect() error {
 	for {
 		if e.conn != nil {
 			if err := e.conn.Close(e.ctx); err != nil {
-				e.logger.Error("error closing connection", "error", err)
+				e.logger.With(zap.Error(err)).Error("error closing connection")
 				return err
 			}
 		}
@@ -352,7 +352,7 @@ func (e *DBEvents) reconnect() error {
 			return err
 		}
 
-		e.logger.Error("reconnect failed, retrying", "error", err)
+		e.logger.With(zap.Error(err)).Error("reconnect failed, retrying")
 
 		select {
 		case <-e.ctx.Done():

@@ -8,6 +8,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/middleware"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/peer"
@@ -78,7 +79,7 @@ func (i *Interceptor) authorizeRequest(ctx context.Context, method string) error
 	logger := logging.GetLoggerFromContext(ctx)
 
 	if !i.config.Mode.Valid() {
-		logger.Warn("invalid authz mode - treating authz as disabled", "mode", i.config.Mode)
+		logger.Sugar().Warnf("invalid authz mode %d - treating authz as disabled", i.config.Mode)
 	}
 
 	// If authorization is disabled or unset, allow all requests
@@ -113,7 +114,7 @@ func (i *Interceptor) authorizeRequest(ctx context.Context, method string) error
 		return nil
 	}
 	if clientIP, _, err = net.SplitHostPort(p.Addr.String()); err != nil {
-		logger.Error("Failed to split host and port from peer address", "peer_addr", p.Addr.String(), "error", err)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to split host and port from peer address %s", p.Addr.String())
 		if i.config.Mode == ModeEnforce {
 			return status.Error(codes.Internal, "failed to get peer information")
 		}
@@ -123,12 +124,12 @@ func (i *Interceptor) authorizeRequest(ctx context.Context, method string) error
 	// Internal APIs must only be called from an internal IP on the VPC, even if
 	// that means going through a load balancer.
 	if !strings.HasPrefix(p.Addr.String(), "10.") {
-		logger.Warn("internal API call from peer address not internal to VPC", "peer_addr", p.Addr.String())
+		logger.Sugar().Warnf("internal API call from peer address %s not internal to VPC", p.Addr.String())
 		switch i.config.Mode {
 		case ModeEnforce:
 			return status.Error(codes.PermissionDenied, "request not allowed from "+p.Addr.String())
 		case ModeWarn:
-			logger.Warn("warn authz mode - request would be denied - peer address is not internal to VPC", "peer_addr", p.Addr.String())
+			logger.Sugar().Warnf("warn authz mode - request would be denied - peer address %s is not internal to VPC", p.Addr.String())
 		default:
 			break
 		}
@@ -145,10 +146,10 @@ func (i *Interceptor) authorizeRequest(ctx context.Context, method string) error
 	// Only allow requests from internal IPs on the VPC, which are all 10.x.x.x IPs, or allowlisted IPs.
 	if !strings.HasPrefix(clientIP, "10.") && i.config.Mode != ModeLogOnly && !slices.Contains(i.config.AllowedIPs, clientIP) {
 		if i.config.Mode == ModeEnforce {
-			logger.Warn("internal API call from non-internal or allowlisted IP - request denied", "client_ip", clientIP, "allowed_ips", i.config.AllowedIPs, "method", method)
+			logger.Sugar().Warnf("internal API call from non-internal or allowlisted IP %s (allowed: %+q) - request denied", clientIP, i.config.AllowedIPs)
 			return status.Error(codes.PermissionDenied, "request not allowed from "+clientIP)
 		}
-		logger.Warn("warn authz mode - internal API call from non-internal or allowlisted IP - request would be denied", "client_ip", clientIP, "allowed_ips", i.config.AllowedIPs, "method", method)
+		logger.Sugar().Warnf("warn authz mode - internal API call from non-internal or allowlisted IP %s (allowed: %+q) - request would be denied", clientIP, i.config.AllowedIPs)
 	}
 	return nil
 }

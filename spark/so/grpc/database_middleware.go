@@ -8,6 +8,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/grpcutil"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
@@ -46,7 +47,7 @@ func DatabaseSessionMiddleware(factory db.SessionFactory, txBeginTimeout *time.D
 			if r := recover(); r != nil {
 				if tx := session.GetTxIfExists(); tx != nil {
 					if dberr := tx.Rollback(); dberr != nil {
-						logger.Error("Failed to rollback transaction", "error", dberr)
+						logger.Error("Failed to rollback transaction", zap.Error(dberr))
 					}
 				}
 				panic(r)
@@ -59,7 +60,7 @@ func DatabaseSessionMiddleware(factory db.SessionFactory, txBeginTimeout *time.D
 		if err != nil {
 			if tx := session.GetTxIfExists(); tx != nil {
 				if dberr := tx.Rollback(); dberr != nil {
-					logger.Error("Failed to rollback transaction", "error", dberr)
+					logger.Error("Failed to rollback transaction", zap.Error(dberr))
 				}
 			}
 			return nil, err
@@ -67,7 +68,7 @@ func DatabaseSessionMiddleware(factory db.SessionFactory, txBeginTimeout *time.D
 
 		if tx := session.GetTxIfExists(); tx != nil {
 			if dberr := tx.Commit(); dberr != nil {
-				logger.Error("Failed to commit transaction", "error", dberr)
+				logger.Error("Failed to commit transaction", zap.Error(dberr))
 				return nil, dberr
 			}
 		}

@@ -16,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.uber.org/zap"
 )
 
 var (
@@ -32,19 +33,18 @@ func LogMiddleware() TaskMiddleware {
 		ctx, span := tracer.Start(ctx, task.Name)
 		defer span.End()
 
-		logger := logging.GetLoggerFromContext(ctx).
-			With("task.name", task.Name).
-			With("task.id", uuid.New().String()).
-			With("task.trace_id", span.SpanContext().TraceID().String())
-
-		ctx = logging.Inject(ctx, logger)
+		ctx, logger := logging.WithAttrs(ctx,
+			zap.String("task.name", task.Name),
+			zap.Stringer("task.id", uuid.New()),
+			zap.Stringer("task.trace_id", span.SpanContext().TraceID()),
+		)
 
 		logger.Info("Executing task")
 
 		err := task.Task(ctx, config, knobsService)
 		if err != nil {
 			span.SetStatus(codes.Error, err.Error())
-			logger.Error("Task execution failed", "error", err)
+			logger.Error("Task execution failed", zap.Error(err))
 			return err
 		}
 
@@ -83,7 +83,7 @@ func TimeoutMiddleware() TaskMiddleware {
 				return err
 			}
 
-			logger.Warn("Context done before task completion! Are we shutting down?", "error", err)
+			logger.Warn("Context done before task completion! Are we shutting down?", zap.Error(err))
 			return err
 		}
 	}
@@ -119,7 +119,7 @@ func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration
 			if err != nil {
 				rollbackErr := tx.Rollback()
 				if rollbackErr != nil {
-					logger.Warn("Failed to rollback transaction after task failure", "error", rollbackErr)
+					logger.Warn("Failed to rollback transaction after task failure", zap.Error(rollbackErr))
 				}
 
 				return err
@@ -137,10 +137,9 @@ func PanicRecoveryMiddleware() TaskMiddleware {
 		logger := logging.GetLoggerFromContext(ctx)
 		defer func() {
 			if r := recover(); r != nil {
-				stack := debug.Stack()
 				logger.Error("Panic in task execution",
-					"panic", fmt.Sprintf("%v", r),
-					"stack", string(stack),
+					zap.String("panic", fmt.Sprintf("%v", r)),  // TODO(mhr): Probably a better way to do this.
+					zap.String("stack", string(debug.Stack())), // TODO(mhr): zap.ByteString?
 				)
 				err = errTaskPanic
 			}

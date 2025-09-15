@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/lightsparkdev/spark/common/logging"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -81,10 +81,7 @@ func ValidationInterceptor() grpc.UnaryServerInterceptor {
 		if err := validateRequestSize(req, info.FullMethod); err != nil {
 			var valErr *ValidationError
 			if errors.As(err, &valErr) {
-				logger.Warn("Request size validation failed",
-					"error", err,
-					"size", valErr.Value,
-				)
+				logger.With(zap.Error(err)).Sugar().Warnf("Request size validation failed (size: %d)", valErr.Value)
 			}
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
@@ -93,10 +90,7 @@ func ValidationInterceptor() grpc.UnaryServerInterceptor {
 		if err := validateArrayLengths(req, info.FullMethod); err != nil {
 			var valErr *ValidationError
 			if errors.As(err, &valErr) {
-				logger.Warn("Array length validation failed",
-					"error", err,
-					"length", valErr.Value,
-				)
+				logger.With(zap.Error(err)).Sugar().Warnf("Array length validation failed (length: %d)", valErr.Value)
 			}
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
@@ -104,7 +98,7 @@ func ValidationInterceptor() grpc.UnaryServerInterceptor {
 		// Validate the request proto if it implements Validate()
 		if v, ok := req.(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				logger.Warn("Proto validation failed", "error", err)
+				logger.Warn("Proto validation failed", zap.Error(err))
 				return nil, status.Errorf(codes.InvalidArgument, "invalid request: %v", err)
 			}
 		}
@@ -119,7 +113,7 @@ func ValidationInterceptor() grpc.UnaryServerInterceptor {
 		if resp != nil {
 			if v, ok := resp.(interface{ Validate() error }); ok {
 				if err := v.Validate(); err != nil {
-					logger.Error("Response validation failed", "error", err)
+					logger.Error("Response validation failed", zap.Error(err))
 					return nil, status.Errorf(codes.Internal, "invalid response: %v", err)
 				}
 			}
@@ -132,7 +126,7 @@ func ValidationInterceptor() grpc.UnaryServerInterceptor {
 type validatingServerStream struct {
 	grpc.ServerStream
 	method string
-	logger *slog.Logger
+	logger *zap.Logger
 }
 
 func StreamValidationInterceptor() grpc.StreamServerInterceptor {
@@ -156,7 +150,7 @@ func (s *validatingServerStream) SendMsg(m any) error {
 	if m != nil {
 		if v, ok := m.(interface{ Validate() error }); ok {
 			if err := v.Validate(); err != nil {
-				s.logger.Error("Stream response validation failed", "error", err)
+				s.logger.Error("Stream response validation failed", zap.Error(err))
 				return status.Errorf(codes.Internal, "invalid response: %v", err)
 			}
 		}

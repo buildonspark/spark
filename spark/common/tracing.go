@@ -5,15 +5,16 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/logging"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
+	"go.uber.org/zap"
 	"google.golang.org/grpc/credentials"
 )
 
@@ -49,8 +50,10 @@ type SpanSamplingConfig struct {
 
 // getOTLPTraceExporter sets up the OTLP trace exporter if endpoint is provided, else returns nil and logs.
 func getOTLPTraceExporter(ctx context.Context, endpoint, certPath string) (trace.SpanExporter, error) {
+	logger := logging.GetLoggerFromContext(ctx)
+
 	if endpoint == "" {
-		slog.Info("No OTEL collector endpoint configured, tracing will be enabled locally only")
+		logger.Info("No OTEL collector endpoint configured, tracing will be enabled locally only")
 		return nil, nil
 	}
 
@@ -77,11 +80,13 @@ func getOTLPTraceExporter(ctx context.Context, endpoint, certPath string) (trace
 // ConfigureTracing sets up the complete tracing configuration including sampling and exporters
 // Returns a shutdown function that should be deferred by the caller
 func ConfigureTracing(ctx context.Context, config TracingConfig) (func(context.Context) error, error) {
-	slog.Info("Configuring tracing", "endpoint", config.OTelCollectorEndpoint)
+	logger := logging.GetLoggerFromContext(ctx)
+
+	logger.Sugar().Infof("Configuring tracing (endpoint: %s)", config.OTelCollectorEndpoint)
 
 	traceExporter, err := getOTLPTraceExporter(ctx, config.OTelCollectorEndpoint, config.OTelCollectorCertPath)
 	if err != nil {
-		slog.Warn("failed to get OTLP trace exporter; continuing to run with local tracing", "error", err)
+		logger.Warn("failed to get OTLP trace exporter; continuing to run with local tracing", zap.Error(err))
 	}
 
 	sampler := trace.TraceIDRatioBased(config.GlobalSamplingRate)
