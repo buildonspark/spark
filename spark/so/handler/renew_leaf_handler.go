@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common/keys"
-	"github.com/lightsparkdev/spark/common/logging"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -19,7 +18,6 @@ import (
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
-	"go.uber.org/zap"
 )
 
 // RenewLeafHandler is a handler for renewing a leaf node.
@@ -77,7 +75,7 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 
 // Resets the node and refund transaction timelocks
 func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb.RenewNodeTimelockSigningJob, leaf *ent.TreeNode) (*pb.RenewLeafResponse, error) {
-	err := h.validateRenewNodeTimelocks(ctx, leaf)
+	err := h.validateRenewNodeTimelocks(leaf)
 	if err != nil {
 		return nil, fmt.Errorf("validating extend timelock failed: %w", err)
 	}
@@ -267,7 +265,7 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 
 // renewRefundTimelock resets the timelock of a refund transaction
 func (h *RenewLeafHandler) renewRefundTimelock(ctx context.Context, signingJob *pb.RenewRefundTimelockSigningJob, leaf *ent.TreeNode) (*pb.RenewLeafResponse, error) {
-	err := h.validateRenewRefundTimelock(ctx, leaf)
+	err := h.validateRenewRefundTimelock(leaf)
 	if err != nil {
 		return nil, fmt.Errorf("validating refresh timelock failed: %w", err)
 	}
@@ -578,7 +576,7 @@ func (h *RenewLeafHandler) constructRenewRefundTransactions(leaf *ent.TreeNode) 
 // validateRenewNodeTimelocks validates the timelock requirements for a renew
 // node timelock operation. Both the node transaction and the refund transaction
 // must have a timelock of 300 or less.
-func (h *RenewLeafHandler) validateRenewNodeTimelocks(ctx context.Context, leaf *ent.TreeNode) error {
+func (h *RenewLeafHandler) validateRenewNodeTimelocks(leaf *ent.TreeNode) error {
 	// Check the leaf's node transaction sequence
 	leafNodeTx, err := common.TxFromRawTxBytes(leaf.RawTx)
 	if err != nil {
@@ -587,15 +585,10 @@ func (h *RenewLeafHandler) validateRenewNodeTimelocks(ctx context.Context, leaf 
 	if len(leafNodeTx.TxIn) == 0 {
 		return fmt.Errorf("found no tx inputs for leaf node tx %v", leafNodeTx)
 	}
-	timelock := leafNodeTx.TxIn[0].Sequence & 0xffff
+	nodeTimelock := leafNodeTx.TxIn[0].Sequence & 0xffff
 
-	// TODO: Throw an error here
-	// Leaving in to make unit testing easier
-	if timelock > 300 {
-		logger := logging.GetLoggerFromContext(ctx)
-		logger.Error("leaf node transaction sequence must be less than or equal to 300",
-			zap.Uint32("sequence", leafNodeTx.TxIn[0].Sequence),
-			zap.String("leaf_id", leaf.ID.String()))
+	if nodeTimelock > 300 {
+		return errors.FailedPreconditionErrorf("leaf %s node transaction sequence must be less than or equal to 300, got %d", leaf.ID, nodeTimelock)
 	}
 
 	leafRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
@@ -605,13 +598,9 @@ func (h *RenewLeafHandler) validateRenewNodeTimelocks(ctx context.Context, leaf 
 	if len(leafRefundTx.TxIn) == 0 {
 		return fmt.Errorf("found no tx inputs for leaf refund tx %v", leafRefundTx)
 	}
-
-	timelock = leafRefundTx.TxIn[0].Sequence & 0xffff
-	if timelock > 300 {
-		logger := logging.GetLoggerFromContext(ctx)
-		logger.Error("leaf refund transaction sequence must be less than or equal to 300",
-			zap.Uint32("sequence", leafRefundTx.TxIn[0].Sequence),
-			zap.String("leaf_id", leaf.ID.String()))
+	refundTimelock := leafRefundTx.TxIn[0].Sequence & 0xffff
+	if refundTimelock > 300 {
+		return errors.FailedPreconditionErrorf("leaf %s refund transaction sequence must be less than or equal to 300, got %d", leaf.ID, nodeTimelock)
 	}
 
 	return nil
@@ -619,7 +608,7 @@ func (h *RenewLeafHandler) validateRenewNodeTimelocks(ctx context.Context, leaf 
 
 // validateRenewRefundTimelock validates the timelock requirements for a renew
 // refund timelock operation. Refund timelock must be <= 300
-func (h *RenewLeafHandler) validateRenewRefundTimelock(ctx context.Context, leaf *ent.TreeNode) error {
+func (h *RenewLeafHandler) validateRenewRefundTimelock(leaf *ent.TreeNode) error {
 	// Check the leaf's refund transaction sequence
 	leafRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
 	if err != nil {
@@ -628,15 +617,10 @@ func (h *RenewLeafHandler) validateRenewRefundTimelock(ctx context.Context, leaf
 	if len(leafRefundTx.TxIn) == 0 {
 		return fmt.Errorf("found no tx inputs for leaf refund tx %v", leafRefundTx)
 	}
-	timelock := leafRefundTx.TxIn[0].Sequence & 0xffff
+	refundTimelock := leafRefundTx.TxIn[0].Sequence & 0xffff
 
-	// TODO: Throw an error here
-	// Leaving in to make unit testing easier
-	if timelock > 300 {
-		logger := logging.GetLoggerFromContext(ctx)
-		logger.Error("leaf refund transaction sequence must be less than or equal to 300",
-			zap.Uint32("sequence", leafRefundTx.TxIn[0].Sequence),
-			zap.String("leaf_id", leaf.ID.String()))
+	if refundTimelock > 300 {
+		return errors.FailedPreconditionErrorf("leaf %s refund transaction sequence must be less than or equal to 300, got %d", leaf.ID, refundTimelock)
 	}
 
 	return nil
