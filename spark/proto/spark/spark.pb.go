@@ -1651,9 +1651,8 @@ func (x *SigningResult) GetSigningKeyshare() *SigningKeyshare {
 }
 
 type RenewLeafRequest struct {
-	state                  protoimpl.MessageState `protogen:"open.v1"`
-	LeafId                 string                 `protobuf:"bytes,1,opt,name=leaf_id,json=leafId,proto3" json:"leaf_id,omitempty"`
-	OwnerIdentityPublicKey []byte                 `protobuf:"bytes,2,opt,name=owner_identity_public_key,json=ownerIdentityPublicKey,proto3" json:"owner_identity_public_key,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	LeafId string                 `protobuf:"bytes,1,opt,name=leaf_id,json=leafId,proto3" json:"leaf_id,omitempty"`
 	// Types that are valid to be assigned to SigningJobs:
 	//
 	//	*RenewLeafRequest_RenewNodeTimelockSigningJob
@@ -1700,13 +1699,6 @@ func (x *RenewLeafRequest) GetLeafId() string {
 	return ""
 }
 
-func (x *RenewLeafRequest) GetOwnerIdentityPublicKey() []byte {
-	if x != nil {
-		return x.OwnerIdentityPublicKey
-	}
-	return nil
-}
-
 func (x *RenewLeafRequest) GetSigningJobs() isRenewLeafRequest_SigningJobs {
 	if x != nil {
 		return x.SigningJobs
@@ -1745,7 +1737,7 @@ type RenewLeafRequest_RenewNodeTimelockSigningJob struct {
 	// Requires that the existing node transaction timelock is <= 300
 	// at the time this function is called. Returns an error if these
 	// conditions are not met.
-	RenewNodeTimelockSigningJob *RenewNodeTimelockSigningJob `protobuf:"bytes,3,opt,name=renew_node_timelock_signing_job,json=renewNodeTimelockSigningJob,proto3,oneof"`
+	RenewNodeTimelockSigningJob *RenewNodeTimelockSigningJob `protobuf:"bytes,2,opt,name=renew_node_timelock_signing_job,json=renewNodeTimelockSigningJob,proto3,oneof"`
 }
 
 type RenewLeafRequest_RenewRefundTimelockSigningJob struct {
@@ -1754,7 +1746,7 @@ type RenewLeafRequest_RenewRefundTimelockSigningJob struct {
 	// Requires that the existing refund transaction timelock is <= 300 and
 	// the node transaction timelock > 300 at the time this function is
 	// called. Returns an error if these conditions are not met.
-	RenewRefundTimelockSigningJob *RenewRefundTimelockSigningJob `protobuf:"bytes,4,opt,name=renew_refund_timelock_signing_job,json=renewRefundTimelockSigningJob,proto3,oneof"`
+	RenewRefundTimelockSigningJob *RenewRefundTimelockSigningJob `protobuf:"bytes,3,opt,name=renew_refund_timelock_signing_job,json=renewRefundTimelockSigningJob,proto3,oneof"`
 }
 
 func (*RenewLeafRequest_RenewNodeTimelockSigningJob) isRenewLeafRequest_SigningJobs() {}
@@ -10954,12 +10946,11 @@ const file_spark_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\v2\x19.common.SigningCommitmentR\x05value:\x028\x01\x1aB\n" +
 	"\x14SignatureSharesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"\xd4\x02\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"\x99\x02\n" +
 	"\x10RenewLeafRequest\x12\x17\n" +
-	"\aleaf_id\x18\x01 \x01(\tR\x06leafId\x129\n" +
-	"\x19owner_identity_public_key\x18\x02 \x01(\fR\x16ownerIdentityPublicKey\x12j\n" +
-	"\x1frenew_node_timelock_signing_job\x18\x03 \x01(\v2\".spark.RenewNodeTimelockSigningJobH\x00R\x1brenewNodeTimelockSigningJob\x12p\n" +
-	"!renew_refund_timelock_signing_job\x18\x04 \x01(\v2$.spark.RenewRefundTimelockSigningJobH\x00R\x1drenewRefundTimelockSigningJobB\x0e\n" +
+	"\aleaf_id\x18\x01 \x01(\tR\x06leafId\x12j\n" +
+	"\x1frenew_node_timelock_signing_job\x18\x02 \x01(\v2\".spark.RenewNodeTimelockSigningJobH\x00R\x1brenewNodeTimelockSigningJob\x12p\n" +
+	"!renew_refund_timelock_signing_job\x18\x03 \x01(\v2$.spark.RenewRefundTimelockSigningJobH\x00R\x1drenewRefundTimelockSigningJobB\x0e\n" +
 	"\fsigning_jobs\"\xa7\x05\n" +
 	"\x1bRenewNodeTimelockSigningJob\x12W\n" +
 	"\x19split_node_tx_signing_job\x18\x01 \x01(\v2\x1d.spark.UserSignedTxSigningJobR\x15splitNodeTxSigningJob\x12d\n" +

@@ -321,7 +321,6 @@ message SigningResult {
 
 message RenewLeafRequest {
     string leaf_id = 1;
-    bytes owner_identity_public_key = 2;
 
     oneof signing_jobs {
       // Resets the node transaction timelock and refund transaction timelock
@@ -332,14 +331,14 @@ message RenewLeafRequest {
       // Requires that the existing node transaction timelock is <= 300
       // at the time this function is called. Returns an error if these
       // conditions are not met.
-      RenewNodeTimelockSigningJob renew_node_timelock_signing_job = 3;
+      RenewNodeTimelockSigningJob renew_node_timelock_signing_job = 2;
 
       // Resets the refund transaction timelock for a leaf to 2000. Takes in
       // the signing jobs for the updated transactions with the new timelocks.
       // Requires that the existing refund transaction timelock is <= 300 and
       // the node transaction timelock > 300 at the time this function is
       // called. Returns an error if these conditions are not met.
-      RenewRefundTimelockSigningJob renew_refund_timelock_signing_job = 4;
+      RenewRefundTimelockSigningJob renew_refund_timelock_signing_job = 3;
     }
 }
 

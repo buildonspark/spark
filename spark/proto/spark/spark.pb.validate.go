@@ -2434,8 +2434,6 @@ func (m *RenewLeafRequest) validate(all bool) error {
 
 	// no validation rules for LeafId
 
-	// no validation rules for OwnerIdentityPublicKey
-
 	switch v := m.SigningJobs.(type) {
 	case *RenewLeafRequest_RenewNodeTimelockSigningJob:
 		if v == nil {

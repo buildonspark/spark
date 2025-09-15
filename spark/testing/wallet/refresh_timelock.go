@@ -761,8 +761,7 @@ func ExtendTimelockUsingRenew(
 
 	// Send to SO to sign
 	response, err := sparkClient.RenewLeaf(authCtx, &pb.RenewLeafRequest{
-		LeafId:                 node.Id,
-		OwnerIdentityPublicKey: config.IdentityPublicKey().Serialize(),
+		LeafId: node.Id,
 		SigningJobs: &pb.RenewLeafRequest_RenewNodeTimelockSigningJob{
 			RenewNodeTimelockSigningJob: &pb.RenewNodeTimelockSigningJob{
 				SplitNodeTxSigningJob: decrementedNodeUserSigningJob,
@@ -929,8 +928,7 @@ func RefreshTimelockUsingRenew(
 
 	// Send to SO to sign with refresh signing job
 	response, err := sparkClient.RenewLeaf(authCtx, &pb.RenewLeafRequest{
-		LeafId:                 node.Id,
-		OwnerIdentityPublicKey: config.IdentityPublicKey().Serialize(),
+		LeafId: node.Id,
 		SigningJobs: &pb.RenewLeafRequest_RenewRefundTimelockSigningJob{
 			RenewRefundTimelockSigningJob: &pb.RenewRefundTimelockSigningJob{
 				NodeTxSigningJob:   newNodeSigningJob,

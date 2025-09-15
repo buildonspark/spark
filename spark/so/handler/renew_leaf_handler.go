@@ -14,6 +14,7 @@ import (
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
@@ -61,6 +62,14 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 
 	if leaf.Status != st.TreeNodeStatusAvailable {
 		return nil, errors.InvalidUserInputErrorf("leaf node is not available for renewal, current status: %s", leaf.Status)
+	}
+	ownerIDPubKey, err := keys.ParsePublicKey(leaf.OwnerIdentityPubkey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse owner identity public key: %w", err)
+	}
+	err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, ownerIDPubKey)
+	if err != nil {
+		return nil, err
 	}
 
 	// Determine operation type and delegate to appropriate handler
