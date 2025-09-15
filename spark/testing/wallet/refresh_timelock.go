@@ -779,6 +779,173 @@ func ExtendTimelockUsingRenew(
 	return response, nil
 }
 
+func RefreshTimelockUsingRenew(
+	ctx context.Context,
+	config *TestWalletConfig,
+	node *pb.TreeNode,
+	parentNode *pb.TreeNode,
+	signingPrivKey keys.Private,
+) (*pb.RenewLeafResponse, error) {
+	nodeTx, err := common.TxFromRawTxBytes(node.NodeTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse node tx: %w", err)
+	}
+	refundTx, err := common.TxFromRawTxBytes(node.RefundTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse refund tx: %w", err)
+	}
+
+	// Create new node tx with next sequence from original node tx
+	newNodeTx := nodeTx.Copy()
+	for _, txin := range newNodeTx.TxIn {
+		txin.SignatureScript = nil
+		txin.Witness = nil
+		txin.Sequence, err = spark.NextSequence(txin.Sequence)
+		if err != nil {
+			return nil, fmt.Errorf("failed to increment sequence: %w", err)
+		}
+	}
+
+	// Create new refund tx to spend the new node tx with initial sequence
+	newRefundOutPoint := wire.OutPoint{Hash: newNodeTx.TxHash(), Index: 0}
+	cpfpRefundTx, _, err := createRefundTxs(spark.InitialSequence(), &newRefundOutPoint, refundTx.TxOut[0].Value, signingPrivKey.Public(), false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create refund tx: %w", err)
+	}
+
+	// Get signing commitments
+	sparkConn, err := config.NewCoordinatorGRPCConnection()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create grpc connection: %w", err)
+	}
+	defer sparkConn.Close()
+	token, err := AuthenticateWithConnection(ctx, config, sparkConn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authenticate with server: %w", err)
+	}
+	authCtx := ContextWithToken(ctx, token)
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	signingCommitments, err := sparkClient.GetSigningCommitments(authCtx, &pb.GetSigningCommitmentsRequest{
+		NodeIds: []string{node.Id},
+		Count:   2,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Prepare signing jobs (only 2 transactions: node and refund)
+	signingJobs := []*pbfrost.FrostSigningJob{}
+	userCommitments := []*objects.SigningCommitment{}
+
+	// node tx
+	parentNodeTx, err := common.TxFromRawTxBytes(parentNode.NodeTx)
+	if err != nil {
+		return nil, err
+	}
+	nodeSigningJob, nodeCommitment, err := createSigningJobForRenewLeaf(
+		newNodeTx, parentNodeTx, "Node tx",
+		signingCommitments.SigningCommitments[0], node, signingPrivKey,
+	)
+	if err != nil {
+		return nil, err
+	}
+	signingJobs = append(signingJobs, nodeSigningJob)
+	userCommitments = append(userCommitments, nodeCommitment)
+
+	// refund tx
+	refundSigningJob, refundCommitment, err := createSigningJobForRenewLeaf(
+		cpfpRefundTx, newNodeTx, "Refund tx",
+		signingCommitments.SigningCommitments[1], node, signingPrivKey,
+	)
+	if err != nil {
+		return nil, err
+	}
+	signingJobs = append(signingJobs, refundSigningJob)
+	userCommitments = append(userCommitments, refundCommitment)
+
+	// Sign user transactions
+	signerConn, err := config.NewFrostGRPCConnection()
+	if err != nil {
+		return nil, err
+	}
+	defer signerConn.Close()
+	signerClient := pbfrost.NewFrostServiceClient(signerConn)
+	signingResults, err := signerClient.SignFrost(ctx, &pbfrost.SignFrostRequest{
+		SigningJobs: signingJobs,
+		Role:        pbfrost.SigningRole_USER,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(signingResults.Results) != len(signingJobs) {
+		return nil, fmt.Errorf("expected %d signing results, got %d", len(signingJobs), len(signingResults.Results))
+	}
+
+	signingResultsArray := make([]*pbcommon.SigningResult, 0, len(signingResults.Results))
+	for _, job := range signingJobs {
+		signingResultsArray = append(signingResultsArray, signingResults.Results[job.JobId])
+	}
+
+	// Serialize transactions to bytes
+	newNodeTxBytes, err := common.SerializeTx(newNodeTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize new node tx: %w", err)
+	}
+	cpfpRefundTxBytes, err := common.SerializeTx(cpfpRefundTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize refund tx: %w", err)
+	}
+
+	// Create signing jobs for refresh (only 2 transactions)
+	nodeUserCommitmentProto, err := userCommitments[0].MarshalProto()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal user commitment: %w", err)
+	}
+	newNodeSigningJob := &pb.UserSignedTxSigningJob{
+		LeafId:                 node.Id,
+		SigningPublicKey:       node.OwnerSigningPublicKey,
+		SigningNonceCommitment: nodeUserCommitmentProto,
+		UserSignature:          signingResultsArray[0].SignatureShare,
+		RawTx:                  newNodeTxBytes,
+		SigningCommitments: &pb.SigningCommitments{
+			SigningCommitments: signingCommitments.SigningCommitments[0].SigningNonceCommitments,
+		},
+	}
+
+	refundUserCommitmentProto, err := userCommitments[1].MarshalProto()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal user commitment: %w", err)
+	}
+	cpfpRefundSigningJob := &pb.UserSignedTxSigningJob{
+		LeafId:                 node.Id,
+		SigningPublicKey:       node.OwnerSigningPublicKey,
+		SigningNonceCommitment: refundUserCommitmentProto,
+		UserSignature:          signingResultsArray[1].SignatureShare,
+		RawTx:                  cpfpRefundTxBytes,
+		SigningCommitments: &pb.SigningCommitments{
+			SigningCommitments: signingCommitments.SigningCommitments[1].SigningNonceCommitments,
+		},
+	}
+
+	// Send to SO to sign with refresh signing job
+	response, err := sparkClient.RenewLeaf(authCtx, &pb.RenewLeafRequest{
+		LeafId:                 node.Id,
+		OwnerIdentityPublicKey: config.IdentityPublicKey().Serialize(),
+		SigningJobs: &pb.RenewLeafRequest_RenewRefundTimelockSigningJob{
+			RenewRefundTimelockSigningJob: &pb.RenewRefundTimelockSigningJob{
+				NodeTxSigningJob:   newNodeSigningJob,
+				RefundTxSigningJob: cpfpRefundSigningJob,
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to refresh leaf: %w", err)
+	}
+
+	// Return the response
+	return response, nil
+}
+
 func createFrostJobsFromTx(
 	tx *wire.MsgTx,
 	parentTxOut *wire.TxOut,

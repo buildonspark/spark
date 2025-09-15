@@ -366,7 +366,13 @@ func (s *SparkServer) RenewLeaf(ctx context.Context, req *pb.RenewLeafRequest) (
 		return nil, errors.UnavailableErrorf("RenewLeaf endpoint is currently unavailable")
 	}
 
-	return &pb.RenewLeafResponse{}, nil
+	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
+	}
+	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
+	leafHandler := handler.NewRenewLeafHandler(s.config)
+	return leafHandler.RenewLeaf(ctx, req)
 }
 
 // GetSigningOperatorList gets the list of signing operators.

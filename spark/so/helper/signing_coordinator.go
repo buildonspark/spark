@@ -374,6 +374,92 @@ func NewSigningJob(keyshare *ent.SigningKeyshare, proto *pbspark.SigningJob, pre
 	return job, tx, nil
 }
 
+// validateKeysMatch validates that the user and operator keys combine to match the verifying public key
+func validateKeysMatch(ctx context.Context, userSigningPublicKey []byte, operatorPublicKey []byte, verifyingPubKey keys.Public) error {
+	userPubkey, err := keys.ParsePublicKey(userSigningPublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to parse user pubkey: %w", err)
+	}
+	operatorPubkey, err := keys.ParsePublicKey(operatorPublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to parse operator pubkey: %w", err)
+	}
+	combinedKey := operatorPubkey.Add(userPubkey)
+	if !combinedKey.Equals(verifyingPubKey) {
+		return fmt.Errorf("user key %s and operator key %s combine to %s; expected %s", userPubkey.String(), operatorPubkey.String(), combinedKey.String(), verifyingPubKey.String())
+	}
+	return nil
+}
+
+// NewSigningJobWithPregeneratedNonce creates a new signing job with pregenerated nonce commitments.
+func NewSigningJobWithPregeneratedNonce(
+	ctx context.Context,
+	signingJobProto *pbspark.UserSignedTxSigningJob,
+	signingKeyshare *ent.SigningKeyshare,
+	verifyingPubKey keys.Public,
+	deserializedTx *wire.MsgTx,
+	prevOutput *wire.TxOut,
+) (*SigningJobWithPregeneratedNonce, error) {
+	if signingJobProto == nil {
+		return nil, errors.New("signingJobProto cannot be nil")
+	}
+	if signingKeyshare == nil {
+		return nil, errors.New("signingKeyshare cannot be nil")
+	}
+	if deserializedTx == nil {
+		return nil, errors.New("deserializedTx cannot be nil")
+	}
+	if prevOutput == nil {
+		return nil, errors.New("prevOutput cannot be nil")
+	}
+
+	// Create user nonce commitment
+	userNonceCommitment, err := objects.NewSigningCommitment(signingJobProto.SigningNonceCommitment.Binding, signingJobProto.SigningNonceCommitment.Hiding)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user nonce commitment: %w", err)
+	}
+
+	// Validate keys match
+	err = validateKeysMatch(ctx, signingJobProto.SigningPublicKey, signingKeyshare.PublicKey.Serialize(), verifyingPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("transaction key validation failed: %w", err)
+	}
+
+	// Get signature hash
+	sigHash, err := common.SigHashFromTx(deserializedTx, 0, prevOutput)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sig hash: %w", err)
+	}
+
+	// Extract round1 packages from user's signing commitments
+	round1Packages := make(map[string]objects.SigningCommitment)
+	for key, commitment := range signingJobProto.SigningCommitments.SigningCommitments {
+		obj := objects.SigningCommitment{}
+		err = obj.UnmarshalProto(commitment)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal signing commitment for key %s: %w", key, err)
+		}
+		round1Packages[key] = obj
+		if len(obj.Hiding) == 0 || len(obj.Binding) == 0 {
+			return nil, fmt.Errorf("signing commitment is invalid for key %s: hiding or binding is empty", key)
+		}
+	}
+
+	jobID := uuid.New().String()
+	signingJob := &SigningJobWithPregeneratedNonce{
+		SigningJob: SigningJob{
+			JobID:             jobID,
+			SigningKeyshareID: signingKeyshare.ID,
+			Message:           sigHash,
+			VerifyingKey:      &verifyingPubKey,
+			UserCommitment:    userNonceCommitment,
+		},
+		Round1Packages: round1Packages,
+	}
+
+	return signingJob, nil
+}
+
 // SigningKeyshareIDsFromSigningJobs returns the IDs of the keyshares used for signing.
 func SigningKeyshareIDsFromSigningJobs(jobs []*SigningJob) []uuid.UUID {
 	ids := make([]uuid.UUID, len(jobs))
