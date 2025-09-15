@@ -24,6 +24,12 @@ export class SparkEngine {
     initializePools: (params?: any) =>
       this.walletActions.initializePools(params),
     cleanupPools: () => this.walletActions.cleanupPools(),
+    unlockPoolWallets: (params?: any) =>
+      this.walletActions.unlockPoolWallets(params),
+
+    announceToken: (params?: any) => this.tokenActions.announceToken(params),
+    announceTokensForPool: (params?: any) =>
+      this.tokenActions.announceTokensForPool(params),
     unlockWallets: (params?: any) => this.walletActions.unlockWallets(params),
 
     mintToken: (params?: any) => this.tokenActions.mintToken(params),

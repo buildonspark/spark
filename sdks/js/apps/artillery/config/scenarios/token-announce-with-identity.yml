@@ -1,0 +1,33 @@
+config:
+  target: "http://localhost"
+  engines:
+    spark: {}
+  phases:
+    - duration: 1
+      arrivalRate: 20
+      maxVusers: 20
+
+scenarios:
+  - name: "Token Announcement with Identity Keys Demo"
+    weight: 1
+    engine: spark
+
+    before:
+      - initializePools:
+          pools:
+            - name: "demo-pool"
+              mnemonicsFile: "./mnemonics/batch-source-wallets.txt"
+              useWalletStateCache: false
+              randomSelection: true
+              amount: 10
+              batchSize: 10
+              lockWallets: true
+
+    flow:
+      - announceTokensForPool:
+          poolName: "demo-pool"
+
+    after:
+      - unlockPoolWallets:
+          poolNames: ["demo-pool"]
+          force: true

@@ -1,7 +1,17 @@
-import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { WalletPoolManager } from "./wallet-pool-manager";
 import type { SparkContext, ArtilleryEventEmitter, EngineStep } from "./types";
+import { walletPools } from "./hooks";
 import { UserTokenMetadata } from "@buildonspark/spark-sdk";
+import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
+
+type TokenParams = {
+  walletName?: string;
+  tokenName?: string;
+  tokenSymbol?: string;
+  totalSupply?: number;
+  decimals?: number;
+  isFreezable?: boolean;
+};
 
 export class TokenActions {
   private poolManager: WalletPoolManager;
@@ -15,7 +25,6 @@ export class TokenActions {
     this.engine = engine;
   }
 
-  // Mint tokens
   mintToken(params: {
     walletName?: string;
     tokenId?: string;
@@ -266,6 +275,143 @@ export class TokenActions {
         }
 
         callback(error);
+      }
+    };
+  }
+
+  // Create a new tokens for all wallets in pool (V2 flow)
+  announceTokensForPool(params: { poolName: string }): EngineStep {
+    return async (context: SparkContext, callback) => {
+      const ee = this.engine?.scenarioEE ?? this.ee;
+
+      try {
+        const wallets = walletPools.get(params.poolName).wallets;
+        for (const wallet of wallets) {
+          const addr = await wallet.getSparkAddress();
+          console.log(`Announcing token for ${addr}`);
+
+          let tokenId: string;
+          try {
+            tokenId = await wallet.getIssuerTokenIdentifier();
+            if (tokenId) {
+              // token is set for this wallet
+              ee.emit("counter", "spark.token_already_exists", 1);
+              continue;
+            }
+          } catch (err) {
+            // If getIssuerTokenIdentifier fails, we'll try to create the token anyway
+            // as it might not exist yet. If there's a real error, createToken will fail.
+            console.log(
+              `Token may not exist for ${addr}, attempting to create...`,
+            );
+          }
+
+          let creationResult: string;
+          try {
+            creationResult = await wallet.createToken({
+              tokenName: "TEST_TOKEN",
+              tokenTicker: "TST",
+              decimals: 8,
+              maxSupply: BigInt(0),
+              isFreezable: false,
+            });
+          } catch (tokenError: any) {
+            const error: Error = tokenError;
+            console.log(`message: ${error.message}`);
+            console.log(
+              `Failed to create token for ${addr}, error: ${error.message}`,
+            );
+            ee.emit("counter", "spark.token_announce_failed", 1);
+            continue;
+          }
+
+          console.log(`Token creation TX ID: ${creationResult}`);
+          console.log(`Token announced successfully! Now you can mint tokens.`);
+
+          ee.emit("counter", "spark.token_announced", 1);
+        }
+
+        callback(null, context);
+      } catch (err) {
+        console.log(
+          `Failed to announce tokens for wallets in pool: ${err.message}`,
+        );
+        callback(err);
+        ee.emit("counter", "spark.token_announce_failed", 1);
+      }
+    };
+  }
+
+  // Create a new token (V2 flow)
+  announceToken({
+    walletName,
+    tokenName = "TEST_TOKEN",
+    tokenSymbol = "TEST",
+    totalSupply = 0,
+    decimals = 8,
+    isFreezable = false,
+  }: TokenParams = {}): EngineStep {
+    return async (context: SparkContext, callback) => {
+      const startTime = Date.now();
+      const ee = this.engine?.scenarioEE ?? this.ee;
+
+      try {
+        const walletInfo = walletName
+          ? context.vars?.[walletName]
+          : context.sparkWallet;
+        if (!walletInfo) {
+          throw new Error(`Wallet ${walletName || "default"} not found`);
+        }
+
+        console.log(
+          `Creating token ${tokenSymbol} (${tokenName}) from ${walletInfo.name}...`,
+        );
+        console.log(
+          `Max supply: ${totalSupply}, Decimals: ${decimals || 8}, Freezable: ${isFreezable || false}`,
+        );
+
+        let creationResult: string;
+        try {
+          creationResult = await walletInfo.wallet.createToken({
+            tokenName: tokenName,
+            tokenTicker: tokenSymbol,
+            decimals: decimals || 8,
+            maxSupply: BigInt(totalSupply),
+            isFreezable: isFreezable || false,
+          });
+        } catch (tokenError: any) {
+          console.log(
+            `Failed to announce tokens for wallet ${walletName} in pool: ${tokenError}`,
+          );
+          ee.emit("counter", "spark.token_announce_failed", 1);
+          callback(null, context);
+          return;
+        }
+
+        context.vars = context.vars || {};
+        context.vars.tokenSymbol = tokenSymbol;
+        context.vars.tokenName = tokenName;
+        context.vars.tokenTicker = tokenSymbol;
+        context.vars.creationTxId = creationResult;
+
+        console.log(`Token creation TX ID: ${creationResult}`);
+        console.log(`Token announced successfully! Now you can mint tokens.`);
+
+        const announceTime = Date.now() - startTime;
+        console.log(`Create operation took ${announceTime}ms`);
+        context.vars.announceTime = announceTime;
+
+        ee.emit("histogram", "spark.announce_token_time", announceTime);
+        ee.emit("counter", "spark.token_announced", 1);
+
+        callback(null, context);
+      } catch (error: any) {
+        console.error(
+          "Token creation failed:",
+          error?.message || String(error),
+        );
+        ee.emit("counter", "spark.token_announce_failed", 1);
+        callback(null, context);
       }
     };
   }
