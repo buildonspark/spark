@@ -25,6 +25,8 @@ const (
 	SigningCommitmentBatchSize = 1000
 )
 
+var ZeroSequence = uint32(0)
+
 func InitialSequence() uint32 {
 	return uint32((1 << 30) | InitialTimeLock)
 }

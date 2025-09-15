@@ -56,3 +56,20 @@ func TestExtendLeaf(t *testing.T) {
 	// TODO: test that we cannot modify a node after it's reached
 	// 0 timelock
 }
+
+func TestRenewLeaf(t *testing.T) {
+	senderConfig, err := sparktesting.TestWalletConfig()
+	require.NoError(t, err)
+	senderLeafPrivKey, err := keys.GeneratePrivateKey()
+	require.NoError(t, err)
+	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
+	require.NoError(t, err)
+	require.NotEmpty(t, nodes, "no nodes created when creating tree")
+	node := nodes[len(nodes)-1]
+	parentNode := nodes[len(nodes)-3]
+	assert.Equal(t, parentNode.Id, *node.ParentNodeId)
+
+	signingKey := tree.Children[1].SigningPrivateKey
+	_, err = wallet.ExtendTimelockUsingRenew(t.Context(), senderConfig, node, parentNode, signingKey)
+	require.NoError(t, err)
+}

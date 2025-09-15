@@ -89,6 +89,28 @@ func createLeafNodeTx(
 	return newLeafTx
 }
 
+// createLeafNodeTxWithAnchor creates a leaf node transaction with an ephemeral anchor output.
+// This transaction provides an intermediate transaction to allow the timelock of the final
+// refund transaction to be extended, and includes an ephemeral anchor output for CPFP.
+func createLeafNodeTxWithAnchor(
+	sequence uint32,
+	parentOutPoint *wire.OutPoint,
+	txOut *wire.TxOut,
+) *wire.MsgTx {
+	newLeafTx := wire.NewMsgTx(3)
+	newLeafTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: *parentOutPoint,
+		SignatureScript:  nil,
+		Witness:          nil,
+		Sequence:         sequence,
+	})
+	amountSats := txOut.Value
+	outputAmount := amountSats
+	newLeafTx.AddTxOut(wire.NewTxOut(outputAmount, txOut.PkScript))
+	newLeafTx.AddTxOut(EphemeralAnchorOutput())
+	return newLeafTx
+}
+
 func createRefundTxs(
 	sequence uint32,
 	nodeOutPoint *wire.OutPoint,

@@ -358,6 +358,10 @@ func (s *SparkServer) ExtendLeafV2(ctx context.Context, req *pb.ExtendLeafReques
 	return leafHandler.ExtendLeafV2(ctx, req)
 }
 
+func (s *SparkServer) RenewLeaf(ctx context.Context, req *pb.RenewLeafRequest) (*pb.RenewLeafResponse, error) {
+	return &pb.RenewLeafResponse{}, nil
+}
+
 // GetSigningOperatorList gets the list of signing operators.
 func (s *SparkServer) GetSigningOperatorList(_ context.Context, _ *emptypb.Empty) (*pb.GetSigningOperatorListResponse, error) {
 	return &pb.GetSigningOperatorListResponse{SigningOperators: s.config.GetSigningOperatorList()}, nil
