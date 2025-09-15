@@ -29,6 +29,7 @@ const (
 	KnobSoMaxTransactionsPerRequest      = "spark.so.max_transactions_per_request"
 	KnobSoMaxKeysharesPerRequest         = "spark.so.max_keyshares_per_request"
 	KnobGRPCClientTimeout                = "spark.so.grpc.client.timeout"
+	KnobRenewLeafDisabled                = "spark.so.grpc.server.disable_renew_leaf"
 )
 
 type Config struct {

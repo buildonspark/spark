@@ -58,8 +58,7 @@ func TestExtendLeaf(t *testing.T) {
 }
 
 func TestRenewLeaf(t *testing.T) {
-	senderConfig, err := sparktesting.TestWalletConfig()
-	require.NoError(t, err)
+	senderConfig := sparktesting.TestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)

@@ -18,6 +18,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/handler"
+	"github.com/lightsparkdev/spark/so/knobs"
 	events "github.com/lightsparkdev/spark/so/stream"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -359,6 +360,12 @@ func (s *SparkServer) ExtendLeafV2(ctx context.Context, req *pb.ExtendLeafReques
 }
 
 func (s *SparkServer) RenewLeaf(ctx context.Context, req *pb.RenewLeafRequest) (*pb.RenewLeafResponse, error) {
+	// Check if RenewLeaf feature is disabled via knob
+	knobsService := knobs.GetKnobsService(ctx)
+	if knobsService == nil || knobsService.GetValue(knobs.KnobRenewLeafDisabled, 0) >= 1 {
+		return nil, errors.UnavailableErrorf("RenewLeaf endpoint is currently unavailable")
+	}
+
 	return &pb.RenewLeafResponse{}, nil
 }
 
