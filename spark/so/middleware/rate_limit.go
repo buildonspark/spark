@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -48,10 +49,12 @@ type RateLimiterConfigProvider interface {
 }
 
 type RateLimiter struct {
-	config *RateLimiterConfig
-	store  MemoryStore
-	clock  Clock
-	knobs  knobs.Knobs
+	config    *RateLimiterConfig
+	store     MemoryStore
+	clock     Clock
+	knobs     knobs.Knobs
+	configs   map[string]storeConfig
+	configsMu sync.RWMutex
 }
 
 type RateLimiterOption func(*RateLimiter)
@@ -82,7 +85,7 @@ func (c *realClock) Now() time.Time {
 
 type MemoryStore interface {
 	Get(ctx context.Context, key string) (tokens uint64, remaining uint64, err error)
-	Set(ctx context.Context, key string, tokens uint64, interval time.Duration) error
+	Set(ctx context.Context, key string, tokens uint64, window time.Duration) error
 	Take(ctx context.Context, key string) (tokens uint64, remaining uint64, reset uint64, ok bool, err error)
 }
 
@@ -92,12 +95,17 @@ type realMemoryStore struct {
 	store limiter.Store
 }
 
+type storeConfig struct {
+	tokens uint64
+	window time.Duration
+}
+
 func (s *realMemoryStore) Get(ctx context.Context, key string) (tokens uint64, remaining uint64, err error) {
 	return s.store.Get(ctx, key)
 }
 
-func (s *realMemoryStore) Set(ctx context.Context, key string, tokens uint64, interval time.Duration) error {
-	return s.store.Set(ctx, key, tokens, interval)
+func (s *realMemoryStore) Set(ctx context.Context, key string, tokens uint64, window time.Duration) error {
+	return s.store.Set(ctx, key, tokens, window)
 }
 
 func (s *realMemoryStore) Take(ctx context.Context, key string) (tokens uint64, remaining uint64, reset uint64, ok bool, err error) {
@@ -116,9 +124,10 @@ func NewRateLimiter(configOrProvider any, opts ...RateLimiterOption) (*RateLimit
 	}
 
 	rateLimiter := &RateLimiter{
-		config: config,
-		clock:  &realClock{},
-		knobs:  knobs.New(nil),
+		config:  config,
+		clock:   &realClock{},
+		knobs:   knobs.New(nil),
+		configs: make(map[string]storeConfig),
 	}
 
 	for _, opt := range opts {
@@ -126,13 +135,13 @@ func NewRateLimiter(configOrProvider any, opts ...RateLimiterOption) (*RateLimit
 	}
 
 	// Knob values should not be set to negative values—they will be cast to uint64.
-	interval := knobs.GetDurationSeconds(rateLimiter.knobs, knobs.KnobRateLimitPeriod, config.Window)
+	window := knobs.GetDurationSeconds(rateLimiter.knobs, knobs.KnobRateLimitPeriod, config.Window)
 	maxRequests := uint64(rateLimiter.knobs.GetValue(knobs.KnobRateLimitLimit, float64(config.MaxRequests)))
 
 	if rateLimiter.store == nil {
 		defaultStore, err := memorystore.New(&memorystore.Config{
 			Tokens:   maxRequests,
-			Interval: interval,
+			Interval: window,
 		})
 		if err != nil {
 			return nil, err
@@ -142,6 +151,28 @@ func NewRateLimiter(configOrProvider any, opts ...RateLimiterOption) (*RateLimit
 	}
 
 	return rateLimiter, nil
+}
+
+func (r *RateLimiter) getConfig(key string) (tokens uint64, window time.Duration, exists bool) {
+	r.configsMu.RLock()
+	defer r.configsMu.RUnlock()
+
+	config, exists := r.configs[key]
+	if !exists {
+		return 0, 0, false
+	}
+
+	return config.tokens, config.window, true
+}
+
+func (r *RateLimiter) setConfig(key string, tokens uint64, window time.Duration) {
+	r.configsMu.Lock()
+	defer r.configsMu.Unlock()
+
+	r.configs[key] = storeConfig{
+		tokens: tokens,
+		window: window,
+	}
 }
 
 func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
@@ -174,7 +205,7 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 
 		key := sanitizeKey(fmt.Sprintf("rl:%s:%s", info.FullMethod, ip))
 
-		// Methods can also have specific rate limits and intervals set for
+		// Methods can also have specific rate limits and windows set for
 		// them, so we need to check for that here. That should override the
 		// default values, if they exist.
 		methodMaxRequests := uint64(r.config.MaxRequests)
@@ -186,15 +217,19 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 			methodMaxRequests = uint64(rawMethodMaxRequests)
 		}
 
+		methodWindow := knobs.GetTargetDurationSeconds(r.knobs, knobs.KnobRateLimitPeriod, &info.FullMethod, r.config.Window)
+
 		// We only do the update if there's a change since it has the side
 		// effect of reseting the bucket and thus the current rate limit status,
 		// which we don't want to do in general.
-		curMaxRequests, _, err := r.store.Get(ctx, key)
-		if err != nil || curMaxRequests != methodMaxRequests {
+		curMaxRequests, curWindow, exists := r.getConfig(key)
+		hasChanged := !exists || curMaxRequests != methodMaxRequests || curWindow != methodWindow
+		if hasChanged {
 			// We ignore the error because, in the end, there's nothing we can
 			// do about it. Additionally, in practice, the underlying real store
 			// doesn't actually ever return an error.
-			_ = r.store.Set(ctx, key, methodMaxRequests, r.config.Window)
+			_ = r.store.Set(ctx, key, methodMaxRequests, methodWindow)
+			r.setConfig(key, methodMaxRequests, methodWindow)
 		}
 
 		_, _, _, ok, err := r.store.Take(ctx, key)

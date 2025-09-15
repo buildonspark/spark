@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"context"
-	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,57 +24,79 @@ func (c *testClock) Now() time.Time {
 }
 
 type testMemoryStore struct {
-	ok bool
+	clock     Clock
+	buckets   map[string]*testBucket
+	bucketsMu sync.RWMutex
+}
+
+type testBucket struct {
+	tokens      uint64
+	window      time.Duration
+	windowStart time.Time // When current window started
+	remaining   uint64
+}
+
+func newTestMemoryStore(clock Clock) *testMemoryStore {
+	store := &testMemoryStore{
+		clock:   clock,
+		buckets: make(map[string]*testBucket),
+	}
+	return store
 }
 
 func (s *testMemoryStore) Get(ctx context.Context, key string) (tokens uint64, remaining uint64, err error) {
-	return 0, 0, nil
+	s.bucketsMu.RLock()
+	defer s.bucketsMu.RUnlock()
+
+	bucket, exists := s.buckets[key]
+	if !exists {
+		return 0, 0, nil
+	}
+	return bucket.tokens, bucket.remaining, nil
 }
 
-func (s *testMemoryStore) Set(ctx context.Context, key string, tokens uint64, interval time.Duration) error {
+func (s *testMemoryStore) Set(ctx context.Context, key string, tokens uint64, window time.Duration) error {
+	s.bucketsMu.Lock()
+	defer s.bucketsMu.Unlock()
+
+	now := s.clock.Now()
+	s.buckets[key] = &testBucket{
+		tokens:      tokens,
+		window:      window,
+		windowStart: now,
+		remaining:   tokens,
+	}
 	return nil
 }
 
 func (s *testMemoryStore) Take(ctx context.Context, key string) (tokens uint64, remaining uint64, reset uint64, ok bool, err error) {
-	return 0, 0, 0, s.ok, nil
-}
+	s.bucketsMu.Lock()
+	defer s.bucketsMu.Unlock()
 
-type conditionalErrorStore struct {
-	buckets map[string]*tokenBucket
-}
-
-type tokenBucket struct {
-	maxTokens uint64
-	remaining uint64
-}
-
-func (s *conditionalErrorStore) Get(ctx context.Context, key string) (tokens uint64, remaining uint64, err error) {
-	if bucket, exists := s.buckets[key]; exists {
-		return bucket.maxTokens, bucket.remaining, nil
-	}
-	return 0, 0, fmt.Errorf("key not found: %s", key)
-}
-
-func (s *conditionalErrorStore) Set(ctx context.Context, key string, tokens uint64, interval time.Duration) error {
-	s.buckets[key] = &tokenBucket{
-		maxTokens: tokens,
-		remaining: tokens,
-	}
-	return nil
-}
-
-func (s *conditionalErrorStore) Take(ctx context.Context, key string) (tokens uint64, remaining uint64, reset uint64, ok bool, err error) {
 	bucket, exists := s.buckets[key]
 	if !exists {
-		return 0, 0, 0, false, fmt.Errorf("bucket not found")
+		return 0, 0, 0, false, nil
 	}
+
+	now := s.clock.Now()
+
+	// Check if current window has expired and we need to start a new window
+	elapsed := now.Sub(bucket.windowStart)
+	if elapsed >= bucket.window {
+		// Start new window
+		bucket.windowStart = now
+		bucket.remaining = bucket.tokens
+	}
+
+	// Calculate when next reset will happen
+	nextReset := bucket.windowStart.Add(bucket.window)
 
 	if bucket.remaining > 0 {
 		bucket.remaining--
-		return bucket.maxTokens, bucket.remaining, 0, true, nil
+		return bucket.tokens, bucket.remaining, uint64(nextReset.Unix()), true, nil
 	}
 
-	return bucket.maxTokens, 0, 0, false, nil
+	return bucket.tokens, 0, uint64(nextReset.Unix()), false, nil
 }
 
 func TestRateLimiter(t *testing.T) {
@@ -129,7 +151,7 @@ func TestRateLimiter(t *testing.T) {
 
 	t.Run("window expiration", func(t *testing.T) {
 		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
-		store := &testMemoryStore{ok: true}
+		store := newTestMemoryStore(clock)
 
 		rateLimiter, err := NewRateLimiter(config, WithClock(clock), WithStore(store))
 		require.NoError(t, err)
@@ -144,27 +166,23 @@ func TestRateLimiter(t *testing.T) {
 			"x-forwarded-for": "1.2.3.4",
 		}))
 
-		resp, err := interceptor(ctx, "request", info, handler)
-		require.NoError(t, err)
-		assert.Equal(t, "ok", resp)
+		// First 2 requests should succeed (config.MaxRequests = 2)
+		for i := 0; i < 2; i++ {
+			resp, err := interceptor(ctx, "request", info, handler)
+			require.NoError(t, err, "Request %d should succeed", i+1)
+			assert.Equal(t, "ok", resp)
+		}
 
-		resp, err = interceptor(ctx, "request", info, handler)
-		require.NoError(t, err)
-		assert.Equal(t, "ok", resp)
-
-		// Simulate rate limit exceeding
-		store.ok = false
-
+		// 3rd request should fail due to rate limit
 		_, err = interceptor(ctx, "request", info, handler)
 		require.Error(t, err)
 		assert.Equal(t, codes.ResourceExhausted, status.Code(err))
 		assert.Equal(t, "rate limit exceeded", status.Convert(err).Message())
 
-		// Now simulate time passing which resets the rate limit
+		// Now simulate time passing which resets the rate limit (config.Window = 1 second)
 		clock.Time = clock.Time.Add(2 * time.Second)
-		store.ok = true
 
-		resp, err = interceptor(ctx, "request", info, handler)
+		resp, err := interceptor(ctx, "request", info, handler)
 		require.NoError(t, err)
 		assert.Equal(t, "ok", resp)
 	})
@@ -445,10 +463,6 @@ func TestRateLimiter(t *testing.T) {
 	})
 
 	t.Run("per-method limits allow dynamic updates to limits", func(t *testing.T) {
-		store := &conditionalErrorStore{
-			buckets: make(map[string]*tokenBucket),
-		}
-
 		knobValues := map[string]float64{
 			knobs.KnobRateLimitLimit + "@/test.Service/Method1": 5,
 			knobs.KnobRateLimitLimit + "@/test.Service/Method2": 1,
@@ -463,7 +477,8 @@ func TestRateLimiter(t *testing.T) {
 
 		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
 
-		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs), WithStore(store), WithClock(clock))
+		mockStore := newTestMemoryStore(clock)
+		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs), WithStore(mockStore), WithClock(clock))
 		require.NoError(t, err)
 
 		interceptor := rateLimiter.UnaryServerInterceptor()
@@ -527,7 +542,7 @@ func TestRateLimiter(t *testing.T) {
 			Methods:     []string{"/test.Service/Method3"},
 		}
 
-		rateLimiter3, err := NewRateLimiter(config3, WithKnobs(mockKnobs), WithStore(store), WithClock(clock))
+		rateLimiter3, err := NewRateLimiter(config3, WithKnobs(mockKnobs), WithStore(mockStore), WithClock(clock))
 		require.NoError(t, err)
 		interceptor3 := rateLimiter3.UnaryServerInterceptor()
 
@@ -553,7 +568,7 @@ func TestRateLimiter(t *testing.T) {
 			MaxRequests: 2,
 			Methods:     []string{"/test.Service/Method4"},
 		}
-		rateLimiter4, err := NewRateLimiter(config4, WithKnobs(mockKnobs), WithStore(store), WithClock(clock))
+		rateLimiter4, err := NewRateLimiter(config4, WithKnobs(mockKnobs), WithStore(mockStore), WithClock(clock))
 		require.NoError(t, err)
 		interceptor4 := rateLimiter4.UnaryServerInterceptor()
 
@@ -579,6 +594,145 @@ func TestRateLimiter(t *testing.T) {
 
 		// 3rd request should fail due to rate limit
 		_, err = interceptor4(ctx4, "request", info4, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+	})
+
+	t.Run("per-method window knob values are read correctly", func(t *testing.T) {
+		config := &RateLimiterConfig{
+			Window: 2 * time.Second,
+		}
+
+		mockKnobsMap := map[string]float64{
+			knobs.KnobRateLimitPeriod + "@/test.Service/Method1": 5,
+			knobs.KnobRateLimitPeriod + "@/test.Service/Method2": 1,
+		}
+		mockKnobs := knobs.NewFixedKnobs(mockKnobsMap)
+
+		method1Value := mockKnobs.GetValueTarget(knobs.KnobRateLimitPeriod, &(&grpc.UnaryServerInfo{FullMethod: "/test.Service/Method1"}).FullMethod, float64(config.Window.Seconds()))
+		assert.InDelta(t, 5.0, method1Value, 0.001, "Method1 should have custom window of 5 seconds")
+
+		method2Value := mockKnobs.GetValueTarget(knobs.KnobRateLimitPeriod, &(&grpc.UnaryServerInfo{FullMethod: "/test.Service/Method2"}).FullMethod, float64(config.Window.Seconds()))
+		assert.InDelta(t, 1.0, method2Value, 0.001, "Method2 should have custom window of 1 second")
+
+		methodDefaultValue := mockKnobs.GetValueTarget(knobs.KnobRateLimitPeriod, &(&grpc.UnaryServerInfo{FullMethod: "/test.Service/Default"}).FullMethod, float64(config.Window.Seconds()))
+		assert.InDelta(t, 2.0, methodDefaultValue, 0.001, "Default method should use config default of 2 seconds")
+	})
+
+	t.Run("per-method windows allow dynamic updates to windows", func(t *testing.T) {
+		knobValues := map[string]float64{
+			knobs.KnobRateLimitPeriod + "@/test.Service/Method1": 3,
+			knobs.KnobRateLimitPeriod + "@/test.Service/Method2": 1,
+		}
+		mockKnobs := knobs.NewFixedKnobs(knobValues)
+
+		config := &RateLimiterConfig{
+			Window:      2 * time.Second,
+			MaxRequests: 2,
+			Methods:     []string{"/test.Service/Method1", "/test.Service/Method2"},
+		}
+
+		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+
+		mockStore := newTestMemoryStore(clock)
+
+		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs), WithStore(mockStore), WithClock(clock))
+		require.NoError(t, err)
+
+		interceptor := rateLimiter.UnaryServerInterceptor()
+		handler := func(_ context.Context, _ any) (any, error) {
+			return "ok", nil
+		}
+
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "1.2.3.4",
+		}))
+
+		// Test Method1 with custom window of 3 seconds
+		info1 := &grpc.UnaryServerInfo{FullMethod: "/test.Service/Method1"}
+
+		// First 2 requests should succeed (max requests = 2)
+		for i := 0; i < 2; i++ {
+			resp, err := interceptor(ctx, "request", info1, handler)
+			require.NoError(t, err, "Method1 request %d should succeed", i+1)
+			assert.Equal(t, "ok", resp)
+		}
+
+		// 3rd request should fail due to rate limit
+		_, err = interceptor(ctx, "request", info1, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+
+		// If we dynamically update the knob value for this method window, it
+		// should work again since it resets the bucket
+		knobValues[knobs.KnobRateLimitPeriod+"@/test.Service/Method1"] = 10
+		for i := 0; i < 2; i++ {
+			resp, err := interceptor(ctx, "request", info1, handler)
+			require.NoError(t, err, "Method1 request %d should succeed", i+1)
+			assert.Equal(t, "ok", resp)
+		}
+
+		// But if we max out the rate limit, we have to wait for the new window length before it resets.
+		_, err = interceptor(ctx, "request", info1, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+		// Waiting 5 seconds isn't enough...
+		clock.Time = clock.Time.Add(5 * time.Second)
+		_, err = interceptor(ctx, "request", info1, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+
+		// But waiting another 50 seconds (55 total, much longer than 10 second window) should work.
+		clock.Time = clock.Time.Add(50 * time.Second)
+		resp, err := interceptor(ctx, "request", info1, handler)
+		require.NoError(t, err, "Method1 request after window passes should succeed")
+		assert.Equal(t, "ok", resp)
+
+		// Test Method2 with custom window of 1 second
+		ctx2 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "5.6.7.8",
+		}))
+		info2 := &grpc.UnaryServerInfo{FullMethod: "/test.Service/Method2"}
+
+		// First 2 requests should succeed (max requests = 2)
+		for i := 0; i < 2; i++ {
+			resp, err := interceptor(ctx2, "request", info2, handler)
+			require.NoError(t, err, "Method2 request %d should succeed", i+1)
+			assert.Equal(t, "ok", resp)
+		}
+
+		// 3rd request should fail due to rate limit
+		_, err = interceptor(ctx2, "request", info2, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+
+		// Test Method3 without custom knob - should use default window of 2 seconds
+		ctx3 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "9.10.11.12",
+		}))
+		info3 := &grpc.UnaryServerInfo{FullMethod: "/test.Service/Method3"}
+
+		// Need to add Method3 to the methods list and create a new rate limiter
+		config3 := &RateLimiterConfig{
+			Window:      2 * time.Second,
+			MaxRequests: 2,
+			Methods:     []string{"/test.Service/Method3"},
+		}
+
+		mockStore3 := newTestMemoryStore(clock)
+		rateLimiter3, err := NewRateLimiter(config3, WithKnobs(mockKnobs), WithStore(mockStore3), WithClock(clock))
+		require.NoError(t, err)
+		interceptor3 := rateLimiter3.UnaryServerInterceptor()
+
+		// First 2 requests should succeed (default limit and window)
+		for i := 0; i < 2; i++ {
+			resp, err := interceptor3(ctx3, "request", info3, handler)
+			require.NoError(t, err, "Method3 request %d should succeed", i+1)
+			assert.Equal(t, "ok", resp)
+		}
+
+		// 3rd request should fail due to rate limit
+		_, err = interceptor3(ctx3, "request", info3, handler)
 		require.ErrorContains(t, err, "rate limit exceeded")
 		require.Equal(t, codes.ResourceExhausted, status.Code(err))
 	})
