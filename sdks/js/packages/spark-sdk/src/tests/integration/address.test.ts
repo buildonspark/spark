@@ -1,5 +1,6 @@
 import { describe, expect } from "@jest/globals";
 import { ConfigOptions } from "../../services/wallet-config.js";
+import { isLegacySparkAddress } from "../../utils/address.js";
 import { NetworkType } from "../../utils/network.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 
@@ -31,6 +32,9 @@ describe("address", () => {
             new RegExp(`^${sparkAddressPrefix}1[a-zA-Z0-9]{62}$`),
           );
           expect(sparkAddress).toEqual(await wallet.getSparkAddress());
+
+          // TODO: Remove this once we upgrade to the new spark address format
+          expect(isLegacySparkAddress(sparkAddress)).toBe(true);
 
           const depositAddresses = await Promise.all([
             wallet.getSingleUseDepositAddress(),

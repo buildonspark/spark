@@ -5,11 +5,13 @@ import { wordlist } from "@scure/bip39/wordlists/english";
 import { uuidv7 } from "uuidv7";
 import { RPCError } from "../../errors/types.js";
 import {
+  decodeSparkAddress,
+  isLegacySparkAddress,
   KeyDerivation,
   KeyDerivationType,
   SparkWalletEvent,
 } from "../../index.js";
-import { TransferStatus, InvoiceStatus } from "../../proto/spark.js";
+import { InvoiceStatus, TransferStatus } from "../../proto/spark.js";
 import { WalletConfigService } from "../../services/config.js";
 import { ConnectionManager } from "../../services/connection.js";
 import { SigningService } from "../../services/signing.js";
@@ -1189,6 +1191,96 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     await alice.transfer({
       amountSats: 1000,
       receiverSparkAddress: sparkAddress,
+    });
+
+    const pendingTransfers = await bob.queryPendingTransfers();
+    expect(pendingTransfers.transfers.length).toBe(1);
+    const transfer = pendingTransfers.transfers[0]!;
+
+    const claimingNodes: LeafKeyTweak[] = transfer!.leaves.map((leaf) => ({
+      leaf: leaf.leaf!,
+      keyDerivation: {
+        type: KeyDerivationType.ECIES,
+        path: leaf.secretCipher,
+      },
+      newKeyDerivation: {
+        type: KeyDerivationType.LEAF,
+        path: leaf.leaf!.id,
+      },
+    }));
+
+    await bobTransferService.claimTransfer(transfer!, claimingNodes);
+  });
+
+  it(`${name} - test transfer with new spark address`, async () => {
+    const faucet = BitcoinFaucet.getInstance();
+
+    const localOperators = Object.values(getLocalSigningOperators());
+    const { wallet: alice } = await SparkWalletTesting.initialize({
+      options: {
+        network: "LOCAL",
+        coordinatorIdentifier: localOperators[0]!.identifier,
+      },
+      signer: new Signer(),
+    });
+    const depositResp = await alice.getSingleUseDepositAddress();
+
+    if (!depositResp) {
+      throw new RPCError("Deposit address not found", {
+        method: "getDepositAddress",
+      });
+    }
+
+    const signedTx = await faucet.sendToAddress(depositResp, 1_000n);
+
+    await faucet.mineBlocks(1);
+
+    await alice.claimDeposit(signedTx.id);
+
+    const balance = await alice.getBalance();
+    expect(balance.balance).toBe(1_000n);
+
+    const options: ConfigOptions = {
+      network: "LOCAL",
+      coordinatorIdentifier: localOperators[1]!.identifier,
+    };
+    const { wallet: bob } = await SparkWalletTesting.initialize({
+      options,
+      mnemonicOrSeed:
+        "vacant travel foot castle surprise another dress stem slam lemon open anxiety",
+      signer: new Signer(),
+    });
+
+    const bobConfigService = new WalletConfigService(options, bob.getSigner());
+    const bobConnectionManager = new ConnectionManager(bobConfigService);
+    const bobSigningService = new SigningService(bobConfigService);
+
+    const bobTransferService = new TransferService(
+      bobConfigService,
+      bobConnectionManager,
+      bobSigningService,
+    );
+
+    const legacySparkAddress = await bob.getSparkAddress();
+    const newSparkAddress =
+      "sparkl1pgssxlp9dr9ypzqf2havm5weefu6470l062k3ujtw4uu6gjmfgl599rxucvvkr";
+
+    // TODO: Remove this once we upgrade to the new spark address format
+    expect(isLegacySparkAddress(legacySparkAddress)).toBe(true);
+
+    const decodedLegacySparkAddress = decodeSparkAddress(
+      legacySparkAddress,
+      "LOCAL",
+    );
+    const decodedNewSparkAddress = decodeSparkAddress(newSparkAddress, "LOCAL");
+
+    expect(decodedLegacySparkAddress).toMatchObject({
+      ...decodedNewSparkAddress,
+    });
+
+    await alice.transfer({
+      amountSats: 1000,
+      receiverSparkAddress: newSparkAddress,
     });
 
     const pendingTransfers = await bob.queryPendingTransfers();
