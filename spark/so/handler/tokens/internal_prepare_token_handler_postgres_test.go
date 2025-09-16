@@ -73,7 +73,7 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 			require.NoError(t, err)
 
 			tokenCreate := dbtx.TokenCreate.Create().
-				SetIssuerPublicKey(issuerPriv.Public().Serialize()).
+				SetIssuerPublicKey(issuerPriv.Public()).
 				SetTokenName("TT").
 				SetTokenTicker("TT").
 				SetDecimals(8).
@@ -81,7 +81,7 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 				SetIsFreezable(true).
 				SetNetwork(tc.tokenNet).
 				SetTokenIdentifier(make([]byte, 32)).
-				SetCreationEntityPublicKey(issuerPriv.Public().Serialize()).
+				SetCreationEntityPublicKey(issuerPriv.Public()).
 				SaveX(ctx)
 
 			// Create an AVAILABLE signing keyshare to be reserved by prepare handler

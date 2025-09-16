@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"github.com/lightsparkdev/spark/common/keys"
 )
 
 // TokenCreate is the schema for tracking token metadata
@@ -23,7 +24,7 @@ func (TokenCreate) Fields() []ent.Field {
 	return []ent.Field{
 		field.Bytes("issuer_signature").NotEmpty().Optional().Unique(),
 		field.Bytes("operator_specific_issuer_signature").Optional().Unique(),
-		field.Bytes("creation_entity_public_key").NotEmpty().Immutable(),
+		field.Bytes("creation_entity_public_key").Immutable().GoType(keys.Public{}),
 		field.Uint64("wallet_provided_timestamp").Optional().Immutable().Deprecated(),
 	}
 }

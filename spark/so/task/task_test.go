@@ -42,14 +42,14 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 
 	tokenCreate, err := tx.TokenCreate.Create().
 		SetTokenIdentifier(randomBytes(32)).
-		SetIssuerPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()).
+		SetIssuerPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
 		SetMaxSupply(randomBytes(16)).
 		SetTokenName("Test Token").
 		SetTokenTicker("TEST").
 		SetDecimals(8).
 		SetIsFreezable(false).
 		SetNetwork(st.NetworkRegtest).
-		SetCreationEntityPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()).
+		SetCreationEntityPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
 		Save(ctx)
 	require.NoError(t, err)
 

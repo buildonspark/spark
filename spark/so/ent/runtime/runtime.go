@@ -185,10 +185,6 @@ func init() {
 	l1tokencreate.DefaultUpdateTime = l1tokencreateDescUpdateTime.Default.(func() time.Time)
 	// l1tokencreate.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	l1tokencreate.UpdateDefaultUpdateTime = l1tokencreateDescUpdateTime.UpdateDefault.(func() time.Time)
-	// l1tokencreateDescIssuerPublicKey is the schema descriptor for issuer_public_key field.
-	l1tokencreateDescIssuerPublicKey := l1tokencreateMixinFields1[0].Descriptor()
-	// l1tokencreate.IssuerPublicKeyValidator is a validator for the "issuer_public_key" field. It is called by the builders before save.
-	l1tokencreate.IssuerPublicKeyValidator = l1tokencreateDescIssuerPublicKey.Validators[0].(func([]byte) error)
 	// l1tokencreateDescTokenName is the schema descriptor for token_name field.
 	l1tokencreateDescTokenName := l1tokencreateMixinFields1[1].Descriptor()
 	// l1tokencreate.TokenNameValidator is a validator for the "token_name" field. It is called by the builders before save.
@@ -405,10 +401,6 @@ func init() {
 	tokencreate.DefaultUpdateTime = tokencreateDescUpdateTime.Default.(func() time.Time)
 	// tokencreate.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	tokencreate.UpdateDefaultUpdateTime = tokencreateDescUpdateTime.UpdateDefault.(func() time.Time)
-	// tokencreateDescIssuerPublicKey is the schema descriptor for issuer_public_key field.
-	tokencreateDescIssuerPublicKey := tokencreateMixinFields1[0].Descriptor()
-	// tokencreate.IssuerPublicKeyValidator is a validator for the "issuer_public_key" field. It is called by the builders before save.
-	tokencreate.IssuerPublicKeyValidator = tokencreateDescIssuerPublicKey.Validators[0].(func([]byte) error)
 	// tokencreateDescTokenName is the schema descriptor for token_name field.
 	tokencreateDescTokenName := tokencreateMixinFields1[1].Descriptor()
 	// tokencreate.TokenNameValidator is a validator for the "token_name" field. It is called by the builders before save.
@@ -429,10 +421,6 @@ func init() {
 	tokencreateDescIssuerSignature := tokencreateFields[0].Descriptor()
 	// tokencreate.IssuerSignatureValidator is a validator for the "issuer_signature" field. It is called by the builders before save.
 	tokencreate.IssuerSignatureValidator = tokencreateDescIssuerSignature.Validators[0].(func([]byte) error)
-	// tokencreateDescCreationEntityPublicKey is the schema descriptor for creation_entity_public_key field.
-	tokencreateDescCreationEntityPublicKey := tokencreateFields[2].Descriptor()
-	// tokencreate.CreationEntityPublicKeyValidator is a validator for the "creation_entity_public_key" field. It is called by the builders before save.
-	tokencreate.CreationEntityPublicKeyValidator = tokencreateDescCreationEntityPublicKey.Validators[0].(func([]byte) error)
 	// tokencreateDescID is the schema descriptor for id field.
 	tokencreateDescID := tokencreateMixinFields0[0].Descriptor()
 	// tokencreate.DefaultID holds the default value on creation for the id field.

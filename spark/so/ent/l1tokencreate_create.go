@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -54,8 +55,8 @@ func (lcc *L1TokenCreateCreate) SetNillableUpdateTime(t *time.Time) *L1TokenCrea
 }
 
 // SetIssuerPublicKey sets the "issuer_public_key" field.
-func (lcc *L1TokenCreateCreate) SetIssuerPublicKey(b []byte) *L1TokenCreateCreate {
-	lcc.mutation.SetIssuerPublicKey(b)
+func (lcc *L1TokenCreateCreate) SetIssuerPublicKey(k keys.Public) *L1TokenCreateCreate {
+	lcc.mutation.SetIssuerPublicKey(k)
 	return lcc
 }
 
@@ -192,11 +193,6 @@ func (lcc *L1TokenCreateCreate) check() error {
 	}
 	if _, ok := lcc.mutation.IssuerPublicKey(); !ok {
 		return &ValidationError{Name: "issuer_public_key", err: errors.New(`ent: missing required field "L1TokenCreate.issuer_public_key"`)}
-	}
-	if v, ok := lcc.mutation.IssuerPublicKey(); ok {
-		if err := l1tokencreate.IssuerPublicKeyValidator(v); err != nil {
-			return &ValidationError{Name: "issuer_public_key", err: fmt.Errorf(`ent: validator failed for field "L1TokenCreate.issuer_public_key": %w`, err)}
-		}
 	}
 	if _, ok := lcc.mutation.TokenName(); !ok {
 		return &ValidationError{Name: "token_name", err: errors.New(`ent: missing required field "L1TokenCreate.token_name"`)}

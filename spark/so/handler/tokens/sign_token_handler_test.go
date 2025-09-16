@@ -240,15 +240,18 @@ func createCreateTokenTransactionProto(t *testing.T, setup *testSetupCommon) (*t
 // setupDBCreateTokenTransactionInternalSignFailedScenario sets up the database entities for a create token transaction
 func setupDBCreateTokenTransactionInternalSignFailedScenario(t *testing.T, setup *testSetupCommon, tokenTxProto *tokenpb.TokenTransaction, partialTxHash, finalTxHash, tokenIdentifier []byte) {
 	coordinatorSignature := ecdsa.Sign(setup.coordinatorPrivKey.ToBTCEC(), finalTxHash)
-	creationEntityPubKeyBytes := tokenTxProto.TokenInputs.(*tokenpb.TokenTransaction_CreateInput).CreateInput.CreationEntityPublicKey
+	createInput, ok := tokenTxProto.TokenInputs.(*tokenpb.TokenTransaction_CreateInput)
+	require.True(t, ok, "invalid tokenTxProto.TokenInputs: %v", tokenTxProto)
+	creationEntityPubKey, err := keys.ParsePublicKey(createInput.CreateInput.CreationEntityPublicKey)
+	require.NoError(t, err)
 	tokenCreate, err := setup.sessionCtx.Client.TokenCreate.Create().
 		SetTokenName(testTokenName).
 		SetTokenTicker(testTokenTicker).
 		SetDecimals(testTokenDecimals).
 		SetMaxSupply(testTokenMaxSupplyBytes).
 		SetIsFreezable(true).
-		SetIssuerPublicKey(setup.coordinatorPubKey.Serialize()).
-		SetCreationEntityPublicKey(creationEntityPubKeyBytes).
+		SetIssuerPublicKey(setup.coordinatorPubKey).
+		SetCreationEntityPublicKey(creationEntityPubKey).
 		SetNetwork(common.SchemaNetwork(common.Regtest)).
 		SetTokenIdentifier(tokenIdentifier).
 		Save(setup.ctx)
@@ -313,13 +316,13 @@ func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) 
 		Only(setup.ctx)
 	if ent.IsNotFound(err) {
 		tokenCreate, err = setup.sessionCtx.Client.TokenCreate.Create().
-			SetIssuerPublicKey(setup.pubKey.Serialize()).
+			SetIssuerPublicKey(setup.pubKey).
 			SetTokenName(testTokenName).
 			SetTokenTicker(testTokenTicker).
 			SetDecimals(testTokenDecimals).
 			SetMaxSupply(testTokenMaxSupplyBytes).
 			SetIsFreezable(testTokenIsFreezable).
-			SetCreationEntityPublicKey(setup.coordinatorPubKey.Serialize()).
+			SetCreationEntityPublicKey(setup.coordinatorPubKey).
 			SetNetwork(common.SchemaNetwork(common.Regtest)).
 			SetTokenIdentifier(tokenIdentifier).
 			Save(setup.ctx)
@@ -460,13 +463,13 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 		Only(setup.ctx)
 	if ent.IsNotFound(err) {
 		tokenCreate, err = setup.sessionCtx.Client.TokenCreate.Create().
-			SetIssuerPublicKey(setup.pubKey.Serialize()).
+			SetIssuerPublicKey(setup.pubKey).
 			SetTokenName(testTokenName).
 			SetTokenTicker(testTokenTicker).
 			SetDecimals(testTokenDecimals).
 			SetMaxSupply(testTokenMaxSupplyBytes).
 			SetIsFreezable(testTokenIsFreezable).
-			SetCreationEntityPublicKey(setup.coordinatorPubKey.Serialize()).
+			SetCreationEntityPublicKey(setup.coordinatorPubKey).
 			SetNetwork(common.SchemaNetwork(common.Regtest)).
 			SetTokenIdentifier(transferData.tokenIdentifier).
 			Save(setup.ctx)

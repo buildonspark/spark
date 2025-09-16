@@ -7,6 +7,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -67,7 +68,7 @@ func UpdateTime(v time.Time) predicate.L1TokenCreate {
 }
 
 // IssuerPublicKey applies equality check predicate on the "issuer_public_key" field. It's identical to IssuerPublicKeyEQ.
-func IssuerPublicKey(v []byte) predicate.L1TokenCreate {
+func IssuerPublicKey(v keys.Public) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldEQ(FieldIssuerPublicKey, v))
 }
 
@@ -187,42 +188,42 @@ func UpdateTimeLTE(v time.Time) predicate.L1TokenCreate {
 }
 
 // IssuerPublicKeyEQ applies the EQ predicate on the "issuer_public_key" field.
-func IssuerPublicKeyEQ(v []byte) predicate.L1TokenCreate {
+func IssuerPublicKeyEQ(v keys.Public) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldEQ(FieldIssuerPublicKey, v))
 }
 
 // IssuerPublicKeyNEQ applies the NEQ predicate on the "issuer_public_key" field.
-func IssuerPublicKeyNEQ(v []byte) predicate.L1TokenCreate {
+func IssuerPublicKeyNEQ(v keys.Public) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldNEQ(FieldIssuerPublicKey, v))
 }
 
 // IssuerPublicKeyIn applies the In predicate on the "issuer_public_key" field.
-func IssuerPublicKeyIn(vs ...[]byte) predicate.L1TokenCreate {
+func IssuerPublicKeyIn(vs ...keys.Public) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldIn(FieldIssuerPublicKey, vs...))
 }
 
 // IssuerPublicKeyNotIn applies the NotIn predicate on the "issuer_public_key" field.
-func IssuerPublicKeyNotIn(vs ...[]byte) predicate.L1TokenCreate {
+func IssuerPublicKeyNotIn(vs ...keys.Public) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldNotIn(FieldIssuerPublicKey, vs...))
 }
 
 // IssuerPublicKeyGT applies the GT predicate on the "issuer_public_key" field.
-func IssuerPublicKeyGT(v []byte) predicate.L1TokenCreate {
+func IssuerPublicKeyGT(v keys.Public) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldGT(FieldIssuerPublicKey, v))
 }
 
 // IssuerPublicKeyGTE applies the GTE predicate on the "issuer_public_key" field.
-func IssuerPublicKeyGTE(v []byte) predicate.L1TokenCreate {
+func IssuerPublicKeyGTE(v keys.Public) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldGTE(FieldIssuerPublicKey, v))
 }
 
 // IssuerPublicKeyLT applies the LT predicate on the "issuer_public_key" field.
-func IssuerPublicKeyLT(v []byte) predicate.L1TokenCreate {
+func IssuerPublicKeyLT(v keys.Public) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldLT(FieldIssuerPublicKey, v))
 }
 
 // IssuerPublicKeyLTE applies the LTE predicate on the "issuer_public_key" field.
-func IssuerPublicKeyLTE(v []byte) predicate.L1TokenCreate {
+func IssuerPublicKeyLTE(v keys.Public) predicate.L1TokenCreate {
 	return predicate.L1TokenCreate(sql.FieldLTE(FieldIssuerPublicKey, v))
 }
 

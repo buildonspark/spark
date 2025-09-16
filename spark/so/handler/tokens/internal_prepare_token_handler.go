@@ -77,56 +77,58 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 		return nil, err
 	}
 
-	err = validateFinalTokenTransaction(h.config, req.FinalTokenTransaction, req.TokenTransactionSignatures, expectedRevocationPublicKeys, expectedCreationEntityPublicKey)
+	finalTokenTX := req.GetFinalTokenTransaction()
+	err = validateFinalTokenTransaction(h.config, finalTokenTX, req.TokenTransactionSignatures, expectedRevocationPublicKeys, expectedCreationEntityPublicKey)
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto("invalid final token transaction", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("invalid final token transaction: %w", err))
 	}
 
-	//nolint:all
-	if req.FinalTokenTransaction.Version >= 2 && req.FinalTokenTransaction.GetInvoiceAttachments() != nil {
-		// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
+	//nolint:govet,revive // TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
+	if finalTokenTX.Version >= 2 && finalTokenTX.GetInvoiceAttachments() != nil {
 		return nil, sparkerrors.UnimplementedErrorf("spark invoice support not implemented")
-		err = validateSparkInvoicesForTransaction(ctx, req.FinalTokenTransaction)
-		if err != nil {
+		if err := validateSparkInvoicesForTransaction(ctx, finalTokenTX); err != nil {
 			return nil, err
 		}
-		err = validateInvoiceAttachmentsNotInFlightOrFinalized(ctx, req.FinalTokenTransaction)
-		if err != nil {
+		if err := validateInvoiceAttachmentsNotInFlightOrFinalized(ctx, finalTokenTX); err != nil {
 			return nil, err
 		}
 	}
 
-	txType, err := utils.InferTokenTransactionType(req.FinalTokenTransaction)
+	txType, err := utils.InferTokenTransactionType(finalTokenTX)
 	if err != nil {
 		return nil, sparkerrors.InvalidUserInputErrorf("failed to check token transaction type: %w", err)
 	}
 
 	var inputTtxos []*ent.TokenOutput
+
 	switch txType {
 	case utils.TokenTransactionTypeCreate:
-		createPubKey, err := keys.ParsePublicKey(req.FinalTokenTransaction.GetCreateInput().GetIssuerPublicKey())
+		createPubKey, err := keys.ParsePublicKey(finalTokenTX.GetCreateInput().GetIssuerPublicKey())
 		if err != nil {
 			return nil, err
 		}
-		if err = validateIssuerSignature(req.FinalTokenTransaction, req.TokenTransactionSignatures, createPubKey); err != nil {
+		if err = validateIssuerSignature(finalTokenTX, req.TokenTransactionSignatures, createPubKey); err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to validate create token transaction signature", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to validate create token transaction signature: %w", err))
 		}
-		if err = validateIssuerTokenNotAlreadyCreated(ctx, req.FinalTokenTransaction); err != nil {
+		if err = validateIssuerTokenNotAlreadyCreated(ctx, finalTokenTX); err != nil {
 			return nil, err
 		}
 	case utils.TokenTransactionTypeMint:
-		mintPubKey, err := keys.ParsePublicKey(req.FinalTokenTransaction.GetMintInput().GetIssuerPublicKey())
+		mintPubKey, err := keys.ParsePublicKey(finalTokenTX.GetMintInput().GetIssuerPublicKey())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse issuer public key: %w", err)
 		}
-		if err = validateIssuerSignature(req.FinalTokenTransaction, req.TokenTransactionSignatures, mintPubKey); err != nil {
+		if err := validateIssuerSignature(finalTokenTX, req.GetTokenTransactionSignatures(), mintPubKey); err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to validate mint token transaction signature", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to validate mint token transaction signature: %w", err))
+
 		}
-		tokenMetadata, err := ent.GetTokenMetadataForTokenTransaction(ctx, req.FinalTokenTransaction)
+		tokenMetadata, err := ent.GetTokenMetadataForTokenTransaction(ctx, finalTokenTX)
 		if err != nil {
 			return nil, err
 		}
-		if tokenMetadata == nil {
+
+		// When disconnecting LRC20, we must have token metadata
+		if h.config.Token.DisconnectLRC20Node && tokenMetadata == nil {
 			return nil, tokens.FormatErrorWithTransactionProto("minting not allowed because a created token was not found", req.FinalTokenTransaction,
 				sparkerrors.FailedPreconditionErrorf("no tokencreate entity found for token"))
 		}
@@ -143,26 +145,26 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 			)
 		}
 
-		err = tokens.ValidateMintDoesNotExceedMaxSupply(ctx, req.FinalTokenTransaction)
+		err = tokens.ValidateMintDoesNotExceedMaxSupply(ctx, finalTokenTX)
 		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("max supply error", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("max supply error: %w", err))
+			return nil, tokens.FormatErrorWithTransactionProto("max supply error", finalTokenTX, sparkerrors.InvalidUserInputErrorf("max supply error: %w", err))
 		}
 	case utils.TokenTransactionTypeTransfer:
-		inputTtxos, err = ent.FetchAndLockTokenInputs(ctx, req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend())
+		inputTtxos, err = ent.FetchAndLockTokenInputs(ctx, finalTokenTX.GetTransferInput().GetOutputsToSpend())
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to fetch outputs to spend", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to fetch outputs to spend: %w", err))
 		}
-		if len(inputTtxos) != len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()) {
+		if len(inputTtxos) != len(finalTokenTX.GetTransferInput().GetOutputsToSpend()) {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to fetch all leaves to spend", req.FinalTokenTransaction,
 				sparkerrors.NotFoundErrorf("failed to fetch all leaves to spend: got %d leaves, expected %d", len(inputTtxos), len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend())))
 		}
 
-		err = validateTransferTokenTransactionUsingPreviousTransactionData(ctx, h.enablePreemption, req.FinalTokenTransaction, req.TokenTransactionSignatures, inputTtxos, h.config.Lrc20Configs[req.FinalTokenTransaction.Network.String()].TransactionExpiryDuration)
+		err = validateTransferTokenTransactionUsingPreviousTransactionData(ctx, h.enablePreemption, finalTokenTX, req.GetTokenTransactionSignatures(), inputTtxos, h.config.Lrc20Configs[finalTokenTX.Network.String()].TransactionExpiryDuration)
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("error validating transfer using previous output data", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("error validating transfer using previous output data: %w", err))
 		}
 		if h.enablePreemption && anyTtxosHaveSpentTransactions(inputTtxos) {
-			if err := preemptOrRejectTransactionsWithInputEnts(ctx, req.FinalTokenTransaction, inputTtxos); err != nil {
+			if err := preemptOrRejectTransactionsWithInputEnts(ctx, finalTokenTX, inputTtxos); err != nil {
 				return nil, err
 			}
 		}
@@ -175,7 +177,7 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 	if err != nil {
 		return nil, sparkerrors.InvalidUserInputErrorf("failed to parse coordinator public key: %w", err)
 	}
-	_, err = ent.CreateStartedTransactionEntities(ctx, req.FinalTokenTransaction, req.TokenTransactionSignatures, req.KeyshareIds, inputTtxos, coordinatorPubKey)
+	_, err = ent.CreateStartedTransactionEntities(ctx, finalTokenTX, req.TokenTransactionSignatures, req.KeyshareIds, inputTtxos, coordinatorPubKey)
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto("failed to save token transaction and output ent", req.FinalTokenTransaction, sparkerrors.InternalErrorf("failed to save token transaction and output ent: %w", err))
 	}
@@ -324,11 +326,7 @@ func validateIssuerOperatorSpecificSignatures(identityPublicKey keys.Public, ope
 		}
 		issuerPublicKey = issuerKey
 	} else if tokenTransaction.Edges.Create != nil {
-		issuerKey, err := keys.ParsePublicKey(tokenTransaction.Edges.Create.IssuerPublicKey)
-		if err != nil {
-			return sparkerrors.InvalidUserInputErrorf("unable to parse issuer public key: %w", err)
-		}
-		issuerPublicKey = issuerKey
+		issuerPublicKey = tokenTransaction.Edges.Create.IssuerPublicKey
 	} else {
 		return tokens.FormatErrorWithTransactionEnt(
 			"db consistency error",
@@ -408,12 +406,9 @@ func validateIssuerSignature(
 	if err != nil {
 		return tokens.FormatErrorWithTransactionProto("failed to hash token transaction", tokenTransaction, err)
 	}
-
-	err = utils.ValidateOwnershipSignature(signaturesWithIndex[0].Signature, partialTokenTransactionHash, issuerPublicKey)
-	if err != nil {
+	if err = utils.ValidateOwnershipSignature(signaturesWithIndex[0].Signature, partialTokenTransactionHash, issuerPublicKey); err != nil {
 		return tokens.FormatErrorWithTransactionProto("invalid issuer signature", tokenTransaction, err)
 	}
-
 	return nil
 }
 
@@ -510,12 +505,10 @@ func validateTransferTokenTransactionUsingPreviousTransactionData(
 		if err != nil {
 			return tokens.FormatErrorWithTransactionProto("failed to parse owner public key", tokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to parse owner key: %w", err))
 		}
-		err = utils.ValidateOwnershipSignature(ownershipSignature.Signature, partialTokenTransactionHash, ownerPublicKey)
-		if err != nil {
+		if err := utils.ValidateOwnershipSignature(ownershipSignature.Signature, partialTokenTransactionHash, ownerPublicKey); err != nil {
 			return tokens.FormatErrorWithTransactionProto("invalid ownership signature", tokenTransaction, sparkerrors.InvalidUserInputErrorf("invalid ownership signature: %w", err))
 		}
-		err = validateOutputIsSpendable(ctx, enablePreemption, i, outputEnt, tokenTransaction, v0DefaultTransactionExpiryDuration)
-		if err != nil {
+		if err := validateOutputIsSpendable(ctx, enablePreemption, i, outputEnt, tokenTransaction, v0DefaultTransactionExpiryDuration); err != nil {
 			return err
 		}
 	}
@@ -863,12 +856,12 @@ func validateInvoiceAttachmentsNotInFlightOrFinalized(ctx context.Context, token
 	)
 
 	inFlightOrFinalizedTransactions, err := db.TokenTransaction.Query().
-		Where(tokentransaction.And(
+		Where(
 			transactionFinalizedOrInFlight,
 			tokentransaction.HasSparkInvoiceWith(
 				sparkinvoice.IDIn(sparkInvoiceIDsToQuery...),
 			),
-		)).
+		).
 		WithSparkInvoice(func(q *ent.SparkInvoiceQuery) {
 			q.Select(sparkinvoice.FieldID)
 		}).

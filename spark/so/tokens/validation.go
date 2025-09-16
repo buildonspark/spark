@@ -105,7 +105,10 @@ func validateMintAgainstMaxSupplyCore(ctx context.Context, mintAmount *big.Int, 
 		identifierInfo = fmt.Sprintf("token identifier: %x", tokenIdentifier)
 	} else if !issuerPublicKey.IsZero() {
 		tokenCreate, err = db.TokenCreate.Query().
-			Where(tokencreate.IssuerPublicKeyEQ(issuerPublicKey.Serialize()), tokencreate.NetworkEQ(network)).
+			Where(
+				tokencreate.IssuerPublicKeyEQ(issuerPublicKey),
+				tokencreate.NetworkEQ(network),
+			).
 			ForUpdate().
 			First(ctx)
 		identifierInfo = fmt.Sprintf("issuer public key: %v", issuerPublicKey)

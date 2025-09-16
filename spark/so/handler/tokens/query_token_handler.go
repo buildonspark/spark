@@ -61,7 +61,7 @@ func (h *QueryTokenHandler) QueryTokenMetadata(ctx context.Context, req *tokenpb
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	if len(req.TokenIdentifiers) == 0 && len(req.IssuerPublicKeys) == 0 {
+	if len(req.TokenIdentifiers) == 0 && len(req.GetIssuerPublicKeys()) == 0 {
 		return nil, fmt.Errorf("must provide at least one token identifier or issuer public key")
 	}
 
@@ -76,17 +76,23 @@ func (h *QueryTokenHandler) QueryTokenMetadata(ctx context.Context, req *tokenpb
 		tokencreate.FieldNetwork,
 	}
 
-	query := db.TokenCreate.Query()
 	var conditions []predicate.TokenCreate
 	if len(req.TokenIdentifiers) > 0 {
 		conditions = append(conditions, tokencreate.TokenIdentifierIn(req.TokenIdentifiers...))
 	}
 
-	if len(req.IssuerPublicKeys) > 0 {
-		conditions = append(conditions, tokencreate.IssuerPublicKeyIn(req.IssuerPublicKeys...))
+	issuerPubKeys, err := keys.ParsePublicKeys(req.GetIssuerPublicKeys())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse issuer public key: %w", err)
 	}
-	query = query.Where(tokencreate.Or(conditions...))
-	tokenCreateEntities, err := query.Select(fields...).All(ctx)
+	if len(issuerPubKeys) > 0 {
+		conditions = append(conditions, tokencreate.IssuerPublicKeyIn(issuerPubKeys...))
+	}
+
+	tokenCreateEntities, err := db.TokenCreate.Query().
+		Where(tokencreate.Or(conditions...)).
+		Select(fields...).
+		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query token metadata: %w", err)
 	}
@@ -100,9 +106,7 @@ func (h *QueryTokenHandler) QueryTokenMetadata(ctx context.Context, req *tokenpb
 		tokenMetadataList = append(tokenMetadataList, tokenMetadata.ToTokenMetadataProto())
 	}
 
-	return &tokenpb.QueryTokenMetadataResponse{
-		TokenMetadata: tokenMetadataList,
-	}, nil
+	return &tokenpb.QueryTokenMetadataResponse{TokenMetadata: tokenMetadataList}, nil
 }
 
 // QueryTokenTransactions returns SO provided data about specific token transactions along with their status.
@@ -355,7 +359,7 @@ func (h *QueryTokenHandler) queryTokenOutputsInternal(
 	// Only return token outputs to the wallet that ALL SOs agree are spendable.
 	//
 	// If a TTXO is partially signed, the spending transaction will be cancelled once it expires to return the TTXO to the wallet.
-	spendableOutputs := make([]*sparkpb.OutputWithPreviousTransactionData, 0)
+	var spendableOutputs []*sparkpb.OutputWithPreviousTransactionData
 	countSpendableOperatorsForOutputID := make(map[string]int)
 
 	requiredSpendableOperators := len(h.config.GetSigningOperatorList())
@@ -423,11 +427,11 @@ func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tok
 		return nil, err
 	}
 
-	ownerPubKeys, err := parsePubKeys(req.GetOwnerPublicKeys())
+	ownerPubKeys, err := keys.ParsePublicKeys(req.GetOwnerPublicKeys())
 	if err != nil {
 		return nil, errors.InvalidUserInputErrorf("invalid owner public keys: %w", err)
 	}
-	issuerPubKeys, err := parsePubKeys(req.GetIssuerPublicKeys())
+	issuerPubKeys, err := keys.ParsePublicKeys(req.GetIssuerPublicKeys())
 	if err != nil {
 		return nil, errors.InvalidUserInputErrorf("invalid issuer public keys: %w", err)
 	}
@@ -534,7 +538,7 @@ func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tok
 	// Set previous cursor (first item's ID) - for going backward from this page
 	if len(ownedTokenOutputs) > 0 {
 		if first := ownedTokenOutputs[0]; first != nil && first.Output != nil && first.Output.Id != nil {
-			if firstUUID, err := uuid.Parse(*first.Output.Id); err == nil {
+			if firstUUID, err := uuid.Parse(first.GetOutput().GetId()); err == nil {
 				pageResponse.PreviousCursor = base64.RawURLEncoding.EncodeToString(firstUUID[:])
 			}
 		}
@@ -543,7 +547,7 @@ func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tok
 	// Set next cursor (last item's ID) - for going forward from this page
 	if len(ownedTokenOutputs) > 0 {
 		if last := ownedTokenOutputs[len(ownedTokenOutputs)-1]; last != nil && last.Output != nil && last.Output.Id != nil {
-			if lastUUID, err := uuid.Parse(*last.Output.Id); err == nil {
+			if lastUUID, err := uuid.Parse(last.GetOutput().GetId()); err == nil {
 				pageResponse.NextCursor = base64.RawURLEncoding.EncodeToString(lastUUID[:])
 			}
 		}
@@ -553,16 +557,4 @@ func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tok
 		OutputsWithPreviousTransactionData: ownedTokenOutputs,
 		PageResponse:                       pageResponse,
 	}, nil
-}
-
-func parsePubKeys(rawKeys [][]byte) ([]keys.Public, error) {
-	parsed := make([]keys.Public, len(rawKeys))
-	for i, rawKey := range rawKeys {
-		pubKey, err := keys.ParsePublicKey(rawKey)
-		if err != nil {
-			return nil, err
-		}
-		parsed[i] = pubKey
-	}
-	return parsed, nil
 }

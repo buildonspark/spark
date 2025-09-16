@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"unicode/utf8"
 
+	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"golang.org/x/text/unicode/norm"
@@ -23,7 +24,7 @@ var (
 	L1CreationEntityPublicKey = make([]byte, CreationEntityPublicKeyLength)
 
 	ErrInvalidTokenMetadata                 = errors.New("token metadata is invalid")
-	ErrInvalidIssuerPublicKeyLength         = errors.New("issuer public key must be 33 bytes")
+	ErrInvalidIssuerPublicKey               = errors.New("issuer public key must be set")
 	ErrTokenNameEmpty                       = errors.New("token name cannot be empty")
 	ErrTokenNameUTF8                        = errors.New("token name contains invalid or non-normalized UTF-8")
 	ErrTokenNameLength                      = errors.New("token name must be between 3 and 20 bytes")
@@ -44,12 +45,9 @@ type TokenMetadataProvider interface {
 // TokenIdentifier represents a unique identifier for a token
 type TokenIdentifier []byte
 
-// IssuerPublicKey represents the public key of the issuer of a token
-type IssuerPublicKey []byte
-
 // TokenMetadata represents the core metadata needed to compute a token identifier
 type TokenMetadata struct {
-	IssuerPublicKey         IssuerPublicKey
+	IssuerPublicKey         keys.Public
 	TokenName               string
 	TokenTicker             string
 	Decimals                uint8
@@ -75,8 +73,12 @@ func NewTokenMetadataFromCreateInput(
 	if err != nil {
 		return nil, fmt.Errorf("invalid network: %w", err)
 	}
+	issuerPubKey, err := keys.ParsePublicKey(createInput.GetIssuerPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("invalid issuer public key: %w", err)
+	}
 	return &TokenMetadata{
-		IssuerPublicKey:         createInput.GetIssuerPublicKey(),
+		IssuerPublicKey:         issuerPubKey,
 		TokenName:               createInput.GetTokenName(),
 		TokenTicker:             createInput.GetTokenTicker(),
 		Decimals:                uint8(createInput.GetDecimals()),
@@ -93,7 +95,7 @@ func (tm *TokenMetadata) ToTokenMetadataProto() *tokenpb.TokenMetadata {
 		return nil
 	}
 	return &tokenpb.TokenMetadata{
-		IssuerPublicKey:         tm.IssuerPublicKey,
+		IssuerPublicKey:         tm.IssuerPublicKey.Serialize(),
 		TokenName:               tm.TokenName,
 		TokenTicker:             tm.TokenTicker,
 		Decimals:                uint32(tm.Decimals),
@@ -116,7 +118,7 @@ func (tm *TokenMetadata) ComputeTokenIdentifierV1() (TokenIdentifier, error) {
 	h.Write(version1Hash)
 
 	// Hash issuer public key (33 bytes)
-	h.Write(sha256Slice(tm.IssuerPublicKey))
+	h.Write(sha256Slice(tm.IssuerPublicKey.Serialize()))
 
 	// Hash token name (variable length)
 	h.Write(sha256Slice([]byte(tm.TokenName)))
@@ -191,8 +193,8 @@ func (tm *TokenMetadata) GetTokenCreateLayer() (TokenCreateLayer, error) {
 // ValidatePartial checks if the TokenMetadata has all required fields except for the creation entity public key
 // This allows validation of a partial token metadata object before the creation entity public key is set
 func (tm *TokenMetadata) ValidatePartial() error {
-	if len(tm.IssuerPublicKey) != 33 {
-		return fmt.Errorf("%w: got %d", ErrInvalidIssuerPublicKeyLength, len(tm.IssuerPublicKey))
+	if tm.IssuerPublicKey.IsZero() {
+		return ErrInvalidIssuerPublicKey
 	}
 	if tm.TokenName == "" {
 		return ErrTokenNameEmpty

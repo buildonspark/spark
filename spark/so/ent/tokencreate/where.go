@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -68,7 +69,7 @@ func UpdateTime(v time.Time) predicate.TokenCreate {
 }
 
 // IssuerPublicKey applies equality check predicate on the "issuer_public_key" field. It's identical to IssuerPublicKeyEQ.
-func IssuerPublicKey(v []byte) predicate.TokenCreate {
+func IssuerPublicKey(v keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldEQ(FieldIssuerPublicKey, v))
 }
 
@@ -113,7 +114,7 @@ func OperatorSpecificIssuerSignature(v []byte) predicate.TokenCreate {
 }
 
 // CreationEntityPublicKey applies equality check predicate on the "creation_entity_public_key" field. It's identical to CreationEntityPublicKeyEQ.
-func CreationEntityPublicKey(v []byte) predicate.TokenCreate {
+func CreationEntityPublicKey(v keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldEQ(FieldCreationEntityPublicKey, v))
 }
 
@@ -203,42 +204,42 @@ func UpdateTimeLTE(v time.Time) predicate.TokenCreate {
 }
 
 // IssuerPublicKeyEQ applies the EQ predicate on the "issuer_public_key" field.
-func IssuerPublicKeyEQ(v []byte) predicate.TokenCreate {
+func IssuerPublicKeyEQ(v keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldEQ(FieldIssuerPublicKey, v))
 }
 
 // IssuerPublicKeyNEQ applies the NEQ predicate on the "issuer_public_key" field.
-func IssuerPublicKeyNEQ(v []byte) predicate.TokenCreate {
+func IssuerPublicKeyNEQ(v keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldNEQ(FieldIssuerPublicKey, v))
 }
 
 // IssuerPublicKeyIn applies the In predicate on the "issuer_public_key" field.
-func IssuerPublicKeyIn(vs ...[]byte) predicate.TokenCreate {
+func IssuerPublicKeyIn(vs ...keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldIn(FieldIssuerPublicKey, vs...))
 }
 
 // IssuerPublicKeyNotIn applies the NotIn predicate on the "issuer_public_key" field.
-func IssuerPublicKeyNotIn(vs ...[]byte) predicate.TokenCreate {
+func IssuerPublicKeyNotIn(vs ...keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldNotIn(FieldIssuerPublicKey, vs...))
 }
 
 // IssuerPublicKeyGT applies the GT predicate on the "issuer_public_key" field.
-func IssuerPublicKeyGT(v []byte) predicate.TokenCreate {
+func IssuerPublicKeyGT(v keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldGT(FieldIssuerPublicKey, v))
 }
 
 // IssuerPublicKeyGTE applies the GTE predicate on the "issuer_public_key" field.
-func IssuerPublicKeyGTE(v []byte) predicate.TokenCreate {
+func IssuerPublicKeyGTE(v keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldGTE(FieldIssuerPublicKey, v))
 }
 
 // IssuerPublicKeyLT applies the LT predicate on the "issuer_public_key" field.
-func IssuerPublicKeyLT(v []byte) predicate.TokenCreate {
+func IssuerPublicKeyLT(v keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldLT(FieldIssuerPublicKey, v))
 }
 
 // IssuerPublicKeyLTE applies the LTE predicate on the "issuer_public_key" field.
-func IssuerPublicKeyLTE(v []byte) predicate.TokenCreate {
+func IssuerPublicKeyLTE(v keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldLTE(FieldIssuerPublicKey, v))
 }
 
@@ -633,42 +634,42 @@ func OperatorSpecificIssuerSignatureNotNil() predicate.TokenCreate {
 }
 
 // CreationEntityPublicKeyEQ applies the EQ predicate on the "creation_entity_public_key" field.
-func CreationEntityPublicKeyEQ(v []byte) predicate.TokenCreate {
+func CreationEntityPublicKeyEQ(v keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldEQ(FieldCreationEntityPublicKey, v))
 }
 
 // CreationEntityPublicKeyNEQ applies the NEQ predicate on the "creation_entity_public_key" field.
-func CreationEntityPublicKeyNEQ(v []byte) predicate.TokenCreate {
+func CreationEntityPublicKeyNEQ(v keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldNEQ(FieldCreationEntityPublicKey, v))
 }
 
 // CreationEntityPublicKeyIn applies the In predicate on the "creation_entity_public_key" field.
-func CreationEntityPublicKeyIn(vs ...[]byte) predicate.TokenCreate {
+func CreationEntityPublicKeyIn(vs ...keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldIn(FieldCreationEntityPublicKey, vs...))
 }
 
 // CreationEntityPublicKeyNotIn applies the NotIn predicate on the "creation_entity_public_key" field.
-func CreationEntityPublicKeyNotIn(vs ...[]byte) predicate.TokenCreate {
+func CreationEntityPublicKeyNotIn(vs ...keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldNotIn(FieldCreationEntityPublicKey, vs...))
 }
 
 // CreationEntityPublicKeyGT applies the GT predicate on the "creation_entity_public_key" field.
-func CreationEntityPublicKeyGT(v []byte) predicate.TokenCreate {
+func CreationEntityPublicKeyGT(v keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldGT(FieldCreationEntityPublicKey, v))
 }
 
 // CreationEntityPublicKeyGTE applies the GTE predicate on the "creation_entity_public_key" field.
-func CreationEntityPublicKeyGTE(v []byte) predicate.TokenCreate {
+func CreationEntityPublicKeyGTE(v keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldGTE(FieldCreationEntityPublicKey, v))
 }
 
 // CreationEntityPublicKeyLT applies the LT predicate on the "creation_entity_public_key" field.
-func CreationEntityPublicKeyLT(v []byte) predicate.TokenCreate {
+func CreationEntityPublicKeyLT(v keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldLT(FieldCreationEntityPublicKey, v))
 }
 
 // CreationEntityPublicKeyLTE applies the LTE predicate on the "creation_entity_public_key" field.
-func CreationEntityPublicKeyLTE(v []byte) predicate.TokenCreate {
+func CreationEntityPublicKeyLTE(v keys.Public) predicate.TokenCreate {
 	return predicate.TokenCreate(sql.FieldLTE(FieldCreationEntityPublicKey, v))
 }
 

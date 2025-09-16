@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -24,7 +25,7 @@ type L1TokenCreate struct {
 	// UpdateTime holds the value of the "update_time" field.
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// IssuerPublicKey holds the value of the "issuer_public_key" field.
-	IssuerPublicKey []byte `json:"issuer_public_key,omitempty"`
+	IssuerPublicKey keys.Public `json:"issuer_public_key,omitempty"`
 	// TokenName holds the value of the "token_name" field.
 	TokenName string `json:"token_name,omitempty"`
 	// TokenTicker holds the value of the "token_ticker" field.
@@ -49,8 +50,10 @@ func (*L1TokenCreate) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case l1tokencreate.FieldIssuerPublicKey, l1tokencreate.FieldMaxSupply, l1tokencreate.FieldTokenIdentifier, l1tokencreate.FieldTransactionID:
+		case l1tokencreate.FieldMaxSupply, l1tokencreate.FieldTokenIdentifier, l1tokencreate.FieldTransactionID:
 			values[i] = new([]byte)
+		case l1tokencreate.FieldIssuerPublicKey:
+			values[i] = new(keys.Public)
 		case l1tokencreate.FieldIsFreezable:
 			values[i] = new(sql.NullBool)
 		case l1tokencreate.FieldDecimals:
@@ -95,7 +98,7 @@ func (lc *L1TokenCreate) assignValues(columns []string, values []any) error {
 				lc.UpdateTime = value.Time
 			}
 		case l1tokencreate.FieldIssuerPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field issuer_public_key", values[i])
 			} else if value != nil {
 				lc.IssuerPublicKey = *value

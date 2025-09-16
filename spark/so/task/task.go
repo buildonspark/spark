@@ -51,8 +51,7 @@ var (
 	deleteStaleTreeNodesTaskTimeout = 10 * time.Minute
 )
 
-// BaseTask contains common fields for all task types.
-
+// Task contains common fields for all task types.
 type Task func(context.Context, *so.Config) error
 
 // BaseTaskSpec is a task that is scheduled to run.
@@ -69,14 +68,14 @@ type BaseTaskSpec struct { //nolint:revive
 	Task func(context.Context, *so.Config, knobs.Knobs) error
 }
 
-// ScheduledTask is a task that runs on a schedule.
+// ScheduledTaskSpec is a task that runs on a schedule.
 type ScheduledTaskSpec struct {
 	BaseTaskSpec
 	// ExecutionInterval is the interval between each run of the task.
 	ExecutionInterval time.Duration
 }
 
-// StartupTask is a task that runs once at startup.
+// StartupTaskSpec is a task that runs once at startup.
 type StartupTaskSpec struct {
 	BaseTaskSpec
 	// RetryInterval is the interval between retries for startup tasks. If nil, no retries are performed.
@@ -240,11 +239,9 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					// 2. Have status "CREATING"
 					// 3. Belong to trees with status "PENDING"
 					query := tx.TreeNode.Query().Where(
-						treenode.And(
-							treenode.StatusEQ(st.TreeNodeStatusCreating),
-							treenode.CreateTimeLTE(time.Now().Add(-5*24*time.Hour)),
-							treenode.HasTreeWith(tree.StatusEQ(st.TreeStatusPending)),
-						),
+						treenode.StatusEQ(st.TreeNodeStatusCreating),
+						treenode.CreateTimeLTE(time.Now().Add(-5*24*time.Hour)),
+						treenode.HasTreeWith(tree.StatusEQ(st.TreeStatusPending)),
 					).WithTree()
 
 					treeNodes, err := query.All(ctx)
@@ -302,10 +299,8 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
 					}
 					query := tx.Transfer.Query().Where(
-						transfer.And(
-							transfer.StatusEQ(st.TransferStatusSenderInitiatedCoordinator),
-							transfer.TypeNEQ(st.TransferTypeCooperativeExit),
-						),
+						transfer.StatusEQ(st.TransferStatusSenderInitiatedCoordinator),
+						transfer.TypeNEQ(st.TransferTypeCooperativeExit),
 					).Limit(1000)
 
 					transfers, err := query.All(ctx)
@@ -341,7 +336,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					logger := logging.GetLoggerFromContext(ctx)
 					logger.Info("[cron] Finalizing revealed token transactions")
-					db, err := ent.GetDbFromContext(ctx)
+					dbTX, err := ent.GetDbFromContext(ctx)
 					if err != nil {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
 					}
@@ -354,7 +349,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						return fmt.Errorf("invalid hex for finalized token transaction hash B: %w", err)
 					}
 
-					tokenTransactions, err := db.TokenTransaction.Query().
+					tokenTransactions, err := dbTX.TokenTransaction.Query().
 						Where(
 							tokentransaction.Or(
 								tokentransaction.StatusEQ(st.TokenTransactionStatusRevealed),

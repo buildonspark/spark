@@ -25,7 +25,7 @@ import (
 var (
 	seededRand   = rand.NewChaCha8([32]byte{})
 	maxSupply    = []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
-	issuerPubKey = keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()
+	issuerPubKey = keys.MustGeneratePrivateKeyFromRand(seededRand).Public()
 )
 
 // setupIsolatedTest creates a fresh database context for a test or subtest with proper cleanup.
@@ -82,7 +82,7 @@ func TestParseTokenAnnouncement(t *testing.T) {
 				return pushData1(slices.Concat(
 					[]byte(announcementPrefix),
 					creationAnnouncementKind[:],
-					issuerPubKey,
+					issuerPubKey.Serialize(),
 					[]byte{byte(len(nameBytes))},
 					nameBytes,
 					[]byte{byte(len(tickerBytes))},
@@ -192,7 +192,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 			script: pushData1(slices.Concat(
 				[]byte(announcementPrefix),
 				creationAnnouncementKind[:],
-				issuerPubKey,
+				issuerPubKey.Serialize(),
 				[]byte{4}, []byte("ABCD"),
 				[]byte{4}, []byte("TICK"),
 				[]byte{8},
@@ -207,7 +207,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 			script: directPush(slices.Concat(
 				[]byte(announcementPrefix),
 				creationAnnouncementKind[:],
-				issuerPubKey,
+				issuerPubKey.Serialize(),
 				[]byte{2}, []byte("AB"), // Too short
 				[]byte{4}, []byte("TICK"),
 				[]byte{8},
@@ -221,7 +221,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 			script: pushData1(slices.Concat(
 				[]byte(announcementPrefix),
 				creationAnnouncementKind[:],
-				issuerPubKey,
+				issuerPubKey.Serialize(),
 				[]byte{25}, []byte("1234567890123456789012345"), // Too long
 				[]byte{4}, []byte("TICK"),
 				[]byte{8},
@@ -235,7 +235,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 			script: directPush(slices.Concat(
 				[]byte(announcementPrefix),
 				creationAnnouncementKind[:],
-				issuerPubKey,
+				issuerPubKey.Serialize(),
 				[]byte{9}, []byte("TestToken"),
 				[]byte{2}, []byte("XY"), // Too short
 				[]byte{8},
@@ -249,7 +249,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 			script: pushData1(slices.Concat(
 				[]byte(announcementPrefix),
 				creationAnnouncementKind[:],
-				issuerPubKey,
+				issuerPubKey.Serialize(),
 				[]byte{9}, []byte("TestToken"),
 				[]byte{7}, []byte("1234567"), // Too long
 				[]byte{8},
@@ -263,7 +263,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 			script: pushData1(slices.Concat(
 				[]byte(announcementPrefix),
 				creationAnnouncementKind[:],
-				issuerPubKey,
+				issuerPubKey.Serialize(),
 				[]byte{9}, []byte("TestToken"),
 				[]byte{4}, []byte("TICK"),
 				[]byte{8},
@@ -276,7 +276,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 			script: directPush(slices.Concat(
 				[]byte(announcementPrefix),
 				creationAnnouncementKind[:],
-				issuerPubKey,
+				issuerPubKey.Serialize(),
 				[]byte{9}, []byte("TestToken"),
 				[]byte{4}, []byte("TICK"),
 				[]byte{8},
@@ -289,7 +289,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 			script: directPush(slices.Concat(
 				[]byte(announcementPrefix),
 				creationAnnouncementKind[:],
-				issuerPubKey,
+				issuerPubKey.Serialize(),
 				[]byte{3}, []byte{0xFF, 0x80, 0x80}, // Invalid UTF-8
 				[]byte{4}, []byte("TICK"),
 				[]byte{8},
@@ -303,7 +303,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 			script: directPush(slices.Concat(
 				[]byte(announcementPrefix),
 				creationAnnouncementKind[:],
-				issuerPubKey,
+				issuerPubKey.Serialize(),
 				[]byte{9}, []byte("TestToken"),
 				[]byte{4}, []byte{0xC0, 0x80, 0xFF, 0x80}, // Invalid UTF-8
 				[]byte{8},
@@ -317,7 +317,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 			script: directPush(slices.Concat(
 				[]byte(announcementPrefix),
 				creationAnnouncementKind[:],
-				issuerPubKey,
+				issuerPubKey.Serialize(),
 				[]byte{3}, []byte("e\u0301"), // Non-normalized name
 				[]byte{4}, []byte("TICK"),
 				[]byte{8},
@@ -331,7 +331,7 @@ func TestParseTokenAnnouncement_Errors(t *testing.T) {
 			script: directPush(slices.Concat(
 				[]byte(announcementPrefix),
 				creationAnnouncementKind[:],
-				issuerPubKey,
+				issuerPubKey.Serialize(),
 				[]byte{9}, []byte("TestToken"),
 				[]byte{3}, []byte("e\u0301"), // Non-normalized ticker
 				[]byte{8},
@@ -381,7 +381,7 @@ func createValidTokenData() []byte {
 	return slices.Concat(
 		[]byte(announcementPrefix),
 		creationAnnouncementKind[:],
-		issuerPubKey,
+		issuerPubKey.Serialize(),
 		[]byte{9}, []byte("TestToken"),
 		[]byte{4}, []byte("TICK"),
 		[]byte{8},
@@ -435,7 +435,7 @@ func createAlternativeTokenData() []byte {
 	return slices.Concat(
 		[]byte(announcementPrefix),
 		creationAnnouncementKind[:],
-		issuerPubKey,                  // Same issuer public key
+		issuerPubKey.Serialize(),      // Same issuer public key
 		[]byte{8}, []byte("DiffName"), // Different name
 		[]byte{4}, []byte("DIFF"), // Different ticker
 		[]byte{6}, // Different decimals

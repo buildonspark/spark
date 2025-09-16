@@ -4,12 +4,16 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"math/rand/v2"
 	"testing"
+
+	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/stretchr/testify/require"
 )
 
-func createValidTokenMetadata() *TokenMetadata {
+func createValidTokenMetadata(rng *rand.ChaCha8) *TokenMetadata {
 	return &TokenMetadata{
-		IssuerPublicKey:         make([]byte, 33),
+		IssuerPublicKey:         keys.MustGeneratePrivateKeyFromRand(rng).Public(),
 		TokenName:               "Test Token",
 		TokenTicker:             "TEST",
 		Decimals:                8,
@@ -22,7 +26,7 @@ func createValidTokenMetadata() *TokenMetadata {
 
 func TestTokenMetadata_Validate(t *testing.T) {
 	t.Run("valid metadata", func(t *testing.T) {
-		tm := createValidTokenMetadata()
+		tm := createValidTokenMetadata(rng)
 		err := tm.Validate()
 		if err != nil {
 			t.Errorf("expected no error for valid metadata, got: %v", err)
@@ -34,7 +38,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 	})
 
 	t.Run("valid non-ascii token name", func(t *testing.T) {
-		tm := createValidTokenMetadata()
+		tm := createValidTokenMetadata(rng)
 		tm.TokenName = "tεst" // 4 runes, 5 bytes
 		err := tm.Validate()
 		if err != nil {
@@ -47,7 +51,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 	})
 
 	t.Run("valid non-ascii ticker", func(t *testing.T) {
-		tm := createValidTokenMetadata()
+		tm := createValidTokenMetadata(rng)
 		tm.TokenTicker = "tεst" // 4 runes, 5 bytes
 		err := tm.Validate()
 		if err != nil {
@@ -55,28 +59,12 @@ func TestTokenMetadata_Validate(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid issuer public key length", func(t *testing.T) {
-		testCases := []struct {
-			name   string
-			length int
-		}{
-			{"empty", 0},
-			{"too short", 32},
-			{"too long", 34},
-		}
-
-		for _, tc := range testCases {
-			t.Run(tc.name, func(t *testing.T) {
-				tm := createValidTokenMetadata()
-				tm.IssuerPublicKey = make([]byte, tc.length)
-				err := tm.Validate()
-				if err == nil {
-					t.Errorf("expected error for issuer public key length %d, got none", tc.length)
-				}
-				if !errors.Is(err, ErrInvalidIssuerPublicKeyLength) {
-					t.Errorf("expected error about issuer public key length, got: %v", err)
-				}
-			})
+	t.Run("invalid issuer public key", func(t *testing.T) {
+		tm := createValidTokenMetadata(rng)
+		tm.IssuerPublicKey = keys.Public{}
+		err := tm.Validate()
+		if !errors.Is(err, ErrInvalidIssuerPublicKey) {
+			t.Errorf("expected error about issuer public key length, got: %v", err)
 		}
 	})
 
@@ -93,7 +81,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				tm := createValidTokenMetadata()
+				tm := createValidTokenMetadata(rng)
 				tm.TokenName = tc.tokenName
 				err := tm.Validate()
 				if err == nil {
@@ -119,7 +107,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				tm := createValidTokenMetadata()
+				tm := createValidTokenMetadata(rng)
 				tm.TokenTicker = tc.tokenTicker
 				err := tm.Validate()
 				if err == nil {
@@ -145,7 +133,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				tm := createValidTokenMetadata()
+				tm := createValidTokenMetadata(rng)
 				tm.TokenName = tc.tokenName
 				err := tm.Validate()
 				if err == nil {
@@ -171,7 +159,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				tm := createValidTokenMetadata()
+				tm := createValidTokenMetadata(rng)
 				tm.TokenTicker = tc.tokenTicker
 				err := tm.Validate()
 				if err == nil {
@@ -185,7 +173,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 	})
 
 	t.Run("non-normalized UTF-8 in token name", func(t *testing.T) {
-		tm := createValidTokenMetadata()
+		tm := createValidTokenMetadata(rng)
 		tm.TokenName = "te\u0301st" // "e" + combining accent for "é"
 		err := tm.Validate()
 		if err == nil {
@@ -197,7 +185,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 	})
 
 	t.Run("non-normalized UTF-8 in token ticker", func(t *testing.T) {
-		tm := createValidTokenMetadata()
+		tm := createValidTokenMetadata(rng)
 		tm.TokenTicker = "te\u0301st" // "e" + combining accent for "é"
 		err := tm.Validate()
 		if err == nil {
@@ -222,7 +210,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				tm := createValidTokenMetadata()
+				tm := createValidTokenMetadata(rng)
 				tm.TokenName = tc.tokenName
 				tm.TokenTicker = tc.tokenTicker
 				err := tm.Validate()
@@ -250,7 +238,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				tm := createValidTokenMetadata()
+				tm := createValidTokenMetadata(rng)
 				tm.MaxSupply = make([]byte, tc.length)
 				err := tm.Validate()
 				if err == nil {
@@ -275,7 +263,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				tm := createValidTokenMetadata()
+				tm := createValidTokenMetadata(rng)
 				tm.CreationEntityPublicKey = make([]byte, tc.length)
 				err := tm.Validate()
 				if err == nil {
@@ -320,7 +308,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				tm := createValidTokenMetadata()
+				tm := createValidTokenMetadata(rng)
 				tm.TokenName = tc.tokenName
 				tm.TokenTicker = tc.tokenTicker
 				err := tm.Validate()
@@ -342,7 +330,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 
 	t.Run("minimum boundary values", func(t *testing.T) {
 		tm := &TokenMetadata{
-			IssuerPublicKey:         make([]byte, 33),
+			IssuerPublicKey:         keys.MustGeneratePrivateKeyFromRand(rng).Public(),
 			TokenName:               "abc", // exactly 3 bytes (minimum)
 			TokenTicker:             "abc", // exactly 3 bytes (minimum)
 			Decimals:                0,     // minimum allowed
@@ -366,7 +354,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 
 	t.Run("maximum boundary values", func(t *testing.T) {
 		tm := &TokenMetadata{
-			IssuerPublicKey: make([]byte, 33),
+			IssuerPublicKey: keys.MustGeneratePrivateKeyFromRand(rng).Public(),
 			TokenName:       "12345678901234567890", // exactly 20 bytes (maximum)
 			TokenTicker:     "MAXLEN",               // exactly 6 bytes (maximum)
 			Decimals:        255,                    // maximum allowed
@@ -393,12 +381,14 @@ func TestTokenMetadata_Validate(t *testing.T) {
 // Confirm that l1 token identifier computation continues to match for a live l1 spark token
 // and does not change in a future push.
 func TestActualProductionL1TokenIdentifier(t *testing.T) {
-	issuerPublicKey, _ := hex.DecodeString("036898ed2b633947f0994b8952fa06da2cfc7d1ee003fcf2cc076752b9ad3b3691")
+	issuerPubKeyBytes, _ := hex.DecodeString("036898ed2b633947f0994b8952fa06da2cfc7d1ee003fcf2cc076752b9ad3b3691")
+	issuerPubKey, err := keys.ParsePublicKey(issuerPubKeyBytes)
+	require.NoError(t, err)
 	maxSupply, _ := hex.DecodeString("00000000000000000000000000009c3f")
 
 	// This is an actual token created in production servers on Regtest.
 	tm := &TokenMetadata{
-		IssuerPublicKey:         issuerPublicKey,
+		IssuerPublicKey:         issuerPubKey,
 		TokenName:               "RaccoonCoin",
 		TokenTicker:             "RCC",
 		Decimals:                10,
@@ -423,13 +413,15 @@ func TestActualProductionL1TokenIdentifier(t *testing.T) {
 // Confirm that spark token identifier computation continues to match for a live l1 spark token
 // and does not change in a future push.
 func TestActualProductionSparkTokenIdentifier(t *testing.T) {
-	issuerPublicKey, _ := hex.DecodeString("036898ed2b633947f0994b8952fa06da2cfc7d1ee003fcf2cc076752b9ad3b3691")
+	issuerPubKeyBytes, _ := hex.DecodeString("036898ed2b633947f0994b8952fa06da2cfc7d1ee003fcf2cc076752b9ad3b3691")
+	issuerPubKey, err := keys.ParsePublicKey(issuerPubKeyBytes)
+	require.NoError(t, err)
 	creationEntityPublicKey, _ := hex.DecodeString("0345b806679a5e63159584db91fec038cffd2ef59cee031abe92e2f30bf0642175")
 	maxSupply, _ := hex.DecodeString("00000000000000000000000000009c3f")
 
 	// This is an actual token created in production servers on Regtest.
 	tm := &TokenMetadata{
-		IssuerPublicKey:         issuerPublicKey,
+		IssuerPublicKey:         issuerPubKey,
 		TokenName:               "RaccoonCoin",
 		TokenTicker:             "RCC",
 		Decimals:                10,
@@ -454,7 +446,7 @@ func TestActualProductionSparkTokenIdentifier(t *testing.T) {
 func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
 	// This initial test ensures that a valid metadata object produces a hash of the correct length.
 	t.Run("valid metadata produces hash", func(t *testing.T) {
-		tm := createValidTokenMetadata()
+		tm := createValidTokenMetadata(rng)
 		hash, err := tm.ComputeTokenIdentifierV1()
 		if err != nil {
 			t.Errorf("expected no error for valid metadata, got: %v", err)
@@ -466,8 +458,8 @@ func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
 
 	// This test case handles invalid metadata and ensures it returns the expected error.
 	t.Run("invalid metadata returns error", func(t *testing.T) {
-		tm := createValidTokenMetadata()
-		tm.IssuerPublicKey = make([]byte, 0) // invalid length
+		tm := createValidTokenMetadata(rng)
+		tm.IssuerPublicKey = keys.Public{} // invalid length
 
 		_, err := tm.ComputeTokenIdentifierV1()
 		if err == nil {
@@ -556,10 +548,10 @@ func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
 		{
 			name: "different issuer public keys produce different hashes",
 			modifier1: func(tm *TokenMetadata) {
-				tm.IssuerPublicKey = bytes.Repeat([]byte{0x01}, 33)
+				tm.IssuerPublicKey = keys.MustGeneratePrivateKeyFromRand(rng).Public()
 			},
 			modifier2: func(tm *TokenMetadata) {
-				tm.IssuerPublicKey = bytes.Repeat([]byte{0x02}, 33)
+				tm.IssuerPublicKey = keys.MustGeneratePrivateKeyFromRand(rng).Public()
 			},
 			shouldBeEqual: false,
 		},
@@ -577,12 +569,14 @@ func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tm1 := createValidTokenMetadata()
+			var rng = rand.NewChaCha8([32]byte{})
+			tm1 := createValidTokenMetadata(rng)
 			if tc.modifier1 != nil {
 				tc.modifier1(tm1)
 			}
 
-			tm2 := createValidTokenMetadata()
+			rng.Seed([32]byte{}) // Reset rng
+			tm2 := createValidTokenMetadata(rng)
 			if tc.modifier2 != nil {
 				tc.modifier2(tm2)
 			}

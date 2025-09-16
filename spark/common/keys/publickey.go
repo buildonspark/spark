@@ -40,6 +40,19 @@ func ParsePublicKeyMap[k comparable](asBytes map[k][]byte) (map[k]Public, error)
 	return asKeys, nil
 }
 
+// ParsePublicKeys creates secp256k1 public keys from a slice of byte slices.
+func ParsePublicKeys(asBytes [][]byte) ([]Public, error) {
+	asKeys := make([]Public, len(asBytes))
+	for i, bytes := range asBytes {
+		key, err := ParsePublicKey(bytes)
+		if err != nil {
+			return nil, err
+		}
+		asKeys[i] = key
+	}
+	return asKeys, nil
+}
+
 // publicKeyFromInts creates an secp256k1 public key from x and y big integers. x and y must not be nil, and must be
 // on the secp256k1 curve.
 func publicKeyFromInts(x, y *big.Int) Public {

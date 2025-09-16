@@ -5,6 +5,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"entgo.io/ent/schema/mixin"
+	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
@@ -15,7 +16,7 @@ type TokenMetadataMixin struct {
 
 func (TokenMetadataMixin) Fields() []ent.Field {
 	return []ent.Field{
-		field.Bytes("issuer_public_key").NotEmpty().Immutable(),
+		field.Bytes("issuer_public_key").Immutable().GoType(keys.Public{}),
 		field.String("token_name").NotEmpty().Immutable(),
 		field.String("token_ticker").NotEmpty().Immutable(),
 		field.Uint8("decimals").Immutable(),

@@ -3734,7 +3734,7 @@ type L1TokenCreateMutation struct {
 	id                *uuid.UUID
 	create_time       *time.Time
 	update_time       *time.Time
-	issuer_public_key *[]byte
+	issuer_public_key *keys.Public
 	token_name        *string
 	token_ticker      *string
 	decimals          *uint8
@@ -3927,12 +3927,12 @@ func (m *L1TokenCreateMutation) ResetUpdateTime() {
 }
 
 // SetIssuerPublicKey sets the "issuer_public_key" field.
-func (m *L1TokenCreateMutation) SetIssuerPublicKey(b []byte) {
-	m.issuer_public_key = &b
+func (m *L1TokenCreateMutation) SetIssuerPublicKey(k keys.Public) {
+	m.issuer_public_key = &k
 }
 
 // IssuerPublicKey returns the value of the "issuer_public_key" field in the mutation.
-func (m *L1TokenCreateMutation) IssuerPublicKey() (r []byte, exists bool) {
+func (m *L1TokenCreateMutation) IssuerPublicKey() (r keys.Public, exists bool) {
 	v := m.issuer_public_key
 	if v == nil {
 		return
@@ -3943,7 +3943,7 @@ func (m *L1TokenCreateMutation) IssuerPublicKey() (r []byte, exists bool) {
 // OldIssuerPublicKey returns the old "issuer_public_key" field's value of the L1TokenCreate entity.
 // If the L1TokenCreate object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *L1TokenCreateMutation) OldIssuerPublicKey(ctx context.Context) (v []byte, err error) {
+func (m *L1TokenCreateMutation) OldIssuerPublicKey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldIssuerPublicKey is only allowed on UpdateOne operations")
 	}
@@ -4423,7 +4423,7 @@ func (m *L1TokenCreateMutation) SetField(name string, value ent.Value) error {
 		m.SetUpdateTime(v)
 		return nil
 	case l1tokencreate.FieldIssuerPublicKey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -9623,7 +9623,7 @@ type TokenCreateMutation struct {
 	id                                 *uuid.UUID
 	create_time                        *time.Time
 	update_time                        *time.Time
-	issuer_public_key                  *[]byte
+	issuer_public_key                  *keys.Public
 	token_name                         *string
 	token_ticker                       *string
 	decimals                           *uint8
@@ -9634,7 +9634,7 @@ type TokenCreateMutation struct {
 	token_identifier                   *[]byte
 	issuer_signature                   *[]byte
 	operator_specific_issuer_signature *[]byte
-	creation_entity_public_key         *[]byte
+	creation_entity_public_key         *keys.Public
 	wallet_provided_timestamp          *uint64
 	addwallet_provided_timestamp       *int64
 	clearedFields                      map[string]struct{}
@@ -9831,12 +9831,12 @@ func (m *TokenCreateMutation) ResetUpdateTime() {
 }
 
 // SetIssuerPublicKey sets the "issuer_public_key" field.
-func (m *TokenCreateMutation) SetIssuerPublicKey(b []byte) {
-	m.issuer_public_key = &b
+func (m *TokenCreateMutation) SetIssuerPublicKey(k keys.Public) {
+	m.issuer_public_key = &k
 }
 
 // IssuerPublicKey returns the value of the "issuer_public_key" field in the mutation.
-func (m *TokenCreateMutation) IssuerPublicKey() (r []byte, exists bool) {
+func (m *TokenCreateMutation) IssuerPublicKey() (r keys.Public, exists bool) {
 	v := m.issuer_public_key
 	if v == nil {
 		return
@@ -9847,7 +9847,7 @@ func (m *TokenCreateMutation) IssuerPublicKey() (r []byte, exists bool) {
 // OldIssuerPublicKey returns the old "issuer_public_key" field's value of the TokenCreate entity.
 // If the TokenCreate object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenCreateMutation) OldIssuerPublicKey(ctx context.Context) (v []byte, err error) {
+func (m *TokenCreateMutation) OldIssuerPublicKey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldIssuerPublicKey is only allowed on UpdateOne operations")
 	}
@@ -10237,12 +10237,12 @@ func (m *TokenCreateMutation) ResetOperatorSpecificIssuerSignature() {
 }
 
 // SetCreationEntityPublicKey sets the "creation_entity_public_key" field.
-func (m *TokenCreateMutation) SetCreationEntityPublicKey(b []byte) {
-	m.creation_entity_public_key = &b
+func (m *TokenCreateMutation) SetCreationEntityPublicKey(k keys.Public) {
+	m.creation_entity_public_key = &k
 }
 
 // CreationEntityPublicKey returns the value of the "creation_entity_public_key" field in the mutation.
-func (m *TokenCreateMutation) CreationEntityPublicKey() (r []byte, exists bool) {
+func (m *TokenCreateMutation) CreationEntityPublicKey() (r keys.Public, exists bool) {
 	v := m.creation_entity_public_key
 	if v == nil {
 		return
@@ -10253,7 +10253,7 @@ func (m *TokenCreateMutation) CreationEntityPublicKey() (r []byte, exists bool) 
 // OldCreationEntityPublicKey returns the old "creation_entity_public_key" field's value of the TokenCreate entity.
 // If the TokenCreate object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenCreateMutation) OldCreationEntityPublicKey(ctx context.Context) (v []byte, err error) {
+func (m *TokenCreateMutation) OldCreationEntityPublicKey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldCreationEntityPublicKey is only allowed on UpdateOne operations")
 	}
@@ -10717,7 +10717,7 @@ func (m *TokenCreateMutation) SetField(name string, value ent.Value) error {
 		m.SetUpdateTime(v)
 		return nil
 	case tokencreate.FieldIssuerPublicKey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -10787,7 +10787,7 @@ func (m *TokenCreateMutation) SetField(name string, value ent.Value) error {
 		m.SetOperatorSpecificIssuerSignature(v)
 		return nil
 	case tokencreate.FieldCreationEntityPublicKey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

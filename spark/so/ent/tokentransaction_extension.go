@@ -79,7 +79,8 @@ func CreateStartedTransactionEntities(
 	}
 	switch tokenTransactionType {
 	case utils.TokenTransactionTypeCreate:
-		tokenMetadata, err := common.NewTokenMetadataFromCreateInput(tokenTransaction.GetCreateInput(), tokenTransaction.Network)
+		createInput := tokenTransaction.GetCreateInput()
+		tokenMetadata, err := common.NewTokenMetadataFromCreateInput(createInput, tokenTransaction.Network)
 		if err != nil {
 			return nil, sparkerrors.InternalErrorf("failed to create token metadata: %w", err)
 		}
@@ -88,15 +89,23 @@ func CreateStartedTransactionEntities(
 			return nil, sparkerrors.InternalErrorf("failed to compute token identifier: %w", err)
 		}
 
+		issuerPubKey, err := keys.ParsePublicKey(createInput.GetIssuerPublicKey())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse issuer public key: %w", err)
+		}
+		creationEntityPubKey, err := keys.ParsePublicKey(createInput.GetCreationEntityPublicKey())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse creation entity public key: %w", err)
+		}
 		tokenCreateEnt, err := db.TokenCreate.Create().
-			SetIssuerPublicKey(tokenTransaction.GetCreateInput().GetIssuerPublicKey()).
+			SetIssuerPublicKey(issuerPubKey).
 			SetIssuerSignature(signaturesWithIndex[0].Signature).
-			SetTokenName(tokenTransaction.GetCreateInput().GetTokenName()).
-			SetTokenTicker(tokenTransaction.GetCreateInput().GetTokenTicker()).
-			SetDecimals(uint8(tokenTransaction.GetCreateInput().GetDecimals())).
-			SetMaxSupply(tokenTransaction.GetCreateInput().GetMaxSupply()).
-			SetIsFreezable(tokenTransaction.GetCreateInput().GetIsFreezable()).
-			SetCreationEntityPublicKey(tokenTransaction.GetCreateInput().GetCreationEntityPublicKey()).
+			SetTokenName(createInput.GetTokenName()).
+			SetTokenTicker(createInput.GetTokenTicker()).
+			SetDecimals(uint8(createInput.GetDecimals())).
+			SetMaxSupply(createInput.GetMaxSupply()).
+			SetIsFreezable(createInput.GetIsFreezable()).
+			SetCreationEntityPublicKey(creationEntityPubKey).
 			SetNetwork(network).
 			SetTokenIdentifier(computedTokenIdentifier).
 			Save(ctx)
@@ -221,7 +230,7 @@ func CreateStartedTransactionEntities(
 	// Since we have already hashed the final token transaction, the txHash still represents
 	// the original token transaction that was passed by the client.
 	var tokenIdentifierToWrite []byte
-	var issuerPublicKeyToWrite []byte
+	var issuerPublicKeyToWrite keys.Public
 
 	tokenOutputs := tokenTransaction.GetTokenOutputs()
 	var tokenCreateEnt *TokenCreate
@@ -237,9 +246,13 @@ func CreateStartedTransactionEntities(
 				return nil, fmt.Errorf("failed to fetch token create ent: %w", err)
 			}
 			issuerPublicKeyToWrite = tokenCreateEnt.IssuerPublicKey
-		} else if tokenOutputs[0].TokenPublicKey != nil {
+		} else if len(tokenOutputs[0].TokenPublicKey) != 0 {
+			tokenPubKey, err := keys.ParsePublicKey(tokenOutputs[0].TokenPublicKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse token public key: %w", err)
+			}
 			tokenCreateEnt, err = db.TokenCreate.Query().
-				Where(tokencreate.IssuerPublicKey(tokenOutputs[0].TokenPublicKey)).
+				Where(tokencreate.IssuerPublicKey(tokenPubKey)).
 				Only(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to fetch token create ent: %w", err)
@@ -259,8 +272,12 @@ func CreateStartedTransactionEntities(
 			return nil, err
 		}
 
-		if len(issuerPublicKeyToWrite) == 0 {
-			issuerPublicKeyToWrite = output.TokenPublicKey
+		if issuerPublicKeyToWrite.IsZero() {
+			outputPubKey, err := keys.ParsePublicKey(output.GetTokenPublicKey())
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse output token public key: %w", err)
+			}
+			issuerPublicKeyToWrite = outputPubKey
 		}
 		if len(tokenIdentifierToWrite) == 0 {
 			tokenIdentifierToWrite = output.TokenIdentifier
@@ -273,10 +290,10 @@ func CreateStartedTransactionEntities(
 				SetID(outputUUID).
 				SetStatus(st.TokenOutputStatusCreatedStarted).
 				SetOwnerPublicKey(output.OwnerPublicKey).
-				SetWithdrawBondSats(*output.WithdrawBondSats).
-				SetWithdrawRelativeBlockLocktime(*output.WithdrawRelativeBlockLocktime).
+				SetWithdrawBondSats(output.GetWithdrawBondSats()).
+				SetWithdrawRelativeBlockLocktime(output.GetWithdrawRelativeBlockLocktime()).
 				SetWithdrawRevocationCommitment(output.RevocationCommitment).
-				SetTokenPublicKey(issuerPublicKeyToWrite).
+				SetTokenPublicKey(issuerPublicKeyToWrite.Serialize()).
 				SetTokenIdentifier(tokenIdentifierToWrite).
 				SetTokenAmount(output.TokenAmount).
 				SetNetwork(network).
@@ -763,10 +780,10 @@ func FetchAndLockTokenTransactionData(ctx context.Context, finalTokenTransaction
 			return nil, fmt.Errorf("database has create/mint transaction but protobuf has transfer input - transaction type mismatch")
 		}
 		transferInput := finalTokenTransaction.GetTransferInput()
-		if len(transferInput.OutputsToSpend) != len(tokenTransaction.Edges.SpentOutput) {
+		if len(transferInput.GetOutputsToSpend()) != len(tokenTransaction.Edges.SpentOutput) {
 			return nil, fmt.Errorf(
 				"number of inputs in proto (%d) does not match number of spent outputs started with this transaction in the database (%d)",
-				len(transferInput.OutputsToSpend),
+				len(transferInput.GetOutputsToSpend()),
 				len(tokenTransaction.Edges.SpentOutput),
 			)
 		}
@@ -888,14 +905,14 @@ func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) 
 	if t.Edges.Create != nil {
 		tokenTransaction.TokenInputs = &tokenpb.TokenTransaction_CreateInput{
 			CreateInput: &tokenpb.TokenCreateInput{
-				IssuerPublicKey: t.Edges.Create.IssuerPublicKey,
+				IssuerPublicKey: t.Edges.Create.IssuerPublicKey.Serialize(),
 				TokenName:       t.Edges.Create.TokenName,
 				TokenTicker:     t.Edges.Create.TokenTicker,
 				// Protos do not have support for uint8, so convert to uint32.
 				Decimals:                uint32(t.Edges.Create.Decimals),
 				MaxSupply:               t.Edges.Create.MaxSupply,
 				IsFreezable:             t.Edges.Create.IsFreezable,
-				CreationEntityPublicKey: t.Edges.Create.CreationEntityPublicKey,
+				CreationEntityPublicKey: t.Edges.Create.CreationEntityPublicKey.Serialize(),
 			},
 		}
 	} else if t.Edges.Mint != nil {

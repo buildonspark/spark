@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
@@ -25,7 +26,7 @@ type TokenCreate struct {
 	// UpdateTime holds the value of the "update_time" field.
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// IssuerPublicKey holds the value of the "issuer_public_key" field.
-	IssuerPublicKey []byte `json:"issuer_public_key,omitempty"`
+	IssuerPublicKey keys.Public `json:"issuer_public_key,omitempty"`
 	// TokenName holds the value of the "token_name" field.
 	TokenName string `json:"token_name,omitempty"`
 	// TokenTicker holds the value of the "token_ticker" field.
@@ -45,7 +46,7 @@ type TokenCreate struct {
 	// OperatorSpecificIssuerSignature holds the value of the "operator_specific_issuer_signature" field.
 	OperatorSpecificIssuerSignature []byte `json:"operator_specific_issuer_signature,omitempty"`
 	// CreationEntityPublicKey holds the value of the "creation_entity_public_key" field.
-	CreationEntityPublicKey []byte `json:"creation_entity_public_key,omitempty"`
+	CreationEntityPublicKey keys.Public `json:"creation_entity_public_key,omitempty"`
 	// WalletProvidedTimestamp holds the value of the "wallet_provided_timestamp" field.
 	//
 	// Deprecated: Field "wallet_provided_timestamp" was marked as deprecated in the schema.
@@ -115,8 +116,10 @@ func (*TokenCreate) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokencreate.FieldIssuerPublicKey, tokencreate.FieldMaxSupply, tokencreate.FieldTokenIdentifier, tokencreate.FieldIssuerSignature, tokencreate.FieldOperatorSpecificIssuerSignature, tokencreate.FieldCreationEntityPublicKey:
+		case tokencreate.FieldMaxSupply, tokencreate.FieldTokenIdentifier, tokencreate.FieldIssuerSignature, tokencreate.FieldOperatorSpecificIssuerSignature:
 			values[i] = new([]byte)
+		case tokencreate.FieldIssuerPublicKey, tokencreate.FieldCreationEntityPublicKey:
+			values[i] = new(keys.Public)
 		case tokencreate.FieldIsFreezable:
 			values[i] = new(sql.NullBool)
 		case tokencreate.FieldDecimals, tokencreate.FieldWalletProvidedTimestamp:
@@ -163,7 +166,7 @@ func (tc *TokenCreate) assignValues(columns []string, values []any) error {
 				tc.UpdateTime = value.Time
 			}
 		case tokencreate.FieldIssuerPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field issuer_public_key", values[i])
 			} else if value != nil {
 				tc.IssuerPublicKey = *value
@@ -223,7 +226,7 @@ func (tc *TokenCreate) assignValues(columns []string, values []any) error {
 				tc.OperatorSpecificIssuerSignature = *value
 			}
 		case tokencreate.FieldCreationEntityPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field creation_entity_public_key", values[i])
 			} else if value != nil {
 				tc.CreationEntityPublicKey = *value

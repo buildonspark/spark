@@ -103,7 +103,7 @@ func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *te
 	require.NoError(t, err)
 
 	tokenCreate := tx.TokenCreate.Create().
-		SetIssuerPublicKey(handler.config.IdentityPublicKey().Serialize()).
+		SetIssuerPublicKey(handler.config.IdentityPublicKey()).
 		SetTokenName("test token").
 		SetTokenTicker("TTK").
 		SetDecimals(8).
@@ -111,7 +111,7 @@ func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *te
 		SetIsFreezable(true).
 		SetNetwork(st.NetworkRegtest).
 		SetTokenIdentifier([]byte("token_identifier")).
-		SetCreationEntityPublicKey(handler.config.IdentityPublicKey().Serialize()).
+		SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
 		SaveX(ctx)
 
 	output := createTestSpentOutputWithShares(t, ctx, tx, handler, tokenCreate.ID, priv, shares, ids)

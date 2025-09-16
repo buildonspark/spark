@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
@@ -58,8 +59,8 @@ func (tcc *TokenCreateCreate) SetNillableUpdateTime(t *time.Time) *TokenCreateCr
 }
 
 // SetIssuerPublicKey sets the "issuer_public_key" field.
-func (tcc *TokenCreateCreate) SetIssuerPublicKey(b []byte) *TokenCreateCreate {
-	tcc.mutation.SetIssuerPublicKey(b)
+func (tcc *TokenCreateCreate) SetIssuerPublicKey(k keys.Public) *TokenCreateCreate {
+	tcc.mutation.SetIssuerPublicKey(k)
 	return tcc
 }
 
@@ -118,8 +119,8 @@ func (tcc *TokenCreateCreate) SetOperatorSpecificIssuerSignature(b []byte) *Toke
 }
 
 // SetCreationEntityPublicKey sets the "creation_entity_public_key" field.
-func (tcc *TokenCreateCreate) SetCreationEntityPublicKey(b []byte) *TokenCreateCreate {
-	tcc.mutation.SetCreationEntityPublicKey(b)
+func (tcc *TokenCreateCreate) SetCreationEntityPublicKey(k keys.Public) *TokenCreateCreate {
+	tcc.mutation.SetCreationEntityPublicKey(k)
 	return tcc
 }
 
@@ -287,11 +288,6 @@ func (tcc *TokenCreateCreate) check() error {
 	if _, ok := tcc.mutation.IssuerPublicKey(); !ok {
 		return &ValidationError{Name: "issuer_public_key", err: errors.New(`ent: missing required field "TokenCreate.issuer_public_key"`)}
 	}
-	if v, ok := tcc.mutation.IssuerPublicKey(); ok {
-		if err := tokencreate.IssuerPublicKeyValidator(v); err != nil {
-			return &ValidationError{Name: "issuer_public_key", err: fmt.Errorf(`ent: validator failed for field "TokenCreate.issuer_public_key": %w`, err)}
-		}
-	}
 	if _, ok := tcc.mutation.TokenName(); !ok {
 		return &ValidationError{Name: "token_name", err: errors.New(`ent: missing required field "TokenCreate.token_name"`)}
 	}
@@ -345,11 +341,6 @@ func (tcc *TokenCreateCreate) check() error {
 	}
 	if _, ok := tcc.mutation.CreationEntityPublicKey(); !ok {
 		return &ValidationError{Name: "creation_entity_public_key", err: errors.New(`ent: missing required field "TokenCreate.creation_entity_public_key"`)}
-	}
-	if v, ok := tcc.mutation.CreationEntityPublicKey(); ok {
-		if err := tokencreate.CreationEntityPublicKeyValidator(v); err != nil {
-			return &ValidationError{Name: "creation_entity_public_key", err: fmt.Errorf(`ent: validator failed for field "TokenCreate.creation_entity_public_key": %w`, err)}
-		}
 	}
 	return nil
 }

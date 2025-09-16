@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
@@ -19,15 +20,15 @@ func getTokenIdentifierFromTransaction(tokenTransaction *tokenpb.TokenTransactio
 	return nil
 }
 
-func getIssuerPublicKeyFromTransaction(tokenTransaction *tokenpb.TokenTransaction) common.IssuerPublicKey {
+func getIssuerPublicKeyFromTransaction(tokenTransaction *tokenpb.TokenTransaction) (keys.Public, error) {
 	// For transactions with token public key set in outputs
 	if len(tokenTransaction.TokenOutputs) > 0 && tokenTransaction.TokenOutputs[0].GetTokenPublicKey() != nil {
-		return tokenTransaction.TokenOutputs[0].GetTokenPublicKey()
+		return keys.ParsePublicKey(tokenTransaction.TokenOutputs[0].GetTokenPublicKey())
 	}
-	if tokenTransaction.GetCreateInput() != nil && tokenTransaction.GetCreateInput().GetIssuerPublicKey() != nil {
-		return tokenTransaction.GetCreateInput().GetIssuerPublicKey()
+	if tokenTransaction.GetCreateInput().GetIssuerPublicKey() != nil {
+		return keys.ParsePublicKey(tokenTransaction.GetCreateInput().GetIssuerPublicKey())
 	}
-	return nil
+	return keys.Public{}, fmt.Errorf("no token identifier or issuer public key found for token transaction: %v", tokenTransaction)
 }
 
 // GetTokenMetadataForTokenTransaction returns the token metadata for the given token transaction.
@@ -54,27 +55,27 @@ func GetTokenMetadataForTokenTransaction(ctx context.Context, tokenTransaction *
 		return nil, nil
 	}
 
-	issuerPublicKey := getIssuerPublicKeyFromTransaction(tokenTransaction)
-	if issuerPublicKey != nil {
-		network, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
-		if err != nil {
-			return nil, err
-		}
-		schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
-		if err != nil {
-			return nil, err
-		}
-		tokenCreate, err := tx.TokenCreate.Query().Where(tokencreate.IssuerPublicKeyEQ(issuerPublicKey), tokencreate.NetworkEQ(schemaNetwork)).First(ctx)
-		if err == nil {
-			return tokenCreate.ToTokenMetadata()
-		}
-		if !IsNotFound(err) {
-			return nil, fmt.Errorf("error querying TokenCreate table: %w", err)
-		}
-
-		logger.Sugar().Warnf("no token found for token transaction by issuer public key %s", issuerPublicKey)
-		return nil, nil
+	issuerPublicKey, err := getIssuerPublicKeyFromTransaction(tokenTransaction)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, fmt.Errorf("no token identifier or issuer public key found for token transaction: %v", tokenTransaction)
+	network, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
+	if err != nil {
+		return nil, err
+	}
+	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
+	if err != nil {
+		return nil, err
+	}
+	tokenCreate, err := tx.TokenCreate.Query().Where(tokencreate.IssuerPublicKeyEQ(issuerPublicKey), tokencreate.NetworkEQ(schemaNetwork)).First(ctx)
+	if err == nil {
+		return tokenCreate.ToTokenMetadata()
+	}
+	if !IsNotFound(err) {
+		return nil, fmt.Errorf("error querying TokenCreate table: %w", err)
+	}
+
+	logger.Sugar().Warnf("no token found for token transaction by issuer public key %s", issuerPublicKey)
+	return nil, nil
 }

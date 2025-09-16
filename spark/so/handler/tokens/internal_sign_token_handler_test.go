@@ -54,7 +54,7 @@ func TestExchangeRevocationSecretsShares(t *testing.T) {
 	}
 	// Minimal TokenCreate required for TokenTransaction
 	tokenCreate := tx.TokenCreate.Create().
-		SetIssuerPublicKey(handler.config.IdentityPublicKey().Serialize()).
+		SetIssuerPublicKey(handler.config.IdentityPublicKey()).
 		SetTokenName("test token").
 		SetTokenTicker("TTK").
 		SetDecimals(8).
@@ -62,7 +62,7 @@ func TestExchangeRevocationSecretsShares(t *testing.T) {
 		SetIsFreezable(true).
 		SetNetwork(st.NetworkRegtest).
 		SetTokenIdentifier([]byte("token_identifier")).
-		SetCreationEntityPublicKey(handler.config.IdentityPublicKey().Serialize()).
+		SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
 		SaveX(ctx)
 	testTransaction := tx.TokenTransaction.Create().
 		SetPartialTokenTransactionHash(testHash).
@@ -151,7 +151,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 
 	// Minimal TokenCreate required for TokenOutput and TokenTransaction relationships
 	tokenCreate := tx.TokenCreate.Create().
-		SetIssuerPublicKey(handler.config.IdentityPublicKey().Serialize()).
+		SetIssuerPublicKey(handler.config.IdentityPublicKey()).
 		SetTokenName("test token").
 		SetTokenTicker("TTK").
 		SetDecimals(8).
@@ -159,7 +159,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SetIsFreezable(true).
 		SetNetwork(st.NetworkRegtest).
 		SetTokenIdentifier([]byte("token_identifier")).
-		SetCreationEntityPublicKey(handler.config.IdentityPublicKey().Serialize()).
+		SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
 		SaveX(ctx)
 
 	withdrawRevocationCommitment := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -254,7 +254,7 @@ func TestValidateSignaturesPackageAndPersistPeerSignatures_RequireThresholdOpera
 	// Prepare a fake transaction in the DB.
 	testHash := bytes.Repeat([]byte{0x42}, 32)
 	tokenCreate := tx.TokenCreate.Create().
-		SetIssuerPublicKey(handler.config.IdentityPublicKey().Serialize()).
+		SetIssuerPublicKey(handler.config.IdentityPublicKey()).
 		SetTokenName("test token").
 		SetTokenTicker("TTK").
 		SetDecimals(8).
@@ -262,7 +262,7 @@ func TestValidateSignaturesPackageAndPersistPeerSignatures_RequireThresholdOpera
 		SetIsFreezable(true).
 		SetNetwork(st.NetworkRegtest).
 		SetTokenIdentifier([]byte("token_identifier")).
-		SetCreationEntityPublicKey(handler.config.IdentityPublicKey().Serialize()).
+		SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
 		SaveX(ctx)
 	tokenTransaction := tx.TokenTransaction.Create().
 		SetPartialTokenTransactionHash(testHash).

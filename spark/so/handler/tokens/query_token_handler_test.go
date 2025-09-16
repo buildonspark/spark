@@ -142,7 +142,7 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 
 		tokenIdentifier := randomBytes(32)
 		tokenCreate, err := tx.TokenCreate.Create().
-			SetIssuerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
+			SetIssuerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetTokenName("TestToken").
 			SetTokenTicker("TT").
 			SetDecimals(0).
@@ -150,7 +150,7 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 			SetIsFreezable(true).
 			SetNetwork(st.NetworkRegtest).
 			SetTokenIdentifier(tokenIdentifier).
-			SetCreationEntityPublicKey(handler.config.IdentityPublicKey().Serialize()).
+			SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -245,7 +245,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 
 	tokenIdentifier := randomBytes(32)
 	tokenCreate, err := tx.TokenCreate.Create().
-		SetIssuerPublicKey(issuerKey.Public().Serialize()).
+		SetIssuerPublicKey(issuerKey.Public()).
 		SetTokenName("TestToken").
 		SetTokenTicker("TT").
 		SetDecimals(0).
@@ -253,7 +253,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 		SetIsFreezable(true).
 		SetNetwork(st.NetworkRegtest).
 		SetTokenIdentifier(tokenIdentifier).
-		SetCreationEntityPublicKey(handler.config.IdentityPublicKey().Serialize()).
+		SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
 		Save(ctx)
 	require.NoError(t, err)
 

@@ -82,8 +82,6 @@ var (
 	DefaultUpdateTime func() time.Time
 	// UpdateDefaultUpdateTime holds the default value on update for the "update_time" field.
 	UpdateDefaultUpdateTime func() time.Time
-	// IssuerPublicKeyValidator is a validator for the "issuer_public_key" field. It is called by the builders before save.
-	IssuerPublicKeyValidator func([]byte) error
 	// TokenNameValidator is a validator for the "token_name" field. It is called by the builders before save.
 	TokenNameValidator func(string) error
 	// TokenTickerValidator is a validator for the "token_ticker" field. It is called by the builders before save.

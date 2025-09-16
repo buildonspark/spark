@@ -346,10 +346,10 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	require.NotNil(t, duplicateToken)
 	assert.Equal(t, "TestToken", validToken.TokenName)
 	assert.Equal(t, "TICK", validToken.TokenTicker)
-	assert.Equal(t, validIssuerPubKey.Serialize(), validToken.IssuerPublicKey)
+	assert.Equal(t, validIssuerPubKey, validToken.IssuerPublicKey)
 	assert.Equal(t, "DUP1", duplicateToken.TokenName)
 	assert.Equal(t, "DUP1", duplicateToken.TokenTicker)
-	assert.Equal(t, validIssuerPubKey.Serialize(), duplicateToken.IssuerPublicKey)
+	assert.Equal(t, validIssuerPubKey, duplicateToken.IssuerPublicKey)
 
 	// Only one TokenCreate should be created (duplicate issuer filtered out)
 	createdTokens, err := dbTx.TokenCreate.Query().All(ctx)
@@ -357,7 +357,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	require.Len(t, createdTokens, 1)
 	assert.Equal(t, "TestToken", createdTokens[0].TokenName)
 	assert.Equal(t, "TICK", createdTokens[0].TokenTicker)
-	assert.Equal(t, validIssuerPubKey.Serialize(), createdTokens[0].IssuerPublicKey)
+	assert.Equal(t, validIssuerPubKey, createdTokens[0].IssuerPublicKey)
 
 	// And the tree node should have been refunded
 	node, err := dbTx.TreeNode.Get(ctx, treeNode.ID)
