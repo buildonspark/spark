@@ -1379,6 +1379,13 @@ func (h *LightningHandler) ValidatePreimageInternal(ctx context.Context, req *pb
 }
 
 func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvidePreimageRequest) (*pb.ProvidePreimageResponse, error) {
+	identityPubKey, err := keys.ParsePublicKey(req.IdentityPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, identityPubKey); err != nil {
+		return nil, err
+	}
 	transfer, err := h.ValidatePreimage(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("unable to provide preimage: %w", err)
