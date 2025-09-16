@@ -4,6 +4,7 @@ import {
 } from "../../utils/spark-testing-wallet.js";
 import { bytesToHex } from "@noble/hashes/utils";
 import { BitcoinFaucet } from "../../utils/test-faucet.js";
+import { retryUntilSuccess, waitForClaim } from "../../utils/utils.js";
 
 export const DEPOSIT_AMOUNT = 10000n;
 const SECOND_DEPOSIT_AMOUNT = 20000n;
@@ -11,7 +12,7 @@ const THIRD_DEPOSIT_AMOUNT = 30000n;
 
 describe("SSP static deposit address integration", () => {
   describe("Happy path testing", () => {
-    it.skip("should claim deposits to a static deposit address", async () => {
+    it("should claim deposits to a static deposit address", async () => {
       const faucet = BitcoinFaucet.getInstance();
       const { wallet: userWallet } = await SparkWalletTesting.initialize(
         {
@@ -108,7 +109,7 @@ describe("SSP static deposit address integration", () => {
       expect(transfers.transfers.length).toBe(3);
     }, 60000);
 
-    it.skip("should create a refund transaction", async () => {
+    it("should create a refund transaction", async () => {
       const faucet = BitcoinFaucet.getInstance();
 
       const { wallet: userWallet } = await SparkWalletTesting.initialize(
@@ -147,11 +148,15 @@ describe("SSP static deposit address integration", () => {
 
       const refundAddress = await faucet.getNewAddress();
 
-      const refundTx = await userWallet.refundStaticDeposit({
-        depositTransactionId: transactionId,
-        destinationAddress: refundAddress,
-        satsPerVbyteFee: 2,
-      });
+      // Chainwatcher needs to catch up. Could take a few seconds so retry until success.
+      const refundTx = await retryUntilSuccess(
+        async () =>
+          await userWallet.refundStaticDeposit({
+            depositTransactionId: transactionId,
+            destinationAddress: refundAddress,
+            satsPerVbyteFee: 2,
+          }),
+      );
 
       expect(refundTx).toBeDefined();
 
@@ -368,7 +373,7 @@ describe("SSP static deposit address integration", () => {
       expect(successes).toHaveLength(1);
       expect(failures).toHaveLength(1);
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await waitForClaim({ wallet: aliceWallet });
 
       const { balance: aliceBalance } = await aliceWallet.getBalance();
       const { balance: alice2Balance } = await aliceWallet2.getBalance();
