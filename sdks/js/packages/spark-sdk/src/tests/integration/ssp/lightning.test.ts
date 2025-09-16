@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { ConfigOptions } from "../../../services/wallet-config.js";
-import { SparkWallet } from "../../../spark-wallet/spark-wallet.js";
+import { SparkWallet } from "../../../spark-wallet/spark-wallet.node.js";
 import {
   BitcoinNetwork,
   CurrencyUnit,
