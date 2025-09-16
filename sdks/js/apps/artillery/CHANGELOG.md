@@ -1,5 +1,13 @@
 # artillery-engine-spark
 
+## 0.1.9
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.3.5
+  - @buildonspark/issuer-sdk@0.0.98
+
 ## 0.1.8
 
 ### Patch Changes

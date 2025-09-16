@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.3.5
+
+### Patch Changes
+
+- - Fix 0 amount invoice validation
+
 ## 0.3.4
 
 ### Patch Changes
