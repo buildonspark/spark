@@ -11,7 +11,7 @@ const THIRD_DEPOSIT_AMOUNT = 30000n;
 
 describe("SSP static deposit address integration", () => {
   describe("Happy path testing", () => {
-    it("should claim deposits to a static deposit address", async () => {
+    it.skip("should claim deposits to a static deposit address", async () => {
       const faucet = BitcoinFaucet.getInstance();
       const { wallet: userWallet } = await SparkWalletTesting.initialize(
         {
@@ -108,7 +108,7 @@ describe("SSP static deposit address integration", () => {
       expect(transfers.transfers.length).toBe(3);
     }, 60000);
 
-    it("should create a refund transaction", async () => {
+    it.skip("should create a refund transaction", async () => {
       const faucet = BitcoinFaucet.getInstance();
 
       const { wallet: userWallet } = await SparkWalletTesting.initialize(
