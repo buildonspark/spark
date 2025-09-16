@@ -13,7 +13,6 @@ import (
 	"github.com/lightsparkdev/spark/so/handler/tokens"
 
 	"github.com/lightsparkdev/spark/common"
-	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
@@ -44,33 +43,18 @@ func NewSparkServer(config *so.Config, eventsRouter *events.EventRouter) *SparkS
 
 // GenerateDepositAddress generates a deposit address for the given public key.
 func (s *SparkServer) GenerateDepositAddress(ctx context.Context, req *pb.GenerateDepositAddressRequest) (*pb.GenerateDepositAddressResponse, error) {
-	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, idPubKey)
 	depositHandler := handler.NewDepositHandler(s.config)
 	return depositHandler.GenerateDepositAddress(ctx, s.config, req)
 }
 
 // GenerateStaticDepositAddress generates a static deposit address for the given public key.
 func (s *SparkServer) GenerateStaticDepositAddress(ctx context.Context, req *pb.GenerateStaticDepositAddressRequest) (*pb.GenerateStaticDepositAddressResponse, error) {
-	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, idPubKey)
 	depositHandler := handler.NewDepositHandler(s.config)
 	return depositHandler.GenerateStaticDepositAddress(ctx, s.config, req)
 }
 
 // StartDepositTreeCreation verifies the on chain utxo, and then verifies and signs the offchain root and refund transactions.
 func (s *SparkServer) StartDepositTreeCreation(ctx context.Context, req *pb.StartDepositTreeCreationRequest) (*pb.StartDepositTreeCreationResponse, error) {
-	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, idPubKey)
 	depositHandler := handler.NewDepositHandler(s.config)
 	return depositHandler.StartDepositTreeCreation(ctx, s.config, req)
 }
@@ -78,11 +62,6 @@ func (s *SparkServer) StartDepositTreeCreation(ctx context.Context, req *pb.Star
 // StartTreeCreation is deprecated.
 // Deprecated: Use StartDepositTreeCreation instead
 func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
-	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, idPubKey)
 	depositHandler := handler.NewDepositHandler(s.config)
 	return depositHandler.StartTreeCreation(ctx, s.config, req)
 }
@@ -101,54 +80,29 @@ func (s *SparkServer) FinalizeNodeSignaturesV2(ctx context.Context, req *pb.Fina
 
 // StartTransfer initiates a transfer from sender.
 func (s *SparkServer) StartTransfer(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.StartTransfer(ctx, req)
 }
 
 // StartTransferV2 initiates a transfer from sender.
 func (s *SparkServer) StartTransferV2(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.StartTransferV2(ctx, req)
 }
 
 // FinalizeTransfer completes a transfer from sender.
 func (s *SparkServer) FinalizeTransfer(ctx context.Context, req *pb.FinalizeTransferRequest) (*pb.FinalizeTransferResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.FinalizeTransfer(ctx, req)
 }
 
 func (s *SparkServer) FinalizeTransferWithTransferPackage(ctx context.Context, req *pb.FinalizeTransferWithTransferPackageRequest) (*pb.FinalizeTransferResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	transferHandler := handler.NewTransferHandler(s.config)
 	return transferHandler.FinalizeTransferWithTransferPackage(ctx, req)
 }
 
 // CancelTransfer cancels a transfer from sender before key is tweaked.
 func (s *SparkServer) CancelTransfer(ctx context.Context, req *pb.CancelTransferRequest) (*pb.CancelTransferResponse, error) {
-	senderIDPubKey, err := keys.ParsePublicKey(req.GetSenderIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse sender identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, senderIDPubKey)
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.CancelTransfer(ctx, req)
 }
@@ -161,34 +115,18 @@ func (s *SparkServer) QueryPendingTransfers(ctx context.Context, req *pb.Transfe
 
 // ClaimTransferTweakKeys starts claiming a pending transfer by tweaking keys of leaves.
 func (s *SparkServer) ClaimTransferTweakKeys(ctx context.Context, req *pb.ClaimTransferTweakKeysRequest) (*emptypb.Empty, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	transferHander := handler.NewTransferHandler(s.config)
 	return emptyResponse, transferHander.ClaimTransferTweakKeys(ctx, req)
 }
 
 // ClaimTransferSignRefundsV2 signs new refund transactions as part of the transfer.
 func (s *SparkServer) ClaimTransferSignRefundsV2(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.ClaimTransferSignRefundsV2(ctx, req)
 }
 
 // ClaimTransferSignRefunds signs new refund transactions as part of the transfer.
 func (s *SparkServer) ClaimTransferSignRefunds(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
-
 	if !s.claimTransferSignRefundsTransferGuard.Acquire(req.TransferId) {
 		return nil, errors.ResourceExhaustedConcurrencyLimitExceeded(fmt.Errorf("concurrency limit exceeded"))
 	}
@@ -200,11 +138,6 @@ func (s *SparkServer) ClaimTransferSignRefunds(ctx context.Context, req *pb.Clai
 
 // StorePreimageShare stores the preimage share for the given payment hash.
 func (s *SparkServer) StorePreimageShare(ctx context.Context, req *pb.StorePreimageShareRequest) (*emptypb.Empty, error) {
-	userIDPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse user identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, userIDPubKey)
 	lightningHandler := handler.NewLightningHandler(s.config)
 	return emptyResponse, lightningHandler.StorePreimageShare(ctx, req)
 }
@@ -217,22 +150,12 @@ func (s *SparkServer) GetSigningCommitments(ctx context.Context, req *pb.GetSign
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
 func (s *SparkServer) InitiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	lightningHandler := handler.NewLightningHandler(s.config)
 	return lightningHandler.InitiatePreimageSwap(ctx, req)
 }
 
 // InitiatePreimageSwapV2 initiates a preimage swap for the given payment hash.
 func (s *SparkServer) InitiatePreimageSwapV2(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	lightningHandler := handler.NewLightningHandler(s.config)
 	return lightningHandler.InitiatePreimageSwapV2(ctx, req)
 }
@@ -240,44 +163,24 @@ func (s *SparkServer) InitiatePreimageSwapV2(ctx context.Context, req *pb.Initia
 // CooperativeExit asks for signatures for refund transactions spending leaves
 // and connector outputs on another user's L1 transaction.
 func (s *SparkServer) CooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	coopExitHandler := handler.NewCooperativeExitHandler(s.config)
 	return coopExitHandler.CooperativeExit(ctx, req)
 }
 
 // CooperativeExitV2 is the same as CooperativeExit, but enforces use of direct transactions for unilateral exits
 func (s *SparkServer) CooperativeExitV2(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	coopExitHandler := handler.NewCooperativeExitHandler(s.config)
 	return coopExitHandler.CooperativeExit(ctx, req)
 }
 
 // StartLeafSwap initiates a swap of leaves between two users.
 func (s *SparkServer) StartLeafSwap(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.StartLeafSwap(ctx, req)
 }
 
 // StartLeafSwapV2 initiates a swap of leaves between two users.
 func (s *SparkServer) StartLeafSwapV2(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.StartLeafSwapV2(ctx, req)
 }
@@ -286,75 +189,40 @@ func (s *SparkServer) StartLeafSwapV2(ctx context.Context, req *pb.StartTransfer
 // This is deprecated but remains for backwards compatibility,
 // CounterLeafSwap should be used instead.
 func (s *SparkServer) LeafSwap(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.CounterLeafSwap(ctx, req)
 }
 
 // CounterLeafSwap starts the reverse side of a swap of leaves between two users.
 func (s *SparkServer) CounterLeafSwap(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.CounterLeafSwap(ctx, req)
 }
 
 // CounterLeafSwapV2 starts the reverse side of a swap of leaves between two users.
 func (s *SparkServer) CounterLeafSwapV2(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetTransfer().GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.CounterLeafSwapV2(ctx, req)
 }
 
 // RefreshTimelock refreshes the timelocks of a leaf and its ancestors.
 func (s *SparkServer) RefreshTimelock(ctx context.Context, req *pb.RefreshTimelockRequest) (*pb.RefreshTimelockResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	timelockHandler := handler.NewRefreshTimelockHandler(s.config)
 	return timelockHandler.RefreshTimelock(ctx, req)
 }
 
 // RefreshTimelockV2 is the same as RefreshTimelock, but requires the direct TX to be included.
 func (s *SparkServer) RefreshTimelockV2(ctx context.Context, req *pb.RefreshTimelockRequest) (*pb.RefreshTimelockResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	leafHandler := handler.NewRefreshTimelockHandler(s.config)
 	return leafHandler.RefreshTimelockV2(ctx, req)
 }
 
 func (s *SparkServer) ExtendLeaf(ctx context.Context, req *pb.ExtendLeafRequest) (*pb.ExtendLeafResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	leafHandler := handler.NewExtendLeafHandler(s.config)
 	return leafHandler.ExtendLeaf(ctx, req)
 }
 
 func (s *SparkServer) ExtendLeafV2(ctx context.Context, req *pb.ExtendLeafRequest) (*pb.ExtendLeafResponse, error) {
-	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerIDPubKey)
 	leafHandler := handler.NewExtendLeafHandler(s.config)
 	return leafHandler.ExtendLeafV2(ctx, req)
 }
@@ -376,42 +244,22 @@ func (s *SparkServer) GetSigningOperatorList(_ context.Context, _ *emptypb.Empty
 }
 
 func (s *SparkServer) QueryUserSignedRefunds(ctx context.Context, req *pb.QueryUserSignedRefundsRequest) (*pb.QueryUserSignedRefundsResponse, error) {
-	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, idPubKey)
 	lightningHandler := handler.NewLightningHandler(s.config)
 	return lightningHandler.QueryUserSignedRefunds(ctx, req)
 }
 
 func (s *SparkServer) ProvidePreimage(ctx context.Context, req *pb.ProvidePreimageRequest) (*pb.ProvidePreimageResponse, error) {
-	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, idPubKey)
 	lightningHandler := handler.NewLightningHandler(s.config)
 	return lightningHandler.ProvidePreimage(ctx, req)
 }
 
 func (s *SparkServer) ReturnLightningPayment(ctx context.Context, req *pb.ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
-	userIDPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse user identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, userIDPubKey)
 	lightningHandler := handler.NewLightningHandler(s.config)
 	return lightningHandler.ReturnLightningPayment(ctx, req, false)
 }
 
 // StartTokenTransaction reserves revocation keyshares, and fills the revocation commitment (and other SO-derived fields) to create the final token transaction.
 func (s *SparkServer) StartTokenTransaction(ctx context.Context, req *pb.StartTokenTransactionRequest) (*pb.StartTokenTransactionResponse, error) {
-	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, idPubKey)
 	tokenTransactionHandler := tokens.NewStartTokenTransactionHandler(s.config)
 
 	network, err := common.NetworkFromProtoNetwork(req.PartialTokenTransaction.Network)
@@ -445,11 +293,6 @@ func (s *SparkServer) QueryNodes(ctx context.Context, req *pb.QueryNodesRequest)
 // GetTokenTransactionRevocationKeyshares allows the wallet to retrieve the revocation keyshares from each individual SO to
 // allow the wallet to combine these shares into the fully resolved revocation secret necessary for transaction finalization.
 func (s *SparkServer) SignTokenTransaction(ctx context.Context, req *pb.SignTokenTransactionRequest) (*pb.SignTokenTransactionResponse, error) {
-	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, idPubKey)
 	signTokenHandler := tokens.NewSignTokenHandler(s.config)
 	return signTokenHandler.SignTokenTransaction(ctx, req)
 }
@@ -457,11 +300,6 @@ func (s *SparkServer) SignTokenTransaction(ctx context.Context, req *pb.SignToke
 // FinalizeTokenTransaction verifies the revocation secrets constructed by the wallet and passes these keys to the LRC20 Node
 // to finalize the transaction. This operation irreversibly spends the inputs associated with the transaction.
 func (s *SparkServer) FinalizeTokenTransaction(ctx context.Context, req *pb.FinalizeTokenTransactionRequest) (*emptypb.Empty, error) {
-	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, idPubKey)
 	finalizeTokenHandler := tokens.NewFinalizeTokenHandler(s.config)
 	return finalizeTokenHandler.FinalizeTokenTransaction(ctx, req)
 }
@@ -469,11 +307,6 @@ func (s *SparkServer) FinalizeTokenTransaction(ctx context.Context, req *pb.Fina
 // FreezeTokens prevents transfer of all outputs owned now and in the future by the provided owner public key.
 // Unfreeze undos this operation and re-enables transfers.
 func (s *SparkServer) FreezeTokens(ctx context.Context, req *pb.FreezeTokensRequest) (*pb.FreezeTokensResponse, error) {
-	ownerPubKey, err := keys.ParsePublicKey(req.GetFreezeTokensPayload().GetOwnerPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, ownerPubKey)
 	tokenReq := protoconverter.TokenProtoFreezeTokensRequestFromSpark(req)
 	freezeTokenHandler := tokens.NewFreezeTokenHandler(s.config)
 
@@ -502,31 +335,16 @@ func (s *SparkServer) QueryAllTransfers(ctx context.Context, req *pb.TransferFil
 }
 
 func (s *SparkServer) QueryUnusedDepositAddresses(ctx context.Context, req *pb.QueryUnusedDepositAddressesRequest) (*pb.QueryUnusedDepositAddressesResponse, error) {
-	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, idPubKey)
 	treeQueryHandler := handler.NewTreeQueryHandler(s.config)
 	return treeQueryHandler.QueryUnusedDepositAddresses(ctx, req)
 }
 
 func (s *SparkServer) QueryStaticDepositAddresses(ctx context.Context, req *pb.QueryStaticDepositAddressesRequest) (*pb.QueryStaticDepositAddressesResponse, error) {
-	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, idPubKey)
 	treeQueryHandler := handler.NewTreeQueryHandler(s.config)
 	return treeQueryHandler.QueryStaticDepositAddresses(ctx, req)
 }
 
 func (s *SparkServer) QueryBalance(ctx context.Context, req *pb.QueryBalanceRequest) (*pb.QueryBalanceResponse, error) {
-	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
-	}
-	ctx, _ = logging.WithIdentityPubkey(ctx, idPubKey)
 	treeQueryHandler := handler.NewTreeQueryHandler(s.config)
 	return treeQueryHandler.QueryBalance(ctx, req)
 }

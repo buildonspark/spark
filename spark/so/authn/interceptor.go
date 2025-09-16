@@ -122,6 +122,8 @@ func (i *Interceptor) authenticateContext(ctx context.Context) context.Context {
 		})
 	}
 
+	ctx, logger = logging.WithIdentityPubkey(ctx, key)
+
 	return context.WithValue(ctx, authnContextKey, &Context{
 		Session: &Session{
 			identityPublicKey:   key,
