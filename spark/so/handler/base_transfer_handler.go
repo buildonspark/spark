@@ -509,15 +509,13 @@ func (h *BaseTransferHandler) validateTransferLeaves(
 	requireDirectTx bool,
 ) error {
 	for _, leaf := range leaves {
-		directRefundTx := leafDirectRefundMap[leaf.ID.String()]
-		intermediateDirectFromCpfpRefundTx := leafDirectFromCpfpRefundMap[leaf.ID.String()]
-
+		// TODO(LIG-7719) reinstate direct tx validation once sync_transfer_refunds job has been added.
 		rawRefundTx, exist := leafCpfpRefundMap[leaf.ID.String()]
 		if !exist {
 			return fmt.Errorf("leaf %s not found in cpfp refund map", leaf.ID)
 		}
 
-		err := validateSendLeafRefundTxs(leaf, rawRefundTx, directRefundTx, intermediateDirectFromCpfpRefundTx, receiverIdentityPublicKey, 1, requireDirectTx)
+		err := validateSendLeafRefundTxs(leaf, rawRefundTx, nil, nil, receiverIdentityPublicKey, 1, false)
 		if err != nil {
 			return fmt.Errorf("unable to validate refund tx for leaf %s: %w", leaf.ID, err)
 		}
