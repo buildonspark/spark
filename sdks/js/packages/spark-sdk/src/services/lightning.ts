@@ -21,7 +21,7 @@ import { getTxFromRawTxBytes } from "../utils/bitcoin.js";
 import { getCrypto } from "../utils/crypto.js";
 import { decodeInvoice } from "./bolt11-spark.js";
 import { WalletConfigService } from "./config.js";
-import { ConnectionManager } from "./connection.js";
+import { ConnectionManager } from "./connection/connection.js";
 import { SigningService } from "./signing.js";
 import type { LeafKeyTweak } from "./transfer.js";
 

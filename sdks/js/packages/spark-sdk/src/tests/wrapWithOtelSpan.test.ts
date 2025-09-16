@@ -3,9 +3,16 @@ import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { getTestWalletConfig } from "./test-utils.js";
 import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
 import { trace } from "@opentelemetry/api";
+import { ConfigOptions } from "../index.node.js";
+import { SparkSigner } from "../signer/signer.js";
 
 class TestableWallet extends SparkWalletTesting {
   public wrapWithOtelSpanPublic = this.wrapWithOtelSpan;
+
+  // Public constructor to allow direct instantiation in tests without init
+  public constructor(options?: ConfigOptions, signer?: SparkSigner) {
+    super(options, signer);
+  }
 }
 
 // Set up a real tracer provider once for all tests

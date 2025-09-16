@@ -5,6 +5,13 @@ import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch";
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
 import { propagation } from "@opentelemetry/api";
 import { SparkWalletProps } from "../spark-wallet/types.js";
+import {
+  ConnectionManagerBrowser,
+  type Transport,
+} from "../services/connection/connection.browser.js";
+import { SparkSigner } from "../signer/signer.js";
+import { ConfigOptions } from "../services/wallet-config.js";
+import { WalletConfigService } from "../services/config.js";
 
 export class SparkWalletBrowser extends BaseSparkWallet {
   public static async initialize({
@@ -14,28 +21,23 @@ export class SparkWalletBrowser extends BaseSparkWallet {
     options,
   }: SparkWalletProps) {
     const wallet = new SparkWalletBrowser(options, signer);
-    wallet.initializeTracer(wallet);
+    const initResponse = await wallet.initWallet(
+      mnemonicOrSeed,
+      accountNumber,
+      options,
+    );
+    return initResponse;
+  }
 
-    if (options && options.signerWithPreExistingKeys) {
-      await wallet.initWalletWithoutSeed();
-
-      return {
-        wallet,
-      };
-    }
-
-    const initResponse = await wallet.initWallet(mnemonicOrSeed, accountNumber);
-
-    return {
-      wallet,
-      ...initResponse,
-    };
+  protected buildConnectionManager(config: WalletConfigService) {
+    return new ConnectionManagerBrowser(config);
   }
 
   protected initializeTracerEnv({
     spanProcessors,
     traceUrls,
   }: Parameters<BaseSparkWallet["initializeTracerEnv"]>[0]) {
+    console.log("initializeTracerEnvBrowser");
     initializeTracerEnvBrowser({ spanProcessors, traceUrls });
   }
 }

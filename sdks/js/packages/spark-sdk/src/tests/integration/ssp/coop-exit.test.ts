@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { ExitSpeed } from "../../../types/index.js";
 import {
-  initWallet,
+  initTestingWallet,
   SparkWalletTesting,
 } from "../../utils/spark-testing-wallet.js";
 import { getNewAddress } from "../../utils/regtest-test-faucet.js";
@@ -15,10 +15,8 @@ describe("SSP coop exit integration", () => {
   let quoteAmount: number;
 
   beforeEach(async () => {
-    const { wallet, depositAddress, signedTx, vout, faucet } = await initWallet(
-      DEPOSIT_AMOUNT,
-      "LOCAL",
-    );
+    const { wallet, depositAddress, signedTx, vout, faucet } =
+      await initTestingWallet(DEPOSIT_AMOUNT, "LOCAL");
 
     // Wait for the transaction to be mined
     await new Promise((resolve) => setTimeout(resolve, 30000));

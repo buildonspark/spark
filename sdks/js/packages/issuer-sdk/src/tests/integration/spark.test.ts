@@ -7,8 +7,10 @@ import {
 import { jest } from "@jest/globals";
 import { bytesToHex } from "@noble/curves/utils";
 import { IssuerSparkWalletTesting } from "../utils/issuer-test-wallet.js";
-import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
-import { BitcoinFaucet } from "@buildonspark/spark-sdk/test-utils";
+import {
+  BitcoinFaucet,
+  SparkWalletTesting,
+} from "@buildonspark/spark-sdk/test-utils";
 import { InvoiceStatus } from "@buildonspark/spark-sdk/proto/spark";
 
 export const TOKENS_SCHNORR_CONFIG: Required<ConfigOptions> = {

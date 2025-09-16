@@ -11,7 +11,7 @@ import {
 } from "../../index.js";
 import { TransferStatus } from "../../proto/spark.js";
 import { WalletConfigService } from "../../services/config.js";
-import { ConnectionManager } from "../../services/connection.js";
+import { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
 import { LightningService } from "../../services/lightning.js";
 import { SigningService } from "../../services/signing.js";
 import type { LeafKeyTweak } from "../../services/transfer.js";
@@ -34,7 +34,7 @@ async function cleanUp() {
   const paymentHash = sha256(preimage);
 
   const configService = new WalletConfigService(config);
-  const connectionManager = new ConnectionManager(configService);
+  const connectionManager = new ConnectionManagerNodeJS(configService);
   for (const operator of Object.values(config.signingOperators!)) {
     const client = await connectionManager.createMockClient(operator!.address);
     await client.clean_up_preimage_share({
@@ -108,7 +108,7 @@ describe.each(walletTypes)(
         },
         userWallet.getSigner(),
       );
-      const connectionManager = new ConnectionManager(userConfig);
+      const connectionManager = new ConnectionManagerNodeJS(userConfig);
       signingService = new SigningService(userConfig);
       lightningService = new LightningService(
         userConfig,
@@ -136,7 +136,7 @@ describe.each(walletTypes)(
         },
         sspWallet.getSigner(),
       );
-      const sspConnectionManager = new ConnectionManager(sspConfig);
+      const sspConnectionManager = new ConnectionManagerNodeJS(sspConfig);
       sspSigningService = new SigningService(sspConfig);
       sspLightningService = new LightningService(
         sspConfig,

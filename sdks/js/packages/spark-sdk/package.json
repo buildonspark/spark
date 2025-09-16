@@ -22,6 +22,10 @@
   "exports": {
     ".": {
       "import": {
+        "bun": {
+          "types": "./dist/index.d.ts",
+          "default": "./dist/index.js"
+        },
         "node": {
           "types": "./dist/index.node.d.ts",
           "default": "./dist/index.node.js"
@@ -84,7 +88,6 @@
     "crypto": false,
     "fs": false,
     "fs/promises": false,
-    "nice-grpc": "nice-grpc-web",
     "path": false,
     "url": false
   },

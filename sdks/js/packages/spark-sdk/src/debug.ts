@@ -1,4 +1,4 @@
-import { SparkWallet } from "./spark-wallet/spark-wallet.js";
+import { SparkWallet } from "./spark-wallet/spark-wallet.browser.js";
 import { WalletConfig } from "./services/wallet-config.js";
 import * as utils from "./utils/index.js";
 

@@ -9,17 +9,14 @@ export class IssuerSparkWalletTesting extends IssuerSparkWallet {
     this.disableEvents = disableEvents;
   }
 
-  static async initialize(props: SparkWalletProps): Promise<{
-    mnemonic?: string;
-    wallet: IssuerSparkWalletTesting;
-  }> {
+  static async initialize(props: SparkWalletProps) {
     const wallet = new IssuerSparkWalletTesting(props, true);
-
-    const result = await wallet.initWallet(props.mnemonicOrSeed);
-    return {
-      wallet,
-      mnemonic: result?.mnemonic,
-    };
+    const initResponse = await wallet.initWallet(
+      props.mnemonicOrSeed,
+      props.accountNumber,
+      props.options,
+    );
+    return initResponse;
   }
 
   protected override async setupBackgroundStream() {

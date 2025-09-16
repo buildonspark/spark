@@ -1,5 +1,5 @@
 import {
-  type ConnectionManager,
+  type BaseConnectionManager,
   NetworkError,
   WalletConfigService,
   collectResponses,
@@ -13,11 +13,11 @@ import { hashFreezeTokensPayload } from "../utils/token-hashing.js";
 
 export class TokenFreezeService {
   private readonly config: WalletConfigService;
-  private readonly connectionManager: ConnectionManager;
+  private readonly connectionManager: BaseConnectionManager;
 
   constructor(
     config: WalletConfigService,
-    connectionManager: ConnectionManager,
+    connectionManager: BaseConnectionManager,
   ) {
     this.config = config;
     this.connectionManager = connectionManager;

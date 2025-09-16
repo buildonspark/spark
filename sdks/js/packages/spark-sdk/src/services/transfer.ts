@@ -65,7 +65,7 @@ import {
 } from "../utils/transaction.js";
 import { getTransferPackageSigningPayload } from "../utils/transfer_package.js";
 import { WalletConfigService } from "./config.js";
-import { ConnectionManager } from "./connection.js";
+import { ConnectionManager } from "./connection/connection.js";
 import { SigningService } from "./signing.js";
 const DEFAULT_EXPIRY_TIME = 10 * 60 * 1000;
 

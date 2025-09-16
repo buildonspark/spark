@@ -7,6 +7,7 @@ import { KeyDerivation } from "../signer/types.js";
 import { Bech32mTokenIdentifier } from "../utils/token-identifier.js";
 import { SparkAddressFormat } from "../utils/address.js";
 import { WalletTransfer } from "../types/index.js";
+import type { SparkWallet } from "./spark-wallet.js";
 
 export type CreateLightningInvoiceParams = {
   amountSats: number;
@@ -140,8 +141,9 @@ export type TokenOutputsMap = Map<
 
 export type TokenMetadataMap = Map<Bech32mTokenIdentifier, TokenMetadata>;
 
-export type InitWalletResponse = {
-  mnemonic?: string | undefined;
+export type InitWalletResponse<T extends SparkWallet = SparkWallet> = {
+  wallet: T;
+  mnemonic: string | undefined;
 };
 export interface SparkWalletProps {
   mnemonicOrSeed?: Uint8Array | string;

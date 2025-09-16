@@ -15,10 +15,7 @@ export class IssuerSparkWalletNoEvents extends IssuerSparkWallet {
 
   static async initialize(
     props: SparkWalletProps & { skipBackgroundStream?: boolean },
-  ): Promise<{
-    mnemonic?: string;
-    wallet: IssuerSparkWalletNoEvents;
-  }> {
+  ) {
     const { skipBackgroundStream = false, ...walletProps } = props;
     const wallet = new IssuerSparkWalletNoEvents(walletProps, true);
 

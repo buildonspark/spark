@@ -1,28 +1,30 @@
-import { isBare, isError, isNode } from "@lightsparkdev/core";
+import { isBare, isError } from "@lightsparkdev/core";
 import { sha256 } from "@noble/hashes/sha2";
 import type { Channel, ClientFactory } from "nice-grpc";
 import { retryMiddleware } from "nice-grpc-client-middleware-retry";
 import { ClientMiddlewareCall, Metadata } from "nice-grpc-common";
 import {
-  NodeHttpTransport,
   type Channel as ChannelWeb,
   type ClientFactory as ClientFactoryWeb,
 } from "nice-grpc-web";
-import { clientEnv, isBun, isReactNative } from "../constants.js";
-import { AuthenticationError, NetworkError } from "../errors/types.js";
-import { MockServiceClient, MockServiceDefinition } from "../proto/mock.js";
-import { SparkServiceClient, SparkServiceDefinition } from "../proto/spark.js";
+import { clientEnv } from "../../constants.js";
+import { AuthenticationError, NetworkError } from "../../errors/types.js";
+import { MockServiceClient, MockServiceDefinition } from "../../proto/mock.js";
+import {
+  SparkServiceClient,
+  SparkServiceDefinition,
+} from "../../proto/spark.js";
 import {
   Challenge,
   SparkAuthnServiceClient,
   SparkAuthnServiceDefinition,
-} from "../proto/spark_authn.js";
+} from "../../proto/spark_authn.js";
 import {
   SparkTokenServiceClient,
   SparkTokenServiceDefinition,
-} from "../proto/spark_token.js";
-import { RetryOptions, SparkCallOptions } from "../types/grpc.js";
-import { WalletConfigService } from "./config.js";
+} from "../../proto/spark_token.js";
+import { RetryOptions, SparkCallOptions } from "../../types/grpc.js";
+import { WalletConfigService } from "../config.js";
 
 type SparkAuthnServiceClientWithClose = SparkAuthnServiceClient & {
   close?: () => void;
@@ -30,7 +32,7 @@ type SparkAuthnServiceClientWithClose = SparkAuthnServiceClient & {
 
 export class ConnectionManager {
   private config: WalletConfigService;
-  private clients: Map<
+  protected clients: Map<
     string,
     {
       client: SparkServiceClient & { close?: () => void };
@@ -82,94 +84,11 @@ export class ConnectionManager {
     this.clients.clear();
   }
 
-  async createMockClient(address: string): Promise<
-    MockServiceClient & {
-      close: () => void;
-    }
-  > {
-    const channel = await this.createChannelWithTLS(address);
-    const isNodeChannel = "close" in channel;
-
-    if (isNode && isNodeChannel && !isBun) {
-      const grpcModule = await import("nice-grpc");
-      const { createClient } =
-        "default" in grpcModule ? grpcModule.default : grpcModule;
-
-      const client = createClient(MockServiceDefinition, channel);
-      return { ...client, close: () => channel.close() };
-    } else if (!isNodeChannel) {
-      const grpcModule = await import("nice-grpc-web");
-      const { createClient } =
-        "default" in grpcModule ? grpcModule.default : grpcModule;
-
-      const client = createClient(MockServiceDefinition, channel);
-      return { ...client, close: () => {} };
-    } else {
-      throw new Error("Channel does not have close in NodeJS environment");
-    }
-  }
-
-  private async createChannelWithTLS(address: string, certPath?: string) {
-    try {
-      if (isNode && !isBun) {
-        const grpcModule = await import("nice-grpc");
-        const { ChannelCredentials, createChannel } =
-          "default" in grpcModule ? grpcModule.default : grpcModule;
-
-        if (certPath) {
-          try {
-            // Dynamic import for Node.js only
-            const fs = await import("fs");
-            const cert = fs.readFileSync(certPath);
-            return createChannel(address, ChannelCredentials.createSsl(cert));
-          } catch (error) {
-            console.error("Error reading certificate:", error);
-            // Fallback to insecure for development
-            return createChannel(
-              address,
-              ChannelCredentials.createSsl(null, null, null, {
-                rejectUnauthorized: false,
-              }),
-            );
-          }
-        } else {
-          // No cert provided, use insecure SSL for development
-          return createChannel(
-            address,
-            ChannelCredentials.createSsl(null, null, null, {
-              rejectUnauthorized: false,
-            }),
-          );
-        }
-      } else {
-        // Browser environment - nice-grpc-web handles TLS automatically
-        const grpcModule = await import("nice-grpc-web");
-        const { createChannel, FetchTransport } =
-          "default" in grpcModule ? grpcModule.default : grpcModule;
-        const { XHRTransport } = await import("./xhr-transport.js");
-
-        return createChannel(
-          address,
-          isBare
-            ? NodeHttpTransport()
-            : isReactNative
-              ? XHRTransport()
-              : FetchTransport(),
-        );
-      }
-    } catch (error) {
-      console.error("Channel creation error:", error);
-      throw new NetworkError(
-        "Failed to create channel",
-        {
-          url: address,
-          operation: "createChannel",
-          errorCount: 1,
-          errors: error instanceof Error ? error.message : String(error),
-        },
-        error as Error,
-      );
-    }
+  protected createChannelWithTLS(
+    address: string,
+    certPath?: string,
+  ): Promise<Channel | ChannelWeb> {
+    throw new Error("createChannelWithTLS: Not implemented");
   }
 
   async createSparkStreamClient(
@@ -181,6 +100,15 @@ export class ConnectionManager {
     }
     const authToken = await this.authenticate(address);
     const channel = await this.createChannelWithTLS(address, certPath);
+
+    if (!channel) {
+      throw new NetworkError("Failed to create channel", {
+        url: address,
+        operation: "createChannel",
+        errorCount: 1,
+        errors: "Channel is undefined",
+      });
+    }
 
     const middleware = this.createMiddleware(address, authToken);
     const client = await this.createGrpcClient<SparkServiceClient>(
@@ -352,50 +280,29 @@ export class ConnectionManager {
     );
   }
 
-  private createAuthnMiddleware() {
-    if (isNode) {
-      return async function* (
-        this: ConnectionManager,
-        call: ClientMiddlewareCall<any, any>,
-        options: SparkCallOptions,
-      ) {
-        const metadata = Metadata(options.metadata).set(
-          "X-Client-Env",
-          clientEnv,
-        );
-        return yield* call.next(call.request, {
-          ...options,
-          metadata,
-        });
-      }.bind(this);
-    } else {
-      return async function* (
-        this: ConnectionManager,
-        call: ClientMiddlewareCall<any, any>,
-        options: SparkCallOptions,
-      ) {
-        const metadata = Metadata(options.metadata)
-          .set("X-Requested-With", "XMLHttpRequest")
-          .set("X-Grpc-Web", "1")
-          .set("X-Client-Env", clientEnv)
-          .set("Content-Type", "application/grpc-web+proto");
-        return yield* call.next(call.request, {
-          ...options,
-          metadata,
-        });
-      }.bind(this);
-    }
+  protected createAuthnMiddleware() {
+    return async function* (
+      this: ConnectionManager,
+      call: ClientMiddlewareCall<any, any>,
+      options: SparkCallOptions,
+    ) {
+      return yield* call.next(call.request, options);
+    }.bind(this);
   }
 
-  private createMiddleware(address: string, authToken: string) {
-    if (isNode) {
-      return this.createNodeMiddleware(address, authToken);
-    } else {
-      return this.createBrowserMiddleware(address, authToken);
-    }
+  protected createMiddleware(
+    address: string,
+    authToken: string,
+  ):
+    | ((
+        call: ClientMiddlewareCall<any, any>,
+        options: SparkCallOptions,
+      ) => AsyncGenerator<any, any, undefined>)
+    | undefined {
+    return undefined;
   }
 
-  private async *handleMiddlewareError(
+  protected async *handleMiddlewareError(
     error: unknown,
     address: string,
     call: ClientMiddlewareCall<any, any>,
@@ -421,69 +328,7 @@ export class ConnectionManager {
     throw error;
   }
 
-  private createNodeMiddleware(address: string, initialAuthToken: string) {
-    return async function* (
-      this: ConnectionManager,
-      call: ClientMiddlewareCall<any, any>,
-      options: SparkCallOptions,
-    ) {
-      const metadata = Metadata(options.metadata).set(
-        "X-Client-Env",
-        clientEnv,
-      );
-      try {
-        return yield* call.next(call.request, {
-          ...options,
-          metadata: metadata.set(
-            "Authorization",
-            `Bearer ${this.clients.get(address)?.authToken || initialAuthToken}`,
-          ),
-        });
-      } catch (error: unknown) {
-        return yield* this.handleMiddlewareError(
-          error,
-          address,
-          call,
-          metadata,
-          options,
-        );
-      }
-    }.bind(this);
-  }
-
-  private createBrowserMiddleware(address: string, initialAuthToken: string) {
-    return async function* (
-      this: ConnectionManager,
-      call: ClientMiddlewareCall<any, any>,
-      options: SparkCallOptions,
-    ) {
-      const metadata = Metadata(options.metadata)
-        .set("X-Requested-With", "XMLHttpRequest")
-        .set("X-Grpc-Web", "1")
-        .set("X-Client-Env", clientEnv)
-        .set("Content-Type", "application/grpc-web+proto");
-
-      try {
-        return yield* call.next(call.request, {
-          ...options,
-          metadata: metadata.set(
-            "Authorization",
-            `Bearer ${this.clients.get(address)?.authToken || initialAuthToken}`,
-          ),
-        });
-      } catch (error: any) {
-        return yield* this.handleMiddlewareError(
-          error,
-          address,
-          call,
-          metadata,
-          options,
-        );
-      }
-    }.bind(this);
-  }
-
-  private async createGrpcClient<T>(
+  protected async createGrpcClient<T>(
     defintion:
       | SparkAuthnServiceDefinition
       | SparkServiceDefinition
@@ -492,62 +337,6 @@ export class ConnectionManager {
     withRetries: boolean,
     middleware?: any,
   ): Promise<T & { close?: () => void }> {
-    let clientFactory: ClientFactory | ClientFactoryWeb;
-
-    const retryOptions = {
-      retry: true,
-      retryMaxAttempts: 3,
-    };
-    let options: RetryOptions = {};
-    const isNodeChannel = "close" in channel;
-
-    if (isNode && isNodeChannel && !isBun) {
-      const grpcModule = await import("nice-grpc");
-      const { openTelemetryClientMiddleware } = await import(
-        "nice-grpc-opentelemetry"
-      );
-      const { createClientFactory } =
-        "default" in grpcModule ? grpcModule.default : grpcModule;
-
-      clientFactory = createClientFactory();
-      if (withRetries) {
-        options = retryOptions;
-        clientFactory = clientFactory
-          .use(openTelemetryClientMiddleware())
-          .use(retryMiddleware);
-      }
-      if (middleware) {
-        clientFactory = clientFactory.use(middleware);
-      }
-      const client = clientFactory.create(defintion, channel, {
-        "*": options,
-      }) as T;
-      return {
-        ...client,
-        close: channel.close.bind(channel),
-      };
-    } else if (!isNodeChannel) {
-      const grpcModule = await import("nice-grpc-web");
-      const { createClientFactory } =
-        "default" in grpcModule ? grpcModule.default : grpcModule;
-
-      clientFactory = createClientFactory();
-      if (withRetries) {
-        options = retryOptions;
-        clientFactory = clientFactory.use(retryMiddleware);
-      }
-      if (middleware) {
-        clientFactory = clientFactory.use(middleware);
-      }
-      const client = clientFactory.create(defintion, channel, {
-        "*": options,
-      }) as T;
-      return {
-        ...client,
-        close: undefined,
-      };
-    } else {
-      throw new Error("Channel does not have close in NodeJS environment");
-    }
+    throw new Error("createGrpcClient: Not implemented");
   }
 }

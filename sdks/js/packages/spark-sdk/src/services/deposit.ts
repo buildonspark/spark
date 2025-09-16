@@ -23,7 +23,7 @@ import {
   INITIAL_SEQUENCE,
 } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
-import { ConnectionManager } from "./connection.js";
+import { ConnectionManager } from "./connection/connection.js";
 
 type ValidateDepositAddressParams = {
   address: Address;

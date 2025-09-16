@@ -51,7 +51,7 @@ import {
 } from "../proto/spark.js";
 import { QueryTokenTransactionsResponse } from "../proto/spark_token.js";
 import { WalletConfigService } from "../services/config.js";
-import { ConnectionManager } from "../services/connection.js";
+import { ConnectionManager } from "../services/connection/connection.js";
 import { CoopExitService } from "../services/coop-exit.js";
 import { DepositService } from "../services/deposit.js";
 import { LightningService } from "../services/lightning.js";
@@ -197,7 +197,7 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
     super();
 
     this.config = new WalletConfigService(options, signer);
-    this.connectionManager = new ConnectionManager(this.config);
+    this.connectionManager = this.buildConnectionManager(this.config);
     this.signingService = new SigningService(this.config);
     this.depositService = new DepositService(
       this.config,
@@ -225,34 +225,25 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     this.tracer = trace.getTracer(this.tracerId);
     this.wrapSparkWalletMethodsWithTracing();
+    this.initializeTracer(this);
   }
 
   public static async initialize({
     mnemonicOrSeed,
     accountNumber,
     signer,
-    options,
+    options = {},
   }: SparkWalletProps) {
     const wallet = new SparkWallet(options, signer);
-    wallet.initializeTracer(wallet);
-
-    if (options && options.signerWithPreExistingKeys) {
-      await wallet.initWalletWithoutSeed();
-
-      return {
-        wallet,
-      };
-    }
-
-    const initResponse = await wallet.initWallet(mnemonicOrSeed, accountNumber);
-
-    return {
-      wallet,
-      ...initResponse,
-    };
+    const initWalletResponse = await wallet.initWallet(
+      mnemonicOrSeed,
+      accountNumber,
+      options,
+    );
+    return initWalletResponse;
   }
 
-  private async initializeWallet() {
+  private async createClientsAndSyncWallet() {
     this.sspClient = new SspClient(this.config);
     await this.connectionManager.createClients();
 
@@ -272,6 +263,10 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
     }
     return this.sspClient;
+  }
+
+  protected buildConnectionManager(config: WalletConfigService) {
+    return new ConnectionManager(config);
   }
 
   private async handleStreamEvent({ event }: SubscribeToEventsResponse) {
@@ -880,14 +875,22 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
    *
    * @returns {Promise<Object>} Object containing:
    *   - mnemonic: The mnemonic if one was generated (undefined for raw seed)
-   *   - balance: The wallet's initial balance in satoshis
-   *   - tokenBalance: Map of token balances
+   *   - wallet: The wallet instance
    * @private
    */
   protected async initWallet(
     mnemonicOrSeed?: Uint8Array | string,
     accountNumber?: number,
-  ): Promise<InitWalletResponse | undefined> {
+    options: ConfigOptions = {},
+  ): Promise<InitWalletResponse<this>> {
+    if (options.signerWithPreExistingKeys) {
+      await this.initWalletWithoutSeed();
+      return {
+        wallet: this,
+        mnemonic: undefined,
+      };
+    }
+
     if (accountNumber === undefined) {
       if (this.config.getNetwork() === Network.REGTEST) {
         accountNumber = 0;
@@ -917,6 +920,7 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     return {
       mnemonic,
+      wallet: this,
     };
   }
 
@@ -925,7 +929,7 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * @private
    */
   protected async initWalletWithoutSeed() {
-    await this.initializeWallet();
+    await this.createClientsAndSyncWallet();
 
     const identityPublicKey = await this.config.signer.getIdentityPublicKey();
 
@@ -957,7 +961,7 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
   ) {
     const identityPublicKey =
       await this.config.signer.createSparkWalletFromSeed(seed, accountNumber);
-    await this.initializeWallet();
+    await this.createClientsAndSyncWallet();
 
     this.sparkAddress = encodeSparkAddress({
       identityPublicKey: identityPublicKey,

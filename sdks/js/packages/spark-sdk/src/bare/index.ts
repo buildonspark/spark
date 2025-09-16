@@ -35,7 +35,7 @@ setFetch(sparkBareFetch, Headers);
 
 export * from "../errors/index.js";
 /* Use Browser otel wrapper for now (more compatible with bare-fetch): */
-export { SparkWallet } from "../spark-wallet/spark-wallet.browser.js";
+export { SparkWallet } from "../spark-wallet/spark-wallet.bare.js";
 export { getLatestDepositTxId } from "../utils/mempool.js";
 export * from "../utils/index.js";
 export {

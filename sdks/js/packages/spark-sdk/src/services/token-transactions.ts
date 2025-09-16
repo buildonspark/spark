@@ -41,7 +41,7 @@ import {
   sumAvailableTokens,
 } from "../utils/token-transactions.js";
 import { WalletConfigService } from "./config.js";
-import { ConnectionManager } from "./connection.js";
+import { ConnectionManager } from "./connection/connection.js";
 import { SigningOperator } from "./wallet-config.js";
 
 const MAX_TOKEN_OUTPUTS = 500;

@@ -1,7 +1,7 @@
 import { walletTypes, createDeterministicKeys } from "../test-utils.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { WalletConfigService } from "../../services/config.js";
-import { ConnectionManager } from "../../services/connection.js";
+import { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
 import { TokenTransactionService } from "../../services/token-transactions.js";
 import { ValidationError } from "../../errors/types.js";
 
@@ -25,7 +25,7 @@ describe.each(walletTypes)(
         },
         wallet.getSigner(),
       );
-      const connectionManager = new ConnectionManager(userConfig);
+      const connectionManager = new ConnectionManagerNodeJS(userConfig);
       tokenTransactionService = new TokenTransactionService(
         userConfig,
         connectionManager,

@@ -54,7 +54,7 @@ export const createSparkRouter = (
     return config;
   };
 
-  const initWallet = async (mnemonicOrSeed: string) => {
+  const handleInitWallet = async (mnemonicOrSeed: string) => {
     if (walletInstance) {
       return undefined;
     }
@@ -125,7 +125,7 @@ export const createSparkRouter = (
       if (!mnemonicOrSeed) {
         mnemonicOrSeed = await loadMnemonic(mnemonicPath);
       }
-      const response = await initWallet(mnemonicOrSeed ?? "");
+      const response = await handleInitWallet(mnemonicOrSeed ?? "");
       if (!mnemonicOrSeed && response?.mnemonic) {
         await saveMnemonic(mnemonicPath, response.mnemonic);
       }

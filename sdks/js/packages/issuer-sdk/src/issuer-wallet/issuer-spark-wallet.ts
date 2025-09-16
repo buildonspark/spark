@@ -43,22 +43,12 @@ export class IssuerSparkWallet extends SparkWallet {
     options,
   }: SparkWalletProps) {
     const wallet = new IssuerSparkWallet(options, signer);
-    wallet.initializeTracer(wallet);
-
-    if (options && options.signerWithPreExistingKeys) {
-      await wallet.initWalletWithoutSeed();
-
-      return {
-        wallet,
-      };
-    }
-
-    const initResponse = await wallet.initWallet(mnemonicOrSeed, accountNumber);
-
-    return {
-      wallet,
-      ...initResponse,
-    };
+    const initResponse = await wallet.initWallet(
+      mnemonicOrSeed,
+      accountNumber,
+      options,
+    );
+    return initResponse;
   }
 
   protected constructor(configOptions?: ConfigOptions, signer?: SparkSigner) {

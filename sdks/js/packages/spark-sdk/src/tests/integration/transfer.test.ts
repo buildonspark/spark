@@ -13,7 +13,7 @@ import {
 } from "../../index.js";
 import { InvoiceStatus, TransferStatus } from "../../proto/spark.js";
 import { WalletConfigService } from "../../services/config.js";
-import { ConnectionManager } from "../../services/connection.js";
+import { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
 import { SigningService } from "../../services/signing.js";
 import type { LeafKeyTweak } from "../../services/transfer.js";
 import { TransferService } from "../../services/transfer.js";
@@ -49,7 +49,7 @@ describe.each(walletTypes)(
         options,
         senderWallet.getSigner(),
       );
-      const senderConnectionManager = new ConnectionManager(
+      const senderConnectionManager = new ConnectionManagerNodeJS(
         senderConfigService,
       );
       const signingService = new SigningService(senderConfigService);
@@ -77,7 +77,7 @@ describe.each(walletTypes)(
         options,
         receiverWallet.getSigner(),
       );
-      const receiverConnectionManager = new ConnectionManager(
+      const receiverConnectionManager = new ConnectionManagerNodeJS(
         receiverConfigService,
       );
       const receiverSigningService = new SigningService(receiverConfigService);
@@ -165,7 +165,7 @@ describe.each(walletTypes)(
         options,
         senderWallet.getSigner(),
       );
-      const senderConnectionManager = new ConnectionManager(
+      const senderConnectionManager = new ConnectionManagerNodeJS(
         senderConfigService,
       );
       const senderSigningService = new SigningService(senderConfigService);
@@ -186,7 +186,7 @@ describe.each(walletTypes)(
         options,
         receiverWallet.getSigner(),
       );
-      const receiverConnectionManager = new ConnectionManager(
+      const receiverConnectionManager = new ConnectionManagerNodeJS(
         receiverConfigService,
       );
       const receiverSigningService = new SigningService(receiverConfigService);
@@ -264,7 +264,7 @@ describe.each(walletTypes)(
 
       const transferService = new TransferService(
         receiverConfigService,
-        new ConnectionManager(receiverConfigService),
+        new ConnectionManagerNodeJS(receiverConfigService),
         new SigningService(receiverConfigService),
       );
 
@@ -329,7 +329,7 @@ describe.each(walletTypes)(
           options,
           senderWallet.getSigner(),
         );
-        const senderConnectionManager = new ConnectionManager(
+        const senderConnectionManager = new ConnectionManagerNodeJS(
           senderConfigService,
         );
         const senderSigningService = new SigningService(senderConfigService);
@@ -372,7 +372,7 @@ describe.each(walletTypes)(
           missingOperatorOptions,
           receiverWallet.getSigner(),
         );
-        const receiverConnectionManager = new ConnectionManager(
+        const receiverConnectionManager = new ConnectionManagerNodeJS(
           receiverConfigService,
         );
         const receiverSigningService = new SigningService(
@@ -457,9 +457,8 @@ describe.each(walletTypes)(
           receiverOptions,
           receiverWalletWithAllOperators.getSigner(),
         );
-        const receiverConnectionManagerWithAllOperators = new ConnectionManager(
-          receiverConfigServiceWithAllOperators,
-        );
+        const receiverConnectionManagerWithAllOperators =
+          new ConnectionManagerNodeJS(receiverConfigServiceWithAllOperators);
         const receiverSigningServiceWithAllOperators = new SigningService(
           receiverConfigServiceWithAllOperators,
         );
@@ -719,7 +718,9 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
       options,
       senderWallet.getSigner(),
     );
-    const senderConnectionManager = new ConnectionManager(senderConfigService);
+    const senderConnectionManager = new ConnectionManagerNodeJS(
+      senderConfigService,
+    );
     const signingService = new SigningService(senderConfigService);
     const senderTransferService = new TransferService(
       senderConfigService,
@@ -745,7 +746,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
       options,
       receiverWallet.getSigner(),
     );
-    const receiverConnectionManager = new ConnectionManager(
+    const receiverConnectionManager = new ConnectionManagerNodeJS(
       receiverConfigService,
     );
     const receiverSigningService = new SigningService(receiverConfigService);
@@ -834,7 +835,9 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
       options,
       senderWallet.getSigner(),
     );
-    const senderConnectionManager = new ConnectionManager(senderConfigService);
+    const senderConnectionManager = new ConnectionManagerNodeJS(
+      senderConfigService,
+    );
     const senderSigningService = new SigningService(senderConfigService);
     const senderTransferService = new TransferService(
       senderConfigService,
@@ -1093,7 +1096,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
       options,
       sdk2.getSigner(),
     );
-    const receiverConnectionManager = new ConnectionManager(
+    const receiverConnectionManager = new ConnectionManagerNodeJS(
       receiverConfigService,
     );
     const receiverSigningService = new SigningService(receiverConfigService);
@@ -1177,7 +1180,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     });
 
     const bobConfigService = new WalletConfigService(options, bob.getSigner());
-    const bobConnectionManager = new ConnectionManager(bobConfigService);
+    const bobConnectionManager = new ConnectionManagerNodeJS(bobConfigService);
     const bobSigningService = new SigningService(bobConfigService);
 
     const bobTransferService = new TransferService(
@@ -1252,7 +1255,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
     });
 
     const bobConfigService = new WalletConfigService(options, bob.getSigner());
-    const bobConnectionManager = new ConnectionManager(bobConfigService);
+    const bobConnectionManager = new ConnectionManagerNodeJS(bobConfigService);
     const bobSigningService = new SigningService(bobConfigService);
 
     const bobTransferService = new TransferService(
@@ -1365,7 +1368,7 @@ describe.skip.each(walletTypes)(
         options,
         sdk2.getSigner(),
       );
-      const receiverConnectionManager = new ConnectionManager(
+      const receiverConnectionManager = new ConnectionManagerNodeJS(
         receiverConfigService,
       );
       const receiverSigningService = new SigningService(receiverConfigService);
@@ -1482,7 +1485,7 @@ describe.skip.each(walletTypes)(
         options,
         sdk2.getSigner(),
       );
-      const receiverConnectionManager = new ConnectionManager(
+      const receiverConnectionManager = new ConnectionManagerNodeJS(
         receiverConfigService,
       );
       const receiverSigningService = new SigningService(receiverConfigService);
@@ -1542,7 +1545,7 @@ describe.skip.each(walletTypes)(
         options,
         sdk2.getSigner(),
       );
-      const receiverConnectionManager = new ConnectionManager(
+      const receiverConnectionManager = new ConnectionManagerNodeJS(
         receiverConfigService,
       );
       const receiverSigningService = new SigningService(receiverConfigService);

@@ -17,7 +17,7 @@ import {
   maybeApplyFee,
 } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
-import { ConnectionManager } from "./connection.js";
+import { ConnectionManager } from "./connection/connection.js";
 import { SigningService } from "./signing.js";
 import type { LeafKeyTweak } from "./transfer.js";
 import { BaseTransferService, LeafRefundSigningData } from "./transfer.js";

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import { SparkWallet } from "../../spark-wallet/spark-wallet.js";
-import type { ConnectionManager } from "../../services/connection.js";
+import type { ConnectionManager } from "../../services/connection/connection.js";
 
 /** Helper subclass to expose the private `queryNodes` method for testing. */
 class TestSparkWallet extends SparkWallet {

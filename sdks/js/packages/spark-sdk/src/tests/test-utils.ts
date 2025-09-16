@@ -8,7 +8,7 @@ import {
 } from "../index.js";
 import { FinalizeNodeSignaturesResponse, TreeNode } from "../proto/spark.js";
 import { WalletConfigService } from "../services/config.js";
-import { ConnectionManager } from "../services/connection.js";
+import { ConnectionManagerNodeJS } from "../services/connection/connection.node.js";
 import { DepositService } from "../services/deposit.js";
 import { ConfigOptions, WalletConfig } from "../services/wallet-config.js";
 import { getP2TRAddressFromPublicKey } from "../utils/bitcoin.js";
@@ -17,7 +17,7 @@ import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
 import { sha256 } from "@noble/hashes/sha2";
 
-export { BitcoinFaucet };
+export { BitcoinFaucet, SparkWalletTesting };
 
 export function getTestWalletConfig() {
   const identityPrivateKey = secp256k1.utils.randomPrivateKey();
@@ -48,7 +48,7 @@ async function createDeposit(
     },
     wallet.getSigner(),
   );
-  const connectionManager = new ConnectionManager(configService);
+  const connectionManager = new ConnectionManagerNodeJS(configService);
   const depositService = new DepositService(configService, connectionManager);
 
   const pubKey = await wallet.getSigner().getPublicKeyFromDerivation({

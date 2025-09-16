@@ -1,6 +1,8 @@
 import { IssuerSparkWallet as BaseIssuerSparkWallet } from "./issuer-spark-wallet.js";
 import {
   initializeTracerEnv as initializeTracerEnvBrowser,
+  ConnectionManager,
+  type WalletConfigService,
   type SparkWalletProps,
 } from "@buildonspark/spark-sdk";
 
@@ -12,22 +14,16 @@ export class IssuerSparkWalletBrowser extends BaseIssuerSparkWallet {
     options,
   }: SparkWalletProps) {
     const wallet = new IssuerSparkWalletBrowser(options, signer);
-    wallet.initializeTracer(wallet);
+    const initResponse = await wallet.initWallet(
+      mnemonicOrSeed,
+      accountNumber,
+      options,
+    );
+    return initResponse;
+  }
 
-    if (options && options.signerWithPreExistingKeys) {
-      await wallet.initWalletWithoutSeed();
-
-      return {
-        wallet,
-      };
-    }
-
-    const initResponse = await wallet.initWallet(mnemonicOrSeed, accountNumber);
-
-    return {
-      wallet,
-      ...initResponse,
-    };
+  protected buildConnectionManager(config: WalletConfigService) {
+    return new ConnectionManager(config);
   }
 
   protected initializeTracerEnv({

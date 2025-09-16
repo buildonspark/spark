@@ -3,7 +3,7 @@ import { bytesToHex, hexToBytes } from "@noble/curves/utils";
 import { uuidv7 } from "uuidv7";
 import { KeyDerivation, KeyDerivationType } from "../../index.js";
 import { WalletConfigService } from "../../services/config.js";
-import { ConnectionManager } from "../../services/connection.js";
+import { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
 import { SigningService } from "../../services/signing.js";
 import type { LeafKeyTweak } from "../../services/transfer.js";
 import { TransferService } from "../../services/transfer.js";
@@ -42,7 +42,7 @@ describe.each(walletTypes)("Node compatibility tests", ({ name, Signer }) => {
       options,
       oldWallet.getSigner(),
     );
-    const oldConnectionManager = new ConnectionManager(oldConfigService);
+    const oldConnectionManager = new ConnectionManagerNodeJS(oldConfigService);
     const oldSigningService = new SigningService(oldConfigService);
     const oldTransferService = new TransferService(
       oldConfigService,
@@ -54,7 +54,7 @@ describe.each(walletTypes)("Node compatibility tests", ({ name, Signer }) => {
       options,
       newWallet.getSigner(),
     );
-    const newConnectionManager = new ConnectionManager(newConfigService);
+    const newConnectionManager = new ConnectionManagerNodeJS(newConfigService);
     const newSigningService = new SigningService(newConfigService);
     const newTransferService = new TransferService(
       newConfigService,

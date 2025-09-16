@@ -1,7 +1,7 @@
 import {
   TokenTransactionService,
   WalletConfigService,
-  type ConnectionManager,
+  type BaseConnectionManager,
 } from "@buildonspark/spark-sdk";
 import { TokenTransaction } from "@buildonspark/spark-sdk/proto/spark_token";
 import { numberToBytesBE } from "@noble/curves/utils";
@@ -9,7 +9,7 @@ import { numberToBytesBE } from "@noble/curves/utils";
 export class IssuerTokenTransactionService extends TokenTransactionService {
   constructor(
     config: WalletConfigService,
-    connectionManager: ConnectionManager,
+    connectionManager: BaseConnectionManager,
   ) {
     super(config, connectionManager);
   }

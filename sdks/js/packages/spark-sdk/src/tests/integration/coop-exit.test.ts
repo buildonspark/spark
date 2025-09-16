@@ -6,7 +6,7 @@ import { TransactionInput } from "@scure/btc-signer/psbt";
 import { equalBytes } from "@scure/btc-signer/utils";
 import { uuidv7 } from "uuidv7";
 import { WalletConfigService } from "../../services/config.js";
-import { ConnectionManager } from "../../services/connection.js";
+import { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
 import { CoopExitService } from "../../services/coop-exit.js";
 import { SigningService } from "../../services/signing.js";
 import type { LeafKeyTweak } from "../../services/transfer.js";
@@ -47,7 +47,7 @@ describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
       options,
       userWallet.getSigner(),
     );
-    const connectionManager = new ConnectionManager(configService);
+    const connectionManager = new ConnectionManagerNodeJS(configService);
     const signingService = new SigningService(configService);
     const coopExitService = new CoopExitService(
       configService,
@@ -69,7 +69,7 @@ describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
       options,
       sspWallet.getSigner(),
     );
-    const sspConnectionManager = new ConnectionManager(sspConfigService);
+    const sspConnectionManager = new ConnectionManagerNodeJS(sspConfigService);
     const sspSigningService = new SigningService(sspConfigService);
     const sspTransferService = new TransferService(
       sspConfigService,

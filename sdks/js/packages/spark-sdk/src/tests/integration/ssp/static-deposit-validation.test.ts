@@ -1,5 +1,5 @@
 import {
-  initWallet,
+  initTestingWallet,
   SparkWalletTesting,
 } from "../../utils/spark-testing-wallet.js";
 import { sha256 } from "@noble/hashes/sha2";
@@ -60,7 +60,7 @@ describe("SSP static deposit validation tests", () => {
       signedTx,
       vout,
       faucet,
-    } = await initWallet(DEPOSIT_AMOUNT, "LOCAL");
+    } = await initTestingWallet(DEPOSIT_AMOUNT, "LOCAL");
 
     await new Promise((resolve) => setTimeout(resolve, 30000));
 

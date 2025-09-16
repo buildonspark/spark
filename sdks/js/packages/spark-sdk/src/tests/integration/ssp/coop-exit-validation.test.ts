@@ -1,6 +1,6 @@
 import { Transaction } from "@scure/btc-signer";
 import {
-  initWallet,
+  initTestingWallet,
   SparkWalletTesting,
 } from "../../utils/spark-testing-wallet.js";
 import { expect } from "@jest/globals";
@@ -16,10 +16,8 @@ describe("SSP coop exit basic validation", () => {
   let quoteAmount: number;
 
   beforeAll(async () => {
-    const { wallet, depositAddress, signedTx, vout, faucet } = await initWallet(
-      DEPOSIT_AMOUNT,
-      "LOCAL",
-    );
+    const { wallet, depositAddress, signedTx, vout, faucet } =
+      await initTestingWallet(DEPOSIT_AMOUNT, "LOCAL");
 
     // Wait for the transaction to be mined
     await new Promise((resolve) => setTimeout(resolve, 30000));

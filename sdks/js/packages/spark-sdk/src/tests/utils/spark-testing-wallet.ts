@@ -1,59 +1,40 @@
 import { QueryTransfersResponse, Transfer } from "../../proto/spark.js";
 import { ConfigOptions } from "../../services/wallet-config.js";
 import { SparkSigner } from "../../signer/signer.js";
-import { SparkWallet } from "../../spark-wallet/spark-wallet.node.js";
 import type { SparkWalletProps } from "../../spark-wallet/types.js";
 import { BitcoinFaucet } from "./test-faucet.js";
 import { Transaction } from "@scure/btc-signer";
 import { NetworkType } from "../../index.node.js";
+import { SparkWalletNodeJS } from "../../spark-wallet/spark-wallet.node.js";
 
-interface ISparkWalletTesting extends SparkWallet {
+interface ISparkWalletTesting extends SparkWalletNodeJS {
   getSigner(): SparkSigner;
   queryPendingTransfers(): Promise<QueryTransfersResponse>;
   verifyPendingTransfer(transfer: Transfer): Promise<Map<string, Uint8Array>>;
 }
 
 export class SparkWalletTesting
-  extends SparkWallet
+  extends SparkWalletNodeJS
   implements ISparkWalletTesting
 {
-  private disableEvents: boolean;
-
-  constructor(
-    options?: ConfigOptions,
-    signer?: SparkSigner,
-    disableEvents = true,
-  ) {
-    super(options, signer);
-    this.disableEvents = disableEvents;
-  }
+  public disableEvents = true;
 
   static async initialize(props: SparkWalletProps, disableEvents = true) {
-    const wallet = new SparkWalletTesting(
+    const wallet = new SparkWalletTesting(props.options, props.signer);
+    wallet.disableEvents = disableEvents;
+    const initWalletResponse = await wallet.initWallet(
+      props.mnemonicOrSeed,
+      props.accountNumber,
       props.options,
-      props.signer,
-      disableEvents,
     );
-
-    if (props.options && props.options.signerWithPreExistingKeys) {
-      await wallet.initWalletWithoutSeed();
-
-      return {
-        wallet,
-      };
-    } else {
-      const initResponse = await wallet.initWallet(
-        props.mnemonicOrSeed,
-        props.accountNumber,
-      );
-      return {
-        wallet,
-        mnemonic: initResponse?.mnemonic,
-      };
-    }
+    return initWalletResponse;
   }
 
   protected override async setupBackgroundStream() {
+    console.log(
+      "tmp SparkWalletTesting.setupBackgroundStream disableEvents",
+      this.disableEvents,
+    );
     if (!this.disableEvents) {
       await super.setupBackgroundStream();
     }
@@ -75,7 +56,7 @@ export class SparkWalletTesting
   }
 }
 
-export async function initWallet(
+export async function initTestingWallet(
   amount: bigint,
   network: NetworkType,
 ): Promise<{

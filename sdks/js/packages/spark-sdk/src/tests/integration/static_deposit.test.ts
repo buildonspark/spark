@@ -1,6 +1,6 @@
 import {
   SparkWalletTesting,
-  initWallet,
+  initTestingWallet,
 } from "../utils/spark-testing-wallet.js";
 
 export const DEPOSIT_AMOUNT = 10000n;
@@ -16,7 +16,7 @@ describe("SSP static deposit address integration", () => {
         signedTx,
         vout,
         faucet,
-      } = await initWallet(DEPOSIT_AMOUNT, "LOCAL");
+      } = await initTestingWallet(DEPOSIT_AMOUNT, "LOCAL");
 
       // Wait for the transaction to be mined
       await faucet.mineBlocks(6);
@@ -59,7 +59,7 @@ describe("SSP static deposit address integration", () => {
         signedTx,
         vout,
         faucet,
-      } = await initWallet(DEPOSIT_AMOUNT, "LOCAL");
+      } = await initTestingWallet(DEPOSIT_AMOUNT, "LOCAL");
 
       // Wait for the transaction to be mined
       await faucet.mineBlocks(6);
@@ -86,7 +86,7 @@ describe("SSP static deposit address integration", () => {
         signedTx,
         vout,
         faucet,
-      } = await initWallet(DEPOSIT_AMOUNT, "LOCAL");
+      } = await initTestingWallet(DEPOSIT_AMOUNT, "LOCAL");
 
       // Wait for the transaction to be mined
       await faucet.mineBlocks(6);
