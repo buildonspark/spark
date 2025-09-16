@@ -39,6 +39,12 @@ const (
 	// Task / gocron related knobs.
 	KnobSoTaskEnabled = "spark.so.task.enabled"
 	KnobSoTaskTimeout = "spark.so.task.timeout"
+
+	// Tasks
+	// Set the batch size for the backfill tree node txids task that pupulatesthe
+	// txids for tree nodes that were created before the txids were added to the
+	// database.
+	KnobTasksEnableBackfillTreeNodeTxidsBatchSize = "spark.so.tasks.enable_backfill_tree_node_txids_batch_size"
 )
 
 type Config struct {

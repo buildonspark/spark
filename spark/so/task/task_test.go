@@ -1,16 +1,20 @@
 package task
 
 import (
+	"bytes"
 	"math/rand/v2"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
@@ -112,4 +116,94 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 	hasSpentTx, err = tokenOutput.QueryOutputSpentTokenTransaction().Exist(ctx)
 	require.NoError(t, err)
 	require.True(t, hasSpentTx, "Should still have single spent relationship")
+}
+
+func TestBackfillTreeNodeTxids(t *testing.T) {
+	ctx, _ := db.ConnectToTestPostgres(t)
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	var nodeID = uuid.New()
+	var treeID = uuid.New()
+
+	rng := rand.NewChaCha8([32]byte{})
+	ownerIdentityPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	nodeValue := uint64(1000)
+	nodeVerifyingPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	nodeRawTx, err := sparktesting.CreateTestP2TRTransaction("bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0", 1000)
+	require.NoError(t, err)
+	nodeRawTxBytes, err := common.SerializeTx(nodeRawTx)
+	require.NoError(t, err)
+	nodeRawRefundTx, err := sparktesting.CreateTestP2TRTransaction("bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0", 1000)
+	require.NoError(t, err)
+	nodeRawRefundTxBytes, err := common.SerializeTx(nodeRawRefundTx)
+	require.NoError(t, err)
+	nodeDirectRefundTx, err := sparktesting.CreateTestP2TRTransaction("bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0", 1000)
+	require.NoError(t, err)
+	nodeDirectRefundTxBytes, err := common.SerializeTx(nodeDirectRefundTx)
+	require.NoError(t, err)
+	nodeDirectFromCpfpRefundTx, err := sparktesting.CreateTestP2TRTransaction("bc1p0xlxvlhemja6c4dqv22uapctqupfhlxm9h8z3k2e72q4k9hcz7vqzk5jj0", 1000)
+	require.NoError(t, err)
+	nodeDirectFromCpfpRefundTxBytes, err := common.SerializeTx(nodeDirectFromCpfpRefundTx)
+	require.NoError(t, err)
+
+	_, err = tx.Tree.Create().
+		SetID(treeID).
+		SetOwnerIdentityPubkey(ownerIdentityPubkey).
+		SetNetwork(st.NetworkRegtest).
+		SetStatus(st.TreeStatusAvailable).
+		SetBaseTxid([]byte{1, 2, 3}).
+		SetVout(int16(0)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	keysharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	publicSharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	signingKeyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
+		SetPublicShares(map[string]keys.Public{"test": publicSharePrivkey.Public()}).
+		SetPublicKey(keysharePrivkey.Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// OpCreate
+	insertQuery := `
+		INSERT INTO tree_nodes (id, create_time, update_time, tree_node_tree, status, owner_identity_pubkey, owner_signing_pubkey, value, verifying_pubkey, tree_node_signing_keyshare, raw_tx, raw_refund_tx, direct_refund_tx, direct_from_cpfp_refund_tx, vout)
+		VALUES ($1, '2025-01-01 00:00:00', '2025-01-01 00:00:00', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+	`
+	// Bypass hooks
+	// nolint:forbidigo
+	_, err = tx.ExecContext(ctx, insertQuery, nodeID, treeID, st.TreeNodeStatusAvailable, ownerIdentityPubkey.Serialize(), ownerSigningPubkey.Serialize(), nodeValue, nodeVerifyingPubkey.Serialize(), signingKeyshare.ID, nodeRawTxBytes, nodeRawRefundTxBytes, nodeDirectRefundTxBytes, nodeDirectFromCpfpRefundTxBytes, int16(0))
+	require.NoError(t, err)
+
+	// Get the backfill task from AllStartupTasks
+	var backfillTask *ScheduledTaskSpec
+	for _, task := range AllScheduledTasks() {
+		if task.Name == "backfill_tree_node_txids" {
+			backfillTask = &task
+			break
+		}
+	}
+	require.NotNil(t, backfillTask, "Should find backfill task")
+
+	config := sparktesting.TestConfig(t)
+
+	err = backfillTask.Task(ctx, config, knobs.NewFixedKnobs(map[string]float64{}))
+	require.NoError(t, err)
+
+	tx, err = ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	treeNode, err := tx.TreeNode.Query().
+		Where(treenode.ID(nodeID)).
+		Only(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, treeNode.RawTxid)
+	require.True(t, bytes.Equal(treeNode.RawTx, nodeRawTxBytes))
+	require.NotNil(t, treeNode.RawRefundTxid)
+	require.NotNil(t, treeNode.DirectRefundTxid)
+	require.NotNil(t, treeNode.DirectFromCpfpRefundTxid)
 }
