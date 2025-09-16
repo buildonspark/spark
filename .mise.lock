@@ -8,31 +8,26 @@ size = 93071218
 url = "https://release.ariga.io/atlas/atlas-darwin-arm64-v0.35.0"
 
 [tools.go]
-version = "1.24.6"
+version = "1.25.1"
 backend = "core:go"
 
 [tools.go.platforms.macos-arm64]
-checksum = "sha256:4e29202c49573b953be7cc3500e1f8d9e66ddd12faa8cf0939a4951411e09a2a"
-size = 76293244
-url = "https://dl.google.com/go/go1.24.6.darwin-arm64.tar.gz"
+checksum = "sha256:68deebb214f39d542e518ebb0598a406ab1b5a22bba8ec9ade9f55fb4dd94a6c"
+size = 57906702
+url = "https://dl.google.com/go/go1.25.1.darwin-arm64.tar.gz"
 
 [tools.golangci-lint]
-version = "2.2.2"
+version = "2.4.0"
 backend = "aqua:golangci/golangci-lint"
 
-[tools.golangci-lint.platforms.macos-arm64]
-checksum = "sha256:d84d94d042c0d495fd1746f3d18948a75de163b17a14e8de3ef840928dd2df74"
-size = 13585670
-url = "https://github.com/golangci/golangci-lint/releases/download/v2.2.2/golangci-lint-2.2.2-darwin-arm64.tar.gz"
-
 [tools.gotestsum]
-version = "1.12.0"
+version = "1.13.0"
 backend = "aqua:gotestyourself/gotestsum"
 
 [tools.gotestsum.platforms.macos-arm64]
-checksum = "sha256:c5ffdc9054644c4db365de2197a12d21eff48b88a9ad20e3e0c29346802d0b41"
-size = 2252304
-url = "https://github.com/gotestyourself/gotestsum/releases/download/v1.12.0/gotestsum_1.12.0_darwin_arm64.tar.gz"
+checksum = "sha256:509cb27aef747f48faf9bce424f59dcf79572c905204b990ee935bbfcc7fa0e9"
+size = 2472317
+url = "https://github.com/gotestyourself/gotestsum/releases/download/v1.13.0/gotestsum_1.13.0_darwin_arm64.tar.gz"
 
 [tools.lefthook]
 version = "1.11.14"
