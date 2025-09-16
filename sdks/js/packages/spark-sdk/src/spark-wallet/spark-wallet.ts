@@ -3289,7 +3289,18 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
         });
       }
 
-      if (decodedInvoice.amountMSats !== BigInt(amountSats * 1000)) {
+      if (decodedInvoice.amountMSats === null && amountSats !== 0) {
+        throw new ValidationError("Amount mismatch", {
+          field: "amountMSats",
+          value: "null",
+          expected: amountSats * 1000,
+        });
+      }
+
+      if (
+        decodedInvoice.amountMSats !== null &&
+        decodedInvoice.amountMSats !== BigInt(amountSats * 1000)
+      ) {
         throw new ValidationError("Amount mismatch", {
           field: "amountMSats",
           value: decodedInvoice.amountMSats,
