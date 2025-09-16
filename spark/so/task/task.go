@@ -340,25 +340,10 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					if err != nil {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
 					}
-					stuckTx1, err := hex.DecodeString("637c8251c4f6748c3fc70880f7e6e6fa607c563fae8e21866946f49400d0d5d5")
-					if err != nil {
-						return fmt.Errorf("invalid hex for finalized token transaction hash A: %w", err)
-					}
-					stuckTx2, err := hex.DecodeString("7941b215536c63e4a0f8c1ad0ea5770d614e959b2f7adb647bfc8c4e78ad1dc4")
-					if err != nil {
-						return fmt.Errorf("invalid hex for finalized token transaction hash B: %w", err)
-					}
-
 					tokenTransactions, err := dbTX.TokenTransaction.Query().
 						Where(
 							tokentransaction.Or(
 								tokentransaction.StatusEQ(st.TokenTransactionStatusRevealed),
-								// Temporary condition to resolve stuck transactions created due to theshold bug.
-								// TODO(CNT-444): Remove this condition once the threshold bug is resolved.
-								tokentransaction.And(
-									tokentransaction.FinalizedTokenTransactionHashIn(stuckTx1, stuckTx2),
-									tokentransaction.StatusNotIn(st.TokenTransactionStatusFinalized),
-								),
 							),
 							tokentransaction.UpdateTimeLT(
 								time.Now().Add(-5*time.Minute).UTC(),
@@ -369,8 +354,12 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							q.WithOutputCreatedTokenTransaction()
 							q.WithTokenPartialRevocationSecretShares()
 							q.WithRevocationKeyshare()
+							q.ForUpdate()
 						}).
-						WithCreatedOutput().
+						WithCreatedOutput(func(q *ent.TokenOutputQuery) {
+							q.ForUpdate()
+						}).
+						ForUpdate().
 						All(ctx)
 					if err != nil {
 						return err
@@ -391,7 +380,12 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						}
 						finalized, err := internalSignTokenHandler.RecoverFullRevocationSecretsAndFinalize(ctx, tokenTransaction)
 						if err != nil {
-							return fmt.Errorf("failed to recover full revocation secrets and finalize token transaction with id: %s, hash: %x: %w", tokenTransaction.ID, tokenTransaction.FinalizedTokenTransactionHash, err)
+							logger.Error("failed to recover full revocation secrets and finalize token transaction",
+								zap.Stringer("transaction_id", tokenTransaction.ID),
+								zap.String("transaction_hash", hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash)),
+								zap.Error(err),
+							)
+							continue
 						}
 						if finalized {
 							logger.Info("Successfully finalized token transaction",
