@@ -1,5 +1,14 @@
 # @buildonspark/spark-sdk
 
+## 0.3.4
+
+### Patch Changes
+
+- - Remove v0 token transactions in favor of v1
+  - Add method to query spark invoices
+  - Support decoding spark1 addresses
+  - Validate invoice details returned from SSP in lightning receive flow
+
 ## 0.3.3
 
 ### Patch Changes
