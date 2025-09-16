@@ -348,8 +348,8 @@ func validateNewTxOutput(leaf *ent.TreeNode,
 	if len(newDirectNodeTx.TxOut) == 0 {
 		return fmt.Errorf("new direct node tx output is empty")
 	}
-	if uint64(newDirectNodeTx.TxOut[0].Value) >= leaf.Value {
-		return fmt.Errorf("new direct node tx output value must be less than leaf value, leaf value: %d, direct node tx value: %d", leaf.Value, newDirectNodeTx.TxOut[0].Value)
+	if uint64(newDirectNodeTx.TxOut[0].Value) > leaf.Value {
+		return fmt.Errorf("new direct node tx output value must be less than or equal to leaf value, leaf value: %d, direct node tx value: %d", leaf.Value, newDirectNodeTx.TxOut[0].Value)
 	}
 
 	if len(cpfpRefundTx.TxOut) == 0 {
@@ -362,15 +362,15 @@ func validateNewTxOutput(leaf *ent.TreeNode,
 	if len(directRefundTx.TxOut) == 0 {
 		return fmt.Errorf("direct refund tx output is empty")
 	}
-	if uint64(directRefundTx.TxOut[0].Value) >= leaf.Value {
-		return fmt.Errorf("direct refund tx output value must be less than leaf value, leaf value %d, direct refund tx value: %d", leaf.Value, cpfpRefundTx.TxOut[0].Value)
+	if uint64(directRefundTx.TxOut[0].Value) > leaf.Value {
+		return fmt.Errorf("direct refund tx output value must be less than or equal to leaf value, leaf value %d, direct refund tx value: %d", leaf.Value, cpfpRefundTx.TxOut[0].Value)
 	}
 
 	if len(directFromCpfpRefundTx.TxOut) == 0 {
 		return fmt.Errorf("direct from cpfp refund tx output is empty")
 	}
-	if uint64(directFromCpfpRefundTx.TxOut[0].Value) >= leaf.Value {
-		return fmt.Errorf("direct from cpfp refund tx output value must be less than leaf value, leaf value %d, direct from cpfp refund tx value: %d", leaf.Value, directFromCpfpRefundTx.TxOut[0].Value)
+	if uint64(directFromCpfpRefundTx.TxOut[0].Value) > leaf.Value {
+		return fmt.Errorf("direct from cpfp refund tx output value must be less than or equal to leaf value, leaf value %d, direct from cpfp refund tx value: %d", leaf.Value, directFromCpfpRefundTx.TxOut[0].Value)
 	}
 	return nil
 }
