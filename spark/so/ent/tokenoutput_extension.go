@@ -89,7 +89,11 @@ func FetchAndLockTokenInputs(ctx context.Context, outputsToSpend []*tokenpb.Toke
 
 	lockedOutputs, err := db.TokenOutput.Query().
 		Where(tokenoutput.IDIn(outputIDs...)).
-		WithOutputSpentTokenTransaction().
+		WithOutputSpentTokenTransaction(
+			func(q *TokenTransactionQuery) {
+				q.ForUpdate()
+			},
+		).
 		ForUpdate().
 		All(ctx)
 	if err != nil {

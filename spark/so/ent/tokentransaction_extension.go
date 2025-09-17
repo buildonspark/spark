@@ -809,18 +809,34 @@ func FetchAndLockTokenTransactionDataByHash(ctx context.Context, tokenTransactio
 
 	tokenTransaction, err := db.TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHash(tokenTransactionHash)).
-		WithCreatedOutput().
+		// Lock outputs which may be updated along with this token transaction.
+		WithCreatedOutput(func(q *TokenOutputQuery) {
+			q.ForUpdate()
+		}).
+		// Lock inputs which may be updated along with this token transaction.
 		WithSpentOutput(func(q *TokenOutputQuery) {
 			// Needed to enable computation of the progress of a transaction commit.
+			// Don't lock because revocation keyshares are append-only.
 			q.WithRevocationKeyshare().
 				WithTokenPartialRevocationSecretShares().
 				// Needed to enable marshalling of the token transaction proto.
-				WithOutputCreatedTokenTransaction()
+				// Don't lock because data for prior token transactions is immutable.
+				WithOutputCreatedTokenTransaction().
+				ForUpdate()
 		}).
+		// Don't lock because peer signatures are append-only.
 		WithPeerSignatures().
+		// Don't lock because although we set the operator-specific issuer signature during signing,
+		// there is only one writer under a locked TokenTransaction, so a separate Mint lock is unnecessary.
 		WithMint().
+		// Don't lock so that token transactions for a token can be executed in parallel.
+		// Overmint prevention is enforced by locking TokenCreate dosntream when checking max-supply
+		// (ValidateMintDoesNotExceedMaxSupply* calls ForUpdate on TokenCreate).
 		WithCreate().
-		WithSparkInvoice().
+		// Lock invoice which may may not be re-mapped depending on the state of this token transaction.
+		WithSparkInvoice(func(q *SparkInvoiceQuery) {
+			q.ForUpdate()
+		}).
 		ForUpdate().
 		Only(ctx)
 	if err != nil {
