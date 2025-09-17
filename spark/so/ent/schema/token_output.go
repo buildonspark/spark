@@ -6,6 +6,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
@@ -23,11 +24,11 @@ func (TokenOutput) Mixin() []ent.Mixin {
 func (TokenOutput) Fields() []ent.Field {
 	return []ent.Field{
 		field.Enum("status").GoType(st.TokenOutputStatus("")),
-		field.Bytes("owner_public_key").NotEmpty().Immutable(),
+		field.Bytes("owner_public_key").Immutable().GoType(keys.Public{}),
 		field.Uint64("withdraw_bond_sats").Immutable(),
 		field.Uint64("withdraw_relative_block_locktime").Immutable(),
 		field.Bytes("withdraw_revocation_commitment").Immutable(),
-		field.Bytes("token_public_key").Immutable().Optional(),
+		field.Bytes("token_public_key").Immutable().Optional().GoType(keys.Public{}),
 		field.Bytes("token_amount").NotEmpty().Immutable(),
 		field.Int32("created_transaction_output_vout").Immutable(),
 		field.Bytes("spent_ownership_signature").Optional(),

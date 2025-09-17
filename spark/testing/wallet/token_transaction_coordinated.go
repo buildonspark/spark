@@ -2,9 +2,10 @@ package wallet
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"log"
+	"maps"
+	"slices"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
@@ -471,7 +472,7 @@ func PrepareRevocationSharesFromCoordinator(
 		outputsWithKeyShares = append(outputsWithKeyShares, output)
 	}
 
-	sharesToReturnMap := make(map[string]*tokeninternalpb.OperatorRevocationShares)
+	sharesToReturnMap := make(map[keys.Public]*tokeninternalpb.OperatorRevocationShares)
 
 	allOperatorPubkeys := make([]keys.Public, 0, len(config.SigningOperators))
 	for _, operator := range config.SigningOperators {
@@ -479,17 +480,16 @@ func PrepareRevocationSharesFromCoordinator(
 	}
 
 	for _, identityPubkey := range allOperatorPubkeys {
-		sharesToReturnMap[identityPubkey.ToHex()] = &tokeninternalpb.OperatorRevocationShares{
+		sharesToReturnMap[identityPubkey] = &tokeninternalpb.OperatorRevocationShares{
 			OperatorIdentityPublicKey: identityPubkey.Serialize(),
 			Shares:                    make([]*tokeninternalpb.RevocationSecretShare, 0, len(outputsToSpend)),
 		}
 	}
 
 	coordinator := config.SigningOperators[config.CoordinatorIdentifier]
-	coordinatorPubKeyStr := coordinator.IdentityPublicKey.ToHex()
 	for _, outputWithKeyShare := range outputsWithKeyShares {
 		if keyshare := outputWithKeyShare.Edges.RevocationKeyshare; keyshare != nil {
-			if operatorShares, exists := sharesToReturnMap[coordinatorPubKeyStr]; exists {
+			if operatorShares, exists := sharesToReturnMap[coordinator.IdentityPublicKey]; exists {
 				operatorShares.Shares = append(operatorShares.Shares, &tokeninternalpb.RevocationSecretShare{
 					InputTtxoId: outputWithKeyShare.ID.String(),
 					SecretShare: keyshare.SecretShare,
@@ -499,7 +499,7 @@ func PrepareRevocationSharesFromCoordinator(
 		// Add any partial revocation secret shares from other operators
 		if outputWithKeyShare.Edges.TokenPartialRevocationSecretShares != nil {
 			for _, partialShare := range outputWithKeyShare.Edges.TokenPartialRevocationSecretShares {
-				operatorKey := hex.EncodeToString(partialShare.OperatorIdentityPublicKey)
+				operatorKey := partialShare.OperatorIdentityPublicKey
 				if operatorShares, exists := sharesToReturnMap[operatorKey]; exists {
 					operatorShares.Shares = append(operatorShares.Shares, &tokeninternalpb.RevocationSecretShare{
 						InputTtxoId: outputWithKeyShare.ID.String(),
@@ -510,10 +510,5 @@ func PrepareRevocationSharesFromCoordinator(
 		}
 	}
 
-	operatorRevocationShares := make([]*tokeninternalpb.OperatorRevocationShares, 0, len(sharesToReturnMap))
-	for _, operatorShares := range sharesToReturnMap {
-		operatorRevocationShares = append(operatorRevocationShares, operatorShares)
-	}
-
-	return operatorRevocationShares, nil
+	return slices.Collect(maps.Values(sharesToReturnMap)), nil
 }

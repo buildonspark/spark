@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokenpartialrevocationsecretshare"
@@ -37,8 +38,16 @@ func (tprssu *TokenPartialRevocationSecretShareUpdate) SetUpdateTime(t time.Time
 }
 
 // SetOperatorIdentityPublicKey sets the "operator_identity_public_key" field.
-func (tprssu *TokenPartialRevocationSecretShareUpdate) SetOperatorIdentityPublicKey(b []byte) *TokenPartialRevocationSecretShareUpdate {
-	tprssu.mutation.SetOperatorIdentityPublicKey(b)
+func (tprssu *TokenPartialRevocationSecretShareUpdate) SetOperatorIdentityPublicKey(k keys.Public) *TokenPartialRevocationSecretShareUpdate {
+	tprssu.mutation.SetOperatorIdentityPublicKey(k)
+	return tprssu
+}
+
+// SetNillableOperatorIdentityPublicKey sets the "operator_identity_public_key" field if the given value is not nil.
+func (tprssu *TokenPartialRevocationSecretShareUpdate) SetNillableOperatorIdentityPublicKey(k *keys.Public) *TokenPartialRevocationSecretShareUpdate {
+	if k != nil {
+		tprssu.SetOperatorIdentityPublicKey(*k)
+	}
 	return tprssu
 }
 
@@ -114,11 +123,6 @@ func (tprssu *TokenPartialRevocationSecretShareUpdate) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (tprssu *TokenPartialRevocationSecretShareUpdate) check() error {
-	if v, ok := tprssu.mutation.OperatorIdentityPublicKey(); ok {
-		if err := tokenpartialrevocationsecretshare.OperatorIdentityPublicKeyValidator(v); err != nil {
-			return &ValidationError{Name: "operator_identity_public_key", err: fmt.Errorf(`ent: validator failed for field "TokenPartialRevocationSecretShare.operator_identity_public_key": %w`, err)}
-		}
-	}
 	if v, ok := tprssu.mutation.SecretShare(); ok {
 		if err := tokenpartialrevocationsecretshare.SecretShareValidator(v); err != nil {
 			return &ValidationError{Name: "secret_share", err: fmt.Errorf(`ent: validator failed for field "TokenPartialRevocationSecretShare.secret_share": %w`, err)}
@@ -207,8 +211,16 @@ func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) SetUpdateTime(t time.
 }
 
 // SetOperatorIdentityPublicKey sets the "operator_identity_public_key" field.
-func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) SetOperatorIdentityPublicKey(b []byte) *TokenPartialRevocationSecretShareUpdateOne {
-	tprssuo.mutation.SetOperatorIdentityPublicKey(b)
+func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) SetOperatorIdentityPublicKey(k keys.Public) *TokenPartialRevocationSecretShareUpdateOne {
+	tprssuo.mutation.SetOperatorIdentityPublicKey(k)
+	return tprssuo
+}
+
+// SetNillableOperatorIdentityPublicKey sets the "operator_identity_public_key" field if the given value is not nil.
+func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) SetNillableOperatorIdentityPublicKey(k *keys.Public) *TokenPartialRevocationSecretShareUpdateOne {
+	if k != nil {
+		tprssuo.SetOperatorIdentityPublicKey(*k)
+	}
 	return tprssuo
 }
 
@@ -297,11 +309,6 @@ func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) check() error {
-	if v, ok := tprssuo.mutation.OperatorIdentityPublicKey(); ok {
-		if err := tokenpartialrevocationsecretshare.OperatorIdentityPublicKeyValidator(v); err != nil {
-			return &ValidationError{Name: "operator_identity_public_key", err: fmt.Errorf(`ent: validator failed for field "TokenPartialRevocationSecretShare.operator_identity_public_key": %w`, err)}
-		}
-	}
 	if v, ok := tprssuo.mutation.SecretShare(); ok {
 		if err := tokenpartialrevocationsecretshare.SecretShareValidator(v); err != nil {
 			return &ValidationError{Name: "secret_share", err: fmt.Errorf(`ent: validator failed for field "TokenPartialRevocationSecretShare.secret_share": %w`, err)}

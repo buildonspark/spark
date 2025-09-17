@@ -127,8 +127,12 @@ func CreateStartedTransactionEntities(
 			return nil, sparkerrors.InternalErrorf("failed to create create token transaction: %w", err)
 		}
 	case utils.TokenTransactionTypeMint:
+		issuerPubKey, err := keys.ParsePublicKey(tokenTransaction.GetMintInput().GetIssuerPublicKey())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse issuer public key: %w", err)
+		}
 		tokenMintEnt, err := db.TokenMint.Create().
-			SetIssuerPublicKey(tokenTransaction.GetMintInput().GetIssuerPublicKey()).
+			SetIssuerPublicKey(issuerPubKey).
 			SetIssuerSignature(signaturesWithIndex[0].Signature).
 			// TODO CNT-376: remove timestamp field from MintInput and use TokenTransaction.ClientCreatedTimestamp instead
 			SetWalletProvidedTimestamp(uint64(tokenTransaction.ClientCreatedTimestamp.AsTime().UnixMilli())).
@@ -283,17 +287,21 @@ func CreateStartedTransactionEntities(
 			tokenIdentifierToWrite = output.TokenIdentifier
 		}
 
+		ownerPubKey, err := keys.ParsePublicKey(output.OwnerPublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse output token owner public key: %w", err)
+		}
 		outputEnts = append(
 			outputEnts,
 			db.TokenOutput.
 				Create().
 				SetID(outputUUID).
 				SetStatus(st.TokenOutputStatusCreatedStarted).
-				SetOwnerPublicKey(output.OwnerPublicKey).
+				SetOwnerPublicKey(ownerPubKey).
 				SetWithdrawBondSats(output.GetWithdrawBondSats()).
 				SetWithdrawRelativeBlockLocktime(output.GetWithdrawRelativeBlockLocktime()).
 				SetWithdrawRevocationCommitment(output.RevocationCommitment).
-				SetTokenPublicKey(issuerPublicKeyToWrite.Serialize()).
+				SetTokenPublicKey(issuerPublicKeyToWrite).
 				SetTokenIdentifier(tokenIdentifierToWrite).
 				SetTokenAmount(output.TokenAmount).
 				SetNetwork(network).
@@ -903,11 +911,11 @@ func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) 
 	for i, output := range sortedCreatedOutputs {
 		tokenTransaction.TokenOutputs[i] = &tokenpb.TokenOutput{
 			Id:                            proto.String(output.ID.String()),
-			OwnerPublicKey:                output.OwnerPublicKey,
+			OwnerPublicKey:                output.OwnerPublicKey.Serialize(),
 			RevocationCommitment:          output.WithdrawRevocationCommitment,
 			WithdrawBondSats:              &output.WithdrawBondSats,
 			WithdrawRelativeBlockLocktime: &output.WithdrawRelativeBlockLocktime,
-			TokenPublicKey:                output.TokenPublicKey,
+			TokenPublicKey:                output.TokenPublicKey.Serialize(),
 			TokenIdentifier:               output.TokenIdentifier,
 			TokenAmount:                   output.TokenAmount,
 		}
@@ -934,7 +942,7 @@ func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) 
 	} else if t.Edges.Mint != nil {
 		tokenTransaction.TokenInputs = &tokenpb.TokenTransaction_MintInput{
 			MintInput: &tokenpb.TokenMintInput{
-				IssuerPublicKey: t.Edges.Mint.IssuerPublicKey,
+				IssuerPublicKey: t.Edges.Mint.IssuerPublicKey.Serialize(),
 				TokenIdentifier: t.Edges.Mint.TokenIdentifier,
 			},
 		}
@@ -961,9 +969,7 @@ func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) 
 			}
 		}
 
-		tokenTransaction.TokenInputs = &tokenpb.TokenTransaction_TransferInput{
-			TransferInput: transferInput,
-		}
+		tokenTransaction.TokenInputs = &tokenpb.TokenTransaction_TransferInput{TransferInput: transferInput}
 
 		// Because we checked for create and mint inputs below, if it doesn't map to inputs it is a special case where a transfer
 		// may not have successfully completed and has since had its inputs remappted.

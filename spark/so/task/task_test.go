@@ -65,11 +65,11 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 	// (has output_spent_token_transaction but NOT output_spent_started_token_transactions)
 	tokenOutput, err := tx.TokenOutput.Create().
 		SetStatus(st.TokenOutputStatusSpentFinalized).
-		SetOwnerPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()).
+		SetOwnerPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
 		SetWithdrawBondSats(1000).
 		SetWithdrawRelativeBlockLocktime(144).
 		SetWithdrawRevocationCommitment(keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()).
-		SetTokenPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()).
+		SetTokenPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
 		SetTokenAmount(randomBytes(8)).
 		SetCreatedTransactionOutputVout(0).
 		SetNetwork(st.NetworkRegtest).

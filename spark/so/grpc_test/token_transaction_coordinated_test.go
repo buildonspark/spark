@@ -207,7 +207,7 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 			require.Equal(t, expectedCreatedTokenAmount, createdTokenAmount, "created token amount does not match expected")
 
 			// We expect to see both the tokenPublicKey and the tokenIdentifier
-			require.Equal(t, tokenPrivKey.Public().Serialize(), createdTokenOutputs[0].TokenPublicKey)
+			require.Equal(t, tokenPrivKey.Public(), createdTokenOutputs[0].TokenPublicKey)
 			require.NotNil(t, createdTokenOutputs[0].TokenIdentifier, "tokenIdentifier should not be nil")
 
 			for _, tokenOutput := range spentTokenOutputs {
@@ -216,11 +216,11 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 					"tokenOutput %s should have %d secret-share rows", tokenOutput.ID, numOperators-1)
 
 				seenSecrets := make(map[string]struct{})
-				seenOperators := make(map[string]struct{})
+				seenOperators := make(map[keys.Public]struct{})
 
 				for _, s := range shares {
 					seenSecrets[string(s.SecretShare)] = struct{}{}
-					seenOperators[string(s.OperatorIdentityPublicKey)] = struct{}{}
+					seenOperators[s.OperatorIdentityPublicKey] = struct{}{}
 				}
 
 				// We expect to see one secret share per operator, except for the coordinator

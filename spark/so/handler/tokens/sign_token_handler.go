@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"cmp"
 	"context"
-	"encoding/hex"
 	"fmt"
 	"slices"
 	"strings"
@@ -465,16 +464,15 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 		outputsWithKeyShares = append(outputsWithKeyShares, batchOutputs...)
 	}
 
-	sharesToReturnMap := make(map[string]*tokeninternalpb.OperatorRevocationShares)
+	sharesToReturnMap := make(map[keys.Public]*tokeninternalpb.OperatorRevocationShares)
 
-	coordinatorPubKeyStr := h.config.IdentityPublicKey().ToHex()
 	allOperatorPubkeys := make([]keys.Public, 0, len(h.config.SigningOperatorMap))
 	for _, operator := range h.config.SigningOperatorMap {
 		allOperatorPubkeys = append(allOperatorPubkeys, operator.IdentityPublicKey)
 	}
 
 	for _, identityPubkey := range allOperatorPubkeys {
-		sharesToReturnMap[identityPubkey.ToHex()] = &tokeninternalpb.OperatorRevocationShares{
+		sharesToReturnMap[identityPubkey] = &tokeninternalpb.OperatorRevocationShares{
 			OperatorIdentityPublicKey: identityPubkey.Serialize(),
 			Shares:                    make([]*tokeninternalpb.RevocationSecretShare, 0, len(tokenTransaction.GetTransferInput().GetOutputsToSpend())),
 		}
@@ -482,7 +480,7 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 
 	for _, outputWithKeyShare := range outputsWithKeyShares {
 		if keyshare := outputWithKeyShare.Edges.RevocationKeyshare; keyshare != nil {
-			if operatorShares, exists := sharesToReturnMap[coordinatorPubKeyStr]; exists {
+			if operatorShares, exists := sharesToReturnMap[h.config.IdentityPublicKey()]; exists {
 				operatorShares.Shares = append(operatorShares.Shares, &tokeninternalpb.RevocationSecretShare{
 					InputTtxoId: outputWithKeyShare.ID.String(),
 					SecretShare: keyshare.SecretShare,
@@ -491,8 +489,7 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 		}
 		if outputWithKeyShare.Edges.TokenPartialRevocationSecretShares != nil {
 			for _, partialShare := range outputWithKeyShare.Edges.TokenPartialRevocationSecretShares {
-				operatorKey := hex.EncodeToString(partialShare.OperatorIdentityPublicKey)
-				if operatorShares, exists := sharesToReturnMap[operatorKey]; exists {
+				if operatorShares, exists := sharesToReturnMap[partialShare.OperatorIdentityPublicKey]; exists {
 					operatorShares.Shares = append(operatorShares.Shares, &tokeninternalpb.RevocationSecretShare{
 						InputTtxoId: outputWithKeyShare.ID.String(),
 						SecretShare: partialShare.SecretShare,
@@ -686,11 +683,7 @@ func (h *SignTokenHandler) getRevealCommitProgress(ctx context.Context, tokenTra
 		}
 		if output.Edges.TokenPartialRevocationSecretShares != nil {
 			for _, partialShare := range output.Edges.TokenPartialRevocationSecretShares {
-				operatorKey, err := keys.ParsePublicKey(partialShare.OperatorIdentityPublicKey)
-				if err != nil {
-					return nil, fmt.Errorf("failed to parse operator identity public key: %w", err)
-				}
-				operatorSharesPerOutput[i][operatorKey] = struct{}{}
+				operatorSharesPerOutput[i][partialShare.OperatorIdentityPublicKey] = struct{}{}
 			}
 		}
 	}

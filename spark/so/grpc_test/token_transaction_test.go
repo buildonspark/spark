@@ -456,7 +456,6 @@ func TestBroadcastTokenTransactionMintAndTransferTokensExpectedOutputAndTxRetrie
 		t.Fatalf("failed to broadcast transfer token transaction: %v", err)
 	}
 	log.Printf("transfer broadcast finalized token transaction: %s", logging.FormatProto("token_transaction", transferTokenTransactionResponse))
-
 	// Query token transactions with pagination - first page
 	tokenTransactionsPage1, err := wallet.QueryTokenTransactions(
 		t.Context(),

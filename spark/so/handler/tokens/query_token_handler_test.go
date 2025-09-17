@@ -76,7 +76,7 @@ func createTestTokenOutputs(t *testing.T, ctx context.Context, tx *ent.Tx, count
 
 		out, err := tx.TokenOutput.Create().
 			SetStatus(st.TokenOutputStatusCreatedFinalized).
-			SetOwnerPublicKey(ownerKey.Serialize()).
+			SetOwnerPublicKey(ownerKey).
 			SetWithdrawBondSats(1_000).
 			SetWithdrawRelativeBlockLocktime(10).
 			SetWithdrawRevocationCommitment(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
@@ -134,7 +134,7 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 
 		// Create a mint transaction that produces an output we will later spend
 		mintEnt, err := tx.TokenMint.Create().
-			SetIssuerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
+			SetIssuerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetWalletProvidedTimestamp(uint64(time.Now().UnixMilli())).
 			SetIssuerSignature(randomBytes(64)).
 			Save(ctx)
@@ -164,7 +164,7 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 
 		mintOutput, err := tx.TokenOutput.Create().
 			SetStatus(st.TokenOutputStatusCreatedFinalized).
-			SetOwnerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
+			SetOwnerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetWithdrawBondSats(1_000).
 			SetWithdrawRelativeBlockLocktime(10).
 			SetWithdrawRevocationCommitment(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
@@ -199,7 +199,7 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 		// Create a new output produced by the transferTx
 		_, err = tx.TokenOutput.Create().
 			SetStatus(st.TokenOutputStatusCreatedSigned).
-			SetOwnerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
+			SetOwnerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetWithdrawBondSats(500).
 			SetWithdrawRelativeBlockLocktime(10).
 			SetWithdrawRevocationCommitment(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
@@ -214,7 +214,7 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 		require.NoError(t, err)
 
 		outputsResp, err := handler.QueryTokenOutputsToken(ctx, &tokenpb.QueryTokenOutputsRequest{
-			OwnerPublicKeys: [][]byte{mintOutput.OwnerPublicKey},
+			OwnerPublicKeys: [][]byte{mintOutput.OwnerPublicKey.Serialize()},
 			Network:         sparkpb.Network_REGTEST,
 		})
 		require.NoError(t, err)

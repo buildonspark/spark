@@ -5,9 +5,9 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/lightsparkdev/spark/common/keys"
 )
 
-// TokenTransactionAuthorization is the schema for tracking keys required to authorize issuance and transfers.
 type TokenMint struct {
 	ent.Schema
 }
@@ -21,7 +21,7 @@ func (TokenMint) Mixin() []ent.Mixin {
 
 func (TokenMint) Fields() []ent.Field {
 	return []ent.Field{
-		field.Bytes("issuer_public_key").NotEmpty().Immutable(),
+		field.Bytes("issuer_public_key").Immutable().GoType(keys.Public{}),
 		field.Uint64("wallet_provided_timestamp").Immutable(),
 		field.Bytes("issuer_signature").NotEmpty().Immutable(),
 		field.Bytes("operator_specific_issuer_signature").Optional().Unique(),
@@ -32,8 +32,7 @@ func (TokenMint) Fields() []ent.Field {
 func (TokenMint) Edges() []ent.Edge {
 	return []ent.Edge{
 		// Maps to the token transaction representing the token mint.
-		edge.From("token_transaction", TokenTransaction.Type).
-			Ref("mint"),
+		edge.From("token_transaction", TokenTransaction.Type).Ref("mint"),
 	}
 }
 

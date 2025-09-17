@@ -298,11 +298,7 @@ func validateTransferOperatorSpecificSignatures(identityPublicKey keys.Public, o
 			return sparkerrors.FailedPreconditionErrorf(tokens.ErrOperatorPublicKeyMismatch, payloadPubKey, identityPublicKey)
 		}
 		output := spentOutputs[i]
-		ownerPubKey, err := keys.ParsePublicKey(output.OwnerPublicKey)
-		if err != nil {
-			return sparkerrors.InvalidUserInputErrorf("unable to parse signature owner public key: %w", err)
-		}
-		if err := utils.ValidateOwnershipSignature(sig.OwnerSignature.Signature, payloadHash, ownerPubKey); err != nil {
+		if err := utils.ValidateOwnershipSignature(sig.OwnerSignature.Signature, payloadHash, output.OwnerPublicKey); err != nil {
 			return tokens.FormatErrorWithTransactionEnt(tokens.ErrInvalidOwnerSignature, tokenTransaction, err)
 		}
 	}
@@ -320,11 +316,7 @@ func validateIssuerOperatorSpecificSignatures(identityPublicKey keys.Public, ope
 
 	var issuerPublicKey keys.Public
 	if tokenTransaction.Edges.Mint != nil {
-		issuerKey, err := keys.ParsePublicKey(tokenTransaction.Edges.Mint.IssuerPublicKey)
-		if err != nil {
-			return sparkerrors.InvalidUserInputErrorf("unable to parse issuer public key: %w", err)
-		}
-		issuerPublicKey = issuerKey
+		issuerPublicKey = tokenTransaction.Edges.Mint.IssuerPublicKey
 	} else if tokenTransaction.Edges.Create != nil {
 		issuerPublicKey = tokenTransaction.Edges.Create.IssuerPublicKey
 	} else {
@@ -430,21 +422,21 @@ func validateTransferTokenTransactionUsingPreviousTransactionData(
 			}
 		}
 	} else {
-		expectedTokenPubKey := tokenTransaction.TokenOutputs[0].GetTokenPublicKey()
-		if expectedTokenPubKey == nil {
-			return tokens.FormatErrorWithTransactionProto("invalid token public key", tokenTransaction, sparkerrors.InvalidUserInputErrorf("token public key is required in outputs"))
+		expectedTokenPubKey, err := keys.ParsePublicKey(tokenTransaction.TokenOutputs[0].GetTokenPublicKey())
+		if err != nil {
+			return tokens.FormatErrorWithTransactionProto("invalid token public key", tokenTransaction, err)
 		}
 		// Validate that all spent outputs have the same token public key
 		for i, outputEnt := range outputToSpendEnts {
-			if !bytes.Equal(outputEnt.TokenPublicKey, expectedTokenPubKey) {
-				return tokens.FormatErrorWithTransactionProto("token public key mismatch", tokenTransaction, sparkerrors.FailedPreconditionErrorf("output %d has different token public key", i))
+			if !outputEnt.TokenPublicKey.Equals(expectedTokenPubKey) {
+				return tokens.FormatErrorWithTransactionProto("token public key mismatch", tokenTransaction, fmt.Errorf("output %d has different token public key", i))
 			}
 		}
 	}
 
 	// TODO(DL-104): For now we allow the network to be nil to support old outputs. In the future we should require it to be set.
 	for i, outputEnt := range outputToSpendEnts {
-		if outputEnt.Network != ("") {
+		if outputEnt.Network != "" {
 			entNetwork, err := outputEnt.Network.MarshalProto()
 			if err != nil {
 				return tokens.FormatErrorWithTransactionProto("failed to marshal network", tokenTransaction, sparkerrors.InternalErrorf("failed to marshal network: %w", err))
@@ -500,13 +492,8 @@ func validateTransferTokenTransactionUsingPreviousTransactionData(
 		if outputEnt == nil {
 			return tokens.FormatErrorWithTransactionProto("missing output entity", tokenTransaction, sparkerrors.NotFoundErrorf("could not find output entity for output to spend at index %d", i))
 		}
-
-		ownerPublicKey, err := keys.ParsePublicKey(outputEnt.OwnerPublicKey)
-		if err != nil {
-			return tokens.FormatErrorWithTransactionProto("failed to parse owner public key", tokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to parse owner key: %w", err))
-		}
-		if err := utils.ValidateOwnershipSignature(ownershipSignature.Signature, partialTokenTransactionHash, ownerPublicKey); err != nil {
-			return tokens.FormatErrorWithTransactionProto("invalid ownership signature", tokenTransaction, sparkerrors.InvalidUserInputErrorf("invalid ownership signature: %w", err))
+		if err := utils.ValidateOwnershipSignature(ownershipSignature.Signature, partialTokenTransactionHash, outputEnt.OwnerPublicKey); err != nil {
+			return tokens.FormatErrorWithTransactionProto("invalid ownership signature", tokenTransaction, fmt.Errorf("invalid ownership signature for output %d: %w", i, err))
 		}
 		if err := validateOutputIsSpendable(ctx, enablePreemption, i, outputEnt, tokenTransaction, v0DefaultTransactionExpiryDuration); err != nil {
 			return err
@@ -885,11 +872,6 @@ func validateInvoiceAttachmentsNotInFlightOrFinalized(ctx context.Context, token
 
 // If sender pubkey is present, the owner of the spent outputs must match the expected sender public key.
 func validateOutputsMatchSenderAndNetwork(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction, senderPublicKey keys.Public, network common.Network) error {
-	var senderPublicKeyBytes []byte
-	if senderPublicKey != (keys.Public{}) {
-		senderPublicKeyBytes = senderPublicKey.Serialize()
-	}
-
 	var outputsToSpend []*tokenpb.TokenOutputToSpend
 	if tokenTransaction.GetTransferInput() != nil {
 		outputsToSpend = tokenTransaction.GetTransferInput().OutputsToSpend
@@ -929,8 +911,8 @@ func validateOutputsMatchSenderAndNetwork(ctx context.Context, tokenTransaction 
 				tokenoutput.CreatedTransactionOutputVoutIn(vouts...),
 				tokenoutput.NetworkEQ(schemaNetwork),
 			}
-			if len(senderPublicKeyBytes) > 0 {
-				condition = append(condition, tokenoutput.OwnerPublicKeyEQ(senderPublicKeyBytes))
+			if !senderPublicKey.IsZero() {
+				condition = append(condition, tokenoutput.OwnerPublicKeyEQ(senderPublicKey))
 			}
 			predicates = append(predicates, tokenoutput.And(condition...))
 		}

@@ -165,8 +165,8 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 	withdrawRevocationCommitment := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	tokenOutputInDb := tx.TokenOutput.Create().
 		SetID(uuid.New()).
-		SetOwnerPublicKey(aliceOperatorPubKey.Serialize()).
-		SetTokenPublicKey(aliceOperatorPubKey.Serialize()).
+		SetOwnerPublicKey(aliceOperatorPubKey).
+		SetTokenPublicKey(aliceOperatorPubKey).
 		SetTokenAmount([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100}).
 		SetRevocationKeyshare(aliceSigningKeyshare).
 		SetStatus(st.TokenOutputStatusCreatedFinalized).
@@ -181,13 +181,13 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 
 	tx.TokenPartialRevocationSecretShare.Create().
 		SetTokenOutput(tokenOutputInDb).
-		SetOperatorIdentityPublicKey(bobOperatorPubKey.Serialize()).
+		SetOperatorIdentityPublicKey(bobOperatorPubKey).
 		SetSecretShare(bobSigningKeyshare.SecretShare).
 		SaveX(ctx)
 
 	tx.TokenPartialRevocationSecretShare.Create().
 		SetTokenOutput(tokenOutputInDb).
-		SetOperatorIdentityPublicKey(carolOperatorPubKey.Serialize()).
+		SetOperatorIdentityPublicKey(carolOperatorPubKey).
 		SetSecretShare(carolSigningKeyshare.SecretShare).
 		SaveX(ctx)
 

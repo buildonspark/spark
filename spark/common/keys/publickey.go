@@ -103,7 +103,7 @@ func (p Public) Equals(other Public) bool {
 	return p.key.IsEqual(&other.key)
 }
 
-// IsZero returns true if p is the empty key.
+// IsZero returns true if this public key is the empty key, and false otherwise.
 func (p Public) IsZero() bool {
 	return p == Public{}
 }

@@ -45,7 +45,7 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.
 		SetCoordinatorIndex(1).
 		SaveX(ctx)
 
-	ownerPubKey := handler.config.IdentityPublicKey().Serialize()
+	ownerPubKey := handler.config.IdentityPublicKey()
 
 	output := tx.TokenOutput.Create().
 		SetID(uuid.New()).
@@ -70,7 +70,7 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.
 	require.NoError(t, err)
 	tx.TokenPartialRevocationSecretShare.Create().
 		SetTokenOutput(output).
-		SetOperatorIdentityPublicKey(opPub.Serialize()).
+		SetOperatorIdentityPublicKey(opPub).
 		SetSecretShare(share1.Serialize()).
 		SaveX(ctx)
 

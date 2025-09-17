@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokenpartialrevocationsecretshare"
 )
@@ -54,8 +55,8 @@ func (tprssc *TokenPartialRevocationSecretShareCreate) SetNillableUpdateTime(t *
 }
 
 // SetOperatorIdentityPublicKey sets the "operator_identity_public_key" field.
-func (tprssc *TokenPartialRevocationSecretShareCreate) SetOperatorIdentityPublicKey(b []byte) *TokenPartialRevocationSecretShareCreate {
-	tprssc.mutation.SetOperatorIdentityPublicKey(b)
+func (tprssc *TokenPartialRevocationSecretShareCreate) SetOperatorIdentityPublicKey(k keys.Public) *TokenPartialRevocationSecretShareCreate {
+	tprssc.mutation.SetOperatorIdentityPublicKey(k)
 	return tprssc
 }
 
@@ -161,11 +162,6 @@ func (tprssc *TokenPartialRevocationSecretShareCreate) check() error {
 	}
 	if _, ok := tprssc.mutation.OperatorIdentityPublicKey(); !ok {
 		return &ValidationError{Name: "operator_identity_public_key", err: errors.New(`ent: missing required field "TokenPartialRevocationSecretShare.operator_identity_public_key"`)}
-	}
-	if v, ok := tprssc.mutation.OperatorIdentityPublicKey(); ok {
-		if err := tokenpartialrevocationsecretshare.OperatorIdentityPublicKeyValidator(v); err != nil {
-			return &ValidationError{Name: "operator_identity_public_key", err: fmt.Errorf(`ent: validator failed for field "TokenPartialRevocationSecretShare.operator_identity_public_key": %w`, err)}
-		}
 	}
 	if _, ok := tprssc.mutation.SecretShare(); !ok {
 		return &ValidationError{Name: "secret_share", err: errors.New(`ent: missing required field "TokenPartialRevocationSecretShare.secret_share"`)}
@@ -312,7 +308,7 @@ func (u *TokenPartialRevocationSecretShareUpsert) UpdateUpdateTime() *TokenParti
 }
 
 // SetOperatorIdentityPublicKey sets the "operator_identity_public_key" field.
-func (u *TokenPartialRevocationSecretShareUpsert) SetOperatorIdentityPublicKey(v []byte) *TokenPartialRevocationSecretShareUpsert {
+func (u *TokenPartialRevocationSecretShareUpsert) SetOperatorIdentityPublicKey(v keys.Public) *TokenPartialRevocationSecretShareUpsert {
 	u.Set(tokenpartialrevocationsecretshare.FieldOperatorIdentityPublicKey, v)
 	return u
 }
@@ -401,7 +397,7 @@ func (u *TokenPartialRevocationSecretShareUpsertOne) UpdateUpdateTime() *TokenPa
 }
 
 // SetOperatorIdentityPublicKey sets the "operator_identity_public_key" field.
-func (u *TokenPartialRevocationSecretShareUpsertOne) SetOperatorIdentityPublicKey(v []byte) *TokenPartialRevocationSecretShareUpsertOne {
+func (u *TokenPartialRevocationSecretShareUpsertOne) SetOperatorIdentityPublicKey(v keys.Public) *TokenPartialRevocationSecretShareUpsertOne {
 	return u.Update(func(s *TokenPartialRevocationSecretShareUpsert) {
 		s.SetOperatorIdentityPublicKey(v)
 	})
@@ -661,7 +657,7 @@ func (u *TokenPartialRevocationSecretShareUpsertBulk) UpdateUpdateTime() *TokenP
 }
 
 // SetOperatorIdentityPublicKey sets the "operator_identity_public_key" field.
-func (u *TokenPartialRevocationSecretShareUpsertBulk) SetOperatorIdentityPublicKey(v []byte) *TokenPartialRevocationSecretShareUpsertBulk {
+func (u *TokenPartialRevocationSecretShareUpsertBulk) SetOperatorIdentityPublicKey(v keys.Public) *TokenPartialRevocationSecretShareUpsertBulk {
 	return u.Update(func(s *TokenPartialRevocationSecretShareUpsert) {
 		s.SetOperatorIdentityPublicKey(v)
 	})

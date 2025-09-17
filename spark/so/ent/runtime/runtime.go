@@ -471,10 +471,6 @@ func init() {
 	tokenmint.DefaultUpdateTime = tokenmintDescUpdateTime.Default.(func() time.Time)
 	// tokenmint.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	tokenmint.UpdateDefaultUpdateTime = tokenmintDescUpdateTime.UpdateDefault.(func() time.Time)
-	// tokenmintDescIssuerPublicKey is the schema descriptor for issuer_public_key field.
-	tokenmintDescIssuerPublicKey := tokenmintFields[0].Descriptor()
-	// tokenmint.IssuerPublicKeyValidator is a validator for the "issuer_public_key" field. It is called by the builders before save.
-	tokenmint.IssuerPublicKeyValidator = tokenmintDescIssuerPublicKey.Validators[0].(func([]byte) error)
 	// tokenmintDescIssuerSignature is the schema descriptor for issuer_signature field.
 	tokenmintDescIssuerSignature := tokenmintFields[2].Descriptor()
 	// tokenmint.IssuerSignatureValidator is a validator for the "issuer_signature" field. It is called by the builders before save.
@@ -500,10 +496,6 @@ func init() {
 	tokenoutput.DefaultUpdateTime = tokenoutputDescUpdateTime.Default.(func() time.Time)
 	// tokenoutput.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	tokenoutput.UpdateDefaultUpdateTime = tokenoutputDescUpdateTime.UpdateDefault.(func() time.Time)
-	// tokenoutputDescOwnerPublicKey is the schema descriptor for owner_public_key field.
-	tokenoutputDescOwnerPublicKey := tokenoutputFields[1].Descriptor()
-	// tokenoutput.OwnerPublicKeyValidator is a validator for the "owner_public_key" field. It is called by the builders before save.
-	tokenoutput.OwnerPublicKeyValidator = tokenoutputDescOwnerPublicKey.Validators[0].(func([]byte) error)
 	// tokenoutputDescTokenAmount is the schema descriptor for token_amount field.
 	tokenoutputDescTokenAmount := tokenoutputFields[6].Descriptor()
 	// tokenoutput.TokenAmountValidator is a validator for the "token_amount" field. It is called by the builders before save.
@@ -529,10 +521,6 @@ func init() {
 	tokenpartialrevocationsecretshare.DefaultUpdateTime = tokenpartialrevocationsecretshareDescUpdateTime.Default.(func() time.Time)
 	// tokenpartialrevocationsecretshare.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	tokenpartialrevocationsecretshare.UpdateDefaultUpdateTime = tokenpartialrevocationsecretshareDescUpdateTime.UpdateDefault.(func() time.Time)
-	// tokenpartialrevocationsecretshareDescOperatorIdentityPublicKey is the schema descriptor for operator_identity_public_key field.
-	tokenpartialrevocationsecretshareDescOperatorIdentityPublicKey := tokenpartialrevocationsecretshareFields[0].Descriptor()
-	// tokenpartialrevocationsecretshare.OperatorIdentityPublicKeyValidator is a validator for the "operator_identity_public_key" field. It is called by the builders before save.
-	tokenpartialrevocationsecretshare.OperatorIdentityPublicKeyValidator = tokenpartialrevocationsecretshareDescOperatorIdentityPublicKey.Validators[0].(func([]byte) error)
 	// tokenpartialrevocationsecretshareDescSecretShare is the schema descriptor for secret_share field.
 	tokenpartialrevocationsecretshareDescSecretShare := tokenpartialrevocationsecretshareFields[1].Descriptor()
 	// tokenpartialrevocationsecretshare.SecretShareValidator is a validator for the "secret_share" field. It is called by the builders before save.

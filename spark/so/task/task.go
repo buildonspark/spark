@@ -400,11 +400,11 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 								idStr := createdOutput.ID.String()
 								createdOutputs = append(createdOutputs, &tokenpb.TokenOutput{
 									Id:                            &idStr,
-									OwnerPublicKey:                createdOutput.OwnerPublicKey,
+									OwnerPublicKey:                createdOutput.OwnerPublicKey.Serialize(),
 									RevocationCommitment:          createdOutput.WithdrawRevocationCommitment,
 									WithdrawBondSats:              &createdOutput.WithdrawBondSats,
 									WithdrawRelativeBlockLocktime: &createdOutput.WithdrawRelativeBlockLocktime,
-									TokenPublicKey:                createdOutput.TokenPublicKey,
+									TokenPublicKey:                createdOutput.TokenPublicKey.Serialize(),
 									TokenIdentifier:               createdOutput.TokenIdentifier,
 									TokenAmount:                   createdOutput.TokenAmount,
 								})
@@ -763,11 +763,7 @@ func (t *ScheduledTaskSpec) Schedule(scheduler gocron.Scheduler, config *so.Conf
 		gocron.NewTask(wrappedTask.Task, config, knobsService),
 		gocron.WithName(t.Name),
 	)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // Wrap the task with the given middleware. This returns a new BaseTaskSpec whose Task function

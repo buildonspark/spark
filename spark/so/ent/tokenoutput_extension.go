@@ -203,15 +203,11 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 		statusPredicate = ownedStatusPredicate
 	}
 
-	ownerPubKeyBytes := make([][]byte, len(params.OwnerPublicKeys))
-	for i, pk := range params.OwnerPublicKeys {
-		ownerPubKeyBytes[i] = pk.Serialize()
-	}
 	query := db.TokenOutput.
 		Query().
 		Where(
 			// Order matters here to leverage the index.
-			tokenoutput.OwnerPublicKeyIn(ownerPubKeyBytes...),
+			tokenoutput.OwnerPublicKeyIn(params.OwnerPublicKeys...),
 			// A output is 'owned' as long as it has been fully created and a spending transaction
 			// has not yet been signed by this SO (if a transaction with it has been started
 			// and not yet signed it is still considered owned).
@@ -220,11 +216,7 @@ func GetOwnedTokenOutputs(ctx context.Context, params GetOwnedTokenOutputsParams
 		).
 		Where(tokenoutput.NetworkEQ(schemaNetwork))
 	if len(params.IssuerPublicKeys) > 0 {
-		issuerPubKeyBytes := make([][]byte, len(params.IssuerPublicKeys))
-		for i, pk := range params.IssuerPublicKeys {
-			issuerPubKeyBytes[i] = pk.Serialize()
-		}
-		query = query.Where(tokenoutput.TokenPublicKeyIn(issuerPubKeyBytes...))
+		query = query.Where(tokenoutput.TokenPublicKeyIn(params.IssuerPublicKeys...))
 	}
 	if len(params.TokenIdentifiers) > 0 {
 		query = query.Where(tokenoutput.TokenIdentifierIn(params.TokenIdentifiers...))

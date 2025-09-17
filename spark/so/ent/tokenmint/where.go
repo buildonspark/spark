@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 )
 
@@ -67,7 +68,7 @@ func UpdateTime(v time.Time) predicate.TokenMint {
 }
 
 // IssuerPublicKey applies equality check predicate on the "issuer_public_key" field. It's identical to IssuerPublicKeyEQ.
-func IssuerPublicKey(v []byte) predicate.TokenMint {
+func IssuerPublicKey(v keys.Public) predicate.TokenMint {
 	return predicate.TokenMint(sql.FieldEQ(FieldIssuerPublicKey, v))
 }
 
@@ -172,42 +173,42 @@ func UpdateTimeLTE(v time.Time) predicate.TokenMint {
 }
 
 // IssuerPublicKeyEQ applies the EQ predicate on the "issuer_public_key" field.
-func IssuerPublicKeyEQ(v []byte) predicate.TokenMint {
+func IssuerPublicKeyEQ(v keys.Public) predicate.TokenMint {
 	return predicate.TokenMint(sql.FieldEQ(FieldIssuerPublicKey, v))
 }
 
 // IssuerPublicKeyNEQ applies the NEQ predicate on the "issuer_public_key" field.
-func IssuerPublicKeyNEQ(v []byte) predicate.TokenMint {
+func IssuerPublicKeyNEQ(v keys.Public) predicate.TokenMint {
 	return predicate.TokenMint(sql.FieldNEQ(FieldIssuerPublicKey, v))
 }
 
 // IssuerPublicKeyIn applies the In predicate on the "issuer_public_key" field.
-func IssuerPublicKeyIn(vs ...[]byte) predicate.TokenMint {
+func IssuerPublicKeyIn(vs ...keys.Public) predicate.TokenMint {
 	return predicate.TokenMint(sql.FieldIn(FieldIssuerPublicKey, vs...))
 }
 
 // IssuerPublicKeyNotIn applies the NotIn predicate on the "issuer_public_key" field.
-func IssuerPublicKeyNotIn(vs ...[]byte) predicate.TokenMint {
+func IssuerPublicKeyNotIn(vs ...keys.Public) predicate.TokenMint {
 	return predicate.TokenMint(sql.FieldNotIn(FieldIssuerPublicKey, vs...))
 }
 
 // IssuerPublicKeyGT applies the GT predicate on the "issuer_public_key" field.
-func IssuerPublicKeyGT(v []byte) predicate.TokenMint {
+func IssuerPublicKeyGT(v keys.Public) predicate.TokenMint {
 	return predicate.TokenMint(sql.FieldGT(FieldIssuerPublicKey, v))
 }
 
 // IssuerPublicKeyGTE applies the GTE predicate on the "issuer_public_key" field.
-func IssuerPublicKeyGTE(v []byte) predicate.TokenMint {
+func IssuerPublicKeyGTE(v keys.Public) predicate.TokenMint {
 	return predicate.TokenMint(sql.FieldGTE(FieldIssuerPublicKey, v))
 }
 
 // IssuerPublicKeyLT applies the LT predicate on the "issuer_public_key" field.
-func IssuerPublicKeyLT(v []byte) predicate.TokenMint {
+func IssuerPublicKeyLT(v keys.Public) predicate.TokenMint {
 	return predicate.TokenMint(sql.FieldLT(FieldIssuerPublicKey, v))
 }
 
 // IssuerPublicKeyLTE applies the LTE predicate on the "issuer_public_key" field.
-func IssuerPublicKeyLTE(v []byte) predicate.TokenMint {
+func IssuerPublicKeyLTE(v keys.Public) predicate.TokenMint {
 	return predicate.TokenMint(sql.FieldLTE(FieldIssuerPublicKey, v))
 }
 

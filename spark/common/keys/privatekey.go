@@ -117,7 +117,7 @@ func (p Private) Equals(other Private) bool {
 	return p.key.Key.Equals(&other.key.Key)
 }
 
-// IsZero returns true if p is the empty key.
+// IsZero returns true if this private key is the empty key, and false otherwise.
 func (p Private) IsZero() bool {
 	return p.key.Key.IsZero()
 }
@@ -187,8 +187,10 @@ func (p *Private) UnmarshalJSON(data []byte) error {
 
 func getValue(src any) ([]byte, error) {
 	switch v := src.(type) {
+	case nil:
+		return nil, nil
 	case *sql.Null[[]byte]:
-		if !v.Valid { // It's NULL
+		if v == nil || !v.Valid { // It's NULL
 			return nil, nil
 		}
 		return v.V, nil

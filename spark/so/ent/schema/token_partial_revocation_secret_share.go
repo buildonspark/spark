@@ -6,6 +6,7 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/lightsparkdev/spark/common/keys"
 )
 
 type TokenPartialRevocationSecretShare struct {
@@ -28,7 +29,7 @@ func (TokenPartialRevocationSecretShare) Annotations() []schema.Annotation {
 
 func (TokenPartialRevocationSecretShare) Fields() []ent.Field {
 	return []ent.Field{
-		field.Bytes("operator_identity_public_key").NotEmpty(),
+		field.Bytes("operator_identity_public_key").GoType(keys.Public{}),
 		field.Bytes("secret_share").NotEmpty(),
 	}
 }

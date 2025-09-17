@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
@@ -64,8 +65,8 @@ func (toc *TokenOutputCreate) SetStatus(sos schematype.TokenOutputStatus) *Token
 }
 
 // SetOwnerPublicKey sets the "owner_public_key" field.
-func (toc *TokenOutputCreate) SetOwnerPublicKey(b []byte) *TokenOutputCreate {
-	toc.mutation.SetOwnerPublicKey(b)
+func (toc *TokenOutputCreate) SetOwnerPublicKey(k keys.Public) *TokenOutputCreate {
+	toc.mutation.SetOwnerPublicKey(k)
 	return toc
 }
 
@@ -88,8 +89,16 @@ func (toc *TokenOutputCreate) SetWithdrawRevocationCommitment(b []byte) *TokenOu
 }
 
 // SetTokenPublicKey sets the "token_public_key" field.
-func (toc *TokenOutputCreate) SetTokenPublicKey(b []byte) *TokenOutputCreate {
-	toc.mutation.SetTokenPublicKey(b)
+func (toc *TokenOutputCreate) SetTokenPublicKey(k keys.Public) *TokenOutputCreate {
+	toc.mutation.SetTokenPublicKey(k)
+	return toc
+}
+
+// SetNillableTokenPublicKey sets the "token_public_key" field if the given value is not nil.
+func (toc *TokenOutputCreate) SetNillableTokenPublicKey(k *keys.Public) *TokenOutputCreate {
+	if k != nil {
+		toc.SetTokenPublicKey(*k)
+	}
 	return toc
 }
 
@@ -346,11 +355,6 @@ func (toc *TokenOutputCreate) check() error {
 	}
 	if _, ok := toc.mutation.OwnerPublicKey(); !ok {
 		return &ValidationError{Name: "owner_public_key", err: errors.New(`ent: missing required field "TokenOutput.owner_public_key"`)}
-	}
-	if v, ok := toc.mutation.OwnerPublicKey(); ok {
-		if err := tokenoutput.OwnerPublicKeyValidator(v); err != nil {
-			return &ValidationError{Name: "owner_public_key", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.owner_public_key": %w`, err)}
-		}
 	}
 	if _, ok := toc.mutation.WithdrawBondSats(); !ok {
 		return &ValidationError{Name: "withdraw_bond_sats", err: errors.New(`ent: missing required field "TokenOutput.withdraw_bond_sats"`)}

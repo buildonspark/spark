@@ -97,7 +97,6 @@ require (
 	github.com/cockroachdb/redact v1.1.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/decred/dcrd/crypto/blake256 v1.1.0 // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v2 v2.0.0 // indirect
 	github.com/decred/dcrd/lru v1.1.3 // indirect
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
@@ -212,7 +211,6 @@ require (
 require (
 	github.com/DataDog/zstd v1.5.6
 	github.com/btcsuite/btcd v0.24.3-0.20240921052913-67b8efd3ba53
-	github.com/decred/dcrd/dcrec/secp256k1 v1.0.4
 	github.com/go-co-op/gocron/v2 v2.16.1
 	github.com/improbable-eng/grpc-web v0.15.0
 	golang.org/x/net v0.42.0 // indirect

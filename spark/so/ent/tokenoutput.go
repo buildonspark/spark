@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
@@ -29,7 +30,7 @@ type TokenOutput struct {
 	// Status holds the value of the "status" field.
 	Status schematype.TokenOutputStatus `json:"status,omitempty"`
 	// OwnerPublicKey holds the value of the "owner_public_key" field.
-	OwnerPublicKey []byte `json:"owner_public_key,omitempty"`
+	OwnerPublicKey keys.Public `json:"owner_public_key,omitempty"`
 	// WithdrawBondSats holds the value of the "withdraw_bond_sats" field.
 	WithdrawBondSats uint64 `json:"withdraw_bond_sats,omitempty"`
 	// WithdrawRelativeBlockLocktime holds the value of the "withdraw_relative_block_locktime" field.
@@ -37,7 +38,7 @@ type TokenOutput struct {
 	// WithdrawRevocationCommitment holds the value of the "withdraw_revocation_commitment" field.
 	WithdrawRevocationCommitment []byte `json:"withdraw_revocation_commitment,omitempty"`
 	// TokenPublicKey holds the value of the "token_public_key" field.
-	TokenPublicKey []byte `json:"token_public_key,omitempty"`
+	TokenPublicKey keys.Public `json:"token_public_key,omitempty"`
 	// TokenAmount holds the value of the "token_amount" field.
 	TokenAmount []byte `json:"token_amount,omitempty"`
 	// CreatedTransactionOutputVout holds the value of the "created_transaction_output_vout" field.
@@ -153,8 +154,10 @@ func (*TokenOutput) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokenoutput.FieldOwnerPublicKey, tokenoutput.FieldWithdrawRevocationCommitment, tokenoutput.FieldTokenPublicKey, tokenoutput.FieldTokenAmount, tokenoutput.FieldSpentOwnershipSignature, tokenoutput.FieldSpentOperatorSpecificOwnershipSignature, tokenoutput.FieldSpentRevocationSecret, tokenoutput.FieldConfirmedWithdrawBlockHash, tokenoutput.FieldTokenIdentifier:
+		case tokenoutput.FieldWithdrawRevocationCommitment, tokenoutput.FieldTokenAmount, tokenoutput.FieldSpentOwnershipSignature, tokenoutput.FieldSpentOperatorSpecificOwnershipSignature, tokenoutput.FieldSpentRevocationSecret, tokenoutput.FieldConfirmedWithdrawBlockHash, tokenoutput.FieldTokenIdentifier:
 			values[i] = new([]byte)
+		case tokenoutput.FieldOwnerPublicKey, tokenoutput.FieldTokenPublicKey:
+			values[i] = new(keys.Public)
 		case tokenoutput.FieldWithdrawBondSats, tokenoutput.FieldWithdrawRelativeBlockLocktime, tokenoutput.FieldCreatedTransactionOutputVout, tokenoutput.FieldSpentTransactionInputVout:
 			values[i] = new(sql.NullInt64)
 		case tokenoutput.FieldStatus, tokenoutput.FieldNetwork:
@@ -209,7 +212,7 @@ func (to *TokenOutput) assignValues(columns []string, values []any) error {
 				to.Status = schematype.TokenOutputStatus(value.String)
 			}
 		case tokenoutput.FieldOwnerPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field owner_public_key", values[i])
 			} else if value != nil {
 				to.OwnerPublicKey = *value
@@ -233,7 +236,7 @@ func (to *TokenOutput) assignValues(columns []string, values []any) error {
 				to.WithdrawRevocationCommitment = *value
 			}
 		case tokenoutput.FieldTokenPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field token_public_key", values[i])
 			} else if value != nil {
 				to.TokenPublicKey = *value

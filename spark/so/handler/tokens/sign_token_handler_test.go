@@ -333,7 +333,7 @@ func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) 
 	// Create the previous token outputs that will be spent
 	prevTokenOutput1, err := setup.sessionCtx.Client.TokenOutput.Create().
 		SetID(uuid.New()).
-		SetOwnerPublicKey(setup.coordinatorPubKey.Serialize()).
+		SetOwnerPublicKey(setup.coordinatorPubKey).
 		SetTokenAmount(testTokenAmountBytes).
 		SetStatus(schematype.TokenOutputStatusCreatedSigned).
 		SetCreatedTransactionOutputVout(0).
@@ -349,7 +349,7 @@ func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) 
 
 	prevTokenOutput2, err := setup.sessionCtx.Client.TokenOutput.Create().
 		SetID(uuid.New()).
-		SetOwnerPublicKey(setup.coordinatorPubKey.Serialize()).
+		SetOwnerPublicKey(setup.coordinatorPubKey).
 		SetTokenAmount(testTokenAmountBytes).
 		SetStatus(schematype.TokenOutputStatusCreatedSigned).
 		SetCreatedTransactionOutputVout(1).
@@ -479,7 +479,7 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 	// Create the new token outputs for the transfer
 	dbTokenOutput1, err := setup.sessionCtx.Client.TokenOutput.Create().
 		SetID(uuid.MustParse(transferData.tokenOutputId1)).
-		SetOwnerPublicKey(setup.coordinatorPubKey.Serialize()).
+		SetOwnerPublicKey(setup.coordinatorPubKey).
 		SetTokenAmount(padBytes(big.NewInt(50).Bytes(), 16)).
 		SetStatus(schematype.TokenOutputStatusCreatedSigned).
 		SetCreatedTransactionOutputVout(0).
@@ -495,7 +495,7 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 
 	dbTokenOutput2, err := setup.sessionCtx.Client.TokenOutput.Create().
 		SetID(uuid.MustParse(transferData.tokenOutputId2)).
-		SetOwnerPublicKey(setup.coordinatorPubKey.Serialize()).
+		SetOwnerPublicKey(setup.coordinatorPubKey).
 		SetTokenAmount(padBytes(big.NewInt(50).Bytes(), 16)).
 		SetStatus(schematype.TokenOutputStatusCreatedSigned).
 		SetCreatedTransactionOutputVout(1).

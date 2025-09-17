@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/tokenmint"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 )
@@ -54,8 +55,8 @@ func (tmc *TokenMintCreate) SetNillableUpdateTime(t *time.Time) *TokenMintCreate
 }
 
 // SetIssuerPublicKey sets the "issuer_public_key" field.
-func (tmc *TokenMintCreate) SetIssuerPublicKey(b []byte) *TokenMintCreate {
-	tmc.mutation.SetIssuerPublicKey(b)
+func (tmc *TokenMintCreate) SetIssuerPublicKey(k keys.Public) *TokenMintCreate {
+	tmc.mutation.SetIssuerPublicKey(k)
 	return tmc
 }
 
@@ -183,11 +184,6 @@ func (tmc *TokenMintCreate) check() error {
 	}
 	if _, ok := tmc.mutation.IssuerPublicKey(); !ok {
 		return &ValidationError{Name: "issuer_public_key", err: errors.New(`ent: missing required field "TokenMint.issuer_public_key"`)}
-	}
-	if v, ok := tmc.mutation.IssuerPublicKey(); ok {
-		if err := tokenmint.IssuerPublicKeyValidator(v); err != nil {
-			return &ValidationError{Name: "issuer_public_key", err: fmt.Errorf(`ent: validator failed for field "TokenMint.issuer_public_key": %w`, err)}
-		}
 	}
 	if _, ok := tmc.mutation.WalletProvidedTimestamp(); !ok {
 		return &ValidationError{Name: "wallet_provided_timestamp", err: errors.New(`ent: missing required field "TokenMint.wallet_provided_timestamp"`)}

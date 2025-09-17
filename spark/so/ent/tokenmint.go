@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/tokenmint"
 )
 
@@ -23,7 +24,7 @@ type TokenMint struct {
 	// UpdateTime holds the value of the "update_time" field.
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// IssuerPublicKey holds the value of the "issuer_public_key" field.
-	IssuerPublicKey []byte `json:"issuer_public_key,omitempty"`
+	IssuerPublicKey keys.Public `json:"issuer_public_key,omitempty"`
 	// WalletProvidedTimestamp holds the value of the "wallet_provided_timestamp" field.
 	WalletProvidedTimestamp uint64 `json:"wallet_provided_timestamp,omitempty"`
 	// IssuerSignature holds the value of the "issuer_signature" field.
@@ -61,8 +62,10 @@ func (*TokenMint) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokenmint.FieldIssuerPublicKey, tokenmint.FieldIssuerSignature, tokenmint.FieldOperatorSpecificIssuerSignature, tokenmint.FieldTokenIdentifier:
+		case tokenmint.FieldIssuerSignature, tokenmint.FieldOperatorSpecificIssuerSignature, tokenmint.FieldTokenIdentifier:
 			values[i] = new([]byte)
+		case tokenmint.FieldIssuerPublicKey:
+			values[i] = new(keys.Public)
 		case tokenmint.FieldWalletProvidedTimestamp:
 			values[i] = new(sql.NullInt64)
 		case tokenmint.FieldCreateTime, tokenmint.FieldUpdateTime:
@@ -103,7 +106,7 @@ func (tm *TokenMint) assignValues(columns []string, values []any) error {
 				tm.UpdateTime = value.Time
 			}
 		case tokenmint.FieldIssuerPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field issuer_public_key", values[i])
 			} else if value != nil {
 				tm.IssuerPublicKey = *value

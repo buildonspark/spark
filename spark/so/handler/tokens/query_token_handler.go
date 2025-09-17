@@ -145,13 +145,9 @@ func (h *QueryTokenHandler) queryTokenTransactionsInternal(ctx context.Context, 
 	// Apply filters based on request parameters
 	if len(req.OutputIds) > 0 {
 		// Convert string IDs to UUIDs
-		outputUUIDs := make([]uuid.UUID, 0, len(req.OutputIds))
-		for _, idStr := range req.OutputIds {
-			id, err := uuid.Parse(idStr)
-			if err != nil {
-				return nil, fmt.Errorf("invalid output ID format: %w", err)
-			}
-			outputUUIDs = append(outputUUIDs, id)
+		outputUUIDs, err := common.StringUUIDArrayToUUIDArray(req.OutputIds)
+		if err != nil {
+			return nil, fmt.Errorf("invalid output ID format: %w", err)
 		}
 
 		// Find transactions that created or spent these outputs
@@ -167,20 +163,30 @@ func (h *QueryTokenHandler) queryTokenTransactionsInternal(ctx context.Context, 
 		baseQuery = baseQuery.Where(tokentransaction.FinalizedTokenTransactionHashIn(req.TokenTransactionHashes...))
 	}
 
-	if len(req.OwnerPublicKeys) > 0 {
+	ownerPubKeys, err := keys.ParsePublicKeys(req.GetOwnerPublicKeys())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner public key: %w", err)
+	}
+
+	if len(ownerPubKeys) > 0 {
 		baseQuery = baseQuery.Where(
 			tokentransaction.Or(
-				tokentransaction.HasCreatedOutputWith(tokenoutput.OwnerPublicKeyIn(req.OwnerPublicKeys...)),
-				tokentransaction.HasSpentOutputWith(tokenoutput.OwnerPublicKeyIn(req.OwnerPublicKeys...)),
+				tokentransaction.HasCreatedOutputWith(tokenoutput.OwnerPublicKeyIn(ownerPubKeys...)),
+				tokentransaction.HasSpentOutputWith(tokenoutput.OwnerPublicKeyIn(ownerPubKeys...)),
 			),
 		)
 	}
 
-	if len(req.IssuerPublicKeys) > 0 {
+	issuerPubKeys, err := keys.ParsePublicKeys(req.GetIssuerPublicKeys())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse issuer public key: %w", err)
+	}
+
+	if len(issuerPubKeys) > 0 {
 		baseQuery = baseQuery.Where(
 			tokentransaction.Or(
-				tokentransaction.HasCreatedOutputWith(tokenoutput.TokenPublicKeyIn(req.IssuerPublicKeys...)),
-				tokentransaction.HasSpentOutputWith(tokenoutput.TokenPublicKeyIn(req.IssuerPublicKeys...)),
+				tokentransaction.HasCreatedOutputWith(tokenoutput.TokenPublicKeyIn(issuerPubKeys...)),
+				tokentransaction.HasSpentOutputWith(tokenoutput.TokenPublicKeyIn(issuerPubKeys...)),
 			),
 		)
 	}
@@ -197,14 +203,13 @@ func (h *QueryTokenHandler) queryTokenTransactionsInternal(ctx context.Context, 
 	// Apply sorting, limit and offset
 	query := baseQuery.Order(ent.Desc(tokentransaction.FieldUpdateTime))
 
-	if req.Limit == 0 {
-		req.Limit = 100
+	limit := req.GetLimit()
+	if limit == 0 {
+		limit = 100
+	} else if limit > 1000 {
+		limit = 1000
 	}
-
-	if req.Limit > 1000 {
-		req.Limit = 1000
-	}
-	query = query.Limit(int(req.Limit))
+	query = query.Limit(int(limit))
 
 	if req.Offset > 0 {
 		query = query.Offset(int(req.Offset))
@@ -245,13 +250,13 @@ func (h *QueryTokenHandler) queryTokenTransactionsInternal(ctx context.Context, 
 		}
 
 		if status == tokenpb.TokenTransactionStatus_TOKEN_TRANSACTION_FINALIZED {
-			spentTokenOutputsMetadata := make([]*tokenpb.SpentTokenOutputMetadata, 0, len(transaction.Edges.SpentOutput))
+			spentTokenOutputsMetadata := make([]*tokenpb.SpentTokenOutputMetadata, len(transaction.Edges.SpentOutput))
 
-			for _, spentOutput := range transaction.Edges.SpentOutput {
-				spentTokenOutputsMetadata = append(spentTokenOutputsMetadata, &tokenpb.SpentTokenOutputMetadata{
+			for i, spentOutput := range transaction.Edges.SpentOutput {
+				spentTokenOutputsMetadata[i] = &tokenpb.SpentTokenOutputMetadata{
 					OutputId:         spentOutput.ID.String(),
 					RevocationSecret: spentOutput.SpentRevocationSecret,
-				})
+				}
 			}
 			transactionWithStatus.ConfirmationMetadata = &tokenpb.TokenTransactionConfirmationMetadata{
 				SpentTokenOutputsMetadata: spentTokenOutputsMetadata,
@@ -346,7 +351,7 @@ func (h *QueryTokenHandler) queryTokenOutputsInternal(
 
 			spendableOutputMap := make(map[string]*sparkpb.OutputWithPreviousTransactionData)
 			for _, output := range availableOutputs.OutputsWithPreviousTransactionData {
-				spendableOutputMap[*output.Output.Id] = output
+				spendableOutputMap[output.GetOutput().GetId()] = output
 			}
 			return spendableOutputMap, nil
 		},
@@ -509,11 +514,11 @@ func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tok
 		ownedTokenOutputs = append(ownedTokenOutputs, &tokenpb.OutputWithPreviousTransactionData{
 			Output: &tokenpb.TokenOutput{
 				Id:                            &idStr,
-				OwnerPublicKey:                output.OwnerPublicKey,
+				OwnerPublicKey:                output.OwnerPublicKey.Serialize(),
 				RevocationCommitment:          output.WithdrawRevocationCommitment,
 				WithdrawBondSats:              &output.WithdrawBondSats,
 				WithdrawRelativeBlockLocktime: &output.WithdrawRelativeBlockLocktime,
-				TokenPublicKey:                output.TokenPublicKey,
+				TokenPublicKey:                output.TokenPublicKey.Serialize(),
 				TokenIdentifier:               output.TokenIdentifier,
 				TokenAmount:                   output.TokenAmount,
 			},
@@ -525,27 +530,25 @@ func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tok
 
 	hasMoreResults := len(outputs) > limit
 
-	if afterID != nil {
-		// Forward pagination: we know there's a previous page, check if there's a next page
-		pageResponse.HasPreviousPage = true
-		pageResponse.HasNextPage = hasMoreResults
-	} else {
+	if afterID == nil {
 		// No pagination: no previous page, check if there's a next page
 		pageResponse.HasPreviousPage = false
 		pageResponse.HasNextPage = hasMoreResults
+	} else {
+		// Forward pagination: we know there's a previous page, check if there's a next page
+		pageResponse.HasPreviousPage = true
+		pageResponse.HasNextPage = hasMoreResults
 	}
 
-	// Set previous cursor (first item's ID) - for going backward from this page
 	if len(ownedTokenOutputs) > 0 {
+		// Set previous cursor (first item's ID) - for going backward from this page
 		if first := ownedTokenOutputs[0]; first != nil && first.Output != nil && first.Output.Id != nil {
 			if firstUUID, err := uuid.Parse(first.GetOutput().GetId()); err == nil {
 				pageResponse.PreviousCursor = base64.RawURLEncoding.EncodeToString(firstUUID[:])
 			}
 		}
-	}
 
-	// Set next cursor (last item's ID) - for going forward from this page
-	if len(ownedTokenOutputs) > 0 {
+		// Set next cursor (last item's ID) - for going forward from this page
 		if last := ownedTokenOutputs[len(ownedTokenOutputs)-1]; last != nil && last.Output != nil && last.Output.Id != nil {
 			if lastUUID, err := uuid.Parse(last.GetOutput().GetId()); err == nil {
 				pageResponse.NextCursor = base64.RawURLEncoding.EncodeToString(lastUUID[:])

@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -68,7 +69,7 @@ func UpdateTime(v time.Time) predicate.TokenOutput {
 }
 
 // OwnerPublicKey applies equality check predicate on the "owner_public_key" field. It's identical to OwnerPublicKeyEQ.
-func OwnerPublicKey(v []byte) predicate.TokenOutput {
+func OwnerPublicKey(v keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldEQ(FieldOwnerPublicKey, v))
 }
 
@@ -88,7 +89,7 @@ func WithdrawRevocationCommitment(v []byte) predicate.TokenOutput {
 }
 
 // TokenPublicKey applies equality check predicate on the "token_public_key" field. It's identical to TokenPublicKeyEQ.
-func TokenPublicKey(v []byte) predicate.TokenOutput {
+func TokenPublicKey(v keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldEQ(FieldTokenPublicKey, v))
 }
 
@@ -248,42 +249,42 @@ func StatusNotIn(vs ...schematype.TokenOutputStatus) predicate.TokenOutput {
 }
 
 // OwnerPublicKeyEQ applies the EQ predicate on the "owner_public_key" field.
-func OwnerPublicKeyEQ(v []byte) predicate.TokenOutput {
+func OwnerPublicKeyEQ(v keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldEQ(FieldOwnerPublicKey, v))
 }
 
 // OwnerPublicKeyNEQ applies the NEQ predicate on the "owner_public_key" field.
-func OwnerPublicKeyNEQ(v []byte) predicate.TokenOutput {
+func OwnerPublicKeyNEQ(v keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldNEQ(FieldOwnerPublicKey, v))
 }
 
 // OwnerPublicKeyIn applies the In predicate on the "owner_public_key" field.
-func OwnerPublicKeyIn(vs ...[]byte) predicate.TokenOutput {
+func OwnerPublicKeyIn(vs ...keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldIn(FieldOwnerPublicKey, vs...))
 }
 
 // OwnerPublicKeyNotIn applies the NotIn predicate on the "owner_public_key" field.
-func OwnerPublicKeyNotIn(vs ...[]byte) predicate.TokenOutput {
+func OwnerPublicKeyNotIn(vs ...keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldNotIn(FieldOwnerPublicKey, vs...))
 }
 
 // OwnerPublicKeyGT applies the GT predicate on the "owner_public_key" field.
-func OwnerPublicKeyGT(v []byte) predicate.TokenOutput {
+func OwnerPublicKeyGT(v keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldGT(FieldOwnerPublicKey, v))
 }
 
 // OwnerPublicKeyGTE applies the GTE predicate on the "owner_public_key" field.
-func OwnerPublicKeyGTE(v []byte) predicate.TokenOutput {
+func OwnerPublicKeyGTE(v keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldGTE(FieldOwnerPublicKey, v))
 }
 
 // OwnerPublicKeyLT applies the LT predicate on the "owner_public_key" field.
-func OwnerPublicKeyLT(v []byte) predicate.TokenOutput {
+func OwnerPublicKeyLT(v keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldLT(FieldOwnerPublicKey, v))
 }
 
 // OwnerPublicKeyLTE applies the LTE predicate on the "owner_public_key" field.
-func OwnerPublicKeyLTE(v []byte) predicate.TokenOutput {
+func OwnerPublicKeyLTE(v keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldLTE(FieldOwnerPublicKey, v))
 }
 
@@ -408,42 +409,42 @@ func WithdrawRevocationCommitmentLTE(v []byte) predicate.TokenOutput {
 }
 
 // TokenPublicKeyEQ applies the EQ predicate on the "token_public_key" field.
-func TokenPublicKeyEQ(v []byte) predicate.TokenOutput {
+func TokenPublicKeyEQ(v keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldEQ(FieldTokenPublicKey, v))
 }
 
 // TokenPublicKeyNEQ applies the NEQ predicate on the "token_public_key" field.
-func TokenPublicKeyNEQ(v []byte) predicate.TokenOutput {
+func TokenPublicKeyNEQ(v keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldNEQ(FieldTokenPublicKey, v))
 }
 
 // TokenPublicKeyIn applies the In predicate on the "token_public_key" field.
-func TokenPublicKeyIn(vs ...[]byte) predicate.TokenOutput {
+func TokenPublicKeyIn(vs ...keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldIn(FieldTokenPublicKey, vs...))
 }
 
 // TokenPublicKeyNotIn applies the NotIn predicate on the "token_public_key" field.
-func TokenPublicKeyNotIn(vs ...[]byte) predicate.TokenOutput {
+func TokenPublicKeyNotIn(vs ...keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldNotIn(FieldTokenPublicKey, vs...))
 }
 
 // TokenPublicKeyGT applies the GT predicate on the "token_public_key" field.
-func TokenPublicKeyGT(v []byte) predicate.TokenOutput {
+func TokenPublicKeyGT(v keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldGT(FieldTokenPublicKey, v))
 }
 
 // TokenPublicKeyGTE applies the GTE predicate on the "token_public_key" field.
-func TokenPublicKeyGTE(v []byte) predicate.TokenOutput {
+func TokenPublicKeyGTE(v keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldGTE(FieldTokenPublicKey, v))
 }
 
 // TokenPublicKeyLT applies the LT predicate on the "token_public_key" field.
-func TokenPublicKeyLT(v []byte) predicate.TokenOutput {
+func TokenPublicKeyLT(v keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldLT(FieldTokenPublicKey, v))
 }
 
 // TokenPublicKeyLTE applies the LTE predicate on the "token_public_key" field.
-func TokenPublicKeyLTE(v []byte) predicate.TokenOutput {
+func TokenPublicKeyLTE(v keys.Public) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldLTE(FieldTokenPublicKey, v))
 }
 

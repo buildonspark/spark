@@ -117,11 +117,7 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 			return nil, tokens.FormatErrorWithTransactionEnt("no created token found when attempting to validate transfer transaction", tokenTransaction, nil)
 		}
 		for i, output := range tokenTransaction.Edges.SpentOutput {
-			pubKey, err := keys.ParsePublicKey(output.OwnerPublicKey)
-			if err != nil {
-				return nil, tokens.FormatErrorWithTransactionEnt(err.Error(), tokenTransaction, nil)
-			}
-			ownerPublicKeys[i] = pubKey
+			ownerPublicKeys[i] = output.OwnerPublicKey
 		}
 
 		// Bulk query all input ids to ensure none of them are frozen.
@@ -384,7 +380,7 @@ func (h *InternalSignTokenHandler) getSecretSharesNotInInput(ctx context.Context
 					excludePartialShareConditions = append(excludePartialShareConditions,
 						tokenpartialrevocationsecretshare.And(
 							tokenpartialrevocationsecretshare.HasTokenOutputWith(tokenoutput.IDEQ(shareKey.TokenOutputID)),
-							tokenpartialrevocationsecretshare.OperatorIdentityPublicKeyEQ(shareValue.OperatorIdentityPublicKey.Serialize()),
+							tokenpartialrevocationsecretshare.OperatorIdentityPublicKeyEQ(shareValue.OperatorIdentityPublicKey),
 						),
 					)
 					break
@@ -438,12 +434,9 @@ func (h *InternalSignTokenHandler) buildOperatorPubkeyToRevocationSecretShareMap
 			)
 		}
 		for _, partialShare := range to.Edges.TokenPartialRevocationSecretShares {
-			partialShareOperatorIdentityPubkey, err := keys.ParsePublicKey(partialShare.OperatorIdentityPublicKey)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create operator identity pubkey: %w", err)
-			}
-			operatorShares[partialShareOperatorIdentityPubkey] = append(
-				operatorShares[partialShareOperatorIdentityPubkey],
+			idPubKey := partialShare.OperatorIdentityPublicKey
+			operatorShares[idPubKey] = append(
+				operatorShares[idPubKey],
 				&pbtkinternal.RevocationSecretShare{
 					InputTtxoId: to.ID.String(),
 					SecretShare: partialShare.SecretShare,
@@ -511,7 +504,7 @@ func (h *InternalSignTokenHandler) persistPartialRevocationSecretShares(
 			continue
 		}
 		newShares = append(newShares, db.TokenPartialRevocationSecretShare.Create().
-			SetOperatorIdentityPublicKey(sv.OperatorIdentityPublicKey.Serialize()).
+			SetOperatorIdentityPublicKey(sv.OperatorIdentityPublicKey).
 			SetSecretShare(sv.SecretShare).
 			SetTokenOutputID(sk.TokenOutputID))
 	}
@@ -682,11 +675,7 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(tokenTransaction
 		outputToSpendRevocationCommitments = append(outputToSpendRevocationCommitments, commitment)
 		outputShares := make([]*secretsharing.SecretShare, 0, len(output.Edges.TokenPartialRevocationSecretShares)+1)
 		for _, share := range output.Edges.TokenPartialRevocationSecretShares {
-			identityPubKey, err := keys.ParsePublicKey(share.OperatorIdentityPublicKey)
-			if err != nil {
-				return nil, nil, err
-			}
-			operatorIndex, err := strconv.ParseInt(h.config.GetOperatorIdentifierFromIdentityPublicKey(identityPubKey), 10, 64)
+			operatorIndex, err := strconv.ParseInt(h.config.GetOperatorIdentifierFromIdentityPublicKey(share.OperatorIdentityPublicKey), 10, 64)
 			if err != nil {
 				return nil, nil, tokens.FormatErrorWithTransactionEnt("failed to parse operator index", tokenTransaction, err)
 			}

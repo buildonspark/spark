@@ -73,10 +73,7 @@ func ValidateMintDoesNotExceedMaxSupplyEnt(ctx context.Context, tokenTransaction
 		return sparkerrors.NotFoundErrorf("cannot verify max supply for mint transaction because no mint input was found")
 	}
 	tokenIdentifier := tokenTransaction.Edges.Mint.TokenIdentifier
-	issuerPublicKey, err := keys.ParsePublicKey(tokenTransaction.Edges.Mint.IssuerPublicKey)
-	if err != nil {
-		return sparkerrors.NotFoundErrorf("failed to get issuer public key: %w", err)
-	}
+	issuerPublicKey := tokenTransaction.Edges.Mint.IssuerPublicKey
 
 	if len(tokenTransaction.Edges.CreatedOutput) == 0 {
 		return sparkerrors.NotFoundErrorf("cannot determine network for mint transaction because no outputs were found")
@@ -160,7 +157,7 @@ func calculateCurrentSupplyByTokenIdentifier(ctx context.Context, tokenIdentifie
 // calculateCurrentSupplyByIssuerKey calculates the current minted supply for a token by issuer public key.
 func calculateCurrentSupplyByIssuerKey(ctx context.Context, issuerPublicKey keys.Public) (*big.Int, error) {
 	return calculateCurrentSupply(ctx, func(q *ent.TokenOutputQuery) *ent.TokenOutputQuery {
-		return q.Where(tokenoutput.TokenPublicKeyEQ(issuerPublicKey.Serialize()))
+		return q.Where(tokenoutput.TokenPublicKeyEQ(issuerPublicKey))
 	})
 }
 

@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/lightsparkdev/spark/common/keys"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenmint"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 )
 
-// FetchSignedMintsForToken fetches all token_mint entities for a specific token
+// FetchSignedMintsForTokenWithOutputs fetches all token_mint entities for a specific token
 // that have associated token_transaction entities with SIGNED status.
 // It queries based on either token_identifier or issuer_public_key depending on what's specified in the token transaction.
 // TODO DL-155: Optimize this query to reduce data fetch requirements.
@@ -39,7 +40,11 @@ func FetchSignedMintsForTokenWithOutputs(ctx context.Context, tokenTransaction *
 	if mintInput.GetTokenIdentifier() != nil {
 		query = query.Where(tokenmint.TokenIdentifierEQ(mintInput.GetTokenIdentifier()))
 	} else {
-		query = query.Where(tokenmint.IssuerPublicKeyEQ(mintInput.GetIssuerPublicKey()))
+		issuerPubKey, err := keys.ParsePublicKey(mintInput.GetIssuerPublicKey())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse issuer public key: %w", err)
+		}
+		query = query.Where(tokenmint.IssuerPublicKeyEQ(issuerPubKey))
 	}
 
 	mints, err := query.All(ctx)

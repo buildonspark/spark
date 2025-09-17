@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokenpartialrevocationsecretshare"
 )
@@ -24,7 +25,7 @@ type TokenPartialRevocationSecretShare struct {
 	// UpdateTime holds the value of the "update_time" field.
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// OperatorIdentityPublicKey holds the value of the "operator_identity_public_key" field.
-	OperatorIdentityPublicKey []byte `json:"operator_identity_public_key,omitempty"`
+	OperatorIdentityPublicKey keys.Public `json:"operator_identity_public_key,omitempty"`
 	// SecretShare holds the value of the "secret_share" field.
 	SecretShare []byte `json:"secret_share,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -59,8 +60,10 @@ func (*TokenPartialRevocationSecretShare) scanValues(columns []string) ([]any, e
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokenpartialrevocationsecretshare.FieldOperatorIdentityPublicKey, tokenpartialrevocationsecretshare.FieldSecretShare:
+		case tokenpartialrevocationsecretshare.FieldSecretShare:
 			values[i] = new([]byte)
+		case tokenpartialrevocationsecretshare.FieldOperatorIdentityPublicKey:
+			values[i] = new(keys.Public)
 		case tokenpartialrevocationsecretshare.FieldCreateTime, tokenpartialrevocationsecretshare.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
 		case tokenpartialrevocationsecretshare.FieldID:
@@ -101,7 +104,7 @@ func (tprss *TokenPartialRevocationSecretShare) assignValues(columns []string, v
 				tprss.UpdateTime = value.Time
 			}
 		case tokenpartialrevocationsecretshare.FieldOperatorIdentityPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field operator_identity_public_key", values[i])
 			} else if value != nil {
 				tprss.OperatorIdentityPublicKey = *value
