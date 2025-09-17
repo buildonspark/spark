@@ -626,11 +626,7 @@ func (h *SignTokenHandler) getSignedCommitProgress(_ context.Context, tt *ent.To
 
 	seen := map[keys.Public]struct{}{}
 	for _, ps := range peerSigs {
-		operatorPublicKey, err := keys.ParsePublicKey(ps.OperatorIdentityPublicKey)
-		if err != nil {
-			return nil, err
-		}
-		seen[operatorPublicKey] = struct{}{}
+		seen[ps.OperatorIdentityPublicKey] = struct{}{}
 	}
 
 	self := h.config.IdentityPublicKey()

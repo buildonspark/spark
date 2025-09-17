@@ -5,6 +5,7 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
@@ -24,7 +25,7 @@ func (Tree) Mixin() []ent.Mixin {
 // Fields are the fields for the trees table.
 func (Tree) Fields() []ent.Field {
 	return []ent.Field{
-		field.Bytes("owner_identity_pubkey").NotEmpty(),
+		field.Bytes("owner_identity_pubkey").GoType(keys.Public{}),
 		field.Enum("status").GoType(st.TreeStatus("")),
 		field.Enum("network").GoType(st.Network("")),
 		field.Bytes("base_txid").NotEmpty(),
@@ -35,8 +36,7 @@ func (Tree) Fields() []ent.Field {
 // Edges are the edges for the trees table.
 func (Tree) Edges() []ent.Edge {
 	return []ent.Edge{
-		edge.To("root", TreeNode.Type).
-			Unique(),
+		edge.To("root", TreeNode.Type).Unique(),
 		edge.From("nodes", TreeNode.Type).Ref("tree"),
 	}
 }

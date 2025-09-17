@@ -1529,7 +1529,7 @@ func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.R
 		return nil, fmt.Errorf("unable to get transfer: %w", err)
 	}
 
-	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.UserIdentityPublicKey) {
+	if !transfer.ReceiverIdentityPubkey.Equals(reqUserIdentityPubKey) {
 		return nil, fmt.Errorf("transfer receiver identity public key mismatch")
 	}
 

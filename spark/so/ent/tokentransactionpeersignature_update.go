@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/ent/tokentransactionpeersignature"
@@ -37,8 +38,16 @@ func (ttpsu *TokenTransactionPeerSignatureUpdate) SetUpdateTime(t time.Time) *To
 }
 
 // SetOperatorIdentityPublicKey sets the "operator_identity_public_key" field.
-func (ttpsu *TokenTransactionPeerSignatureUpdate) SetOperatorIdentityPublicKey(b []byte) *TokenTransactionPeerSignatureUpdate {
-	ttpsu.mutation.SetOperatorIdentityPublicKey(b)
+func (ttpsu *TokenTransactionPeerSignatureUpdate) SetOperatorIdentityPublicKey(k keys.Public) *TokenTransactionPeerSignatureUpdate {
+	ttpsu.mutation.SetOperatorIdentityPublicKey(k)
+	return ttpsu
+}
+
+// SetNillableOperatorIdentityPublicKey sets the "operator_identity_public_key" field if the given value is not nil.
+func (ttpsu *TokenTransactionPeerSignatureUpdate) SetNillableOperatorIdentityPublicKey(k *keys.Public) *TokenTransactionPeerSignatureUpdate {
+	if k != nil {
+		ttpsu.SetOperatorIdentityPublicKey(*k)
+	}
 	return ttpsu
 }
 
@@ -114,11 +123,6 @@ func (ttpsu *TokenTransactionPeerSignatureUpdate) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (ttpsu *TokenTransactionPeerSignatureUpdate) check() error {
-	if v, ok := ttpsu.mutation.OperatorIdentityPublicKey(); ok {
-		if err := tokentransactionpeersignature.OperatorIdentityPublicKeyValidator(v); err != nil {
-			return &ValidationError{Name: "operator_identity_public_key", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionPeerSignature.operator_identity_public_key": %w`, err)}
-		}
-	}
 	if v, ok := ttpsu.mutation.Signature(); ok {
 		if err := tokentransactionpeersignature.SignatureValidator(v); err != nil {
 			return &ValidationError{Name: "signature", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionPeerSignature.signature": %w`, err)}
@@ -207,8 +211,16 @@ func (ttpsuo *TokenTransactionPeerSignatureUpdateOne) SetUpdateTime(t time.Time)
 }
 
 // SetOperatorIdentityPublicKey sets the "operator_identity_public_key" field.
-func (ttpsuo *TokenTransactionPeerSignatureUpdateOne) SetOperatorIdentityPublicKey(b []byte) *TokenTransactionPeerSignatureUpdateOne {
-	ttpsuo.mutation.SetOperatorIdentityPublicKey(b)
+func (ttpsuo *TokenTransactionPeerSignatureUpdateOne) SetOperatorIdentityPublicKey(k keys.Public) *TokenTransactionPeerSignatureUpdateOne {
+	ttpsuo.mutation.SetOperatorIdentityPublicKey(k)
+	return ttpsuo
+}
+
+// SetNillableOperatorIdentityPublicKey sets the "operator_identity_public_key" field if the given value is not nil.
+func (ttpsuo *TokenTransactionPeerSignatureUpdateOne) SetNillableOperatorIdentityPublicKey(k *keys.Public) *TokenTransactionPeerSignatureUpdateOne {
+	if k != nil {
+		ttpsuo.SetOperatorIdentityPublicKey(*k)
+	}
 	return ttpsuo
 }
 
@@ -297,11 +309,6 @@ func (ttpsuo *TokenTransactionPeerSignatureUpdateOne) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (ttpsuo *TokenTransactionPeerSignatureUpdateOne) check() error {
-	if v, ok := ttpsuo.mutation.OperatorIdentityPublicKey(); ok {
-		if err := tokentransactionpeersignature.OperatorIdentityPublicKeyValidator(v); err != nil {
-			return &ValidationError{Name: "operator_identity_public_key", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionPeerSignature.operator_identity_public_key": %w`, err)}
-		}
-	}
 	if v, ok := ttpsuo.mutation.Signature(); ok {
 		if err := tokentransactionpeersignature.SignatureValidator(v); err != nil {
 			return &ValidationError{Name: "signature", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionPeerSignature.signature": %w`, err)}

@@ -16,7 +16,7 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to query transfer leaves for transfer %s: %w", t.ID.String(), err)
 	}
-	leavesProto := []*pb.TransferLeaf{}
+	var leavesProto []*pb.TransferLeaf
 	for _, leaf := range leaves {
 		leafProto, err := leaf.MarshalProto(ctx)
 		if err != nil {
@@ -39,8 +39,8 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 	}
 	return &pb.Transfer{
 		Id:                        t.ID.String(),
-		SenderIdentityPublicKey:   t.SenderIdentityPubkey,
-		ReceiverIdentityPublicKey: t.ReceiverIdentityPubkey,
+		SenderIdentityPublicKey:   t.SenderIdentityPubkey.Serialize(),
+		ReceiverIdentityPublicKey: t.ReceiverIdentityPubkey.Serialize(),
 		Status:                    *status,
 		TotalValue:                t.TotalValue,
 		ExpiryTime:                timestamppb.New(t.ExpiryTime),

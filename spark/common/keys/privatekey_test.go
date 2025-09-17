@@ -229,6 +229,16 @@ func TestPrivate_Scan(t *testing.T) {
 			want:  privKey.key,
 		},
 		{
+			name:  "nil value",
+			input: nil,
+			want:  secp256k1.PrivateKey{},
+		},
+		{
+			name:  "nil sql.Null",
+			input: (*sql.Null[[]byte])(nil),
+			want:  secp256k1.PrivateKey{},
+		},
+		{
 			name:  "null value",
 			input: &sql.Null[[]byte]{Valid: false},
 			want:  secp256k1.PrivateKey{},

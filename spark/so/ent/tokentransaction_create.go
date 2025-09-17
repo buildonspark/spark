@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
@@ -106,8 +107,16 @@ func (ttc *TokenTransactionCreate) SetNillableExpiryTime(t *time.Time) *TokenTra
 }
 
 // SetCoordinatorPublicKey sets the "coordinator_public_key" field.
-func (ttc *TokenTransactionCreate) SetCoordinatorPublicKey(b []byte) *TokenTransactionCreate {
-	ttc.mutation.SetCoordinatorPublicKey(b)
+func (ttc *TokenTransactionCreate) SetCoordinatorPublicKey(k keys.Public) *TokenTransactionCreate {
+	ttc.mutation.SetCoordinatorPublicKey(k)
+	return ttc
+}
+
+// SetNillableCoordinatorPublicKey sets the "coordinator_public_key" field if the given value is not nil.
+func (ttc *TokenTransactionCreate) SetNillableCoordinatorPublicKey(k *keys.Public) *TokenTransactionCreate {
+	if k != nil {
+		ttc.SetCoordinatorPublicKey(*k)
+	}
 	return ttc
 }
 
@@ -719,7 +728,7 @@ func (u *TokenTransactionUpsert) ClearStatus() *TokenTransactionUpsert {
 }
 
 // SetCoordinatorPublicKey sets the "coordinator_public_key" field.
-func (u *TokenTransactionUpsert) SetCoordinatorPublicKey(v []byte) *TokenTransactionUpsert {
+func (u *TokenTransactionUpsert) SetCoordinatorPublicKey(v keys.Public) *TokenTransactionUpsert {
 	u.Set(tokentransaction.FieldCoordinatorPublicKey, v)
 	return u
 }
@@ -911,7 +920,7 @@ func (u *TokenTransactionUpsertOne) ClearStatus() *TokenTransactionUpsertOne {
 }
 
 // SetCoordinatorPublicKey sets the "coordinator_public_key" field.
-func (u *TokenTransactionUpsertOne) SetCoordinatorPublicKey(v []byte) *TokenTransactionUpsertOne {
+func (u *TokenTransactionUpsertOne) SetCoordinatorPublicKey(v keys.Public) *TokenTransactionUpsertOne {
 	return u.Update(func(s *TokenTransactionUpsert) {
 		s.SetCoordinatorPublicKey(v)
 	})
@@ -1279,7 +1288,7 @@ func (u *TokenTransactionUpsertBulk) ClearStatus() *TokenTransactionUpsertBulk {
 }
 
 // SetCoordinatorPublicKey sets the "coordinator_public_key" field.
-func (u *TokenTransactionUpsertBulk) SetCoordinatorPublicKey(v []byte) *TokenTransactionUpsertBulk {
+func (u *TokenTransactionUpsertBulk) SetCoordinatorPublicKey(v keys.Public) *TokenTransactionUpsertBulk {
 	return u.Update(func(s *TokenTransactionUpsert) {
 		s.SetCoordinatorPublicKey(v)
 	})

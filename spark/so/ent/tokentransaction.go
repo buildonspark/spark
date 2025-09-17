@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
@@ -37,7 +38,7 @@ type TokenTransaction struct {
 	// ExpiryTime holds the value of the "expiry_time" field.
 	ExpiryTime time.Time `json:"expiry_time,omitempty"`
 	// CoordinatorPublicKey holds the value of the "coordinator_public_key" field.
-	CoordinatorPublicKey []byte `json:"coordinator_public_key,omitempty"`
+	CoordinatorPublicKey keys.Public `json:"coordinator_public_key,omitempty"`
 	// ClientCreatedTimestamp holds the value of the "client_created_timestamp" field.
 	ClientCreatedTimestamp time.Time `json:"client_created_timestamp,omitempty"`
 	// Version holds the value of the "version" field.
@@ -157,8 +158,10 @@ func (*TokenTransaction) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokentransaction.FieldPartialTokenTransactionHash, tokentransaction.FieldFinalizedTokenTransactionHash, tokentransaction.FieldOperatorSignature, tokentransaction.FieldCoordinatorPublicKey:
+		case tokentransaction.FieldPartialTokenTransactionHash, tokentransaction.FieldFinalizedTokenTransactionHash, tokentransaction.FieldOperatorSignature:
 			values[i] = new([]byte)
+		case tokentransaction.FieldCoordinatorPublicKey:
+			values[i] = new(keys.Public)
 		case tokentransaction.FieldVersion:
 			values[i] = new(sql.NullInt64)
 		case tokentransaction.FieldStatus:
@@ -237,7 +240,7 @@ func (tt *TokenTransaction) assignValues(columns []string, values []any) error {
 				tt.ExpiryTime = value.Time
 			}
 		case tokentransaction.FieldCoordinatorPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field coordinator_public_key", values[i])
 			} else if value != nil {
 				tt.CoordinatorPublicKey = *value

@@ -80,8 +80,6 @@ var (
 	DefaultUpdateTime func() time.Time
 	// UpdateDefaultUpdateTime holds the default value on update for the "update_time" field.
 	UpdateDefaultUpdateTime func() time.Time
-	// OperatorIdentityPublicKeyValidator is a validator for the "operator_identity_public_key" field. It is called by the builders before save.
-	OperatorIdentityPublicKeyValidator func([]byte) error
 	// SignatureValidator is a validator for the "signature" field. It is called by the builders before save.
 	SignatureValidator func([]byte) error
 	// DefaultID holds the default value on creation for the "id" field.

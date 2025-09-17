@@ -376,7 +376,7 @@ func TestRevocationExchangeCronJobDoesNotFinalizeStartedIfSignatureIsInvalid(t *
 	peerSignature, err := nonCoordEntClient.TokenTransactionPeerSignature.Query().
 		Where(tokentransactionpeersignature.And(
 			tokentransactionpeersignature.HasTokenTransactionWith(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)),
-			tokentransactionpeersignature.OperatorIdentityPublicKeyEQ(config.SigningOperators[config.CoordinatorIdentifier].IdentityPublicKey.Serialize()),
+			tokentransactionpeersignature.OperatorIdentityPublicKeyEQ(config.SigningOperators[config.CoordinatorIdentifier].IdentityPublicKey),
 		)).Only(ctx)
 	require.NoError(t, err)
 	// Reset the peer signature to its original value after the test

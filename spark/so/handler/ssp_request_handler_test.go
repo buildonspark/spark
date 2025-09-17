@@ -47,7 +47,7 @@ func TestGetStuckLightningPayments(t *testing.T) {
 	// Create a tree for the transfers
 	tree, err := dbTx.Tree.Create().
 		SetNetwork(st.NetworkMainnet).
-		SetOwnerIdentityPubkey(ownerIdentityPubKey.Serialize()).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey).
 		SetBaseTxid([]byte("base_txid")).
 		SetVout(0).
 		SetStatus(st.TreeStatusAvailable).
@@ -62,8 +62,8 @@ func TestGetStuckLightningPayments(t *testing.T) {
 			SetStatus(status).
 			SetExpiryTime(expiryTime).
 			SetTotalValue(1000).
-			SetSenderIdentityPubkey(senderIdentityPubKey.Serialize()).
-			SetReceiverIdentityPubkey(receiverIdentityPubKey.Serialize()).
+			SetSenderIdentityPubkey(senderIdentityPubKey).
+			SetReceiverIdentityPubkey(receiverIdentityPubKey).
 			Save(ctx)
 		if err != nil {
 			return nil, err

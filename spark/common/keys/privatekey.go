@@ -190,7 +190,7 @@ func getValue(src any) ([]byte, error) {
 	case nil:
 		return nil, nil
 	case *sql.Null[[]byte]:
-		if v == nil || !v.Valid { // It's NULL
+		if v == nil || !v.Valid { // It can be a nil pointer to a Null, or just a null Null.
 			return nil, nil
 		}
 		return v.V, nil

@@ -126,7 +126,7 @@ func TestFinalizeTransfer(t *testing.T) {
 		tree, err := dbCtx.Client.Tree.Create().
 			SetStatus(st.TreeStatusAvailable).
 			SetNetwork(st.NetworkRegtest).
-			SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public().Serialize()).
+			SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
 			SetBaseTxid([]byte("test_base_txid")).
 			SetVout(0).
 			Save(ctx)
@@ -154,8 +154,8 @@ func TestFinalizeTransfer(t *testing.T) {
 		transfer, err := dbCtx.Client.Transfer.Create().
 			SetStatus(st.TransferStatusReceiverRefundSigned).
 			SetType(st.TransferTypeTransfer).
-			SetSenderIdentityPubkey(senderIdentityPrivKey.Public().Serialize()).
-			SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public().Serialize()).
+			SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
+			SetReceiverIdentityPubkey(receiverIdentityPrivKey.Public()).
 			SetTotalValue(1000).
 			SetExpiryTime(time.Now().Add(24 * time.Hour)).
 			SetCompletionTime(time.Now()).
@@ -316,21 +316,23 @@ func TestApplySignatures(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	tree, err := dbCtx.Client.Tree.Create().
 		SetStatus(st.TreeStatusAvailable).
 		SetNetwork(st.NetworkRegtest).
-		SetOwnerIdentityPubkey([]byte("test_owner_identity")).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey).
 		SetBaseTxid([]byte("test_base_txid")).
 		SetVout(0).
 		Save(ctx)
 	require.NoError(t, err)
 
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	leaf, err := dbCtx.Client.TreeNode.Create().
 		SetStatus(st.TreeNodeStatusAvailable).
 		SetTree(tree).
 		SetSigningKeyshare(signingKeyshare).
 		SetValue(1000).
-		SetVerifyingPubkey(key.Public().Serialize()).
+		SetVerifyingPubkey(verifyingPubKey.Serialize()).
 		SetOwnerIdentityPubkey(key.Public().Serialize()).
 		SetOwnerSigningPubkey(key.Public().Serialize()).
 		SetRawTx(rawTx).
@@ -341,11 +343,12 @@ func TestApplySignatures(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
+	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	transfer, err := dbCtx.Client.Transfer.Create().
 		SetStatus(st.TransferStatusReceiverRefundSigned).
 		SetType(st.TransferTypeTransfer).
-		SetSenderIdentityPubkey(key.Public().Serialize()).
-		SetReceiverIdentityPubkey([]byte("test_receiver_identity")).
+		SetSenderIdentityPubkey(key.Public()).
+		SetReceiverIdentityPubkey(receiverIdentityPubKey).
 		SetTotalValue(900).
 		SetExpiryTime(time.Now().Add(24 * time.Hour)).
 		SetCompletionTime(time.Now()).

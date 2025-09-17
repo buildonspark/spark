@@ -283,8 +283,8 @@ func (h *BaseTransferHandler) createTransfer(
 
 	transferCreate := db.Transfer.Create().
 		SetID(transferUUID).
-		SetSenderIdentityPubkey(senderIdentityPubKey.Serialize()).
-		SetReceiverIdentityPubkey(receiverIdentityPubKey.Serialize()).
+		SetSenderIdentityPubkey(senderIdentityPubKey).
+		SetReceiverIdentityPubkey(receiverIdentityPubKey).
 		SetStatus(status).
 		SetTotalValue(0).
 		SetExpiryTime(expiryTime).
@@ -534,7 +534,7 @@ func (h *BaseTransferHandler) leafAvailableToTransfer(ctx context.Context, leaf 
 				enttransferleaf.HasLeafWith(treenode.IDEQ(leaf.ID)),
 			).WithTransfer().All(ctx)
 			if err != nil {
-				return fmt.Errorf("unable to find transfer leaf for leaf %s: %w", leaf.ID.String(), err)
+				return fmt.Errorf("unable to find transfer leaf for leaf %v: %w", leaf.ID, err)
 			}
 			now := time.Now()
 			for _, transferLeaf := range transferLeaves {
@@ -546,10 +546,14 @@ func (h *BaseTransferHandler) leafAvailableToTransfer(ctx context.Context, leaf 
 				}
 			}
 		}
-		return fmt.Errorf("leaf %s is not available to transfer, status: %s", leaf.ID.String(), leaf.Status)
+		return fmt.Errorf("leaf %v is not available to transfer, status: %s", leaf.ID, leaf.Status)
 	}
-	if !bytes.Equal(leaf.OwnerIdentityPubkey, transfer.SenderIdentityPubkey) {
-		return fmt.Errorf("leaf %s is not owned by sender", leaf.ID.String())
+	ownerIDPubKey, err := keys.ParsePublicKey(leaf.OwnerIdentityPubkey)
+	if err != nil {
+		return fmt.Errorf("unable to parse leaf owner identity public key: %w", err)
+	}
+	if !ownerIDPubKey.Equals(transfer.SenderIdentityPubkey) {
+		return fmt.Errorf("leaf %v is not owned by sender", leaf.ID)
 	}
 	return nil
 }
@@ -657,12 +661,7 @@ func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.C
 		logger.Sugar().Info("Transfer %s not found", req.TransferId)
 		return &pbspark.CancelTransferResponse{}, nil
 	}
-	transferSenderIDPubKey, err := keys.ParsePublicKey(transfer.SenderIdentityPubkey)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse transfer sender identity public key: %w", err)
-	}
-
-	if !transferSenderIDPubKey.Equals(reqSenderIDPubKey) {
+	if !transfer.SenderIdentityPubkey.Equals(reqSenderIDPubKey) {
 		return nil, fmt.Errorf("only sender is eligible to cancel the transfer %s", req.TransferId)
 	}
 

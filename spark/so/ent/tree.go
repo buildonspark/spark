@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
@@ -25,7 +26,7 @@ type Tree struct {
 	// UpdateTime holds the value of the "update_time" field.
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// OwnerIdentityPubkey holds the value of the "owner_identity_pubkey" field.
-	OwnerIdentityPubkey []byte `json:"owner_identity_pubkey,omitempty"`
+	OwnerIdentityPubkey keys.Public `json:"owner_identity_pubkey,omitempty"`
 	// Status holds the value of the "status" field.
 	Status schematype.TreeStatus `json:"status,omitempty"`
 	// Network holds the value of the "network" field.
@@ -77,8 +78,10 @@ func (*Tree) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tree.FieldOwnerIdentityPubkey, tree.FieldBaseTxid:
+		case tree.FieldBaseTxid:
 			values[i] = new([]byte)
+		case tree.FieldOwnerIdentityPubkey:
+			values[i] = new(keys.Public)
 		case tree.FieldVout:
 			values[i] = new(sql.NullInt64)
 		case tree.FieldStatus, tree.FieldNetwork:
@@ -123,7 +126,7 @@ func (t *Tree) assignValues(columns []string, values []any) error {
 				t.UpdateTime = value.Time
 			}
 		case tree.FieldOwnerIdentityPubkey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field owner_identity_pubkey", values[i])
 			} else if value != nil {
 				t.OwnerIdentityPubkey = *value

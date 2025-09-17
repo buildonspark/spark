@@ -62,6 +62,7 @@ func TestNewTreeCreationHandler(t *testing.T) {
 }
 
 func TestFindParentOutputFromUtxo(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
 	ctx, _ := db.NewTestSQLiteContext(t)
 	handler := createTestHandler()
 	testTx := createTestTx()
@@ -118,7 +119,7 @@ func TestFindParentOutputFromUtxo(t *testing.T) {
 
 				txHash := tx.TxHash()
 				_, err = dbTX.Tree.Create().
-					SetOwnerIdentityPubkey([]byte("test")).
+					SetOwnerIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 					SetNetwork(st.NetworkRegtest).
 					SetBaseTxid(txHash[:]).
 					SetVout(0).
@@ -166,7 +167,7 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 
 	// Create a tree
 	tree, err := dbTX.Tree.Create().
-		SetOwnerIdentityPubkey(identityPrivKey.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPrivKey.Public()).
 		SetNetwork(st.NetworkRegtest).
 		SetBaseTxid(make([]byte, 32)).
 		SetVout(0).
@@ -552,7 +553,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 
 	keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	publicSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
-	identityPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
+	identityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	signingPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
 	verifyingPrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
 
@@ -568,7 +569,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 
 	// Create a tree
 	tree, err := dbTX.Tree.Create().
-		SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPrivKey.Public()).
 		SetNetwork(st.NetworkRegtest).
 		SetBaseTxid(make([]byte, 32)).
 		SetVout(0).
@@ -580,7 +581,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	availableNode, err := dbTX.TreeNode.Create().
 		SetTree(tree).
 		SetStatus(st.TreeNodeStatusAvailable).
-		SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPrivKey.Public().Serialize()).
 		SetOwnerSigningPubkey(signingPrivkey.Public().Serialize()).
 		SetValue(100000).
 		SetVerifyingPubkey(verifyingPrivkey.Public().Serialize()).
@@ -594,7 +595,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	creatingNode, err := dbTX.TreeNode.Create().
 		SetTree(tree).
 		SetStatus(st.TreeNodeStatusCreating).
-		SetOwnerIdentityPubkey(identityPrivkey.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPrivKey.Public().Serialize()).
 		SetOwnerSigningPubkey(signingPrivkey.Public().Serialize()).
 		SetValue(100000).
 		SetVerifyingPubkey(verifyingPrivkey.Public().Serialize()).

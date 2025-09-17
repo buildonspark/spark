@@ -509,6 +509,11 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		vout:       vout,
 	}}
 
+	userIDPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse user identity public key: %w", err)
+	}
+
 	var signingJobs []*helper.SigningJob
 	var nodes []*ent.TreeNode
 
@@ -554,7 +559,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			txid := tx.TxHash()
 			treeMutator := db.Tree.
 				Create().
-				SetOwnerIdentityPubkey(req.UserIdentityPublicKey).
+				SetOwnerIdentityPubkey(userIDPubKey).
 				SetNetwork(schemaNetwork).
 				SetBaseTxid(txid[:]).
 				SetVout(int16(req.GetOnChainUtxo().Vout))
@@ -603,12 +608,10 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			return nil, nil, errors.New("directNodeTxSigningJob is required. Please upgrade to the latest SDK version")
 		}
 
-		createNode := db.
-			TreeNode.
-			Create().
+		createNode := db.TreeNode.Create().
 			SetTree(savedTree).
 			SetStatus(st.TreeNodeStatusCreating).
-			SetOwnerIdentityPubkey(req.UserIdentityPublicKey).
+			SetOwnerIdentityPubkey(userIDPubKey.Serialize()).
 			SetOwnerSigningPubkey(currentElement.userPubKey.Serialize()).
 			SetValue(uint64(currentElement.output.Value)).
 			SetVerifyingPubkey(verifyingKey.Serialize()).

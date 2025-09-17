@@ -108,7 +108,7 @@ func createTestTreeForClaim(t *testing.T, ctx context.Context, ownerIdentityPubK
 	tree, err := client.Tree.Create().
 		SetStatus(st.TreeStatusAvailable).
 		SetNetwork(st.NetworkRegtest).
-		SetOwnerIdentityPubkey(ownerIdentityPubKey.Serialize()).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey).
 		SetBaseTxid([]byte("test_base_txid")).
 		SetVout(0).
 		Save(ctx)
@@ -149,8 +149,8 @@ func createTestTransfer(t *testing.T, ctx context.Context, rng io.Reader, client
 	transfer, err := client.Transfer.Create().
 		SetStatus(status).
 		SetType(st.TransferTypeTransfer).
-		SetSenderIdentityPubkey(senderPubKey.Serialize()).
-		SetReceiverIdentityPubkey(receiverPubKey.Serialize()).
+		SetSenderIdentityPubkey(senderPubKey).
+		SetReceiverIdentityPubkey(receiverPubKey).
 		SetTotalValue(1000).
 		SetExpiryTime(time.Now().Add(24 * time.Hour)).
 		Save(ctx)
@@ -248,7 +248,7 @@ func TestClaimTransferSignRefunds_Success(t *testing.T) {
 	cfg := sparktesting.TestConfig(t)
 	req := &pb.ClaimTransferSignRefundsRequest{
 		TransferId:             transfer.ID.String(),
-		OwnerIdentityPublicKey: transfer.ReceiverIdentityPubkey,
+		OwnerIdentityPublicKey: transfer.ReceiverIdentityPubkey.Serialize(),
 		SigningJobs: []*pb.LeafRefundTxSigningJob{
 			createTestLeafRefundTxSigningJob(t, rng, leaf),
 		},

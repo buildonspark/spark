@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 )
 
@@ -67,7 +68,7 @@ func UpdateTime(v time.Time) predicate.TokenTransactionPeerSignature {
 }
 
 // OperatorIdentityPublicKey applies equality check predicate on the "operator_identity_public_key" field. It's identical to OperatorIdentityPublicKeyEQ.
-func OperatorIdentityPublicKey(v []byte) predicate.TokenTransactionPeerSignature {
+func OperatorIdentityPublicKey(v keys.Public) predicate.TokenTransactionPeerSignature {
 	return predicate.TokenTransactionPeerSignature(sql.FieldEQ(FieldOperatorIdentityPublicKey, v))
 }
 
@@ -157,42 +158,42 @@ func UpdateTimeLTE(v time.Time) predicate.TokenTransactionPeerSignature {
 }
 
 // OperatorIdentityPublicKeyEQ applies the EQ predicate on the "operator_identity_public_key" field.
-func OperatorIdentityPublicKeyEQ(v []byte) predicate.TokenTransactionPeerSignature {
+func OperatorIdentityPublicKeyEQ(v keys.Public) predicate.TokenTransactionPeerSignature {
 	return predicate.TokenTransactionPeerSignature(sql.FieldEQ(FieldOperatorIdentityPublicKey, v))
 }
 
 // OperatorIdentityPublicKeyNEQ applies the NEQ predicate on the "operator_identity_public_key" field.
-func OperatorIdentityPublicKeyNEQ(v []byte) predicate.TokenTransactionPeerSignature {
+func OperatorIdentityPublicKeyNEQ(v keys.Public) predicate.TokenTransactionPeerSignature {
 	return predicate.TokenTransactionPeerSignature(sql.FieldNEQ(FieldOperatorIdentityPublicKey, v))
 }
 
 // OperatorIdentityPublicKeyIn applies the In predicate on the "operator_identity_public_key" field.
-func OperatorIdentityPublicKeyIn(vs ...[]byte) predicate.TokenTransactionPeerSignature {
+func OperatorIdentityPublicKeyIn(vs ...keys.Public) predicate.TokenTransactionPeerSignature {
 	return predicate.TokenTransactionPeerSignature(sql.FieldIn(FieldOperatorIdentityPublicKey, vs...))
 }
 
 // OperatorIdentityPublicKeyNotIn applies the NotIn predicate on the "operator_identity_public_key" field.
-func OperatorIdentityPublicKeyNotIn(vs ...[]byte) predicate.TokenTransactionPeerSignature {
+func OperatorIdentityPublicKeyNotIn(vs ...keys.Public) predicate.TokenTransactionPeerSignature {
 	return predicate.TokenTransactionPeerSignature(sql.FieldNotIn(FieldOperatorIdentityPublicKey, vs...))
 }
 
 // OperatorIdentityPublicKeyGT applies the GT predicate on the "operator_identity_public_key" field.
-func OperatorIdentityPublicKeyGT(v []byte) predicate.TokenTransactionPeerSignature {
+func OperatorIdentityPublicKeyGT(v keys.Public) predicate.TokenTransactionPeerSignature {
 	return predicate.TokenTransactionPeerSignature(sql.FieldGT(FieldOperatorIdentityPublicKey, v))
 }
 
 // OperatorIdentityPublicKeyGTE applies the GTE predicate on the "operator_identity_public_key" field.
-func OperatorIdentityPublicKeyGTE(v []byte) predicate.TokenTransactionPeerSignature {
+func OperatorIdentityPublicKeyGTE(v keys.Public) predicate.TokenTransactionPeerSignature {
 	return predicate.TokenTransactionPeerSignature(sql.FieldGTE(FieldOperatorIdentityPublicKey, v))
 }
 
 // OperatorIdentityPublicKeyLT applies the LT predicate on the "operator_identity_public_key" field.
-func OperatorIdentityPublicKeyLT(v []byte) predicate.TokenTransactionPeerSignature {
+func OperatorIdentityPublicKeyLT(v keys.Public) predicate.TokenTransactionPeerSignature {
 	return predicate.TokenTransactionPeerSignature(sql.FieldLT(FieldOperatorIdentityPublicKey, v))
 }
 
 // OperatorIdentityPublicKeyLTE applies the LTE predicate on the "operator_identity_public_key" field.
-func OperatorIdentityPublicKeyLTE(v []byte) predicate.TokenTransactionPeerSignature {
+func OperatorIdentityPublicKeyLTE(v keys.Public) predicate.TokenTransactionPeerSignature {
 	return predicate.TokenTransactionPeerSignature(sql.FieldLTE(FieldOperatorIdentityPublicKey, v))
 }
 

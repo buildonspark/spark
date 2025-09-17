@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/ent/tokentransactionpeersignature"
 )
@@ -24,7 +25,7 @@ type TokenTransactionPeerSignature struct {
 	// UpdateTime holds the value of the "update_time" field.
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// OperatorIdentityPublicKey holds the value of the "operator_identity_public_key" field.
-	OperatorIdentityPublicKey []byte `json:"operator_identity_public_key,omitempty"`
+	OperatorIdentityPublicKey keys.Public `json:"operator_identity_public_key,omitempty"`
 	// Signature holds the value of the "signature" field.
 	Signature []byte `json:"signature,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -59,8 +60,10 @@ func (*TokenTransactionPeerSignature) scanValues(columns []string) ([]any, error
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokentransactionpeersignature.FieldOperatorIdentityPublicKey, tokentransactionpeersignature.FieldSignature:
+		case tokentransactionpeersignature.FieldSignature:
 			values[i] = new([]byte)
+		case tokentransactionpeersignature.FieldOperatorIdentityPublicKey:
+			values[i] = new(keys.Public)
 		case tokentransactionpeersignature.FieldCreateTime, tokentransactionpeersignature.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
 		case tokentransactionpeersignature.FieldID:
@@ -101,7 +104,7 @@ func (ttps *TokenTransactionPeerSignature) assignValues(columns []string, values
 				ttps.UpdateTime = value.Time
 			}
 		case tokentransactionpeersignature.FieldOperatorIdentityPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field operator_identity_public_key", values[i])
 			} else if value != nil {
 				ttps.OperatorIdentityPublicKey = *value

@@ -3,6 +3,7 @@ package tokens
 import (
 	"context"
 	"math/rand/v2"
+	"slices"
 
 	"testing"
 	"time"
@@ -50,8 +51,7 @@ func createTestTokenOutputs(t *testing.T, ctx context.Context, tx *ent.Tx, count
 
 	randomBytes := func(length int) []byte {
 		b := make([]byte, length)
-		_, err := rng.Read(b)
-		require.NoError(t, err)
+		_, _ = rng.Read(b)
 		return b
 	}
 
@@ -235,8 +235,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
 	randomBytes := func(length int) []byte {
 		b := make([]byte, length)
-		_, err := rng.Read(b)
-		require.NoError(t, err)
+		_, _ = rng.Read(b)
 		return b
 	}
 
@@ -261,10 +260,10 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 
 	t.Run("forward pagination", func(t *testing.T) {
 		// Page size 3, expect 3 pages: 3,3,1
-		var all []*tokenpb.OutputWithPreviousTransactionData
+		var all []string
 		var afterCursor string
 
-		for page := 0; page < 3; page++ {
+		for page := range 3 {
 			req := &tokenpb.QueryTokenOutputsRequest{
 				OwnerPublicKeys: [][]byte{ownerKey.Public().Serialize()},
 				Network:         sparkpb.Network_REGTEST,
@@ -281,7 +280,9 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, resp.PageResponse)
 
-			all = append(all, resp.OutputsWithPreviousTransactionData...)
+			for _, output := range resp.OutputsWithPreviousTransactionData {
+				all = append(all, output.GetOutput().GetId())
+			}
 
 			if page == 0 {
 				require.False(t, resp.PageResponse.HasPreviousPage)
@@ -298,13 +299,8 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 			}
 		}
 
-		require.Len(t, all, 7)
-		// Validate the IDs are sorted ascending by UUID (matching query order by ID)
-		for i := 1; i < len(all); i++ {
-			prev := all[i-1].Output.GetId()
-			curr := all[i].Output.GetId()
-			require.LessOrEqual(t, prev, curr)
-		}
+		assert.Len(t, all, 7)
+		assert.True(t, slices.IsSorted(all), "IDs should be sorted ascending by UUID; got %v", all)
 	})
 
 	t.Run("backward pagination", func(t *testing.T) {
@@ -317,7 +313,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		require.Len(t, resp.OutputsWithPreviousTransactionData, 7)
+		assert.Len(t, resp.OutputsWithPreviousTransactionData, 7)
 
 		// Use the PageResponse.NextCursor from the response, which is properly encoded
 		beforeCursor := resp.PageResponse.NextCursor
@@ -333,8 +329,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 				Direction: sparkpb.Direction_PREVIOUS,
 			},
 		})
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "backward pagination with 'previous' direction is not currently supported")
+		require.ErrorContains(t, err, "backward pagination with 'previous' direction is not currently supported")
 	})
 
 	t.Run("default page size", func(t *testing.T) {
@@ -347,9 +342,9 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 		require.NotNil(t, resp.PageResponse)
 
 		// Should get all 7 outputs since DefaultTokenOutputPageSize (500) > 7
-		require.Len(t, resp.OutputsWithPreviousTransactionData, 7)
-		require.False(t, resp.PageResponse.HasNextPage)
-		require.False(t, resp.PageResponse.HasPreviousPage)
+		assert.Len(t, resp.OutputsWithPreviousTransactionData, 7)
+		assert.False(t, resp.PageResponse.HasNextPage)
+		assert.False(t, resp.PageResponse.HasPreviousPage)
 	})
 
 	t.Run("page size limit", func(t *testing.T) {
@@ -363,6 +358,6 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		require.Len(t, resp.OutputsWithPreviousTransactionData, 7)
+		assert.Len(t, resp.OutputsWithPreviousTransactionData, 7)
 	})
 }

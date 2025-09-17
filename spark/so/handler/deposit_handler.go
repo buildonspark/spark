@@ -813,7 +813,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	txid := onChainTx.TxHash()
 	treeMutator := db.Tree.
 		Create().
-		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey.Serialize()).
+		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
 		SetNetwork(schemaNetwork).
 		SetBaseTxid(txid[:]).
 		SetVout(int16(req.OnChainUtxo.Vout))
@@ -1155,7 +1155,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		// Create new tree
 		treeMutator := db.Tree.
 			Create().
-			SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey.Serialize()).
+			SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
 			SetNetwork(schemaNetwork).
 			SetBaseTxid(txid[:]).
 			SetVout(int16(req.OnChainUtxo.Vout))

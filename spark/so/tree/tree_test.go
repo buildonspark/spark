@@ -240,7 +240,7 @@ func seedTreeNode(t *testing.T, ctx context.Context, network st.Network, opts ..
 	irrelevant := []byte{1, 2, 3, 4}
 
 	tr, err := tx.Tree.Create().
-		SetOwnerIdentityPubkey(opts[0].ownerIDPubKey.Serialize()).
+		SetOwnerIdentityPubkey(opts[0].ownerIDPubKey).
 		SetNetwork(network).
 		SetStatus(st.TreeStatusAvailable).
 		SetBaseTxid(irrelevant).

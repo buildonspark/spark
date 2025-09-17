@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -68,7 +69,7 @@ func UpdateTime(v time.Time) predicate.Tree {
 }
 
 // OwnerIdentityPubkey applies equality check predicate on the "owner_identity_pubkey" field. It's identical to OwnerIdentityPubkeyEQ.
-func OwnerIdentityPubkey(v []byte) predicate.Tree {
+func OwnerIdentityPubkey(v keys.Public) predicate.Tree {
 	return predicate.Tree(sql.FieldEQ(FieldOwnerIdentityPubkey, v))
 }
 
@@ -163,42 +164,42 @@ func UpdateTimeLTE(v time.Time) predicate.Tree {
 }
 
 // OwnerIdentityPubkeyEQ applies the EQ predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyEQ(v []byte) predicate.Tree {
+func OwnerIdentityPubkeyEQ(v keys.Public) predicate.Tree {
 	return predicate.Tree(sql.FieldEQ(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerIdentityPubkeyNEQ applies the NEQ predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyNEQ(v []byte) predicate.Tree {
+func OwnerIdentityPubkeyNEQ(v keys.Public) predicate.Tree {
 	return predicate.Tree(sql.FieldNEQ(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerIdentityPubkeyIn applies the In predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyIn(vs ...[]byte) predicate.Tree {
+func OwnerIdentityPubkeyIn(vs ...keys.Public) predicate.Tree {
 	return predicate.Tree(sql.FieldIn(FieldOwnerIdentityPubkey, vs...))
 }
 
 // OwnerIdentityPubkeyNotIn applies the NotIn predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyNotIn(vs ...[]byte) predicate.Tree {
+func OwnerIdentityPubkeyNotIn(vs ...keys.Public) predicate.Tree {
 	return predicate.Tree(sql.FieldNotIn(FieldOwnerIdentityPubkey, vs...))
 }
 
 // OwnerIdentityPubkeyGT applies the GT predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyGT(v []byte) predicate.Tree {
+func OwnerIdentityPubkeyGT(v keys.Public) predicate.Tree {
 	return predicate.Tree(sql.FieldGT(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerIdentityPubkeyGTE applies the GTE predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyGTE(v []byte) predicate.Tree {
+func OwnerIdentityPubkeyGTE(v keys.Public) predicate.Tree {
 	return predicate.Tree(sql.FieldGTE(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerIdentityPubkeyLT applies the LT predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyLT(v []byte) predicate.Tree {
+func OwnerIdentityPubkeyLT(v keys.Public) predicate.Tree {
 	return predicate.Tree(sql.FieldLT(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerIdentityPubkeyLTE applies the LTE predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyLTE(v []byte) predicate.Tree {
+func OwnerIdentityPubkeyLTE(v keys.Public) predicate.Tree {
 	return predicate.Tree(sql.FieldLTE(FieldOwnerIdentityPubkey, v))
 }
 

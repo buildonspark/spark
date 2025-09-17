@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -88,7 +89,7 @@ func ExpiryTime(v time.Time) predicate.TokenTransaction {
 }
 
 // CoordinatorPublicKey applies equality check predicate on the "coordinator_public_key" field. It's identical to CoordinatorPublicKeyEQ.
-func CoordinatorPublicKey(v []byte) predicate.TokenTransaction {
+func CoordinatorPublicKey(v keys.Public) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldEQ(FieldCoordinatorPublicKey, v))
 }
 
@@ -404,42 +405,42 @@ func ExpiryTimeNotNil() predicate.TokenTransaction {
 }
 
 // CoordinatorPublicKeyEQ applies the EQ predicate on the "coordinator_public_key" field.
-func CoordinatorPublicKeyEQ(v []byte) predicate.TokenTransaction {
+func CoordinatorPublicKeyEQ(v keys.Public) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldEQ(FieldCoordinatorPublicKey, v))
 }
 
 // CoordinatorPublicKeyNEQ applies the NEQ predicate on the "coordinator_public_key" field.
-func CoordinatorPublicKeyNEQ(v []byte) predicate.TokenTransaction {
+func CoordinatorPublicKeyNEQ(v keys.Public) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldNEQ(FieldCoordinatorPublicKey, v))
 }
 
 // CoordinatorPublicKeyIn applies the In predicate on the "coordinator_public_key" field.
-func CoordinatorPublicKeyIn(vs ...[]byte) predicate.TokenTransaction {
+func CoordinatorPublicKeyIn(vs ...keys.Public) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldIn(FieldCoordinatorPublicKey, vs...))
 }
 
 // CoordinatorPublicKeyNotIn applies the NotIn predicate on the "coordinator_public_key" field.
-func CoordinatorPublicKeyNotIn(vs ...[]byte) predicate.TokenTransaction {
+func CoordinatorPublicKeyNotIn(vs ...keys.Public) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldNotIn(FieldCoordinatorPublicKey, vs...))
 }
 
 // CoordinatorPublicKeyGT applies the GT predicate on the "coordinator_public_key" field.
-func CoordinatorPublicKeyGT(v []byte) predicate.TokenTransaction {
+func CoordinatorPublicKeyGT(v keys.Public) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldGT(FieldCoordinatorPublicKey, v))
 }
 
 // CoordinatorPublicKeyGTE applies the GTE predicate on the "coordinator_public_key" field.
-func CoordinatorPublicKeyGTE(v []byte) predicate.TokenTransaction {
+func CoordinatorPublicKeyGTE(v keys.Public) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldGTE(FieldCoordinatorPublicKey, v))
 }
 
 // CoordinatorPublicKeyLT applies the LT predicate on the "coordinator_public_key" field.
-func CoordinatorPublicKeyLT(v []byte) predicate.TokenTransaction {
+func CoordinatorPublicKeyLT(v keys.Public) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldLT(FieldCoordinatorPublicKey, v))
 }
 
 // CoordinatorPublicKeyLTE applies the LTE predicate on the "coordinator_public_key" field.
-func CoordinatorPublicKeyLTE(v []byte) predicate.TokenTransaction {
+func CoordinatorPublicKeyLTE(v keys.Public) predicate.TokenTransaction {
 	return predicate.TokenTransaction(sql.FieldLTE(FieldCoordinatorPublicKey, v))
 }
 

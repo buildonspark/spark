@@ -581,10 +581,6 @@ func init() {
 	tokentransactionpeersignature.DefaultUpdateTime = tokentransactionpeersignatureDescUpdateTime.Default.(func() time.Time)
 	// tokentransactionpeersignature.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	tokentransactionpeersignature.UpdateDefaultUpdateTime = tokentransactionpeersignatureDescUpdateTime.UpdateDefault.(func() time.Time)
-	// tokentransactionpeersignatureDescOperatorIdentityPublicKey is the schema descriptor for operator_identity_public_key field.
-	tokentransactionpeersignatureDescOperatorIdentityPublicKey := tokentransactionpeersignatureFields[0].Descriptor()
-	// tokentransactionpeersignature.OperatorIdentityPublicKeyValidator is a validator for the "operator_identity_public_key" field. It is called by the builders before save.
-	tokentransactionpeersignature.OperatorIdentityPublicKeyValidator = tokentransactionpeersignatureDescOperatorIdentityPublicKey.Validators[0].(func([]byte) error)
 	// tokentransactionpeersignatureDescSignature is the schema descriptor for signature field.
 	tokentransactionpeersignatureDescSignature := tokentransactionpeersignatureFields[1].Descriptor()
 	// tokentransactionpeersignature.SignatureValidator is a validator for the "signature" field. It is called by the builders before save.
@@ -610,14 +606,6 @@ func init() {
 	transfer.DefaultUpdateTime = transferDescUpdateTime.Default.(func() time.Time)
 	// transfer.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	transfer.UpdateDefaultUpdateTime = transferDescUpdateTime.UpdateDefault.(func() time.Time)
-	// transferDescSenderIdentityPubkey is the schema descriptor for sender_identity_pubkey field.
-	transferDescSenderIdentityPubkey := transferFields[0].Descriptor()
-	// transfer.SenderIdentityPubkeyValidator is a validator for the "sender_identity_pubkey" field. It is called by the builders before save.
-	transfer.SenderIdentityPubkeyValidator = transferDescSenderIdentityPubkey.Validators[0].(func([]byte) error)
-	// transferDescReceiverIdentityPubkey is the schema descriptor for receiver_identity_pubkey field.
-	transferDescReceiverIdentityPubkey := transferFields[1].Descriptor()
-	// transfer.ReceiverIdentityPubkeyValidator is a validator for the "receiver_identity_pubkey" field. It is called by the builders before save.
-	transfer.ReceiverIdentityPubkeyValidator = transferDescReceiverIdentityPubkey.Validators[0].(func([]byte) error)
 	// transferDescID is the schema descriptor for id field.
 	transferDescID := transferMixinFields0[0].Descriptor()
 	// transfer.DefaultID holds the default value on creation for the id field.
@@ -668,10 +656,6 @@ func init() {
 	tree.DefaultUpdateTime = treeDescUpdateTime.Default.(func() time.Time)
 	// tree.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	tree.UpdateDefaultUpdateTime = treeDescUpdateTime.UpdateDefault.(func() time.Time)
-	// treeDescOwnerIdentityPubkey is the schema descriptor for owner_identity_pubkey field.
-	treeDescOwnerIdentityPubkey := treeFields[0].Descriptor()
-	// tree.OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
-	tree.OwnerIdentityPubkeyValidator = treeDescOwnerIdentityPubkey.Validators[0].(func([]byte) error)
 	// treeDescBaseTxid is the schema descriptor for base_txid field.
 	treeDescBaseTxid := treeFields[3].Descriptor()
 	// tree.BaseTxidValidator is a validator for the "base_txid" field. It is called by the builders before save.

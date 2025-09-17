@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tree"
@@ -38,8 +39,16 @@ func (tu *TreeUpdate) SetUpdateTime(t time.Time) *TreeUpdate {
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (tu *TreeUpdate) SetOwnerIdentityPubkey(b []byte) *TreeUpdate {
-	tu.mutation.SetOwnerIdentityPubkey(b)
+func (tu *TreeUpdate) SetOwnerIdentityPubkey(k keys.Public) *TreeUpdate {
+	tu.mutation.SetOwnerIdentityPubkey(k)
+	return tu
+}
+
+// SetNillableOwnerIdentityPubkey sets the "owner_identity_pubkey" field if the given value is not nil.
+func (tu *TreeUpdate) SetNillableOwnerIdentityPubkey(k *keys.Public) *TreeUpdate {
+	if k != nil {
+		tu.SetOwnerIdentityPubkey(*k)
+	}
 	return tu
 }
 
@@ -208,11 +217,6 @@ func (tu *TreeUpdate) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (tu *TreeUpdate) check() error {
-	if v, ok := tu.mutation.OwnerIdentityPubkey(); ok {
-		if err := tree.OwnerIdentityPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "Tree.owner_identity_pubkey": %w`, err)}
-		}
-	}
 	if v, ok := tu.mutation.Status(); ok {
 		if err := tree.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Tree.status": %w`, err)}
@@ -370,8 +374,16 @@ func (tuo *TreeUpdateOne) SetUpdateTime(t time.Time) *TreeUpdateOne {
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (tuo *TreeUpdateOne) SetOwnerIdentityPubkey(b []byte) *TreeUpdateOne {
-	tuo.mutation.SetOwnerIdentityPubkey(b)
+func (tuo *TreeUpdateOne) SetOwnerIdentityPubkey(k keys.Public) *TreeUpdateOne {
+	tuo.mutation.SetOwnerIdentityPubkey(k)
+	return tuo
+}
+
+// SetNillableOwnerIdentityPubkey sets the "owner_identity_pubkey" field if the given value is not nil.
+func (tuo *TreeUpdateOne) SetNillableOwnerIdentityPubkey(k *keys.Public) *TreeUpdateOne {
+	if k != nil {
+		tuo.SetOwnerIdentityPubkey(*k)
+	}
 	return tuo
 }
 
@@ -553,11 +565,6 @@ func (tuo *TreeUpdateOne) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (tuo *TreeUpdateOne) check() error {
-	if v, ok := tuo.mutation.OwnerIdentityPubkey(); ok {
-		if err := tree.OwnerIdentityPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "Tree.owner_identity_pubkey": %w`, err)}
-		}
-	}
 	if v, ok := tuo.mutation.Status(); ok {
 		if err := tree.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Tree.status": %w`, err)}

@@ -731,7 +731,7 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 
 	// Valid 33-byte compressed secp256k1 public key for destination
-	validPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()
+	validPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	paymentHash := []byte("test_payment_hash_32_bytes_long_")
 
 	// Create a valid transaction for testing
@@ -895,17 +895,17 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	require.NoError(t, err)
 
 	tree, err := tx.Tree.Create().
-		SetOwnerIdentityPubkey(validPubKey.Serialize()).
+		SetOwnerIdentityPubkey(validPubKey).
 		SetStatus(st.TreeStatusAvailable).
 		SetNetwork(st.NetworkMainnet).
-		SetBaseTxid([]byte("test_base_txid_32_bytes_long_")).
+		SetBaseTxid([]byte("test_base_txid_32_bytes_long____")).
 		SetVout(0).
 		Save(ctx)
 	require.NoError(t, err)
 
 	keyshare, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusInUse).
-		SetSecretShare([]byte("test_secret_share_32_bytes_long_")).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
 		SetPublicShares(map[string]keys.Public{"operator1": validPubKey}).
 		SetPublicKey(validPubKey).
 		SetMinSigners(2).

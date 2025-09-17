@@ -116,7 +116,7 @@ func CreateStartedTransactionEntities(
 			SetPartialTokenTransactionHash(partialTokenTransactionHash).
 			SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
 			SetStatus(st.TokenTransactionStatusStarted).
-			SetCoordinatorPublicKey(coordinatorPublicKey.Serialize()).
+			SetCoordinatorPublicKey(coordinatorPublicKey).
 			SetVersion(st.TokenTransactionVersion(tokenTransaction.Version)).
 			SetCreateID(tokenCreateEnt.ID)
 		if tokenTransaction.ExpiryTime != nil {
@@ -145,7 +145,7 @@ func CreateStartedTransactionEntities(
 			SetPartialTokenTransactionHash(partialTokenTransactionHash).
 			SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
 			SetStatus(st.TokenTransactionStatusStarted).
-			SetCoordinatorPublicKey(coordinatorPublicKey.Serialize()).
+			SetCoordinatorPublicKey(coordinatorPublicKey).
 			SetClientCreatedTimestamp(tokenTransaction.ClientCreatedTimestamp.AsTime()).
 			SetVersion(st.TokenTransactionVersion(tokenTransaction.Version)).
 			SetMintID(tokenMintEnt.ID)
@@ -168,7 +168,7 @@ func CreateStartedTransactionEntities(
 			SetPartialTokenTransactionHash(partialTokenTransactionHash).
 			SetFinalizedTokenTransactionHash(finalTokenTransactionHash).
 			SetStatus(st.TokenTransactionStatusStarted).
-			SetCoordinatorPublicKey(coordinatorPublicKey.Serialize()).
+			SetCoordinatorPublicKey(coordinatorPublicKey).
 			SetClientCreatedTimestamp(tokenTransaction.ClientCreatedTimestamp.AsTime()).
 			SetVersion(st.TokenTransactionVersion(tokenTransaction.Version))
 		if tokenTransaction.ExpiryTime != nil && tokenTransaction.Version != 0 {

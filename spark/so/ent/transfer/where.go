@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -68,12 +69,12 @@ func UpdateTime(v time.Time) predicate.Transfer {
 }
 
 // SenderIdentityPubkey applies equality check predicate on the "sender_identity_pubkey" field. It's identical to SenderIdentityPubkeyEQ.
-func SenderIdentityPubkey(v []byte) predicate.Transfer {
+func SenderIdentityPubkey(v keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldEQ(FieldSenderIdentityPubkey, v))
 }
 
 // ReceiverIdentityPubkey applies equality check predicate on the "receiver_identity_pubkey" field. It's identical to ReceiverIdentityPubkeyEQ.
-func ReceiverIdentityPubkey(v []byte) predicate.Transfer {
+func ReceiverIdentityPubkey(v keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldEQ(FieldReceiverIdentityPubkey, v))
 }
 
@@ -178,82 +179,82 @@ func UpdateTimeLTE(v time.Time) predicate.Transfer {
 }
 
 // SenderIdentityPubkeyEQ applies the EQ predicate on the "sender_identity_pubkey" field.
-func SenderIdentityPubkeyEQ(v []byte) predicate.Transfer {
+func SenderIdentityPubkeyEQ(v keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldEQ(FieldSenderIdentityPubkey, v))
 }
 
 // SenderIdentityPubkeyNEQ applies the NEQ predicate on the "sender_identity_pubkey" field.
-func SenderIdentityPubkeyNEQ(v []byte) predicate.Transfer {
+func SenderIdentityPubkeyNEQ(v keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldNEQ(FieldSenderIdentityPubkey, v))
 }
 
 // SenderIdentityPubkeyIn applies the In predicate on the "sender_identity_pubkey" field.
-func SenderIdentityPubkeyIn(vs ...[]byte) predicate.Transfer {
+func SenderIdentityPubkeyIn(vs ...keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldIn(FieldSenderIdentityPubkey, vs...))
 }
 
 // SenderIdentityPubkeyNotIn applies the NotIn predicate on the "sender_identity_pubkey" field.
-func SenderIdentityPubkeyNotIn(vs ...[]byte) predicate.Transfer {
+func SenderIdentityPubkeyNotIn(vs ...keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldNotIn(FieldSenderIdentityPubkey, vs...))
 }
 
 // SenderIdentityPubkeyGT applies the GT predicate on the "sender_identity_pubkey" field.
-func SenderIdentityPubkeyGT(v []byte) predicate.Transfer {
+func SenderIdentityPubkeyGT(v keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldGT(FieldSenderIdentityPubkey, v))
 }
 
 // SenderIdentityPubkeyGTE applies the GTE predicate on the "sender_identity_pubkey" field.
-func SenderIdentityPubkeyGTE(v []byte) predicate.Transfer {
+func SenderIdentityPubkeyGTE(v keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldGTE(FieldSenderIdentityPubkey, v))
 }
 
 // SenderIdentityPubkeyLT applies the LT predicate on the "sender_identity_pubkey" field.
-func SenderIdentityPubkeyLT(v []byte) predicate.Transfer {
+func SenderIdentityPubkeyLT(v keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldLT(FieldSenderIdentityPubkey, v))
 }
 
 // SenderIdentityPubkeyLTE applies the LTE predicate on the "sender_identity_pubkey" field.
-func SenderIdentityPubkeyLTE(v []byte) predicate.Transfer {
+func SenderIdentityPubkeyLTE(v keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldLTE(FieldSenderIdentityPubkey, v))
 }
 
 // ReceiverIdentityPubkeyEQ applies the EQ predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyEQ(v []byte) predicate.Transfer {
+func ReceiverIdentityPubkeyEQ(v keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldEQ(FieldReceiverIdentityPubkey, v))
 }
 
 // ReceiverIdentityPubkeyNEQ applies the NEQ predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyNEQ(v []byte) predicate.Transfer {
+func ReceiverIdentityPubkeyNEQ(v keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldNEQ(FieldReceiverIdentityPubkey, v))
 }
 
 // ReceiverIdentityPubkeyIn applies the In predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyIn(vs ...[]byte) predicate.Transfer {
+func ReceiverIdentityPubkeyIn(vs ...keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldIn(FieldReceiverIdentityPubkey, vs...))
 }
 
 // ReceiverIdentityPubkeyNotIn applies the NotIn predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyNotIn(vs ...[]byte) predicate.Transfer {
+func ReceiverIdentityPubkeyNotIn(vs ...keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldNotIn(FieldReceiverIdentityPubkey, vs...))
 }
 
 // ReceiverIdentityPubkeyGT applies the GT predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyGT(v []byte) predicate.Transfer {
+func ReceiverIdentityPubkeyGT(v keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldGT(FieldReceiverIdentityPubkey, v))
 }
 
 // ReceiverIdentityPubkeyGTE applies the GTE predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyGTE(v []byte) predicate.Transfer {
+func ReceiverIdentityPubkeyGTE(v keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldGTE(FieldReceiverIdentityPubkey, v))
 }
 
 // ReceiverIdentityPubkeyLT applies the LT predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyLT(v []byte) predicate.Transfer {
+func ReceiverIdentityPubkeyLT(v keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldLT(FieldReceiverIdentityPubkey, v))
 }
 
 // ReceiverIdentityPubkeyLTE applies the LTE predicate on the "receiver_identity_pubkey" field.
-func ReceiverIdentityPubkeyLTE(v []byte) predicate.Transfer {
+func ReceiverIdentityPubkeyLTE(v keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldLTE(FieldReceiverIdentityPubkey, v))
 }
 

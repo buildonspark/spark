@@ -197,7 +197,7 @@ func createTestTree(t *testing.T, ctx context.Context, network st.Network, statu
 		SetStatus(status).
 		SetBaseTxid(baseTxid).
 		SetVout(0).
-		SetOwnerIdentityPubkey(ownerIdentity.Public().Serialize()).
+		SetOwnerIdentityPubkey(ownerIdentity.Public()).
 		Save(ctx)
 	require.NoError(t, err)
 

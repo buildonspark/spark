@@ -204,7 +204,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 	tree, err := dbTx.Tree.Create().
 		SetStatus(schematype.TreeStatusPending).
 		SetBaseTxid([]byte("dummytxid")).
-		SetOwnerIdentityPubkey(ownerIDPubKey.Serialize()).
+		SetOwnerIdentityPubkey(ownerIDPubKey).
 		SetNetwork(common.SchemaNetwork(common.Testnet)).
 		SetVout(0).
 		Save(ctx)

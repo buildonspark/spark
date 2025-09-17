@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
@@ -55,8 +56,8 @@ func (tc *TreeCreate) SetNillableUpdateTime(t *time.Time) *TreeCreate {
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (tc *TreeCreate) SetOwnerIdentityPubkey(b []byte) *TreeCreate {
-	tc.mutation.SetOwnerIdentityPubkey(b)
+func (tc *TreeCreate) SetOwnerIdentityPubkey(k keys.Public) *TreeCreate {
+	tc.mutation.SetOwnerIdentityPubkey(k)
 	return tc
 }
 
@@ -203,11 +204,6 @@ func (tc *TreeCreate) check() error {
 	}
 	if _, ok := tc.mutation.OwnerIdentityPubkey(); !ok {
 		return &ValidationError{Name: "owner_identity_pubkey", err: errors.New(`ent: missing required field "Tree.owner_identity_pubkey"`)}
-	}
-	if v, ok := tc.mutation.OwnerIdentityPubkey(); ok {
-		if err := tree.OwnerIdentityPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "Tree.owner_identity_pubkey": %w`, err)}
-		}
 	}
 	if _, ok := tc.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "Tree.status"`)}
@@ -403,7 +399,7 @@ func (u *TreeUpsert) UpdateUpdateTime() *TreeUpsert {
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (u *TreeUpsert) SetOwnerIdentityPubkey(v []byte) *TreeUpsert {
+func (u *TreeUpsert) SetOwnerIdentityPubkey(v keys.Public) *TreeUpsert {
 	u.Set(tree.FieldOwnerIdentityPubkey, v)
 	return u
 }
@@ -534,7 +530,7 @@ func (u *TreeUpsertOne) UpdateUpdateTime() *TreeUpsertOne {
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (u *TreeUpsertOne) SetOwnerIdentityPubkey(v []byte) *TreeUpsertOne {
+func (u *TreeUpsertOne) SetOwnerIdentityPubkey(v keys.Public) *TreeUpsertOne {
 	return u.Update(func(s *TreeUpsert) {
 		s.SetOwnerIdentityPubkey(v)
 	})
@@ -843,7 +839,7 @@ func (u *TreeUpsertBulk) UpdateUpdateTime() *TreeUpsertBulk {
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (u *TreeUpsertBulk) SetOwnerIdentityPubkey(v []byte) *TreeUpsertBulk {
+func (u *TreeUpsertBulk) SetOwnerIdentityPubkey(v keys.Public) *TreeUpsertBulk {
 	return u.Update(func(s *TreeUpsert) {
 		s.SetOwnerIdentityPubkey(v)
 	})

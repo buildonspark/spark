@@ -541,13 +541,13 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecretsAndFinalize(ctx c
 	}
 
 	tokenTransaction, err := db.TokenTransaction.Query().
-		Where(tokentransaction.FinalizedTokenTransactionHashEQ(tokenTransactionHash)).
-		Where(tokentransaction.StatusIn(
-			st.TokenTransactionStatusStarted,
-			st.TokenTransactionStatusSigned,
-			st.TokenTransactionStatusRevealed,
-			st.TokenTransactionStatusFinalized,
-		)).
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(tokenTransactionHash),
+			tokentransaction.StatusIn(
+				st.TokenTransactionStatusStarted,
+				st.TokenTransactionStatusSigned,
+				st.TokenTransactionStatusRevealed,
+				st.TokenTransactionStatusFinalized,
+			)).
 		WithSpentOutput().
 		Only(ctx)
 	if err != nil {
@@ -767,7 +767,7 @@ func (h *InternalSignTokenHandler) validateSignaturesPackageAndPersistPeerSignat
 			operatorIdentityPubkey := h.config.SigningOperatorMap[identifier].IdentityPublicKey
 			peerSignatures = append(peerSignatures, db.TokenTransactionPeerSignature.Create().
 				SetTokenTransactionID(tokenTransaction.ID).
-				SetOperatorIdentityPublicKey(operatorIdentityPubkey.Serialize()).
+				SetOperatorIdentityPublicKey(operatorIdentityPubkey).
 				SetSignature(sig))
 		}
 	}

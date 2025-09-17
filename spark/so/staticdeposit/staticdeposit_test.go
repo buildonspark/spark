@@ -30,9 +30,9 @@ func createTestEntities(t *testing.T, ctx context.Context, rng io.Reader, tx *en
 		Save(ctx)
 	require.NoError(t, err)
 
+	// Create a DepositAddress (required for Utxo)
 	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	// Create a DepositAddress (required for Utxo)
 	depositAddress, err := tx.DepositAddress.Create().
 		SetAddress("bc1ptest_static_deposit_address_for_testing").
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).

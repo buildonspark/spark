@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
@@ -26,9 +27,9 @@ type Transfer struct {
 	// UpdateTime holds the value of the "update_time" field.
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// The identity public key of the sender of the transfer.
-	SenderIdentityPubkey []byte `json:"sender_identity_pubkey,omitempty"`
+	SenderIdentityPubkey keys.Public `json:"sender_identity_pubkey,omitempty"`
 	// ReceiverIdentityPubkey holds the value of the "receiver_identity_pubkey" field.
-	ReceiverIdentityPubkey []byte `json:"receiver_identity_pubkey,omitempty"`
+	ReceiverIdentityPubkey keys.Public `json:"receiver_identity_pubkey,omitempty"`
 	// TotalValue holds the value of the "total_value" field.
 	TotalValue uint64 `json:"total_value,omitempty"`
 	// Status holds the value of the "status" field.
@@ -98,7 +99,7 @@ func (*Transfer) scanValues(columns []string) ([]any, error) {
 	for i := range columns {
 		switch columns[i] {
 		case transfer.FieldSenderIdentityPubkey, transfer.FieldReceiverIdentityPubkey:
-			values[i] = new([]byte)
+			values[i] = new(keys.Public)
 		case transfer.FieldTotalValue:
 			values[i] = new(sql.NullInt64)
 		case transfer.FieldStatus, transfer.FieldType:
@@ -143,13 +144,13 @@ func (t *Transfer) assignValues(columns []string, values []any) error {
 				t.UpdateTime = value.Time
 			}
 		case transfer.FieldSenderIdentityPubkey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field sender_identity_pubkey", values[i])
 			} else if value != nil {
 				t.SenderIdentityPubkey = *value
 			}
 		case transfer.FieldReceiverIdentityPubkey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field receiver_identity_pubkey", values[i])
 			} else if value != nil {
 				t.ReceiverIdentityPubkey = *value

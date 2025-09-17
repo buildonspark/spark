@@ -70,7 +70,6 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, idPubKey); err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrIdentityPublicKeyAuthFailed, req.PartialTokenTransaction, err)
 	}
-
 	if err := utils.ValidatePartialTokenTransaction(req.PartialTokenTransaction, req.PartialTokenTransactionOwnerSignatures, h.config.GetSigningOperatorList(), h.config.SupportedNetworks, h.config.Token.RequireTokenIdentifierForMints, h.config.Token.RequireTokenIdentifierForTransfers); err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrInvalidPartialTokenTransaction, req.PartialTokenTransaction, err)
 	}
@@ -89,13 +88,8 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	// Check that the previous created transaction was found and that it is still in the started state.
 	// Also, check that this SO was the coordinator for the transaction. This is necessary because only the coordinator
 	// receives direct evidence from each SO individually that a threshold of SOs have validated and saved the transaction.
-	if previouslyCreatedTokenTransaction != nil &&
-		previouslyCreatedTokenTransaction.Status == st.TokenTransactionStatusStarted {
-		coordinatorPubKey, err := keys.ParsePublicKey(previouslyCreatedTokenTransaction.CoordinatorPublicKey)
-		if err != nil {
-			return nil, err
-		}
-		if coordinatorPubKey.Equals(h.config.IdentityPublicKey()) {
+	if previouslyCreatedTokenTransaction != nil && previouslyCreatedTokenTransaction.Status == st.TokenTransactionStatusStarted {
+		if previouslyCreatedTokenTransaction.CoordinatorPublicKey.Equals(h.config.IdentityPublicKey()) {
 			ctx, logger := logging.WithAttrs(ctx, tokens.GetEntTokenTransactionAttrs(previouslyCreatedTokenTransaction)...)
 			logger.Info("Found existing token transaction in started state with matching coordinator")
 			return h.regenerateStartResponseForDuplicateRequest(ctx, previouslyCreatedTokenTransaction)
@@ -108,9 +102,8 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 		}
 	}
 
-	//nolint:all
+	//nolint:govet,revive // TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
 	if req.PartialTokenTransaction.Version >= 2 && len(req.PartialTokenTransaction.InvoiceAttachments) > 0 {
-		// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
 		return nil, sparkerrors.UnimplementedErrorf("spark invoice support not implemented")
 		if err := validateSparkInvoicesForTransaction(ctx, req.PartialTokenTransaction); err != nil {
 			return nil, err

@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
@@ -57,14 +58,14 @@ func (tc *TransferCreate) SetNillableUpdateTime(t *time.Time) *TransferCreate {
 }
 
 // SetSenderIdentityPubkey sets the "sender_identity_pubkey" field.
-func (tc *TransferCreate) SetSenderIdentityPubkey(b []byte) *TransferCreate {
-	tc.mutation.SetSenderIdentityPubkey(b)
+func (tc *TransferCreate) SetSenderIdentityPubkey(k keys.Public) *TransferCreate {
+	tc.mutation.SetSenderIdentityPubkey(k)
 	return tc
 }
 
 // SetReceiverIdentityPubkey sets the "receiver_identity_pubkey" field.
-func (tc *TransferCreate) SetReceiverIdentityPubkey(b []byte) *TransferCreate {
-	tc.mutation.SetReceiverIdentityPubkey(b)
+func (tc *TransferCreate) SetReceiverIdentityPubkey(k keys.Public) *TransferCreate {
+	tc.mutation.SetReceiverIdentityPubkey(k)
 	return tc
 }
 
@@ -245,18 +246,8 @@ func (tc *TransferCreate) check() error {
 	if _, ok := tc.mutation.SenderIdentityPubkey(); !ok {
 		return &ValidationError{Name: "sender_identity_pubkey", err: errors.New(`ent: missing required field "Transfer.sender_identity_pubkey"`)}
 	}
-	if v, ok := tc.mutation.SenderIdentityPubkey(); ok {
-		if err := transfer.SenderIdentityPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "sender_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "Transfer.sender_identity_pubkey": %w`, err)}
-		}
-	}
 	if _, ok := tc.mutation.ReceiverIdentityPubkey(); !ok {
 		return &ValidationError{Name: "receiver_identity_pubkey", err: errors.New(`ent: missing required field "Transfer.receiver_identity_pubkey"`)}
-	}
-	if v, ok := tc.mutation.ReceiverIdentityPubkey(); ok {
-		if err := transfer.ReceiverIdentityPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "receiver_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "Transfer.receiver_identity_pubkey": %w`, err)}
-		}
 	}
 	if _, ok := tc.mutation.TotalValue(); !ok {
 		return &ValidationError{Name: "total_value", err: errors.New(`ent: missing required field "Transfer.total_value"`)}

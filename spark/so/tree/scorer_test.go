@@ -91,7 +91,7 @@ func TestPolarityScorer_UpdateLeaves(t *testing.T) {
 
 	treeOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(seeded).Public()
 	tree := dbTx.Tree.Create().
-		SetOwnerIdentityPubkey(treeOwnerPubKey.Serialize()).
+		SetOwnerIdentityPubkey(treeOwnerPubKey).
 		SetStatus(st.TreeStatusAvailable).
 		SetNetwork(st.NetworkMainnet).
 		SetBaseTxid([]byte("base_txid")).

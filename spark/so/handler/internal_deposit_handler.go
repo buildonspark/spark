@@ -221,10 +221,14 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if nodeTx.TxIn[0].PreviousOutPoint.Index > math.MaxInt16 {
 			return fmt.Errorf("previous outpoint index overflows int16: %d", nodeTx.TxIn[0].PreviousOutPoint.Index)
 		}
+		ownerIDPubKey, err := keys.ParsePublicKey(selectedNode.OwnerIdentityPubkey)
+		if err != nil {
+			return fmt.Errorf("failed to parse owner identity public key: %w", err)
+		}
 		treeMutator := db.Tree.
 			Create().
 			SetID(treeID).
-			SetOwnerIdentityPubkey(selectedNode.OwnerIdentityPubkey).
+			SetOwnerIdentityPubkey(ownerIDPubKey).
 			SetBaseTxid(txid[:]).
 			SetVout(int16(nodeTx.TxIn[0].PreviousOutPoint.Index)).
 			SetNetwork(schemaNetwork)

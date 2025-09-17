@@ -39,7 +39,7 @@ func TestTweakLeafKey(t *testing.T) {
 	pubkeyShareTweakPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	tree, err := dbTx.Tree.Create().
-		SetOwnerIdentityPubkey(ownerPub.Serialize()).
+		SetOwnerIdentityPubkey(ownerPub).
 		SetStatus(schematype.TreeStatusAvailable).
 		SetNetwork(schematype.NetworkMainnet).
 		SetBaseTxid(baseTxid).
@@ -132,7 +132,7 @@ func TestTweakLeafKey_EmptySecretShareTweakProofsList(t *testing.T) {
 	pubkeyShareTweakPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	tree, err := dbTx.Tree.Create().
-		SetOwnerIdentityPubkey(ownerPub.Serialize()).
+		SetOwnerIdentityPubkey(ownerPub).
 		SetStatus(schematype.TreeStatusAvailable).
 		SetNetwork(schematype.NetworkMainnet).
 		SetBaseTxid(baseTxid).

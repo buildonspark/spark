@@ -7,6 +7,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
@@ -27,10 +28,10 @@ func (Transfer) Mixin() []ent.Mixin {
 func (Transfer) Fields() []ent.Field {
 	return []ent.Field{
 		field.Bytes("sender_identity_pubkey").
-			NotEmpty().
 			Immutable().
+			GoType(keys.Public{}).
 			Comment("The identity public key of the sender of the transfer."),
-		field.Bytes("receiver_identity_pubkey").NotEmpty().Immutable(),
+		field.Bytes("receiver_identity_pubkey").Immutable().GoType(keys.Public{}),
 		field.Uint64("total_value"),
 		field.Enum("status").GoType(st.TransferStatus("")),
 		field.Enum("type").GoType(st.TransferType("")),

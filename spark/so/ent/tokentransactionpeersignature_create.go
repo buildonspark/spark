@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/ent/tokentransactionpeersignature"
 )
@@ -54,8 +55,8 @@ func (ttpsc *TokenTransactionPeerSignatureCreate) SetNillableUpdateTime(t *time.
 }
 
 // SetOperatorIdentityPublicKey sets the "operator_identity_public_key" field.
-func (ttpsc *TokenTransactionPeerSignatureCreate) SetOperatorIdentityPublicKey(b []byte) *TokenTransactionPeerSignatureCreate {
-	ttpsc.mutation.SetOperatorIdentityPublicKey(b)
+func (ttpsc *TokenTransactionPeerSignatureCreate) SetOperatorIdentityPublicKey(k keys.Public) *TokenTransactionPeerSignatureCreate {
+	ttpsc.mutation.SetOperatorIdentityPublicKey(k)
 	return ttpsc
 }
 
@@ -161,11 +162,6 @@ func (ttpsc *TokenTransactionPeerSignatureCreate) check() error {
 	}
 	if _, ok := ttpsc.mutation.OperatorIdentityPublicKey(); !ok {
 		return &ValidationError{Name: "operator_identity_public_key", err: errors.New(`ent: missing required field "TokenTransactionPeerSignature.operator_identity_public_key"`)}
-	}
-	if v, ok := ttpsc.mutation.OperatorIdentityPublicKey(); ok {
-		if err := tokentransactionpeersignature.OperatorIdentityPublicKeyValidator(v); err != nil {
-			return &ValidationError{Name: "operator_identity_public_key", err: fmt.Errorf(`ent: validator failed for field "TokenTransactionPeerSignature.operator_identity_public_key": %w`, err)}
-		}
 	}
 	if _, ok := ttpsc.mutation.Signature(); !ok {
 		return &ValidationError{Name: "signature", err: errors.New(`ent: missing required field "TokenTransactionPeerSignature.signature"`)}
@@ -312,7 +308,7 @@ func (u *TokenTransactionPeerSignatureUpsert) UpdateUpdateTime() *TokenTransacti
 }
 
 // SetOperatorIdentityPublicKey sets the "operator_identity_public_key" field.
-func (u *TokenTransactionPeerSignatureUpsert) SetOperatorIdentityPublicKey(v []byte) *TokenTransactionPeerSignatureUpsert {
+func (u *TokenTransactionPeerSignatureUpsert) SetOperatorIdentityPublicKey(v keys.Public) *TokenTransactionPeerSignatureUpsert {
 	u.Set(tokentransactionpeersignature.FieldOperatorIdentityPublicKey, v)
 	return u
 }
@@ -401,7 +397,7 @@ func (u *TokenTransactionPeerSignatureUpsertOne) UpdateUpdateTime() *TokenTransa
 }
 
 // SetOperatorIdentityPublicKey sets the "operator_identity_public_key" field.
-func (u *TokenTransactionPeerSignatureUpsertOne) SetOperatorIdentityPublicKey(v []byte) *TokenTransactionPeerSignatureUpsertOne {
+func (u *TokenTransactionPeerSignatureUpsertOne) SetOperatorIdentityPublicKey(v keys.Public) *TokenTransactionPeerSignatureUpsertOne {
 	return u.Update(func(s *TokenTransactionPeerSignatureUpsert) {
 		s.SetOperatorIdentityPublicKey(v)
 	})
@@ -661,7 +657,7 @@ func (u *TokenTransactionPeerSignatureUpsertBulk) UpdateUpdateTime() *TokenTrans
 }
 
 // SetOperatorIdentityPublicKey sets the "operator_identity_public_key" field.
-func (u *TokenTransactionPeerSignatureUpsertBulk) SetOperatorIdentityPublicKey(v []byte) *TokenTransactionPeerSignatureUpsertBulk {
+func (u *TokenTransactionPeerSignatureUpsertBulk) SetOperatorIdentityPublicKey(v keys.Public) *TokenTransactionPeerSignatureUpsertBulk {
 	return u.Update(func(s *TokenTransactionPeerSignatureUpsert) {
 		s.SetOperatorIdentityPublicKey(v)
 	})

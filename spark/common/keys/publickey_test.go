@@ -248,13 +248,23 @@ func TestPublic_Scan(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		input *sql.Null[[]byte]
+		input any
 		want  secp256k1.PublicKey
 	}{
 		{
 			name:  "valid key",
 			input: &sql.Null[[]byte]{V: pubKey.Serialize(), Valid: true},
 			want:  pubKey.key,
+		},
+		{
+			name:  "nil value",
+			input: nil,
+			want:  secp256k1.PublicKey{},
+		},
+		{
+			name:  "nil sql.Null",
+			input: (*sql.Null[[]byte])(nil),
+			want:  secp256k1.PublicKey{},
 		},
 		{
 			name:  "null value",
@@ -274,16 +284,16 @@ func TestPublic_Scan(t *testing.T) {
 	}
 }
 
-func TestPublic_Serialize_Empty_ReturnsEmpty(t *testing.T) {
-	pubKeyBytes := Public{}.Serialize()
-
-	assert.Empty(t, pubKeyBytes)
-}
-
 func TestPublic_Scan_InvalidInput_Errors(t *testing.T) {
 	public := &Public{}
 	err := public.Scan("not bytes")
 	assert.ErrorContains(t, err, "unexpected input for Scan")
+}
+
+func TestPublic_Serialize_Empty_ReturnsEmpty(t *testing.T) {
+	pubKeyBytes := Public{}.Serialize()
+
+	assert.Empty(t, pubKeyBytes)
 }
 
 func TestPublic_MarshalJSON(t *testing.T) {

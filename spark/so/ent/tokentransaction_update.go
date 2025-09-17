@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -87,8 +88,16 @@ func (ttu *TokenTransactionUpdate) ClearStatus() *TokenTransactionUpdate {
 }
 
 // SetCoordinatorPublicKey sets the "coordinator_public_key" field.
-func (ttu *TokenTransactionUpdate) SetCoordinatorPublicKey(b []byte) *TokenTransactionUpdate {
-	ttu.mutation.SetCoordinatorPublicKey(b)
+func (ttu *TokenTransactionUpdate) SetCoordinatorPublicKey(k keys.Public) *TokenTransactionUpdate {
+	ttu.mutation.SetCoordinatorPublicKey(k)
+	return ttu
+}
+
+// SetNillableCoordinatorPublicKey sets the "coordinator_public_key" field if the given value is not nil.
+func (ttu *TokenTransactionUpdate) SetNillableCoordinatorPublicKey(k *keys.Public) *TokenTransactionUpdate {
+	if k != nil {
+		ttu.SetCoordinatorPublicKey(*k)
+	}
 	return ttu
 }
 
@@ -903,8 +912,16 @@ func (ttuo *TokenTransactionUpdateOne) ClearStatus() *TokenTransactionUpdateOne 
 }
 
 // SetCoordinatorPublicKey sets the "coordinator_public_key" field.
-func (ttuo *TokenTransactionUpdateOne) SetCoordinatorPublicKey(b []byte) *TokenTransactionUpdateOne {
-	ttuo.mutation.SetCoordinatorPublicKey(b)
+func (ttuo *TokenTransactionUpdateOne) SetCoordinatorPublicKey(k keys.Public) *TokenTransactionUpdateOne {
+	ttuo.mutation.SetCoordinatorPublicKey(k)
+	return ttuo
+}
+
+// SetNillableCoordinatorPublicKey sets the "coordinator_public_key" field if the given value is not nil.
+func (ttuo *TokenTransactionUpdateOne) SetNillableCoordinatorPublicKey(k *keys.Public) *TokenTransactionUpdateOne {
+	if k != nil {
+		ttuo.SetCoordinatorPublicKey(*k)
+	}
 	return ttuo
 }
 

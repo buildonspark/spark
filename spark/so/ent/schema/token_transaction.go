@@ -7,6 +7,7 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
@@ -28,7 +29,7 @@ func (TokenTransaction) Fields() []ent.Field {
 		field.Bytes("operator_signature").Optional().Unique(),
 		field.Enum("status").GoType(st.TokenTransactionStatus("")).Optional(),
 		field.Time("expiry_time").Optional().Immutable(),
-		field.Bytes("coordinator_public_key").Optional(),
+		field.Bytes("coordinator_public_key").Optional().GoType(keys.Public{}),
 		field.Time("client_created_timestamp").Optional(),
 		field.Int("version").GoType(st.TokenTransactionVersion(0)).Default(int(st.TokenTransactionVersionV0)).Validate(func(v int) error {
 			if !st.TokenTransactionVersion(v).IsValid() {

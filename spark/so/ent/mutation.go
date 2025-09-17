@@ -15347,7 +15347,7 @@ type TokenTransactionMutation struct {
 	operator_signature               *[]byte
 	status                           *schematype.TokenTransactionStatus
 	expiry_time                      *time.Time
-	coordinator_public_key           *[]byte
+	coordinator_public_key           *keys.Public
 	client_created_timestamp         *time.Time
 	version                          *schematype.TokenTransactionVersion
 	addversion                       *schematype.TokenTransactionVersion
@@ -15774,12 +15774,12 @@ func (m *TokenTransactionMutation) ResetExpiryTime() {
 }
 
 // SetCoordinatorPublicKey sets the "coordinator_public_key" field.
-func (m *TokenTransactionMutation) SetCoordinatorPublicKey(b []byte) {
-	m.coordinator_public_key = &b
+func (m *TokenTransactionMutation) SetCoordinatorPublicKey(k keys.Public) {
+	m.coordinator_public_key = &k
 }
 
 // CoordinatorPublicKey returns the value of the "coordinator_public_key" field in the mutation.
-func (m *TokenTransactionMutation) CoordinatorPublicKey() (r []byte, exists bool) {
+func (m *TokenTransactionMutation) CoordinatorPublicKey() (r keys.Public, exists bool) {
 	v := m.coordinator_public_key
 	if v == nil {
 		return
@@ -15790,7 +15790,7 @@ func (m *TokenTransactionMutation) CoordinatorPublicKey() (r []byte, exists bool
 // OldCoordinatorPublicKey returns the old "coordinator_public_key" field's value of the TokenTransaction entity.
 // If the TokenTransaction object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenTransactionMutation) OldCoordinatorPublicKey(ctx context.Context) (v []byte, err error) {
+func (m *TokenTransactionMutation) OldCoordinatorPublicKey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldCoordinatorPublicKey is only allowed on UpdateOne operations")
 	}
@@ -16495,7 +16495,7 @@ func (m *TokenTransactionMutation) SetField(name string, value ent.Value) error 
 		m.SetExpiryTime(v)
 		return nil
 	case tokentransaction.FieldCoordinatorPublicKey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -16896,7 +16896,7 @@ type TokenTransactionPeerSignatureMutation struct {
 	id                           *uuid.UUID
 	create_time                  *time.Time
 	update_time                  *time.Time
-	operator_identity_public_key *[]byte
+	operator_identity_public_key *keys.Public
 	signature                    *[]byte
 	clearedFields                map[string]struct{}
 	token_transaction            *uuid.UUID
@@ -17083,12 +17083,12 @@ func (m *TokenTransactionPeerSignatureMutation) ResetUpdateTime() {
 }
 
 // SetOperatorIdentityPublicKey sets the "operator_identity_public_key" field.
-func (m *TokenTransactionPeerSignatureMutation) SetOperatorIdentityPublicKey(b []byte) {
-	m.operator_identity_public_key = &b
+func (m *TokenTransactionPeerSignatureMutation) SetOperatorIdentityPublicKey(k keys.Public) {
+	m.operator_identity_public_key = &k
 }
 
 // OperatorIdentityPublicKey returns the value of the "operator_identity_public_key" field in the mutation.
-func (m *TokenTransactionPeerSignatureMutation) OperatorIdentityPublicKey() (r []byte, exists bool) {
+func (m *TokenTransactionPeerSignatureMutation) OperatorIdentityPublicKey() (r keys.Public, exists bool) {
 	v := m.operator_identity_public_key
 	if v == nil {
 		return
@@ -17099,7 +17099,7 @@ func (m *TokenTransactionPeerSignatureMutation) OperatorIdentityPublicKey() (r [
 // OldOperatorIdentityPublicKey returns the old "operator_identity_public_key" field's value of the TokenTransactionPeerSignature entity.
 // If the TokenTransactionPeerSignature object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenTransactionPeerSignatureMutation) OldOperatorIdentityPublicKey(ctx context.Context) (v []byte, err error) {
+func (m *TokenTransactionPeerSignatureMutation) OldOperatorIdentityPublicKey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOperatorIdentityPublicKey is only allowed on UpdateOne operations")
 	}
@@ -17297,7 +17297,7 @@ func (m *TokenTransactionPeerSignatureMutation) SetField(name string, value ent.
 		m.SetUpdateTime(v)
 		return nil
 	case tokentransactionpeersignature.FieldOperatorIdentityPublicKey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -17457,8 +17457,8 @@ type TransferMutation struct {
 	id                       *uuid.UUID
 	create_time              *time.Time
 	update_time              *time.Time
-	sender_identity_pubkey   *[]byte
-	receiver_identity_pubkey *[]byte
+	sender_identity_pubkey   *keys.Public
+	receiver_identity_pubkey *keys.Public
 	total_value              *uint64
 	addtotal_value           *int64
 	status                   *schematype.TransferStatus
@@ -17655,12 +17655,12 @@ func (m *TransferMutation) ResetUpdateTime() {
 }
 
 // SetSenderIdentityPubkey sets the "sender_identity_pubkey" field.
-func (m *TransferMutation) SetSenderIdentityPubkey(b []byte) {
-	m.sender_identity_pubkey = &b
+func (m *TransferMutation) SetSenderIdentityPubkey(k keys.Public) {
+	m.sender_identity_pubkey = &k
 }
 
 // SenderIdentityPubkey returns the value of the "sender_identity_pubkey" field in the mutation.
-func (m *TransferMutation) SenderIdentityPubkey() (r []byte, exists bool) {
+func (m *TransferMutation) SenderIdentityPubkey() (r keys.Public, exists bool) {
 	v := m.sender_identity_pubkey
 	if v == nil {
 		return
@@ -17671,7 +17671,7 @@ func (m *TransferMutation) SenderIdentityPubkey() (r []byte, exists bool) {
 // OldSenderIdentityPubkey returns the old "sender_identity_pubkey" field's value of the Transfer entity.
 // If the Transfer object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TransferMutation) OldSenderIdentityPubkey(ctx context.Context) (v []byte, err error) {
+func (m *TransferMutation) OldSenderIdentityPubkey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldSenderIdentityPubkey is only allowed on UpdateOne operations")
 	}
@@ -17691,12 +17691,12 @@ func (m *TransferMutation) ResetSenderIdentityPubkey() {
 }
 
 // SetReceiverIdentityPubkey sets the "receiver_identity_pubkey" field.
-func (m *TransferMutation) SetReceiverIdentityPubkey(b []byte) {
-	m.receiver_identity_pubkey = &b
+func (m *TransferMutation) SetReceiverIdentityPubkey(k keys.Public) {
+	m.receiver_identity_pubkey = &k
 }
 
 // ReceiverIdentityPubkey returns the value of the "receiver_identity_pubkey" field in the mutation.
-func (m *TransferMutation) ReceiverIdentityPubkey() (r []byte, exists bool) {
+func (m *TransferMutation) ReceiverIdentityPubkey() (r keys.Public, exists bool) {
 	v := m.receiver_identity_pubkey
 	if v == nil {
 		return
@@ -17707,7 +17707,7 @@ func (m *TransferMutation) ReceiverIdentityPubkey() (r []byte, exists bool) {
 // OldReceiverIdentityPubkey returns the old "receiver_identity_pubkey" field's value of the Transfer entity.
 // If the Transfer object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TransferMutation) OldReceiverIdentityPubkey(ctx context.Context) (v []byte, err error) {
+func (m *TransferMutation) OldReceiverIdentityPubkey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldReceiverIdentityPubkey is only allowed on UpdateOne operations")
 	}
@@ -18254,14 +18254,14 @@ func (m *TransferMutation) SetField(name string, value ent.Value) error {
 		m.SetUpdateTime(v)
 		return nil
 	case transfer.FieldSenderIdentityPubkey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSenderIdentityPubkey(v)
 		return nil
 	case transfer.FieldReceiverIdentityPubkey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -19830,7 +19830,7 @@ type TreeMutation struct {
 	id                    *uuid.UUID
 	create_time           *time.Time
 	update_time           *time.Time
-	owner_identity_pubkey *[]byte
+	owner_identity_pubkey *keys.Public
 	status                *schematype.TreeStatus
 	network               *schematype.Network
 	base_txid             *[]byte
@@ -20024,12 +20024,12 @@ func (m *TreeMutation) ResetUpdateTime() {
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (m *TreeMutation) SetOwnerIdentityPubkey(b []byte) {
-	m.owner_identity_pubkey = &b
+func (m *TreeMutation) SetOwnerIdentityPubkey(k keys.Public) {
+	m.owner_identity_pubkey = &k
 }
 
 // OwnerIdentityPubkey returns the value of the "owner_identity_pubkey" field in the mutation.
-func (m *TreeMutation) OwnerIdentityPubkey() (r []byte, exists bool) {
+func (m *TreeMutation) OwnerIdentityPubkey() (r keys.Public, exists bool) {
 	v := m.owner_identity_pubkey
 	if v == nil {
 		return
@@ -20040,7 +20040,7 @@ func (m *TreeMutation) OwnerIdentityPubkey() (r []byte, exists bool) {
 // OldOwnerIdentityPubkey returns the old "owner_identity_pubkey" field's value of the Tree entity.
 // If the Tree object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeMutation) OldOwnerIdentityPubkey(ctx context.Context) (v []byte, err error) {
+func (m *TreeMutation) OldOwnerIdentityPubkey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOwnerIdentityPubkey is only allowed on UpdateOne operations")
 	}
@@ -20441,7 +20441,7 @@ func (m *TreeMutation) SetField(name string, value ent.Value) error {
 		m.SetUpdateTime(v)
 		return nil
 	case tree.FieldOwnerIdentityPubkey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

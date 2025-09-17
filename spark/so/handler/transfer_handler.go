@@ -31,7 +31,6 @@ import (
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
-	"github.com/lightsparkdev/spark/so/ent/treenode"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
@@ -1163,7 +1162,7 @@ func (h *TransferHandler) FinalizeTransfer(ctx context.Context, req *pb.Finalize
 	ctx, span := tracer.Start(ctx, "TransferHandler.FinalizeTransfer")
 	defer span.End()
 
-	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("invalid identity public key: %w", err)
 	}
@@ -1176,7 +1175,7 @@ func (h *TransferHandler) FinalizeTransfer(ctx context.Context, req *pb.Finalize
 		return nil, fmt.Errorf("unable to load transfer %s: %w", req.TransferId, err)
 	}
 	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))
-	if !bytes.Equal(transfer.SenderIdentityPubkey, req.OwnerIdentityPublicKey) || transfer.Status != st.TransferStatusSenderInitiated {
+	if !transfer.SenderIdentityPubkey.Equals(reqOwnerIDPubKey) {
 		return nil, fmt.Errorf("send transfer cannot be completed %s, status: %s", req.TransferId, transfer.Status)
 	}
 
@@ -1188,8 +1187,8 @@ func (h *TransferHandler) FinalizeTransfer(ctx context.Context, req *pb.Finalize
 	switch transfer.Type {
 	case st.TransferTypePreimageSwap:
 		preimageRequest, err := db.PreimageRequest.Query().Where(preimagerequest.HasTransfersWith(enttransfer.ID(transfer.ID))).Only(ctx)
-		if err != nil || preimageRequest == nil {
-			return nil, fmt.Errorf("unable to find preimage request for transfer %s: %w", transfer.ID.String(), err)
+		if err != nil {
+			return nil, fmt.Errorf("unable to find preimage request for transfer %v: %w", transfer.ID, err)
 		}
 		shouldTweakKey = preimageRequest.Status == st.PreimageRequestStatusPreimageShared
 	case st.TransferTypeCooperativeExit:
@@ -1200,8 +1199,7 @@ func (h *TransferHandler) FinalizeTransfer(ctx context.Context, req *pb.Finalize
 	}
 
 	for _, leaf := range req.LeavesToSend {
-		err = h.completeSendLeaf(ctx, transfer, leaf, shouldTweakKey)
-		if err != nil {
+		if err = h.completeSendLeaf(ctx, transfer, leaf, shouldTweakKey); err != nil {
 			return nil, fmt.Errorf("unable to complete send leaf transfer for leaf %s: %w", leaf.LeafId, err)
 		}
 	}
@@ -1378,11 +1376,15 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 	leaf, err := db.TreeNode.Get(ctx, leafID)
-	if err != nil || leaf == nil {
+	if err != nil {
 		return fmt.Errorf("unable to find leaf %s: %w", req.LeafId, err)
 	}
+	ownerIDPubKey, err := keys.ParsePublicKey(leaf.OwnerIdentityPubkey)
+	if err != nil {
+		return fmt.Errorf("unable to parse owner identity public key: %w", err)
+	}
 	if leaf.Status != st.TreeNodeStatusTransferLocked ||
-		!bytes.Equal(leaf.OwnerIdentityPubkey, transfer.SenderIdentityPubkey) {
+		!ownerIDPubKey.Equals(transfer.SenderIdentityPubkey) {
 		return fmt.Errorf("leaf %s is not available to transfer", req.LeafId)
 	}
 
@@ -1568,11 +1570,9 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, receiverIDPubKey); err != nil {
 			return nil, err
 		}
-		transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(filter.GetReceiverIdentityPublicKey()))
+		transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(receiverIDPubKey))
 		if isPending {
-			transferPredicate = append(transferPredicate,
-				enttransfer.StatusIn(receiverPendingStatuses...),
-			)
+			transferPredicate = append(transferPredicate, enttransfer.StatusIn(receiverPendingStatuses...))
 		}
 	case *pb.TransferFilter_SenderIdentityPublicKey:
 		senderIDPubKey, err := keys.ParsePublicKey(filter.GetSenderIdentityPublicKey())
@@ -1582,7 +1582,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, senderIDPubKey); err != nil {
 			return nil, err
 		}
-		transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(filter.GetSenderIdentityPublicKey()))
+		transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(senderIDPubKey))
 		if isPending {
 			transferPredicate = append(transferPredicate,
 				enttransfer.StatusIn(senderPendingStatuses...),
@@ -1600,19 +1600,19 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		if isPending {
 			transferPredicate = append(transferPredicate, enttransfer.Or(
 				enttransfer.And(
-					enttransfer.ReceiverIdentityPubkeyEQ(identityPubKey.Serialize()),
+					enttransfer.ReceiverIdentityPubkeyEQ(identityPubKey),
 					enttransfer.StatusIn(receiverPendingStatuses...),
 				),
 				enttransfer.And(
-					enttransfer.SenderIdentityPubkeyEQ(identityPubKey.Serialize()),
+					enttransfer.SenderIdentityPubkeyEQ(identityPubKey),
 					enttransfer.StatusIn(senderPendingStatuses...),
 					enttransfer.ExpiryTimeLT(time.Now()),
 				),
 			))
 		} else {
 			transferPredicate = append(transferPredicate, enttransfer.Or(
-				enttransfer.ReceiverIdentityPubkeyEQ(identityPubKey.Serialize()),
-				enttransfer.SenderIdentityPubkeyEQ(identityPubKey.Serialize()),
+				enttransfer.ReceiverIdentityPubkeyEQ(identityPubKey),
+				enttransfer.SenderIdentityPubkeyEQ(identityPubKey),
 			))
 		}
 	}
@@ -1766,7 +1766,7 @@ func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Tx, transfer *ent.T
 func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.ClaimTransferTweakKeysRequest) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.ClaimTransferTweakKeys")
 	defer span.End()
-	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
 	if err != nil {
 		return fmt.Errorf("invalid identity public key: %w", err)
 	}
@@ -1779,7 +1779,7 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		return fmt.Errorf("unable to load transfer %s: %w", req.TransferId, err)
 	}
 	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))
-	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) {
+	if !transfer.ReceiverIdentityPubkey.Equals(reqOwnerIDPubKey) {
 		return fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", req.TransferId)
 	}
 	// Validate transfer is not in terminal states
@@ -2080,7 +2080,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		return nil, fmt.Errorf("unable to load transfer %s: %w", req.TransferId, err)
 	}
 	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))
-	if !bytes.Equal(transfer.ReceiverIdentityPubkey, req.OwnerIdentityPublicKey) {
+	if !transfer.ReceiverIdentityPubkey.Equals(reqOwnerIDPubKey) {
 		return nil, fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", req.TransferId)
 	}
 
@@ -2424,41 +2424,33 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 		for _, leaf := range leaves {
 			treeNode := leaf.Edges.Leaf
 			if treeNode == nil {
-				return fmt.Errorf("unable to get tree node for leaf %s: %w", leaf.ID.String(), err)
+				return fmt.Errorf("unable to get tree node for leaf %v: %w", leaf.ID, err)
 			}
 			if len(leaf.KeyTweak) == 0 {
-				return fmt.Errorf("key tweak for leaf %s is not set", leaf.ID.String())
+				return fmt.Errorf("key tweak for leaf %v is not set", leaf.ID)
 			}
 			keyTweakProto := &pb.ClaimLeafKeyTweak{}
-			err = proto.Unmarshal(leaf.KeyTweak, keyTweakProto)
-			if err != nil {
-				return fmt.Errorf("unable to unmarshal key tweak for leaf %s: %w", leaf.ID.String(), err)
+			if err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto); err != nil {
+				return fmt.Errorf("unable to unmarshal key tweak for leaf %v: %w", leaf.ID, err)
 			}
-			transferReceiverIDPubKey, err := keys.ParsePublicKey(transfer.ReceiverIdentityPubkey)
-			if err != nil {
-				return fmt.Errorf("unable to parse transfer receiver identity pubkey for leaf %s: %w", leaf.ID.String(), err)
+			if err := h.claimLeafTweakKey(ctx, treeNode, keyTweakProto, transfer.ReceiverIdentityPubkey); err != nil {
+				return fmt.Errorf("unable to claim leaf tweak key for leaf %v: %w", leaf.ID, err)
 			}
-			err = h.claimLeafTweakKey(ctx, treeNode, keyTweakProto, transferReceiverIDPubKey)
-			if err != nil {
-				return fmt.Errorf("unable to claim leaf tweak key for leaf %s: %w", leaf.ID.String(), err)
-			}
-			_, err = leaf.Update().SetKeyTweak(nil).Save(ctx)
-			if err != nil {
-				return fmt.Errorf("unable to update leaf key tweak %s: %w", leaf.ID.String(), err)
+			if _, err := leaf.Update().SetKeyTweak(nil).Save(ctx); err != nil {
+				return fmt.Errorf("unable to update leaf key tweak %v: %w", leaf.ID, err)
 			}
 		}
 		_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweakApplied).Save(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to update transfer status %s: %w", transfer.ID.String(), err)
+			return fmt.Errorf("unable to update transfer status %v: %w", transfer.ID, err)
 		}
 	case pbinternal.SettleKeyTweakAction_ROLLBACK:
 		leaves, err := transfer.QueryTransferLeaves().All(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to get leaves from transfer %s: %w", req.TransferId, err)
 		}
-		err = h.revertClaimTransfer(ctx, transfer, leaves)
-		if err != nil {
-			return fmt.Errorf("unable to revert claim transfer %s: %w", transfer.ID.String(), err)
+		if err := h.revertClaimTransfer(ctx, transfer, leaves); err != nil {
+			return fmt.Errorf("unable to revert claim transfer %v: %w", transfer.ID, err)
 		}
 	default:
 		return fmt.Errorf("invalid action %s", req.Action)
@@ -2468,11 +2460,9 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 	if err != nil {
 		return fmt.Errorf("unable to get db: %w", err)
 	}
-	err = db.Commit()
-	if err != nil {
+	if err := db.Commit(); err != nil {
 		return fmt.Errorf("unable to commit db: %w", err)
 	}
-
 	return nil
 }
 
@@ -2549,14 +2539,12 @@ func (h *TransferHandler) InvestigateLeaves(ctx context.Context, req *pb.Investi
 		}
 		leafIDs[i] = leafUUID
 	}
-	query := db.TreeNode.Query()
-	query = query.Where(treenode.IDIn(leafIDs...)).ForUpdate()
-
-	nodes, err := query.All(ctx)
+	nodes, err := db.TreeNode.Query().Where(enttreenode.IDIn(leafIDs...)).ForUpdate().All(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	logger := logging.GetLoggerFromContext(ctx)
 	for _, node := range nodes {
 		if node.Status != st.TreeNodeStatusAvailable {
 			return nil, fmt.Errorf("node %s is not available", node.ID)
@@ -2565,7 +2553,6 @@ func (h *TransferHandler) InvestigateLeaves(ctx context.Context, req *pb.Investi
 			return nil, fmt.Errorf("node %s is not owned by the identity public key %s", node.ID, req.OwnerIdentityPublicKey)
 		}
 		_, err := node.Update().SetStatus(st.TreeNodeStatusInvestigation).Save(ctx)
-		logger := logging.GetLoggerFromContext(ctx)
 		logger.Sugar().Warnf("Tree Node %s is marked as investigation", node.ID)
 		if err != nil {
 			return nil, err

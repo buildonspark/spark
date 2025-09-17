@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark"
-	"github.com/lightsparkdev/spark/common/keys"
 	"go.uber.org/zap"
 
 	"github.com/lightsparkdev/spark/so/db"
@@ -110,7 +109,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					}
 
 					logger := logging.GetLoggerFromContext(ctx)
-					entCommitments := make([]*ent.SigningCommitmentCreate, 0)
+					var entCommitments []*ent.SigningCommitmentCreate
 					for _, operator := range config.SigningOperatorMap {
 						count, err := db.SigningCommitment.Query().Where(
 							signingcommitment.OperatorIndexEQ(uint(operator.ID)),
@@ -423,11 +422,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 
 						if tokenTransaction.Edges.PeerSignatures != nil {
 							for _, signature := range tokenTransaction.Edges.PeerSignatures {
-								pubKey, err := keys.ParsePublicKey(signature.OperatorIdentityPublicKey)
-								if err != nil {
-									return fmt.Errorf("unable to parse public key: %w", err)
-								}
-								identifier := config.GetOperatorIdentifierFromIdentityPublicKey(pubKey)
+								identifier := config.GetOperatorIdentifierFromIdentityPublicKey(signature.OperatorIdentityPublicKey)
 								signaturesPackage[identifier] = &tokeninternalpb.SignTokenTransactionFromCoordinationResponse{
 									SparkOperatorSignature: signature.Signature,
 								}
