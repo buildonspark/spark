@@ -1081,7 +1081,7 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pb.Init
 		directSequence := refundTx.TxIn[0].Sequence - DirectSequenceOffset
 
 		// Build cpfp htlc tx.
-		builtTx, err := bitcointransaction.CreateLightningHTLCTransaction(nodeTx, 0, network, currentSequence, req.PaymentHash, ownerIdentityPubKey, receiverIdentityPubKey)
+		builtTx, err := bitcointransaction.CreateLightningHTLCTransaction(nodeTx, 0, network, currentSequence, req.PaymentHash, receiverIdentityPubKey, ownerIdentityPubKey)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to create lightning htlc transaction: %w", err)
 		}
@@ -1095,7 +1095,7 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pb.Init
 		}
 
 		// Build direct cpfphtlc tx.
-		builtTx, err = bitcointransaction.CreateDirectLightningHTLCTransaction(nodeTx, 0, network, directSequence, req.PaymentHash, ownerIdentityPubKey, receiverIdentityPubKey)
+		builtTx, err = bitcointransaction.CreateDirectLightningHTLCTransaction(nodeTx, 0, network, directSequence, req.PaymentHash, receiverIdentityPubKey, ownerIdentityPubKey)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to create lightning htlc transaction: %w", err)
 		}
@@ -1115,7 +1115,7 @@ func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pb.Init
 				return nil, nil, nil, fmt.Errorf("failed to get direct node tx: %w", err)
 			}
 
-			builtTx, err = bitcointransaction.CreateDirectLightningHTLCTransaction(directNodeTx, 0, network, directSequence, req.PaymentHash, ownerIdentityPubKey, receiverIdentityPubKey)
+			builtTx, err = bitcointransaction.CreateDirectLightningHTLCTransaction(directNodeTx, 0, network, directSequence, req.PaymentHash, receiverIdentityPubKey, ownerIdentityPubKey)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to create lightning htlc transaction: %w", err)
 			}

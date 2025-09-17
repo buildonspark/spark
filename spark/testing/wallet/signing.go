@@ -175,11 +175,11 @@ func prepareFrostSigningJobsForUserSignedRefundHTLC(
 		var htlcTx *wire.MsgTx
 		switch htlcType {
 		case PrepareFrostSigningJobsForUserSignedRefundHTLCTypeCPFPRefund:
-			htlcTx, err = bitcointransaction.CreateLightningHTLCTransaction(nodeTx, 0, network, nextSequence, paymentHash, senderIdentityPubKey, receiverIdentityPubKey)
+			htlcTx, err = bitcointransaction.CreateLightningHTLCTransaction(nodeTx, 0, network, nextSequence, paymentHash, receiverIdentityPubKey, senderIdentityPubKey)
 		case PrepareFrostSigningJobsForUserSignedRefundHTLCTypeDirectRefund:
-			htlcTx, err = bitcointransaction.CreateDirectLightningHTLCTransaction(nodeTx, 0, network, nextSequence, paymentHash, senderIdentityPubKey, receiverIdentityPubKey)
+			htlcTx, err = bitcointransaction.CreateDirectLightningHTLCTransaction(nodeTx, 0, network, nextSequence, paymentHash, receiverIdentityPubKey, senderIdentityPubKey)
 		case PrepareFrostSigningJobsForUserSignedRefundHTLCTypeDirectFromCpfpRefund:
-			htlcTx, err = bitcointransaction.CreateDirectLightningHTLCTransaction(nodeTx, 0, network, nextSequence, paymentHash, senderIdentityPubKey, receiverIdentityPubKey)
+			htlcTx, err = bitcointransaction.CreateDirectLightningHTLCTransaction(nodeTx, 0, network, nextSequence, paymentHash, receiverIdentityPubKey, senderIdentityPubKey)
 		}
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to create lightning htlc transaction: %w", err)
