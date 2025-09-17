@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -56,9 +57,11 @@ func TestCreateLightningHTLCTransaction_BuildsExpectedTx(t *testing.T) {
 	// First output amount preserved (no fee in CPFP-friendly variant)
 	assert.Equal(t, amount, htlcTx.TxOut[0].Value)
 	// First output script matches computed HTLC taproot address script
-	expectedAddr, err := CreateLightningHTLCTaprootAddress(network, hash, hashLockPriv.Public(), sequenceLockPriv.Public())
+	expectedAddr, err := CreateLightningHTLCTaprootAddressWithSequence(network, hash, hashLockPriv.Public(), LightningHTLCSequence, sequenceLockPriv.Public())
 	require.NoError(t, err)
-	assert.Equal(t, expectedAddr.ScriptAddress(), htlcTx.TxOut[0].PkScript)
+	expectedPkScript, err := txscript.PayToAddrScript(expectedAddr)
+	require.NoError(t, err)
+	assert.Equal(t, expectedPkScript, htlcTx.TxOut[0].PkScript)
 	// Second output is the ephemeral anchor (zero-value, fixed script)
 	anchor := common.EphemeralAnchorOutput()
 	assert.Equal(t, int64(0), htlcTx.TxOut[1].Value)
@@ -97,6 +100,6 @@ func TestCreateDirectLightningHTLCTransaction_SubtractsFee(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	require.NotNil(t, htlcTx)
-	require.Len(t, htlcTx.TxOut, 2)
+	require.Len(t, htlcTx.TxOut, 1)
 	assert.Equal(t, amount-int64(fee), htlcTx.TxOut[0].Value)
 }

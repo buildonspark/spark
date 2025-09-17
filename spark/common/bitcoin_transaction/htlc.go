@@ -21,14 +21,14 @@ var NUMSPoint = func() keys.Public {
 var LightningHTLCSequence = uint32(2160)
 
 func CreateLightningHTLCTransaction(nodeTx *wire.MsgTx, vout uint32, network common.Network, transactionSequence uint32, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public) (*wire.MsgTx, error) {
-	return createLightningHTLCTransaction(nodeTx, vout, network, transactionSequence, hash, hashLockDestinationPubkey, sequenceLockDestinationPubkey, false)
+	return CreateLightningHTLCTransactionWithSequence(nodeTx, vout, network, transactionSequence, LightningHTLCSequence, hash, hashLockDestinationPubkey, sequenceLockDestinationPubkey, false)
 }
 
 func CreateDirectLightningHTLCTransaction(nodeTx *wire.MsgTx, vout uint32, network common.Network, transactionSequence uint32, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public) (*wire.MsgTx, error) {
-	return createLightningHTLCTransaction(nodeTx, vout, network, transactionSequence, hash, hashLockDestinationPubkey, sequenceLockDestinationPubkey, true)
+	return CreateLightningHTLCTransactionWithSequence(nodeTx, vout, network, transactionSequence, LightningHTLCSequence, hash, hashLockDestinationPubkey, sequenceLockDestinationPubkey, true)
 }
 
-func createLightningHTLCTransaction(nodeTx *wire.MsgTx, vout uint32, network common.Network, transactionSequence uint32, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public, includeFee bool) (*wire.MsgTx, error) {
+func CreateLightningHTLCTransactionWithSequence(nodeTx *wire.MsgTx, vout uint32, network common.Network, transactionSequence uint32, timelockSequence uint32, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public, includeFee bool) (*wire.MsgTx, error) {
 	htlcTransaction := wire.NewMsgTx(3)
 	previousOutpoint := wire.OutPoint{
 		Hash:  nodeTx.TxHash(),
@@ -46,30 +46,37 @@ func createLightningHTLCTransaction(nodeTx *wire.MsgTx, vout uint32, network com
 		value = common.MaybeApplyFee(value)
 	}
 
-	taprootAddr, err := CreateLightningHTLCTaprootAddress(network, hash, hashLockDestinationPubkey, sequenceLockDestinationPubkey)
+	taprootAddr, err := CreateLightningHTLCTaprootAddressWithSequence(network, hash, hashLockDestinationPubkey, timelockSequence, sequenceLockDestinationPubkey)
 	if err != nil {
 		return nil, err
 	}
-	htlcTransaction.AddTxOut(wire.NewTxOut(value, taprootAddr.ScriptAddress()))
-	htlcTransaction.AddTxOut(common.EphemeralAnchorOutput())
+	// Build a standard P2TR pkScript for the HTLC output instead of using ScriptAddress directly
+	htlcPkScript, err := txscript.PayToAddrScript(taprootAddr)
+	if err != nil {
+		return nil, err
+	}
+	htlcTransaction.AddTxOut(wire.NewTxOut(value, htlcPkScript))
+	if !includeFee {
+		htlcTransaction.AddTxOut(common.EphemeralAnchorOutput())
+	}
 
 	return htlcTransaction, nil
 }
 
-func CreateLightningHTLCTaprootAddress(network common.Network, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public) (btcutil.Address, error) {
-	return createHTLCTaprootAddress(network, hash, hashLockDestinationPubkey, LightningHTLCSequence, sequenceLockDestinationPubkey)
+func CreateLightningHTLCTaprootAddressWithSequence(network common.Network, hash []byte, hashLockDestinationPubkey keys.Public, sequence uint32, sequenceLockDestinationPubkey keys.Public) (btcutil.Address, error) {
+	return createHTLCTaprootAddress(network, hash, hashLockDestinationPubkey, sequence, sequenceLockDestinationPubkey)
 }
 
 func createHTLCTaprootAddress(network common.Network, hash []byte, hashLockDestinationPubkey keys.Public, sequence uint32, sequenceLockDestinationPubkey keys.Public) (btcutil.Address, error) {
 	numsKey := NUMSPoint()
 
-	hashLockScript, err := createHashLockScript(hash, hashLockDestinationPubkey)
+	hashLockScript, err := CreateHashLockScript(hash, hashLockDestinationPubkey)
 	if err != nil {
 		return nil, err
 	}
 	hashLockLeaf := txscript.NewBaseTapLeaf(hashLockScript)
 
-	sequenceLockScript, err := createSequencLockScript(sequence, sequenceLockDestinationPubkey)
+	sequenceLockScript, err := CreateSequencLockScript(sequence, sequenceLockDestinationPubkey)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +98,7 @@ func createHTLCTaprootAddress(network common.Network, hash []byte, hashLockDesti
 	return taprootAddr, nil
 }
 
-func createHashLockScript(hash []byte, destinationPubkey keys.Public) (script []byte, err error) {
+func CreateHashLockScript(hash []byte, destinationPubkey keys.Public) (script []byte, err error) {
 	builder := txscript.NewScriptBuilder()
 	builder.AddOp(txscript.OP_SHA256)
 	builder.AddData(hash)
@@ -101,7 +108,7 @@ func createHashLockScript(hash []byte, destinationPubkey keys.Public) (script []
 	return builder.Script()
 }
 
-func createSequencLockScript(sequence uint32, destinationPubkey keys.Public) (script []byte, err error) {
+func CreateSequencLockScript(sequence uint32, destinationPubkey keys.Public) (script []byte, err error) {
 	builder := txscript.NewScriptBuilder()
 	builder.AddInt64(int64(sequence))
 	builder.AddOp(txscript.OP_CHECKSEQUENCEVERIFY)
