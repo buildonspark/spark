@@ -440,7 +440,7 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 		if ownerIDPubKey.IsZero() {
 			return nil, fmt.Errorf("owner identity public key is required")
 		}
-		if _, err := transferHandler.validateTransferPackage(ctx, req.Transfer.TransferId, req.Transfer.TransferPackage, ownerIDPubKey); err != nil {
+		if _, err := transferHandler.ValidateTransferPackage(ctx, req.Transfer.TransferId, req.Transfer.TransferPackage, ownerIDPubKey); err != nil {
 			return nil, fmt.Errorf("error validating transfer package: %w", err)
 		}
 

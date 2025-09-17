@@ -189,7 +189,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
 	}
-	if _, err := transferHandler.validateTransferPackage(ctx, req.Transfer.TransferId, req.Transfer.TransferPackage, reqTransferOwnerIDPubKey); err != nil {
+	if _, err := transferHandler.ValidateTransferPackage(ctx, req.Transfer.TransferId, req.Transfer.TransferPackage, reqTransferOwnerIDPubKey); err != nil {
 		return nil, fmt.Errorf("error validating transfer package: %w", err)
 	}
 

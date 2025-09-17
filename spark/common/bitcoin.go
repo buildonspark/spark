@@ -25,6 +25,13 @@ func EphemeralAnchorOutput() *wire.TxOut {
 	return wire.NewTxOut(0, []byte{txscript.OP_TRUE, 0x02, 0x4e, 0x73})
 }
 
+func MaybeApplyFee(amount int64) int64 {
+	if amount > int64(DefaultFeeSats) {
+		return amount - int64(DefaultFeeSats)
+	}
+	return amount
+}
+
 func DetermineNetwork(protoNetwork pb.Network) (*Network, error) {
 	var network Network
 	if protoNetwork == pb.Network_UNSPECIFIED {

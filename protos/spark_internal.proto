@@ -27,6 +27,7 @@ service SparkInternalService {
    rpc finalize_renew_node_timelock(FinalizeRenewNodeTimelockRequest) returns (google.protobuf.Empty) {}
 
     rpc initiate_preimage_swap(spark.InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
+    rpc initiate_preimage_swap_v2(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc provide_preimage(ProvidePreimageRequest) returns (google.protobuf.Empty) {}
     rpc update_preimage_request(UpdatePreimageRequestRequest) returns (google.protobuf.Empty) {}
 
@@ -182,6 +183,13 @@ message TreeNode {
     bytes direct_tx = 13;
     bytes direct_refund_tx = 14;
     bytes direct_from_cpfp_refund_tx = 15;
+}
+
+message InitiatePreimageSwapRequest {
+    spark.InitiatePreimageSwapRequest request = 1;
+    map<string, bytes> cpfp_refund_signatures = 2;
+    map<string, bytes> direct_refund_signatures = 3;
+    map<string, bytes> direct_from_cpfp_refund_signatures = 4;
 }
 
 message InitiatePreimageSwapResponse {

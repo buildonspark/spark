@@ -991,6 +991,74 @@ func (x *TreeNode) GetDirectFromCpfpRefundTx() []byte {
 	return nil
 }
 
+type InitiatePreimageSwapRequest struct {
+	state                          protoimpl.MessageState             `protogen:"open.v1"`
+	Request                        *spark.InitiatePreimageSwapRequest `protobuf:"bytes,1,opt,name=request,proto3" json:"request,omitempty"`
+	CpfpRefundSignatures           map[string][]byte                  `protobuf:"bytes,2,rep,name=cpfp_refund_signatures,json=cpfpRefundSignatures,proto3" json:"cpfp_refund_signatures,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	DirectRefundSignatures         map[string][]byte                  `protobuf:"bytes,3,rep,name=direct_refund_signatures,json=directRefundSignatures,proto3" json:"direct_refund_signatures,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	DirectFromCpfpRefundSignatures map[string][]byte                  `protobuf:"bytes,4,rep,name=direct_from_cpfp_refund_signatures,json=directFromCpfpRefundSignatures,proto3" json:"direct_from_cpfp_refund_signatures,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields                  protoimpl.UnknownFields
+	sizeCache                      protoimpl.SizeCache
+}
+
+func (x *InitiatePreimageSwapRequest) Reset() {
+	*x = InitiatePreimageSwapRequest{}
+	mi := &file_spark_internal_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InitiatePreimageSwapRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InitiatePreimageSwapRequest) ProtoMessage() {}
+
+func (x *InitiatePreimageSwapRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_spark_internal_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InitiatePreimageSwapRequest.ProtoReflect.Descriptor instead.
+func (*InitiatePreimageSwapRequest) Descriptor() ([]byte, []int) {
+	return file_spark_internal_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *InitiatePreimageSwapRequest) GetRequest() *spark.InitiatePreimageSwapRequest {
+	if x != nil {
+		return x.Request
+	}
+	return nil
+}
+
+func (x *InitiatePreimageSwapRequest) GetCpfpRefundSignatures() map[string][]byte {
+	if x != nil {
+		return x.CpfpRefundSignatures
+	}
+	return nil
+}
+
+func (x *InitiatePreimageSwapRequest) GetDirectRefundSignatures() map[string][]byte {
+	if x != nil {
+		return x.DirectRefundSignatures
+	}
+	return nil
+}
+
+func (x *InitiatePreimageSwapRequest) GetDirectFromCpfpRefundSignatures() map[string][]byte {
+	if x != nil {
+		return x.DirectFromCpfpRefundSignatures
+	}
+	return nil
+}
+
 type InitiatePreimageSwapResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PreimageShare []byte                 `protobuf:"bytes,1,opt,name=preimage_share,json=preimageShare,proto3" json:"preimage_share,omitempty"`
@@ -1000,7 +1068,7 @@ type InitiatePreimageSwapResponse struct {
 
 func (x *InitiatePreimageSwapResponse) Reset() {
 	*x = InitiatePreimageSwapResponse{}
-	mi := &file_spark_internal_proto_msgTypes[15]
+	mi := &file_spark_internal_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1012,7 +1080,7 @@ func (x *InitiatePreimageSwapResponse) String() string {
 func (*InitiatePreimageSwapResponse) ProtoMessage() {}
 
 func (x *InitiatePreimageSwapResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[15]
+	mi := &file_spark_internal_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1025,7 +1093,7 @@ func (x *InitiatePreimageSwapResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InitiatePreimageSwapResponse.ProtoReflect.Descriptor instead.
 func (*InitiatePreimageSwapResponse) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{15}
+	return file_spark_internal_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *InitiatePreimageSwapResponse) GetPreimageShare() []byte {
@@ -1046,7 +1114,7 @@ type PrepareTreeAddressNode struct {
 
 func (x *PrepareTreeAddressNode) Reset() {
 	*x = PrepareTreeAddressNode{}
-	mi := &file_spark_internal_proto_msgTypes[16]
+	mi := &file_spark_internal_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1058,7 +1126,7 @@ func (x *PrepareTreeAddressNode) String() string {
 func (*PrepareTreeAddressNode) ProtoMessage() {}
 
 func (x *PrepareTreeAddressNode) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[16]
+	mi := &file_spark_internal_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1071,7 +1139,7 @@ func (x *PrepareTreeAddressNode) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareTreeAddressNode.ProtoReflect.Descriptor instead.
 func (*PrepareTreeAddressNode) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{16}
+	return file_spark_internal_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *PrepareTreeAddressNode) GetSigningKeyshareId() string {
@@ -1108,7 +1176,7 @@ type PrepareTreeAddressRequest struct {
 
 func (x *PrepareTreeAddressRequest) Reset() {
 	*x = PrepareTreeAddressRequest{}
-	mi := &file_spark_internal_proto_msgTypes[17]
+	mi := &file_spark_internal_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1120,7 +1188,7 @@ func (x *PrepareTreeAddressRequest) String() string {
 func (*PrepareTreeAddressRequest) ProtoMessage() {}
 
 func (x *PrepareTreeAddressRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[17]
+	mi := &file_spark_internal_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1133,7 +1201,7 @@ func (x *PrepareTreeAddressRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareTreeAddressRequest.ProtoReflect.Descriptor instead.
 func (*PrepareTreeAddressRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{17}
+	return file_spark_internal_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *PrepareTreeAddressRequest) GetTargetKeyshareId() string {
@@ -1173,7 +1241,7 @@ type PrepareTreeAddressResponse struct {
 
 func (x *PrepareTreeAddressResponse) Reset() {
 	*x = PrepareTreeAddressResponse{}
-	mi := &file_spark_internal_proto_msgTypes[18]
+	mi := &file_spark_internal_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1185,7 +1253,7 @@ func (x *PrepareTreeAddressResponse) String() string {
 func (*PrepareTreeAddressResponse) ProtoMessage() {}
 
 func (x *PrepareTreeAddressResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[18]
+	mi := &file_spark_internal_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1198,7 +1266,7 @@ func (x *PrepareTreeAddressResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareTreeAddressResponse.ProtoReflect.Descriptor instead.
 func (*PrepareTreeAddressResponse) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{18}
+	return file_spark_internal_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *PrepareTreeAddressResponse) GetSignatures() map[string][]byte {
@@ -1220,7 +1288,7 @@ type InitiateTransferLeaf struct {
 
 func (x *InitiateTransferLeaf) Reset() {
 	*x = InitiateTransferLeaf{}
-	mi := &file_spark_internal_proto_msgTypes[19]
+	mi := &file_spark_internal_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1232,7 +1300,7 @@ func (x *InitiateTransferLeaf) String() string {
 func (*InitiateTransferLeaf) ProtoMessage() {}
 
 func (x *InitiateTransferLeaf) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[19]
+	mi := &file_spark_internal_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1245,7 +1313,7 @@ func (x *InitiateTransferLeaf) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InitiateTransferLeaf.ProtoReflect.Descriptor instead.
 func (*InitiateTransferLeaf) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{19}
+	return file_spark_internal_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *InitiateTransferLeaf) GetLeafId() string {
@@ -1300,7 +1368,7 @@ type InitiateTransferRequest struct {
 
 func (x *InitiateTransferRequest) Reset() {
 	*x = InitiateTransferRequest{}
-	mi := &file_spark_internal_proto_msgTypes[20]
+	mi := &file_spark_internal_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1312,7 +1380,7 @@ func (x *InitiateTransferRequest) String() string {
 func (*InitiateTransferRequest) ProtoMessage() {}
 
 func (x *InitiateTransferRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[20]
+	mi := &file_spark_internal_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1325,7 +1393,7 @@ func (x *InitiateTransferRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InitiateTransferRequest.ProtoReflect.Descriptor instead.
 func (*InitiateTransferRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{20}
+	return file_spark_internal_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *InitiateTransferRequest) GetTransferId() string {
@@ -1423,7 +1491,7 @@ type DeliverSenderKeyTweakRequest struct {
 
 func (x *DeliverSenderKeyTweakRequest) Reset() {
 	*x = DeliverSenderKeyTweakRequest{}
-	mi := &file_spark_internal_proto_msgTypes[21]
+	mi := &file_spark_internal_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1435,7 +1503,7 @@ func (x *DeliverSenderKeyTweakRequest) String() string {
 func (*DeliverSenderKeyTweakRequest) ProtoMessage() {}
 
 func (x *DeliverSenderKeyTweakRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[21]
+	mi := &file_spark_internal_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1448,7 +1516,7 @@ func (x *DeliverSenderKeyTweakRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeliverSenderKeyTweakRequest.ProtoReflect.Descriptor instead.
 func (*DeliverSenderKeyTweakRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{21}
+	return file_spark_internal_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *DeliverSenderKeyTweakRequest) GetTransferId() string {
@@ -1483,7 +1551,7 @@ type InitiateCooperativeExitRequest struct {
 
 func (x *InitiateCooperativeExitRequest) Reset() {
 	*x = InitiateCooperativeExitRequest{}
-	mi := &file_spark_internal_proto_msgTypes[22]
+	mi := &file_spark_internal_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1495,7 +1563,7 @@ func (x *InitiateCooperativeExitRequest) String() string {
 func (*InitiateCooperativeExitRequest) ProtoMessage() {}
 
 func (x *InitiateCooperativeExitRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[22]
+	mi := &file_spark_internal_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1508,7 +1576,7 @@ func (x *InitiateCooperativeExitRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InitiateCooperativeExitRequest.ProtoReflect.Descriptor instead.
 func (*InitiateCooperativeExitRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{22}
+	return file_spark_internal_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *InitiateCooperativeExitRequest) GetTransfer() *InitiateTransferRequest {
@@ -1543,7 +1611,7 @@ type UpdatePreimageRequestRequest struct {
 
 func (x *UpdatePreimageRequestRequest) Reset() {
 	*x = UpdatePreimageRequestRequest{}
-	mi := &file_spark_internal_proto_msgTypes[23]
+	mi := &file_spark_internal_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1555,7 +1623,7 @@ func (x *UpdatePreimageRequestRequest) String() string {
 func (*UpdatePreimageRequestRequest) ProtoMessage() {}
 
 func (x *UpdatePreimageRequestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[23]
+	mi := &file_spark_internal_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1568,7 +1636,7 @@ func (x *UpdatePreimageRequestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdatePreimageRequestRequest.ProtoReflect.Descriptor instead.
 func (*UpdatePreimageRequestRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{23}
+	return file_spark_internal_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *UpdatePreimageRequestRequest) GetPreimageRequestId() string {
@@ -1604,7 +1672,7 @@ type StartTokenTransactionInternalRequest struct {
 
 func (x *StartTokenTransactionInternalRequest) Reset() {
 	*x = StartTokenTransactionInternalRequest{}
-	mi := &file_spark_internal_proto_msgTypes[24]
+	mi := &file_spark_internal_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1616,7 +1684,7 @@ func (x *StartTokenTransactionInternalRequest) String() string {
 func (*StartTokenTransactionInternalRequest) ProtoMessage() {}
 
 func (x *StartTokenTransactionInternalRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[24]
+	mi := &file_spark_internal_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1629,7 +1697,7 @@ func (x *StartTokenTransactionInternalRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use StartTokenTransactionInternalRequest.ProtoReflect.Descriptor instead.
 func (*StartTokenTransactionInternalRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{24}
+	return file_spark_internal_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *StartTokenTransactionInternalRequest) GetFinalTokenTransaction() *spark.TokenTransaction {
@@ -1669,7 +1737,7 @@ type StartTokenTransactionInternalResponse struct {
 
 func (x *StartTokenTransactionInternalResponse) Reset() {
 	*x = StartTokenTransactionInternalResponse{}
-	mi := &file_spark_internal_proto_msgTypes[25]
+	mi := &file_spark_internal_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1681,7 +1749,7 @@ func (x *StartTokenTransactionInternalResponse) String() string {
 func (*StartTokenTransactionInternalResponse) ProtoMessage() {}
 
 func (x *StartTokenTransactionInternalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[25]
+	mi := &file_spark_internal_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1694,7 +1762,7 @@ func (x *StartTokenTransactionInternalResponse) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use StartTokenTransactionInternalResponse.ProtoReflect.Descriptor instead.
 func (*StartTokenTransactionInternalResponse) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{25}
+	return file_spark_internal_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *StartTokenTransactionInternalResponse) GetFinalTokenTransaction() *spark.TokenTransaction {
@@ -1715,7 +1783,7 @@ type InitiateSettleReceiverKeyTweakRequest struct {
 
 func (x *InitiateSettleReceiverKeyTweakRequest) Reset() {
 	*x = InitiateSettleReceiverKeyTweakRequest{}
-	mi := &file_spark_internal_proto_msgTypes[26]
+	mi := &file_spark_internal_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1727,7 +1795,7 @@ func (x *InitiateSettleReceiverKeyTweakRequest) String() string {
 func (*InitiateSettleReceiverKeyTweakRequest) ProtoMessage() {}
 
 func (x *InitiateSettleReceiverKeyTweakRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[26]
+	mi := &file_spark_internal_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1740,7 +1808,7 @@ func (x *InitiateSettleReceiverKeyTweakRequest) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use InitiateSettleReceiverKeyTweakRequest.ProtoReflect.Descriptor instead.
 func (*InitiateSettleReceiverKeyTweakRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{26}
+	return file_spark_internal_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *InitiateSettleReceiverKeyTweakRequest) GetTransferId() string {
@@ -1774,7 +1842,7 @@ type SettleReceiverKeyTweakRequest struct {
 
 func (x *SettleReceiverKeyTweakRequest) Reset() {
 	*x = SettleReceiverKeyTweakRequest{}
-	mi := &file_spark_internal_proto_msgTypes[27]
+	mi := &file_spark_internal_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1786,7 +1854,7 @@ func (x *SettleReceiverKeyTweakRequest) String() string {
 func (*SettleReceiverKeyTweakRequest) ProtoMessage() {}
 
 func (x *SettleReceiverKeyTweakRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[27]
+	mi := &file_spark_internal_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1799,7 +1867,7 @@ func (x *SettleReceiverKeyTweakRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SettleReceiverKeyTweakRequest.ProtoReflect.Descriptor instead.
 func (*SettleReceiverKeyTweakRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{27}
+	return file_spark_internal_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *SettleReceiverKeyTweakRequest) GetTransferId() string {
@@ -1826,7 +1894,7 @@ type SettleSenderKeyTweakRequest struct {
 
 func (x *SettleSenderKeyTweakRequest) Reset() {
 	*x = SettleSenderKeyTweakRequest{}
-	mi := &file_spark_internal_proto_msgTypes[28]
+	mi := &file_spark_internal_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1838,7 +1906,7 @@ func (x *SettleSenderKeyTweakRequest) String() string {
 func (*SettleSenderKeyTweakRequest) ProtoMessage() {}
 
 func (x *SettleSenderKeyTweakRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[28]
+	mi := &file_spark_internal_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1851,7 +1919,7 @@ func (x *SettleSenderKeyTweakRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SettleSenderKeyTweakRequest.ProtoReflect.Descriptor instead.
 func (*SettleSenderKeyTweakRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{28}
+	return file_spark_internal_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *SettleSenderKeyTweakRequest) GetTransferId() string {
@@ -1879,7 +1947,7 @@ type CreateUtxoSwapRequest struct {
 
 func (x *CreateUtxoSwapRequest) Reset() {
 	*x = CreateUtxoSwapRequest{}
-	mi := &file_spark_internal_proto_msgTypes[29]
+	mi := &file_spark_internal_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1891,7 +1959,7 @@ func (x *CreateUtxoSwapRequest) String() string {
 func (*CreateUtxoSwapRequest) ProtoMessage() {}
 
 func (x *CreateUtxoSwapRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[29]
+	mi := &file_spark_internal_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1904,7 +1972,7 @@ func (x *CreateUtxoSwapRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUtxoSwapRequest.ProtoReflect.Descriptor instead.
 func (*CreateUtxoSwapRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{29}
+	return file_spark_internal_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *CreateUtxoSwapRequest) GetRequest() *spark.InitiateUtxoSwapRequest {
@@ -1937,7 +2005,7 @@ type CreateUtxoSwapResponse struct {
 
 func (x *CreateUtxoSwapResponse) Reset() {
 	*x = CreateUtxoSwapResponse{}
-	mi := &file_spark_internal_proto_msgTypes[30]
+	mi := &file_spark_internal_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1949,7 +2017,7 @@ func (x *CreateUtxoSwapResponse) String() string {
 func (*CreateUtxoSwapResponse) ProtoMessage() {}
 
 func (x *CreateUtxoSwapResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[30]
+	mi := &file_spark_internal_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1962,7 +2030,7 @@ func (x *CreateUtxoSwapResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUtxoSwapResponse.ProtoReflect.Descriptor instead.
 func (*CreateUtxoSwapResponse) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{30}
+	return file_spark_internal_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *CreateUtxoSwapResponse) GetUtxoDepositAddress() string {
@@ -1991,7 +2059,7 @@ type InitiateStaticDepositUtxoSwapRequest struct {
 
 func (x *InitiateStaticDepositUtxoSwapRequest) Reset() {
 	*x = InitiateStaticDepositUtxoSwapRequest{}
-	mi := &file_spark_internal_proto_msgTypes[31]
+	mi := &file_spark_internal_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2003,7 +2071,7 @@ func (x *InitiateStaticDepositUtxoSwapRequest) String() string {
 func (*InitiateStaticDepositUtxoSwapRequest) ProtoMessage() {}
 
 func (x *InitiateStaticDepositUtxoSwapRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[31]
+	mi := &file_spark_internal_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2016,7 +2084,7 @@ func (x *InitiateStaticDepositUtxoSwapRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use InitiateStaticDepositUtxoSwapRequest.ProtoReflect.Descriptor instead.
 func (*InitiateStaticDepositUtxoSwapRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{31}
+	return file_spark_internal_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *InitiateStaticDepositUtxoSwapRequest) GetOnChainUtxo() *spark.UTXO {
@@ -2065,7 +2133,7 @@ type CreateStaticDepositUtxoSwapRequest struct {
 
 func (x *CreateStaticDepositUtxoSwapRequest) Reset() {
 	*x = CreateStaticDepositUtxoSwapRequest{}
-	mi := &file_spark_internal_proto_msgTypes[32]
+	mi := &file_spark_internal_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2077,7 +2145,7 @@ func (x *CreateStaticDepositUtxoSwapRequest) String() string {
 func (*CreateStaticDepositUtxoSwapRequest) ProtoMessage() {}
 
 func (x *CreateStaticDepositUtxoSwapRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[32]
+	mi := &file_spark_internal_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2090,7 +2158,7 @@ func (x *CreateStaticDepositUtxoSwapRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use CreateStaticDepositUtxoSwapRequest.ProtoReflect.Descriptor instead.
 func (*CreateStaticDepositUtxoSwapRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{32}
+	return file_spark_internal_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *CreateStaticDepositUtxoSwapRequest) GetRequest() *InitiateStaticDepositUtxoSwapRequest {
@@ -2123,7 +2191,7 @@ type CreateStaticDepositUtxoSwapResponse struct {
 
 func (x *CreateStaticDepositUtxoSwapResponse) Reset() {
 	*x = CreateStaticDepositUtxoSwapResponse{}
-	mi := &file_spark_internal_proto_msgTypes[33]
+	mi := &file_spark_internal_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2135,7 +2203,7 @@ func (x *CreateStaticDepositUtxoSwapResponse) String() string {
 func (*CreateStaticDepositUtxoSwapResponse) ProtoMessage() {}
 
 func (x *CreateStaticDepositUtxoSwapResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[33]
+	mi := &file_spark_internal_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2148,7 +2216,7 @@ func (x *CreateStaticDepositUtxoSwapResponse) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use CreateStaticDepositUtxoSwapResponse.ProtoReflect.Descriptor instead.
 func (*CreateStaticDepositUtxoSwapResponse) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{33}
+	return file_spark_internal_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *CreateStaticDepositUtxoSwapResponse) GetUtxoDepositAddress() string {
@@ -2169,7 +2237,7 @@ type CreateStaticDepositUtxoRefundRequest struct {
 
 func (x *CreateStaticDepositUtxoRefundRequest) Reset() {
 	*x = CreateStaticDepositUtxoRefundRequest{}
-	mi := &file_spark_internal_proto_msgTypes[34]
+	mi := &file_spark_internal_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2181,7 +2249,7 @@ func (x *CreateStaticDepositUtxoRefundRequest) String() string {
 func (*CreateStaticDepositUtxoRefundRequest) ProtoMessage() {}
 
 func (x *CreateStaticDepositUtxoRefundRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[34]
+	mi := &file_spark_internal_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2194,7 +2262,7 @@ func (x *CreateStaticDepositUtxoRefundRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use CreateStaticDepositUtxoRefundRequest.ProtoReflect.Descriptor instead.
 func (*CreateStaticDepositUtxoRefundRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{34}
+	return file_spark_internal_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *CreateStaticDepositUtxoRefundRequest) GetRequest() *spark.InitiateStaticDepositUtxoRefundRequest {
@@ -2227,7 +2295,7 @@ type CreateStaticDepositUtxoRefundResponse struct {
 
 func (x *CreateStaticDepositUtxoRefundResponse) Reset() {
 	*x = CreateStaticDepositUtxoRefundResponse{}
-	mi := &file_spark_internal_proto_msgTypes[35]
+	mi := &file_spark_internal_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2239,7 +2307,7 @@ func (x *CreateStaticDepositUtxoRefundResponse) String() string {
 func (*CreateStaticDepositUtxoRefundResponse) ProtoMessage() {}
 
 func (x *CreateStaticDepositUtxoRefundResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[35]
+	mi := &file_spark_internal_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2252,7 +2320,7 @@ func (x *CreateStaticDepositUtxoRefundResponse) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use CreateStaticDepositUtxoRefundResponse.ProtoReflect.Descriptor instead.
 func (*CreateStaticDepositUtxoRefundResponse) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{35}
+	return file_spark_internal_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *CreateStaticDepositUtxoRefundResponse) GetUtxoDepositAddress() string {
@@ -2273,7 +2341,7 @@ type RollbackUtxoSwapRequest struct {
 
 func (x *RollbackUtxoSwapRequest) Reset() {
 	*x = RollbackUtxoSwapRequest{}
-	mi := &file_spark_internal_proto_msgTypes[36]
+	mi := &file_spark_internal_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2285,7 +2353,7 @@ func (x *RollbackUtxoSwapRequest) String() string {
 func (*RollbackUtxoSwapRequest) ProtoMessage() {}
 
 func (x *RollbackUtxoSwapRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[36]
+	mi := &file_spark_internal_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2298,7 +2366,7 @@ func (x *RollbackUtxoSwapRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RollbackUtxoSwapRequest.ProtoReflect.Descriptor instead.
 func (*RollbackUtxoSwapRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{36}
+	return file_spark_internal_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *RollbackUtxoSwapRequest) GetOnChainUtxo() *spark.UTXO {
@@ -2330,7 +2398,7 @@ type RollbackUtxoSwapResponse struct {
 
 func (x *RollbackUtxoSwapResponse) Reset() {
 	*x = RollbackUtxoSwapResponse{}
-	mi := &file_spark_internal_proto_msgTypes[37]
+	mi := &file_spark_internal_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2342,7 +2410,7 @@ func (x *RollbackUtxoSwapResponse) String() string {
 func (*RollbackUtxoSwapResponse) ProtoMessage() {}
 
 func (x *RollbackUtxoSwapResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[37]
+	mi := &file_spark_internal_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2355,7 +2423,7 @@ func (x *RollbackUtxoSwapResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RollbackUtxoSwapResponse.ProtoReflect.Descriptor instead.
 func (*RollbackUtxoSwapResponse) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{37}
+	return file_spark_internal_proto_rawDescGZIP(), []int{38}
 }
 
 type UtxoSwapCompletedRequest struct {
@@ -2369,7 +2437,7 @@ type UtxoSwapCompletedRequest struct {
 
 func (x *UtxoSwapCompletedRequest) Reset() {
 	*x = UtxoSwapCompletedRequest{}
-	mi := &file_spark_internal_proto_msgTypes[38]
+	mi := &file_spark_internal_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2381,7 +2449,7 @@ func (x *UtxoSwapCompletedRequest) String() string {
 func (*UtxoSwapCompletedRequest) ProtoMessage() {}
 
 func (x *UtxoSwapCompletedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[38]
+	mi := &file_spark_internal_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2394,7 +2462,7 @@ func (x *UtxoSwapCompletedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UtxoSwapCompletedRequest.ProtoReflect.Descriptor instead.
 func (*UtxoSwapCompletedRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{38}
+	return file_spark_internal_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *UtxoSwapCompletedRequest) GetOnChainUtxo() *spark.UTXO {
@@ -2426,7 +2494,7 @@ type UtxoSwapCompletedResponse struct {
 
 func (x *UtxoSwapCompletedResponse) Reset() {
 	*x = UtxoSwapCompletedResponse{}
-	mi := &file_spark_internal_proto_msgTypes[39]
+	mi := &file_spark_internal_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2438,7 +2506,7 @@ func (x *UtxoSwapCompletedResponse) String() string {
 func (*UtxoSwapCompletedResponse) ProtoMessage() {}
 
 func (x *UtxoSwapCompletedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[39]
+	mi := &file_spark_internal_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2451,7 +2519,7 @@ func (x *UtxoSwapCompletedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UtxoSwapCompletedResponse.ProtoReflect.Descriptor instead.
 func (*UtxoSwapCompletedResponse) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{39}
+	return file_spark_internal_proto_rawDescGZIP(), []int{40}
 }
 
 type CancelOrFinalizeExpiredTokenTransactionRequest struct {
@@ -2463,7 +2531,7 @@ type CancelOrFinalizeExpiredTokenTransactionRequest struct {
 
 func (x *CancelOrFinalizeExpiredTokenTransactionRequest) Reset() {
 	*x = CancelOrFinalizeExpiredTokenTransactionRequest{}
-	mi := &file_spark_internal_proto_msgTypes[40]
+	mi := &file_spark_internal_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2475,7 +2543,7 @@ func (x *CancelOrFinalizeExpiredTokenTransactionRequest) String() string {
 func (*CancelOrFinalizeExpiredTokenTransactionRequest) ProtoMessage() {}
 
 func (x *CancelOrFinalizeExpiredTokenTransactionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[40]
+	mi := &file_spark_internal_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2488,7 +2556,7 @@ func (x *CancelOrFinalizeExpiredTokenTransactionRequest) ProtoReflect() protoref
 
 // Deprecated: Use CancelOrFinalizeExpiredTokenTransactionRequest.ProtoReflect.Descriptor instead.
 func (*CancelOrFinalizeExpiredTokenTransactionRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{40}
+	return file_spark_internal_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *CancelOrFinalizeExpiredTokenTransactionRequest) GetFinalTokenTransaction() *spark.TokenTransaction {
@@ -2507,7 +2575,7 @@ type QueryLeafSigningPubkeysRequest struct {
 
 func (x *QueryLeafSigningPubkeysRequest) Reset() {
 	*x = QueryLeafSigningPubkeysRequest{}
-	mi := &file_spark_internal_proto_msgTypes[41]
+	mi := &file_spark_internal_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2519,7 +2587,7 @@ func (x *QueryLeafSigningPubkeysRequest) String() string {
 func (*QueryLeafSigningPubkeysRequest) ProtoMessage() {}
 
 func (x *QueryLeafSigningPubkeysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[41]
+	mi := &file_spark_internal_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2532,7 +2600,7 @@ func (x *QueryLeafSigningPubkeysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryLeafSigningPubkeysRequest.ProtoReflect.Descriptor instead.
 func (*QueryLeafSigningPubkeysRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{41}
+	return file_spark_internal_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *QueryLeafSigningPubkeysRequest) GetLeafIds() []string {
@@ -2551,7 +2619,7 @@ type QueryLeafSigningPubkeysResponse struct {
 
 func (x *QueryLeafSigningPubkeysResponse) Reset() {
 	*x = QueryLeafSigningPubkeysResponse{}
-	mi := &file_spark_internal_proto_msgTypes[42]
+	mi := &file_spark_internal_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2563,7 +2631,7 @@ func (x *QueryLeafSigningPubkeysResponse) String() string {
 func (*QueryLeafSigningPubkeysResponse) ProtoMessage() {}
 
 func (x *QueryLeafSigningPubkeysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[42]
+	mi := &file_spark_internal_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2576,7 +2644,7 @@ func (x *QueryLeafSigningPubkeysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QueryLeafSigningPubkeysResponse.ProtoReflect.Descriptor instead.
 func (*QueryLeafSigningPubkeysResponse) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{42}
+	return file_spark_internal_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *QueryLeafSigningPubkeysResponse) GetSigningPubkeys() map[string][]byte {
@@ -2596,7 +2664,7 @@ type ResolveLeafInvestigationRequest struct {
 
 func (x *ResolveLeafInvestigationRequest) Reset() {
 	*x = ResolveLeafInvestigationRequest{}
-	mi := &file_spark_internal_proto_msgTypes[43]
+	mi := &file_spark_internal_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2608,7 +2676,7 @@ func (x *ResolveLeafInvestigationRequest) String() string {
 func (*ResolveLeafInvestigationRequest) ProtoMessage() {}
 
 func (x *ResolveLeafInvestigationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[43]
+	mi := &file_spark_internal_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2621,7 +2689,7 @@ func (x *ResolveLeafInvestigationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveLeafInvestigationRequest.ProtoReflect.Descriptor instead.
 func (*ResolveLeafInvestigationRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{43}
+	return file_spark_internal_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *ResolveLeafInvestigationRequest) GetLostLeafIds() []string {
@@ -2651,7 +2719,7 @@ type ProvidePreimageRequest struct {
 
 func (x *ProvidePreimageRequest) Reset() {
 	*x = ProvidePreimageRequest{}
-	mi := &file_spark_internal_proto_msgTypes[44]
+	mi := &file_spark_internal_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2663,7 +2731,7 @@ func (x *ProvidePreimageRequest) String() string {
 func (*ProvidePreimageRequest) ProtoMessage() {}
 
 func (x *ProvidePreimageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[44]
+	mi := &file_spark_internal_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2676,7 +2744,7 @@ func (x *ProvidePreimageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProvidePreimageRequest.ProtoReflect.Descriptor instead.
 func (*ProvidePreimageRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{44}
+	return file_spark_internal_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *ProvidePreimageRequest) GetPaymentHash() []byte {
@@ -2716,7 +2784,7 @@ type ReserveEntityDkgKeyRequest struct {
 
 func (x *ReserveEntityDkgKeyRequest) Reset() {
 	*x = ReserveEntityDkgKeyRequest{}
-	mi := &file_spark_internal_proto_msgTypes[45]
+	mi := &file_spark_internal_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2728,7 +2796,7 @@ func (x *ReserveEntityDkgKeyRequest) String() string {
 func (*ReserveEntityDkgKeyRequest) ProtoMessage() {}
 
 func (x *ReserveEntityDkgKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[45]
+	mi := &file_spark_internal_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2741,7 +2809,7 @@ func (x *ReserveEntityDkgKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReserveEntityDkgKeyRequest.ProtoReflect.Descriptor instead.
 func (*ReserveEntityDkgKeyRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{45}
+	return file_spark_internal_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *ReserveEntityDkgKeyRequest) GetKeyshareId() string {
@@ -2762,7 +2830,7 @@ type FixKeyshareRequest struct {
 
 func (x *FixKeyshareRequest) Reset() {
 	*x = FixKeyshareRequest{}
-	mi := &file_spark_internal_proto_msgTypes[46]
+	mi := &file_spark_internal_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2774,7 +2842,7 @@ func (x *FixKeyshareRequest) String() string {
 func (*FixKeyshareRequest) ProtoMessage() {}
 
 func (x *FixKeyshareRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[46]
+	mi := &file_spark_internal_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2787,7 +2855,7 @@ func (x *FixKeyshareRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FixKeyshareRequest.ProtoReflect.Descriptor instead.
 func (*FixKeyshareRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{46}
+	return file_spark_internal_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *FixKeyshareRequest) GetBadKeyshareId() string {
@@ -2822,7 +2890,7 @@ type FixKeyshareRound1Request struct {
 
 func (x *FixKeyshareRound1Request) Reset() {
 	*x = FixKeyshareRound1Request{}
-	mi := &file_spark_internal_proto_msgTypes[47]
+	mi := &file_spark_internal_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2834,7 +2902,7 @@ func (x *FixKeyshareRound1Request) String() string {
 func (*FixKeyshareRound1Request) ProtoMessage() {}
 
 func (x *FixKeyshareRound1Request) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[47]
+	mi := &file_spark_internal_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2847,7 +2915,7 @@ func (x *FixKeyshareRound1Request) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FixKeyshareRound1Request.ProtoReflect.Descriptor instead.
 func (*FixKeyshareRound1Request) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{47}
+	return file_spark_internal_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *FixKeyshareRound1Request) GetBadKeyshareId() string {
@@ -2880,7 +2948,7 @@ type FixKeyshareRound1Response struct {
 
 func (x *FixKeyshareRound1Response) Reset() {
 	*x = FixKeyshareRound1Response{}
-	mi := &file_spark_internal_proto_msgTypes[48]
+	mi := &file_spark_internal_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2892,7 +2960,7 @@ func (x *FixKeyshareRound1Response) String() string {
 func (*FixKeyshareRound1Response) ProtoMessage() {}
 
 func (x *FixKeyshareRound1Response) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[48]
+	mi := &file_spark_internal_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2905,7 +2973,7 @@ func (x *FixKeyshareRound1Response) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FixKeyshareRound1Response.ProtoReflect.Descriptor instead.
 func (*FixKeyshareRound1Response) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{48}
+	return file_spark_internal_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *FixKeyshareRound1Response) GetMessage() [][]byte {
@@ -2927,7 +2995,7 @@ type FixKeyshareRound2Request struct {
 
 func (x *FixKeyshareRound2Request) Reset() {
 	*x = FixKeyshareRound2Request{}
-	mi := &file_spark_internal_proto_msgTypes[49]
+	mi := &file_spark_internal_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2939,7 +3007,7 @@ func (x *FixKeyshareRound2Request) String() string {
 func (*FixKeyshareRound2Request) ProtoMessage() {}
 
 func (x *FixKeyshareRound2Request) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[49]
+	mi := &file_spark_internal_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2952,7 +3020,7 @@ func (x *FixKeyshareRound2Request) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FixKeyshareRound2Request.ProtoReflect.Descriptor instead.
 func (*FixKeyshareRound2Request) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{49}
+	return file_spark_internal_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *FixKeyshareRound2Request) GetBadKeyshareId() string {
@@ -2992,7 +3060,7 @@ type FixKeyshareRound2Response struct {
 
 func (x *FixKeyshareRound2Response) Reset() {
 	*x = FixKeyshareRound2Response{}
-	mi := &file_spark_internal_proto_msgTypes[50]
+	mi := &file_spark_internal_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3004,7 +3072,7 @@ func (x *FixKeyshareRound2Response) String() string {
 func (*FixKeyshareRound2Response) ProtoMessage() {}
 
 func (x *FixKeyshareRound2Response) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[50]
+	mi := &file_spark_internal_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3017,7 +3085,7 @@ func (x *FixKeyshareRound2Response) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FixKeyshareRound2Response.ProtoReflect.Descriptor instead.
 func (*FixKeyshareRound2Response) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{50}
+	return file_spark_internal_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *FixKeyshareRound2Response) GetMessage() []byte {
@@ -3036,7 +3104,7 @@ type GetTransfersRequest struct {
 
 func (x *GetTransfersRequest) Reset() {
 	*x = GetTransfersRequest{}
-	mi := &file_spark_internal_proto_msgTypes[51]
+	mi := &file_spark_internal_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3048,7 +3116,7 @@ func (x *GetTransfersRequest) String() string {
 func (*GetTransfersRequest) ProtoMessage() {}
 
 func (x *GetTransfersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[51]
+	mi := &file_spark_internal_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3061,7 +3129,7 @@ func (x *GetTransfersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTransfersRequest.ProtoReflect.Descriptor instead.
 func (*GetTransfersRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{51}
+	return file_spark_internal_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *GetTransfersRequest) GetTransferIds() []string {
@@ -3080,7 +3148,7 @@ type GetTransfersResponse struct {
 
 func (x *GetTransfersResponse) Reset() {
 	*x = GetTransfersResponse{}
-	mi := &file_spark_internal_proto_msgTypes[52]
+	mi := &file_spark_internal_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3092,7 +3160,7 @@ func (x *GetTransfersResponse) String() string {
 func (*GetTransfersResponse) ProtoMessage() {}
 
 func (x *GetTransfersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[52]
+	mi := &file_spark_internal_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3105,7 +3173,7 @@ func (x *GetTransfersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTransfersResponse.ProtoReflect.Descriptor instead.
 func (*GetTransfersResponse) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{52}
+	return file_spark_internal_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *GetTransfersResponse) GetTransfers() []*spark.Transfer {
@@ -3126,7 +3194,7 @@ type GenerateStaticDepositAddressProofsRequest struct {
 
 func (x *GenerateStaticDepositAddressProofsRequest) Reset() {
 	*x = GenerateStaticDepositAddressProofsRequest{}
-	mi := &file_spark_internal_proto_msgTypes[53]
+	mi := &file_spark_internal_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3138,7 +3206,7 @@ func (x *GenerateStaticDepositAddressProofsRequest) String() string {
 func (*GenerateStaticDepositAddressProofsRequest) ProtoMessage() {}
 
 func (x *GenerateStaticDepositAddressProofsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[53]
+	mi := &file_spark_internal_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3151,7 +3219,7 @@ func (x *GenerateStaticDepositAddressProofsRequest) ProtoReflect() protoreflect.
 
 // Deprecated: Use GenerateStaticDepositAddressProofsRequest.ProtoReflect.Descriptor instead.
 func (*GenerateStaticDepositAddressProofsRequest) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{53}
+	return file_spark_internal_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *GenerateStaticDepositAddressProofsRequest) GetKeyshareId() string {
@@ -3184,7 +3252,7 @@ type GenerateStaticDepositAddressProofsResponse struct {
 
 func (x *GenerateStaticDepositAddressProofsResponse) Reset() {
 	*x = GenerateStaticDepositAddressProofsResponse{}
-	mi := &file_spark_internal_proto_msgTypes[54]
+	mi := &file_spark_internal_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3196,7 +3264,7 @@ func (x *GenerateStaticDepositAddressProofsResponse) String() string {
 func (*GenerateStaticDepositAddressProofsResponse) ProtoMessage() {}
 
 func (x *GenerateStaticDepositAddressProofsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_spark_internal_proto_msgTypes[54]
+	mi := &file_spark_internal_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3209,7 +3277,7 @@ func (x *GenerateStaticDepositAddressProofsResponse) ProtoReflect() protoreflect
 
 // Deprecated: Use GenerateStaticDepositAddressProofsResponse.ProtoReflect.Descriptor instead.
 func (*GenerateStaticDepositAddressProofsResponse) Descriptor() ([]byte, []int) {
-	return file_spark_internal_proto_rawDescGZIP(), []int{54}
+	return file_spark_internal_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *GenerateStaticDepositAddressProofsResponse) GetAddressSignature() []byte {
@@ -3304,7 +3372,21 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\tdirect_tx\x18\r \x01(\fR\bdirectTx\x12(\n" +
 	"\x10direct_refund_tx\x18\x0e \x01(\fR\x0edirectRefundTx\x12:\n" +
 	"\x1adirect_from_cpfp_refund_tx\x18\x0f \x01(\fR\x16directFromCpfpRefundTxB\x11\n" +
-	"\x0f_parent_node_id\"E\n" +
+	"\x0f_parent_node_id\"\xe1\x05\n" +
+	"\x1bInitiatePreimageSwapRequest\x12<\n" +
+	"\arequest\x18\x01 \x01(\v2\".spark.InitiatePreimageSwapRequestR\arequest\x12{\n" +
+	"\x16cpfp_refund_signatures\x18\x02 \x03(\v2E.spark_internal.InitiatePreimageSwapRequest.CpfpRefundSignaturesEntryR\x14cpfpRefundSignatures\x12\x81\x01\n" +
+	"\x18direct_refund_signatures\x18\x03 \x03(\v2G.spark_internal.InitiatePreimageSwapRequest.DirectRefundSignaturesEntryR\x16directRefundSignatures\x12\x9b\x01\n" +
+	"\"direct_from_cpfp_refund_signatures\x18\x04 \x03(\v2O.spark_internal.InitiatePreimageSwapRequest.DirectFromCpfpRefundSignaturesEntryR\x1edirectFromCpfpRefundSignatures\x1aG\n" +
+	"\x19CpfpRefundSignaturesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\x1aI\n" +
+	"\x1bDirectRefundSignaturesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\x1aQ\n" +
+	"#DirectFromCpfpRefundSignaturesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value:\x028\x01\"E\n" +
 	"\x1cInitiatePreimageSwapResponse\x12%\n" +
 	"\x0epreimage_share\x18\x01 \x01(\fR\rpreimageShare\"\xb4\x01\n" +
 	"\x16PrepareTreeAddressNode\x12.\n" +
@@ -3486,7 +3568,7 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x04NONE\x10\x00\x12\n" +
 	"\n" +
 	"\x06COMMIT\x10\x01\x12\f\n" +
-	"\bROLLBACK\x10\x022\xa4\x1e\n" +
+	"\bROLLBACK\x10\x022\x9e\x1f\n" +
 	"\x14SparkInternalService\x12^\n" +
 	"\x16mark_keyshares_as_used\x12*.spark_internal.MarkKeysharesAsUsedRequest\x1a\x16.google.protobuf.Empty\"\x00\x12\x92\x01\n" +
 	"!mark_keyshare_for_deposit_address\x124.spark_internal.MarkKeyshareForDepositAddressRequest\x1a5.spark_internal.MarkKeyshareForDepositAddressResponse\"\x00\x12^\n" +
@@ -3499,7 +3581,8 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x14finalize_extend_leaf\x12).spark_internal.FinalizeExtendLeafRequest\x1a\x16.google.protobuf.Empty\"\x00\x12n\n" +
 	"\x1efinalize_renew_refund_timelock\x122.spark_internal.FinalizeRenewRefundTimelockRequest\x1a\x16.google.protobuf.Empty\"\x00\x12j\n" +
 	"\x1cfinalize_renew_node_timelock\x120.spark_internal.FinalizeRenewNodeTimelockRequest\x1a\x16.google.protobuf.Empty\"\x00\x12l\n" +
-	"\x16initiate_preimage_swap\x12\".spark.InitiatePreimageSwapRequest\x1a,.spark_internal.InitiatePreimageSwapResponse\"\x00\x12T\n" +
+	"\x16initiate_preimage_swap\x12\".spark.InitiatePreimageSwapRequest\x1a,.spark_internal.InitiatePreimageSwapResponse\"\x00\x12x\n" +
+	"\x19initiate_preimage_swap_v2\x12+.spark_internal.InitiatePreimageSwapRequest\x1a,.spark_internal.InitiatePreimageSwapResponse\"\x00\x12T\n" +
 	"\x10provide_preimage\x12&.spark_internal.ProvidePreimageRequest\x1a\x16.google.protobuf.Empty\"\x00\x12a\n" +
 	"\x17update_preimage_request\x12,.spark_internal.UpdatePreimageRequestRequest\x1a\x16.google.protobuf.Empty\"\x00\x12o\n" +
 	"\x14prepare_tree_address\x12).spark_internal.PrepareTreeAddressRequest\x1a*.spark_internal.PrepareTreeAddressResponse\"\x00\x12V\n" +
@@ -3538,7 +3621,7 @@ func file_spark_internal_proto_rawDescGZIP() []byte {
 }
 
 var file_spark_internal_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_spark_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 67)
+var file_spark_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 71)
 var file_spark_internal_proto_goTypes = []any{
 	(SettleKeyTweakAction)(0),                              // 0: spark_internal.SettleKeyTweakAction
 	(*MarkKeysharesAsUsedRequest)(nil),                     // 1: spark_internal.MarkKeysharesAsUsedRequest
@@ -3556,210 +3639,220 @@ var file_spark_internal_proto_goTypes = []any{
 	(*FinalizeRenewRefundTimelockRequest)(nil),             // 13: spark_internal.FinalizeRenewRefundTimelockRequest
 	(*FinalizeRenewNodeTimelockRequest)(nil),               // 14: spark_internal.FinalizeRenewNodeTimelockRequest
 	(*TreeNode)(nil),                                       // 15: spark_internal.TreeNode
-	(*InitiatePreimageSwapResponse)(nil),                   // 16: spark_internal.InitiatePreimageSwapResponse
-	(*PrepareTreeAddressNode)(nil),                         // 17: spark_internal.PrepareTreeAddressNode
-	(*PrepareTreeAddressRequest)(nil),                      // 18: spark_internal.PrepareTreeAddressRequest
-	(*PrepareTreeAddressResponse)(nil),                     // 19: spark_internal.PrepareTreeAddressResponse
-	(*InitiateTransferLeaf)(nil),                           // 20: spark_internal.InitiateTransferLeaf
-	(*InitiateTransferRequest)(nil),                        // 21: spark_internal.InitiateTransferRequest
-	(*DeliverSenderKeyTweakRequest)(nil),                   // 22: spark_internal.DeliverSenderKeyTweakRequest
-	(*InitiateCooperativeExitRequest)(nil),                 // 23: spark_internal.InitiateCooperativeExitRequest
-	(*UpdatePreimageRequestRequest)(nil),                   // 24: spark_internal.UpdatePreimageRequestRequest
-	(*StartTokenTransactionInternalRequest)(nil),           // 25: spark_internal.StartTokenTransactionInternalRequest
-	(*StartTokenTransactionInternalResponse)(nil),          // 26: spark_internal.StartTokenTransactionInternalResponse
-	(*InitiateSettleReceiverKeyTweakRequest)(nil),          // 27: spark_internal.InitiateSettleReceiverKeyTweakRequest
-	(*SettleReceiverKeyTweakRequest)(nil),                  // 28: spark_internal.SettleReceiverKeyTweakRequest
-	(*SettleSenderKeyTweakRequest)(nil),                    // 29: spark_internal.SettleSenderKeyTweakRequest
-	(*CreateUtxoSwapRequest)(nil),                          // 30: spark_internal.CreateUtxoSwapRequest
-	(*CreateUtxoSwapResponse)(nil),                         // 31: spark_internal.CreateUtxoSwapResponse
-	(*InitiateStaticDepositUtxoSwapRequest)(nil),           // 32: spark_internal.InitiateStaticDepositUtxoSwapRequest
-	(*CreateStaticDepositUtxoSwapRequest)(nil),             // 33: spark_internal.CreateStaticDepositUtxoSwapRequest
-	(*CreateStaticDepositUtxoSwapResponse)(nil),            // 34: spark_internal.CreateStaticDepositUtxoSwapResponse
-	(*CreateStaticDepositUtxoRefundRequest)(nil),           // 35: spark_internal.CreateStaticDepositUtxoRefundRequest
-	(*CreateStaticDepositUtxoRefundResponse)(nil),          // 36: spark_internal.CreateStaticDepositUtxoRefundResponse
-	(*RollbackUtxoSwapRequest)(nil),                        // 37: spark_internal.RollbackUtxoSwapRequest
-	(*RollbackUtxoSwapResponse)(nil),                       // 38: spark_internal.RollbackUtxoSwapResponse
-	(*UtxoSwapCompletedRequest)(nil),                       // 39: spark_internal.UtxoSwapCompletedRequest
-	(*UtxoSwapCompletedResponse)(nil),                      // 40: spark_internal.UtxoSwapCompletedResponse
-	(*CancelOrFinalizeExpiredTokenTransactionRequest)(nil), // 41: spark_internal.CancelOrFinalizeExpiredTokenTransactionRequest
-	(*QueryLeafSigningPubkeysRequest)(nil),                 // 42: spark_internal.QueryLeafSigningPubkeysRequest
-	(*QueryLeafSigningPubkeysResponse)(nil),                // 43: spark_internal.QueryLeafSigningPubkeysResponse
-	(*ResolveLeafInvestigationRequest)(nil),                // 44: spark_internal.ResolveLeafInvestigationRequest
-	(*ProvidePreimageRequest)(nil),                         // 45: spark_internal.ProvidePreimageRequest
-	(*ReserveEntityDkgKeyRequest)(nil),                     // 46: spark_internal.ReserveEntityDkgKeyRequest
-	(*FixKeyshareRequest)(nil),                             // 47: spark_internal.FixKeyshareRequest
-	(*FixKeyshareRound1Request)(nil),                       // 48: spark_internal.FixKeyshareRound1Request
-	(*FixKeyshareRound1Response)(nil),                      // 49: spark_internal.FixKeyshareRound1Response
-	(*FixKeyshareRound2Request)(nil),                       // 50: spark_internal.FixKeyshareRound2Request
-	(*FixKeyshareRound2Response)(nil),                      // 51: spark_internal.FixKeyshareRound2Response
-	(*GetTransfersRequest)(nil),                            // 52: spark_internal.GetTransfersRequest
-	(*GetTransfersResponse)(nil),                           // 53: spark_internal.GetTransfersResponse
-	(*GenerateStaticDepositAddressProofsRequest)(nil),      // 54: spark_internal.GenerateStaticDepositAddressProofsRequest
-	(*GenerateStaticDepositAddressProofsResponse)(nil),     // 55: spark_internal.GenerateStaticDepositAddressProofsResponse
-	nil,                                      // 56: spark_internal.FrostRound1Request.PublicKeysEntry
-	nil,                                      // 57: spark_internal.SigningJob.CommitmentsEntry
-	nil,                                      // 58: spark_internal.FrostRound2Response.ResultsEntry
-	nil,                                      // 59: spark_internal.PrepareTreeAddressResponse.SignaturesEntry
-	nil,                                      // 60: spark_internal.InitiateTransferRequest.SenderKeyTweakProofsEntry
-	nil,                                      // 61: spark_internal.InitiateTransferRequest.RefundSignaturesEntry
-	nil,                                      // 62: spark_internal.InitiateTransferRequest.DirectRefundSignaturesEntry
-	nil,                                      // 63: spark_internal.InitiateTransferRequest.DirectFromCpfpRefundSignaturesEntry
-	nil,                                      // 64: spark_internal.InitiateSettleReceiverKeyTweakRequest.KeyTweakProofsEntry
-	nil,                                      // 65: spark_internal.InitiateSettleReceiverKeyTweakRequest.UserPublicKeysEntry
-	nil,                                      // 66: spark_internal.QueryLeafSigningPubkeysResponse.SigningPubkeysEntry
-	nil,                                      // 67: spark_internal.ProvidePreimageRequest.KeyTweakProofsEntry
-	(*common.SigningCommitment)(nil),         // 68: common.SigningCommitment
-	(spark.Network)(0),                       // 69: spark.Network
-	(*timestamppb.Timestamp)(nil),            // 70: google.protobuf.Timestamp
-	(spark.TransferType)(0),                  // 71: spark.TransferType
-	(*spark.TransferPackage)(nil),            // 72: spark.TransferPackage
-	(*spark.TokenTransaction)(nil),           // 73: spark.TokenTransaction
-	(*spark.TokenTransactionSignatures)(nil), // 74: spark.TokenTransactionSignatures
-	(*spark.InitiateUtxoSwapRequest)(nil),    // 75: spark.InitiateUtxoSwapRequest
-	(*spark.UTXO)(nil),                       // 76: spark.UTXO
-	(*spark.StartTransferRequest)(nil),       // 77: spark.StartTransferRequest
-	(*spark.SigningJob)(nil),                 // 78: spark.SigningJob
-	(*spark.InitiateStaticDepositUtxoRefundRequest)(nil), // 79: spark.InitiateStaticDepositUtxoRefundRequest
-	(*spark.Transfer)(nil),                               // 80: spark.Transfer
-	(*common.SigningResult)(nil),                         // 81: common.SigningResult
-	(*spark.SecretProof)(nil),                            // 82: spark.SecretProof
-	(*spark.InitiatePreimageSwapRequest)(nil),            // 83: spark.InitiatePreimageSwapRequest
-	(*spark.ReturnLightningPaymentRequest)(nil),          // 84: spark.ReturnLightningPaymentRequest
-	(*spark.QueryTokenOutputsRequest)(nil),               // 85: spark.QueryTokenOutputsRequest
-	(*emptypb.Empty)(nil),                                // 86: google.protobuf.Empty
-	(*spark.QueryTokenOutputsResponse)(nil),              // 87: spark.QueryTokenOutputsResponse
+	(*InitiatePreimageSwapRequest)(nil),                    // 16: spark_internal.InitiatePreimageSwapRequest
+	(*InitiatePreimageSwapResponse)(nil),                   // 17: spark_internal.InitiatePreimageSwapResponse
+	(*PrepareTreeAddressNode)(nil),                         // 18: spark_internal.PrepareTreeAddressNode
+	(*PrepareTreeAddressRequest)(nil),                      // 19: spark_internal.PrepareTreeAddressRequest
+	(*PrepareTreeAddressResponse)(nil),                     // 20: spark_internal.PrepareTreeAddressResponse
+	(*InitiateTransferLeaf)(nil),                           // 21: spark_internal.InitiateTransferLeaf
+	(*InitiateTransferRequest)(nil),                        // 22: spark_internal.InitiateTransferRequest
+	(*DeliverSenderKeyTweakRequest)(nil),                   // 23: spark_internal.DeliverSenderKeyTweakRequest
+	(*InitiateCooperativeExitRequest)(nil),                 // 24: spark_internal.InitiateCooperativeExitRequest
+	(*UpdatePreimageRequestRequest)(nil),                   // 25: spark_internal.UpdatePreimageRequestRequest
+	(*StartTokenTransactionInternalRequest)(nil),           // 26: spark_internal.StartTokenTransactionInternalRequest
+	(*StartTokenTransactionInternalResponse)(nil),          // 27: spark_internal.StartTokenTransactionInternalResponse
+	(*InitiateSettleReceiverKeyTweakRequest)(nil),          // 28: spark_internal.InitiateSettleReceiverKeyTweakRequest
+	(*SettleReceiverKeyTweakRequest)(nil),                  // 29: spark_internal.SettleReceiverKeyTweakRequest
+	(*SettleSenderKeyTweakRequest)(nil),                    // 30: spark_internal.SettleSenderKeyTweakRequest
+	(*CreateUtxoSwapRequest)(nil),                          // 31: spark_internal.CreateUtxoSwapRequest
+	(*CreateUtxoSwapResponse)(nil),                         // 32: spark_internal.CreateUtxoSwapResponse
+	(*InitiateStaticDepositUtxoSwapRequest)(nil),           // 33: spark_internal.InitiateStaticDepositUtxoSwapRequest
+	(*CreateStaticDepositUtxoSwapRequest)(nil),             // 34: spark_internal.CreateStaticDepositUtxoSwapRequest
+	(*CreateStaticDepositUtxoSwapResponse)(nil),            // 35: spark_internal.CreateStaticDepositUtxoSwapResponse
+	(*CreateStaticDepositUtxoRefundRequest)(nil),           // 36: spark_internal.CreateStaticDepositUtxoRefundRequest
+	(*CreateStaticDepositUtxoRefundResponse)(nil),          // 37: spark_internal.CreateStaticDepositUtxoRefundResponse
+	(*RollbackUtxoSwapRequest)(nil),                        // 38: spark_internal.RollbackUtxoSwapRequest
+	(*RollbackUtxoSwapResponse)(nil),                       // 39: spark_internal.RollbackUtxoSwapResponse
+	(*UtxoSwapCompletedRequest)(nil),                       // 40: spark_internal.UtxoSwapCompletedRequest
+	(*UtxoSwapCompletedResponse)(nil),                      // 41: spark_internal.UtxoSwapCompletedResponse
+	(*CancelOrFinalizeExpiredTokenTransactionRequest)(nil), // 42: spark_internal.CancelOrFinalizeExpiredTokenTransactionRequest
+	(*QueryLeafSigningPubkeysRequest)(nil),                 // 43: spark_internal.QueryLeafSigningPubkeysRequest
+	(*QueryLeafSigningPubkeysResponse)(nil),                // 44: spark_internal.QueryLeafSigningPubkeysResponse
+	(*ResolveLeafInvestigationRequest)(nil),                // 45: spark_internal.ResolveLeafInvestigationRequest
+	(*ProvidePreimageRequest)(nil),                         // 46: spark_internal.ProvidePreimageRequest
+	(*ReserveEntityDkgKeyRequest)(nil),                     // 47: spark_internal.ReserveEntityDkgKeyRequest
+	(*FixKeyshareRequest)(nil),                             // 48: spark_internal.FixKeyshareRequest
+	(*FixKeyshareRound1Request)(nil),                       // 49: spark_internal.FixKeyshareRound1Request
+	(*FixKeyshareRound1Response)(nil),                      // 50: spark_internal.FixKeyshareRound1Response
+	(*FixKeyshareRound2Request)(nil),                       // 51: spark_internal.FixKeyshareRound2Request
+	(*FixKeyshareRound2Response)(nil),                      // 52: spark_internal.FixKeyshareRound2Response
+	(*GetTransfersRequest)(nil),                            // 53: spark_internal.GetTransfersRequest
+	(*GetTransfersResponse)(nil),                           // 54: spark_internal.GetTransfersResponse
+	(*GenerateStaticDepositAddressProofsRequest)(nil),      // 55: spark_internal.GenerateStaticDepositAddressProofsRequest
+	(*GenerateStaticDepositAddressProofsResponse)(nil),     // 56: spark_internal.GenerateStaticDepositAddressProofsResponse
+	nil,                              // 57: spark_internal.FrostRound1Request.PublicKeysEntry
+	nil,                              // 58: spark_internal.SigningJob.CommitmentsEntry
+	nil,                              // 59: spark_internal.FrostRound2Response.ResultsEntry
+	nil,                              // 60: spark_internal.InitiatePreimageSwapRequest.CpfpRefundSignaturesEntry
+	nil,                              // 61: spark_internal.InitiatePreimageSwapRequest.DirectRefundSignaturesEntry
+	nil,                              // 62: spark_internal.InitiatePreimageSwapRequest.DirectFromCpfpRefundSignaturesEntry
+	nil,                              // 63: spark_internal.PrepareTreeAddressResponse.SignaturesEntry
+	nil,                              // 64: spark_internal.InitiateTransferRequest.SenderKeyTweakProofsEntry
+	nil,                              // 65: spark_internal.InitiateTransferRequest.RefundSignaturesEntry
+	nil,                              // 66: spark_internal.InitiateTransferRequest.DirectRefundSignaturesEntry
+	nil,                              // 67: spark_internal.InitiateTransferRequest.DirectFromCpfpRefundSignaturesEntry
+	nil,                              // 68: spark_internal.InitiateSettleReceiverKeyTweakRequest.KeyTweakProofsEntry
+	nil,                              // 69: spark_internal.InitiateSettleReceiverKeyTweakRequest.UserPublicKeysEntry
+	nil,                              // 70: spark_internal.QueryLeafSigningPubkeysResponse.SigningPubkeysEntry
+	nil,                              // 71: spark_internal.ProvidePreimageRequest.KeyTweakProofsEntry
+	(*common.SigningCommitment)(nil), // 72: common.SigningCommitment
+	(spark.Network)(0),               // 73: spark.Network
+	(*timestamppb.Timestamp)(nil),    // 74: google.protobuf.Timestamp
+	(*spark.InitiatePreimageSwapRequest)(nil),            // 75: spark.InitiatePreimageSwapRequest
+	(spark.TransferType)(0),                              // 76: spark.TransferType
+	(*spark.TransferPackage)(nil),                        // 77: spark.TransferPackage
+	(*spark.TokenTransaction)(nil),                       // 78: spark.TokenTransaction
+	(*spark.TokenTransactionSignatures)(nil),             // 79: spark.TokenTransactionSignatures
+	(*spark.InitiateUtxoSwapRequest)(nil),                // 80: spark.InitiateUtxoSwapRequest
+	(*spark.UTXO)(nil),                                   // 81: spark.UTXO
+	(*spark.StartTransferRequest)(nil),                   // 82: spark.StartTransferRequest
+	(*spark.SigningJob)(nil),                             // 83: spark.SigningJob
+	(*spark.InitiateStaticDepositUtxoRefundRequest)(nil), // 84: spark.InitiateStaticDepositUtxoRefundRequest
+	(*spark.Transfer)(nil),                               // 85: spark.Transfer
+	(*common.SigningResult)(nil),                         // 86: common.SigningResult
+	(*spark.SecretProof)(nil),                            // 87: spark.SecretProof
+	(*spark.ReturnLightningPaymentRequest)(nil),          // 88: spark.ReturnLightningPaymentRequest
+	(*spark.QueryTokenOutputsRequest)(nil),               // 89: spark.QueryTokenOutputsRequest
+	(*emptypb.Empty)(nil),                                // 90: google.protobuf.Empty
+	(*spark.QueryTokenOutputsResponse)(nil),              // 91: spark.QueryTokenOutputsResponse
 }
 var file_spark_internal_proto_depIdxs = []int32{
-	56, // 0: spark_internal.FrostRound1Request.public_keys:type_name -> spark_internal.FrostRound1Request.PublicKeysEntry
-	68, // 1: spark_internal.FrostRound1Response.signing_commitments:type_name -> common.SigningCommitment
-	57, // 2: spark_internal.SigningJob.commitments:type_name -> spark_internal.SigningJob.CommitmentsEntry
-	68, // 3: spark_internal.SigningJob.user_commitments:type_name -> common.SigningCommitment
+	57, // 0: spark_internal.FrostRound1Request.public_keys:type_name -> spark_internal.FrostRound1Request.PublicKeysEntry
+	72, // 1: spark_internal.FrostRound1Response.signing_commitments:type_name -> common.SigningCommitment
+	58, // 2: spark_internal.SigningJob.commitments:type_name -> spark_internal.SigningJob.CommitmentsEntry
+	72, // 3: spark_internal.SigningJob.user_commitments:type_name -> common.SigningCommitment
 	6,  // 4: spark_internal.FrostRound2Request.signing_jobs:type_name -> spark_internal.SigningJob
-	58, // 5: spark_internal.FrostRound2Response.results:type_name -> spark_internal.FrostRound2Response.ResultsEntry
+	59, // 5: spark_internal.FrostRound2Response.results:type_name -> spark_internal.FrostRound2Response.ResultsEntry
 	15, // 6: spark_internal.FinalizeTreeCreationRequest.nodes:type_name -> spark_internal.TreeNode
-	69, // 7: spark_internal.FinalizeTreeCreationRequest.network:type_name -> spark.Network
+	73, // 7: spark_internal.FinalizeTreeCreationRequest.network:type_name -> spark.Network
 	15, // 8: spark_internal.FinalizeTransferRequest.nodes:type_name -> spark_internal.TreeNode
-	70, // 9: spark_internal.FinalizeTransferRequest.timestamp:type_name -> google.protobuf.Timestamp
+	74, // 9: spark_internal.FinalizeTransferRequest.timestamp:type_name -> google.protobuf.Timestamp
 	15, // 10: spark_internal.FinalizeRefreshTimelockRequest.nodes:type_name -> spark_internal.TreeNode
 	15, // 11: spark_internal.FinalizeExtendLeafRequest.node:type_name -> spark_internal.TreeNode
 	15, // 12: spark_internal.FinalizeRenewRefundTimelockRequest.node:type_name -> spark_internal.TreeNode
 	15, // 13: spark_internal.FinalizeRenewNodeTimelockRequest.split_node:type_name -> spark_internal.TreeNode
 	15, // 14: spark_internal.FinalizeRenewNodeTimelockRequest.node:type_name -> spark_internal.TreeNode
-	17, // 15: spark_internal.PrepareTreeAddressNode.children:type_name -> spark_internal.PrepareTreeAddressNode
-	17, // 16: spark_internal.PrepareTreeAddressRequest.node:type_name -> spark_internal.PrepareTreeAddressNode
-	69, // 17: spark_internal.PrepareTreeAddressRequest.network:type_name -> spark.Network
-	59, // 18: spark_internal.PrepareTreeAddressResponse.signatures:type_name -> spark_internal.PrepareTreeAddressResponse.SignaturesEntry
-	70, // 19: spark_internal.InitiateTransferRequest.expiry_time:type_name -> google.protobuf.Timestamp
-	20, // 20: spark_internal.InitiateTransferRequest.leaves:type_name -> spark_internal.InitiateTransferLeaf
-	60, // 21: spark_internal.InitiateTransferRequest.sender_key_tweak_proofs:type_name -> spark_internal.InitiateTransferRequest.SenderKeyTweakProofsEntry
-	71, // 22: spark_internal.InitiateTransferRequest.type:type_name -> spark.TransferType
-	72, // 23: spark_internal.InitiateTransferRequest.transfer_package:type_name -> spark.TransferPackage
-	61, // 24: spark_internal.InitiateTransferRequest.refund_signatures:type_name -> spark_internal.InitiateTransferRequest.RefundSignaturesEntry
-	62, // 25: spark_internal.InitiateTransferRequest.direct_refund_signatures:type_name -> spark_internal.InitiateTransferRequest.DirectRefundSignaturesEntry
-	63, // 26: spark_internal.InitiateTransferRequest.direct_from_cpfp_refund_signatures:type_name -> spark_internal.InitiateTransferRequest.DirectFromCpfpRefundSignaturesEntry
-	72, // 27: spark_internal.DeliverSenderKeyTweakRequest.transfer_package:type_name -> spark.TransferPackage
-	21, // 28: spark_internal.InitiateCooperativeExitRequest.transfer:type_name -> spark_internal.InitiateTransferRequest
-	73, // 29: spark_internal.StartTokenTransactionInternalRequest.final_token_transaction:type_name -> spark.TokenTransaction
-	74, // 30: spark_internal.StartTokenTransactionInternalRequest.token_transaction_signatures:type_name -> spark.TokenTransactionSignatures
-	73, // 31: spark_internal.StartTokenTransactionInternalResponse.final_token_transaction:type_name -> spark.TokenTransaction
-	64, // 32: spark_internal.InitiateSettleReceiverKeyTweakRequest.key_tweak_proofs:type_name -> spark_internal.InitiateSettleReceiverKeyTweakRequest.KeyTweakProofsEntry
-	65, // 33: spark_internal.InitiateSettleReceiverKeyTweakRequest.user_public_keys:type_name -> spark_internal.InitiateSettleReceiverKeyTweakRequest.UserPublicKeysEntry
-	0,  // 34: spark_internal.SettleReceiverKeyTweakRequest.action:type_name -> spark_internal.SettleKeyTweakAction
-	0,  // 35: spark_internal.SettleSenderKeyTweakRequest.action:type_name -> spark_internal.SettleKeyTweakAction
-	75, // 36: spark_internal.CreateUtxoSwapRequest.request:type_name -> spark.InitiateUtxoSwapRequest
-	76, // 37: spark_internal.InitiateStaticDepositUtxoSwapRequest.on_chain_utxo:type_name -> spark.UTXO
-	77, // 38: spark_internal.InitiateStaticDepositUtxoSwapRequest.transfer:type_name -> spark.StartTransferRequest
-	78, // 39: spark_internal.InitiateStaticDepositUtxoSwapRequest.spend_tx_signing_job:type_name -> spark.SigningJob
-	32, // 40: spark_internal.CreateStaticDepositUtxoSwapRequest.request:type_name -> spark_internal.InitiateStaticDepositUtxoSwapRequest
-	79, // 41: spark_internal.CreateStaticDepositUtxoRefundRequest.request:type_name -> spark.InitiateStaticDepositUtxoRefundRequest
-	76, // 42: spark_internal.RollbackUtxoSwapRequest.on_chain_utxo:type_name -> spark.UTXO
-	76, // 43: spark_internal.UtxoSwapCompletedRequest.on_chain_utxo:type_name -> spark.UTXO
-	73, // 44: spark_internal.CancelOrFinalizeExpiredTokenTransactionRequest.final_token_transaction:type_name -> spark.TokenTransaction
-	66, // 45: spark_internal.QueryLeafSigningPubkeysResponse.signing_pubkeys:type_name -> spark_internal.QueryLeafSigningPubkeysResponse.SigningPubkeysEntry
-	67, // 46: spark_internal.ProvidePreimageRequest.key_tweak_proofs:type_name -> spark_internal.ProvidePreimageRequest.KeyTweakProofsEntry
-	80, // 47: spark_internal.GetTransfersResponse.transfers:type_name -> spark.Transfer
-	68, // 48: spark_internal.SigningJob.CommitmentsEntry.value:type_name -> common.SigningCommitment
-	81, // 49: spark_internal.FrostRound2Response.ResultsEntry.value:type_name -> common.SigningResult
-	82, // 50: spark_internal.InitiateTransferRequest.SenderKeyTweakProofsEntry.value:type_name -> spark.SecretProof
-	82, // 51: spark_internal.InitiateSettleReceiverKeyTweakRequest.KeyTweakProofsEntry.value:type_name -> spark.SecretProof
-	82, // 52: spark_internal.ProvidePreimageRequest.KeyTweakProofsEntry.value:type_name -> spark.SecretProof
-	1,  // 53: spark_internal.SparkInternalService.mark_keyshares_as_used:input_type -> spark_internal.MarkKeysharesAsUsedRequest
-	2,  // 54: spark_internal.SparkInternalService.mark_keyshare_for_deposit_address:input_type -> spark_internal.MarkKeyshareForDepositAddressRequest
-	46, // 55: spark_internal.SparkInternalService.reserve_entity_dkg_key:input_type -> spark_internal.ReserveEntityDkgKeyRequest
-	9,  // 56: spark_internal.SparkInternalService.finalize_tree_creation:input_type -> spark_internal.FinalizeTreeCreationRequest
-	4,  // 57: spark_internal.SparkInternalService.frost_round1:input_type -> spark_internal.FrostRound1Request
-	7,  // 58: spark_internal.SparkInternalService.frost_round2:input_type -> spark_internal.FrostRound2Request
-	10, // 59: spark_internal.SparkInternalService.finalize_transfer:input_type -> spark_internal.FinalizeTransferRequest
-	11, // 60: spark_internal.SparkInternalService.finalize_refresh_timelock:input_type -> spark_internal.FinalizeRefreshTimelockRequest
-	12, // 61: spark_internal.SparkInternalService.finalize_extend_leaf:input_type -> spark_internal.FinalizeExtendLeafRequest
-	13, // 62: spark_internal.SparkInternalService.finalize_renew_refund_timelock:input_type -> spark_internal.FinalizeRenewRefundTimelockRequest
-	14, // 63: spark_internal.SparkInternalService.finalize_renew_node_timelock:input_type -> spark_internal.FinalizeRenewNodeTimelockRequest
-	83, // 64: spark_internal.SparkInternalService.initiate_preimage_swap:input_type -> spark.InitiatePreimageSwapRequest
-	45, // 65: spark_internal.SparkInternalService.provide_preimage:input_type -> spark_internal.ProvidePreimageRequest
-	24, // 66: spark_internal.SparkInternalService.update_preimage_request:input_type -> spark_internal.UpdatePreimageRequestRequest
-	18, // 67: spark_internal.SparkInternalService.prepare_tree_address:input_type -> spark_internal.PrepareTreeAddressRequest
-	21, // 68: spark_internal.SparkInternalService.initiate_transfer:input_type -> spark_internal.InitiateTransferRequest
-	22, // 69: spark_internal.SparkInternalService.deliver_sender_key_tweak:input_type -> spark_internal.DeliverSenderKeyTweakRequest
-	23, // 70: spark_internal.SparkInternalService.initiate_cooperative_exit:input_type -> spark_internal.InitiateCooperativeExitRequest
-	84, // 71: spark_internal.SparkInternalService.return_lightning_payment:input_type -> spark.ReturnLightningPaymentRequest
-	25, // 72: spark_internal.SparkInternalService.start_token_transaction_internal:input_type -> spark_internal.StartTokenTransactionInternalRequest
-	85, // 73: spark_internal.SparkInternalService.query_token_outputs_internal:input_type -> spark.QueryTokenOutputsRequest
-	27, // 74: spark_internal.SparkInternalService.initiate_settle_receiver_key_tweak:input_type -> spark_internal.InitiateSettleReceiverKeyTweakRequest
-	28, // 75: spark_internal.SparkInternalService.settle_receiver_key_tweak:input_type -> spark_internal.SettleReceiverKeyTweakRequest
-	29, // 76: spark_internal.SparkInternalService.settle_sender_key_tweak:input_type -> spark_internal.SettleSenderKeyTweakRequest
-	30, // 77: spark_internal.SparkInternalService.create_utxo_swap:input_type -> spark_internal.CreateUtxoSwapRequest
-	33, // 78: spark_internal.SparkInternalService.create_static_deposit_utxo_swap:input_type -> spark_internal.CreateStaticDepositUtxoSwapRequest
-	35, // 79: spark_internal.SparkInternalService.create_static_deposit_utxo_refund:input_type -> spark_internal.CreateStaticDepositUtxoRefundRequest
-	37, // 80: spark_internal.SparkInternalService.rollback_utxo_swap:input_type -> spark_internal.RollbackUtxoSwapRequest
-	39, // 81: spark_internal.SparkInternalService.utxo_swap_completed:input_type -> spark_internal.UtxoSwapCompletedRequest
-	42, // 82: spark_internal.SparkInternalService.query_leaf_signing_pubkeys:input_type -> spark_internal.QueryLeafSigningPubkeysRequest
-	44, // 83: spark_internal.SparkInternalService.resolve_leaf_investigation:input_type -> spark_internal.ResolveLeafInvestigationRequest
-	47, // 84: spark_internal.SparkInternalService.fix_keyshare:input_type -> spark_internal.FixKeyshareRequest
-	48, // 85: spark_internal.SparkInternalService.fix_keyshare_round1:input_type -> spark_internal.FixKeyshareRound1Request
-	50, // 86: spark_internal.SparkInternalService.fix_keyshare_round2:input_type -> spark_internal.FixKeyshareRound2Request
-	52, // 87: spark_internal.SparkInternalService.get_transfers:input_type -> spark_internal.GetTransfersRequest
-	54, // 88: spark_internal.SparkInternalService.generate_static_deposit_address_proofs:input_type -> spark_internal.GenerateStaticDepositAddressProofsRequest
-	86, // 89: spark_internal.SparkInternalService.mark_keyshares_as_used:output_type -> google.protobuf.Empty
-	3,  // 90: spark_internal.SparkInternalService.mark_keyshare_for_deposit_address:output_type -> spark_internal.MarkKeyshareForDepositAddressResponse
-	86, // 91: spark_internal.SparkInternalService.reserve_entity_dkg_key:output_type -> google.protobuf.Empty
-	86, // 92: spark_internal.SparkInternalService.finalize_tree_creation:output_type -> google.protobuf.Empty
-	5,  // 93: spark_internal.SparkInternalService.frost_round1:output_type -> spark_internal.FrostRound1Response
-	8,  // 94: spark_internal.SparkInternalService.frost_round2:output_type -> spark_internal.FrostRound2Response
-	86, // 95: spark_internal.SparkInternalService.finalize_transfer:output_type -> google.protobuf.Empty
-	86, // 96: spark_internal.SparkInternalService.finalize_refresh_timelock:output_type -> google.protobuf.Empty
-	86, // 97: spark_internal.SparkInternalService.finalize_extend_leaf:output_type -> google.protobuf.Empty
-	86, // 98: spark_internal.SparkInternalService.finalize_renew_refund_timelock:output_type -> google.protobuf.Empty
-	86, // 99: spark_internal.SparkInternalService.finalize_renew_node_timelock:output_type -> google.protobuf.Empty
-	16, // 100: spark_internal.SparkInternalService.initiate_preimage_swap:output_type -> spark_internal.InitiatePreimageSwapResponse
-	86, // 101: spark_internal.SparkInternalService.provide_preimage:output_type -> google.protobuf.Empty
-	86, // 102: spark_internal.SparkInternalService.update_preimage_request:output_type -> google.protobuf.Empty
-	19, // 103: spark_internal.SparkInternalService.prepare_tree_address:output_type -> spark_internal.PrepareTreeAddressResponse
-	86, // 104: spark_internal.SparkInternalService.initiate_transfer:output_type -> google.protobuf.Empty
-	86, // 105: spark_internal.SparkInternalService.deliver_sender_key_tweak:output_type -> google.protobuf.Empty
-	86, // 106: spark_internal.SparkInternalService.initiate_cooperative_exit:output_type -> google.protobuf.Empty
-	86, // 107: spark_internal.SparkInternalService.return_lightning_payment:output_type -> google.protobuf.Empty
-	86, // 108: spark_internal.SparkInternalService.start_token_transaction_internal:output_type -> google.protobuf.Empty
-	87, // 109: spark_internal.SparkInternalService.query_token_outputs_internal:output_type -> spark.QueryTokenOutputsResponse
-	86, // 110: spark_internal.SparkInternalService.initiate_settle_receiver_key_tweak:output_type -> google.protobuf.Empty
-	86, // 111: spark_internal.SparkInternalService.settle_receiver_key_tweak:output_type -> google.protobuf.Empty
-	86, // 112: spark_internal.SparkInternalService.settle_sender_key_tweak:output_type -> google.protobuf.Empty
-	31, // 113: spark_internal.SparkInternalService.create_utxo_swap:output_type -> spark_internal.CreateUtxoSwapResponse
-	34, // 114: spark_internal.SparkInternalService.create_static_deposit_utxo_swap:output_type -> spark_internal.CreateStaticDepositUtxoSwapResponse
-	36, // 115: spark_internal.SparkInternalService.create_static_deposit_utxo_refund:output_type -> spark_internal.CreateStaticDepositUtxoRefundResponse
-	38, // 116: spark_internal.SparkInternalService.rollback_utxo_swap:output_type -> spark_internal.RollbackUtxoSwapResponse
-	40, // 117: spark_internal.SparkInternalService.utxo_swap_completed:output_type -> spark_internal.UtxoSwapCompletedResponse
-	43, // 118: spark_internal.SparkInternalService.query_leaf_signing_pubkeys:output_type -> spark_internal.QueryLeafSigningPubkeysResponse
-	86, // 119: spark_internal.SparkInternalService.resolve_leaf_investigation:output_type -> google.protobuf.Empty
-	86, // 120: spark_internal.SparkInternalService.fix_keyshare:output_type -> google.protobuf.Empty
-	49, // 121: spark_internal.SparkInternalService.fix_keyshare_round1:output_type -> spark_internal.FixKeyshareRound1Response
-	51, // 122: spark_internal.SparkInternalService.fix_keyshare_round2:output_type -> spark_internal.FixKeyshareRound2Response
-	53, // 123: spark_internal.SparkInternalService.get_transfers:output_type -> spark_internal.GetTransfersResponse
-	55, // 124: spark_internal.SparkInternalService.generate_static_deposit_address_proofs:output_type -> spark_internal.GenerateStaticDepositAddressProofsResponse
-	89, // [89:125] is the sub-list for method output_type
-	53, // [53:89] is the sub-list for method input_type
-	53, // [53:53] is the sub-list for extension type_name
-	53, // [53:53] is the sub-list for extension extendee
-	0,  // [0:53] is the sub-list for field type_name
+	75, // 15: spark_internal.InitiatePreimageSwapRequest.request:type_name -> spark.InitiatePreimageSwapRequest
+	60, // 16: spark_internal.InitiatePreimageSwapRequest.cpfp_refund_signatures:type_name -> spark_internal.InitiatePreimageSwapRequest.CpfpRefundSignaturesEntry
+	61, // 17: spark_internal.InitiatePreimageSwapRequest.direct_refund_signatures:type_name -> spark_internal.InitiatePreimageSwapRequest.DirectRefundSignaturesEntry
+	62, // 18: spark_internal.InitiatePreimageSwapRequest.direct_from_cpfp_refund_signatures:type_name -> spark_internal.InitiatePreimageSwapRequest.DirectFromCpfpRefundSignaturesEntry
+	18, // 19: spark_internal.PrepareTreeAddressNode.children:type_name -> spark_internal.PrepareTreeAddressNode
+	18, // 20: spark_internal.PrepareTreeAddressRequest.node:type_name -> spark_internal.PrepareTreeAddressNode
+	73, // 21: spark_internal.PrepareTreeAddressRequest.network:type_name -> spark.Network
+	63, // 22: spark_internal.PrepareTreeAddressResponse.signatures:type_name -> spark_internal.PrepareTreeAddressResponse.SignaturesEntry
+	74, // 23: spark_internal.InitiateTransferRequest.expiry_time:type_name -> google.protobuf.Timestamp
+	21, // 24: spark_internal.InitiateTransferRequest.leaves:type_name -> spark_internal.InitiateTransferLeaf
+	64, // 25: spark_internal.InitiateTransferRequest.sender_key_tweak_proofs:type_name -> spark_internal.InitiateTransferRequest.SenderKeyTweakProofsEntry
+	76, // 26: spark_internal.InitiateTransferRequest.type:type_name -> spark.TransferType
+	77, // 27: spark_internal.InitiateTransferRequest.transfer_package:type_name -> spark.TransferPackage
+	65, // 28: spark_internal.InitiateTransferRequest.refund_signatures:type_name -> spark_internal.InitiateTransferRequest.RefundSignaturesEntry
+	66, // 29: spark_internal.InitiateTransferRequest.direct_refund_signatures:type_name -> spark_internal.InitiateTransferRequest.DirectRefundSignaturesEntry
+	67, // 30: spark_internal.InitiateTransferRequest.direct_from_cpfp_refund_signatures:type_name -> spark_internal.InitiateTransferRequest.DirectFromCpfpRefundSignaturesEntry
+	77, // 31: spark_internal.DeliverSenderKeyTweakRequest.transfer_package:type_name -> spark.TransferPackage
+	22, // 32: spark_internal.InitiateCooperativeExitRequest.transfer:type_name -> spark_internal.InitiateTransferRequest
+	78, // 33: spark_internal.StartTokenTransactionInternalRequest.final_token_transaction:type_name -> spark.TokenTransaction
+	79, // 34: spark_internal.StartTokenTransactionInternalRequest.token_transaction_signatures:type_name -> spark.TokenTransactionSignatures
+	78, // 35: spark_internal.StartTokenTransactionInternalResponse.final_token_transaction:type_name -> spark.TokenTransaction
+	68, // 36: spark_internal.InitiateSettleReceiverKeyTweakRequest.key_tweak_proofs:type_name -> spark_internal.InitiateSettleReceiverKeyTweakRequest.KeyTweakProofsEntry
+	69, // 37: spark_internal.InitiateSettleReceiverKeyTweakRequest.user_public_keys:type_name -> spark_internal.InitiateSettleReceiverKeyTweakRequest.UserPublicKeysEntry
+	0,  // 38: spark_internal.SettleReceiverKeyTweakRequest.action:type_name -> spark_internal.SettleKeyTweakAction
+	0,  // 39: spark_internal.SettleSenderKeyTweakRequest.action:type_name -> spark_internal.SettleKeyTweakAction
+	80, // 40: spark_internal.CreateUtxoSwapRequest.request:type_name -> spark.InitiateUtxoSwapRequest
+	81, // 41: spark_internal.InitiateStaticDepositUtxoSwapRequest.on_chain_utxo:type_name -> spark.UTXO
+	82, // 42: spark_internal.InitiateStaticDepositUtxoSwapRequest.transfer:type_name -> spark.StartTransferRequest
+	83, // 43: spark_internal.InitiateStaticDepositUtxoSwapRequest.spend_tx_signing_job:type_name -> spark.SigningJob
+	33, // 44: spark_internal.CreateStaticDepositUtxoSwapRequest.request:type_name -> spark_internal.InitiateStaticDepositUtxoSwapRequest
+	84, // 45: spark_internal.CreateStaticDepositUtxoRefundRequest.request:type_name -> spark.InitiateStaticDepositUtxoRefundRequest
+	81, // 46: spark_internal.RollbackUtxoSwapRequest.on_chain_utxo:type_name -> spark.UTXO
+	81, // 47: spark_internal.UtxoSwapCompletedRequest.on_chain_utxo:type_name -> spark.UTXO
+	78, // 48: spark_internal.CancelOrFinalizeExpiredTokenTransactionRequest.final_token_transaction:type_name -> spark.TokenTransaction
+	70, // 49: spark_internal.QueryLeafSigningPubkeysResponse.signing_pubkeys:type_name -> spark_internal.QueryLeafSigningPubkeysResponse.SigningPubkeysEntry
+	71, // 50: spark_internal.ProvidePreimageRequest.key_tweak_proofs:type_name -> spark_internal.ProvidePreimageRequest.KeyTweakProofsEntry
+	85, // 51: spark_internal.GetTransfersResponse.transfers:type_name -> spark.Transfer
+	72, // 52: spark_internal.SigningJob.CommitmentsEntry.value:type_name -> common.SigningCommitment
+	86, // 53: spark_internal.FrostRound2Response.ResultsEntry.value:type_name -> common.SigningResult
+	87, // 54: spark_internal.InitiateTransferRequest.SenderKeyTweakProofsEntry.value:type_name -> spark.SecretProof
+	87, // 55: spark_internal.InitiateSettleReceiverKeyTweakRequest.KeyTweakProofsEntry.value:type_name -> spark.SecretProof
+	87, // 56: spark_internal.ProvidePreimageRequest.KeyTweakProofsEntry.value:type_name -> spark.SecretProof
+	1,  // 57: spark_internal.SparkInternalService.mark_keyshares_as_used:input_type -> spark_internal.MarkKeysharesAsUsedRequest
+	2,  // 58: spark_internal.SparkInternalService.mark_keyshare_for_deposit_address:input_type -> spark_internal.MarkKeyshareForDepositAddressRequest
+	47, // 59: spark_internal.SparkInternalService.reserve_entity_dkg_key:input_type -> spark_internal.ReserveEntityDkgKeyRequest
+	9,  // 60: spark_internal.SparkInternalService.finalize_tree_creation:input_type -> spark_internal.FinalizeTreeCreationRequest
+	4,  // 61: spark_internal.SparkInternalService.frost_round1:input_type -> spark_internal.FrostRound1Request
+	7,  // 62: spark_internal.SparkInternalService.frost_round2:input_type -> spark_internal.FrostRound2Request
+	10, // 63: spark_internal.SparkInternalService.finalize_transfer:input_type -> spark_internal.FinalizeTransferRequest
+	11, // 64: spark_internal.SparkInternalService.finalize_refresh_timelock:input_type -> spark_internal.FinalizeRefreshTimelockRequest
+	12, // 65: spark_internal.SparkInternalService.finalize_extend_leaf:input_type -> spark_internal.FinalizeExtendLeafRequest
+	13, // 66: spark_internal.SparkInternalService.finalize_renew_refund_timelock:input_type -> spark_internal.FinalizeRenewRefundTimelockRequest
+	14, // 67: spark_internal.SparkInternalService.finalize_renew_node_timelock:input_type -> spark_internal.FinalizeRenewNodeTimelockRequest
+	75, // 68: spark_internal.SparkInternalService.initiate_preimage_swap:input_type -> spark.InitiatePreimageSwapRequest
+	16, // 69: spark_internal.SparkInternalService.initiate_preimage_swap_v2:input_type -> spark_internal.InitiatePreimageSwapRequest
+	46, // 70: spark_internal.SparkInternalService.provide_preimage:input_type -> spark_internal.ProvidePreimageRequest
+	25, // 71: spark_internal.SparkInternalService.update_preimage_request:input_type -> spark_internal.UpdatePreimageRequestRequest
+	19, // 72: spark_internal.SparkInternalService.prepare_tree_address:input_type -> spark_internal.PrepareTreeAddressRequest
+	22, // 73: spark_internal.SparkInternalService.initiate_transfer:input_type -> spark_internal.InitiateTransferRequest
+	23, // 74: spark_internal.SparkInternalService.deliver_sender_key_tweak:input_type -> spark_internal.DeliverSenderKeyTweakRequest
+	24, // 75: spark_internal.SparkInternalService.initiate_cooperative_exit:input_type -> spark_internal.InitiateCooperativeExitRequest
+	88, // 76: spark_internal.SparkInternalService.return_lightning_payment:input_type -> spark.ReturnLightningPaymentRequest
+	26, // 77: spark_internal.SparkInternalService.start_token_transaction_internal:input_type -> spark_internal.StartTokenTransactionInternalRequest
+	89, // 78: spark_internal.SparkInternalService.query_token_outputs_internal:input_type -> spark.QueryTokenOutputsRequest
+	28, // 79: spark_internal.SparkInternalService.initiate_settle_receiver_key_tweak:input_type -> spark_internal.InitiateSettleReceiverKeyTweakRequest
+	29, // 80: spark_internal.SparkInternalService.settle_receiver_key_tweak:input_type -> spark_internal.SettleReceiverKeyTweakRequest
+	30, // 81: spark_internal.SparkInternalService.settle_sender_key_tweak:input_type -> spark_internal.SettleSenderKeyTweakRequest
+	31, // 82: spark_internal.SparkInternalService.create_utxo_swap:input_type -> spark_internal.CreateUtxoSwapRequest
+	34, // 83: spark_internal.SparkInternalService.create_static_deposit_utxo_swap:input_type -> spark_internal.CreateStaticDepositUtxoSwapRequest
+	36, // 84: spark_internal.SparkInternalService.create_static_deposit_utxo_refund:input_type -> spark_internal.CreateStaticDepositUtxoRefundRequest
+	38, // 85: spark_internal.SparkInternalService.rollback_utxo_swap:input_type -> spark_internal.RollbackUtxoSwapRequest
+	40, // 86: spark_internal.SparkInternalService.utxo_swap_completed:input_type -> spark_internal.UtxoSwapCompletedRequest
+	43, // 87: spark_internal.SparkInternalService.query_leaf_signing_pubkeys:input_type -> spark_internal.QueryLeafSigningPubkeysRequest
+	45, // 88: spark_internal.SparkInternalService.resolve_leaf_investigation:input_type -> spark_internal.ResolveLeafInvestigationRequest
+	48, // 89: spark_internal.SparkInternalService.fix_keyshare:input_type -> spark_internal.FixKeyshareRequest
+	49, // 90: spark_internal.SparkInternalService.fix_keyshare_round1:input_type -> spark_internal.FixKeyshareRound1Request
+	51, // 91: spark_internal.SparkInternalService.fix_keyshare_round2:input_type -> spark_internal.FixKeyshareRound2Request
+	53, // 92: spark_internal.SparkInternalService.get_transfers:input_type -> spark_internal.GetTransfersRequest
+	55, // 93: spark_internal.SparkInternalService.generate_static_deposit_address_proofs:input_type -> spark_internal.GenerateStaticDepositAddressProofsRequest
+	90, // 94: spark_internal.SparkInternalService.mark_keyshares_as_used:output_type -> google.protobuf.Empty
+	3,  // 95: spark_internal.SparkInternalService.mark_keyshare_for_deposit_address:output_type -> spark_internal.MarkKeyshareForDepositAddressResponse
+	90, // 96: spark_internal.SparkInternalService.reserve_entity_dkg_key:output_type -> google.protobuf.Empty
+	90, // 97: spark_internal.SparkInternalService.finalize_tree_creation:output_type -> google.protobuf.Empty
+	5,  // 98: spark_internal.SparkInternalService.frost_round1:output_type -> spark_internal.FrostRound1Response
+	8,  // 99: spark_internal.SparkInternalService.frost_round2:output_type -> spark_internal.FrostRound2Response
+	90, // 100: spark_internal.SparkInternalService.finalize_transfer:output_type -> google.protobuf.Empty
+	90, // 101: spark_internal.SparkInternalService.finalize_refresh_timelock:output_type -> google.protobuf.Empty
+	90, // 102: spark_internal.SparkInternalService.finalize_extend_leaf:output_type -> google.protobuf.Empty
+	90, // 103: spark_internal.SparkInternalService.finalize_renew_refund_timelock:output_type -> google.protobuf.Empty
+	90, // 104: spark_internal.SparkInternalService.finalize_renew_node_timelock:output_type -> google.protobuf.Empty
+	17, // 105: spark_internal.SparkInternalService.initiate_preimage_swap:output_type -> spark_internal.InitiatePreimageSwapResponse
+	17, // 106: spark_internal.SparkInternalService.initiate_preimage_swap_v2:output_type -> spark_internal.InitiatePreimageSwapResponse
+	90, // 107: spark_internal.SparkInternalService.provide_preimage:output_type -> google.protobuf.Empty
+	90, // 108: spark_internal.SparkInternalService.update_preimage_request:output_type -> google.protobuf.Empty
+	20, // 109: spark_internal.SparkInternalService.prepare_tree_address:output_type -> spark_internal.PrepareTreeAddressResponse
+	90, // 110: spark_internal.SparkInternalService.initiate_transfer:output_type -> google.protobuf.Empty
+	90, // 111: spark_internal.SparkInternalService.deliver_sender_key_tweak:output_type -> google.protobuf.Empty
+	90, // 112: spark_internal.SparkInternalService.initiate_cooperative_exit:output_type -> google.protobuf.Empty
+	90, // 113: spark_internal.SparkInternalService.return_lightning_payment:output_type -> google.protobuf.Empty
+	90, // 114: spark_internal.SparkInternalService.start_token_transaction_internal:output_type -> google.protobuf.Empty
+	91, // 115: spark_internal.SparkInternalService.query_token_outputs_internal:output_type -> spark.QueryTokenOutputsResponse
+	90, // 116: spark_internal.SparkInternalService.initiate_settle_receiver_key_tweak:output_type -> google.protobuf.Empty
+	90, // 117: spark_internal.SparkInternalService.settle_receiver_key_tweak:output_type -> google.protobuf.Empty
+	90, // 118: spark_internal.SparkInternalService.settle_sender_key_tweak:output_type -> google.protobuf.Empty
+	32, // 119: spark_internal.SparkInternalService.create_utxo_swap:output_type -> spark_internal.CreateUtxoSwapResponse
+	35, // 120: spark_internal.SparkInternalService.create_static_deposit_utxo_swap:output_type -> spark_internal.CreateStaticDepositUtxoSwapResponse
+	37, // 121: spark_internal.SparkInternalService.create_static_deposit_utxo_refund:output_type -> spark_internal.CreateStaticDepositUtxoRefundResponse
+	39, // 122: spark_internal.SparkInternalService.rollback_utxo_swap:output_type -> spark_internal.RollbackUtxoSwapResponse
+	41, // 123: spark_internal.SparkInternalService.utxo_swap_completed:output_type -> spark_internal.UtxoSwapCompletedResponse
+	44, // 124: spark_internal.SparkInternalService.query_leaf_signing_pubkeys:output_type -> spark_internal.QueryLeafSigningPubkeysResponse
+	90, // 125: spark_internal.SparkInternalService.resolve_leaf_investigation:output_type -> google.protobuf.Empty
+	90, // 126: spark_internal.SparkInternalService.fix_keyshare:output_type -> google.protobuf.Empty
+	50, // 127: spark_internal.SparkInternalService.fix_keyshare_round1:output_type -> spark_internal.FixKeyshareRound1Response
+	52, // 128: spark_internal.SparkInternalService.fix_keyshare_round2:output_type -> spark_internal.FixKeyshareRound2Response
+	54, // 129: spark_internal.SparkInternalService.get_transfers:output_type -> spark_internal.GetTransfersResponse
+	56, // 130: spark_internal.SparkInternalService.generate_static_deposit_address_proofs:output_type -> spark_internal.GenerateStaticDepositAddressProofsResponse
+	94, // [94:131] is the sub-list for method output_type
+	57, // [57:94] is the sub-list for method input_type
+	57, // [57:57] is the sub-list for extension type_name
+	57, // [57:57] is the sub-list for extension extendee
+	0,  // [0:57] is the sub-list for field type_name
 }
 
 func init() { file_spark_internal_proto_init() }
@@ -3775,7 +3868,7 @@ func file_spark_internal_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_spark_internal_proto_rawDesc), len(file_spark_internal_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   67,
+			NumMessages:   71,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

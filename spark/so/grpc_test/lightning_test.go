@@ -746,3 +746,88 @@ func TestSendLightningPaymentTwice(t *testing.T) {
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
 }
+
+func TestSendLightningPaymentWithHTLC(t *testing.T) {
+	// Create user and ssp configs
+	userConfig := sparktesting.TestWalletConfig(t)
+
+	sspConfig := sparktesting.TestWalletConfig(t)
+
+	// User creates an invoice
+	amountSats := uint64(100)
+	preimage, paymentHash := testPreimageHash(t, amountSats)
+	invoice := testInvoice
+
+	defer cleanUp(t, userConfig, paymentHash)
+
+	// User creates a node of 12345 sats
+	userLeafPrivKey, err := keys.GeneratePrivateKey()
+	require.NoError(t, err)
+	feeSats := uint64(2)
+	nodeToSend, err := sparktesting.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
+	require.NoError(t, err)
+
+	newLeafPrivKey, err := keys.GeneratePrivateKey()
+	require.NoError(t, err)
+
+	leaves := []wallet.LeafKeyTweak{{
+		Leaf:              nodeToSend,
+		SigningPrivKey:    userLeafPrivKey,
+		NewSigningPrivKey: newLeafPrivKey,
+	}}
+
+	response, err := wallet.SwapNodesForPreimageWithHTLC(
+		t.Context(),
+		userConfig,
+		leaves,
+		sspConfig.IdentityPublicKey(),
+		paymentHash[:],
+		&invoice,
+		feeSats,
+		false,
+		amountSats,
+	)
+	require.NoError(t, err)
+
+	transfer := response.Transfer
+	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.Status)
+
+	refunds, err := wallet.QueryUserSignedRefunds(t.Context(), sspConfig, paymentHash[:])
+	require.NoError(t, err)
+
+	var totalValue int64
+	for _, refund := range refunds {
+		value, err := wallet.ValidateUserSignedRefund(refund)
+		require.NoError(t, err)
+		totalValue += value
+	}
+	assert.Equal(t, int64(12345+feeSats), totalValue)
+
+	receiverTransfer, err := wallet.ProvidePreimage(t.Context(), sspConfig, preimage[:])
+	require.NoError(t, err)
+	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receiverTransfer.Status)
+
+	receiverToken, err := wallet.AuthenticateWithServer(t.Context(), sspConfig)
+	require.NoError(t, err, "failed to authenticate receiver")
+	receiverCtx := wallet.ContextWithToken(t.Context(), receiverToken)
+	require.Equal(t, receiverTransfer.Id, transfer.Id)
+
+	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), sspConfig, receiverTransfer)
+	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
+
+	finalLeafPrivKey, err := keys.GeneratePrivateKey()
+	require.NoError(t, err, "failed to create new node signing private key")
+	claimingNode := wallet.LeafKeyTweak{
+		Leaf:              receiverTransfer.Leaves[0].Leaf,
+		SigningPrivKey:    newLeafPrivKey,
+		NewSigningPrivKey: finalLeafPrivKey,
+	}
+	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	_, err = wallet.ClaimTransfer(
+		receiverCtx,
+		receiverTransfer,
+		sspConfig,
+		leavesToClaim[:],
+	)
+	require.NoError(t, err, "failed to ClaimTransfer")
+}

@@ -47,7 +47,11 @@ func TestCreateLightningHTLCTransaction_BuildsExpectedTx(t *testing.T) {
 	require.Len(t, htlcTx.TxIn, 1)
 	require.Len(t, htlcTx.TxOut, 2)
 	// Input prev outpoint and sequence propagated
-	assert.Equal(t, nodeTx.TxIn[0].PreviousOutPoint, htlcTx.TxIn[0].PreviousOutPoint)
+	outpoint := wire.OutPoint{
+		Hash:  nodeTx.TxHash(),
+		Index: 0,
+	}
+	assert.Equal(t, outpoint, htlcTx.TxIn[0].PreviousOutPoint)
 	assert.Equal(t, sequence, htlcTx.TxIn[0].Sequence)
 	// First output amount preserved (no fee in CPFP-friendly variant)
 	assert.Equal(t, amount, htlcTx.TxOut[0].Value)
@@ -77,14 +81,13 @@ func TestCreateDirectLightningHTLCTransaction_SubtractsFee(t *testing.T) {
 	nodeTx.AddTxOut(wire.NewTxOut(amount, []byte{0x51}))
 
 	sequence := uint32(54321)
-	fee := int64(1_000)
+	fee := common.DefaultFeeSats
 
 	// Act
 	htlcTx, err := CreateDirectLightningHTLCTransaction(
 		nodeTx,
 		0,
 		network,
-		fee,
 		sequence,
 		hash,
 		hashLockPriv.Public(),
@@ -95,39 +98,5 @@ func TestCreateDirectLightningHTLCTransaction_SubtractsFee(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, htlcTx)
 	require.Len(t, htlcTx.TxOut, 2)
-	assert.Equal(t, amount-fee, htlcTx.TxOut[0].Value)
-}
-
-func TestCreateDirectLightningHTLCTransaction_FeeTooHigh(t *testing.T) {
-	// Arrange
-	network := common.Regtest
-	hash := bytes.Repeat([]byte{0x33}, 32)
-	hashLockPriv, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
-	sequenceLockPriv, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
-
-	parentOutPoint := &wire.OutPoint{}
-	nodeTx := wire.NewMsgTx(3)
-	nodeTx.AddTxIn(wire.NewTxIn(parentOutPoint, nil, nil))
-	amount := int64(10_000)
-	nodeTx.AddTxOut(wire.NewTxOut(amount, []byte{0x51}))
-
-	sequence := uint32(1)
-	fee := amount + 1
-
-	// Act
-	_, err = CreateDirectLightningHTLCTransaction(
-		nodeTx,
-		0,
-		network,
-		fee,
-		sequence,
-		hash,
-		hashLockPriv.Public(),
-		sequenceLockPriv.Public(),
-	)
-
-	// Assert
-	require.Error(t, err)
+	assert.Equal(t, amount-int64(fee), htlcTx.TxOut[0].Value)
 }

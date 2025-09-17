@@ -16,15 +16,6 @@ func EphemeralAnchorOutput() *wire.TxOut {
 	return wire.NewTxOut(0, []byte{txscript.OP_TRUE, 0x02, 0x4e, 0x73})
 }
 
-// maybeApplyFee subtracts the default fee from the amount if it's greater than the fee.
-// Returns the original amount if it's less than or equal to the fee.
-func maybeApplyFee(amount int64) int64 {
-	if amount > int64(common.DefaultFeeSats) {
-		return amount - int64(common.DefaultFeeSats)
-	}
-	return amount
-}
-
 func createRootTx(
 	depositOutPoint *wire.OutPoint,
 	depositTxOut *wire.TxOut,
@@ -145,7 +136,7 @@ func createRefundTxs(
 
 	outputAmount := amountSats
 	if shouldCalculateFee {
-		outputAmount = maybeApplyFee(amountSats)
+		outputAmount = common.MaybeApplyFee(amountSats)
 	}
 	directRefundTx.AddTxOut(wire.NewTxOut(outputAmount, refundPkScript))
 

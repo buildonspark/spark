@@ -316,7 +316,7 @@ func (h *BaseTransferHandler) createTransfer(
 	case st.TransferTypeUtxoSwap:
 		err = h.validateUtxoSwapLeaves(ctx, transfer, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey, requireDirectTx)
 	case st.TransferTypePreimageSwap:
-		// do nothing
+		err = h.validatePreimageSwapLeaves(ctx, transfer, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey, requireDirectTx)
 	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to validate transfer leaves: %w", err)
@@ -460,6 +460,25 @@ func (h *BaseTransferHandler) validateCooperativeExitLeaves(ctx context.Context,
 			return fmt.Errorf("unable to validate refund tx for leaf %s: %w", leaf.ID, err)
 		}
 		err = h.leafAvailableToTransfer(ctx, leaf, transfer)
+		if err != nil {
+			return fmt.Errorf("unable to validate leaf %s: %w", leaf.ID, err)
+		}
+	}
+	return nil
+}
+
+func (h *BaseTransferHandler) validatePreimageSwapLeaves(
+	ctx context.Context,
+	transfer *ent.Transfer,
+	leaves []*ent.TreeNode,
+	leafCpfpRefundMap map[string][]byte,
+	leafDirectRefundMap map[string][]byte,
+	leafDirectFromCpfpRefundMap map[string][]byte,
+	receiverIdentityPublicKey keys.Public,
+	requireDirectTx bool,
+) error {
+	for _, leaf := range leaves {
+		err := h.leafAvailableToTransfer(ctx, leaf, transfer)
 		if err != nil {
 			return fmt.Errorf("unable to validate leaf %s: %w", leaf.ID, err)
 		}
@@ -904,8 +923,8 @@ func (h *BaseTransferHandler) loadTransferNoUpdate(ctx context.Context, transfer
 	return transfer, nil
 }
 
-// validateTransferPackage validates the transfer package, to ensure the key tweaks are valid.
-func (h *BaseTransferHandler) validateTransferPackage(ctx context.Context, transferID string, req *pbspark.TransferPackage, senderIdentityPubKey keys.Public) (map[string]*pbspark.SendLeafKeyTweak, error) {
+// ValidateTransferPackage validates the transfer package, to ensure the key tweaks are valid.
+func (h *BaseTransferHandler) ValidateTransferPackage(ctx context.Context, transferID string, req *pbspark.TransferPackage, senderIdentityPubKey keys.Public) (map[string]*pbspark.SendLeafKeyTweak, error) {
 	// If the transfer package is nil, we don't need to validate it.
 	if req == nil {
 		return nil, nil

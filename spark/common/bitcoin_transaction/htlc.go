@@ -2,7 +2,6 @@ package bitcointransaction
 
 import (
 	"encoding/hex"
-	"fmt"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
@@ -22,31 +21,36 @@ var NUMSPoint = func() keys.Public {
 var LightningHTLCSequence = uint32(2160)
 
 func CreateLightningHTLCTransaction(nodeTx *wire.MsgTx, vout uint32, network common.Network, transactionSequence uint32, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public) (*wire.MsgTx, error) {
-	return createLightningHTLCTransaction(nodeTx, vout, network, 0, transactionSequence, hash, hashLockDestinationPubkey, sequenceLockDestinationPubkey)
+	return createLightningHTLCTransaction(nodeTx, vout, network, transactionSequence, hash, hashLockDestinationPubkey, sequenceLockDestinationPubkey, false)
 }
 
-func CreateDirectLightningHTLCTransaction(nodeTx *wire.MsgTx, vout uint32, network common.Network, fee int64, transactionSequence uint32, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public) (*wire.MsgTx, error) {
-	return createLightningHTLCTransaction(nodeTx, vout, network, fee, transactionSequence, hash, hashLockDestinationPubkey, sequenceLockDestinationPubkey)
+func CreateDirectLightningHTLCTransaction(nodeTx *wire.MsgTx, vout uint32, network common.Network, transactionSequence uint32, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public) (*wire.MsgTx, error) {
+	return createLightningHTLCTransaction(nodeTx, vout, network, transactionSequence, hash, hashLockDestinationPubkey, sequenceLockDestinationPubkey, true)
 }
 
-func createLightningHTLCTransaction(nodeTx *wire.MsgTx, vout uint32, network common.Network, fee int64, transactionSequence uint32, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public) (*wire.MsgTx, error) {
-	if fee > nodeTx.TxOut[vout].Value {
-		return nil, fmt.Errorf("fee is greater than the amount")
-	}
-
+func createLightningHTLCTransaction(nodeTx *wire.MsgTx, vout uint32, network common.Network, transactionSequence uint32, hash []byte, hashLockDestinationPubkey keys.Public, sequenceLockDestinationPubkey keys.Public, includeFee bool) (*wire.MsgTx, error) {
 	htlcTransaction := wire.NewMsgTx(3)
+	previousOutpoint := wire.OutPoint{
+		Hash:  nodeTx.TxHash(),
+		Index: vout,
+	}
 	htlcTransaction.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: nodeTx.TxIn[vout].PreviousOutPoint,
+		PreviousOutPoint: previousOutpoint,
 		SignatureScript:  nil,
 		Witness:          nil,
 		Sequence:         transactionSequence,
 	})
 
+	value := nodeTx.TxOut[vout].Value
+	if includeFee {
+		value = common.MaybeApplyFee(value)
+	}
+
 	taprootAddr, err := CreateLightningHTLCTaprootAddress(network, hash, hashLockDestinationPubkey, sequenceLockDestinationPubkey)
 	if err != nil {
 		return nil, err
 	}
-	htlcTransaction.AddTxOut(wire.NewTxOut(nodeTx.TxOut[vout].Value-fee, taprootAddr.ScriptAddress()))
+	htlcTransaction.AddTxOut(wire.NewTxOut(value, taprootAddr.ScriptAddress()))
 	htlcTransaction.AddTxOut(common.EphemeralAnchorOutput())
 
 	return htlcTransaction, nil

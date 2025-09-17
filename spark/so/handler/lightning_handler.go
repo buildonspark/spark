@@ -16,12 +16,14 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
 	"github.com/lightsparkdev/spark/common/logging"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authn"
@@ -40,7 +42,9 @@ import (
 )
 
 const (
-	MaximumExpiryTime = 5 * time.Minute
+	MaximumExpiryTime    = 5 * time.Minute
+	HTLCSequenceOffset   = 30
+	DirectSequenceOffset = 15
 )
 
 // LightningHandler is the handler for the lightning service.
@@ -774,7 +778,13 @@ func (h *LightningHandler) storeUserSignedTransactions(
 }
 
 // GetPreimageShare gets the preimage share for the given payment hash.
-func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.InitiatePreimageSwapRequest) ([]byte, error) {
+func (h *LightningHandler) GetPreimageShare(
+	ctx context.Context,
+	req *pb.InitiatePreimageSwapRequest,
+	cpfpRefundSignatures map[string][]byte,
+	directRefundSignatures map[string][]byte,
+	directFromCpfpRefundSignatures map[string][]byte,
+) ([]byte, error) {
 	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE && req.FeeSats != 0 {
 		return nil, fmt.Errorf("fee is not allowed for receive preimage swap")
 	}
@@ -816,6 +826,17 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		return nil, fmt.Errorf("unable to validate duplicate leaves: %w", err)
 	}
 
+	// TODO: Once SSP has removed the query user refund call, we can replace everything with transfer request and remove this validation.
+	// Currently all validation is done in req.Transfer, so we only need to validate that req.TransferRequest has all the same leaves as req.Transfer.
+	// The transactions will be reconstructed before signing, so we don't need to validate the transactions themselves.
+	transferRequest := req.GetTransferRequest()
+	if transferRequest != nil {
+		err := h.validateIdenticalLeavesInTransferAndTransferRequest(ctx, req)
+		if err != nil {
+			return nil, fmt.Errorf("unable to validate identical transfer and transfer request: %w", err)
+		}
+	}
+
 	err = h.ValidateGetPreimageRequest(
 		ctx,
 		req.PaymentHash,
@@ -853,6 +874,19 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse owner identity public key: %w", err)
 	}
+
+	var keyTweakMap map[string]*pbspark.SendLeafKeyTweak
+	if req.TransferRequest != nil {
+		keyTweakMap, err = transferHandler.ValidateTransferPackage(ctx, req.Transfer.TransferId, req.TransferRequest.TransferPackage, ownerIdentityPubKey)
+		if err != nil {
+			return nil, fmt.Errorf("unable to validate transfer package: %w", err)
+		}
+
+		cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, err = h.buildHTLCRefundMaps(ctx, req)
+		if err != nil {
+			return nil, fmt.Errorf("unable to build htlc refund maps: %w", err)
+		}
+	}
 	transfer, _, err := transferHandler.createTransfer(
 		ctx,
 		req.Transfer.TransferId,
@@ -863,13 +897,20 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 		cpfpLeafRefundMap,
 		directLeafRefundMap,
 		directFromCpfpLeafRefundMap,
-		nil,
-		TransferRoleCoordinator,
+		keyTweakMap,
+		TransferRoleParticipant,
 		false,
 		"",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer: %w", err)
+	}
+
+	if req.TransferRequest != nil {
+		err = transferHandler.UpdateTransferLeavesSignatures(ctx, transfer, cpfpRefundSignatures, directRefundSignatures, directFromCpfpRefundSignatures)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update transfer leaves signatures: %w", err)
+		}
 	}
 
 	var status st.PreimageRequestStatus
@@ -898,6 +939,206 @@ func (h *LightningHandler) GetPreimageShare(ctx context.Context, req *pb.Initiat
 	}
 
 	return nil, nil
+}
+
+func (h *LightningHandler) validateSigningJobsHasAllLeafIDs(ctx context.Context, signingJobs []*pb.UserSignedTxSigningJob, leafIDMap map[string]bool, needDirectTx bool) error {
+	logger := logging.GetLoggerFromContext(ctx)
+	currentLeafIDMap := make(map[string]bool)
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get or create current tx for request: %w", err)
+	}
+	for _, job := range signingJobs {
+		if _, ok := leafIDMap[job.LeafId]; !ok {
+			logger.Sugar().Errorf("leaf id is not in signing jobs %s", job.LeafId)
+			return fmt.Errorf("leaf id %s is not in signing jobs", job.LeafId)
+		}
+		currentLeafIDMap[job.LeafId] = true
+	}
+
+	if needDirectTx {
+		for leafID := range leafIDMap {
+			if _, ok := currentLeafIDMap[leafID]; !ok {
+				leafID, err := uuid.Parse(leafID)
+				if err != nil {
+					return fmt.Errorf("failed to parse leaf id: %w", err)
+				}
+				leaf, err := db.TreeNode.Get(ctx, leafID)
+				if err != nil {
+					return fmt.Errorf("failed to get leaf by id: %w", err)
+				}
+				if len(leaf.DirectTx) == 0 {
+					currentLeafIDMap[leafID.String()] = true
+				}
+			}
+		}
+	}
+	if len(currentLeafIDMap) != len(leafIDMap) {
+		logger.Sugar().Errorf("signing jobs has different number of leaves than leaf id map %v %v", currentLeafIDMap, leafIDMap)
+		return fmt.Errorf("signing jobs has different number of leaves than leaf id map")
+	}
+	return nil
+}
+
+func (h *LightningHandler) validateIdenticalLeavesInTransferAndTransferRequest(ctx context.Context, req *pb.InitiatePreimageSwapRequest) error {
+	// The purpose of the function is to validate that req.Transfer and req.TransferRequest have the same leaves.
+	// The idea is to replace req.Transfer with req.TransferRequest, but until SSP stop using the query user refund call, we can't simply remove req.Transfer.
+	if !bytes.Equal(req.Transfer.OwnerIdentityPublicKey, req.TransferRequest.OwnerIdentityPublicKey) ||
+		!bytes.Equal(req.Transfer.ReceiverIdentityPublicKey, req.TransferRequest.ReceiverIdentityPublicKey) ||
+		!bytes.Equal(req.ReceiverIdentityPublicKey, req.TransferRequest.ReceiverIdentityPublicKey) {
+		return fmt.Errorf("owner identity public key or receiver identity public key mismatch")
+	}
+	if req.Transfer.ExpiryTime.AsTime() != req.TransferRequest.ExpiryTime.AsTime() {
+		return fmt.Errorf("expiry time mismatch")
+	}
+	if req.Transfer.TransferId != req.TransferRequest.TransferId {
+		return fmt.Errorf("transfer id mismatch")
+	}
+	leafIDMap := make(map[string]bool)
+	for _, leaf := range req.Transfer.LeavesToSend {
+		leafIDMap[leaf.LeafId] = true
+	}
+	err := h.validateSigningJobsHasAllLeafIDs(ctx, req.TransferRequest.TransferPackage.LeavesToSend, leafIDMap, false)
+	if err != nil {
+		return fmt.Errorf("unable to validate signing jobs has same leaf id: %w", err)
+	}
+
+	err = h.validateSigningJobsHasAllLeafIDs(ctx, req.TransferRequest.TransferPackage.DirectLeavesToSend, leafIDMap, true)
+	if err != nil {
+		return fmt.Errorf("unable to validate signing jobs has same leaf id: %w", err)
+	}
+
+	err = h.validateSigningJobsHasAllLeafIDs(ctx, req.TransferRequest.TransferPackage.DirectFromCpfpLeavesToSend, leafIDMap, false)
+	if err != nil {
+		return fmt.Errorf("unable to validate signing jobs has same leaf id: %w", err)
+	}
+	return nil
+}
+
+func (h *LightningHandler) loadRefund(req []*pb.UserSignedTxSigningJob) map[string][]byte {
+	refundMap := make(map[string][]byte)
+	for _, job := range req {
+		refundMap[job.LeafId] = job.RawTx
+	}
+	return refundMap
+}
+
+func (h *LightningHandler) buildHTLCRefundMaps(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (map[string][]byte, map[string][]byte, map[string][]byte, error) {
+	cpfpLeafRefundMap := h.loadRefund(req.TransferRequest.TransferPackage.LeavesToSend)
+	directLeafRefundMap := h.loadRefund(req.TransferRequest.TransferPackage.DirectLeavesToSend)
+	directFromCpfpLeafRefundMap := h.loadRefund(req.TransferRequest.TransferPackage.DirectFromCpfpLeavesToSend)
+
+	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
+		// We are not building the refund maps for receive preimage swap for now, the transactions are created from SSP.
+		// TODO: we still need to build the refund transaction from the SSP here to validate.
+		return cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, nil
+	}
+
+	var network common.Network
+	transferRequest := req.TransferRequest
+	ownerIdentityPubKey, err := keys.ParsePublicKey(transferRequest.OwnerIdentityPublicKey)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
+	}
+	receiverIdentityPubKey, err := keys.ParsePublicKey(transferRequest.ReceiverIdentityPublicKey)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to parse owner signing public key: %w", err)
+	}
+	for _, leaf := range transferRequest.TransferPackage.LeavesToSend {
+		db, err := ent.GetDbFromContext(ctx)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+		}
+		leafID, err := uuid.Parse(leaf.LeafId)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to parse leaf id: %w", err)
+		}
+		treeNode, err := db.TreeNode.Get(ctx, leafID)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to get tree node: %w", err)
+		}
+
+		if network == common.Unspecified {
+			tree, err := treeNode.QueryTree().Only(ctx)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to get tree: %w", err)
+			}
+			network, err = common.NetworkFromSchemaNetwork(tree.Network)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to get network: %w", err)
+			}
+		}
+
+		nodeTx, err := common.TxFromRawTxBytes(treeNode.RawTx)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to get node tx: %w", err)
+		}
+		refundTx, err := common.TxFromRawTxBytes(treeNode.RawRefundTx)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to get refund tx: %w", err)
+		}
+		currentSequence := refundTx.TxIn[0].Sequence - HTLCSequenceOffset
+		directSequence := refundTx.TxIn[0].Sequence - DirectSequenceOffset
+
+		// Build cpfp htlc tx.
+		builtTx, err := bitcointransaction.CreateLightningHTLCTransaction(nodeTx, 0, network, currentSequence, req.PaymentHash, ownerIdentityPubKey, receiverIdentityPubKey)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to create lightning htlc transaction: %w", err)
+		}
+		var serializedCpfpTx bytes.Buffer
+		err = builtTx.Serialize(&serializedCpfpTx)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to serialize tx: %w", err)
+		}
+		if !bytes.Equal(serializedCpfpTx.Bytes(), cpfpLeafRefundMap[leaf.LeafId]) {
+			return nil, nil, nil, fmt.Errorf("cpfp leaf refund tx mismatch, expected: %s, got: %s", hex.EncodeToString(cpfpLeafRefundMap[leaf.LeafId]), hex.EncodeToString(serializedCpfpTx.Bytes()))
+		}
+
+		// Build direct cpfphtlc tx.
+		builtTx, err = bitcointransaction.CreateDirectLightningHTLCTransaction(nodeTx, 0, network, directSequence, req.PaymentHash, ownerIdentityPubKey, receiverIdentityPubKey)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to create lightning htlc transaction: %w", err)
+		}
+		var serializedDirectFromCpfpTx bytes.Buffer
+		err = builtTx.Serialize(&serializedDirectFromCpfpTx)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to serialize tx: %w", err)
+		}
+		if !bytes.Equal(serializedDirectFromCpfpTx.Bytes(), directFromCpfpLeafRefundMap[leaf.LeafId]) {
+			return nil, nil, nil, fmt.Errorf("direct from cpfp leaf refund tx mismatch, expected: %s, got: %s", hex.EncodeToString(directFromCpfpLeafRefundMap[leaf.LeafId]), hex.EncodeToString(serializedDirectFromCpfpTx.Bytes()))
+		}
+
+		// Build direct htlc tx.
+		if len(treeNode.DirectTx) > 0 {
+			directNodeTx, err := common.TxFromRawTxBytes(treeNode.DirectTx)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to get direct node tx: %w", err)
+			}
+
+			builtTx, err = bitcointransaction.CreateDirectLightningHTLCTransaction(directNodeTx, 0, network, directSequence, req.PaymentHash, ownerIdentityPubKey, receiverIdentityPubKey)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to create lightning htlc transaction: %w", err)
+			}
+
+			var serializedDirectTx bytes.Buffer
+			err = builtTx.Serialize(&serializedDirectTx)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to serialize tx: %w", err)
+			}
+			if !bytes.Equal(serializedDirectTx.Bytes(), directLeafRefundMap[leaf.LeafId]) {
+				return nil, nil, nil, fmt.Errorf("direct leaf refund tx mismatch, expected: %s, got: %s", hex.EncodeToString(directLeafRefundMap[leaf.LeafId]), hex.EncodeToString(serializedDirectTx.Bytes()))
+			}
+		}
+	}
+	return cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, nil
+}
+
+func (h *LightningHandler) signHTLCRefunds(ctx context.Context, transferRequest *pb.StartTransferRequest, leafMap map[string]*ent.TreeNode) (map[string][]byte, map[string][]byte, map[string][]byte, error) {
+	cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, err := SignRefundsWithPregeneratedNonce(ctx, h.config, transferRequest, leafMap, keys.Public{}, keys.Public{}, keys.Public{})
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to sign refunds with pregenerated nonce: %w", err)
+	}
+	return AggregateSignatures(ctx, h.config, transferRequest, keys.Public{}, keys.Public{}, keys.Public{}, cpfpSigningResultMap, directSigningResultMap, directFromCpfpSigningResultMap, leafMap)
 }
 
 // InitiatePreimageSwapV2 initiates a preimage swap for the given payment hash.
@@ -979,6 +1220,17 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("unable to validate duplicate leaves: %w", err)
 	}
 
+	// TODO: Once SSP has removed the query user refund call, we can replace everything with transfer request and remove this validation.
+	// Currently all validation is done in req.Transfer, so we only need to validate that req.TransferRequest has all the same leaves as req.Transfer.
+	// The transactions will be reconstructed before signing, so we don't need to validate the transactions themselves.
+	transferRequest := req.GetTransferRequest()
+	if transferRequest != nil {
+		err := h.validateIdenticalLeavesInTransferAndTransferRequest(ctx, req)
+		if err != nil {
+			return nil, fmt.Errorf("unable to validate identical transfer and transfer request: %w", err)
+		}
+	}
+
 	err = h.ValidateGetPreimageRequest(
 		ctx,
 		req.PaymentHash,
@@ -1017,7 +1269,20 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 	}
 
 	transferHandler := NewTransferHandler(h.config)
-	transfer, _, err := transferHandler.createTransfer(
+	var keyTweakMap map[string]*pbspark.SendLeafKeyTweak
+	if req.TransferRequest != nil {
+		keyTweakMap, err = transferHandler.ValidateTransferPackage(ctx, req.Transfer.TransferId, req.TransferRequest.TransferPackage, ownerIdentityPubKey)
+		if err != nil {
+			return nil, fmt.Errorf("unable to validate transfer package: %w", err)
+		}
+
+		cpfpLeafRefundMap, directLeafRefundMap, directFromCpfpLeafRefundMap, err = h.buildHTLCRefundMaps(ctx, req)
+		if err != nil {
+			return nil, fmt.Errorf("unable to build htlc refund maps: %w", err)
+		}
+	}
+
+	transfer, leafMap, err := transferHandler.createTransfer(
 		ctx,
 		req.Transfer.TransferId,
 		st.TransferTypePreimageSwap,
@@ -1027,8 +1292,8 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		cpfpLeafRefundMap,
 		directLeafRefundMap,
 		directFromCpfpLeafRefundMap,
-		nil,
-		TransferRoleCoordinator,
+		keyTweakMap,
+		TransferRoleParticipant, // No coordinator in this flow need to settle the key tweak.
 		requireDirectTx,
 		"",
 	)
@@ -1036,6 +1301,21 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return nil, fmt.Errorf("unable to create transfer for payment hash: %x: %w", req.PaymentHash, err)
 	}
 
+	var cpfpSignatureMap map[string][]byte
+	var directSignatureMap map[string][]byte
+	var directFromCpfpSignatureMap map[string][]byte
+	if req.TransferRequest != nil && req.Reason == pb.InitiatePreimageSwapRequest_REASON_SEND {
+		cpfpSignatureMap, directSignatureMap, directFromCpfpSignatureMap, err = h.signHTLCRefunds(ctx, req.TransferRequest, leafMap)
+		if err != nil {
+			return nil, fmt.Errorf("unable to sign htlc refunds: %w", err)
+		}
+		err = transferHandler.UpdateTransferLeavesSignatures(ctx, transfer, cpfpSignatureMap, directSignatureMap, directFromCpfpSignatureMap)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update transfer leaves signatures: %w", err)
+		}
+	}
+
+	// TODO: Remove this once SSP has removed the query user refund call.
 	var status st.PreimageRequestStatus
 	if req.Reason == pb.InitiatePreimageSwapRequest_REASON_RECEIVE {
 		status = st.PreimageRequestStatusPreimageShared
@@ -1066,7 +1346,12 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		defer conn.Close()
 
 		client := pbinternal.NewSparkInternalServiceClient(conn)
-		response, err := client.InitiatePreimageSwap(ctx, req)
+		response, err := client.InitiatePreimageSwapV2(ctx, &pbinternal.InitiatePreimageSwapRequest{
+			Request:                        req,
+			CpfpRefundSignatures:           cpfpSignatureMap,
+			DirectRefundSignatures:         directSignatureMap,
+			DirectFromCpfpRefundSignatures: directFromCpfpSignatureMap,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("unable to initiate preimage swap for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID.String(), err)
 		}
@@ -1296,20 +1581,11 @@ func (h *LightningHandler) ValidatePreimage(ctx context.Context, req *pb.Provide
 	logger := logging.GetLoggerFromContext(ctx)
 
 	// Validate input parameters
-	if len(req.PaymentHash) == 0 {
-		return nil, fmt.Errorf("payment hash cannot be empty")
-	}
 	if len(req.PaymentHash) != 32 {
 		return nil, fmt.Errorf("invalid payment hash length: %d bytes, expected 32 bytes", len(req.PaymentHash))
 	}
-	if len(req.Preimage) == 0 {
-		return nil, fmt.Errorf("preimage cannot be empty")
-	}
 	if len(req.Preimage) != 32 {
 		return nil, fmt.Errorf("invalid preimage length: %d bytes, expected 32 bytes", len(req.Preimage))
-	}
-	if len(req.IdentityPublicKey) == 0 {
-		return nil, fmt.Errorf("identity public key cannot be empty")
 	}
 	if len(req.IdentityPublicKey) != 33 {
 		return nil, fmt.Errorf("invalid identity public key length: %d bytes, expected 33 bytes", len(req.IdentityPublicKey))

@@ -106,7 +106,13 @@ func (s *SparkInternalServer) FinalizeExtendLeaf(ctx context.Context, req *pb.Fi
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
 func (s *SparkInternalServer) InitiatePreimageSwap(ctx context.Context, req *pbspark.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
-	preimageShare, err := lightningHandler.GetPreimageShare(ctx, req)
+	preimageShare, err := lightningHandler.GetPreimageShare(ctx, req, nil, nil, nil)
+	return &pb.InitiatePreimageSwapResponse{PreimageShare: preimageShare}, err
+}
+
+func (s *SparkInternalServer) InitiatePreimageSwapV2(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
+	lightningHandler := handler.NewLightningHandler(s.config)
+	preimageShare, err := lightningHandler.GetPreimageShare(ctx, req.Request, req.CpfpRefundSignatures, req.DirectRefundSignatures, req.DirectFromCpfpRefundSignatures)
 	return &pb.InitiatePreimageSwapResponse{PreimageShare: preimageShare}, err
 }
 

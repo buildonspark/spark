@@ -425,21 +425,21 @@ func TestValidatePreimage_InvalidPreimage_Errors(t *testing.T) {
 			paymentHash:    []byte{},
 			preimage:       []byte("test_preimage"),
 			identityPubKey: identityKey,
-			expectedErrMsg: "payment hash cannot be empty",
+			expectedErrMsg: "invalid payment hash length: 0 bytes, expected 32 bytes",
 		},
 		{
 			name:           "empty preimage",
 			paymentHash:    []byte("payment_hash_32_bytes_long______"),
 			preimage:       []byte{},
 			identityPubKey: identityKey,
-			expectedErrMsg: "preimage cannot be empty",
+			expectedErrMsg: "invalid preimage length: 0 bytes, expected 32 bytes",
 		},
 		{
 			name:           "nil identity public key",
 			paymentHash:    []byte("payment_hash_32_bytes_long______"),
 			preimage:       []byte("test_preimage_32_bytes_long_____"),
 			identityPubKey: keys.Public{},
-			expectedErrMsg: "identity public key cannot be empty",
+			expectedErrMsg: "invalid identity public key length: 0 bytes, expected 33 bytes",
 		},
 	}
 

@@ -176,7 +176,7 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 	if err != nil {
 		return fmt.Errorf("failed to parse receiver identity public key: %w", err)
 	}
-	keyTweakMap, err := h.validateTransferPackage(ctx, req.TransferId, req.TransferPackage, senderIDPubKey)
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, req.TransferId, req.TransferPackage, senderIDPubKey)
 	if err != nil {
 		return err
 	}
@@ -243,7 +243,7 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 	if err != nil {
 		return fmt.Errorf("failed to parse sender identity public key: %w", err)
 	}
-	keyTweakMap, err := h.validateTransferPackage(ctx, req.TransferId, req.TransferPackage, senderIDPubKey)
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, req.TransferId, req.TransferPackage, senderIDPubKey)
 	if err != nil {
 		return err
 	}
