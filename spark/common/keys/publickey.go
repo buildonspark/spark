@@ -9,6 +9,7 @@ import (
 
 	"entgo.io/ent/schema/field"
 
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
@@ -140,6 +141,14 @@ func (p Public) Serialize() []byte {
 		return nil
 	}
 	return p.key.SerializeCompressed()
+}
+
+// SerializeXOnly serializes this key into the 32-byte x-only format. It is equivalent to [schnorr.SerializePubKey].
+func (p Public) SerializeXOnly() []byte {
+	if p.IsZero() {
+		return nil
+	}
+	return schnorr.SerializePubKey(&p.key)
 }
 
 // Value implements the [field.ValueScanner] interface.

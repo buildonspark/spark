@@ -20,6 +20,11 @@ import (
 // Network is the type for Bitcoin networks used with the operator.
 type Network int
 
+// TODO: replace all other code to use this function to create the ephemeral anchor output.
+func EphemeralAnchorOutput() *wire.TxOut {
+	return wire.NewTxOut(0, []byte{txscript.OP_TRUE, 0x02, 0x4e, 0x73})
+}
+
 func DetermineNetwork(protoNetwork pb.Network) (*Network, error) {
 	var network Network
 	if protoNetwork == pb.Network_UNSPECIFIED {
