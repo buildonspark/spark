@@ -331,7 +331,7 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 
 		updatedCpfpRefundTxBytes, err := common.UpdateTxWithSignature(leaf.IntermediateRefundTx, 0, cpfpSignatureMap[leaf.Edges.Leaf.ID.String()])
 		if err != nil {
-			return fmt.Errorf("unable to update leaf signature: %w", err)
+			return fmt.Errorf("unable to update leaf cpfp refund tx signature: %w", err)
 		}
 		updatedCpfpRefundTx, err := common.TxFromRawTxBytes(updatedCpfpRefundTxBytes)
 		if err != nil {
@@ -339,24 +339,27 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 		}
 		err = common.VerifySignatureSingleInput(updatedCpfpRefundTx, 0, nodeTx.TxOut[0])
 		if err != nil {
-			return fmt.Errorf("unable to verify leaf signature: %w", err)
+			return fmt.Errorf("unable to verify leaf cpfp refund tx signature: %w", err)
 		}
 
-		updatedDirectFromCpfpRefundTxBytes, err := common.UpdateTxWithSignature(leaf.IntermediateDirectFromCpfpRefundTx, 0, directFromCpfpSignatureMap[leaf.Edges.Leaf.ID.String()])
-		if err != nil {
-			return fmt.Errorf("unable to update leaf signature: %w", err)
-		}
-		updatedDirectFromCpfpRefundTx, err := common.TxFromRawTxBytes(updatedDirectFromCpfpRefundTxBytes)
-		if err != nil {
-			return fmt.Errorf("unable to get direct from cpfp refund tx: %w", err)
-		}
-		err = common.VerifySignatureSingleInput(updatedDirectFromCpfpRefundTx, 0, nodeTx.TxOut[0])
-		if err != nil {
-			return fmt.Errorf("unable to verify leaf signature: %w", err)
+		var updatedDirectFromCpfpRefundTxBytes []byte
+		if len(leaf.Edges.Leaf.DirectFromCpfpRefundTx) > 0 && len(directFromCpfpSignatureMap[leaf.Edges.Leaf.ID.String()]) > 0 {
+			updatedDirectFromCpfpRefundTxBytes, err := common.UpdateTxWithSignature(leaf.IntermediateDirectFromCpfpRefundTx, 0, directFromCpfpSignatureMap[leaf.Edges.Leaf.ID.String()])
+			if err != nil {
+				return fmt.Errorf("unable to update leaf direct from cpfp refund tx signature: %w", err)
+			}
+			updatedDirectFromCpfpRefundTx, err := common.TxFromRawTxBytes(updatedDirectFromCpfpRefundTxBytes)
+			if err != nil {
+				return fmt.Errorf("unable to get direct from cpfp refund tx: %w", err)
+			}
+			err = common.VerifySignatureSingleInput(updatedDirectFromCpfpRefundTx, 0, nodeTx.TxOut[0])
+			if err != nil {
+				return fmt.Errorf("unable to verify leaf direct from cpfp refund tx signature: %w", err)
+			}
 		}
 
 		var updatedDirectRefundTxBytes []byte
-		if len(leaf.Edges.Leaf.DirectTx) > 0 {
+		if len(leaf.Edges.Leaf.DirectTx) > 0 && len(directSignatureMap[leaf.Edges.Leaf.ID.String()]) > 0 {
 			directNodeTx, err := common.TxFromRawTxBytes(leaf.Edges.Leaf.DirectTx)
 			if err != nil {
 				return fmt.Errorf("unable to get direct node tx: %w", err)
