@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -38,6 +39,13 @@ const (
 type testServerConfig struct {
 	clock authninternal.Clock
 }
+
+type signingAlgorithm int
+
+const (
+	signingAlgorithmECDSA signingAlgorithm = iota
+	signingAlgorithmSchnorr
+)
 
 // newTestServerAndTokenVerifier creates an AuthenticationServer and SessionTokenCreatorVerifier with default test configuration
 func newTestServerAndTokenVerifier(
@@ -102,11 +110,20 @@ func TestGetChallenge_InvalidPublicKey(t *testing.T) {
 	}
 }
 
-func TestVerifyChallenge_ValidToken(t *testing.T) {
+func TestVerifyChallenge_ValidTokenECDSA(t *testing.T) {
+	testVerifyChallenge_ValidToken(t, signingAlgorithmECDSA)
+}
+
+func TestVerifyChallenge_ValidTokenSchnorr(t *testing.T) {
+	testVerifyChallenge_ValidToken(t, signingAlgorithmSchnorr)
+}
+
+func testVerifyChallenge_ValidToken(t *testing.T, sigAlg signingAlgorithm) {
 	clock := authninternal.NewTestClock(time.Now())
 	server, tokenVerifier := newTestServerAndTokenVerifier(t, withClock(clock))
 	privKey := keys.MustGeneratePrivateKeyFromRand(seededRand)
-	challengeResp, signature := createSignedChallenge(t, server, privKey)
+
+	challengeResp, signature := createSignedChallenge(t, server, privKey, sigAlg)
 	verifyResp := verifyChallenge(t, server, challengeResp, privKey.Public(), signature)
 
 	assert.NotNil(t, verifyResp)
@@ -130,23 +147,44 @@ func TestVerifyChallenge_ValidToken(t *testing.T) {
 	assert.Equal(t, session.ExpirationTimestamp(), clock.Now().Add(testSessionDuration).Unix())
 }
 
-func TestVerifyChallenge_InvalidSignature(t *testing.T) {
+func TestVerifyChallenge_InvalidSignatureECDSA(t *testing.T) {
+	testVerifyChallenge_InvalidSignature(t, signingAlgorithmECDSA)
+}
+
+func TestVerifyChallenge_InvalidSignatureSchnorr(t *testing.T) {
+	testVerifyChallenge_InvalidSignature(t, signingAlgorithmSchnorr)
+}
+
+func testVerifyChallenge_InvalidSignature(t *testing.T, sigAlg signingAlgorithm) {
 	server, _ := newTestServerAndTokenVerifier(t)
 	privKey := keys.MustGeneratePrivateKeyFromRand(seededRand)
 	pubKey := privKey.Public()
 
-	challengeResp, _ := createSignedChallenge(t, server, privKey)
+	challengeResp, _ := createSignedChallenge(t, server, privKey, sigAlg)
 
 	wrongPrivKey := keys.MustGeneratePrivateKeyFromRand(seededRand)
 	challengeBytes, _ := proto.Marshal(challengeResp.ProtectedChallenge.Challenge)
 	hash := sha256.Sum256(challengeBytes)
-	wrongSignature := ecdsa.Sign(wrongPrivKey.ToBTCEC(), hash[:])
+
+	var wrongSignatureBytes []byte
+	switch sigAlg {
+	case signingAlgorithmECDSA:
+		wrongSignature := ecdsa.Sign(wrongPrivKey.ToBTCEC(), hash[:])
+		wrongSignatureBytes = wrongSignature.Serialize()
+	case signingAlgorithmSchnorr:
+		wrongSignature, err := schnorr.Sign(wrongPrivKey.ToBTCEC(), hash[:])
+		require.NoError(t, err)
+
+		wrongSignatureBytes = wrongSignature.Serialize()
+	default:
+		t.Fatal("invalid enum value")
+	}
 
 	resp, err := server.VerifyChallenge(
 		t.Context(),
 		&pb.VerifyChallengeRequest{
 			ProtectedChallenge: challengeResp.ProtectedChallenge,
-			Signature:          wrongSignature.Serialize(),
+			Signature:          wrongSignatureBytes,
 			PublicKey:          pubKey.Serialize(),
 		},
 	)
@@ -161,7 +199,7 @@ func TestVerifyChallenge_ExpiredSessionToken(t *testing.T) {
 	server, tokenVerifier := newTestServerAndTokenVerifier(t, withClock(clock))
 	privKey := keys.MustGeneratePrivateKeyFromRand(seededRand)
 
-	challengeResp, signature := createSignedChallenge(t, server, privKey)
+	challengeResp, signature := createSignedChallengeECDSA(t, server, privKey)
 	resp := verifyChallenge(t, server, challengeResp, privKey.Public(), signature)
 
 	clock.Advance(testSessionDuration + time.Second)
@@ -189,7 +227,7 @@ func TestVerifyChallenge_ExpiredChallenge(t *testing.T) {
 	server, _ := newTestServerAndTokenVerifier(t, withClock(clock))
 	privKey := keys.MustGeneratePrivateKeyFromRand(seededRand)
 
-	challengeResp, signature := createSignedChallenge(t, server, privKey)
+	challengeResp, signature := createSignedChallengeECDSA(t, server, privKey)
 
 	clock.Advance(testChallengeTimeout + time.Second)
 
@@ -212,7 +250,7 @@ func TestVerifyChallenge_TamperedToken(t *testing.T) {
 	server, tokenVerifier := newTestServerAndTokenVerifier(t)
 	privKey := keys.MustGeneratePrivateKeyFromRand(seededRand)
 
-	challengeResp, signature := createSignedChallenge(t, server, privKey)
+	challengeResp, signature := createSignedChallengeECDSA(t, server, privKey)
 	verifyResp := verifyChallenge(t, server, challengeResp, privKey.Public(), signature)
 
 	sessionToken := verifyResp.SessionToken
@@ -276,7 +314,7 @@ func TestVerifyChallenge_ReusedChallenge(t *testing.T) {
 	server, _ := newTestServerAndTokenVerifier(t, withClock(clock))
 	privKey := keys.MustGeneratePrivateKeyFromRand(seededRand)
 
-	challengeResp, signature := createSignedChallenge(t, server, privKey)
+	challengeResp, signature := createSignedChallengeECDSA(t, server, privKey)
 
 	verifyResp := verifyChallenge(t, server, challengeResp, privKey.Public(), signature)
 	assert.NotNil(t, verifyResp)
@@ -311,7 +349,7 @@ func TestVerifyChallenge_CacheExpiration(t *testing.T) {
 
 	privKey := keys.MustGeneratePrivateKeyFromRand(seededRand)
 	pubKey := privKey.Public()
-	challengeResp, signature := createSignedChallenge(t, server, privKey)
+	challengeResp, signature := createSignedChallengeECDSA(t, server, privKey)
 
 	verifyResp := verifyChallenge(t, server, challengeResp, pubKey, signature)
 	assert.NotNil(t, verifyResp)
@@ -341,7 +379,7 @@ func TestVerifyChallenge_CacheExpiration(t *testing.T) {
 	require.ErrorIs(t, err, ErrChallengeExpired)
 }
 
-func createSignedChallenge(t *testing.T, server *AuthnServer, privKey keys.Private) (*pb.GetChallengeResponse, []byte) {
+func createSignedChallenge(t *testing.T, server *AuthnServer, privKey keys.Private, sigAlg signingAlgorithm) (*pb.GetChallengeResponse, []byte) {
 	pubKey := privKey.Public()
 
 	challengeResp, err := server.GetChallenge(t.Context(), &pb.GetChallengeRequest{
@@ -352,10 +390,26 @@ func createSignedChallenge(t *testing.T, server *AuthnServer, privKey keys.Priva
 	challengeBytes, err := proto.Marshal(challengeResp.ProtectedChallenge.Challenge)
 	require.NoError(t, err)
 
+	var signatureBytes []byte
 	hash := sha256.Sum256(challengeBytes)
-	signature := ecdsa.Sign(privKey.ToBTCEC(), hash[:])
+	switch sigAlg {
+	case signingAlgorithmECDSA:
+		signature := ecdsa.Sign(privKey.ToBTCEC(), hash[:])
+		signatureBytes = signature.Serialize()
+	case signingAlgorithmSchnorr:
+		signature, err := schnorr.Sign(privKey.ToBTCEC(), hash[:])
+		require.NoError(t, err)
 
-	return challengeResp, signature.Serialize()
+		signatureBytes = signature.Serialize()
+	default:
+		t.Fatal("invalid enum value")
+	}
+
+	return challengeResp, signatureBytes
+}
+
+func createSignedChallengeECDSA(t *testing.T, server *AuthnServer, privKey keys.Private) (*pb.GetChallengeResponse, []byte) {
+	return createSignedChallenge(t, server, privKey, signingAlgorithmECDSA)
 }
 
 func verifyChallenge(t *testing.T, server *AuthnServer, challengeResp *pb.GetChallengeResponse, pubKey keys.Public, signature []byte) *pb.VerifyChallengeResponse {

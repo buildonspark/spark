@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/lightsparkdev/spark/common/keys"
 	"go.uber.org/zap"
 
@@ -287,6 +288,34 @@ func (s *AuthnServer) verifyClientSignature(challengeBytes []byte, pubKey keys.P
 		return sparkerrors.InvalidUserInputErrorf("invalid input: challenge bytes cannot be empty")
 	}
 
+	errECDSA := s.verifyClientSignatureECDSA(challengeBytes, pubKey, signature)
+	if errECDSA == nil {
+		return nil
+	}
+
+	errSchnorr := s.verifyClientSignatureSchnorr(challengeBytes, pubKey, signature)
+	if errSchnorr == nil {
+		return nil
+	}
+
+	return sparkerrors.InvalidUserInputErrorf("%w: signature verification failed under both ECDSA and Schnorr: %w, %w", ErrInvalidSignature, errECDSA, errSchnorr)
+}
+
+func (s *AuthnServer) verifyClientSignatureSchnorr(challengeBytes []byte, pubKey keys.Public, signature []byte) error {
+	schnorrSig, err := schnorr.ParseSignature(signature)
+	if err != nil {
+		return sparkerrors.InvalidUserInputErrorf("%w: Schnorr signature parsing failed: %w", ErrInvalidSignature, err)
+	}
+
+	hash := sha256.Sum256(challengeBytes)
+	if !schnorrSig.Verify(hash[:], pubKey.ToBTCEC()) {
+		return sparkerrors.InvalidUserInputErrorf("%w: Schnorr signature verification failed", ErrInvalidSignature)
+	}
+
+	return nil
+}
+
+func (s *AuthnServer) verifyClientSignatureECDSA(challengeBytes []byte, pubKey keys.Public, signature []byte) error {
 	hash := sha256.Sum256(challengeBytes)
 	if err := common.VerifyECDSASignature(pubKey, signature, hash[:]); err != nil {
 		return sparkerrors.InvalidUserInputErrorf("%w: %w", ErrInvalidSignature, err)
