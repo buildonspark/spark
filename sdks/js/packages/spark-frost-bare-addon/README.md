@@ -24,13 +24,13 @@ From the Spark JS workspaces you can test running spark-sdk in bare from our [sp
 ```js
 import {
   SparkWallet,
-  BareSparkSigner
-} from '@buildonspark/bare' with { imports: './imports.json' }
+  BareSparkSigner,
+} from "@buildonspark/bare" with { imports: "./imports.json" };
 
 let { wallet, mnemonic } = await SparkWallet.initialize({
-  signer: new BareSparkSigner()
-})
-const balance = await wallet.getBalance()
+  signer: new BareSparkSigner(),
+});
+const balance = await wallet.getBalance();
 ```
 
 ## Publishing

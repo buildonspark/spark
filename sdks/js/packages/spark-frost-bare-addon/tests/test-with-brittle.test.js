@@ -13,4 +13,4 @@ test('hello', (t) => {
 
 */
 
-Bare.exit(0)
+Bare.exit(0);
