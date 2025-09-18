@@ -18,6 +18,7 @@ import {
   NotImplementedError,
   RPCError,
   ValidationError,
+  InternalValidationError,
 } from "../errors/types.js";
 import SspClient, { TransferWithUserRequest } from "../graphql/client.js";
 import {
@@ -151,6 +152,7 @@ import type {
   UserTokenMetadata,
 } from "./types.js";
 import { SparkWalletEvent } from "./types.js";
+import { maximizeUnilateralExit } from "../utils/optimize.js";
 
 /**
  * The SparkWallet class is the primary interface for interacting with the Spark network.
@@ -744,9 +746,40 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     await this.withLeaves(async () => {
       this.optimizationInProgress = true;
       try {
-        if (this.leaves.length > 0) {
-          await this.requestLeavesSwap({ leaves: this.leaves });
+        this.leaves = await this.getLeaves();
+        const swaps = maximizeUnilateralExit(
+          this.leaves.map((leaf) => leaf.value),
+        );
+
+        // Build a map from the denomination to the nodes
+        const valueToNodes = new Map<number, TreeNode[]>();
+        this.leaves.forEach((leaf) => {
+          if (!valueToNodes.has(leaf.value)) {
+            valueToNodes.set(leaf.value, []);
+          }
+          valueToNodes.get(leaf.value)!.push(leaf);
+        });
+
+        // Select the leaves to send for each swap.
+        for (const swap of swaps) {
+          const leavesToSend: TreeNode[] = [];
+          for (const leafValue of swap.inLeaves) {
+            const nodes = valueToNodes.get(leafValue);
+            if (nodes && nodes.length > 0) {
+              const node = nodes.shift()!;
+              leavesToSend.push(node);
+            } else {
+              throw new InternalValidationError(
+                `No unused leaf with value ${leafValue} found in leaves`,
+              );
+            }
+          }
+          await this.requestLeavesSwap({
+            leaves: leavesToSend,
+            targetAmounts: swap.outLeaves,
+          });
         }
+
         this.leaves = await this.getLeaves();
       } finally {
         this.optimizationInProgress = false;
