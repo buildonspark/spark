@@ -311,8 +311,8 @@ export class CoopExitService extends BaseTransferService {
           receiverIdentityPublicKey: receiverPubKey,
           expiryTime:
             this.config.getNetwork() == Network.MAINNET
-              ? new Date(Date.now() + 2 * 24 * 60 * 60 * 1000 + 5 * 60 * 1000)
-              : new Date(Date.now() + 35 * 60 * 1000), // 48 hours 5 min for mainnet, 35 min otherwise
+              ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 5 * 60 * 1000)
+              : new Date(Date.now() + 35 * 60 * 1000), // 1 week 5 min for mainnet, 35 min otherwise
         },
         exitId: uuidv7(),
         exitTxid: exitTxId,
