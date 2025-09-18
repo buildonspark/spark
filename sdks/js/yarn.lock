@@ -2806,6 +2806,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@buildonspark/spark-frost-bare-addon@workspace:packages/spark-frost-bare-addon"
   dependencies:
+    "@arethetypeswrong/cli": "npm:^0.17.4"
     "@noble/curves": "npm:^1.8.0"
     "@noble/secp256k1": "npm:^2.3.0"
     bare: "npm:^1.21.3"
@@ -2817,6 +2818,7 @@ __metadata:
     cmake-npm: "npm:^1.1.0"
     prettier: "npm:^3.6.2"
     prettier-config-standard: "npm:^7.0.0"
+    publint: "npm:^0.3.9"
   languageName: unknown
   linkType: soft
 

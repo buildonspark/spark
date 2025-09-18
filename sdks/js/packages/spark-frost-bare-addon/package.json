@@ -2,6 +2,8 @@
   "name": "@buildonspark/spark-frost-bare-addon",
   "version": "0.0.3",
   "description": "Example Bare addon",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/buildonspark/spark",
   "exports": {
     "./package": "./package.json",
     ".": "./index.js"
@@ -18,23 +20,17 @@
     "build": "./build.sh",
     "test": "bare ./test.js",
     "format:fix": "prettier . --write",
-    "format": "prettier . --check"
+    "format": "prettier . --check",
+    "package:checks": "yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
+    "postversion": "yarn build"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/holepunchto/bare-addon-rust.git"
-  },
-  "author": "Holepunch",
-  "license": "Apache-2.0",
-  "bugs": {
-    "url": "https://github.com/holepunchto/bare-addon-rust/issues"
-  },
-  "homepage": "https://github.com/holepunchto/bare-addon-rust#readme",
   "installConfig": {
     "hoistingLimits": "dependencies"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.17.4",
     "@noble/curves": "^1.8.0",
+    "@noble/secp256k1": "^2.3.0",
     "bare": "^1.21.3",
     "bare-crypto": "^1.9.2",
     "bare-fs": "^4.1.6",
@@ -43,9 +39,7 @@
     "cmake-cargo": "^0.0.5",
     "cmake-npm": "^1.1.0",
     "prettier": "^3.6.2",
-    "prettier-config-standard": "^7.0.0"
-  },
-  "dependencies": {
-    "@noble/secp256k1": "^2.3.0"
+    "prettier-config-standard": "^7.0.0",
+    "publint": "^0.3.9"
   }
 }

@@ -6,7 +6,7 @@
        until then it's easiest to declare dependencies in the workspace turbo config itself
        https://github.com/vercel/turborepo/issues/937 */
     "package:checks": {
-      "dependsOn": ["build"]
+      "dependsOn": ["^build"]
     },
     "test:integration": {
       "dependsOn": ["^build"]

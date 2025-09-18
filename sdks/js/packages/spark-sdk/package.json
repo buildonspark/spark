@@ -83,21 +83,13 @@
       "require": "./dist/bare/index.cjs"
     }
   },
-  "browser": {
-    "assert": false,
-    "crypto": false,
-    "fs": false,
-    "fs/promises": false,
-    "path": false,
-    "url": false
-  },
   "scripts": {
     "build": "yarn tsc && rm -rf dist && tsup",
     "build:watch": "yarn build --watch --clean=false",
     "clean": "rm -rf dist",
     "circular-deps": "madge --circular --extensions ts,tsx src",
     "dev": "yarn build -- --watch",
-    "depcheck": "depcheck --ignores=buffer,ts-proto,jest,ts-jest,publint",
+    "depcheck": "depcheck --ignores=buffer,ts-proto,jest,ts-jest",
     "docs": "typedoc src",
     "format:fix": "prettier . --write",
     "format": "prettier . --check",
@@ -105,7 +97,7 @@
     "lint:fix:continue": "eslint --fix . || exit 0",
     "lint:watch": "esw ./src -w --ext .ts,.tsx,.js --color",
     "lint": "eslint .",
-    "package:checks": "yarn depcheck && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
+    "package:checks": "yarn depcheck && yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
     "postversion": "yarn build",
     "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand --detectOpenHandles --forceExit",
     "test": "yarn test-cmd src/tests/*.test.ts",
