@@ -175,9 +175,7 @@ func (tu *TreeUpdate) RemoveNodes(t ...*TreeNode) *TreeUpdate {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (tu *TreeUpdate) Save(ctx context.Context) (int, error) {
-	if err := tu.defaults(); err != nil {
-		return 0, err
-	}
+	tu.defaults()
 	return withHooks(ctx, tu.sqlSave, tu.mutation, tu.hooks)
 }
 
@@ -204,15 +202,11 @@ func (tu *TreeUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tu *TreeUpdate) defaults() error {
+func (tu *TreeUpdate) defaults() {
 	if _, ok := tu.mutation.UpdateTime(); !ok {
-		if tree.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized tree.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := tree.UpdateDefaultUpdateTime()
 		tu.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -523,9 +517,7 @@ func (tuo *TreeUpdateOne) Select(field string, fields ...string) *TreeUpdateOne 
 
 // Save executes the query and returns the updated Tree entity.
 func (tuo *TreeUpdateOne) Save(ctx context.Context) (*Tree, error) {
-	if err := tuo.defaults(); err != nil {
-		return nil, err
-	}
+	tuo.defaults()
 	return withHooks(ctx, tuo.sqlSave, tuo.mutation, tuo.hooks)
 }
 
@@ -552,15 +544,11 @@ func (tuo *TreeUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tuo *TreeUpdateOne) defaults() error {
+func (tuo *TreeUpdateOne) defaults() {
 	if _, ok := tuo.mutation.UpdateTime(); !ok {
-		if tree.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized tree.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := tree.UpdateDefaultUpdateTime()
 		tuo.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

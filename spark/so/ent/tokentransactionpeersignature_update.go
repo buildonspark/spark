@@ -81,9 +81,7 @@ func (ttpsu *TokenTransactionPeerSignatureUpdate) ClearTokenTransaction() *Token
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (ttpsu *TokenTransactionPeerSignatureUpdate) Save(ctx context.Context) (int, error) {
-	if err := ttpsu.defaults(); err != nil {
-		return 0, err
-	}
+	ttpsu.defaults()
 	return withHooks(ctx, ttpsu.sqlSave, ttpsu.mutation, ttpsu.hooks)
 }
 
@@ -110,15 +108,11 @@ func (ttpsu *TokenTransactionPeerSignatureUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (ttpsu *TokenTransactionPeerSignatureUpdate) defaults() error {
+func (ttpsu *TokenTransactionPeerSignatureUpdate) defaults() {
 	if _, ok := ttpsu.mutation.UpdateTime(); !ok {
-		if tokentransactionpeersignature.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokentransactionpeersignature.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := tokentransactionpeersignature.UpdateDefaultUpdateTime()
 		ttpsu.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -267,9 +261,7 @@ func (ttpsuo *TokenTransactionPeerSignatureUpdateOne) Select(field string, field
 
 // Save executes the query and returns the updated TokenTransactionPeerSignature entity.
 func (ttpsuo *TokenTransactionPeerSignatureUpdateOne) Save(ctx context.Context) (*TokenTransactionPeerSignature, error) {
-	if err := ttpsuo.defaults(); err != nil {
-		return nil, err
-	}
+	ttpsuo.defaults()
 	return withHooks(ctx, ttpsuo.sqlSave, ttpsuo.mutation, ttpsuo.hooks)
 }
 
@@ -296,15 +288,11 @@ func (ttpsuo *TokenTransactionPeerSignatureUpdateOne) ExecX(ctx context.Context)
 }
 
 // defaults sets the default values of the builder before save.
-func (ttpsuo *TokenTransactionPeerSignatureUpdateOne) defaults() error {
+func (ttpsuo *TokenTransactionPeerSignatureUpdateOne) defaults() {
 	if _, ok := ttpsuo.mutation.UpdateTime(); !ok {
-		if tokentransactionpeersignature.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokentransactionpeersignature.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := tokentransactionpeersignature.UpdateDefaultUpdateTime()
 		ttpsuo.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

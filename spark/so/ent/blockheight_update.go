@@ -77,9 +77,7 @@ func (bhu *BlockHeightUpdate) Mutation() *BlockHeightMutation {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (bhu *BlockHeightUpdate) Save(ctx context.Context) (int, error) {
-	if err := bhu.defaults(); err != nil {
-		return 0, err
-	}
+	bhu.defaults()
 	return withHooks(ctx, bhu.sqlSave, bhu.mutation, bhu.hooks)
 }
 
@@ -106,15 +104,11 @@ func (bhu *BlockHeightUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (bhu *BlockHeightUpdate) defaults() error {
+func (bhu *BlockHeightUpdate) defaults() {
 	if _, ok := bhu.mutation.UpdateTime(); !ok {
-		if blockheight.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized blockheight.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := blockheight.UpdateDefaultUpdateTime()
 		bhu.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -232,9 +226,7 @@ func (bhuo *BlockHeightUpdateOne) Select(field string, fields ...string) *BlockH
 
 // Save executes the query and returns the updated BlockHeight entity.
 func (bhuo *BlockHeightUpdateOne) Save(ctx context.Context) (*BlockHeight, error) {
-	if err := bhuo.defaults(); err != nil {
-		return nil, err
-	}
+	bhuo.defaults()
 	return withHooks(ctx, bhuo.sqlSave, bhuo.mutation, bhuo.hooks)
 }
 
@@ -261,15 +253,11 @@ func (bhuo *BlockHeightUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (bhuo *BlockHeightUpdateOne) defaults() error {
+func (bhuo *BlockHeightUpdateOne) defaults() {
 	if _, ok := bhuo.mutation.UpdateTime(); !ok {
-		if blockheight.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized blockheight.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := blockheight.UpdateDefaultUpdateTime()
 		bhuo.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

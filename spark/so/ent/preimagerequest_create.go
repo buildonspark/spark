@@ -163,9 +163,7 @@ func (prc *PreimageRequestCreate) Mutation() *PreimageRequestMutation {
 
 // Save creates the PreimageRequest in the database.
 func (prc *PreimageRequestCreate) Save(ctx context.Context) (*PreimageRequest, error) {
-	if err := prc.defaults(); err != nil {
-		return nil, err
-	}
+	prc.defaults()
 	return withHooks(ctx, prc.sqlSave, prc.mutation, prc.hooks)
 }
 
@@ -192,29 +190,19 @@ func (prc *PreimageRequestCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (prc *PreimageRequestCreate) defaults() error {
+func (prc *PreimageRequestCreate) defaults() {
 	if _, ok := prc.mutation.CreateTime(); !ok {
-		if preimagerequest.DefaultCreateTime == nil {
-			return fmt.Errorf("ent: uninitialized preimagerequest.DefaultCreateTime (forgotten import ent/runtime?)")
-		}
 		v := preimagerequest.DefaultCreateTime()
 		prc.mutation.SetCreateTime(v)
 	}
 	if _, ok := prc.mutation.UpdateTime(); !ok {
-		if preimagerequest.DefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized preimagerequest.DefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := preimagerequest.DefaultUpdateTime()
 		prc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := prc.mutation.ID(); !ok {
-		if preimagerequest.DefaultID == nil {
-			return fmt.Errorf("ent: uninitialized preimagerequest.DefaultID (forgotten import ent/runtime?)")
-		}
 		v := preimagerequest.DefaultID()
 		prc.mutation.SetID(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

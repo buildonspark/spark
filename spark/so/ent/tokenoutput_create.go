@@ -283,9 +283,7 @@ func (toc *TokenOutputCreate) Mutation() *TokenOutputMutation {
 
 // Save creates the TokenOutput in the database.
 func (toc *TokenOutputCreate) Save(ctx context.Context) (*TokenOutput, error) {
-	if err := toc.defaults(); err != nil {
-		return nil, err
-	}
+	toc.defaults()
 	return withHooks(ctx, toc.sqlSave, toc.mutation, toc.hooks)
 }
 
@@ -312,29 +310,19 @@ func (toc *TokenOutputCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (toc *TokenOutputCreate) defaults() error {
+func (toc *TokenOutputCreate) defaults() {
 	if _, ok := toc.mutation.CreateTime(); !ok {
-		if tokenoutput.DefaultCreateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokenoutput.DefaultCreateTime (forgotten import ent/runtime?)")
-		}
 		v := tokenoutput.DefaultCreateTime()
 		toc.mutation.SetCreateTime(v)
 	}
 	if _, ok := toc.mutation.UpdateTime(); !ok {
-		if tokenoutput.DefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokenoutput.DefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := tokenoutput.DefaultUpdateTime()
 		toc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := toc.mutation.ID(); !ok {
-		if tokenoutput.DefaultID == nil {
-			return fmt.Errorf("ent: uninitialized tokenoutput.DefaultID (forgotten import ent/runtime?)")
-		}
 		v := tokenoutput.DefaultID()
 		toc.mutation.SetID(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

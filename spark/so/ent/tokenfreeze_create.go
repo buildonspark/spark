@@ -130,9 +130,7 @@ func (tfc *TokenFreezeCreate) Mutation() *TokenFreezeMutation {
 
 // Save creates the TokenFreeze in the database.
 func (tfc *TokenFreezeCreate) Save(ctx context.Context) (*TokenFreeze, error) {
-	if err := tfc.defaults(); err != nil {
-		return nil, err
-	}
+	tfc.defaults()
 	return withHooks(ctx, tfc.sqlSave, tfc.mutation, tfc.hooks)
 }
 
@@ -159,29 +157,19 @@ func (tfc *TokenFreezeCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tfc *TokenFreezeCreate) defaults() error {
+func (tfc *TokenFreezeCreate) defaults() {
 	if _, ok := tfc.mutation.CreateTime(); !ok {
-		if tokenfreeze.DefaultCreateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokenfreeze.DefaultCreateTime (forgotten import ent/runtime?)")
-		}
 		v := tokenfreeze.DefaultCreateTime()
 		tfc.mutation.SetCreateTime(v)
 	}
 	if _, ok := tfc.mutation.UpdateTime(); !ok {
-		if tokenfreeze.DefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokenfreeze.DefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := tokenfreeze.DefaultUpdateTime()
 		tfc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := tfc.mutation.ID(); !ok {
-		if tokenfreeze.DefaultID == nil {
-			return fmt.Errorf("ent: uninitialized tokenfreeze.DefaultID (forgotten import ent/runtime?)")
-		}
 		v := tokenfreeze.DefaultID()
 		tfc.mutation.SetID(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

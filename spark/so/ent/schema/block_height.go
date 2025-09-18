@@ -15,7 +15,6 @@ type BlockHeight struct {
 func (BlockHeight) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
-		NotifyMixin{},
 	}
 }
 

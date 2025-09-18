@@ -87,9 +87,7 @@ func (ceu *CooperativeExitUpdate) ClearTransfer() *CooperativeExitUpdate {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (ceu *CooperativeExitUpdate) Save(ctx context.Context) (int, error) {
-	if err := ceu.defaults(); err != nil {
-		return 0, err
-	}
+	ceu.defaults()
 	return withHooks(ctx, ceu.sqlSave, ceu.mutation, ceu.hooks)
 }
 
@@ -116,15 +114,11 @@ func (ceu *CooperativeExitUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (ceu *CooperativeExitUpdate) defaults() error {
+func (ceu *CooperativeExitUpdate) defaults() {
 	if _, ok := ceu.mutation.UpdateTime(); !ok {
-		if cooperativeexit.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized cooperativeexit.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := cooperativeexit.UpdateDefaultUpdateTime()
 		ceu.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -278,9 +272,7 @@ func (ceuo *CooperativeExitUpdateOne) Select(field string, fields ...string) *Co
 
 // Save executes the query and returns the updated CooperativeExit entity.
 func (ceuo *CooperativeExitUpdateOne) Save(ctx context.Context) (*CooperativeExit, error) {
-	if err := ceuo.defaults(); err != nil {
-		return nil, err
-	}
+	ceuo.defaults()
 	return withHooks(ctx, ceuo.sqlSave, ceuo.mutation, ceuo.hooks)
 }
 
@@ -307,15 +299,11 @@ func (ceuo *CooperativeExitUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (ceuo *CooperativeExitUpdateOne) defaults() error {
+func (ceuo *CooperativeExitUpdateOne) defaults() {
 	if _, ok := ceuo.mutation.UpdateTime(); !ok {
-		if cooperativeexit.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized cooperativeexit.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := cooperativeexit.UpdateDefaultUpdateTime()
 		ceuo.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

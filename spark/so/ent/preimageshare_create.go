@@ -124,9 +124,7 @@ func (psc *PreimageShareCreate) Mutation() *PreimageShareMutation {
 
 // Save creates the PreimageShare in the database.
 func (psc *PreimageShareCreate) Save(ctx context.Context) (*PreimageShare, error) {
-	if err := psc.defaults(); err != nil {
-		return nil, err
-	}
+	psc.defaults()
 	return withHooks(ctx, psc.sqlSave, psc.mutation, psc.hooks)
 }
 
@@ -153,29 +151,19 @@ func (psc *PreimageShareCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (psc *PreimageShareCreate) defaults() error {
+func (psc *PreimageShareCreate) defaults() {
 	if _, ok := psc.mutation.CreateTime(); !ok {
-		if preimageshare.DefaultCreateTime == nil {
-			return fmt.Errorf("ent: uninitialized preimageshare.DefaultCreateTime (forgotten import ent/runtime?)")
-		}
 		v := preimageshare.DefaultCreateTime()
 		psc.mutation.SetCreateTime(v)
 	}
 	if _, ok := psc.mutation.UpdateTime(); !ok {
-		if preimageshare.DefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized preimageshare.DefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := preimageshare.DefaultUpdateTime()
 		psc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := psc.mutation.ID(); !ok {
-		if preimageshare.DefaultID == nil {
-			return fmt.Errorf("ent: uninitialized preimageshare.DefaultID (forgotten import ent/runtime?)")
-		}
 		v := preimageshare.DefaultID()
 		psc.mutation.SetID(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

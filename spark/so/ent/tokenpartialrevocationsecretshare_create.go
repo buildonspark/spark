@@ -98,9 +98,7 @@ func (tprssc *TokenPartialRevocationSecretShareCreate) Mutation() *TokenPartialR
 
 // Save creates the TokenPartialRevocationSecretShare in the database.
 func (tprssc *TokenPartialRevocationSecretShareCreate) Save(ctx context.Context) (*TokenPartialRevocationSecretShare, error) {
-	if err := tprssc.defaults(); err != nil {
-		return nil, err
-	}
+	tprssc.defaults()
 	return withHooks(ctx, tprssc.sqlSave, tprssc.mutation, tprssc.hooks)
 }
 
@@ -127,29 +125,19 @@ func (tprssc *TokenPartialRevocationSecretShareCreate) ExecX(ctx context.Context
 }
 
 // defaults sets the default values of the builder before save.
-func (tprssc *TokenPartialRevocationSecretShareCreate) defaults() error {
+func (tprssc *TokenPartialRevocationSecretShareCreate) defaults() {
 	if _, ok := tprssc.mutation.CreateTime(); !ok {
-		if tokenpartialrevocationsecretshare.DefaultCreateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokenpartialrevocationsecretshare.DefaultCreateTime (forgotten import ent/runtime?)")
-		}
 		v := tokenpartialrevocationsecretshare.DefaultCreateTime()
 		tprssc.mutation.SetCreateTime(v)
 	}
 	if _, ok := tprssc.mutation.UpdateTime(); !ok {
-		if tokenpartialrevocationsecretshare.DefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokenpartialrevocationsecretshare.DefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := tokenpartialrevocationsecretshare.DefaultUpdateTime()
 		tprssc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := tprssc.mutation.ID(); !ok {
-		if tokenpartialrevocationsecretshare.DefaultID == nil {
-			return fmt.Errorf("ent: uninitialized tokenpartialrevocationsecretshare.DefaultID (forgotten import ent/runtime?)")
-		}
 		v := tokenpartialrevocationsecretshare.DefaultID()
 		tprssc.mutation.SetID(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

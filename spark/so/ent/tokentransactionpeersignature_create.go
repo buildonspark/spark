@@ -98,9 +98,7 @@ func (ttpsc *TokenTransactionPeerSignatureCreate) Mutation() *TokenTransactionPe
 
 // Save creates the TokenTransactionPeerSignature in the database.
 func (ttpsc *TokenTransactionPeerSignatureCreate) Save(ctx context.Context) (*TokenTransactionPeerSignature, error) {
-	if err := ttpsc.defaults(); err != nil {
-		return nil, err
-	}
+	ttpsc.defaults()
 	return withHooks(ctx, ttpsc.sqlSave, ttpsc.mutation, ttpsc.hooks)
 }
 
@@ -127,29 +125,19 @@ func (ttpsc *TokenTransactionPeerSignatureCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (ttpsc *TokenTransactionPeerSignatureCreate) defaults() error {
+func (ttpsc *TokenTransactionPeerSignatureCreate) defaults() {
 	if _, ok := ttpsc.mutation.CreateTime(); !ok {
-		if tokentransactionpeersignature.DefaultCreateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokentransactionpeersignature.DefaultCreateTime (forgotten import ent/runtime?)")
-		}
 		v := tokentransactionpeersignature.DefaultCreateTime()
 		ttpsc.mutation.SetCreateTime(v)
 	}
 	if _, ok := ttpsc.mutation.UpdateTime(); !ok {
-		if tokentransactionpeersignature.DefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokentransactionpeersignature.DefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := tokentransactionpeersignature.DefaultUpdateTime()
 		ttpsc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := ttpsc.mutation.ID(); !ok {
-		if tokentransactionpeersignature.DefaultID == nil {
-			return fmt.Errorf("ent: uninitialized tokentransactionpeersignature.DefaultID (forgotten import ent/runtime?)")
-		}
 		v := tokentransactionpeersignature.DefaultID()
 		ttpsc.mutation.SetID(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

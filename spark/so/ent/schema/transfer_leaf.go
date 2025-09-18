@@ -16,7 +16,6 @@ type TransferLeaf struct {
 func (TransferLeaf) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
-		NotifyMixin{},
 	}
 }
 

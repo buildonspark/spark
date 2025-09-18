@@ -15,7 +15,6 @@ type UserSignedTransaction struct {
 func (UserSignedTransaction) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
-		NotifyMixin{},
 	}
 }
 

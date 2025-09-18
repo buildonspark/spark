@@ -18,7 +18,6 @@ type PaymentIntent struct {
 func (PaymentIntent) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
-		NotifyMixin{},
 	}
 }
 

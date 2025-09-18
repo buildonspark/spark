@@ -16,7 +16,6 @@ type TokenPartialRevocationSecretShare struct {
 func (TokenPartialRevocationSecretShare) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
-		NotifyMixin{},
 	}
 }
 

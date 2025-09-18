@@ -68,7 +68,7 @@ func ValidColumn(column string) bool {
 //
 //	import _ "github.com/lightsparkdev/spark/so/ent/runtime"
 var (
-	Hooks [2]ent.Hook
+	Hooks [1]ent.Hook
 	// DefaultCreateTime holds the default value on creation for the "create_time" field.
 	DefaultCreateTime func() time.Time
 	// DefaultUpdateTime holds the default value on creation for the "update_time" field.

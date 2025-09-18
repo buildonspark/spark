@@ -81,9 +81,7 @@ func (tprssu *TokenPartialRevocationSecretShareUpdate) ClearTokenOutput() *Token
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (tprssu *TokenPartialRevocationSecretShareUpdate) Save(ctx context.Context) (int, error) {
-	if err := tprssu.defaults(); err != nil {
-		return 0, err
-	}
+	tprssu.defaults()
 	return withHooks(ctx, tprssu.sqlSave, tprssu.mutation, tprssu.hooks)
 }
 
@@ -110,15 +108,11 @@ func (tprssu *TokenPartialRevocationSecretShareUpdate) ExecX(ctx context.Context
 }
 
 // defaults sets the default values of the builder before save.
-func (tprssu *TokenPartialRevocationSecretShareUpdate) defaults() error {
+func (tprssu *TokenPartialRevocationSecretShareUpdate) defaults() {
 	if _, ok := tprssu.mutation.UpdateTime(); !ok {
-		if tokenpartialrevocationsecretshare.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokenpartialrevocationsecretshare.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := tokenpartialrevocationsecretshare.UpdateDefaultUpdateTime()
 		tprssu.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -267,9 +261,7 @@ func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) Select(field string, 
 
 // Save executes the query and returns the updated TokenPartialRevocationSecretShare entity.
 func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) Save(ctx context.Context) (*TokenPartialRevocationSecretShare, error) {
-	if err := tprssuo.defaults(); err != nil {
-		return nil, err
-	}
+	tprssuo.defaults()
 	return withHooks(ctx, tprssuo.sqlSave, tprssuo.mutation, tprssuo.hooks)
 }
 
@@ -296,15 +288,11 @@ func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) ExecX(ctx context.Con
 }
 
 // defaults sets the default values of the builder before save.
-func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) defaults() error {
+func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) defaults() {
 	if _, ok := tprssuo.mutation.UpdateTime(); !ok {
-		if tokenpartialrevocationsecretshare.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokenpartialrevocationsecretshare.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := tokenpartialrevocationsecretshare.UpdateDefaultUpdateTime()
 		tprssuo.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

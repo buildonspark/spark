@@ -91,9 +91,7 @@ func (tmu *TokenMintUpdate) RemoveTokenTransaction(t ...*TokenTransaction) *Toke
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (tmu *TokenMintUpdate) Save(ctx context.Context) (int, error) {
-	if err := tmu.defaults(); err != nil {
-		return 0, err
-	}
+	tmu.defaults()
 	return withHooks(ctx, tmu.sqlSave, tmu.mutation, tmu.hooks)
 }
 
@@ -120,15 +118,11 @@ func (tmu *TokenMintUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tmu *TokenMintUpdate) defaults() error {
+func (tmu *TokenMintUpdate) defaults() {
 	if _, ok := tmu.mutation.UpdateTime(); !ok {
-		if tokenmint.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokenmint.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := tokenmint.UpdateDefaultUpdateTime()
 		tmu.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 func (tmu *TokenMintUpdate) sqlSave(ctx context.Context) (n int, err error) {
@@ -291,9 +285,7 @@ func (tmuo *TokenMintUpdateOne) Select(field string, fields ...string) *TokenMin
 
 // Save executes the query and returns the updated TokenMint entity.
 func (tmuo *TokenMintUpdateOne) Save(ctx context.Context) (*TokenMint, error) {
-	if err := tmuo.defaults(); err != nil {
-		return nil, err
-	}
+	tmuo.defaults()
 	return withHooks(ctx, tmuo.sqlSave, tmuo.mutation, tmuo.hooks)
 }
 
@@ -320,15 +312,11 @@ func (tmuo *TokenMintUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tmuo *TokenMintUpdateOne) defaults() error {
+func (tmuo *TokenMintUpdateOne) defaults() {
 	if _, ok := tmuo.mutation.UpdateTime(); !ok {
-		if tokenmint.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokenmint.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := tokenmint.UpdateDefaultUpdateTime()
 		tmuo.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 func (tmuo *TokenMintUpdateOne) sqlSave(ctx context.Context) (_node *TokenMint, err error) {

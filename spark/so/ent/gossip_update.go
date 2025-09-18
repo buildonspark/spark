@@ -62,9 +62,7 @@ func (gu *GossipUpdate) Mutation() *GossipMutation {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (gu *GossipUpdate) Save(ctx context.Context) (int, error) {
-	if err := gu.defaults(); err != nil {
-		return 0, err
-	}
+	gu.defaults()
 	return withHooks(ctx, gu.sqlSave, gu.mutation, gu.hooks)
 }
 
@@ -91,15 +89,11 @@ func (gu *GossipUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (gu *GossipUpdate) defaults() error {
+func (gu *GossipUpdate) defaults() {
 	if _, ok := gu.mutation.UpdateTime(); !ok {
-		if gossip.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized gossip.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := gossip.UpdateDefaultUpdateTime()
 		gu.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -199,9 +193,7 @@ func (guo *GossipUpdateOne) Select(field string, fields ...string) *GossipUpdate
 
 // Save executes the query and returns the updated Gossip entity.
 func (guo *GossipUpdateOne) Save(ctx context.Context) (*Gossip, error) {
-	if err := guo.defaults(); err != nil {
-		return nil, err
-	}
+	guo.defaults()
 	return withHooks(ctx, guo.sqlSave, guo.mutation, guo.hooks)
 }
 
@@ -228,15 +220,11 @@ func (guo *GossipUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (guo *GossipUpdateOne) defaults() error {
+func (guo *GossipUpdateOne) defaults() {
 	if _, ok := guo.mutation.UpdateTime(); !ok {
-		if gossip.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized gossip.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := gossip.UpdateDefaultUpdateTime()
 		guo.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

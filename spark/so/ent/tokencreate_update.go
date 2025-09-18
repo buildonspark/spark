@@ -203,9 +203,7 @@ func (tcu *TokenCreateUpdate) RemoveTokenFreeze(t ...*TokenFreeze) *TokenCreateU
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (tcu *TokenCreateUpdate) Save(ctx context.Context) (int, error) {
-	if err := tcu.defaults(); err != nil {
-		return 0, err
-	}
+	tcu.defaults()
 	return withHooks(ctx, tcu.sqlSave, tcu.mutation, tcu.hooks)
 }
 
@@ -232,15 +230,11 @@ func (tcu *TokenCreateUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tcu *TokenCreateUpdate) defaults() error {
+func (tcu *TokenCreateUpdate) defaults() {
 	if _, ok := tcu.mutation.UpdateTime(); !ok {
-		if tokencreate.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokencreate.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := tokencreate.UpdateDefaultUpdateTime()
 		tcu.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -650,9 +644,7 @@ func (tcuo *TokenCreateUpdateOne) Select(field string, fields ...string) *TokenC
 
 // Save executes the query and returns the updated TokenCreate entity.
 func (tcuo *TokenCreateUpdateOne) Save(ctx context.Context) (*TokenCreate, error) {
-	if err := tcuo.defaults(); err != nil {
-		return nil, err
-	}
+	tcuo.defaults()
 	return withHooks(ctx, tcuo.sqlSave, tcuo.mutation, tcuo.hooks)
 }
 
@@ -679,15 +671,11 @@ func (tcuo *TokenCreateUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tcuo *TokenCreateUpdateOne) defaults() error {
+func (tcuo *TokenCreateUpdateOne) defaults() {
 	if _, ok := tcuo.mutation.UpdateTime(); !ok {
-		if tokencreate.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized tokencreate.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := tokencreate.UpdateDefaultUpdateTime()
 		tcuo.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

@@ -196,9 +196,7 @@ func (usc *UtxoSwapCreate) Mutation() *UtxoSwapMutation {
 
 // Save creates the UtxoSwap in the database.
 func (usc *UtxoSwapCreate) Save(ctx context.Context) (*UtxoSwap, error) {
-	if err := usc.defaults(); err != nil {
-		return nil, err
-	}
+	usc.defaults()
 	return withHooks(ctx, usc.sqlSave, usc.mutation, usc.hooks)
 }
 
@@ -225,29 +223,19 @@ func (usc *UtxoSwapCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (usc *UtxoSwapCreate) defaults() error {
+func (usc *UtxoSwapCreate) defaults() {
 	if _, ok := usc.mutation.CreateTime(); !ok {
-		if utxoswap.DefaultCreateTime == nil {
-			return fmt.Errorf("ent: uninitialized utxoswap.DefaultCreateTime (forgotten import ent/runtime?)")
-		}
 		v := utxoswap.DefaultCreateTime()
 		usc.mutation.SetCreateTime(v)
 	}
 	if _, ok := usc.mutation.UpdateTime(); !ok {
-		if utxoswap.DefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized utxoswap.DefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := utxoswap.DefaultUpdateTime()
 		usc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := usc.mutation.ID(); !ok {
-		if utxoswap.DefaultID == nil {
-			return fmt.Errorf("ent: uninitialized utxoswap.DefaultID (forgotten import ent/runtime?)")
-		}
 		v := utxoswap.DefaultID()
 		usc.mutation.SetID(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

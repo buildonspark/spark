@@ -106,9 +106,7 @@ func (gc *GossipCreate) Mutation() *GossipMutation {
 
 // Save creates the Gossip in the database.
 func (gc *GossipCreate) Save(ctx context.Context) (*Gossip, error) {
-	if err := gc.defaults(); err != nil {
-		return nil, err
-	}
+	gc.defaults()
 	return withHooks(ctx, gc.sqlSave, gc.mutation, gc.hooks)
 }
 
@@ -135,18 +133,12 @@ func (gc *GossipCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (gc *GossipCreate) defaults() error {
+func (gc *GossipCreate) defaults() {
 	if _, ok := gc.mutation.CreateTime(); !ok {
-		if gossip.DefaultCreateTime == nil {
-			return fmt.Errorf("ent: uninitialized gossip.DefaultCreateTime (forgotten import ent/runtime?)")
-		}
 		v := gossip.DefaultCreateTime()
 		gc.mutation.SetCreateTime(v)
 	}
 	if _, ok := gc.mutation.UpdateTime(); !ok {
-		if gossip.DefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized gossip.DefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := gossip.DefaultUpdateTime()
 		gc.mutation.SetUpdateTime(v)
 	}
@@ -155,13 +147,9 @@ func (gc *GossipCreate) defaults() error {
 		gc.mutation.SetStatus(v)
 	}
 	if _, ok := gc.mutation.ID(); !ok {
-		if gossip.DefaultID == nil {
-			return fmt.Errorf("ent: uninitialized gossip.DefaultID (forgotten import ent/runtime?)")
-		}
 		v := gossip.DefaultID()
 		gc.mutation.SetID(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

@@ -185,9 +185,7 @@ func (pru *PreimageRequestUpdate) ClearTransfers() *PreimageRequestUpdate {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (pru *PreimageRequestUpdate) Save(ctx context.Context) (int, error) {
-	if err := pru.defaults(); err != nil {
-		return 0, err
-	}
+	pru.defaults()
 	return withHooks(ctx, pru.sqlSave, pru.mutation, pru.hooks)
 }
 
@@ -214,15 +212,11 @@ func (pru *PreimageRequestUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (pru *PreimageRequestUpdate) defaults() error {
+func (pru *PreimageRequestUpdate) defaults() {
 	if _, ok := pru.mutation.UpdateTime(); !ok {
-		if preimagerequest.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized preimagerequest.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := preimagerequest.UpdateDefaultUpdateTime()
 		pru.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -560,9 +554,7 @@ func (pruo *PreimageRequestUpdateOne) Select(field string, fields ...string) *Pr
 
 // Save executes the query and returns the updated PreimageRequest entity.
 func (pruo *PreimageRequestUpdateOne) Save(ctx context.Context) (*PreimageRequest, error) {
-	if err := pruo.defaults(); err != nil {
-		return nil, err
-	}
+	pruo.defaults()
 	return withHooks(ctx, pruo.sqlSave, pruo.mutation, pruo.hooks)
 }
 
@@ -589,15 +581,11 @@ func (pruo *PreimageRequestUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (pruo *PreimageRequestUpdateOne) defaults() error {
+func (pruo *PreimageRequestUpdateOne) defaults() {
 	if _, ok := pruo.mutation.UpdateTime(); !ok {
-		if preimagerequest.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized preimagerequest.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := preimagerequest.UpdateDefaultUpdateTime()
 		pruo.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

@@ -256,9 +256,7 @@ func (tnc *TreeNodeCreate) Mutation() *TreeNodeMutation {
 
 // Save creates the TreeNode in the database.
 func (tnc *TreeNodeCreate) Save(ctx context.Context) (*TreeNode, error) {
-	if err := tnc.defaults(); err != nil {
-		return nil, err
-	}
+	tnc.defaults()
 	return withHooks(ctx, tnc.sqlSave, tnc.mutation, tnc.hooks)
 }
 
@@ -285,29 +283,19 @@ func (tnc *TreeNodeCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (tnc *TreeNodeCreate) defaults() error {
+func (tnc *TreeNodeCreate) defaults() {
 	if _, ok := tnc.mutation.CreateTime(); !ok {
-		if treenode.DefaultCreateTime == nil {
-			return fmt.Errorf("ent: uninitialized treenode.DefaultCreateTime (forgotten import ent/runtime?)")
-		}
 		v := treenode.DefaultCreateTime()
 		tnc.mutation.SetCreateTime(v)
 	}
 	if _, ok := tnc.mutation.UpdateTime(); !ok {
-		if treenode.DefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized treenode.DefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := treenode.DefaultUpdateTime()
 		tnc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := tnc.mutation.ID(); !ok {
-		if treenode.DefaultID == nil {
-			return fmt.Errorf("ent: uninitialized treenode.DefaultID (forgotten import ent/runtime?)")
-		}
 		v := treenode.DefaultID()
 		tnc.mutation.SetID(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

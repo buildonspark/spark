@@ -18,7 +18,6 @@ type Tree struct {
 func (Tree) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
-		NotifyMixin{},
 	}
 }
 

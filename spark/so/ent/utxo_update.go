@@ -81,9 +81,7 @@ func (uu *UtxoUpdate) ClearDepositAddress() *UtxoUpdate {
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (uu *UtxoUpdate) Save(ctx context.Context) (int, error) {
-	if err := uu.defaults(); err != nil {
-		return 0, err
-	}
+	uu.defaults()
 	return withHooks(ctx, uu.sqlSave, uu.mutation, uu.hooks)
 }
 
@@ -110,15 +108,11 @@ func (uu *UtxoUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (uu *UtxoUpdate) defaults() error {
+func (uu *UtxoUpdate) defaults() {
 	if _, ok := uu.mutation.UpdateTime(); !ok {
-		if utxo.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized utxo.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := utxo.UpdateDefaultUpdateTime()
 		uu.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -263,9 +257,7 @@ func (uuo *UtxoUpdateOne) Select(field string, fields ...string) *UtxoUpdateOne 
 
 // Save executes the query and returns the updated Utxo entity.
 func (uuo *UtxoUpdateOne) Save(ctx context.Context) (*Utxo, error) {
-	if err := uuo.defaults(); err != nil {
-		return nil, err
-	}
+	uuo.defaults()
 	return withHooks(ctx, uuo.sqlSave, uuo.mutation, uuo.hooks)
 }
 
@@ -292,15 +284,11 @@ func (uuo *UtxoUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (uuo *UtxoUpdateOne) defaults() error {
+func (uuo *UtxoUpdateOne) defaults() {
 	if _, ok := uuo.mutation.UpdateTime(); !ok {
-		if utxo.UpdateDefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized utxo.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := utxo.UpdateDefaultUpdateTime()
 		uuo.mutation.SetUpdateTime(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

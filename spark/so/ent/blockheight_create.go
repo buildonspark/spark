@@ -86,9 +86,7 @@ func (bhc *BlockHeightCreate) Mutation() *BlockHeightMutation {
 
 // Save creates the BlockHeight in the database.
 func (bhc *BlockHeightCreate) Save(ctx context.Context) (*BlockHeight, error) {
-	if err := bhc.defaults(); err != nil {
-		return nil, err
-	}
+	bhc.defaults()
 	return withHooks(ctx, bhc.sqlSave, bhc.mutation, bhc.hooks)
 }
 
@@ -115,29 +113,19 @@ func (bhc *BlockHeightCreate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (bhc *BlockHeightCreate) defaults() error {
+func (bhc *BlockHeightCreate) defaults() {
 	if _, ok := bhc.mutation.CreateTime(); !ok {
-		if blockheight.DefaultCreateTime == nil {
-			return fmt.Errorf("ent: uninitialized blockheight.DefaultCreateTime (forgotten import ent/runtime?)")
-		}
 		v := blockheight.DefaultCreateTime()
 		bhc.mutation.SetCreateTime(v)
 	}
 	if _, ok := bhc.mutation.UpdateTime(); !ok {
-		if blockheight.DefaultUpdateTime == nil {
-			return fmt.Errorf("ent: uninitialized blockheight.DefaultUpdateTime (forgotten import ent/runtime?)")
-		}
 		v := blockheight.DefaultUpdateTime()
 		bhc.mutation.SetUpdateTime(v)
 	}
 	if _, ok := bhc.mutation.ID(); !ok {
-		if blockheight.DefaultID == nil {
-			return fmt.Errorf("ent: uninitialized blockheight.DefaultID (forgotten import ent/runtime?)")
-		}
 		v := blockheight.DefaultID()
 		bhc.mutation.SetID(v)
 	}
-	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

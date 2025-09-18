@@ -18,7 +18,6 @@ type TokenFreeze struct {
 func (TokenFreeze) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
-		NotifyMixin{},
 	}
 }
 
