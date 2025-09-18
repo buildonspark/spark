@@ -21,7 +21,6 @@ export class SparkWalletBrowser extends BaseSparkWallet {
     spanProcessors,
     traceUrls,
   }: Parameters<BaseSparkWallet["initializeTracerEnv"]>[0]) {
-    console.log("initializeTracerEnvBrowser");
     initializeTracerEnvBrowser({ spanProcessors, traceUrls });
   }
 }

@@ -4887,7 +4887,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const consoleOptions = wallet.config.getConsoleOptions();
     const spanProcessors: SpanProcessor[] = [];
     if (consoleOptions.otel) {
-      console.log("OpenTelemetry client logging enabled.");
       spanProcessors.push(new SimpleSpanProcessor(new ConsoleSpanExporter()));
     }
     const traceUrls = this.getOtelTraceUrls();
