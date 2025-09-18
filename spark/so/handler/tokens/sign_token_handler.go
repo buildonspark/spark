@@ -11,6 +11,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"go.uber.org/zap"
 
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
@@ -19,7 +20,6 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/ent/predicate"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
@@ -408,6 +408,7 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 
 	voutsByPrevHash := make(map[string][]int32)
 	hashBytesByKey := make(map[string][]byte)
+
 	for _, outputToSpend := range outputsToSpend {
 		if outputToSpend == nil {
 			continue
@@ -430,38 +431,51 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 		}
 	}
 
-	var matchOutputsToSpendPredicates []predicate.TokenOutput
-	for prevHash, vouts := range voutsByPrevHash {
-		hash := hashBytesByKey[prevHash]
-		matchOutputsToSpendPredicates = append(matchOutputsToSpendPredicates,
-			tokenoutput.And(
-				tokenoutput.HasOutputCreatedTokenTransactionWith(
-					tokentransaction.FinalizedTokenTransactionHashEQ(hash),
-				),
-				tokenoutput.CreatedTransactionOutputVoutIn(vouts...),
-			),
-		)
+	// Get all distinct transaction hashes for batch lookup
+	var distinctTxHashes [][]byte
+	for _, hashBytes := range hashBytesByKey {
+		distinctTxHashes = append(distinctTxHashes, hashBytes)
 	}
 
-	const batchSize = queryTokenOutputsWithPartialRevocationSecretSharesBatchSize
-	var outputsWithKeyShares []*ent.TokenOutput
+	transactions, err := db.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashIn(distinctTxHashes...)).
+		WithCreatedOutput().
+		All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch matching transactions and outputs: %w", err)
+	}
 
-	for i := 0; i < len(matchOutputsToSpendPredicates); i += batchSize {
-		end := i + batchSize
-		if end > len(matchOutputsToSpendPredicates) {
-			end = len(matchOutputsToSpendPredicates)
-		}
-		batchPredicates := matchOutputsToSpendPredicates[i:end]
-		batchOutputs, err := db.TokenOutput.Query().
-			Where(tokenoutput.Or(batchPredicates...)).
-			WithRevocationKeyshare().
-			WithTokenPartialRevocationSecretShares().
-			All(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to query TokenOutputs batch (%d-%d): %w", i, end-1, err)
+	transactionMap := make(map[string]*ent.TokenTransaction)
+	for _, tx := range transactions {
+		hashKey := string(tx.FinalizedTokenTransactionHash)
+		transactionMap[hashKey] = tx
+	}
+
+	var outputIDs []uuid.UUID
+	for prevHash, vouts := range voutsByPrevHash {
+		transaction, ok := transactionMap[prevHash]
+		if !ok {
+			return nil, fmt.Errorf("no transaction found for prev tx hash %x", hashBytesByKey[prevHash])
 		}
 
-		outputsWithKeyShares = append(outputsWithKeyShares, batchOutputs...)
+		// Find matching outputs by vout
+		for _, createdOutput := range transaction.Edges.CreatedOutput {
+			for _, vout := range vouts {
+				if createdOutput.CreatedTransactionOutputVout == vout {
+					outputIDs = append(outputIDs, createdOutput.ID)
+					break
+				}
+			}
+		}
+	}
+
+	outputsWithKeyShares, err := db.TokenOutput.Query().
+		Where(tokenoutput.IDIn(outputIDs...)).
+		WithRevocationKeyshare().
+		WithTokenPartialRevocationSecretShares().
+		All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query TokenOutputs with key shares: %w", err)
 	}
 
 	sharesToReturnMap := make(map[keys.Public]*tokeninternalpb.OperatorRevocationShares)
