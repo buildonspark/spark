@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/spark-cli",
-  "version": "0.0.76",
+  "version": "0.0.77",
   "private": true,
   "description": "Spark CLI",
   "main": "index.js",
@@ -28,8 +28,8 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
-    "@buildonspark/issuer-sdk": "0.0.98",
-    "@buildonspark/spark-sdk": "0.3.5",
+    "@buildonspark/issuer-sdk": "0.0.99",
+    "@buildonspark/spark-sdk": "0.3.6",
     "tsx": "^4.19.3",
     "yargs": "^18.0.0"
   },
