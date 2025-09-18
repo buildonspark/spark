@@ -2710,7 +2710,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       amountSatsArray.push(amountSats);
     }
 
-    const transferJobs = await this.withLeaves(async () => {
+    return await this.withLeaves(async () => {
       const selectLeavesToSendMap: Map<number, TreeNode[][]> =
         await this.selectLeaves(amountSatsArray);
 
@@ -2753,50 +2753,49 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         this.leaves = this.leaves.filter((leaf) => !idsToRemove.has(leaf.id));
       }
 
-      return jobs;
-    });
+      const signerIdentityPublicKey =
+        await this.config.signer.getIdentityPublicKey();
 
-    const signerIdentityPublicKey =
-      await this.config.signer.getIdentityPublicKey();
-
-    const outcomes = await Promise.all(
-      transferJobs.map(async (job) => {
-        try {
-          const transfer = await this.transferService.sendTransferWithKeyTweaks(
-            job.leafKeyTweaks,
-            job.receiverIdentityPubkey,
-            job.sparkInvoice,
-          );
-          const isSelfTransfer = equalBytes(
-            signerIdentityPublicKey,
-            job.receiverIdentityPubkey,
-          );
-          if (isSelfTransfer) {
-            const pending = await this.transferService.queryTransfer(
-              transfer.id,
+      const outcomes = await Promise.all(
+        jobs.map(async (job) => {
+          try {
+            const transfer =
+              await this.transferService.sendTransferWithKeyTweaks(
+                job.leafKeyTweaks,
+                job.receiverIdentityPubkey,
+                job.sparkInvoice,
+              );
+            const isSelfTransfer = equalBytes(
+              signerIdentityPublicKey,
+              job.receiverIdentityPubkey,
             );
-            if (pending) {
-              await this.claimTransfer({ transfer: pending, optimize: true });
+            if (isSelfTransfer) {
+              const pending = await this.transferService.queryTransfer(
+                transfer.id,
+              );
+              if (pending) {
+                await this.claimTransfer({ transfer: pending, optimize: true });
+              }
             }
+            return {
+              ok: true as const,
+              transfer: mapTransferToWalletTransfer(
+                transfer,
+                bytesToHex(await this.config.signer.getIdentityPublicKey()),
+              ),
+              param: job.param,
+            };
+          } catch (error) {
+            return {
+              ok: false as const,
+              error: error instanceof Error ? error : new Error(String(error)),
+              param: job.param,
+            };
           }
-          return {
-            ok: true as const,
-            transfer: mapTransferToWalletTransfer(
-              transfer,
-              bytesToHex(await this.config.signer.getIdentityPublicKey()),
-            ),
-            param: job.param,
-          };
-        } catch (error) {
-          return {
-            ok: false as const,
-            error: error instanceof Error ? error : new Error(String(error)),
-            param: job.param,
-          };
-        }
-      }),
-    );
-    return outcomes;
+        }),
+      );
+      return outcomes;
+    });
   }
 
   private buildTweaksByAmount(
