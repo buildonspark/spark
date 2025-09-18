@@ -1,5 +1,5 @@
 import * as btc from "@scure/btc-signer";
-import * as bitcoin from "bitcoinjs-lib";
+import { bech32, bech32m } from "@scure/base";
 import { Network as NetworkProto } from "../proto/spark.js";
 import { BitcoinNetwork } from "../graphql/objects/BitcoinNetwork.js";
 import { ValidationError } from "../errors/index.js";
@@ -50,14 +50,6 @@ const NetworkConfig: Record<Network, typeof btc.NETWORK> = {
 export const getNetwork = (network: Network): typeof btc.NETWORK =>
   NetworkConfig[network];
 
-export const LRC_WALLET_NETWORK = Object.freeze({
-  [Network.MAINNET]: bitcoin.networks.bitcoin,
-  [Network.TESTNET]: bitcoin.networks.testnet,
-  [Network.SIGNET]: bitcoin.networks.testnet,
-  [Network.REGTEST]: bitcoin.networks.regtest,
-  [Network.LOCAL]: bitcoin.networks.regtest,
-});
-
 /**
  * Utility function to determine the network from a Bitcoin address.
  *
@@ -66,7 +58,16 @@ export const LRC_WALLET_NETWORK = Object.freeze({
  */
 export function getNetworkFromAddress(address: string) {
   try {
-    const decoded = bitcoin.address.fromBech32(address);
+    // Try bech32 first, then bech32m (Taproot)
+    const bechAddress = address as `${string}1${string}`;
+    const decoded = (() => {
+      try {
+        return bech32.decode(bechAddress);
+      } catch (_) {
+        return bech32m.decode(bechAddress);
+      }
+    })();
+
     // HRP (human-readable part) determines the network
     if (decoded.prefix === "bc") {
       return BitcoinNetwork.MAINNET;

@@ -2888,7 +2888,6 @@ __metadata:
     async-mutex: "npm:^0.5.0"
     bare-crypto: "npm:^1.9.2"
     bare-fetch: "npm:^2.4.1"
-    bitcoinjs-lib: "npm:^6.1.5"
     buffer: "npm:^6.0.3"
     depcheck: "npm:^1.4.7"
     eciesjs: "npm:^0.4.13"

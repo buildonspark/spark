@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import * as bitcoin from "bitcoinjs-lib";
 /* Note lrc20-sdk will be deprecated and has been removed from Spark JS workspaces.
    This is temporarily left for testing purposes: */
 import {
@@ -18,6 +17,18 @@ export const isHermeticTest = Boolean(
   typeof process !== "undefined" && process?.env?.HERMETIC_TEST === "true",
 );
 
+const regtest = {
+  messagePrefix: "\x18Bitcoin Signed Message:\n",
+  bech32: "bcrt",
+  bip32: {
+    public: 0x043587cf,
+    private: 0x04358394,
+  },
+  pubKeyHash: 0x6f,
+  scriptHash: 0xc4,
+  wif: 0xef,
+};
+
 async function main() {
   const tokenName = "TestToken";
   const tokenTicker = "TEST";
@@ -27,7 +38,7 @@ async function main() {
 
   let wallet = new LRCWallet(
     "515c86ccb09faa2235acd0e287381bf286b37002328a8cc3c3b89738ab59dc93",
-    bitcoin.networks.regtest,
+    regtest,
     NetworkType.LOCAL,
     {
       lrc20NodeUrl: "http://127.0.0.1:18332",
