@@ -107,7 +107,6 @@ func (i *Interceptor) authenticateContext(ctx context.Context) context.Context {
 	sessionInfo, err := i.sessionTokenCreatorVerifier.VerifyToken(token)
 	if err != nil {
 		wrappedErr := errors.WrapErrorWithCode(fmt.Errorf("failed to verify token: %w", err), codes.Unauthenticated)
-		logger.Info("Authentication error", zap.Error(wrappedErr))
 		return context.WithValue(ctx, authnContextKey, &Context{
 			Error: wrappedErr,
 		})
@@ -116,7 +115,6 @@ func (i *Interceptor) authenticateContext(ctx context.Context) context.Context {
 	key, err := keys.ParsePublicKey(sessionInfo.PublicKey)
 	if err != nil {
 		wrappedErr := errors.WrapErrorWithCode(fmt.Errorf("failed to parse public key: %w", err), codes.Unauthenticated)
-		logger.Info("Authentication error", zap.Error(wrappedErr))
 		return context.WithValue(ctx, authnContextKey, &Context{
 			Error: wrappedErr,
 		})

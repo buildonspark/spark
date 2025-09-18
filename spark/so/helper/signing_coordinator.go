@@ -12,7 +12,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
-	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/handler/signing_handler"
@@ -226,10 +225,6 @@ func frostRound2(
 	operatorSelection *OperatorSelection,
 	sparkServiceClientFactory SparkServiceFrostSignerFactory,
 ) (map[string]map[string][]byte, error) {
-	logger := logging.GetLoggerFromContext(ctx)
-	for _, job := range jobs {
-		logger.Sugar().Infof("FrostRound2 signing job: message %x, verifying key %s", job.Message, job.VerifyingKey)
-	}
 	operatorResult, err := ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (map[string][]byte, error) {
 		commitmentsArray := common.MapOfArrayToArrayOfMap(round1)
 

@@ -8,7 +8,6 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so"
 )
 
@@ -113,8 +112,6 @@ type taskResult[V any] struct {
 // This will run goroutines for each operator and wait for all of them to complete before returning.
 // It returns an error if any of the tasks fail.
 func ExecuteTaskWithAllOperators[V any](ctx context.Context, config *so.Config, selection *OperatorSelection, task func(ctx context.Context, operator *so.SigningOperator) (V, error)) (map[string]V, error) {
-	logger := logging.GetLoggerFromContext(ctx)
-
 	wg := sync.WaitGroup{}
 
 	operators, err := selection.OperatorList(config)
@@ -162,8 +159,6 @@ func ExecuteTaskWithAllOperators[V any](ctx context.Context, config *so.Config, 
 		}
 		resultsMap[config.Identifier] = result
 	}
-
-	logger.Info("Successfully executed task with all operators")
 
 	return resultsMap, nil
 }
