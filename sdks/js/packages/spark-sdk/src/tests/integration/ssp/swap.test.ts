@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { SparkWalletTesting } from "../../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../../utils/test-faucet.js";
+import { SparkWalletTestingWithStream } from "../../utils/spark-testing-wallet.js";
 
 const DEPOSIT_AMOUNT = 10000n;
 
@@ -8,14 +9,12 @@ describe("SSP swap", () => {
   it("it should swap with the SSP before sending a transfer if the user does not have exact leaf amount", async () => {
     const faucet = BitcoinFaucet.getInstance();
 
-    const { wallet: userWallet } = await SparkWalletTesting.initialize(
-      {
+    const { wallet: userWallet } =
+      await SparkWalletTestingWithStream.initialize({
         options: {
           network: "LOCAL",
         },
-      },
-      false,
-    );
+      });
 
     const depositAddress = await userWallet.getSingleUseDepositAddress();
     expect(depositAddress).toBeDefined();

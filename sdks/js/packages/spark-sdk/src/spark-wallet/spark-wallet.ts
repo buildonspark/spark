@@ -157,7 +157,7 @@ import { SparkWalletEvent } from "./types.js";
  * It provides methods for creating and managing wallets, handling deposits, executing transfers,
  * and interacting with the Lightning Network.
  */
-export class SparkWallet extends EventEmitter<SparkWalletEvents> {
+export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   protected config: WalletConfigService;
 
   protected connectionManager: ConnectionManager;
@@ -193,7 +193,7 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   private tracer: Tracer | null = null;
 
-  protected constructor(options?: ConfigOptions, signer?: SparkSigner) {
+  constructor(options?: ConfigOptions, signer?: SparkSigner) {
     super();
 
     this.config = new WalletConfigService(options, signer);
@@ -228,19 +228,17 @@ export class SparkWallet extends EventEmitter<SparkWalletEvents> {
     this.initializeTracer(this);
   }
 
-  public static async initialize({
-    mnemonicOrSeed,
-    accountNumber,
-    signer,
-    options = {},
-  }: SparkWalletProps) {
-    const wallet = new SparkWallet(options, signer);
+  public static async initialize<T extends SparkWallet>(
+    this: new (options?: ConfigOptions, signer?: SparkSigner) => T,
+    { mnemonicOrSeed, accountNumber, signer, options = {} }: SparkWalletProps,
+  ): Promise<InitWalletResponse<T>> {
+    const wallet = new this(options, signer);
     const initWalletResponse = await wallet.initWallet(
       mnemonicOrSeed,
       accountNumber,
       options,
     );
-    return initWalletResponse;
+    return initWalletResponse as InitWalletResponse<T>;
   }
 
   private async createClientsAndSyncWallet() {

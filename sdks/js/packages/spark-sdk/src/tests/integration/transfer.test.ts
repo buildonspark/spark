@@ -24,7 +24,10 @@ import {
 } from "../../services/wallet-config.js";
 import { NetworkType } from "../../utils/network.js";
 import { walletTypes } from "../test-utils.js";
-import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
+import {
+  SparkWalletTesting,
+  SparkWalletTestingWithStream,
+} from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
 
 const testLocalOnly = process.env.GITHUB_ACTIONS ? it.skip : it;
@@ -549,12 +552,10 @@ describe.each(walletTypes)(
 
       await senderWallet.claimDeposit(signedTx.id);
 
-      const { wallet: receiverWallet } = await SparkWalletTesting.initialize(
-        {
+      const { wallet: receiverWallet } =
+        await SparkWalletTestingWithStream.initialize({
           options,
-        },
-        false,
-      );
+        });
 
       expect(await receiverWallet.getSparkAddress()).not.toEqual(
         await senderWallet.getSparkAddress(),

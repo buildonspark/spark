@@ -1,5 +1,5 @@
 import {
-  SparkWalletTesting,
+  SparkWalletTestingWithStream,
   initTestingWallet,
 } from "../../utils/spark-testing-wallet.js";
 import { bytesToHex } from "@noble/hashes/utils";
@@ -14,14 +14,12 @@ describe("SSP static deposit address integration", () => {
   describe("Happy path testing", () => {
     it("should claim deposits to a static deposit address", async () => {
       const faucet = BitcoinFaucet.getInstance();
-      const { wallet: userWallet } = await SparkWalletTesting.initialize(
-        {
+      const { wallet: userWallet } =
+        await SparkWalletTestingWithStream.initialize({
           options: {
             network: "LOCAL",
           },
-        },
-        false,
-      );
+        });
 
       const depositAddress = await userWallet.getStaticDepositAddress();
       expect(depositAddress).toBeDefined();
@@ -112,14 +110,12 @@ describe("SSP static deposit address integration", () => {
     it("should create a refund transaction", async () => {
       const faucet = BitcoinFaucet.getInstance();
 
-      const { wallet: userWallet } = await SparkWalletTesting.initialize(
-        {
+      const { wallet: userWallet } =
+        await SparkWalletTestingWithStream.initialize({
           options: {
             network: "LOCAL",
           },
-        },
-        false,
-      );
+        });
 
       const depositAddress = await userWallet.getStaticDepositAddress();
       expect(depositAddress).toBeDefined();
@@ -175,14 +171,12 @@ describe("SSP static deposit address integration", () => {
 
     it("should return the right amount of txns when querying for utxos sent to a static deposit address", async () => {
       const faucet = BitcoinFaucet.getInstance();
-      const { wallet: userWallet } = await SparkWalletTesting.initialize(
-        {
+      const { wallet: userWallet } =
+        await SparkWalletTestingWithStream.initialize({
           options: {
             network: "LOCAL",
           },
-        },
-        false,
-      );
+        });
 
       const depositAddress = await userWallet.getStaticDepositAddress();
       expect(depositAddress).toBeDefined();
@@ -306,25 +300,19 @@ describe("SSP static deposit address integration", () => {
     it("Wallet balance should be correct after concurrent claims of the same wallet initted in different places", async () => {
       const faucet = BitcoinFaucet.getInstance();
       const { wallet: aliceWallet, mnemonic: aliceMnemonic } =
-        await SparkWalletTesting.initialize(
-          {
-            options: {
-              network: "LOCAL",
-            },
+        await SparkWalletTestingWithStream.initialize({
+          options: {
+            network: "LOCAL",
           },
-          false,
-        );
+        });
 
       const { wallet: aliceWallet2, mnemonic: aliceMnemonic2 } =
-        await SparkWalletTesting.initialize(
-          {
-            options: {
-              network: "LOCAL",
-            },
-            mnemonicOrSeed: aliceMnemonic,
+        await SparkWalletTestingWithStream.initialize({
+          options: {
+            network: "LOCAL",
           },
-          false,
-        );
+          mnemonicOrSeed: aliceMnemonic,
+        });
 
       expect(aliceMnemonic).toEqual(aliceMnemonic2);
 
@@ -386,14 +374,12 @@ describe("SSP static deposit address integration", () => {
 
     it("Wallet balance should be correct after concurrent claims of the same initted wallet", async () => {
       const faucet = BitcoinFaucet.getInstance();
-      const { wallet: aliceWallet } = await SparkWalletTesting.initialize(
-        {
+      const { wallet: aliceWallet } =
+        await SparkWalletTestingWithStream.initialize({
           options: {
             network: "LOCAL",
           },
-        },
-        false,
-      );
+        });
 
       const depositAddress = await aliceWallet.getStaticDepositAddress();
 
@@ -447,23 +433,19 @@ describe("SSP static deposit address integration", () => {
 
   describe("Quote unhappy path testing", () => {
     it("should error claim quote from a different wallet", async () => {
-      const { wallet: aliceWallet } = await SparkWalletTesting.initialize(
-        {
+      const { wallet: aliceWallet } =
+        await SparkWalletTestingWithStream.initialize({
           options: {
             network: "LOCAL",
           },
-        },
-        false,
-      );
+        });
 
-      const { wallet: bobWallet } = await SparkWalletTesting.initialize(
-        {
+      const { wallet: bobWallet } =
+        await SparkWalletTestingWithStream.initialize({
           options: {
             network: "LOCAL",
           },
-        },
-        false,
-      );
+        });
 
       const faucet = BitcoinFaucet.getInstance();
 
@@ -488,14 +470,12 @@ describe("SSP static deposit address integration", () => {
     }, 60000);
 
     it("should error if txid does not exist", async () => {
-      const { wallet: aliceWallet } = await SparkWalletTesting.initialize(
-        {
+      const { wallet: aliceWallet } =
+        await SparkWalletTestingWithStream.initialize({
           options: {
             network: "LOCAL",
           },
-        },
-        false,
-      );
+        });
 
       const faucet = BitcoinFaucet.getInstance();
 
@@ -522,14 +502,12 @@ describe("SSP static deposit address integration", () => {
     });
 
     it("should error claim quote if tx already claimed", async () => {
-      const { wallet: aliceWallet } = await SparkWalletTesting.initialize(
-        {
+      const { wallet: aliceWallet } =
+        await SparkWalletTestingWithStream.initialize({
           options: {
             network: "LOCAL",
           },
-        },
-        false,
-      );
+        });
 
       const faucet = BitcoinFaucet.getInstance();
 

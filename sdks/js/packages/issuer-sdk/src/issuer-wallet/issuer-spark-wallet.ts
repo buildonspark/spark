@@ -26,32 +26,17 @@ const BURN_ADDRESS = "02".repeat(33);
  * This class extends the base SparkWallet with additional functionality for token minting,
  * burning, and freezing operations.
  */
-export class IssuerSparkWallet extends SparkWallet {
+export abstract class IssuerSparkWallet extends SparkWallet {
   private issuerTokenTransactionService: IssuerTokenTransactionService;
   private tokenFreezeService: TokenFreezeService;
   protected tracerId = "issuer-sdk";
 
   /**
    * Initializes a new IssuerSparkWallet instance.
-   * @param options - Configuration options for the wallet
-   * @returns An object containing the initialized wallet and initialization response
+   * Inherits the generic static initialize from the base class.
    */
-  public static async initialize({
-    mnemonicOrSeed,
-    accountNumber,
-    signer,
-    options,
-  }: SparkWalletProps) {
-    const wallet = new IssuerSparkWallet(options, signer);
-    const initResponse = await wallet.initWallet(
-      mnemonicOrSeed,
-      accountNumber,
-      options,
-    );
-    return initResponse;
-  }
 
-  protected constructor(configOptions?: ConfigOptions, signer?: SparkSigner) {
+  constructor(configOptions?: ConfigOptions, signer?: SparkSigner) {
     super(configOptions, signer);
     this.issuerTokenTransactionService = new IssuerTokenTransactionService(
       this.config,

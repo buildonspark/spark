@@ -4,26 +4,10 @@ import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-ho
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
 import { registerInstrumentations } from "@opentelemetry/instrumentation";
 import { UndiciInstrumentation } from "@opentelemetry/instrumentation-undici";
-import { SparkWalletProps } from "./types.js";
 import { ConnectionManagerNodeJS } from "../services/connection/connection.node.js";
 import { WalletConfigService } from "../services/config.js";
 
 export class SparkWalletNodeJS extends BaseSparkWallet {
-  public static async initialize({
-    mnemonicOrSeed,
-    accountNumber,
-    signer,
-    options,
-  }: SparkWalletProps) {
-    const wallet = new SparkWalletNodeJS(options, signer);
-    const initResponse = await wallet.initWallet(
-      mnemonicOrSeed,
-      accountNumber,
-      options,
-    );
-    return initResponse;
-  }
-
   protected buildConnectionManager(config: WalletConfigService) {
     return new ConnectionManagerNodeJS(config);
   }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import { TransferType, transferTypeToJSON } from "../../../proto/spark.js";
-import { SparkWalletTesting } from "../../utils/spark-testing-wallet.js";
+import {
+  SparkWalletTesting,
+  SparkWalletTestingWithStream,
+} from "../../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../../utils/test-faucet.js";
 
 const DEPOSIT_AMOUNT = 10000n;
@@ -10,23 +13,19 @@ describe("SSP Transfers Test", () => {
   it("getTransfers and getTransfer should return the corresponding ssp request if it exists", async () => {
     const faucet = BitcoinFaucet.getInstance();
 
-    const { wallet: userWallet } = await SparkWalletTesting.initialize(
-      {
+    const { wallet: userWallet } =
+      await SparkWalletTestingWithStream.initialize({
         options: {
           network: "LOCAL",
         },
-      },
-      false,
-    );
+      });
 
-    const { wallet: userWallet2 } = await SparkWalletTesting.initialize(
-      {
+    const { wallet: userWallet2 } =
+      await SparkWalletTestingWithStream.initialize({
         options: {
           network: "LOCAL",
         },
-      },
-      false,
-    );
+      });
 
     const depositAddress = await userWallet.getStaticDepositAddress();
     expect(depositAddress).toBeDefined();

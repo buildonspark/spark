@@ -7,38 +7,14 @@ import { Transaction } from "@scure/btc-signer";
 import { NetworkType } from "../../index.node.js";
 import { SparkWalletNodeJS } from "../../spark-wallet/spark-wallet.node.js";
 
-interface ISparkWalletTesting extends SparkWalletNodeJS {
-  getSigner(): SparkSigner;
-  queryPendingTransfers(): Promise<QueryTransfersResponse>;
-  verifyPendingTransfer(transfer: Transfer): Promise<Map<string, Uint8Array>>;
-}
-
-export class SparkWalletTesting
-  extends SparkWalletNodeJS
-  implements ISparkWalletTesting
-{
-  public disableEvents = true;
-
-  static async initialize(props: SparkWalletProps, disableEvents = true) {
-    const wallet = new SparkWalletTesting(props.options, props.signer);
-    wallet.disableEvents = disableEvents;
-    const initWalletResponse = await wallet.initWallet(
-      props.mnemonicOrSeed,
-      props.accountNumber,
-      props.options,
-    );
-    return initWalletResponse;
+export class SparkWalletTesting extends SparkWalletNodeJS {
+  protected override async setupBackgroundStream() {
+    // Background stream is disabled by default, use SparkWalletTestingWithStream to enable it
+    return;
   }
 
-  protected override async setupBackgroundStream() {
-    console.log(
-      "tmp SparkWalletTesting.setupBackgroundStream disableEvents",
-      this.disableEvents,
-    );
-    if (!this.disableEvents) {
-      await super.setupBackgroundStream();
-    }
-    return;
+  protected async proxyParentSetupBackgroundStream() {
+    return super.setupBackgroundStream();
   }
 
   public getSigner(): SparkSigner {
@@ -56,6 +32,12 @@ export class SparkWalletTesting
   }
 }
 
+export class SparkWalletTestingWithStream extends SparkWalletTesting {
+  protected override async setupBackgroundStream() {
+    return this.proxyParentSetupBackgroundStream();
+  }
+}
+
 export async function initTestingWallet(
   amount: bigint,
   network: NetworkType,
@@ -67,14 +49,11 @@ export async function initTestingWallet(
   faucet: BitcoinFaucet;
 }> {
   const faucet = BitcoinFaucet.getInstance();
-  const { wallet: userWallet } = await SparkWalletTesting.initialize(
-    {
-      options: {
-        network: network,
-      },
+  const { wallet: userWallet } = await SparkWalletTestingWithStream.initialize({
+    options: {
+      network: network,
     },
-    false,
-  );
+  });
 
   const depositAddress = await userWallet.getStaticDepositAddress();
 

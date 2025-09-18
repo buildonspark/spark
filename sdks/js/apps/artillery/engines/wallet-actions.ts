@@ -404,7 +404,6 @@ export class WalletActions {
     namedWallet?: { name: string; lock?: boolean; minBalance?: number },
     walletStateDir?: string,
     useRandomSelection: boolean = true,
-    skipBackgroundStream?: boolean,
   ): Promise<{
     wallet: WalletType;
     index: number;
@@ -421,7 +420,6 @@ export class WalletActions {
       namedWallet,
       walletStateDir,
       useRandomSelection,
-      skipBackgroundStream,
     );
   }
 
@@ -434,7 +432,6 @@ export class WalletActions {
     namedWallet?: { name: string; lock?: boolean; minBalance?: number },
     walletStateDir?: string,
     useRandomSelection: boolean = true,
-    skipBackgroundStream?: boolean,
   ): Promise<{
     wallet: WalletType;
     index: number;
@@ -522,7 +519,6 @@ export class WalletActions {
           const networkConfig = getLoadtestNetworkConfig();
 
           const { wallet } = await IssuerSparkWalletNoEvents.initialize({
-            skipBackgroundStream,
             options: networkConfig,
             mnemonicOrSeed: mnemonic,
           });
@@ -578,7 +574,6 @@ export class WalletActions {
       lockWallets?: boolean;
       minBalance?: number;
       useWalletStateCache?: boolean;
-      skipBackgroundStream?: boolean;
       namedWallets?: Array<{
         name: string;
         lock?: boolean;
@@ -678,7 +673,6 @@ export class WalletActions {
                     namedWallet,
                     undefined,
                     true,
-                    poolConfig.skipBackgroundStream,
                   );
 
                   if (walletInfo) {
@@ -800,7 +794,6 @@ export class WalletActions {
                     namedWallet,
                     walletStateDir,
                     poolConfig.randomSelection !== false,
-                    poolConfig.skipBackgroundStream,
                   );
 
                   if (!walletInfo) {
@@ -895,7 +888,6 @@ export class WalletActions {
                     undefined,
                     walletStateDir,
                     poolConfig.randomSelection !== false,
-                    poolConfig.skipBackgroundStream,
                   )
                   .then((walletInfo) => ({
                     walletInfo,

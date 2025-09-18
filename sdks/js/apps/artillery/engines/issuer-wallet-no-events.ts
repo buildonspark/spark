@@ -6,42 +6,8 @@ import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
  * and exposes testing methods for manual transfer management
  */
 export class IssuerSparkWalletNoEvents extends IssuerSparkWallet {
-  private disableEvents: boolean;
-
-  constructor(props: SparkWalletProps, disableEvents = true) {
-    super(props.options, props.signer);
-    this.disableEvents = disableEvents;
-  }
-
-  static async initialize(
-    props: SparkWalletProps & { skipBackgroundStream?: boolean },
-  ) {
-    const { skipBackgroundStream = false, ...walletProps } = props;
-    const wallet = new IssuerSparkWalletNoEvents(walletProps, true);
-
-    const result = await wallet.initWallet(
-      walletProps.mnemonicOrSeed,
-      walletProps.accountNumber,
-    );
-
-    // Note: skipBackgroundStream is handled by disableEvents in the constructor
-    // The background stream setup is controlled by the setupBackgroundStream override below
-    if (skipBackgroundStream) {
-      console.log(
-        `[IssuerWallet] Background stream disabled (skipBackgroundStream=true)`,
-      );
-    }
-
-    return {
-      wallet,
-      mnemonic: result?.mnemonic,
-    };
-  }
-
   protected override async setupBackgroundStream() {
-    if (!this.disableEvents) {
-      return super.setupBackgroundStream();
-    }
+    console.log(`[IssuerWallet] Background stream disabled`);
     return;
   }
 

@@ -4,7 +4,6 @@ import { registerInstrumentations } from "@opentelemetry/instrumentation";
 import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch";
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
 import { propagation } from "@opentelemetry/api";
-import { SparkWalletProps } from "../spark-wallet/types.js";
 import {
   ConnectionManagerBrowser,
   type Transport,
@@ -14,21 +13,6 @@ import { ConfigOptions } from "../services/wallet-config.js";
 import { WalletConfigService } from "../services/config.js";
 
 export class SparkWalletBrowser extends BaseSparkWallet {
-  public static async initialize({
-    mnemonicOrSeed,
-    accountNumber,
-    signer,
-    options,
-  }: SparkWalletProps) {
-    const wallet = new SparkWalletBrowser(options, signer);
-    const initResponse = await wallet.initWallet(
-      mnemonicOrSeed,
-      accountNumber,
-      options,
-    );
-    return initResponse;
-  }
-
   protected buildConnectionManager(config: WalletConfigService) {
     return new ConnectionManagerBrowser(config);
   }
