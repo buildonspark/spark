@@ -40,6 +40,11 @@ const (
 	KnobSoTaskEnabled = "spark.so.task.enabled"
 	KnobSoTaskTimeout = "spark.so.task.timeout"
 
+	// Watch Chain
+	// Set to 0 to disable updating exiting Tree Nodes in Chain Watcher.
+	// DANGEROUS: Disabling it can lead to loss of funds.
+	KnobWatchChainMarkExitingNodesEnabled = "spark.so.watch_chain.mark_exiting_nodes.enabled"
+
 	// Tasks
 	// Set the batch size for the backfill tree node txids task that pupulatesthe
 	// txids for tree nodes that were created before the txids were added to the

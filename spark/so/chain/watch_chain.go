@@ -31,6 +31,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/tree"
 	"github.com/lightsparkdev/spark/so/watchtower"
 	"go.opentelemetry.io/otel"
@@ -496,10 +497,15 @@ func handleBlock(
 		}
 	}
 
-	logger.Sugar().Infof("Started processing confirmed transactions for exiting tree nodes", "height", blockHeight)
-	err = tree.MarkExitingNodes(ctx, dbTx, confirmedTxHashSet, blockHeight)
-	if err != nil {
-		return fmt.Errorf("failed to mark exiting nodes: %w", err)
+	networkString := network.String()
+	// If marking exiting nodes is slow, it can be disabled by setting the knob to 0,
+	// but this should be done for a short period of time to avoid any potential double spends.
+	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobWatchChainMarkExitingNodesEnabled, &networkString, 1.0) > 0 {
+		logger.Sugar().Infof("Started processing confirmed transactions for exiting tree nodes at height %d", blockHeight)
+		err = tree.MarkExitingNodes(ctx, dbTx, confirmedTxHashSet, blockHeight)
+		if err != nil {
+			return fmt.Errorf("failed to mark exiting nodes: %w", err)
+		}
 	}
 
 	logger.Sugar().Infof("Started processing coop exits", "height", blockHeight)
