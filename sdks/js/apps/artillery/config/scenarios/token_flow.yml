@@ -1,0 +1,59 @@
+config:
+  target: "http://localhost"
+  engines:
+    spark: {}
+  phases:
+    - duration: 10
+      arrivalRate: 50
+
+beforeTest:
+  - initializePools:
+      pools:
+        - name: "issuer-pool"
+          mnemonicsFile: "./mnemonics/batch-source-wallets.txt"
+          amount: 500
+
+        - name: "recipient-pool"
+          mnemonicsFile: "./mnemonics/batch-recipient-wallets.txt"
+          amount: 500
+
+scenarios:
+  - name: "Token flow test"
+    weight: 1
+    engine: spark
+    before:
+      - lockWallets:
+          wallets:
+            - { walletName: "issuer", pool: "issuer-pool" }
+            - { walletName: "recipient", pool: "recipient-pool" }
+    flow:
+      - announceToken:
+          walletName: "issuer"
+      - mintToken:
+          walletName: "issuer"
+          amount: 10
+
+      # Perform the transfer activity with announced tokens
+      - loop:
+          count: 20
+          actions:
+            - transferToken:
+                walletName: "issuer"
+                receiverName: "recipient"
+                amount: 1
+            - transferToken:
+                walletName: "recipient"
+                receiverName: "issuer"
+                amount: 1
+            - transferToken:
+                walletName: "issuer"
+                receiverName: "recipient"
+                amount: 2
+            - transferToken:
+                walletName: "recipient"
+                receiverName: "issuer"
+                amount: 2
+    after:
+      # Unlock the wallets and close connections
+      unlockWallets:
+        wallets: ["issuer", "recipient"]

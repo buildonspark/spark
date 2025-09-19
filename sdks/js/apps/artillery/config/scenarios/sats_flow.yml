@@ -1,0 +1,67 @@
+config:
+  target: "http://localhost"
+  engines:
+    spark: {}
+  phases:
+    - duration: 10
+      arrivalRate: 20
+
+beforeTest:
+  - initializePools:
+      pools:
+        - name: "sender-pool"
+          mnemonicsFile: "./mnemonics/batch-source-wallets.txt"
+          amount: 200
+          # Minimal balance must be not less than wallet exit amount + transfer amount * loops count
+          minBalance: 3500
+          randomSelection: true
+
+        - name: "receiver-pool"
+          mnemonicsFile: "./mnemonics/batch-recipient-wallets.txt"
+          amount: 200
+
+scenarios:
+  - name: "Sats flow test"
+    weight: 1
+    engine: spark
+    before:
+      - lockWallets:
+          wallets:
+            - { walletName: "sender", pool: "sender-pool" }
+            - { walletName: "receiver", pool: "receiver-pool" }
+    flow:
+      - loop:
+          count: 20
+          actions:
+            - transfer:
+                walletName: "sender"
+                receiverName: "receiver"
+                amount: 10
+
+            - claimTransfer:
+                walletName: "receiver"
+
+            - transfer:
+                walletName: "receiver"
+                receiverName: "sender"
+                amount: 10
+
+            - claimTransfer:
+                walletName: "sender"
+
+      - getStaticAddress:
+          walletName: "receiver"
+          storeAs: "receiverInitial"
+
+      - withdraw:
+          senderWallet: "sender"
+          receiverWallet: "receiverInitial"
+          storeAs: "receiverWallet"
+          amount: 2500
+
+      - claimStaticDeposit:
+          walletName: "receiverWallet"
+    after:
+      # Unlock the wallets and close connections
+      unlockWallets:
+        wallets: ["sender", "receiver"]

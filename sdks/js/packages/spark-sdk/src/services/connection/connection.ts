@@ -183,6 +183,7 @@ export class ConnectionManager {
       /* React Native can cause some outgoing requests to be paused which can result
          in challenges expiring, so we'll retry any authentication failures: */
       for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        console.log(`connection attempt ${attempt}`);
         let sparkAuthnClient: SparkAuthnServiceClientWithClose | undefined;
         try {
           const identityPublicKey =
@@ -226,6 +227,16 @@ export class ConnectionManager {
             if (error.message.includes("challenge expired")) {
               console.warn(
                 `Authentication attempt ${attempt + 1} failed due to expired challenge, retrying...`,
+              );
+              lastError = error;
+              continue;
+            }
+
+            if (
+              error.message.includes("UNAVAILABLE: No connection established.")
+            ) {
+              console.warn(
+                `Authentication attempt ${attempt + 1} failed due to unavailable status, retrying...`,
               );
               lastError = error;
               continue;

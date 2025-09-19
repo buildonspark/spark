@@ -1,10 +1,9 @@
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import { IssuerSparkWalletNoEvents } from "./issuer-wallet-no-events";
 
-type WalletType = IssuerSparkWallet | IssuerSparkWalletNoEvents;
-
 import type { SparkContext, ArtilleryEventEmitter } from "./types";
 import { LockManager } from "./lock-manager";
+import { bytesToHex } from "@noble/hashes/utils";
 
 const lockManager = LockManager.getInstance();
 
@@ -59,17 +58,6 @@ export const lockedWallets = new Map<
   {
     wallet: IssuerSparkWallet;
     pool: string;
-  }
->();
-
-// Global named wallets map
-export const globalNamedWallets = new Map<
-  string,
-  {
-    wallet: IssuerSparkWallet;
-    address: string;
-    publicKey: string;
-    balance: bigint;
   }
 >();
 
@@ -134,11 +122,11 @@ function getWalletsToLockConfig(
 } {
   let walletsToLock: LockWalletConfig[] = [];
   let pollInterval = 500;
-  let pollMaxAttempts = 120;
+  let pollMaxAttempts = 500;
   if (lockWalletsConfig) {
     walletsToLock = lockWalletsConfig.wallets || [];
     pollInterval = lockWalletsConfig.interval ?? 500;
-    pollMaxAttempts = lockWalletsConfig.maxAttempts ?? 120;
+    pollMaxAttempts = lockWalletsConfig.maxAttempts ?? 500;
   }
   return { walletsToLock, pollInterval, pollMaxAttempts };
 }
@@ -181,7 +169,7 @@ async function lockWalletByConfig(
   // Get an available wallet from the pool
   let wallet: any;
   let attempts = 0;
-
+  console.log(`Pool: ${pool.wallets.length}`);
   while (attempts < pollMaxAttempts && !wallet) {
     attempts++;
 
@@ -262,12 +250,15 @@ async function lockWalletByConfig(
 
   lockedWalletsParam.set(name, { wallet, pool: actualPoolName });
   context.scenarioLockedWallets.push(name);
-  globalNamedWallets.set(name, {
-    wallet,
-    address,
-    publicKey,
+  context.vars = context.vars || {};
+  context.vars[name] = {
+    wallet: wallet,
+    name: name,
+    address: address,
+    publicKey:
+      typeof publicKey === "string" ? publicKey : bytesToHex(publicKey),
     balance: 0n,
-  });
+  };
 
   return { name, success: true };
 }
@@ -320,12 +311,15 @@ async function lockDefaultWallets(
 
       lockedWalletsParam.set(name, { wallet, pool: usedPoolName });
       context.scenarioLockedWallets.push(name);
-      globalNamedWallets.set(name, {
-        wallet,
-        address,
-        publicKey,
+      context.vars = context.vars || {};
+      context.vars[name] = {
+        wallet: wallet,
+        name: name,
+        address: address,
+        publicKey:
+          typeof publicKey === "string" ? publicKey : bytesToHex(publicKey),
         balance: 0n,
-      });
+      };
     }
   }
 }
@@ -531,7 +525,8 @@ export async function afterScenario(
           );
         }
         lockedWallets.delete(name);
-        globalNamedWallets.delete(name);
+        context.vars = context.vars || {};
+        delete (context.vars as Record<string, unknown>)[name];
       }
     }
 
@@ -560,7 +555,7 @@ export async function afterTest(
 
     walletPools.clear();
     lockedWallets.clear();
-    globalNamedWallets.clear();
+    context.vars = {};
 
     console.log("AfterTest: Cleanup complete");
     done();

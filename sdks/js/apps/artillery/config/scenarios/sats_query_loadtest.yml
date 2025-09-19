@@ -1,0 +1,98 @@
+config:
+  target: "http://localhost"
+  engines:
+    spark: {}
+  phases:
+    - duration: 10
+      arrivalRate: 10
+
+beforeTest:
+  - initializePools:
+      pools:
+        - name: "issuer-pool"
+          mnemonicsFile: "./mnemonics/batch-source-wallets.txt"
+          amount: 100
+          minBalance: 15
+
+        - name: "recipient-pool"
+          mnemonicsFile: "./mnemonics/batch-recipient-wallets.txt"
+          amount: 100
+
+scenarios:
+  # Scenario 1: querying nodes for locked issuer wallet
+  - name: "Query Nodes"
+    # Weight is a percentage of whole calls amount, in this case it is 20%
+    weight: 45
+    engine: spark
+    before:
+      - lockWallets:
+          wallets:
+            - { walletName: "issuer", pool: "issuer-pool" }
+    flow:
+      - queryNodes:
+          walletName: "issuer"
+    after:
+      # Unlocking wallet to let it be used by another scenario
+      unlockWallets:
+        wallets: ["issuer"]
+
+  # Scenario 2: query pending transfers for issuer wallet
+  - name: "Query pending transfers"
+    weight: 15
+    engine: spark
+    before:
+      - lockWallets:
+          wallets:
+            - { walletName: "issuer", pool: "issuer-pool" }
+    flow:
+      - queryPendingTransfers:
+          walletName: "issuer"
+    after:
+      unlockWallets:
+        wallets: ["issuer"]
+
+  # Scenario 3: subscribe to events for issuer wallet
+  - name: "Subscribe to events"
+    weight: 10
+    engine: spark
+    before:
+      - lockWallets:
+          wallets:
+            - { walletName: "issuer", pool: "issuer-pool" }
+    flow:
+      - subscribeToEvents:
+          walletName: "issuer"
+
+    after:
+      unlockWallets:
+        wallets: ["issuer"]
+
+  # Scenario 4: generate deposit address for issuer wallet
+  - name: "Generate deposit address"
+    weight: 20
+    engine: spark
+    before:
+      - lockWallets:
+          wallets:
+            - { walletName: "issuer", pool: "issuer-pool" }
+    flow:
+      - generateDepositAddress:
+          walletName: "issuer"
+    after:
+      unlockWallets:
+        wallets: ["issuer"]
+
+  # Scenario 5: query all transfers for issuer wallet
+  - name: "Query all transfers"
+    weight: 10
+    engine: spark
+    before:
+      - lockWallets:
+          wallets:
+            - { walletName: "issuer", pool: "issuer-pool" }
+    flow:
+      - queryAllTransfers:
+          walletName: "issuer"
+    after:
+      unlockWallets:
+        wallets: ["issuer"]

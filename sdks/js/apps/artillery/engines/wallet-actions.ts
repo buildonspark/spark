@@ -16,6 +16,7 @@ import type { SparkContext, ArtilleryEventEmitter, EngineStep } from "./types";
 import { randomUUID } from "crypto";
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import * as path from "path";
+import { ConnectionManager, KeyDerivationType } from "@buildonspark/spark-sdk";
 
 type WalletType = IssuerSparkWallet | IssuerSparkWalletNoEvents;
 
@@ -1330,7 +1331,7 @@ export class WalletActions {
     pools?: string[];
     force?: boolean;
   }): EngineStep {
-    return async function (context: SparkContext, callback) {
+    return async (context: SparkContext, callback) => {
       try {
         const poolsToUnlock = params?.pools || Array.from(walletPools.keys());
         const forceUnlock = params?.force || false;
@@ -1692,9 +1693,8 @@ export class WalletActions {
     walletName: string;
     storeAs: string;
   }): EngineStep {
+    const ee = this.engine?.scenarioEE ?? this.ee;
     return async function (context: SparkContext, callback) {
-      const startTime = Date.now();
-
       try {
         const walletInfo = params.walletName
           ? context.vars?.[params.walletName]
@@ -1728,19 +1728,19 @@ export class WalletActions {
           balance: balance,
         };
 
-        this.ee.emit("histogram", "spark.get_static_address_time", Date.now());
-        this.ee.emit("counter", "spark.get_static_address_success", 1);
+        ee.emit("histogram", "spark.get_static_address_time", Date.now());
+        ee.emit("counter", "spark.get_static_address_success", 1);
         callback(null, context);
       } catch (error) {
-        this.ee.emit("counter", "spark.get_static_address_failed", 1);
+        ee.emit("counter", "spark.get_static_address_failed", 1);
         callback(error);
       }
     };
   }
 
   printWalletInfo(params: { storedName: string }): EngineStep {
+    const ee = this.engine?.scenarioEE ?? this.ee;
     return async function (context: SparkContext, callback) {
-      const startTime = Date.now();
       try {
         const walletInfo: {
           walletName: string;
@@ -1754,20 +1754,19 @@ export class WalletActions {
           throw new Error(`Wallet ${params.storedName} not found`);
         }
 
-        this.ee.emit("histogram", "spark.print_wallet_info_time", Date.now());
-        this.ee.emit("counter", "spark.print_wallet_info_success", 1);
+        ee.emit("histogram", "spark.print_wallet_info_time", Date.now());
+        ee.emit("counter", "spark.print_wallet_info_success", 1);
         callback(null, context);
       } catch (error) {
-        this.ee.emit("counter", "spark.print_wallet_info_failed", 1);
+        ee.emit("counter", "spark.print_wallet_info_failed", 1);
         callback(error);
       }
     };
   }
 
   claimStaticDeposit(params: { walletName: string }): EngineStep {
+    const ee = this.engine?.scenarioEE ?? this.ee;
     return async function (context: SparkContext, callback) {
-      const startTime = Date.now();
-
       try {
         const walletInfo: {
           wallet: IssuerSparkWallet;
@@ -1834,6 +1833,7 @@ export class WalletActions {
     storeAs: string;
     amount: number;
   }): EngineStep {
+    const ee = this.engine?.scenarioEE ?? this.ee;
     return async function (context, callback) {
       try {
         let namedWalletInfo = context.vars?.[params.senderWallet];
@@ -1891,16 +1891,12 @@ export class WalletActions {
           txId: result.coopExitTxid,
         };
 
-        this.ee.emit("counter", "spark.exit_succesful", 1);
-        this.ee.emit(
-          "counter",
-          "spark.amount_withdrawed",
-          Number(params.amount),
-        );
+        ee.emit("counter", "spark.exit_succesful", 1);
+        ee.emit("counter", "spark.amount_withdrawed", Number(params.amount));
 
         callback(null, context);
       } catch (error) {
-        this.ee.emit("counter", "spark.exit_error", 1);
+        ee.emit("counter", "spark.exit_error", 1);
         callback(error);
       }
     };
@@ -2138,5 +2134,182 @@ export class WalletActions {
         callback(error);
       }
     };
+  }
+
+  queryNodes(params: { walletName: string }): EngineStep {
+    return async (context: SparkContext, callback): Promise<void> => {
+      const ee = this.engine?.scenarioEE ?? this.ee;
+
+      // Initialize event emitter
+      try {
+        // Get the named wallet from context
+        const walletInfo = this.getNamedWalletFromContext(
+          { walletName: params.walletName },
+          context,
+        );
+
+        console.log(`Querying nodes for wallet: ${walletInfo.wallet.address}`);
+
+        // Query nodes for given wallet name
+        await (walletInfo as any).wallet.queryNodes(
+          { includeParents: false } as any,
+          undefined,
+          2,
+        );
+
+        ee.emit("counter", "spark.successful_query_nodes", 1);
+        callback(null, context);
+      } catch (error) {
+        console.log("Query nodes failed: ", error.message);
+        ee.emit("counter", "spark.failed_queries", 1);
+        callback(error);
+      }
+    };
+  }
+
+  queryPendingTransfers(params: { walletName: string }): EngineStep {
+    return async (context: SparkContext, callback): Promise<void> => {
+      const ee = this.engine?.scenarioEE ?? this.ee;
+      try {
+        const walletInfo = this.getNamedWalletFromContext(
+          { walletName: params.walletName },
+          context,
+        );
+
+        console.log(
+          `Querying pending transfers for wallet: ${walletInfo.address}`,
+        );
+        await (walletInfo as any).wallet.queryPendingTransfers({
+          walletName: params.walletName,
+        });
+
+        ee.emit("counter", "spark.successful_transfers_queries", 1);
+        callback(null, context);
+      } catch (error) {
+        console.log("Query transfers failed:", error.message);
+        ee.emit("counter", "spark.failed_transfers_queries", 1);
+        callback(error);
+      }
+    };
+  }
+
+  subscribeToEvents(params: { walletName: string }): EngineStep {
+    return async (context: SparkContext, callback): Promise<void> => {
+      const ee = this.engine?.scenarioEE ?? this.ee;
+      try {
+        const walletInfo = this.getNamedWalletFromContext(
+          { walletName: params.walletName },
+          context,
+        );
+
+        console.log(`Subscribing to events for wallet: ${walletInfo.address}`);
+        const connection = (walletInfo as any).wallet.connectionManager;
+        const coordinatorAddress = (
+          walletInfo as any
+        ).wallet.config.getCoordinatorAddress();
+        const sparkClient =
+          await connection.createSparkStreamClient(coordinatorAddress);
+        await connection.getStreamChannel(walletInfo.address);
+
+        sparkClient.subscribe_to_events(
+          {
+            identityPublicKey: await (
+              walletInfo as any
+            ).wallet.config.signer.getIdentityPublicKey(),
+          },
+          {
+            signal: (walletInfo as any).wallet.streamController?.signal,
+          },
+        );
+
+        ee.emit("counter", "spark.successful_subscribe_events", 1);
+        callback(null, context);
+      } catch (error) {
+        console.log("Subscription events failed:", error.message);
+        ee.emit("counter", "subscription_events_failed", 1);
+        callback(error);
+      }
+    };
+  }
+
+  generateDepositAddress(params: { walletName: string }): EngineStep {
+    return async (context: SparkContext, callback): Promise<void> => {
+      const ee = this.engine?.scenarioEE ?? this.ee;
+      try {
+        const walletInfo: any = this.getNamedWalletFromContext(
+          { walletName: params.walletName },
+          context,
+        );
+
+        console.log(
+          `Generating deposit address for wallet: ${walletInfo.address}`,
+        );
+        const leafId = randomUUID();
+        const pubKey = await (
+          walletInfo as any
+        ).wallet.config.signer.getPublicKeyFromDerivation({
+          type: KeyDerivationType.LEAF,
+          path: leafId,
+        });
+        const depositResp = await (
+          walletInfo as any
+        ).wallet.depositService.generateDepositAddress({
+          signingPubkey: pubKey,
+          leafId,
+        });
+
+        console.log(`Generated deposit address: ${depositResp}`);
+
+        ee.emit("counter", "spark.successful_deposit_address", 1);
+        callback(null, context);
+      } catch (error) {
+        console.log("Generating deposit address for wallet: ", error.message);
+        ee.emit("counter", "spark.failed_queries", 1);
+        callback(error);
+      }
+    };
+  }
+
+  queryAllTransfers(params: { walletName: string }): EngineStep {
+    return async (context: SparkContext, callback): Promise<void> => {
+      const ee = this.engine?.scenarioEE ?? this.ee;
+      try {
+        const walletInfo: any = this.getNamedWalletFromContext(
+          { walletName: params.walletName },
+          context,
+        );
+        console.log(`Querying all transfers for wallet: ${walletInfo.address}`);
+
+        await (walletInfo as any).wallet.transferService.queryAllTransfers();
+
+        ee.emit("counter", "spark.successful_queried_transfers", 1);
+        callback(null, context);
+      } catch (error) {
+        console.log("Querying all transfers failed: ", error.message);
+        ee.emit("counter", "spark.failed_query_transfers", 1);
+        callback(error);
+      }
+    };
+  }
+
+  public getNamedWalletFromContext(
+    params: { walletName: string },
+    context: SparkContext,
+  ): any {
+    const walletInfo = params.walletName
+      ? context.vars?.[params.walletName]
+      : context.sparkWallet;
+    if (!walletInfo) {
+      console.error(
+        `  ERROR: Wallet "${params.walletName || "default"}" not found in context`,
+      );
+      console.error(
+        `  context.vars keys:`,
+        context.vars ? Object.keys(context.vars) : "undefined",
+      );
+      throw new Error(`Wallet ${params.walletName || "default"} not found`);
+    }
+
+    return walletInfo;
   }
 }

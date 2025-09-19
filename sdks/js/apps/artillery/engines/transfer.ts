@@ -1,7 +1,6 @@
 // @ts-nocheck
 import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import {
-  TransferParams,
   SparkContext,
   EngineStep,
   ArtilleryEventEmitter,

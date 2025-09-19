@@ -30,6 +30,7 @@ export class SparkEngine {
     announceToken: (params?: any) => this.tokenActions.announceToken(params),
     announceTokensForPool: (params?: any) =>
       this.tokenActions.announceTokensForPool(params),
+    lockWallets: (params?: any) => this.walletActions.lockWallets(params),
     unlockWallets: (params?: any) => this.walletActions.unlockWallets(params),
 
     mintToken: (params?: any) => this.tokenActions.mintToken(params),
@@ -47,6 +48,15 @@ export class SparkEngine {
     claimStaticDeposit: (params?: any) =>
       this.walletActions.claimStaticDeposit(params),
     withdraw: (params?: any) => this.walletActions.withdraw(params),
+    queryNodes: (params?: any) => this.walletActions.queryNodes(params),
+    queryPendingTransfers: (params?: any) =>
+      this.walletActions.queryPendingTransfers(params),
+    subscribeToEvents: (params: any) =>
+      this.walletActions.subscribeToEvents(params),
+    generateDepositAddress: (params?: any) =>
+      this.walletActions.generateDepositAddress(params),
+    queryAllTransfers: (params?: any) =>
+      this.walletActions.queryAllTransfers(params),
   } as const;
 
   public readonly availableActions = Object.keys(this.stepActions) as Array<
