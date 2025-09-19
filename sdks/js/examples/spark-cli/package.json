@@ -7,7 +7,7 @@
   "scripts": {
     "cli": "cross-env NODE_ENV=production NETWORK=regtest tsx src/cli.ts",
     "cli:local": "cross-env NODE_ENV=development NETWORK=local tsx src/cli.ts",
-    "cli:minikube": "cross-env NODE_ENV=developent NETWORK=local HERMETIC_TEST=true tsx src/cli.ts",
+    "cli:minikube": "cross-env NODE_ENV=developent NETWORK=local HERMETIC_TEST=true MINIKUBE_IP=$(minikube ip) tsx src/cli.ts",
     "cli:mainnet": "cross-env NODE_ENV=production NETWORK=mainnet tsx src/cli.ts",
     "cli:dev": "cross-env NODE_ENV=development NETWORK=regtest CONFIG_FILE=config/dev-regtest-config.json tsx src/cli.ts",
     "cli:dev:mainnet": "cross-env NODE_ENV=development NETWORK=mainnet CONFIG_FILE=config/dev-mainnet-config.json tsx src/cli.ts",

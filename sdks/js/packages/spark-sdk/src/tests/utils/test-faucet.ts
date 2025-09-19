@@ -42,9 +42,9 @@ export class BitcoinFaucet {
   private lock: Promise<void> = Promise.resolve();
 
   private constructor(
-    private url: string = "http://127.0.0.1:8332",
-    private username: string = "testutil",
-    private password: string = "testutilpassword",
+    private url: string,
+    private username: string,
+    private password: string,
   ) {
     this.miningAddress = getP2TRAddressFromPublicKey(
       secp256k1.getPublicKey(STATIC_MINING_KEY),
@@ -52,12 +52,16 @@ export class BitcoinFaucet {
     );
   }
 
-  static getInstance(
-    url: string = "http://127.0.0.1:8332",
-    username: string = "testutil",
-    password: string = "testutilpassword",
-  ): BitcoinFaucet {
+  static getInstance(): BitcoinFaucet {
     if (!BitcoinFaucet.instance) {
+      const url =
+        process.env.BITCOIN_RPC_URL ||
+        (process.env.MINIKUBE_IP
+          ? `http://${process.env.MINIKUBE_IP}:8332`
+          : "http://127.0.0.1:8332");
+      const username = process.env.BITCOIN_RPC_USER || "testutil";
+      const password = process.env.BITCOIN_RPC_PASSWORD || "testutilpassword";
+
       BitcoinFaucet.instance = new BitcoinFaucet(url, username, password);
     }
     return BitcoinFaucet.instance;
