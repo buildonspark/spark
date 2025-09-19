@@ -38,7 +38,11 @@ func TimeoutInterceptor(knobsService knobs.Knobs, defaultServerUnaryHandlerTimeo
 		case res := <-resultChan:
 			return res.resp, res.err
 		case <-timeoutCtx.Done():
-			return nil, status.Errorf(codes.DeadlineExceeded, "request timeout after %v", timeout)
+			if timeoutCtx.Err() == context.DeadlineExceeded {
+				return nil, status.Errorf(codes.DeadlineExceeded, "request timeout after %v", timeout)
+			}
+
+			return nil, timeoutCtx.Err()
 		}
 	}
 }
