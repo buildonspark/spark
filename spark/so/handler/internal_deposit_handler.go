@@ -862,13 +862,17 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 
 	utxoSwap, err := db.UtxoSwap.Query().
 		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).
-		Where(utxoswap.StatusEQ(st.UtxoSwapStatusCreated)).
+		Where(utxoswap.Or(utxoswap.StatusEQ(st.UtxoSwapStatusCreated), utxoswap.StatusEQ(st.UtxoSwapStatusCompleted))).
 		// The identity public key of the coordinator that created the utxo swap.
 		// It's been verified above.
 		Where(utxoswap.CoordinatorIdentityPublicKeyEQ(coordinatorPubKey.Serialize())).
 		Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get utxo swap: %w", err)
+		return nil, fmt.Errorf("unable to get utxo swap for utxo %s: %w", targetUtxo.ID, err)
+	}
+
+	if utxoSwap != nil && utxoSwap.Status == st.UtxoSwapStatusCompleted {
+		return &pbinternal.UtxoSwapCompletedResponse{}, nil
 	}
 
 	if err := CompleteUtxoSwap(ctx, utxoSwap); err != nil {
