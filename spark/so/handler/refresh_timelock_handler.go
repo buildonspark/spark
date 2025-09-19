@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/objects"
 )
@@ -59,9 +60,16 @@ func (h *RefreshTimelockHandler) refreshTimelock(ctx context.Context, req *pb.Re
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-	leaf, err := db.TreeNode.Get(ctx, leafUUID)
+	leaf, err := db.TreeNode.Query().Where(treenode.ID(leafUUID)).ForUpdate().Only(ctx)
 	if err != nil {
 		return nil, err
+	}
+	leafOwnerIDPubKey, err := keys.ParsePublicKey(leaf.OwnerIdentityPubkey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse owner identity public key: %w", err)
+	}
+	if !leafOwnerIDPubKey.Equals(reqOwnerIDPubKey) {
+		return nil, fmt.Errorf("leaf %s is not owned by the authenticated identity public key %s", leaf.ID, reqOwnerIDPubKey)
 	}
 
 	// Start at the node and collect txs by going through the signing jobs
@@ -118,7 +126,7 @@ func (h *RefreshTimelockHandler) refreshTimelock(ctx context.Context, req *pb.Re
 			} else if i == len(req.SigningJobs)-2 {
 				rawTxBytes = node.RawTx
 			} else {
-				node, err = node.QueryParent().First(ctx)
+				node, err = node.QueryParent().ForUpdate().First(ctx)
 				if err != nil {
 					return nil, fmt.Errorf("unable to query parent node: %w", err)
 				}
