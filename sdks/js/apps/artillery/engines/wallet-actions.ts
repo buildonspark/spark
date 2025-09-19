@@ -25,12 +25,16 @@ const removeLockFile = removeLockFileFromHooks;
 const isLocked = isLockedFromHooks;
 
 export class WalletActions {
-  private poolManager = WalletPoolManager.getInstance();
+  private poolManager: WalletPoolManager;
+  private engine: any; // Reference to parent engine
 
   constructor(
     private ee: ArtilleryEventEmitter,
-    private engine?: any,
-  ) {}
+    engine?: any,
+  ) {
+    this.poolManager = WalletPoolManager.getInstance();
+    this.engine = engine;
+  }
 
   private getWallet(context: SparkContext, walletName?: string) {
     const walletInfo = walletName
@@ -1632,6 +1636,7 @@ export class WalletActions {
   }
 
   cleanupPools(): EngineStep {
+    const poolManager = this.poolManager;
     return async function (context: SparkContext, callback) {
       try {
         const unlockedCount = lockedWallets.size;
@@ -1663,7 +1668,7 @@ export class WalletActions {
           context.scenarioLockedWallets = [];
         }
 
-        this.poolManager.clearAll();
+        poolManager.clearAll();
 
         const poolCount = walletPools.size;
         walletPools.clear();
@@ -1902,236 +1907,318 @@ export class WalletActions {
     };
   }
 
-  distributeAndRebalance(params?: {
+  fundWalletPool(params?: {
     pools?: string[];
     minAmount?: number;
   }): EngineStep {
-    return async function (context: SparkContext, callback) {
-      try {
-        const minAmount = params?.minAmount || 10000;
-        const poolNames = params?.pools || Array.from(walletPools.keys());
-        const walletBalances: Map<
-          string,
-          {
-            wallet: IssuerSparkWallet;
-            balance: bigint;
-            pool: string;
-            address: string;
+    let ee: ArtilleryEventEmitter;
+    const scenarioEE = this.engine?.scenarioEE;
+    if (scenarioEE) {
+      ee = scenarioEE;
+    } else {
+      ee = this.engine;
+    }
+    const cmpBig = (x: bigint, y: bigint) => (x < y ? -1 : x > y ? 1 : 0);
+    const minBig = (a: bigint, b: bigint) => (a < b ? a : b);
+
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    async function runWithConcurrency<T>(
+      items: T[],
+      limit: number,
+      task: (x: T) => Promise<void>,
+    ) {
+      let i = 0;
+      const workers = Array(Math.min(limit, items.length))
+        .fill(0)
+        .map(async () => {
+          while (i < items.length) {
+            const idx = i++;
+            await task(items[idx]);
           }
-        > = new Map();
+        });
+      await Promise.all(workers);
+    }
+
+    return async (context: SparkContext, callback) => {
+      try {
+        const minAmount = BigInt(params?.minAmount ?? 4000);
+        const poolNames = params?.pools ?? Array.from(walletPools.keys());
+
+        type WalletMeta = {
+          wallet: IssuerSparkWallet;
+          address: string;
+          pool: string;
+        };
+        const metas: WalletMeta[] = [];
+
+        for (const poolName of poolNames) {
+          const pool = walletPools.get(poolName);
+          if (!pool) {
+            console.warn(`Pool "${poolName}" not found, skip`);
+            continue;
+          }
+          for (const wallet of pool.wallets)
+            metas.push({ wallet, address: "", pool: poolName });
+        }
+
+        const addrByWallet = new Map<IssuerSparkWallet, string>();
+        const poolByWallet = new Map<IssuerSparkWallet, string>();
+        const balanceByAddr = new Map<string, bigint>();
+
+        await runWithConcurrency(metas, 12, async (m) => {
+          try {
+            const address = await m.wallet.getSparkAddress();
+            addrByWallet.set(m.wallet, address);
+            poolByWallet.set(m.wallet, m.pool);
+
+            const br = await m.wallet.getBalance();
+            const bal = BigInt(br.balance);
+            balanceByAddr.set(address, bal);
+          } catch (e: any) {
+            console.error(`Balance load failed: ${e?.message ?? e}`);
+          }
+        });
+
         const needsFunding: Array<{
           wallet: IssuerSparkWallet;
           deficit: bigint;
-          pool: string;
           address: string;
         }> = [];
         const hasSurplus: Array<{
           wallet: IssuerSparkWallet;
           surplus: bigint;
-          pool: string;
           address: string;
         }> = [];
 
-        let totalDeficit = 0n;
-        let totalSurplus = 0n;
+        let totalDeficit = 0n,
+          totalSurplus = 0n;
+        for (const { wallet } of metas) {
+          const address = addrByWallet.get(wallet);
+          if (!address) continue;
+          const bal = balanceByAddr.get(address) ?? 0n;
 
-        for (const poolName of poolNames) {
-          const pool = walletPools.get(poolName);
-          if (!pool) {
-            continue;
-          }
-
-          for (const wallet of pool.wallets) {
-            try {
-              const address = await wallet.getSparkAddress();
-              const balanceResult = await wallet.getBalance();
-              const balance = BigInt(balanceResult.balance);
-
-              walletBalances.set(address, {
-                wallet,
-                balance,
-                pool: poolName,
-                address,
-              });
-
-              if (balance < BigInt(minAmount)) {
-                const deficit = BigInt(minAmount) - balance;
-                needsFunding.push({ wallet, deficit, pool: poolName, address });
-                totalDeficit += deficit;
-              } else if (balance > BigInt(minAmount)) {
-                const surplus = balance - BigInt(minAmount);
-                hasSurplus.push({ wallet, surplus, pool: poolName, address });
-                totalSurplus += surplus;
-              } else {
-              }
-            } catch (error) {}
+          if (bal < minAmount) {
+            const d = minAmount - bal;
+            needsFunding.push({ wallet, deficit: d, address });
+            totalDeficit += d;
+          } else if (bal > minAmount) {
+            const s = bal - minAmount;
+            hasSurplus.push({ wallet, surplus: s, address });
+            totalSurplus += s;
           }
         }
 
-        if (needsFunding.length === 0) {
-          callback(null, context);
-          return;
-        }
-
-        const fundingSources: Array<{
-          wallet: IssuerSparkWallet;
-          availableAmount: bigint;
-          pool: string;
-          address: string;
-        }> = [];
-
-        hasSurplus.sort((a, b) => Number(b.surplus - a.surplus));
-
-        for (const surplusWallet of hasSurplus) {
-          fundingSources.push({
-            wallet: surplusWallet.wallet,
-            availableAmount: surplusWallet.surplus,
-            pool: surplusWallet.pool,
-            address: surplusWallet.address,
-          });
-        }
-
-        const totalAvailable = fundingSources.reduce(
-          (sum, source) => sum + source.availableAmount,
-          0n,
+        console.log(
+          `Analysis: need=${needsFunding.length}, surplus=${hasSurplus.length}, deficit=${totalDeficit}, surplus=${totalSurplus}`,
         );
 
-        if (totalAvailable < totalDeficit) {
-          const fundingNeeded = totalDeficit - totalAvailable;
+        if (needsFunding.length === 0) {
+          context.vars ||= {};
+          context.vars.rebalanceTransferCount = 0;
+          context.vars.rebalanceTotalTransferred = 0;
+          return callback(null, context);
+        }
 
-          const allWallets: Array<{
-            wallet: IssuerSparkWallet;
-            balance: bigint;
-            pool: string;
-          }> = [];
+        hasSurplus.sort((a, b) => cmpBig(b.surplus, a.surplus));
+        type Source = {
+          wallet: IssuerSparkWallet;
+          available: bigint;
+          address: string;
+        };
+        const sources: Source[] = hasSurplus.map((s) => ({
+          wallet: s.wallet,
+          available: s.surplus,
+          address: s.address,
+        }));
 
-          for (const poolName of poolNames) {
-            const pool = walletPools.get(poolName);
-            if (pool) {
-              for (const wallet of pool.wallets) {
-                const balanceInfo = walletBalances.get(
-                  await wallet.getSparkAddress(),
-                );
-                if (balanceInfo) {
-                  allWallets.push({
-                    wallet,
-                    balance: balanceInfo.balance,
-                    pool: poolName,
-                  });
-                }
-              }
-            }
-          }
+        const sumAvailable = sources.reduce((acc, s) => acc + s.available, 0n);
 
-          allWallets.sort((a, b) => Number(a.balance - b.balance));
+        if (sumAvailable < totalDeficit) {
+          const needFromFaucet = totalDeficit - sumAvailable;
+          console.log(`Need faucet: ${needFromFaucet}`);
 
-          const faucetWallets = allWallets.slice(0, 10).map((w) => ({
-            wallet: w.wallet,
-            getSparkAddress: () => w.wallet.getSparkAddress(),
-            getSingleUseDepositAddress: () =>
-              w.wallet.getSingleUseDepositAddress(),
-            claimDeposit: (txId: string) => w.wallet.claimDeposit(txId),
-          }));
+          const allByBalanceAsc = metas
+            .map((m) => ({
+              wallet: m.wallet,
+              address: addrByWallet.get(m.wallet)!,
+              bal: balanceByAddr.get(addrByWallet.get(m.wallet)!) ?? 0n,
+            }))
+            .filter((x) => x.address)
+            .sort((a, b) => cmpBig(a.bal, b.bal))
+            .slice(0, 10);
 
-          if (faucetWallets.length === 0) {
-            throw new Error("No wallets available for faucet funding");
-          }
+          const minPerTx = 1000n;
+          const maxPerTx = 50000n;
 
-          const { fundMultipleWallets } = await import(
+          const { fundWalletFromGraphQL } = await import(
             "./bitcoin-faucet-wrapper"
           );
 
-          await fundMultipleWallets(faucetWallets, fundingNeeded, {
-            maxPerTransaction: 50000n,
-            maxTransactionsPerBatch: 2,
-            batchDelayMs: 30000,
-            maxRetryDuration: 120000,
-            retryInterval: 30000,
-            onSuccess: (wallet, amount, address) => {
-              let walletPool = poolNames[0];
-              for (const poolName of poolNames) {
-                const pool = walletPools.get(poolName);
-                if (pool && pool.wallets.includes(wallet)) {
-                  walletPool = poolName;
-                  break;
-                }
-              }
+          let received = 0n;
+          let backoff = 30_000;
+          for (
+            let idx = 0;
+            idx < allByBalanceAsc.length && received < needFromFaucet;
+            idx++
+          ) {
+            const w = allByBalanceAsc[idx].wallet;
+            const bal = allByBalanceAsc[idx].bal;
+            const address = addrByWallet.get(w)!;
+            const remaining = needFromFaucet - received;
+            const ask =
+              remaining <= maxPerTx
+                ? remaining < minPerTx
+                  ? minPerTx
+                  : remaining
+                : maxPerTx;
 
-              fundingSources.push({
-                wallet,
-                availableAmount: amount,
-                pool: walletPool,
-                address,
-              });
-            },
-            emitEvent: (event, value) => {
-              this.ee.emit("counter", event, value);
-            },
-          });
+            try {
+              const deposit = await w.getSingleUseDepositAddress();
+              const txId = await fundWalletFromGraphQL(deposit, Number(ask));
+              ee.emit("counter", "spark.faucet_req", 1);
+
+              await sleep(backoff);
+
+              try {
+                const leaves = await w.claimDeposit(txId);
+                await sleep(40_000);
+
+                if (leaves?.length) {
+                  const newBal = await w.getBalance();
+                  const got = newBal.balance - bal;
+                  received += got;
+                  sources.push({
+                    wallet: w,
+                    available: got - minAmount,
+                    address,
+                  });
+
+                  ee.emit("counter", "spark.faucet_ok", 1);
+                  console.log(
+                    `Faucet: got ${got} to ${address} (total received ${received}/${needFromFaucet})`,
+                  );
+                  allByBalanceAsc[idx].bal = newBal.balance;
+                  backoff = 30_000;
+                } else {
+                  ee.emit("counter", "spark.faucet_claim_empty", 1);
+                }
+              } catch (e: any) {
+                const msg = String(e?.message ?? e);
+
+                ee.emit("counter", "spark.faucet_claim_failed", 1);
+                console.error(`Faucet claim failed: ${msg}`);
+              }
+            } catch (e: any) {
+              const msg = String(e?.message ?? e);
+              if (msg.includes("429") || msg.toLowerCase().includes("rate")) {
+                ee.emit("counter", "spark.faucet_rate", 1);
+                await sleep(backoff);
+                backoff = Math.min(backoff * 2, 5 * 60_000);
+                idx--;
+              } else {
+                ee.emit("counter", "spark.faucet_err", 1);
+              }
+            }
+          }
+
+          console.log(`Faucet received: ${received}/${needFromFaucet}`);
         }
 
+        needsFunding.sort((a, b) => cmpBig(b.deficit, a.deficit));
+        sources.sort((a, b) => cmpBig(b.available, a.available));
+
+        let i = 0,
+          j = 0;
         let transferCount = 0;
         let totalTransferred = 0n;
 
-        needsFunding.sort((a, b) => Number(b.deficit - a.deficit));
+        while (i < needsFunding.length && j < sources.length) {
+          const r = needsFunding[i];
+          const s = sources[j];
 
-        for (const recipient of needsFunding) {
-          let remainingDeficit = recipient.deficit;
-
-          for (const source of fundingSources) {
-            if (remainingDeficit <= 0n || source.availableAmount <= 0n) break;
-
-            if (source.address === recipient.address) continue;
-
-            const transferAmount =
-              remainingDeficit < source.availableAmount
-                ? remainingDeficit
-                : source.availableAmount;
-
-            try {
-              const transferResult = await source.wallet.transfer({
-                receiverSparkAddress: recipient.address,
-                amountSats: Number(transferAmount),
-              });
-
-              const transactionId = transferResult.id;
-              const pendingTransfer = await (
-                recipient.wallet as any
-              ).transferService.queryTransfer(transactionId);
-              if (pendingTransfer) {
-                await (recipient.wallet as any).claimTransfer({
-                  transfer: pendingTransfer,
-                  optimize: true,
-                });
-              }
-
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-
-              transferCount++;
-              totalTransferred += transferAmount;
-              source.availableAmount -= transferAmount;
-              remainingDeficit -= transferAmount;
-
-              this.ee.emit("counter", "spark.rebalance_transfer_success", 1);
-              this.ee.emit(
-                "counter",
-                "spark.rebalance_amount_transferred",
-                Number(transferAmount),
-              );
-            } catch (error) {
-              this.ee.emit("counter", "spark.rebalance_transfer_failed", 1);
-              throw error;
+          const amt = minBig(r.deficit, s.available);
+          if (r.address === s.address) {
+            i++;
+            r.deficit -= amt;
+            continue;
+          }
+          if (r.deficit <= 0n) {
+            i++;
+            continue;
+          }
+          if (s.available <= 0n) {
+            j++;
+            if (j >= sources.length) {
+              j = 0;
             }
+
+            continue;
+          }
+
+          try {
+            console.log(
+              `Transfer ${amt} from ${s.address.slice(0, 10)}... (${poolByWallet.get(s.wallet)}) to ${r.address.slice(0, 10)}... (${poolByWallet.get(r.wallet)})`,
+            );
+            const tr = await s.wallet.transfer({
+              receiverSparkAddress: r.address,
+              amountSats: Number(amt),
+            });
+
+            await sleep(3000);
+            const pendingTransfer = await (
+              r.wallet as any
+            ).transferService.queryTransfer(tr.id);
+            if (pendingTransfer) {
+              console.log(` Wait for transfer claim...`);
+              await (r.wallet as any).claimTransfer({
+                transfer: pendingTransfer,
+              });
+              console.log(
+                ` Transfer claimed ${tr.id} from ${s.address} to ${r.address}`,
+              );
+            }
+
+            r.deficit -= amt;
+            s.available -= amt;
+            totalTransferred += amt;
+            transferCount++;
+
+            ee.emit("counter", "spark.rebalance_transfer_ok", 1);
+            ee.emit("counter", "spark.rebalance_amount", Number(amt));
+          } catch (error: any) {
+            ee.emit("counter", "spark.rebalance_transfer_failed", 1);
+            console.error(`Transfer failed: ${error?.message ?? error}`);
+            j++;
           }
         }
 
-        context.vars = context.vars || {};
+        for (; i < needsFunding.length; i++) {
+          if (needsFunding[i].deficit > 0n) {
+            console.warn(
+              `Unfunded ${needsFunding[i].address.slice(0, 10)}..., missing ${needsFunding[i].deficit}`,
+            );
+          }
+        }
+
+        console.log(
+          `Rebalance done. transfers=${transferCount}, total=${totalTransferred}`,
+        );
+
+        context.vars ||= {};
         context.vars.rebalanceTransferCount = transferCount;
         context.vars.rebalanceTotalTransferred = Number(totalTransferred);
 
+        ee.emit("counter", "spark.distribute_and_rebalance_complete", 1);
+        ee.emit(
+          "histogram",
+          "spark.distribute_and_rebalance_total",
+          Number(totalTransferred),
+        );
         callback(null, context);
-      } catch (error) {
-        callback(error);
+      } catch (e) {
+        console.error("DistributeAndRebalance failed:", e);
+        callback(e as any);
       }
     };
   }

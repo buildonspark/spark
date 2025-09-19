@@ -3,12 +3,12 @@ config:
   engines:
     spark: {}
   phases:
-    - duration: 10
+    - duration: 2
       arrivalRate: 10
       maxVusers: 10
 
 scenarios:
-  - name: "Distribute to Distributors Pool"
+  - name: "Fund Wallet Pool"
     weight: 1
     engine: spark
     before:
@@ -16,15 +16,19 @@ scenarios:
       - initializePools:
           pools:
             - name: "distributor-pool"
-              amount: 200
+              amount: 20
               randomSelection: true
-              batchSize: 50
+              batchSize: 20
               mnemonicsFile: "./mnemonics/batch-source-wallets.txt"
               lockWallets: true
 
     flow:
-      - distributeAndRebalance:
-          pools: ["distributor-pool"]
-          minAmount: 3500
+      - loop:
+          count: 4
+          actions:
+            - fundWalletPool:
+                pools: ["distributor-pool"]
+                minAmount: 5000
+
     after:
       - cleanupPools: {}

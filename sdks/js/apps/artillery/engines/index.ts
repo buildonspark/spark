@@ -35,8 +35,8 @@ export class SparkEngine {
 
     mintToken: (params?: any) => this.tokenActions.mintToken(params),
     transferToken: (params?: any) => this.tokenActions.transferToken(params),
-    distributeAndRebalance: (params?: any) =>
-      this.walletActions.distributeAndRebalance(params),
+
+    fundWalletPool: (params?: any) => this.walletActions.fundWalletPool(params),
 
     getBalance: (params?: any) => this.walletActions.getBalance(params),
     claimTransfer: (params?: any) => this.transferActions.claimTransfer(params),
