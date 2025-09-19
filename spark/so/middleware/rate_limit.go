@@ -193,13 +193,17 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 		} else if methodLimitEnabled == 0 {
 			shouldLimit = false
 		}
-
 		if !shouldLimit {
 			return handler(ctx, req)
 		}
 
 		ip, err := GetClientIpFromHeader(ctx, r.config.XffClientIpPosition)
 		if err != nil {
+			return handler(ctx, req)
+		}
+		// Check for excluded IPs. A value of > 0 means to exclude the IP.
+		isIpExcluded := r.knobs.GetValueTarget(knobs.KnobRateLimitExcludeIps, &ip, 0)
+		if isIpExcluded > 0 {
 			return handler(ctx, req)
 		}
 

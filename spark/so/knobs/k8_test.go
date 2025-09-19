@@ -66,12 +66,13 @@ func TestKnobsK8ValuesProvider_HandleConfigMap(t *testing.T) {
 		{
 			name: "empty and invalid values",
 			configMapData: map[string]string{
-				"valid_knob":   "123.45",
-				"invalid_yaml": "invalid: yaml: content",
+				"valid_knob":    "123.45",
+				"invalid_yaml":  "invalid: yaml: content",
+				"a_string_knob": "hello-world",
 			},
 			expectedValues: map[string]float64{
 				"valid_knob": 123.45,
-				// invalid_yaml should not be added
+				// invalid_yaml and hello-world should not be added
 			},
 		},
 	}

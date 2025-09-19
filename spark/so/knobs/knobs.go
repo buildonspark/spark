@@ -17,6 +17,7 @@ const (
 	KnobRateLimitPeriod               = "spark.so.ratelimit.period"
 	KnobRateLimitLimit                = "spark.so.ratelimit.limit"
 	KnobRateLimitMethods              = "spark.so.ratelimit.methods"
+	KnobRateLimitExcludeIps           = "spark.so.ratelimit.exclude_ips"
 	KnobSoRollbackUtxoSwapUsingGossip = "spark.so.rollback_utxo_swap_using_gossip"
 	KnobSoTransferLimit               = "spark.so.transfer_limit"
 

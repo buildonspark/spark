@@ -736,4 +736,54 @@ func TestRateLimiter(t *testing.T) {
 		require.ErrorContains(t, err, "rate limit exceeded")
 		require.Equal(t, codes.ResourceExhausted, status.Code(err))
 	})
+
+	t.Run("IP address excluded via knobs", func(t *testing.T) {
+		config := &RateLimiterConfig{
+			Window:      time.Second,
+			MaxRequests: 2,
+			Methods:     []string{"/test.Service/TestMethod"},
+		}
+
+		mockKnobsMap := map[string]float64{
+			knobs.KnobRateLimitExcludeIps + "@1.2.3.4": 1,
+			knobs.KnobRateLimitExcludeIps + "@5.6.7.8": 0,
+		}
+		mockKnobs := knobs.NewFixedKnobs(mockKnobsMap)
+
+		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs))
+		require.NoError(t, err)
+
+		interceptor := rateLimiter.UnaryServerInterceptor()
+		handler := func(_ context.Context, _ any) (any, error) {
+			return "ok", nil
+		}
+		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/TestMethod"}
+
+		// IP 1.2.3.4 is excluded, so it should not be rate-limited.
+		ctxExcluded := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "1.2.3.4",
+		}))
+		for i := 0; i < 5; i++ {
+			resp, err := interceptor(ctxExcluded, "request", info, handler)
+			require.NoError(t, err)
+			assert.Equal(t, "ok", resp)
+		}
+
+		// IP 5.6.7.8 is not excluded, so it should be rate-limited.
+		ctxNotExcluded := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "5.6.7.8",
+		}))
+
+		resp, err := interceptor(ctxNotExcluded, "request", info, handler)
+		require.NoError(t, err)
+		assert.Equal(t, "ok", resp)
+
+		resp, err = interceptor(ctxNotExcluded, "request", info, handler)
+		require.NoError(t, err)
+		assert.Equal(t, "ok", resp)
+
+		_, err = interceptor(ctxNotExcluded, "request", info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+	})
 }
