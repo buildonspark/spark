@@ -103,6 +103,18 @@ func (h *TransferHandler) loadDirectFromCpfpLeafRefundMap(req *pb.StartTransferR
 	return leafRefundMap
 }
 
+type TransferAdaptorPublicKeys struct {
+	cpfpAdaptorPubKey           keys.Public
+	directAdaptorPubKey         keys.Public
+	directFromCpfpAdaptorPubKey keys.Public
+}
+
+// A helper function to call startTransferInternal from the SSP handler for Swap V3 counter swap initiation.
+// Will pass adaptor pubkeys and enable key tweak for both transfers of the swap.
+func (h *TransferHandler) StartCounterTransferInternal(ctx context.Context, req *pb.StartTransferRequest, adaptorPublicKeys TransferAdaptorPublicKeys, primaryTransferId uuid.UUID) (*pb.StartTransferResponse, error) {
+	return h.startTransferInternal(ctx, req, st.TransferTypeCounterSwap, adaptorPublicKeys.cpfpAdaptorPubKey, adaptorPublicKeys.directAdaptorPubKey, adaptorPublicKeys.directFromCpfpAdaptorPubKey, false, true)
+}
+
 // startTransferInternal initiates a transfer between two parties by validating the transfer request,
 // creating transfer records, signing refund transactions, and coordinating with other service operators.
 //
