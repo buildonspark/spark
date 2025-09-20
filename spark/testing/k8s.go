@@ -3,6 +3,7 @@ package sparktesting
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -21,6 +22,7 @@ const (
 type SparkOperatorController struct {
 	client    kubernetes.Interface
 	operators map[int]*sparkOperatorState
+	mu        sync.RWMutex
 }
 
 // sparkOperatorState tracks the state of a single operator service
@@ -42,6 +44,7 @@ func NewSparkOperatorController(t *testing.T) (*SparkOperatorController, error) 
 	controller := &SparkOperatorController{
 		client:    client,
 		operators: make(map[int]*sparkOperatorState, numOperators),
+		mu:        sync.RWMutex{},
 	}
 
 	// Initialize all operators
@@ -54,6 +57,9 @@ func NewSparkOperatorController(t *testing.T) (*SparkOperatorController, error) 
 
 	// Set up cleanup to automatically re-enable all services when test finishes
 	t.Cleanup(func() {
+		controller.mu.Lock()
+		defer controller.mu.Unlock()
+
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // nolint: usetesting
 		defer cancel()
 
@@ -77,30 +83,11 @@ func (s *SparkOperatorController) DisableOperator(t *testing.T, operatorNum int)
 	return s.disableOperator(t.Context(), operatorNum)
 }
 
-// EnableAllOperators enables all operators at once
-func (s *SparkOperatorController) EnableAllOperators(t *testing.T) error {
-	for i := 1; i <= len(s.operators); i++ {
-		if s.operators[i].disabled {
-			if err := s.enableOperator(t.Context(), i); err != nil {
-				return fmt.Errorf("failed to enable operator %d: %w", i, err)
-			}
-		}
-	}
-	return nil
-}
-
-// DisableAllOperators disables all operators at once
-func (s *SparkOperatorController) DisableAllOperators(t *testing.T) error {
-	for i := 1; i <= len(s.operators); i++ {
-		if err := s.disableOperator(t.Context(), i); err != nil {
-			return fmt.Errorf("failed to disable operator %d: %w", i, err)
-		}
-	}
-	return nil
-}
-
 // IsOperatorDisabled returns whether the specified operator is currently disabled
 func (s *SparkOperatorController) IsOperatorDisabled(operatorNum int) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	operator, exists := s.operators[operatorNum]
 	if !exists {
 		return false
@@ -110,6 +97,9 @@ func (s *SparkOperatorController) IsOperatorDisabled(operatorNum int) bool {
 
 // GetDisabledOperators returns a slice of operator numbers that are currently disabled
 func (s *SparkOperatorController) GetDisabledOperators() []int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	var disabled []int
 	for i := 1; i <= len(s.operators); i++ {
 		if s.operators[i].disabled {
@@ -121,6 +111,9 @@ func (s *SparkOperatorController) GetDisabledOperators() []int {
 
 // GetEnabledOperators returns a slice of operator numbers that are currently enabled
 func (s *SparkOperatorController) GetEnabledOperators() []int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	var enabled []int
 	for i := 1; i <= len(s.operators); i++ {
 		if !s.operators[i].disabled {
@@ -158,6 +151,9 @@ func (s *SparkOperatorController) enableOperator(ctx context.Context, operatorNu
 		return fmt.Errorf("operator %d does not exist (valid range: 1-%d)", operatorNum, len(s.operators))
 	}
 
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if !operator.disabled {
 		return fmt.Errorf("operator %d is not disabled", operatorNum)
 	}
@@ -192,6 +188,9 @@ func (s *SparkOperatorController) disableOperator(ctx context.Context, operatorN
 	if !exists {
 		return fmt.Errorf("operator %d does not exist (valid range: 1-%d)", operatorNum, len(s.operators))
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	if operator.disabled {
 		return fmt.Errorf("operator %d is already disabled", operatorNum)
