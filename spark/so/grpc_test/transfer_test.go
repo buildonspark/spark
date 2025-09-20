@@ -217,19 +217,17 @@ func TestTransferInterrupt(t *testing.T) {
 	require.NoError(t, err, "failed to ClaimTransferTweakKeys")
 
 	// Bring SO 1 down and try to finish claiming.
-	soController := sparktesting.NewSparkOperatorController(t)
+	soController, err := sparktesting.NewSparkOperatorController(t)
+	require.NoError(t, err, "failed to create SO controller")
+
 	err = soController.DisableOperator(t, 1)
-	if err != nil {
-		t.Fatalf("failed to disable operator: %v", err)
-	}
+	require.NoError(t, err, "failed to disable operator 1")
 
 	_, err = wallet.ClaimTransferSignRefunds(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim, proofs)
 	require.Error(t, err, "expected error when claiming transfer")
 
 	err = soController.EnableOperator(t, 1)
-	if err != nil {
-		t.Fatalf("failed to enable operator: %v", err)
-	}
+	require.NoError(t, err, "failed to enable operator 1")
 
 	attempts := 0
 	claimedNodes := make([]*spark.TreeNode, 0)

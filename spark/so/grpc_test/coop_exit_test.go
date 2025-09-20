@@ -523,11 +523,11 @@ func TestCoopExitFailureToSync(t *testing.T) {
 		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
 	)
 
-	soController := sparktesting.NewSparkOperatorController(t)
+	soController, err := sparktesting.NewSparkOperatorController(t)
+	require.NoError(t, err, "failed to create operator controller")
+
 	err = soController.DisableOperator(t, 2)
-	if err != nil {
-		t.Fatalf("failed to disable operator 2: %v", err)
-	}
+	require.NoError(t, err, "failed to disable operator 2")
 
 	// User creates transfer to SSP on the condition that the tx is confirmed
 	exitTxID, err := hex.DecodeString(exitTx.TxID())
@@ -544,9 +544,7 @@ func TestCoopExitFailureToSync(t *testing.T) {
 	require.Error(t, err)
 
 	err = soController.EnableOperator(t, 2)
-	if err != nil {
-		t.Fatalf("failed to enable operator 2: %v", err)
-	}
+	require.NoError(t, err, "failed to enable operator 2")
 
 	// Verify that any new transfers created during this test have the correct status
 	for id, op := range config.SigningOperators {

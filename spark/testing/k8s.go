@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	numOperators = 3 // Adjust this to match your setup
-	namespace    = "spark"
+	namespace = "spark"
 )
 
 // SparkOperatorController provides functionality to temporarily disable Spark operator services
@@ -32,12 +31,17 @@ type sparkOperatorState struct {
 }
 
 // NewSparkOperatorController creates a new SparkOperatorController for managing multiple operators
-func NewSparkOperatorController(t *testing.T) *SparkOperatorController {
+func NewSparkOperatorController(t *testing.T) (*SparkOperatorController, error) {
 	client := getKubernetesClient(t)
+
+	numOperators, err := operatorCount()
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine number of operators: %w", err)
+	}
 
 	controller := &SparkOperatorController{
 		client:    client,
-		operators: make(map[int]*sparkOperatorState),
+		operators: make(map[int]*sparkOperatorState, numOperators),
 	}
 
 	// Initialize all operators
@@ -62,7 +66,7 @@ func NewSparkOperatorController(t *testing.T) *SparkOperatorController {
 		}
 	})
 
-	return controller
+	return controller, nil
 }
 
 func (s *SparkOperatorController) EnableOperator(t *testing.T, operatorNum int) error {
@@ -75,7 +79,7 @@ func (s *SparkOperatorController) DisableOperator(t *testing.T, operatorNum int)
 
 // EnableAllOperators enables all operators at once
 func (s *SparkOperatorController) EnableAllOperators(t *testing.T) error {
-	for i := 1; i <= numOperators; i++ {
+	for i := 1; i <= len(s.operators); i++ {
 		if s.operators[i].disabled {
 			if err := s.enableOperator(t.Context(), i); err != nil {
 				return fmt.Errorf("failed to enable operator %d: %w", i, err)
@@ -87,7 +91,7 @@ func (s *SparkOperatorController) EnableAllOperators(t *testing.T) error {
 
 // DisableAllOperators disables all operators at once
 func (s *SparkOperatorController) DisableAllOperators(t *testing.T) error {
-	for i := 1; i <= numOperators; i++ {
+	for i := 1; i <= len(s.operators); i++ {
 		if err := s.disableOperator(t.Context(), i); err != nil {
 			return fmt.Errorf("failed to disable operator %d: %w", i, err)
 		}
@@ -107,7 +111,7 @@ func (s *SparkOperatorController) IsOperatorDisabled(operatorNum int) bool {
 // GetDisabledOperators returns a slice of operator numbers that are currently disabled
 func (s *SparkOperatorController) GetDisabledOperators() []int {
 	var disabled []int
-	for i := 1; i <= numOperators; i++ {
+	for i := 1; i <= len(s.operators); i++ {
 		if s.operators[i].disabled {
 			disabled = append(disabled, i)
 		}
@@ -118,7 +122,7 @@ func (s *SparkOperatorController) GetDisabledOperators() []int {
 // GetEnabledOperators returns a slice of operator numbers that are currently enabled
 func (s *SparkOperatorController) GetEnabledOperators() []int {
 	var enabled []int
-	for i := 1; i <= numOperators; i++ {
+	for i := 1; i <= len(s.operators); i++ {
 		if !s.operators[i].disabled {
 			enabled = append(enabled, i)
 		}
@@ -151,7 +155,7 @@ func getKubernetesClient(t *testing.T) kubernetes.Interface {
 func (s *SparkOperatorController) enableOperator(ctx context.Context, operatorNum int) error {
 	operator, exists := s.operators[operatorNum]
 	if !exists {
-		return fmt.Errorf("operator %d does not exist (valid range: 1-%d)", operatorNum, numOperators)
+		return fmt.Errorf("operator %d does not exist (valid range: 1-%d)", operatorNum, len(s.operators))
 	}
 
 	if !operator.disabled {
@@ -186,7 +190,7 @@ func (s *SparkOperatorController) enableOperator(ctx context.Context, operatorNu
 func (s *SparkOperatorController) disableOperator(ctx context.Context, operatorNum int) error {
 	operator, exists := s.operators[operatorNum]
 	if !exists {
-		return fmt.Errorf("operator %d does not exist (valid range: 1-%d)", operatorNum, numOperators)
+		return fmt.Errorf("operator %d does not exist (valid range: 1-%d)", operatorNum, len(s.operators))
 	}
 
 	if operator.disabled {
