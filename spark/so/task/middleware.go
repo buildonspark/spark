@@ -99,8 +99,6 @@ func TimeoutMiddleware() TaskMiddleware {
 
 func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration) TaskMiddleware {
 	return func(ctx context.Context, config *so.Config, task *BaseTaskSpec, knobsService knobs.Knobs) error {
-		logger := logging.GetLoggerFromContext(ctx)
-
 		sessionCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
@@ -124,18 +122,13 @@ func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration
 
 		err := task.Task(ctx, config, knobsService)
 
-		tx := session.GetTxIfExists()
-		if tx != nil {
-			if err != nil {
-				rollbackErr := tx.Rollback()
-				if rollbackErr != nil {
-					logger.Warn("Failed to rollback transaction after task failure", zap.Error(rollbackErr))
-				}
+		if tx := session.GetTxIfExists(); tx != nil {
+			// nolint:errcheck
+			defer tx.Rollback() // Safe to call, will be a no-op if already committed or rolled back.
 
-				return err
+			if err == nil {
+				return tx.Commit()
 			}
-
-			return tx.Commit()
 		}
 
 		return err

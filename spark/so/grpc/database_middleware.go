@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/logging"
@@ -58,23 +59,19 @@ func DatabaseSessionMiddleware(dbClient *ent.Client, factory db.SessionFactory, 
 
 		// Call the handler (the actual RPC method)
 		resp, err := handler(ctx, req)
-		// Handle transaction commit/rollback
-		if err != nil {
-			if tx := session.GetTxIfExists(); tx != nil {
-				if dberr := tx.Rollback(); dberr != nil {
-					logger.Error("Failed to rollback transaction", zap.Error(dberr))
-				}
-			}
-			return nil, err
-		}
 
 		if tx := session.GetTxIfExists(); tx != nil {
-			if dberr := tx.Commit(); dberr != nil {
-				logger.Error("Failed to commit transaction", zap.Error(dberr))
-				return nil, dberr
+			// nolint:errcheck
+			defer tx.Rollback() // Safe to call, will be a no-op if already committed or rolled back.
+
+			if err == nil {
+				dberr := tx.Commit()
+				if dberr != nil {
+					return nil, fmt.Errorf("failed to commit transaction: %w", dberr)
+				}
 			}
 		}
 
-		return resp, nil
+		return resp, err
 	}
 }
