@@ -16,3 +16,11 @@ test-grpc = """
     --rerun-fails-max-failures=1000 \
     --packages=./so/grpc_test/...
 """
+test-grpc-minikube = """
+  HERMETIC_TEST=true \
+  gotestsum \
+    --format testname \
+    --rerun-fails \
+    --rerun-fails-max-failures=1000 \
+    --packages=./so/grpc_test/...
+"""

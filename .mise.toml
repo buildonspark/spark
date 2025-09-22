@@ -26,6 +26,7 @@ spark-cli-dev-mainnet = { dir = "{{config_root}}/sdks/js", run = 'yarn install &
 spark-cli-loadtest = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn build:packages && cd examples/spark-cli && yarn build && yarn run cli:loadtest' }
 test-go = { dir = "{{config_root}}/spark", run = 'mise test-unit-with-postgres' }
 test-grpc = { dir = "{{config_root}}/spark", run = 'mise test-grpc' }
+test-grpc-minikube = { dir = "{{config_root}}/spark", run = 'mise test-grpc-minikube' }
 test-js = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test' }
 test-js-integration = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test:integration' }
 test-js-integration-ssp = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test:integration:ssp' }

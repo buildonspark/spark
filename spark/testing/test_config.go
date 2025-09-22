@@ -20,15 +20,12 @@ import (
 var rng = rand.NewChaCha8([32]byte{1})
 
 const (
-	hermeticMarkerPath    = "/tmp/spark_hermetic"
-	hermeticTestEnvVar    = "HERMETIC_TEST"
 	minikubeCAFilePath    = "/tmp/minikube-ca.pem"
 	signingOperatorPrefix = "000000000000000000000000000000000000000000000000000000000000000"
 )
 
 func isHermeticTest() bool {
-	_, err := os.Stat(hermeticMarkerPath)
-	return err == nil || os.Getenv(hermeticTestEnvVar) == "true"
+	return os.Getenv("HERMETIC_TEST") == "true"
 }
 
 // IsGripmock returns true if the GRIPMOCK environment variable is set to true.
