@@ -887,6 +887,7 @@ func (h *LightningHandler) GetPreimageShare(
 		TransferRoleParticipant,
 		false,
 		"",
+		uuid.Nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer: %w", err)
@@ -1297,6 +1298,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		TransferRoleParticipant, // No coordinator in this flow need to settle the key tweak.
 		requireDirectTx,
 		"",
+		uuid.Nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create transfer for payment hash: %x: %w", req.PaymentHash, err)

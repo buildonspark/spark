@@ -242,6 +242,10 @@ message InitiateTransferRequest {
     string spark_invoice = 12;
     // Adaptor public keys to verify adapted signatures for tree node refund transactions.
     spark.AdaptorPublicKeyPackage adaptor_public_keys = 13;
+    // Primary transfer ID of a counter transfer in Swap V3 flow. Transfers are
+    // required to be connected so their keys can be tweaked at the same time.
+    // For non-SwapV3 flows this field will be an empty string.
+    string primary_transfer_id = 14;
 }
 
 message DeliverSenderKeyTweakRequest {

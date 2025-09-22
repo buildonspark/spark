@@ -32,6 +32,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
+	"github.com/lightsparkdev/spark/so/ent/transfer"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
@@ -242,6 +243,7 @@ func (h *BaseTransferHandler) createTransfer(
 	role TransferRole,
 	requireDirectTx bool,
 	sparkInvoice string,
+	primaryTransferId uuid.UUID,
 ) (*ent.Transfer, map[string]*ent.TreeNode, error) {
 	transferUUID, err := uuid.Parse(transferID)
 	if err != nil {
@@ -289,6 +291,14 @@ func (h *BaseTransferHandler) createTransfer(
 
 	if len(sparkInvoice) > 0 && invoiceID != uuid.Nil {
 		transferCreate = transferCreate.SetSparkInvoiceID(invoiceID)
+	}
+
+	if primaryTransferId != uuid.Nil {
+		primaryTransfer, err := db.Transfer.Query().Where(transfer.IDEQ(primaryTransferId)).Only(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("Unable to find primary swap transfer id=%s", primaryTransferId.String())
+		}
+		transferCreate.SetPrimarySwapTransfer(primaryTransfer)
 	}
 
 	transfer, err := transferCreate.Save(ctx)

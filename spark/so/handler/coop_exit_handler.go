@@ -103,6 +103,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 		TransferRoleCoordinator,
 		requireDirectTx,
 		"",
+		uuid.Nil,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create transfer for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)

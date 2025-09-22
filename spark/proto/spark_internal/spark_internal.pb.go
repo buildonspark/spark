@@ -1364,6 +1364,10 @@ type InitiateTransferRequest struct {
 	SparkInvoice string `protobuf:"bytes,12,opt,name=spark_invoice,json=sparkInvoice,proto3" json:"spark_invoice,omitempty"`
 	// Adaptor public keys to verify adapted signatures for tree node refund transactions.
 	AdaptorPublicKeys *spark.AdaptorPublicKeyPackage `protobuf:"bytes,13,opt,name=adaptor_public_keys,json=adaptorPublicKeys,proto3" json:"adaptor_public_keys,omitempty"`
+	// Primary transfer ID of a counter transfer in Swap V3 flow. Transfers are
+	// required to be connected so their keys can be tweaked at the same time.
+	// For non-SwapV3 flows this field will be an empty string.
+	PrimaryTransferId string `protobuf:"bytes,14,opt,name=primary_transfer_id,json=primaryTransferId,proto3" json:"primary_transfer_id,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -1487,6 +1491,13 @@ func (x *InitiateTransferRequest) GetAdaptorPublicKeys() *spark.AdaptorPublicKey
 		return x.AdaptorPublicKeys
 	}
 	return nil
+}
+
+func (x *InitiateTransferRequest) GetPrimaryTransferId() string {
+	if x != nil {
+		return x.PrimaryTransferId
+	}
+	return ""
 }
 
 type DeliverSenderKeyTweakRequest struct {
@@ -3418,8 +3429,7 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\aleaf_id\x18\x01 \x01(\tR\x06leafId\x12\"\n" +
 	"\rraw_refund_tx\x18\x02 \x01(\fR\vrawRefundTx\x12(\n" +
 	"\x10direct_refund_tx\x18\x03 \x01(\fR\x0edirectRefundTx\x12:\n" +
-	"\x1adirect_from_cpfp_refund_tx\x18\x04 \x01(\fR\x16directFromCpfpRefundTx\"\xd3\n" +
-	"\n" +
+	"\x1adirect_from_cpfp_refund_tx\x18\x04 \x01(\fR\x16directFromCpfpRefundTx\"\x83\v\n" +
 	"\x17InitiateTransferRequest\x12\x1f\n" +
 	"\vtransfer_id\x18\x01 \x01(\tR\n" +
 	"transferId\x12;\n" +
@@ -3436,7 +3446,8 @@ const file_spark_internal_proto_rawDesc = "" +
 	" \x03(\v2C.spark_internal.InitiateTransferRequest.DirectRefundSignaturesEntryR\x16directRefundSignatures\x12\x97\x01\n" +
 	"\"direct_from_cpfp_refund_signatures\x18\v \x03(\v2K.spark_internal.InitiateTransferRequest.DirectFromCpfpRefundSignaturesEntryR\x1edirectFromCpfpRefundSignatures\x12#\n" +
 	"\rspark_invoice\x18\f \x01(\tR\fsparkInvoice\x12N\n" +
-	"\x13adaptor_public_keys\x18\r \x01(\v2\x1e.spark.AdaptorPublicKeyPackageR\x11adaptorPublicKeys\x1a[\n" +
+	"\x13adaptor_public_keys\x18\r \x01(\v2\x1e.spark.AdaptorPublicKeyPackageR\x11adaptorPublicKeys\x12.\n" +
+	"\x13primary_transfer_id\x18\x0e \x01(\tR\x11primaryTransferId\x1a[\n" +
 	"\x19SenderKeyTweakProofsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12(\n" +
 	"\x05value\x18\x02 \x01(\v2\x12.spark.SecretProofR\x05value:\x028\x01\x1aC\n" +

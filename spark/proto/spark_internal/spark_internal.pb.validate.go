@@ -3018,6 +3018,8 @@ func (m *InitiateTransferRequest) validate(all bool) error {
 		}
 	}
 
+	// no validation rules for PrimaryTransferId
+
 	if len(errors) > 0 {
 		return InitiateTransferRequestMultiError(errors)
 	}

@@ -199,6 +199,14 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 		}
 	}
 
+	// Swap V3 primary transfer for a counter transfer
+	var primaryTransferId uuid.UUID
+	if req.GetPrimaryTransferId() != "" {
+		if primaryTransferId, err = uuid.Parse(req.GetPrimaryTransferId()); err != nil {
+			return fmt.Errorf("Unable to parse primary transfer uuid for transfer id %s: %w", req.TransferId, err)
+		}
+	}
+
 	// Swap V3 requires adapted signatures from the User and AdaptorPublicKeys must be provided for this flow.
 	// If the user intends to use Swap V3 flow, they will call InitiateSwapPrimaryTransfer rpc and
 	// it will validate that the adaptor public keys are provided and then call this generic rpc.
@@ -224,6 +232,7 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 		}
 	} else {
 		// Swap V3 flow
+
 		if req.RefundSignatures == nil {
 			return fmt.Errorf("refund signatures are required when adaptor public keys are provided")
 		}
@@ -269,6 +278,7 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 		TransferRoleParticipant,
 		false,
 		req.SparkInvoice,
+		primaryTransferId,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initiate transfer for transfer id: %s and error: %w", req.TransferId, err)
@@ -440,6 +450,7 @@ func (h *InternalTransferHandler) InitiateCooperativeExit(ctx context.Context, r
 		TransferRoleParticipant,
 		false,
 		"",
+		uuid.Nil,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initiate cooperative exit for transfer id: %s and error: %w", transferReq.TransferId, err)
