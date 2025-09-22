@@ -494,9 +494,9 @@ func main() {
 	// Establish base values from config, then allow runtime knobs to override
 	// grpcConnTimeout, grpcKeepaliveTime and grpcKeepaliveTimeout are set when
 	// the server is created and cannot be changed at runtime.
-	grpcConnTimeout := knobs.GetDurationSeconds(knobsService, knobs.KnobGrpcServerConnectionTimeout, config.GRPC.ServerConnectionTimeout)
-	grpcKeepaliveTime := knobs.GetDurationSeconds(knobsService, knobs.KnobGrpcServerKeepaliveTime, config.GRPC.ServerKeepaliveTime)
-	grpcKeepaliveTimeout := knobs.GetDurationSeconds(knobsService, knobs.KnobGrpcServerKeepaliveTimeout, config.GRPC.ServerKeepaliveTimeout)
+	grpcConnTimeout := knobsService.GetDuration(knobs.KnobGrpcServerConnectionTimeout, config.GRPC.ServerConnectionTimeout)
+	grpcKeepaliveTime := knobsService.GetDuration(knobs.KnobGrpcServerKeepaliveTime, config.GRPC.ServerKeepaliveTime)
+	grpcKeepaliveTimeout := knobsService.GetDuration(knobs.KnobGrpcServerKeepaliveTimeout, config.GRPC.ServerKeepaliveTimeout)
 
 	// This uses SetDeadline in net.Conn to set the timeout for the connection
 	// establishment, after which the connection is closed with error

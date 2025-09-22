@@ -13,7 +13,7 @@ import (
 // TimeoutInterceptor creates a unary server interceptor that enforces a timeout on incoming requests
 func TimeoutInterceptor(knobsService knobs.Knobs, defaultServerUnaryHandlerTimeout time.Duration) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		timeout := knobs.GetTargetDurationSeconds(knobsService, knobs.KnobGrpcServerUnaryHandlerTimeout, &info.FullMethod, defaultServerUnaryHandlerTimeout)
+		timeout := knobsService.GetDurationTarget(knobs.KnobGrpcServerUnaryHandlerTimeout, &info.FullMethod, defaultServerUnaryHandlerTimeout)
 		if timeout.Seconds() <= 0 {
 			// If timeout is not set or is non-positive, proceed without timeout
 			return handler(ctx, req)

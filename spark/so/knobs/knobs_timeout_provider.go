@@ -20,5 +20,5 @@ func NewKnobsTimeoutProvider(knobsService Knobs, defaultTimeout time.Duration) *
 // GetTimeoutForMethod implements common.TimeoutProvider.
 // Uses the knobs service to get a method-specific timeout value.
 func (k *KnobsTimeoutProvider) GetTimeoutForMethod(method string) time.Duration {
-	return GetTargetDurationSeconds(k.knobsService, KnobGRPCClientTimeout, &method, k.defaultTimeout)
+	return k.knobsService.GetDurationTarget(KnobGRPCClientTimeout, &method, k.defaultTimeout)
 }

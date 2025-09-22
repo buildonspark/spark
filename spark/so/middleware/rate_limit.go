@@ -135,7 +135,7 @@ func NewRateLimiter(configOrProvider any, opts ...RateLimiterOption) (*RateLimit
 	}
 
 	// Knob values should not be set to negative values—they will be cast to uint64.
-	window := knobs.GetDurationSeconds(rateLimiter.knobs, knobs.KnobRateLimitPeriod, config.Window)
+	window := rateLimiter.knobs.GetDuration(knobs.KnobRateLimitPeriod, config.Window)
 	maxRequests := uint64(rateLimiter.knobs.GetValue(knobs.KnobRateLimitLimit, float64(config.MaxRequests)))
 
 	if rateLimiter.store == nil {
@@ -221,7 +221,7 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 			methodMaxRequests = uint64(rawMethodMaxRequests)
 		}
 
-		methodWindow := knobs.GetTargetDurationSeconds(r.knobs, knobs.KnobRateLimitPeriod, &info.FullMethod, r.config.Window)
+		methodWindow := r.knobs.GetDurationTarget(knobs.KnobRateLimitPeriod, &info.FullMethod, r.config.Window)
 
 		// We only do the update if there's a change since it has the side
 		// effect of reseting the bucket and thus the current rate limit status,

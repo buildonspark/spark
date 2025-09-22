@@ -3,6 +3,7 @@ package knobs
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -21,6 +22,9 @@ func TestKnobs(t *testing.T) {
 	value := k.GetValue("test_knob", 0.0)
 	assert.Zero(t, value)
 
+	// Test GetDuration with default value
+	assert.Equal(t, 5*time.Second, k.GetDuration("test_knob", 5*time.Second))
+
 	// Test RolloutRandom with default value
 	assert.True(t, k.RolloutRandom("test_knob", 100.0)) // 100% chance
 	assert.False(t, k.RolloutRandom("test_knob", 0.0))  // 0% chance
@@ -33,8 +37,10 @@ func TestKnobs(t *testing.T) {
 	// Test target-specific values
 	// Create a new knobs instance with specific values for testing
 	testValues := map[string]float64{
-		"test_knob@target1": 50.0,
-		"test_knob@target2": 0.0,
+		"test_knob@target1":          50.0,
+		"test_knob@target2":          0.0,
+		"test_duration_knob@target1": 3.0,
+		"test_duration_knob@target2": 1.5,
 	}
 	k = NewFixedKnobs(testValues)
 
@@ -47,6 +53,9 @@ func TestKnobs(t *testing.T) {
 
 	value = k.GetValueTarget("test_knob", &target2, 0.0)
 	assert.InDelta(t, 0.0, value, 0.001)
+
+	assert.Equal(t, 3*time.Second, k.GetDurationTarget("test_duration_knob", &target1, 5*time.Second))
+	assert.Equal(t, 1500*time.Millisecond, k.GetDurationTarget("test_duration_knob", &target2, 5*time.Second))
 
 	// Test RolloutRandomTarget
 	assert.False(t, k.RolloutRandomTarget("test_knob", &target2, 100.0)) // 0% chance

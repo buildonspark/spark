@@ -49,6 +49,8 @@ func (c *Config) IsEnabled() bool {
 type Knobs interface {
 	GetValue(knob string, defaultValue float64) float64
 	GetValueTarget(knob string, target *string, defaultValue float64) float64
+	GetDuration(knob string, defaultValue time.Duration) time.Duration
+	GetDurationTarget(knob string, target *string, defaultValue time.Duration) time.Duration
 	RolloutRandomTarget(knob string, target *string, defaultValue float64) bool
 	RolloutRandom(knob string, defaultValue float64) bool
 	RolloutUUIDTarget(knob string, id uuid.UUID, target *string, defaultValue float64) bool
@@ -108,6 +110,22 @@ func (k knobsImpl) GetValueTarget(knob string, target *string, defaultValue floa
 // GetValue retrieves a knob value without a target
 func (k knobsImpl) GetValue(knob string, defaultValue float64) float64 {
 	return k.GetValueTarget(knob, nil, defaultValue)
+}
+
+// GetDurationTarget returns a duration interpreted from a knob value with target in seconds.
+// If the knob is nil or resolves to a non-positive value, the defaultDuration is returned.
+func (k knobsImpl) GetDurationTarget(knob string, target *string, defaultDuration time.Duration) time.Duration {
+	seconds := k.GetValueTarget(knob, target, defaultDuration.Seconds())
+	if seconds > 0 {
+		return time.Duration(seconds * float64(time.Second))
+	}
+	return defaultDuration
+}
+
+// GetDuration returns a duration interpreted from a knob value in seconds.
+// If the knob is nil or resolves to a non-positive value, the defaultDuration is returned.
+func (k knobsImpl) GetDuration(knob string, defaultDuration time.Duration) time.Duration {
+	return k.GetDurationTarget(knob, nil, defaultDuration)
 }
 
 // RolloutRandomTarget determines if a feature should be rolled out based on a random value.
@@ -241,28 +259,18 @@ func (m fixedKnobs) RolloutUUID(knob string, id uuid.UUID, defaultValue float64)
 	return m.RolloutUUIDTarget(knob, id, nil, defaultValue)
 }
 
-// GetDurationSeconds returns a duration interpreted from a knob value in seconds.
+// GetDurationTarget returns a duration interpreted from a knob value with target in seconds.
 // If the knob is nil or resolves to a non-positive value, the defaultDuration is returned.
-func GetDurationSeconds(k Knobs, knob string, defaultDuration time.Duration) time.Duration {
-	if k == nil {
-		return defaultDuration
-	}
-	seconds := k.GetValue(knob, defaultDuration.Seconds())
+func (m fixedKnobs) GetDurationTarget(knob string, target *string, defaultDuration time.Duration) time.Duration {
+	seconds := m.GetValueTarget(knob, target, defaultDuration.Seconds())
 	if seconds > 0 {
-		return time.Duration(seconds) * time.Second
+		return time.Duration(seconds * float64(time.Second))
 	}
 	return defaultDuration
 }
 
-// GetTargetDurationSeconds returns a duration interpreted from a knob value with target in seconds.
+// GetDuration returns a duration interpreted from a knob value in seconds.
 // If the knob is nil or resolves to a non-positive value, the defaultDuration is returned.
-func GetTargetDurationSeconds(k Knobs, knob string, target *string, defaultDuration time.Duration) time.Duration {
-	if k == nil {
-		return defaultDuration
-	}
-	seconds := k.GetValueTarget(knob, target, defaultDuration.Seconds())
-	if seconds > 0 {
-		return time.Duration(seconds) * time.Second
-	}
-	return defaultDuration
+func (m fixedKnobs) GetDuration(knob string, defaultDuration time.Duration) time.Duration {
+	return m.GetDurationTarget(knob, nil, defaultDuration)
 }
