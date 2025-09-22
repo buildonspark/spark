@@ -4,6 +4,7 @@ lint = "golangci-lint run"
 # Sadly, `mise fmt` is a built in command
 format = "golangci-lint fmt"
 test-unit = """
+  GRIPMOCK=true \
   gotestsum \
     --format testname \
     $(go list ./... | grep -v -E 'so/grpc_test|so/tree')
@@ -15,5 +16,3 @@ test-grpc = """
     --rerun-fails-max-failures=1000 \
     --packages=./so/grpc_test/...
 """
-[env]
-GRIPMOCK = true
