@@ -1206,6 +1206,10 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	if err != nil {
 		return nil, err
 	}
+	err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, transfer.SenderIdentityPubkey)
+	if err != nil {
+		return nil, err
+	}
 	if transfer.Status != st.TransferStatusSenderInitiated {
 		return nil, fmt.Errorf("transfer %s is in state %s; expected sender initiated status", req.TransferId, transfer.Status)
 	}
