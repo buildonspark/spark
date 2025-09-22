@@ -29,7 +29,7 @@ func TestAdaptorSignature(t *testing.T) {
 
 		_, adaptorPub := btcec.PrivKeyFromBytes(adaptorPrivKey)
 
-		err = ValidateOutboundAdaptorSignature(pubkey, hash[:], adaptorSig, adaptorPub.SerializeCompressed())
+		err = ValidateAdaptorSignature(pubkey, hash[:], adaptorSig, adaptorPub.SerializeCompressed())
 		require.NoError(t, err)
 
 		adaptorSig, err = ApplyAdaptorToSignature(pubkey, hash[:], adaptorSig, adaptorPrivKey)

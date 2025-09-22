@@ -69,7 +69,7 @@ func TestSwap(t *testing.T) {
 	nodeVerifyingPubkey, err := keys.ParsePublicKey(senderRootNode.VerifyingPublicKey)
 	require.NoError(t, err)
 	taprootKey := txscript.ComputeTaprootKeyNoScript(nodeVerifyingPubkey.ToBTCEC())
-	err = common.ValidateOutboundAdaptorSignature(taprootKey, sighash, adaptorAddedSignature, adaptorPub.Serialize())
+	err = common.ValidateAdaptorSignature(taprootKey, sighash, adaptorAddedSignature, adaptorPub.Serialize())
 	require.NoError(t, err)
 
 	// Bob signs refunds with adaptor
@@ -260,7 +260,7 @@ func TestSwapDeliverTransferPackageTwice(t *testing.T) {
 	nodeVerifyingPubKey, err := keys.ParsePublicKey(senderRootNode.VerifyingPublicKey)
 	require.NoError(t, err)
 	taprootKey := txscript.ComputeTaprootKeyNoScript(nodeVerifyingPubKey.ToBTCEC())
-	err = common.ValidateOutboundAdaptorSignature(taprootKey, sighash, adaptorAddedSignature, adaptorPub.Serialize())
+	err = common.ValidateAdaptorSignature(taprootKey, sighash, adaptorAddedSignature, adaptorPub.Serialize())
 	require.NoError(t, err)
 
 	// Bob signs refunds with adaptor

@@ -247,7 +247,7 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 	require.NoError(t, err)
 	adaptorPub := adaptorPrivKey.Public()
 
-	err = common.ValidateOutboundAdaptorSignature(pk.ToBTCEC(), msgHash[:], adaptorSig, adaptorPub.Serialize())
+	err = common.ValidateAdaptorSignature(pk.ToBTCEC(), msgHash[:], adaptorSig, adaptorPub.Serialize())
 	require.NoError(t, err)
 
 	// Step 1: Setup config

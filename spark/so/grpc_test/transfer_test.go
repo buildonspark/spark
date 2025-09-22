@@ -622,7 +622,7 @@ func TestQueryTransfers(t *testing.T) {
 	nodeVerifyingPubKey, err := keys.ParsePublicKey(senderRootNode.VerifyingPublicKey)
 	require.NoError(t, err)
 	taprootKey := txscript.ComputeTaprootKeyNoScript(nodeVerifyingPubKey.ToBTCEC())
-	err = common.ValidateOutboundAdaptorSignature(taprootKey, sighash, adaptorAddedSignature, adaptorPrivKey.Public().Serialize())
+	err = common.ValidateAdaptorSignature(taprootKey, sighash, adaptorAddedSignature, adaptorPrivKey.Public().Serialize())
 	require.NoError(t, err)
 
 	// Bob signs refunds with adaptor

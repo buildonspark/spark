@@ -49,8 +49,8 @@ func GenerateSignatureFromExistingAdaptor(signature []byte, adaptorPrivateKeyByt
 	return newSig.serialize(), nil
 }
 
-// ValidateOutboundAdaptorSignature validates a adaptor signature from creator of the adaptor.
-func ValidateOutboundAdaptorSignature(pubkey *btcec.PublicKey, hash []byte, signature []byte, adaptorPubkey []byte) error {
+// ValidateAdaptorSignature validates a adaptor signature from creator of the adaptor.
+func ValidateAdaptorSignature(pubkey *btcec.PublicKey, hash []byte, signature []byte, adaptorPubkey []byte) error {
 	sig, err := parseSignature(signature)
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func ValidateOutboundAdaptorSignature(pubkey *btcec.PublicKey, hash []byte, sign
 
 	pubkeyBytes := schnorr.SerializePubKey(pubkey)
 
-	return schnorrVerifyWithAdaptor(sig, hash, pubkeyBytes, adaptorPubkey, false)
+	return schnorrVerifyWithAdaptor(sig, hash, pubkeyBytes, adaptorPubkey)
 }
 
 // ApplyAdaptorToSignature applies an adaptor to a signature.
@@ -155,7 +155,7 @@ func parseSignature(sig []byte) (*signature, error) {
 }
 
 // This is copied and modified with adaptor from the schnorrVerify function in the btcd library.
-func schnorrVerifyWithAdaptor(sig *signature, hash []byte, pubKeyBytes []byte, adaptorPubkey []byte, inbound bool) error {
+func schnorrVerifyWithAdaptor(sig *signature, hash []byte, pubKeyBytes []byte, adaptorPubkey []byte) error {
 	// The algorithm for producing a BIP-340 signature is described in
 	// README.md and is reproduced here for reference:
 	//
@@ -248,10 +248,8 @@ func schnorrVerifyWithAdaptor(sig *signature, hash []byte, pubKeyBytes []byte, a
 	// Step 7.
 	//
 	// Fail if R is the point at infinity
-	if !inbound {
-		if (newR.X.IsZero() && newR.Y.IsZero()) || newR.Z.IsZero() {
-			return fmt.Errorf("calculated R point is the point at infinity")
-		}
+	if (newR.X.IsZero() && newR.Y.IsZero()) || newR.Z.IsZero() {
+		return fmt.Errorf("calculated R point is the point at infinity")
 	}
 
 	// Step 8.
