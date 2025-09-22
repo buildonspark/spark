@@ -14,11 +14,11 @@ import { Mutex } from "async-mutex";
 import { uuidv7 } from "uuidv7";
 import {
   ConfigurationError,
+  InternalValidationError,
   NetworkError,
   NotImplementedError,
   RPCError,
   ValidationError,
-  InternalValidationError,
 } from "../errors/types.js";
 import SspClient, { TransferWithUserRequest } from "../graphql/client.js";
 import {
@@ -126,6 +126,7 @@ import {
 import { chunkArray } from "../utils/chunkArray.js";
 import { getFetch } from "../utils/fetch.js";
 import { addPublicKeys } from "../utils/keys.js";
+import { maximizeUnilateralExit } from "../utils/optimize.js";
 import { RetryContext, withRetry } from "../utils/retry.js";
 import {
   Bech32mTokenIdentifier,
@@ -152,7 +153,6 @@ import type {
   UserTokenMetadata,
 } from "./types.js";
 import { SparkWalletEvent } from "./types.js";
-import { maximizeUnilateralExit } from "../utils/optimize.js";
 
 /**
  * The SparkWallet class is the primary interface for interacting with the Spark network.
@@ -1490,11 +1490,18 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         throw new Error("Failed to get incoming transfer");
       }
 
-      return await this.claimTransfer({
+      const incomingLeaves = await this.claimTransfer({
         transfer: incomingTransfer,
         emit: false,
         optimize: false,
       });
+
+      this.updateLeaves(
+        leavesBatch.map((leaf) => leaf.id),
+        incomingLeaves,
+      );
+
+      return incomingLeaves;
     } catch (e) {
       console.error("[processSwapBatch] Error details:", {
         error: e,
@@ -3577,7 +3584,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       if (!sspResponse) {
         throw new Error("Failed to contact SSP");
       }
-      // test
+
       const leavesToRemove = new Set(leavesToSend.map((leaf) => leaf.leaf.id));
       this.leaves = this.leaves.filter((leaf) => !leavesToRemove.has(leaf.id));
 
