@@ -20,8 +20,9 @@ import (
 )
 
 var (
-	errTaskTimeout = fmt.Errorf("task timed out")
-	errTaskPanic   = fmt.Errorf("task panicked")
+	errTaskDisabled = fmt.Errorf("task is disabled")
+	errTaskTimeout  = fmt.Errorf("task timed out")
+	errTaskPanic    = fmt.Errorf("task panicked")
 )
 
 type TaskMiddleware func(context.Context, *so.Config, *BaseTaskSpec, knobs.Knobs) error //nolint:revive
@@ -42,7 +43,7 @@ func LogMiddleware() TaskMiddleware {
 		logger.Info("Executing task")
 
 		err := task.Task(ctx, config, knobsService)
-		if err != nil {
+		if err != nil && !errors.Is(err, errTaskDisabled) {
 			span.SetStatus(codes.Error, err.Error())
 			logger.Error("Task execution failed", zap.Error(err))
 			return err
@@ -57,7 +58,14 @@ func TimeoutMiddleware() TaskMiddleware {
 	return func(ctx context.Context, config *so.Config, task *BaseTaskSpec, knobsService knobs.Knobs) error {
 		logger := logging.GetLoggerFromContext(ctx)
 
-		ctx, cancel := context.WithTimeoutCause(ctx, task.getTimeout(), errTaskTimeout)
+		enabled := knobsService.RolloutRandomTarget(knobs.KnobSoTaskEnabled, &task.Name, 100)
+		if !enabled {
+			return errTaskDisabled
+		}
+
+		timeout := knobsService.GetDurationTarget(knobs.KnobSoTaskTimeout, &task.Name, task.getTimeout())
+
+		ctx, cancel := context.WithTimeoutCause(ctx, timeout, errTaskTimeout)
 		defer cancel()
 
 		done := make(chan error)

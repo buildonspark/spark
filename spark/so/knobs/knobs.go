@@ -35,6 +35,10 @@ const (
 	KnobSoMaxKeysharesPerRequest         = "spark.so.max_keyshares_per_request"
 	KnobGRPCClientTimeout                = "spark.so.grpc.client.timeout"
 	KnobRenewLeafDisabled                = "spark.so.grpc.server.disable_renew_leaf"
+
+	// Task / gocron related knobs.
+	KnobSoTaskEnabled = "spark.so.task.enabled"
+	KnobSoTaskTimeout = "spark.so.task.timeout"
 )
 
 type Config struct {
