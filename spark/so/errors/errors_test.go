@@ -84,10 +84,10 @@ func TestInternalErrorDetailMasking(t *testing.T) {
 			fullMethod:     "/spark_internal.SparkInternalService/SomeMethod",
 			wantDetails:    false,
 			handler: func(_ context.Context, _ any) (any, error) {
-				return nil, FailedPreconditionNotSpendable(fmt.Errorf("utxo not found: txid: %s vout: %d", "492aef9399b186196effc64f5a754fb6ccff5942adefde9786da5249eb9dde47", 0))
+				return nil, FailedPreconditionBadSignature(fmt.Errorf("bad signature"))
 			},
 			expectedCode:   codes.FailedPrecondition,
-			expectedReason: "NOT_SPENDABLE",
+			expectedReason: ReasonFailedPreconditionBadSignature,
 		},
 		{
 			name:           "show details for internal service even if detailedErrors disabled",
@@ -199,25 +199,25 @@ func TestToGRPCError(t *testing.T) {
 		},
 		{
 			name:        "existing grpcError returns same error",
-			err:         InvalidUserInputErrorf("not found"),
+			err:         InvalidArgumentMalformedField(fmt.Errorf("not found")),
 			wantErrCode: codes.InvalidArgument,
 			wantMessage: "not found",
 		},
 		{
 			name:        "not found error returns not found code",
-			err:         NotFoundErrorf("resource not found"),
+			err:         NotFoundMissingEntity(fmt.Errorf("resource not found")),
 			wantErrCode: codes.NotFound,
 			wantMessage: "resource not found",
 		},
 		{
 			name:        "failed precondition error returns failed precondition code",
-			err:         FailedPreconditionErrorf("precondition failed"),
+			err:         FailedPreconditionInvalidState(fmt.Errorf("precondition failed")),
 			wantErrCode: codes.FailedPrecondition,
 			wantMessage: "precondition failed",
 		},
 		{
 			name:        "unavailable error returns unavailable code",
-			err:         UnavailableErrorf("service unavailable"),
+			err:         UnavailableMethodDisabled(fmt.Errorf("service unavailable")),
 			wantErrCode: codes.Unavailable,
 			wantMessage: "service unavailable",
 		},
@@ -250,10 +250,10 @@ func TestCodeAndReasonFrom_InternalError_ExplicitReason(t *testing.T) {
 }
 
 func TestCodeAndReasonFrom_UpstreamStatus_ErrorInfo(t *testing.T) {
-	st, _ := status.New(codes.FailedPrecondition, "oops").WithDetails(&errdetails.ErrorInfo{Reason: ReasonFailedPreconditionNotSpendable})
+	st, _ := status.New(codes.FailedPrecondition, "oops").WithDetails(&errdetails.ErrorInfo{Reason: ReasonFailedPreconditionBadSignature})
 	code, reason := CodeAndReasonFrom(st.Err())
 	assert.Equal(t, codes.FailedPrecondition, code)
-	assert.Equal(t, ReasonFailedPreconditionNotSpendable, reason)
+	assert.Equal(t, ReasonFailedPreconditionBadSignature, reason)
 }
 
 func TestCodeAndReasonFrom_StatusWithoutErrorInfo_NoDefaultReason(t *testing.T) {
@@ -301,8 +301,8 @@ func TestGRPCStatus_AttachesErrorInfo(t *testing.T) {
 	assert.Equal(t, ReasonResourceExhaustedConcurrencyLimitExceeded, gotReason)
 }
 
-func TestInvalidUserInputErrorf(t *testing.T) {
-	err := InvalidUserInputErrorf("invalid input: %s, value: %d", "field", 42)
+func TestInvalidArgumentMalformedField(t *testing.T) {
+	err := InvalidArgumentMalformedField(fmt.Errorf("invalid input: %s, value: %d", "field", 42))
 
 	require.Error(t, err)
 	st := status.Convert(err)
@@ -310,8 +310,8 @@ func TestInvalidUserInputErrorf(t *testing.T) {
 	assert.Equal(t, "invalid input: field, value: 42", st.Message())
 }
 
-func TestFailedPreconditionErrorf(t *testing.T) {
-	err := FailedPreconditionErrorf("precondition failed: %s, state: %s", "operation", "pending")
+func TestFailedPreconditionInvalidState(t *testing.T) {
+	err := FailedPreconditionInvalidState(fmt.Errorf("precondition failed: %s, state: %s", "operation", "pending"))
 
 	require.Error(t, err)
 	st := status.Convert(err)
@@ -319,8 +319,8 @@ func TestFailedPreconditionErrorf(t *testing.T) {
 	assert.Equal(t, "precondition failed: operation, state: pending", st.Message())
 }
 
-func TestNotFoundErrorf(t *testing.T) {
-	err := NotFoundErrorf("resource not found: %s with id %d", "user", 123)
+func TestNotFoundMissingEntity(t *testing.T) {
+	err := NotFoundMissingEntity(fmt.Errorf("resource not found: %s with id %d", "user", 123))
 
 	require.Error(t, err)
 	st := status.Convert(err)
@@ -328,8 +328,8 @@ func TestNotFoundErrorf(t *testing.T) {
 	assert.Equal(t, "resource not found: user with id 123", st.Message())
 }
 
-func TestUnavailableErrorf(t *testing.T) {
-	err := UnavailableErrorf("service unavailable: %s, retry after %d seconds", "database", 30)
+func TestUnavailableMethodDisabled(t *testing.T) {
+	err := UnavailableMethodDisabled(fmt.Errorf("service unavailable: %s, retry after %d seconds", "database", 30))
 
 	require.Error(t, err)
 	st := status.Convert(err)
@@ -368,17 +368,17 @@ func TestWrapGRPCErrorWithReasonPrefix(t *testing.T) {
 	})
 
 	t.Run("prefixes an error with existing reason", func(t *testing.T) {
-		originalErr := FailedPreconditionNotSpendable(errors.New("already spent"))
+		originalErr := FailedPreconditionBadSignature(errors.New("bad signature"))
 		wrappedErr := WrapErrorWithReasonPrefix(originalErr, "FAILED_WITH_EXTERNAL_COORDINATOR")
 
 		require.Error(t, wrappedErr)
 		st := status.Convert(wrappedErr)
 		assert.Equal(t, codes.FailedPrecondition, st.Code())
-		assert.Equal(t, "already spent", st.Message())
+		assert.Equal(t, "bad signature", st.Message())
 
 		code, reason := CodeAndReasonFrom(wrappedErr)
 		assert.Equal(t, codes.FailedPrecondition, code)
-		assert.Equal(t, "FAILED_WITH_EXTERNAL_COORDINATOR:NOT_SPENDABLE", reason)
+		assert.Equal(t, "FAILED_WITH_EXTERNAL_COORDINATOR:BAD_SIGNATURE", reason)
 	})
 
 	t.Run("wraps a non-grpc error", func(t *testing.T) {

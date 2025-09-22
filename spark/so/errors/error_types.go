@@ -9,15 +9,23 @@ import (
 // Canonical reason constants for ErrorInfo.Reason. Keep stable, UPPER_SNAKE_CASE.  All errors should have a grpc error code prefix.
 const (
 	ReasonInternalDependencyFailure = "DEPENDENCY_FAILURE"
+	ReasonInternalDatabaseError     = "DATABASE_ERROR"
+	ReasonInternalUnhandledError    = "UNHANDLED_ERROR"
 
-	ReasonInvalidArgumentMissingField   = "MISSING_FIELD"
-	ReasonInvalidArgumentMalformedField = "MALFORMED_FIELD"
-	ReasonInvalidArgumenMalformedKey    = "MALFORMED_KEY"
+	ReasonInvalidArgumentMissingField      = "MISSING_FIELD"
+	ReasonInvalidArgumentMalformedField    = "MALFORMED_FIELD"
+	ReasonInvalidArgumentDuplicateField    = "DUPLICATE_FIELD"
+	ReasonInvalidArgumenMalformedKey       = "MALFORMED_KEY"
+	ReasonInvalidArgumentInvalidVersion    = "INVALID_VERSION"
+	ReasonInvalidArgumentPublicKeyMismatch = "PUBLIC_KEY_MISMATCH"
 
-	ReasonFailedPreconditionNotSpendable              = "NOT_SPENDABLE"
 	ReasonFailedPreconditionBadSignature              = "BAD_SIGNATURE"
 	ReasonFailedPreconditionTokenRulesViolation       = "TOKEN_RULES_VIOLATION"
 	ReasonFailedPreconditionInsufficientConfirmations = "INSUFFICIENT_CONFIRMATIONS"
+	ReasonFailedPreconditionInvalidState              = "INVALID_STATE"
+	ReasonFailedPreconditionExpired                   = "EXPIRED"
+	ReasonFailedPreconditionReplay                    = "REPLAY"
+	ReasonFailedPreconditionHashMismatch              = "HASH_MISMATCH"
 
 	ReasonAbortedTransactionPreempted = "TRANSACTION_PREEMPTED"
 
@@ -29,6 +37,8 @@ const (
 	ReasonResourceExhaustedRateLimitExceeded        = "RATE_LIMIT_EXCEEDED"
 	ReasonResourceExhaustedConcurrencyLimitExceeded = "CONCURRENCY_LIMIT_EXCEEDED"
 
+	ReasonUnavailableMethodDisabled = "METHOD_DISABLED"
+
 	// ErrorReasonPrefixFailedWithExternalCoordinator is a prefix for errors that occur when the coordinator calls out to another
 	// coordinator and that call fails. The underlying reason from the external coordinator should be appended after a colon.
 	ErrorReasonPrefixFailedWithExternalCoordinator = "FAILED_WITH_EXTERNAL_COORDINATOR"
@@ -36,6 +46,14 @@ const (
 
 func InternalDependencyFailure(err error) error {
 	return newGRPCError(codes.Internal, err, ReasonInternalDependencyFailure)
+}
+
+func InternalUnhandledError(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalUnhandledError)
+}
+
+func InternalDatabaseError(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalDatabaseError)
 }
 
 func InvalidArgumentMissingField(err error) error {
@@ -46,8 +64,20 @@ func InvalidArgumentMalformedField(err error) error {
 	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentMalformedField)
 }
 
-func FailedPreconditionNotSpendable(err error) error {
-	return newGRPCError(codes.FailedPrecondition, err, ReasonFailedPreconditionNotSpendable)
+func InvalidArgumentDuplicateField(err error) error {
+	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentDuplicateField)
+}
+
+func InvalidArgumentMalformedKey(err error) error {
+	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumenMalformedKey)
+}
+
+func InvalidArgumentInvalidVersion(err error) error {
+	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentInvalidVersion)
+}
+
+func InvalidArgumentPublicKeyMismatch(err error) error {
+	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentPublicKeyMismatch)
 }
 
 func FailedPreconditionBadSignature(err error) error {
@@ -60,6 +90,22 @@ func FailedPreconditionTokenRulesViolation(err error) error {
 
 func FailedPreconditionInsufficientConfirmations(err error) error {
 	return newGRPCError(codes.FailedPrecondition, err, ReasonFailedPreconditionInsufficientConfirmations)
+}
+
+func FailedPreconditionInvalidState(err error) error {
+	return newGRPCError(codes.FailedPrecondition, err, ReasonFailedPreconditionInvalidState)
+}
+
+func FailedPreconditionExpired(err error) error {
+	return newGRPCError(codes.FailedPrecondition, err, ReasonFailedPreconditionExpired)
+}
+
+func FailedPreconditionReplay(err error) error {
+	return newGRPCError(codes.FailedPrecondition, err, ReasonFailedPreconditionReplay)
+}
+
+func FailedPreconditionHashMismatch(err error) error {
+	return newGRPCError(codes.FailedPrecondition, err, ReasonFailedPreconditionHashMismatch)
 }
 
 func AbortedTransactionPreempted(err error) error {
@@ -84,6 +130,10 @@ func ResourceExhaustedRateLimitExceeded(err error) error {
 
 func ResourceExhaustedConcurrencyLimitExceeded(err error) error {
 	return newGRPCError(codes.ResourceExhausted, err, ReasonResourceExhaustedConcurrencyLimitExceeded)
+}
+
+func UnavailableMethodDisabled(err error) error {
+	return newGRPCError(codes.Unavailable, err, ReasonUnavailableMethodDisabled)
 }
 
 // ------------------------------------------------------------
@@ -112,13 +162,9 @@ func AlreadyExistsErrorf(format string, args ...any) error {
 	ge := newGRPCError(codes.AlreadyExists, fmt.Errorf(format, args...), "")
 	return ge
 }
+
 func UnimplementedErrorf(format string, args ...any) error {
 	ge := newGRPCError(codes.Unimplemented, fmt.Errorf(format, args...), "")
-	return ge
-}
-
-func AbortedErrorf(format string, args ...any) error {
-	ge := newGRPCError(codes.Aborted, fmt.Errorf(format, args...), "")
 	return ge
 }
 
