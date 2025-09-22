@@ -17473,10 +17473,10 @@ type TransferMutation struct {
 	clearedpayment_intent        bool
 	spark_invoice                *uuid.UUID
 	clearedspark_invoice         bool
-	counter_swap_transfer        *uuid.UUID
+	counter_swap_transfer        map[uuid.UUID]struct{}
+	removedcounter_swap_transfer map[uuid.UUID]struct{}
 	clearedcounter_swap_transfer bool
-	primary_swap_transfer        map[uuid.UUID]struct{}
-	removedprimary_swap_transfer map[uuid.UUID]struct{}
+	primary_swap_transfer        *uuid.UUID
 	clearedprimary_swap_transfer bool
 	done                         bool
 	oldValue                     func(context.Context) (*Transfer, error)
@@ -18113,9 +18113,14 @@ func (m *TransferMutation) ResetSparkInvoice() {
 	m.clearedspark_invoice = false
 }
 
-// SetCounterSwapTransferID sets the "counter_swap_transfer" edge to the Transfer entity by id.
-func (m *TransferMutation) SetCounterSwapTransferID(id uuid.UUID) {
-	m.counter_swap_transfer = &id
+// AddCounterSwapTransferIDs adds the "counter_swap_transfer" edge to the Transfer entity by ids.
+func (m *TransferMutation) AddCounterSwapTransferIDs(ids ...uuid.UUID) {
+	if m.counter_swap_transfer == nil {
+		m.counter_swap_transfer = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		m.counter_swap_transfer[ids[i]] = struct{}{}
+	}
 }
 
 // ClearCounterSwapTransfer clears the "counter_swap_transfer" edge to the Transfer entity.
@@ -18128,20 +18133,29 @@ func (m *TransferMutation) CounterSwapTransferCleared() bool {
 	return m.clearedcounter_swap_transfer
 }
 
-// CounterSwapTransferID returns the "counter_swap_transfer" edge ID in the mutation.
-func (m *TransferMutation) CounterSwapTransferID() (id uuid.UUID, exists bool) {
-	if m.counter_swap_transfer != nil {
-		return *m.counter_swap_transfer, true
+// RemoveCounterSwapTransferIDs removes the "counter_swap_transfer" edge to the Transfer entity by IDs.
+func (m *TransferMutation) RemoveCounterSwapTransferIDs(ids ...uuid.UUID) {
+	if m.removedcounter_swap_transfer == nil {
+		m.removedcounter_swap_transfer = make(map[uuid.UUID]struct{})
+	}
+	for i := range ids {
+		delete(m.counter_swap_transfer, ids[i])
+		m.removedcounter_swap_transfer[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedCounterSwapTransfer returns the removed IDs of the "counter_swap_transfer" edge to the Transfer entity.
+func (m *TransferMutation) RemovedCounterSwapTransferIDs() (ids []uuid.UUID) {
+	for id := range m.removedcounter_swap_transfer {
+		ids = append(ids, id)
 	}
 	return
 }
 
 // CounterSwapTransferIDs returns the "counter_swap_transfer" edge IDs in the mutation.
-// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
-// CounterSwapTransferID instead. It exists only for internal usage by the builders.
 func (m *TransferMutation) CounterSwapTransferIDs() (ids []uuid.UUID) {
-	if id := m.counter_swap_transfer; id != nil {
-		ids = append(ids, *id)
+	for id := range m.counter_swap_transfer {
+		ids = append(ids, id)
 	}
 	return
 }
@@ -18150,16 +18164,12 @@ func (m *TransferMutation) CounterSwapTransferIDs() (ids []uuid.UUID) {
 func (m *TransferMutation) ResetCounterSwapTransfer() {
 	m.counter_swap_transfer = nil
 	m.clearedcounter_swap_transfer = false
+	m.removedcounter_swap_transfer = nil
 }
 
-// AddPrimarySwapTransferIDs adds the "primary_swap_transfer" edge to the Transfer entity by ids.
-func (m *TransferMutation) AddPrimarySwapTransferIDs(ids ...uuid.UUID) {
-	if m.primary_swap_transfer == nil {
-		m.primary_swap_transfer = make(map[uuid.UUID]struct{})
-	}
-	for i := range ids {
-		m.primary_swap_transfer[ids[i]] = struct{}{}
-	}
+// SetPrimarySwapTransferID sets the "primary_swap_transfer" edge to the Transfer entity by id.
+func (m *TransferMutation) SetPrimarySwapTransferID(id uuid.UUID) {
+	m.primary_swap_transfer = &id
 }
 
 // ClearPrimarySwapTransfer clears the "primary_swap_transfer" edge to the Transfer entity.
@@ -18172,29 +18182,20 @@ func (m *TransferMutation) PrimarySwapTransferCleared() bool {
 	return m.clearedprimary_swap_transfer
 }
 
-// RemovePrimarySwapTransferIDs removes the "primary_swap_transfer" edge to the Transfer entity by IDs.
-func (m *TransferMutation) RemovePrimarySwapTransferIDs(ids ...uuid.UUID) {
-	if m.removedprimary_swap_transfer == nil {
-		m.removedprimary_swap_transfer = make(map[uuid.UUID]struct{})
-	}
-	for i := range ids {
-		delete(m.primary_swap_transfer, ids[i])
-		m.removedprimary_swap_transfer[ids[i]] = struct{}{}
-	}
-}
-
-// RemovedPrimarySwapTransfer returns the removed IDs of the "primary_swap_transfer" edge to the Transfer entity.
-func (m *TransferMutation) RemovedPrimarySwapTransferIDs() (ids []uuid.UUID) {
-	for id := range m.removedprimary_swap_transfer {
-		ids = append(ids, id)
+// PrimarySwapTransferID returns the "primary_swap_transfer" edge ID in the mutation.
+func (m *TransferMutation) PrimarySwapTransferID() (id uuid.UUID, exists bool) {
+	if m.primary_swap_transfer != nil {
+		return *m.primary_swap_transfer, true
 	}
 	return
 }
 
 // PrimarySwapTransferIDs returns the "primary_swap_transfer" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// PrimarySwapTransferID instead. It exists only for internal usage by the builders.
 func (m *TransferMutation) PrimarySwapTransferIDs() (ids []uuid.UUID) {
-	for id := range m.primary_swap_transfer {
-		ids = append(ids, id)
+	if id := m.primary_swap_transfer; id != nil {
+		ids = append(ids, *id)
 	}
 	return
 }
@@ -18203,7 +18204,6 @@ func (m *TransferMutation) PrimarySwapTransferIDs() (ids []uuid.UUID) {
 func (m *TransferMutation) ResetPrimarySwapTransfer() {
 	m.primary_swap_transfer = nil
 	m.clearedprimary_swap_transfer = false
-	m.removedprimary_swap_transfer = nil
 }
 
 // Where appends a list predicates to the TransferMutation builder.
@@ -18560,15 +18560,15 @@ func (m *TransferMutation) AddedIDs(name string) []ent.Value {
 			return []ent.Value{*id}
 		}
 	case transfer.EdgeCounterSwapTransfer:
-		if id := m.counter_swap_transfer; id != nil {
-			return []ent.Value{*id}
-		}
-	case transfer.EdgePrimarySwapTransfer:
-		ids := make([]ent.Value, 0, len(m.primary_swap_transfer))
-		for id := range m.primary_swap_transfer {
+		ids := make([]ent.Value, 0, len(m.counter_swap_transfer))
+		for id := range m.counter_swap_transfer {
 			ids = append(ids, id)
 		}
 		return ids
+	case transfer.EdgePrimarySwapTransfer:
+		if id := m.primary_swap_transfer; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
@@ -18579,8 +18579,8 @@ func (m *TransferMutation) RemovedEdges() []string {
 	if m.removedtransfer_leaves != nil {
 		edges = append(edges, transfer.EdgeTransferLeaves)
 	}
-	if m.removedprimary_swap_transfer != nil {
-		edges = append(edges, transfer.EdgePrimarySwapTransfer)
+	if m.removedcounter_swap_transfer != nil {
+		edges = append(edges, transfer.EdgeCounterSwapTransfer)
 	}
 	return edges
 }
@@ -18595,9 +18595,9 @@ func (m *TransferMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
-	case transfer.EdgePrimarySwapTransfer:
-		ids := make([]ent.Value, 0, len(m.removedprimary_swap_transfer))
-		for id := range m.removedprimary_swap_transfer {
+	case transfer.EdgeCounterSwapTransfer:
+		ids := make([]ent.Value, 0, len(m.removedcounter_swap_transfer))
+		for id := range m.removedcounter_swap_transfer {
 			ids = append(ids, id)
 		}
 		return ids
@@ -18654,8 +18654,8 @@ func (m *TransferMutation) ClearEdge(name string) error {
 	case transfer.EdgeSparkInvoice:
 		m.ClearSparkInvoice()
 		return nil
-	case transfer.EdgeCounterSwapTransfer:
-		m.ClearCounterSwapTransfer()
+	case transfer.EdgePrimarySwapTransfer:
+		m.ClearPrimarySwapTransfer()
 		return nil
 	}
 	return fmt.Errorf("unknown Transfer unique edge %s", name)

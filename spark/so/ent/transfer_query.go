@@ -151,7 +151,7 @@ func (tq *TransferQuery) QueryCounterSwapTransfer() *TransferQuery {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(transfer.Table, transfer.FieldID, selector),
 			sqlgraph.To(transfer.Table, transfer.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, transfer.CounterSwapTransferTable, transfer.CounterSwapTransferColumn),
+			sqlgraph.Edge(sqlgraph.O2M, false, transfer.CounterSwapTransferTable, transfer.CounterSwapTransferColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
 		return fromU, nil
@@ -173,7 +173,7 @@ func (tq *TransferQuery) QueryPrimarySwapTransfer() *TransferQuery {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(transfer.Table, transfer.FieldID, selector),
 			sqlgraph.To(transfer.Table, transfer.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, transfer.PrimarySwapTransferTable, transfer.PrimarySwapTransferColumn),
+			sqlgraph.Edge(sqlgraph.M2O, true, transfer.PrimarySwapTransferTable, transfer.PrimarySwapTransferColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
 		return fromU, nil
@@ -526,7 +526,7 @@ func (tq *TransferQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tra
 			tq.withPrimarySwapTransfer != nil,
 		}
 	)
-	if tq.withPaymentIntent != nil || tq.withCounterSwapTransfer != nil {
+	if tq.withPaymentIntent != nil || tq.withPrimarySwapTransfer != nil {
 		withFKs = true
 	}
 	if withFKs {
@@ -573,15 +573,15 @@ func (tq *TransferQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tra
 		}
 	}
 	if query := tq.withCounterSwapTransfer; query != nil {
-		if err := tq.loadCounterSwapTransfer(ctx, query, nodes, nil,
-			func(n *Transfer, e *Transfer) { n.Edges.CounterSwapTransfer = e }); err != nil {
+		if err := tq.loadCounterSwapTransfer(ctx, query, nodes,
+			func(n *Transfer) { n.Edges.CounterSwapTransfer = []*Transfer{} },
+			func(n *Transfer, e *Transfer) { n.Edges.CounterSwapTransfer = append(n.Edges.CounterSwapTransfer, e) }); err != nil {
 			return nil, err
 		}
 	}
 	if query := tq.withPrimarySwapTransfer; query != nil {
-		if err := tq.loadPrimarySwapTransfer(ctx, query, nodes,
-			func(n *Transfer) { n.Edges.PrimarySwapTransfer = []*Transfer{} },
-			func(n *Transfer, e *Transfer) { n.Edges.PrimarySwapTransfer = append(n.Edges.PrimarySwapTransfer, e) }); err != nil {
+		if err := tq.loadPrimarySwapTransfer(ctx, query, nodes, nil,
+			func(n *Transfer, e *Transfer) { n.Edges.PrimarySwapTransfer = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -681,13 +681,44 @@ func (tq *TransferQuery) loadSparkInvoice(ctx context.Context, query *SparkInvoi
 	return nil
 }
 func (tq *TransferQuery) loadCounterSwapTransfer(ctx context.Context, query *TransferQuery, nodes []*Transfer, init func(*Transfer), assign func(*Transfer, *Transfer)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*Transfer)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	query.Where(predicate.Transfer(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(transfer.CounterSwapTransferColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.transfer_counter_swap_transfer
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "transfer_counter_swap_transfer" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "transfer_counter_swap_transfer" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (tq *TransferQuery) loadPrimarySwapTransfer(ctx context.Context, query *TransferQuery, nodes []*Transfer, init func(*Transfer), assign func(*Transfer, *Transfer)) error {
 	ids := make([]uuid.UUID, 0, len(nodes))
 	nodeids := make(map[uuid.UUID][]*Transfer)
 	for i := range nodes {
-		if nodes[i].transfer_primary_swap_transfer == nil {
+		if nodes[i].transfer_counter_swap_transfer == nil {
 			continue
 		}
-		fk := *nodes[i].transfer_primary_swap_transfer
+		fk := *nodes[i].transfer_counter_swap_transfer
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -704,42 +735,11 @@ func (tq *TransferQuery) loadCounterSwapTransfer(ctx context.Context, query *Tra
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "transfer_primary_swap_transfer" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "transfer_counter_swap_transfer" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
 		}
-	}
-	return nil
-}
-func (tq *TransferQuery) loadPrimarySwapTransfer(ctx context.Context, query *TransferQuery, nodes []*Transfer, init func(*Transfer), assign func(*Transfer, *Transfer)) error {
-	fks := make([]driver.Value, 0, len(nodes))
-	nodeids := make(map[uuid.UUID]*Transfer)
-	for i := range nodes {
-		fks = append(fks, nodes[i].ID)
-		nodeids[nodes[i].ID] = nodes[i]
-		if init != nil {
-			init(nodes[i])
-		}
-	}
-	query.withFKs = true
-	query.Where(predicate.Transfer(func(s *sql.Selector) {
-		s.Where(sql.InValues(s.C(transfer.PrimarySwapTransferColumn), fks...))
-	}))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		fk := n.transfer_primary_swap_transfer
-		if fk == nil {
-			return fmt.Errorf(`foreign-key "transfer_primary_swap_transfer" is nil for node %v`, n.ID)
-		}
-		node, ok := nodeids[*fk]
-		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "transfer_primary_swap_transfer" returned %v for node %v`, *fk, n.ID)
-		}
-		assign(node, n)
 	}
 	return nil
 }

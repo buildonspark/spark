@@ -3814,7 +3814,7 @@ func (c *TransferClient) QueryCounterSwapTransfer(t *Transfer) *TransferQuery {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(transfer.Table, transfer.FieldID, id),
 			sqlgraph.To(transfer.Table, transfer.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, transfer.CounterSwapTransferTable, transfer.CounterSwapTransferColumn),
+			sqlgraph.Edge(sqlgraph.O2M, false, transfer.CounterSwapTransferTable, transfer.CounterSwapTransferColumn),
 		)
 		fromV = sqlgraph.Neighbors(t.driver.Dialect(), step)
 		return fromV, nil
@@ -3830,7 +3830,7 @@ func (c *TransferClient) QueryPrimarySwapTransfer(t *Transfer) *TransferQuery {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(transfer.Table, transfer.FieldID, id),
 			sqlgraph.To(transfer.Table, transfer.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, transfer.PrimarySwapTransferTable, transfer.PrimarySwapTransferColumn),
+			sqlgraph.Edge(sqlgraph.M2O, true, transfer.PrimarySwapTransferTable, transfer.PrimarySwapTransferColumn),
 		)
 		fromV = sqlgraph.Neighbors(t.driver.Dialect(), step)
 		return fromV, nil

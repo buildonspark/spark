@@ -732,7 +732,7 @@ var (
 		{Name: "completion_time", Type: field.TypeTime, Nullable: true},
 		{Name: "transfer_payment_intent", Type: field.TypeUUID, Nullable: true},
 		{Name: "spark_invoice_id", Type: field.TypeUUID, Nullable: true},
-		{Name: "transfer_primary_swap_transfer", Type: field.TypeUUID, Nullable: true},
+		{Name: "transfer_counter_swap_transfer", Type: field.TypeUUID, Nullable: true},
 	}
 	// TransfersTable holds the schema information for the "transfers" table.
 	TransfersTable = &schema.Table{
@@ -753,7 +753,7 @@ var (
 				OnDelete:   schema.SetNull,
 			},
 			{
-				Symbol:     "transfers_transfers_primary_swap_transfer",
+				Symbol:     "transfers_transfers_counter_swap_transfer",
 				Columns:    []*schema.Column{TransfersColumns[12]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.SetNull,

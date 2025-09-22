@@ -167,38 +167,38 @@ func (tu *TransferUpdate) SetSparkInvoice(s *SparkInvoice) *TransferUpdate {
 	return tu.SetSparkInvoiceID(s.ID)
 }
 
-// SetCounterSwapTransferID sets the "counter_swap_transfer" edge to the Transfer entity by ID.
-func (tu *TransferUpdate) SetCounterSwapTransferID(id uuid.UUID) *TransferUpdate {
-	tu.mutation.SetCounterSwapTransferID(id)
+// AddCounterSwapTransferIDs adds the "counter_swap_transfer" edge to the Transfer entity by IDs.
+func (tu *TransferUpdate) AddCounterSwapTransferIDs(ids ...uuid.UUID) *TransferUpdate {
+	tu.mutation.AddCounterSwapTransferIDs(ids...)
 	return tu
 }
 
-// SetNillableCounterSwapTransferID sets the "counter_swap_transfer" edge to the Transfer entity by ID if the given value is not nil.
-func (tu *TransferUpdate) SetNillableCounterSwapTransferID(id *uuid.UUID) *TransferUpdate {
-	if id != nil {
-		tu = tu.SetCounterSwapTransferID(*id)
-	}
-	return tu
-}
-
-// SetCounterSwapTransfer sets the "counter_swap_transfer" edge to the Transfer entity.
-func (tu *TransferUpdate) SetCounterSwapTransfer(t *Transfer) *TransferUpdate {
-	return tu.SetCounterSwapTransferID(t.ID)
-}
-
-// AddPrimarySwapTransferIDs adds the "primary_swap_transfer" edge to the Transfer entity by IDs.
-func (tu *TransferUpdate) AddPrimarySwapTransferIDs(ids ...uuid.UUID) *TransferUpdate {
-	tu.mutation.AddPrimarySwapTransferIDs(ids...)
-	return tu
-}
-
-// AddPrimarySwapTransfer adds the "primary_swap_transfer" edges to the Transfer entity.
-func (tu *TransferUpdate) AddPrimarySwapTransfer(t ...*Transfer) *TransferUpdate {
+// AddCounterSwapTransfer adds the "counter_swap_transfer" edges to the Transfer entity.
+func (tu *TransferUpdate) AddCounterSwapTransfer(t ...*Transfer) *TransferUpdate {
 	ids := make([]uuid.UUID, len(t))
 	for i := range t {
 		ids[i] = t[i].ID
 	}
-	return tu.AddPrimarySwapTransferIDs(ids...)
+	return tu.AddCounterSwapTransferIDs(ids...)
+}
+
+// SetPrimarySwapTransferID sets the "primary_swap_transfer" edge to the Transfer entity by ID.
+func (tu *TransferUpdate) SetPrimarySwapTransferID(id uuid.UUID) *TransferUpdate {
+	tu.mutation.SetPrimarySwapTransferID(id)
+	return tu
+}
+
+// SetNillablePrimarySwapTransferID sets the "primary_swap_transfer" edge to the Transfer entity by ID if the given value is not nil.
+func (tu *TransferUpdate) SetNillablePrimarySwapTransferID(id *uuid.UUID) *TransferUpdate {
+	if id != nil {
+		tu = tu.SetPrimarySwapTransferID(*id)
+	}
+	return tu
+}
+
+// SetPrimarySwapTransfer sets the "primary_swap_transfer" edge to the Transfer entity.
+func (tu *TransferUpdate) SetPrimarySwapTransfer(t *Transfer) *TransferUpdate {
+	return tu.SetPrimarySwapTransferID(t.ID)
 }
 
 // Mutation returns the TransferMutation object of the builder.
@@ -239,31 +239,31 @@ func (tu *TransferUpdate) ClearSparkInvoice() *TransferUpdate {
 	return tu
 }
 
-// ClearCounterSwapTransfer clears the "counter_swap_transfer" edge to the Transfer entity.
+// ClearCounterSwapTransfer clears all "counter_swap_transfer" edges to the Transfer entity.
 func (tu *TransferUpdate) ClearCounterSwapTransfer() *TransferUpdate {
 	tu.mutation.ClearCounterSwapTransfer()
 	return tu
 }
 
-// ClearPrimarySwapTransfer clears all "primary_swap_transfer" edges to the Transfer entity.
-func (tu *TransferUpdate) ClearPrimarySwapTransfer() *TransferUpdate {
-	tu.mutation.ClearPrimarySwapTransfer()
+// RemoveCounterSwapTransferIDs removes the "counter_swap_transfer" edge to Transfer entities by IDs.
+func (tu *TransferUpdate) RemoveCounterSwapTransferIDs(ids ...uuid.UUID) *TransferUpdate {
+	tu.mutation.RemoveCounterSwapTransferIDs(ids...)
 	return tu
 }
 
-// RemovePrimarySwapTransferIDs removes the "primary_swap_transfer" edge to Transfer entities by IDs.
-func (tu *TransferUpdate) RemovePrimarySwapTransferIDs(ids ...uuid.UUID) *TransferUpdate {
-	tu.mutation.RemovePrimarySwapTransferIDs(ids...)
-	return tu
-}
-
-// RemovePrimarySwapTransfer removes "primary_swap_transfer" edges to Transfer entities.
-func (tu *TransferUpdate) RemovePrimarySwapTransfer(t ...*Transfer) *TransferUpdate {
+// RemoveCounterSwapTransfer removes "counter_swap_transfer" edges to Transfer entities.
+func (tu *TransferUpdate) RemoveCounterSwapTransfer(t ...*Transfer) *TransferUpdate {
 	ids := make([]uuid.UUID, len(t))
 	for i := range t {
 		ids[i] = t[i].ID
 	}
-	return tu.RemovePrimarySwapTransferIDs(ids...)
+	return tu.RemoveCounterSwapTransferIDs(ids...)
+}
+
+// ClearPrimarySwapTransfer clears the "primary_swap_transfer" edge to the Transfer entity.
+func (tu *TransferUpdate) ClearPrimarySwapTransfer() *TransferUpdate {
+	tu.mutation.ClearPrimarySwapTransfer()
+	return tu
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -461,24 +461,40 @@ func (tu *TransferUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if tu.mutation.CounterSwapTransferCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
 			Table:   transfer.CounterSwapTransferTable,
 			Columns: []string{transfer.CounterSwapTransferColumn},
-			Bidi:    false,
+			Bidi:    true,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := tu.mutation.CounterSwapTransferIDs(); len(nodes) > 0 {
+	if nodes := tu.mutation.RemovedCounterSwapTransferIDs(); len(nodes) > 0 && !tu.mutation.CounterSwapTransferCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
 			Table:   transfer.CounterSwapTransferTable,
 			Columns: []string{transfer.CounterSwapTransferColumn},
-			Bidi:    false,
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tu.mutation.CounterSwapTransferIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   transfer.CounterSwapTransferTable,
+			Columns: []string{transfer.CounterSwapTransferColumn},
+			Bidi:    true,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
 			},
@@ -490,37 +506,21 @@ func (tu *TransferUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if tu.mutation.PrimarySwapTransferCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
 			Table:   transfer.PrimarySwapTransferTable,
 			Columns: []string{transfer.PrimarySwapTransferColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
 			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := tu.mutation.RemovedPrimarySwapTransferIDs(); len(nodes) > 0 && !tu.mutation.PrimarySwapTransferCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   transfer.PrimarySwapTransferTable,
-			Columns: []string{transfer.PrimarySwapTransferColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
 	if nodes := tu.mutation.PrimarySwapTransferIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
 			Table:   transfer.PrimarySwapTransferTable,
 			Columns: []string{transfer.PrimarySwapTransferColumn},
 			Bidi:    false,
@@ -687,38 +687,38 @@ func (tuo *TransferUpdateOne) SetSparkInvoice(s *SparkInvoice) *TransferUpdateOn
 	return tuo.SetSparkInvoiceID(s.ID)
 }
 
-// SetCounterSwapTransferID sets the "counter_swap_transfer" edge to the Transfer entity by ID.
-func (tuo *TransferUpdateOne) SetCounterSwapTransferID(id uuid.UUID) *TransferUpdateOne {
-	tuo.mutation.SetCounterSwapTransferID(id)
+// AddCounterSwapTransferIDs adds the "counter_swap_transfer" edge to the Transfer entity by IDs.
+func (tuo *TransferUpdateOne) AddCounterSwapTransferIDs(ids ...uuid.UUID) *TransferUpdateOne {
+	tuo.mutation.AddCounterSwapTransferIDs(ids...)
 	return tuo
 }
 
-// SetNillableCounterSwapTransferID sets the "counter_swap_transfer" edge to the Transfer entity by ID if the given value is not nil.
-func (tuo *TransferUpdateOne) SetNillableCounterSwapTransferID(id *uuid.UUID) *TransferUpdateOne {
-	if id != nil {
-		tuo = tuo.SetCounterSwapTransferID(*id)
-	}
-	return tuo
-}
-
-// SetCounterSwapTransfer sets the "counter_swap_transfer" edge to the Transfer entity.
-func (tuo *TransferUpdateOne) SetCounterSwapTransfer(t *Transfer) *TransferUpdateOne {
-	return tuo.SetCounterSwapTransferID(t.ID)
-}
-
-// AddPrimarySwapTransferIDs adds the "primary_swap_transfer" edge to the Transfer entity by IDs.
-func (tuo *TransferUpdateOne) AddPrimarySwapTransferIDs(ids ...uuid.UUID) *TransferUpdateOne {
-	tuo.mutation.AddPrimarySwapTransferIDs(ids...)
-	return tuo
-}
-
-// AddPrimarySwapTransfer adds the "primary_swap_transfer" edges to the Transfer entity.
-func (tuo *TransferUpdateOne) AddPrimarySwapTransfer(t ...*Transfer) *TransferUpdateOne {
+// AddCounterSwapTransfer adds the "counter_swap_transfer" edges to the Transfer entity.
+func (tuo *TransferUpdateOne) AddCounterSwapTransfer(t ...*Transfer) *TransferUpdateOne {
 	ids := make([]uuid.UUID, len(t))
 	for i := range t {
 		ids[i] = t[i].ID
 	}
-	return tuo.AddPrimarySwapTransferIDs(ids...)
+	return tuo.AddCounterSwapTransferIDs(ids...)
+}
+
+// SetPrimarySwapTransferID sets the "primary_swap_transfer" edge to the Transfer entity by ID.
+func (tuo *TransferUpdateOne) SetPrimarySwapTransferID(id uuid.UUID) *TransferUpdateOne {
+	tuo.mutation.SetPrimarySwapTransferID(id)
+	return tuo
+}
+
+// SetNillablePrimarySwapTransferID sets the "primary_swap_transfer" edge to the Transfer entity by ID if the given value is not nil.
+func (tuo *TransferUpdateOne) SetNillablePrimarySwapTransferID(id *uuid.UUID) *TransferUpdateOne {
+	if id != nil {
+		tuo = tuo.SetPrimarySwapTransferID(*id)
+	}
+	return tuo
+}
+
+// SetPrimarySwapTransfer sets the "primary_swap_transfer" edge to the Transfer entity.
+func (tuo *TransferUpdateOne) SetPrimarySwapTransfer(t *Transfer) *TransferUpdateOne {
+	return tuo.SetPrimarySwapTransferID(t.ID)
 }
 
 // Mutation returns the TransferMutation object of the builder.
@@ -759,31 +759,31 @@ func (tuo *TransferUpdateOne) ClearSparkInvoice() *TransferUpdateOne {
 	return tuo
 }
 
-// ClearCounterSwapTransfer clears the "counter_swap_transfer" edge to the Transfer entity.
+// ClearCounterSwapTransfer clears all "counter_swap_transfer" edges to the Transfer entity.
 func (tuo *TransferUpdateOne) ClearCounterSwapTransfer() *TransferUpdateOne {
 	tuo.mutation.ClearCounterSwapTransfer()
 	return tuo
 }
 
-// ClearPrimarySwapTransfer clears all "primary_swap_transfer" edges to the Transfer entity.
-func (tuo *TransferUpdateOne) ClearPrimarySwapTransfer() *TransferUpdateOne {
-	tuo.mutation.ClearPrimarySwapTransfer()
+// RemoveCounterSwapTransferIDs removes the "counter_swap_transfer" edge to Transfer entities by IDs.
+func (tuo *TransferUpdateOne) RemoveCounterSwapTransferIDs(ids ...uuid.UUID) *TransferUpdateOne {
+	tuo.mutation.RemoveCounterSwapTransferIDs(ids...)
 	return tuo
 }
 
-// RemovePrimarySwapTransferIDs removes the "primary_swap_transfer" edge to Transfer entities by IDs.
-func (tuo *TransferUpdateOne) RemovePrimarySwapTransferIDs(ids ...uuid.UUID) *TransferUpdateOne {
-	tuo.mutation.RemovePrimarySwapTransferIDs(ids...)
-	return tuo
-}
-
-// RemovePrimarySwapTransfer removes "primary_swap_transfer" edges to Transfer entities.
-func (tuo *TransferUpdateOne) RemovePrimarySwapTransfer(t ...*Transfer) *TransferUpdateOne {
+// RemoveCounterSwapTransfer removes "counter_swap_transfer" edges to Transfer entities.
+func (tuo *TransferUpdateOne) RemoveCounterSwapTransfer(t ...*Transfer) *TransferUpdateOne {
 	ids := make([]uuid.UUID, len(t))
 	for i := range t {
 		ids[i] = t[i].ID
 	}
-	return tuo.RemovePrimarySwapTransferIDs(ids...)
+	return tuo.RemoveCounterSwapTransferIDs(ids...)
+}
+
+// ClearPrimarySwapTransfer clears the "primary_swap_transfer" edge to the Transfer entity.
+func (tuo *TransferUpdateOne) ClearPrimarySwapTransfer() *TransferUpdateOne {
+	tuo.mutation.ClearPrimarySwapTransfer()
+	return tuo
 }
 
 // Where appends a list predicates to the TransferUpdate builder.
@@ -1011,24 +1011,40 @@ func (tuo *TransferUpdateOne) sqlSave(ctx context.Context) (_node *Transfer, err
 	}
 	if tuo.mutation.CounterSwapTransferCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
 			Table:   transfer.CounterSwapTransferTable,
 			Columns: []string{transfer.CounterSwapTransferColumn},
-			Bidi:    false,
+			Bidi:    true,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := tuo.mutation.CounterSwapTransferIDs(); len(nodes) > 0 {
+	if nodes := tuo.mutation.RemovedCounterSwapTransferIDs(); len(nodes) > 0 && !tuo.mutation.CounterSwapTransferCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
 			Table:   transfer.CounterSwapTransferTable,
 			Columns: []string{transfer.CounterSwapTransferColumn},
-			Bidi:    false,
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tuo.mutation.CounterSwapTransferIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   transfer.CounterSwapTransferTable,
+			Columns: []string{transfer.CounterSwapTransferColumn},
+			Bidi:    true,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
 			},
@@ -1040,37 +1056,21 @@ func (tuo *TransferUpdateOne) sqlSave(ctx context.Context) (_node *Transfer, err
 	}
 	if tuo.mutation.PrimarySwapTransferCleared() {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
 			Table:   transfer.PrimarySwapTransferTable,
 			Columns: []string{transfer.PrimarySwapTransferColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
 			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := tuo.mutation.RemovedPrimarySwapTransferIDs(); len(nodes) > 0 && !tuo.mutation.PrimarySwapTransferCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   transfer.PrimarySwapTransferTable,
-			Columns: []string{transfer.PrimarySwapTransferColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
 	if nodes := tuo.mutation.PrimarySwapTransferIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
 			Table:   transfer.PrimarySwapTransferTable,
 			Columns: []string{transfer.PrimarySwapTransferColumn},
 			Bidi:    false,

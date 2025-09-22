@@ -74,11 +74,11 @@ const (
 	// CounterSwapTransferTable is the table that holds the counter_swap_transfer relation/edge.
 	CounterSwapTransferTable = "transfers"
 	// CounterSwapTransferColumn is the table column denoting the counter_swap_transfer relation/edge.
-	CounterSwapTransferColumn = "transfer_primary_swap_transfer"
+	CounterSwapTransferColumn = "transfer_counter_swap_transfer"
 	// PrimarySwapTransferTable is the table that holds the primary_swap_transfer relation/edge.
 	PrimarySwapTransferTable = "transfers"
 	// PrimarySwapTransferColumn is the table column denoting the primary_swap_transfer relation/edge.
-	PrimarySwapTransferColumn = "transfer_primary_swap_transfer"
+	PrimarySwapTransferColumn = "transfer_counter_swap_transfer"
 )
 
 // Columns holds all SQL columns for transfer fields.
@@ -100,7 +100,7 @@ var Columns = []string{
 // table and are not defined as standalone fields in the schema.
 var ForeignKeys = []string{
 	"transfer_payment_intent",
-	"transfer_primary_swap_transfer",
+	"transfer_counter_swap_transfer",
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -231,24 +231,24 @@ func BySparkInvoiceField(field string, opts ...sql.OrderTermOption) OrderOption 
 	}
 }
 
-// ByCounterSwapTransferField orders the results by counter_swap_transfer field.
-func ByCounterSwapTransferField(field string, opts ...sql.OrderTermOption) OrderOption {
+// ByCounterSwapTransferCount orders the results by counter_swap_transfer count.
+func ByCounterSwapTransferCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newCounterSwapTransferStep(), sql.OrderByField(field, opts...))
+		sqlgraph.OrderByNeighborsCount(s, newCounterSwapTransferStep(), opts...)
 	}
 }
 
-// ByPrimarySwapTransferCount orders the results by primary_swap_transfer count.
-func ByPrimarySwapTransferCount(opts ...sql.OrderTermOption) OrderOption {
+// ByCounterSwapTransfer orders the results by counter_swap_transfer terms.
+func ByCounterSwapTransfer(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newPrimarySwapTransferStep(), opts...)
+		sqlgraph.OrderByNeighborTerms(s, newCounterSwapTransferStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
 
-// ByPrimarySwapTransfer orders the results by primary_swap_transfer terms.
-func ByPrimarySwapTransfer(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+// ByPrimarySwapTransferField orders the results by primary_swap_transfer field.
+func ByPrimarySwapTransferField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newPrimarySwapTransferStep(), append([]sql.OrderTerm{term}, terms...)...)
+		sqlgraph.OrderByNeighborTerms(s, newPrimarySwapTransferStep(), sql.OrderByField(field, opts...))
 	}
 }
 func newTransferLeavesStep() *sqlgraph.Step {
@@ -276,13 +276,13 @@ func newCounterSwapTransferStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(Table, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, true, CounterSwapTransferTable, CounterSwapTransferColumn),
+		sqlgraph.Edge(sqlgraph.O2M, false, CounterSwapTransferTable, CounterSwapTransferColumn),
 	)
 }
 func newPrimarySwapTransferStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(Table, FieldID),
-		sqlgraph.Edge(sqlgraph.O2M, false, PrimarySwapTransferTable, PrimarySwapTransferColumn),
+		sqlgraph.Edge(sqlgraph.M2O, true, PrimarySwapTransferTable, PrimarySwapTransferColumn),
 	)
 }

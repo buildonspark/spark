@@ -46,7 +46,7 @@ type Transfer struct {
 	// The values are being populated by the TransferQuery when eager-loading is set.
 	Edges                          TransferEdges `json:"edges"`
 	transfer_payment_intent        *uuid.UUID
-	transfer_primary_swap_transfer *uuid.UUID
+	transfer_counter_swap_transfer *uuid.UUID
 	selectValues                   sql.SelectValues
 }
 
@@ -59,9 +59,9 @@ type TransferEdges struct {
 	// Invoice that this transfer pays. Only set for transfers that paid an invoice.
 	SparkInvoice *SparkInvoice `json:"spark_invoice,omitempty"`
 	// For SWAP type transfer, this field references the corresponding counter transfer (type COUNTER_SWAP), which will establish this edge automatically upon creation.
-	CounterSwapTransfer *Transfer `json:"counter_swap_transfer,omitempty"`
+	CounterSwapTransfer []*Transfer `json:"counter_swap_transfer,omitempty"`
 	// For counter transfers of type COUNTER_SWAP, this field references the corresponding primary transfer (type SWAP) that initiated the atomic swap. There are multiple counter transfers possible for a single primary transfer, because if a counter transfer fails the SSP will create a new one.
-	PrimarySwapTransfer []*Transfer `json:"primary_swap_transfer,omitempty"`
+	PrimarySwapTransfer *Transfer `json:"primary_swap_transfer,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
 	loadedTypes [5]bool
@@ -99,21 +99,21 @@ func (e TransferEdges) SparkInvoiceOrErr() (*SparkInvoice, error) {
 }
 
 // CounterSwapTransferOrErr returns the CounterSwapTransfer value or an error if the edge
-// was not loaded in eager-loading, or loaded but was not found.
-func (e TransferEdges) CounterSwapTransferOrErr() (*Transfer, error) {
-	if e.CounterSwapTransfer != nil {
+// was not loaded in eager-loading.
+func (e TransferEdges) CounterSwapTransferOrErr() ([]*Transfer, error) {
+	if e.loadedTypes[3] {
 		return e.CounterSwapTransfer, nil
-	} else if e.loadedTypes[3] {
-		return nil, &NotFoundError{label: transfer.Label}
 	}
 	return nil, &NotLoadedError{edge: "counter_swap_transfer"}
 }
 
 // PrimarySwapTransferOrErr returns the PrimarySwapTransfer value or an error if the edge
-// was not loaded in eager-loading.
-func (e TransferEdges) PrimarySwapTransferOrErr() ([]*Transfer, error) {
-	if e.loadedTypes[4] {
+// was not loaded in eager-loading, or loaded but was not found.
+func (e TransferEdges) PrimarySwapTransferOrErr() (*Transfer, error) {
+	if e.PrimarySwapTransfer != nil {
 		return e.PrimarySwapTransfer, nil
+	} else if e.loadedTypes[4] {
+		return nil, &NotFoundError{label: transfer.Label}
 	}
 	return nil, &NotLoadedError{edge: "primary_swap_transfer"}
 }
@@ -135,7 +135,7 @@ func (*Transfer) scanValues(columns []string) ([]any, error) {
 			values[i] = new(uuid.UUID)
 		case transfer.ForeignKeys[0]: // transfer_payment_intent
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
-		case transfer.ForeignKeys[1]: // transfer_primary_swap_transfer
+		case transfer.ForeignKeys[1]: // transfer_counter_swap_transfer
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
@@ -228,10 +228,10 @@ func (t *Transfer) assignValues(columns []string, values []any) error {
 			}
 		case transfer.ForeignKeys[1]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
-				return fmt.Errorf("unexpected type %T for field transfer_primary_swap_transfer", values[i])
+				return fmt.Errorf("unexpected type %T for field transfer_counter_swap_transfer", values[i])
 			} else if value.Valid {
-				t.transfer_primary_swap_transfer = new(uuid.UUID)
-				*t.transfer_primary_swap_transfer = *value.S.(*uuid.UUID)
+				t.transfer_counter_swap_transfer = new(uuid.UUID)
+				*t.transfer_counter_swap_transfer = *value.S.(*uuid.UUID)
 			}
 		default:
 			t.selectValues.Set(columns[i], values[i])

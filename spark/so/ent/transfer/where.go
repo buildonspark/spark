@@ -552,7 +552,7 @@ func HasCounterSwapTransfer() predicate.Transfer {
 	return predicate.Transfer(func(s *sql.Selector) {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, CounterSwapTransferTable, CounterSwapTransferColumn),
+			sqlgraph.Edge(sqlgraph.O2M, false, CounterSwapTransferTable, CounterSwapTransferColumn),
 		)
 		sqlgraph.HasNeighbors(s, step)
 	})
@@ -575,7 +575,7 @@ func HasPrimarySwapTransfer() predicate.Transfer {
 	return predicate.Transfer(func(s *sql.Selector) {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, PrimarySwapTransferTable, PrimarySwapTransferColumn),
+			sqlgraph.Edge(sqlgraph.M2O, true, PrimarySwapTransferTable, PrimarySwapTransferColumn),
 		)
 		sqlgraph.HasNeighbors(s, step)
 	})
