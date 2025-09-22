@@ -472,9 +472,6 @@ func TestCoopExitCannotCancelAfterBroadcast(t *testing.T) {
 
 // This test starts a coop exit, fails for one operator on the sync, and verifies that no transfer was created across all operators
 func TestCoopExitFailureToSync(t *testing.T) {
-	_, err := sparktesting.NewRegtestClient()
-	require.NoError(t, err)
-
 	coin, err := faucet.Fund()
 	require.NoError(t, err)
 

@@ -64,23 +64,6 @@ type uTXO struct {
 	Height int64
 }
 
-// NewRegtestClient returns a new rpcclient.Client with a hard-coded
-// config for our integration tests.
-func NewRegtestClient() (*rpcclient.Client, error) {
-	connConfig := rpcclient.ConnConfig{
-		Host:         "127.0.0.1:8332",
-		User:         "testutil",
-		Pass:         "testutilpassword",
-		Params:       "regtest",
-		DisableTLS:   true,
-		HTTPPostMode: true,
-	}
-	return rpcclient.New(
-		&connConfig,
-		nil,
-	)
-}
-
 type FaucetCoin struct {
 	Key      *secp256k1.PrivateKey
 	OutPoint *wire.OutPoint

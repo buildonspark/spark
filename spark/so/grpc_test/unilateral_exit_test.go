@@ -139,7 +139,7 @@ func TestUnilateralExitSingleLeaf(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	client, err := sparktesting.NewRegtestClient()
+	client := sparktesting.GetBitcoinClient()
 	require.NoError(t, err)
 
 	nodeTx, err := common.TxFromRawTxBytes(rootNode.GetNodeTx())
@@ -186,7 +186,7 @@ func TestUnilateralExitTreeLeaf(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	client, err := sparktesting.NewRegtestClient()
+	client := sparktesting.GetBitcoinClient()
 	require.NoError(t, err)
 
 	rootNodeTx, err := common.TxFromRawTxBytes(rootNode.GetNodeTx())
