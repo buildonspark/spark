@@ -24,15 +24,17 @@ import (
 // TransferQuery is the builder for querying Transfer entities.
 type TransferQuery struct {
 	config
-	ctx                *QueryContext
-	order              []transfer.OrderOption
-	inters             []Interceptor
-	predicates         []predicate.Transfer
-	withTransferLeaves *TransferLeafQuery
-	withPaymentIntent  *PaymentIntentQuery
-	withSparkInvoice   *SparkInvoiceQuery
-	withFKs            bool
-	modifiers          []func(*sql.Selector)
+	ctx                     *QueryContext
+	order                   []transfer.OrderOption
+	inters                  []Interceptor
+	predicates              []predicate.Transfer
+	withTransferLeaves      *TransferLeafQuery
+	withPaymentIntent       *PaymentIntentQuery
+	withSparkInvoice        *SparkInvoiceQuery
+	withCounterSwapTransfer *TransferQuery
+	withPrimarySwapTransfer *TransferQuery
+	withFKs                 bool
+	modifiers               []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -128,6 +130,50 @@ func (tq *TransferQuery) QuerySparkInvoice() *SparkInvoiceQuery {
 			sqlgraph.From(transfer.Table, transfer.FieldID, selector),
 			sqlgraph.To(sparkinvoice.Table, sparkinvoice.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, transfer.SparkInvoiceTable, transfer.SparkInvoiceColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryCounterSwapTransfer chains the current query on the "counter_swap_transfer" edge.
+func (tq *TransferQuery) QueryCounterSwapTransfer() *TransferQuery {
+	query := (&TransferClient{config: tq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := tq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := tq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transfer.Table, transfer.FieldID, selector),
+			sqlgraph.To(transfer.Table, transfer.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, transfer.CounterSwapTransferTable, transfer.CounterSwapTransferColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryPrimarySwapTransfer chains the current query on the "primary_swap_transfer" edge.
+func (tq *TransferQuery) QueryPrimarySwapTransfer() *TransferQuery {
+	query := (&TransferClient{config: tq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := tq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := tq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(transfer.Table, transfer.FieldID, selector),
+			sqlgraph.To(transfer.Table, transfer.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, transfer.PrimarySwapTransferTable, transfer.PrimarySwapTransferColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
 		return fromU, nil
@@ -322,14 +368,16 @@ func (tq *TransferQuery) Clone() *TransferQuery {
 		return nil
 	}
 	return &TransferQuery{
-		config:             tq.config,
-		ctx:                tq.ctx.Clone(),
-		order:              append([]transfer.OrderOption{}, tq.order...),
-		inters:             append([]Interceptor{}, tq.inters...),
-		predicates:         append([]predicate.Transfer{}, tq.predicates...),
-		withTransferLeaves: tq.withTransferLeaves.Clone(),
-		withPaymentIntent:  tq.withPaymentIntent.Clone(),
-		withSparkInvoice:   tq.withSparkInvoice.Clone(),
+		config:                  tq.config,
+		ctx:                     tq.ctx.Clone(),
+		order:                   append([]transfer.OrderOption{}, tq.order...),
+		inters:                  append([]Interceptor{}, tq.inters...),
+		predicates:              append([]predicate.Transfer{}, tq.predicates...),
+		withTransferLeaves:      tq.withTransferLeaves.Clone(),
+		withPaymentIntent:       tq.withPaymentIntent.Clone(),
+		withSparkInvoice:        tq.withSparkInvoice.Clone(),
+		withCounterSwapTransfer: tq.withCounterSwapTransfer.Clone(),
+		withPrimarySwapTransfer: tq.withPrimarySwapTransfer.Clone(),
 		// clone intermediate query.
 		sql:  tq.sql.Clone(),
 		path: tq.path,
@@ -366,6 +414,28 @@ func (tq *TransferQuery) WithSparkInvoice(opts ...func(*SparkInvoiceQuery)) *Tra
 		opt(query)
 	}
 	tq.withSparkInvoice = query
+	return tq
+}
+
+// WithCounterSwapTransfer tells the query-builder to eager-load the nodes that are connected to
+// the "counter_swap_transfer" edge. The optional arguments are used to configure the query builder of the edge.
+func (tq *TransferQuery) WithCounterSwapTransfer(opts ...func(*TransferQuery)) *TransferQuery {
+	query := (&TransferClient{config: tq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	tq.withCounterSwapTransfer = query
+	return tq
+}
+
+// WithPrimarySwapTransfer tells the query-builder to eager-load the nodes that are connected to
+// the "primary_swap_transfer" edge. The optional arguments are used to configure the query builder of the edge.
+func (tq *TransferQuery) WithPrimarySwapTransfer(opts ...func(*TransferQuery)) *TransferQuery {
+	query := (&TransferClient{config: tq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	tq.withPrimarySwapTransfer = query
 	return tq
 }
 
@@ -448,13 +518,15 @@ func (tq *TransferQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tra
 		nodes       = []*Transfer{}
 		withFKs     = tq.withFKs
 		_spec       = tq.querySpec()
-		loadedTypes = [3]bool{
+		loadedTypes = [5]bool{
 			tq.withTransferLeaves != nil,
 			tq.withPaymentIntent != nil,
 			tq.withSparkInvoice != nil,
+			tq.withCounterSwapTransfer != nil,
+			tq.withPrimarySwapTransfer != nil,
 		}
 	)
-	if tq.withPaymentIntent != nil {
+	if tq.withPaymentIntent != nil || tq.withCounterSwapTransfer != nil {
 		withFKs = true
 	}
 	if withFKs {
@@ -497,6 +569,19 @@ func (tq *TransferQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tra
 	if query := tq.withSparkInvoice; query != nil {
 		if err := tq.loadSparkInvoice(ctx, query, nodes, nil,
 			func(n *Transfer, e *SparkInvoice) { n.Edges.SparkInvoice = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := tq.withCounterSwapTransfer; query != nil {
+		if err := tq.loadCounterSwapTransfer(ctx, query, nodes, nil,
+			func(n *Transfer, e *Transfer) { n.Edges.CounterSwapTransfer = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := tq.withPrimarySwapTransfer; query != nil {
+		if err := tq.loadPrimarySwapTransfer(ctx, query, nodes,
+			func(n *Transfer) { n.Edges.PrimarySwapTransfer = []*Transfer{} },
+			func(n *Transfer, e *Transfer) { n.Edges.PrimarySwapTransfer = append(n.Edges.PrimarySwapTransfer, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -592,6 +677,69 @@ func (tq *TransferQuery) loadSparkInvoice(ctx context.Context, query *SparkInvoi
 		for i := range nodes {
 			assign(nodes[i], n)
 		}
+	}
+	return nil
+}
+func (tq *TransferQuery) loadCounterSwapTransfer(ctx context.Context, query *TransferQuery, nodes []*Transfer, init func(*Transfer), assign func(*Transfer, *Transfer)) error {
+	ids := make([]uuid.UUID, 0, len(nodes))
+	nodeids := make(map[uuid.UUID][]*Transfer)
+	for i := range nodes {
+		if nodes[i].transfer_primary_swap_transfer == nil {
+			continue
+		}
+		fk := *nodes[i].transfer_primary_swap_transfer
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(transfer.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "transfer_primary_swap_transfer" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (tq *TransferQuery) loadPrimarySwapTransfer(ctx context.Context, query *TransferQuery, nodes []*Transfer, init func(*Transfer), assign func(*Transfer, *Transfer)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*Transfer)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	query.Where(predicate.Transfer(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(transfer.PrimarySwapTransferColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.transfer_primary_swap_transfer
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "transfer_primary_swap_transfer" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "transfer_primary_swap_transfer" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
 	}
 	return nil
 }

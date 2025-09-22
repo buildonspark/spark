@@ -44,6 +44,10 @@ const (
 	EdgePaymentIntent = "payment_intent"
 	// EdgeSparkInvoice holds the string denoting the spark_invoice edge name in mutations.
 	EdgeSparkInvoice = "spark_invoice"
+	// EdgeCounterSwapTransfer holds the string denoting the counter_swap_transfer edge name in mutations.
+	EdgeCounterSwapTransfer = "counter_swap_transfer"
+	// EdgePrimarySwapTransfer holds the string denoting the primary_swap_transfer edge name in mutations.
+	EdgePrimarySwapTransfer = "primary_swap_transfer"
 	// Table holds the table name of the transfer in the database.
 	Table = "transfers"
 	// TransferLeavesTable is the table that holds the transfer_leaves relation/edge.
@@ -67,6 +71,14 @@ const (
 	SparkInvoiceInverseTable = "spark_invoices"
 	// SparkInvoiceColumn is the table column denoting the spark_invoice relation/edge.
 	SparkInvoiceColumn = "spark_invoice_id"
+	// CounterSwapTransferTable is the table that holds the counter_swap_transfer relation/edge.
+	CounterSwapTransferTable = "transfers"
+	// CounterSwapTransferColumn is the table column denoting the counter_swap_transfer relation/edge.
+	CounterSwapTransferColumn = "transfer_primary_swap_transfer"
+	// PrimarySwapTransferTable is the table that holds the primary_swap_transfer relation/edge.
+	PrimarySwapTransferTable = "transfers"
+	// PrimarySwapTransferColumn is the table column denoting the primary_swap_transfer relation/edge.
+	PrimarySwapTransferColumn = "transfer_primary_swap_transfer"
 )
 
 // Columns holds all SQL columns for transfer fields.
@@ -88,6 +100,7 @@ var Columns = []string{
 // table and are not defined as standalone fields in the schema.
 var ForeignKeys = []string{
 	"transfer_payment_intent",
+	"transfer_primary_swap_transfer",
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -217,6 +230,27 @@ func BySparkInvoiceField(field string, opts ...sql.OrderTermOption) OrderOption 
 		sqlgraph.OrderByNeighborTerms(s, newSparkInvoiceStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByCounterSwapTransferField orders the results by counter_swap_transfer field.
+func ByCounterSwapTransferField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newCounterSwapTransferStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// ByPrimarySwapTransferCount orders the results by primary_swap_transfer count.
+func ByPrimarySwapTransferCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newPrimarySwapTransferStep(), opts...)
+	}
+}
+
+// ByPrimarySwapTransfer orders the results by primary_swap_transfer terms.
+func ByPrimarySwapTransfer(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPrimarySwapTransferStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newTransferLeavesStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -236,5 +270,19 @@ func newSparkInvoiceStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(SparkInvoiceInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, false, SparkInvoiceTable, SparkInvoiceColumn),
+	)
+}
+func newCounterSwapTransferStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(Table, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, CounterSwapTransferTable, CounterSwapTransferColumn),
+	)
+}
+func newPrimarySwapTransferStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(Table, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, PrimarySwapTransferTable, PrimarySwapTransferColumn),
 	)
 }

@@ -44,9 +44,10 @@ type Transfer struct {
 	SparkInvoiceID uuid.UUID `json:"spark_invoice_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TransferQuery when eager-loading is set.
-	Edges                   TransferEdges `json:"edges"`
-	transfer_payment_intent *uuid.UUID
-	selectValues            sql.SelectValues
+	Edges                          TransferEdges `json:"edges"`
+	transfer_payment_intent        *uuid.UUID
+	transfer_primary_swap_transfer *uuid.UUID
+	selectValues                   sql.SelectValues
 }
 
 // TransferEdges holds the relations/edges for other nodes in the graph.
@@ -57,9 +58,13 @@ type TransferEdges struct {
 	PaymentIntent *PaymentIntent `json:"payment_intent,omitempty"`
 	// Invoice that this transfer pays. Only set for transfers that paid an invoice.
 	SparkInvoice *SparkInvoice `json:"spark_invoice,omitempty"`
+	// For SWAP type transfer, this field references the corresponding counter transfer (type COUNTER_SWAP), which will establish this edge automatically upon creation.
+	CounterSwapTransfer *Transfer `json:"counter_swap_transfer,omitempty"`
+	// For counter transfers of type COUNTER_SWAP, this field references the corresponding primary transfer (type SWAP) that initiated the atomic swap. There are multiple counter transfers possible for a single primary transfer, because if a counter transfer fails the SSP will create a new one.
+	PrimarySwapTransfer []*Transfer `json:"primary_swap_transfer,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [5]bool
 }
 
 // TransferLeavesOrErr returns the TransferLeaves value or an error if the edge
@@ -93,6 +98,26 @@ func (e TransferEdges) SparkInvoiceOrErr() (*SparkInvoice, error) {
 	return nil, &NotLoadedError{edge: "spark_invoice"}
 }
 
+// CounterSwapTransferOrErr returns the CounterSwapTransfer value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e TransferEdges) CounterSwapTransferOrErr() (*Transfer, error) {
+	if e.CounterSwapTransfer != nil {
+		return e.CounterSwapTransfer, nil
+	} else if e.loadedTypes[3] {
+		return nil, &NotFoundError{label: transfer.Label}
+	}
+	return nil, &NotLoadedError{edge: "counter_swap_transfer"}
+}
+
+// PrimarySwapTransferOrErr returns the PrimarySwapTransfer value or an error if the edge
+// was not loaded in eager-loading.
+func (e TransferEdges) PrimarySwapTransferOrErr() ([]*Transfer, error) {
+	if e.loadedTypes[4] {
+		return e.PrimarySwapTransfer, nil
+	}
+	return nil, &NotLoadedError{edge: "primary_swap_transfer"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*Transfer) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -109,6 +134,8 @@ func (*Transfer) scanValues(columns []string) ([]any, error) {
 		case transfer.FieldID, transfer.FieldSparkInvoiceID:
 			values[i] = new(uuid.UUID)
 		case transfer.ForeignKeys[0]: // transfer_payment_intent
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
+		case transfer.ForeignKeys[1]: // transfer_primary_swap_transfer
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
@@ -199,6 +226,13 @@ func (t *Transfer) assignValues(columns []string, values []any) error {
 				t.transfer_payment_intent = new(uuid.UUID)
 				*t.transfer_payment_intent = *value.S.(*uuid.UUID)
 			}
+		case transfer.ForeignKeys[1]:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field transfer_primary_swap_transfer", values[i])
+			} else if value.Valid {
+				t.transfer_primary_swap_transfer = new(uuid.UUID)
+				*t.transfer_primary_swap_transfer = *value.S.(*uuid.UUID)
+			}
 		default:
 			t.selectValues.Set(columns[i], values[i])
 		}
@@ -225,6 +259,16 @@ func (t *Transfer) QueryPaymentIntent() *PaymentIntentQuery {
 // QuerySparkInvoice queries the "spark_invoice" edge of the Transfer entity.
 func (t *Transfer) QuerySparkInvoice() *SparkInvoiceQuery {
 	return NewTransferClient(t.config).QuerySparkInvoice(t)
+}
+
+// QueryCounterSwapTransfer queries the "counter_swap_transfer" edge of the Transfer entity.
+func (t *Transfer) QueryCounterSwapTransfer() *TransferQuery {
+	return NewTransferClient(t.config).QueryCounterSwapTransfer(t)
+}
+
+// QueryPrimarySwapTransfer queries the "primary_swap_transfer" edge of the Transfer entity.
+func (t *Transfer) QueryPrimarySwapTransfer() *TransferQuery {
+	return NewTransferClient(t.config).QueryPrimarySwapTransfer(t)
 }
 
 // Update returns a builder for updating this Transfer.

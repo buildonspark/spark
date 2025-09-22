@@ -547,6 +547,52 @@ func HasSparkInvoiceWith(preds ...predicate.SparkInvoice) predicate.Transfer {
 	})
 }
 
+// HasCounterSwapTransfer applies the HasEdge predicate on the "counter_swap_transfer" edge.
+func HasCounterSwapTransfer() predicate.Transfer {
+	return predicate.Transfer(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, CounterSwapTransferTable, CounterSwapTransferColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasCounterSwapTransferWith applies the HasEdge predicate on the "counter_swap_transfer" edge with a given conditions (other predicates).
+func HasCounterSwapTransferWith(preds ...predicate.Transfer) predicate.Transfer {
+	return predicate.Transfer(func(s *sql.Selector) {
+		step := newCounterSwapTransferStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasPrimarySwapTransfer applies the HasEdge predicate on the "primary_swap_transfer" edge.
+func HasPrimarySwapTransfer() predicate.Transfer {
+	return predicate.Transfer(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, PrimarySwapTransferTable, PrimarySwapTransferColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPrimarySwapTransferWith applies the HasEdge predicate on the "primary_swap_transfer" edge with a given conditions (other predicates).
+func HasPrimarySwapTransferWith(preds ...predicate.Transfer) predicate.Transfer {
+	return predicate.Transfer(func(s *sql.Selector) {
+		step := newPrimarySwapTransferStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.Transfer) predicate.Transfer {
 	return predicate.Transfer(sql.AndPredicates(predicates...))

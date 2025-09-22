@@ -174,6 +174,40 @@ func (tc *TransferCreate) SetSparkInvoice(s *SparkInvoice) *TransferCreate {
 	return tc.SetSparkInvoiceID(s.ID)
 }
 
+// SetCounterSwapTransferID sets the "counter_swap_transfer" edge to the Transfer entity by ID.
+func (tc *TransferCreate) SetCounterSwapTransferID(id uuid.UUID) *TransferCreate {
+	tc.mutation.SetCounterSwapTransferID(id)
+	return tc
+}
+
+// SetNillableCounterSwapTransferID sets the "counter_swap_transfer" edge to the Transfer entity by ID if the given value is not nil.
+func (tc *TransferCreate) SetNillableCounterSwapTransferID(id *uuid.UUID) *TransferCreate {
+	if id != nil {
+		tc = tc.SetCounterSwapTransferID(*id)
+	}
+	return tc
+}
+
+// SetCounterSwapTransfer sets the "counter_swap_transfer" edge to the Transfer entity.
+func (tc *TransferCreate) SetCounterSwapTransfer(t *Transfer) *TransferCreate {
+	return tc.SetCounterSwapTransferID(t.ID)
+}
+
+// AddPrimarySwapTransferIDs adds the "primary_swap_transfer" edge to the Transfer entity by IDs.
+func (tc *TransferCreate) AddPrimarySwapTransferIDs(ids ...uuid.UUID) *TransferCreate {
+	tc.mutation.AddPrimarySwapTransferIDs(ids...)
+	return tc
+}
+
+// AddPrimarySwapTransfer adds the "primary_swap_transfer" edges to the Transfer entity.
+func (tc *TransferCreate) AddPrimarySwapTransfer(t ...*Transfer) *TransferCreate {
+	ids := make([]uuid.UUID, len(t))
+	for i := range t {
+		ids[i] = t[i].ID
+	}
+	return tc.AddPrimarySwapTransferIDs(ids...)
+}
+
 // Mutation returns the TransferMutation object of the builder.
 func (tc *TransferCreate) Mutation() *TransferMutation {
 	return tc.mutation
@@ -391,6 +425,39 @@ func (tc *TransferCreate) createSpec() (*Transfer, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.SparkInvoiceID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := tc.mutation.CounterSwapTransferIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   transfer.CounterSwapTransferTable,
+			Columns: []string{transfer.CounterSwapTransferColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.transfer_primary_swap_transfer = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := tc.mutation.PrimarySwapTransferIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   transfer.PrimarySwapTransferTable,
+			Columns: []string{transfer.PrimarySwapTransferColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
