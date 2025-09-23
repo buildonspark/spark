@@ -37,9 +37,10 @@ var (
 
 const (
 	// Constants for coin amounts
-	coinAmountSats int64 = 10_000_000
-	feeAmountSats  int64 = 1_000
-	targetNumCoins       = 20
+	refillAmountSats int64 = 10_000_000
+	coinAmountSats   int64 = 1_000_000
+	feeAmountSats    int64 = 1_000
+	targetNumCoins         = 20
 )
 
 // scanUnspent represents an unspent output found by scanning
@@ -194,6 +195,7 @@ func (f *Faucet) Refill() error {
 
 	var fundingTx *wire.MsgTx
 	var fundingTxOut *wire.TxOut
+	var fundingOutPoint *wire.OutPoint
 
 	if selectedUTXO != nil {
 		txHash, err := chainhash.NewHashFromStr(selectedUTXO.TxID)
@@ -206,52 +208,49 @@ func (f *Faucet) Refill() error {
 		}
 		fundingTx = tx.MsgTx()
 		fundingTxOut = fundingTx.TxOut[selectedUTXO.Vout]
+		fundingOutPoint = wire.NewOutPoint(txHash, selectedUTXO.Vout)
 	} else {
-		// No suitable UTXO found, need to mine a new block
+		// No suitable UTXO found, send some money from the node to our mining address and mine a block
+		// to create a new UTXO that we can split.
 		miningAddress, err := common.P2TRRawAddressFromPublicKey(staticMiningKey.Public(), common.Regtest)
 		if err != nil {
 			return err
 		}
 
-		blockHash, err := f.client.GenerateToAddress(1, miningAddress, nil)
+		miningScript, err := txscript.PayToAddrScript(miningAddress)
 		if err != nil {
 			return err
 		}
 
-		block, err := f.client.GetBlockVerboseTx(blockHash[0])
+		fundingTxid, err := f.client.SendToAddress(miningAddress, btcutil.Amount(refillAmountSats))
 		if err != nil {
 			return err
 		}
-		fundingTx = wire.NewMsgTx(3)
-		txBytes, err := hex.DecodeString(block.Tx[0].Hex)
+		_, err = f.client.GenerateToAddress(1, miningAddress, nil)
 		if err != nil {
 			return err
 		}
-		err = fundingTx.Deserialize(bytes.NewReader(txBytes))
-		if err != nil {
-			return err
-		}
-		fundingTxOut = fundingTx.TxOut[0]
 
-		// Mine 100 blocks to make funds spendable
-		_, err = f.client.GenerateToAddress(100, miningAddress, nil)
+		fundingTxRaw, err := f.client.GetRawTransaction(fundingTxid)
 		if err != nil {
 			return err
+		}
+
+		fundingTx = fundingTxRaw.MsgTx()
+		for i, out := range fundingTx.TxOut {
+			if bytes.Equal(out.PkScript, miningScript) && out.Value == refillAmountSats {
+				fundingTxOut = out
+				fundingOutPoint = wire.NewOutPoint(fundingTxid, uint32(i))
+				break
+			}
+		}
+
+		if fundingTxOut == nil || fundingOutPoint == nil {
+			return fmt.Errorf("could not find funding output in transaction")
 		}
 	}
 
 	splitTx := wire.NewMsgTx(3)
-	var fundingOutPoint *wire.OutPoint
-	if selectedUTXO != nil {
-		txHash, err := chainhash.NewHashFromStr(selectedUTXO.TxID)
-		if err != nil {
-			return err
-		}
-		fundingOutPoint = wire.NewOutPoint(txHash, selectedUTXO.Vout)
-	} else {
-		fundingTxid := fundingTx.TxHash()
-		fundingOutPoint = wire.NewOutPoint(&fundingTxid, 0)
-	}
 	splitTx.AddTxIn(wire.NewTxIn(fundingOutPoint, nil, nil))
 
 	initialValueSats := fundingTxOut.Value
