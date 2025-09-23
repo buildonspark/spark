@@ -87,13 +87,24 @@ func validateLeafRefundTxOutput(refundTx *wire.MsgTx, receiverIdentityPubKey key
 	return nil
 }
 
-func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, expectedOutPoint *wire.OutPoint, expectedInputCount uint32) error {
+func parseRefundTx(refundBytes []byte) (*wire.MsgTx, error) {
+	refundTx, err := common.TxFromRawTxBytes(refundBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse bytes: %w", err)
+	}
+
 	if refundTx.Version < 2 {
-		return fmt.Errorf("refund tx must be v2 or above, got v%d", refundTx.Version)
+		return nil, fmt.Errorf("refund tx must be v2 or above, got v%d", refundTx.Version)
 	}
-	if len(refundTx.TxIn) == 0 {
-		return fmt.Errorf("refund tx must have at least 1 input")
+
+	if len(refundTx.TxIn) < 1 {
+		return nil, fmt.Errorf("refund tx must have at least 1 input")
 	}
+
+	return refundTx, nil
+}
+
+func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, expectedOutPoint *wire.OutPoint, expectedInputCount uint32) error {
 	if refundTx.TxIn[0].Sequence&(1<<31) != 0 {
 		return fmt.Errorf("refund tx input 0 sequence must have bit 31 clear to enable relative locktime, got %d", refundTx.TxIn[0].Sequence)
 	}
@@ -122,43 +133,30 @@ func validateSendLeafDirectRefundTxs(leaf *ent.TreeNode, directTx []byte, direct
 	var oldDirectRefundTxSequence uint32
 	var oldDirectFromCpfpRefundTxSequence uint32
 
-	newDirectRefundTx, err := common.TxFromRawTxBytes(directTx)
+	newDirectRefundTx, err := parseRefundTx(directTx)
 	if err != nil {
 		return fmt.Errorf("unable to load new direct refund tx: %w", err)
 	}
 
-	newDirectFromCpfpRefundTx, err := common.TxFromRawTxBytes(directFromCpfpRefundTx)
+	newDirectFromCpfpRefundTx, err := parseRefundTx(directFromCpfpRefundTx)
 	if err != nil {
 		return fmt.Errorf("unable to load new direct from cpfprefund tx: %w", err)
-	}
-
-	if len(newDirectRefundTx.TxIn) == 0 {
-		return fmt.Errorf("new direct refund tx has no inputs")
-	}
-
-	if len(newDirectFromCpfpRefundTx.TxIn) == 0 {
-		return fmt.Errorf("new direct from cpfp refund tx has no inputs")
-
 	}
 
 	leafDirectOutPoint := wire.OutPoint{}
 	leafDirectFromCpfpOutPoint := wire.OutPoint{}
 
 	if len(leaf.DirectRefundTx) > 0 && len(leaf.DirectFromCpfpRefundTx) > 0 {
-		oldDirectRefundTx, err := common.TxFromRawTxBytes(leaf.DirectRefundTx)
+		oldDirectRefundTx, err := parseRefundTx(leaf.DirectRefundTx)
 		if err != nil {
 			return fmt.Errorf("unable to load old direct refund tx: %w", err)
 		}
-		oldDirectFromCpfpRefundTx, err := common.TxFromRawTxBytes(leaf.DirectFromCpfpRefundTx)
+
+		oldDirectFromCpfpRefundTx, err := parseRefundTx(leaf.DirectFromCpfpRefundTx)
 		if err != nil {
 			return fmt.Errorf("unable to load old direct from cpfp refund tx: %w", err)
 		}
-		if len(oldDirectRefundTx.TxIn) == 0 {
-			return fmt.Errorf("old direct refund tx has no inputs")
-		}
-		if len(oldDirectFromCpfpRefundTx.TxIn) == 0 {
-			return fmt.Errorf("old direct from cpfp refund tx has no inputs")
-		}
+
 		oldDirectRefundTxIn := oldDirectRefundTx.TxIn[0]
 		oldDirectFromCpfpRefundTxIn := oldDirectFromCpfpRefundTx.TxIn[0]
 
@@ -191,7 +189,7 @@ func validateSendLeafDirectRefundTxs(leaf *ent.TreeNode, directTx []byte, direct
 }
 
 func validateSendLeafRefundTxs(leaf *ent.TreeNode, rawTx []byte, directTx []byte, directFromCpfpRefundTx []byte, receiverIdentityPubKey keys.Public, expectedInputCount uint32, requireDirectTx bool) error {
-	newCpfpRefundTx, err := common.TxFromRawTxBytes(rawTx)
+	newCpfpRefundTx, err := parseRefundTx(rawTx)
 	if err != nil {
 		return fmt.Errorf("unable to load new cpfp refund tx: %w", err)
 	}
@@ -208,12 +206,9 @@ func validateSendLeafRefundTxs(leaf *ent.TreeNode, rawTx []byte, directTx []byte
 		}
 	}
 
-	oldCpfpRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
+	oldCpfpRefundTx, err := parseRefundTx(leaf.RawRefundTx)
 	if err != nil {
 		return fmt.Errorf("unable to load old cpfp refund tx: %w", err)
-	}
-	if len(oldCpfpRefundTx.TxIn) == 0 {
-		return fmt.Errorf("old cpfp refund tx has no inputs")
 	}
 	oldCpfpRefundTxIn := oldCpfpRefundTx.TxIn[0]
 	expectedOutPoint := oldCpfpRefundTxIn.PreviousOutPoint
