@@ -36,10 +36,7 @@ type sparkOperatorState struct {
 func NewSparkOperatorController(t *testing.T) (*SparkOperatorController, error) {
 	client := getKubernetesClient(t)
 
-	numOperators, err := operatorCount()
-	if err != nil {
-		return nil, fmt.Errorf("failed to determine number of operators: %w", err)
-	}
+	numOperators := operatorCount(t)
 
 	controller := &SparkOperatorController{
 		client:    client,

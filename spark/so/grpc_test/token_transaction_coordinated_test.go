@@ -325,8 +325,7 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesStarted(t *testing.T) {
 	coordinatorEntClient = db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
 	defer coordinatorEntClient.Close()
 
-	nonCoordOperatorConfig, err := sparktesting.SpecificOperatorTestConfig(1)
-	require.NoError(t, err, "failed to get non-coordinator operator config")
+	nonCoordOperatorConfig := sparktesting.SpecificOperatorTestConfig(t, 1)
 	nonCoordEntClient = db.NewPostgresEntClientForIntegrationTest(t, nonCoordOperatorConfig.DatabasePath)
 	defer nonCoordEntClient.Close()
 
@@ -367,8 +366,7 @@ func TestRevocationExchangeCronJobDoesNotFinalizeStartedIfSignatureIsInvalid(t *
 	coordinatorEntClient = db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
 	defer coordinatorEntClient.Close()
 
-	nonCoordOperatorConfig, err := sparktesting.SpecificOperatorTestConfig(1)
-	require.NoError(t, err, "failed to get non-coordinator operator config")
+	nonCoordOperatorConfig := sparktesting.SpecificOperatorTestConfig(t, 1)
 	nonCoordEntClient = db.NewPostgresEntClientForIntegrationTest(t, nonCoordOperatorConfig.DatabasePath)
 	defer nonCoordEntClient.Close()
 

@@ -67,27 +67,24 @@ func (f *TestGRPCConnectionFactory) SetTimeoutProvider(timeoutProvider sparkgrpc
 	}
 }
 
-func operatorCount() (int, error) {
+func operatorCount(tb testing.TB) int {
 	if envOpCount := os.Getenv("NUM_SPARK_OPERATORS"); envOpCount != "" {
 		if n, err := strconv.Atoi(envOpCount); err == nil {
 			if n > 0 && n <= len(testOperatorPubkeys) {
-				return n, nil
+				return n
 			} else {
-				return 0, fmt.Errorf("invalid NUM_SPARK_OPERATORS value: %s. Must be between 1 and %d", envOpCount, len(testOperatorPubkeys))
+				tb.Fatalf("Invalid NUM_SPARK_OPERATORS value: %s. Must be between 1 and %d", envOpCount, len(testOperatorPubkeys))
 			}
 		} else {
-			return 0, fmt.Errorf("error converting NUM_SPARK_OPERATORS to integer: %w", err)
+			tb.Fatalf("Error converting NUM_SPARK_OPERATORS to integer: %v", err)
 		}
 	}
 	// default to all test operators
-	return len(testOperatorPubkeys), nil
+	return len(testOperatorPubkeys)
 }
 
-func GetAllSigningOperators() (map[string]*so.SigningOperator, error) {
-	opCount, err := operatorCount()
-	if err != nil {
-		return nil, err
-	}
+func GetAllSigningOperators(tb testing.TB) map[string]*so.SigningOperator {
+	opCount := operatorCount(tb)
 
 	certPath := minikubeCAFilePath
 	if !isHermeticTest() {
@@ -117,7 +114,7 @@ func GetAllSigningOperators() (map[string]*so.SigningOperator, error) {
 			OperatorConnectionFactory: operatorConnectionFactory,
 		}
 	}
-	return operators, nil
+	return operators
 }
 
 func getTestDatabasePath(operatorIndex int) string {
@@ -138,24 +135,16 @@ func getLocalFrostSignerAddress() string {
 }
 
 func TestConfig(tb testing.TB) *so.Config {
-	config, err := SpecificOperatorTestConfig(0)
-	require.NoError(tb, err)
-	return config
+	return SpecificOperatorTestConfig(tb, 0)
 }
 
-func SpecificOperatorTestConfig(operatorIndex int) (*so.Config, error) {
-	operatorCount, err := operatorCount()
-	if err != nil {
-		return nil, err
-	}
+func SpecificOperatorTestConfig(tb testing.TB, operatorIndex int) *so.Config {
+	operatorCount := operatorCount(tb)
 	if operatorIndex >= operatorCount {
-		return nil, fmt.Errorf("operator index %d out of range", operatorIndex)
+		tb.Fatalf("Operator index %d out of range", operatorIndex)
 	}
 
-	signingOperators, err := GetAllSigningOperators()
-	if err != nil {
-		return nil, err
-	}
+	signingOperators := GetAllSigningOperators(tb)
 
 	identifier := signingOperatorPrefix + strconv.Itoa(operatorIndex+1)
 	opCount := len(signingOperators)
@@ -172,7 +161,7 @@ func SpecificOperatorTestConfig(operatorIndex int) (*so.Config, error) {
 		SupportedNetworks:          []common.Network{common.Regtest, common.Mainnet},
 	}
 
-	return &config, nil
+	return &config
 }
 
 // TestWalletConfig returns a wallet configuration that can be used for testing.
@@ -232,8 +221,7 @@ func TestWalletConfigWithParams(tb testing.TB, p TestWalletConfigParams) *wallet
 		privKey = p.IdentityPrivateKey
 	}
 
-	signingOperators, err := GetAllSigningOperators()
-	require.NoError(tb, err, "failed to get signing operators")
+	signingOperators := GetAllSigningOperators(tb)
 
 	network := common.Regtest
 	if p.Network != common.Unspecified {

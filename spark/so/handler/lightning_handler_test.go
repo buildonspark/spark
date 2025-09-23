@@ -312,8 +312,7 @@ func TestStorePreimageShareEdgeCases(t *testing.T) {
 func TestGetSigningCommitments(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 
-	signingOperators, err := sparktesting.GetAllSigningOperators()
-	require.NoError(t, err)
+	signingOperators := sparktesting.GetAllSigningOperators(t)
 
 	config := &so.Config{
 		SigningOperatorMap:         signingOperators,
