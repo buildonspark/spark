@@ -106,7 +106,7 @@ func TestRenewLeafExtend(t *testing.T) {
 	assert.Empty(t, splitLeaf.RefundTx)
 
 	// Extract and deserialize transactions from the response
-	decrementedNodeTx, err := common.TxFromRawTxBytes(splitLeaf.NodeTx)
+	splitNodeTx, err := common.TxFromRawTxBytes(splitLeaf.NodeTx)
 	require.NoError(t, err, "failed to deserialize decremented node tx")
 
 	extendedNodeTx, err := common.TxFromRawTxBytes(extendedLeaf.NodeTx)
@@ -116,12 +116,12 @@ func TestRenewLeafExtend(t *testing.T) {
 	require.NoError(t, err, "failed to deserialize refund tx")
 
 	// Check sequences
-	assert.Equal(t, spark.ZeroSequence, decrementedNodeTx.TxIn[0].Sequence)
+	assert.Equal(t, spark.ZeroSequence, splitNodeTx.TxIn[0].Sequence)
 	assert.Equal(t, spark.InitialSequence(), extendedNodeTx.TxIn[0].Sequence)
 	assert.Equal(t, spark.InitialSequence(), refundTx.TxIn[0].Sequence)
 
 	// Check signatures
-	assert.True(t, decrementedNodeTx.HasWitness())
+	assert.True(t, splitNodeTx.HasWitness())
 	assert.True(t, refundTx.HasWitness())
 	assert.True(t, extendedNodeTx.HasWitness())
 }
@@ -173,6 +173,71 @@ func TestRenewLeafRefresh(t *testing.T) {
 	assert.True(t, refundTx.HasWitness())
 }
 
+func TestRenewLeafZeroTimelock(t *testing.T) {
+	skipIfGithubActions(t)
+	senderConfig := sparktesting.TestWalletConfig(t)
+	senderLeafPrivKey, err := keys.GeneratePrivateKey()
+	require.NoError(t, err)
+	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
+	require.NoError(t, err)
+	require.NotEmpty(t, nodes, "no nodes created when creating tree")
+	node := nodes[len(nodes)-1]
+	parentNode := nodes[len(nodes)-3]
+	assert.Equal(t, parentNode.Id, *node.ParentNodeId)
+
+	signingKey := tree.Children[1].SigningPrivateKey
+	// Decrement timelock of node TX to 0
+	for range 20 {
+		// Reset timelock on refundTx, decrement timelock on leafNodeTx
+		refreshedNodes, err := wallet.RefreshTimelockNodes(t.Context(), senderConfig, []*pb.TreeNode{node}, parentNode, signingKey)
+		require.NoError(t, err)
+		require.Len(t, refreshedNodes, 1)
+		node = refreshedNodes[0]
+	}
+	// Decrement timelock of refund TX to 300
+	for range 17 {
+		// Decrement timelock on refundTx
+		node, err = wallet.RefreshTimelockRefundTx(t.Context(), senderConfig, node, signingKey)
+		require.NoError(t, err)
+	}
+
+	resp, err := wallet.RenewLeafZeroTimelock(t.Context(), senderConfig, node, signingKey)
+	require.NoError(t, err)
+
+	result := resp.GetRenewNodeZeroTimelockResult()
+	require.NotNil(t, result)
+	splitLeaf := result.SplitNode
+	require.NotNil(t, splitLeaf)
+	extendedLeaf := result.Node
+	require.NotNil(t, extendedLeaf)
+	assert.Equal(t, "SPLIT_LOCKED", splitLeaf.Status)
+	assert.Equal(t, "AVAILABLE", extendedLeaf.Status)
+	assert.Empty(t, splitLeaf.RefundTx)
+	fmt.Printf("split node id %s extended id %s\n", splitLeaf.Id, extendedLeaf.Id)
+
+	// Extract and deserialize transactions from the response
+	splitNodeTx, err := common.TxFromRawTxBytes(splitLeaf.NodeTx)
+	require.NoError(t, err, "failed to deserialize decremented node tx")
+
+	extendedNodeTx, err := common.TxFromRawTxBytes(extendedLeaf.NodeTx)
+	require.NoError(t, err, "failed to deserialize extended node tx")
+
+	refundTx, err := common.TxFromRawTxBytes(extendedLeaf.RefundTx)
+	require.NoError(t, err, "failed to deserialize refund tx")
+
+	// Check sequences
+	// Leaf is created with 30th bit set true. The 30th bit is meaningless.
+	// The sequence behaves exactly the same as the zero sequence
+	assert.Equal(t, spark.ZeroSequence, splitNodeTx.TxIn[0].Sequence)
+	assert.Equal(t, spark.ZeroSequence, extendedNodeTx.TxIn[0].Sequence)
+	assert.Equal(t, spark.InitialSequence(), refundTx.TxIn[0].Sequence)
+
+	// Check signatures
+	assert.True(t, splitNodeTx.HasWitness())
+	assert.True(t, refundTx.HasWitness())
+	assert.True(t, extendedNodeTx.HasWitness())
+}
+
 func TestRenewLeafExtend_InvalidRefundTimelock(t *testing.T) {
 	skipIfGithubActions(t)
 	senderConfig := sparktesting.TestWalletConfig(t)
@@ -221,6 +286,56 @@ func TestRenewLeafExtend_InvalidNodeTimelock(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, codes.FailedPrecondition, stat.Code())
 	assert.Contains(t, err.Error(), "node transaction sequence must be less than or equal to 300")
+}
+
+func TestRenewZeroTimelock_InvalidRefundTimelock(t *testing.T) {
+	skipIfGithubActions(t)
+	senderConfig := sparktesting.TestWalletConfig(t)
+	senderLeafPrivKey, err := keys.GeneratePrivateKey()
+	require.NoError(t, err)
+	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
+	require.NoError(t, err)
+	require.NotEmpty(t, nodes, "no nodes created when creating tree")
+	node := nodes[len(nodes)-1]
+	parentNode := nodes[len(nodes)-3]
+	assert.Equal(t, parentNode.Id, *node.ParentNodeId)
+
+	signingKey := tree.Children[1].SigningPrivateKey
+	// Decrement timelock of node TX to 0
+	for range 20 {
+		// Reset timelock on refundTx, decrement timelock on leafNodeTx
+		refreshedNodes, err := wallet.RefreshTimelockNodes(t.Context(), senderConfig, []*pb.TreeNode{node}, parentNode, signingKey)
+		require.NoError(t, err)
+		require.Len(t, refreshedNodes, 1)
+		node = refreshedNodes[0]
+	}
+
+	_, err = wallet.RenewLeafZeroTimelock(t.Context(), senderConfig, node, signingKey)
+	require.Error(t, err)
+	stat, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, stat.Code())
+	assert.Contains(t, err.Error(), "refund transaction sequence must be less than or equal to 300")
+}
+
+func TestRenewZeroTimelock_InvalidNodeTimelock(t *testing.T) {
+	senderConfig := sparktesting.TestWalletConfig(t)
+	senderLeafPrivKey, err := keys.GeneratePrivateKey()
+	require.NoError(t, err)
+	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
+	require.NoError(t, err)
+	require.NotEmpty(t, nodes, "no nodes created when creating tree")
+	node := nodes[len(nodes)-1]
+	parentNode := nodes[len(nodes)-3]
+	assert.Equal(t, parentNode.Id, *node.ParentNodeId)
+
+	signingKey := tree.Children[1].SigningPrivateKey
+	_, err = wallet.RenewLeafZeroTimelock(t.Context(), senderConfig, node, signingKey)
+	require.Error(t, err)
+	stat, ok := status.FromError(err)
+	require.True(t, ok)
+	assert.Equal(t, codes.FailedPrecondition, stat.Code())
+	assert.Contains(t, err.Error(), "node transaction sequence must be 0 for zero timelock renewal")
 }
 
 func TestRenewLeafRefresh_InvalidRefundTimelock(t *testing.T) {

@@ -339,6 +339,13 @@ message RenewLeafRequest {
       // the node transaction timelock > 300 at the time this function is
       // called. Returns an error if these conditions are not met.
       RenewRefundTimelockSigningJob renew_refund_timelock_signing_job = 3;
+
+      // A special case of refresh for when the node transaction is at 0 and
+      // cannot be decremented further. This operation resets the refund
+      // transaction's timelock and, similar to renew node, adds an additional
+      // node transaction to the transaction chain with zero timelock as well.
+      // This case is mostly used for user-created trees from L1 deposits.
+      RenewNodeZeroTimelockSigningJob renew_node_zero_timelock_signing_job = 4;
     }
 }
 
@@ -371,10 +378,27 @@ message RenewRefundTimelockSigningJob {
     UserSignedTxSigningJob direct_from_cpfp_refund_tx_signing_job = 5;
 }
 
+message RenewNodeZeroTimelockSigningJob {
+    // Signing job with the new node transaction. The updated transaction is
+    // expected to have a timelock of 0.
+    UserSignedTxSigningJob node_tx_signing_job = 1;
+
+    // Signing job with the updated refund transaction. This updated transaction
+    // must have a timelock of 2000.
+    UserSignedTxSigningJob refund_tx_signing_job = 2;
+    UserSignedTxSigningJob direct_node_tx_signing_job = 3;
+    UserSignedTxSigningJob direct_refund_tx_signing_job = 4;
+    UserSignedTxSigningJob direct_from_cpfp_refund_tx_signing_job = 5;
+
+    // Notice no signing job for the split node; we will be using the existing
+    // node transaction.
+}
+
 message RenewLeafResponse {
     oneof renew_result {
       RenewNodeTimelockResult renew_node_timelock_result = 1;
       RenewRefundTimelockResult renew_refund_timelock_result = 2;
+      RenewNodeZeroTimelockResult renew_node_zero_timelock_result = 3;
     }
 }
 
@@ -385,6 +409,11 @@ message RenewNodeTimelockResult {
 
 message RenewRefundTimelockResult {
     TreeNode node = 1;
+}
+
+message RenewNodeZeroTimelockResult {
+    TreeNode split_node = 1;
+    TreeNode node = 2;
 }
 
 /**

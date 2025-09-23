@@ -78,6 +78,8 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 		return h.renewNodeTimelock(ctx, req.GetRenewNodeTimelockSigningJob(), leaf)
 	case *pb.RenewLeafRequest_RenewRefundTimelockSigningJob:
 		return h.renewRefundTimelock(ctx, req.GetRenewRefundTimelockSigningJob(), leaf)
+	case *pb.RenewLeafRequest_RenewNodeZeroTimelockSigningJob:
+		return h.renewNodeZeroTimelock(ctx, req.GetRenewNodeZeroTimelockSigningJob(), leaf)
 	default:
 		return nil, errors.InvalidUserInputErrorf("request must specify either RenewNodeTimelockSigningJob or RenewRefundTimelockSigningJob")
 	}
@@ -400,6 +402,175 @@ func (h *RenewLeafHandler) renewRefundTimelock(ctx context.Context, signingJob *
 	}, nil
 }
 
+// renewNodeZeroTimelock resets the timelock for a node that is at zero sequence and cannot be decremented further
+func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob *pb.RenewNodeZeroTimelockSigningJob, leaf *ent.TreeNode) (*pb.RenewLeafResponse, error) {
+	err := h.validateRenewNodeZeroTimelock(leaf)
+	if err != nil {
+		return nil, fmt.Errorf("validating zero timelock renewal failed: %w", err)
+	}
+
+	// Construct transactions
+	nodeTx, refundTx, err := h.constructRenewZeroNodeTransactions(leaf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct renew zero timelock transactions: %w", err)
+	}
+
+	userRawTxs := [][]byte{signingJob.NodeTxSigningJob.RawTx, signingJob.RefundTxSigningJob.RawTx}
+	expectedTxs := []*wire.MsgTx{nodeTx, refundTx}
+	err = h.validateUserTransactions(userRawTxs, expectedTxs)
+	if err != nil {
+		return nil, fmt.Errorf("user transaction validation failed: %w", err)
+	}
+
+	// Create signing jobs with pregenerated nonces
+	var signingJobs []*helper.SigningJobWithPregeneratedNonce
+
+	signingKeyshare, err := leaf.QuerySigningKeyshare().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing keyshare: %w", err)
+	}
+
+	verifyingPubKey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse verifying public key: %w", err)
+	}
+
+	// Get the original leaf transaction for parent output
+	originalTx, err := common.TxFromRawTxBytes(leaf.RawTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse original transaction: %w", err)
+	}
+
+	// Create node transaction signing job (FIRST)
+	nodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
+		ctx,
+		signingJob.NodeTxSigningJob,
+		signingKeyshare,
+		verifyingPubKey,
+		nodeTx,
+		originalTx.TxOut[0], // New node tx spends from original tx directly
+	)
+	if err != nil {
+		return nil, err
+	}
+	signingJobs = append(signingJobs, nodeSigningJobHelper)
+
+	// Create refund transaction signing job (SECOND)
+	refundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
+		ctx,
+		signingJob.RefundTxSigningJob,
+		signingKeyshare,
+		verifyingPubKey,
+		refundTx,
+		nodeTx.TxOut[0],
+	)
+	if err != nil {
+		return nil, err
+	}
+	signingJobs = append(signingJobs, refundSigningJobHelper)
+
+	// Sign the renew refunds
+	signingResults, err := h.signRenewRefunds(ctx, signingJobs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign renew refunds: %w", err)
+	}
+
+	// Aggregate signatures
+	// Aggregate node transaction signature (FIRST)
+	nodeSignature, err := h.aggregateRenewLeafSignature(ctx, signingResults[0], signingJob.NodeTxSigningJob, leaf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate node signature: %w", err)
+	}
+
+	// Aggregate refund transaction signature (SECOND)
+	refundSignature, err := h.aggregateRenewLeafSignature(ctx, signingResults[1], signingJob.RefundTxSigningJob, leaf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate refund signature: %w", err)
+	}
+
+	// Apply signatures to transactions
+	signedNodeTx, nodeTxBytes, err := h.applyAndVerifySignature(nodeTx, nodeSignature, originalTx.TxOut[0], 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply and verify node tx signature: %w", err)
+	}
+
+	_, refundTxBytes, err := h.applyAndVerifySignature(refundTx, refundSignature, signedNodeTx.TxOut[0], 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply and verify refund tx signature: %w", err)
+	}
+
+	// For zero timelock renewal, we need to create a new split node and update the leaf
+	// This is similar to the renewNodeTimelock flow but uses the existing node as the split
+	treeID, err := leaf.QueryTree().Only(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tree id: %w", err)
+	}
+
+	// Get database context
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database from context: %w", err)
+	}
+
+	// Create new split node
+	mut := db.
+		TreeNode.
+		Create().
+		SetTreeID(treeID.ID).
+		SetStatus(st.TreeNodeStatusSplitLocked).
+		SetOwnerIdentityPubkey(leaf.OwnerIdentityPubkey).
+		SetOwnerSigningPubkey(leaf.OwnerSigningPubkey).
+		SetValue(leaf.Value).
+		SetVerifyingPubkey(leaf.VerifyingPubkey).
+		SetSigningKeyshareID(signingKeyshare.ID).
+		SetRawTx(leaf.RawTx).
+		SetVout(int16(0))
+	if leaf.Edges.Parent != nil {
+		mut.SetParentID(leaf.Edges.Parent.ID)
+	}
+	splitNode, err := mut.Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new node: %w", err)
+	}
+
+	// Update the old leaf with extended transactions
+	leaf, err = leaf.Update().
+		SetRawTx(nodeTxBytes).
+		SetRawRefundTx(refundTxBytes).
+		SetParentID(splitNode.ID).
+		Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update leaf: %w", err)
+	}
+
+	// Marshal the split node into proto
+	splitNodeProto, err := splitNode.MarshalSparkProto(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal split node %s on spark: %w", splitNode.ID.String(), err)
+	}
+
+	// Marshal the new leaf node into proto
+	leafProto, err := leaf.MarshalSparkProto(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to marshal new leaf node %s on spark: %w", leaf.ID.String(), err)
+	}
+
+	// Reuse finalize node timelock gossip message
+	err = h.sendFinalizeNodeTimelockGossipMessage(ctx, splitNode, leaf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send gossip message: %w", err)
+	}
+
+	return &pb.RenewLeafResponse{
+		RenewResult: &pb.RenewLeafResponse_RenewNodeZeroTimelockResult{
+			RenewNodeZeroTimelockResult: &pb.RenewNodeZeroTimelockResult{
+				SplitNode: splitNodeProto,
+				Node:      leafProto,
+			},
+		},
+	}, nil
+}
+
 /**
  * 	aggregateRenewLeafSignature performs frost aggregation on a single signing
  *	result and user signing job. After signing in signRenewRefunds,
@@ -510,7 +681,7 @@ func (h *RenewLeafHandler) constructRenewNodeTransactions(leaf *ent.TreeNode) (*
 	}
 	extendedNodeTx.AddTxOut(wire.NewTxOut(leafNodeTx.TxOut[0].Value, outputPkScript))
 	// Add ephemeral anchor output for CPFP
-	extendedNodeTx.AddTxOut(wire.NewTxOut(0, []byte{0x51, 0x02, 0x4e, 0x73}))
+	extendedNodeTx.AddTxOut(common.EphemeralAnchorOutput())
 
 	// Create refund tx to spend the extended node tx
 	ownerSigningPubkey, err := keys.ParsePublicKey(leaf.OwnerSigningPubkey)
@@ -533,7 +704,7 @@ func (h *RenewLeafHandler) constructRenewNodeTransactions(leaf *ent.TreeNode) (*
 		PkScript: refundPkScript,
 	})
 	// Add ephemeral anchor output for CPFP
-	refundTx.AddTxOut(wire.NewTxOut(0, []byte{0x51, 0x02, 0x4e, 0x73}))
+	refundTx.AddTxOut(common.EphemeralAnchorOutput())
 	return splitNodeTx, extendedNodeTx, refundTx, nil
 }
 
@@ -580,9 +751,71 @@ func (h *RenewLeafHandler) constructRenewRefundTransactions(leaf *ent.TreeNode) 
 		PkScript: refundPkScript,
 	})
 	// Add ephemeral anchor output for CPFP
-	refundTx.AddTxOut(wire.NewTxOut(0, []byte{0x51, 0x02, 0x4e, 0x73}))
+	refundTx.AddTxOut(common.EphemeralAnchorOutput())
 
 	return nodeTx, refundTx, nil
+}
+
+// constructRenewZeroNodeTransactions creates the node and refund transactions for zero timelock renewal
+func (h *RenewLeafHandler) constructRenewZeroNodeTransactions(leaf *ent.TreeNode) (*wire.MsgTx, *wire.MsgTx, error) {
+	leafNodeTx, err := common.TxFromRawTxBytes(leaf.RawTx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse leaf node transaction: %w", err)
+	}
+
+	// Create new node tx with zero sequence (timelock = 0)
+	newNodeTx := wire.NewMsgTx(3)
+	newNodeTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: leafNodeTx.TxHash(), Index: 0},
+		SignatureScript:  nil,
+		Witness:          nil,
+		Sequence:         spark.ZeroSequence,
+	})
+
+	// Use same output value and script as original node tx
+	verifyingPubkey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse verifying pubkey: %w", err)
+	}
+	outputPkScript, err := common.P2TRScriptFromPubKey(verifyingPubkey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to construct pkscript: %w", err)
+	}
+	newNodeTx.AddTxOut(wire.NewTxOut(leafNodeTx.TxOut[0].Value, outputPkScript))
+	// Add ephemeral anchor output for CPFP
+	newNodeTx.AddTxOut(common.EphemeralAnchorOutput())
+
+	// Create refund tx to spend the new node tx with initial sequence (timelock = 2000)
+	refundTx := wire.NewMsgTx(3)
+	refundTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: newNodeTx.TxHash(), Index: 0},
+		SignatureScript:  nil,
+		Witness:          nil,
+		Sequence:         spark.InitialSequence(),
+	})
+
+	ownerSigningPubkey, err := keys.ParsePublicKey(leaf.OwnerSigningPubkey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to parse owner signing pubkey: %w", err)
+	}
+	refundPkScript, err := common.P2TRScriptFromPubKey(ownerSigningPubkey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create refund script: %w", err)
+	}
+
+	// Use original refund value
+	oldRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to deserialize leaf refund tx: %w", err)
+	}
+	refundTx.AddTxOut(&wire.TxOut{
+		Value:    oldRefundTx.TxOut[0].Value,
+		PkScript: refundPkScript,
+	})
+	// Add ephemeral anchor output for CPFP
+	refundTx.AddTxOut(common.EphemeralAnchorOutput())
+
+	return newNodeTx, refundTx, nil
 }
 
 // validateRenewNodeTimelocks validates the timelock requirements for a renew
@@ -621,6 +854,41 @@ func (h *RenewLeafHandler) validateRenewNodeTimelocks(leaf *ent.TreeNode) error 
 // validateRenewRefundTimelock validates the timelock requirements for a renew
 // refund timelock operation. Refund timelock must be <= 300
 func (h *RenewLeafHandler) validateRenewRefundTimelock(leaf *ent.TreeNode) error {
+	// Check the leaf's refund transaction sequence
+	leafRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
+	if err != nil {
+		return fmt.Errorf("failed to parse leaf refund transaction: %w", err)
+	}
+	if len(leafRefundTx.TxIn) == 0 {
+		return fmt.Errorf("found no tx inputs for leaf refund tx %v", leafRefundTx)
+	}
+	refundTimelock := leafRefundTx.TxIn[0].Sequence & 0xffff
+
+	if refundTimelock > 300 {
+		return errors.FailedPreconditionErrorf("leaf %s refund transaction sequence must be less than or equal to 300, got %d", leaf.ID, refundTimelock)
+	}
+
+	return nil
+}
+
+// validateRenewNodeZeroTimelock validates the timelock requirements for a renew
+// node zero timelock operation. The node transaction must have a timelock of 0
+// and the refund transaction must have a timelock of 300 or less.
+func (h *RenewLeafHandler) validateRenewNodeZeroTimelock(leaf *ent.TreeNode) error {
+	// Check the leaf's node transaction sequence
+	leafNodeTx, err := common.TxFromRawTxBytes(leaf.RawTx)
+	if err != nil {
+		return fmt.Errorf("failed to parse leaf node transaction: %w", err)
+	}
+	if len(leafNodeTx.TxIn) == 0 {
+		return fmt.Errorf("found no tx inputs for leaf node tx %v", leafNodeTx)
+	}
+	nodeTimelock := leafNodeTx.TxIn[0].Sequence & 0xffff
+
+	if nodeTimelock != 0 {
+		return errors.FailedPreconditionErrorf("leaf %s node transaction sequence must be 0 for zero timelock renewal, got %d", leaf.ID, nodeTimelock)
+	}
+
 	// Check the leaf's refund transaction sequence
 	leafRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
 	if err != nil {
