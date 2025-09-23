@@ -118,93 +118,100 @@ func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, leafOut
 	return nil
 }
 
+func validateSendLeafDirectRefundTxs(leaf *ent.TreeNode, directTx []byte, directFromCpfpRefundTx []byte, receiverIdentityPubKey keys.Public, expectedInputCount uint32) error {
+	var oldDirectRefundTxSequence uint32
+	var oldDirectFromCpfpRefundTxSequence uint32
+
+	newDirectRefundTx, err := common.TxFromRawTxBytes(directTx)
+	if err != nil {
+		return fmt.Errorf("unable to load new direct refund tx: %w", err)
+	}
+
+	newDirectFromCpfpRefundTx, err := common.TxFromRawTxBytes(directFromCpfpRefundTx)
+	if err != nil {
+		return fmt.Errorf("unable to load new direct from cpfprefund tx: %w", err)
+	}
+
+	if len(newDirectRefundTx.TxIn) == 0 {
+		return fmt.Errorf("new direct refund tx has no inputs")
+	}
+
+	if len(newDirectFromCpfpRefundTx.TxIn) == 0 {
+		return fmt.Errorf("new direct from cpfp refund tx has no inputs")
+
+	}
+
+	leafDirectOutPoint := wire.OutPoint{}
+	leafDirectFromCpfpOutPoint := wire.OutPoint{}
+
+	if len(leaf.DirectRefundTx) > 0 && len(leaf.DirectFromCpfpRefundTx) > 0 {
+		oldDirectRefundTx, err := common.TxFromRawTxBytes(leaf.DirectRefundTx)
+		if err != nil {
+			return fmt.Errorf("unable to load old direct refund tx: %w", err)
+		}
+		oldDirectFromCpfpRefundTx, err := common.TxFromRawTxBytes(leaf.DirectFromCpfpRefundTx)
+		if err != nil {
+			return fmt.Errorf("unable to load old direct from cpfp refund tx: %w", err)
+		}
+		if len(oldDirectRefundTx.TxIn) == 0 {
+			return fmt.Errorf("old direct refund tx has no inputs")
+		}
+		if len(oldDirectFromCpfpRefundTx.TxIn) == 0 {
+			return fmt.Errorf("old direct from cpfp refund tx has no inputs")
+		}
+		oldDirectRefundTxIn := oldDirectRefundTx.TxIn[0]
+		leafDirectOutPoint = wire.OutPoint{
+			Hash:  oldDirectRefundTxIn.PreviousOutPoint.Hash,
+			Index: oldDirectRefundTxIn.PreviousOutPoint.Index,
+		}
+		oldDirectFromCpfpRefundTxIn := oldDirectFromCpfpRefundTx.TxIn[0]
+		leafDirectFromCpfpOutPoint = wire.OutPoint{
+			Hash:  oldDirectFromCpfpRefundTxIn.PreviousOutPoint.Hash,
+			Index: oldDirectFromCpfpRefundTxIn.PreviousOutPoint.Index,
+		}
+		oldDirectRefundTxSequence = oldDirectRefundTxIn.Sequence
+		oldDirectFromCpfpRefundTxSequence = oldDirectFromCpfpRefundTxIn.Sequence
+	} else {
+		oldDirectRefundTxSequence = 0xFFFF
+		oldDirectFromCpfpRefundTxSequence = 0xFFFF
+		leafDirectOutPoint = wire.OutPoint{
+			Hash:  newDirectRefundTx.TxIn[0].PreviousOutPoint.Hash,
+			Index: newDirectRefundTx.TxIn[0].PreviousOutPoint.Index,
+		}
+		leafDirectFromCpfpOutPoint = wire.OutPoint{
+			Hash:  newDirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Hash,
+			Index: newDirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Index,
+		}
+	}
+
+	if err := validateLeafRefundTxInput(newDirectRefundTx, oldDirectRefundTxSequence, &leafDirectOutPoint, expectedInputCount); err != nil {
+		return fmt.Errorf("unable to validate direct refund tx inputs: %w", err)
+	}
+	if err := validateLeafRefundTxInput(newDirectFromCpfpRefundTx, oldDirectFromCpfpRefundTxSequence, &leafDirectFromCpfpOutPoint, expectedInputCount); err != nil {
+		return fmt.Errorf("unable to validate direct from cpfp refund tx inputs: %w", err)
+	}
+	if err := validateLeafRefundTxOutput(newDirectRefundTx, receiverIdentityPubKey); err != nil {
+		return fmt.Errorf("unable to validate direct refund tx output: %w", err)
+	}
+	if err := validateLeafRefundTxOutput(newDirectFromCpfpRefundTx, receiverIdentityPubKey); err != nil {
+		return fmt.Errorf("unable to validate direct from cpfp refund tx output: %w", err)
+	}
+
+	return nil
+}
+
 func validateSendLeafRefundTxs(leaf *ent.TreeNode, rawTx []byte, directTx []byte, directFromCpfpRefundTx []byte, receiverIdentityPubKey keys.Public, expectedInputCount uint32, requireDirectTx bool) error {
 	newCpfpRefundTx, err := common.TxFromRawTxBytes(rawTx)
 	if err != nil {
 		return fmt.Errorf("unable to load new cpfp refund tx: %w", err)
 	}
-	var newDirectRefundTx *wire.MsgTx
-	var newDirectFromCpfpRefundTx *wire.MsgTx
-	leafDirectOutPoint := wire.OutPoint{}
-	leafDirectFromCpfpOutPoint := wire.OutPoint{}
 
 	leafIsWatchtowerReady := len(leaf.DirectTx) > 0
-	haveDirectTxs := len(directTx) > 0 && len(directFromCpfpRefundTx) > 0
-
 	if leafIsWatchtowerReady {
-		if haveDirectTxs {
-			var oldDirectRefundTxSequence uint32
-			var oldDirectFromCpfpRefundTxSequence uint32
-			newDirectRefundTx, err = common.TxFromRawTxBytes(directTx)
-			if err != nil {
-				return fmt.Errorf("unable to load new direct refund tx: %w", err)
-			}
-			newDirectFromCpfpRefundTx, err = common.TxFromRawTxBytes(directFromCpfpRefundTx)
-			if err != nil {
-				return fmt.Errorf("unable to load new direct from cpfprefund tx: %w", err)
-			}
-			if len(newDirectRefundTx.TxIn) == 0 {
-				return fmt.Errorf("new direct refund tx has no inputs")
-			}
-			if len(newDirectFromCpfpRefundTx.TxIn) == 0 {
-				return fmt.Errorf("new direct from cpfp refund tx has no inputs")
-
-			}
-			if len(leaf.DirectRefundTx) > 0 && len(leaf.DirectFromCpfpRefundTx) > 0 {
-				oldDirectRefundTx, err := common.TxFromRawTxBytes(leaf.DirectRefundTx)
-				if err != nil {
-					return fmt.Errorf("unable to load old direct refund tx: %w", err)
-				}
-				oldDirectFromCpfpRefundTx, err := common.TxFromRawTxBytes(leaf.DirectFromCpfpRefundTx)
-				if err != nil {
-					return fmt.Errorf("unable to load old direct from cpfp refund tx: %w", err)
-				}
-				if len(oldDirectRefundTx.TxIn) == 0 {
-					return fmt.Errorf("old direct refund tx has no inputs")
-				}
-				if len(oldDirectFromCpfpRefundTx.TxIn) == 0 {
-					return fmt.Errorf("old direct from cpfp refund tx has no inputs")
-				}
-				oldDirectRefundTxIn := oldDirectRefundTx.TxIn[0]
-				leafDirectOutPoint = wire.OutPoint{
-					Hash:  oldDirectRefundTxIn.PreviousOutPoint.Hash,
-					Index: oldDirectRefundTxIn.PreviousOutPoint.Index,
-				}
-				oldDirectFromCpfpRefundTxIn := oldDirectFromCpfpRefundTx.TxIn[0]
-				leafDirectFromCpfpOutPoint = wire.OutPoint{
-					Hash:  oldDirectFromCpfpRefundTxIn.PreviousOutPoint.Hash,
-					Index: oldDirectFromCpfpRefundTxIn.PreviousOutPoint.Index,
-				}
-				oldDirectRefundTxSequence = oldDirectRefundTxIn.Sequence
-				oldDirectFromCpfpRefundTxSequence = oldDirectFromCpfpRefundTxIn.Sequence
-			} else {
-				oldDirectRefundTxSequence = 0xFFFF
-				oldDirectFromCpfpRefundTxSequence = 0xFFFF
-				leafDirectOutPoint = wire.OutPoint{
-					Hash:  newDirectRefundTx.TxIn[0].PreviousOutPoint.Hash,
-					Index: newDirectRefundTx.TxIn[0].PreviousOutPoint.Index,
-				}
-				leafDirectFromCpfpOutPoint = wire.OutPoint{
-					Hash:  newDirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Hash,
-					Index: newDirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Index,
-				}
-			}
-
-			err = validateLeafRefundTxInput(newDirectRefundTx, oldDirectRefundTxSequence, &leafDirectOutPoint, expectedInputCount)
-			if err != nil {
-				return fmt.Errorf("unable to validate direct refund tx inputs: %w", err)
-			}
-			err = validateLeafRefundTxInput(newDirectFromCpfpRefundTx, oldDirectFromCpfpRefundTxSequence, &leafDirectFromCpfpOutPoint, expectedInputCount)
-			if err != nil {
-				return fmt.Errorf("unable to validate direct from cpfp refund tx inputs: %w", err)
-			}
-			err = validateLeafRefundTxOutput(newDirectRefundTx, receiverIdentityPubKey)
-			if err != nil {
-				return fmt.Errorf("unable to validate direct refund tx output: %w", err)
-			}
-			err = validateLeafRefundTxOutput(newDirectFromCpfpRefundTx, receiverIdentityPubKey)
-			if err != nil {
-				return fmt.Errorf("unable to validate direct from cpfp refund tx output: %w", err)
+		receivedDirectTxs := len(directTx) > 0 && len(directFromCpfpRefundTx) > 0
+		if receivedDirectTxs {
+			if err := validateSendLeafDirectRefundTxs(leaf, directTx, directFromCpfpRefundTx, receiverIdentityPubKey, expectedInputCount); err != nil {
+				return err
 			}
 		} else if requireDirectTx {
 			return fmt.Errorf("DirectNodeTxSignature is required. Please upgrade to the latest SDK version")
