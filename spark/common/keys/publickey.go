@@ -28,6 +28,27 @@ func ParsePublicKey(bytes []byte) (Public, error) {
 	return Public{key: *key}, nil
 }
 
+// ParsePublicKeyHex parses an secp256k1 public key hex-encoded according to the format specified
+// by ANSI X9.62-1998.
+func ParsePublicKeyHex(s string) (Public, error) {
+	bytes, err := hex.DecodeString(s)
+	if err != nil {
+		return Public{}, err
+	}
+
+	return ParsePublicKey(bytes)
+}
+
+// MustParsePublicKeyHex parses a hex-encoded public key. Meant for testing, it panics if the key
+// cannot be parsed.
+func MustParsePublicKeyHex(s string) Public {
+	key, err := ParsePublicKeyHex(s)
+	if err != nil {
+		panic(err)
+	}
+	return key
+}
+
 // ParsePublicKeyMap creates secp256k1 public keys from a map of byte slices.
 func ParsePublicKeyMap[k comparable](asBytes map[k][]byte) (map[k]Public, error) {
 	asKeys := make(map[k]Public, len(asBytes))

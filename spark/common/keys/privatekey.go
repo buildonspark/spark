@@ -52,6 +52,26 @@ func ParsePrivateKey(privKeyBytes []byte) (Private, error) {
 	return pk, nil
 }
 
+// ParsePrivateKey creates an secp256k1 private key from a hex-encoded string.
+func ParsePrivateKeyHex(s string) (Private, error) {
+	bytes, err := hex.DecodeString(s)
+	if err != nil {
+		return Private{}, err
+	}
+
+	return ParsePrivateKey(bytes)
+}
+
+// MustParsePrivateKeyHex is the same as ParsePrivateKeyHex, but panics if the key cannot be
+// parsed. This is generally meant for use in tests.
+func MustParsePrivateKeyHex(s string) Private {
+	key, err := ParsePrivateKeyHex(s)
+	if err != nil {
+		panic(err)
+	}
+	return key
+}
+
 // PrivateKeyFromBigInt creates an secp256k1 private key from a big integer.
 func PrivateKeyFromBigInt(privKeyInt *big.Int) (Private, error) {
 	if privKeyInt == nil || len(privKeyInt.Bits()) == 0 {

@@ -1,7 +1,6 @@
 package sparktesting
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math/rand/v2"
 	"os"
@@ -38,20 +37,20 @@ func IsGripmock() bool {
 }
 
 // Common pubkeys used for both hermetic and local test environments
-var testOperatorPubkeys = []string{
-	"0322ca18fc489ae25418a0e768273c2c61cabb823edfb14feb891e9bec62016510",
-	"0341727a6c41b168f07eb50865ab8c397a53c7eef628ac1020956b705e43b6cb27",
-	"0305ab8d485cc752394de4981f8a5ae004f2becfea6f432c9a59d5022d8764f0a6",
-	"0352aef4d49439dedd798ac4aef1e7ebef95f569545b647a25338398c1247ffdea",
-	"02c05c88cc8fc181b1ba30006df6a4b0597de6490e24514fbdd0266d2b9cd3d0ba",
+var testOperatorPubkeys = []keys.Public{
+	keys.MustParsePublicKeyHex("0322ca18fc489ae25418a0e768273c2c61cabb823edfb14feb891e9bec62016510"),
+	keys.MustParsePublicKeyHex("0341727a6c41b168f07eb50865ab8c397a53c7eef628ac1020956b705e43b6cb27"),
+	keys.MustParsePublicKeyHex("0305ab8d485cc752394de4981f8a5ae004f2becfea6f432c9a59d5022d8764f0a6"),
+	keys.MustParsePublicKeyHex("0352aef4d49439dedd798ac4aef1e7ebef95f569545b647a25338398c1247ffdea"),
+	keys.MustParsePublicKeyHex("02c05c88cc8fc181b1ba30006df6a4b0597de6490e24514fbdd0266d2b9cd3d0ba"),
 }
 
-var testOperatorPrivkeys = []string{
-	"5eaae81bcf1fd43fbb92432b82dbafc8273bb3287b42cb4cf3c851fcee2212a5",
-	"bc0f5b9055c4a88b881d4bb48d95b409cd910fb27c088380f8ecda2150ee8faf",
-	"d5043294f686bc1e3337ce4a44801b011adc67524175f27d7adc85d81d6a4545",
-	"f2136e83e8dc4090291faaaf5ea21a27581906d8b108ac0eefdaecf4ee86ac99",
-	"effe79dc2a911a5a359910cb7782f5cabb3b7cf01e3809f8d323898ffd78e408",
+var testOperatorPrivkeys = []keys.Private{
+	keys.MustParsePrivateKeyHex("5eaae81bcf1fd43fbb92432b82dbafc8273bb3287b42cb4cf3c851fcee2212a5"),
+	keys.MustParsePrivateKeyHex("bc0f5b9055c4a88b881d4bb48d95b409cd910fb27c088380f8ecda2150ee8faf"),
+	keys.MustParsePrivateKeyHex("d5043294f686bc1e3337ce4a44801b011adc67524175f27d7adc85d81d6a4545"),
+	keys.MustParsePrivateKeyHex("f2136e83e8dc4090291faaaf5ea21a27581906d8b108ac0eefdaecf4ee86ac99"),
+	keys.MustParsePrivateKeyHex("effe79dc2a911a5a359910cb7782f5cabb3b7cf01e3809f8d323898ffd78e408"),
 }
 
 type TestGRPCConnectionFactory struct {
@@ -66,22 +65,6 @@ func (f *TestGRPCConnectionFactory) SetTimeoutProvider(timeoutProvider sparkgrpc
 	f.timeoutProvider = &common.ClientTimeoutConfig{
 		TimeoutProvider: timeoutProvider,
 	}
-}
-
-func decodePubKeys(pubKeys []string) ([]keys.Public, error) {
-	parsed := make([]keys.Public, len(pubKeys))
-	for i, pubKey := range pubKeys {
-		pubKeyBytes, err := hex.DecodeString(pubKey)
-		if err != nil {
-			return nil, err
-		}
-		key, err := keys.ParsePublicKey(pubKeyBytes)
-		if err != nil {
-			return nil, err
-		}
-		parsed[i] = key
-	}
-	return parsed, nil
 }
 
 func operatorCount() (int, error) {
@@ -102,11 +85,6 @@ func operatorCount() (int, error) {
 
 func GetAllSigningOperators() (map[string]*so.SigningOperator, error) {
 	opCount, err := operatorCount()
-	if err != nil {
-		return nil, err
-	}
-
-	pubkeyBytesArray, err := decodePubKeys(testOperatorPubkeys[:opCount])
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +112,7 @@ func GetAllSigningOperators() (map[string]*so.SigningOperator, error) {
 			Identifier:                id,
 			AddressRpc:                address,
 			AddressDkg:                address,
-			IdentityPublicKey:         pubkeyBytesArray[i],
+			IdentityPublicKey:         testOperatorPubkeys[i],
 			CertPath:                  certPath,
 			OperatorConnectionFactory: operatorConnectionFactory,
 		}
@@ -174,15 +152,6 @@ func SpecificOperatorTestConfig(operatorIndex int) (*so.Config, error) {
 		return nil, fmt.Errorf("operator index %d out of range", operatorIndex)
 	}
 
-	identityPrivateKeyBytes, err := hex.DecodeString(testOperatorPrivkeys[operatorIndex])
-	if err != nil {
-		return nil, err
-	}
-	identityPrivateKey, err := keys.ParsePrivateKey(identityPrivateKeyBytes)
-	if err != nil {
-		return nil, err
-	}
-
 	signingOperators, err := GetAllSigningOperators()
 	if err != nil {
 		return nil, err
@@ -194,7 +163,7 @@ func SpecificOperatorTestConfig(operatorIndex int) (*so.Config, error) {
 	config := so.Config{
 		Index:                      uint64(operatorIndex),
 		Identifier:                 identifier,
-		IdentityPrivateKey:         identityPrivateKey,
+		IdentityPrivateKey:         testOperatorPrivkeys[operatorIndex],
 		SigningOperatorMap:         signingOperators,
 		Threshold:                  uint64(threshold),
 		SignerAddress:              getLocalFrostSignerAddress(),
