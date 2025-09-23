@@ -389,6 +389,9 @@ func (t *TxProviderWithTimeout) GetOrBeginTx(ctx context.Context) (*ent.Tx, erro
 	case err := <-errChan:
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	case <-timeoutCtx.Done():
-		return nil, ErrTxBeginTimeout
+		if timeoutCtx.Err() == context.DeadlineExceeded {
+			return nil, ErrTxBeginTimeout
+		}
+		return nil, timeoutCtx.Err()
 	}
 }
