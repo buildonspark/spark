@@ -83,9 +83,14 @@ func operatorCount(tb testing.TB) int {
 func GetAllSigningOperators(tb testing.TB) map[string]*so.SigningOperator {
 	opCount := operatorCount(tb)
 
-	certPath := minikubeCAFilePath
-	if !isHermeticTest() {
-		certPath = ""
+	isHermetic, isGripmock := isHermeticTest(), IsGripmock()
+	if isHermetic && isGripmock {
+		tb.Fatal("Cannot set both HERMETIC_TEST and GRIPMOCK environment variables to true")
+	}
+
+	certPath := ""
+	if isHermetic {
+		certPath = minikubeCAFilePath
 	}
 
 	operators := make(map[string]*so.SigningOperator, opCount)
@@ -94,10 +99,10 @@ func GetAllSigningOperators(tb testing.TB) map[string]*so.SigningOperator {
 		id := fmt.Sprintf("%064x", i+1) // "000…001", "000…002" …
 		address := fmt.Sprintf("localhost:%d", basePort+i)
 		var operatorConnectionFactory so.OperatorConnectionFactory = &DangerousTestOperatorConnectionFactoryNoVerifyTLS{}
-		if isHermeticTest() {
+		if isHermetic {
 			address = fmt.Sprintf("dns:///%d.spark.minikube.local", i)
 		}
-		if IsGripmock() {
+		if isGripmock {
 			operatorConnectionFactory = &DangerousTestOperatorConnectionFactoryNoTLS{}
 		}
 
@@ -121,11 +126,16 @@ func getTestDatabasePath(operatorIndex int) string {
 	return fmt.Sprintf("postgresql://:@127.0.0.1:5432/sparkoperator_%d?sslmode=disable", operatorIndex)
 }
 
-func getLocalFrostSignerAddress() string {
-	if isHermeticTest() {
+func getLocalFrostSignerAddress(tb testing.TB) string {
+	isHermetic, isGripmock := isHermeticTest(), IsGripmock()
+	if isHermetic && isGripmock {
+		tb.Fatal("Cannot set both HERMETIC_TEST and GRIPMOCK environment variables to true")
+	}
+
+	if isHermetic {
 		return "localhost:9999"
 	}
-	if IsGripmock() {
+	if isGripmock {
 		return "localhost:8535"
 	}
 	return "unix:///tmp/frost_0.sock"
@@ -152,7 +162,7 @@ func SpecificOperatorTestConfig(tb testing.TB, operatorIndex int) *so.Config {
 		IdentityPrivateKey:         testOperatorPrivkeys[operatorIndex],
 		SigningOperatorMap:         signingOperators,
 		Threshold:                  uint64(threshold),
-		SignerAddress:              getLocalFrostSignerAddress(),
+		SignerAddress:              getLocalFrostSignerAddress(tb),
 		DatabasePath:               getTestDatabasePath(operatorIndex),
 		FrostGRPCConnectionFactory: &TestGRPCConnectionFactory{},
 		SupportedNetworks:          []common.Network{common.Regtest, common.Mainnet},
@@ -230,7 +240,7 @@ func TestWalletConfigWithParams(tb testing.TB, p TestWalletConfigParams) *wallet
 		Network:                               network,
 		SigningOperators:                      signingOperators,
 		CoordinatorIdentifier:                 coordinatorIdentifier,
-		FrostSignerAddress:                    getLocalFrostSignerAddress(),
+		FrostSignerAddress:                    getLocalFrostSignerAddress(tb),
 		IdentityPrivateKey:                    privKey,
 		Threshold:                             3,
 		SparkServiceProviderIdentityPublicKey: keys.MustGeneratePrivateKeyFromRand(rng).Public(),
