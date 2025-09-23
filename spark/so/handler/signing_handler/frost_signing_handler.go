@@ -111,7 +111,7 @@ func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRoun
 			return nil, err
 		}
 	}
-	nonces, err := ent.GetSigningNonces(ctx, h.config, commitments)
+	nonces, err := ent.GetSigningNoncesForUpdate(ctx, h.config, commitments)
 	if err != nil {
 		return nil, err
 	}

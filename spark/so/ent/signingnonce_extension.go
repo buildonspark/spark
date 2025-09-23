@@ -31,8 +31,8 @@ func GetSigningNonceFromCommitment(ctx context.Context, _ *so.Config, commitment
 	return &signingNonce, nil
 }
 
-// GetSigningNonces returns the signing nonces associated with the given commitments.
-func GetSigningNonces(ctx context.Context, _ *so.Config, commitments []objects.SigningCommitment) (map[[66]byte]*SigningNonce, error) {
+// GetSigningNoncesForUpdate returns the signing nonces associated with the given commitments, and locks them for update.
+func GetSigningNoncesForUpdate(ctx context.Context, _ *so.Config, commitments []objects.SigningCommitment) (map[[66]byte]*SigningNonce, error) {
 	commitmentBytes := make([][]byte, len(commitments))
 	for i, commitment := range commitments {
 		commitmentBytes[i] = commitment.MarshalBinary()
@@ -41,7 +41,7 @@ func GetSigningNonces(ctx context.Context, _ *so.Config, commitments []objects.S
 	if err != nil {
 		return nil, err
 	}
-	noncesResult, err := db.SigningNonce.Query().Where(signingnonce.NonceCommitmentIn(commitmentBytes...)).All(ctx)
+	noncesResult, err := db.SigningNonce.Query().Where(signingnonce.NonceCommitmentIn(commitmentBytes...)).ForUpdate().All(ctx)
 	if err != nil {
 		return nil, err
 	}
