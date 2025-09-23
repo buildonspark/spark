@@ -1,12 +1,11 @@
-import { Transaction } from "@scure/btc-signer";
+import { expect } from "@jest/globals";
+import { ValidationError } from "../../../errors/types.js";
+import { ExitSpeed } from "../../../types/index.js";
+import { getNewAddress } from "../../utils/regtest-test-faucet.js";
 import {
   initTestingWallet,
   SparkWalletTesting,
 } from "../../utils/spark-testing-wallet.js";
-import { expect } from "@jest/globals";
-import { ExitSpeed } from "../../../types/index.js";
-import { ValidationError } from "../../../errors/types.js";
-import { getNewAddress } from "../../utils/regtest-test-faucet.js";
 
 const DEPOSIT_AMOUNT = 50_000n;
 
@@ -200,7 +199,7 @@ describe("SSP coop exit basic validation", () => {
         exitSpeed: ExitSpeed.FAST,
         deductFeeFromWithdrawalAmount: true,
       }),
-    ).rejects.toThrow("Not enough leaves to swap for the target amount");
+    ).rejects.toThrow("Total target amount exceeds available balance");
   }, 600000);
 
   // it("should correctly update balance after successful withdrawal", async () => {

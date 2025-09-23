@@ -1463,6 +1463,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         directSignatureMap,
         directFromCpfpSignatureMap,
       );
+
+      // At this point the leaves are considered outgoing.
+      // Remove them from internal state so we don't select them again
+      const leavesToRemove = new Set(leavesBatch.map((leaf) => leaf.id));
+      this.leaves = [
+        ...this.leaves.filter((leaf) => !leavesToRemove.has(leaf.id)),
+      ];
+
       const completeResponse = await sspClient.completeLeaveSwap({
         adaptorSecretKey: bytesToHex(cpfpAdaptorPrivateKey),
         directAdaptorSecretKey: bytesToHex(directAdaptorPrivateKey),
@@ -1490,18 +1498,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         throw new Error("Failed to get incoming transfer");
       }
 
-      const incomingLeaves = await this.claimTransfer({
+      return await this.claimTransfer({
         transfer: incomingTransfer,
         emit: false,
         optimize: false,
       });
-
-      this.updateLeaves(
-        leavesBatch.map((leaf) => leaf.id),
-        incomingLeaves,
-      );
-
-      return incomingLeaves;
     } catch (e) {
       console.error("[processSwapBatch] Error details:", {
         error: e,
