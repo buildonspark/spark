@@ -27,6 +27,9 @@ type L1TokenCreate func(*sql.Selector)
 // PaymentIntent is the predicate function for paymentintent builders.
 type PaymentIntent func(*sql.Selector)
 
+// PendingSendTransfer is the predicate function for pendingsendtransfer builders.
+type PendingSendTransfer func(*sql.Selector)
+
 // PreimageRequest is the predicate function for preimagerequest builders.
 type PreimageRequest func(*sql.Selector)
 

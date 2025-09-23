@@ -93,6 +93,18 @@ func (f PaymentIntentFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Valu
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PaymentIntentMutation", m)
 }
 
+// The PendingSendTransferFunc type is an adapter to allow the use of ordinary
+// function as PendingSendTransfer mutator.
+type PendingSendTransferFunc func(context.Context, *ent.PendingSendTransferMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PendingSendTransferFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PendingSendTransferMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PendingSendTransferMutation", m)
+}
+
 // The PreimageRequestFunc type is an adapter to allow the use of ordinary
 // function as PreimageRequest mutator.
 type PreimageRequestFunc func(context.Context, *ent.PreimageRequestMutation) (ent.Value, error)

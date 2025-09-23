@@ -208,6 +208,32 @@ var (
 		Columns:    PaymentIntentsColumns,
 		PrimaryKey: []*schema.Column{PaymentIntentsColumns[0]},
 	}
+	// PendingSendTransfersColumns holds the columns for the "pending_send_transfers" table.
+	PendingSendTransfersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "transfer_id", Type: field.TypeUUID, Unique: true},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"STARTED", "FINISHED"}, Default: "STARTED"},
+	}
+	// PendingSendTransfersTable holds the schema information for the "pending_send_transfers" table.
+	PendingSendTransfersTable = &schema.Table{
+		Name:       "pending_send_transfers",
+		Columns:    PendingSendTransfersColumns,
+		PrimaryKey: []*schema.Column{PendingSendTransfersColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "pendingsendtransfer_transfer_id",
+				Unique:  true,
+				Columns: []*schema.Column{PendingSendTransfersColumns[3]},
+			},
+			{
+				Name:    "pendingsendtransfer_status",
+				Unique:  false,
+				Columns: []*schema.Column{PendingSendTransfersColumns[4]},
+			},
+		},
+	}
 	// PreimageRequestsColumns holds the columns for the "preimage_requests" table.
 	PreimageRequestsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1208,6 +1234,7 @@ var (
 		GossipsTable,
 		L1tokenCreatesTable,
 		PaymentIntentsTable,
+		PendingSendTransfersTable,
 		PreimageRequestsTable,
 		PreimageSharesTable,
 		SigningCommitmentsTable,

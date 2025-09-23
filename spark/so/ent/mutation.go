@@ -20,6 +20,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
+	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
@@ -60,6 +61,7 @@ const (
 	TypeGossip                            = "Gossip"
 	TypeL1TokenCreate                     = "L1TokenCreate"
 	TypePaymentIntent                     = "PaymentIntent"
+	TypePendingSendTransfer               = "PendingSendTransfer"
 	TypePreimageRequest                   = "PreimageRequest"
 	TypePreimageShare                     = "PreimageShare"
 	TypeSigningCommitment                 = "SigningCommitment"
@@ -5248,6 +5250,500 @@ func (m *PaymentIntentMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown PaymentIntent edge %s", name)
+}
+
+// PendingSendTransferMutation represents an operation that mutates the PendingSendTransfer nodes in the graph.
+type PendingSendTransferMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *uuid.UUID
+	create_time   *time.Time
+	update_time   *time.Time
+	transfer_id   *uuid.UUID
+	status        *schematype.PendingSendTransferStatus
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*PendingSendTransfer, error)
+	predicates    []predicate.PendingSendTransfer
+}
+
+var _ ent.Mutation = (*PendingSendTransferMutation)(nil)
+
+// pendingsendtransferOption allows management of the mutation configuration using functional options.
+type pendingsendtransferOption func(*PendingSendTransferMutation)
+
+// newPendingSendTransferMutation creates new mutation for the PendingSendTransfer entity.
+func newPendingSendTransferMutation(c config, op Op, opts ...pendingsendtransferOption) *PendingSendTransferMutation {
+	m := &PendingSendTransferMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePendingSendTransfer,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPendingSendTransferID sets the ID field of the mutation.
+func withPendingSendTransferID(id uuid.UUID) pendingsendtransferOption {
+	return func(m *PendingSendTransferMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PendingSendTransfer
+		)
+		m.oldValue = func(ctx context.Context) (*PendingSendTransfer, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PendingSendTransfer.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPendingSendTransfer sets the old PendingSendTransfer of the mutation.
+func withPendingSendTransfer(node *PendingSendTransfer) pendingsendtransferOption {
+	return func(m *PendingSendTransferMutation) {
+		m.oldValue = func(context.Context) (*PendingSendTransfer, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PendingSendTransferMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PendingSendTransferMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of PendingSendTransfer entities.
+func (m *PendingSendTransferMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PendingSendTransferMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PendingSendTransferMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PendingSendTransfer.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreateTime sets the "create_time" field.
+func (m *PendingSendTransferMutation) SetCreateTime(t time.Time) {
+	m.create_time = &t
+}
+
+// CreateTime returns the value of the "create_time" field in the mutation.
+func (m *PendingSendTransferMutation) CreateTime() (r time.Time, exists bool) {
+	v := m.create_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreateTime returns the old "create_time" field's value of the PendingSendTransfer entity.
+// If the PendingSendTransfer object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PendingSendTransferMutation) OldCreateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreateTime: %w", err)
+	}
+	return oldValue.CreateTime, nil
+}
+
+// ResetCreateTime resets all changes to the "create_time" field.
+func (m *PendingSendTransferMutation) ResetCreateTime() {
+	m.create_time = nil
+}
+
+// SetUpdateTime sets the "update_time" field.
+func (m *PendingSendTransferMutation) SetUpdateTime(t time.Time) {
+	m.update_time = &t
+}
+
+// UpdateTime returns the value of the "update_time" field in the mutation.
+func (m *PendingSendTransferMutation) UpdateTime() (r time.Time, exists bool) {
+	v := m.update_time
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdateTime returns the old "update_time" field's value of the PendingSendTransfer entity.
+// If the PendingSendTransfer object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PendingSendTransferMutation) OldUpdateTime(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdateTime is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdateTime requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdateTime: %w", err)
+	}
+	return oldValue.UpdateTime, nil
+}
+
+// ResetUpdateTime resets all changes to the "update_time" field.
+func (m *PendingSendTransferMutation) ResetUpdateTime() {
+	m.update_time = nil
+}
+
+// SetTransferID sets the "transfer_id" field.
+func (m *PendingSendTransferMutation) SetTransferID(u uuid.UUID) {
+	m.transfer_id = &u
+}
+
+// TransferID returns the value of the "transfer_id" field in the mutation.
+func (m *PendingSendTransferMutation) TransferID() (r uuid.UUID, exists bool) {
+	v := m.transfer_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTransferID returns the old "transfer_id" field's value of the PendingSendTransfer entity.
+// If the PendingSendTransfer object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PendingSendTransferMutation) OldTransferID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTransferID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTransferID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTransferID: %w", err)
+	}
+	return oldValue.TransferID, nil
+}
+
+// ResetTransferID resets all changes to the "transfer_id" field.
+func (m *PendingSendTransferMutation) ResetTransferID() {
+	m.transfer_id = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *PendingSendTransferMutation) SetStatus(ssts schematype.PendingSendTransferStatus) {
+	m.status = &ssts
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *PendingSendTransferMutation) Status() (r schematype.PendingSendTransferStatus, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the PendingSendTransfer entity.
+// If the PendingSendTransfer object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PendingSendTransferMutation) OldStatus(ctx context.Context) (v schematype.PendingSendTransferStatus, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *PendingSendTransferMutation) ResetStatus() {
+	m.status = nil
+}
+
+// Where appends a list predicates to the PendingSendTransferMutation builder.
+func (m *PendingSendTransferMutation) Where(ps ...predicate.PendingSendTransfer) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PendingSendTransferMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PendingSendTransferMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PendingSendTransfer, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PendingSendTransferMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PendingSendTransferMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PendingSendTransfer).
+func (m *PendingSendTransferMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PendingSendTransferMutation) Fields() []string {
+	fields := make([]string, 0, 4)
+	if m.create_time != nil {
+		fields = append(fields, pendingsendtransfer.FieldCreateTime)
+	}
+	if m.update_time != nil {
+		fields = append(fields, pendingsendtransfer.FieldUpdateTime)
+	}
+	if m.transfer_id != nil {
+		fields = append(fields, pendingsendtransfer.FieldTransferID)
+	}
+	if m.status != nil {
+		fields = append(fields, pendingsendtransfer.FieldStatus)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PendingSendTransferMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case pendingsendtransfer.FieldCreateTime:
+		return m.CreateTime()
+	case pendingsendtransfer.FieldUpdateTime:
+		return m.UpdateTime()
+	case pendingsendtransfer.FieldTransferID:
+		return m.TransferID()
+	case pendingsendtransfer.FieldStatus:
+		return m.Status()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PendingSendTransferMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case pendingsendtransfer.FieldCreateTime:
+		return m.OldCreateTime(ctx)
+	case pendingsendtransfer.FieldUpdateTime:
+		return m.OldUpdateTime(ctx)
+	case pendingsendtransfer.FieldTransferID:
+		return m.OldTransferID(ctx)
+	case pendingsendtransfer.FieldStatus:
+		return m.OldStatus(ctx)
+	}
+	return nil, fmt.Errorf("unknown PendingSendTransfer field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PendingSendTransferMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case pendingsendtransfer.FieldCreateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreateTime(v)
+		return nil
+	case pendingsendtransfer.FieldUpdateTime:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdateTime(v)
+		return nil
+	case pendingsendtransfer.FieldTransferID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTransferID(v)
+		return nil
+	case pendingsendtransfer.FieldStatus:
+		v, ok := value.(schematype.PendingSendTransferStatus)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PendingSendTransfer field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PendingSendTransferMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PendingSendTransferMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PendingSendTransferMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PendingSendTransfer numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PendingSendTransferMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PendingSendTransferMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PendingSendTransferMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown PendingSendTransfer nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PendingSendTransferMutation) ResetField(name string) error {
+	switch name {
+	case pendingsendtransfer.FieldCreateTime:
+		m.ResetCreateTime()
+		return nil
+	case pendingsendtransfer.FieldUpdateTime:
+		m.ResetUpdateTime()
+		return nil
+	case pendingsendtransfer.FieldTransferID:
+		m.ResetTransferID()
+		return nil
+	case pendingsendtransfer.FieldStatus:
+		m.ResetStatus()
+		return nil
+	}
+	return fmt.Errorf("unknown PendingSendTransfer field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PendingSendTransferMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PendingSendTransferMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PendingSendTransferMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PendingSendTransferMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PendingSendTransferMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PendingSendTransferMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PendingSendTransferMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown PendingSendTransfer unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PendingSendTransferMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown PendingSendTransfer edge %s", name)
 }
 
 // PreimageRequestMutation represents an operation that mutates the PreimageRequest nodes in the graph.

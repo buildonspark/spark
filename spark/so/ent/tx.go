@@ -28,6 +28,8 @@ type Tx struct {
 	L1TokenCreate *L1TokenCreateClient
 	// PaymentIntent is the client for interacting with the PaymentIntent builders.
 	PaymentIntent *PaymentIntentClient
+	// PendingSendTransfer is the client for interacting with the PendingSendTransfer builders.
+	PendingSendTransfer *PendingSendTransferClient
 	// PreimageRequest is the client for interacting with the PreimageRequest builders.
 	PreimageRequest *PreimageRequestClient
 	// PreimageShare is the client for interacting with the PreimageShare builders.
@@ -206,6 +208,7 @@ func (tx *Tx) init() {
 	tx.Gossip = NewGossipClient(tx.config)
 	tx.L1TokenCreate = NewL1TokenCreateClient(tx.config)
 	tx.PaymentIntent = NewPaymentIntentClient(tx.config)
+	tx.PendingSendTransfer = NewPendingSendTransferClient(tx.config)
 	tx.PreimageRequest = NewPreimageRequestClient(tx.config)
 	tx.PreimageShare = NewPreimageShareClient(tx.config)
 	tx.SigningCommitment = NewSigningCommitmentClient(tx.config)

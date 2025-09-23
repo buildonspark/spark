@@ -23,6 +23,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
+	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark/so/ent/signingcommitment"
@@ -66,6 +67,8 @@ type Client struct {
 	L1TokenCreate *L1TokenCreateClient
 	// PaymentIntent is the client for interacting with the PaymentIntent builders.
 	PaymentIntent *PaymentIntentClient
+	// PendingSendTransfer is the client for interacting with the PendingSendTransfer builders.
+	PendingSendTransfer *PendingSendTransferClient
 	// PreimageRequest is the client for interacting with the PreimageRequest builders.
 	PreimageRequest *PreimageRequestClient
 	// PreimageShare is the client for interacting with the PreimageShare builders.
@@ -124,6 +127,7 @@ func (c *Client) init() {
 	c.Gossip = NewGossipClient(c.config)
 	c.L1TokenCreate = NewL1TokenCreateClient(c.config)
 	c.PaymentIntent = NewPaymentIntentClient(c.config)
+	c.PendingSendTransfer = NewPendingSendTransferClient(c.config)
 	c.PreimageRequest = NewPreimageRequestClient(c.config)
 	c.PreimageShare = NewPreimageShareClient(c.config)
 	c.SigningCommitment = NewSigningCommitmentClient(c.config)
@@ -243,6 +247,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Gossip:                            NewGossipClient(cfg),
 		L1TokenCreate:                     NewL1TokenCreateClient(cfg),
 		PaymentIntent:                     NewPaymentIntentClient(cfg),
+		PendingSendTransfer:               NewPendingSendTransferClient(cfg),
 		PreimageRequest:                   NewPreimageRequestClient(cfg),
 		PreimageShare:                     NewPreimageShareClient(cfg),
 		SigningCommitment:                 NewSigningCommitmentClient(cfg),
@@ -289,6 +294,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Gossip:                            NewGossipClient(cfg),
 		L1TokenCreate:                     NewL1TokenCreateClient(cfg),
 		PaymentIntent:                     NewPaymentIntentClient(cfg),
+		PendingSendTransfer:               NewPendingSendTransferClient(cfg),
 		PreimageRequest:                   NewPreimageRequestClient(cfg),
 		PreimageShare:                     NewPreimageShareClient(cfg),
 		SigningCommitment:                 NewSigningCommitmentClient(cfg),
@@ -339,9 +345,9 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey, c.Gossip,
-		c.L1TokenCreate, c.PaymentIntent, c.PreimageRequest, c.PreimageShare,
-		c.SigningCommitment, c.SigningKeyshare, c.SigningNonce, c.SparkInvoice,
-		c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
+		c.L1TokenCreate, c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest,
+		c.PreimageShare, c.SigningCommitment, c.SigningKeyshare, c.SigningNonce,
+		c.SparkInvoice, c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
 		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
 		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.Tree,
 		c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap,
@@ -355,9 +361,9 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey, c.Gossip,
-		c.L1TokenCreate, c.PaymentIntent, c.PreimageRequest, c.PreimageShare,
-		c.SigningCommitment, c.SigningKeyshare, c.SigningNonce, c.SparkInvoice,
-		c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
+		c.L1TokenCreate, c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest,
+		c.PreimageShare, c.SigningCommitment, c.SigningKeyshare, c.SigningNonce,
+		c.SparkInvoice, c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
 		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
 		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.Tree,
 		c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap,
@@ -383,6 +389,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.L1TokenCreate.mutate(ctx, m)
 	case *PaymentIntentMutation:
 		return c.PaymentIntent.mutate(ctx, m)
+	case *PendingSendTransferMutation:
+		return c.PendingSendTransfer.mutate(ctx, m)
 	case *PreimageRequestMutation:
 		return c.PreimageRequest.mutate(ctx, m)
 	case *PreimageShareMutation:
@@ -1470,6 +1478,139 @@ func (c *PaymentIntentClient) mutate(ctx context.Context, m *PaymentIntentMutati
 		return (&PaymentIntentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown PaymentIntent mutation op: %q", m.Op())
+	}
+}
+
+// PendingSendTransferClient is a client for the PendingSendTransfer schema.
+type PendingSendTransferClient struct {
+	config
+}
+
+// NewPendingSendTransferClient returns a client for the PendingSendTransfer from the given config.
+func NewPendingSendTransferClient(c config) *PendingSendTransferClient {
+	return &PendingSendTransferClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `pendingsendtransfer.Hooks(f(g(h())))`.
+func (c *PendingSendTransferClient) Use(hooks ...Hook) {
+	c.hooks.PendingSendTransfer = append(c.hooks.PendingSendTransfer, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `pendingsendtransfer.Intercept(f(g(h())))`.
+func (c *PendingSendTransferClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PendingSendTransfer = append(c.inters.PendingSendTransfer, interceptors...)
+}
+
+// Create returns a builder for creating a PendingSendTransfer entity.
+func (c *PendingSendTransferClient) Create() *PendingSendTransferCreate {
+	mutation := newPendingSendTransferMutation(c.config, OpCreate)
+	return &PendingSendTransferCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PendingSendTransfer entities.
+func (c *PendingSendTransferClient) CreateBulk(builders ...*PendingSendTransferCreate) *PendingSendTransferCreateBulk {
+	return &PendingSendTransferCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PendingSendTransferClient) MapCreateBulk(slice any, setFunc func(*PendingSendTransferCreate, int)) *PendingSendTransferCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PendingSendTransferCreateBulk{err: fmt.Errorf("calling to PendingSendTransferClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PendingSendTransferCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PendingSendTransferCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PendingSendTransfer.
+func (c *PendingSendTransferClient) Update() *PendingSendTransferUpdate {
+	mutation := newPendingSendTransferMutation(c.config, OpUpdate)
+	return &PendingSendTransferUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PendingSendTransferClient) UpdateOne(pst *PendingSendTransfer) *PendingSendTransferUpdateOne {
+	mutation := newPendingSendTransferMutation(c.config, OpUpdateOne, withPendingSendTransfer(pst))
+	return &PendingSendTransferUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PendingSendTransferClient) UpdateOneID(id uuid.UUID) *PendingSendTransferUpdateOne {
+	mutation := newPendingSendTransferMutation(c.config, OpUpdateOne, withPendingSendTransferID(id))
+	return &PendingSendTransferUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PendingSendTransfer.
+func (c *PendingSendTransferClient) Delete() *PendingSendTransferDelete {
+	mutation := newPendingSendTransferMutation(c.config, OpDelete)
+	return &PendingSendTransferDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PendingSendTransferClient) DeleteOne(pst *PendingSendTransfer) *PendingSendTransferDeleteOne {
+	return c.DeleteOneID(pst.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PendingSendTransferClient) DeleteOneID(id uuid.UUID) *PendingSendTransferDeleteOne {
+	builder := c.Delete().Where(pendingsendtransfer.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PendingSendTransferDeleteOne{builder}
+}
+
+// Query returns a query builder for PendingSendTransfer.
+func (c *PendingSendTransferClient) Query() *PendingSendTransferQuery {
+	return &PendingSendTransferQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePendingSendTransfer},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PendingSendTransfer entity by its id.
+func (c *PendingSendTransferClient) Get(ctx context.Context, id uuid.UUID) (*PendingSendTransfer, error) {
+	return c.Query().Where(pendingsendtransfer.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PendingSendTransferClient) GetX(ctx context.Context, id uuid.UUID) *PendingSendTransfer {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PendingSendTransferClient) Hooks() []Hook {
+	return c.hooks.PendingSendTransfer
+}
+
+// Interceptors returns the client interceptors.
+func (c *PendingSendTransferClient) Interceptors() []Interceptor {
+	return c.inters.PendingSendTransfer
+}
+
+func (c *PendingSendTransferClient) mutate(ctx context.Context, m *PendingSendTransferMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PendingSendTransferCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PendingSendTransferUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PendingSendTransferUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PendingSendTransferDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PendingSendTransfer mutation op: %q", m.Op())
 	}
 }
 
@@ -4875,19 +5016,21 @@ func (c *UtxoSwapClient) mutate(ctx context.Context, m *UtxoSwapMutation) (Value
 type (
 	hooks struct {
 		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, Gossip,
-		L1TokenCreate, PaymentIntent, PreimageRequest, PreimageShare,
-		SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice, TokenCreate,
-		TokenFreeze, TokenMint, TokenOutput, TokenPartialRevocationSecretShare,
-		TokenTransaction, TokenTransactionPeerSignature, Transfer, TransferLeaf, Tree,
-		TreeNode, UserSignedTransaction, Utxo, UtxoSwap []ent.Hook
+		L1TokenCreate, PaymentIntent, PendingSendTransfer, PreimageRequest,
+		PreimageShare, SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice,
+		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
+		TokenPartialRevocationSecretShare, TokenTransaction,
+		TokenTransactionPeerSignature, Transfer, TransferLeaf, Tree, TreeNode,
+		UserSignedTransaction, Utxo, UtxoSwap []ent.Hook
 	}
 	inters struct {
 		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, Gossip,
-		L1TokenCreate, PaymentIntent, PreimageRequest, PreimageShare,
-		SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice, TokenCreate,
-		TokenFreeze, TokenMint, TokenOutput, TokenPartialRevocationSecretShare,
-		TokenTransaction, TokenTransactionPeerSignature, Transfer, TransferLeaf, Tree,
-		TreeNode, UserSignedTransaction, Utxo, UtxoSwap []ent.Interceptor
+		L1TokenCreate, PaymentIntent, PendingSendTransfer, PreimageRequest,
+		PreimageShare, SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice,
+		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
+		TokenPartialRevocationSecretShare, TokenTransaction,
+		TokenTransactionPeerSignature, Transfer, TransferLeaf, Tree, TreeNode,
+		UserSignedTransaction, Utxo, UtxoSwap []ent.Interceptor
 	}
 )
 

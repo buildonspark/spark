@@ -13,6 +13,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
+	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 	"github.com/lightsparkdev/spark/so/ent/schema"
@@ -224,6 +225,25 @@ func init() {
 	paymentintentDescID := paymentintentMixinFields0[0].Descriptor()
 	// paymentintent.DefaultID holds the default value on creation for the id field.
 	paymentintent.DefaultID = paymentintentDescID.Default.(func() uuid.UUID)
+	pendingsendtransferMixin := schema.PendingSendTransfer{}.Mixin()
+	pendingsendtransferMixinFields0 := pendingsendtransferMixin[0].Fields()
+	_ = pendingsendtransferMixinFields0
+	pendingsendtransferFields := schema.PendingSendTransfer{}.Fields()
+	_ = pendingsendtransferFields
+	// pendingsendtransferDescCreateTime is the schema descriptor for create_time field.
+	pendingsendtransferDescCreateTime := pendingsendtransferMixinFields0[1].Descriptor()
+	// pendingsendtransfer.DefaultCreateTime holds the default value on creation for the create_time field.
+	pendingsendtransfer.DefaultCreateTime = pendingsendtransferDescCreateTime.Default.(func() time.Time)
+	// pendingsendtransferDescUpdateTime is the schema descriptor for update_time field.
+	pendingsendtransferDescUpdateTime := pendingsendtransferMixinFields0[2].Descriptor()
+	// pendingsendtransfer.DefaultUpdateTime holds the default value on creation for the update_time field.
+	pendingsendtransfer.DefaultUpdateTime = pendingsendtransferDescUpdateTime.Default.(func() time.Time)
+	// pendingsendtransfer.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	pendingsendtransfer.UpdateDefaultUpdateTime = pendingsendtransferDescUpdateTime.UpdateDefault.(func() time.Time)
+	// pendingsendtransferDescID is the schema descriptor for id field.
+	pendingsendtransferDescID := pendingsendtransferMixinFields0[0].Descriptor()
+	// pendingsendtransfer.DefaultID holds the default value on creation for the id field.
+	pendingsendtransfer.DefaultID = pendingsendtransferDescID.Default.(func() uuid.UUID)
 	preimagerequestMixin := schema.PreimageRequest{}.Mixin()
 	preimagerequestMixinFields0 := preimagerequestMixin[0].Fields()
 	_ = preimagerequestMixinFields0
