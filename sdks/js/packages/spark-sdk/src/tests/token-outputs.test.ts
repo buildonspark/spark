@@ -1,4 +1,4 @@
-import { numberToBytesBE } from "@noble/curves/utils";
+import { numberToBytesBE, bytesToNumberBE } from "@noble/curves/utils";
 import { ValidationError } from "../errors/types.js";
 import { OutputWithPreviousTransactionData } from "../proto/spark.js";
 import { WalletConfigService } from "../services/config.js";
@@ -16,6 +16,18 @@ describe("select token outputs", () => {
       mockConnectionManager,
     );
   });
+
+  // Helper to access the private sorting method
+  const sortTokenOutputsByStrategy = (
+    tokenOutputs: OutputWithPreviousTransactionData[],
+    strategy: "SMALL_FIRST" | "LARGE_FIRST",
+  ) => {
+    // TypeScript bracket notation to access private method
+    (tokenTransactionService as any)["sortTokenOutputsByStrategy"](
+      tokenOutputs,
+      strategy,
+    );
+  };
 
   const createMockTokenOutput = (
     id: string,
@@ -189,6 +201,53 @@ describe("select token outputs", () => {
 
       expect(result).toHaveLength(3);
       // Total: 600n >= 600n
+    });
+  });
+
+  describe("sorting with large amounts", () => {
+    it("should sort correctly when all amounts are above 2^60", () => {
+      const base = 2n ** 60n;
+      const amounts = [
+        base + 5000n,
+        base + 100n,
+        base + 1n,
+        base + 10000n,
+        base + 500n,
+      ];
+
+      const tokenOutputs = amounts.map((amount, i) =>
+        createMockTokenOutput(`output${i}`, amount),
+      );
+
+      // SMALL_FIRST
+      const smallFirstSorted = [...tokenOutputs];
+      sortTokenOutputsByStrategy(smallFirstSorted, "SMALL_FIRST");
+
+      const smallFirstAmounts = smallFirstSorted.map((o) =>
+        bytesToNumberBE(o.output!.tokenAmount!),
+      );
+      expect(smallFirstAmounts).toEqual([
+        base + 1n,
+        base + 100n,
+        base + 500n,
+        base + 5000n,
+        base + 10000n,
+      ]);
+
+      // LARGE_FIRST
+      const largeFirstSorted = [...tokenOutputs];
+      sortTokenOutputsByStrategy(largeFirstSorted, "LARGE_FIRST");
+
+      const largeFirstAmounts = largeFirstSorted.map((o) =>
+        bytesToNumberBE(o.output!.tokenAmount!),
+      );
+      expect(largeFirstAmounts).toEqual([
+        base + 10000n,
+        base + 5000n,
+        base + 500n,
+        base + 100n,
+        base + 1n,
+      ]);
     });
   });
 });

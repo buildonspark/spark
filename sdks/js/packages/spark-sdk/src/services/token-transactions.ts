@@ -685,17 +685,17 @@ export class TokenTransactionService {
   ): void {
     if (strategy === "SMALL_FIRST") {
       tokenOutputs.sort((a, b) => {
-        return Number(
-          bytesToNumberBE(a.output!.tokenAmount!) -
-            bytesToNumberBE(b.output!.tokenAmount!),
-        );
+        const amountA = bytesToNumberBE(a.output!.tokenAmount!);
+        const amountB = bytesToNumberBE(b.output!.tokenAmount!);
+
+        return amountA < amountB ? -1 : amountA > amountB ? 1 : 0;
       });
     } else {
       tokenOutputs.sort((a, b) => {
-        return Number(
-          bytesToNumberBE(b.output!.tokenAmount!) -
-            bytesToNumberBE(a.output!.tokenAmount!),
-        );
+        const amountA = bytesToNumberBE(a.output!.tokenAmount!);
+        const amountB = bytesToNumberBE(b.output!.tokenAmount!);
+
+        return amountB < amountA ? -1 : amountB > amountA ? 1 : 0;
       });
     }
   }
