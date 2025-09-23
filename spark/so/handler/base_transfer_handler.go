@@ -87,12 +87,12 @@ func validateLeafRefundTxOutput(refundTx *wire.MsgTx, receiverIdentityPubKey key
 	return nil
 }
 
-func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, leafOutPoint *wire.OutPoint, expectedInputCount uint32) error {
-	if len(refundTx.TxIn) == 0 {
-		return fmt.Errorf("refund tx must have at least 1 input")
-	}
+func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, expectedOutPoint *wire.OutPoint, expectedInputCount uint32) error {
 	if refundTx.Version < 2 {
 		return fmt.Errorf("refund tx must be v2 or above, got v%d", refundTx.Version)
+	}
+	if len(refundTx.TxIn) == 0 {
+		return fmt.Errorf("refund tx must have at least 1 input")
 	}
 	if refundTx.TxIn[0].Sequence&(1<<31) != 0 {
 		return fmt.Errorf("refund tx input 0 sequence must have bit 31 clear to enable relative locktime, got %d", refundTx.TxIn[0].Sequence)
@@ -112,7 +112,7 @@ func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, leafOut
 	if len(refundTx.TxIn) != int(expectedInputCount) {
 		return fmt.Errorf("refund tx should have %d inputs, but has %d", expectedInputCount, len(refundTx.TxIn))
 	}
-	if !refundTx.TxIn[0].PreviousOutPoint.Hash.IsEqual(&leafOutPoint.Hash) || refundTx.TxIn[0].PreviousOutPoint.Index != leafOutPoint.Index {
+	if refundTx.TxIn[0].PreviousOutPoint != *expectedOutPoint {
 		return fmt.Errorf("unexpected input in refund tx")
 	}
 	return nil
@@ -160,28 +160,18 @@ func validateSendLeafDirectRefundTxs(leaf *ent.TreeNode, directTx []byte, direct
 			return fmt.Errorf("old direct from cpfp refund tx has no inputs")
 		}
 		oldDirectRefundTxIn := oldDirectRefundTx.TxIn[0]
-		leafDirectOutPoint = wire.OutPoint{
-			Hash:  oldDirectRefundTxIn.PreviousOutPoint.Hash,
-			Index: oldDirectRefundTxIn.PreviousOutPoint.Index,
-		}
 		oldDirectFromCpfpRefundTxIn := oldDirectFromCpfpRefundTx.TxIn[0]
-		leafDirectFromCpfpOutPoint = wire.OutPoint{
-			Hash:  oldDirectFromCpfpRefundTxIn.PreviousOutPoint.Hash,
-			Index: oldDirectFromCpfpRefundTxIn.PreviousOutPoint.Index,
-		}
+
+		leafDirectOutPoint = oldDirectRefundTxIn.PreviousOutPoint
+		leafDirectFromCpfpOutPoint = oldDirectFromCpfpRefundTxIn.PreviousOutPoint
+
 		oldDirectRefundTxSequence = oldDirectRefundTxIn.Sequence
 		oldDirectFromCpfpRefundTxSequence = oldDirectFromCpfpRefundTxIn.Sequence
 	} else {
 		oldDirectRefundTxSequence = 0xFFFF
 		oldDirectFromCpfpRefundTxSequence = 0xFFFF
-		leafDirectOutPoint = wire.OutPoint{
-			Hash:  newDirectRefundTx.TxIn[0].PreviousOutPoint.Hash,
-			Index: newDirectRefundTx.TxIn[0].PreviousOutPoint.Index,
-		}
-		leafDirectFromCpfpOutPoint = wire.OutPoint{
-			Hash:  newDirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Hash,
-			Index: newDirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Index,
-		}
+		leafDirectOutPoint = newDirectRefundTx.TxIn[0].PreviousOutPoint
+		leafDirectFromCpfpOutPoint = newDirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint
 	}
 
 	if err := validateLeafRefundTxInput(newDirectRefundTx, oldDirectRefundTxSequence, &leafDirectOutPoint, expectedInputCount); err != nil {
@@ -226,20 +216,16 @@ func validateSendLeafRefundTxs(leaf *ent.TreeNode, rawTx []byte, directTx []byte
 		return fmt.Errorf("old cpfp refund tx has no inputs")
 	}
 	oldCpfpRefundTxIn := oldCpfpRefundTx.TxIn[0]
-	leafCpfpOutPoint := wire.OutPoint{
-		Hash:  oldCpfpRefundTxIn.PreviousOutPoint.Hash,
-		Index: oldCpfpRefundTxIn.PreviousOutPoint.Index,
-	}
+	expectedOutPoint := oldCpfpRefundTxIn.PreviousOutPoint
 
-	err = validateLeafRefundTxInput(newCpfpRefundTx, oldCpfpRefundTxIn.Sequence, &leafCpfpOutPoint, expectedInputCount)
-	if err != nil {
+	if err := validateLeafRefundTxInput(newCpfpRefundTx, oldCpfpRefundTxIn.Sequence, &expectedOutPoint, expectedInputCount); err != nil {
 		return fmt.Errorf("unable to validate cpfp refund tx inputs: %w", err)
 	}
 
-	err = validateLeafRefundTxOutput(newCpfpRefundTx, receiverIdentityPubKey)
-	if err != nil {
+	if err := validateLeafRefundTxOutput(newCpfpRefundTx, receiverIdentityPubKey); err != nil {
 		return fmt.Errorf("unable to validate cpfp refund tx output: %w", err)
 	}
+
 	return nil
 }
 
