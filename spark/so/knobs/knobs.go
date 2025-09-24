@@ -42,7 +42,8 @@ const (
 )
 
 type Config struct {
-	Enabled *bool `yaml:"enabled"`
+	Enabled   *bool   `yaml:"enabled"`
+	Namespace *string `yaml:"namespace"`
 }
 
 func (c *Config) IsEnabled() bool {

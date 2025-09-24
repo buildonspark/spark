@@ -19,21 +19,30 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+const defaultNamespace string = "knobs"
+
 type knobsK8ValuesProvider struct {
-	context context.Context
-	logger  *zap.Logger
-	lock    *sync.RWMutex
-	values  map[string]float64
+	context   context.Context
+	namespace string
+	logger    *zap.Logger
+	lock      *sync.RWMutex
+	values    map[string]float64
 }
 
-func NewKnobsK8ValuesProvider(ctx context.Context) (*knobsK8ValuesProvider, error) {
+func NewKnobsK8ValuesProvider(ctx context.Context, providedNamespace *string) (*knobsK8ValuesProvider, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
+	namespace := defaultNamespace
+	if providedNamespace != nil && *providedNamespace != "" {
+		namespace = *providedNamespace
+	}
+
 	provider := knobsK8ValuesProvider{
-		context: ctx,
-		logger:  logger.With(zap.String("component", "knobs")),
-		lock:    &sync.RWMutex{},
-		values:  make(map[string]float64),
+		context:   ctx,
+		namespace: namespace,
+		logger:    logger.With(zap.String("component", "knobs")),
+		lock:      &sync.RWMutex{},
+		values:    make(map[string]float64),
 	}
 
 	if err := provider.fetchAndUpdate(); err != nil {
@@ -98,11 +107,11 @@ func (k *knobsK8ValuesProvider) fetchAndUpdate() error {
 	watchOnlyLW := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = "metadata.name=knobs"
-			return clientset.CoreV1().ConfigMaps("knobs").List(context.Background(), options)
+			return clientset.CoreV1().ConfigMaps(k.namespace).List(context.Background(), options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = "metadata.name=knobs"
-			return clientset.CoreV1().ConfigMaps("knobs").Watch(context.Background(), options)
+			return clientset.CoreV1().ConfigMaps(k.namespace).Watch(context.Background(), options)
 		},
 	}
 
