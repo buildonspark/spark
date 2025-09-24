@@ -93,13 +93,39 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		return nil, fmt.Errorf("validating extend timelock failed: %w", err)
 	}
 
-	splitNodeTx, nodeTx, refundTx, err := h.constructRenewNodeTransactions(leaf)
+	// Validate that all direct signing jobs are present
+	if signingJob.SplitNodeDirectTxSigningJob == nil {
+		return nil, errors.InvalidUserInputErrorf("split node direct tx signing job is required")
+	}
+	if signingJob.DirectNodeTxSigningJob == nil {
+		return nil, errors.InvalidUserInputErrorf("direct node tx signing job is required")
+	}
+	if signingJob.DirectRefundTxSigningJob == nil {
+		return nil, errors.InvalidUserInputErrorf("direct refund tx signing job is required")
+	}
+	if signingJob.DirectFromCpfpRefundTxSigningJob == nil {
+		return nil, errors.InvalidUserInputErrorf("direct from cpfp refund tx signing job is required")
+	}
+
+	// Query the parent of the leaf to ensure it exists
+	parentLeaf, err := leaf.QueryParent().Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, errors.InvalidUserInputErrorf("parent node does not exist for leaf %s", leaf.ID.String())
+		}
+		return nil, fmt.Errorf("failed to query parent node: %w", err)
+	}
+	if parentLeaf == nil {
+		return nil, errors.InvalidUserInputErrorf("parent node does not exist for leaf %s", leaf.ID.String())
+	}
+
+	splitNodeTx, nodeTx, refundTx, directSplitNodeTx, directNodeTx, directRefundTx, directFromCpfpRefundTx, err := h.constructRenewNodeTransactions(leaf, parentLeaf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct renew transactions: %w", err)
 	}
 
-	userRawTxs := [][]byte{signingJob.SplitNodeTxSigningJob.RawTx, signingJob.NodeTxSigningJob.RawTx, signingJob.RefundTxSigningJob.RawTx}
-	expectedTxs := []*wire.MsgTx{splitNodeTx, nodeTx, refundTx}
+	userRawTxs := [][]byte{signingJob.SplitNodeTxSigningJob.RawTx, signingJob.NodeTxSigningJob.RawTx, signingJob.RefundTxSigningJob.RawTx, signingJob.SplitNodeDirectTxSigningJob.RawTx, signingJob.DirectNodeTxSigningJob.RawTx, signingJob.DirectRefundTxSigningJob.RawTx, signingJob.DirectFromCpfpRefundTxSigningJob.RawTx}
+	expectedTxs := []*wire.MsgTx{splitNodeTx, nodeTx, refundTx, directSplitNodeTx, directNodeTx, directRefundTx, directFromCpfpRefundTx}
 	err = h.validateUserTransactions(userRawTxs, expectedTxs)
 	if err != nil {
 		return nil, fmt.Errorf("user transaction validation failed: %w", err)
@@ -119,7 +145,7 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 	}
 
 	// Get the parent transaction output for the node transaction
-	parentTx, err := common.TxFromRawTxBytes(leaf.RawTx)
+	parentTx, err := common.TxFromRawTxBytes(parentLeaf.RawTx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse parent transaction: %w", err)
 	}
@@ -166,6 +192,62 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 	}
 	signingJobs = append(signingJobs, splitNodeSigningJobHelper)
 
+	// Create direct split node transaction signing job (FOURTH)
+	directSplitNodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
+		ctx,
+		signingJob.SplitNodeDirectTxSigningJob,
+		signingKeyshare,
+		verifyingPubKey,
+		directSplitNodeTx,
+		parentTx.TxOut[0],
+	)
+	if err != nil {
+		return nil, err
+	}
+	signingJobs = append(signingJobs, directSplitNodeSigningJobHelper)
+
+	// Create direct node transaction signing job (FIFTH)
+	directNodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
+		ctx,
+		signingJob.DirectNodeTxSigningJob,
+		signingKeyshare,
+		verifyingPubKey,
+		directNodeTx,
+		splitNodeTx.TxOut[0],
+	)
+	if err != nil {
+		return nil, err
+	}
+	signingJobs = append(signingJobs, directNodeSigningJobHelper)
+
+	// Create direct refund transaction signing job (SIXTH)
+	directRefundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
+		ctx,
+		signingJob.DirectRefundTxSigningJob,
+		signingKeyshare,
+		verifyingPubKey,
+		directRefundTx,
+		directNodeTx.TxOut[0],
+	)
+	if err != nil {
+		return nil, err
+	}
+	signingJobs = append(signingJobs, directRefundSigningJobHelper)
+
+	// Create direct from CPFP refund transaction signing job (SEVENTH)
+	directFromCpfpRefundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
+		ctx,
+		signingJob.DirectFromCpfpRefundTxSigningJob,
+		signingKeyshare,
+		verifyingPubKey,
+		directFromCpfpRefundTx,
+		nodeTx.TxOut[0],
+	)
+	if err != nil {
+		return nil, err
+	}
+	signingJobs = append(signingJobs, directFromCpfpRefundSigningJobHelper)
+
 	// Sign the renew refunds
 	signingResults, err := h.signRenewRefunds(ctx, signingJobs)
 	if err != nil {
@@ -191,6 +273,30 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		return nil, fmt.Errorf("failed to aggregate split node signature: %w", err)
 	}
 
+	// Aggregate direct split node transaction signature (FOURTH)
+	directSplitNodeSignature, err := h.aggregateRenewLeafSignature(ctx, signingResults[3], signingJob.SplitNodeDirectTxSigningJob, leaf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate direct split node signature: %w", err)
+	}
+
+	// Aggregate direct node transaction signature (FIFTH)
+	directNodeSignature, err := h.aggregateRenewLeafSignature(ctx, signingResults[4], signingJob.DirectNodeTxSigningJob, leaf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate direct node signature: %w", err)
+	}
+
+	// Aggregate direct refund transaction signature (SIXTH)
+	directRefundSignature, err := h.aggregateRenewLeafSignature(ctx, signingResults[5], signingJob.DirectRefundTxSigningJob, leaf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate direct refund signature: %w", err)
+	}
+
+	// Aggregate direct from CPFP refund transaction signature (SEVENTH)
+	directFromCpfpRefundSignature, err := h.aggregateRenewLeafSignature(ctx, signingResults[6], signingJob.DirectFromCpfpRefundTxSigningJob, leaf)
+	if err != nil {
+		return nil, fmt.Errorf("failed to aggregate direct from cpfp refund signature: %w", err)
+	}
+
 	// Apply signatures to transactions
 	signedSplitNodeTx, splitNodeTxBytes, err := h.applyAndVerifySignature(splitNodeTx, splitNodeSignature, parentTx.TxOut[0], 0)
 	if err != nil {
@@ -205,6 +311,30 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 	_, refundTxBytes, err := h.applyAndVerifySignature(refundTx, refundSignature, signedNodeTx.TxOut[0], 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply and verify refund tx signature: %w", err)
+	}
+
+	// Apply and verify direct split node transaction signature
+	signedDirectSplitNodeTx, directSplitNodeTxBytes, err := h.applyAndVerifySignature(directSplitNodeTx, directSplitNodeSignature, parentTx.TxOut[0], 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply and verify direct split node tx signature: %w", err)
+	}
+
+	// Apply and verify direct node transaction signature
+	signedDirectNodeTx, directNodeTxBytes, err := h.applyAndVerifySignature(directNodeTx, directNodeSignature, signedDirectSplitNodeTx.TxOut[0], 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply and verify direct node tx signature: %w", err)
+	}
+
+	// Apply and verify direct refund transaction signature
+	_, directRefundTxBytes, err := h.applyAndVerifySignature(directRefundTx, directRefundSignature, signedDirectNodeTx.TxOut[0], 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply and verify direct refund tx signature: %w", err)
+	}
+
+	// Apply and verify direct from CPFP refund transaction signature
+	_, directFromCpfpRefundTxBytes, err := h.applyAndVerifySignature(directFromCpfpRefundTx, directFromCpfpRefundSignature, signedNodeTx.TxOut[0], 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply and verify direct from cpfp refund tx signature: %w", err)
 	}
 
 	// Create new tree node and split the old one
@@ -231,6 +361,7 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		SetVerifyingPubkey(leaf.VerifyingPubkey).
 		SetSigningKeyshareID(signingKeyshare.ID).
 		SetRawTx(splitNodeTxBytes).
+		SetDirectTx(directSplitNodeTxBytes).
 		SetVout(int16(0))
 	if leaf.Edges.Parent != nil {
 		mut.SetParentID(leaf.Edges.Parent.ID)
@@ -244,6 +375,9 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 	leaf, err = leaf.Update().
 		SetRawTx(nodeTxBytes).
 		SetRawRefundTx(refundTxBytes).
+		SetDirectTx(directNodeTxBytes).
+		SetDirectRefundTx(directRefundTxBytes).
+		SetDirectFromCpfpRefundTx(directFromCpfpRefundTxBytes).
 		SetParentID(splitNode.ID).
 		Save(ctx)
 	if err != nil {
@@ -842,68 +976,104 @@ func (h *RenewLeafHandler) signRenewRefunds(
 	return signingResults, nil
 }
 
-// constructRenewNodeTransactions creates the split node, extended node, and refund transactions
-func (h *RenewLeafHandler) constructRenewNodeTransactions(leaf *ent.TreeNode) (*wire.MsgTx, *wire.MsgTx, *wire.MsgTx, error) {
-	leafNodeTx, err := common.TxFromRawTxBytes(leaf.RawTx)
+// constructRenewNodeTransactions creates the split node, extended node, refund transactions, and all direct transactions
+func (h *RenewLeafHandler) constructRenewNodeTransactions(leaf, parentLeaf *ent.TreeNode) (*wire.MsgTx, *wire.MsgTx, *wire.MsgTx, *wire.MsgTx, *wire.MsgTx, *wire.MsgTx, *wire.MsgTx, error) {
+	parentTx, err := common.TxFromRawTxBytes(parentLeaf.RawTx)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to parse leaf node transaction: %w", err)
+		return nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("failed to parse parent node transaction: %w", err)
 	}
-	// Construct split node transaction from leaf's node transaction
-	splitNodeTx := leafNodeTx.Copy()
-	// Clear witness and signature script
-	for i := range splitNodeTx.TxIn {
-		splitNodeTx.TxIn[i].Witness = wire.TxWitness{}
-		splitNodeTx.TxIn[i].SignatureScript = []byte{}
-		splitNodeTx.TxIn[i].Sequence = spark.ZeroSequence
-	}
-	// Create extended node tx to spend the split node tx
-	oldRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
+	parentAmount := parentTx.TxOut[0].Value
+
+	// Construct split node transaction using parent node tx as prev outpoint
+	splitNodeTx := wire.NewMsgTx(3)
+	splitNodeTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
+		Sequence:         spark.ZeroSequence,
+	})
+	verifyingPubkey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to deserialize leaf refund tx: %w", err)
+		return nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("failed to parse verifying pubkey: %w", err)
 	}
+	outputPkScript, err := common.P2TRScriptFromPubKey(verifyingPubkey)
+	if err != nil {
+		return nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("failed to construct pkscript: %w", err)
+	}
+	splitNodeTx.AddTxOut(wire.NewTxOut(parentAmount, outputPkScript))
+	splitNodeTx.AddTxOut(common.EphemeralAnchorOutput())
+
 	// Create extended node tx to spend the split node tx
 	extendedNodeTx := wire.NewMsgTx(3)
 	extendedNodeTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: splitNodeTx.TxHash(), Index: 0},
-		SignatureScript:  nil,
-		Witness:          nil,
 		Sequence:         spark.InitialSequence(),
 	})
-	verifyingPubkey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to parse verifying pubkey: %w", err)
-	}
-	outputPkScript, err := common.P2TRScriptFromPubKey(verifyingPubkey)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to construct pkscript: %w", err)
-	}
-	extendedNodeTx.AddTxOut(wire.NewTxOut(leafNodeTx.TxOut[0].Value, outputPkScript))
+	extendedNodeTx.AddTxOut(wire.NewTxOut(parentAmount, outputPkScript))
 	// Add ephemeral anchor output for CPFP
 	extendedNodeTx.AddTxOut(common.EphemeralAnchorOutput())
 
 	// Create refund tx to spend the extended node tx
 	ownerSigningPubkey, err := keys.ParsePublicKey(leaf.OwnerSigningPubkey)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to parse owner signing pubkey: %w", err)
+		return nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("failed to parse owner signing pubkey: %w", err)
 	}
 	refundPkScript, err := common.P2TRScriptFromPubKey(ownerSigningPubkey)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create refund script: %w", err)
+		return nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("failed to create refund script: %w", err)
 	}
 	refundTx := wire.NewMsgTx(3)
 	refundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: extendedNodeTx.TxHash(), Index: 0},
-		SignatureScript:  nil,
-		Witness:          nil,
 		Sequence:         spark.InitialSequence(),
 	})
 	refundTx.AddTxOut(&wire.TxOut{
-		Value:    oldRefundTx.TxOut[0].Value,
+		Value:    parentAmount,
 		PkScript: refundPkScript,
 	})
 	// Add ephemeral anchor output for CPFP
 	refundTx.AddTxOut(common.EphemeralAnchorOutput())
-	return splitNodeTx, extendedNodeTx, refundTx, nil
+
+	// Direct split node tx uses parent node tx as prev outpoint with parent node value (no fee applied)
+	directSplitNodeTx := wire.NewMsgTx(3)
+	directSplitNodeTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
+		Sequence:         spark.DirectTimelockOffset,
+	})
+	directSplitNodeTx.AddTxOut(&wire.TxOut{
+		Value:    common.MaybeApplyFee(parentAmount),
+		PkScript: outputPkScript,
+	})
+
+	directNodeTx := wire.NewMsgTx(3)
+	directNodeTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: splitNodeTx.TxHash(), Index: 0},
+		Sequence:         spark.InitialSequence() + spark.DirectTimelockOffset,
+	})
+	directNodeTx.AddTxOut(&wire.TxOut{
+		Value:    common.MaybeApplyFee(parentAmount),
+		PkScript: outputPkScript,
+	})
+
+	directRefundTx := wire.NewMsgTx(3)
+	directRefundTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: directNodeTx.TxHash(), Index: 0},
+		Sequence:         spark.InitialSequence() + spark.DirectTimelockOffset,
+	})
+	directRefundTx.AddTxOut(&wire.TxOut{
+		Value:    common.MaybeApplyFee(directNodeTx.TxOut[0].Value),
+		PkScript: refundPkScript,
+	})
+
+	directFromCpfpRefundTx := wire.NewMsgTx(3)
+	directFromCpfpRefundTx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: extendedNodeTx.TxHash(), Index: 0},
+		Sequence:         spark.InitialSequence() + spark.DirectTimelockOffset,
+	})
+	directFromCpfpRefundTx.AddTxOut(&wire.TxOut{
+		Value:    common.MaybeApplyFee(parentAmount),
+		PkScript: refundPkScript,
+	})
+
+	return splitNodeTx, extendedNodeTx, refundTx, directSplitNodeTx, directNodeTx, directRefundTx, directFromCpfpRefundTx, nil
 }
 
 // constructRenewRefundTransactions creates the node and refund transactions
