@@ -6,6 +6,7 @@ import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";
 import { taprootTweakPrivKey } from "@scure/btc-signer/utils";
 import { RPCError } from "../../errors/index.js";
 import {
+  getP2TRAddressFromPkScript,
   getP2TRAddressFromPublicKey,
   getP2TRScriptFromPublicKey,
 } from "../../utils/bitcoin.js";
@@ -31,7 +32,8 @@ export type FaucetCoin = {
 };
 
 // The amount of satoshis to put in each faucet coin to be used in tests
-const COIN_AMOUNT = 10_000_000n;
+const REFILL_AMOUNT = 10_000_000n;
+const COIN_AMOUNT = 1_000_000n;
 const FEE_AMOUNT = 1000n;
 const TARGET_NUM_COINS = 20;
 
@@ -106,22 +108,8 @@ export class BitcoinFaucet {
 
     let selectedUtxo;
     let selectedUtxoAmountSats;
-    if (!scanResult.success || scanResult.unspents.length === 0) {
-      const blockHash = await this.generateToAddress(1, address);
-      const block = await this.getBlock(blockHash[0]);
-      const fundingTx = Transaction.fromRaw(hexToBytes(block.tx[0].hex), {
-        allowUnknownOutputs: true,
-      });
 
-      await this.generateToAddress(100, this.miningAddress);
-
-      selectedUtxo = {
-        txid: block.tx[0].txid,
-        vout: 0,
-        amount: fundingTx.getOutput(0)!.amount!, // Already in sats
-      };
-      selectedUtxoAmountSats = BigInt(selectedUtxo.amount);
-    } else {
+    if (scanResult.success && scanResult.unspents.length > 0) {
       selectedUtxo = scanResult.unspents.find((utxo) => {
         const isValueEnough =
           BigInt(Math.floor(utxo.amount * SATS_PER_BTC)) >=
@@ -130,12 +118,50 @@ export class BitcoinFaucet {
         return isValueEnough && isMature;
       });
 
-      if (!selectedUtxo) {
-        throw new Error("No UTXO large enough to create even one faucet coin");
+      if (selectedUtxo) {
+        selectedUtxoAmountSats = BigInt(
+          Math.floor(selectedUtxo.amount * SATS_PER_BTC),
+        );
       }
-      selectedUtxoAmountSats = BigInt(
-        Math.floor(selectedUtxo.amount * SATS_PER_BTC),
+    }
+
+    if (!selectedUtxo) {
+      // Nothing found while scanning, so send some coins to ourselves from the node wallet.
+      const fundingTxid = await this.sendToAddressInternal(
+        address,
+        Number(REFILL_AMOUNT),
       );
+
+      await this.generateToAddress(1, address);
+
+      const fundingTxRaw = await this.getRawTransaction(fundingTxid);
+      const fundingTx = Transaction.fromRaw(hexToBytes(fundingTxRaw.hex));
+
+      for (let i = 0; i < fundingTx.outputsLength; i++) {
+        const output = fundingTx.getOutput(i);
+
+        if (!output.script || !output.amount) continue;
+
+        const outputAddress = getP2TRAddressFromPkScript(
+          output.script,
+          Network.LOCAL,
+        );
+
+        if (outputAddress === address && output.amount === REFILL_AMOUNT) {
+          selectedUtxo = {
+            txid: fundingTxid,
+            vout: i,
+            amount: REFILL_AMOUNT,
+          };
+          selectedUtxoAmountSats = REFILL_AMOUNT;
+          break;
+        }
+      }
+    }
+
+    if (!selectedUtxo) {
+      // Still no UTXO, give up.
+      throw new Error("No UTXO large enough to create even one faucet coin");
     }
 
     const maxPossibleCoins = Number(
@@ -330,6 +356,13 @@ export class BitcoinFaucet {
 
   async generateToAddress(numBlocks: number, address: string) {
     return await this.call("generatetoaddress", [numBlocks, address]);
+  }
+
+  async sendToAddressInternal(address: string, amountSats: number) {
+    return await this.call("sendtoaddress", [
+      address,
+      amountSats / SATS_PER_BTC,
+    ]);
   }
 
   async getBlock(blockHash: string) {
