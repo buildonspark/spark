@@ -24,8 +24,8 @@ const (
 	signingOperatorPrefix = "000000000000000000000000000000000000000000000000000000000000000"
 )
 
-func isHermeticTest() bool {
-	return os.Getenv("HERMETIC_TEST") == "true"
+func isMinikube() bool {
+	return os.Getenv("MINIKUBE_IP") != ""
 }
 
 // IsGripmock returns true if the GRIPMOCK environment variable is set to true.
@@ -83,13 +83,13 @@ func operatorCount(tb testing.TB) int {
 func GetAllSigningOperators(tb testing.TB) map[string]*so.SigningOperator {
 	opCount := operatorCount(tb)
 
-	isHermetic, isGripmock := isHermeticTest(), IsGripmock()
-	if isHermetic && isGripmock {
-		tb.Fatal("Cannot set both HERMETIC_TEST and GRIPMOCK environment variables to true")
+	isMinikube, isGripmock := isMinikube(), IsGripmock()
+	if isMinikube && isGripmock {
+		tb.Fatal("Cannot set both MINIKUBE_IP and GRIPMOCK environment variables")
 	}
 
 	certPath := ""
-	if isHermetic {
+	if isMinikube {
 		certPath = minikubeCAFilePath
 	}
 
@@ -99,7 +99,7 @@ func GetAllSigningOperators(tb testing.TB) map[string]*so.SigningOperator {
 		id := fmt.Sprintf("%064x", i+1) // "000…001", "000…002" …
 		address := fmt.Sprintf("localhost:%d", basePort+i)
 		var operatorConnectionFactory so.OperatorConnectionFactory = &DangerousTestOperatorConnectionFactoryNoVerifyTLS{}
-		if isHermetic {
+		if isMinikube {
 			address = fmt.Sprintf("dns:///%d.spark.minikube.local", i)
 		}
 		if isGripmock {
@@ -120,19 +120,19 @@ func GetAllSigningOperators(tb testing.TB) map[string]*so.SigningOperator {
 }
 
 func getTestDatabasePath(operatorIndex int) string {
-	if isHermeticTest() {
+	if isMinikube() {
 		return fmt.Sprintf("postgresql://postgres@localhost:15432/sparkoperator_%d?sslmode=disable", operatorIndex)
 	}
 	return fmt.Sprintf("postgresql://:@127.0.0.1:5432/sparkoperator_%d?sslmode=disable", operatorIndex)
 }
 
 func getLocalFrostSignerAddress(tb testing.TB) string {
-	isHermetic, isGripmock := isHermeticTest(), IsGripmock()
-	if isHermetic && isGripmock {
-		tb.Fatal("Cannot set both HERMETIC_TEST and GRIPMOCK environment variables to true")
+	isMinikube, isGripmock := isMinikube(), IsGripmock()
+	if isMinikube && isGripmock {
+		tb.Fatal("Cannot set both MINIKUBE_IP and GRIPMOCK environment variables")
 	}
 
-	if isHermetic {
+	if isMinikube {
 		return "localhost:9999"
 	}
 	if isGripmock {

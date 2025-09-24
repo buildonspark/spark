@@ -17,7 +17,6 @@ test-grpc = """
     --packages=./so/grpc_test/...
 """
 test-grpc-minikube = """
-  HERMETIC_TEST=true \
   MINIKUBE_IP=$(minikube ip) \
   gotestsum \
     --format testname \
