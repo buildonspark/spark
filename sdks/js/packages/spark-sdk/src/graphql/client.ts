@@ -2,15 +2,16 @@ import {
   AuthProvider,
   bytesToHex,
   DefaultCrypto,
+  isError,
   NodeKeyCache,
   Query,
   Requester,
-  isError,
 } from "@lightsparkdev/core";
 import { sha256 } from "@noble/hashes/sha2";
 import { AuthenticationError, NetworkError } from "../errors/index.js";
 import { SparkSigner } from "../signer/signer.js";
 import { UserRequestType } from "../types/sdk-types.js";
+import { getFetch } from "../utils/fetch.js";
 import { ClaimStaticDeposit } from "./mutations/ClaimStaticDeposit.js";
 import { CompleteCoopExit } from "./mutations/CompleteCoopExit.js";
 import { CompleteLeavesSwap } from "./mutations/CompleteLeavesSwap.js";
@@ -74,7 +75,6 @@ import { LeavesSwapFeeEstimate } from "./queries/LeavesSwapFeeEstimate.js";
 import { LightningSendFeeEstimate } from "./queries/LightningSendFeeEstimate.js";
 import { GetTransfers } from "./queries/Transfers.js";
 import { UserRequest } from "./queries/UserRequest.js";
-import { getFetch } from "../utils/fetch.js";
 
 export interface SspClientOptions {
   baseUrl: string;
@@ -222,13 +222,11 @@ export default class SspClient {
 
   async completeCoopExit({
     userOutboundTransferExternalId,
-    coopExitRequestId,
   }: CompleteCoopExitInput): Promise<CoopExitRequest | null> {
     return await this.executeRawQuery({
       queryPayload: CompleteCoopExit,
       variables: {
         user_outbound_transfer_external_id: userOutboundTransferExternalId,
-        coop_exit_request_id: coopExitRequestId,
       },
       constructObject: (response: { complete_coop_exit: any }) => {
         return CoopExitRequestFromJson(response.complete_coop_exit.request);
@@ -239,22 +237,22 @@ export default class SspClient {
   async requestCoopExit({
     leafExternalIds,
     withdrawalAddress,
-    idempotencyKey,
     exitSpeed,
     feeLeafExternalIds,
     feeQuoteId,
     withdrawAll,
+    userOutboundTransferExternalId,
   }: RequestCoopExitInput): Promise<CoopExitRequest | null> {
     return await this.executeRawQuery({
       queryPayload: RequestCoopExit,
       variables: {
         leaf_external_ids: leafExternalIds,
         withdrawal_address: withdrawalAddress,
-        idempotency_key: idempotencyKey,
         exit_speed: exitSpeed,
         fee_leaf_external_ids: feeLeafExternalIds,
         fee_quote_id: feeQuoteId,
         withdraw_all: withdrawAll,
+        user_outbound_transfer_external_id: userOutboundTransferExternalId,
       },
       constructObject: (response: { request_coop_exit: any }) => {
         return CoopExitRequestFromJson(response.request_coop_exit.request);
@@ -262,7 +260,6 @@ export default class SspClient {
     });
   }
 
-  // TODO: Lets name this better
   async requestLightningReceive({
     amountSats,
     network,

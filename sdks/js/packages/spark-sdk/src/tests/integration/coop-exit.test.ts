@@ -156,11 +156,13 @@ describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
       newKeyDerivation: newLeafDerivationPath,
     };
 
+    const transferId = uuidv7();
     const senderTransfer = await coopExitService.getConnectorRefundSignatures({
       leaves: [transferNode],
       exitTxId: hexToBytes(getTxIdNoReverse(exitTx)),
       connectorOutputs,
       receiverPubKey: hexToBytes(sspPubkey),
+      transferId,
     });
 
     const receiverTransfer = await sspTransferService.queryTransfer(

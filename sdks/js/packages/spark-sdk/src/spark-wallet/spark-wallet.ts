@@ -3953,12 +3953,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       })),
     );
 
+    const transferId = uuidv7();
+
     const requestCoopExitParams: RequestCoopExitInput = {
       leafExternalIds: leavesToSendToSsp.map((leaf) => leaf.id),
       withdrawalAddress: onchainAddress,
-      idempotencyKey: uuidv7(),
       exitSpeed,
       withdrawAll: deductFeeFromWithdrawalAmount,
+      userOutboundTransferExternalId: transferId,
     };
 
     if (!deductFeeFromWithdrawalAmount) {
@@ -4003,11 +4005,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       exitTxId: coopExitTxId,
       connectorOutputs,
       receiverPubKey: sspPubIdentityKey,
+      transferId,
     });
 
     const completeResponse = await sspClient.completeCoopExit({
       userOutboundTransferExternalId: transfer.transfer.id,
-      coopExitRequestId: coopExitRequest.id,
     });
 
     return completeResponse;

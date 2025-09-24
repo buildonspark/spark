@@ -27,6 +27,7 @@ export type GetConnectorRefundSignaturesParams = {
   exitTxId: Uint8Array;
   connectorOutputs: TransactionInput[];
   receiverPubKey: Uint8Array;
+  transferId: string;
 };
 
 export class CoopExitService extends BaseTransferService {
@@ -43,6 +44,7 @@ export class CoopExitService extends BaseTransferService {
     exitTxId,
     connectorOutputs,
     receiverPubKey,
+    transferId,
   }: GetConnectorRefundSignaturesParams): Promise<{
     transfer: Transfer;
     signaturesMap: Map<string, Uint8Array>;
@@ -59,6 +61,7 @@ export class CoopExitService extends BaseTransferService {
       exitTxId,
       connectorOutputs,
       receiverPubKey,
+      transferId,
     );
 
     const transferTweak = await this.deliverTransferPackage(
@@ -169,6 +172,7 @@ export class CoopExitService extends BaseTransferService {
     exitTxId: Uint8Array,
     connectorOutputs: TransactionInput[],
     receiverPubKey: Uint8Array,
+    transferId: string,
   ): Promise<{
     transfer: Transfer;
     signaturesMap: Map<string, Uint8Array>;
@@ -304,7 +308,7 @@ export class CoopExitService extends BaseTransferService {
     try {
       response = await sparkClient.cooperative_exit_v2({
         transfer: {
-          transferId: uuidv7(),
+          transferId,
           leavesToSend: signingJobs,
           ownerIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
