@@ -118,6 +118,11 @@ service SparkService {
     rpc get_utxos_for_address(GetUtxosForAddressRequest) returns (GetUtxosForAddressResponse) {}
 
     rpc query_spark_invoices(QuerySparkInvoicesRequest) returns (QuerySparkInvoicesResponse) {}
+
+    // Inititiates a primary transfer in a Swap V3 protocol. The sender submits the
+    // transfer package, but the SOs will not tweak the keys at this stage of the flow.
+    // It will be done later, when the SSP initiates a counter swap.
+    rpc initiate_swap_primary_transfer(InitiateSwapPrimaryTransferRequest) returns (InitiateSwapPrimaryTransferResponse) {}
 }
 
 message SubscribeToEventsRequest {
@@ -834,6 +839,8 @@ message LeafRefundTxSigningJob {
 message UserSignedTxSigningJob {
     string leaf_id = 1;
     bytes signing_public_key = 2;
+    // CPFP Refund Tx that is created when the User signs refunds. It spends the
+    // node transaction to the receiver.
     bytes raw_tx = 3;
     common.SigningCommitment signing_nonce_commitment = 4;
     bytes user_signature = 5;
@@ -1576,3 +1583,26 @@ enum InvoiceStatus {
     RETURNED = 4;
 }
 
+
+message InitiateSwapPrimaryTransferRequest {
+    // Transfer with refunds and key tweaks signed
+    StartTransferRequest transfer = 1;
+    // Adaptor public keys to verify the signatures of refunds for the primary
+    // transfer in the swap
+    AdaptorPublicKeyPackage adaptor_public_keys = 2;
+}
+
+message InitiateSwapPrimaryTransferResponse {
+    Transfer transfer = 1;
+    repeated LeafRefundTxSigningResult signing_results = 2;
+}
+
+// Adaptor public key is derived from the secret `t` using formula:
+// ```
+// T = t * G
+// ```
+message AdaptorPublicKeyPackage {
+    bytes adaptor_public_key = 1;
+    bytes direct_adaptor_public_key = 2;
+    bytes direct_from_cpfp_adaptor_public_key = 3;
+}

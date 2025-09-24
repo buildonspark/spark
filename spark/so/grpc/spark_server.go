@@ -410,3 +410,12 @@ func (s *SparkServer) QuerySparkInvoices(ctx context.Context, req *pb.QuerySpark
 	invoiceHandler := handler.NewSparkInvoiceHandler(s.config)
 	return invoiceHandler.QuerySparkInvoices(ctx, req)
 }
+
+func (s *SparkServer) InitiateSwapPrimaryTransfer(ctx context.Context, req *pb.InitiateSwapPrimaryTransferRequest) (*pb.InitiateSwapPrimaryTransferResponse, error) {
+	transferHander := handler.NewTransferHandler(s.config)
+	res, err := transferHander.InitiateSwapPrimaryTransfer(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.InitiateSwapPrimaryTransferResponse{Transfer: res.Transfer, SigningResults: res.SigningResults}, nil
+}

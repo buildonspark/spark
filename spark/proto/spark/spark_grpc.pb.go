@@ -75,6 +75,7 @@ const (
 	SparkService_RefreshTimelockV2_FullMethodName                   = "/spark.SparkService/refresh_timelock_v2"
 	SparkService_GetUtxosForAddress_FullMethodName                  = "/spark.SparkService/get_utxos_for_address"
 	SparkService_QuerySparkInvoices_FullMethodName                  = "/spark.SparkService/query_spark_invoices"
+	SparkService_InitiateSwapPrimaryTransfer_FullMethodName         = "/spark.SparkService/initiate_swap_primary_transfer"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -166,6 +167,10 @@ type SparkServiceClient interface {
 	RefreshTimelockV2(ctx context.Context, in *RefreshTimelockRequest, opts ...grpc.CallOption) (*RefreshTimelockResponse, error)
 	GetUtxosForAddress(ctx context.Context, in *GetUtxosForAddressRequest, opts ...grpc.CallOption) (*GetUtxosForAddressResponse, error)
 	QuerySparkInvoices(ctx context.Context, in *QuerySparkInvoicesRequest, opts ...grpc.CallOption) (*QuerySparkInvoicesResponse, error)
+	// Inititiates a primary transfer in a Swap V3 protocol. The sender submits the
+	// transfer package, but the SOs will not tweak the keys at this stage of the flow.
+	// It will be done later, when the SSP initiates a counter swap.
+	InitiateSwapPrimaryTransfer(ctx context.Context, in *InitiateSwapPrimaryTransferRequest, opts ...grpc.CallOption) (*InitiateSwapPrimaryTransferResponse, error)
 }
 
 type sparkServiceClient struct {
@@ -739,6 +744,16 @@ func (c *sparkServiceClient) QuerySparkInvoices(ctx context.Context, in *QuerySp
 	return out, nil
 }
 
+func (c *sparkServiceClient) InitiateSwapPrimaryTransfer(ctx context.Context, in *InitiateSwapPrimaryTransferRequest, opts ...grpc.CallOption) (*InitiateSwapPrimaryTransferResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InitiateSwapPrimaryTransferResponse)
+	err := c.cc.Invoke(ctx, SparkService_InitiateSwapPrimaryTransfer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
@@ -828,6 +843,10 @@ type SparkServiceServer interface {
 	RefreshTimelockV2(context.Context, *RefreshTimelockRequest) (*RefreshTimelockResponse, error)
 	GetUtxosForAddress(context.Context, *GetUtxosForAddressRequest) (*GetUtxosForAddressResponse, error)
 	QuerySparkInvoices(context.Context, *QuerySparkInvoicesRequest) (*QuerySparkInvoicesResponse, error)
+	// Inititiates a primary transfer in a Swap V3 protocol. The sender submits the
+	// transfer package, but the SOs will not tweak the keys at this stage of the flow.
+	// It will be done later, when the SSP initiates a counter swap.
+	InitiateSwapPrimaryTransfer(context.Context, *InitiateSwapPrimaryTransferRequest) (*InitiateSwapPrimaryTransferResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -1002,6 +1021,9 @@ func (UnimplementedSparkServiceServer) GetUtxosForAddress(context.Context, *GetU
 }
 func (UnimplementedSparkServiceServer) QuerySparkInvoices(context.Context, *QuerySparkInvoicesRequest) (*QuerySparkInvoicesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QuerySparkInvoices not implemented")
+}
+func (UnimplementedSparkServiceServer) InitiateSwapPrimaryTransfer(context.Context, *InitiateSwapPrimaryTransferRequest) (*InitiateSwapPrimaryTransferResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InitiateSwapPrimaryTransfer not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -2007,6 +2029,24 @@ func _SparkService_QuerySparkInvoices_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_InitiateSwapPrimaryTransfer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitiateSwapPrimaryTransferRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).InitiateSwapPrimaryTransfer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_InitiateSwapPrimaryTransfer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).InitiateSwapPrimaryTransfer(ctx, req.(*InitiateSwapPrimaryTransferRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -2229,6 +2269,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "query_spark_invoices",
 			Handler:    _SparkService_QuerySparkInvoices_Handler,
+		},
+		{
+			MethodName: "initiate_swap_primary_transfer",
+			Handler:    _SparkService_InitiateSwapPrimaryTransfer_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

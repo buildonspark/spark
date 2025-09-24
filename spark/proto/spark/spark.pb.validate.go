@@ -24669,3 +24669,442 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = TokenTransferValidationError{}
+
+// Validate checks the field values on InitiateSwapPrimaryTransferRequest with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *InitiateSwapPrimaryTransferRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InitiateSwapPrimaryTransferRequest
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// InitiateSwapPrimaryTransferRequestMultiError, or nil if none found.
+func (m *InitiateSwapPrimaryTransferRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiateSwapPrimaryTransferRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetTransfer()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, InitiateSwapPrimaryTransferRequestValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, InitiateSwapPrimaryTransferRequestValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTransfer()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return InitiateSwapPrimaryTransferRequestValidationError{
+				field:  "Transfer",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if all {
+		switch v := interface{}(m.GetAdaptorPublicKeys()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, InitiateSwapPrimaryTransferRequestValidationError{
+					field:  "AdaptorPublicKeys",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, InitiateSwapPrimaryTransferRequestValidationError{
+					field:  "AdaptorPublicKeys",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetAdaptorPublicKeys()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return InitiateSwapPrimaryTransferRequestValidationError{
+				field:  "AdaptorPublicKeys",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return InitiateSwapPrimaryTransferRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiateSwapPrimaryTransferRequestMultiError is an error wrapping multiple
+// validation errors returned by
+// InitiateSwapPrimaryTransferRequest.ValidateAll() if the designated
+// constraints aren't met.
+type InitiateSwapPrimaryTransferRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiateSwapPrimaryTransferRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiateSwapPrimaryTransferRequestMultiError) AllErrors() []error { return m }
+
+// InitiateSwapPrimaryTransferRequestValidationError is the validation error
+// returned by InitiateSwapPrimaryTransferRequest.Validate if the designated
+// constraints aren't met.
+type InitiateSwapPrimaryTransferRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiateSwapPrimaryTransferRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiateSwapPrimaryTransferRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiateSwapPrimaryTransferRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiateSwapPrimaryTransferRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiateSwapPrimaryTransferRequestValidationError) ErrorName() string {
+	return "InitiateSwapPrimaryTransferRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiateSwapPrimaryTransferRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiateSwapPrimaryTransferRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiateSwapPrimaryTransferRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiateSwapPrimaryTransferRequestValidationError{}
+
+// Validate checks the field values on InitiateSwapPrimaryTransferResponse with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *InitiateSwapPrimaryTransferResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on InitiateSwapPrimaryTransferResponse
+// with the rules defined in the proto definition for this message. If any
+// rules are violated, the result is a list of violation errors wrapped in
+// InitiateSwapPrimaryTransferResponseMultiError, or nil if none found.
+func (m *InitiateSwapPrimaryTransferResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *InitiateSwapPrimaryTransferResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetTransfer()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, InitiateSwapPrimaryTransferResponseValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, InitiateSwapPrimaryTransferResponseValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetTransfer()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return InitiateSwapPrimaryTransferResponseValidationError{
+				field:  "Transfer",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	for idx, item := range m.GetSigningResults() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, InitiateSwapPrimaryTransferResponseValidationError{
+						field:  fmt.Sprintf("SigningResults[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, InitiateSwapPrimaryTransferResponseValidationError{
+						field:  fmt.Sprintf("SigningResults[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return InitiateSwapPrimaryTransferResponseValidationError{
+					field:  fmt.Sprintf("SigningResults[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if len(errors) > 0 {
+		return InitiateSwapPrimaryTransferResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// InitiateSwapPrimaryTransferResponseMultiError is an error wrapping multiple
+// validation errors returned by
+// InitiateSwapPrimaryTransferResponse.ValidateAll() if the designated
+// constraints aren't met.
+type InitiateSwapPrimaryTransferResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m InitiateSwapPrimaryTransferResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m InitiateSwapPrimaryTransferResponseMultiError) AllErrors() []error { return m }
+
+// InitiateSwapPrimaryTransferResponseValidationError is the validation error
+// returned by InitiateSwapPrimaryTransferResponse.Validate if the designated
+// constraints aren't met.
+type InitiateSwapPrimaryTransferResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e InitiateSwapPrimaryTransferResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e InitiateSwapPrimaryTransferResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e InitiateSwapPrimaryTransferResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e InitiateSwapPrimaryTransferResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e InitiateSwapPrimaryTransferResponseValidationError) ErrorName() string {
+	return "InitiateSwapPrimaryTransferResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e InitiateSwapPrimaryTransferResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sInitiateSwapPrimaryTransferResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = InitiateSwapPrimaryTransferResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = InitiateSwapPrimaryTransferResponseValidationError{}
+
+// Validate checks the field values on AdaptorPublicKeyPackage with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *AdaptorPublicKeyPackage) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on AdaptorPublicKeyPackage with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// AdaptorPublicKeyPackageMultiError, or nil if none found.
+func (m *AdaptorPublicKeyPackage) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *AdaptorPublicKeyPackage) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for AdaptorPublicKey
+
+	// no validation rules for DirectAdaptorPublicKey
+
+	// no validation rules for DirectFromCpfpAdaptorPublicKey
+
+	if len(errors) > 0 {
+		return AdaptorPublicKeyPackageMultiError(errors)
+	}
+
+	return nil
+}
+
+// AdaptorPublicKeyPackageMultiError is an error wrapping multiple validation
+// errors returned by AdaptorPublicKeyPackage.ValidateAll() if the designated
+// constraints aren't met.
+type AdaptorPublicKeyPackageMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m AdaptorPublicKeyPackageMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m AdaptorPublicKeyPackageMultiError) AllErrors() []error { return m }
+
+// AdaptorPublicKeyPackageValidationError is the validation error returned by
+// AdaptorPublicKeyPackage.Validate if the designated constraints aren't met.
+type AdaptorPublicKeyPackageValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e AdaptorPublicKeyPackageValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e AdaptorPublicKeyPackageValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e AdaptorPublicKeyPackageValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e AdaptorPublicKeyPackageValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e AdaptorPublicKeyPackageValidationError) ErrorName() string {
+	return "AdaptorPublicKeyPackageValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e AdaptorPublicKeyPackageValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sAdaptorPublicKeyPackage.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = AdaptorPublicKeyPackageValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = AdaptorPublicKeyPackageValidationError{}

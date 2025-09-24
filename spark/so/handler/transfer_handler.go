@@ -529,6 +529,25 @@ func (h *TransferHandler) StartLeafSwapV2(ctx context.Context, req *pb.StartTran
 	return h.startTransferInternal(ctx, req, st.TransferTypeSwap, keys.Public{}, keys.Public{}, keys.Public{}, true)
 }
 
+// Initiate a primary swap transfer in Swap V3 protocol. This will create a
+// transfer to the SSP with adapted refunds with key tweaks stored but not yet
+// applied, awaiting a counter swap transfer.
+func (h *TransferHandler) InitiateSwapPrimaryTransfer(ctx context.Context, req *pb.InitiateSwapPrimaryTransferRequest) (*pb.StartTransferResponse, error) {
+	adaptorPublicKey, err := keys.ParsePublicKey(req.AdaptorPublicKeys.AdaptorPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse adaptor public key: %w", err)
+	}
+	directAdaptorPublicKey, err := parsePublicKeyIfPresent(req.AdaptorPublicKeys.DirectAdaptorPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse direct adaptor public key: %w", err)
+	}
+	directFromCpfpAdaptorPublicKey, err := parsePublicKeyIfPresent(req.AdaptorPublicKeys.DirectFromCpfpAdaptorPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse direct from cpfp adaptor public key: %w", err)
+	}
+	return h.startTransferInternal(ctx, req.GetTransfer(), st.TransferTypeSwap, adaptorPublicKey, directAdaptorPublicKey, directFromCpfpAdaptorPublicKey, true)
+}
+
 // CounterLeafSwap initiates a leaf swap for the other side, signing refunds with an adaptor public key.
 func (h *TransferHandler) CounterLeafSwap(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
 	adaptorPublicKey, err := keys.ParsePublicKey(req.AdaptorPublicKey)
