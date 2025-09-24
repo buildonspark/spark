@@ -103,9 +103,38 @@ func (h *TransferHandler) loadDirectFromCpfpLeafRefundMap(req *pb.StartTransferR
 	return leafRefundMap
 }
 
-// startTransferInternal starts a transfer, signing refunds, and saving the transfer to the DB
-// for the first time. This optionally takes an adaptorPubKey to modify the refund signatures.
-func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.StartTransferRequest, transferType st.TransferType, cpfpAdaptorPubKey keys.Public, directAdaptorPubKey keys.Public, directFromCpfpAdaptorPubKey keys.Public, requireDirectTx bool) (*pb.StartTransferResponse, error) {
+// startTransferInternal initiates a transfer between two parties by validating the transfer request,
+// creating transfer records, signing refund transactions, and coordinating with other service operators.
+//
+// This is the core internal method that handles the transfer initiation logic for different transfer types
+// including regular transfers, swaps, cooperative exits, and preimage swaps.
+//
+// Parameters:
+//   - ctx: Request context for tracing and logging
+//   - req: StartTransferRequest containing transfer details, leaves to send, and participant public keys
+//   - transferType: Type of transfer (TRANSFER, SWAP, COOPERATIVE_EXIT, PREIMAGE_SWAP, etc.)
+//   - cpfpAdaptorPubKey: Adaptor signature / public key used for CPFP (Child Pays for Parent) refund transaction signing
+//   - directAdaptorPubKey: Adaptor signature / public key used for direct refund transaction signing
+//   - directFromCpfpAdaptorPubKey: Adaptor signature / public key used for direct-from-CPFP refund transaction signing
+//   - requireDirectTx: Whether direct transactions are required for this flow. If true and there is no direct transaction, the validation will fail.
+//   - tweakKeys: Whether to perform sender key tweaking operations as part of the transfer. Normally set to true. Only needed for Swap V3 flow when initiating a primary transfer.
+//
+// The method performs the following key operations:
+//  1. Validates the owner's identity and enforces authorization
+//  2. Validates the transfer package containing leaves and key tweaks
+//  3. Enforces transfer limits if configured via knobs
+//  4. Creates the transfer record and associated leaf mappings in the database
+//  5. Signs refund transactions (CPFP, direct, and direct-from-CPFP variants)
+//  6. Coordinates with other service operators to validate and finalize the transfer
+//  7. Optionally handles key tweaking and settlement
+//
+// Returns:
+//   - StartTransferResponse: Contains the created transfer details and signing results for refund transactions
+//   - error: Any validation, signing, or coordination errors encountered during the process
+//
+// The method ensures atomicity by rolling back changes if any step fails, and marks the transfer
+// as successful only after all service operators have validated the transfer package.
+func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.StartTransferRequest, transferType st.TransferType, cpfpAdaptorPubKey keys.Public, directAdaptorPubKey keys.Public, directFromCpfpAdaptorPubKey keys.Public, requireDirectTx bool, tweakKeys bool) (*pb.StartTransferResponse, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	ctx, span := tracer.Start(ctx, "TransferHandler.startTransferInternal", trace.WithAttributes(
@@ -177,6 +206,12 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		return nil, fmt.Errorf("unable to commit database transaction: %w", err)
 	}
 
+	role := TransferRoleCoordinator
+	// Swap V3 flow: If skipping tweaks is enabled then set role to Participant to
+	// disable retry settling key tweaks in `resume_send_transfer` cron task.
+	if !tweakKeys {
+		role = TransferRoleParticipant
+	}
 	transfer, leafMap, err := h.createTransfer(
 		ctx,
 		req.TransferId,
@@ -188,7 +223,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		leafDirectRefundMap,
 		leafDirectFromCpfpRefundMap,
 		leafTweakMap,
-		TransferRoleCoordinator,
+		role,
 		requireDirectTx,
 		req.SparkInvoice,
 	)
@@ -332,38 +367,41 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		if err != nil {
 			return nil, fmt.Errorf("unable to commit db before sync transfer init: %w", err)
 		}
-		// If all other SOs have settled the sender key tweaks, we can commit the sender key tweaks.
-		// If there's any error, it means one or more of the SOs are down at the time, we will have a
-		// cron job to retry the key commit.
-		keyTweakProofMap := make(map[string]*pb.SecretProof)
-		for _, leaf := range leafTweakMap {
-			keyTweakProofMap[leaf.LeafId] = &pb.SecretProof{
-				Proofs: leaf.SecretShareTweak.Proofs,
+		// Only false for Swap V3 flow when initiating a primary transfer for a swap.
+		if tweakKeys {
+			// If all other SOs have settled the sender key tweaks, we can commit the sender key tweaks.
+			// If there's any error, it means one or more of the SOs are down at the time, we will have a
+			// cron job to retry the key commit.
+			keyTweakProofMap := make(map[string]*pb.SecretProof)
+			for _, leaf := range leafTweakMap {
+				keyTweakProofMap[leaf.LeafId] = &pb.SecretProof{
+					Proofs: leaf.SecretShareTweak.Proofs,
+				}
 			}
-		}
 
-		sendGossipHandler := NewSendGossipHandler(h.config)
-		selection := helper.OperatorSelection{
-			Option: helper.OperatorSelectionOptionExcludeSelf,
-		}
-		participants, err := selection.OperatorIdentifierList(h.config)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get operator list: %w", err)
-		}
-		_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
-			Message: &pbgossip.GossipMessage_SettleSenderKeyTweak{
-				SettleSenderKeyTweak: &pbgossip.GossipMessageSettleSenderKeyTweak{
-					TransferId:           req.TransferId,
-					SenderKeyTweakProofs: keyTweakProofMap,
+			sendGossipHandler := NewSendGossipHandler(h.config)
+			selection := helper.OperatorSelection{
+				Option: helper.OperatorSelectionOptionExcludeSelf,
+			}
+			participants, err := selection.OperatorIdentifierList(h.config)
+			if err != nil {
+				return nil, fmt.Errorf("unable to get operator list: %w", err)
+			}
+			_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
+				Message: &pbgossip.GossipMessage_SettleSenderKeyTweak{
+					SettleSenderKeyTweak: &pbgossip.GossipMessageSettleSenderKeyTweak{
+						TransferId:           req.TransferId,
+						SenderKeyTweakProofs: keyTweakProofMap,
+					},
 				},
-			},
-		}, participants)
-		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf(
-				"Failed to create and send gossip message to settle sender key tweak for transfer %s",
-				req.TransferId,
-			)
-			return nil, fmt.Errorf("failed to create and send gossip message to settle sender key tweak: %w", err)
+			}, participants)
+			if err != nil {
+				logger.With(zap.Error(err)).Sugar().Errorf(
+					"Failed to create and send gossip message to settle sender key tweak for transfer %s",
+					req.TransferId,
+				)
+				return nil, fmt.Errorf("failed to create and send gossip message to settle sender key tweak: %w", err)
+			}
 		}
 		transfer, err = h.loadTransferForUpdate(ctx, req.TransferId)
 		if err != nil {
@@ -508,19 +546,19 @@ func (h *TransferHandler) settleSenderKeyTweaks(ctx context.Context, transferID 
 
 // StartTransfer initiates a transfer from sender.
 func (h *TransferHandler) StartTransfer(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	return h.startTransferInternal(ctx, req, st.TransferTypeTransfer, keys.Public{}, keys.Public{}, keys.Public{}, false)
+	return h.startTransferInternal(ctx, req, st.TransferTypeTransfer, keys.Public{}, keys.Public{}, keys.Public{}, false, true)
 }
 
 func (h *TransferHandler) StartTransferV2(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	return h.startTransferInternal(ctx, req, st.TransferTypeTransfer, keys.Public{}, keys.Public{}, keys.Public{}, true)
+	return h.startTransferInternal(ctx, req, st.TransferTypeTransfer, keys.Public{}, keys.Public{}, keys.Public{}, true, true)
 }
 
 func (h *TransferHandler) StartLeafSwap(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	return h.startTransferInternal(ctx, req, st.TransferTypeSwap, keys.Public{}, keys.Public{}, keys.Public{}, false)
+	return h.startTransferInternal(ctx, req, st.TransferTypeSwap, keys.Public{}, keys.Public{}, keys.Public{}, false, true)
 }
 
 func (h *TransferHandler) StartLeafSwapV2(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	return h.startTransferInternal(ctx, req, st.TransferTypeSwap, keys.Public{}, keys.Public{}, keys.Public{}, true)
+	return h.startTransferInternal(ctx, req, st.TransferTypeSwap, keys.Public{}, keys.Public{}, keys.Public{}, true, true)
 }
 
 // Initiate a primary swap transfer in Swap V3 protocol. This will create a
@@ -540,7 +578,7 @@ func (h *TransferHandler) InitiateSwapPrimaryTransfer(ctx context.Context, req *
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse direct from cpfp adaptor public key: %w", err)
 	}
-	return h.startTransferInternal(ctx, req.GetTransfer(), st.TransferTypeSwap, adaptorPublicKey, directAdaptorPublicKey, directFromCpfpAdaptorPublicKey, true)
+	return h.startTransferInternal(ctx, req.GetTransfer(), st.TransferTypeSwap, adaptorPublicKey, directAdaptorPublicKey, directFromCpfpAdaptorPublicKey, true, false)
 }
 
 // CounterLeafSwap initiates a leaf swap for the other side, signing refunds with an adaptor public key.
@@ -557,7 +595,7 @@ func (h *TransferHandler) CounterLeafSwap(ctx context.Context, req *pb.CounterLe
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse direct from cpfp adaptor public key: %w", err)
 	}
-	startTransferResponse, err := h.startTransferInternal(ctx, req.Transfer, st.TransferTypeCounterSwap, adaptorPublicKey, directAdaptorPublicKey, directFromCpfpAdaptorPublicKey, false)
+	startTransferResponse, err := h.startTransferInternal(ctx, req.Transfer, st.TransferTypeCounterSwap, adaptorPublicKey, directAdaptorPublicKey, directFromCpfpAdaptorPublicKey, false, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start counter leaf swap for request %s: %w", logging.FormatProto("counter_leaf_swap_request", req), err)
 	}
@@ -579,7 +617,7 @@ func (h *TransferHandler) CounterLeafSwapV2(ctx context.Context, req *pb.Counter
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse direct from cpfp adaptor public key: %w", err)
 	}
-	startTransferResponse, err := h.startTransferInternal(ctx, req.Transfer, st.TransferTypeCounterSwap, adaptorPublicKey, directAdaptorPublicKey, directFromCpfpAdaptorPublicKey, true)
+	startTransferResponse, err := h.startTransferInternal(ctx, req.Transfer, st.TransferTypeCounterSwap, adaptorPublicKey, directAdaptorPublicKey, directFromCpfpAdaptorPublicKey, true, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start counter leaf swap for request %s: %w", logging.FormatProto("counter_leaf_swap_request", req), err)
 	}
