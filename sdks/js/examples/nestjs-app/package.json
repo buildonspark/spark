@@ -13,7 +13,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "test:integration": "HERMETIC_TEST=true NODE_OPTIONS=\"--experimental-vm-modules\" yarn jest --detectOpenHandles --forceExit && yarn test:e2e && yarn run test:start",
+    "test:integration": "NODE_OPTIONS=\"--experimental-vm-modules\" yarn jest --detectOpenHandles --forceExit && yarn test:e2e && yarn run test:start",
     "test:start": "./test-start.sh",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",

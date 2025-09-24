@@ -1,6 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalEnv": ["GITHUB_ACTIONS", "HERMETIC_TEST"],
+  "globalEnv": ["GITHUB_ACTIONS", "MINIKUBE_IP"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

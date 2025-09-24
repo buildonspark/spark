@@ -14,7 +14,7 @@ Object.defineProperty(globalThis, "fetch", {
 });
 
 export const isHermeticTest = Boolean(
-  typeof process !== "undefined" && process?.env?.HERMETIC_TEST === "true",
+  typeof process !== "undefined" && process?.env?.MINIKUBE_IP,
 );
 
 const regtest = {

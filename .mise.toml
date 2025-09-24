@@ -29,7 +29,9 @@ test-grpc = { dir = "{{config_root}}/spark", run = 'mise test-grpc' }
 test-grpc-minikube = { dir = "{{config_root}}/spark", run = 'mise test-grpc-minikube' }
 test-js = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test' }
 test-js-integration = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test:integration' }
+test-js-integration-minikube = { dir = "{{config_root}}/sdks/js", run = 'MINIKUBE_IP=$(minikube ip) yarn install && yarn test:integration' }
 test-js-integration-ssp = { dir = "{{config_root}}/sdks/js", run = 'yarn install && yarn test:integration:ssp' }
+test-js-integration-ssp-minikube = { dir = "{{config_root}}/sdks/js", run = 'MINIKUBE_IP=$(minikube ip) yarn install && yarn test:integration:ssp' }
 
 [tasks.money-dev]
 description = "Send regtest BTC on dev to <address> [amount (default=0.0001)]"

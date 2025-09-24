@@ -78,7 +78,7 @@
     "postversion": "yarn build",
     "test-cmd": "node --experimental-vm-modules $(yarn bin jest) --no-cache --runInBand --detectOpenHandles --forceExit",
     "test": "yarn test-cmd src/tests/*.test.ts",
-    "test:integration": "HERMETIC_TEST=true yarn test-cmd src/tests/integration/*.test.ts",
+    "test:integration": "yarn test-cmd src/tests/integration/*.test.ts",
     "test:stress": "yarn test-cmd src/tests/stress/*.test.ts",
     "types:watch": "tsc-absolute --watch",
     "types": "tsc"
