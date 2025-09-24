@@ -46,18 +46,20 @@ describe("SSP static deposit address integration", () => {
         vout!,
       );
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       const quoteAmount = quote!.creditAmountSats;
       const sspSignature = quote!.signature;
 
-      await userWallet.claimStaticDeposit({
-        transactionId,
-        creditAmountSats: quoteAmount,
-        sspSignature,
-        outputIndex: vout!,
-      });
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await retryUntilSuccess(
+        async () =>
+          await userWallet.claimStaticDeposit({
+            transactionId,
+            creditAmountSats: quoteAmount,
+            sspSignature,
+            outputIndex: vout!,
+          }),
+      );
+
+      await waitForClaim({ wallet: userWallet });
       const { balance } = await userWallet.getBalance();
       expect(balance).toBe(BigInt(quoteAmount));
 
@@ -79,7 +81,7 @@ describe("SSP static deposit address integration", () => {
         creditAmountSats: quoteAmount2,
         sspSignature: sspSignature2,
       });
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await waitForClaim({ wallet: userWallet });
       const { balance: balance2 } = await userWallet.getBalance();
       expect(balance2).toBe(BigInt(quoteAmount + quoteAmount2));
 
@@ -99,7 +101,7 @@ describe("SSP static deposit address integration", () => {
         transactionId: transactionId3,
         maxFee: 1000,
       });
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await waitForClaim({ wallet: userWallet });
       const { balance: balance3 } = await userWallet.getBalance();
       expect(balance3).toBe(BigInt(quoteAmount + quoteAmount2 + quoteAmount3));
       // Get transfers should include static deposit transfers.
@@ -203,18 +205,20 @@ describe("SSP static deposit address integration", () => {
         vout!,
       );
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       const quoteAmount = quote!.creditAmountSats;
       const sspSignature = quote!.signature;
 
-      await userWallet.claimStaticDeposit({
-        transactionId,
-        creditAmountSats: quoteAmount,
-        sspSignature,
-        outputIndex: vout!,
-      });
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await retryUntilSuccess(
+        async () =>
+          await userWallet.claimStaticDeposit({
+            transactionId,
+            creditAmountSats: quoteAmount,
+            sspSignature,
+            outputIndex: vout!,
+          }),
+      );
+
+      await waitForClaim({ wallet: userWallet });
       const { balance } = await userWallet.getBalance();
       expect(balance).toBe(BigInt(quoteAmount));
 
@@ -231,12 +235,15 @@ describe("SSP static deposit address integration", () => {
         await userWallet.getClaimStaticDepositQuote(transactionId2);
       const quoteAmount2 = quote2!.creditAmountSats;
       const sspSignature2 = quote2!.signature;
-      await userWallet.claimStaticDeposit({
-        transactionId: transactionId2,
-        creditAmountSats: quoteAmount2,
-        sspSignature: sspSignature2,
-      });
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await retryUntilSuccess(
+        async () =>
+          await userWallet.claimStaticDeposit({
+            transactionId: transactionId2,
+            creditAmountSats: quoteAmount2,
+            sspSignature: sspSignature2,
+          }),
+      );
+      await waitForClaim({ wallet: userWallet });
       const { balance: balance2 } = await userWallet.getBalance();
       expect(balance2).toBe(BigInt(quoteAmount + quoteAmount2));
 
@@ -252,11 +259,14 @@ describe("SSP static deposit address integration", () => {
       const quote3 =
         await userWallet.getClaimStaticDepositQuote(transactionId3);
       const quoteAmount3 = quote3!.creditAmountSats;
-      await userWallet.claimStaticDepositWithMaxFee({
-        transactionId: transactionId3,
-        maxFee: 1000,
-      });
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await retryUntilSuccess(
+        async () =>
+          await userWallet.claimStaticDepositWithMaxFee({
+            transactionId: transactionId3,
+            maxFee: 1000,
+          }),
+      );
+      await waitForClaim({ wallet: userWallet });
       const { balance: balance3 } = await userWallet.getBalance();
       expect(balance3).toBe(BigInt(quoteAmount + quoteAmount2 + quoteAmount3));
       // Get transfers should include static deposit transfers.
@@ -533,7 +543,7 @@ describe("SSP static deposit address integration", () => {
         creditAmountSats: quote.creditAmountSats,
         sspSignature: quote.signature,
       });
-      await new Promise((resolve) => setTimeout(resolve, 40000));
+      await waitForClaim({ wallet: aliceWallet });
 
       const { balance } = await aliceWallet.getBalance();
 
@@ -619,7 +629,7 @@ describe("SSP static deposit address integration", () => {
         outputIndex: vout!,
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 30000));
+      await waitForClaim({ wallet: userWallet });
 
       expect(outputs).toBeDefined();
 
@@ -669,7 +679,7 @@ describe("SSP static deposit address integration", () => {
         outputIndex: vout!,
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 30000));
+      await waitForClaim({ wallet: userWallet });
 
       console.log("Fetching wallet balance after claim...");
       const { balance } = await userWallet.getBalance();
@@ -686,7 +696,7 @@ describe("SSP static deposit address integration", () => {
 
       expect(transfer).toBeDefined();
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await waitForClaim({ wallet: userWallet });
 
       // Try to refund the deposit after claiming and transfer
       console.log("Attempting refund of claimed deposit...");
