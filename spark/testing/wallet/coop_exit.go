@@ -188,7 +188,7 @@ func signCoopExitRefunds(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initiate cooperative exit: %w", err)
 	}
-	signatures, err := signRefunds(config, leafDataMap, response.SigningResults, keys.Public{})
+	signatures, err := SignRefunds(config, leafDataMap, response.SigningResults, keys.Public{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to sign refund transactions: %w", err)
 	}

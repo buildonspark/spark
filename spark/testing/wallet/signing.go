@@ -41,8 +41,9 @@ func prepareFrostSigningJobsForUserSignedRefund(
 	leaves []LeafKeyTweak,
 	signingCommitments []*pb.RequestedSigningCommitments,
 	receiverIdentityPubKey keys.Public,
+	adaptorPublicKey keys.Public,
 ) ([]*pbfrost.FrostSigningJob, [][]byte, []*objects.SigningCommitment, error) {
-	return prepareFrostSigningJobsForUserSignedRefundWithType(leaves, signingCommitments, receiverIdentityPubKey, true)
+	return prepareFrostSigningJobsForUserSignedRefundWithType(leaves, signingCommitments, receiverIdentityPubKey, true, adaptorPublicKey)
 }
 
 // prepareFrostSigningJobsForUserSignedRefundDirect creates signing jobs for direct refund transactions (with fee deduction)
@@ -52,7 +53,7 @@ func prepareFrostSigningJobsForUserSignedRefundDirect(
 	signingCommitments []*pb.RequestedSigningCommitments,
 	receiverIdentityPubKey keys.Public,
 ) ([]*pbfrost.FrostSigningJob, [][]byte, []*objects.SigningCommitment, error) {
-	return prepareFrostSigningJobsForUserSignedRefundWithType(leaves, signingCommitments, receiverIdentityPubKey, false)
+	return prepareFrostSigningJobsForUserSignedRefundWithType(leaves, signingCommitments, receiverIdentityPubKey, false, keys.Public{})
 }
 
 // prepareFrostSigningJobsForDirectRefund creates signing jobs for direct refund transactions
@@ -140,6 +141,7 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 	signingCommitments []*pb.RequestedSigningCommitments,
 	receiverIdentityPubKey keys.Public,
 	useCPFP bool,
+	adaptorPublicKey keys.Public,
 ) ([]*pbfrost.FrostSigningJob, [][]byte, []*objects.SigningCommitment, error) {
 	var signingJobs []*pbfrost.FrostSigningJob
 	refundTxs := make([][]byte, len(leaves))
@@ -212,13 +214,14 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
 
 		signingJobs = append(signingJobs, &pbfrost.FrostSigningJob{
-			JobId:           leaf.Leaf.Id,
-			Message:         sighash,
-			KeyPackage:      userKeyPackage,
-			VerifyingKey:    leaf.Leaf.VerifyingPublicKey,
-			Nonce:           signingNonceProto,
-			Commitments:     signingCommitments[i].SigningNonceCommitments,
-			UserCommitments: userCommitmentProto,
+			JobId:            leaf.Leaf.Id,
+			Message:          sighash,
+			KeyPackage:       userKeyPackage,
+			VerifyingKey:     leaf.Leaf.VerifyingPublicKey,
+			Nonce:            signingNonceProto,
+			Commitments:      signingCommitments[i].SigningNonceCommitments,
+			UserCommitments:  userCommitmentProto,
+			AdaptorPublicKey: adaptorPublicKey.Serialize(),
 		})
 	}
 	return signingJobs, refundTxs, userCommitments, nil

@@ -64,7 +64,7 @@ func SwapNodesForPreimage(
 	}
 	defer signerConn.Close()
 
-	signingJobs, refundTxs, userCommitments, err := prepareFrostSigningJobsForUserSignedRefund(leaves, signingCommitments.SigningCommitments, receiverIdentityPubKey)
+	signingJobs, refundTxs, userCommitments, err := prepareFrostSigningJobsForUserSignedRefund(leaves, signingCommitments.SigningCommitments, receiverIdentityPubKey, keys.Public{})
 	if err != nil {
 		return nil, err
 	}
@@ -251,7 +251,7 @@ func SwapNodesForPreimageWithHTLC(
 	defer signerConn.Close()
 
 	originalRefundSigningCommitments := signingCommitments.SigningCommitments[:len(leaves)]
-	signingJobs, refundTxs, userCommitments, err := prepareFrostSigningJobsForUserSignedRefund(leaves, originalRefundSigningCommitments, receiverIdentityPubKey)
+	signingJobs, refundTxs, userCommitments, err := prepareFrostSigningJobsForUserSignedRefund(leaves, originalRefundSigningCommitments, receiverIdentityPubKey, keys.Public{})
 	if err != nil {
 		return nil, err
 	}

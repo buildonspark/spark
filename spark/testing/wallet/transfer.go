@@ -25,6 +25,7 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/objects"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -68,7 +69,7 @@ func CreateTransferPackage(
 		return nil, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
 
-	return PrepareTransferPackage(ctx, config, client, transferID, keyTweakInputMap, leaves, receiverIdentityPubKey)
+	return PrepareTransferPackage(ctx, config, client, transferID, keyTweakInputMap, leaves, receiverIdentityPubKey, keys.Public{})
 }
 
 func SendTransferWithKeyTweaks(
@@ -135,6 +136,7 @@ func PrepareTransferPackage(
 	keyTweakInputMap map[string][]*pb.SendLeafKeyTweak,
 	leaves []LeafKeyTweak,
 	receiverIdentityPubKey keys.Public,
+	adaptorPublicKey keys.Public,
 ) (*pb.TransferPackage, error) {
 	// Fetch signing commitments.
 	nodes := make([]string, len(leaves))
@@ -157,7 +159,7 @@ func PrepareTransferPackage(
 	signerClient := pbfrost.NewFrostServiceClient(signerConn)
 
 	// Create CPFP refund transactions (with anchor, no fee deduction)
-	cpfpSigningJobs, cpfpRefundTxs, cpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefund(leaves, signingCommitments.SigningCommitments, receiverIdentityPubKey)
+	cpfpSigningJobs, cpfpRefundTxs, cpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefund(leaves, signingCommitments.SigningCommitments, receiverIdentityPubKey, adaptorPublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -301,6 +303,131 @@ func PrepareTransferPackage(
 	return transferPackage, nil
 }
 
+// Create a transfer package for SwapV3 flow primary or counter transfer.
+// - use adaptor signatures to ensure one transfer can not be exited without the other,
+// - skip direct transactions, because the transfers are short lived.
+func GenerateTransferPackageForSwapV3(
+	ctx context.Context,
+	config *TestWalletConfig,
+	receiverIdentityPubkey keys.Public,
+	leavesToTransfer []LeafKeyTweak,
+	sparkClient pb.SparkServiceClient,
+	adaptorPublicKey keys.Public,
+) (*pb.TransferPackage, uuid.UUID, error) {
+	// 1. Generate transfer id
+	transferID, err := uuid.NewV7()
+	if err != nil {
+		return nil, uuid.UUID{}, fmt.Errorf("failed to generate transfer id: %w", err)
+	}
+
+	// 2. Prepare user key tweaks
+	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferID.String(), receiverIdentityPubkey, leavesToTransfer, map[string][]byte{})
+	if err != nil {
+		return nil, uuid.UUID{}, fmt.Errorf("failed to prepare transfer data: %w", err)
+	}
+
+	// 3. Encrypt key tweaks for transfer package.
+	encryptedKeyTweaks := make(map[string][]byte)
+	for identifier, keyTweaks := range keyTweakInputMap {
+		protoToEncrypt := pb.SendLeafKeyTweaks{
+			LeavesToSend: keyTweaks,
+		}
+		protoToEncryptBinary, err := proto.Marshal(&protoToEncrypt)
+		if err != nil {
+			return nil, transferID, fmt.Errorf("failed to marshal proto to encrypt: %w", err)
+		}
+		encryptionKeyBytes := config.SigningOperators[identifier].IdentityPublicKey
+		encryptionKey, err := eciesgo.NewPublicKeyFromBytes(encryptionKeyBytes.Serialize())
+		if err != nil {
+			return nil, transferID, fmt.Errorf("failed to parse encryption key: %w", err)
+		}
+		encryptedProto, err := eciesgo.Encrypt(encryptionKey, protoToEncryptBinary)
+		if err != nil {
+			return nil, transferID, fmt.Errorf("failed to encrypt proto: %w", err)
+		}
+		encryptedKeyTweaks[identifier] = encryptedProto
+	}
+
+	// 4. Prepare user signed refunds
+	leafSigningJobs, err := PrepareUserSignedLeafSigningJobs(
+		ctx,
+		config,
+		sparkClient,
+		leavesToTransfer,
+		receiverIdentityPubkey,
+		adaptorPublicKey,
+	)
+	if err != nil {
+		return nil, uuid.UUID{}, fmt.Errorf("failed to prepare user signed leaf signing jobs: %w", err)
+	}
+
+	// 5. Prepare transfer package.
+
+	// SwapV3 does not include direct transactions in the transfer package,
+	// because the transfer is expected to be short lived and not protected by watch towers.
+	transferPackage := &pb.TransferPackage{
+		LeavesToSend:    leafSigningJobs,
+		KeyTweakPackage: encryptedKeyTweaks,
+	}
+
+	transferPackageSigningPayload := common.GetTransferPackageSigningPayload(transferID, transferPackage)
+	signature := ecdsa.Sign(config.IdentityPrivateKey.ToBTCEC(), transferPackageSigningPayload)
+	transferPackage.UserSignature = signature.Serialize()
+
+	return transferPackage, transferID, nil
+}
+
+func PrepareUserSignedLeafSigningJobs(
+	ctx context.Context,
+	config *TestWalletConfig,
+	client pb.SparkServiceClient,
+	leaves []LeafKeyTweak,
+	receiverIdentityPubKey keys.Public,
+	adaptorPublicKey keys.Public,
+) ([]*pb.UserSignedTxSigningJob, error) {
+	// Fetch signing commitments.
+	nodes := make([]string, len(leaves))
+	for i, leaf := range leaves {
+		nodes[i] = leaf.Leaf.Id
+	}
+	signingCommitments, err := client.GetSigningCommitments(ctx, &pb.GetSigningCommitmentsRequest{
+		NodeIds: nodes,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signing commitments: %w", err)
+	}
+
+	// Sign user refund.
+	signerConn, err := config.NewFrostGRPCConnection()
+	if err != nil {
+		return nil, err
+	}
+	defer signerConn.Close()
+	signerClient := pbfrost.NewFrostServiceClient(signerConn)
+
+	// Create CPFP refund transactions (with anchor, no fee deduction)
+	cpfpSigningJobs, cpfpRefundTxs, cpfpUserCommitments, err := prepareFrostSigningJobsForUserSignedRefund(leaves, signingCommitments.SigningCommitments, receiverIdentityPubKey, adaptorPublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	cpfpSigningResults, err := signerClient.SignFrost(ctx, &pbfrost.SignFrostRequest{
+		SigningJobs: cpfpSigningJobs,
+		Role:        pbfrost.SigningRole_USER,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return prepareLeafSigningJobs(
+		leaves,
+		cpfpRefundTxs,
+		cpfpSigningResults.Results,
+		cpfpUserCommitments,
+		signingCommitments.SigningCommitments,
+	)
+}
+
 func DeliverTransferPackage(
 	ctx context.Context,
 	config *TestWalletConfig,
@@ -336,7 +463,7 @@ func DeliverTransferPackage(
 		return nil, fmt.Errorf("failed to parse transfer id %s: %w", transfer.Id, err)
 	}
 
-	transferPackage, err := PrepareTransferPackage(authCtx, config, client, transferUUID, keyTweakInputMap, leaves, transferReceiverPubKey)
+	transferPackage, err := PrepareTransferPackage(authCtx, config, client, transferUUID, keyTweakInputMap, leaves, transferReceiverPubKey, keys.Public{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
@@ -478,7 +605,7 @@ func sendTransferSignRefund(
 		}
 	}
 
-	signingJobs, err := prepareRefundSoSigningJobs(leaves, leafDataMap)
+	signingJobs, err := PrepareRefundSoSigningJobs(leaves, leafDataMap)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to prepare signing jobs for sending transfer: %w", err)
 	}
@@ -538,7 +665,7 @@ func sendTransferSignRefund(
 		signingResults = response.SigningResults
 	}
 
-	signatures, err := signRefunds(config, leafDataMap, signingResults, adaptorPublicKey)
+	signatures, err := SignRefunds(config, leafDataMap, signingResults, adaptorPublicKey)
 	if err != nil {
 		return transfer, nil, nil, nil, fmt.Errorf("failed to sign refunds for send: %w", err)
 	}
@@ -773,7 +900,7 @@ func ClaimTransfer(
 		}
 	}
 
-	signatures, err := ClaimTransferSignRefunds(ctx, transfer, config, leaves, proofMap)
+	signatures, err := ClaimTransferSignRefunds(ctx, transfer, config, leaves, proofMap, keys.Public{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign refunds when claiming leaves: %w", err)
 	}
@@ -796,7 +923,7 @@ func ClaimTransferWithoutFinalizeSignatures(
 		}
 	}
 
-	signatures, err := ClaimTransferSignRefunds(ctx, transfer, config, leaves, proofMap)
+	signatures, err := ClaimTransferSignRefunds(ctx, transfer, config, leaves, proofMap, keys.Public{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign refunds when claiming leaves: %w", err)
 	}
@@ -941,6 +1068,7 @@ func ClaimTransferSignRefunds(
 	config *TestWalletConfig,
 	leafKeys []LeafKeyTweak,
 	proofMap map[string][][]byte,
+	adaptorPublicKey keys.Public,
 ) ([]*pb.NodeSignatures, error) {
 	leafDataMap := make(map[string]*LeafRefundSigningData)
 	for _, leafKey := range leafKeys {
@@ -955,7 +1083,7 @@ func ClaimTransferSignRefunds(
 		}
 	}
 
-	signingJobs, err := prepareRefundSoSigningJobs(leafKeys, leafDataMap)
+	signingJobs, err := PrepareRefundSoSigningJobs(leafKeys, leafDataMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare signing jobs for claiming transfer: %w", err)
 	}
@@ -980,7 +1108,7 @@ func ClaimTransferSignRefunds(
 		return nil, fmt.Errorf("failed to call ClaimTransferSignRefunds: %w", err)
 	}
 
-	return signRefunds(config, leafDataMap, response.SigningResults, keys.Public{})
+	return SignRefunds(config, leafDataMap, response.SigningResults, adaptorPublicKey)
 }
 
 func FinalizeTransfer(
@@ -1017,7 +1145,7 @@ type refundJobMetadata struct {
 	jobType refundJobType
 }
 
-func signRefunds(
+func SignRefunds(
 	config *TestWalletConfig,
 	leafDataMap map[string]*LeafRefundSigningData,
 	operatorSigningResults []*pb.LeafRefundTxSigningResult,
@@ -1186,7 +1314,7 @@ func signRefunds(
 	return nodeSignatures, nil
 }
 
-func prepareRefundSoSigningJobs(
+func PrepareRefundSoSigningJobs(
 	leaves []LeafKeyTweak,
 	leafDataMap map[string]*LeafRefundSigningData,
 ) ([]*pb.LeafRefundTxSigningJob, error) {
@@ -1360,4 +1488,40 @@ func QueryAllTransfersWithTypes(ctx context.Context, config *TestWalletConfig, l
 		return nil, 0, fmt.Errorf("failed to call QueryAllTransfers: %w", err)
 	}
 	return response.GetTransfers(), response.GetOffset(), nil
+}
+
+func InitiateSwapPrimaryTransfer(
+	ctx context.Context,
+	config *TestWalletConfig,
+	sparkConn *grpc.ClientConn,
+	transferId uuid.UUID,
+	transferPackage *pb.TransferPackage,
+	receiverIdentityPublicKey keys.Public,
+	expiryTime time.Time,
+	adaptorPublicKey keys.Public,
+	directAdaptorPublicKey keys.Public,
+	directFromCpfpAdaptorPublicKey keys.Public,
+) (*pb.InitiateSwapPrimaryTransferResponse, error) {
+
+	startTransferRequest := &pb.StartTransferRequest{
+		TransferId:                transferId.String(),
+		OwnerIdentityPublicKey:    config.IdentityPublicKey().Serialize(),
+		ReceiverIdentityPublicKey: receiverIdentityPublicKey.Serialize(),
+		ExpiryTime:                timestamppb.New(expiryTime),
+		TransferPackage:           transferPackage,
+	}
+
+	sparkClient := pb.NewSparkServiceClient(sparkConn)
+	response, err := sparkClient.InitiateSwapPrimaryTransfer(ctx, &pb.InitiateSwapPrimaryTransferRequest{
+		Transfer: startTransferRequest,
+		AdaptorPublicKeys: &pb.AdaptorPublicKeyPackage{
+			AdaptorPublicKey:               adaptorPublicKey.Serialize(),
+			DirectAdaptorPublicKey:         directAdaptorPublicKey.Serialize(),
+			DirectFromCpfpAdaptorPublicKey: directFromCpfpAdaptorPublicKey.Serialize(),
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transfer: %w", err)
+	}
+	return response, nil
 }

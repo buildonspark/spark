@@ -647,7 +647,7 @@ func ClaimStaticDepositLegacy(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
-	transferPackage, err := PrepareTransferPackage(ctx, config, sparkClient, transferID, keyTweakInputMap, leavesToTransfer, userIdentityPubKey)
+	transferPackage, err := PrepareTransferPackage(ctx, config, sparkClient, transferID, keyTweakInputMap, leavesToTransfer, userIdentityPubKey, keys.Public{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
@@ -957,19 +957,29 @@ type RefundStaticDepositParams struct {
 func GenerateTransferPackage(
 	ctx context.Context,
 	config *TestWalletConfig,
-	userIdentityPubkey keys.Public,
+	receiverIdentityPubkey keys.Public,
 	leavesToTransfer []LeafKeyTweak,
 	sparkClient pb.SparkServiceClient,
+	adaptorPublicKey keys.Public,
 ) (*pb.TransferPackage, uuid.UUID, error) {
 	transferID, err := uuid.NewV7()
 	if err != nil {
 		return nil, uuid.UUID{}, fmt.Errorf("failed to generate transfer id: %w", err)
 	}
-	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferID.String(), userIdentityPubkey, leavesToTransfer, map[string][]byte{})
+	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferID.String(), receiverIdentityPubkey, leavesToTransfer, map[string][]byte{})
 	if err != nil {
 		return nil, uuid.UUID{}, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
-	transferPackage, err := PrepareTransferPackage(ctx, config, sparkClient, transferID, keyTweakInputMap, leavesToTransfer, userIdentityPubkey)
+	transferPackage, err := PrepareTransferPackage(
+		ctx,
+		config,
+		sparkClient,
+		transferID,
+		keyTweakInputMap,
+		leavesToTransfer,
+		receiverIdentityPubkey,
+		adaptorPublicKey,
+	)
 	if err != nil {
 		return nil, uuid.UUID{}, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}

@@ -276,6 +276,7 @@ func TestPrepareFrostSigningJobsForUserSignedRefund(t *testing.T) {
 				tt.leaves,
 				tt.signingCommitments,
 				tt.receiverIdentityPubKey,
+				keys.Public{},
 			)
 
 			if tt.expectError {

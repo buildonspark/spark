@@ -218,7 +218,7 @@ func TestTransferInterrupt(t *testing.T) {
 	err = soController.DisableOperator(t, 1)
 	require.NoError(t, err, "failed to disable operator 1")
 
-	_, err = wallet.ClaimTransferSignRefunds(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim, proofs)
+	_, err = wallet.ClaimTransferSignRefunds(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim, proofs, keys.Public{})
 	require.Error(t, err, "expected error when claiming transfer")
 
 	err = soController.EnableOperator(t, 1)
@@ -413,6 +413,7 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 		receiverConfig,
 		leavesToClaim,
 		nil,
+		keys.Public{},
 	)
 	require.NoError(t, err, "failed to ClaimTransferSignRefunds")
 
