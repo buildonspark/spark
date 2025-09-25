@@ -853,6 +853,7 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 		SetVerifyingPubkey(leaf.VerifyingPubkey).
 		SetSigningKeyshareID(signingKeyshare.ID).
 		SetRawTx(leaf.RawTx).
+		SetDirectTx(leaf.DirectTx).
 		SetVout(int16(0))
 	if leaf.Edges.Parent != nil {
 		mut.SetParentID(leaf.Edges.Parent.ID)

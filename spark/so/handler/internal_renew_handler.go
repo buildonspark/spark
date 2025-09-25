@@ -84,10 +84,7 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 		SetVerifyingPubkey(splitNode.VerifyingPubkey).
 		SetSigningKeyshareID(splitSigningKeyshareID).
 		SetRawTx(splitNode.RawTx).
-		SetRawRefundTx(splitNode.RawRefundTx).
 		SetDirectTx(splitNode.DirectTx).
-		SetDirectRefundTx(splitNode.DirectRefundTx).
-		SetDirectFromCpfpRefundTx(splitNode.DirectFromCpfpRefundTx).
 		SetVout(int16(0))
 	if splitParentID != nil {
 		splitNodeMut.SetParentID(*splitParentID)
