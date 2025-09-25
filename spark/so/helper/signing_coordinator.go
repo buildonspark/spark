@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 
 	"github.com/lightsparkdev/spark/common/keys"
-	testutil "github.com/lightsparkdev/spark/testing"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -89,7 +89,7 @@ func (c *SparkServiceFrostSignerImpl) CallFrostRound1(ctx context.Context, opera
 	// This is a shortcut to avoid an unnecessary round trip when we're asking
 	// for signing from the current SO. That is, no need for a gRPC call to
 	// ourself.
-	if operator.Identifier == c.config.Identifier && !testutil.IsGripmock() {
+	if operator.Identifier == c.config.Identifier && !isGripmock() {
 		handler := signing_handler.NewFrostSigningHandler(c.config)
 		return handler.FrostRound1(ctx, req)
 	} else {
@@ -107,7 +107,7 @@ func (c *SparkServiceFrostSignerImpl) CallFrostRound2(ctx context.Context, opera
 	// This is a shortcut to avoid an unnecessary round trip when we're asking
 	// for signing from the current SO. That is, no need for a gRPC call to
 	// ourself.
-	if operator.Identifier == c.config.Identifier && !testutil.IsGripmock() {
+	if operator.Identifier == c.config.Identifier && !isGripmock() {
 		handler := signing_handler.NewFrostSigningHandler(c.config)
 		return handler.FrostRound2(ctx, req)
 	} else {
@@ -119,6 +119,12 @@ func (c *SparkServiceFrostSignerImpl) CallFrostRound2(ctx context.Context, opera
 		client := pbinternal.NewSparkInternalServiceClient(conn)
 		return client.FrostRound2(ctx, req)
 	}
+}
+
+// This is a dup of IsGripmock in testing/test_config.go, but we don't want to import the testing
+// package here to avoid circular dependencies.
+func isGripmock() bool {
+	return os.Getenv("GRIPMOCK") == "true"
 }
 
 // frostRound1 performs the first round of the Frost signing. It gathers the signing commitments from all operators.
