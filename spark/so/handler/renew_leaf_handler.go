@@ -412,6 +412,20 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 }
 
 // renewRefundTimelock resets the timelock of a refund transaction
+/*
+BEFORE                                      AFTER
+----------------------------                ------------------------------------------------------------------------------------------------
+(parent_node_tx timelock: 0)                (parent_node_tx timelock: 0)
+|                                           |                             \
+|                                           |                              \
+v                                           v                               \
+(node_tx: timelock: 2000)                   (node_tx: timelock: 1900)        \-> (direct_refund_tx: timelock 1950)
+|                                           |                       \                                             \
+|                                           |                        \                                             \
+v                                           v                         \                                             \
+(refund_tx: timelock:100)                   (refund_tx     )           \-> (direct_refund_tx_from_cpfp)              \->(direct_refund_tx)
+                                            (timelock: 2000)               (timelock: 2050            )                 (timelock: 2050  )
+*/
 func (h *RenewLeafHandler) renewRefundTimelock(ctx context.Context, signingJob *pb.RenewRefundTimelockSigningJob, leaf *ent.TreeNode) (*pb.RenewLeafResponse, error) {
 	err := h.validateRenewRefundTimelock(leaf)
 	if err != nil {
