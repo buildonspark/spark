@@ -314,13 +314,13 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 	}
 
 	// Apply and verify direct split node transaction signature
-	signedDirectSplitNodeTx, directSplitNodeTxBytes, err := h.applyAndVerifySignature(directSplitNodeTx, directSplitNodeSignature, parentTx.TxOut[0], 0)
+	_, directSplitNodeTxBytes, err := h.applyAndVerifySignature(directSplitNodeTx, directSplitNodeSignature, parentTx.TxOut[0], 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply and verify direct split node tx signature: %w", err)
 	}
 
 	// Apply and verify direct node transaction signature
-	signedDirectNodeTx, directNodeTxBytes, err := h.applyAndVerifySignature(directNodeTx, directNodeSignature, signedDirectSplitNodeTx.TxOut[0], 0)
+	signedDirectNodeTx, directNodeTxBytes, err := h.applyAndVerifySignature(directNodeTx, directNodeSignature, signedSplitNodeTx.TxOut[0], 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply and verify direct node tx signature: %w", err)
 	}
