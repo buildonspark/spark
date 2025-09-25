@@ -15,7 +15,7 @@ export class WalletConfigService implements HasSspClientOptions {
   public readonly signer: SparkSigner;
   public readonly sspClientOptions: SspClientOptions;
 
-  constructor(options?: ConfigOptions, signer?: SparkSigner) {
+  constructor(options: ConfigOptions = {}, signer: SparkSigner) {
     const network = options?.network ?? "REGTEST";
 
     this.config = {
@@ -23,7 +23,7 @@ export class WalletConfigService implements HasSspClientOptions {
       ...options,
     };
 
-    this.signer = signer ?? new DefaultSparkSigner();
+    this.signer = signer;
     this.sspClientOptions = this.config.sspClientOptions;
   }
 

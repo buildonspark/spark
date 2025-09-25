@@ -24,6 +24,7 @@ import {
 import { getTestWalletConfig, walletTypes } from "../test-utils.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
+import { DefaultSparkSigner } from "../../signer/signer.js";
 
 async function cleanUp() {
   const config = getTestWalletConfig();
@@ -33,7 +34,10 @@ async function cleanUp() {
   );
   const paymentHash = sha256(preimage);
 
-  const configService = new WalletConfigService(config);
+  const configService = new WalletConfigService(
+    config,
+    new DefaultSparkSigner(),
+  );
   const connectionManager = new ConnectionManagerNodeJS(configService);
   for (const operator of Object.values(config.signingOperators!)) {
     const client = await connectionManager.createMockClient(operator!.address);

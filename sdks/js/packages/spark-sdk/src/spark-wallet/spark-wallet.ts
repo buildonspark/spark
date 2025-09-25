@@ -107,7 +107,7 @@ import {
   isValidSparkFallback,
 } from "../services/bolt11-spark.js";
 import { SigningService } from "../services/signing.js";
-import { SparkSigner } from "../signer/signer.js";
+import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
 import { KeyDerivation, KeyDerivationType } from "../signer/types.js";
 import { BitcoinFaucet } from "../tests/utils/test-faucet.js";
 import {
@@ -195,9 +195,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   private tracer: Tracer | null = null;
 
-  constructor(options?: ConfigOptions, signer?: SparkSigner) {
+  constructor(options?: ConfigOptions, signerArg?: SparkSigner) {
     super();
 
+    const signer = signerArg || this.buildSigner();
     this.config = new WalletConfigService(options, signer);
     this.connectionManager = this.buildConnectionManager(this.config);
     this.signingService = new SigningService(this.config);
@@ -263,6 +264,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
     }
     return this.sspClient;
+  }
+
+  protected buildSigner() {
+    return new DefaultSparkSigner();
   }
 
   protected buildConnectionManager(config: WalletConfigService) {
