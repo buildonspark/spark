@@ -5,7 +5,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcjson"
 	_ "github.com/lightsparkdev/spark/so/ent/runtime"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
@@ -21,7 +20,6 @@ func TestMain(m *testing.M) {
 	}
 
 	faucet = sparktesting.GetFaucetInstance(client)
-	btcjson.MustRegisterCmd("submitpackage", (*SubmitPackageCmd)(nil), btcjson.UsageFlag(0))
 
 	// Run tests
 	code := m.Run()

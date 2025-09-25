@@ -50,7 +50,7 @@ func TestTimelockExpirationHappyPath(t *testing.T) {
 	// Broadcast the node transaction
 	nodeTx, err := common.TxFromRawTxBytes(rootNode.GetNodeTx())
 	require.NoError(t, err)
-	nodeTxBytes, err := serializeTx(nodeTx)
+	nodeTxBytes, err := common.SerializeTx(nodeTx)
 	require.NoError(t, err)
 
 	// Generate a block to start
@@ -226,7 +226,7 @@ func TestTimelockExpirationTransferredNode(t *testing.T) {
 	// Serialize the node transaction for database queries
 	nodeTx, err := common.TxFromRawTxBytes(transferredNode.GetNodeTx())
 	require.NoError(t, err)
-	nodeTxBytes, err := serializeTx(nodeTx)
+	nodeTxBytes, err := common.SerializeTx(nodeTx)
 	require.NoError(t, err)
 
 	// Generate a block to start
@@ -369,17 +369,17 @@ func TestTimelockExpirationMultiLevelTree(t *testing.T) {
 	// Serialize transactions for database queries
 	rootNodeTx, err := common.TxFromRawTxBytes(rootNode.GetNodeTx())
 	require.NoError(t, err)
-	rootNodeTxBytes, err := serializeTx(rootNodeTx)
+	rootNodeTxBytes, err := common.SerializeTx(rootNodeTx)
 	require.NoError(t, err)
 
 	parentNodeTx, err := common.TxFromRawTxBytes(parentNode.GetNodeTx())
 	require.NoError(t, err)
-	parentNodeTxBytes, err := serializeTx(parentNodeTx)
+	parentNodeTxBytes, err := common.SerializeTx(parentNodeTx)
 	require.NoError(t, err)
 
 	leafNodeTx, err := common.TxFromRawTxBytes(leafNode.GetNodeTx())
 	require.NoError(t, err)
-	leafNodeTxBytes, err := serializeTx(leafNodeTx)
+	leafNodeTxBytes, err := common.SerializeTx(leafNodeTx)
 	require.NoError(t, err)
 
 	// Generate a block to start
@@ -631,7 +631,7 @@ func TestTimelockExpirationAfterLightningTransfer(t *testing.T) {
 	// Serialize the node transaction for database queries
 	nodeTx, err := common.TxFromRawTxBytes(transferredNode.GetNodeTx())
 	require.NoError(t, err)
-	nodeTxBytes, err := serializeTx(nodeTx)
+	nodeTxBytes, err := common.SerializeTx(nodeTx)
 	require.NoError(t, err)
 
 	// Generate a block to start

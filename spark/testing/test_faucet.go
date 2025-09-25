@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"slices"
 	"sync"
 
 	"github.com/lightsparkdev/spark/common/keys"
@@ -300,6 +301,81 @@ func (f *Faucet) Refill() error {
 		f.coins = append(f.coins, faucetCoin)
 	}
 	log.Printf("Refilled faucet with %d coins", len(f.coins))
+
+	return nil
+}
+
+// Get some money from the faucet, create a tx fee bumping the provided tx,
+// broadcast the two txs together, mine them, and assert they both confirmed in the block.
+// If the tx has a timelock of X blocks, we'll assume the parent tx just confirmed,
+// and mine X blocks before broadcasting the tx.
+func (f *Faucet) FeeBumpAndConfirmTx(tx *wire.MsgTx) error {
+	miningScript, err := common.P2TRScriptFromPubKey(staticMiningKey.Public())
+	if err != nil {
+		return err
+	}
+
+	miningAddress, err := common.P2TRRawAddressFromPublicKey(staticMiningKey.Public(), common.Regtest)
+	if err != nil {
+		return err
+	}
+
+	txHash := tx.TxHash()
+	anchorOutPoint := wire.NewOutPoint(&txHash, uint32(len(tx.TxOut)-1))
+
+	coin, err := f.Fund()
+	if err != nil {
+		return err
+	}
+
+	feeBumpTx, err := SignFaucetCoinFeeBump(anchorOutPoint, coin, miningScript)
+	if err != nil {
+		return err
+	}
+
+	txBytes, err := common.SerializeTx(tx)
+	if err != nil {
+		return err
+	}
+
+	feeBumpTxBytes, err := common.SerializeTx(feeBumpTx)
+	if err != nil {
+		return err
+	}
+
+	// https://github.com/bitcoin/bips/blob/master/bip-0068.mediawiki
+	// https://learnmeabitcoin.com/technical/transaction/input/sequence/
+	timelockEnabled := tx.TxIn[0].Sequence <= 0xFFFFFFFE
+	timelock := int64(tx.TxIn[0].Sequence & 0xFFFF)
+	if timelockEnabled && timelock > 0 {
+		_, err = f.client.GenerateToAddress(timelock, miningAddress, nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = SubmitPackage(f.client, []string{hex.EncodeToString(txBytes), hex.EncodeToString(feeBumpTxBytes)})
+	if err != nil {
+		return err
+	}
+
+	blockHashes, err := f.client.GenerateToAddress(1, miningAddress, nil)
+	if err != nil {
+		return err
+	}
+
+	block, err := f.client.GetBlockVerbose(blockHashes[0])
+	if err != nil {
+		return err
+	}
+
+	if !slices.Contains(block.Tx, tx.TxID()) {
+		return fmt.Errorf("block did not contain the original transaction")
+	}
+
+	if !slices.Contains(block.Tx, feeBumpTx.TxID()) {
+		return fmt.Errorf("block did not contain the fee bump transaction")
+	}
 
 	return nil
 }
