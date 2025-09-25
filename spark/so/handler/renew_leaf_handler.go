@@ -676,6 +676,20 @@ func (h *RenewLeafHandler) renewRefundTimelock(ctx context.Context, signingJob *
 }
 
 // renewNodeZeroTimelock resets the timelock for a node that is at zero sequence and cannot be decremented further
+/*
+BEFORE                                AFTER
+---------------------------           ------------------------------------------------------------------------------------------------------------
+(node_tx timelock: 0)                 (node_tx timelock: 0)                // This transaction is to invalidate all the previously signed node_tx.
+|                                     |                             \      // This is a tempory solution to make sure that watchtower is able to
+|                                     |                              \     // prevent attacks. But after this is broadcasted, user will need to
+|                                     v                               \    // work with SOs to sign an exit transaction to claim the funds back
+|                                     (new_node_tx: timelock: 0)       \-> (direct_node_tx: timelock 50)
+|                                     |                       \
+|                                     |                        \
+v                                     v                         \
+(refund_tx: timelock:100)             (refund_tx  )              \-> (direct_refund_tx_from_cpfp)
+                                      (timelock:2000)                (timelock 2050             )
+*/
 func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob *pb.RenewNodeZeroTimelockSigningJob, leaf *ent.TreeNode) (*pb.RenewLeafResponse, error) {
 	err := h.validateRenewNodeZeroTimelock(leaf)
 	if err != nil {
