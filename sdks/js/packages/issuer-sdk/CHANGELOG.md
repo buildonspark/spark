@@ -1,5 +1,14 @@
 # @buildonspark/issuer-sdk
 
+## 0.0.100
+
+### Patch Changes
+
+- - Fix: replacement of lossy comparison for sorting token outputs
+  - Added React Native support and export directly from @buildonspark/issuer-sdk in RN
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.3.7
+
 ## 0.0.99
 
 ### Patch Changes

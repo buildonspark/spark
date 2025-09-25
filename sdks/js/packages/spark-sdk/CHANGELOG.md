@@ -1,5 +1,13 @@
 # @buildonspark/spark-sdk
 
+## 0.3.7
+
+### Patch Changes
+
+- - Direct exports from @buildonspark/spark-sdk support in React Native
+  - Default to ReactNativeSparkSigner in React Native if not provided to SparkWallet.initialize
+  - Add leaf optimization strategies
+
 ## 0.3.6
 
 ### Patch Changes

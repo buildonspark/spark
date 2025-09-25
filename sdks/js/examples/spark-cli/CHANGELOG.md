@@ -1,5 +1,14 @@
 # @buildonspark/spark-cli
 
+## 0.0.78
+
+### Patch Changes
+
+- Updated dependencies
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.3.7
+  - @buildonspark/issuer-sdk@0.0.100
+
 ## 0.0.77
 
 ### Patch Changes
