@@ -87,6 +87,25 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 }
 
 // Resets the node and refund transaction timelocks
+/*
+BEFORE                                   AFTER
+----------------------------             ------------------------------------------------------------------------------------------------------------
+(parent_node_tx timelock: 0)             (parent_node_tx timelock: 0)         // This transaction is to invalidate all the previously signed node_tx.
+|                                        |                             \      // This is a tempory solution to make sure that watchtower is able to
+|                                        |                              \     // prevent attacks. But after this is broadcasted, user will need to
+v                                        v                               \    // work with SOs to sign an exit transaction to claim the funds back
+(node_tx: timelock: 100)                 (node_tx: timelock: 0)           \-> (direct_node_tx: timelock 50)
+|                                        |                     \
+|                                        |                      \
+v                                        v                       \
+(refund_tx: timelock:100)                (new_node_tx  )          \-> (direc_node_tx: timelock 2050)
+                                         (timelock:2000)                                              \
+                                         |               \                                             \
+                                         |                \                                             \
+                                         v                 \                                             \
+                                         (refund_tx     )   \-> (direct_refund_tx_from_cpfp)              \->(direct_refund_tx)
+                                         (timelock: 2000)       (timelock: 2050            )                 (timelock: 2050  )
+*/
 func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb.RenewNodeTimelockSigningJob, leaf *ent.TreeNode) (*pb.RenewLeafResponse, error) {
 	err := h.validateRenewNodeTimelocks(leaf)
 	if err != nil {
