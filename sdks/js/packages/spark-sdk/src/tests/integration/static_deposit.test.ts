@@ -1,7 +1,5 @@
-import {
-  SparkWalletTesting,
-  initTestingWallet,
-} from "../utils/spark-testing-wallet.js";
+import { initTestingWallet } from "../utils/spark-testing-wallet.js";
+import { retryUntilSuccess } from "../utils/utils.js";
 
 export const DEPOSIT_AMOUNT = 10000n;
 
@@ -66,12 +64,15 @@ describe("SSP static deposit address integration", () => {
 
       const transactionId = signedTx.id;
 
-      const txId = await userWallet.refundAndBroadcastStaticDeposit({
-        depositTransactionId: transactionId,
-        outputIndex: vout!,
-        destinationAddress: depositAddress,
-        satsPerVbyteFee: 2,
-      });
+      const txId = await retryUntilSuccess(
+        async () =>
+          await userWallet.refundAndBroadcastStaticDeposit({
+            depositTransactionId: transactionId,
+            outputIndex: vout!,
+            destinationAddress: depositAddress,
+            satsPerVbyteFee: 2,
+          }),
+      );
 
       await faucet.mineBlocks(6);
 
