@@ -628,7 +628,6 @@ export interface SigningResult_SignatureSharesEntry {
 
 export interface RenewLeafRequest {
   leafId: string;
-  ownerIdentityPublicKey: Uint8Array;
   signingJobs?:
     | //
     /**
@@ -694,9 +693,9 @@ export interface RenewRefundTimelockSigningJob {
 }
 
 export interface RenewLeafResponse {
-  renewResult?: { $case: "extendResult"; extendResult: RenewNodeTimelockResult } | {
-    $case: "refreshResult";
-    refreshResult: RenewRefundTimelockResult;
+  renewResult?: { $case: "renewNodeTimelockResult"; renewNodeTimelockResult: RenewNodeTimelockResult } | {
+    $case: "renewRefundTimelockResult";
+    renewRefundTimelockResult: RenewRefundTimelockResult;
   } | undefined;
 }
 
@@ -1378,15 +1377,28 @@ export interface RequestedSigningCommitments_SigningNonceCommitmentsEntry {
 }
 
 export interface GetSigningCommitmentsRequest {
+  /** The node IDs for which to get signing commitments. */
   nodeIds: string[];
+  /** The number of signing commitments to get per node ID. */
   count: number;
 }
 
 export interface GetSigningCommitmentsResponse {
+  /**
+   * A list of signing commitments for each requested node ID. The signing commitments will be
+   * ordered in the same order as the requested node IDs, repeated for the number of commitments
+   * requested. For example, if node_ids = [A, B] and count = 2, the response will contain:
+   *
+   * [commitment_A1, commitment_B1, commitment_A2, commitment_B2]
+   */
   signingCommitments: RequestedSigningCommitments[];
 }
 
 export interface SigningCommitments {
+  /**
+   * A map of signing operator ID (i.e. 000...01) to the signing commitment provided by that
+   * operator.
+   */
   signingCommitments: { [key: string]: SigningCommitment };
 }
 
@@ -1420,6 +1432,7 @@ export interface InitiatePreimageSwapRequest {
   transfer: StartUserSignedTransferRequest | undefined;
   receiverIdentityPublicKey: Uint8Array;
   feeSats: number;
+  transferRequest: StartTransferRequest | undefined;
 }
 
 export enum InitiatePreimageSwapRequest_Reason {
@@ -4026,7 +4039,7 @@ export const SigningResult_SignatureSharesEntry: MessageFns<SigningResult_Signat
 };
 
 function createBaseRenewLeafRequest(): RenewLeafRequest {
-  return { leafId: "", ownerIdentityPublicKey: new Uint8Array(0), signingJobs: undefined };
+  return { leafId: "", signingJobs: undefined };
 }
 
 export const RenewLeafRequest: MessageFns<RenewLeafRequest> = {
@@ -4034,18 +4047,15 @@ export const RenewLeafRequest: MessageFns<RenewLeafRequest> = {
     if (message.leafId !== "") {
       writer.uint32(10).string(message.leafId);
     }
-    if (message.ownerIdentityPublicKey.length !== 0) {
-      writer.uint32(18).bytes(message.ownerIdentityPublicKey);
-    }
     switch (message.signingJobs?.$case) {
       case "renewNodeTimelockSigningJob":
-        RenewNodeTimelockSigningJob.encode(message.signingJobs.renewNodeTimelockSigningJob, writer.uint32(26).fork())
+        RenewNodeTimelockSigningJob.encode(message.signingJobs.renewNodeTimelockSigningJob, writer.uint32(18).fork())
           .join();
         break;
       case "renewRefundTimelockSigningJob":
         RenewRefundTimelockSigningJob.encode(
           message.signingJobs.renewRefundTimelockSigningJob,
-          writer.uint32(34).fork(),
+          writer.uint32(26).fork(),
         ).join();
         break;
     }
@@ -4072,22 +4082,14 @@ export const RenewLeafRequest: MessageFns<RenewLeafRequest> = {
             break;
           }
 
-          message.ownerIdentityPublicKey = reader.bytes();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
           message.signingJobs = {
             $case: "renewNodeTimelockSigningJob",
             renewNodeTimelockSigningJob: RenewNodeTimelockSigningJob.decode(reader, reader.uint32()),
           };
           continue;
         }
-        case 4: {
-          if (tag !== 34) {
+        case 3: {
+          if (tag !== 26) {
             break;
           }
 
@@ -4109,9 +4111,6 @@ export const RenewLeafRequest: MessageFns<RenewLeafRequest> = {
   fromJSON(object: any): RenewLeafRequest {
     return {
       leafId: isSet(object.leafId) ? globalThis.String(object.leafId) : "",
-      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
-        ? bytesFromBase64(object.ownerIdentityPublicKey)
-        : new Uint8Array(0),
       signingJobs: isSet(object.renewNodeTimelockSigningJob)
         ? {
           $case: "renewNodeTimelockSigningJob",
@@ -4131,9 +4130,6 @@ export const RenewLeafRequest: MessageFns<RenewLeafRequest> = {
     if (message.leafId !== "") {
       obj.leafId = message.leafId;
     }
-    if (message.ownerIdentityPublicKey.length !== 0) {
-      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
-    }
     if (message.signingJobs?.$case === "renewNodeTimelockSigningJob") {
       obj.renewNodeTimelockSigningJob = RenewNodeTimelockSigningJob.toJSON(
         message.signingJobs.renewNodeTimelockSigningJob,
@@ -4152,7 +4148,6 @@ export const RenewLeafRequest: MessageFns<RenewLeafRequest> = {
   fromPartial(object: DeepPartial<RenewLeafRequest>): RenewLeafRequest {
     const message = createBaseRenewLeafRequest();
     message.leafId = object.leafId ?? "";
-    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
     switch (object.signingJobs?.$case) {
       case "renewNodeTimelockSigningJob": {
         if (
@@ -4544,11 +4539,12 @@ function createBaseRenewLeafResponse(): RenewLeafResponse {
 export const RenewLeafResponse: MessageFns<RenewLeafResponse> = {
   encode(message: RenewLeafResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     switch (message.renewResult?.$case) {
-      case "extendResult":
-        RenewNodeTimelockResult.encode(message.renewResult.extendResult, writer.uint32(10).fork()).join();
+      case "renewNodeTimelockResult":
+        RenewNodeTimelockResult.encode(message.renewResult.renewNodeTimelockResult, writer.uint32(10).fork()).join();
         break;
-      case "refreshResult":
-        RenewRefundTimelockResult.encode(message.renewResult.refreshResult, writer.uint32(18).fork()).join();
+      case "renewRefundTimelockResult":
+        RenewRefundTimelockResult.encode(message.renewResult.renewRefundTimelockResult, writer.uint32(18).fork())
+          .join();
         break;
     }
     return writer;
@@ -4567,8 +4563,8 @@ export const RenewLeafResponse: MessageFns<RenewLeafResponse> = {
           }
 
           message.renewResult = {
-            $case: "extendResult",
-            extendResult: RenewNodeTimelockResult.decode(reader, reader.uint32()),
+            $case: "renewNodeTimelockResult",
+            renewNodeTimelockResult: RenewNodeTimelockResult.decode(reader, reader.uint32()),
           };
           continue;
         }
@@ -4578,8 +4574,8 @@ export const RenewLeafResponse: MessageFns<RenewLeafResponse> = {
           }
 
           message.renewResult = {
-            $case: "refreshResult",
-            refreshResult: RenewRefundTimelockResult.decode(reader, reader.uint32()),
+            $case: "renewRefundTimelockResult",
+            renewRefundTimelockResult: RenewRefundTimelockResult.decode(reader, reader.uint32()),
           };
           continue;
         }
@@ -4594,20 +4590,26 @@ export const RenewLeafResponse: MessageFns<RenewLeafResponse> = {
 
   fromJSON(object: any): RenewLeafResponse {
     return {
-      renewResult: isSet(object.extendResult)
-        ? { $case: "extendResult", extendResult: RenewNodeTimelockResult.fromJSON(object.extendResult) }
-        : isSet(object.refreshResult)
-        ? { $case: "refreshResult", refreshResult: RenewRefundTimelockResult.fromJSON(object.refreshResult) }
+      renewResult: isSet(object.renewNodeTimelockResult)
+        ? {
+          $case: "renewNodeTimelockResult",
+          renewNodeTimelockResult: RenewNodeTimelockResult.fromJSON(object.renewNodeTimelockResult),
+        }
+        : isSet(object.renewRefundTimelockResult)
+        ? {
+          $case: "renewRefundTimelockResult",
+          renewRefundTimelockResult: RenewRefundTimelockResult.fromJSON(object.renewRefundTimelockResult),
+        }
         : undefined,
     };
   },
 
   toJSON(message: RenewLeafResponse): unknown {
     const obj: any = {};
-    if (message.renewResult?.$case === "extendResult") {
-      obj.extendResult = RenewNodeTimelockResult.toJSON(message.renewResult.extendResult);
-    } else if (message.renewResult?.$case === "refreshResult") {
-      obj.refreshResult = RenewRefundTimelockResult.toJSON(message.renewResult.refreshResult);
+    if (message.renewResult?.$case === "renewNodeTimelockResult") {
+      obj.renewNodeTimelockResult = RenewNodeTimelockResult.toJSON(message.renewResult.renewNodeTimelockResult);
+    } else if (message.renewResult?.$case === "renewRefundTimelockResult") {
+      obj.renewRefundTimelockResult = RenewRefundTimelockResult.toJSON(message.renewResult.renewRefundTimelockResult);
     }
     return obj;
   },
@@ -4618,20 +4620,28 @@ export const RenewLeafResponse: MessageFns<RenewLeafResponse> = {
   fromPartial(object: DeepPartial<RenewLeafResponse>): RenewLeafResponse {
     const message = createBaseRenewLeafResponse();
     switch (object.renewResult?.$case) {
-      case "extendResult": {
-        if (object.renewResult?.extendResult !== undefined && object.renewResult?.extendResult !== null) {
+      case "renewNodeTimelockResult": {
+        if (
+          object.renewResult?.renewNodeTimelockResult !== undefined &&
+          object.renewResult?.renewNodeTimelockResult !== null
+        ) {
           message.renewResult = {
-            $case: "extendResult",
-            extendResult: RenewNodeTimelockResult.fromPartial(object.renewResult.extendResult),
+            $case: "renewNodeTimelockResult",
+            renewNodeTimelockResult: RenewNodeTimelockResult.fromPartial(object.renewResult.renewNodeTimelockResult),
           };
         }
         break;
       }
-      case "refreshResult": {
-        if (object.renewResult?.refreshResult !== undefined && object.renewResult?.refreshResult !== null) {
+      case "renewRefundTimelockResult": {
+        if (
+          object.renewResult?.renewRefundTimelockResult !== undefined &&
+          object.renewResult?.renewRefundTimelockResult !== null
+        ) {
           message.renewResult = {
-            $case: "refreshResult",
-            refreshResult: RenewRefundTimelockResult.fromPartial(object.renewResult.refreshResult),
+            $case: "renewRefundTimelockResult",
+            renewRefundTimelockResult: RenewRefundTimelockResult.fromPartial(
+              object.renewResult.renewRefundTimelockResult,
+            ),
           };
         }
         break;
@@ -12972,6 +12982,7 @@ function createBaseInitiatePreimageSwapRequest(): InitiatePreimageSwapRequest {
     transfer: undefined,
     receiverIdentityPublicKey: new Uint8Array(0),
     feeSats: 0,
+    transferRequest: undefined,
   };
 }
 
@@ -12994,6 +13005,9 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
     }
     if (message.feeSats !== 0) {
       writer.uint32(48).uint64(message.feeSats);
+    }
+    if (message.transferRequest !== undefined) {
+      StartTransferRequest.encode(message.transferRequest, writer.uint32(58).fork()).join();
     }
     return writer;
   },
@@ -13053,6 +13067,14 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
           message.feeSats = longToNumber(reader.uint64());
           continue;
         }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.transferRequest = StartTransferRequest.decode(reader, reader.uint32());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -13072,6 +13094,9 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
         ? bytesFromBase64(object.receiverIdentityPublicKey)
         : new Uint8Array(0),
       feeSats: isSet(object.feeSats) ? globalThis.Number(object.feeSats) : 0,
+      transferRequest: isSet(object.transferRequest)
+        ? StartTransferRequest.fromJSON(object.transferRequest)
+        : undefined,
     };
   },
 
@@ -13095,6 +13120,9 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
     if (message.feeSats !== 0) {
       obj.feeSats = Math.round(message.feeSats);
     }
+    if (message.transferRequest !== undefined) {
+      obj.transferRequest = StartTransferRequest.toJSON(message.transferRequest);
+    }
     return obj;
   },
 
@@ -13113,6 +13141,9 @@ export const InitiatePreimageSwapRequest: MessageFns<InitiatePreimageSwapRequest
       : undefined;
     message.receiverIdentityPublicKey = object.receiverIdentityPublicKey ?? new Uint8Array(0);
     message.feeSats = object.feeSats ?? 0;
+    message.transferRequest = (object.transferRequest !== undefined && object.transferRequest !== null)
+      ? StartTransferRequest.fromPartial(object.transferRequest)
+      : undefined;
     return message;
   },
 };
@@ -19900,6 +19931,10 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /**
+     * Gets a specified number of signing commmitments for a set of nodes, which can be used as
+     * part of a transfer package.
+     */
     get_signing_commitments: {
       name: "get_signing_commitments",
       requestType: GetSigningCommitmentsRequest,
@@ -20330,6 +20365,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StorePreimageShareRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<Empty>>;
+  /**
+   * Gets a specified number of signing commmitments for a set of nodes, which can be used as
+   * part of a transfer package.
+   */
   get_signing_commitments(
     request: GetSigningCommitmentsRequest,
     context: CallContext & CallContextExt,
@@ -20596,6 +20635,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<StorePreimageShareRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<Empty>;
+  /**
+   * Gets a specified number of signing commmitments for a set of nodes, which can be used as
+   * part of a transfer package.
+   */
   get_signing_commitments(
     request: DeepPartial<GetSigningCommitmentsRequest>,
     options?: CallOptions & CallOptionsExt,

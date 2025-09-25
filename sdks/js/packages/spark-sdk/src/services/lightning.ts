@@ -15,6 +15,7 @@ import {
   ProvidePreimageResponse,
   QueryUserSignedRefundsResponse,
   Transfer,
+  StartTransferRequest,
   UserSignedRefund,
 } from "../proto/spark.js";
 import { getTxFromRawTxBytes } from "../utils/bitcoin.js";
@@ -51,6 +52,9 @@ export type SwapNodesForPreimageParams = {
   isInboundPayment: boolean;
   feeSats?: number;
   amountSatsToSend?: number;
+  startTransferRequest?: StartTransferRequest;
+  expiryTime?: Date;
+  transferID?: string;
 };
 
 export class LightningService {
@@ -175,6 +179,19 @@ export class LightningService {
     return invoice;
   }
 
+  /**
+   * Swap nodes for preimage
+   * @param leaves - The leaves to swap for preimage
+   * @param receiverIdentityPubkey - The receiver identity public key
+   * @param paymentHash - The payment hash
+   * @param invoiceString - The invoice string
+   * @param isInboundPayment - Whether the payment is inbound
+   * @param feeSats - The fee in sats
+   * @param amountSatsToSend - The amount in sats to send
+   * @param expiryTime - The expiry time
+   * @param startTransferRequest - The start transfer request, do not populate if is inbound payment
+   * @param transferID - The transfer ID, do not populate if is inbound payment
+   */
   async swapNodesForPreimage({
     leaves,
     receiverIdentityPubkey,
@@ -183,6 +200,9 @@ export class LightningService {
     isInboundPayment,
     feeSats = 0,
     amountSatsToSend,
+    expiryTime,
+    startTransferRequest,
+    transferID,
   }: SwapNodesForPreimageParams): Promise<InitiatePreimageSwapResponse> {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
@@ -222,7 +242,7 @@ export class LightningService {
       signingCommitments.signingCommitments.slice(2 * leaves.length),
     );
 
-    const transferId = uuidv7();
+    const transferId = transferID ? transferID : uuidv7();
     let bolt11String = "";
     let amountSats: number = 0;
     if (invoiceString) {
@@ -267,6 +287,7 @@ export class LightningService {
       : InitiatePreimageSwapRequest_Reason.REASON_SEND;
 
     let response: InitiatePreimageSwapResponse;
+    // TODO(LIG-8126): Remove transfer inputs once SDK upgrade is complete
     try {
       response = await sparkClient.initiate_preimage_swap_v2({
         paymentHash,
@@ -282,13 +303,18 @@ export class LightningService {
           ownerIdentityPublicKey:
             await this.config.signer.getIdentityPublicKey(),
           leavesToSend: cpfpLeafSigningJobs,
-          directLeavesToSend: directLeafSigningJobs,
-          directFromCpfpLeavesToSend: directFromCpfpLeafSigningJobs,
+          directLeavesToSend: startTransferRequest
+            ? undefined
+            : directLeafSigningJobs,
+          directFromCpfpLeavesToSend: startTransferRequest
+            ? undefined
+            : directFromCpfpLeafSigningJobs,
           receiverIdentityPublicKey: receiverIdentityPubkey,
-          expiryTime: new Date(Date.now() + 2 * 60 * 1000),
+          expiryTime,
         },
         receiverIdentityPublicKey: receiverIdentityPubkey,
         feeSats,
+        transferRequest: startTransferRequest,
       });
     } catch (error) {
       throw new NetworkError(

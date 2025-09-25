@@ -29,6 +29,7 @@ import {
   SendLeafKeyTweak,
   SendLeafKeyTweaks,
   SigningJob,
+  StartTransferRequest,
   StartTransferResponse,
   Transfer,
   TransferPackage,
@@ -67,7 +68,6 @@ import { getTransferPackageSigningPayload } from "../utils/transfer_package.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection/connection.js";
 import { SigningService } from "./signing.js";
-const DEFAULT_EXPIRY_TIME = 10 * 60 * 1000;
 
 export type LeafKeyTweak = {
   leaf: TreeNode;
@@ -179,6 +179,41 @@ export class BaseTransferService {
     return response.transfer;
   }
 
+  async prepareTransferForLightning(
+    leaves: LeafKeyTweak[],
+    receiverIdentityPubkey: Uint8Array,
+    paymentHash: Uint8Array,
+    expiryTime: Date,
+    transferID: string,
+  ): Promise<StartTransferRequest> {
+    const keyTweakInputMap = await this.prepareSendTransferKeyTweaks(
+      transferID,
+      receiverIdentityPubkey,
+      leaves,
+      new Map<string, Uint8Array>(),
+      new Map<string, Uint8Array>(),
+      new Map<string, Uint8Array>(),
+    );
+
+    const transferPackage = await this.prepareTransferPackageForLightning(
+      transferID,
+      keyTweakInputMap,
+      leaves,
+      receiverIdentityPubkey,
+      paymentHash,
+    );
+
+    return {
+      transferId: transferID,
+      ownerIdentityPublicKey: await this.config.signer.getIdentityPublicKey(),
+      receiverIdentityPublicKey: receiverIdentityPubkey,
+      transferPackage,
+      sparkInvoice: "",
+      leavesToSend: [],
+      expiryTime,
+    };
+  }
+
   async sendTransferWithKeyTweaks(
     leaves: LeafKeyTweak[],
     receiverIdentityPubkey: Uint8Array,
@@ -266,6 +301,86 @@ export class BaseTransferService {
         2 * leaves.length,
       ),
       signingCommitments.signingCommitments.slice(2 * leaves.length),
+    );
+
+    const encryptedKeyTweaks: { [key: string]: Uint8Array } = {};
+    for (const [key, value] of keyTweakInputMap) {
+      const protoToEncrypt: SendLeafKeyTweaks = {
+        leavesToSend: value,
+      };
+
+      const protoToEncryptBinary =
+        SendLeafKeyTweaks.encode(protoToEncrypt).finish();
+
+      const operator = this.config.getSigningOperators()[key];
+      if (!operator) {
+        throw new ValidationError("Operator not found");
+      }
+
+      const soPublicKey = ecies.PublicKey.fromHex(operator.identityPublicKey);
+
+      const encryptedProto = ecies.encrypt(
+        soPublicKey.toBytes(),
+        protoToEncryptBinary,
+      );
+      encryptedKeyTweaks[key] = Uint8Array.from(encryptedProto);
+    }
+
+    const transferPackage: TransferPackage = {
+      leavesToSend: cpfpLeafSigningJobs,
+      keyTweakPackage: encryptedKeyTweaks,
+      userSignature: new Uint8Array(),
+      directLeavesToSend: directLeafSigningJobs,
+      directFromCpfpLeavesToSend: directFromCpfpLeafSigningJobs,
+    };
+
+    const transferPackageSigningPayload = getTransferPackageSigningPayload(
+      transferID,
+      transferPackage,
+    );
+    const signature = await this.config.signer.signMessageWithIdentityKey(
+      transferPackageSigningPayload,
+    );
+    transferPackage.userSignature = new Uint8Array(signature);
+
+    return transferPackage;
+  }
+
+  private async prepareTransferPackageForLightning(
+    transferID: string,
+    keyTweakInputMap: Map<string, SendLeafKeyTweak[]>,
+    leaves: LeafKeyTweak[],
+    receiverIdentityPubkey: Uint8Array,
+    paymentHash: Uint8Array,
+  ): Promise<TransferPackage> {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+
+    const nodes: string[] = [];
+
+    for (const leaf of leaves) {
+      nodes.push(leaf.leaf.id);
+    }
+    const signingCommitments = await sparkClient.get_signing_commitments({
+      nodeIds: nodes,
+      count: 3,
+    });
+
+    const {
+      cpfpLeafSigningJobs,
+      directLeafSigningJobs,
+      directFromCpfpLeafSigningJobs,
+    } = await this.signingService.signRefundsForLightning(
+      leaves,
+      receiverIdentityPubkey,
+      signingCommitments.signingCommitments.slice(0, leaves.length),
+      signingCommitments.signingCommitments.slice(
+        leaves.length,
+        2 * leaves.length,
+      ),
+      signingCommitments.signingCommitments.slice(2 * leaves.length),
+      paymentHash,
     );
 
     const encryptedKeyTweaks: { [key: string]: Uint8Array } = {};

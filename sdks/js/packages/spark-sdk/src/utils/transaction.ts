@@ -9,6 +9,8 @@ const TEST_UNILATERAL_TIMELOCK = 100;
 
 const TIME_LOCK_INTERVAL = 100;
 export const DIRECT_TIMELOCK_OFFSET = 50;
+export const HTLC_TIMELOCK_OFFSET = 70;
+export const DIRECT_HTLC_TIMELOCK_OFFSET = 85;
 
 export const INITIAL_SEQUENCE = (1 << 30) | INITIAL_TIMELOCK;
 export const INITIAL_DIRECT_SEQUENCE =
@@ -267,6 +269,39 @@ export function createRefundTx({
   return refundTx;
 }
 
+export function getNextHTLCTransactionSequence(
+  currSequence: number,
+  isNodeTx?: boolean,
+): {
+  nextSequence: number;
+  nextDirectSequence: number;
+} {
+  const currentTimelock = getCurrentTimelock(currSequence);
+  const nextTimelock = currentTimelock - TIME_LOCK_INTERVAL;
+  const isBit30Defined = (currSequence || 0) & (1 << 30);
+
+  if (isNodeTx && nextTimelock < 0) {
+    throw new ValidationError("timelock interval is less than 0", {
+      field: "nextTimelock",
+      value: nextTimelock,
+      expected: "Non-negative timelock interval",
+    });
+  } else if (!isNodeTx && nextTimelock <= 0) {
+    throw new ValidationError("timelock interval is less than or equal to 0", {
+      field: "nextTimelock",
+      value: nextTimelock,
+      expected: "Timelock greater than 0",
+    });
+  }
+
+  // If bit 30 is defined, we need to add it to the next sequence.
+  return {
+    nextSequence: isBit30Defined | (nextTimelock + HTLC_TIMELOCK_OFFSET),
+    nextDirectSequence:
+      isBit30Defined | (nextTimelock + DIRECT_HTLC_TIMELOCK_OFFSET),
+  };
+}
+
 interface CreateRefundTxsInput {
   sequence: number;
   directSequence?: number;
@@ -276,6 +311,7 @@ interface CreateRefundTxsInput {
   receivingPubkey: Uint8Array;
   network: Network;
 }
+
 export function createRefundTxs({
   sequence,
   directSequence,

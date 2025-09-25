@@ -3507,6 +3507,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     // Pay over Lightning
     return await this.withLeaves(async () => {
+      const expiryTime = new Date(Date.now() + 2 * 60 * 1000);
       const sspClient = this.getSspClient();
 
       // If 0 amount lightning invoice, use amountSatsToSend for fee estimate
@@ -3557,6 +3558,17 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         })),
       );
 
+      const transferID = uuidv7();
+
+      const startTransferRequest =
+        await this.transferService.prepareTransferForLightning(
+          leavesToSend,
+          hexToBytes(this.config.getSspIdentityPublicKey()),
+          hexToBytes(paymentHash),
+          expiryTime,
+          transferID,
+        );
+
       const swapResponse = await this.lightningService.swapNodesForPreimage({
         leaves: leavesToSend,
         receiverIdentityPubkey: hexToBytes(
@@ -3567,19 +3579,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         invoiceString: invoice,
         feeSats: feeEstimate,
         amountSatsToSend: amountSatsToSend,
+        startTransferRequest,
+        expiryTime,
+        transferID,
       });
 
       if (!swapResponse.transfer) {
         throw new Error("Failed to swap nodes for preimage");
       }
-
-      await this.transferService.deliverTransferPackage(
-        swapResponse.transfer,
-        leavesToSend,
-        new Map(),
-        new Map(),
-        new Map(),
-      );
 
       const sspResponse = await sspClient.requestLightningSend({
         encodedInvoice: invoice,

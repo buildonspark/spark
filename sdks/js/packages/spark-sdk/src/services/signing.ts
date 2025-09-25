@@ -14,8 +14,11 @@ import {
 } from "../utils/bitcoin.js";
 import {
   createRefundTxs,
+  getNextHTLCTransactionSequence,
   getNextTransactionSequence,
 } from "../utils/transaction.js";
+import { createRefundTxsForLightning } from "../utils/htlc-transactions.js";
+import { getNetwork } from "../utils/network.js";
 import { WalletConfigService } from "./config.js";
 import type { LeafKeyTweak } from "./transfer.js";
 
@@ -200,6 +203,140 @@ export class SigningService {
             },
           );
         }
+        const refundSighash = getSigHashFromTx(
+          directFromCpfpRefundTx,
+          0,
+          nodeTx.getOutput(0),
+        );
+        const signingJobs = await this.signRefundsInternal(
+          directFromCpfpRefundTx,
+          refundSighash,
+          leaf,
+          directFromCpfpSigningCommitments[i]?.signingNonceCommitments,
+        );
+        directFromCpfpLeafSigningJobs.push(...signingJobs);
+      }
+    }
+
+    return {
+      cpfpLeafSigningJobs,
+      directLeafSigningJobs,
+      directFromCpfpLeafSigningJobs,
+    };
+  }
+
+  async signRefundsForLightning(
+    leaves: LeafKeyTweak[],
+    receiverIdentityPubkey: Uint8Array,
+    cpfpSigningCommitments: RequestedSigningCommitments[],
+    directSigningCommitments: RequestedSigningCommitments[],
+    directFromCpfpSigningCommitments: RequestedSigningCommitments[],
+    hash: Uint8Array,
+  ): Promise<{
+    cpfpLeafSigningJobs: UserSignedTxSigningJob[];
+    directLeafSigningJobs: UserSignedTxSigningJob[];
+    directFromCpfpLeafSigningJobs: UserSignedTxSigningJob[];
+  }> {
+    const network = getNetwork(this.config.getNetwork());
+    const cpfpLeafSigningJobs: UserSignedTxSigningJob[] = [];
+    const directLeafSigningJobs: UserSignedTxSigningJob[] = [];
+    const directFromCpfpLeafSigningJobs: UserSignedTxSigningJob[] = [];
+
+    for (let i = 0; i < leaves.length; i++) {
+      const leaf = leaves[i];
+      if (!leaf?.leaf) {
+        throw new ValidationError("Leaf not found in signRefunds", {
+          field: "leaf",
+          value: leaf,
+          expected: "Non-null leaf",
+        });
+      }
+
+      const nodeTx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
+
+      const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
+
+      const sequence = currRefundTx.getInput(0).sequence;
+      if (!sequence) {
+        throw new ValidationError("Invalid refund transaction", {
+          field: "sequence",
+          value: currRefundTx.getInput(0),
+          expected: "Non-null sequence",
+        });
+      }
+
+      const amountSats = currRefundTx.getOutput(0).amount;
+      if (amountSats === undefined) {
+        throw new ValidationError("Invalid refund transaction", {
+          field: "amount",
+          value: currRefundTx.getOutput(0),
+          expected: "Non-null amount",
+        });
+      }
+
+      const { nextSequence, nextDirectSequence } =
+        getNextHTLCTransactionSequence(sequence);
+
+      let directNodeTx: Transaction | undefined;
+      if (leaf.leaf.directTx.length > 0) {
+        directNodeTx = getTxFromRawTxBytes(leaf.leaf.directTx);
+      }
+
+      const identityPublicKey = await this.config.signer.getIdentityPublicKey();
+
+      const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
+        createRefundTxsForLightning({
+          nodeTx: nodeTx,
+          directNodeTx: directNodeTx,
+          vout: 0,
+          network,
+          sequence: nextSequence,
+          directSequence: nextDirectSequence,
+          hash,
+          hashLockDestinationPubkey: receiverIdentityPubkey,
+          sequenceLockDestinationPubkey: identityPublicKey,
+        });
+
+      const refundSighash = getSigHashFromTx(
+        cpfpRefundTx,
+        0,
+        nodeTx.getOutput(0),
+      );
+      const signingJobs = await this.signRefundsInternal(
+        cpfpRefundTx,
+        refundSighash,
+        leaf,
+        cpfpSigningCommitments[i]?.signingNonceCommitments,
+      );
+
+      cpfpLeafSigningJobs.push(...signingJobs);
+
+      if (directRefundTx) {
+        if (!directNodeTx) {
+          throw new ValidationError(
+            "Direct node transaction undefined while direct refund transaction is defined",
+            {
+              field: "directNodeTx",
+              value: directNodeTx,
+              expected: "Non-null direct node transaction",
+            },
+          );
+        }
+        const refundSighash = getSigHashFromTx(
+          directRefundTx,
+          0,
+          directNodeTx.getOutput(0),
+        );
+        const signingJobs = await this.signRefundsInternal(
+          directRefundTx,
+          refundSighash,
+          leaf,
+          directSigningCommitments[i]?.signingNonceCommitments,
+        );
+        directLeafSigningJobs.push(...signingJobs);
+      }
+
+      if (directFromCpfpRefundTx) {
         const refundSighash = getSigHashFromTx(
           directFromCpfpRefundTx,
           0,

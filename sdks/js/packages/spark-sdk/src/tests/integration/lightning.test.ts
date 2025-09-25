@@ -195,6 +195,7 @@ describe.each(walletTypes)(
 
       const leafId = uuidv7();
       const nodeToSend = await createTree(sspWallet, leafId, faucet, 12345n);
+      const expiryTime = new Date(Date.now() + 2 * 60 * 1000);
 
       const newDerivationPath: KeyDerivation = {
         type: KeyDerivationType.LEAF,
@@ -217,6 +218,7 @@ describe.each(walletTypes)(
         receiverIdentityPubkey: await userConfig.signer.getIdentityPublicKey(),
         paymentHash,
         isInboundPayment: true,
+        expiryTime,
       });
 
       expect(equalBytes(response.preimage, preimage)).toBe(true);
@@ -299,6 +301,7 @@ describe.each(walletTypes)(
 
       const leafId = uuidv7();
       const nodeToSend = await createTree(sspWallet, leafId, faucet, 12345n);
+      const expiryTime = new Date(Date.now() + 2 * 60 * 1000);
 
       const newKeyDerivation: KeyDerivation = {
         type: KeyDerivationType.LEAF,
@@ -320,6 +323,7 @@ describe.each(walletTypes)(
         receiverIdentityPubkey: await userConfig.signer.getIdentityPublicKey(),
         paymentHash,
         isInboundPayment: true,
+        expiryTime,
       });
 
       expect(equalBytes(response.preimage, preimage)).toBe(true);
@@ -390,6 +394,7 @@ describe.each(walletTypes)(
       const paymentHash = sha256(preimage);
 
       const leafId = uuidv7();
+      const expiryTime = new Date(Date.now() + 2 * 60 * 1000);
       const nodeToSend = await createTree(userWallet, leafId, faucet, 12345n);
 
       const newKeyDerivation: KeyDerivation = {
@@ -414,6 +419,7 @@ describe.each(walletTypes)(
         paymentHash,
         isInboundPayment: false,
         invoiceString: (await fakeInvoiceCreator()).invoice.encodedInvoice,
+        expiryTime,
       });
 
       expect(response.transfer).toBeDefined();
@@ -464,7 +470,7 @@ describe.each(walletTypes)(
       expect(receiverTransfer.status).toEqual(
         TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
       );
-      expect(receiverTransfer.id).toEqual(transfer.id);
+      expect(receiverTransfer.id).toEqual(transfer!.id);
 
       const leafPrivKeyMap =
         await sspTransferService.verifyPendingTransfer(receiverTransfer);
@@ -506,6 +512,8 @@ describe.each(walletTypes)(
       const paymentHash = sha256(preimage);
 
       const leafId = uuidv7();
+      const transferID = uuidv7();
+      const expiryTime = new Date(Date.now() + 2 * 60 * 1000);
       const nodeToSend = await createTree(userWallet, leafId, faucet, 12345n);
 
       const newKeyDerivation: KeyDerivation = {
@@ -524,25 +532,31 @@ describe.each(walletTypes)(
         },
       ];
 
+      const startTransferRequest =
+        await transferService.prepareTransferForLightning(
+          leaves,
+          await sspConfig.signer.getIdentityPublicKey(),
+          paymentHash,
+          expiryTime,
+          transferID,
+        );
+
       const response = await lightningService.swapNodesForPreimage({
         leaves,
         receiverIdentityPubkey: await sspConfig.signer.getIdentityPublicKey(),
         paymentHash,
         isInboundPayment: false,
         invoiceString: (await fakeInvoiceCreator()).invoice.encodedInvoice,
+        startTransferRequest,
+        expiryTime,
+        transferID,
       });
 
       expect(response.transfer).toBeDefined();
 
-      const transfer = await transferService.deliverTransferPackage(
-        response.transfer!,
-        leaves,
-        new Map(),
-        new Map(),
-        new Map(),
-      );
+      const transfer = response.transfer;
 
-      expect(transfer.status).toEqual(
+      expect(transfer!.status).toEqual(
         TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING,
       );
 
@@ -550,7 +564,7 @@ describe.each(walletTypes)(
         await sspLightningService.queryUserSignedRefunds(paymentHash);
 
       let expectedValue = 0n;
-      for (const leaf of transfer.leaves) {
+      for (const leaf of transfer!.leaves) {
         const cpfpRefund = getTxFromRawTxBytes(leaf.intermediateRefundTx);
         expectedValue += cpfpRefund.getOutput(0)?.amount || 0n;
 
@@ -582,7 +596,7 @@ describe.each(walletTypes)(
       expect(receiverTransfer.status).toEqual(
         TransferStatus.TRANSFER_STATUS_SENDER_KEY_TWEAKED,
       );
-      expect(receiverTransfer.id).toEqual(transfer.id);
+      expect(receiverTransfer.id).toEqual(transfer!.id);
 
       const leafPrivKeyMap =
         await sspTransferService.verifyPendingTransfer(receiverTransfer);
