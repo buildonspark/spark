@@ -381,7 +381,7 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		SetSigningKeyshareID(signingKeyshare.ID).
 		SetRawTx(splitNodeTxBytes).
 		SetDirectTx(directSplitNodeTxBytes).
-		SetVout(int16(0))
+		SetVout(leaf.Vout)
 	if leaf.Edges.Parent != nil {
 		mut.SetParentID(leaf.Edges.Parent.ID)
 	}
@@ -887,7 +887,7 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 		SetSigningKeyshareID(signingKeyshare.ID).
 		SetRawTx(leaf.RawTx).
 		SetDirectTx(leaf.DirectTx).
-		SetVout(int16(0))
+		SetVout(leaf.Vout)
 	if leaf.Edges.Parent != nil {
 		mut.SetParentID(leaf.Edges.Parent.ID)
 	}
