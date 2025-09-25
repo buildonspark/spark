@@ -57,6 +57,22 @@ describe('Spark React Native App', () => {
     await expect(element(by.id('dummy-tx-display'))).toBeVisible();
   });
 
+  it('should create test token after wallet connection', async () => {
+    await element(by.id('connect-wallet-button')).tap();
+
+    await waitFor(element(by.id('wallet-status')))
+      .toBeVisible()
+      .withTimeout(5000);
+
+    await element(by.id('create-test-token-button')).tap();
+
+    await waitFor(element(by.id('test-token-tx-id-display')))
+      .toBeVisible()
+      .withTimeout(5000);
+
+    await expect(element(by.id('test-token-tx-id-display'))).toBeVisible();
+  });
+
   it('should handle wallet operations in sequence', async () => {
     // Test the full flow: connect wallet -> create invoice -> test bindings
     await element(by.id('connect-wallet-button')).tap();
@@ -80,5 +96,13 @@ describe('Spark React Native App', () => {
       .withTimeout(5000);
 
     await expect(element(by.id('dummy-tx-display'))).toBeVisible();
+
+    await element(by.id('create-test-token-button')).tap();
+
+    await waitFor(element(by.id('test-token-tx-id-display')))
+      .toBeVisible()
+      .withTimeout(5000);
+
+    await expect(element(by.id('test-token-tx-id-display'))).toBeVisible();
   });
 });
