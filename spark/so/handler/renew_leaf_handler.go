@@ -1318,7 +1318,8 @@ func (h *RenewLeafHandler) validateRenewNodeTimelocks(leaf *ent.TreeNode) error 
 }
 
 // validateRenewRefundTimelock validates the timelock requirements for a renew
-// refund timelock operation. Refund timelock must be <= 300
+// refund timelock operation. Refund timelock must be <= 300, and the node
+// timelock must not go below 100 following a decrement.
 func (h *RenewLeafHandler) validateRenewRefundTimelock(leaf *ent.TreeNode) error {
 	// Check the leaf's refund transaction sequence
 	leafRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
@@ -1332,6 +1333,24 @@ func (h *RenewLeafHandler) validateRenewRefundTimelock(leaf *ent.TreeNode) error
 
 	if refundTimelock > 300 {
 		return errors.FailedPreconditionErrorf("leaf %s refund transaction sequence must be less than or equal to 300, got %d", leaf.ID, refundTimelock)
+	}
+
+	// Check the next sequence of the leaf's node transaction
+	leafNodeTx, err := common.TxFromRawTxBytes(leaf.RawTx)
+	if err != nil {
+		return fmt.Errorf("failed to parse leaf node transaction: %w", err)
+	}
+	if len(leafNodeTx.TxIn) == 0 {
+		return fmt.Errorf("found no tx inputs for leaf node tx %v", leafNodeTx)
+	}
+	nextNodeSequence, err := spark.NextSequence(leafNodeTx.TxIn[0].Sequence)
+	if err != nil {
+		return fmt.Errorf("failed to decrement node tx timelock: %w", err)
+	}
+	nextNodeTimelock := nextNodeSequence & 0xffff
+
+	if nextNodeTimelock < 100 {
+		return errors.FailedPreconditionErrorf("next leaf %s node transaction sequence must be 100 or greater, got %d", leaf.ID, nextNodeTimelock)
 	}
 
 	return nil
