@@ -71,6 +71,24 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer receiver identity public key: %w", err)
 	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get database transaction: %w", err)
+	}
+	transferUUID, err := uuid.Parse(req.Transfer.TransferId)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.Transfer.TransferId, err)
+	}
+	_, err = db.PendingSendTransfer.Create().SetTransferID(transferUUID).SetStatus(st.PendingSendTransferStatusPending).Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create pending send transfer: %w", err)
+	}
+	err = db.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("unable to commit database transaction: %w", err)
+	}
+
 	transfer, leafMap, err := transferHandler.createTransfer(
 		ctx,
 		req.Transfer.TransferId,
@@ -99,7 +117,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 		return nil, fmt.Errorf("exit_txid is not 32 bytes in request %s: %x", logging.FormatProto("cooperative_exit_request", req), req.ExitTxid)
 	}
 
-	db, err := ent.GetDbFromContext(ctx)
+	db, err = ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request %s: %w", logging.FormatProto("cooperative_exit_request", req), err)
 	}

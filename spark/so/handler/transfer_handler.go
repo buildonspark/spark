@@ -25,6 +25,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
+	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -158,6 +159,23 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate sats spark invoice: %s for transfer id: %s. error: %w", req.SparkInvoice, req.TransferId, err)
 		}
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get database transaction: %w", err)
+	}
+	transferUUID, err := uuid.Parse(req.TransferId)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.TransferId, err)
+	}
+	_, err = db.PendingSendTransfer.Create().SetTransferID(transferUUID).SetStatus(st.PendingSendTransferStatusPending).Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create pending send transfer: %w", err)
+	}
+	err = db.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("unable to commit database transaction: %w", err)
 	}
 
 	transfer, leafMap, err := h.createTransfer(
@@ -306,6 +324,15 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		transfer, err = h.loadTransferForUpdate(ctx, req.TransferId)
 		if err != nil {
 			return nil, fmt.Errorf("unable to load transfer: %w", err)
+		}
+
+		db, err = ent.GetDbFromContext(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get database transaction: %w", err)
+		}
+		_, err = db.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transfer.ID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update pending send transfer: %w", err)
 		}
 	}
 
@@ -1319,6 +1346,15 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal transfer: %w", err)
+	}
+
+	db, err = ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get database transaction: %w", err)
+	}
+	_, err = db.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transfer.ID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update pending send transfer: %w", err)
 	}
 	return &pb.FinalizeTransferResponse{Transfer: transferProto}, err
 }

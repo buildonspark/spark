@@ -29,6 +29,7 @@ import (
 	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -1282,6 +1283,23 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		}
 	}
 
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get database transaction: %w", err)
+	}
+	transferUUID, err := uuid.Parse(req.Transfer.TransferId)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.Transfer.TransferId, err)
+	}
+	_, err = db.PendingSendTransfer.Create().SetTransferID(transferUUID).SetStatus(st.PendingSendTransferStatusPending).Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create pending send transfer: %w", err)
+	}
+	err = db.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("unable to commit database transaction: %w", err)
+	}
+
 	transfer, leafMap, err := transferHandler.createTransfer(
 		ctx,
 		req.Transfer.TransferId,
@@ -1431,6 +1449,13 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 	err = preimageRequest.Update().SetStatus(st.PreimageRequestStatusPreimageShared).Exec(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to update preimage request status for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID.String(), err)
+	}
+
+	if req.TransferRequest != nil {
+		_, err = db.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transfer.ID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update pending send transfer: %w", err)
+		}
 	}
 
 	return &pb.InitiatePreimageSwapResponse{Preimage: secretBytes, Transfer: transferProto}, nil
