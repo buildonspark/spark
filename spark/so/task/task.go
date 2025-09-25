@@ -32,6 +32,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
+	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingcommitment"
@@ -548,6 +549,57 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 								if err := h.CompleteSwapForAllOperators(ctx, config, completedUtxoSwapRequest); err != nil {
 									logger.Warn("Failed to mark a utxo swap as completed in all operators, cron task to retry", zap.Error(err))
 								}
+							}
+						}
+					}
+					return nil
+				},
+			},
+		},
+		{
+			ExecutionInterval: 10 * time.Minute,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "monitor_pending_send_transfers",
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					logger := logging.GetLoggerFromContext(ctx)
+					tx, err := ent.GetDbFromContext(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get or create current tx for request: %w", err)
+					}
+					pendingSendTransfers, err := tx.PendingSendTransfer.Query().Where(
+						pendingsendtransfer.StatusEQ(st.PendingSendTransferStatusPending),
+						pendingsendtransfer.UpdateTimeLT(time.Now().Add(-10*time.Minute)),
+					).Limit(1000).ForUpdate().All(ctx)
+					if err != nil {
+						return err
+					}
+					for _, pendingSendTransfer := range pendingSendTransfers {
+						logger.Sugar().Infof("Pending send transfer %s is still pending", pendingSendTransfer.ID)
+						transfer, err := tx.Transfer.Query().Where(transfer.IDEQ(pendingSendTransfer.TransferID)).Only(ctx)
+						if err != nil && !ent.IsNotFound(err) {
+							logger.Sugar().Errorf("failed to get transfer", zap.Error(err))
+							continue
+						}
+						shouldCancel := ent.IsNotFound(err) || transfer.Status == st.TransferStatusReturned
+						if shouldCancel {
+							logger.Sugar().Infof("Cancelling transfer %s", transfer.ID)
+							transferHandler := handler.NewTransferHandler(config)
+							err := transferHandler.CreateCancelTransferGossipMessage(ctx, transfer.ID.String())
+							if err != nil {
+								logger.Sugar().Errorf("failed to cancel transfer", zap.Error(err))
+							} else {
+								logger.Sugar().Infof("Successfully cancelled transfer %s", transfer.ID)
+								_, err = pendingSendTransfer.Update().SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
+								if err != nil {
+									logger.Sugar().Errorf("failed to update pending send transfer", zap.Error(err))
+								}
+							}
+						} else {
+							logger.Sugar().Infof("Transfer %s is not ready to be cancelled", transfer.ID)
+							_, err = pendingSendTransfer.Update().SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
+							if err != nil {
+								logger.Sugar().Errorf("failed to update pending send transfer", zap.Error(err))
 							}
 						}
 					}
