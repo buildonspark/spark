@@ -37,7 +37,7 @@ export default defineConfig([
   },
   {
     ...commonConfig,
-    entry: ["src/native/index.ts"],
+    entry: ["src/index.react-native.ts"],
     format: ["cjs", "esm"],
     banner: {
       /* @noble/hashes assigns crypto export on module load which makes it sensitive to

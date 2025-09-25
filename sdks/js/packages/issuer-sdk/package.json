@@ -3,13 +3,25 @@
   "version": "0.0.99",
   "description": "Spark Issuer SDK for token issuance",
   "license": "Apache-2.0",
-  "module": "./dist/index.js",
+  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "module": "./dist/index.js",
+  "react-native": "./dist/native/index.react-native.js",
   "type": "module",
   "homepage": "https://github.com/buildonspark/spark",
   "exports": {
     ".": {
+      "react-native": {
+        "types": "./dist/native/index.react-native.d.ts",
+        "import": "./dist/native/index.react-native.js",
+        "require": "./dist/native/index.react-native.cjs",
+        "default": "./dist/native/index.react-native.js"
+      },
       "import": {
+        "bun": {
+          "types": "./dist/index.d.ts",
+          "default": "./dist/index.js"
+        },
         "node": {
           "types": "./dist/index.node.d.ts",
           "default": "./dist/index.node.js"
@@ -20,6 +32,10 @@
         }
       },
       "require": {
+        "bun": {
+          "types": "./dist/index.d.cts",
+          "default": "./dist/index.cjs"
+        },
         "node": {
           "types": "./dist/index.node.d.cts",
           "default": "./dist/index.node.cjs"
@@ -33,6 +49,10 @@
     "./proto/spark": {
       "import": "./dist/proto/spark.js",
       "require": "./dist/proto/spark.cjs"
+    },
+    "./native": {
+      "import": "./dist/native/index.react-native.js",
+      "require": "./dist/native/index.react-native.cjs"
     }
   },
   "files": [
@@ -41,7 +61,7 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "yarn tsc && tsup",
+    "build": "yarn tsc && rm -rf dist && tsup",
     "build:watch": "yarn build --watch --clean=false",
     "clean": "rm -rf dist",
     "circular-deps": "madge --circular --extensions ts,tsx src",
@@ -80,9 +100,28 @@
     "node-fetch": "^3.3.2",
     "prettier": "^3.6.2",
     "publint": "^0.3.9",
+    "react": "19.0.0",
+    "react-native": "0.79.4",
+    "react-native-get-random-values": "^1.11.0",
     "ts-jest": "^29.2.5",
     "tsup": "^8.4.0",
     "typescript": "^5.7.3"
+  },
+  "peerDependencies": {
+    "react": ">=18.2.0",
+    "react-native": ">=0.71.0",
+    "react-native-get-random-values": ">=1.11.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-native": {
+      "optional": true
+    },
+    "react-native-get-random-values": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=18.0.0"

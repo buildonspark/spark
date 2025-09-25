@@ -2612,9 +2612,23 @@ __metadata:
     node-fetch: "npm:^3.3.2"
     prettier: "npm:^3.6.2"
     publint: "npm:^0.3.9"
+    react: "npm:19.0.0"
+    react-native: "npm:0.79.4"
+    react-native-get-random-values: "npm:^1.11.0"
     ts-jest: "npm:^29.2.5"
     tsup: "npm:^8.4.0"
     typescript: "npm:^5.7.3"
+  peerDependencies:
+    react: ">=18.2.0"
+    react-native: ">=0.71.0"
+    react-native-get-random-values: ">=1.11.0"
+  peerDependenciesMeta:
+    react:
+      optional: true
+    react-native:
+      optional: true
+    react-native-get-random-values:
+      optional: true
   languageName: unknown
   linkType: soft
 

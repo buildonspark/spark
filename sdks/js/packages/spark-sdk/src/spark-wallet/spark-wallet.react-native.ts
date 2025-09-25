@@ -4,7 +4,7 @@ import { ConfigOptions } from "../services/wallet-config.js";
 import { SparkSigner } from "../signer/signer.js";
 import { ReactNativeSparkSigner } from "../signer/signer.react-native.js";
 import { ConnectionManagerBrowser } from "../services/connection/connection.browser.js";
-import { WalletConfigService } from "../index.node.js";
+import type { WalletConfigService } from "../services/config.js";
 
 export class SparkWalletReactNative extends BaseSparkWallet {
   protected buildConnectionManager(config: WalletConfigService) {
