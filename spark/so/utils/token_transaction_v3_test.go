@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/lightsparkdev/spark/common"
@@ -128,5 +129,88 @@ func TestValidatePartialTokenTransaction_V3Ordering_InvoiceAttachmentsOutOfOrder
 	badInv.InvoiceAttachments = []*tokenpb.InvoiceAttachment{{SparkInvoice: "b"}, {SparkInvoice: "a"}}
 	if err := ValidatePartialTokenTransaction(badInv, sigs, expectedOps, []common.Network{common.Mainnet}, false, false); err == nil {
 		t.Fatalf("expected invoice ordering validation error, got nil")
+	}
+}
+
+func TestValidatePartialTokenTransaction_TokenAmountLen_Not16(t *testing.T) {
+	base := makeMinimalV3MintPartial(t)
+	// Make amount invalid (15 bytes)
+	base.TokenOutputs[0].TokenAmount = makeBytes(0x01, 15)
+
+	expectedOps := map[string]*sparkpb.SigningOperatorInfo{
+		"op": {Identifier: "op", PublicKey: base.SparkOperatorIdentityPublicKeys[0]},
+	}
+	sigs := []*tokenpb.SignatureWithIndex{{Signature: makeBytes(0x11, 64), InputIndex: 0}}
+
+	err := ValidatePartialTokenTransaction(base, sigs, expectedOps, []common.Network{common.Mainnet}, false, false)
+	if err == nil {
+		t.Fatalf("expected error for invalid token amount length, got nil")
+	}
+	if !strings.Contains(err.Error(), "token amount must be exactly 16 bytes") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidatePartialTokenTransaction_TokenIdentifierLen_Not32(t *testing.T) {
+	base := makeMinimalV3MintPartial(t)
+	// Make identifier invalid (31 bytes)
+	badID := makeBytes(0xAA, 31)
+	base.TokenOutputs[0].TokenIdentifier = badID
+	base.TokenInputs = &tokenpb.TokenTransaction_MintInput{MintInput: &tokenpb.TokenMintInput{
+		IssuerPublicKey: makeBytes(0x03, 33),
+		TokenIdentifier: badID,
+	}}
+
+	expectedOps := map[string]*sparkpb.SigningOperatorInfo{
+		"op": {Identifier: "op", PublicKey: base.SparkOperatorIdentityPublicKeys[0]},
+	}
+	sigs := []*tokenpb.SignatureWithIndex{{Signature: makeBytes(0x11, 64), InputIndex: 0}}
+
+	err := ValidatePartialTokenTransaction(base, sigs, expectedOps, []common.Network{common.Mainnet}, false, false)
+	if err == nil {
+		t.Fatalf("expected error for invalid token identifier length, got nil")
+	}
+	if !strings.Contains(err.Error(), "token identifier must be exactly 32 bytes") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidatePartialTokenTransaction_TransferAmount_NotZero(t *testing.T) {
+	// Build a minimal transfer partial with zero amount to trigger validation
+	owner := makeBytes(0x02, 33)
+	operator := makeBytes(0x01, 33)
+	prev := makeBytes(0xAB, 32)
+
+	tx := &tokenpb.TokenTransaction{
+		Version: 3,
+		TokenInputs: &tokenpb.TokenTransaction_TransferInput{
+			TransferInput: &tokenpb.TokenTransferInput{
+				OutputsToSpend: []*tokenpb.TokenOutputToSpend{{
+					PrevTokenTransactionHash: prev,
+					PrevTokenTransactionVout: 0,
+				}},
+			},
+		},
+		TokenOutputs: []*tokenpb.TokenOutput{{
+			OwnerPublicKey:  owner,
+			TokenAmount:     makeBytes(0x00, 16),
+			TokenIdentifier: makeBytes(0xAA, 32),
+		}},
+		SparkOperatorIdentityPublicKeys: [][]byte{operator},
+		Network:                         sparkpb.Network_MAINNET,
+		ClientCreatedTimestamp:          timestamppb.Now(),
+	}
+
+	expectedOps := map[string]*sparkpb.SigningOperatorInfo{
+		"op": {Identifier: "op", PublicKey: tx.SparkOperatorIdentityPublicKeys[0]},
+	}
+	sigs := []*tokenpb.SignatureWithIndex{{Signature: makeBytes(0x11, 64), InputIndex: 0}}
+
+	err := ValidatePartialTokenTransaction(tx, sigs, expectedOps, []common.Network{common.Mainnet}, false, false)
+	if err == nil {
+		t.Fatalf("expected error for zero transfer amount, got nil")
+	}
+	if !strings.Contains(err.Error(), "output 0 token amount cannot be 0") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

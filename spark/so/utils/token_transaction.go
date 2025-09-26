@@ -1072,21 +1072,6 @@ func validateBaseMintTransaction(
 		return fmt.Errorf("mint signature cannot be nil")
 	}
 
-	// Validate mint amounts > 0
-	for i, output := range tokenTransaction.TokenOutputs {
-		amount := new(big.Int).SetBytes(output.GetTokenAmount())
-
-		if amount.Cmp(zero) == 0 {
-			return fmt.Errorf("mint amount for output %d cannot be 0", i)
-		}
-
-		if requireTokenIdentifierForMints {
-			if output.GetTokenIdentifier() == nil {
-				return fmt.Errorf("token identifier cannot be nil")
-			}
-		}
-	}
-
 	return nil
 }
 
@@ -1196,6 +1181,17 @@ func validateBaseTokenOutputs(tokenTransaction *tokenpb.TokenTransaction, requir
 		return fmt.Errorf("token outputs cannot be empty for mint and transfer transactions")
 	}
 
+	for i, output := range tokenTransaction.TokenOutputs {
+		amount := new(big.Int).SetBytes(output.GetTokenAmount())
+		if amount.Cmp(zero) == 0 {
+			return fmt.Errorf("output %d token amount cannot be 0", i)
+		}
+		amt := output.GetTokenAmount()
+		if len(amt) != 16 {
+			return fmt.Errorf("output %d token amount must be exactly 16 bytes, got %d", i, len(amt))
+		}
+	}
+
 	hasTokenIdentifier := tokenTransaction.TokenOutputs[0].GetTokenIdentifier() != nil
 	if requireTokenIdentifier && !hasTokenIdentifier {
 		return fmt.Errorf("token identifier must be set when token identifier is required")
@@ -1210,6 +1206,9 @@ func validateBaseTokenOutputs(tokenTransaction *tokenpb.TokenTransaction, requir
 		for i, output := range tokenTransaction.TokenOutputs {
 			if output.GetTokenIdentifier() == nil {
 				return fmt.Errorf("output %d missing token identifier", i)
+			}
+			if len(output.GetTokenIdentifier()) != 32 {
+				return fmt.Errorf("output %d token identifier must be exactly 32 bytes, got %d", i, len(output.GetTokenIdentifier()))
 			}
 			if !bytes.Equal(output.GetTokenIdentifier(), expectedTokenIdentifier) {
 				return fmt.Errorf("output %d token identifier (%x) must match mint input token identifier (%x)",

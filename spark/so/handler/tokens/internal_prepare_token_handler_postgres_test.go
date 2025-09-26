@@ -114,7 +114,7 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 						Id:                   proto.String(uuid.Must(uuid.NewV7()).String()),
 						OwnerPublicKey:       issuerPriv.Public().Serialize(),
 						TokenIdentifier:      tokenCreate.TokenIdentifier,
-						TokenAmount:          []byte{0, 0, 0, 0, 0, 0, 0, 10},
+						TokenAmount:          []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10},
 						RevocationCommitment: ks.PublicKey.Serialize(),
 					},
 				},
