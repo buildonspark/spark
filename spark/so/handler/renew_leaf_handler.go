@@ -686,21 +686,18 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 	if signingJob.DirectNodeTxSigningJob == nil {
 		return nil, errors.InvalidUserInputErrorf("direct node tx signing job is required")
 	}
-	if signingJob.DirectRefundTxSigningJob == nil {
-		return nil, errors.InvalidUserInputErrorf("direct refund tx signing job is required")
-	}
 	if signingJob.DirectFromCpfpRefundTxSigningJob == nil {
 		return nil, errors.InvalidUserInputErrorf("direct from cpfp refund tx signing job is required")
 	}
 
 	// Construct transactions
-	nodeTx, refundTx, directNodeTx, directRefundTx, directFromCpfpRefundTx, err := h.constructRenewZeroNodeTransactions(leaf)
+	nodeTx, refundTx, directNodeTx, directFromCpfpRefundTx, err := h.constructRenewZeroNodeTransactions(leaf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct renew zero timelock transactions: %w", err)
 	}
 
-	userRawTxs := [][]byte{signingJob.NodeTxSigningJob.RawTx, signingJob.RefundTxSigningJob.RawTx, signingJob.DirectNodeTxSigningJob.RawTx, signingJob.DirectRefundTxSigningJob.RawTx, signingJob.DirectFromCpfpRefundTxSigningJob.RawTx}
-	expectedTxs := []*wire.MsgTx{nodeTx, refundTx, directNodeTx, directRefundTx, directFromCpfpRefundTx}
+	userRawTxs := [][]byte{signingJob.NodeTxSigningJob.RawTx, signingJob.RefundTxSigningJob.RawTx, signingJob.DirectNodeTxSigningJob.RawTx, signingJob.DirectFromCpfpRefundTxSigningJob.RawTx}
+	expectedTxs := []*wire.MsgTx{nodeTx, refundTx, directNodeTx, directFromCpfpRefundTx}
 	err = h.validateUserTransactions(userRawTxs, expectedTxs)
 	if err != nil {
 		return nil, fmt.Errorf("user transaction validation failed: %w", err)
@@ -767,21 +764,7 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 	}
 	signingJobs = append(signingJobs, directNodeSigningJobHelper)
 
-	// Create direct refund transaction signing job (FOURTH)
-	directRefundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.DirectRefundTxSigningJob,
-		signingKeyshare,
-		verifyingPubKey,
-		directRefundTx,
-		directNodeTx.TxOut[0],
-	)
-	if err != nil {
-		return nil, err
-	}
-	signingJobs = append(signingJobs, directRefundSigningJobHelper)
-
-	// Create direct from CPFP refund transaction signing job (FIFTH)
+	// Create direct from CPFP refund transaction signing job (FOURTH)
 	directFromCpfpRefundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
 		ctx,
 		signingJob.DirectFromCpfpRefundTxSigningJob,
@@ -820,14 +803,8 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 		return nil, fmt.Errorf("failed to aggregate direct node signature: %w", err)
 	}
 
-	// Aggregate direct refund transaction signature (FOURTH)
-	directRefundSignature, err := h.aggregateRenewLeafSignature(ctx, signingResults[3], signingJob.DirectRefundTxSigningJob, leaf)
-	if err != nil {
-		return nil, fmt.Errorf("failed to aggregate direct refund signature: %w", err)
-	}
-
-	// Aggregate direct from CPFP refund transaction signature (FIFTH)
-	directFromCpfpRefundSignature, err := h.aggregateRenewLeafSignature(ctx, signingResults[4], signingJob.DirectFromCpfpRefundTxSigningJob, leaf)
+	// Aggregate direct from CPFP refund transaction signature (FOURTH)
+	directFromCpfpRefundSignature, err := h.aggregateRenewLeafSignature(ctx, signingResults[3], signingJob.DirectFromCpfpRefundTxSigningJob, leaf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to aggregate direct from cpfp refund signature: %w", err)
 	}
@@ -844,15 +821,9 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 	}
 
 	// Apply and verify direct node transaction signature
-	signedDirectNodeTx, directNodeTxBytes, err := h.applyAndVerifySignature(directNodeTx, directNodeSignature, originalTx.TxOut[0], 0)
+	_, directNodeTxBytes, err := h.applyAndVerifySignature(directNodeTx, directNodeSignature, originalTx.TxOut[0], 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply and verify direct node tx signature: %w", err)
-	}
-
-	// Apply and verify direct refund transaction signature
-	_, directRefundTxBytes, err := h.applyAndVerifySignature(directRefundTx, directRefundSignature, signedDirectNodeTx.TxOut[0], 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to apply and verify direct refund tx signature: %w", err)
 	}
 
 	// Apply and verify direct from CPFP refund transaction signature
@@ -901,8 +872,8 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 		SetRawTx(nodeTxBytes).
 		SetRawRefundTx(refundTxBytes).
 		SetDirectTx(directNodeTxBytes).
-		SetDirectRefundTx(directRefundTxBytes).
 		SetDirectFromCpfpRefundTx(directFromCpfpRefundTxBytes).
+		ClearDirectRefundTx().
 		SetParentID(splitNode.ID).
 		Save(ctx)
 	if err != nil {
@@ -1202,10 +1173,10 @@ func (h *RenewLeafHandler) constructRenewRefundTransactions(leaf, parentLeaf *en
 }
 
 // constructRenewZeroNodeTransactions creates the node and refund transactions for zero timelock renewal
-func (h *RenewLeafHandler) constructRenewZeroNodeTransactions(leaf *ent.TreeNode) (*wire.MsgTx, *wire.MsgTx, *wire.MsgTx, *wire.MsgTx, *wire.MsgTx, error) {
+func (h *RenewLeafHandler) constructRenewZeroNodeTransactions(leaf *ent.TreeNode) (*wire.MsgTx, *wire.MsgTx, *wire.MsgTx, *wire.MsgTx, error) {
 	leafNodeTx, err := common.TxFromRawTxBytes(leaf.RawTx)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to parse leaf node transaction: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to parse leaf node transaction: %w", err)
 	}
 	leafAmount := leafNodeTx.TxOut[0].Value
 
@@ -1219,11 +1190,11 @@ func (h *RenewLeafHandler) constructRenewZeroNodeTransactions(leaf *ent.TreeNode
 	// Use same output value and script as original node tx
 	verifyingPubkey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to parse verifying pubkey: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to parse verifying pubkey: %w", err)
 	}
 	nodePkScript, err := common.P2TRScriptFromPubKey(verifyingPubkey)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to construct pkscript: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to construct pkscript: %w", err)
 	}
 	newNodeTx.AddTxOut(wire.NewTxOut(leafAmount, nodePkScript))
 	// Add ephemeral anchor output for CPFP
@@ -1238,11 +1209,11 @@ func (h *RenewLeafHandler) constructRenewZeroNodeTransactions(leaf *ent.TreeNode
 
 	ownerSigningPubkey, err := keys.ParsePublicKey(leaf.OwnerSigningPubkey)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to parse owner signing pubkey: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to parse owner signing pubkey: %w", err)
 	}
 	refundPkScript, err := common.P2TRScriptFromPubKey(ownerSigningPubkey)
 	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to create refund script: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("failed to create refund script: %w", err)
 	}
 	refundTx.AddTxOut(&wire.TxOut{
 		Value:    leafAmount,
@@ -1261,16 +1232,6 @@ func (h *RenewLeafHandler) constructRenewZeroNodeTransactions(leaf *ent.TreeNode
 		PkScript: nodePkScript,
 	})
 
-	directRefundTx := wire.NewMsgTx(3)
-	directRefundTx.AddTxIn(&wire.TxIn{
-		PreviousOutPoint: wire.OutPoint{Hash: directNodeTx.TxHash(), Index: 0},
-		Sequence:         spark.InitialSequence() + spark.DirectTimelockOffset,
-	})
-	directRefundTx.AddTxOut(&wire.TxOut{
-		Value:    common.MaybeApplyFee(directNodeTx.TxOut[0].Value),
-		PkScript: refundPkScript,
-	})
-
 	directFromCpfpRefundTx := wire.NewMsgTx(3)
 	directFromCpfpRefundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: newNodeTx.TxHash(), Index: 0},
@@ -1281,7 +1242,7 @@ func (h *RenewLeafHandler) constructRenewZeroNodeTransactions(leaf *ent.TreeNode
 		PkScript: refundPkScript,
 	})
 
-	return newNodeTx, refundTx, directNodeTx, directRefundTx, directFromCpfpRefundTx, nil
+	return newNodeTx, refundTx, directNodeTx, directFromCpfpRefundTx, nil
 }
 
 // validateRenewNodeTimelocks validates the timelock requirements for a renew
