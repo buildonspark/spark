@@ -584,20 +584,20 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						}
 						shouldCancel := ent.IsNotFound(err) || transfer.Status == st.TransferStatusReturned
 						if shouldCancel {
-							logger.Sugar().Infof("Cancelling transfer %s", transfer.ID)
+							logger.Sugar().Infof("Cancelling transfer %s", pendingSendTransfer.ID)
 							transferHandler := handler.NewTransferHandler(config)
-							err := transferHandler.CreateCancelTransferGossipMessage(ctx, transfer.ID.String())
+							err := transferHandler.CreateCancelTransferGossipMessage(ctx, pendingSendTransfer.ID.String())
 							if err != nil {
 								logger.Sugar().Errorf("failed to cancel transfer", zap.Error(err))
 							} else {
-								logger.Sugar().Infof("Successfully cancelled transfer %s", transfer.ID)
+								logger.Sugar().Infof("Successfully cancelled transfer %s", pendingSendTransfer.ID)
 								_, err = pendingSendTransfer.Update().SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
 								if err != nil {
 									logger.Sugar().Errorf("failed to update pending send transfer", zap.Error(err))
 								}
 							}
 						} else {
-							logger.Sugar().Infof("Transfer %s is not ready to be cancelled", transfer.ID)
+							logger.Sugar().Infof("Transfer %s is not ready to be cancelled", pendingSendTransfer.ID)
 							_, err = pendingSendTransfer.Update().SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
 							if err != nil {
 								logger.Sugar().Errorf("failed to update pending send transfer", zap.Error(err))
