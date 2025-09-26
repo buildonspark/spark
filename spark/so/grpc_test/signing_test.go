@@ -5,14 +5,11 @@ import (
 	"math/rand/v2"
 	"testing"
 
-	"github.com/lightsparkdev/spark/common/keys"
-
-	"github.com/stretchr/testify/require"
-
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	"github.com/lightsparkdev/spark/so/db"
@@ -21,6 +18,7 @@ import (
 	"github.com/lightsparkdev/spark/so/objects"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestFrostSign tests the frost signing process.
