@@ -37,6 +37,7 @@ import {
   UserLeafInput,
 } from "../graphql/objects/index.js";
 import {
+  ConnectedEvent,
   DepositAddressQueryResult,
   OutputWithPreviousTransactionData,
   QueryNodesRequest,
@@ -45,6 +46,7 @@ import {
   SigningJob,
   SubscribeToEventsResponse,
   Transfer,
+  TransferEvent,
   TransferStatus,
   TransferType,
   TreeNode,
@@ -142,6 +144,7 @@ import type {
   InvalidInvoice,
   PayLightningInvoiceParams,
   SparkWalletEvents,
+  SparkWalletEventType,
   SparkWalletProps,
   TokenBalanceMap,
   TokenInvoice,
@@ -195,11 +198,24 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   private tracer: Tracer | null = null;
 
+  protected abstract buildConnectionManager(
+    config: WalletConfigService,
+  ): ConnectionManager;
+
   constructor(options?: ConfigOptions, signerArg?: SparkSigner) {
     super();
 
     const signer = signerArg || this.buildSigner();
     this.config = new WalletConfigService(options, signer);
+    const events = this.config.getEvents();
+    if (Object.keys(events).length > 0) {
+      Object.entries(events).forEach(([event, handler]) => {
+        this.on(
+          event as SparkWalletEventType,
+          handler as (...args: unknown[]) => void,
+        );
+      });
+    }
     this.connectionManager = this.buildConnectionManager(this.config);
     this.signingService = new SigningService(this.config);
     this.depositService = new DepositService(
@@ -270,15 +286,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return new DefaultSparkSigner();
   }
 
-  protected buildConnectionManager(config: WalletConfigService) {
-    return new ConnectionManager(config);
-  }
-
   private async handleStreamEvent({ event }: SubscribeToEventsResponse) {
     try {
       if (
-        event?.$case === "transfer" &&
-        event.transfer.transfer &&
+        isTransferStreamEvent(event) &&
         event.transfer.transfer.type !== TransferType.COUNTER_SWAP
       ) {
         const { senderIdentityPublicKey, receiverIdentityPublicKey } =
@@ -295,9 +306,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             optimize: true,
           });
         }
-      } else if (event?.$case === "deposit" && event.deposit.deposit) {
+      } else if (isDepositStreamEvent(event)) {
         const deposit = event.deposit.deposit;
-
         const newLeaf = await this.transferService.extendTimelock(deposit);
         await this.transferLeavesToSelf(newLeaf.nodes, {
           type: KeyDerivationType.LEAF,
@@ -319,91 +329,48 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const INITIAL_DELAY = 1000;
     const MAX_DELAY = 60000;
 
-    this.streamController = new AbortController();
-
-    const delay = (ms: number, signal?: AbortSignal): Promise<boolean> => {
-      return new Promise((resolve) => {
+    const delay = (ms: number, signal: AbortSignal) => {
+      return new Promise<boolean>((resolve) => {
         const timer = setTimeout(() => {
-          if (signal) {
-            signal.removeEventListener("abort", onAbort);
-          }
+          signal.removeEventListener("abort", onAbort);
           resolve(true);
         }, ms);
 
         function onAbort() {
           clearTimeout(timer);
           resolve(false);
-          signal?.removeEventListener("abort", onAbort);
+          signal.removeEventListener("abort", onAbort);
         }
 
-        if (signal) {
-          signal.addEventListener("abort", onAbort);
-        }
+        signal.addEventListener("abort", onAbort);
       });
     };
 
     let retryCount = 0;
+    const streamController = new AbortController();
+    this.streamController = streamController;
     while (retryCount <= MAX_RETRIES) {
       try {
         const address = this.config.getCoordinatorAddress();
-
-        const sparkClient =
-          await this.connectionManager.createSparkStreamClient(address);
-        const channel = await this.connectionManager.getStreamChannel(address);
-
-        const stream = sparkClient.subscribe_to_events(
-          {
-            identityPublicKey: await this.config.signer.getIdentityPublicKey(),
-          },
-          {
-            signal: this.streamController?.signal,
-          },
+        const stream = await this.connectionManager.subscribeToEvents(
+          address,
+          streamController.signal,
         );
-
-        // In Node.js, long-lived gRPC streams keep the underlying socket "ref'd",
-        // which prevents the process from exiting. To avoid that (e.g. in CLI tools),
-        // we manually unref the socket so Node can shut down when nothing else is active.
-        //
-        // The gRPC client doesn't expose the socket directly, so we dig through
-        // internal fields to find it. This is a bit of a hack and may break if the
-        // internals change.
-        //
-        // Since the socket isn't always immediately available, we retry with setTimeout
-        // until it shows up.
-        const maybeUnref = () => {
-          const internalChannel = (channel as any).internalChannel;
-          if (
-            internalChannel?.currentPicker?.subchannel?.child?.transport
-              ?.session?.socket
-          ) {
-            internalChannel.currentPicker.subchannel.child.transport.session.socket.unref();
-          } else {
-            setTimeout(maybeUnref, 100);
-          }
-        };
-
-        // Only need to unref in Node environments.
-        // In the browser and React Native, the runtime handles shutdown when the tab/app closes.
-        if (isNode) {
-          maybeUnref();
-        }
-
         const claimedTransfersIds = await this.claimTransfers();
 
         try {
           for await (const data of stream) {
-            if (this.streamController?.signal.aborted) {
+            if (streamController.signal.aborted) {
               break;
             }
 
-            if (data.event?.$case === "connected") {
+            if (isConnectedStreamEvent(data.event)) {
               this.emit(SparkWalletEvent.StreamConnected);
               retryCount = 0;
             }
 
             if (
-              data.event?.$case === "transfer" &&
-              data.event.transfer.transfer &&
+              isTransferStreamEvent(data.event) &&
               claimedTransfersIds.includes(data.event.transfer.transfer.id)
             ) {
               continue;
@@ -414,7 +381,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           throw error;
         }
       } catch (error) {
-        if (this.streamController?.signal.aborted) {
+        if (streamController.signal.aborted) {
           break;
         }
 
@@ -435,13 +402,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           try {
             const completed = await delay(
               backoffDelay,
-              this.streamController?.signal,
+              streamController.signal,
             );
             if (!completed) {
               break;
             }
           } catch (error) {
-            if (this.streamController?.signal.aborted) {
+            if (streamController.signal.aborted) {
               break;
             }
           }
@@ -4847,7 +4814,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       clearInterval(this.claimTransfersInterval);
       this.claimTransfersInterval = null;
     }
-    this.streamController?.abort();
+    if (this.streamController) {
+      this.streamController.abort();
+    }
     this.removeAllListeners();
   }
 
@@ -5054,4 +5023,22 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       this.initWallet.bind(this),
     );
   }
+}
+
+function isConnectedStreamEvent(
+  event: SubscribeToEventsResponse["event"],
+): event is { $case: "connected"; connected: ConnectedEvent } {
+  return event?.$case === "connected";
+}
+
+function isTransferStreamEvent(
+  event: SubscribeToEventsResponse["event"],
+): event is { $case: "transfer"; transfer: { transfer: Transfer } } {
+  return Boolean(event?.$case === "transfer" && event.transfer.transfer);
+}
+
+function isDepositStreamEvent(
+  event: SubscribeToEventsResponse["event"],
+): event is { $case: "deposit"; deposit: { deposit: TreeNode } } {
+  return Boolean(event?.$case === "deposit" && event.deposit.deposit);
 }

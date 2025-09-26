@@ -9,6 +9,7 @@ import {
   ConsoleOptions,
 } from "./wallet-config.js";
 import { ConfigurationError } from "../errors/types.js";
+import { SparkWalletEvents } from "../spark-wallet/types.js";
 
 export class WalletConfigService implements HasSspClientOptions {
   private readonly config: Required<ConfigOptions>;
@@ -121,5 +122,9 @@ export class WalletConfigService implements HasSspClientOptions {
     return {
       ...this.config.console,
     };
+  }
+
+  public getEvents(): Partial<SparkWalletEvents> {
+    return this.config.events;
   }
 }

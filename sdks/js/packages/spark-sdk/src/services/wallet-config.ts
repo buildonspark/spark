@@ -4,6 +4,10 @@ import {
 } from "../graphql/client.js";
 import { NetworkType } from "../utils/network.js";
 import { isHermeticTest } from "../tests/isHermeticTest.js";
+import type {
+  SparkWalletEvents,
+  SparkWalletEventType,
+} from "../spark-wallet/types.js";
 
 const SSP_IDENTITY_PUBLIC_KEYS = {
   LOCAL: "028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4",
@@ -114,6 +118,7 @@ export type ConfigOptions = MayHaveSspClientOptions & {
   readonly expectedWithdrawRelativeBlockLocktime?: number;
   readonly signerWithPreExistingKeys?: boolean;
   readonly console?: ConsoleOptions;
+  readonly events?: Partial<SparkWalletEvents>;
 };
 
 const PROD_PUBKEYS = [
@@ -147,6 +152,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
   console: {
     otel: false,
   },
+  events: {},
 };
 
 const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {

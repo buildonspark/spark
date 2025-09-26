@@ -7,6 +7,7 @@ import {
   type ClientFactory as ClientFactoryWeb,
 } from "nice-grpc-web";
 import { ClientMiddlewareCall, Metadata } from "nice-grpc-common";
+import type { ClientMiddleware } from "nice-grpc-common";
 import { retryMiddleware } from "nice-grpc-client-middleware-retry";
 import { RetryOptions, SparkCallOptions } from "../../types/grpc.js";
 import { WalletConfigService } from "../config.js";
@@ -26,7 +27,7 @@ export class ConnectionManagerBrowser extends ConnectionManager {
     this.transport = transport;
   }
 
-  protected async createChannelWithTLS(address: string, certPath?: string) {
+  protected async createChannelWithTLS(address: string) {
     try {
       return createChannel(address, this.transport);
     } catch (error) {
@@ -45,9 +46,9 @@ export class ConnectionManagerBrowser extends ConnectionManager {
   }
 
   protected createAuthnMiddleware() {
-    return async function* (
+    return async function* <Req, Res>(
       this: ConnectionManagerBrowser,
-      call: ClientMiddlewareCall<any, any>,
+      call: ClientMiddlewareCall<Req, Res>,
       options: SparkCallOptions,
     ) {
       const metadata = Metadata(options.metadata)
@@ -55,17 +56,20 @@ export class ConnectionManagerBrowser extends ConnectionManager {
         .set("X-Grpc-Web", "1")
         .set("X-Client-Env", clientEnv)
         .set("Content-Type", "application/grpc-web+proto");
-      return yield* call.next(call.request, {
+      return yield* call.next(call.request as Req, {
         ...options,
         metadata,
       });
-    }.bind(this);
+    }.bind(this) as <Req, Res>(
+      call: ClientMiddlewareCall<Req, Res>,
+      options: SparkCallOptions,
+    ) => AsyncGenerator<Res, Res | void, undefined>;
   }
 
-  protected createMiddleware(address: string, initialAuthToken: string) {
-    return async function* (
+  protected createMiddleware(address: string) {
+    return async function* <Req, Res>(
       this: ConnectionManagerBrowser,
-      call: ClientMiddlewareCall<any, any>,
+      call: ClientMiddlewareCall<Req, Res>,
       options: SparkCallOptions,
     ) {
       const metadata = Metadata(options.metadata)
@@ -75,14 +79,12 @@ export class ConnectionManagerBrowser extends ConnectionManager {
         .set("Content-Type", "application/grpc-web+proto");
 
       try {
-        return yield* call.next(call.request, {
+        const token = await this.authenticate(address);
+        return yield* call.next(call.request as Req, {
           ...options,
-          metadata: metadata.set(
-            "Authorization",
-            `Bearer ${this.clients.get(address)?.authToken || initialAuthToken}`,
-          ),
+          metadata: metadata.set("Authorization", `Bearer ${token}`),
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
         return yield* this.handleMiddlewareError(
           error,
           address,
@@ -91,17 +93,21 @@ export class ConnectionManagerBrowser extends ConnectionManager {
           options,
         );
       }
-    }.bind(this);
+    }.bind(this) as <Req, Res>(
+      call: ClientMiddlewareCall<Req, Res>,
+      options: SparkCallOptions,
+    ) => AsyncGenerator<Res, Res | void, undefined>;
   }
 
   protected async createGrpcClient<T>(
-    defintion:
+    definition:
       | SparkAuthnServiceDefinition
       | SparkServiceDefinition
       | SparkTokenServiceDefinition,
     channel: ChannelWeb,
     withRetries: boolean,
-    middleware?: any,
+    middleware?: ClientMiddleware<RetryOptions, {}>,
+    channelKey?: string,
   ) {
     let clientFactory: ClientFactoryWeb;
 
@@ -119,12 +125,14 @@ export class ConnectionManagerBrowser extends ConnectionManager {
     if (middleware) {
       clientFactory = clientFactory.use(middleware);
     }
-    const client = clientFactory.create(defintion, channel, {
+    const client = clientFactory.create(definition, channel, {
       "*": options,
     }) as T;
     return {
       ...client,
-      close: undefined,
+      close: channelKey
+        ? () => ConnectionManager.releaseChannel(channelKey)
+        : undefined,
     };
   }
 }

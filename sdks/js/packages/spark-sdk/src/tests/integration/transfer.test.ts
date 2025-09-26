@@ -552,10 +552,22 @@ describe.each(walletTypes)(
 
       await senderWallet.claimDeposit(signedTx.id);
 
+      let resolveStreamConnected: () => void;
+      const streamConnectedPromise = new Promise<void>((resolve) => {
+        resolveStreamConnected = resolve;
+      });
       const { wallet: receiverWallet } =
         await SparkWalletTestingWithStream.initialize({
-          options,
+          options: {
+            ...options,
+            events: {
+              [SparkWalletEvent.StreamConnected]: () => {
+                resolveStreamConnected();
+              },
+            },
+          },
         });
+      await streamConnectedPromise;
 
       expect(await receiverWallet.getSparkAddress()).not.toEqual(
         await senderWallet.getSparkAddress(),
