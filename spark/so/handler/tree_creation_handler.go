@@ -483,7 +483,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	if err != nil {
 		return nil, nil, err
 	}
-	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*addressString)).Only(ctx)
+	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*addressString)).WithTree().ForUpdate().Only(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -544,6 +544,9 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		var savedTree *ent.Tree
 		var parentNodeID *uuid.UUID
 		if currentElement.parentNode == nil {
+			if depositAddress.Edges.Tree != nil {
+				return nil, nil, errors.New("deposit address already has a tree")
+			}
 			schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
 			if err != nil {
 				return nil, nil, err
@@ -561,7 +564,8 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 				SetOwnerIdentityPubkey(userIDPubKey).
 				SetNetwork(schemaNetwork).
 				SetBaseTxid(txid[:]).
-				SetVout(int16(req.GetOnChainUtxo().Vout))
+				SetVout(int16(req.GetOnChainUtxo().Vout)).
+				SetDepositAddress(depositAddress)
 			if onChain {
 				treeMutator.SetStatus(st.TreeStatusAvailable)
 			} else {

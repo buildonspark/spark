@@ -197,9 +197,12 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if err != nil {
 			return err
 		}
-		address, err := db.DepositAddress.Query().Where(depositaddress.HasSigningKeyshareWith(signingkeyshare.IDEQ(signingKeyshareID))).Only(ctx)
+		address, err := db.DepositAddress.Query().Where(depositaddress.HasSigningKeyshareWith(signingkeyshare.IDEQ(signingKeyshareID))).WithTree().ForUpdate().Only(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get deposit address: %w", err)
+		}
+		if address.Edges.Tree != nil {
+			return fmt.Errorf("deposit address already has a tree")
 		}
 		markNodeAsAvailable = address.ConfirmationHeight != 0
 		logger.Info(fmt.Sprintf("Marking node as available: %v", markNodeAsAvailable))
@@ -231,7 +234,8 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			SetOwnerIdentityPubkey(ownerIDPubKey).
 			SetBaseTxid(txid[:]).
 			SetVout(int16(nodeTx.TxIn[0].PreviousOutPoint.Index)).
-			SetNetwork(schemaNetwork)
+			SetNetwork(schemaNetwork).
+			SetDepositAddress(address)
 
 		if markNodeAsAvailable {
 			treeMutator.SetStatus(st.TreeStatusAvailable)

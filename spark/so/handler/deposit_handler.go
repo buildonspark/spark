@@ -590,7 +590,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).First(ctx)
+	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).WithTree().ForUpdate().First(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query deposit address for request %s: %w", logging.FormatProto("start_tree_creation_request", req), err)
 	}
@@ -805,6 +805,10 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		}
 	}
 
+	if depositAddress.Edges.Tree != nil {
+		return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("deposit address already has a tree"))
+	}
+
 	// Create the tree
 	schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
 	if err != nil {
@@ -816,7 +820,8 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
 		SetNetwork(schemaNetwork).
 		SetBaseTxid(txid[:]).
-		SetVout(int16(req.OnChainUtxo.Vout))
+		SetVout(int16(req.OnChainUtxo.Vout)).
+		SetDepositAddress(depositAddress)
 	if txConfirmed {
 		treeMutator.SetStatus(st.TreeStatusAvailable)
 	} else {
@@ -914,7 +919,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).Only(ctx)
+	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).WithTree().ForUpdate().Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			err = errors.NotFoundMissingEntity(fmt.Errorf("the requested deposit address could not be found for address: %s", *utxoAddress))
@@ -1152,13 +1157,17 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		entTree = existingTree
 		logger.Sugar().Infof("Found existing tree %s for txid %s", existingTree.ID, txid)
 	} else {
+		if depositAddress.Edges.Tree != nil {
+			return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("deposit address already has a tree"))
+		}
 		// Create new tree
 		treeMutator := db.Tree.
 			Create().
 			SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
 			SetNetwork(schemaNetwork).
 			SetBaseTxid(txid[:]).
-			SetVout(int16(req.OnChainUtxo.Vout))
+			SetVout(int16(req.OnChainUtxo.Vout)).
+			SetDepositAddress(depositAddress)
 
 		if txConfirmed {
 			treeMutator.SetStatus(st.TreeStatusAvailable)
