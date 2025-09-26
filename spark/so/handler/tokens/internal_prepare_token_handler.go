@@ -124,7 +124,6 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 		}
 		if err := validateIssuerSignature(finalTokenTX, req.GetTokenTransactionSignatures(), mintPubKey); err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to validate mint token transaction signature", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to validate mint token transaction signature: %w", err))
-
 		}
 		tokenMetadata, err := ent.GetTokenMetadataForTokenTransaction(ctx, finalTokenTX)
 		if err != nil {

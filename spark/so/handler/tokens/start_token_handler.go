@@ -331,14 +331,20 @@ func preemptOrRejectTransactionsWithInputEnts(
 }
 
 // preemptOrRejectTransaction implements the racing logic for token transactions.
-// It compares client timestamps first (earlier timestamp wins), then falls back to partial hash comparison.
+// It checks that the "competing" existing transaction is not REVEALED or FINALIZED. Then it compares
+// client timestamps first (earlier timestamp wins), then falls back to partial hash comparison.
 // Returns an error if the new transaction should be rejected, nil if it should proceed.
 func preemptOrRejectTransaction(
 	ctx context.Context,
 	newTransaction *tokenpb.TokenTransaction,
 	existingTransaction *ent.TokenTransaction,
 ) error {
-	// First, compare client timestamps if both transactions have them
+	if existingTransaction.Status == st.TokenTransactionStatusRevealed ||
+		existingTransaction.Status == st.TokenTransactionStatusFinalized {
+		return rejectNewTransaction(ctx, newTransaction, existingTransaction, "a non-preemptable status", fmt.Sprintf("status=%s", existingTransaction.Status))
+	}
+
+	// Compare client timestamps if both transactions have them
 	if newTransaction.ClientCreatedTimestamp != nil && !existingTransaction.ClientCreatedTimestamp.IsZero() {
 		newTimestamp := newTransaction.ClientCreatedTimestamp.AsTime()
 		existingTimestamp := existingTransaction.ClientCreatedTimestamp

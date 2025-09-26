@@ -3715,3 +3715,104 @@ func TestCoordinatedTokenTransferV3(t *testing.T) {
 		})
 	}
 }
+
+// TestCoordinatedTokenTransferPreemptionPreventionRevealed tests that REVEALED transactions cannot be pre-empted
+func TestCoordinatedTokenTransferPreemptionPreventionRevealed(t *testing.T) {
+	config := sparktesting.TestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	tokenPrivKey := config.IdentityPrivateKey
+	tokenIdentityPubKey := tokenPrivKey.Public()
+
+	// For transfers, we need to create a mint first to have outputs to spend
+	mintTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenIdentityPubKey)
+	require.NoError(t, err, "failed to create mint transaction for transfer test")
+
+	finalMintTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+		t.Context(), config, mintTransaction,
+		[]keys.Private{tokenPrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast mint transaction for transfer test")
+
+	finalMintTransactionHash, err := utils.HashTokenTransaction(finalMintTransaction, false)
+	require.NoError(t, err, "failed to hash mint transaction")
+
+	// Create and broadcast first transfer transaction
+	transaction1, _, err := createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey)
+	require.NoError(t, err, "failed to create first transfer transaction")
+
+	finalTransferTransaction1, err := wallet.BroadcastCoordinatedTokenTransfer(
+		t.Context(), config, transaction1,
+		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast first transfer transaction")
+
+	finalTxHash1, err := utils.HashTokenTransaction(finalTransferTransaction1, false)
+	require.NoError(t, err, "failed to hash first transfer transaction")
+
+	// Manually set the first transaction to REVEALED status
+	entClient, err := ent.Open("postgres", config.CoordinatorDatabaseURI)
+	require.NoError(t, err)
+	defer entClient.Close()
+
+	setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t, t.Context(), entClient, finalTxHash1)
+
+	// Create second transfer transaction that should NOT be able to pre-empt the first
+	transaction2, _, err := createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey)
+	require.NoError(t, err, "failed to create second transfer transaction")
+
+	// Set an earlier timestamp for the second transaction to make it "win" the pre-emption race
+	earlierTime := time.Now().Add(-1 * time.Hour)
+	transaction2.ClientCreatedTimestamp = timestamppb.New(earlierTime)
+
+	_, _, err = wallet.StartTokenTransactionCoordinated(
+		t.Context(), config, transaction2,
+		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey}, TestValidityDurationSecs, nil,
+	)
+	require.Error(t, err, "expected error when trying to pre-empt a REVEALED transaction")
+	require.Contains(t, err.Error(), "cannot be spent", "error should indicate output cannot be spent")
+}
+
+// TestCoordinatedTokenTransferPreemptionPreventionFinalized tests that FINALIZED transactions cannot be pre-empted
+func TestCoordinatedTokenTransferPreemptionPreventionFinalized(t *testing.T) {
+	config := sparktesting.TestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	tokenPrivKey := config.IdentityPrivateKey
+	tokenIdentityPubKey := tokenPrivKey.Public()
+
+	// For transfers, we need to create a mint first to have outputs to spend
+	mintTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenIdentityPubKey)
+	require.NoError(t, err, "failed to create mint transaction for transfer test")
+
+	finalMintTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+		t.Context(), config, mintTransaction,
+		[]keys.Private{tokenPrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast mint transaction for transfer test")
+
+	finalMintTransactionHash, err := utils.HashTokenTransaction(finalMintTransaction, false)
+	require.NoError(t, err, "failed to hash mint transaction")
+
+	// Create and broadcast first transfer transaction
+	transaction1, _, err := createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey)
+	require.NoError(t, err, "failed to create first transfer transaction")
+
+	_, err = wallet.BroadcastCoordinatedTokenTransfer(
+		t.Context(), config, transaction1,
+		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast first transfer transaction")
+
+	// Create second transfer transaction that should NOT be able to pre-empt the first
+	transaction2, _, err := createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey)
+	require.NoError(t, err, "failed to create second transfer transaction")
+
+	// Set an earlier timestamp for the second transaction to make it "win" the pre-emption race
+	earlierTime := time.Now().Add(-1 * time.Hour)
+	transaction2.ClientCreatedTimestamp = timestamppb.New(earlierTime)
+
+	// Attempt to start the second transaction - this should fail because the first is FINALIZED
+	_, _, err = wallet.StartTokenTransactionCoordinated(
+		t.Context(), config, transaction2,
+		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey}, TestValidityDurationSecs, nil,
+	)
+	require.Error(t, err, "expected error when trying to pre-empt a FINALIZED transaction")
+	require.Contains(t, err.Error(), "cannot be spent", "error should indicate output cannot be spent")
+}
