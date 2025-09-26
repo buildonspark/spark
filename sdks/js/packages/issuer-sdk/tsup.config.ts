@@ -25,6 +25,8 @@ export default defineConfig([
   {
     ...commonConfig,
     entry: ["src/index.react-native.ts"],
+    /* Lower target required for RN: */
+    target: "es2020",
     format: ["cjs", "esm"],
     banner: {
       /* @noble/hashes assigns crypto export on module load which makes it sensitive to
