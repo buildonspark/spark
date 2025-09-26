@@ -37,6 +37,7 @@ func (Tree) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("root", TreeNode.Type).Unique(),
 		edge.From("nodes", TreeNode.Type).Ref("tree"),
+		edge.From("deposit_address", DepositAddress.Type).Ref("tree").Unique(),
 	}
 }
 

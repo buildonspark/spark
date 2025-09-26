@@ -1263,6 +1263,8 @@ type DepositAddressMutation struct {
 	utxoswaps               map[uuid.UUID]struct{}
 	removedutxoswaps        map[uuid.UUID]struct{}
 	clearedutxoswaps        bool
+	tree                    *uuid.UUID
+	clearedtree             bool
 	done                    bool
 	oldValue                func(context.Context) (*DepositAddress, error)
 	predicates              []predicate.DepositAddress
@@ -2086,6 +2088,45 @@ func (m *DepositAddressMutation) ResetUtxoswaps() {
 	m.removedutxoswaps = nil
 }
 
+// SetTreeID sets the "tree" edge to the Tree entity by id.
+func (m *DepositAddressMutation) SetTreeID(id uuid.UUID) {
+	m.tree = &id
+}
+
+// ClearTree clears the "tree" edge to the Tree entity.
+func (m *DepositAddressMutation) ClearTree() {
+	m.clearedtree = true
+}
+
+// TreeCleared reports if the "tree" edge to the Tree entity was cleared.
+func (m *DepositAddressMutation) TreeCleared() bool {
+	return m.clearedtree
+}
+
+// TreeID returns the "tree" edge ID in the mutation.
+func (m *DepositAddressMutation) TreeID() (id uuid.UUID, exists bool) {
+	if m.tree != nil {
+		return *m.tree, true
+	}
+	return
+}
+
+// TreeIDs returns the "tree" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// TreeID instead. It exists only for internal usage by the builders.
+func (m *DepositAddressMutation) TreeIDs() (ids []uuid.UUID) {
+	if id := m.tree; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetTree resets all changes to the "tree" edge.
+func (m *DepositAddressMutation) ResetTree() {
+	m.tree = nil
+	m.clearedtree = false
+}
+
 // Where appends a list predicates to the DepositAddressMutation builder.
 func (m *DepositAddressMutation) Where(ps ...predicate.DepositAddress) {
 	m.predicates = append(m.predicates, ps...)
@@ -2477,7 +2518,7 @@ func (m *DepositAddressMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *DepositAddressMutation) AddedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 4)
 	if m.signing_keyshare != nil {
 		edges = append(edges, depositaddress.EdgeSigningKeyshare)
 	}
@@ -2486,6 +2527,9 @@ func (m *DepositAddressMutation) AddedEdges() []string {
 	}
 	if m.utxoswaps != nil {
 		edges = append(edges, depositaddress.EdgeUtxoswaps)
+	}
+	if m.tree != nil {
+		edges = append(edges, depositaddress.EdgeTree)
 	}
 	return edges
 }
@@ -2510,13 +2554,17 @@ func (m *DepositAddressMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case depositaddress.EdgeTree:
+		if id := m.tree; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *DepositAddressMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 4)
 	if m.removedutxo != nil {
 		edges = append(edges, depositaddress.EdgeUtxo)
 	}
@@ -2548,7 +2596,7 @@ func (m *DepositAddressMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *DepositAddressMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 4)
 	if m.clearedsigning_keyshare {
 		edges = append(edges, depositaddress.EdgeSigningKeyshare)
 	}
@@ -2557,6 +2605,9 @@ func (m *DepositAddressMutation) ClearedEdges() []string {
 	}
 	if m.clearedutxoswaps {
 		edges = append(edges, depositaddress.EdgeUtxoswaps)
+	}
+	if m.clearedtree {
+		edges = append(edges, depositaddress.EdgeTree)
 	}
 	return edges
 }
@@ -2571,6 +2622,8 @@ func (m *DepositAddressMutation) EdgeCleared(name string) bool {
 		return m.clearedutxo
 	case depositaddress.EdgeUtxoswaps:
 		return m.clearedutxoswaps
+	case depositaddress.EdgeTree:
+		return m.clearedtree
 	}
 	return false
 }
@@ -2581,6 +2634,9 @@ func (m *DepositAddressMutation) ClearEdge(name string) error {
 	switch name {
 	case depositaddress.EdgeSigningKeyshare:
 		m.ClearSigningKeyshare()
+		return nil
+	case depositaddress.EdgeTree:
+		m.ClearTree()
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress unique edge %s", name)
@@ -2598,6 +2654,9 @@ func (m *DepositAddressMutation) ResetEdge(name string) error {
 		return nil
 	case depositaddress.EdgeUtxoswaps:
 		m.ResetUtxoswaps()
+		return nil
+	case depositaddress.EdgeTree:
+		m.ResetTree()
 		return nil
 	}
 	return fmt.Errorf("unknown DepositAddress edge %s", name)
@@ -20463,26 +20522,28 @@ func (m *TransferLeafMutation) ResetEdge(name string) error {
 // TreeMutation represents an operation that mutates the Tree nodes in the graph.
 type TreeMutation struct {
 	config
-	op                    Op
-	typ                   string
-	id                    *uuid.UUID
-	create_time           *time.Time
-	update_time           *time.Time
-	owner_identity_pubkey *keys.Public
-	status                *schematype.TreeStatus
-	network               *schematype.Network
-	base_txid             *[]byte
-	vout                  *int16
-	addvout               *int16
-	clearedFields         map[string]struct{}
-	root                  *uuid.UUID
-	clearedroot           bool
-	nodes                 map[uuid.UUID]struct{}
-	removednodes          map[uuid.UUID]struct{}
-	clearednodes          bool
-	done                  bool
-	oldValue              func(context.Context) (*Tree, error)
-	predicates            []predicate.Tree
+	op                     Op
+	typ                    string
+	id                     *uuid.UUID
+	create_time            *time.Time
+	update_time            *time.Time
+	owner_identity_pubkey  *keys.Public
+	status                 *schematype.TreeStatus
+	network                *schematype.Network
+	base_txid              *[]byte
+	vout                   *int16
+	addvout                *int16
+	clearedFields          map[string]struct{}
+	root                   *uuid.UUID
+	clearedroot            bool
+	nodes                  map[uuid.UUID]struct{}
+	removednodes           map[uuid.UUID]struct{}
+	clearednodes           bool
+	deposit_address        *uuid.UUID
+	cleareddeposit_address bool
+	done                   bool
+	oldValue               func(context.Context) (*Tree, error)
+	predicates             []predicate.Tree
 }
 
 var _ ent.Mutation = (*TreeMutation)(nil)
@@ -20954,6 +21015,45 @@ func (m *TreeMutation) ResetNodes() {
 	m.removednodes = nil
 }
 
+// SetDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by id.
+func (m *TreeMutation) SetDepositAddressID(id uuid.UUID) {
+	m.deposit_address = &id
+}
+
+// ClearDepositAddress clears the "deposit_address" edge to the DepositAddress entity.
+func (m *TreeMutation) ClearDepositAddress() {
+	m.cleareddeposit_address = true
+}
+
+// DepositAddressCleared reports if the "deposit_address" edge to the DepositAddress entity was cleared.
+func (m *TreeMutation) DepositAddressCleared() bool {
+	return m.cleareddeposit_address
+}
+
+// DepositAddressID returns the "deposit_address" edge ID in the mutation.
+func (m *TreeMutation) DepositAddressID() (id uuid.UUID, exists bool) {
+	if m.deposit_address != nil {
+		return *m.deposit_address, true
+	}
+	return
+}
+
+// DepositAddressIDs returns the "deposit_address" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// DepositAddressID instead. It exists only for internal usage by the builders.
+func (m *TreeMutation) DepositAddressIDs() (ids []uuid.UUID) {
+	if id := m.deposit_address; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetDepositAddress resets all changes to the "deposit_address" edge.
+func (m *TreeMutation) ResetDepositAddress() {
+	m.deposit_address = nil
+	m.cleareddeposit_address = false
+}
+
 // Where appends a list predicates to the TreeMutation builder.
 func (m *TreeMutation) Where(ps ...predicate.Tree) {
 	m.predicates = append(m.predicates, ps...)
@@ -21204,12 +21304,15 @@ func (m *TreeMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *TreeMutation) AddedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.root != nil {
 		edges = append(edges, tree.EdgeRoot)
 	}
 	if m.nodes != nil {
 		edges = append(edges, tree.EdgeNodes)
+	}
+	if m.deposit_address != nil {
+		edges = append(edges, tree.EdgeDepositAddress)
 	}
 	return edges
 }
@@ -21228,13 +21331,17 @@ func (m *TreeMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case tree.EdgeDepositAddress:
+		if id := m.deposit_address; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *TreeMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.removednodes != nil {
 		edges = append(edges, tree.EdgeNodes)
 	}
@@ -21257,12 +21364,15 @@ func (m *TreeMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *TreeMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 2)
+	edges := make([]string, 0, 3)
 	if m.clearedroot {
 		edges = append(edges, tree.EdgeRoot)
 	}
 	if m.clearednodes {
 		edges = append(edges, tree.EdgeNodes)
+	}
+	if m.cleareddeposit_address {
+		edges = append(edges, tree.EdgeDepositAddress)
 	}
 	return edges
 }
@@ -21275,6 +21385,8 @@ func (m *TreeMutation) EdgeCleared(name string) bool {
 		return m.clearedroot
 	case tree.EdgeNodes:
 		return m.clearednodes
+	case tree.EdgeDepositAddress:
+		return m.cleareddeposit_address
 	}
 	return false
 }
@@ -21285,6 +21397,9 @@ func (m *TreeMutation) ClearEdge(name string) error {
 	switch name {
 	case tree.EdgeRoot:
 		m.ClearRoot()
+		return nil
+	case tree.EdgeDepositAddress:
+		m.ClearDepositAddress()
 		return nil
 	}
 	return fmt.Errorf("unknown Tree unique edge %s", name)
@@ -21299,6 +21414,9 @@ func (m *TreeMutation) ResetEdge(name string) error {
 		return nil
 	case tree.EdgeNodes:
 		m.ResetNodes()
+		return nil
+	case tree.EdgeDepositAddress:
+		m.ResetDepositAddress()
 		return nil
 	}
 	return fmt.Errorf("unknown Tree edge %s", name)

@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
@@ -37,9 +38,10 @@ type Tree struct {
 	Vout int16 `json:"vout,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TreeQuery when eager-loading is set.
-	Edges        TreeEdges `json:"edges"`
-	tree_root    *uuid.UUID
-	selectValues sql.SelectValues
+	Edges                TreeEdges `json:"edges"`
+	deposit_address_tree *uuid.UUID
+	tree_root            *uuid.UUID
+	selectValues         sql.SelectValues
 }
 
 // TreeEdges holds the relations/edges for other nodes in the graph.
@@ -48,9 +50,11 @@ type TreeEdges struct {
 	Root *TreeNode `json:"root,omitempty"`
 	// Nodes holds the value of the nodes edge.
 	Nodes []*TreeNode `json:"nodes,omitempty"`
+	// DepositAddress holds the value of the deposit_address edge.
+	DepositAddress *DepositAddress `json:"deposit_address,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // RootOrErr returns the Root value or an error if the edge
@@ -73,6 +77,17 @@ func (e TreeEdges) NodesOrErr() ([]*TreeNode, error) {
 	return nil, &NotLoadedError{edge: "nodes"}
 }
 
+// DepositAddressOrErr returns the DepositAddress value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e TreeEdges) DepositAddressOrErr() (*DepositAddress, error) {
+	if e.DepositAddress != nil {
+		return e.DepositAddress, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: depositaddress.Label}
+	}
+	return nil, &NotLoadedError{edge: "deposit_address"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*Tree) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -90,7 +105,9 @@ func (*Tree) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullTime)
 		case tree.FieldID:
 			values[i] = new(uuid.UUID)
-		case tree.ForeignKeys[0]: // tree_root
+		case tree.ForeignKeys[0]: // deposit_address_tree
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
+		case tree.ForeignKeys[1]: // tree_root
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		default:
 			values[i] = new(sql.UnknownType)
@@ -157,6 +174,13 @@ func (t *Tree) assignValues(columns []string, values []any) error {
 			}
 		case tree.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field deposit_address_tree", values[i])
+			} else if value.Valid {
+				t.deposit_address_tree = new(uuid.UUID)
+				*t.deposit_address_tree = *value.S.(*uuid.UUID)
+			}
+		case tree.ForeignKeys[1]:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
 				return fmt.Errorf("unexpected type %T for field tree_root", values[i])
 			} else if value.Valid {
 				t.tree_root = new(uuid.UUID)
@@ -183,6 +207,11 @@ func (t *Tree) QueryRoot() *TreeNodeQuery {
 // QueryNodes queries the "nodes" edge of the Tree entity.
 func (t *Tree) QueryNodes() *TreeNodeQuery {
 	return NewTreeClient(t.config).QueryNodes(t)
+}
+
+// QueryDepositAddress queries the "deposit_address" edge of the Tree entity.
+func (t *Tree) QueryDepositAddress() *DepositAddressQuery {
+	return NewTreeClient(t.config).QueryDepositAddress(t)
 }
 
 // Update returns a builder for updating this Tree.

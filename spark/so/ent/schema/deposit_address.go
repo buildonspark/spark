@@ -89,5 +89,7 @@ func (DepositAddress) Edges() []ent.Edge {
 			Immutable(),
 		edge.To("utxo", Utxo.Type),
 		edge.To("utxoswaps", UtxoSwap.Type),
+		edge.To("tree", Tree.Type).
+			Unique(),
 	}
 }

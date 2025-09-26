@@ -35,6 +35,8 @@ const (
 	EdgeRoot = "root"
 	// EdgeNodes holds the string denoting the nodes edge name in mutations.
 	EdgeNodes = "nodes"
+	// EdgeDepositAddress holds the string denoting the deposit_address edge name in mutations.
+	EdgeDepositAddress = "deposit_address"
 	// Table holds the table name of the tree in the database.
 	Table = "trees"
 	// RootTable is the table that holds the root relation/edge.
@@ -51,6 +53,13 @@ const (
 	NodesInverseTable = "tree_nodes"
 	// NodesColumn is the table column denoting the nodes relation/edge.
 	NodesColumn = "tree_node_tree"
+	// DepositAddressTable is the table that holds the deposit_address relation/edge.
+	DepositAddressTable = "trees"
+	// DepositAddressInverseTable is the table name for the DepositAddress entity.
+	// It exists in this package in order to avoid circular dependency with the "depositaddress" package.
+	DepositAddressInverseTable = "deposit_addresses"
+	// DepositAddressColumn is the table column denoting the deposit_address relation/edge.
+	DepositAddressColumn = "deposit_address_tree"
 )
 
 // Columns holds all SQL columns for tree fields.
@@ -68,6 +77,7 @@ var Columns = []string{
 // ForeignKeys holds the SQL foreign-keys that are owned by the "trees"
 // table and are not defined as standalone fields in the schema.
 var ForeignKeys = []string{
+	"deposit_address_tree",
 	"tree_root",
 }
 
@@ -174,6 +184,13 @@ func ByNodes(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newNodesStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByDepositAddressField orders the results by deposit_address field.
+func ByDepositAddressField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newDepositAddressStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newRootStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -186,5 +203,12 @@ func newNodesStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(NodesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, true, NodesTable, NodesColumn),
+	)
+}
+func newDepositAddressStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(DepositAddressInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2O, true, DepositAddressTable, DepositAddressColumn),
 	)
 }

@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
@@ -22,14 +23,15 @@ import (
 // TreeQuery is the builder for querying Tree entities.
 type TreeQuery struct {
 	config
-	ctx        *QueryContext
-	order      []tree.OrderOption
-	inters     []Interceptor
-	predicates []predicate.Tree
-	withRoot   *TreeNodeQuery
-	withNodes  *TreeNodeQuery
-	withFKs    bool
-	modifiers  []func(*sql.Selector)
+	ctx                *QueryContext
+	order              []tree.OrderOption
+	inters             []Interceptor
+	predicates         []predicate.Tree
+	withRoot           *TreeNodeQuery
+	withNodes          *TreeNodeQuery
+	withDepositAddress *DepositAddressQuery
+	withFKs            bool
+	modifiers          []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -103,6 +105,28 @@ func (tq *TreeQuery) QueryNodes() *TreeNodeQuery {
 			sqlgraph.From(tree.Table, tree.FieldID, selector),
 			sqlgraph.To(treenode.Table, treenode.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, true, tree.NodesTable, tree.NodesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryDepositAddress chains the current query on the "deposit_address" edge.
+func (tq *TreeQuery) QueryDepositAddress() *DepositAddressQuery {
+	query := (&DepositAddressClient{config: tq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := tq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := tq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tree.Table, tree.FieldID, selector),
+			sqlgraph.To(depositaddress.Table, depositaddress.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, true, tree.DepositAddressTable, tree.DepositAddressColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(tq.driver.Dialect(), step)
 		return fromU, nil
@@ -297,13 +321,14 @@ func (tq *TreeQuery) Clone() *TreeQuery {
 		return nil
 	}
 	return &TreeQuery{
-		config:     tq.config,
-		ctx:        tq.ctx.Clone(),
-		order:      append([]tree.OrderOption{}, tq.order...),
-		inters:     append([]Interceptor{}, tq.inters...),
-		predicates: append([]predicate.Tree{}, tq.predicates...),
-		withRoot:   tq.withRoot.Clone(),
-		withNodes:  tq.withNodes.Clone(),
+		config:             tq.config,
+		ctx:                tq.ctx.Clone(),
+		order:              append([]tree.OrderOption{}, tq.order...),
+		inters:             append([]Interceptor{}, tq.inters...),
+		predicates:         append([]predicate.Tree{}, tq.predicates...),
+		withRoot:           tq.withRoot.Clone(),
+		withNodes:          tq.withNodes.Clone(),
+		withDepositAddress: tq.withDepositAddress.Clone(),
 		// clone intermediate query.
 		sql:  tq.sql.Clone(),
 		path: tq.path,
@@ -329,6 +354,17 @@ func (tq *TreeQuery) WithNodes(opts ...func(*TreeNodeQuery)) *TreeQuery {
 		opt(query)
 	}
 	tq.withNodes = query
+	return tq
+}
+
+// WithDepositAddress tells the query-builder to eager-load the nodes that are connected to
+// the "deposit_address" edge. The optional arguments are used to configure the query builder of the edge.
+func (tq *TreeQuery) WithDepositAddress(opts ...func(*DepositAddressQuery)) *TreeQuery {
+	query := (&DepositAddressClient{config: tq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	tq.withDepositAddress = query
 	return tq
 }
 
@@ -411,12 +447,13 @@ func (tq *TreeQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tree, e
 		nodes       = []*Tree{}
 		withFKs     = tq.withFKs
 		_spec       = tq.querySpec()
-		loadedTypes = [2]bool{
+		loadedTypes = [3]bool{
 			tq.withRoot != nil,
 			tq.withNodes != nil,
+			tq.withDepositAddress != nil,
 		}
 	)
-	if tq.withRoot != nil {
+	if tq.withRoot != nil || tq.withDepositAddress != nil {
 		withFKs = true
 	}
 	if withFKs {
@@ -453,6 +490,12 @@ func (tq *TreeQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Tree, e
 		if err := tq.loadNodes(ctx, query, nodes,
 			func(n *Tree) { n.Edges.Nodes = []*TreeNode{} },
 			func(n *Tree, e *TreeNode) { n.Edges.Nodes = append(n.Edges.Nodes, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := tq.withDepositAddress; query != nil {
+		if err := tq.loadDepositAddress(ctx, query, nodes, nil,
+			func(n *Tree, e *DepositAddress) { n.Edges.DepositAddress = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -519,6 +562,38 @@ func (tq *TreeQuery) loadNodes(ctx context.Context, query *TreeNodeQuery, nodes 
 			return fmt.Errorf(`unexpected referenced foreign-key "tree_node_tree" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
+	}
+	return nil
+}
+func (tq *TreeQuery) loadDepositAddress(ctx context.Context, query *DepositAddressQuery, nodes []*Tree, init func(*Tree), assign func(*Tree, *DepositAddress)) error {
+	ids := make([]uuid.UUID, 0, len(nodes))
+	nodeids := make(map[uuid.UUID][]*Tree)
+	for i := range nodes {
+		if nodes[i].deposit_address_tree == nil {
+			continue
+		}
+		fk := *nodes[i].deposit_address_tree
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(depositaddress.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "deposit_address_tree" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
 	}
 	return nil
 }

@@ -702,6 +702,29 @@ func HasUtxoswapsWith(preds ...predicate.UtxoSwap) predicate.DepositAddress {
 	})
 }
 
+// HasTree applies the HasEdge predicate on the "tree" edge.
+func HasTree() predicate.DepositAddress {
+	return predicate.DepositAddress(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, TreeTable, TreeColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasTreeWith applies the HasEdge predicate on the "tree" edge with a given conditions (other predicates).
+func HasTreeWith(preds ...predicate.Tree) predicate.DepositAddress {
+	return predicate.DepositAddress(func(s *sql.Selector) {
+		step := newTreeStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.DepositAddress) predicate.DepositAddress {
 	return predicate.DepositAddress(sql.AndPredicates(predicates...))

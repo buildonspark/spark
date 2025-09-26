@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/ent/tree"
 )
 
 // DepositAddress is the model entity for the DepositAddress schema.
@@ -63,9 +64,11 @@ type DepositAddressEdges struct {
 	Utxo []*Utxo `json:"utxo,omitempty"`
 	// Utxoswaps holds the value of the utxoswaps edge.
 	Utxoswaps []*UtxoSwap `json:"utxoswaps,omitempty"`
+	// Tree holds the value of the tree edge.
+	Tree *Tree `json:"tree,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [4]bool
 }
 
 // SigningKeyshareOrErr returns the SigningKeyshare value or an error if the edge
@@ -95,6 +98,17 @@ func (e DepositAddressEdges) UtxoswapsOrErr() ([]*UtxoSwap, error) {
 		return e.Utxoswaps, nil
 	}
 	return nil, &NotLoadedError{edge: "utxoswaps"}
+}
+
+// TreeOrErr returns the Tree value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e DepositAddressEdges) TreeOrErr() (*Tree, error) {
+	if e.Tree != nil {
+		return e.Tree, nil
+	} else if e.loadedTypes[3] {
+		return nil, &NotFoundError{label: tree.Label}
+	}
+	return nil, &NotLoadedError{edge: "tree"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -252,6 +266,11 @@ func (da *DepositAddress) QueryUtxo() *UtxoQuery {
 // QueryUtxoswaps queries the "utxoswaps" edge of the DepositAddress entity.
 func (da *DepositAddress) QueryUtxoswaps() *UtxoSwapQuery {
 	return NewDepositAddressClient(da.config).QueryUtxoswaps(da)
+}
+
+// QueryTree queries the "tree" edge of the DepositAddress entity.
+func (da *DepositAddress) QueryTree() *TreeQuery {
+	return NewDepositAddressClient(da.config).QueryTree(da)
 }
 
 // Update returns a builder for updating this DepositAddress.

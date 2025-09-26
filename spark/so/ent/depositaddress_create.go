@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 )
@@ -224,6 +225,25 @@ func (dac *DepositAddressCreate) AddUtxoswaps(u ...*UtxoSwap) *DepositAddressCre
 		ids[i] = u[i].ID
 	}
 	return dac.AddUtxoswapIDs(ids...)
+}
+
+// SetTreeID sets the "tree" edge to the Tree entity by ID.
+func (dac *DepositAddressCreate) SetTreeID(id uuid.UUID) *DepositAddressCreate {
+	dac.mutation.SetTreeID(id)
+	return dac
+}
+
+// SetNillableTreeID sets the "tree" edge to the Tree entity by ID if the given value is not nil.
+func (dac *DepositAddressCreate) SetNillableTreeID(id *uuid.UUID) *DepositAddressCreate {
+	if id != nil {
+		dac = dac.SetTreeID(*id)
+	}
+	return dac
+}
+
+// SetTree sets the "tree" edge to the Tree entity.
+func (dac *DepositAddressCreate) SetTree(t *Tree) *DepositAddressCreate {
+	return dac.SetTreeID(t.ID)
 }
 
 // Mutation returns the DepositAddressMutation object of the builder.
@@ -461,6 +481,22 @@ func (dac *DepositAddressCreate) createSpec() (*DepositAddress, *sqlgraph.Create
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(utxoswap.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := dac.mutation.TreeIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   depositaddress.TreeTable,
+			Columns: []string{depositaddress.TreeColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(tree.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

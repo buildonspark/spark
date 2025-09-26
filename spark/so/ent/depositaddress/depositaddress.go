@@ -50,6 +50,8 @@ const (
 	EdgeUtxo = "utxo"
 	// EdgeUtxoswaps holds the string denoting the utxoswaps edge name in mutations.
 	EdgeUtxoswaps = "utxoswaps"
+	// EdgeTree holds the string denoting the tree edge name in mutations.
+	EdgeTree = "tree"
 	// Table holds the table name of the depositaddress in the database.
 	Table = "deposit_addresses"
 	// SigningKeyshareTable is the table that holds the signing_keyshare relation/edge.
@@ -73,6 +75,13 @@ const (
 	UtxoswapsInverseTable = "utxo_swaps"
 	// UtxoswapsColumn is the table column denoting the utxoswaps relation/edge.
 	UtxoswapsColumn = "deposit_address_utxoswaps"
+	// TreeTable is the table that holds the tree relation/edge.
+	TreeTable = "trees"
+	// TreeInverseTable is the table name for the Tree entity.
+	// It exists in this package in order to avoid circular dependency with the "tree" package.
+	TreeInverseTable = "trees"
+	// TreeColumn is the table column denoting the tree relation/edge.
+	TreeColumn = "deposit_address_tree"
 )
 
 // Columns holds all SQL columns for depositaddress fields.
@@ -234,6 +243,13 @@ func ByUtxoswaps(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newUtxoswapsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByTreeField orders the results by tree field.
+func ByTreeField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newTreeStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newSigningKeyshareStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -253,5 +269,12 @@ func newUtxoswapsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(UtxoswapsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, UtxoswapsTable, UtxoswapsColumn),
+	)
+}
+func newTreeStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(TreeInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2O, false, TreeTable, TreeColumn),
 	)
 }

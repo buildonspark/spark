@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
@@ -131,6 +132,25 @@ func (tc *TreeCreate) AddNodes(t ...*TreeNode) *TreeCreate {
 		ids[i] = t[i].ID
 	}
 	return tc.AddNodeIDs(ids...)
+}
+
+// SetDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by ID.
+func (tc *TreeCreate) SetDepositAddressID(id uuid.UUID) *TreeCreate {
+	tc.mutation.SetDepositAddressID(id)
+	return tc
+}
+
+// SetNillableDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by ID if the given value is not nil.
+func (tc *TreeCreate) SetNillableDepositAddressID(id *uuid.UUID) *TreeCreate {
+	if id != nil {
+		tc = tc.SetDepositAddressID(*id)
+	}
+	return tc
+}
+
+// SetDepositAddress sets the "deposit_address" edge to the DepositAddress entity.
+func (tc *TreeCreate) SetDepositAddress(d *DepositAddress) *TreeCreate {
+	return tc.SetDepositAddressID(d.ID)
 }
 
 // Mutation returns the TreeMutation object of the builder.
@@ -320,6 +340,23 @@ func (tc *TreeCreate) createSpec() (*Tree, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := tc.mutation.DepositAddressIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: true,
+			Table:   tree.DepositAddressTable,
+			Columns: []string{tree.DepositAddressColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.deposit_address_tree = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

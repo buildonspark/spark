@@ -885,6 +885,7 @@ var (
 		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
 		{Name: "base_txid", Type: field.TypeBytes},
 		{Name: "vout", Type: field.TypeInt16},
+		{Name: "deposit_address_tree", Type: field.TypeUUID, Unique: true, Nullable: true},
 		{Name: "tree_root", Type: field.TypeUUID, Nullable: true},
 	}
 	// TreesTable holds the schema information for the "trees" table.
@@ -894,8 +895,14 @@ var (
 		PrimaryKey: []*schema.Column{TreesColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
-				Symbol:     "trees_tree_nodes_root",
+				Symbol:     "trees_deposit_addresses_tree",
 				Columns:    []*schema.Column{TreesColumns[8]},
+				RefColumns: []*schema.Column{DepositAddressesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+			{
+				Symbol:     "trees_tree_nodes_root",
+				Columns:    []*schema.Column{TreesColumns[9]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -1282,7 +1289,8 @@ func init() {
 	TransfersTable.ForeignKeys[2].RefTable = TransfersTable
 	TransferLeafsTable.ForeignKeys[0].RefTable = TransfersTable
 	TransferLeafsTable.ForeignKeys[1].RefTable = TreeNodesTable
-	TreesTable.ForeignKeys[0].RefTable = TreeNodesTable
+	TreesTable.ForeignKeys[0].RefTable = DepositAddressesTable
+	TreesTable.ForeignKeys[1].RefTable = TreeNodesTable
 	TreeNodesTable.ForeignKeys[0].RefTable = TreesTable
 	TreeNodesTable.ForeignKeys[1].RefTable = TreeNodesTable
 	TreeNodesTable.ForeignKeys[2].RefTable = SigningKeysharesTable

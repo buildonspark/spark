@@ -389,6 +389,29 @@ func HasNodesWith(preds ...predicate.TreeNode) predicate.Tree {
 	})
 }
 
+// HasDepositAddress applies the HasEdge predicate on the "deposit_address" edge.
+func HasDepositAddress() predicate.Tree {
+	return predicate.Tree(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, true, DepositAddressTable, DepositAddressColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasDepositAddressWith applies the HasEdge predicate on the "deposit_address" edge with a given conditions (other predicates).
+func HasDepositAddressWith(preds ...predicate.DepositAddress) predicate.Tree {
+	return predicate.Tree(func(s *sql.Selector) {
+		step := newDepositAddressStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.Tree) predicate.Tree {
 	return predicate.Tree(sql.AndPredicates(predicates...))

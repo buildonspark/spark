@@ -874,6 +874,22 @@ func (c *DepositAddressClient) QueryUtxoswaps(da *DepositAddress) *UtxoSwapQuery
 	return query
 }
 
+// QueryTree queries the tree edge of a DepositAddress.
+func (c *DepositAddressClient) QueryTree(da *DepositAddress) *TreeQuery {
+	query := (&TreeClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := da.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(depositaddress.Table, depositaddress.FieldID, id),
+			sqlgraph.To(tree.Table, tree.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, depositaddress.TreeTable, depositaddress.TreeColumn),
+		)
+		fromV = sqlgraph.Neighbors(da.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *DepositAddressClient) Hooks() []Hook {
 	hooks := c.hooks.DepositAddress
@@ -4303,6 +4319,22 @@ func (c *TreeClient) QueryNodes(t *Tree) *TreeNodeQuery {
 			sqlgraph.From(tree.Table, tree.FieldID, id),
 			sqlgraph.To(treenode.Table, treenode.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, true, tree.NodesTable, tree.NodesColumn),
+		)
+		fromV = sqlgraph.Neighbors(t.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryDepositAddress queries the deposit_address edge of a Tree.
+func (c *TreeClient) QueryDepositAddress(t *Tree) *DepositAddressQuery {
+	query := (&DepositAddressClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := t.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(tree.Table, tree.FieldID, id),
+			sqlgraph.To(depositaddress.Table, depositaddress.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, true, tree.DepositAddressTable, tree.DepositAddressColumn),
 		)
 		fromV = sqlgraph.Neighbors(t.driver.Dialect(), step)
 		return fromV, nil

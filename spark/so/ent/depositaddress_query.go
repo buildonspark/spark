@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 )
@@ -31,6 +32,7 @@ type DepositAddressQuery struct {
 	withSigningKeyshare *SigningKeyshareQuery
 	withUtxo            *UtxoQuery
 	withUtxoswaps       *UtxoSwapQuery
+	withTree            *TreeQuery
 	withFKs             bool
 	modifiers           []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
@@ -128,6 +130,28 @@ func (daq *DepositAddressQuery) QueryUtxoswaps() *UtxoSwapQuery {
 			sqlgraph.From(depositaddress.Table, depositaddress.FieldID, selector),
 			sqlgraph.To(utxoswap.Table, utxoswap.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, depositaddress.UtxoswapsTable, depositaddress.UtxoswapsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(daq.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryTree chains the current query on the "tree" edge.
+func (daq *DepositAddressQuery) QueryTree() *TreeQuery {
+	query := (&TreeClient{config: daq.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := daq.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := daq.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(depositaddress.Table, depositaddress.FieldID, selector),
+			sqlgraph.To(tree.Table, tree.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, depositaddress.TreeTable, depositaddress.TreeColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(daq.driver.Dialect(), step)
 		return fromU, nil
@@ -330,6 +354,7 @@ func (daq *DepositAddressQuery) Clone() *DepositAddressQuery {
 		withSigningKeyshare: daq.withSigningKeyshare.Clone(),
 		withUtxo:            daq.withUtxo.Clone(),
 		withUtxoswaps:       daq.withUtxoswaps.Clone(),
+		withTree:            daq.withTree.Clone(),
 		// clone intermediate query.
 		sql:  daq.sql.Clone(),
 		path: daq.path,
@@ -366,6 +391,17 @@ func (daq *DepositAddressQuery) WithUtxoswaps(opts ...func(*UtxoSwapQuery)) *Dep
 		opt(query)
 	}
 	daq.withUtxoswaps = query
+	return daq
+}
+
+// WithTree tells the query-builder to eager-load the nodes that are connected to
+// the "tree" edge. The optional arguments are used to configure the query builder of the edge.
+func (daq *DepositAddressQuery) WithTree(opts ...func(*TreeQuery)) *DepositAddressQuery {
+	query := (&TreeClient{config: daq.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	daq.withTree = query
 	return daq
 }
 
@@ -448,10 +484,11 @@ func (daq *DepositAddressQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 		nodes       = []*DepositAddress{}
 		withFKs     = daq.withFKs
 		_spec       = daq.querySpec()
-		loadedTypes = [3]bool{
+		loadedTypes = [4]bool{
 			daq.withSigningKeyshare != nil,
 			daq.withUtxo != nil,
 			daq.withUtxoswaps != nil,
+			daq.withTree != nil,
 		}
 	)
 	if daq.withSigningKeyshare != nil {
@@ -498,6 +535,12 @@ func (daq *DepositAddressQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 		if err := daq.loadUtxoswaps(ctx, query, nodes,
 			func(n *DepositAddress) { n.Edges.Utxoswaps = []*UtxoSwap{} },
 			func(n *DepositAddress, e *UtxoSwap) { n.Edges.Utxoswaps = append(n.Edges.Utxoswaps, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := daq.withTree; query != nil {
+		if err := daq.loadTree(ctx, query, nodes, nil,
+			func(n *DepositAddress, e *Tree) { n.Edges.Tree = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -593,6 +636,34 @@ func (daq *DepositAddressQuery) loadUtxoswaps(ctx context.Context, query *UtxoSw
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "deposit_address_utxoswaps" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (daq *DepositAddressQuery) loadTree(ctx context.Context, query *TreeQuery, nodes []*DepositAddress, init func(*DepositAddress), assign func(*DepositAddress, *Tree)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*DepositAddress)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+	}
+	query.withFKs = true
+	query.Where(predicate.Tree(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(depositaddress.TreeColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.deposit_address_tree
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "deposit_address_tree" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "deposit_address_tree" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

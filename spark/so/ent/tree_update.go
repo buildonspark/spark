@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tree"
@@ -141,6 +142,25 @@ func (tu *TreeUpdate) AddNodes(t ...*TreeNode) *TreeUpdate {
 	return tu.AddNodeIDs(ids...)
 }
 
+// SetDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by ID.
+func (tu *TreeUpdate) SetDepositAddressID(id uuid.UUID) *TreeUpdate {
+	tu.mutation.SetDepositAddressID(id)
+	return tu
+}
+
+// SetNillableDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by ID if the given value is not nil.
+func (tu *TreeUpdate) SetNillableDepositAddressID(id *uuid.UUID) *TreeUpdate {
+	if id != nil {
+		tu = tu.SetDepositAddressID(*id)
+	}
+	return tu
+}
+
+// SetDepositAddress sets the "deposit_address" edge to the DepositAddress entity.
+func (tu *TreeUpdate) SetDepositAddress(d *DepositAddress) *TreeUpdate {
+	return tu.SetDepositAddressID(d.ID)
+}
+
 // Mutation returns the TreeMutation object of the builder.
 func (tu *TreeUpdate) Mutation() *TreeMutation {
 	return tu.mutation
@@ -171,6 +191,12 @@ func (tu *TreeUpdate) RemoveNodes(t ...*TreeNode) *TreeUpdate {
 		ids[i] = t[i].ID
 	}
 	return tu.RemoveNodeIDs(ids...)
+}
+
+// ClearDepositAddress clears the "deposit_address" edge to the DepositAddress entity.
+func (tu *TreeUpdate) ClearDepositAddress() *TreeUpdate {
+	tu.mutation.ClearDepositAddress()
+	return tu
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -341,6 +367,35 @@ func (tu *TreeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if tu.mutation.DepositAddressCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: true,
+			Table:   tree.DepositAddressTable,
+			Columns: []string{tree.DepositAddressColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tu.mutation.DepositAddressIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: true,
+			Table:   tree.DepositAddressTable,
+			Columns: []string{tree.DepositAddressColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if n, err = sqlgraph.UpdateNodes(ctx, tu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{tree.Label}
@@ -470,6 +525,25 @@ func (tuo *TreeUpdateOne) AddNodes(t ...*TreeNode) *TreeUpdateOne {
 	return tuo.AddNodeIDs(ids...)
 }
 
+// SetDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by ID.
+func (tuo *TreeUpdateOne) SetDepositAddressID(id uuid.UUID) *TreeUpdateOne {
+	tuo.mutation.SetDepositAddressID(id)
+	return tuo
+}
+
+// SetNillableDepositAddressID sets the "deposit_address" edge to the DepositAddress entity by ID if the given value is not nil.
+func (tuo *TreeUpdateOne) SetNillableDepositAddressID(id *uuid.UUID) *TreeUpdateOne {
+	if id != nil {
+		tuo = tuo.SetDepositAddressID(*id)
+	}
+	return tuo
+}
+
+// SetDepositAddress sets the "deposit_address" edge to the DepositAddress entity.
+func (tuo *TreeUpdateOne) SetDepositAddress(d *DepositAddress) *TreeUpdateOne {
+	return tuo.SetDepositAddressID(d.ID)
+}
+
 // Mutation returns the TreeMutation object of the builder.
 func (tuo *TreeUpdateOne) Mutation() *TreeMutation {
 	return tuo.mutation
@@ -500,6 +574,12 @@ func (tuo *TreeUpdateOne) RemoveNodes(t ...*TreeNode) *TreeUpdateOne {
 		ids[i] = t[i].ID
 	}
 	return tuo.RemoveNodeIDs(ids...)
+}
+
+// ClearDepositAddress clears the "deposit_address" edge to the DepositAddress entity.
+func (tuo *TreeUpdateOne) ClearDepositAddress() *TreeUpdateOne {
+	tuo.mutation.ClearDepositAddress()
+	return tuo
 }
 
 // Where appends a list predicates to the TreeUpdate builder.
@@ -693,6 +773,35 @@ func (tuo *TreeUpdateOne) sqlSave(ctx context.Context) (_node *Tree, err error) 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if tuo.mutation.DepositAddressCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: true,
+			Table:   tree.DepositAddressTable,
+			Columns: []string{tree.DepositAddressColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := tuo.mutation.DepositAddressIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: true,
+			Table:   tree.DepositAddressTable,
+			Columns: []string{tree.DepositAddressColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(depositaddress.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
