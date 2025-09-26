@@ -434,15 +434,15 @@ func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tok
 
 	ownerPubKeys, err := keys.ParsePublicKeys(req.GetOwnerPublicKeys())
 	if err != nil {
-		return nil, errors.InvalidUserInputErrorf("invalid owner public keys: %w", err)
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("invalid owner public keys: %w", err))
 	}
 	issuerPubKeys, err := keys.ParsePublicKeys(req.GetIssuerPublicKeys())
 	if err != nil {
-		return nil, errors.InvalidUserInputErrorf("invalid issuer public keys: %w", err)
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("invalid issuer public keys: %w", err))
 	}
 	tokenIdentifiers := req.GetTokenIdentifiers()
 	if len(ownerPubKeys) == 0 && len(issuerPubKeys) == 0 && len(tokenIdentifiers) == 0 {
-		return nil, errors.InvalidUserInputErrorf("must specify owner public key, issuer public key, or token identifier")
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("must specify owner public key, issuer public key, or token identifier"))
 	}
 
 	var afterID *uuid.UUID
@@ -463,12 +463,12 @@ func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tok
 		if err != nil {
 			cursorBytes, err = base64.URLEncoding.DecodeString(cursor)
 			if err != nil {
-				return nil, errors.InvalidUserInputErrorf("invalid cursor: %v", err)
+				return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("invalid cursor: %w", err))
 			}
 		}
 		id, err := uuid.FromBytes(cursorBytes)
 		if err != nil {
-			return nil, errors.InvalidUserInputErrorf("invalid cursor: %v", err)
+			return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("invalid cursor: %w", err))
 		}
 
 		if direction == sparkpb.Direction_PREVIOUS {
@@ -488,7 +488,7 @@ func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tok
 
 	// Check for unsupported backward pagination
 	if direction == sparkpb.Direction_PREVIOUS {
-		return nil, errors.InvalidUserInputErrorf("backward pagination with 'previous' direction is not currently supported")
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("backward pagination with 'previous' direction is not currently supported"))
 	}
 
 	queryLimit := limit + 1

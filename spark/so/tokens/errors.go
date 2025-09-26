@@ -113,7 +113,7 @@ func NewTransactionPreemptedError(tokenTransaction *tokenpb.TokenTransaction, re
 	formattedError := FormatErrorWithTransactionProto(
 		fmt.Sprintf(ErrTransactionPreemptedByExisting, reason, details),
 		tokenTransaction,
-		sparkerrors.AlreadyExistsErrorf("Inputs cannot be spent: token transaction with these inputs is already in progress or finalized"),
+		sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("Inputs cannot be spent: token transaction with these inputs is already in progress or finalized")),
 	)
 	return sparkerrors.AbortedTransactionPreempted(formattedError)
 }

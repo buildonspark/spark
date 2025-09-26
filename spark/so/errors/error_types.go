@@ -8,9 +8,9 @@ import (
 
 // Canonical reason constants for ErrorInfo.Reason. Keep stable, UPPER_SNAKE_CASE.  All errors should have a grpc error code prefix.
 const (
-	ReasonInternalDependencyFailure = "DEPENDENCY_FAILURE"
-	ReasonInternalDatabaseError     = "DATABASE_ERROR"
-	ReasonInternalUnhandledError    = "UNHANDLED_ERROR"
+	ReasonInternalDatabaseError       = "DATABASE_ERROR"
+	ReasonInternalTypeConversionError = "TYPE_CONVERSION_ERROR"
+	ReasonInternalUnhandledError      = "UNHANDLED_ERROR"
 
 	ReasonInvalidArgumentMissingField      = "MISSING_FIELD"
 	ReasonInvalidArgumentMalformedField    = "MALFORMED_FIELD"
@@ -38,14 +38,15 @@ const (
 	ReasonResourceExhaustedConcurrencyLimitExceeded = "CONCURRENCY_LIMIT_EXCEEDED"
 
 	ReasonUnavailableMethodDisabled = "METHOD_DISABLED"
+	ReasonUnavailableDataStore      = "DATA_STORE_UNAVAILABLE"
 
 	// ErrorReasonPrefixFailedWithExternalCoordinator is a prefix for errors that occur when the coordinator calls out to another
 	// coordinator and that call fails. The underlying reason from the external coordinator should be appended after a colon.
 	ErrorReasonPrefixFailedWithExternalCoordinator = "FAILED_WITH_EXTERNAL_COORDINATOR"
 )
 
-func InternalDependencyFailure(err error) error {
-	return newGRPCError(codes.Internal, err, ReasonInternalDependencyFailure)
+func InternalTypeConversionError(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalTypeConversionError)
 }
 
 func InternalUnhandledError(err error) error {
@@ -134,6 +135,10 @@ func ResourceExhaustedConcurrencyLimitExceeded(err error) error {
 
 func UnavailableMethodDisabled(err error) error {
 	return newGRPCError(codes.Unavailable, err, ReasonUnavailableMethodDisabled)
+}
+
+func UnavailableDataStore(err error) error {
+	return newGRPCError(codes.Unavailable, err, ReasonUnavailableDataStore)
 }
 
 // ------------------------------------------------------------

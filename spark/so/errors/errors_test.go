@@ -21,7 +21,7 @@ const (
 
 var (
 	grpcErr = func() error {
-		st, _ := status.New(codes.Internal, msg).WithDetails(&errdetails.ErrorInfo{Reason: ReasonInternalDependencyFailure})
+		st, _ := status.New(codes.Internal, msg).WithDetails(&errdetails.ErrorInfo{Reason: ReasonInternalUnhandledError})
 		return st.Err()
 	}()
 	errHandler = func(_ context.Context, _ any) (any, error) {
@@ -67,7 +67,7 @@ func TestInternalErrorDetailMasking(t *testing.T) {
 			wantDetails:    true,
 			handler:        errHandler,
 			expectedCode:   codes.Internal,
-			expectedReason: ReasonInternalDependencyFailure,
+			expectedReason: ReasonInternalUnhandledError,
 		},
 		{
 			name:           "show details for internal service",
@@ -76,7 +76,7 @@ func TestInternalErrorDetailMasking(t *testing.T) {
 			wantDetails:    true,
 			handler:        errHandler,
 			expectedCode:   codes.Internal,
-			expectedReason: ReasonInternalDependencyFailure,
+			expectedReason: ReasonInternalUnhandledError,
 		},
 		{
 			name:           "show details for failed precondition error",
@@ -96,7 +96,7 @@ func TestInternalErrorDetailMasking(t *testing.T) {
 			wantDetails:    true,
 			handler:        errHandler,
 			expectedCode:   codes.Internal,
-			expectedReason: ReasonInternalDependencyFailure,
+			expectedReason: ReasonInternalUnhandledError,
 		},
 	}
 

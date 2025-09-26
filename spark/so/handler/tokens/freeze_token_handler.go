@@ -67,7 +67,7 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 	// Check for existing freeze.
 	ownerPubKey, err := keys.ParsePublicKey(req.FreezeTokensPayload.OwnerPublicKey)
 	if err != nil {
-		return nil, errors.InvalidUserInputErrorf("failed to parse owner public key: %w", err)
+		return nil, errors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse owner public key: %w", err))
 	}
 
 	activeFreezes, err := ent.GetActiveFreezes(ctx, []keys.Public{ownerPubKey}, tokenCreateEnt.ID)

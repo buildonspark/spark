@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil"
@@ -40,7 +41,7 @@ func DetermineNetwork(protoNetwork pb.Network) (*Network, error) {
 		var err error
 		network, err = NetworkFromProtoNetwork(protoNetwork)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert proto network to common network: %w", err)
+			return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to convert proto network to common network: %w", err))
 		}
 	}
 	return &network, nil
@@ -93,7 +94,7 @@ func NetworkFromString(network string) (Network, error) {
 	case "signet":
 		return Signet, nil
 	default:
-		return Unspecified, fmt.Errorf("invalid network: %s", network)
+		return Unspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("invalid network: %s", network))
 	}
 }
 
@@ -108,7 +109,7 @@ func NetworkFromProtoNetwork(protoNetwork pb.Network) (Network, error) {
 	case pb.Network_SIGNET:
 		return Signet, nil
 	default:
-		return Unspecified, fmt.Errorf("invalid network")
+		return Unspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("invalid network"))
 	}
 }
 
@@ -123,9 +124,9 @@ func NetworkFromSchemaNetwork(schemaNetwork st.Network) (Network, error) {
 	case st.NetworkSignet:
 		return Signet, nil
 	case st.NetworkUnspecified:
-		return Unspecified, fmt.Errorf("invalid network")
+		return Unspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("invalid network"))
 	default:
-		return Unspecified, fmt.Errorf("invalid network")
+		return Unspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("invalid network"))
 	}
 }
 
@@ -155,7 +156,7 @@ func SchemaNetworkFromNetwork(network Network) (st.Network, error) {
 	case Signet:
 		return st.NetworkSignet, nil
 	default:
-		return st.NetworkUnspecified, fmt.Errorf("invalid network")
+		return st.NetworkUnspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("invalid network"))
 	}
 }
 
@@ -170,7 +171,7 @@ func ProtoNetworkFromNetwork(network Network) (pb.Network, error) {
 	case Signet:
 		return pb.Network_SIGNET, nil
 	default:
-		return pb.Network_MAINNET, fmt.Errorf("invalid network")
+		return pb.Network_MAINNET, sparkerrors.InternalTypeConversionError(fmt.Errorf("invalid network"))
 	}
 }
 
@@ -422,7 +423,7 @@ func VerifyECDSASignature(pubKey keys.Public, signatureBytes []byte, messageHash
 // It determines the network by examining the transaction's network field.
 func NetworkFromTokenTransaction(tx *pb.TokenTransaction) (Network, error) {
 	if tx == nil {
-		return Unspecified, fmt.Errorf("token transaction cannot be nil")
+		return Unspecified, sparkerrors.InternalTypeConversionError(fmt.Errorf("token transaction cannot be nil"))
 	}
 
 	return NetworkFromProtoNetwork(tx.Network)

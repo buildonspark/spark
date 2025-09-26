@@ -33,6 +33,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/utils"
+	"google.golang.org/grpc/codes"
 )
 
 type InternalPrepareTokenHandler struct {
@@ -61,7 +62,7 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 	ctx, logger := logging.WithAttrs(ctx, tokens.GetPartialTokenTransactionAttrs(partialTransactionHash)...)
 
 	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto("failed to compute transaction hash", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to compute transaction hash: %w", err))
+		return nil, tokens.FormatErrorWithTransactionProto("failed to compute transaction hash", req.FinalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to compute transaction hash: %w", err)))
 	}
 
 	logger.Sugar().Infof("Starting token transaction (expiry: %s, %+q)", req.FinalTokenTransaction.ExpiryTime, req.KeyshareIds)
@@ -84,12 +85,12 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 	finalTokenTX := req.GetFinalTokenTransaction()
 	err = validateFinalTokenTransaction(h.config, finalTokenTX, req.TokenTransactionSignatures, expectedRevocationPublicKeys, expectedCreationEntityPublicKey)
 	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto("invalid final token transaction", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("invalid final token transaction: %w", err))
+		return nil, tokens.FormatErrorWithTransactionProto("invalid final token transaction", req.FinalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid final token transaction: %w", err)))
 	}
 
 	//nolint:govet,revive // TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
 	if finalTokenTX.Version >= 2 && finalTokenTX.GetInvoiceAttachments() != nil {
-		return nil, sparkerrors.UnimplementedErrorf("spark invoice support not implemented")
+		return nil, sparkerrors.WrapErrorWithCodeAndReason(fmt.Errorf("spark invoice support not implemented"), codes.Unimplemented, "NOT_IMPLEMENTED")
 		if err := validateSparkInvoicesForTransaction(ctx, finalTokenTX); err != nil {
 			return nil, err
 		}
@@ -100,7 +101,7 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 
 	txType, err := utils.InferTokenTransactionType(finalTokenTX)
 	if err != nil {
-		return nil, sparkerrors.InvalidUserInputErrorf("failed to check token transaction type: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to check token transaction type: %w", err))
 	}
 
 	var inputTtxos []*ent.TokenOutput
@@ -112,7 +113,7 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 			return nil, err
 		}
 		if err = validateIssuerSignature(finalTokenTX, req.TokenTransactionSignatures, createPubKey); err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("failed to validate create token transaction signature", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to validate create token transaction signature: %w", err))
+			return nil, tokens.FormatErrorWithTransactionProto("failed to validate create token transaction signature", req.FinalTokenTransaction, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("failed to validate create token transaction signature: %w", err)))
 		}
 		if err = validateIssuerTokenNotAlreadyCreated(ctx, finalTokenTX); err != nil {
 			return nil, err
@@ -120,10 +121,11 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 	case utils.TokenTransactionTypeMint:
 		mintPubKey, err := keys.ParsePublicKey(finalTokenTX.GetMintInput().GetIssuerPublicKey())
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse issuer public key: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse issuer public key: %w", err))
 		}
 		if err := validateIssuerSignature(finalTokenTX, req.GetTokenTransactionSignatures(), mintPubKey); err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("failed to validate mint token transaction signature", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to validate mint token transaction signature: %w", err))
+			return nil, tokens.FormatErrorWithTransactionProto("failed to validate mint token transaction signature", req.FinalTokenTransaction, sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("failed to validate mint token transaction signature: %w", err)))
+
 		}
 		tokenMetadata, err := ent.GetTokenMetadataForTokenTransaction(ctx, finalTokenTX)
 		if err != nil {
@@ -133,38 +135,38 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 		// When disconnecting LRC20, we must have token metadata
 		if h.config.Token.DisconnectLRC20Node && tokenMetadata == nil {
 			return nil, tokens.FormatErrorWithTransactionProto("minting not allowed because a created token was not found", req.FinalTokenTransaction,
-				sparkerrors.FailedPreconditionErrorf("no tokencreate entity found for token"))
+				sparkerrors.NotFoundMissingEntity(fmt.Errorf("no tokencreate entity found for token")))
 		}
 
 		txNet, err := common.NetworkFromProtoNetwork(req.FinalTokenTransaction.Network)
 		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("failed to get network from proto network", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to get network from proto network: %w", err))
+			return nil, tokens.FormatErrorWithTransactionProto("failed to get network from proto network", req.FinalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to get network from proto network: %w", err)))
 		}
 		if txNet != tokenMetadata.Network {
 			return nil, tokens.FormatErrorWithTransactionProto(
 				"network mismatch",
 				req.FinalTokenTransaction,
-				sparkerrors.FailedPreconditionErrorf("transaction network %s does not match token network %s", txNet.String(), tokenMetadata.Network.String()),
+				sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transaction network %s does not match token network %s", txNet.String(), tokenMetadata.Network.String())),
 			)
 		}
 
 		err = tokens.ValidateMintDoesNotExceedMaxSupply(ctx, finalTokenTX)
 		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("max supply error", finalTokenTX, sparkerrors.InvalidUserInputErrorf("max supply error: %w", err))
+			return nil, tokens.FormatErrorWithTransactionProto("max supply error", finalTokenTX, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("max supply error: %w", err)))
 		}
 	case utils.TokenTransactionTypeTransfer:
 		inputTtxos, err = ent.FetchAndLockTokenInputs(ctx, finalTokenTX.GetTransferInput().GetOutputsToSpend())
 		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("failed to fetch outputs to spend", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to fetch outputs to spend: %w", err))
+			return nil, tokens.FormatErrorWithTransactionProto("failed to fetch outputs to spend", req.FinalTokenTransaction, sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to fetch outputs to spend: %w", err)))
 		}
 		if len(inputTtxos) != len(finalTokenTX.GetTransferInput().GetOutputsToSpend()) {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to fetch all leaves to spend", req.FinalTokenTransaction,
-				sparkerrors.NotFoundErrorf("failed to fetch all leaves to spend: got %d leaves, expected %d", len(inputTtxos), len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend())))
+				sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to fetch all leaves to spend: got %d leaves, expected %d", len(inputTtxos), len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()))))
 		}
 
 		err = validateTransferTokenTransactionUsingPreviousTransactionData(ctx, h.enablePreemption, finalTokenTX, req.GetTokenTransactionSignatures(), inputTtxos, h.config.Lrc20Configs[finalTokenTX.Network.String()].TransactionExpiryDuration)
 		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("error validating transfer using previous output data", req.FinalTokenTransaction, sparkerrors.InvalidUserInputErrorf("error validating transfer using previous output data: %w", err))
+			return nil, tokens.FormatErrorWithTransactionProto("error validating transfer using previous output data", req.FinalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("error validating transfer using previous output data: %w", err)))
 		}
 		if h.enablePreemption && anyTtxosHaveSpentTransactions(inputTtxos) {
 			if err := preemptOrRejectTransactionsWithInputEnts(ctx, finalTokenTX, inputTtxos); err != nil {
@@ -172,17 +174,17 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 			}
 		}
 	default:
-		return nil, sparkerrors.InvalidUserInputErrorf("token transaction type unknown")
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token transaction type unknown"))
 	}
 
 	// Save the token transaction, created output ents, and update the outputs to spend.
 	coordinatorPubKey, err := keys.ParsePublicKey(req.CoordinatorPublicKey)
 	if err != nil {
-		return nil, sparkerrors.InvalidUserInputErrorf("failed to parse coordinator public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse coordinator public key: %w", err))
 	}
 	_, err = ent.CreateStartedTransactionEntities(ctx, finalTokenTX, req.TokenTransactionSignatures, req.KeyshareIds, inputTtxos, coordinatorPubKey)
 	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto("failed to save token transaction and output ent", req.FinalTokenTransaction, sparkerrors.InternalErrorf("failed to save token transaction and output ent: %w", err))
+		return nil, tokens.FormatErrorWithTransactionProto("failed to save token transaction and output ent", req.FinalTokenTransaction, sparkerrors.InternalDatabaseError(fmt.Errorf("failed to save token transaction and output ent: %w", err)))
 	}
 
 	return &tokeninternalpb.PrepareTransactionResponse{}, nil
@@ -206,10 +208,10 @@ func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Co
 	for i, id := range keyshareIDs {
 		keyshareUUID, err := uuid.Parse(id)
 		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("failed to parse keyshare ID", finalTokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to parse keyshare ID: %w", err))
+			return nil, tokens.FormatErrorWithTransactionProto("failed to parse keyshare ID", finalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse keyshare ID: %w", err)))
 		}
 		if seenUUIDs[keyshareUUID] {
-			return nil, tokens.FormatErrorWithTransactionProto("duplicate keyshare UUID found", finalTokenTransaction, sparkerrors.InvalidUserInputErrorf("duplicate keyshare UUID found: %s", keyshareUUID))
+			return nil, tokens.FormatErrorWithTransactionProto("duplicate keyshare UUID found", finalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("duplicate keyshare UUID found: %s", keyshareUUID)))
 		}
 		seenUUIDs[keyshareUUID] = true
 		keyshareUUIDs[i] = keyshareUUID
@@ -222,7 +224,7 @@ func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Co
 		keyshares, err := ent.MarkSigningKeysharesAsUsed(ctx, h.config, keyshareUUIDs)
 		addTraceEvent(ctx, "mark_keyshares", attribute.String("keyshare_ids", strings.Join(keyshareIDs, ",")), attribute.Bool("success", err == nil), attribute.Bool("skipped", false))
 		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("failed to mark keyshares as used", finalTokenTransaction, sparkerrors.InternalErrorf("failed to mark keyshares as used: %w", err))
+			return nil, tokens.FormatErrorWithTransactionProto("failed to mark keyshares as used", finalTokenTransaction, sparkerrors.InternalDatabaseError(fmt.Errorf("failed to mark keyshares as used: %w", err)))
 		}
 		logger.Info("Keyshares marked as used")
 		keysharesMap = make(map[uuid.UUID]*ent.SigningKeyshare, len(keyshares))
@@ -242,7 +244,7 @@ func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Co
 	for i, id := range keyshareUUIDs {
 		keyshare, ok := keysharesMap[id]
 		if !ok {
-			return nil, tokens.FormatErrorWithTransactionProto("keyshare ID not found", finalTokenTransaction, sparkerrors.InvalidUserInputErrorf("keyshare ID not found: %s", id))
+			return nil, tokens.FormatErrorWithTransactionProto("keyshare ID not found", finalTokenTransaction, sparkerrors.NotFoundMissingEntity(fmt.Errorf("keyshare ID not found: %s", id)))
 		}
 		expectedRevocationPublicKeys[i] = keyshare.PublicKey
 	}
@@ -263,7 +265,7 @@ func validateTransferOperatorSpecificSignatures(identityPublicKey keys.Public, o
 	if len(operatorSpecificSignatures) != len(tokenTransaction.Edges.SpentOutput) {
 		return tokens.FormatErrorWithTransactionEnt(
 			"invalid number of signatures for transfer",
-			tokenTransaction, sparkerrors.InvalidUserInputErrorf("expected %d signatures for transfer (one per input), but got %d", len(tokenTransaction.Edges.SpentOutput), len(operatorSpecificSignatures)))
+			tokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected %d signatures for transfer (one per input), but got %d", len(tokenTransaction.Edges.SpentOutput), len(operatorSpecificSignatures))))
 	}
 	numInputs := len(tokenTransaction.Edges.SpentOutput)
 	signaturesByIndex := make([]*sparkpb.OperatorSpecificOwnerSignature, numInputs)
@@ -303,20 +305,20 @@ func validateTransferOperatorSpecificSignatures(identityPublicKey keys.Public, o
 	for i, sig := range signaturesByIndex {
 		payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(sig.Payload)
 		if err != nil {
-			return sparkerrors.InternalErrorf("%s: %w", tokens.ErrFailedToHashRevocationKeyshares, err)
+			return sparkerrors.WrapErrorWithMessage(err, tokens.ErrFailedToHashRevocationKeyshares)
 		}
 
 		if !bytes.Equal(sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash) {
-			return sparkerrors.FailedPreconditionErrorf(tokens.ErrTransactionHashMismatch,
-				sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash)
+			return sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf(tokens.ErrTransactionHashMismatch,
+				sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash))
 		}
 
 		payloadPubKey, err := keys.ParsePublicKey(sig.Payload.OperatorIdentityPublicKey)
 		if err != nil {
-			return sparkerrors.InvalidUserInputErrorf("unable to parse signature payload operator identity public key: %w", err)
+			return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse signature payload operator identity public key: %w", err))
 		}
 		if !payloadPubKey.Equals(identityPublicKey) {
-			return sparkerrors.FailedPreconditionErrorf(tokens.ErrOperatorPublicKeyMismatch, payloadPubKey, identityPublicKey)
+			return sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf(tokens.ErrOperatorPublicKeyMismatch, payloadPubKey, identityPublicKey))
 		}
 		output := spentOutputs[i]
 		if err := utils.ValidateOwnershipSignature(sig.OwnerSignature.Signature, payloadHash, output.OwnerPublicKey); err != nil {
@@ -332,7 +334,7 @@ func validateIssuerOperatorSpecificSignatures(identityPublicKey keys.Public, ope
 	if len(operatorSpecificSignatures) != 1 {
 		return tokens.FormatErrorWithTransactionEnt(
 			"invalid number of signatures",
-			tokenTransaction, sparkerrors.InvalidUserInputErrorf("expected exactly 1 signature for mint/create, but got %d", len(operatorSpecificSignatures)))
+			tokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 signature for mint/create, but got %d", len(operatorSpecificSignatures))))
 	}
 
 	var issuerPublicKey keys.Public
@@ -343,7 +345,7 @@ func validateIssuerOperatorSpecificSignatures(identityPublicKey keys.Public, ope
 	} else {
 		return tokens.FormatErrorWithTransactionEnt(
 			"db consistency error",
-			tokenTransaction, sparkerrors.NotFoundErrorf("neither mint nor create record found in db, but expected one for this transaction"))
+			tokenTransaction, sparkerrors.NotFoundMissingEntity(fmt.Errorf("neither mint nor create record found in db, but expected one for this transaction")))
 	}
 
 	sig := operatorSpecificSignatures[0]
@@ -355,17 +357,17 @@ func validateIssuerOperatorSpecificSignatures(identityPublicKey keys.Public, ope
 	}
 
 	if !bytes.Equal(sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash) {
-		return sparkerrors.FailedPreconditionErrorf(tokens.ErrTransactionHashMismatch,
-			sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash)
+		return sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf(tokens.ErrTransactionHashMismatch,
+			sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash))
 	}
 
 	if len(sig.Payload.OperatorIdentityPublicKey) > 0 {
 		payloadPubKey, err := keys.ParsePublicKey(sig.Payload.OperatorIdentityPublicKey)
 		if err != nil {
-			return sparkerrors.InvalidUserInputErrorf("unable to parse signature payload operator identity public key: %w", err)
+			return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse signature payload operator identity public key: %w", err))
 		}
 		if !payloadPubKey.Equals(identityPublicKey) {
-			return sparkerrors.FailedPreconditionErrorf(tokens.ErrOperatorPublicKeyMismatch, payloadPubKey, identityPublicKey)
+			return sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf(tokens.ErrOperatorPublicKeyMismatch, payloadPubKey, identityPublicKey))
 		}
 	}
 
@@ -439,18 +441,18 @@ func validateTransferTokenTransactionUsingPreviousTransactionData(
 		// Validate that all spent outputs have the same token identifier
 		for i, outputEnt := range outputToSpendEnts {
 			if !bytes.Equal(outputEnt.TokenIdentifier, expectedTokenIdentifier) {
-				return tokens.FormatErrorWithTransactionProto("token identifier mismatch", tokenTransaction, sparkerrors.FailedPreconditionErrorf("output %d has different token identifier", i))
+				return tokens.FormatErrorWithTransactionProto("token identifier mismatch", tokenTransaction, sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d has different token identifier", i)))
 			}
 		}
 	} else {
 		expectedTokenPubKey, err := keys.ParsePublicKey(tokenTransaction.TokenOutputs[0].GetTokenPublicKey())
 		if err != nil {
-			return tokens.FormatErrorWithTransactionProto("invalid token public key", tokenTransaction, err)
+			return tokens.FormatErrorWithTransactionProto("invalid token public key", tokenTransaction, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse token public key: %w", err)))
 		}
 		// Validate that all spent outputs have the same token public key
 		for i, outputEnt := range outputToSpendEnts {
 			if !outputEnt.TokenPublicKey.Equals(expectedTokenPubKey) {
-				return tokens.FormatErrorWithTransactionProto("token public key mismatch", tokenTransaction, fmt.Errorf("output %d has different token public key", i))
+				return tokens.FormatErrorWithTransactionProto("token public key mismatch", tokenTransaction, sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d has different token public key", i)))
 			}
 		}
 	}
@@ -460,10 +462,10 @@ func validateTransferTokenTransactionUsingPreviousTransactionData(
 		if outputEnt.Network != "" {
 			entNetwork, err := outputEnt.Network.MarshalProto()
 			if err != nil {
-				return tokens.FormatErrorWithTransactionProto("failed to marshal network", tokenTransaction, sparkerrors.InternalErrorf("failed to marshal network: %w", err))
+				return tokens.FormatErrorWithTransactionProto("failed to marshal network", tokenTransaction, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to marshal network: %w", err)))
 			}
 			if entNetwork != tokenTransaction.Network {
-				return tokens.FormatErrorWithTransactionProto("network mismatch", tokenTransaction, sparkerrors.FailedPreconditionErrorf("output %d: %d != %d", i, entNetwork, tokenTransaction.Network))
+				return tokens.FormatErrorWithTransactionProto("network mismatch", tokenTransaction, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d: %d != %d", i, entNetwork, tokenTransaction.Network)))
 			}
 		}
 	}
@@ -479,7 +481,7 @@ func validateTransferTokenTransactionUsingPreviousTransactionData(
 		totalOutputAmount.Add(totalOutputAmount, outputAmount)
 	}
 	if totalInputAmount.Cmp(totalOutputAmount) != 0 {
-		return tokens.FormatErrorWithTransactionProto("token amount mismatch", tokenTransaction, sparkerrors.FailedPreconditionErrorf("total input amount %s does not match total output amount %s", totalInputAmount.String(), totalOutputAmount.String()))
+		return tokens.FormatErrorWithTransactionProto("token amount mismatch", tokenTransaction, sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("total input amount %s does not match total output amount %s", totalInputAmount.String(), totalOutputAmount.String())))
 	}
 
 	// Validate that the ownership signatures match the ownership public keys in the outputs to spend.
@@ -492,26 +494,26 @@ func validateTransferTokenTransactionUsingPreviousTransactionData(
 	ownerSignaturesByIndex := make(map[uint32]*tokenpb.SignatureWithIndex)
 	for _, sig := range signaturesWithIndex {
 		if sig == nil {
-			return tokens.FormatErrorWithTransactionProto("invalid signature", tokenTransaction, sparkerrors.InvalidUserInputErrorf("ownership signature cannot be nil"))
+			return tokens.FormatErrorWithTransactionProto("invalid signature", tokenTransaction, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("ownership signature cannot be nil")))
 		}
 		ownerSignaturesByIndex[sig.InputIndex] = sig
 	}
 
 	if len(signaturesWithIndex) != len(tokenTransaction.GetTransferInput().GetOutputsToSpend()) {
-		return tokens.FormatErrorWithTransactionProto("signature count mismatch", tokenTransaction, sparkerrors.InvalidUserInputErrorf("number of signatures must match number of outputs to spend"))
+		return tokens.FormatErrorWithTransactionProto("signature count mismatch", tokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("number of signatures must match number of outputs to spend")))
 	}
 
 	for i := range tokenTransaction.GetTransferInput().GetOutputsToSpend() {
 		index := uint32(i)
 		ownershipSignature, exists := ownerSignaturesByIndex[index]
 		if !exists {
-			return tokens.FormatErrorWithTransactionProto("missing signature", tokenTransaction, sparkerrors.InvalidUserInputErrorf("missing owner signature for input index %d, indexes must be contiguous", index))
+			return tokens.FormatErrorWithTransactionProto("missing signature", tokenTransaction, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing owner signature for input index %d, indexes must be contiguous", index)))
 		}
 
 		// Get the corresponding output entity (they are ordered outside of this block when they are fetched)
 		outputEnt := outputToSpendEnts[i]
 		if outputEnt == nil {
-			return tokens.FormatErrorWithTransactionProto("missing output entity", tokenTransaction, sparkerrors.NotFoundErrorf("could not find output entity for output to spend at index %d", i))
+			return tokens.FormatErrorWithTransactionProto("missing output entity", tokenTransaction, sparkerrors.NotFoundMissingEntity(fmt.Errorf("could not find output entity for output to spend at index %d", i)))
 		}
 		if err := utils.ValidateOwnershipSignature(ownershipSignature.Signature, partialTokenTransactionHash, outputEnt.OwnerPublicKey); err != nil {
 			return tokens.FormatErrorWithTransactionProto("invalid ownership signature", tokenTransaction, fmt.Errorf("invalid ownership signature for output %d: %w", i, err))
@@ -531,8 +533,8 @@ func validateOutputIsSpendable(ctx context.Context, enablePreemption bool, index
 	if !isSpendableOutputStatus(output.Status) {
 		spentTx := output.Edges.OutputSpentTokenTransaction
 		if spentTx == nil {
-			return sparkerrors.FailedPreconditionErrorf("output %d cannot be spent: status must be %s or %s (was %s), or have been spent by an expired or pre-emptable transaction (none found)",
-				index, st.TokenOutputStatusCreatedFinalized, st.TokenOutputStatusSpentStarted, output.Status)
+			return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d cannot be spent: status must be %s or %s (was %s), or have been spent by an expired or pre-emptable transaction (none found)",
+				index, st.TokenOutputStatusCreatedFinalized, st.TokenOutputStatusSpentStarted, output.Status))
 		}
 		if !spentTx.IsExpired(time.Now(), v0DefaultTransactionExpiryDuration) {
 			canPreemptSpentTx := false
@@ -542,14 +544,14 @@ func validateOutputIsSpendable(ctx context.Context, enablePreemption bool, index
 				canPreemptSpentTx = cannotPreemptErr == nil
 			}
 			if !canPreemptSpentTx {
-				return sparkerrors.FailedPreconditionErrorf("output %d cannot be spent: status must be %s or %s (was %s), or have been spent by an expired or pre-emptable transaction (transaction was not expired or pre-emptable, id: %s, final_hash: %s, error: %w)",
-					index, st.TokenOutputStatusCreatedFinalized, st.TokenOutputStatusSpentStarted, output.Status, spentTx.ID, hex.EncodeToString(spentTx.FinalizedTokenTransactionHash), cannotPreemptErr)
+				return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d cannot be spent: status must be %s or %s (was %s), or have been spent by an expired or pre-emptable transaction (transaction was not expired or pre-emptable, id: %s, final_hash: %s, error: %w)",
+					index, st.TokenOutputStatusCreatedFinalized, st.TokenOutputStatusSpentStarted, output.Status, spentTx.ID, hex.EncodeToString(spentTx.FinalizedTokenTransactionHash), cannotPreemptErr))
 			}
 		}
 	}
 
 	if output.ConfirmedWithdrawBlockHash != nil {
-		return sparkerrors.FailedPreconditionErrorf("output %d cannot be spent: already withdrawn", index)
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d cannot be spent: already withdrawn", index))
 	}
 
 	return nil
@@ -569,7 +571,7 @@ func validateFinalTokenTransaction(
 ) error {
 	network, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
 	if err != nil {
-		return sparkerrors.InternalErrorf("failed to get network from proto network: %w", err)
+		return err
 	}
 	expectedBondSats := config.Lrc20Configs[network.String()].WithdrawBondSats
 	expectedRelativeBlockLocktime := config.Lrc20Configs[network.String()].WithdrawRelativeBlockLocktime
@@ -588,7 +590,7 @@ func validateFinalTokenTransaction(
 
 	err = utils.ValidateFinalTokenTransaction(tokenTransaction, signaturesWithIndex, validationConfig)
 	if err != nil {
-		return sparkerrors.InvalidUserInputErrorf("failed to validate final token transaction structure: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to validate final token transaction structure: %w", err))
 	}
 
 	return nil
@@ -597,7 +599,7 @@ func validateFinalTokenTransaction(
 func validateIssuerTokenNotAlreadyCreated(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction) error {
 	existingTokenCreateMetadata, err := ent.GetTokenMetadataForTokenTransaction(ctx, tokenTransaction)
 	if err != nil {
-		return tokens.FormatErrorWithTransactionProto("failed to search for existing token create entity", tokenTransaction, sparkerrors.InternalErrorf("failed to search for existing token create entity: %w", err))
+		return tokens.FormatErrorWithTransactionProto("failed to search for existing token create entity", tokenTransaction, sparkerrors.InternalDatabaseError(fmt.Errorf("failed to search for existing token create entity: %w", err)))
 	}
 	if existingTokenCreateMetadata != nil {
 		return tokens.NewTokenAlreadyCreatedError(tokenTransaction)
@@ -615,7 +617,7 @@ type AmountKey [16]byte
 
 func toAmountKey(b []byte) (AmountKey, error) {
 	if len(b) > 16 {
-		return AmountKey{}, sparkerrors.InternalErrorf("amount exceeds 16 bytes, got %d", len(b))
+		return AmountKey{}, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("amount exceeds 16 bytes, got %d", len(b)))
 	}
 	var k AmountKey
 	copy(k[16-len(b):], b)
@@ -642,15 +644,15 @@ func validateSparkInvoicesForTransaction(ctx context.Context, tokenTransaction *
 
 	createdOutputAmountMap, tokenIdentifier, err := getCreatedOutputAmountMapAndTokenIdentifier(tokenTransaction)
 	if err != nil {
-		return tokens.FormatErrorWithTransactionProto("failed to get created output amount map and token identifier", tokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to get created output amount map and token identifier: %w", err))
+		return tokens.FormatErrorWithTransactionProto("failed to get created output amount map and token identifier", tokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to get created output amount map and token identifier: %w", err)))
 	}
 	senderPublicKey, network, err := validateInvoiceFields(invoiceAttachments, tokenIdentifier, transactionExpiry)
 	if err != nil {
-		return tokens.FormatErrorWithTransactionProto("failed to validate invoice fields", tokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to validate invoice fields: %w", err))
+		return tokens.FormatErrorWithTransactionProto("failed to validate invoice fields", tokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to validate invoice fields: %w", err)))
 	}
 	invoiceAmountMap, countNilAmountInvoicesMap, err := countInvoiceAmounts(invoiceAttachments)
 	if err != nil {
-		return tokens.FormatErrorWithTransactionProto("failed to count invoice amounts", tokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to count invoice amounts: %w", err))
+		return tokens.FormatErrorWithTransactionProto("failed to count invoice amounts", tokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to count invoice amounts: %w", err)))
 	}
 
 	// For each receiver and amount: ensure created outputs >= fixed-amount invoices
@@ -658,12 +660,12 @@ func validateSparkInvoicesForTransaction(ctx context.Context, tokenTransaction *
 		outputCountByAmount, ok := createdOutputAmountMap[receiver]
 		if !ok {
 			return tokens.FormatErrorWithTransactionProto("no created outputs for receiver",
-				tokenTransaction, sparkerrors.FailedPreconditionErrorf("no created outputs for receiver %x", receiver[:]))
+				tokenTransaction, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("no created outputs for receiver %x", receiver[:])))
 		}
 		for amt, invoiceCount := range invoiceCountByAmount {
 			if outputCountByAmount[amt] < invoiceCount {
 				return tokens.FormatErrorWithTransactionProto("created output amount mismatch for fixed amount invoices",
-					tokenTransaction, sparkerrors.FailedPreconditionErrorf("not enough created outputs for amount %x for receiver %x", amt, receiver[:]))
+					tokenTransaction, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("not enough created outputs for amount %x for receiver %x", amt, receiver[:])))
 			}
 		}
 	}
@@ -679,14 +681,14 @@ func validateSparkInvoicesForTransaction(ctx context.Context, tokenTransaction *
 		}
 		if numOutputsWithoutMatchingInvoice < countNilAmountInvoicesMap[receiver] {
 			return tokens.FormatErrorWithTransactionProto("created output amount mismatch for nil amount invoices",
-				tokenTransaction, sparkerrors.FailedPreconditionErrorf("not enough created outputs to cover %d nil-amount invoices; outputs=%d for receiver %x",
-					countNilAmountInvoicesMap[receiver], numOutputsWithoutMatchingInvoice, receiver[:]))
+				tokenTransaction, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("not enough created outputs to cover %d nil-amount invoices; outputs=%d for receiver %x",
+					countNilAmountInvoicesMap[receiver], numOutputsWithoutMatchingInvoice, receiver[:])))
 		}
 	}
 
 	err = validateOutputsMatchSenderAndNetwork(ctx, tokenTransaction, senderPublicKey, network)
 	if err != nil {
-		return tokens.FormatErrorWithTransactionProto("failed to validate sender public key matches spent outputs owners and network", tokenTransaction, sparkerrors.InvalidUserInputErrorf("failed to validate sender public key matches spent outputs owners and network: %w", err))
+		return tokens.FormatErrorWithTransactionProto("failed to validate sender public key matches spent outputs owners and network", tokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to validate sender public key matches spent outputs owners and network: %w", err)))
 	}
 
 	return nil
@@ -700,63 +702,63 @@ func validateInvoiceFields(invoiceAttachments []*tokenpb.InvoiceAttachment, toke
 		invoice := attachment.GetSparkInvoice()
 		decoded, err := common.DecodeSparkAddress(invoice)
 		if err != nil {
-			return keys.Public{}, common.Unspecified, sparkerrors.InvalidUserInputErrorf("failed to decode spark invoice %s: %w", invoice, err)
+			return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to decode spark invoice %s: %w", invoice, err))
 		}
 		if decoded.SparkAddress == nil || decoded.SparkAddress.GetSparkInvoiceFields() == nil {
-			return keys.Public{}, common.Unspecified, sparkerrors.InvalidUserInputErrorf("no invoice fields in invoice %s", invoice)
+			return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no invoice fields in invoice %s", invoice))
 		}
 		_, err = keys.ParsePublicKey(decoded.SparkAddress.GetIdentityPublicKey())
 		if err != nil {
-			return keys.Public{}, common.Unspecified, sparkerrors.InvalidUserInputErrorf("invalid recipient public key in invoice %s: %w", invoice, err)
+			return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid recipient public key in invoice %s: %w", invoice, err))
 		}
 		if decoded.SparkAddress.SparkInvoiceFields.Version != uint32(1) {
-			return keys.Public{}, common.Unspecified, sparkerrors.InvalidUserInputErrorf("version mismatch in invoice %s", invoice)
+			return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("version mismatch in invoice %s", invoice))
 		}
 		if _, ok := decoded.SparkAddress.SparkInvoiceFields.PaymentType.(*sparkpb.SparkInvoiceFields_TokensPayment); !ok {
-			return keys.Public{}, common.Unspecified, sparkerrors.InvalidUserInputErrorf("not a tokens payment in invoice %s", invoice)
+			return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("not a tokens payment in invoice %s", invoice))
 		}
 		payment := decoded.SparkAddress.SparkInvoiceFields.PaymentType.(*sparkpb.SparkInvoiceFields_TokensPayment).TokensPayment
 		// all invoices pay the outputs identifier
 		if !bytes.Equal(tokenIdentifier, payment.TokenIdentifier) {
-			return keys.Public{}, common.Unspecified, sparkerrors.InvalidUserInputErrorf("token identifier mismatch in invoice %s", invoice)
+			return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token identifier mismatch in invoice %s", invoice))
 		}
 		if expiry := decoded.SparkAddress.SparkInvoiceFields.GetExpiryTime(); expiry != nil {
 			if err := expiry.CheckValid(); err != nil {
-				return keys.Public{}, common.Unspecified, sparkerrors.InvalidUserInputErrorf("invalid expiry time in invoice %s: %w", invoice, err)
+				return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid expiry time in invoice %s: %w", invoice, err))
 			}
 			if expiry.AsTime().UTC().Before(now) {
-				return keys.Public{}, common.Unspecified, sparkerrors.InvalidUserInputErrorf("expired in invoice %s", invoice)
+				return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expired in invoice %s", invoice))
 			}
 			if !transactionExpiry.IsZero() && expiry.AsTime().UTC().Before(transactionExpiry) {
-				return keys.Public{}, common.Unspecified, sparkerrors.InvalidUserInputErrorf("invoice expiration must be >= transaction expiration in invoice %s", invoice)
+				return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invoice expiration must be >= transaction expiration in invoice %s", invoice))
 			}
 		}
 		// if a sender public key is present, it must be the same across all invoices with a sender public key encoded
 		if decoded.SparkAddress.SparkInvoiceFields.SenderPublicKey != nil {
 			decodedSenderPublicKey, err := keys.ParsePublicKey(decoded.SparkAddress.SparkInvoiceFields.SenderPublicKey)
 			if err != nil {
-				return keys.Public{}, common.Unspecified, sparkerrors.InvalidUserInputErrorf("invalid sender public key in invoice %s: %w", invoice, err)
+				return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid sender public key in invoice %s: %w", invoice, err))
 			}
 			if senderPublicKey == (keys.Public{}) {
 				senderPublicKey = decodedSenderPublicKey
 			} else if !decodedSenderPublicKey.Equals(senderPublicKey) {
-				return keys.Public{}, common.Unspecified, sparkerrors.InvalidUserInputErrorf("sender public key mismatch in invoice %s: expected %x, got %x", invoice, senderPublicKey.Serialize(), decodedSenderPublicKey.Serialize())
+				return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender public key mismatch in invoice %s: expected %x, got %x", invoice, senderPublicKey.Serialize(), decodedSenderPublicKey.Serialize()))
 			}
 		}
 		if network == common.Unspecified {
 			network = decoded.Network
 		} else if network != decoded.Network {
-			return keys.Public{}, common.Unspecified, sparkerrors.InvalidUserInputErrorf("network mismatch in invoice %s: expected %s, got %s", invoice, network, decoded.Network)
+			return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("network mismatch in invoice %s: expected %s, got %s", invoice, network, decoded.Network))
 		}
 		if decoded.SparkAddress.Signature != nil {
 			err := common.VerifySparkAddressSignature(decoded.SparkAddress, decoded.Network)
 			if err != nil {
-				return keys.Public{}, common.Unspecified, sparkerrors.InvalidUserInputErrorf("invalid signature in invoice %s: %w", invoice, err)
+				return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid signature in invoice %s: %w", invoice, err))
 			}
 		}
 	}
 	if network == common.Unspecified {
-		return keys.Public{}, common.Unspecified, sparkerrors.InvalidUserInputErrorf("invalid network encoded in invoices")
+		return keys.Public{}, common.Unspecified, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid network encoded in invoices"))
 	}
 	return senderPublicKey, network, nil
 }
@@ -769,11 +771,11 @@ func countInvoiceAmounts(invoiceAttachments []*tokenpb.InvoiceAttachment) (Invoi
 		invoice := attachment.GetSparkInvoice()
 		decoded, err := common.DecodeSparkAddress(invoice)
 		if err != nil {
-			return nil, nil, sparkerrors.InvalidUserInputErrorf("failed to decode spark invoice %s: %w", invoice, err)
+			return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to decode spark invoice %s: %w", invoice, err))
 		}
 		recipientPubkey, err := keys.ParsePublicKey(decoded.SparkAddress.GetIdentityPublicKey())
 		if err != nil {
-			return nil, nil, sparkerrors.InvalidUserInputErrorf("invalid recipient public key in invoice %s: %w", invoice, err)
+			return nil, nil, sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("invalid recipient public key in invoice %s: %w", invoice, err))
 		}
 		payment := decoded.SparkAddress.SparkInvoiceFields.PaymentType.(*sparkpb.SparkInvoiceFields_TokensPayment).TokensPayment
 
@@ -787,7 +789,7 @@ func countInvoiceAmounts(invoiceAttachments []*tokenpb.InvoiceAttachment) (Invoi
 		} else {
 			amount, err := toAmountKey(payment.Amount)
 			if err != nil {
-				return nil, nil, sparkerrors.InvalidUserInputErrorf("invalid amount in invoice %s: %w", invoice, err)
+				return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid amount in invoice %s: %w", invoice, err))
 			}
 			invoiceAmountMap[recipient][amount]++
 		}
@@ -801,16 +803,16 @@ func getCreatedOutputAmountMapAndTokenIdentifier(tokenTransaction *tokenpb.Token
 	for _, output := range tokenTransaction.TokenOutputs {
 		ownerPubkey, err := keys.ParsePublicKey(output.GetOwnerPublicKey())
 		if err != nil {
-			return nil, nil, sparkerrors.InvalidUserInputErrorf("invalid owner public key: %w", err)
+			return nil, nil, sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("invalid owner public key: %w", err))
 		}
 		if len(tokenIdentifier) == 0 {
 			tokenIdentifier = output.GetTokenIdentifier()
 		} else if !bytes.Equal(tokenIdentifier, output.GetTokenIdentifier()) {
-			return nil, nil, sparkerrors.FailedPreconditionErrorf("token identifier mismatch for owner %s", ownerPubkey)
+			return nil, nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("token identifier mismatch for owner %s", ownerPubkey))
 		}
 		amount, err := toAmountKey(output.GetTokenAmount())
 		if err != nil {
-			return nil, nil, sparkerrors.InvalidUserInputErrorf("invalid amount: %w", err)
+			return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid amount: %w", err))
 		}
 		var owner [33]byte
 		copy(owner[:], ownerPubkey.Serialize())
@@ -830,10 +832,10 @@ func validateInvoiceAttachmentsNotInFlightOrFinalized(ctx context.Context, token
 		sparkInvoice := invoiceAttachment.GetSparkInvoice()
 		parsedInvoice, err := common.ParseSparkInvoice(sparkInvoice)
 		if err != nil {
-			return sparkerrors.InvalidUserInputErrorf("failed to parse spark invoice ID in invoice %s: %w", sparkInvoice, err)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse spark invoice ID in invoice %s: %w", sparkInvoice, err))
 		}
 		if _, exists := sparkInvoiceIDs[parsedInvoice.Id]; exists {
-			return sparkerrors.FailedPreconditionErrorf("duplicate spark invoice ID found in invoice %s: %s", sparkInvoice, parsedInvoice.Id)
+			return sparkerrors.InvalidArgumentDuplicateField(fmt.Errorf("duplicate spark invoice ID found in invoice %s: %s", sparkInvoice, parsedInvoice.Id))
 		}
 		sparkInvoiceIDs[parsedInvoice.Id] = struct{}{}
 	}
@@ -875,7 +877,7 @@ func validateInvoiceAttachmentsNotInFlightOrFinalized(ctx context.Context, token
 		}).
 		All(ctx)
 	if err != nil {
-		return sparkerrors.NotFoundErrorf("failed to get token transactions: %w", err)
+		return sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to get token transactions: %w", err))
 	}
 	var inFlightOrFinalizedInvoices []uuid.UUID
 	for _, transaction := range inFlightOrFinalizedTransactions {
@@ -886,7 +888,7 @@ func validateInvoiceAttachmentsNotInFlightOrFinalized(ctx context.Context, token
 		}
 	}
 	if len(inFlightOrFinalizedInvoices) > 0 {
-		return sparkerrors.FailedPreconditionErrorf("spark invoices %v are currently in flight or finalized and are not reassignable", inFlightOrFinalizedInvoices)
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("spark invoices %v are currently in flight or finalized and are not reassignable", inFlightOrFinalizedInvoices))
 	}
 	return nil
 }
@@ -949,10 +951,10 @@ func validateOutputsMatchSenderAndNetwork(ctx context.Context, tokenTransaction 
 			).
 			All(ctx)
 		if err != nil {
-			return sparkerrors.NotFoundErrorf("failed to get previous token transactions: %w", err)
+			return sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to get previous token transactions: %w", err))
 		}
 		if len(createdOutputs) != len(outputsToSpend) {
-			return sparkerrors.FailedPreconditionErrorf("owner public key mismatch for created outputs")
+			return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("owner public key mismatch for created outputs"))
 		}
 	}
 	return nil
