@@ -65,7 +65,7 @@ func TestNewTreeCreationHandler(t *testing.T) {
 
 func TestFindParentOutputFromUtxo(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{})
-	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
 	handler := createTestHandler()
 	testTx := createTestTx()
 

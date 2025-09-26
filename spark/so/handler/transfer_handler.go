@@ -194,6 +194,26 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		req.SparkInvoice,
 	)
 	if err != nil {
+		db, err := ent.GetDbFromContext(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get database transaction: %w", err)
+		}
+		err = db.Rollback()
+		if err != nil {
+			return nil, fmt.Errorf("unable to rollback database transaction: %w", err)
+		}
+		db, err = ent.GetDbFromContext(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get database transaction: %w", err)
+		}
+		_, err = db.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transferUUID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update pending send transfer: %w", err)
+		}
+		err = db.Commit()
+		if err != nil {
+			return nil, fmt.Errorf("unable to commit database transaction: %w", err)
+		}
 		return nil, fmt.Errorf("failed to create transfer for transfer %s: %w", req.TransferId, err)
 	}
 
@@ -269,11 +289,32 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	// returned, it means the transfer package is valid and the transfer is considered sent.
 	err = h.syncTransferInit(ctx, req, transferType, finalCpfpSignatureMap, finalDirectSignatureMap, finalDirectFromCpfpSignatureMap)
 	if err != nil {
+		db, err := ent.GetDbFromContext(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get database transaction: %w", err)
+		}
+		err = db.Rollback()
+		if err != nil {
+			return nil, fmt.Errorf("unable to rollback database transaction: %w", err)
+		}
+
+		db, err = ent.GetDbFromContext(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get database transaction: %w", err)
+		}
+		_, err = db.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transfer.ID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update pending send transfer: %w", err)
+		}
 		cancelErr := h.CreateCancelTransferGossipMessage(ctx, req.TransferId)
 		if cancelErr != nil {
 			logger.With(zap.Error(cancelErr)).Sugar().Errorf("Failed to create cancel transfer gossip message for transfer %s", req.TransferId)
 		}
 		logger.With(zap.Error(err)).Sugar().Errorf("Failed to sync transfer init for transfer %s", req.TransferId)
+		err = db.Commit()
+		if err != nil {
+			return nil, fmt.Errorf("unable to rollback database transaction: %w", err)
+		}
 		return nil, fmt.Errorf("failed to sync transfer init for transfer %s: %w", req.TransferId, err)
 	}
 
