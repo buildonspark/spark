@@ -581,7 +581,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 	}
 
 	// Step 2 validate the amount is correct and paid to the destination pubkey
-	var totalAmount uint64
+	var totalAmountSats uint64
 
 	// Validate CPFP transactions
 	for i := range cpfpTransactions {
@@ -601,7 +601,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if !bytes.Equal(pubkeyScript, cpfpRefundTx.TxOut[0].PkScript) {
 			return fmt.Errorf("invalid cpfp destination pubkey")
 		}
-		totalAmount += uint64(cpfpRefundTx.TxOut[0].Value)
+		totalAmountSats += uint64(cpfpRefundTx.TxOut[0].Value)
 	}
 
 	// Validate direct transactions
@@ -645,10 +645,14 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 	}
 
 	if reason == pb.InitiatePreimageSwapRequest_REASON_SEND {
-		totalAmount -= feeSats
+		if feeSats >= totalAmountSats {
+			return fmt.Errorf("fee exceeds total amount, fee: %d, total amount: %d", feeSats, totalAmountSats)
+		}
+
+		totalAmountSats -= feeSats
 	}
-	if amount.ValueSats != 0 && totalAmount < amount.ValueSats {
-		return fmt.Errorf("invalid amount, expected: %d or more, got: %d", amount.ValueSats, totalAmount)
+	if amount.ValueSats != 0 && totalAmountSats < amount.ValueSats {
+		return fmt.Errorf("invalid amount, expected: %d or more, got: %d", amount.ValueSats, totalAmountSats)
 	}
 	return nil
 }
