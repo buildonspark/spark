@@ -558,7 +558,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
-			ExecutionInterval: 10 * time.Minute,
+			ExecutionInterval: 1 * time.Minute,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "monitor_pending_send_transfers",
 				RunInTestEnv: true,
@@ -571,7 +571,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					pendingSendTransfers, err := tx.PendingSendTransfer.Query().Where(
 						pendingsendtransfer.StatusEQ(st.PendingSendTransferStatusPending),
 						pendingsendtransfer.UpdateTimeLT(time.Now().Add(-10*time.Minute)),
-					).Limit(1000).ForUpdate().All(ctx)
+					).Limit(100).ForUpdate().All(ctx)
 					if err != nil {
 						return err
 					}
