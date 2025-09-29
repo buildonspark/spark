@@ -34,6 +34,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
@@ -43,9 +44,11 @@ import (
 )
 
 const (
-	MaximumExpiryTime    = 5 * time.Minute
-	HTLCSequenceOffset   = 30
-	DirectSequenceOffset = 15
+	MaximumExpiryTime                = 5 * time.Minute
+	HTLCSequenceOffset               = 30
+	DirectSequenceOffset             = 15
+	DefaultMaxSigningCommitmentNodes = 1000
+	DefaultMaxSigningCommitmentCount = 10
 )
 
 // LightningHandler is the handler for the lightning service.
@@ -176,6 +179,27 @@ func (h *LightningHandler) GetSigningCommitments(ctx context.Context, req *pb.Ge
 		nodeIDs[i] = nodeID
 	}
 
+	knobsService := knobs.GetKnobsService(ctx)
+
+	maxNodeIDs := int(knobsService.GetValue(
+		knobs.KnobSoSigningCommitmentNodeLimit,
+		DefaultMaxSigningCommitmentNodes,
+	))
+
+	if len(nodeIDs) > maxNodeIDs {
+		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("too many node ids: %d", len(nodeIDs)))
+	}
+
+	maxCount := uint32(knobsService.GetValue(knobs.KnobSoSigningCommitmentCountLimit, DefaultMaxSigningCommitmentCount))
+	count := req.Count
+	if count == 0 {
+		count = 1
+	}
+
+	if count > maxCount {
+		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("count too large: %d", count))
+	}
+
 	nodes, err := tx.TreeNode.Query().WithSigningKeyshare().Where(treenode.IDIn(nodeIDs...)).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get nodes: %w", err)
@@ -191,11 +215,6 @@ func (h *LightningHandler) GetSigningCommitments(ctx context.Context, req *pb.Ge
 			return nil, fmt.Errorf("node %s has no keyshare", node.ID)
 		}
 		keyshareIDs[i] = node.Edges.SigningKeyshare.ID
-	}
-
-	count := req.Count
-	if count == 0 {
-		count = 1
 	}
 
 	commitments, err := helper.GetSigningCommitments(ctx, h.config, keyshareIDs, count)

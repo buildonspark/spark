@@ -321,6 +321,11 @@ func TestGetSigningCommitments(t *testing.T) {
 
 	lightningHandler := NewLightningHandler(config)
 
+	manyNodeIDs := make([]string, 1001)
+	for i := 0; i < 1001; i++ {
+		manyNodeIDs[i] = uuid.New().String()
+	}
+
 	tests := []struct {
 		name           string
 		nodeIds        []string
@@ -364,6 +369,20 @@ func TestGetSigningCommitments(t *testing.T) {
 			count:          1,
 			expectError:    true,
 			expectedErrMsg: "unable to parse node id",
+		},
+		{
+			name:           "too many nodes",
+			nodeIds:        manyNodeIDs,
+			count:          3,
+			expectError:    true,
+			expectedErrMsg: "too many node ids: 1001",
+		},
+		{
+			name:           "too high count",
+			nodeIds:        []string{"12345678-1234-1234-1234-123456789012"},
+			count:          100,
+			expectError:    true,
+			expectedErrMsg: "count too large: 100",
 		},
 	}
 

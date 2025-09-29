@@ -18,6 +18,7 @@ const (
 	ReasonInvalidArgumenMalformedKey       = "MALFORMED_KEY"
 	ReasonInvalidArgumentInvalidVersion    = "INVALID_VERSION"
 	ReasonInvalidArgumentPublicKeyMismatch = "PUBLIC_KEY_MISMATCH"
+	ReasonInvalidArgumentOutOfRange        = "OUT_OF_RANGE"
 
 	ReasonFailedPreconditionBadSignature              = "BAD_SIGNATURE"
 	ReasonFailedPreconditionTokenRulesViolation       = "TOKEN_RULES_VIOLATION"
@@ -79,6 +80,10 @@ func InvalidArgumentInvalidVersion(err error) error {
 
 func InvalidArgumentPublicKeyMismatch(err error) error {
 	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentPublicKeyMismatch)
+}
+
+func InvalidArgumentOutOfRange(err error) error {
+	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentOutOfRange)
 }
 
 func FailedPreconditionBadSignature(err error) error {
