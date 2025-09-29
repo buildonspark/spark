@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
 
 	"github.com/lightsparkdev/spark/common"
@@ -78,12 +79,6 @@ func cleanUp(t *testing.T, config *wallet.TestWalletConfig, paymentHash [32]byte
 		require.NoError(t, err)
 		conn.Close()
 	}
-}
-
-func assertVerifiedPendingTransfer(t *testing.T, err error, leafPrivKeyMap map[string][]byte, nodeToSend *spark.TreeNode, newLeafPrivKey keys.Private) {
-	require.NoError(t, err, "unable to verify pending transfer")
-	require.Len(t, leafPrivKeyMap, 1)
-	require.Equal(t, leafPrivKeyMap[nodeToSend.Id], newLeafPrivKey.Serialize(), "wrong leaf signing private key")
 }
 
 func TestCreateLightningInvoice(t *testing.T) {
@@ -188,7 +183,7 @@ func TestReceiveLightningPayment(t *testing.T) {
 	require.Equal(t, spark.TransferType_PREIMAGE_SWAP, receiverTransfer.Type)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), userConfig, receiverTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
 
 	finalLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")
@@ -273,7 +268,7 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 	require.Equal(t, spark.TransferType_PREIMAGE_SWAP, receiverTransfer.Type)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), userConfig, receiverTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
 
 	finalLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")
@@ -407,7 +402,7 @@ func TestSendLightningPayment(t *testing.T) {
 	require.Equal(t, receiverTransfer.Id, transfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), sspConfig, receiverTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
 
 	finalLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")
@@ -491,7 +486,7 @@ func TestSendLightningPaymentV2(t *testing.T) {
 	require.Equal(t, receiverTransfer.Id, transfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), sspConfig, receiverTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
 
 	finalLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")
@@ -727,7 +722,7 @@ func TestSendLightningPaymentTwice(t *testing.T) {
 	require.Equal(t, receiverTransfer.Id, transfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), sspConfig, receiverTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
 
 	finalLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")
@@ -812,7 +807,7 @@ func TestSendLightningPaymentWithHTLC(t *testing.T) {
 	require.Equal(t, receiverTransfer.Id, transfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), sspConfig, receiverTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
 
 	finalLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")

@@ -29,3 +29,9 @@ func TestMain(m *testing.M) {
 	// Teardown
 	os.Exit(code)
 }
+
+func skipIfGithubActions(t *testing.T) {
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		t.Skip("Skipping test on GitHub Actions CI")
+	}
+}

@@ -1,5 +1,6 @@
 [tasks]
 build = "go build -tags=lightspark ./bin/operator"
+build-oss = "go build ./bin/operator"
 lint = "golangci-lint run"
 # Sadly, `mise fmt` is a built in command
 format = "golangci-lint fmt"
@@ -12,15 +13,15 @@ test-unit = """
 test-grpc = """
   gotestsum \
     --format testname \
-    --rerun-fails \
-    --rerun-fails-max-failures=1000 \
-    --packages=./so/grpc_test/...
+    --packages="./so/grpc_test/... ./so/grpc_test_internal/..." \
+    -- \
+    -tags=lightspark
 """
 test-grpc-minikube = """
   MINIKUBE_IP=$(minikube ip) \
   gotestsum \
     --format testname \
-    --rerun-fails \
-    --rerun-fails-max-failures=1000 \
-    --packages=./so/grpc_test/...
+    --packages="./so/grpc_test/... ./so/grpc_test_internal/..." \
+    -- \
+    -tags=lightspark
 """

@@ -76,7 +76,7 @@ func TestTransfer(t *testing.T) {
 	require.Equal(t, spark.TransferType_TRANSFER, receiverTransfer.Type)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
 
 	finalLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")
@@ -203,7 +203,7 @@ func TestTransferInterrupt(t *testing.T) {
 	require.Equal(t, spark.TransferType_TRANSFER, receiverTransfer.Type)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
 
 	finalLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")
@@ -303,7 +303,7 @@ func TestTransferRecoverFinalizeSignatures(t *testing.T) {
 	require.Equal(t, spark.TransferType_TRANSFER, receiverTransfer.Type)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
 
 	finalLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")
@@ -394,7 +394,7 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
 
 	finalLeafPrivKey, err := keys.GeneratePrivateKey()
 	if err != nil {
@@ -422,7 +422,7 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
 
 	leafPrivKeyMap, err = wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
 
 	_, err = wallet.ClaimTransferSignRefunds(
 		receiverCtx,
@@ -508,7 +508,7 @@ func TestCancelTransfer(t *testing.T) {
 	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
 
 	finalLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")
@@ -695,7 +695,7 @@ func TestQueryTransfers(t *testing.T) {
 	require.Equal(t, senderTransfer.Id, receiverPendingTransfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverPendingTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, senderRootNode, senderNewLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, senderRootNode, senderNewLeafPrivKey)
 
 	finalLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")
@@ -732,7 +732,7 @@ func TestQueryTransfers(t *testing.T) {
 	require.Equal(t, senderTransfer.Id, receiverPendingTransfer.Id)
 
 	leafPrivKeyMap, err = wallet.VerifyPendingTransfer(t.Context(), senderConfig, senderPendingTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, receiverRootNode, receiverNewLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, receiverRootNode, receiverNewLeafPrivKey)
 
 	finalLeafPrivKey, err = keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")
@@ -824,7 +824,7 @@ func TestDoubleClaimTransfer(t *testing.T) {
 	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
 
 	finalLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")
@@ -1556,7 +1556,7 @@ func testTransferWithInvoice(t *testing.T, invoice string, senderPrivKey keys.Pr
 	require.Equal(t, invoice, receiverTransfer.GetSparkInvoice())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	assertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
 
 	finalLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create new node signing private key")

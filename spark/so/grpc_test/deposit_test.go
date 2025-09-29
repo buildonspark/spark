@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	pbssp "github.com/lightsparkdev/spark/proto/spark_ssp_internal"
 	"github.com/lightsparkdev/spark/so/dkg"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -1065,131 +1064,6 @@ func TestStartDepositTreeCreationDoubleClaim(t *testing.T) {
 	stat, ok := status.FromError(err)
 	require.True(t, ok)
 	require.Equal(t, codes.FailedPrecondition, stat.Code())
-}
-
-func TestStartDepositTreeCreationDepositCleanup(t *testing.T) {
-	config := wallet.NewTestWalletConfig(t)
-
-	conn, err := config.NewCoordinatorGRPCConnection()
-	if err != nil {
-		t.Fatalf("failed to connect to operator: %v", err)
-	}
-	defer conn.Close()
-
-	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
-	if err != nil {
-		t.Fatalf("failed to authenticate: %v", err)
-	}
-	ctx := wallet.ContextWithToken(t.Context(), token)
-
-	privKey, err := keys.GeneratePrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
-	userPubKey := privKey.Public()
-
-	leafID := uuid.New().String()
-	depositResp, err := wallet.GenerateDepositAddress(ctx, config, userPubKey, &leafID, false)
-	if err != nil {
-		t.Fatalf("failed to generate deposit address: %v", err)
-	}
-
-	unusedDepositAddresses, err := wallet.QueryUnusedDepositAddresses(ctx, config)
-	if err != nil {
-		t.Fatalf("failed to query unused deposit addresses: %v", err)
-	}
-
-	if len(unusedDepositAddresses.DepositAddresses) != 1 {
-		t.Fatalf("expected 1 unused deposit address, got %d", len(unusedDepositAddresses.DepositAddresses))
-	}
-
-	if *unusedDepositAddresses.DepositAddresses[0].LeafId != leafID {
-		t.Fatalf("expected leaf id to be %s, got %s", leafID, *unusedDepositAddresses.DepositAddresses[0].LeafId)
-	}
-
-	client := sparktesting.GetBitcoinClient()
-
-	coin, err := faucet.Fund()
-	require.NoError(t, err)
-
-	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
-	if err != nil {
-		t.Fatalf("failed to create deposit tx: %v", err)
-	}
-	vout := 0
-	var buf bytes.Buffer
-	err = depositTx.Serialize(&buf)
-	if err != nil {
-		t.Fatalf("failed to serialize deposit tx: %v", err)
-	}
-	depositTxHex := hex.EncodeToString(buf.Bytes())
-	decodedBytes, err := hex.DecodeString(depositTxHex)
-	if err != nil {
-		t.Fatalf("failed to decode deposit tx hex: %v", err)
-	}
-	depositTx, err = common.TxFromRawTxBytes(decodedBytes)
-	if err != nil {
-		t.Fatalf("failed to deserilize deposit tx: %v", err)
-	}
-
-	// Sign, broadcast, and mine deposit tx
-	signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
-	if err != nil {
-		t.Fatalf("failed to sign faucet coin: %v", err)
-	}
-	require.NoError(t, err)
-	_, err = client.SendRawTransaction(signedDepositTx, true)
-	require.NoError(t, err)
-
-	randomKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
-	randomPubKey := randomKey.Public()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey, common.Regtest)
-	if err != nil {
-		t.Fatalf("failed to get p2tr raw address: %v", err)
-	}
-	_, err = client.GenerateToAddress(1, randomAddress, nil)
-	if err != nil {
-		t.Fatalf("failed to generate to address: %v", err)
-	}
-
-	time.Sleep(100 * time.Millisecond)
-
-	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
-	require.NoError(t, err)
-	resp, err := wallet.CreateTreeRoot(ctx, config, privKey, verifyingKey, depositTx, vout, false)
-	require.NoError(t, err, "failed to create tree root")
-	require.Len(t, resp.Nodes, 1)
-
-	sparkClient := pb.NewSparkServiceClient(conn)
-	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
-	require.NoError(t, err)
-	assert.Equal(t, rootNode.Id, leafID)
-	assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
-
-	unusedDepositAddresses, err = wallet.QueryUnusedDepositAddresses(ctx, config)
-	require.NoError(t, err, "failed to query unused deposit addresses")
-	require.Empty(t, unusedDepositAddresses.DepositAddresses, "expected no unused deposit addresses")
-
-	// Create SSP client and call DepositCleanup
-	sspConn, err := config.NewCoordinatorGRPCConnection()
-	require.NoError(t, err, "failed to connect to SSP")
-	defer sspConn.Close()
-
-	sspToken, err := wallet.AuthenticateWithConnection(t.Context(), config, sspConn)
-	require.NoError(t, err, "failed to authenticate with SSP")
-	sspCtx := wallet.ContextWithToken(t.Context(), sspToken)
-
-	sparkSspInternalClient := pbssp.NewSparkSspInternalServiceClient(sspConn)
-	txHash := depositTx.TxHash()
-	_, err = sparkSspInternalClient.DepositCleanup(sspCtx, &pbssp.DepositCleanupRequest{
-		Txid: txHash[:],
-	})
-	require.NoError(t, err, "failed to call DepositCleanup")
-
-	_, err = wallet.CreateTreeRoot(ctx, config, privKey, verifyingKey, depositTx, vout, false)
-	require.NoError(t, err, "failed to create tree root")
-	require.Len(t, resp.Nodes, 1)
 }
 
 func TestQueryUnusedDepositAddresses(t *testing.T) {

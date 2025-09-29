@@ -23,7 +23,6 @@ import (
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	pbssp "github.com/lightsparkdev/spark/proto/spark_ssp_internal"
 	"github.com/lightsparkdev/spark/so/objects"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -301,7 +300,7 @@ func CreateTreeRoot(
 	}
 
 	// Create refund tx
-	cpfpRefundTx, _, err := createRefundTxs(
+	cpfpRefundTx, _, err := CreateRefundTxs(
 		spark.InitialSequence(),
 		&wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
 		rootTx.TxOut[0].Value,
@@ -519,11 +518,11 @@ func ClaimStaticDepositLegacy(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate transfer id: %w", err)
 	}
-	keyTweakInputMap, err := prepareSendTransferKeyTweaks(config, transferID.String(), userIdentityPubKey, leavesToTransfer, map[string][]byte{})
+	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferID.String(), userIdentityPubKey, leavesToTransfer, map[string][]byte{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
-	transferPackage, err := prepareTransferPackage(ctx, config, sparkClient, transferID, keyTweakInputMap, leavesToTransfer, userIdentityPubKey)
+	transferPackage, err := PrepareTransferPackage(ctx, config, sparkClient, transferID, keyTweakInputMap, leavesToTransfer, userIdentityPubKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
@@ -828,202 +827,6 @@ func RefundStaticDepositLegacy(
 	return spendTx, nil
 }
 
-// ClaimStaticDeposit claims a static deposit.
-func ClaimStaticDeposit(
-	ctx context.Context,
-	config *TestWalletConfig,
-	network common.Network,
-	leavesToTransfer []LeafKeyTweak,
-	spendTx *wire.MsgTx,
-	depositAddressSecretKey keys.Private,
-	userSignature []byte,
-	sspSignature []byte,
-	userIdentityPubKey keys.Public,
-	sspConn *grpc.ClientConn,
-	prevTxOut *wire.TxOut,
-	receiverIdentityPubKey keys.Public,
-) (*wire.MsgTx, *pb.Transfer, error) {
-	var spendTxBytes bytes.Buffer
-	err := spendTx.Serialize(&spendTxBytes)
-	if err != nil {
-		return nil, nil, err
-	}
-	spendTxSighash, err := common.SigHashFromTx(
-		spendTx,
-		0,
-		prevTxOut,
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get sighash: %w", err)
-	}
-
-	hidingPriv, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, nil, err
-	}
-	bindingPriv, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, nil, err
-	}
-	hidingPubBytes := hidingPriv.Public().Serialize()
-	bindingPubBytes := bindingPriv.Public().Serialize()
-	spendTxNonceCommitment, err := objects.NewSigningCommitment(bindingPubBytes, hidingPubBytes)
-	if err != nil {
-		return nil, nil, err
-	}
-	spendTxNonceCommitmentProto, err := spendTxNonceCommitment.MarshalProto()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	spendTxSigningJob := &pb.SigningJob{
-		RawTx:                  spendTxBytes.Bytes(),
-		SigningPublicKey:       depositAddressSecretKey.Public().Serialize(),
-		SigningNonceCommitment: spendTxNonceCommitmentProto,
-	}
-
-	sparkClient := pb.NewSparkServiceClient(sspConn)
-	sparkSspInternalClient := pbssp.NewSparkSspInternalServiceClient(sspConn)
-
-	creditAmountSats := uint64(0)
-	for _, leaf := range leavesToTransfer {
-		creditAmountSats += leaf.Leaf.Value
-	}
-	transferID, err := uuid.NewV7()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate transfer id: %w", err)
-	}
-	keyTweakInputMap, err := prepareSendTransferKeyTweaks(config, transferID.String(), userIdentityPubKey, leavesToTransfer, map[string][]byte{})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to prepare transfer data: %w", err)
-	}
-	transferPackage, err := prepareTransferPackage(ctx, config, sparkClient, transferID, keyTweakInputMap, leavesToTransfer, userIdentityPubKey)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to prepare transfer data: %w", err)
-	}
-
-	conn, err := config.NewFrostGRPCConnection()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to connect to frost signer: %w", err)
-	}
-	defer conn.Close()
-	protoNetwork, err := common.ProtoNetworkFromNetwork(network)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get proto network: %w", err)
-	}
-	depositTxID, err := hex.DecodeString(spendTx.TxIn[0].PreviousOutPoint.Hash.String())
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to decode deposit txid: %w", err)
-	}
-	if receiverIdentityPubKey == (keys.Public{}) {
-		receiverIdentityPubKey = userIdentityPubKey
-	}
-	swapResponse, err := sparkSspInternalClient.InitiateStaticDepositUtxoSwap(ctx, &pbssp.InitiateStaticDepositUtxoSwapRequest{
-		OnChainUtxo: &pb.UTXO{
-			Txid:    depositTxID,
-			Vout:    spendTx.TxIn[0].PreviousOutPoint.Index,
-			Network: protoNetwork,
-		},
-		UserSignature: userSignature,
-		SspSignature:  sspSignature,
-		Transfer: &pb.StartTransferRequest{
-			TransferId:                transferID.String(),
-			OwnerIdentityPublicKey:    config.IdentityPublicKey().Serialize(),
-			ReceiverIdentityPublicKey: receiverIdentityPubKey.Serialize(),
-			ExpiryTime:                timestamppb.New(time.Now().Add(2 * time.Minute)),
-			TransferPackage:           transferPackage,
-		},
-		SpendTxSigningJob: spendTxSigningJob,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initiate utxo swap: %w", err)
-	}
-	// Similar to CreateUserKeyPackage(depositAddressSecretKey.Serialize())
-	frostUserIdentifier := "0000000000000000000000000000000000000000000000000000000000000063"
-	userKeyPackage := pbfrost.KeyPackage{
-		Identifier:  frostUserIdentifier,
-		SecretShare: depositAddressSecretKey.Serialize(),
-		PublicShares: map[string][]byte{
-			frostUserIdentifier: depositAddressSecretKey.Public().Serialize(),
-		},
-		PublicKey:  swapResponse.DepositAddress.VerifyingPublicKey,
-		MinSigners: 1,
-	}
-	userNonce, err := objects.NewSigningNonce(bindingPriv.Serialize(), hidingPriv.Serialize())
-	if err != nil {
-		return nil, nil, err
-	}
-	userNonceProto, err := userNonce.MarshalProto()
-	if err != nil {
-		return nil, nil, err
-	}
-	userCommitmentProto, err := userNonce.SigningCommitment().MarshalProto()
-	if err != nil {
-		return nil, nil, err
-	}
-	operatorCommitments := swapResponse.SpendTxSigningResult.SigningNonceCommitments
-
-	userJobID := uuid.NewString()
-	userSigningJobs := []*pbfrost.FrostSigningJob{{
-		JobId:           userJobID,
-		Message:         spendTxSighash,
-		KeyPackage:      &userKeyPackage,
-		VerifyingKey:    swapResponse.DepositAddress.VerifyingPublicKey,
-		Nonce:           userNonceProto,
-		Commitments:     operatorCommitments,
-		UserCommitments: userCommitmentProto,
-	}}
-
-	frostConn, err := config.NewFrostGRPCConnection()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to connect to frost signer: %w", err)
-	}
-	defer frostConn.Close()
-
-	frostClient := pbfrost.NewFrostServiceClient(frostConn)
-
-	userSignatures, err := frostClient.SignFrost(context.Background(), &pbfrost.SignFrostRequest{
-		SigningJobs: userSigningJobs,
-		Role:        pbfrost.SigningRole_USER,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to sign frost: %w", err)
-	}
-
-	signatureResult, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
-		Message:            spendTxSighash,
-		SignatureShares:    swapResponse.SpendTxSigningResult.SignatureShares,
-		PublicShares:       swapResponse.SpendTxSigningResult.PublicKeys,
-		VerifyingKey:       swapResponse.DepositAddress.VerifyingPublicKey,
-		Commitments:        operatorCommitments,
-		UserCommitments:    userCommitmentProto,
-		UserPublicKey:      depositAddressSecretKey.Public().Serialize(),
-		UserSignatureShare: userSignatures.Results[userJobID].SignatureShare,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to aggregate frost: %w", err)
-	}
-
-	// Verify signature using go lib.
-	sig, err := schnorr.ParseSignature(signatureResult.Signature)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	pubKey, err := btcec.ParsePubKey(swapResponse.DepositAddress.VerifyingPublicKey)
-	if err != nil {
-		return nil, nil, err
-	}
-	taprootKey := txscript.ComputeTaprootKeyNoScript(pubKey)
-
-	verified := sig.Verify(spendTxSighash[:], taprootKey)
-	if !verified {
-		return nil, nil, fmt.Errorf("signature verification failed")
-	}
-	spendTx.TxIn[0].Witness = wire.TxWitness{signatureResult.Signature}
-	return spendTx, swapResponse.Transfer, nil
-}
-
 type RefundStaticDepositParams struct {
 	Network                 common.Network
 	SpendTx                 *wire.MsgTx
@@ -1043,11 +846,11 @@ func GenerateTransferPackage(
 	if err != nil {
 		return nil, uuid.UUID{}, fmt.Errorf("failed to generate transfer id: %w", err)
 	}
-	keyTweakInputMap, err := prepareSendTransferKeyTweaks(config, transferID.String(), userIdentityPubkey, leavesToTransfer, map[string][]byte{})
+	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferID.String(), userIdentityPubkey, leavesToTransfer, map[string][]byte{})
 	if err != nil {
 		return nil, uuid.UUID{}, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
-	transferPackage, err := prepareTransferPackage(ctx, config, sparkClient, transferID, keyTweakInputMap, leavesToTransfer, userIdentityPubkey)
+	transferPackage, err := PrepareTransferPackage(ctx, config, sparkClient, transferID, keyTweakInputMap, leavesToTransfer, userIdentityPubkey)
 	if err != nil {
 		return nil, uuid.UUID{}, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
@@ -1319,81 +1122,6 @@ func CreateNewTree(config *TestWalletConfig, faucet *sparktesting.Faucet, privKe
 	// Wait until the deposited leaf is available
 	sparkClient := pb.NewSparkServiceClient(conn)
 	return WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
-}
-
-// CreateNewTreeWithLevels creates a new Tree
-func CreateNewTreeWithLevels(config *TestWalletConfig, faucet *sparktesting.Faucet, privKey keys.Private, amountSats int64, levels uint32) (*DepositAddressTree, []*pb.TreeNode, error) {
-	coin, err := faucet.Fund()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to fund faucet: %w", err)
-	}
-
-	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to connect to operator: %w", err)
-	}
-	defer conn.Close()
-
-	token, err := AuthenticateWithConnection(context.Background(), config, conn)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to authenticate: %w", err)
-	}
-	ctx := ContextWithToken(context.Background(), token)
-
-	leafID := uuid.New().String()
-	depositResp, err := GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate deposit address: %w", err)
-	}
-
-	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, amountSats)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create deposit tx: %w", err)
-	}
-	vout := 0
-
-	tree, err := GenerateDepositAddressesForTree(ctx, config, depositTx, nil, uint32(vout), privKey, levels)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create tree: %w", err)
-	}
-
-	treeNodes, err := CreateTree(ctx, config, depositTx, nil, uint32(vout), tree, true)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create tree: %w", err)
-	}
-
-	// Sign, broadcast, mine deposit tx
-	signedExitTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to sign deposit tx: %w", err)
-	}
-
-	client := sparktesting.GetBitcoinClient()
-	_, err = client.SendRawTransaction(signedExitTx, true)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to broadcast deposit tx: %w", err)
-	}
-	randomKey, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate random key: %w", err)
-	}
-	randomPubKey := randomKey.Public()
-	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey, common.Regtest)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to generate random address: %w", err)
-	}
-	_, err = client.GenerateToAddress(1, randomAddress, nil)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to mine deposit tx: %w", err)
-	}
-
-	leafNode := treeNodes.Nodes[len(treeNodes.Nodes)-1]
-	_, err = WaitForPendingDepositNode(ctx, pb.NewSparkServiceClient(conn), leafNode)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to wait for pending deposit node: %w", err)
-	}
-
-	return tree, treeNodes.Nodes, nil
 }
 
 func WaitForPendingDepositNode(ctx context.Context, sparkClient pb.SparkServiceClient, node *pb.TreeNode) (*pb.TreeNode, error) {

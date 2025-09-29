@@ -478,13 +478,13 @@ func ExtendTimelock(
 		return fmt.Errorf("failed to increment sequence: %w", err)
 	}
 	newNodeOutPoint := wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0}
-	newNodeTx := createLeafNodeTx(newNodeSequence, &newNodeOutPoint, nodeTx.TxOut[0])
+	newNodeTx := CreateLeafNodeTx(newNodeSequence, &newNodeOutPoint, nodeTx.TxOut[0])
 
 	// Create new refund tx to spend the new node tx
 	// (signing pubkey is used here as the destination for convenience,
 	// though normally it should just be the same output as the refund tx)
 	newRefundOutPoint := wire.OutPoint{Hash: newNodeTx.TxHash(), Index: 0}
-	cpfpRefundTx, _, err := createRefundTxs(spark.InitialSequence(), &newRefundOutPoint, refundTx.TxOut[0].Value, signingPrivKey.Public(), false)
+	cpfpRefundTx, _, err := CreateRefundTxs(spark.InitialSequence(), &newRefundOutPoint, refundTx.TxOut[0].Value, signingPrivKey.Public(), false)
 	if err != nil {
 		return fmt.Errorf("failed to create refund tx: %w", err)
 	}
@@ -610,7 +610,7 @@ func ExtendTimelockUsingRenew(
 
 	// Create new refund tx to spend the new node tx
 	newRefundOutPoint := wire.OutPoint{Hash: newNodeTx.TxHash(), Index: 0}
-	cpfpRefundTx, _, err := createRefundTxs(spark.InitialSequence(), &newRefundOutPoint, refundTx.TxOut[0].Value, signingPrivKey.Public(), false)
+	cpfpRefundTx, _, err := CreateRefundTxs(spark.InitialSequence(), &newRefundOutPoint, refundTx.TxOut[0].Value, signingPrivKey.Public(), false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create refund tx: %w", err)
 	}
@@ -808,7 +808,7 @@ func RefreshTimelockUsingRenew(
 
 	// Create new refund tx to spend the new node tx with initial sequence
 	newRefundOutPoint := wire.OutPoint{Hash: newNodeTx.TxHash(), Index: 0}
-	cpfpRefundTx, _, err := createRefundTxs(spark.InitialSequence(), &newRefundOutPoint, refundTx.TxOut[0].Value, signingPrivKey.Public(), false)
+	cpfpRefundTx, _, err := CreateRefundTxs(spark.InitialSequence(), &newRefundOutPoint, refundTx.TxOut[0].Value, signingPrivKey.Public(), false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create refund tx: %w", err)
 	}
@@ -966,7 +966,7 @@ func RenewLeafZeroTimelock(
 
 	// Create new refund tx to spend the new node tx with initial sequence
 	newRefundOutPoint := wire.OutPoint{Hash: newNodeTx.TxHash(), Index: 0}
-	cpfpRefundTx, _, err := createRefundTxs(spark.InitialSequence(), &newRefundOutPoint, refundTx.TxOut[0].Value, signingPrivKey.Public(), false)
+	cpfpRefundTx, _, err := CreateRefundTxs(spark.InitialSequence(), &newRefundOutPoint, refundTx.TxOut[0].Value, signingPrivKey.Public(), false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create refund tx: %w", err)
 	}

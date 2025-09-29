@@ -255,11 +255,6 @@ func splitOperatorIdentityPublicKeys(config *wallet.TestWalletConfig) operatorKe
 }
 
 // skipIfGithubActions skips the test if running in GitHub Actions
-func skipIfGithubActions(t *testing.T) {
-	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		t.Skip("Skipping test on GitHub Actions CI")
-	}
-}
 
 func TestQueryPartiallySpentTokenOutputsNotReturned(t *testing.T) {
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())

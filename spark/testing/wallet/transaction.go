@@ -3,6 +3,7 @@ package wallet
 // Tools for building all the different transactions we use.
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common/keys"
@@ -23,41 +24,13 @@ func createRootTx(
 	return rootTx
 }
 
-func createSplitTx(
-	parentOutPoint *wire.OutPoint,
-	childTxOuts []*wire.TxOut,
-) *wire.MsgTx {
-	splitTx := wire.NewMsgTx(3)
-	splitTx.AddTxIn(wire.NewTxIn(parentOutPoint, nil, nil))
-
-	for _, txOut := range childTxOuts {
-		splitTx.AddTxOut(txOut)
-	}
-
-	return splitTx
-}
-
-// createNodeTx creates a node transaction.
-// This stands in between a split tx and a leaf node tx,
-// and has no timelock.
-func createNodeTx(
-	parentOutPoint *wire.OutPoint,
-	txOut *wire.TxOut,
-) *wire.MsgTx {
-	newNodeTx := wire.NewMsgTx(3)
-	newNodeTx.AddTxIn(wire.NewTxIn(parentOutPoint, nil, nil))
-
-	newNodeTx.AddTxOut(wire.NewTxOut(txOut.Value, txOut.PkScript))
-	return newNodeTx
-}
-
-// createLeafNodeTx creates a leaf node transaction.
+// CreateLeafNodeTx creates a leaf node transaction.
 // This transaction provides an intermediate transaction
 // to allow the timelock of the final refund transaction
 // to be extended. E.g. when the refund tx timelock reaches
 // 0, the leaf node tx can be re-signed with a decremented
 // timelock, and the refund tx can be reset it's timelock.
-func createLeafNodeTx(
+func CreateLeafNodeTx(
 	sequence uint32,
 	parentOutPoint *wire.OutPoint,
 	txOut *wire.TxOut,
@@ -97,7 +70,7 @@ func createLeafNodeTxWithAnchor(
 	return newLeafTx
 }
 
-func createRefundTxs(
+func CreateRefundTxs(
 	sequence uint32,
 	nodeOutPoint *wire.OutPoint,
 	amountSats int64,
@@ -159,4 +132,13 @@ func createConnectorRefundTransaction(
 	}
 	refundTx.AddTxOut(wire.NewTxOut(amountSats, receiverScript))
 	return refundTx, nil
+}
+
+func SerializeTx(tx *wire.MsgTx) ([]byte, error) {
+	var buf bytes.Buffer
+	err := tx.Serialize(&buf)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }

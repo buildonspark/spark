@@ -62,12 +62,12 @@ func CreateTransferPackage(
 	leaves []LeafKeyTweak,
 	receiverIdentityPubKey keys.Public,
 ) (*pb.TransferPackage, error) {
-	keyTweakInputMap, err := prepareSendTransferKeyTweaks(config, transferID.String(), receiverIdentityPubKey, leaves, map[string][]byte{})
+	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transferID.String(), receiverIdentityPubKey, leaves, map[string][]byte{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
 
-	return prepareTransferPackage(ctx, config, client, transferID, keyTweakInputMap, leaves, receiverIdentityPubKey)
+	return PrepareTransferPackage(ctx, config, client, transferID, keyTweakInputMap, leaves, receiverIdentityPubKey)
 }
 
 func SendTransferWithKeyTweaks(
@@ -126,7 +126,7 @@ func SendTransferWithKeyTweaksAndInvoice(
 	return resp.Transfer, nil
 }
 
-func prepareTransferPackage(
+func PrepareTransferPackage(
 	ctx context.Context,
 	config *TestWalletConfig,
 	client pb.SparkServiceClient,
@@ -223,7 +223,7 @@ func DeliverTransferPackage(
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse receiver identity public key: %w", err)
 	}
-	keyTweakInputMap, err := prepareSendTransferKeyTweaks(config, transfer.Id, transferReceiverPubKey, leaves, refundSignatureMap)
+	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transfer.Id, transferReceiverPubKey, leaves, refundSignatureMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare key tweaks: %w", err)
 	}
@@ -247,7 +247,7 @@ func DeliverTransferPackage(
 		return nil, fmt.Errorf("failed to parse transfer id %s: %w", transfer.Id, err)
 	}
 
-	transferPackage, err := prepareTransferPackage(authCtx, config, client, transferUUID, keyTweakInputMap, leaves, transferReceiverPubKey)
+	transferPackage, err := PrepareTransferPackage(authCtx, config, client, transferUUID, keyTweakInputMap, leaves, transferReceiverPubKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
@@ -275,7 +275,7 @@ func SendTransferTweakKey(
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse receiver identity public key: %w", err)
 	}
-	keyTweakInputMap, err := prepareSendTransferKeyTweaks(config, transfer.Id, transferReceiverPubKey, leaves, refundSignatureMap)
+	keyTweakInputMap, err := PrepareSendTransferKeyTweaks(config, transfer.Id, transferReceiverPubKey, leaves, refundSignatureMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare transfer data: %w", err)
 	}
@@ -469,7 +469,7 @@ func compareTransfers(transfer1, transfer2 *pb.Transfer) bool {
 		len(transfer1.Leaves) == len(transfer2.Leaves)
 }
 
-func prepareSendTransferKeyTweaks(config *TestWalletConfig, transferID string, receiverIdentityPubkey keys.Public, leaves []LeafKeyTweak, refundSignatureMap map[string][]byte) (map[string][]*pb.SendLeafKeyTweak, error) {
+func PrepareSendTransferKeyTweaks(config *TestWalletConfig, transferID string, receiverIdentityPubkey keys.Public, leaves []LeafKeyTweak, refundSignatureMap map[string][]byte) (map[string][]*pb.SendLeafKeyTweak, error) {
 	receiverEciesPubKey, err := eciesgo.NewPublicKeyFromBytes(receiverIdentityPubkey.Serialize())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse receiver public key: %w", err)
@@ -999,7 +999,7 @@ func prepareRefundSoSigningJobs(
 		if err != nil {
 			return nil, fmt.Errorf("failed to get next sequence: %w", err)
 		}
-		cpfpRefundTx, _, err := createRefundTxs(nextSequence, &nodeOutPoint, amountSats, refundSigningData.ReceivingPubKey, true)
+		cpfpRefundTx, _, err := CreateRefundTxs(nextSequence, &nodeOutPoint, amountSats, refundSigningData.ReceivingPubKey, true)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create refund tx: %w", err)
 		}
