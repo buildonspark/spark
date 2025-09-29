@@ -147,12 +147,12 @@ func NewAuthnServer(
 // This is the first step of the authentication process.
 func (s *AuthnServer) GetChallenge(_ context.Context, req *pb.GetChallengeRequest) (*pb.GetChallengeResponse, error) {
 	if req == nil {
-		return nil, sparkerrors.InvalidUserInputErrorf("invalid request: request cannot be nil")
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invalid request: request cannot be nil"))
 	}
 
 	_, err := keys.ParsePublicKey(req.PublicKey)
 	if err != nil {
-		return nil, sparkerrors.InvalidUserInputErrorf("invalid public key format: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid public key format: %w", err))
 	}
 	nonce, err := s.nonceCache.generateNonce()
 	if err != nil {
@@ -190,24 +190,24 @@ func (s *AuthnServer) GetChallenge(_ context.Context, req *pb.GetChallengeReques
 // This is the second step of the authentication process.
 func (s *AuthnServer) VerifyChallenge(ctx context.Context, req *pb.VerifyChallengeRequest) (*pb.VerifyChallengeResponse, error) {
 	if req == nil {
-		return nil, sparkerrors.InvalidUserInputErrorf("invalid request: request cannot be nil")
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invalid request: request cannot be nil"))
 	}
 
 	if req.ProtectedChallenge == nil {
-		return nil, sparkerrors.InvalidUserInputErrorf("invalid request: protected challenge cannot be nil")
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invalid request: protected challenge cannot be nil"))
 	}
 
 	if req.ProtectedChallenge.Challenge == nil {
-		return nil, sparkerrors.InvalidUserInputErrorf("invalid request: challenge cannot be nil")
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invalid request: challenge cannot be nil"))
 	}
 
 	if len(req.Signature) == 0 {
-		return nil, sparkerrors.InvalidUserInputErrorf("invalid request: signature cannot be empty")
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invalid request: signature cannot be empty"))
 	}
 
 	pubKey, err := keys.ParsePublicKey(req.PublicKey)
 	if err != nil {
-		return nil, sparkerrors.InvalidUserInputErrorf("invalid public key format: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid public key format: %w", err))
 	}
 
 	challenge := req.ProtectedChallenge.Challenge
@@ -248,34 +248,34 @@ func (s *AuthnServer) computeChallengeHmac(challengeBytes []byte) []byte {
 
 func (s *AuthnServer) validateChallenge(ctx context.Context, challenge *pb.Challenge, req *pb.VerifyChallengeRequest) error {
 	if challenge.Version != currentChallengeVersion {
-		return sparkerrors.InvalidUserInputErrorf("%w: got version %d, want version %d",
+		return sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("%w: got version %d, want version %d",
 			ErrUnsupportedChallengeVersion,
 			challenge.Version,
-			currentChallengeVersion)
+			currentChallengeVersion))
 	}
 
 	if req.ProtectedChallenge.Version != currentProtectionVersion {
-		return sparkerrors.InvalidUserInputErrorf("%w: got version %d, want version %d",
+		return sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("%w: got version %d, want version %d",
 			ErrUnsupportedChallengeProtectionVersion,
 			req.ProtectedChallenge.Version,
-			currentProtectionVersion)
+			currentProtectionVersion))
 	}
 
 	challengeAge := s.clock.Now().Unix() + clockSkewSeconds - challenge.Timestamp
 	if challengeAge > int64(s.config.ChallengeTimeout.Seconds()) {
-		return sparkerrors.InvalidUserInputErrorf("%w: challenge expired %d seconds ago",
+		return sparkerrors.FailedPreconditionExpired(fmt.Errorf("%w: challenge expired %d seconds ago",
 			ErrChallengeExpired,
-			challengeAge-int64(s.config.ChallengeTimeout.Seconds()))
+			challengeAge-int64(s.config.ChallengeTimeout.Seconds())))
 	}
 
 	if !bytes.Equal(req.PublicKey, challenge.PublicKey) {
-		return sparkerrors.InvalidUserInputErrorf("%w: request public key does not match challenge public key",
-			ErrPublicKeyMismatch)
+		return sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("%w: request public key does not match challenge public key",
+			ErrPublicKeyMismatch))
 	}
 
 	if err := s.nonceCache.markNonceUsed(ctx, challenge.Nonce); err != nil {
 		if errors.Is(err, ErrChallengeReused) {
-			return sparkerrors.InvalidUserInputErrorf("challenge reused: %w", err)
+			return sparkerrors.FailedPreconditionReplay(fmt.Errorf("challenge reused: %w", err))
 		}
 		return fmt.Errorf("failed to mark nonce as used: %w", err)
 	}
@@ -285,7 +285,7 @@ func (s *AuthnServer) validateChallenge(ctx context.Context, challenge *pb.Chall
 
 func (s *AuthnServer) verifyClientSignature(challengeBytes []byte, pubKey keys.Public, signature []byte) error {
 	if len(challengeBytes) == 0 {
-		return sparkerrors.InvalidUserInputErrorf("invalid input: challenge bytes cannot be empty")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invalid input: challenge bytes cannot be empty"))
 	}
 
 	errECDSA := s.verifyClientSignatureECDSA(challengeBytes, pubKey, signature)
@@ -298,18 +298,18 @@ func (s *AuthnServer) verifyClientSignature(challengeBytes []byte, pubKey keys.P
 		return nil
 	}
 
-	return sparkerrors.InvalidUserInputErrorf("%w: signature verification failed under both ECDSA and Schnorr: %w, %w", ErrInvalidSignature, errECDSA, errSchnorr)
+	return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("%w: signature verification failed under both ECDSA and Schnorr: %w, %w", ErrInvalidSignature, errECDSA, errSchnorr))
 }
 
 func (s *AuthnServer) verifyClientSignatureSchnorr(challengeBytes []byte, pubKey keys.Public, signature []byte) error {
 	schnorrSig, err := schnorr.ParseSignature(signature)
 	if err != nil {
-		return sparkerrors.InvalidUserInputErrorf("%w: Schnorr signature parsing failed: %w", ErrInvalidSignature, err)
+		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("%w: Schnorr signature parsing failed: %w", ErrInvalidSignature, err))
 	}
 
 	hash := sha256.Sum256(challengeBytes)
 	if !schnorrSig.Verify(hash[:], pubKey.ToBTCEC()) {
-		return sparkerrors.InvalidUserInputErrorf("%w: Schnorr signature verification failed", ErrInvalidSignature)
+		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("%w: Schnorr signature verification failed", ErrInvalidSignature))
 	}
 
 	return nil
@@ -318,7 +318,7 @@ func (s *AuthnServer) verifyClientSignatureSchnorr(challengeBytes []byte, pubKey
 func (s *AuthnServer) verifyClientSignatureECDSA(challengeBytes []byte, pubKey keys.Public, signature []byte) error {
 	hash := sha256.Sum256(challengeBytes)
 	if err := common.VerifyECDSASignature(pubKey, signature, hash[:]); err != nil {
-		return sparkerrors.InvalidUserInputErrorf("%w: %w", ErrInvalidSignature, err)
+		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("%w: %w", ErrInvalidSignature, err))
 	}
 
 	return nil
@@ -327,7 +327,7 @@ func (s *AuthnServer) verifyClientSignatureECDSA(challengeBytes []byte, pubKey k
 func (s *AuthnServer) verifyChallengeHmac(challengeBytes []byte, serverHMAC []byte) error {
 	expectedMAC := s.computeChallengeHmac(challengeBytes)
 	if !hmac.Equal(expectedMAC, serverHMAC) {
-		return sparkerrors.InvalidUserInputErrorf("verify challenge hmac: %w", ErrInvalidChallengeHmac)
+		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("verify challenge hmac: %w", ErrInvalidChallengeHmac))
 	}
 	return nil
 }

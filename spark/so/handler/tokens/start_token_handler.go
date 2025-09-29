@@ -111,7 +111,7 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	//nolint:all
 	if req.PartialTokenTransaction.Version >= 2 && len(req.PartialTokenTransaction.InvoiceAttachments) > 0 {
 		// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
-		return nil, sparkerrors.UnavailableMethodDisabled(fmt.Errorf("spark invoice support not implemented"))
+		return nil, sparkerrors.UnimplementedMethodDisabled(fmt.Errorf("spark invoice support not implemented"))
 	}
 
 	finalTokenTransaction, keyshareIDStrings, err := h.constructFinalTokenTransaction(ctx, req.PartialTokenTransaction, req.ValidityDurationSeconds)

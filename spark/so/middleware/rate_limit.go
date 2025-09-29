@@ -180,7 +180,7 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 		// Check if the method is enabled.
 		methodEnabled := r.knobs.RolloutRandomTarget(knobs.KnobGrpcServerMethodEnabled, &info.FullMethod, 100)
 		if !methodEnabled {
-			return nil, errors.UnavailableErrorf("The method is currently unavailable, please try again later.")
+			return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("the method is currently unavailable, please try again later"))
 		}
 
 		shouldLimit := slices.Contains(r.config.Methods, info.FullMethod)

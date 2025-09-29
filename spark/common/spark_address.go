@@ -103,7 +103,7 @@ func DecodeSparkAddress(address string) (*DecodedSparkAddress, error) {
 
 	network := HrpToNetwork(hrp)
 	if network == Unspecified {
-		return nil, sparkerrors.InvalidUserInputErrorf("unknown network: %s", hrp)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unknown network: %s", hrp))
 	}
 
 	// Convert 5-bit bech32 data to 8-bit bytes
@@ -151,7 +151,7 @@ type ParsedSparkInvoice struct {
 func ParseSparkInvoice(addr string) (*ParsedSparkInvoice, error) {
 	decoded, err := DecodeSparkAddress(addr)
 	if err != nil {
-		return nil, sparkerrors.InvalidUserInputErrorf("failed to decode spark address: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to decode spark address: %w", err))
 	}
 	if decoded.SparkAddress == nil || decoded.SparkAddress.SparkInvoiceFields == nil {
 		return nil, fmt.Errorf("spark address or invoice fields are nil")
@@ -163,24 +163,24 @@ func ParseSparkInvoice(addr string) (*ParsedSparkInvoice, error) {
 
 	// version is required
 	if decoded.SparkAddress.SparkInvoiceFields.Version != 1 {
-		return nil, sparkerrors.InvalidUserInputErrorf("invoice version is not supported, expected: 1, got: %d", decoded.SparkAddress.SparkInvoiceFields.Version)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invoice version is not supported, expected: 1, got: %d", decoded.SparkAddress.SparkInvoiceFields.Version))
 	}
 	// receiver public key is required
 	receiverPublicKey, err := keys.ParsePublicKey(decoded.SparkAddress.IdentityPublicKey)
 	if err != nil {
-		return nil, sparkerrors.InvalidUserInputErrorf("failed to parse receiver public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver public key: %w", err))
 	}
 	// id is required
 	decodedUUID, err := uuid.FromBytes(decoded.SparkAddress.SparkInvoiceFields.Id)
 	if err != nil {
-		return nil, sparkerrors.InvalidUserInputErrorf("failed to parse invoice id: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse invoice id: %w", err))
 	}
 
 	var payment ParsedPayment
 	switch pt := decoded.SparkAddress.SparkInvoiceFields.PaymentType.(type) {
 	case *pb.SparkInvoiceFields_TokensPayment:
 		if pt.TokensPayment == nil {
-			return nil, sparkerrors.InvalidUserInputErrorf("tokens payment is nil")
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("tokens payment is nil"))
 		}
 		payment = ParsedPayment{
 			Kind:          PaymentKindTokens,
@@ -188,28 +188,28 @@ func ParseSparkInvoice(addr string) (*ParsedSparkInvoice, error) {
 		}
 	case *pb.SparkInvoiceFields_SatsPayment:
 		if pt.SatsPayment == nil {
-			return nil, sparkerrors.InvalidUserInputErrorf("sats payment is nil")
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("sats payment is nil"))
 		}
 		payment = ParsedPayment{
 			Kind:        PaymentKindSats,
 			SatsPayment: pt.SatsPayment,
 		}
 	default:
-		return nil, sparkerrors.InvalidUserInputErrorf("unknown payment type in invoice")
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unknown payment type in invoice"))
 	}
 	// sender public key is optional
 	var senderPublicKey keys.Public
 	if len(decoded.SparkAddress.SparkInvoiceFields.SenderPublicKey) > 0 {
 		senderPublicKey, err = keys.ParsePublicKey(decoded.SparkAddress.SparkInvoiceFields.SenderPublicKey)
 		if err != nil {
-			return nil, sparkerrors.InvalidUserInputErrorf("failed to parse sender public key: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse sender public key: %w", err))
 		}
 	}
 	// signature is optional. validate if present
 	if len(decoded.SparkAddress.Signature) > 0 {
 		err = VerifySparkAddressSignature(decoded.SparkAddress, decoded.Network)
 		if err != nil {
-			return nil, sparkerrors.InvalidUserInputErrorf("invalid spark invoice signature: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid spark invoice signature: %w", err))
 		}
 	}
 	memo := ""
@@ -233,11 +233,11 @@ func ParseSparkInvoice(addr string) (*ParsedSparkInvoice, error) {
 func enforceCanonicalBytes(address string, decodedSparkAddr *pb.SparkAddress) error {
 	decodedHrp, addrData, err := bech32.DecodeNoLimit(address)
 	if err != nil {
-		return sparkerrors.InvalidUserInputErrorf("failed to decode spark address: %v", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to decode spark address: %w", err))
 	}
 	decodedNetwork := HrpToNetwork(decodedHrp)
 	if decodedNetwork == Unspecified {
-		return sparkerrors.InvalidUserInputErrorf("unknown network: %s", decodedHrp)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unknown network: %s", decodedHrp))
 	}
 	canonBytes, err := proto.MarshalOptions{Deterministic: true}.Marshal(decodedSparkAddr)
 	if err != nil {
@@ -256,17 +256,17 @@ func enforceCanonicalBytes(address string, decodedSparkAddr *pb.SparkAddress) er
 		return fmt.Errorf("failed to encode invoice: %w", err)
 	}
 	if !bytes.Equal(canonData, addrData) {
-		return sparkerrors.InvalidUserInputErrorf("invoice does not adhere to canonical encoding: original: %s, re-encoded: %s", address, canonStr)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invoice does not adhere to canonical encoding: original: %s, re-encoded: %s", address, canonStr))
 	}
 
 	// The spl1 prefix for local invoices is not canonical and maps to regtest.
 	// Skip the check on the full string for local invoices.
 	lower := strings.ToLower(address)
 	if !strings.HasPrefix(lower, "spl1") && lower != canonStr {
-		return sparkerrors.InvalidUserInputErrorf(
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
 			"invoice does not adhere to canonical encoding: original: %s, re-encoded: %s",
 			address, canonStr,
-		)
+		))
 	}
 	return nil
 }
@@ -379,7 +379,7 @@ func HashSparkInvoiceFields(f *pb.SparkInvoiceFields, network Network, receiverP
 	// 2) id
 	h.Reset()
 	id := f.GetId()
-	if id == nil || len(id) != 16 {
+	if len(id) != 16 {
 		return nil, fmt.Errorf("invoice id must be exactly 16 bytes")
 	}
 	h.Write(id)
@@ -407,7 +407,7 @@ func HashSparkInvoiceFields(f *pb.SparkInvoiceFields, network Network, receiverP
 
 		h.Reset()
 		tokenIdentifier := pt.TokensPayment.GetTokenIdentifier()
-		if tokenIdentifier == nil || len(tokenIdentifier) == 0 {
+		if len(tokenIdentifier) == 0 {
 			h.Write(make([]byte, 32))
 		} else {
 			if len(tokenIdentifier) != 32 {
@@ -453,7 +453,7 @@ func HashSparkInvoiceFields(f *pb.SparkInvoiceFields, network Network, receiverP
 
 	h.Reset()
 	spk := f.GetSenderPublicKey()
-	if spk == nil || len(spk) == 0 {
+	if len(spk) == 0 {
 		h.Write(make([]byte, 33))
 	} else {
 		if len(spk) != 33 {

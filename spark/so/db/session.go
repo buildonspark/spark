@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	ErrTxBeginTimeout   = soerrors.UnavailableErrorf("The service is currently unavailable. Please try again later.")
+	ErrTxBeginTimeout   = soerrors.UnavailableDatabaseTimeout(fmt.Errorf("the service is currently unavailable, please try again later"))
 	DefaultNewTxTimeout = 15 * time.Second
 )
 

@@ -38,8 +38,9 @@ const (
 	ReasonResourceExhaustedRateLimitExceeded        = "RATE_LIMIT_EXCEEDED"
 	ReasonResourceExhaustedConcurrencyLimitExceeded = "CONCURRENCY_LIMIT_EXCEEDED"
 
-	ReasonUnavailableMethodDisabled = "METHOD_DISABLED"
-	ReasonUnavailableDataStore      = "DATA_STORE_UNAVAILABLE"
+	ReasonUnavailableMethodDisabled  = "METHOD_DISABLED"
+	ReasonUnavailableDataStore       = "DATA_STORE_UNAVAILABLE"
+	ReasonUnavailableDatabaseTimeout = "DATABASE_TIMEOUT"
 
 	// ErrorReasonPrefixFailedWithExternalCoordinator is a prefix for errors that occur when the coordinator calls out to another
 	// coordinator and that call fails. The underlying reason from the external coordinator should be appended after a colon.
@@ -138,8 +139,12 @@ func ResourceExhaustedConcurrencyLimitExceeded(err error) error {
 	return newGRPCError(codes.ResourceExhausted, err, ReasonResourceExhaustedConcurrencyLimitExceeded)
 }
 
-func UnavailableMethodDisabled(err error) error {
-	return newGRPCError(codes.Unavailable, err, ReasonUnavailableMethodDisabled)
+func UnimplementedMethodDisabled(err error) error {
+	return newGRPCError(codes.Unimplemented, err, ReasonUnavailableMethodDisabled)
+}
+
+func UnavailableDatabaseTimeout(err error) error {
+	return newGRPCError(codes.Unavailable, err, ReasonUnavailableDatabaseTimeout)
 }
 
 func UnavailableDataStore(err error) error {

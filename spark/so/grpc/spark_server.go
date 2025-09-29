@@ -401,7 +401,7 @@ func (s *SparkServer) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxosFo
 //nolint:all
 func (s *SparkServer) QuerySparkInvoices(ctx context.Context, req *pb.QuerySparkInvoicesRequest) (*pb.QuerySparkInvoicesResponse, error) {
 	// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
-	return nil, sparkerrors.UnimplementedErrorf("not implemented")
+	return nil, sparkerrors.UnimplementedMethodDisabled(fmt.Errorf("query spark invoices disabled"))
 	invoiceHandler := handler.NewSparkInvoiceHandler(s.config)
 	return invoiceHandler.QuerySparkInvoices(ctx, req)
 }

@@ -217,8 +217,8 @@ func TestToGRPCError(t *testing.T) {
 		},
 		{
 			name:        "unavailable error returns unavailable code",
-			err:         UnavailableMethodDisabled(fmt.Errorf("service unavailable")),
-			wantErrCode: codes.Unavailable,
+			err:         UnimplementedMethodDisabled(fmt.Errorf("service unavailable")),
+			wantErrCode: codes.Unimplemented,
 			wantMessage: "service unavailable",
 		},
 	}
@@ -328,12 +328,12 @@ func TestNotFoundMissingEntity(t *testing.T) {
 	assert.Equal(t, "resource not found: user with id 123", st.Message())
 }
 
-func TestUnavailableMethodDisabled(t *testing.T) {
-	err := UnavailableMethodDisabled(fmt.Errorf("service unavailable: %s, retry after %d seconds", "database", 30))
+func TestUnimplementedMethodDisabled(t *testing.T) {
+	err := UnimplementedMethodDisabled(fmt.Errorf("service unavailable: %s, retry after %d seconds", "database", 30))
 
 	require.Error(t, err)
 	st := status.Convert(err)
-	assert.Equal(t, codes.Unavailable, st.Code())
+	assert.Equal(t, codes.Unimplemented, st.Code())
 	assert.Equal(t, "service unavailable: database, retry after 30 seconds", st.Message())
 }
 
