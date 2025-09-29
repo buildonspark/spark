@@ -9,7 +9,9 @@ pre-commit:
           - name: golangci-lint
             run: golangci-lint run
           - name: gotestsum
-            run: gotestsum --format testname $(go list ./... | grep -v -E "so/grpc_test|so/tree")
+            env:
+              GOFLAGS: "-tags=lightspark"
+            run: gotestsum --format testname $(go list ./... | grep -v -E "so/grpc_test|so/grpc_test_internal|so/tree")
     - name: frost
       glob: "signer/**"
       root: "signer/"
