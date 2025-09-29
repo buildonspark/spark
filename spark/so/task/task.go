@@ -742,33 +742,22 @@ func AllStartupTasks() []StartupTaskSpec {
 							return fmt.Errorf("failed to query for entity DKG key: %w", err)
 						}
 						// No existing entity DKG key found, create a new one
-						keyshares, err := ent.GetUnusedSigningKeysharesTx(ctx, tx, config, 1)
+						entityDkgKey, err = ent.CreateEntityDkgKeyWithUnusedSigningKeyshare(ctx, config)
 						if err != nil {
-							return fmt.Errorf("failed to get unused signing keyshares: %w", err)
+							return fmt.Errorf("failed to create entity DKG key with unused signing keyshare: %w", err)
 						}
-						if len(keyshares) == 0 {
-							return fmt.Errorf("no signing keyshares available yet")
-						}
-
-						keyshare = keyshares[0]
-						_, err = tx.EntityDkgKey.Create().
-							SetSigningKeyshareID(keyshare.ID).
-							Save(ctx)
+						tx, err = ent.GetDbFromContext(ctx)
 						if err != nil {
-							return fmt.Errorf("failed to create entity DKG key: %w", err)
+							return fmt.Errorf("failed to get database connection: %w", err)
 						}
-
-						// Commit the existing transaction before making the operator calls to ensure it is not rolled back if they fail
-						// due to the SOs still starting up.
-						if err = tx.Commit(); err != nil {
-							return fmt.Errorf("failed to commit entity DKG key: %w", err)
-						}
-					} else {
-						// Existing entity DKG key found, get its signing keyshare
-						keyshare, err = entityDkgKey.Edges.SigningKeyshareOrErr()
+						entityDkgKey, err = tx.EntityDkgKey.Query().WithSigningKeyshare().Only(ctx)
 						if err != nil {
-							return fmt.Errorf("failed to get signing keyshare from entity DKG key: %w", err)
+							return fmt.Errorf("failed to re-load entity DKG key with signing keyshare: %w", err)
 						}
+					}
+					keyshare, err = entityDkgKey.Edges.SigningKeyshareOrErr()
+					if err != nil {
+						return fmt.Errorf("failed to get signing keyshare from entity DKG key: %w", err)
 					}
 					logger.Sugar().Infof("Found available signing keyshare %s, proceeding with reservation on other SOs", keyshare.ID)
 					selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}

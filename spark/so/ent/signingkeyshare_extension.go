@@ -81,7 +81,7 @@ func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareC
 		return nil, err
 	}
 
-	signingKeyshares, err := GetUnusedSigningKeysharesTx(ctx, tx, config, keyshareCount)
+	signingKeyshares, err := getUnusedSigningKeysharesTx(ctx, tx, config, keyshareCount)
 	if err != nil {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
 			logger.Error("Failed to rollback transaction", zap.Error(rollbackErr))
@@ -97,15 +97,15 @@ func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareC
 	return signingKeyshares, nil
 }
 
-// GetUnusedSigningKeysharesTx runs inside an existing *ent.Tx.
+// getUnusedSigningKeysharesTx runs inside an existing *ent.Tx.
 // Caller is responsible for committing/rolling-back the tx.
-func GetUnusedSigningKeysharesTx(
+func getUnusedSigningKeysharesTx(
 	ctx context.Context,
 	tx *Tx,
 	cfg *so.Config,
 	keyshareCount int,
 ) ([]*SigningKeyshare, error) {
-	ctx, span := tracer.Start(ctx, "SigningKeyshare.GetUnusedSigningKeysharesTx")
+	ctx, span := tracer.Start(ctx, "SigningKeyshare.getUnusedSigningKeysharesTx")
 	defer span.End()
 
 	if keyshareCount <= 0 {

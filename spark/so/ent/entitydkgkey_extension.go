@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so"
 )
 
 // GetEntityDkgKeyPublicKey fetches the entity DKG key and returns its associated public key.
@@ -30,4 +31,48 @@ func GetEntityDkgKeyPublicKey(ctx context.Context, db *Client) (keys.Public, err
 	}
 
 	return signingKeyshare.PublicKey, nil
+}
+
+// CreateEntityDkgKeyWithUnusedSigningKeyshare creates a new entity DKG key using an unused signing keyshare.
+// Returns the entity DKG key or an error if there's an error creating the entity DKG key or reserving the keyshare.
+func CreateEntityDkgKeyWithUnusedSigningKeyshare(ctx context.Context, config *so.Config) (*EntityDkgKey, error) {
+	tx, err := GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database connection: %w", err)
+	}
+
+	keyshares, err := getUnusedSigningKeysharesTx(ctx, tx, config, 1)
+	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return nil, fmt.Errorf("failed to rollback transaction after error: %w (original error: %w)", rollbackErr, err)
+		}
+		return nil, fmt.Errorf("failed to get unused signing keyshares: %w", err)
+	}
+
+	if len(keyshares) == 0 {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return nil, fmt.Errorf("failed to rollback transaction: %w", rollbackErr)
+		}
+		return nil, fmt.Errorf("no signing keyshares available yet")
+	}
+
+	keyshare := keyshares[0]
+
+	// Create the entity DKG key
+	entityDkgKey, err := tx.EntityDkgKey.Create().
+		SetSigningKeyshare(keyshare).
+		Save(ctx)
+	if err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			return nil, fmt.Errorf("failed to rollback transaction after error: %w (original error: %w)", rollbackErr, err)
+		}
+		return nil, fmt.Errorf("failed to create entity DKG key: %w", err)
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return entityDkgKey, nil
 }
