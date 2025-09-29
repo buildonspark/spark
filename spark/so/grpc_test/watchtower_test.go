@@ -21,7 +21,7 @@ import (
 
 func TestTimelockExpirationHappyPath(t *testing.T) {
 	skipIfGithubActions(t)
-	walletConfig := sparktesting.TestWalletConfig(t)
+	walletConfig := wallet.NewTestWalletConfig(t)
 	config := sparktesting.TestConfig(t)
 	client := sparktesting.GetBitcoinClient()
 	faucet := sparktesting.GetFaucetInstance(client)
@@ -29,7 +29,7 @@ func TestTimelockExpirationHappyPath(t *testing.T) {
 
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	rootNode, err := sparktesting.CreateNewTree(walletConfig, faucet, leafPrivKey, 100_000)
+	rootNode, err := wallet.CreateNewTree(walletConfig, faucet, leafPrivKey, 100_000)
 	require.NoError(t, err)
 
 	// Reduce timelock
@@ -142,7 +142,7 @@ func TestTimelockExpirationHappyPath(t *testing.T) {
 
 func TestTimelockExpirationTransferredNode(t *testing.T) {
 	skipIfGithubActions(t)
-	walletConfig := sparktesting.TestWalletConfig(t)
+	walletConfig := wallet.NewTestWalletConfig(t)
 	config := sparktesting.TestConfig(t)
 	client := sparktesting.GetBitcoinClient()
 	faucet := sparktesting.GetFaucetInstance(client)
@@ -151,13 +151,13 @@ func TestTimelockExpirationTransferredNode(t *testing.T) {
 	// Create sender wallet and tree
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	senderRootNode, err := sparktesting.CreateNewTree(walletConfig, faucet, senderLeafPrivKey, 100_000)
+	senderRootNode, err := wallet.CreateNewTree(walletConfig, faucet, senderLeafPrivKey, 100_000)
 	require.NoError(t, err)
 
 	// Create receiver wallet
 	receiverPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	receiverConfig := sparktesting.TestWalletConfigWithIdentityKey(t, receiverPrivKey)
+	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
 
 	// Prepare transfer - sender creates new signing key for the transfer
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -326,7 +326,7 @@ func TestTimelockExpirationTransferredNode(t *testing.T) {
 
 func TestTimelockExpirationMultiLevelTree(t *testing.T) {
 	skipIfGithubActions(t)
-	walletConfig := sparktesting.TestWalletConfig(t)
+	walletConfig := wallet.NewTestWalletConfig(t)
 	config := sparktesting.TestConfig(t)
 	client := sparktesting.GetBitcoinClient()
 	faucet := sparktesting.GetFaucetInstance(client)
@@ -336,7 +336,7 @@ func TestTimelockExpirationMultiLevelTree(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a multi-level tree with 1 level (root + 2 children + 2 leaves = 5 nodes total)
-	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(walletConfig, faucet, leafPrivKey, 100_000, 1)
+	tree, nodes, err := wallet.CreateNewTreeWithLevels(walletConfig, faucet, leafPrivKey, 100_000, 1)
 	require.NoError(t, err)
 	require.Len(t, nodes, 5)
 
@@ -519,8 +519,8 @@ func TestTimelockExpirationMultiLevelTree(t *testing.T) {
 func TestTimelockExpirationAfterLightningTransfer(t *testing.T) {
 	skipIfGithubActions(t)
 	// Create user and ssp configs
-	userConfig := sparktesting.TestWalletConfig(t)
-	sspConfig := sparktesting.TestWalletConfig(t)
+	userConfig := wallet.NewTestWalletConfig(t)
+	sspConfig := wallet.NewTestWalletConfig(t)
 	config := sparktesting.TestConfig(t)
 	client := sparktesting.GetBitcoinClient()
 
@@ -544,7 +544,7 @@ func TestTimelockExpirationAfterLightningTransfer(t *testing.T) {
 	sspLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	feeSats := uint64(0)
-	nodeToSend, err := sparktesting.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
+	nodeToSend, err := wallet.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
 	require.NoError(t, err)
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()

@@ -26,7 +26,7 @@ import (
 )
 
 func TestGenerateDepositAddress(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 	token, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 	ctx := wallet.ContextWithToken(t.Context(), token)
@@ -53,7 +53,7 @@ func TestGenerateDepositAddress(t *testing.T) {
 }
 
 func TestGenerateDepositAddressWithoutCustomLeafID(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 	token, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 	ctx := wallet.ContextWithToken(t.Context(), token)
@@ -70,7 +70,7 @@ func TestGenerateDepositAddressWithoutCustomLeafID(t *testing.T) {
 }
 
 func TestGenerateDepositAddressConcurrentRequests(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 	token, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 	ctx := wallet.ContextWithToken(t.Context(), token)
@@ -120,7 +120,7 @@ func TestGenerateDepositAddressConcurrentRequests(t *testing.T) {
 }
 
 func TestGenerateStaticDepositAddress(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 	token, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 	ctx := wallet.ContextWithToken(t.Context(), token)
@@ -155,7 +155,7 @@ func TestGenerateStaticDepositAddress(t *testing.T) {
 }
 
 func TestGenerateStaticDepositAddressDedicatedEndpoint(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 	token, err := wallet.AuthenticateWithServer(t.Context(), config)
 	require.NoError(t, err)
 	ctx := wallet.ContextWithToken(t.Context(), token)
@@ -192,7 +192,7 @@ func TestGenerateStaticDepositAddressDedicatedEndpoint(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationBasic(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	require.NoError(t, err)
 	defer conn.Close()
@@ -268,7 +268,7 @@ func TestStartDepositTreeCreationBasic(t *testing.T) {
 	require.Len(t, resp.Nodes, 1)
 
 	sparkClient := pb.NewSparkServiceClient(conn)
-	rootNode, err := sparktesting.WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
+	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
 	require.NoError(t, err)
 	assert.Equal(t, rootNode.Id, leafID)
 	assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
@@ -284,7 +284,7 @@ func TestStartDepositTreeCreationBasic(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationUnknownAddress(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	if err != nil {
@@ -381,7 +381,7 @@ func TestStartDepositTreeCreationUnknownAddress(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationWithoutCustomLeafID(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	if err != nil {
@@ -465,7 +465,7 @@ func TestStartDepositTreeCreationWithoutCustomLeafID(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationConcurrentWithSameTx(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	if err != nil {
@@ -622,7 +622,7 @@ func TestStartDepositTreeCreationOffchain(t *testing.T) {
 	coin, err := faucet.Fund()
 	require.NoError(t, err)
 
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 
 	// Setup Mock tx
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
@@ -726,7 +726,7 @@ func TestStartDepositTreeCreationOffchain(t *testing.T) {
 		t.Fatalf("failed to generate to address: %v", err)
 	}
 
-	_, err = sparktesting.WaitForPendingDepositNode(ctx, pb.NewSparkServiceClient(conn), rootNode)
+	_, err = wallet.WaitForPendingDepositNode(ctx, pb.NewSparkServiceClient(conn), rootNode)
 	require.NoError(t, err)
 
 	// After L1 tx confirms, user should be able to transfer funds
@@ -749,7 +749,7 @@ func TestStartDepositTreeCreationUnconfirmed(t *testing.T) {
 	coin, err := faucet.Fund()
 	require.NoError(t, err)
 
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 
 	// Setup Mock tx
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
@@ -840,7 +840,7 @@ func TestStartDepositTreeCreationUnconfirmed(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationIdempotency(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	if err != nil {
@@ -941,7 +941,7 @@ func TestStartDepositTreeCreationIdempotency(t *testing.T) {
 	require.Len(t, resp.Nodes, 1)
 
 	sparkClient := pb.NewSparkServiceClient(conn)
-	rootNode, err := sparktesting.WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
+	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
 	require.NoError(t, err)
 	assert.Equal(t, rootNode.Id, leafID)
 	assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
@@ -957,7 +957,7 @@ func TestStartDepositTreeCreationIdempotency(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationDoubleClaim(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	if err != nil {
@@ -1051,7 +1051,7 @@ func TestStartDepositTreeCreationDoubleClaim(t *testing.T) {
 	require.Len(t, resp.Nodes, 1)
 
 	sparkClient := pb.NewSparkServiceClient(conn)
-	rootNode, err := sparktesting.WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
+	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
 	require.NoError(t, err)
 	assert.Equal(t, rootNode.Id, leafID)
 	assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
@@ -1068,7 +1068,7 @@ func TestStartDepositTreeCreationDoubleClaim(t *testing.T) {
 }
 
 func TestStartDepositTreeCreationDepositCleanup(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 
 	conn, err := config.NewCoordinatorGRPCConnection()
 	if err != nil {
@@ -1162,7 +1162,7 @@ func TestStartDepositTreeCreationDepositCleanup(t *testing.T) {
 	require.Len(t, resp.Nodes, 1)
 
 	sparkClient := pb.NewSparkServiceClient(conn)
-	rootNode, err := sparktesting.WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
+	rootNode, err := wallet.WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
 	require.NoError(t, err)
 	assert.Equal(t, rootNode.Id, leafID)
 	assert.Equal(t, rootNode.Status, string(st.TreeNodeStatusAvailable))
@@ -1193,7 +1193,7 @@ func TestStartDepositTreeCreationDepositCleanup(t *testing.T) {
 }
 
 func TestQueryUnusedDepositAddresses(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 	soConfig := sparktesting.TestConfig(t)
 
 	err := dkg.GenerateKeys(t.Context(), soConfig, 500)
@@ -1237,7 +1237,7 @@ func TestQueryUnusedDepositAddresses(t *testing.T) {
 }
 
 func TestQueryUnusedDepositAddressesBackwardsCompatibility(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 	soConfig := sparktesting.TestConfig(t)
 
 	err := dkg.GenerateKeys(t.Context(), soConfig, 500)

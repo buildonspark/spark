@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
-	sparktesting "github.com/lightsparkdev/spark/testing"
 
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -263,7 +262,7 @@ func skipIfGithubActions(t *testing.T) {
 }
 
 func TestQueryPartiallySpentTokenOutputsNotReturned(t *testing.T) {
-	config := sparktesting.TestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 
 	tokenPrivKey := config.IdentityPrivateKey
 	tokenIdentityPubkeyBytes := tokenPrivKey.Public().Serialize()
@@ -362,14 +361,14 @@ func TestQueryPartiallySpentTokenOutputsNotReturned(t *testing.T) {
 }
 
 func TestQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t *testing.T) {
-	config := sparktesting.TestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 
 	tokenPrivKey := config.IdentityPrivateKey
 	// Create the issuance transaction
 	_, userOutput1PrivKey, _, err := createTestTokenMintTransaction(config, tokenPrivKey.Public())
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
-	userOneConfig := sparktesting.TestWalletConfigWithIdentityKey(t, userOutput1PrivKey)
+	userOneConfig := wallet.NewTestWalletConfigWithIdentityKey(t, userOutput1PrivKey)
 
 	correctNetworkResponse, err := wallet.QueryTokenOutputs(
 		t.Context(),
@@ -396,7 +395,7 @@ func TestQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t *testing.T)
 func TestBroadcastTokenTransactionMintAndTransferTokensExpectedOutputAndTxRetrieval(t *testing.T) {
 	// Use a fresh issuer key for this test to avoid cross-test interference.
 	issuerPrivKey := getRandomPrivateKey(t)
-	config := sparktesting.TestWalletConfigWithIdentityKey(t, issuerPrivKey)
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
 	// Create a native Spark token for this issuer so that subsequent
 	// mint/transfer operations are scoped to this isolated token.
@@ -592,7 +591,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensExpectedOutputAndTxRetrie
 
 func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfOutputs(t *testing.T) {
 	skipIfGithubActions(t)
-	config := sparktesting.TestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 
 	tokenPrivKey := config.IdentityPrivateKey
 	// Try to create issuance transaction with 101 outputs (should fail)
@@ -752,7 +751,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfOutputs(t *testing.
 }
 
 func TestV0FreezeAndUnfreezeTokens(t *testing.T) {
-	config := sparktesting.TestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 	tokenPrivKey := config.IdentityPrivateKey
 	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransaction(config, tokenPrivKey.Public())
 	require.NoError(t, err, "failed to create test token issuance transaction")
@@ -1111,7 +1110,7 @@ func TestTokenMintTransactionSigning(t *testing.T) {
 			} else {
 				issuerPrivateKey = tc.explicitWalletPrivateKey
 			}
-			config := sparktesting.TestWalletConfigWithIdentityKey(t, issuerPrivateKey)
+			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivateKey)
 
 			if tc.createNativeSparkToken {
 				err := testCreateNativeSparkTokenWithParams(t, config, issuerPrivateKey, TestTokenName, TestTokenTicker, TestTokenMaxSupply)
@@ -1505,7 +1504,7 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 				issuerPrivateKey = tc.explicitWalletPrivateKey
 			}
 
-			config := sparktesting.TestWalletConfigWithIdentityKey(t, issuerPrivateKey)
+			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivateKey)
 
 			if tc.createNativeSparkToken {
 				err := testCreateNativeSparkTokenWithParams(t, config, issuerPrivateKey, TestTokenName, TestTokenTicker, TestTokenMaxSupply)
@@ -1559,7 +1558,7 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 }
 
 func TestBroadcastTokenTransactionMintAndTransferTokensSchnorr(t *testing.T) {
-	config := sparktesting.TestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 	config.UseTokenTransactionSchnorrSignatures = true
 
 	tokenPrivKey := config.IdentityPrivateKey
@@ -1605,7 +1604,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensSchnorr(t *testing.T) {
 }
 
 func TestV0FreezeAndUnfreezeTokensSchnorr(t *testing.T) {
-	config := sparktesting.TestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 	config.UseTokenTransactionSchnorrSignatures = true
 
 	tokenPrivKey := config.IdentityPrivateKey
@@ -1633,7 +1632,7 @@ func TestV0FreezeAndUnfreezeTokensSchnorr(t *testing.T) {
 }
 
 func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
-	config := sparktesting.TestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 
 	tokenPrivKey := config.IdentityPrivateKey
 	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransaction(config, tokenPrivKey.Public())
@@ -1734,7 +1733,7 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 }
 
 func TestBroadcastTokenTransactionUnspecifiedNetwork(t *testing.T) {
-	config := sparktesting.TestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 
 	tokenPrivKey := config.IdentityPrivateKey
 	issueTokenTransaction, _, _, err := createTestTokenMintTransaction(config, tokenPrivKey.Public())
@@ -1891,7 +1890,7 @@ func TestCreateNativeSparkToken(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			firstTokenConfig := sparktesting.TestWalletConfigWithIdentityKey(t, tc.firstTokenParams.issuerPrivateKey)
+			firstTokenConfig := wallet.NewTestWalletConfigWithIdentityKey(t, tc.firstTokenParams.issuerPrivateKey)
 
 			// Create first token
 			err := testCreateNativeSparkTokenWithParams(
@@ -1911,7 +1910,7 @@ func TestCreateNativeSparkToken(t *testing.T) {
 
 			// Create second token if needed
 			if tc.secondTokenParams != nil {
-				secondTokenConfig := sparktesting.TestWalletConfigWithIdentityKey(t, tc.secondTokenParams.issuerPrivateKey)
+				secondTokenConfig := wallet.NewTestWalletConfigWithIdentityKey(t, tc.secondTokenParams.issuerPrivateKey)
 
 				err := testCreateNativeSparkTokenWithParams(
 					t,

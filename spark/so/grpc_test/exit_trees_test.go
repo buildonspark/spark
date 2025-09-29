@@ -13,7 +13,7 @@ import (
 )
 
 func TestExitSingleNodeTrees(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 	client := sparktesting.GetBitcoinClient()
 
 	var roots []*pb.TreeNode
@@ -22,7 +22,7 @@ func TestExitSingleNodeTrees(t *testing.T) {
 	for range 5 {
 		priKey, err := keys.GeneratePrivateKey()
 		require.NoError(t, err, "failed to create node signing private key")
-		root, err := sparktesting.CreateNewTree(config, faucet, priKey, int64(treeAmountSats))
+		root, err := wallet.CreateNewTree(config, faucet, priKey, int64(treeAmountSats))
 		require.NoError(t, err, "failed to create new tree")
 		roots = append(roots, root)
 		privKeys = append(privKeys, priKey)

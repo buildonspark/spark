@@ -7,7 +7,6 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,8 +21,8 @@ func skipConnectedEvent(t *testing.T, stream pb.SparkService_SubscribeToEventsCl
 }
 
 func TestEventHandlerTransferNotification(t *testing.T) {
-	senderConfig := sparktesting.TestWalletConfig(t)
-	receiverConfig := sparktesting.TestWalletConfig(t)
+	senderConfig := wallet.NewTestWalletConfig(t)
+	receiverConfig := wallet.NewTestWalletConfig(t)
 	stream, err := wallet.SubscribeToEvents(t.Context(), receiverConfig)
 	require.NoError(t, err)
 
@@ -51,7 +50,7 @@ func TestEventHandlerTransferNotification(t *testing.T) {
 		leafPrivKey, err := keys.GeneratePrivateKey()
 		require.NoError(t, err, "failed to create node signing private key")
 
-		rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
+		rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
 		require.NoError(t, err, "failed to create new tree")
 		expectedNodeIDs = append(expectedNodeIDs, rootNode.Id)
 
@@ -100,7 +99,7 @@ func TestEventHandlerTransferNotification(t *testing.T) {
 }
 
 func TestEventHandlerDepositNotification(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 	stream, err := wallet.SubscribeToEvents(t.Context(), config)
 	require.NoError(t, err)
 
@@ -122,7 +121,7 @@ func TestEventHandlerDepositNotification(t *testing.T) {
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
 
-	rootNode, err := sparktesting.CreateNewTree(config, faucet, leafPrivKey, 100_000)
+	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, 100_000)
 	require.NoError(t, err, "failed to create new tree")
 
 	select {
@@ -138,8 +137,8 @@ func TestEventHandlerDepositNotification(t *testing.T) {
 }
 
 func TestMultipleSubscriptions(t *testing.T) {
-	senderConfig := sparktesting.TestWalletConfig(t)
-	receiverConfig := sparktesting.TestWalletConfig(t)
+	senderConfig := wallet.NewTestWalletConfig(t)
+	receiverConfig := wallet.NewTestWalletConfig(t)
 	stream1, err := wallet.SubscribeToEvents(t.Context(), receiverConfig)
 	require.NoError(t, err)
 
@@ -196,7 +195,7 @@ func TestMultipleSubscriptions(t *testing.T) {
 
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	rootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
+	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
 	require.NoError(t, err)
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()

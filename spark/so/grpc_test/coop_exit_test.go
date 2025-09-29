@@ -22,13 +22,13 @@ import (
 )
 
 func setupUsers(t *testing.T, amountSats int64) (*wallet.TestWalletConfig, *wallet.TestWalletConfig, wallet.LeafKeyTweak) {
-	config := sparktesting.TestWalletConfig(t)
-	sspConfig := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
+	sspConfig := wallet.NewTestWalletConfig(t)
 
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 
-	rootNode, err := sparktesting.CreateNewTree(config, faucet, leafPrivKey, amountSats)
+	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, amountSats)
 	require.NoError(t, err)
 
 	transferNode := wallet.LeafKeyTweak{

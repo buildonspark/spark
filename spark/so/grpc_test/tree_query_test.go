@@ -14,7 +14,7 @@ import (
 )
 
 func TestTreeQuery(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 
 	// Create gRPC connection using common helper
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
@@ -36,7 +36,7 @@ func TestTreeQuery(t *testing.T) {
 	rootPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 
-	tree, err := sparktesting.CreateNewTree(config, faucet, rootPrivKey, 65536)
+	tree, err := wallet.CreateNewTree(config, faucet, rootPrivKey, 65536)
 	require.NoError(t, err)
 
 	// Generate tree structure for root with 2 levels
@@ -173,7 +173,7 @@ func TestTreeQuery(t *testing.T) {
 	t.Run("query nodes by value", func(t *testing.T) {
 		rootPrivKey2, err := keys.GeneratePrivateKey()
 		require.NoError(t, err)
-		tree2, err := sparktesting.CreateNewTree(config, faucet, rootPrivKey2, 32768)
+		tree2, err := wallet.CreateNewTree(config, faucet, rootPrivKey2, 32768)
 		require.NoError(t, err)
 		rootTree2, err := wallet.GenerateDepositAddressesForTree(ctx, config, nil, tree2, uint32(0), rootPrivKey2, 1)
 		require.NoError(t, err)

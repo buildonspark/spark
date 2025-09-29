@@ -12,7 +12,6 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	pbmock "github.com/lightsparkdev/spark/proto/mock"
 	"github.com/lightsparkdev/spark/proto/spark"
-	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -88,7 +87,7 @@ func assertVerifiedPendingTransfer(t *testing.T, err error, leafPrivKeyMap map[s
 }
 
 func TestCreateLightningInvoice(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 	fakeInvoiceCreator := NewFakeLightningInvoiceCreator()
 
 	amountSats := uint64(100)
@@ -102,7 +101,7 @@ func TestCreateLightningInvoice(t *testing.T) {
 }
 
 func TestCreateZeroAmountLightningInvoice(t *testing.T) {
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 	fakeInvoiceCreator := NewFakeLightningInvoiceCreator()
 
 	amountSats := uint64(0)
@@ -117,8 +116,8 @@ func TestCreateZeroAmountLightningInvoice(t *testing.T) {
 
 func TestReceiveLightningPayment(t *testing.T) {
 	// Create user and ssp configs
-	userConfig := sparktesting.TestWalletConfig(t)
-	sspConfig := sparktesting.TestWalletConfig(t)
+	userConfig := wallet.NewTestWalletConfig(t)
+	sspConfig := wallet.NewTestWalletConfig(t)
 	// User creates an invoice
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
@@ -134,7 +133,7 @@ func TestReceiveLightningPayment(t *testing.T) {
 	sspLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	feeSats := uint64(0)
-	nodeToSend, err := sparktesting.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
+	nodeToSend, err := wallet.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
 	require.NoError(t, err)
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -210,8 +209,8 @@ func TestReceiveLightningPayment(t *testing.T) {
 
 func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 	// Create user and ssp configs
-	userConfig := sparktesting.TestWalletConfig(t)
-	sspConfig := sparktesting.TestWalletConfig(t)
+	userConfig := wallet.NewTestWalletConfig(t)
+	sspConfig := wallet.NewTestWalletConfig(t)
 	// User creates a 0-amount invoice
 	invoiceSats := uint64(0)
 	preimage, paymentHash := testPreimageHash(t, invoiceSats)
@@ -231,7 +230,7 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 	sspLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	feeSats := uint64(0)
-	nodeToSend, err := sparktesting.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, int64(paymentAmountSats))
+	nodeToSend, err := wallet.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, int64(paymentAmountSats))
 	require.NoError(t, err)
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -295,8 +294,8 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 
 func TestReceiveLightningPaymentCannotCancelAfterPreimageReveal(t *testing.T) {
 	// Create user and ssp configs
-	userConfig := sparktesting.TestWalletConfig(t)
-	sspConfig := sparktesting.TestWalletConfig(t)
+	userConfig := wallet.NewTestWalletConfig(t)
+	sspConfig := wallet.NewTestWalletConfig(t)
 	// User creates an invoice
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
@@ -312,7 +311,7 @@ func TestReceiveLightningPaymentCannotCancelAfterPreimageReveal(t *testing.T) {
 	sspLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	feeSats := uint64(0)
-	nodeToSend, err := sparktesting.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
+	nodeToSend, err := wallet.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
 	require.NoError(t, err)
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -345,8 +344,8 @@ func TestReceiveLightningPaymentCannotCancelAfterPreimageReveal(t *testing.T) {
 
 func TestSendLightningPayment(t *testing.T) {
 	// Create user and ssp configs
-	userConfig := sparktesting.TestWalletConfig(t)
-	sspConfig := sparktesting.TestWalletConfig(t)
+	userConfig := wallet.NewTestWalletConfig(t)
+	sspConfig := wallet.NewTestWalletConfig(t)
 	// User creates an invoice
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
@@ -358,7 +357,7 @@ func TestSendLightningPayment(t *testing.T) {
 	userLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	feeSats := uint64(2)
-	nodeToSend, err := sparktesting.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
+	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
 	require.NoError(t, err)
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -429,8 +428,8 @@ func TestSendLightningPayment(t *testing.T) {
 
 func TestSendLightningPaymentV2(t *testing.T) {
 	// Create user and ssp configs
-	userConfig := sparktesting.TestWalletConfig(t)
-	sspConfig := sparktesting.TestWalletConfig(t)
+	userConfig := wallet.NewTestWalletConfig(t)
+	sspConfig := wallet.NewTestWalletConfig(t)
 	// User creates an invoice
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
@@ -442,7 +441,7 @@ func TestSendLightningPaymentV2(t *testing.T) {
 	userLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	feeSats := uint64(2)
-	nodeToSend, err := sparktesting.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
+	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
 	require.NoError(t, err)
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -513,8 +512,8 @@ func TestSendLightningPaymentV2(t *testing.T) {
 
 func TestSendLightningPaymentWithRejection(t *testing.T) {
 	// Create user and ssp configs
-	userConfig := sparktesting.TestWalletConfig(t)
-	sspConfig := sparktesting.TestWalletConfig(t)
+	userConfig := wallet.NewTestWalletConfig(t)
+	sspConfig := wallet.NewTestWalletConfig(t)
 	// User creates an invoice
 	amountSats := uint64(100)
 	_, paymentHash := testPreimageHash(t, amountSats)
@@ -526,7 +525,7 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 	userLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	feeSats := uint64(2)
-	nodeToSend, err := sparktesting.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
+	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
 	require.NoError(t, err)
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -596,8 +595,8 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 
 func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
 	// Create user and ssp configs
-	userConfig := sparktesting.TestWalletConfig(t)
-	sspConfig := sparktesting.TestWalletConfig(t)
+	userConfig := wallet.NewTestWalletConfig(t)
+	sspConfig := wallet.NewTestWalletConfig(t)
 	// User creates an invoice
 	amountSats := uint64(100)
 	preimage, wrongPaymentHash := testPreimageHash(t, amountSats)
@@ -615,7 +614,7 @@ func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
 	sspLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	feeSats := uint64(0)
-	nodeToSend, err := sparktesting.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
+	nodeToSend, err := wallet.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
 	require.NoError(t, err)
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -652,8 +651,8 @@ func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
 
 func TestSendLightningPaymentTwice(t *testing.T) {
 	// Create user and ssp configs
-	userConfig := sparktesting.TestWalletConfig(t)
-	sspConfig := sparktesting.TestWalletConfig(t)
+	userConfig := wallet.NewTestWalletConfig(t)
+	sspConfig := wallet.NewTestWalletConfig(t)
 	// User creates an invoice
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
@@ -665,7 +664,7 @@ func TestSendLightningPaymentTwice(t *testing.T) {
 	userLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	feeSats := uint64(2)
-	nodeToSend, err := sparktesting.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
+	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
 	require.NoError(t, err)
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()
@@ -749,9 +748,9 @@ func TestSendLightningPaymentTwice(t *testing.T) {
 
 func TestSendLightningPaymentWithHTLC(t *testing.T) {
 	// Create user and ssp configs
-	userConfig := sparktesting.TestWalletConfig(t)
+	userConfig := wallet.NewTestWalletConfig(t)
 
-	sspConfig := sparktesting.TestWalletConfig(t)
+	sspConfig := wallet.NewTestWalletConfig(t)
 
 	// User creates an invoice
 	amountSats := uint64(100)
@@ -764,7 +763,7 @@ func TestSendLightningPaymentWithHTLC(t *testing.T) {
 	userLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
 	feeSats := uint64(2)
-	nodeToSend, err := sparktesting.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
+	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
 	require.NoError(t, err)
 
 	newLeafPrivKey, err := keys.GeneratePrivateKey()

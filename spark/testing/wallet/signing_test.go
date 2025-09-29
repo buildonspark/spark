@@ -16,9 +16,9 @@ import (
 	"github.com/lightsparkdev/spark/so/objects"
 )
 
-var rng = rand.NewChaCha8([32]byte{1})
-
 func TestCreateUserKeyPackage(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{1})
+
 	privkey1 := keys.MustGeneratePrivateKeyFromRand(rng)
 	privkey2 := keys.MustGeneratePrivateKeyFromRand(rng)
 
@@ -63,6 +63,8 @@ func TestCreateUserKeyPackage(t *testing.T) {
 }
 
 func TestPrepareFrostSigningJobsForUserSignedRefund(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{1})
+
 	createValidTx := func() []byte {
 		tx := wire.NewMsgTx(wire.TxVersion)
 		tx.AddTxIn(&wire.TxIn{
@@ -317,6 +319,8 @@ func TestPrepareFrostSigningJobsForUserSignedRefund(t *testing.T) {
 }
 
 func TestPrepareLeafSigningJobs(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{1})
+
 	createTestCommitment := func() *objects.SigningCommitment {
 		nonce, err := objects.RandomSigningNonce()
 		require.NoError(t, err)

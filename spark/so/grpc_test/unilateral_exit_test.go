@@ -8,7 +8,6 @@ import (
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
 )
@@ -17,10 +16,10 @@ import (
 // a single leaf tree.
 func TestUnilateralExitSingleLeaf(t *testing.T) {
 	skipIfGithubActions(t)
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	rootNode, err := sparktesting.CreateNewTree(config, faucet, leafPrivKey, 100_000)
+	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, 100_000)
 	require.NoError(t, err)
 
 	getCurrentTimelock := func(rootNode *pb.TreeNode) int64 {
@@ -49,10 +48,10 @@ func TestUnilateralExitSingleLeaf(t *testing.T) {
 // Test we can unilateral exit a leaf node of a tree with multiple leaves.
 func TestUnilateralExitTreeLeaf(t *testing.T) {
 	skipIfGithubActions(t)
-	config := sparktesting.TestWalletConfig(t)
+	config := wallet.NewTestWalletConfig(t)
 	leafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(config, faucet, leafPrivKey, 100_000, 1)
+	tree, nodes, err := wallet.CreateNewTreeWithLevels(config, faucet, leafPrivKey, 100_000, 1)
 	require.NoError(t, err)
 	require.Len(t, nodes, 5)
 

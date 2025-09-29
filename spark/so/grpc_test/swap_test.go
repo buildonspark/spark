@@ -9,7 +9,6 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/proto/spark"
-	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,17 +16,17 @@ import (
 
 func TestSwap(t *testing.T) {
 	// Initiate sender
-	senderConfig := sparktesting.TestWalletConfig(t)
+	senderConfig := wallet.NewTestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
-	senderRootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, senderLeafPrivKey, 100_000)
+	senderRootNode, err := wallet.CreateNewTree(senderConfig, faucet, senderLeafPrivKey, 100_000)
 	require.NoError(t, err, "failed to create new tree")
 
 	// Initiate receiver
-	receiverConfig := sparktesting.TestWalletConfig(t)
+	receiverConfig := wallet.NewTestWalletConfig(t)
 	receiverLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
-	receiverRootNode, err := sparktesting.CreateNewTree(receiverConfig, faucet, receiverLeafPrivKey, 100_000)
+	receiverRootNode, err := wallet.CreateNewTree(receiverConfig, faucet, receiverLeafPrivKey, 100_000)
 	require.NoError(t, err, "failed to create new tree")
 
 	// Sender initiates transfer
@@ -207,17 +206,17 @@ func TestSwap(t *testing.T) {
 
 func TestSwapDeliverTransferPackageTwice(t *testing.T) {
 	// Initiate sender
-	senderConfig := sparktesting.TestWalletConfig(t)
+	senderConfig := wallet.NewTestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
-	senderRootNode, err := sparktesting.CreateNewTree(senderConfig, faucet, senderLeafPrivKey, 100_000)
+	senderRootNode, err := wallet.CreateNewTree(senderConfig, faucet, senderLeafPrivKey, 100_000)
 	require.NoError(t, err, "failed to create new tree")
 
 	// Initiate receiver
-	receiverConfig := sparktesting.TestWalletConfig(t)
+	receiverConfig := wallet.NewTestWalletConfig(t)
 	receiverLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err, "failed to create node signing private key")
-	receiverRootNode, err := sparktesting.CreateNewTree(receiverConfig, faucet, receiverLeafPrivKey, 100_000)
+	receiverRootNode, err := wallet.CreateNewTree(receiverConfig, faucet, receiverLeafPrivKey, 100_000)
 	require.NoError(t, err, "failed to create new tree")
 
 	// Sender initiates transfer

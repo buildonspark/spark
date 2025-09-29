@@ -7,14 +7,9 @@ import (
 
 	"github.com/lightsparkdev/spark/common/keys"
 
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common"
 )
-
-func EphemeralAnchorOutput() *wire.TxOut {
-	return wire.NewTxOut(0, []byte{txscript.OP_TRUE, 0x02, 0x4e, 0x73})
-}
 
 func createRootTx(
 	depositOutPoint *wire.OutPoint,
@@ -98,7 +93,7 @@ func createLeafNodeTxWithAnchor(
 	amountSats := txOut.Value
 	outputAmount := amountSats
 	newLeafTx.AddTxOut(wire.NewTxOut(outputAmount, txOut.PkScript))
-	newLeafTx.AddTxOut(EphemeralAnchorOutput())
+	newLeafTx.AddTxOut(common.EphemeralAnchorOutput())
 	return newLeafTx
 }
 
@@ -123,7 +118,7 @@ func createRefundTxs(
 		return nil, nil, fmt.Errorf("failed to create refund pkscript: %w", err)
 	}
 	cpfpRefundTx.AddTxOut(wire.NewTxOut(amountSats, refundPkScript))
-	cpfpRefundTx.AddTxOut(EphemeralAnchorOutput())
+	cpfpRefundTx.AddTxOut(common.EphemeralAnchorOutput())
 
 	// Create direct refund tx (with fee, no anchor)
 	directRefundTx := wire.NewMsgTx(3)

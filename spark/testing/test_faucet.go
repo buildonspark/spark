@@ -18,7 +18,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark/common"
-	"github.com/lightsparkdev/spark/testing/wallet"
 )
 
 var (
@@ -428,7 +427,7 @@ func SignFaucetCoinFeeBump(anchorOutPoint *wire.OutPoint, coin FaucetCoin, outpu
 
 	prevOuts := make(map[wire.OutPoint]*wire.TxOut)
 	prevOuts[*coin.OutPoint] = coin.TxOut
-	prevOuts[*anchorOutPoint] = wallet.EphemeralAnchorOutput()
+	prevOuts[*anchorOutPoint] = common.EphemeralAnchorOutput()
 	prevOutputFetcher := txscript.NewMultiPrevOutFetcher(prevOuts)
 	sighashes := txscript.NewTxSigHashes(feeBumpTx, prevOutputFetcher)
 	fakeTapscriptRootHash := []byte{}

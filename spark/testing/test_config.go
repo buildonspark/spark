@@ -2,22 +2,17 @@ package sparktesting
 
 import (
 	"fmt"
-	"math/rand/v2"
 	"os"
 	"strconv"
 	"testing"
 
 	"github.com/lightsparkdev/spark/common/keys"
-	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
 	"github.com/lightsparkdev/spark/common"
 	sparkgrpc "github.com/lightsparkdev/spark/common/grpc"
 	"github.com/lightsparkdev/spark/so"
-	"github.com/lightsparkdev/spark/testing/wallet"
 )
-
-var rng = rand.NewChaCha8([32]byte{1})
 
 const (
 	minikubeCAFilePath    = "/tmp/minikube-ca.pem"
@@ -119,14 +114,14 @@ func GetAllSigningOperators(tb testing.TB) map[string]*so.SigningOperator {
 	return operators
 }
 
-func getTestDatabasePath(operatorIndex int) string {
+func GetTestDatabasePath(operatorIndex int) string {
 	if isMinikube() {
 		return fmt.Sprintf("postgresql://postgres@localhost:15432/sparkoperator_%d?sslmode=disable", operatorIndex)
 	}
 	return fmt.Sprintf("postgresql://:@127.0.0.1:5432/sparkoperator_%d?sslmode=disable", operatorIndex)
 }
 
-func getLocalFrostSignerAddress(tb testing.TB) string {
+func GetLocalFrostSignerAddress(tb testing.TB) string {
 	isMinikube, isGripmock := isMinikube(), IsGripmock()
 	if isMinikube && isGripmock {
 		tb.Fatal("Cannot set both MINIKUBE_IP and GRIPMOCK environment variables")
@@ -162,90 +157,11 @@ func SpecificOperatorTestConfig(tb testing.TB, operatorIndex int) *so.Config {
 		IdentityPrivateKey:         testOperatorPrivkeys[operatorIndex],
 		SigningOperatorMap:         signingOperators,
 		Threshold:                  uint64(threshold),
-		SignerAddress:              getLocalFrostSignerAddress(tb),
-		DatabasePath:               getTestDatabasePath(operatorIndex),
+		SignerAddress:              GetLocalFrostSignerAddress(tb),
+		DatabasePath:               GetTestDatabasePath(operatorIndex),
 		FrostGRPCConnectionFactory: &TestGRPCConnectionFactory{},
 		SupportedNetworks:          []common.Network{common.Regtest, common.Mainnet},
 	}
 
 	return &config
-}
-
-// TestWalletConfig returns a wallet configuration that can be used for testing.
-func TestWalletConfig(tb testing.TB) *wallet.TestWalletConfig {
-	identityPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(tb, err, "failed to generate identity private key")
-	return TestWalletConfigWithIdentityKey(tb, identityPrivKey)
-}
-
-// TestWalletConfigWithIdentityKey returns a wallet configuration with specified identity key that can be used for testing.
-func TestWalletConfigWithIdentityKey(tb testing.TB, identityPrivKey keys.Private) *wallet.TestWalletConfig {
-	return TestWalletConfigWithParams(tb,
-		TestWalletConfigParams{
-			IdentityPrivateKey: identityPrivKey,
-		})
-}
-
-// TestWalletConfigWithIdentityKeyAndCoordinator returns a wallet configuration with specified identity key that can be used for testing.
-func TestWalletConfigWithIdentityKeyAndCoordinator(tb testing.TB, identityPrivKey keys.Private, coordinatorIndex int) *wallet.TestWalletConfig {
-	return TestWalletConfigWithParams(tb,
-		TestWalletConfigParams{
-			IdentityPrivateKey: identityPrivKey,
-			CoordinatorIndex:   coordinatorIndex,
-		})
-}
-
-// TestWalletConfigParams defines optional parameters for generating a test wallet configuration.
-type TestWalletConfigParams struct {
-	// CoordinatorIndex selects which operator should be considered the coordinator for this wallet
-	// configuration. Defaults to index 0.
-	CoordinatorIndex int
-
-	// IdentityPrivateKey allows callers to supply a deterministic identity key. If empty, a new
-	// key will be generated.
-	IdentityPrivateKey keys.Private
-
-	// UseTokenTransactionSchnorrSignatures toggles Schnorr vs ECDSA signatures when constructing
-	// transactions in tests.
-	UseTokenTransactionSchnorrSignatures bool
-
-	// Network allows callers to override the default network (Regtest).
-	Network common.Network
-}
-
-// TestWalletConfigWithParams creates a wallet.Config suitable for tests using the provided parameters.
-func TestWalletConfigWithParams(tb testing.TB, p TestWalletConfigParams) *wallet.TestWalletConfig {
-	if p.CoordinatorIndex < 0 {
-		p.CoordinatorIndex = 0
-	}
-
-	var privKey keys.Private
-	if p.IdentityPrivateKey.IsZero() {
-		var err error
-		privKey, err = keys.GeneratePrivateKey()
-		require.NoError(tb, err, "failed to generate identity private key")
-	} else {
-		privKey = p.IdentityPrivateKey
-	}
-
-	signingOperators := GetAllSigningOperators(tb)
-
-	network := common.Regtest
-	if p.Network != common.Unspecified {
-		network = p.Network
-	}
-
-	coordinatorIdentifier := fmt.Sprintf("%064d", p.CoordinatorIndex+1)
-	return &wallet.TestWalletConfig{
-		Network:                               network,
-		SigningOperators:                      signingOperators,
-		CoordinatorIdentifier:                 coordinatorIdentifier,
-		FrostSignerAddress:                    getLocalFrostSignerAddress(tb),
-		IdentityPrivateKey:                    privKey,
-		Threshold:                             3,
-		SparkServiceProviderIdentityPublicKey: keys.MustGeneratePrivateKeyFromRand(rng).Public(),
-		UseTokenTransactionSchnorrSignatures:  p.UseTokenTransactionSchnorrSignatures,
-		CoordinatorDatabaseURI:                getTestDatabasePath(p.CoordinatorIndex),
-		FrostGRPCConnectionFactory:            &TestGRPCConnectionFactory{},
-	}
 }

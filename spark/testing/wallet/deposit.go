@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -25,6 +27,11 @@ import (
 	"github.com/lightsparkdev/spark/so/objects"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+const (
+	DepositTimeout      = 30 * time.Second
+	DepositPollInterval = 100 * time.Millisecond
 )
 
 // validateDepositAddress validates the cryptographic proofs of a deposit address.
@@ -1240,4 +1247,172 @@ func QueryNodes(
 	}
 
 	return response.Nodes, nil
+}
+
+// CreateNewTree creates a new Tree
+func CreateNewTree(config *TestWalletConfig, faucet *sparktesting.Faucet, privKey keys.Private, amountSats int64) (*pb.TreeNode, error) {
+	coin, err := faucet.Fund()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fund faucet: %w", err)
+	}
+
+	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to operator: %w", err)
+	}
+	defer conn.Close()
+
+	token, err := AuthenticateWithConnection(context.Background(), config, conn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authenticate: %w", err)
+	}
+	ctx := ContextWithToken(context.Background(), token)
+
+	leafID := uuid.New().String()
+	depositResp, err := GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate deposit address: %w", err)
+	}
+
+	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, amountSats)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create deposit tx: %w", err)
+	}
+	vout := 0
+
+	verifyingKey, err := keys.ParsePublicKey(depositResp.DepositAddress.VerifyingKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse verifying key: %w", err)
+	}
+	resp, err := CreateTreeRoot(ctx, config, privKey, verifyingKey, depositTx, vout, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tree: %w", err)
+	}
+	if len(resp.Nodes) == 0 {
+		return nil, fmt.Errorf("no nodes found after creating tree")
+	}
+
+	// Sign, broadcast, mine deposit tx
+	signedExitTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign deposit tx: %w", err)
+	}
+
+	client := sparktesting.GetBitcoinClient()
+	_, err = client.SendRawTransaction(signedExitTx, true)
+	if err != nil {
+		return nil, fmt.Errorf("failed to broadcast deposit tx: %w", err)
+	}
+	randomKey, err := keys.GeneratePrivateKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random key: %w", err)
+	}
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate random address: %w", err)
+	}
+	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to mine deposit tx: %w", err)
+	}
+
+	// Wait until the deposited leaf is available
+	sparkClient := pb.NewSparkServiceClient(conn)
+	return WaitForPendingDepositNode(ctx, sparkClient, resp.Nodes[0])
+}
+
+// CreateNewTreeWithLevels creates a new Tree
+func CreateNewTreeWithLevels(config *TestWalletConfig, faucet *sparktesting.Faucet, privKey keys.Private, amountSats int64, levels uint32) (*DepositAddressTree, []*pb.TreeNode, error) {
+	coin, err := faucet.Fund()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to fund faucet: %w", err)
+	}
+
+	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to connect to operator: %w", err)
+	}
+	defer conn.Close()
+
+	token, err := AuthenticateWithConnection(context.Background(), config, conn)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to authenticate: %w", err)
+	}
+	ctx := ContextWithToken(context.Background(), token)
+
+	leafID := uuid.New().String()
+	depositResp, err := GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate deposit address: %w", err)
+	}
+
+	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, amountSats)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create deposit tx: %w", err)
+	}
+	vout := 0
+
+	tree, err := GenerateDepositAddressesForTree(ctx, config, depositTx, nil, uint32(vout), privKey, levels)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create tree: %w", err)
+	}
+
+	treeNodes, err := CreateTree(ctx, config, depositTx, nil, uint32(vout), tree, true)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create tree: %w", err)
+	}
+
+	// Sign, broadcast, mine deposit tx
+	signedExitTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to sign deposit tx: %w", err)
+	}
+
+	client := sparktesting.GetBitcoinClient()
+	_, err = client.SendRawTransaction(signedExitTx, true)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to broadcast deposit tx: %w", err)
+	}
+	randomKey, err := keys.GeneratePrivateKey()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate random key: %w", err)
+	}
+	randomPubKey := randomKey.Public()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey, common.Regtest)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to generate random address: %w", err)
+	}
+	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to mine deposit tx: %w", err)
+	}
+
+	leafNode := treeNodes.Nodes[len(treeNodes.Nodes)-1]
+	_, err = WaitForPendingDepositNode(ctx, pb.NewSparkServiceClient(conn), leafNode)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to wait for pending deposit node: %w", err)
+	}
+
+	return tree, treeNodes.Nodes, nil
+}
+
+func WaitForPendingDepositNode(ctx context.Context, sparkClient pb.SparkServiceClient, node *pb.TreeNode) (*pb.TreeNode, error) {
+	startTime := time.Now()
+	for node.Status != string(st.TreeNodeStatusAvailable) {
+		if time.Since(startTime) >= DepositTimeout {
+			return nil, fmt.Errorf("timed out waiting for node to be available")
+		}
+		time.Sleep(DepositPollInterval)
+		nodesResp, err := sparkClient.QueryNodes(ctx, &pb.QueryNodesRequest{
+			Source: &pb.QueryNodesRequest_NodeIds{NodeIds: &pb.TreeNodeIds{NodeIds: []string{node.Id}}},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to query nodes: %w", err)
+		}
+		if len(nodesResp.Nodes) != 1 {
+			return nil, fmt.Errorf("expected 1 node, got %d", len(nodesResp.Nodes))
+		}
+		node = nodesResp.Nodes[node.Id]
+	}
+	return node, nil
 }

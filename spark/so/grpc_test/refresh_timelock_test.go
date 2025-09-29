@@ -8,7 +8,6 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,10 +16,10 @@ import (
 )
 
 func TestRefreshTimelock(t *testing.T) {
-	senderConfig := sparktesting.TestWalletConfig(t)
+	senderConfig := wallet.NewTestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
+	tree, nodes, err := wallet.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
 	require.NoError(t, err)
 	fmt.Println("node count:", len(nodes))
 	require.NotEmpty(t, nodes, "no nodes created when creating tree")
@@ -44,10 +43,10 @@ func TestRefreshTimelock(t *testing.T) {
 }
 
 func TestExtendLeaf(t *testing.T) {
-	senderConfig := sparktesting.TestWalletConfig(t)
+	senderConfig := wallet.NewTestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
+	tree, nodes, err := wallet.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
 	require.NoError(t, err)
 	require.NotEmpty(t, nodes, "no nodes created when creating tree")
 	node := nodes[len(nodes)-1]
@@ -66,10 +65,10 @@ func TestExtendLeaf(t *testing.T) {
 
 func TestRenewLeafExtend(t *testing.T) {
 	skipIfGithubActions(t)
-	senderConfig := sparktesting.TestWalletConfig(t)
+	senderConfig := wallet.NewTestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
+	tree, nodes, err := wallet.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
 	require.NoError(t, err)
 	require.NotEmpty(t, nodes, "no nodes created when creating tree")
 	node := nodes[len(nodes)-1]
@@ -128,10 +127,10 @@ func TestRenewLeafExtend(t *testing.T) {
 
 func TestRenewLeafRefresh(t *testing.T) {
 	skipIfGithubActions(t)
-	senderConfig := sparktesting.TestWalletConfig(t)
+	senderConfig := wallet.NewTestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
+	tree, nodes, err := wallet.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
 	require.NoError(t, err)
 	require.NotEmpty(t, nodes, "no nodes created when creating tree")
 	node := nodes[len(nodes)-1]
@@ -175,10 +174,10 @@ func TestRenewLeafRefresh(t *testing.T) {
 
 func TestRenewLeafZeroTimelock(t *testing.T) {
 	skipIfGithubActions(t)
-	senderConfig := sparktesting.TestWalletConfig(t)
+	senderConfig := wallet.NewTestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
+	tree, nodes, err := wallet.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
 	require.NoError(t, err)
 	require.NotEmpty(t, nodes, "no nodes created when creating tree")
 	node := nodes[len(nodes)-1]
@@ -240,10 +239,10 @@ func TestRenewLeafZeroTimelock(t *testing.T) {
 
 func TestRenewLeafExtend_InvalidRefundTimelock(t *testing.T) {
 	skipIfGithubActions(t)
-	senderConfig := sparktesting.TestWalletConfig(t)
+	senderConfig := wallet.NewTestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
+	tree, nodes, err := wallet.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
 	require.NoError(t, err)
 	require.NotEmpty(t, nodes, "no nodes created when creating tree")
 	node := nodes[len(nodes)-1]
@@ -269,10 +268,10 @@ func TestRenewLeafExtend_InvalidRefundTimelock(t *testing.T) {
 }
 
 func TestRenewLeafExtend_InvalidNodeTimelock(t *testing.T) {
-	senderConfig := sparktesting.TestWalletConfig(t)
+	senderConfig := wallet.NewTestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
+	tree, nodes, err := wallet.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
 	require.NoError(t, err)
 	require.NotEmpty(t, nodes, "no nodes created when creating tree")
 	node := nodes[len(nodes)-1]
@@ -290,10 +289,10 @@ func TestRenewLeafExtend_InvalidNodeTimelock(t *testing.T) {
 
 func TestRenewZeroTimelock_InvalidRefundTimelock(t *testing.T) {
 	skipIfGithubActions(t)
-	senderConfig := sparktesting.TestWalletConfig(t)
+	senderConfig := wallet.NewTestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
+	tree, nodes, err := wallet.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
 	require.NoError(t, err)
 	require.NotEmpty(t, nodes, "no nodes created when creating tree")
 	node := nodes[len(nodes)-1]
@@ -319,10 +318,10 @@ func TestRenewZeroTimelock_InvalidRefundTimelock(t *testing.T) {
 }
 
 func TestRenewZeroTimelock_InvalidNodeTimelock(t *testing.T) {
-	senderConfig := sparktesting.TestWalletConfig(t)
+	senderConfig := wallet.NewTestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
+	tree, nodes, err := wallet.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
 	require.NoError(t, err)
 	require.NotEmpty(t, nodes, "no nodes created when creating tree")
 	node := nodes[len(nodes)-1]
@@ -339,10 +338,10 @@ func TestRenewZeroTimelock_InvalidNodeTimelock(t *testing.T) {
 }
 
 func TestRenewLeafRefresh_InvalidRefundTimelock(t *testing.T) {
-	senderConfig := sparktesting.TestWalletConfig(t)
+	senderConfig := wallet.NewTestWalletConfig(t)
 	senderLeafPrivKey, err := keys.GeneratePrivateKey()
 	require.NoError(t, err)
-	tree, nodes, err := sparktesting.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
+	tree, nodes, err := wallet.CreateNewTreeWithLevels(senderConfig, faucet, senderLeafPrivKey, 100_000, 1)
 	require.NoError(t, err)
 	require.NotEmpty(t, nodes, "no nodes created when creating tree")
 	node := nodes[len(nodes)-1]
