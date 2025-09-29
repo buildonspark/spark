@@ -1,5 +1,13 @@
 # @buildonspark/issuer-sdk
 
+## 0.0.101
+
+### Patch Changes
+
+- - Lower target for RN to es2020
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.3.8
+
 ## 0.0.100
 
 ### Patch Changes

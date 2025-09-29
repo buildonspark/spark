@@ -1,6 +1,6 @@
 {
   "name": "@buildonspark/issuer-sdk",
-  "version": "0.0.100",
+  "version": "0.0.101",
   "description": "Spark Issuer SDK for token issuance",
   "license": "Apache-2.0",
   "main": "./dist/index.js",
@@ -84,7 +84,7 @@
     "types": "tsc"
   },
   "dependencies": {
-    "@buildonspark/spark-sdk": "0.3.7",
+    "@buildonspark/spark-sdk": "0.3.8",
     "@noble/curves": "^1.8.0",
     "@scure/btc-signer": "^1.5.0",
     "buffer": "^6.0.3"

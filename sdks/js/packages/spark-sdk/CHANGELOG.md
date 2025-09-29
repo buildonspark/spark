@@ -1,5 +1,13 @@
 # @buildonspark/spark-sdk
 
+## 0.3.8
+
+### Patch Changes
+
+- - Update lighting invoice payment to support new refund transactions
+  - Lower target for RN to es2020
+  - Reuse gRPC channels across all ConnectionManager instances for better performance in Node.js
+
 ## 0.3.7
 
 ### Patch Changes
