@@ -1,24 +1,17 @@
-import { hexToBytes } from "@noble/curves/utils";
 import { Transaction } from "@scure/btc-signer";
-import { TransactionInput } from "@scure/btc-signer/psbt";
 import { ValidationError } from "../errors/types.js";
 import { SigningCommitment } from "../proto/common.js";
 import {
   RequestedSigningCommitments,
   UserSignedTxSigningJob,
 } from "../proto/spark.js";
-import {
-  getSigHashFromTx,
-  getTxFromRawTxBytes,
-  getTxId,
-} from "../utils/bitcoin.js";
-import {
-  createRefundTxs,
-  getNextHTLCTransactionSequence,
-  getNextTransactionSequence,
-} from "../utils/transaction.js";
+import { getSigHashFromTx, getTxFromRawTxBytes } from "../utils/bitcoin.js";
 import { createRefundTxsForLightning } from "../utils/htlc-transactions.js";
 import { getNetwork } from "../utils/network.js";
+import {
+  createDecrementedTimelockRefundTxs,
+  getNextHTLCTransactionSequence,
+} from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import type { LeafKeyTweak } from "./transfer.js";
 
@@ -105,23 +98,8 @@ export class SigningService {
       }
 
       const nodeTx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
-      const cpfpNodeOutPoint: TransactionInput = {
-        txid: hexToBytes(getTxId(nodeTx)),
-        index: 0,
-      };
 
       const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
-
-      const sequence = currRefundTx.getInput(0).sequence;
-      if (!sequence) {
-        throw new ValidationError("Invalid refund transaction", {
-          field: "sequence",
-          value: currRefundTx.getInput(0),
-          expected: "Non-null sequence",
-        });
-      }
-      const { nextSequence, nextDirectSequence } =
-        getNextTransactionSequence(sequence);
 
       const amountSats = currRefundTx.getOutput(0).amount;
       if (amountSats === undefined) {
@@ -133,22 +111,24 @@ export class SigningService {
       }
 
       let directNodeTx: Transaction | undefined;
-      let directNodeOutPoint: TransactionInput | undefined;
       if (leaf.leaf.directTx.length > 0) {
         directNodeTx = getTxFromRawTxBytes(leaf.leaf.directTx);
-        directNodeOutPoint = {
-          txid: hexToBytes(getTxId(directNodeTx)),
-          index: 0,
-        };
+      }
+
+      const currentSequence = currRefundTx.getInput(0).sequence;
+      if (!currentSequence) {
+        throw new ValidationError("Invalid refund transaction", {
+          field: "sequence",
+          value: currRefundTx.getInput(0),
+          expected: "Non-null sequence",
+        });
       }
 
       const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
-        createRefundTxs({
-          sequence: nextSequence,
-          directSequence: nextDirectSequence,
-          input: cpfpNodeOutPoint,
-          directInput: directNodeOutPoint,
-          amountSats,
+        createDecrementedTimelockRefundTxs({
+          nodeTx: nodeTx,
+          directNodeTx: directNodeTx,
+          sequence: currentSequence,
           receivingPubkey: receiverIdentityPubkey,
           network: this.config.getNetwork(),
         });
@@ -193,16 +173,6 @@ export class SigningService {
       }
 
       if (directFromCpfpRefundTx) {
-        if (!directNodeTx) {
-          throw new ValidationError(
-            "Direct node transaction undefined while direct from CPFP refund transaction is defined",
-            {
-              field: "directNodeTx",
-              value: directNodeTx,
-              expected: "Non-null direct node transaction",
-            },
-          );
-        }
         const refundSighash = getSigHashFromTx(
           directFromCpfpRefundTx,
           0,

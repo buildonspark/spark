@@ -51,15 +51,14 @@ import {
 import { NetworkToProto } from "../utils/network.js";
 import { VerifiableSecretShare } from "../utils/secret-sharing.js";
 import {
+  createCurrentTimelockRefundTxs,
+  createDecrementedTimelockRefundTxs,
+  createInitialTimelockRefundTxs,
   createNodeTxs,
-  createRefundTxs,
-  DIRECT_TIMELOCK_OFFSET,
+  createTestUnilateralRefundTxs,
   getCurrentTimelock,
   getEphemeralAnchorOutput,
   getNextTransactionSequence,
-  getTransactionSequence,
-  INITIAL_DIRECT_SEQUENCE,
-  INITIAL_SEQUENCE,
   maybeApplyFee,
   TEST_UNILATERAL_DIRECT_SEQUENCE,
   TEST_UNILATERAL_SEQUENCE,
@@ -1053,50 +1052,35 @@ export class TransferService extends BaseTransferService {
       }
 
       const nodeTx = getTxFromRawTxBytes(leaf.leaf.nodeTx);
-      const cpfpNodeOutPoint: TransactionInput = {
-        txid: hexToBytes(getTxId(nodeTx)),
-        index: 0,
-      };
 
       let directNodeTx: Transaction | undefined;
-      let directNodeOutPoint: TransactionInput | undefined;
       if (leaf.leaf.directTx.length > 0) {
         directNodeTx = getTxFromRawTxBytes(leaf.leaf.directTx);
-        directNodeOutPoint = {
-          txid: hexToBytes(getTxId(directNodeTx)),
-          index: 0,
-        };
       }
 
       const currRefundTx = getTxFromRawTxBytes(leaf.leaf.refundTx);
 
-      const sequence = currRefundTx.getInput(0).sequence;
-      if (!sequence) {
+      const currentSequence = currRefundTx.getInput(0).sequence;
+      if (!currentSequence) {
         throw new ValidationError("Invalid refund transaction", {
           field: "sequence",
           value: currRefundTx.getInput(0),
           expected: "Non-null sequence",
         });
       }
-      const { nextSequence, nextDirectSequence } = isForClaim
-        ? getTransactionSequence(sequence)
-        : getNextTransactionSequence(sequence);
 
-      const amountSats = currRefundTx.getOutput(0).amount;
-      if (amountSats === undefined) {
-        throw new Error("Amount not found in signRefunds");
-      }
+      const refundTxsParams = {
+        nodeTx: nodeTx,
+        directNodeTx: directNodeTx,
+        sequence: currentSequence,
+        receivingPubkey: refundSigningData.receivingPubkey,
+        network: this.config.getNetwork(),
+      };
 
       const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
-        createRefundTxs({
-          sequence: nextSequence,
-          directSequence: nextDirectSequence,
-          input: cpfpNodeOutPoint,
-          directInput: directNodeOutPoint,
-          amountSats,
-          receivingPubkey: refundSigningData.receivingPubkey,
-          network: this.config.getNetwork(),
-        });
+        isForClaim
+          ? createCurrentTimelockRefundTxs(refundTxsParams)
+          : createDecrementedTimelockRefundTxs(refundTxsParams);
 
       refundSigningData.refundTx = cpfpRefundTx;
       refundSigningData.directRefundTx = directRefundTx;
@@ -1486,26 +1470,10 @@ export class TransferService extends BaseTransferService {
       });
     }
 
-    const newCpfpRefundOutPoint: TransactionInput = {
-      txid: hexToBytes(getTxId(cpfpNodeTx)!),
-      index: 0,
-    };
-
-    let newDirectRefundOutPoint: TransactionInput | undefined;
-    if (newDirectNodeTx) {
-      newDirectRefundOutPoint = {
-        txid: hexToBytes(getTxId(newDirectNodeTx)!),
-        index: 0,
-      };
-    }
-
     const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
-      createRefundTxs({
-        sequence: INITIAL_SEQUENCE,
-        directSequence: INITIAL_DIRECT_SEQUENCE,
-        input: newCpfpRefundOutPoint,
-        directInput: newDirectRefundOutPoint,
-        amountSats: nodeOutput.amount!,
+      createInitialTimelockRefundTxs({
+        nodeTx: nodeTx,
+        directNodeTx: newDirectNodeTx,
         receivingPubkey: await this.config.signer.getPublicKeyFromDerivation({
           type: KeyDerivationType.LEAF,
           path: node.id,
@@ -1727,12 +1695,9 @@ export class TransferService extends BaseTransferService {
       cpfpRefundTx: newCpfpRefundTx,
       directRefundTx: newDirectRefundTx,
       directFromCpfpRefundTx: newDirectFromCpfpRefundTx,
-    } = createRefundTxs({
-      sequence: INITIAL_SEQUENCE,
-      directSequence: INITIAL_DIRECT_SEQUENCE,
-      input: newCpfpRefundOutPoint,
-      directInput: newDirectRefundOutPoint,
-      amountSats,
+    } = createInitialTimelockRefundTxs({
+      nodeTx: newNodeTx,
+      directNodeTx: newDirectNodeTx,
       receivingPubkey: signingPublicKey,
       network: this.config.getNetwork(),
     });
@@ -2043,10 +2008,6 @@ export class TransferService extends BaseTransferService {
         expected: "Timelock greater than 100",
       });
     }
-    const nextSequence = TEST_UNILATERAL_SEQUENCE;
-    const nextDirectSequence =
-      TEST_UNILATERAL_SEQUENCE + DIRECT_TIMELOCK_OFFSET;
-
     const nodeOutput = nodeTx.getOutput(0);
     if (!nodeOutput) {
       throw Error("Could not get node output");
@@ -2059,29 +2020,22 @@ export class TransferService extends BaseTransferService {
     const signingPublicKey =
       await this.config.signer.getPublicKeyFromDerivation(keyDerivation);
 
-    const cpfpRefundOutPoint: TransactionInput = {
-      txid: hexToBytes(getTxId(nodeTx)!),
-      index: 0,
-    };
-
-    let directRefundOutPoint: TransactionInput | undefined;
-    if (directNodeTx) {
-      directRefundOutPoint = {
-        txid: hexToBytes(getTxId(directNodeTx)!),
-        index: 0,
-      };
+    const currentSequence = cpfpRefundTx.getInput(0).sequence;
+    if (!currentSequence) {
+      throw new ValidationError("Invalid refund transaction", {
+        field: "sequence",
+        value: cpfpRefundTx.getInput(0),
+        expected: "Non-null sequence",
+      });
     }
 
     const {
       cpfpRefundTx: newCpfpRefundTx,
       directRefundTx: newDirectRefundTx,
       directFromCpfpRefundTx: newDirectFromCpfpRefundTx,
-    } = createRefundTxs({
-      sequence: nextSequence,
-      directSequence: nextDirectSequence,
-      input: cpfpRefundOutPoint,
-      directInput: directRefundOutPoint,
-      amountSats: nodeOutput.amount!,
+    } = createTestUnilateralRefundTxs({
+      nodeTx: nodeTx,
+      directNodeTx: directNodeTx,
       receivingPubkey: signingPublicKey,
       network: this.config.getNetwork(),
     });

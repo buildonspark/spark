@@ -441,17 +441,19 @@ describe.each(walletTypes)(
 
       let expectedValue = 0n;
       for (const leaf of transfer.leaves) {
-        const cpfpRefund = getTxFromRawTxBytes(leaf.leaf?.refundTx!);
+        const cpfpRefund = getTxFromRawTxBytes(leaf.intermediateRefundTx);
         expectedValue += cpfpRefund.getOutput(0)?.amount || 0n;
 
-        if ((leaf.leaf?.directRefundTx.length || 0) > 0) {
-          const directRefund = getTxFromRawTxBytes(leaf.leaf?.directRefundTx!);
+        if ((leaf.intermediateDirectRefundTx.length || 0) > 0) {
+          const directRefund = getTxFromRawTxBytes(
+            leaf.intermediateDirectRefundTx,
+          );
           expectedValue += directRefund.getOutput(0)?.amount || 0n;
         }
 
-        if ((leaf.leaf?.directFromCpfpRefundTx.length || 0) > 0) {
+        if ((leaf.intermediateDirectFromCpfpRefundTx.length || 0) > 0) {
           const directFromCpfpRefund = getTxFromRawTxBytes(
-            leaf.leaf?.directFromCpfpRefundTx!,
+            leaf.intermediateDirectFromCpfpRefundTx,
           );
           expectedValue += directFromCpfpRefund.getOutput(0)?.amount || 0n;
         }

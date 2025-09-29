@@ -17,10 +17,8 @@ import { subtractPublicKeys } from "../utils/keys.js";
 import { getNetwork } from "../utils/network.js";
 import { proofOfPossessionMessageHashForDepositAddress } from "../utils/proof.js";
 import {
-  createRefundTxs,
+  createInitialTimelockRefundTxs,
   createRootTx,
-  INITIAL_DIRECT_SEQUENCE,
-  INITIAL_SEQUENCE,
 } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection/connection.js";
@@ -287,14 +285,10 @@ export class DepositService {
     const signingPubKey =
       await this.config.signer.getPublicKeyFromDerivation(keyDerivation);
 
-    // Create refund transactions (CPFP and direct)
     const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
-      createRefundTxs({
-        sequence: INITIAL_SEQUENCE,
-        directSequence: INITIAL_DIRECT_SEQUENCE,
-        input: { txid: hexToBytes(getTxId(cpfpRootTx)), index: 0 },
-        directInput: { txid: hexToBytes(getTxId(directRootTx)), index: 0 },
-        amountSats: amount,
+      createInitialTimelockRefundTxs({
+        nodeTx: cpfpRootTx,
+        directNodeTx: directRootTx,
         receivingPubkey: signingPubKey,
         network: this.config.getNetwork(),
       });
@@ -696,11 +690,8 @@ export class DepositService {
     const signingPubKey =
       await this.config.signer.getPublicKeyFromDerivation(keyDerivation);
 
-    // Create refund transactions (CPFP and direct)
-    const { cpfpRefundTx } = createRefundTxs({
-      sequence: INITIAL_SEQUENCE,
-      input: { txid: hexToBytes(getTxId(cpfpRootTx)), index: 0 },
-      amountSats: amount,
+    const { cpfpRefundTx } = createInitialTimelockRefundTxs({
+      nodeTx: cpfpRootTx,
       receivingPubkey: signingPubKey,
       network: this.config.getNetwork(),
     });

@@ -1,7 +1,8 @@
+import { hexToBytes } from "@noble/hashes/utils";
 import { Transaction } from "@scure/btc-signer";
 import { TransactionInput, TransactionOutput } from "@scure/btc-signer/psbt";
 import { ValidationError } from "../errors/types.js";
-import { getP2TRScriptFromPublicKey } from "./bitcoin.js";
+import { getP2TRScriptFromPublicKey, getTxId } from "./bitcoin.js";
 import { Network } from "./network.js";
 
 const INITIAL_TIMELOCK = 2000;
@@ -13,8 +14,7 @@ export const HTLC_TIMELOCK_OFFSET = 70;
 export const DIRECT_HTLC_TIMELOCK_OFFSET = 85;
 
 export const INITIAL_SEQUENCE = (1 << 30) | INITIAL_TIMELOCK;
-export const INITIAL_DIRECT_SEQUENCE =
-  (1 << 30) | (INITIAL_TIMELOCK + DIRECT_TIMELOCK_OFFSET);
+
 export const TEST_UNILATERAL_SEQUENCE = (1 << 30) | TEST_UNILATERAL_TIMELOCK;
 export const TEST_UNILATERAL_DIRECT_SEQUENCE =
   (1 << 30) | (TEST_UNILATERAL_TIMELOCK + DIRECT_TIMELOCK_OFFSET);
@@ -301,136 +301,148 @@ export function getNextHTLCTransactionSequence(
       isBit30Defined | (nextTimelock + DIRECT_HTLC_TIMELOCK_OFFSET),
   };
 }
-
-interface CreateRefundTxsInput {
-  sequence: number;
-  directSequence?: number;
-  input: TransactionInput;
-  directInput?: TransactionInput;
-  amountSats: bigint;
+interface RefundTxParams {
+  nodeTx: Transaction;
+  directNodeTx?: Transaction;
   receivingPubkey: Uint8Array;
   network: Network;
 }
 
-export function createRefundTxs({
-  sequence,
-  directSequence,
-  input,
-  directInput,
-  amountSats,
-  receivingPubkey,
-  network,
-}: CreateRefundTxsInput): {
+interface RefundTxWithSequenceParams extends RefundTxParams {
+  sequence: number;
+}
+
+interface RefundTxWithSequenceAndConnectorOutputParams
+  extends RefundTxWithSequenceParams {
+  connectorOutput: TransactionInput;
+}
+
+interface RefundTxs {
   cpfpRefundTx: Transaction;
   directRefundTx?: Transaction;
   directFromCpfpRefundTx?: Transaction;
-} {
+}
+
+function createRefundTxs({
+  nodeTx,
+  directNodeTx,
+  receivingPubkey,
+  network,
+  sequence,
+}: RefundTxWithSequenceParams): RefundTxs {
+  const refundInput: TransactionInput = {
+    txid: hexToBytes(getTxId(nodeTx)!),
+    index: 0,
+  };
+
+  const nodeAmountSats = nodeTx.getOutput(0).amount;
+  if (nodeAmountSats === undefined) {
+    throw new ValidationError("Node amount not found", {
+      field: "nodeAmountSats",
+      value: nodeAmountSats,
+    });
+  }
+
+  let directRefundTx: Transaction | undefined;
+  if (directNodeTx) {
+    const directRefundInput: TransactionInput = {
+      txid: hexToBytes(getTxId(directNodeTx)),
+      index: 0,
+    };
+
+    const directAmountSats = directNodeTx.getOutput(0).amount;
+    if (directAmountSats === undefined) {
+      throw new ValidationError("Direct amount not found", {
+        field: "directAmountSats",
+        value: directAmountSats,
+      });
+    }
+
+    directRefundTx = createRefundTx({
+      sequence: sequence + DIRECT_TIMELOCK_OFFSET,
+      input: directRefundInput,
+      amountSats: directAmountSats,
+      receivingPubkey,
+      network,
+      shouldCalculateFee: true,
+      includeAnchor: false,
+    });
+  }
+
   const cpfpRefundTx = createRefundTx({
-    sequence,
-    input,
-    amountSats,
+    sequence: sequence,
+    input: refundInput,
+    amountSats: nodeAmountSats,
     receivingPubkey,
     network,
     shouldCalculateFee: false,
     includeAnchor: true,
   });
 
-  let directRefundTx: Transaction | undefined;
-  let directFromCpfpRefundTx: Transaction | undefined;
-  if (directSequence && directInput) {
-    directRefundTx = createRefundTx({
-      sequence: directSequence,
-      input: directInput,
-      amountSats,
-      receivingPubkey,
-      network,
-      shouldCalculateFee: true,
-      includeAnchor: false,
-    });
-    directFromCpfpRefundTx = createRefundTx({
-      sequence: directSequence,
-      input,
-      amountSats,
-      receivingPubkey,
-      network,
-      shouldCalculateFee: true,
-      includeAnchor: false,
-    });
-  } else if (directInput && !directSequence) {
-    throw new ValidationError(
-      "directSequence must be provided if directInput is",
-      {
-        field: "directSequence",
-        value: directSequence,
-      },
-    );
-  }
+  const directFromCpfpRefundTx = createRefundTx({
+    sequence: sequence + DIRECT_TIMELOCK_OFFSET,
+    input: refundInput,
+    amountSats: nodeAmountSats,
+    receivingPubkey,
+    network,
+    shouldCalculateFee: true,
+    includeAnchor: false,
+  });
 
   return { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx };
 }
 
-export function createConnectorRefundTransactions(
-  sequence: number,
-  cpfpNodeOutPoint: TransactionInput,
-  directNodeOutPoint: TransactionInput,
-  connectorOutput: TransactionInput,
-  amountSats: bigint,
-  receiverPubKey: Uint8Array,
-  network: Network,
-  shouldCalculateFee: boolean,
-): [Transaction, Transaction, Transaction] {
-  // Create CPFP-friendly connector refund tx (with ephemeral anchor, no fee)
-  const cpfpRefundTx = new Transaction({
-    version: 3,
-    allowUnknownOutputs: true,
+export function createInitialTimelockRefundTxs(
+  params: RefundTxParams,
+): RefundTxs {
+  return createRefundTxs({
+    ...params,
+    sequence: INITIAL_SEQUENCE,
   });
-  cpfpRefundTx.addInput({
-    ...cpfpNodeOutPoint,
-    sequence,
+}
+
+export function createDecrementedTimelockRefundTxs(
+  params: RefundTxWithSequenceParams,
+): RefundTxs {
+  const nextSequence = getNextTransactionSequence(params.sequence).nextSequence;
+
+  return createRefundTxs({
+    ...params,
+    sequence: nextSequence,
   });
+}
+
+export function createCurrentTimelockRefundTxs(
+  params: RefundTxWithSequenceParams,
+): RefundTxs {
+  return createRefundTxs(params);
+}
+
+export function createTestUnilateralRefundTxs(
+  params: RefundTxParams,
+): RefundTxs {
+  return createRefundTxs({
+    ...params,
+    sequence: TEST_UNILATERAL_SEQUENCE,
+  });
+}
+
+export function createConnectorRefundTxs(
+  params: RefundTxWithSequenceAndConnectorOutputParams,
+): RefundTxs {
+  const { connectorOutput, ...baseParams } = params;
+  const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
+    createDecrementedTimelockRefundTxs(baseParams);
+
   cpfpRefundTx.addInput(connectorOutput);
-  const receiverScript = getP2TRScriptFromPublicKey(receiverPubKey, network);
-  cpfpRefundTx.addOutput({
-    script: receiverScript,
-    amount: amountSats,
-  });
-
-  // Create direct connector refund tx (with fee, no anchor)
-  const directRefundTx = new Transaction({
-    version: 3,
-    allowUnknownOutputs: true,
-  });
-  directRefundTx.addInput({
-    ...directNodeOutPoint,
-    sequence,
-  });
-  directRefundTx.addInput(connectorOutput);
-
-  let outputAmount = amountSats;
-  if (shouldCalculateFee) {
-    outputAmount = maybeApplyFee(amountSats);
+  if (directRefundTx) {
+    directRefundTx.addInput(connectorOutput);
   }
-  directRefundTx.addOutput({
-    script: receiverScript,
-    amount: outputAmount,
-  });
+  if (directFromCpfpRefundTx) {
+    directFromCpfpRefundTx.addInput(connectorOutput);
+  }
 
-  // Create direct-style refund tx that spends from CPFP outpoint (with fee, no anchor)
-  const directFromCpfpTx = new Transaction({
-    version: 3,
-    allowUnknownOutputs: true,
-  });
-  directFromCpfpTx.addInput({
-    ...cpfpNodeOutPoint,
-    sequence,
-  });
-  directFromCpfpTx.addInput(connectorOutput);
-  directFromCpfpTx.addOutput({
-    script: receiverScript,
-    amount: outputAmount,
-  });
-
-  return [cpfpRefundTx, directRefundTx, directFromCpfpTx];
+  return { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx };
 }
 
 export function getCurrentTimelock(currSequence?: number): number {
