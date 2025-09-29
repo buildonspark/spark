@@ -40,22 +40,22 @@ func (s *SparkTokenServer) CommitTransaction(ctx context.Context, req *tokenpb.C
 
 // QueryTokenMetadata returns created token metadata associated with passed in token identifiers or issuer public keys.
 func (s *SparkTokenServer) QueryTokenMetadata(ctx context.Context, req *tokenpb.QueryTokenMetadataRequest) (*tokenpb.QueryTokenMetadataResponse, error) {
-	queryTokenHandler := tokens.NewQueryTokenHandler(s.soConfig)
-	resp, err := queryTokenHandler.QueryTokenMetadata(ctx, req)
+	queryTokenMetadataHandler := tokens.NewQueryTokenMetadataHandler(s.soConfig)
+	resp, err := queryTokenMetadataHandler.QueryTokenMetadata(ctx, req)
 	return resp, err
 }
 
 // QueryTokenTransactions returns token transactions with status using native tokenpb protos.
 func (s *SparkTokenServer) QueryTokenTransactions(ctx context.Context, req *tokenpb.QueryTokenTransactionsRequest) (*tokenpb.QueryTokenTransactionsResponse, error) {
-	queryTokenHandler := tokens.NewQueryTokenHandler(s.soConfig)
-	resp, err := queryTokenHandler.QueryTokenTransactionsToken(ctx, req)
+	queryTokenTransactionsHandler := tokens.NewQueryTokenTransactionsHandler(s.soConfig)
+	resp, err := queryTokenTransactionsHandler.QueryTokenTransactions(ctx, req)
 	return resp, err
 }
 
 // QueryTokenOutputs returns token outputs with previous transaction data using native tokenpb protos.
 func (s *SparkTokenServer) QueryTokenOutputs(ctx context.Context, req *tokenpb.QueryTokenOutputsRequest) (*tokenpb.QueryTokenOutputsResponse, error) {
-	queryTokenHandler := tokens.NewQueryTokenHandlerWithExpiredTransactions(s.soConfig)
-	resp, err := queryTokenHandler.QueryTokenOutputsToken(ctx, req)
+	queryTokenOutputsHandler := tokens.NewQueryTokenOutputsHandlerWithExpiredTransactions(s.soConfig)
+	resp, err := queryTokenOutputsHandler.QueryTokenOutputsToken(ctx, req)
 	return resp, err
 }
 

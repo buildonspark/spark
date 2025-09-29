@@ -4,28 +4,20 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-
-	"github.com/lightsparkdev/spark/common/keys"
-	"github.com/lightsparkdev/spark/so/errors"
-	"go.uber.org/zap"
-
-	"github.com/lightsparkdev/spark/common"
-
-	"github.com/lightsparkdev/spark/so/protoconverter"
-
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/ent/predicate"
-	"github.com/lightsparkdev/spark/so/ent/tokencreate"
-	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
-	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/protoconverter"
 	"github.com/lightsparkdev/spark/so/tokens"
+	"go.uber.org/zap"
 )
 
 const (
@@ -33,261 +25,27 @@ const (
 	MaxTokenOutputPageSize     = 500
 )
 
-type QueryTokenHandler struct {
+type QueryTokenOutputsHandler struct {
 	config                     *so.Config
 	includeExpiredTransactions bool
 }
 
-// NewQueryTokenHandler creates a new QueryTokenHandler.
-func NewQueryTokenHandler(config *so.Config) *QueryTokenHandler {
-	return &QueryTokenHandler{
+// NewQueryTokenOutputsHandler creates a new QueryTokenOutputsHandler.
+func NewQueryTokenOutputsHandler(config *so.Config) *QueryTokenOutputsHandler {
+	return &QueryTokenOutputsHandler{
 		config:                     config,
 		includeExpiredTransactions: false,
 	}
 }
 
-func NewQueryTokenHandlerWithExpiredTransactions(config *so.Config) *QueryTokenHandler {
-	return &QueryTokenHandler{
+func NewQueryTokenOutputsHandlerWithExpiredTransactions(config *so.Config) *QueryTokenOutputsHandler {
+	return &QueryTokenOutputsHandler{
 		config:                     config,
 		includeExpiredTransactions: true,
 	}
 }
 
-func (h *QueryTokenHandler) QueryTokenMetadata(ctx context.Context, req *tokenpb.QueryTokenMetadataRequest) (*tokenpb.QueryTokenMetadataResponse, error) {
-	ctx, span := tracer.Start(ctx, "QueryTokenHandler.QueryTokenMetadata")
-	defer span.End()
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
-	}
-
-	if len(req.TokenIdentifiers) == 0 && len(req.GetIssuerPublicKeys()) == 0 {
-		return nil, fmt.Errorf("must provide at least one token identifier or issuer public key")
-	}
-
-	fields := []string{
-		tokencreate.FieldIssuerPublicKey,
-		tokencreate.FieldTokenName,
-		tokencreate.FieldTokenTicker,
-		tokencreate.FieldDecimals,
-		tokencreate.FieldMaxSupply,
-		tokencreate.FieldIsFreezable,
-		tokencreate.FieldCreationEntityPublicKey,
-		tokencreate.FieldNetwork,
-	}
-
-	var conditions []predicate.TokenCreate
-	if len(req.TokenIdentifiers) > 0 {
-		conditions = append(conditions, tokencreate.TokenIdentifierIn(req.TokenIdentifiers...))
-	}
-
-	issuerPubKeys, err := keys.ParsePublicKeys(req.GetIssuerPublicKeys())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse issuer public key: %w", err)
-	}
-	if len(issuerPubKeys) > 0 {
-		conditions = append(conditions, tokencreate.IssuerPublicKeyIn(issuerPubKeys...))
-	}
-
-	tokenCreateEntities, err := db.TokenCreate.Query().
-		Where(tokencreate.Or(conditions...)).
-		Select(fields...).
-		All(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query token metadata: %w", err)
-	}
-
-	var tokenMetadataList []*tokenpb.TokenMetadata
-	for _, tokenCreate := range tokenCreateEntities {
-		tokenMetadata, err := tokenCreate.ToTokenMetadata()
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert token create to token metadata: %w", err)
-		}
-		tokenMetadataList = append(tokenMetadataList, tokenMetadata.ToTokenMetadataProto())
-	}
-
-	return &tokenpb.QueryTokenMetadataResponse{TokenMetadata: tokenMetadataList}, nil
-}
-
-// QueryTokenTransactions returns SO provided data about specific token transactions along with their status.
-// Allows caller to specify data to be returned related to:
-// a) transactions associated with a particular set of output ids
-// b) transactions associated with a particular set of transaction hashes
-// c) all transactions associated with a particular token public key
-func (h *QueryTokenHandler) QueryTokenTransactions(ctx context.Context, req *sparkpb.QueryTokenTransactionsRequest) (*sparkpb.QueryTokenTransactionsResponse, error) {
-	ctx, span := tracer.Start(ctx, "QueryTokenHandler.QueryTokenTransactions")
-	defer span.End()
-	// Convert sparkpb request to tokenpb request
-	tokenReq := protoconverter.TokenProtoQueryTokenTransactionsRequestFromSpark(req)
-
-	// Call internal method with tokenpb
-	tokenResp, err := h.queryTokenTransactionsInternal(ctx, tokenReq)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert tokenpb response back to sparkpb response
-	return protoconverter.SparkQueryTokenTransactionsResponseFromTokenProto(tokenResp)
-}
-
-// queryTokenTransactionsInternal is the internal implementation using tokenpb protos
-func (h *QueryTokenHandler) queryTokenTransactionsInternal(ctx context.Context, req *tokenpb.QueryTokenTransactionsRequest) (*tokenpb.QueryTokenTransactionsResponse, error) {
-	ctx, span := tracer.Start(ctx, "QueryTokenHandler.queryTokenTransactionsInternal")
-	defer span.End()
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
-	}
-
-	// Start with a base query for token transactions
-	baseQuery := db.TokenTransaction.Query()
-
-	// Apply filters based on request parameters
-	if len(req.OutputIds) > 0 {
-		// Convert string IDs to UUIDs
-		outputUUIDs, err := common.StringUUIDArrayToUUIDArray(req.OutputIds)
-		if err != nil {
-			return nil, fmt.Errorf("invalid output ID format: %w", err)
-		}
-
-		// Find transactions that created or spent these outputs
-		baseQuery = baseQuery.Where(
-			tokentransaction.Or(
-				tokentransaction.HasCreatedOutputWith(tokenoutput.IDIn(outputUUIDs...)),
-				tokentransaction.HasSpentOutputWith(tokenoutput.IDIn(outputUUIDs...)),
-			),
-		)
-	}
-
-	if len(req.TokenTransactionHashes) > 0 {
-		baseQuery = baseQuery.Where(tokentransaction.FinalizedTokenTransactionHashIn(req.TokenTransactionHashes...))
-	}
-
-	ownerPubKeys, err := keys.ParsePublicKeys(req.GetOwnerPublicKeys())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner public key: %w", err)
-	}
-
-	if len(ownerPubKeys) > 0 {
-		baseQuery = baseQuery.Where(
-			tokentransaction.Or(
-				tokentransaction.HasCreatedOutputWith(tokenoutput.OwnerPublicKeyIn(ownerPubKeys...)),
-				tokentransaction.HasSpentOutputWith(tokenoutput.OwnerPublicKeyIn(ownerPubKeys...)),
-			),
-		)
-	}
-
-	issuerPubKeys, err := keys.ParsePublicKeys(req.GetIssuerPublicKeys())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse issuer public key: %w", err)
-	}
-
-	if len(issuerPubKeys) > 0 {
-		baseQuery = baseQuery.Where(
-			tokentransaction.Or(
-				tokentransaction.HasCreatedOutputWith(tokenoutput.TokenPublicKeyIn(issuerPubKeys...)),
-				tokentransaction.HasSpentOutputWith(tokenoutput.TokenPublicKeyIn(issuerPubKeys...)),
-			),
-		)
-	}
-
-	if len(req.TokenIdentifiers) > 0 {
-		baseQuery = baseQuery.Where(
-			tokentransaction.Or(
-				tokentransaction.HasCreatedOutputWith(tokenoutput.TokenIdentifierIn(req.TokenIdentifiers...)),
-				tokentransaction.HasSpentOutputWith(tokenoutput.TokenIdentifierIn(req.TokenIdentifiers...)),
-			),
-		)
-	}
-
-	// Apply sorting, limit and offset
-	query := baseQuery.Order(ent.Desc(tokentransaction.FieldUpdateTime))
-
-	limit := req.GetLimit()
-	if limit == 0 {
-		limit = 100
-	} else if limit > 1000 {
-		limit = 1000
-	}
-	query = query.Limit(int(limit))
-
-	if req.Offset > 0 {
-		query = query.Offset(int(req.Offset))
-	}
-
-	// This join respects the query limitations provided above and should only load the necessary relations.
-	query = query.
-		WithCreatedOutput().
-		WithSpentOutput(func(slq *ent.TokenOutputQuery) {
-			slq.WithOutputCreatedTokenTransaction()
-		}).
-		WithCreate().
-		WithMint().
-		WithSparkInvoice()
-
-	// Execute the query
-	transactions, err := query.All(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to query token transactions: %w", err)
-	}
-
-	// Convert to response protos
-	transactionsWithStatus := make([]*tokenpb.TokenTransactionWithStatus, 0, len(transactions))
-	for _, transaction := range transactions {
-		// Determine transaction status based on output statuses.
-		status := protoconverter.ConvertTokenTransactionStatusToTokenPb(transaction.Status)
-
-		// Reconstruct the token transaction from the ent data.
-		transactionProto, err := transaction.MarshalProto(ctx, h.config)
-		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToMarshalTokenTransaction, transaction, err)
-		}
-
-		transactionWithStatus := &tokenpb.TokenTransactionWithStatus{
-			TokenTransaction:     transactionProto,
-			Status:               status,
-			TokenTransactionHash: transaction.FinalizedTokenTransactionHash,
-		}
-
-		if status == tokenpb.TokenTransactionStatus_TOKEN_TRANSACTION_FINALIZED {
-			spentTokenOutputsMetadata := make([]*tokenpb.SpentTokenOutputMetadata, len(transaction.Edges.SpentOutput))
-
-			for i, spentOutput := range transaction.Edges.SpentOutput {
-				spentTokenOutputsMetadata[i] = &tokenpb.SpentTokenOutputMetadata{
-					OutputId:         spentOutput.ID.String(),
-					RevocationSecret: spentOutput.SpentRevocationSecret,
-				}
-			}
-			transactionWithStatus.ConfirmationMetadata = &tokenpb.TokenTransactionConfirmationMetadata{
-				SpentTokenOutputsMetadata: spentTokenOutputsMetadata,
-			}
-		}
-		transactionsWithStatus = append(transactionsWithStatus, transactionWithStatus)
-	}
-
-	// Calculate next offset
-	var nextOffset int64
-	if len(transactions) == int(req.Limit) {
-		nextOffset = req.Offset + int64(len(transactions))
-	} else {
-		nextOffset = -1
-	}
-
-	return &tokenpb.QueryTokenTransactionsResponse{
-		TokenTransactionsWithStatus: transactionsWithStatus,
-		Offset:                      nextOffset,
-	}, nil
-}
-
-// QueryTokenTransactionsToken is the native tokenpb endpoint for SparkTokenService.
-// This provides the same functionality as the legacy QueryTokenTransactions but uses
-// tokenpb protocol directly for better performance and cleaner API design.
-func (h *QueryTokenHandler) QueryTokenTransactionsToken(ctx context.Context, req *tokenpb.QueryTokenTransactionsRequest) (*tokenpb.QueryTokenTransactionsResponse, error) {
-	// Directly use the internal implementation since it already uses tokenpb natively
-	return h.queryTokenTransactionsInternal(ctx, req)
-}
-
-func (h *QueryTokenHandler) QueryTokenOutputs(
+func (h *QueryTokenOutputsHandler) QueryTokenOutputs(
 	ctx context.Context,
 	req *sparkpb.QueryTokenOutputsRequest,
 ) (*sparkpb.QueryTokenOutputsResponse, error) {
@@ -307,7 +65,7 @@ func (h *QueryTokenHandler) QueryTokenOutputs(
 }
 
 // queryTokenOutputsInternal is the internal implementation using tokenpb protos
-func (h *QueryTokenHandler) queryTokenOutputsInternal(
+func (h *QueryTokenOutputsHandler) queryTokenOutputsInternal(
 	ctx context.Context,
 	req *tokenpb.QueryTokenOutputsRequest,
 ) (*tokenpb.QueryTokenOutputsResponse, error) {
@@ -412,7 +170,7 @@ func (h *QueryTokenHandler) queryTokenOutputsInternal(
 	}, nil
 }
 
-func (h *QueryTokenHandler) QueryTokenOutputsSpark(ctx context.Context, req *sparkpb.QueryTokenOutputsRequest) (*sparkpb.QueryTokenOutputsResponse, error) {
+func (h *QueryTokenOutputsHandler) QueryTokenOutputsSpark(ctx context.Context, req *sparkpb.QueryTokenOutputsRequest) (*sparkpb.QueryTokenOutputsResponse, error) {
 	tokenReq := protoconverter.TokenProtoQueryTokenOutputsRequestFromSpark(req)
 
 	tokenResp, err := h.QueryTokenOutputsToken(ctx, tokenReq)
@@ -426,7 +184,7 @@ func (h *QueryTokenHandler) QueryTokenOutputsSpark(ctx context.Context, req *spa
 // QueryTokenOutputsToken is the native tokenpb endpoint for SparkTokenService.
 // This provides the same functionality as the legacy QueryTokenOutputs but uses
 // tokenpb protocol directly for better performance and cleaner API design.
-func (h *QueryTokenHandler) QueryTokenOutputsToken(ctx context.Context, req *tokenpb.QueryTokenOutputsRequest) (*tokenpb.QueryTokenOutputsResponse, error) {
+func (h *QueryTokenOutputsHandler) QueryTokenOutputsToken(ctx context.Context, req *tokenpb.QueryTokenOutputsRequest) (*tokenpb.QueryTokenOutputsResponse, error) {
 	network, err := common.DetermineNetwork(req.GetNetwork())
 	if err != nil {
 		return nil, err

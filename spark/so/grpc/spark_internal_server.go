@@ -210,8 +210,8 @@ func (s *SparkInternalServer) CreateStaticDepositUtxoRefund(ctx context.Context,
 }
 
 func (s *SparkInternalServer) QueryTokenOutputsInternal(ctx context.Context, req *pbspark.QueryTokenOutputsRequest) (*pbspark.QueryTokenOutputsResponse, error) {
-	queryTokenHandler := tokens.NewQueryTokenHandler(s.config)
-	return queryTokenHandler.QueryTokenOutputsSpark(ctx, req)
+	queryTokenOutputsHandler := tokens.NewQueryTokenOutputsHandler(s.config)
+	return queryTokenOutputsHandler.QueryTokenOutputsSpark(ctx, req)
 }
 
 // Cancel a utxo swap in an SO after the creation of the swap failed

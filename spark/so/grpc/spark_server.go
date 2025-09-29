@@ -319,14 +319,14 @@ func (s *SparkServer) FreezeTokens(ctx context.Context, req *pb.FreezeTokensRequ
 
 // QueryTokenTransactions returns the token transactions currently owned by the provided owner public key.
 func (s *SparkServer) QueryTokenTransactions(ctx context.Context, req *pb.QueryTokenTransactionsRequest) (*pb.QueryTokenTransactionsResponse, error) {
-	queryTokenHandler := tokens.NewQueryTokenHandler(s.config)
-	return queryTokenHandler.QueryTokenTransactions(ctx, req)
+	queryTokenTransactionsHandler := tokens.NewQueryTokenTransactionsHandler(s.config)
+	return queryTokenTransactionsHandler.QueryTokenTransactionsSpark(ctx, req)
 }
 
 // QueryTokenOutputs returns the token outputs currently owned by the provided owner public key.
 func (s *SparkServer) QueryTokenOutputs(ctx context.Context, req *pb.QueryTokenOutputsRequest) (*pb.QueryTokenOutputsResponse, error) {
-	queryTokenHandler := tokens.NewQueryTokenHandler(s.config)
-	return queryTokenHandler.QueryTokenOutputs(ctx, req)
+	queryTokenOutputsHandler := tokens.NewQueryTokenOutputsHandler(s.config)
+	return queryTokenOutputsHandler.QueryTokenOutputs(ctx, req)
 }
 
 func (s *SparkServer) QueryAllTransfers(ctx context.Context, req *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {

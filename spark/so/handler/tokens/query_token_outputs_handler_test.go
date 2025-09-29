@@ -22,23 +22,23 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
-type queryTokenTestFixture struct {
-	Handler *QueryTokenHandler
+type queryTokenOutputsTestFixture struct {
+	Handler *QueryTokenOutputsHandler
 	Ctx     context.Context
 	Tx      *ent.Tx
 }
 
-func setUpQueryTokenTestHandler(t *testing.T) *queryTokenTestFixture {
+func setUpQueryTokenOutputsTestHandler(t *testing.T) *queryTokenOutputsTestFixture {
 	t.Helper()
 	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestSQLiteContext(t)
 
-	handler := &QueryTokenHandler{
+	handler := &QueryTokenOutputsHandler{
 		config:                     config,
 		includeExpiredTransactions: true,
 	}
 
-	return &queryTokenTestFixture{
+	return &queryTokenOutputsTestFixture{
 		Handler: handler,
 		Ctx:     ctx,
 	}
@@ -96,7 +96,7 @@ func createTestTokenOutputs(t *testing.T, ctx context.Context, tx *ent.Tx, count
 }
 
 func TestExpiredOutputBeforeFinalization(t *testing.T) {
-	setup := setUpQueryTokenTestHandler(t)
+	setup := setUpQueryTokenOutputsTestHandler(t)
 	handler := setup.Handler
 	ctx := setup.Ctx
 
@@ -225,7 +225,7 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 }
 
 func TestQueryTokenOutputsPagination(t *testing.T) {
-	setup := setUpQueryTokenTestHandler(t)
+	setup := setUpQueryTokenOutputsTestHandler(t)
 	handler := setup.Handler
 	ctx := setup.Ctx
 
