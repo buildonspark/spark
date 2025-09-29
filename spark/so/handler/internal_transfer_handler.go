@@ -103,12 +103,12 @@ func (h *InternalTransferHandler) FinalizeTransfer(ctx context.Context, req *pbi
 			if dbNode.RawRefundTx != nil {
 				update.SetRawRefundTx(node.RawRefundTx)
 			}
-			if dbNode.DirectRefundTx != nil {
-				update.SetDirectRefundTx(node.DirectRefundTx)
-			}
-			if dbNode.DirectFromCpfpRefundTx != nil {
-				update.SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx)
-			}
+
+			// The old direct transactions don't apply to the new owner,
+			// so overwrite them even if new direct transactions aren't provided.
+			update.SetDirectRefundTx(node.DirectRefundTx)
+			update.SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx)
+
 			update.SetStatus(st.TreeNodeStatusAvailable)
 
 			_, err = update.Save(ctx)
