@@ -253,14 +253,6 @@ type DatabaseConfig struct {
 type RateLimiterConfig struct {
 	// Enabled determines if rate limiting is enabled
 	Enabled bool `yaml:"enabled"`
-	// Window is the time window for rate limiting
-	Window time.Duration `yaml:"window"`
-	// MaxRequests is the maximum number of requests allowed in the window
-	MaxRequests int `yaml:"max_requests"`
-	// Methods is a list of methods to rate limit
-	// Note: This does not set up rate limiting across methods by IP,
-	// nor does it provide configuration for custom per-method rate limiting.
-	Methods []string `yaml:"methods"`
 }
 
 // The authzEnabled field currently gates authorization enforcement for client
@@ -661,9 +653,6 @@ func (c *Config) IdentityPublicKey() keys.Public {
 
 func (c *Config) GetRateLimiterConfig() *middleware.RateLimiterConfig {
 	return &middleware.RateLimiterConfig{
-		Window:              c.RateLimiter.Window,
-		MaxRequests:         c.RateLimiter.MaxRequests,
-		Methods:             c.RateLimiter.Methods,
 		XffClientIpPosition: c.XffClientIpPosition,
 	}
 }

@@ -3,7 +3,6 @@ package middleware
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +14,42 @@ import (
 	"github.com/sethvargo/go-limiter/memorystore"
 	"google.golang.org/grpc"
 )
+
+/*
+Rate limiter overview
+
+What this middleware does
+- Enforces per-client-IP rate limits for gRPC unary methods using a token-bucket per tier.
+- Enforcement is always per-method. Only the explicit global scope aggregates across methods.
+- There is no base/window config. Limits are applied only when a tier-suffixed knob is set.
+
+Hardcoded tiers (no discovery)
+- Supported suffixes: #1s, #1m, #10m, #1h, #24h
+
+Configuration via knobs:
+- Method: spark.so.ratelimit.limit@/pkg.Service/Method#1s = <max_requests>
+- Service method-name prefix (longest-match on method name):
+  spark.so.ratelimit.limit@/pkg.Service/^start#1s = <max_requests>
+- Service: spark.so.ratelimit.limit@/pkg.Service/#1s = <max_requests>
+- Global: spark.so.ratelimit.limit@global#1s = <max_requests>
+
+Notes on precedence and behavior
+- For each tier, we compute:
+  - Per-method limit from the first configured (>= 0) among: Method (exact FullMethod), Service/^<method-name-prefix> (longest prefix).
+  - Service limit directly from Service/.
+  - Global limit directly from Global.
+- We enforce all configured scopes for the tier: per-method (if > 0), service (if > 0), and global (if > 0).
+- If none are configured for a tier, that tier is bypassed.
+
+Enforcement in-memory keys (per-client-IP)
+- Per-method scope key: rl:/pkg.Service/Method#<tier>:<ip>
+- Service scope key: rl:/pkg.Service/#<tier>:<ip>
+- Global scope key: rl:global#<tier>:<ip>
+
+Other knobs
+- Exclude an IP entirely: spark.so.ratelimit.exclude_ips@<ip> = 1
+- Kill switch for a method (independent of rate limiting): spark.so.grpc.server.method.enabled@/pkg.Service/Method = 0.
+*/
 
 // sanitizeKey removes control characters and limits key length
 func sanitizeKey(key string) string {
@@ -38,9 +73,6 @@ type Clock interface {
 }
 
 type RateLimiterConfig struct {
-	Window              time.Duration
-	MaxRequests         int
-	Methods             []string
 	XffClientIpPosition int
 }
 
@@ -55,6 +87,7 @@ type RateLimiter struct {
 	knobs     knobs.Knobs
 	configs   map[string]storeConfig
 	configsMu sync.RWMutex
+	tiers     []tier
 }
 
 type RateLimiterOption func(*RateLimiter)
@@ -100,6 +133,11 @@ type storeConfig struct {
 	window time.Duration
 }
 
+type tier struct {
+	suffix string
+	window time.Duration
+}
+
 func (s *realMemoryStore) Get(ctx context.Context, key string) (tokens uint64, remaining uint64, err error) {
 	return s.store.Get(ctx, key)
 }
@@ -134,14 +172,20 @@ func NewRateLimiter(configOrProvider any, opts ...RateLimiterOption) (*RateLimit
 		opt(rateLimiter)
 	}
 
-	// Knob values should not be set to negative values—they will be cast to uint64.
-	window := rateLimiter.knobs.GetDuration(knobs.KnobRateLimitPeriod, config.Window)
-	maxRequests := uint64(rateLimiter.knobs.GetValue(knobs.KnobRateLimitLimit, float64(config.MaxRequests)))
+	rateLimiter.tiers = []tier{
+		{suffix: "#1s", window: time.Second},
+		{suffix: "#1m", window: time.Minute},
+		{suffix: "#10m", window: 10 * time.Minute},
+		{suffix: "#1h", window: time.Hour},
+		{suffix: "#24h", window: 24 * time.Hour},
+	}
 
 	if rateLimiter.store == nil {
+		// Use default dummy configuration for initialization.
+		// Configured rate limits will always override these values via Set.
 		defaultStore, err := memorystore.New(&memorystore.Config{
-			Tokens:   maxRequests,
-			Interval: window,
+			Tokens:   1,
+			Interval: time.Second,
 		})
 		if err != nil {
 			return nil, err
@@ -175,6 +219,29 @@ func (r *RateLimiter) setConfig(key string, tokens uint64, window time.Duration)
 	}
 }
 
+// takeToken enforces a single bucket identified by tierScope and ip.
+// It ensures the store's bucket config matches the desired tokens/window
+// and attempts to take a token, returning an appropriate error on failure.
+func (r *RateLimiter) takeToken(ctx context.Context, tierScope string, ip string, tokens uint64, window time.Duration, label string) error {
+	tierKey := sanitizeKey(fmt.Sprintf("rl:%s:%s", tierScope, ip))
+
+	curTokens, curWindow, exists := r.getConfig(tierKey)
+	hasChanged := !exists || curTokens != tokens || curWindow != window
+	if hasChanged {
+		_ = r.store.Set(ctx, tierKey, tokens, window)
+		r.setConfig(tierKey, tokens, window)
+	}
+
+	_, _, _, ok, err := r.store.Take(ctx, tierKey)
+	if err != nil {
+		return errors.UnavailableDataStore(fmt.Errorf("%s rate limit error: %w", label, err))
+	}
+	if !ok {
+		return errors.ResourceExhaustedRateLimitExceeded(fmt.Errorf("%s rate limit exceeded", label))
+	}
+	return nil
+}
+
 func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		// Check if the method is enabled.
@@ -183,65 +250,73 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 			return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("the method is currently unavailable, please try again later"))
 		}
 
-		shouldLimit := slices.Contains(r.config.Methods, info.FullMethod)
-		// A value of > 0 means to enforce rate limiting for the given method.
-		// A value of 0 means to not enforce the limit for the given method.
-		// Any other value means use the default configuration.
-		methodLimitEnabled := int(r.knobs.GetValueTarget(knobs.KnobRateLimitMethods, &info.FullMethod, -1))
-		if methodLimitEnabled > 0 {
-			shouldLimit = true
-		} else if methodLimitEnabled == 0 {
-			shouldLimit = false
-		}
-		if !shouldLimit {
-			return handler(ctx, req)
-		}
-
 		ip, err := GetClientIpFromHeader(ctx, r.config.XffClientIpPosition)
 		if err != nil {
 			return handler(ctx, req)
 		}
-		// Check for excluded IPs. A value of > 0 means to exclude the IP.
+		// Check for excluded IPs. A value of > 0 means to exclude the IP from rate limiting.
 		isIpExcluded := r.knobs.GetValueTarget(knobs.KnobRateLimitExcludeIps, &ip, 0)
 		if isIpExcluded > 0 {
 			return handler(ctx, req)
 		}
 
-		key := sanitizeKey(fmt.Sprintf("rl:%s:%s", info.FullMethod, ip))
+		for _, t := range r.tiers {
+			suffix := t.suffix
+			if suffix == "" {
+				continue
+			}
+			methodTarget := info.FullMethod + suffix
+			serviceEnd := strings.LastIndex(info.FullMethod, "/")
+			servicePath := info.FullMethod
+			methodName := ""
+			if serviceEnd >= 0 {
+				servicePath = info.FullMethod[:serviceEnd+1] // includes trailing '/'
+				methodName = info.FullMethod[serviceEnd+1:]
+			}
+			serviceTarget := servicePath + suffix // e.g. /pkg.Service/#1s
+			globalTarget := "global" + suffix     // eg. global#1s
+			// Method-name prefix anchor, longest match: /pkg.Service/^prefix#1s
+			prefixTierLimit := -1
+			if len(methodName) > 0 {
+				for i := len(methodName); i >= 1; i-- {
+					candidateKey := servicePath + "^" + methodName[:i] + suffix
+					v := int(r.knobs.GetValueTarget(knobs.KnobRateLimitLimit, &candidateKey, -1))
+					if v >= 0 {
+						prefixTierLimit = v
+						break
+					}
+				}
+			}
+			methodTierLimit := int(r.knobs.GetValueTarget(knobs.KnobRateLimitLimit, &methodTarget, -1))
+			serviceTierLimit := int(r.knobs.GetValueTarget(knobs.KnobRateLimitLimit, &serviceTarget, -1))
+			globalTierLimit := int(r.knobs.GetValueTarget(knobs.KnobRateLimitLimit, &globalTarget, -1))
 
-		// Methods can also have specific rate limits and windows set for
-		// them, so we need to check for that here. That should override the
-		// default values, if they exist.
-		methodMaxRequests := uint64(r.config.MaxRequests)
-		rawMethodMaxRequests := int(r.knobs.GetValueTarget(knobs.KnobRateLimitLimit, &info.FullMethod, float64(r.config.MaxRequests)))
+			// Resolve per-method candidate via precedence (method > prefix)
+			methodCandidate := -1
+			if methodTierLimit >= 0 {
+				methodCandidate = methodTierLimit
+			} else if prefixTierLimit >= 0 {
+				methodCandidate = prefixTierLimit
+			}
+			tierWindow := t.window
 
-		if rawMethodMaxRequests == 0 {
-			return handler(ctx, req)
-		} else if rawMethodMaxRequests > 0 {
-			methodMaxRequests = uint64(rawMethodMaxRequests)
-		}
+			if methodCandidate > 0 {
+				if err := r.takeToken(ctx, info.FullMethod+suffix, ip, uint64(methodCandidate), tierWindow, "per-method"); err != nil {
+					return nil, err
+				}
+			}
 
-		methodWindow := r.knobs.GetDurationTarget(knobs.KnobRateLimitPeriod, &info.FullMethod, r.config.Window)
+			if serviceTierLimit > 0 {
+				if err := r.takeToken(ctx, servicePath+suffix, ip, uint64(serviceTierLimit), tierWindow, "service"); err != nil {
+					return nil, err
+				}
+			}
 
-		// We only do the update if there's a change since it has the side
-		// effect of reseting the bucket and thus the current rate limit status,
-		// which we don't want to do in general.
-		curMaxRequests, curWindow, exists := r.getConfig(key)
-		hasChanged := !exists || curMaxRequests != methodMaxRequests || curWindow != methodWindow
-		if hasChanged {
-			// We ignore the error because, in the end, there's nothing we can
-			// do about it. Additionally, in practice, the underlying real store
-			// doesn't actually ever return an error.
-			_ = r.store.Set(ctx, key, methodMaxRequests, methodWindow)
-			r.setConfig(key, methodMaxRequests, methodWindow)
-		}
-
-		_, _, _, ok, err := r.store.Take(ctx, key)
-		if err != nil {
-			return nil, errors.UnavailableDataStore(fmt.Errorf("rate limiter data store unavailable: %w", err))
-		}
-		if !ok {
-			return nil, errors.ResourceExhaustedRateLimitExceeded(fmt.Errorf("rate limit exceeded"))
+			if globalTierLimit > 0 {
+				if err := r.takeToken(ctx, "global"+suffix, ip, uint64(globalTierLimit), tierWindow, "global"); err != nil {
+					return nil, err
+				}
+			}
 		}
 
 		return handler(ctx, req)

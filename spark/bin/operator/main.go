@@ -85,9 +85,6 @@ type args struct {
 	RunDirectory               string
 	RateLimiterEnabled         bool
 	RateLimiterMemcachedAddrs  string
-	RateLimiterWindow          time.Duration
-	RateLimiterMaxRequests     int
-	RateLimiterMethods         string
 	EntDebug                   bool
 }
 
@@ -134,11 +131,7 @@ func loadArgs() (*args, error) {
 	flag.StringVar(&args.ServerCertPath, "server-cert", "", "Path to server certificate")
 	flag.StringVar(&args.ServerKeyPath, "server-key", "", "Path to server key")
 	flag.StringVar(&args.RunDirectory, "run-dir", "", "Run directory for resolving relative paths")
-	flag.BoolVar(&args.RateLimiterEnabled, "rate-limiter-enabled", false, "Enable rate limiting")
 	flag.StringVar(&args.RateLimiterMemcachedAddrs, "rate-limiter-memcached-addrs", "", "Comma-separated list of Memcached addresses")
-	flag.DurationVar(&args.RateLimiterWindow, "rate-limiter-window", 60*time.Second, "Rate limiter time window")
-	flag.IntVar(&args.RateLimiterMaxRequests, "rate-limiter-max-requests", 100, "Maximum requests allowed in the time window")
-	flag.StringVar(&args.RateLimiterMethods, "rate-limiter-methods", "", "Comma-separated list of methods to rate limit")
 	flag.BoolVar(&args.EntDebug, "ent-debug", false, "Log all the SQL queries")
 
 	// Parse flags
@@ -267,10 +260,7 @@ func main() {
 		args.ServerKeyPath,
 		args.RunDirectory,
 		so.RateLimiterConfig{
-			Enabled:     args.RateLimiterEnabled,
-			Window:      args.RateLimiterWindow,
-			MaxRequests: args.RateLimiterMaxRequests,
-			Methods:     strings.Split(args.RateLimiterMethods, ","),
+			Enabled: args.RateLimiterEnabled,
 		},
 	)
 	if err != nil {
@@ -467,11 +457,8 @@ func main() {
 
 	var rateLimiter *middleware.RateLimiter
 	logger.Sugar().Infof(
-		"Rate limiter config: enabled %t, window %s, max requests %d, methods %+q",
+		"Rate limiter config: enabled %t",
 		config.RateLimiter.Enabled,
-		config.RateLimiter.Window,
-		config.RateLimiter.MaxRequests,
-		config.RateLimiter.Methods,
 	)
 	if config.RateLimiter.Enabled {
 		var err error
