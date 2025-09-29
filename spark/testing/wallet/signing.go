@@ -170,8 +170,6 @@ func prepareFrostSigningJobsForUserSignedRefundHTLC(
 			nextSequence = refundTx.TxIn[0].Sequence - DirectSequenceOffset
 		}
 
-		fmt.Printf("nodeTx: %s\n", nodeTx.TxHash().String())
-
 		var htlcTx *wire.MsgTx
 		switch htlcType {
 		case PrepareFrostSigningJobsForUserSignedRefundHTLCTypeCPFPRefund:

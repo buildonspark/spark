@@ -683,6 +683,7 @@ func ExtendTimelockUsingRenew(
 	}
 	defer signerConn.Close()
 	signerClient := pbfrost.NewFrostServiceClient(signerConn)
+	//nolint:forbidigo
 	fmt.Printf("signing jobs: %v\n", signingJobs)
 	signingResults, err := signerClient.SignFrost(ctx, &pbfrost.SignFrostRequest{
 		SigningJobs: signingJobs,
@@ -1153,6 +1154,7 @@ func createSigningJobForRenewLeaf(
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to calculate sighash for %s: %w", txName, err)
 	}
+	//nolint:forbidigo
 	fmt.Printf("%s sighash: %x\n", txName, sighash)
 
 	signingNonce, err := objects.RandomSigningNonce()

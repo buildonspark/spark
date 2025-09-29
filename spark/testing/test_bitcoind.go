@@ -101,8 +101,10 @@ func SubmitPackage(client *rpcclient.Client, rawTxns []string) error {
 		return err
 	}
 	if result.PackageMsg != "success" {
+		//nolint:forbidigo
 		fmt.Printf("failed to submit package with %d raw transactions\n", len(rawTxns))
 		for _, rawTxn := range rawTxns {
+			//nolint:forbidigo
 			fmt.Printf("submitted raw transaction: %s\n", rawTxn)
 		}
 		return fmt.Errorf("package submission failed: %s", resBytes)

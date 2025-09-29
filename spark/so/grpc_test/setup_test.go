@@ -15,6 +15,7 @@ func TestMain(m *testing.M) {
 	// Setup
 	client, err := sparktesting.InitBitcoinClient()
 	if err != nil {
+		// nolint:forbidigo
 		fmt.Println("Error creating regtest client", err)
 		os.Exit(1)
 	}

@@ -370,6 +370,7 @@ func (w *SingleKeyTestWallet) RequestLeavesSwap(ctx context.Context, targetAmoun
 		if cancelErr != nil {
 			return nil, fmt.Errorf("failed to cancel transfer: %w", cancelErr)
 		}
+		//nolint:forbidigo
 		fmt.Printf("cancelled transfer %s\n", transfer.Id)
 		return nil, fmt.Errorf("failed to request leaves swap: %w", err)
 	}
@@ -550,6 +551,7 @@ func (w *SingleKeyTestWallet) CoopExit(ctx context.Context, targetAmountSats int
 	if err != nil {
 		return nil, fmt.Errorf("failed to complete coop exit: %w", err)
 	}
+	//nolint:forbidigo
 	fmt.Printf("Coop exit completed with id %s\n", completeID)
 
 	w.RemoveOwnedNodes(nodesToRemove)
@@ -585,6 +587,7 @@ func (w *SingleKeyTestWallet) RefreshTimelocks(ctx context.Context, nodeUUID *uu
 			}
 		}
 	}
+	//nolint:forbidigo
 	fmt.Printf("Refreshing %d nodes\n", len(nodesToRefresh))
 
 	authCtx, client, conn, err := w.grpcClient(ctx)
@@ -610,6 +613,7 @@ func (w *SingleKeyTestWallet) RefreshTimelocks(ctx context.Context, nodeUUID *uu
 	}
 
 	for _, node := range nodesToRefresh {
+		//nolint:forbidigo
 		fmt.Printf("Refreshing node %s\n", node.Id)
 		// Get the parent node
 		parentNode, ok := nodesMap[*node.ParentNodeId]

@@ -470,7 +470,7 @@ func setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t *testing.T,
 
 	spentIDs := make([]uuid.UUID, len(tokenTransaction.Edges.SpentOutput))
 	for i, o := range tokenTransaction.Edges.SpentOutput {
-		fmt.Println("spent output", o.ID)
+		t.Logf("spent output %s", o.ID)
 		spentIDs[i] = o.ID
 	}
 
@@ -550,7 +550,7 @@ func setAndValidateSuccessfulTokenTransactionToRevealedWithoutDeletingRevocation
 
 	spentIDs := make([]uuid.UUID, 0, len(tokenTransaction.Edges.SpentOutput))
 	for _, o := range tokenTransaction.Edges.SpentOutput {
-		fmt.Println("spent output", o.ID)
+		t.Logf("spent output %s", o.ID)
 		spentIDs = append(spentIDs, o.ID)
 	}
 
@@ -618,7 +618,7 @@ func setAndValidateSuccessfulTokenTransactionToStartedForOperator(t *testing.T, 
 
 	spentIDs := make([]uuid.UUID, 0, len(tokenTransaction.Edges.SpentOutput))
 	for _, o := range tokenTransaction.Edges.SpentOutput {
-		fmt.Println("spent output", o.ID)
+		t.Logf("spent output %s", o.ID)
 		spentIDs = append(spentIDs, o.ID)
 	}
 
