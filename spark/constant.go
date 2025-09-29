@@ -28,7 +28,10 @@ const (
 	DirectTimelockOffset = 50
 )
 
-var ZeroSequence = uint32(0)
+// Our sequences have the 30th bit set. This bit is meaningless and was likely
+// set  erroneously. We continue to use it to maintain backwards compatibility.
+
+var ZeroSequence = uint32(1 << 30)
 
 func InitialSequence() uint32 {
 	return uint32((1 << 30) | InitialTimeLock)
