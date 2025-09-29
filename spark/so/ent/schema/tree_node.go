@@ -199,7 +199,6 @@ func (TreeNode) Hooks() []ent.Hook {
 									return nil, fmt.Errorf("failed to parse direct_refund_tx for node %s: %w", nodeId, err)
 								}
 								directRefundTxid := directRefundTx.TxHash()
-								fmt.Println("directRefundTxid", directRefundTxid)
 								m.SetDirectRefundTxid(directRefundTxid[:])
 							}
 						}
