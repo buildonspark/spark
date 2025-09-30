@@ -35,84 +35,8 @@ export function maybeApplyFee(amount: bigint): bigint {
   return amount;
 }
 
-export function createRootTx(
-  depositOutPoint: TransactionInput,
-  depositTxOut: TransactionOutput,
-): [Transaction, Transaction] {
-  // Create CPFP-friendly root tx (with ephemeral anchor, no fee)
-  const cpfpRootTx = new Transaction({
-    version: 3,
-    allowUnknownOutputs: true,
-  });
-  cpfpRootTx.addInput(depositOutPoint);
-  cpfpRootTx.addOutput(depositTxOut);
-  cpfpRootTx.addOutput(getEphemeralAnchorOutput());
-
-  // Create direct root tx (with fee, no anchor)
-  const directRootTx = new Transaction({
-    version: 3,
-    allowUnknownOutputs: true,
-  });
-  directRootTx.addInput(depositOutPoint);
-  directRootTx.addOutput({
-    script: depositTxOut.script,
-    amount: maybeApplyFee(depositTxOut.amount ?? 0n),
-  });
-
-  return [cpfpRootTx, directRootTx];
-}
-
-export function createSplitTx(
-  parentOutPoint: TransactionInput,
-  childTxOuts: TransactionOutput[],
-): [Transaction, Transaction] {
-  // Create CPFP-friendly split tx (with ephemeral anchor, no fee)
-  const cpfpSplitTx = new Transaction({
-    version: 3,
-    allowUnknownOutputs: true,
-  });
-  cpfpSplitTx.addInput(parentOutPoint);
-  for (const txOut of childTxOuts) {
-    cpfpSplitTx.addOutput(txOut);
-  }
-  cpfpSplitTx.addOutput(getEphemeralAnchorOutput());
-
-  // Create direct split tx (with fee, no anchor)
-  const directSplitTx = new Transaction({
-    version: 3,
-    allowUnknownOutputs: true,
-  });
-  directSplitTx.addInput(parentOutPoint);
-
-  // Adjust output amounts to account for fee
-  let totalOutputAmount = 0n;
-  for (const txOut of childTxOuts) {
-    totalOutputAmount += txOut.amount ?? 0n;
-  }
-
-  if (totalOutputAmount > BigInt(DEFAULT_FEE_SATS)) {
-    // Distribute fee proportionally across outputs
-    const feeRatio = Number(DEFAULT_FEE_SATS) / Number(totalOutputAmount);
-    for (const txOut of childTxOuts) {
-      const adjustedAmount = BigInt(
-        Math.floor(Number(txOut.amount ?? 0n) * (1 - feeRatio)),
-      );
-      directSplitTx.addOutput({
-        script: txOut.script,
-        amount: adjustedAmount,
-      });
-    }
-  } else {
-    // If fee is larger than total output, just pass through original amounts
-    for (const txOut of childTxOuts) {
-      directSplitTx.addOutput(txOut);
-    }
-  }
-
-  return [cpfpSplitTx, directSplitTx];
-}
-
 interface CreateNodeTxInput {
+  sequence: number;
   txOut: TransactionOutput;
   parentOutPoint: TransactionInput;
   applyFee?: boolean;
@@ -121,7 +45,8 @@ interface CreateNodeTxInput {
 // createNodeTx creates a node transaction.
 // This stands in between a split tx and a leaf node tx,
 // and has no timelock.
-export function createNodeTx({
+function createNodeTx({
+  sequence,
   txOut,
   parentOutPoint,
   applyFee,
@@ -131,7 +56,10 @@ export function createNodeTx({
     version: 3,
     allowUnknownOutputs: true,
   });
-  nodeTx.addInput(parentOutPoint);
+  nodeTx.addInput({
+    ...parentOutPoint,
+    sequence,
+  });
 
   if (applyFee) {
     nodeTx.addOutput({
@@ -149,80 +77,106 @@ export function createNodeTx({
   return nodeTx;
 }
 
-export function createNodeTxs(
-  txOut: TransactionOutput,
-  txIn: TransactionInput,
-  directTxIn?: TransactionInput,
-): {
-  cpfpNodeTx: Transaction;
-  directNodeTx?: Transaction;
+function createNodeTxs({
+  parentTx,
+  sequence,
+  vout,
+}: {
+  parentTx: Transaction;
+  sequence: number;
+  vout: number;
+}): {
+  nodeTx: Transaction;
+  directNodeTx: Transaction;
 } {
-  const cpfpNodeTx = createNodeTx({
-    txOut,
-    parentOutPoint: txIn,
+  const parentOutput = parentTx.getOutput(vout);
+  if (!parentOutput.amount || !parentOutput.script) {
+    throw new Error("Parent output amount or script not found");
+  }
+  const output = {
+    script: parentOutput.script,
+    amount: parentOutput.amount,
+  };
+
+  const input = {
+    txid: hexToBytes(getTxId(parentTx)!),
+    index: vout,
+  };
+
+  const nodeTx = createNodeTx({
+    sequence,
+    txOut: output,
+    parentOutPoint: input,
     includeAnchor: true,
   });
 
-  let directNodeTx: Transaction | undefined;
-  if (directTxIn) {
-    directNodeTx = createNodeTx({
-      txOut,
-      parentOutPoint: directTxIn,
-      includeAnchor: false,
-      applyFee: true,
-    });
-  }
+  const directNodeTx = createNodeTx({
+    sequence: sequence + DIRECT_TIMELOCK_OFFSET,
+    txOut: output,
+    parentOutPoint: input,
+    includeAnchor: false,
+    applyFee: true,
+  });
 
-  return { cpfpNodeTx, directNodeTx };
+  return { nodeTx, directNodeTx };
 }
 
-// createLeafNodeTx creates a leaf node transaction.
-// This transaction provides an intermediate transaction
-// to allow the timelock of the final refund transaction
-// to be extended. E.g. when the refund tx timelock reaches
-// 0, the leaf node tx can be re-signed with a decremented
-// timelock, and the refund tx can be reset it's timelock.
-export function createLeafNodeTx(
-  sequence: number,
-  directSequence: number,
-  parentOutPoint: TransactionInput,
-  txOut: TransactionOutput,
-  shouldCalculateFee: boolean,
-): [Transaction, Transaction] {
-  // Create CPFP-friendly leaf node tx (with ephemeral anchor, no fee)
-  const cpfpLeafTx = new Transaction({
-    version: 3,
-    allowUnknownOutputs: true,
+export function createRootNodeTx(
+  parentTx: Transaction,
+  vout: number,
+): {
+  nodeTx: Transaction;
+  directNodeTx: Transaction;
+} {
+  return createNodeTxs({
+    parentTx,
+    sequence: 0,
+    vout,
   });
-  cpfpLeafTx.addInput({
-    ...parentOutPoint,
-    sequence,
-  });
-  cpfpLeafTx.addOutput(txOut);
-  cpfpLeafTx.addOutput(getEphemeralAnchorOutput());
-
-  // Create direct leaf node tx (with fee, no anchor)
-  const directLeafTx = new Transaction({
-    version: 3,
-    allowUnknownOutputs: true,
-  });
-  directLeafTx.addInput({
-    ...parentOutPoint,
-    sequence: directSequence,
-  });
-  const amountSats = txOut.amount ?? 0n;
-  let outputAmount = amountSats;
-  if (shouldCalculateFee) {
-    outputAmount = maybeApplyFee(amountSats);
-  }
-  directLeafTx.addOutput({
-    script: txOut.script,
-    amount: outputAmount,
-  });
-
-  return [cpfpLeafTx, directLeafTx];
 }
 
+export function createZeroTimelockNodeTx(parentTx: Transaction): {
+  nodeTx: Transaction;
+  directNodeTx: Transaction;
+} {
+  return createNodeTxs({
+    parentTx,
+    sequence: 0,
+    vout: 0,
+  });
+}
+
+export function createInitialTimelockNodeTx(parentTx: Transaction) {
+  return createNodeTxs({
+    parentTx,
+    sequence: INITIAL_SEQUENCE,
+    vout: 0,
+  });
+}
+
+export function createDecrementedTimelockNodeTx(
+  parentTx: Transaction,
+  currentTx: Transaction,
+) {
+  const currentSequence = currentTx.getInput(0).sequence;
+  if (!currentSequence) {
+    throw new Error("Current sequence not found");
+  }
+
+  return createNodeTxs({
+    parentTx,
+    sequence: getNextTransactionSequence(currentSequence).nextSequence,
+    vout: 0,
+  });
+}
+
+export function createTestUnilateralTimelockNodeTx(parentTx: Transaction) {
+  return createNodeTxs({
+    parentTx,
+    sequence: TEST_UNILATERAL_SEQUENCE,
+    vout: 0,
+  });
+}
 interface CreateRefundTxInput {
   sequence: number;
   input: TransactionInput;
@@ -232,7 +186,7 @@ interface CreateRefundTxInput {
   shouldCalculateFee: boolean;
   includeAnchor: boolean;
 }
-export function createRefundTx({
+function createRefundTx({
   sequence,
   input,
   amountSats,

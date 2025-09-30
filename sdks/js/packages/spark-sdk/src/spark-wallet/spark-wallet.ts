@@ -2852,7 +2852,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     for (const node of nodes) {
       const nodeTx = getTxFromRawTxBytes(node.nodeTx);
       const sequence = nodeTx.getInput(0).sequence;
-      if (!sequence) {
+      if (sequence === undefined) {
         throw new ValidationError("Invalid node transaction", {
           field: "sequence",
           value: nodeTx.getInput(0),

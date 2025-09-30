@@ -52,16 +52,12 @@ import { NetworkToProto } from "../utils/network.js";
 import { VerifiableSecretShare } from "../utils/secret-sharing.js";
 import {
   createCurrentTimelockRefundTxs,
+  createDecrementedTimelockNodeTx,
   createDecrementedTimelockRefundTxs,
   createInitialTimelockRefundTxs,
-  createNodeTxs,
   createTestUnilateralRefundTxs,
   getCurrentTimelock,
-  getEphemeralAnchorOutput,
   getNextTransactionSequence,
-  maybeApplyFee,
-  TEST_UNILATERAL_DIRECT_SEQUENCE,
-  TEST_UNILATERAL_SEQUENCE,
 } from "../utils/transaction.js";
 import { getTransferPackageSigningPayload } from "../utils/transfer_package.js";
 import { WalletConfigService } from "./config.js";
@@ -1371,70 +1367,14 @@ export class TransferService extends BaseTransferService {
     })[] = [];
 
     const parentNodeTx = getTxFromRawTxBytes(parentNode.nodeTx);
+    const nodeTx = getTxFromRawTxBytes(node.nodeTx);
     const parentNodeOutput: TransactionOutput = parentNodeTx.getOutput(0);
     if (!parentNodeOutput) {
       throw Error("Could not get parent node output");
     }
 
-    const nodeTx = getTxFromRawTxBytes(node.nodeTx);
-    const nodeInput = nodeTx.getInput(0);
-
-    const nodeOutput = nodeTx.getOutput(0);
-    if (!nodeOutput) {
-      throw Error("Could not get node output");
-    }
-
-    let directNodeTx: Transaction | undefined;
-    let directNodeInput: TransactionInput | undefined;
-    if (node.directTx.length > 0) {
-      directNodeTx = getTxFromRawTxBytes(node.directTx);
-      directNodeInput = directNodeTx.getInput(0);
-    }
-
-    const currSequence = nodeInput.sequence;
-
-    if (!currSequence) {
-      throw new ValidationError("Invalid node transaction", {
-        field: "sequence",
-        value: nodeInput,
-        expected: "Non-null sequence",
-      });
-    }
-
-    let { nextSequence, nextDirectSequence } = getNextTransactionSequence(
-      currSequence,
-      true,
-    );
-
-    const output = {
-      script: parentNodeOutput.script!,
-      amount: parentNodeOutput.amount!,
-    };
-
-    const newNodeInput: TransactionInput = {
-      txid: nodeInput.txid,
-      index: nodeInput.index,
-      sequence: useTestUnilateralSequence
-        ? TEST_UNILATERAL_SEQUENCE
-        : nextSequence,
-    };
-
-    const newDirectInput: TransactionInput | undefined =
-      directNodeTx && directNodeInput
-        ? {
-            txid: directNodeInput.txid,
-            index: directNodeInput.index,
-            sequence: useTestUnilateralSequence
-              ? TEST_UNILATERAL_DIRECT_SEQUENCE
-              : nextDirectSequence,
-          }
-        : undefined;
-
-    const { cpfpNodeTx, directNodeTx: newDirectNodeTx } = createNodeTxs(
-      output,
-      newNodeInput,
-      newDirectInput,
-    );
+    const { nodeTx: cpfpNodeTx, directNodeTx: newDirectNodeTx } =
+      createDecrementedTimelockNodeTx(parentNodeTx, nodeTx);
 
     const newCpfpNodeOutput: TransactionOutput = cpfpNodeTx.getOutput(0);
     if (!newCpfpNodeOutput) {
@@ -1472,7 +1412,7 @@ export class TransferService extends BaseTransferService {
 
     const { cpfpRefundTx, directRefundTx, directFromCpfpRefundTx } =
       createInitialTimelockRefundTxs({
-        nodeTx: nodeTx,
+        nodeTx: cpfpNodeTx,
         directNodeTx: newDirectNodeTx,
         receivingPubkey: await this.config.signer.getPublicKeyFromDerivation({
           type: KeyDerivationType.LEAF,
@@ -1627,62 +1567,8 @@ export class TransferService extends BaseTransferService {
     } = getNextTransactionSequence(refundSequence);
 
     // Create new CPFP node tx
-    const newNodeTx = new Transaction({
-      version: 3,
-      allowUnknownOutputs: true,
-    });
-    newNodeTx.addInput({ ...newNodeOutPoint, sequence: newNodeSequence });
-
-    // Apply fee to the new node transaction output
-    const originalOutput = nodeTx.getOutput(0);
-    if (!originalOutput) {
-      throw Error("Could not get original node output");
-    }
-
-    newNodeTx.addOutput({
-      script: originalOutput.script!,
-      amount: originalOutput.amount!,
-    });
-
-    newNodeTx.addOutput(getEphemeralAnchorOutput());
-
-    // Create new direct node tx
-
-    let newDirectNodeTx: Transaction | undefined;
-    if (node.directTx.length > 0) {
-      newDirectNodeTx = new Transaction({
-        version: 3,
-        allowUnknownOutputs: true,
-      });
-
-      newDirectNodeTx.addInput({
-        ...newNodeOutPoint,
-        sequence: newDirectNodeSequence,
-      });
-
-      newDirectNodeTx.addOutput({
-        script: originalOutput.script!,
-        amount: maybeApplyFee(originalOutput.amount!),
-      });
-    }
-
-    const newCpfpRefundOutPoint: TransactionInput = {
-      txid: hexToBytes(getTxId(newNodeTx)!),
-      index: 0,
-    };
-
-    let newDirectRefundOutPoint: TransactionInput | undefined;
-    if (newDirectNodeTx) {
-      newDirectRefundOutPoint = {
-        txid: hexToBytes(getTxId(newDirectNodeTx)!),
-        index: 0,
-      };
-    }
-
-    const amountSats = refundTx.getOutput(0).amount;
-    if (amountSats === undefined) {
-      throw new Error("Amount not found in extendTimelock");
-    }
+    const { nodeTx: newNodeTx, directNodeTx: newDirectNodeTx } =
+      createDecrementedTimelockNodeTx(nodeTx, refundTx);
 
     const signingPublicKey =
       await this.config.signer.getPublicKeyFromDerivation({

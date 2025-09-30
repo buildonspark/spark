@@ -12,13 +12,13 @@ import {
   StartDepositTreeCreationResponse,
 } from "../proto/spark.js";
 import { KeyDerivation } from "../signer/types.js";
-import { getSigHashFromTx, getTxId } from "../utils/bitcoin.js";
+import { getSigHashFromTx } from "../utils/bitcoin.js";
 import { subtractPublicKeys } from "../utils/keys.js";
 import { getNetwork } from "../utils/network.js";
 import { proofOfPossessionMessageHashForDepositAddress } from "../utils/proof.js";
 import {
   createInitialTimelockRefundTxs,
-  createRootTx,
+  createRootNodeTx,
 } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection/connection.js";
@@ -248,28 +248,10 @@ export class DepositService {
         expected: "Valid output index",
       });
     }
-    const script = output.script;
-    const amount = output.amount;
-    if (!script || !amount) {
-      throw new ValidationError("No script or amount found in deposit tx", {
-        field: "output",
-        value: output,
-        expected: "Output with script and amount",
-      });
-    }
 
-    const depositOutPoint = {
-      txid: hexToBytes(getTxId(depositTx)),
-      index: vout,
-    };
-    const depositTxOut = {
-      script,
-      amount,
-    };
-
-    const [cpfpRootTx, directRootTx] = createRootTx(
-      depositOutPoint,
-      depositTxOut,
+    const { nodeTx: cpfpRootTx, directNodeTx: directRootTx } = createRootNodeTx(
+      depositTx,
+      vout,
     );
 
     // Create nonce commitments for root transactions
@@ -669,16 +651,7 @@ export class DepositService {
       });
     }
 
-    const depositOutPoint = {
-      txid: hexToBytes(getTxId(depositTx)),
-      index: vout,
-    };
-    const depositTxOut = {
-      script,
-      amount,
-    };
-
-    const [cpfpRootTx, _] = createRootTx(depositOutPoint, depositTxOut);
+    const { nodeTx: cpfpRootTx } = createRootNodeTx(depositTx, vout);
 
     // Create nonce commitments for root transactions
     const cpfpRootNonceCommitment =
