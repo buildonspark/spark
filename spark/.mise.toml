@@ -11,6 +11,12 @@ test-unit = """
     --format testname \
     $(go list -tags=lightspark ./... | grep -v -E 'so/grpc_test|so/grpc_test_internal|so/tree') \
 """
+test-unit-oss = """
+  GRIPMOCK=true \
+  gotestsum \
+    --format testname \
+    $(go list ./... | grep -v -E 'so/grpc_test|so/grpc_test_internal|so/tree')
+"""
 test-grpc = """
   gotestsum \
     --format testname \

@@ -18,6 +18,15 @@ spark/proto/%/%.pb.go: $(PROTO_DIR)/%.proto
 		--go-grpc_opt=paths=source_relative \
 		--validate_out="lang=go,paths=source_relative:$(dir $@)" \
 		$<
+	@if [ "$(notdir $<)" = "spark_ssp_internal.proto" ]; then \
+		echo "Adding build tag 'lightspark' to spark_ssp_internal generated files"; \
+		for file in $(dir $@)*.pb.go $(dir $@)*_grpc.pb.go $(dir $@)*.pb.validate.go; do \
+			if [ -f "$$file" ] && ! head -n1 "$$file" | grep -q "//go:build"; then \
+				printf '//go:build lightspark\n\n%s\n' "$$(cat "$$file")" > "$$file.tmp" && mv "$$file.tmp" "$$file"; \
+			fi \
+		done \
+	fi
+
 # Default target
 all: $(GO_OUT) copy-protos
 
