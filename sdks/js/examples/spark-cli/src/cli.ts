@@ -21,6 +21,7 @@ import {
   SparkWalletEvent,
   validateSparkInvoiceSignature,
   WalletConfig,
+  constructFeeBumpTx,
 } from "@buildonspark/spark-sdk";
 import {
   InvoiceStatus,
@@ -352,6 +353,7 @@ const commands = [
   "getleaves",
   "leafidtohex",
   "testonly_generateutxostring",
+  "generatecpfptx",
 
   "fulfillsparkinvoice",
   "querysparkinvoices",
@@ -363,10 +365,6 @@ const commands = [
   "exit",
   "quit",
 ];
-
-// Initialize Spark Wallet
-const walletMnemonic =
-  "cctypical stereo dose party penalty decline neglect feel harvest abstract stage winter";
 
 interface CreateSparkInvoiceArgs {
   asset?: string;
@@ -661,6 +659,7 @@ async function runCLI() {
   testonly_generateexternalwallet                                     - Generate test wallet to fund utxos for fee bumping
   testonly_generateutxostring <txid> <vout> <value> <publicKey>       - Generate correctly formatted UTXO string from your public key
   checktimelock <leafId>                                              - Get the remaining timelock for a given leaf
+  generatefeebumptx <cpfpTx>                                          - Generate a fee bump transaction for a given cpfp transaction
   leafidtohex <leafId1> [leafId2] [leafId3] ...                       - Convert leaf ID to hex string for unilateral exit
   getleaves                                                           - Get all leaves owned by the wallet
   fulfillsparkinvoice <invoice1[:amount1]> <invoice2[:amount2]> ...   - Fulfill one or more Spark token invoices (append :amount if invoice has no preset amount)
@@ -2680,6 +2679,117 @@ async function runCLI() {
           } catch (error) {
             console.error("❌ Error in unilateral exit flow:", error);
           }
+          break;
+        }
+        case "generatecpfptx": {
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+
+          if (args.length < 1) {
+            console.log("Usage: generatecpfptx <cpfpTx>");
+            break;
+          }
+
+          const cpfpTx = args[0];
+
+          console.log("Generating external wallet...");
+          const privateKeyBytes = secp256k1.utils.randomPrivateKey();
+          const privateKeyHex = bytesToHex(privateKeyBytes);
+          const privateKeyWif = hexToWif(privateKeyHex);
+
+          // Get the public key and address
+          const publicKey = secp256k1.getPublicKey(privateKeyBytes, true);
+          const pubKeyHash = hash160(publicKey);
+          const p2wpkhScript = new Uint8Array([0x00, 0x14, ...pubKeyHash]);
+
+          const regtestAddress = getP2WPKHAddressFromPublicKey(
+            publicKey,
+            (wallet as any).config.getNetwork(),
+          );
+
+          console.log(`Generated test wallet:`);
+          console.log(`  Private Key (WIF): ${privateKeyWif}`);
+          console.log(`  Private Key (Hex): ${privateKeyHex}`);
+          console.log(`  Public Key: ${bytesToHex(publicKey)}`);
+          console.log(`  Address: ${regtestAddress}`);
+          console.log("");
+
+          const fundingTxId = await new Promise<string>((resolve) => {
+            rl.question(
+              "Fund the external wallet and enter the funding txid: ",
+              resolve,
+            );
+          });
+
+          if (!fundingTxId) {
+            console.log(
+              "❌ No funding txid provided. Cannot proceed with unilateral exit.",
+            );
+            break;
+          }
+
+          const headers: Record<string, string> = {};
+          const electrsUrl = (wallet as any).config.getElectrsUrl();
+
+          if (network === "REGTEST") {
+            const auth = btoa(
+              `${ELECTRS_CREDENTIALS.username}:${ELECTRS_CREDENTIALS.password}`,
+            );
+            headers["Authorization"] = `Basic ${auth}`;
+          }
+
+          const fundingTx = await fetch(`${electrsUrl}/tx/${fundingTxId}`, {
+            headers,
+          });
+
+          const fundingTxJson = (await fundingTx.json()) as {
+            vout: {
+              scriptpubkey_address: string;
+              value: number;
+            }[];
+          };
+
+          let voutIndex = -1;
+          let value = 0n;
+          for (const [index, output] of fundingTxJson.vout.entries()) {
+            if (output.scriptpubkey_address === regtestAddress) {
+              voutIndex = index;
+              value = BigInt(output.value);
+            }
+          }
+
+          if (voutIndex === -1) {
+            console.log(
+              "❌ Funding tx does not contain the external wallet address. Cannot proceed with unilateral exit.",
+            );
+            break;
+          }
+
+          const utxo = {
+            txid: fundingTxId,
+            vout: voutIndex,
+            value: value,
+            script: bytesToHex(p2wpkhScript),
+            publicKey: bytesToHex(publicKey),
+          };
+
+          const { feeBumpPsbt } = constructFeeBumpTx(
+            cpfpTx,
+            [utxo],
+            { satPerVbyte: 2 },
+            undefined,
+          );
+
+          const signedTx = await signPsbtWithExternalKey(
+            feeBumpPsbt,
+            privateKeyHex,
+          );
+
+          console.log("Signed fee bump transaction:");
+          console.log(signedTx);
+
           break;
         }
       }
