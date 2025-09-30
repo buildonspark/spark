@@ -1,5 +1,12 @@
 # @buildonspark/spark-sdk
 
+## 0.3.9
+
+### Patch Changes
+
+- - Update transaction construction
+  - Replace refresh/extend with improved renew leaf flow
+
 ## 0.3.8
 
 ### Patch Changes
