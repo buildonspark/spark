@@ -299,6 +299,32 @@ func SerializeTx(tx *wire.MsgTx) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func SerializeTxHex(tx *wire.MsgTx) (string, error) {
+	txBytes, err := SerializeTx(tx)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(txBytes), nil
+}
+
+func SerializeTxNoWitness(tx *wire.MsgTx) ([]byte, error) {
+	buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSizeStripped()))
+	if err := tx.SerializeNoWitness(buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func SerializeTxNoWitnessHex(tx *wire.MsgTx) (string, error) {
+	txBytes, err := SerializeTxNoWitness(tx)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(txBytes), nil
+}
+
 // SigHashFromTx returns sighash from a tx.
 func SigHashFromTx(tx *wire.MsgTx, inputIndex int, prevOutput *wire.TxOut) ([]byte, error) {
 	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(

@@ -64,10 +64,6 @@ func CreateLightningHTLCTransactionWithSequence(nodeTx *wire.MsgTx, vout uint32,
 }
 
 func CreateLightningHTLCTaprootAddressWithSequence(network common.Network, hash []byte, hashLockDestinationPubkey keys.Public, sequence uint32, sequenceLockDestinationPubkey keys.Public) (btcutil.Address, error) {
-	return createHTLCTaprootAddress(network, hash, hashLockDestinationPubkey, sequence, sequenceLockDestinationPubkey)
-}
-
-func createHTLCTaprootAddress(network common.Network, hash []byte, hashLockDestinationPubkey keys.Public, sequence uint32, sequenceLockDestinationPubkey keys.Public) (btcutil.Address, error) {
 	numsKey := NUMSPoint()
 
 	hashLockScript, err := CreateHashLockScript(hash, hashLockDestinationPubkey)

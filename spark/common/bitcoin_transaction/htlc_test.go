@@ -105,6 +105,67 @@ func TestCreateDirectLightningHTLCTransaction_SubtractsFee(t *testing.T) {
 	assert.Equal(t, amount-int64(fee), htlcTx.TxOut[0].Value)
 }
 
+func TestCreateLightningHTLCTransaction_BuildsExpectedTxFromExpectedParams(t *testing.T) {
+	network := common.Regtest
+
+	rawTxHex := "0300000000010180d6e3ba8082893627a42f2770fdb2e900731638258a2d04cd6b8b2f7a982e150000000000d0070040020002000000000000225120d04e30f634945d8b59283c10831cfab354d6d9cb88d1f7adfdba67cb8a7734f500000000000000000451024e730140ebcc474fdc71b83fe5f547976e418e91025ef8b323b572f68e709b82c36c7303496ee315c3b3b710af59c14f8d2aa97b9a0bc40b778385b32c59f7e0f34fabb200000000"
+	rawTx, err := common.TxFromRawTxHex(rawTxHex)
+	require.NoError(t, err)
+
+	vout := uint32(0)
+
+	rawRefundTxHex := "03000000000101d4b9193b8a28d4a986a15f17f5fe4e310c1d73e34865a24d04d39e37dddaccff00000000006c0700000200020000000000002251200686f6870264df6673c066f0591d38b5d60636f4f7a58143b88cbdff327cb68000000000000000000451024e73014003bb8cccc5b494ac9eb2b510618e5c54bd0082c5c5ba0838c9411f3d432dd4a0ec59ec4b4274006a2761040d8aa54702bc01dfed165035c2beaa017e5acc79c100000000"
+	rawRefundTx, err := common.TxFromRawTxHex(rawRefundTxHex)
+	require.NoError(t, err)
+
+	hash, err := hex.DecodeString("10d31aeabd2bf7cdcba3a229107a4edb7b1c5b35c90c2fca491bd127c68069bd")
+	require.NoError(t, err)
+
+	hashLockPubKey, err := keys.ParsePublicKeyHex("028c094a432d46a0ac95349d792c2e3730bd60c29188db716f56a99e39b95338b4")
+	require.NoError(t, err)
+
+	// We could just hardcode this value, but in the spirit of making sure everything is derived
+	// from "real" transactions in this test, derive it from the refund tx.
+	sequence := rawRefundTx.TxIn[0].Sequence - 30
+
+	sequenceLockPubKey, err := keys.ParsePublicKeyHex("032f0db1a8b99ad42e75e2f1cf4d977511a6d94587b4482c77fbd1fe9acc456a27")
+	require.NoError(t, err)
+
+	htlcTx, err := CreateLightningHTLCTransaction(rawTx, vout, network, sequence, hash, hashLockPubKey, sequenceLockPubKey)
+	require.NoError(t, err)
+
+	htlcTxHex, err := common.SerializeTxHex(htlcTx)
+	require.NoError(t, err)
+
+	expectedTxWithWitnessHex := "03000000000101d4b9193b8a28d4a986a15f17f5fe4e310c1d73e34865a24d04d39e37dddaccff00000000004e0700000200020000000000002251207898ca6a523e1724e99e3f6eb9bbd36eba16e6b15304921854e3c6b1174574b200000000000000000451024e7301406edf601068e37dc1222de88f2cbceaf9bcaa391683a7f393a40a68dc37d8765a7fae02793c4c3981101d6f35a9b9cd3a901c5f109f58a76ffaf8838c80670b5900000000"
+	expectedTxWithWitness, err := common.TxFromRawTxHex(expectedTxWithWitnessHex)
+	require.NoError(t, err)
+
+	expectedTxHex, err := common.SerializeTxNoWitnessHex(expectedTxWithWitness)
+	require.NoError(t, err)
+
+	require.Equal(t,
+		expectedTxHex,
+		htlcTxHex,
+	)
+}
+
+func TestCreateHTLCTaprootAddress(t *testing.T) {
+	hash, err := hex.DecodeString("02d3bb7a73d1cbdf5193f69bfdac92143703b4e90d7e993dd5644bdda1c0bde1")
+	require.NoError(t, err)
+
+	pk1, err := keys.ParsePublicKeyHex("0247997a5c32ccf934257a675c306bf6ec37019358240156628af62baad7066a83")
+	require.NoError(t, err)
+
+	pk2, err := keys.ParsePublicKeyHex("03b66b574670a7b6bea89c0548903f70a6f059fd9abe737dc4c5aafe14a127408f")
+	require.NoError(t, err)
+
+	address, err := CreateLightningHTLCTaprootAddressWithSequence(common.Regtest, hash, pk1, 2160, pk2)
+	require.NoError(t, err)
+
+	require.Equal(t, "bcrt1p0kdvjnm6mz6zzhnkxhhdw6gemt9cjyvmnn48evlfx7s9hn3a8dxqq7g3eg", address.String())
+}
+
 func TestCreateHashLockScript(t *testing.T) {
 	hash, err := hex.DecodeString("02d3bb7a73d1cbdf5193f69bfdac92143703b4e90d7e993dd5644bdda1c0bde1")
 	require.NoError(t, err)
