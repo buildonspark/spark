@@ -369,8 +369,41 @@ export class BitcoinFaucet {
     return await this.call("getblock", [blockHash, 2]);
   }
 
+  async getBlockCount(): Promise<number> {
+    return await this.call("getblockcount", []);
+  }
+
+  async waitForBlocksMined({
+    startBlock,
+    expectedIncrease,
+    timeoutMs = 15000,
+    intervalMs = 200,
+  }: {
+    startBlock: number;
+    expectedIncrease: number;
+    timeoutMs?: number;
+    intervalMs?: number;
+  }) {
+    const start = startBlock;
+    const target = start + expectedIncrease;
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const currentBlock = await this.getBlockCount();
+      if (currentBlock >= target) return currentBlock;
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    throw new Error(
+      `Timed out waiting for ${expectedIncrease} blocks (target height ${target})`,
+    );
+  }
+
   async broadcastTx(txHex: string) {
     let response = await this.call("sendrawtransaction", [txHex, 0]);
+    return response;
+  }
+
+  async submitPackage(txHexs: string[]) {
+    let response = await this.call("submitpackage", [txHexs]);
     return response;
   }
 
@@ -378,6 +411,20 @@ export class BitcoinFaucet {
     const key = secp256k1.utils.randomPrivateKey();
     const pubKey = secp256k1.getPublicKey(key);
     return getP2TRAddressFromPublicKey(pubKey, Network.LOCAL);
+  }
+
+  async getNewExternalWallet(): Promise<{
+    address: string;
+    key: Uint8Array;
+    pubKey: Uint8Array;
+  }> {
+    const key = secp256k1.utils.randomPrivateKey();
+    const pubKey = secp256k1.getPublicKey(key);
+    return {
+      address: getP2TRAddressFromPublicKey(pubKey, Network.LOCAL),
+      key,
+      pubKey,
+    };
   }
 
   async sendToAddress(

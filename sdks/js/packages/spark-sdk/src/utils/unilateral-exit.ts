@@ -60,45 +60,6 @@ export interface BroadcastResult {
   broadcastedPackages?: number;
 }
 
-// Helper function to convert WIF private key to hex
-function wifToHex(wif: string): string {
-  try {
-    // WIF decoding using base58 (simplified version)
-    const base58Alphabet =
-      "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-
-    // Decode base58
-    let decoded = BigInt(0);
-    for (let i = 0; i < wif.length; i++) {
-      const char = wif[i];
-      if (!char) {
-        throw new Error("Invalid character in WIF at position " + i);
-      }
-      const index = base58Alphabet.indexOf(char);
-      if (index === -1) {
-        throw new Error("Invalid character in WIF");
-      }
-      decoded = decoded * BigInt(58) + BigInt(index);
-    }
-
-    // Convert to hex and pad to ensure proper length
-    let hex = decoded.toString(16);
-
-    // WIF format: [version][32-byte private key][compression flag][4-byte checksum]
-    // We want the 32-byte private key part (skip version byte, take 32 bytes)
-    if (hex.length >= 74) {
-      // 1 + 32 + 1 + 4 = 38 bytes = 76 hex chars minimum
-      // Skip version byte (2 hex chars) and take 32 bytes (64 hex chars)
-      const privateKeyHex = hex.substring(2, 66);
-      return privateKeyHex;
-    }
-
-    throw new Error("Invalid WIF length");
-  } catch (error) {
-    throw new Error(`Failed to convert WIF to hex: ${error}`);
-  }
-}
-
 export function isEphemeralAnchorOutput(
   script?: Uint8Array,
   amount?: bigint,
@@ -542,7 +503,7 @@ export async function constructUnilateralExitFeeBumpPackages(
 }
 
 // Helper function to create RIPEMD160(SHA256(data)) hash
-function hash160(data: Uint8Array): Uint8Array {
+export function hash160(data: Uint8Array): Uint8Array {
   // Proper implementation using RIPEMD160(SHA256(data))
   const sha256Hash = sha256(data);
   return ripemd160(sha256Hash);
