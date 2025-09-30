@@ -705,6 +705,98 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				},
 			},
 		},
+		{
+			ExecutionInterval: 1 * time.Minute,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "backfill_tree_node_txids_transfer_locked",
+				Timeout:      &backfillTreeNodeTxidsTimeout,
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					logger := logging.GetLoggerFromContext(ctx)
+					logger.Info("Starting backfill of tree node txids for tree nodes in status=TRANSFER_LOCKED")
+
+					tx, err := ent.GetDbFromContext(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get or create current tx for request: %w", err)
+					}
+
+					batchSize := int(knobsService.GetValue(knobs.KnobTasksEnableBackfillTreeNodeTxidsBatchSize, 5000))
+
+					treeNodes, err := tx.TreeNode.Query().
+						Where(
+							treenode.RawTxidIsNil(),
+						).
+						Where(treenode.StatusEQ(st.TreeNodeStatusTransferLocked)).
+						// Only backfill tree nodes that have not been updated in the last 24 hours
+						Where(treenode.UpdateTimeLT(time.Now().Add(-24 * time.Hour))).
+						ForUpdate().
+						Order(ent.Asc(treenode.FieldID)).
+						Limit(batchSize).
+						All(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to fetch tree nodes for backfill: %w", err)
+					}
+
+					if len(treeNodes) == 0 {
+						return nil // No more Tree Nodes to process
+					}
+
+					// Process batch
+					for _, treeNode := range treeNodes {
+						// Each tree node needs to resubmit their transaction in order for the Txids to be populated
+						query := tx.TreeNode.Update().
+							Where(treenode.ID(treeNode.ID)).
+							SetRawTx(treeNode.RawTx)
+						if len(treeNode.DirectTx) > 0 {
+							_, err := common.TxFromRawTxBytes(treeNode.DirectTx)
+							if err != nil {
+								logger.Sugar().Errorf("failed to parse direct tx for tree node %s: %w (directTx: %#v)", treeNode.ID, err, treeNode.DirectTx)
+								continue
+							}
+							query = query.SetDirectTx(treeNode.DirectTx)
+						}
+						if len(treeNode.RawRefundTx) > 0 {
+							_, err := common.TxFromRawTxBytes(treeNode.RawRefundTx)
+							if err != nil {
+								logger.Sugar().Errorf("failed to parse raw refund tx for tree node %s: %w (rawRefundTx: %#v)", treeNode.ID, err, treeNode.RawRefundTx)
+								continue
+							}
+							query = query.SetRawRefundTx(treeNode.RawRefundTx)
+						}
+						if len(treeNode.DirectRefundTx) > 0 {
+							_, err := common.TxFromRawTxBytes(treeNode.DirectRefundTx)
+							if err != nil {
+								logger.Sugar().Errorf("failed to parse direct refund tx for tree node %s: %w (directRefundTx: %#v)", treeNode.ID, err, treeNode.DirectRefundTx)
+								continue
+							}
+							query = query.SetDirectRefundTx(treeNode.DirectRefundTx)
+						}
+						if len(treeNode.DirectFromCpfpRefundTx) > 0 {
+							_, err := common.TxFromRawTxBytes(treeNode.DirectFromCpfpRefundTx)
+							if err != nil {
+								logger.Sugar().Errorf("failed to parse direct from cpfp refund tx for tree node %s: %w (directFromCpfpRefundTx: %#v)", treeNode.ID, err, treeNode.DirectFromCpfpRefundTx)
+								continue
+							}
+							query = query.SetDirectFromCpfpRefundTx(treeNode.DirectFromCpfpRefundTx)
+						}
+						_, err = query.Save(ctx)
+						if err != nil {
+							return fmt.Errorf("failed to backfill tree nodes: %w", err)
+						}
+					}
+					if err := tx.Commit(); err != nil {
+						return fmt.Errorf("backfill tree nodes failed to commit tree nodes: %w", err)
+					}
+
+					logger.Sugar().Infof(
+						"Tree Node Txids backfill progress for tree nodes in status=TRANSFER_LOCKED: processed %d tree nodes",
+						batchSize,
+					)
+
+					return nil
+				},
+			},
+		},
 	}
 }
 
