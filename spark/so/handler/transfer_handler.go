@@ -146,7 +146,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 
 	//nolint:govet,revive // TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
 	if len(req.SparkInvoice) > 0 {
-		return nil, sparkerrors.UnimplementedErrorf("spark invoice support not implemented")
+		return nil, sparkerrors.UnimplementedMethodDisabled(fmt.Errorf("spark invoice support not implemented"))
 		leafIDsToSend := make([]uuid.UUID, len(req.TransferPackage.LeavesToSend))
 		for i, leaf := range req.TransferPackage.LeavesToSend {
 			leafID, err := uuid.Parse(leaf.LeafId)
@@ -1817,10 +1817,10 @@ func checkCoopExitTxBroadcasted(ctx context.Context, db *ent.Tx, transfer *ent.T
 		return fmt.Errorf("failed to find block height: %w", err)
 	}
 	if coopExit.ConfirmationHeight == 0 {
-		return sparkerrors.FailedPreconditionErrorf("coop exit tx hasn't been broadcasted")
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("coop exit tx hasn't been broadcasted"))
 	}
 	if coopExit.ConfirmationHeight+CoopExitConfirmationThreshold-1 > blockHeight.Height {
-		return sparkerrors.FailedPreconditionErrorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", coopExit.ConfirmationHeight, blockHeight.Height)
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("coop exit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", coopExit.ConfirmationHeight, blockHeight.Height))
 	}
 	return nil
 }

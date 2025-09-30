@@ -1277,7 +1277,7 @@ func (h *RenewLeafHandler) validateRenewNodeTimelocks(leaf *ent.TreeNode) error 
 	nodeTimelock := leafNodeTx.TxIn[0].Sequence & 0xffff
 
 	if nodeTimelock > 300 {
-		return errors.FailedPreconditionErrorf("leaf %s node transaction sequence must be less than or equal to 300, got %d", leaf.ID, nodeTimelock)
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s node transaction sequence must be less than or equal to 300, got %d", leaf.ID, nodeTimelock))
 	}
 
 	leafRefundTx, err := common.TxFromRawTxBytes(leaf.RawRefundTx)
@@ -1289,7 +1289,7 @@ func (h *RenewLeafHandler) validateRenewNodeTimelocks(leaf *ent.TreeNode) error 
 	}
 	refundTimelock := leafRefundTx.TxIn[0].Sequence & 0xffff
 	if refundTimelock > 300 {
-		return errors.FailedPreconditionErrorf("leaf %s refund transaction sequence must be less than or equal to 300, got %d", leaf.ID, nodeTimelock)
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s refund transaction sequence must be less than or equal to 300, got %d", leaf.ID, refundTimelock))
 	}
 
 	return nil
@@ -1310,7 +1310,7 @@ func (h *RenewLeafHandler) validateRenewRefundTimelock(leaf *ent.TreeNode) error
 	refundTimelock := leafRefundTx.TxIn[0].Sequence & 0xffff
 
 	if refundTimelock > 300 {
-		return errors.FailedPreconditionErrorf("leaf %s refund transaction sequence must be less than or equal to 300, got %d", leaf.ID, refundTimelock)
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s refund transaction sequence must be less than or equal to 300, got %d", leaf.ID, refundTimelock))
 	}
 
 	// Check the next sequence of the leaf's node transaction
@@ -1328,7 +1328,7 @@ func (h *RenewLeafHandler) validateRenewRefundTimelock(leaf *ent.TreeNode) error
 	nextNodeTimelock := nextNodeSequence & 0xffff
 
 	if nextNodeTimelock < 100 {
-		return errors.FailedPreconditionErrorf("next leaf %s node transaction sequence must be 100 or greater, got %d", leaf.ID, nextNodeTimelock)
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("next leaf %s node transaction sequence must be 100 or greater, got %d", leaf.ID, nextNodeTimelock))
 	}
 
 	return nil
@@ -1349,7 +1349,7 @@ func (h *RenewLeafHandler) validateRenewNodeZeroTimelock(leaf *ent.TreeNode) err
 	nodeTimelock := leafNodeTx.TxIn[0].Sequence & 0xffff
 
 	if nodeTimelock != 0 {
-		return errors.FailedPreconditionErrorf("leaf %s node transaction sequence must be 0 for zero timelock renewal, got %d", leaf.ID, nodeTimelock)
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s node transaction sequence must be 0 for zero timelock renewal, got %d", leaf.ID, nodeTimelock))
 	}
 
 	// Check the leaf's refund transaction sequence
@@ -1363,7 +1363,7 @@ func (h *RenewLeafHandler) validateRenewNodeZeroTimelock(leaf *ent.TreeNode) err
 	refundTimelock := leafRefundTx.TxIn[0].Sequence & 0xffff
 
 	if refundTimelock > 300 {
-		return errors.FailedPreconditionErrorf("leaf %s refund transaction sequence must be less than or equal to 300, got %d", leaf.ID, refundTimelock)
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf %s refund transaction sequence must be less than or equal to 300, got %d", leaf.ID, refundTimelock))
 	}
 
 	return nil

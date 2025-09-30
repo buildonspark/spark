@@ -1,8 +1,6 @@
 package errors
 
 import (
-	"fmt"
-
 	"google.golang.org/grpc/codes"
 )
 
@@ -149,41 +147,4 @@ func UnavailableDatabaseTimeout(err error) error {
 
 func UnavailableDataStore(err error) error {
 	return newGRPCError(codes.Unavailable, err, ReasonUnavailableDataStore)
-}
-
-// ------------------------------------------------------------
-// IMPORTANT: These methods are deprecated in favor of migrating to error types with reason.
-// ------------------------------------------------------------
-func InvalidUserInputErrorf(format string, args ...any) error {
-	return newGRPCError(codes.InvalidArgument, fmt.Errorf(format, args...), "")
-}
-
-func FailedPreconditionErrorf(format string, args ...any) error {
-	ge := newGRPCError(codes.FailedPrecondition, fmt.Errorf(format, args...), "")
-	return ge
-}
-
-func NotFoundErrorf(format string, args ...any) error {
-	ge := newGRPCError(codes.NotFound, fmt.Errorf(format, args...), "")
-	return ge
-}
-
-func UnavailableErrorf(format string, args ...any) error {
-	ge := newGRPCError(codes.Unavailable, fmt.Errorf(format, args...), "")
-	return ge
-}
-
-func AlreadyExistsErrorf(format string, args ...any) error {
-	ge := newGRPCError(codes.AlreadyExists, fmt.Errorf(format, args...), "")
-	return ge
-}
-
-func UnimplementedErrorf(format string, args ...any) error {
-	ge := newGRPCError(codes.Unimplemented, fmt.Errorf(format, args...), "")
-	return ge
-}
-
-func InternalErrorf(format string, args ...any) error {
-	ge := newGRPCError(codes.Internal, fmt.Errorf(format, args...), "")
-	return ge
 }
