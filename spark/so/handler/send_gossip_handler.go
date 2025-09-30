@@ -61,6 +61,7 @@ func (h *SendGossipHandler) sendGossipMessageToParticipant(ctx context.Context, 
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 	client := pbgossip.NewGossipServiceClient(conn)
 	_, err = client.Gossip(ctx, gossip)
 	if err != nil {
