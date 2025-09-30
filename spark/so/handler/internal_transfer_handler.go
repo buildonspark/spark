@@ -500,11 +500,11 @@ func validateSatsSparkInvoice(ctx context.Context, invoice string, receiverIdent
 	}
 	receiverPublicKey, err := keys.ParsePublicKey(receiverIdentityPublicKey)
 	if err != nil {
-		return sparkerrors.InvalidUserInputErrorf("failed to parse receiver identity public key: %w", err)
+		return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver identity public key: %w", err))
 	}
 	senderPublicKey, err := keys.ParsePublicKey(senderIdentityPublicKey)
 	if err != nil {
-		return sparkerrors.InvalidUserInputErrorf("failed to parse sender identity public key: %w", err)
+		return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse sender identity public key: %w", err))
 	}
 
 	decodedInvoice, err := common.ParseSparkInvoice(invoice)
@@ -512,24 +512,24 @@ func validateSatsSparkInvoice(ctx context.Context, invoice string, receiverIdent
 		return fmt.Errorf("failed to decode spark invoice: %s, error: %w", invoice, err)
 	}
 	if decodedInvoice.Payment.Kind != common.PaymentKindSats {
-		return sparkerrors.InvalidUserInputErrorf("invoice must be a sats invoice")
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invoice must be a sats invoice"))
 	}
 	if decodedInvoice.ReceiverPublicKey != receiverPublicKey {
-		return sparkerrors.InvalidUserInputErrorf("receiver identity public key does not match the invoice identity public key, expected: %x, got: %x", receiverPublicKey.Serialize(), decodedInvoice.ReceiverPublicKey.Serialize())
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("receiver identity public key does not match the invoice identity public key, expected: %x, got: %x", receiverPublicKey.Serialize(), decodedInvoice.ReceiverPublicKey.Serialize()))
 	}
 	if !decodedInvoice.SenderPublicKey.IsZero() && decodedInvoice.SenderPublicKey != senderPublicKey {
-		return sparkerrors.InvalidUserInputErrorf("sender identity public key does not match the invoice sender public key, expected: %x, got: %x", senderPublicKey.Serialize(), decodedInvoice.SenderPublicKey.Serialize())
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("sender identity public key does not match the invoice sender public key, expected: %x, got: %x", senderPublicKey.Serialize(), decodedInvoice.SenderPublicKey.Serialize()))
 	}
 
 	if checkExpiry {
 		if ts := decodedInvoice.ExpiryTime; ts != nil && ts.IsValid() {
 			exp := ts.AsTime()
 			if exp.Before(now) {
-				return sparkerrors.InvalidUserInputErrorf(
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf(
 					"invoice has expired. decoded expiry(UTC): %s, now(UTC): %s",
 					exp.UTC().Format(time.RFC3339),
 					now.UTC().Format(time.RFC3339),
-				)
+				))
 			}
 		}
 	}
@@ -538,7 +538,7 @@ func validateSatsSparkInvoice(ctx context.Context, invoice string, receiverIdent
 	invoiceAmount := decodedInvoice.Payment.SatsPayment.Amount
 	schemaNetwork, err := common.SchemaNetworkFromNetwork(decodedInvoice.Network)
 	if err != nil {
-		return sparkerrors.InvalidUserInputErrorf("failed to get schema network: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to get schema network: %w", err))
 	}
 	var agg []struct {
 		Count int
@@ -560,7 +560,7 @@ func validateSatsSparkInvoice(ctx context.Context, invoice string, receiverIdent
 	}
 	if agg[0].Count != len(dedupLeafIDs) {
 		// Either the leaf ID was not found, or there was a network mismatch.
-		return sparkerrors.InvalidUserInputErrorf("one or more leaves not found on expected network: %s", schemaNetwork)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("one or more leaves not found on expected network: %s", schemaNetwork))
 	}
 	if invoiceAmount != nil {
 		totalAmount := uint64(0)
@@ -571,7 +571,7 @@ func validateSatsSparkInvoice(ctx context.Context, invoice string, receiverIdent
 			totalAmount = uint64(agg[0].Sum.Int64)
 		}
 		if totalAmount != *invoiceAmount {
-			return sparkerrors.InvalidUserInputErrorf("invoice amount does not match the transfer package amount got: %d, expected: %d", totalAmount, *invoiceAmount)
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invoice amount does not match the transfer package amount got: %d, expected: %d", totalAmount, *invoiceAmount))
 		}
 	}
 	return nil

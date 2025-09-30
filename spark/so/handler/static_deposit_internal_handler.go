@@ -147,7 +147,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 			req.OnChainUtxo.Vout,
 			utxoSwap.RequestType,
 		)
-		return nil, errors.AlreadyExistsErrorf("utxo swap is already registered")
+		return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("utxo swap is already registered"))
 	}
 
 	// Check that the utxo deposit address is static and belongs to the receiver of the transfer
@@ -348,7 +348,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 	}
 	if utxoSwap != nil {
 		logger.Sugar().Infof("Utxo swap is already registered for %x:%d (request type %s)", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout, utxoSwap.Status)
-		return nil, errors.AlreadyExistsErrorf("utxo swap is already registered")
+		return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("utxo swap is already registered"))
 	}
 
 	// Validate user statement

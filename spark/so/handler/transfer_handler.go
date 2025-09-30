@@ -1310,7 +1310,9 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 		}
 		errorMsg := fmt.Sprintf("failed to sync deliver sender key tweak for transfer %s", req.TransferId)
 		if stat, ok := status.FromError(err); ok && stat.Code() == codes.Unavailable {
-			return nil, sparkerrors.UnavailableErrorf("%s: %w", errorMsg, err)
+			// Preserve external error's gRPC code and reason, prefixing with external coordinator context
+			enriched := sparkerrors.WrapErrorWithMessage(err, errorMsg)
+			return nil, sparkerrors.WrapErrorWithReasonPrefix(enriched, sparkerrors.ErrorReasonPrefixFailedWithExternalCoordinator)
 		}
 		dbTx, dbErr = ent.GetDbFromContext(ctx)
 		if dbErr != nil {
@@ -1845,14 +1847,14 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	}
 	// Validate transfer is not in terminal states
 	if transfer.Status == st.TransferStatusCompleted {
-		return sparkerrors.AlreadyExistsErrorf("transfer %s has already been claimed", req.TransferId)
+		return sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s has already been claimed", req.TransferId))
 	}
 	if transfer.Status == st.TransferStatusExpired ||
 		transfer.Status == st.TransferStatusReturned {
-		return sparkerrors.FailedPreconditionErrorf("transfer %s is in terminal state %s and cannot be processed", req.TransferId, transfer.Status)
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("transfer %s is in terminal state %s and cannot be processed", req.TransferId, transfer.Status))
 	}
 	if transfer.Status != st.TransferStatusSenderKeyTweaked {
-		return sparkerrors.FailedPreconditionErrorf("please call ClaimTransferSignRefunds to claim the transfer %s, the transfer is not in SENDER_KEY_TWEAKED status. transferstatus: %s,", req.TransferId, transfer.Status)
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("please call ClaimTransferSignRefunds to claim the transfer %s, the transfer is not in SENDER_KEY_TWEAKED status. transferstatus: %s,", req.TransferId, transfer.Status))
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
@@ -2152,7 +2154,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	case st.TransferStatusReceiverKeyTweakApplied:
 		// do nothing
 	case st.TransferStatusCompleted:
-		return nil, sparkerrors.AlreadyExistsErrorf("transfer %s has already been claimed", req.TransferId)
+		return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s has already been claimed", req.TransferId))
 	default:
 		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusKeyTweaked or TransferStatusReceiverRefundSigned or TransferStatusReceiverKeyTweakLocked or TransferStatusReceiverKeyTweakApplied but %s found", req.TransferId, transfer.Status)
 	}
@@ -2199,7 +2201,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		return nil, fmt.Errorf("unable to load transfer %s: %w", req.TransferId, err)
 	}
 	if transfer.Status == st.TransferStatusCompleted {
-		return nil, fmt.Errorf("transfer %s is already completed", req.TransferId)
+		return nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("transfer %s is already completed", req.TransferId))
 	}
 
 	// Update transfer status.

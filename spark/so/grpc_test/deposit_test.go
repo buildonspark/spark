@@ -376,7 +376,7 @@ func TestStartDepositTreeCreationUnknownAddress(t *testing.T) {
 	grpcStatus, ok := status.FromError(err)
 	assert.True(t, ok)
 	assert.Equal(t, codes.NotFound, grpcStatus.Code())
-	assert.Contains(t, grpcStatus.Message(), "The requested deposit address could not be found")
+	assert.Contains(t, grpcStatus.Message(), "the requested deposit address could not be found")
 }
 
 func TestStartDepositTreeCreationWithoutCustomLeafID(t *testing.T) {

@@ -156,7 +156,7 @@ func TestVerifiedTargetUtxo(t *testing.T) {
 		require.Error(t, err)
 		grpcError, ok := status.FromError(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.FailedPrecondition, grpcError.Code())
+		assert.Equal(t, codes.NotFound, grpcError.Code())
 		assert.Equal(t, fmt.Sprintf("utxo not found: txid: %s vout: 1", hex.EncodeToString(testTxid2[:])), grpcError.Message())
 
 		// Create UTXO with insufficient confirmations

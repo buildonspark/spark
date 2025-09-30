@@ -45,7 +45,7 @@ func (h *SparkInvoiceHandler) QuerySparkInvoices(ctx context.Context, req *spark
 		return h.querySparkInvoicesByRawInvoice(ctx, req, limit)
 	}
 
-	return nil, sparkerrors.InvalidUserInputErrorf("no invoice strings provided")
+	return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no invoice strings provided"))
 }
 
 func (h *SparkInvoiceHandler) querySparkInvoicesByRawInvoice(ctx context.Context, req *sparkpb.QuerySparkInvoicesRequest, limit int) (*sparkpb.QuerySparkInvoicesResponse, error) {
@@ -58,7 +58,7 @@ func (h *SparkInvoiceHandler) querySparkInvoicesByRawInvoice(ctx context.Context
 	for _, invoice := range req.Invoice {
 		decoded, err := common.ParseSparkInvoice(invoice)
 		if err != nil {
-			return nil, sparkerrors.InvalidUserInputErrorf("invalid invoice: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid invoice: %w", err))
 		}
 		idToInvoiceMap[decoded.Id] = invoice
 		invoiceIDsInOrder = append(invoiceIDsInOrder, decoded.Id)

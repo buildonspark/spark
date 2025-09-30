@@ -136,7 +136,7 @@ func (h *InternalDepositHandler) GenerateStaticDepositAddressProofs(ctx context.
 	}
 
 	if depositAddress == nil {
-		return nil, errors.NotFoundErrorf("no static deposit address found for keyshare %s, address %s and identity public key %s", keyshareID, req.Address, ownerIDPubKey)
+		return nil, errors.NotFoundMissingEntity(fmt.Errorf("no static deposit address found for keyshare %s, address %s and identity public key %s", keyshareID, req.Address, ownerIDPubKey))
 	}
 
 	logger.Sugar().Infof("Generating proofs of possession for static deposit address %s generated from keyshare %s", req.Address, req.KeyshareId)

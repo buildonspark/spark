@@ -43,7 +43,7 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 	// Get the leaf from the database
 	leafUUID, err := uuid.Parse(req.LeafId)
 	if err != nil {
-		return nil, errors.InvalidUserInputErrorf("failed to parse leaf id: %w", err)
+		return nil, errors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse leaf id: %w", err))
 	}
 
 	db, err := ent.GetDbFromContext(ctx)
@@ -57,11 +57,14 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 		ForUpdate().
 		Only(ctx)
 	if err != nil {
-		return nil, errors.InvalidUserInputErrorf("failed to get leaf node: %w", err)
+		if ent.IsNotFound(err) {
+			return nil, errors.NotFoundMissingEntity(fmt.Errorf("leaf with id %s not found", req.LeafId))
+		}
+		return nil, fmt.Errorf("failed to get leaf node: %w", err)
 	}
 
 	if leaf.Status != st.TreeNodeStatusAvailable {
-		return nil, errors.InvalidUserInputErrorf("leaf node is not available for renewal, current status: %s", leaf.Status)
+		return nil, errors.FailedPreconditionInvalidState(fmt.Errorf("leaf node is not available for renewal, current status: %s", leaf.Status))
 	}
 
 	ownerIDPubKey, err := keys.ParsePublicKey(leaf.OwnerIdentityPubkey)
@@ -82,7 +85,7 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 	case *pb.RenewLeafRequest_RenewNodeZeroTimelockSigningJob:
 		return h.renewNodeZeroTimelock(ctx, req.GetRenewNodeZeroTimelockSigningJob(), leaf)
 	default:
-		return nil, errors.InvalidUserInputErrorf("request must specify either RenewNodeTimelockSigningJob or RenewRefundTimelockSigningJob")
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("request must specify either RenewNodeTimelockSigningJob or RenewRefundTimelockSigningJob"))
 	}
 }
 
@@ -114,28 +117,28 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 
 	// Validate that all direct signing jobs are present
 	if signingJob.SplitNodeDirectTxSigningJob == nil {
-		return nil, errors.InvalidUserInputErrorf("split node direct tx signing job is required")
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("split node direct tx signing job is required"))
 	}
 	if signingJob.DirectNodeTxSigningJob == nil {
-		return nil, errors.InvalidUserInputErrorf("direct node tx signing job is required")
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct node tx signing job is required"))
 	}
 	if signingJob.DirectRefundTxSigningJob == nil {
-		return nil, errors.InvalidUserInputErrorf("direct refund tx signing job is required")
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct refund tx signing job is required"))
 	}
 	if signingJob.DirectFromCpfpRefundTxSigningJob == nil {
-		return nil, errors.InvalidUserInputErrorf("direct from cpfp refund tx signing job is required")
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct from cpfp refund tx signing job is required"))
 	}
 
 	// Query the parent of the leaf to ensure it exists
 	parentLeaf, err := leaf.QueryParent().Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, errors.InvalidUserInputErrorf("parent node does not exist for leaf %s", leaf.ID.String())
+			return nil, errors.NotFoundMissingEntity(fmt.Errorf("parent node does not exist for leaf %s", leaf.ID.String()))
 		}
 		return nil, fmt.Errorf("failed to query parent node: %w", err)
 	}
 	if parentLeaf == nil {
-		return nil, errors.InvalidUserInputErrorf("parent node does not exist for leaf %s", leaf.ID.String())
+		return nil, errors.NotFoundMissingEntity(fmt.Errorf("parent node does not exist for leaf %s", leaf.ID.String()))
 	}
 
 	splitNodeTx, nodeTx, refundTx, directSplitNodeTx, directNodeTx, directRefundTx, directFromCpfpRefundTx, err := h.constructRenewNodeTransactions(leaf, parentLeaf)
@@ -453,25 +456,25 @@ func (h *RenewLeafHandler) renewRefundTimelock(ctx context.Context, signingJob *
 
 	// Validate that all direct signing jobs are present
 	if signingJob.DirectNodeTxSigningJob == nil {
-		return nil, errors.InvalidUserInputErrorf("direct node tx signing job is required")
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct node tx signing job is required"))
 	}
 	if signingJob.DirectRefundTxSigningJob == nil {
-		return nil, errors.InvalidUserInputErrorf("direct refund tx signing job is required")
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct refund tx signing job is required"))
 	}
 	if signingJob.DirectFromCpfpRefundTxSigningJob == nil {
-		return nil, errors.InvalidUserInputErrorf("direct from cpfp refund tx signing job is required")
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct from cpfp refund tx signing job is required"))
 	}
 
 	// Query the parentLeaf of the leaf to ensure it exists
 	parentLeaf, err := leaf.QueryParent().Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, errors.InvalidUserInputErrorf("parent node does not exist for leaf %s", leaf.ID.String())
+			return nil, errors.NotFoundMissingEntity(fmt.Errorf("parent node does not exist for leaf %s", leaf.ID.String()))
 		}
 		return nil, fmt.Errorf("failed to query parent node: %w", err)
 	}
 	if parentLeaf == nil {
-		return nil, errors.InvalidUserInputErrorf("parent node does not exist for leaf %s", leaf.ID.String())
+		return nil, errors.NotFoundMissingEntity(fmt.Errorf("parent node does not exist for leaf %s", leaf.ID.String()))
 	}
 
 	// Construct transactions
@@ -698,10 +701,10 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 
 	// Validate that all direct signing jobs are present
 	if signingJob.DirectNodeTxSigningJob == nil {
-		return nil, errors.InvalidUserInputErrorf("direct node tx signing job is required")
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct node tx signing job is required"))
 	}
 	if signingJob.DirectFromCpfpRefundTxSigningJob == nil {
-		return nil, errors.InvalidUserInputErrorf("direct from cpfp refund tx signing job is required")
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct from cpfp refund tx signing job is required"))
 	}
 
 	// Construct transactions

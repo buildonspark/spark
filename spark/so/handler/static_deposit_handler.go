@@ -243,7 +243,7 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 			}, nil
 		}
 		logger.Sugar().Infof("utxo swap %x:%d is already registered (request type %s)", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout, utxoSwap.RequestType)
-		return nil, errors.AlreadyExistsErrorf("utxo swap is already registered")
+		return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("utxo swap is already registered"))
 	}
 
 	// **********************************************************************************************

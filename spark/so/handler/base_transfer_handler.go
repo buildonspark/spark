@@ -268,7 +268,7 @@ func (h *BaseTransferHandler) createTransfer(
 	//nolint:all
 	if len(sparkInvoice) > 0 {
 		// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
-		return nil, nil, sparkerrors.UnimplementedErrorf("spark invoice support not implemented")
+		return nil, nil, sparkerrors.UnimplementedMethodDisabled(fmt.Errorf("spark invoice support not implemented"))
 		invoiceID, err = createAndLockSparkInvoice(ctx, sparkInvoice)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to create and lock spark invoice: %w", err)
@@ -294,7 +294,7 @@ func (h *BaseTransferHandler) createTransfer(
 	}
 
 	if len(leafCpfpRefundMap) == 0 {
-		return nil, nil, sparkerrors.InvalidUserInputErrorf("must provide at least one leaf for transfer")
+		return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("must provide at least one leaf for transfer"))
 	}
 
 	leaves, err := loadLeavesWithLock(ctx, db, leafCpfpRefundMap)
@@ -377,7 +377,7 @@ func createAndLockSparkInvoice(ctx context.Context, sparkInvoice string) (uuid.U
 		return uuid.Nil, fmt.Errorf("lock invoice: %w", err)
 	}
 	if storedInvoice.SparkInvoice != sparkInvoice {
-		return uuid.Nil, sparkerrors.InvalidUserInputErrorf("Conflicting invoices found for id: %s. Decoded request invoice: %s", storedInvoice.ID.String(), sparkInvoice)
+		return uuid.Nil, sparkerrors.AlreadyExistsDuplicateOperation(fmt.Errorf("Conflicting invoices found for id: %s. Decoded request invoice: %s", storedInvoice.ID.String(), sparkInvoice))
 	}
 
 	// Check if an existing transfer is in flight or paid with this invoice.
@@ -396,7 +396,7 @@ func createAndLockSparkInvoice(ctx context.Context, sparkInvoice string) (uuid.U
 		return uuid.Nil, fmt.Errorf("failed to query transfer: %w", err)
 	}
 	if paidOrInFlightTransferExists {
-		return uuid.Nil, sparkerrors.InvalidUserInputErrorf("invoice has already been paid")
+		return uuid.Nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("invoice has already been paid"))
 	}
 	return storedInvoice.ID, nil
 }
@@ -705,7 +705,7 @@ func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.C
 		return nil, fmt.Errorf("encountered error when fetching preimage request for transfer id %s: %w", req.TransferId, err)
 	}
 	if preimageRequest != nil && preimageRequest.Status == st.PreimageRequestStatusPreimageShared {
-		return nil, sparkerrors.FailedPreconditionErrorf("Cannot cancel an invoice whose preimage has already been revealed")
+		return nil, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("Cannot cancel an invoice whose preimage has already been revealed"))
 	}
 
 	err = h.CreateCancelTransferGossipMessage(ctx, req.TransferId)

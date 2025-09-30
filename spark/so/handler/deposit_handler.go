@@ -917,7 +917,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			err = errors.NotFoundErrorf("The requested deposit address could not be found.")
+			err = errors.NotFoundMissingEntity(fmt.Errorf("the requested deposit address could not be found for address: %s", *utxoAddress))
 		}
 		if ent.IsNotSingular(err) {
 			return nil, fmt.Errorf("multiple deposit addresses found for address: %s", *utxoAddress)
@@ -925,15 +925,15 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		return nil, err
 	}
 	if !depositAddress.OwnerIdentityPubkey.Equals(reqIDPubKey) {
-		return nil, fmt.Errorf("deposit address not found for address: %s", *utxoAddress)
+		return nil, fmt.Errorf("requested public key does not match public key found for address: %s", *utxoAddress)
 	}
 	rootSigningPubKey, err := keys.ParsePublicKey(req.GetRootTxSigningJob().GetSigningPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("invalid root signing public key: %w", err)
+		return nil, fmt.Errorf("invalid root tx signing public key: %w", err)
 	}
 	refundSigningPubKey, err := keys.ParsePublicKey(req.GetRefundTxSigningJob().GetSigningPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("invalid root signing public key: %w", err)
+		return nil, fmt.Errorf("invalid refund tx signing public key: %w", err)
 	}
 	if !depositAddress.OwnerSigningPubkey.Equals(rootSigningPubKey) || !depositAddress.OwnerSigningPubkey.Equals(refundSigningPubKey) {
 		return nil, fmt.Errorf("unexpected signing public key")
@@ -1168,7 +1168,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		entTree, err = treeMutator.Save(ctx)
 		if err != nil {
 			if ent.IsConstraintError(err) {
-				return nil, errors.AlreadyExistsErrorf("tree already exists: %v", err)
+				return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("tree already exists: %w", err))
 			}
 			return nil, err
 		}
@@ -1201,7 +1201,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	var root *ent.TreeNode
 	if existingRoot != nil {
 		if existingRoot.Status != st.TreeNodeStatusCreating {
-			return nil, errors.FailedPreconditionErrorf("Expected tree node %s to be in creating status; got %s.", existingRoot.ID, existingRoot.Status)
+			return nil, errors.FailedPreconditionInvalidState(fmt.Errorf("expected tree node %s to be in creating status; got %s", existingRoot.ID, existingRoot.Status))
 		}
 		logger.Sugar().Infof(
 			"Tree node %s already exists (deposit address %s), updating with new txid %s",
@@ -1567,7 +1567,7 @@ func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Tx, sche
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
-			return nil, errors.FailedPreconditionErrorf("utxo not found: txid: %s vout: %d", hex.EncodeToString(txid[:]), vout)
+			return nil, errors.NotFoundMissingEntity(fmt.Errorf("utxo not found: txid: %s vout: %d", hex.EncodeToString(txid[:]), vout))
 		}
 		return nil, fmt.Errorf("failed to get target utxo: %w", err)
 	}
@@ -1577,7 +1577,7 @@ func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Tx, sche
 		threshold = bitcoinConfig.DepositConfirmationThreshold
 	}
 	if blockHeight.Height-targetUtxo.BlockHeight+1 < int64(threshold) {
-		return nil, errors.FailedPreconditionErrorf("deposit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", targetUtxo.BlockHeight, blockHeight.Height)
+		return nil, errors.FailedPreconditionInsufficientConfirmations(fmt.Errorf("deposit tx doesn't have enough confirmations: confirmation height: %d current block height: %d", targetUtxo.BlockHeight, blockHeight.Height))
 	}
 	return targetUtxo, nil
 }
