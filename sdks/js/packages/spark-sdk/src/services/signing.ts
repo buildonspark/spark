@@ -10,10 +10,15 @@ import { createRefundTxsForLightning } from "../utils/htlc-transactions.js";
 import { getNetwork } from "../utils/network.js";
 import {
   createDecrementedTimelockRefundTxs,
+  getCurrentTimelock,
   getNextHTLCTransactionSequence,
 } from "../utils/transaction.js";
 import { WalletConfigService } from "./config.js";
-import type { LeafKeyTweak } from "./transfer.js";
+import type {
+  LeafKeyTweak,
+  SigningJobType,
+  SigningJobWithOptionalNonce,
+} from "./transfer.js";
 
 export class SigningService {
   private readonly config: WalletConfigService;
@@ -147,7 +152,8 @@ export class SigningService {
 
       cpfpLeafSigningJobs.push(...signingJobs);
 
-      if (directRefundTx) {
+      const isZeroNode = getCurrentTimelock(nodeTx.getInput(0).sequence);
+      if (directRefundTx && !isZeroNode) {
         if (!directNodeTx) {
           throw new ValidationError(
             "Direct node transaction undefined while direct refund transaction is defined",
@@ -327,5 +333,42 @@ export class SigningService {
       directLeafSigningJobs,
       directFromCpfpLeafSigningJobs,
     };
+  }
+
+  async signSigningJobs(
+    signingJobs: (SigningJobWithOptionalNonce & RequestedSigningCommitments)[],
+  ): Promise<Map<SigningJobType, UserSignedTxSigningJob>> {
+    const userSignedTxSigningJobs: Map<SigningJobType, UserSignedTxSigningJob> =
+      new Map();
+
+    for (const signingJob of signingJobs) {
+      const rawTx = getTxFromRawTxBytes(signingJob.rawTx);
+      const txOut = signingJob.parentTxOut;
+      const rawTxSighash = getSigHashFromTx(rawTx, 0, txOut);
+      const userSignature = await this.config.signer.signFrost({
+        message: rawTxSighash,
+        keyDerivation: signingJob.keyDerivation,
+        publicKey: signingJob.signingPublicKey,
+        verifyingKey: signingJob.verifyingKey,
+        selfCommitment: signingJob.signingNonceCommitment,
+        statechainCommitments: signingJob.signingNonceCommitments,
+        adaptorPubKey: new Uint8Array(),
+      });
+
+      const userSignedTxSigningJob: UserSignedTxSigningJob = {
+        leafId: signingJob.leafId,
+        signingPublicKey: signingJob.signingPublicKey,
+        rawTx: rawTx.toBytes(),
+        signingNonceCommitment: signingJob.signingNonceCommitment.commitment,
+        signingCommitments: {
+          signingCommitments: signingJob.signingNonceCommitments,
+        },
+        userSignature,
+      };
+
+      userSignedTxSigningJobs.set(signingJob.type, userSignedTxSigningJob);
+    }
+
+    return userSignedTxSigningJobs;
   }
 }

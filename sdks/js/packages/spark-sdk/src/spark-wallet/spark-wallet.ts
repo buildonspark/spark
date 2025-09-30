@@ -1,4 +1,4 @@
-import { isNode, isObject, mapCurrencyAmount } from "@lightsparkdev/core";
+import { isObject, mapCurrencyAmount } from "@lightsparkdev/core";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToHex,
@@ -46,7 +46,6 @@ import {
   SigningJob,
   SubscribeToEventsResponse,
   Transfer,
-  TransferEvent,
   TransferStatus,
   TransferType,
   TreeNode,
@@ -87,10 +86,7 @@ import {
   NetworkType,
 } from "../utils/network.js";
 import { sumAvailableTokens } from "../utils/token-transactions.js";
-import {
-  doesLeafNeedRefresh,
-  getCurrentTimelock,
-} from "../utils/transaction.js";
+import { doesTxnNeedRenewed, isZeroTimelock } from "../utils/transaction.js";
 
 import { sha256 } from "@noble/hashes/sha2";
 import { trace, Tracer } from "@opentelemetry/api";
@@ -308,11 +304,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         }
       } else if (isDepositStreamEvent(event)) {
         const deposit = event.deposit.deposit;
-        const newLeaf = await this.transferService.extendTimelock(deposit);
-        await this.transferLeavesToSelf(newLeaf.nodes, {
-          type: KeyDerivationType.LEAF,
-          path: deposit.id,
+
+        await this.withLeaves(async () => {
+          this.leaves.push(deposit);
         });
+
         this.emit(
           SparkWalletEvent.DepositConfirmed,
           deposit.id,
@@ -529,20 +525,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return availableLeaves
       .filter(([_, node]) => !leavesToIgnore.has(node.id))
       .map(([_, node]) => node);
-  }
-
-  private async checkExtendLeaves(leaves: TreeNode[]): Promise<void> {
-    await this.withLeaves(async () => {
-      for (const leaf of leaves) {
-        if (!leaf.parentNodeId && leaf.status === "AVAILABLE") {
-          const res = await this.transferService.extendTimelock(leaf);
-          await this.transferLeavesToSelf(res.nodes, {
-            type: KeyDerivationType.LEAF,
-            path: leaf.id,
-          });
-        }
-      }
-    });
   }
 
   private verifyKey(
@@ -764,11 +746,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     let leaves = await this.getLeaves();
 
-    leaves = await this.checkRefreshTimelockNodes(leaves);
-    leaves = await this.checkExtendTimeLockNodes(leaves);
+    leaves = await this.checkRenewLeaves(leaves);
 
     this.leaves = leaves;
-    this.checkExtendLeaves(leaves);
 
     this.optimizeLeaves().catch((e) => {
       console.error("Failed to optimize leaves", e);
@@ -2333,29 +2313,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       depositTx,
       vout,
     });
-
-    const resultingNodes: TreeNode[] = [];
-    for (const node of res.nodes) {
-      if (node.status === "AVAILABLE") {
-        const { nodes } = await this.transferService.extendTimelock(node);
-
-        for (const n of nodes) {
-          if (n.status === "AVAILABLE") {
-            const transfer = await this.transferLeavesToSelf([n], {
-              type: KeyDerivationType.LEAF,
-              path: node.id,
-            });
-            resultingNodes.push(...transfer);
-          } else {
-            resultingNodes.push(n);
-          }
-        }
-      } else {
-        resultingNodes.push(node);
-      }
-    }
-
-    return resultingNodes;
+    return res.nodes;
   }
 
   /**
@@ -2528,6 +2486,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         vout,
       });
 
+      await this.withLeaves(async () => {
+        this.leaves.push(...nodes);
+      });
+
       return nodes;
     });
 
@@ -2637,6 +2599,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       : await this.claimTransfer({ transfer: pendingTransfer });
 
     const leavesToRemove = new Set(leaves.map((leaf) => leaf.id));
+
     this.leaves = [
       ...this.leaves.filter((leaf) => !leavesToRemove.has(leaf.id)),
       ...resultNodes,
@@ -2735,8 +2698,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
               `TreeNode group at index ${groupIndex} not found for amount ${amount} after selection`,
             );
           }
-          let available = await this.checkRefreshTimelockNodes(group);
-          available = await this.checkExtendTimeLockNodes(available);
+          const available = await this.checkRenewLeaves(group);
 
           if (available.length < group.length) {
             throw new Error(
@@ -2842,87 +2804,55 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     };
   }
 
-  private async checkExtendTimeLockNodes(
-    nodes: TreeNode[],
-  ): Promise<TreeNode[]> {
-    const nodesToExtend: TreeNode[] = [];
+  private async checkRenewLeaves(nodes: TreeNode[]): Promise<TreeNode[]> {
+    const nodesToRenewNode: TreeNode[] = [];
+    const nodesToRenewRefund: TreeNode[] = [];
+    const nodesToRenewZeroTimelock: TreeNode[] = [];
+
     const nodeIds: string[] = [];
     const validNodes: TreeNode[] = [];
 
     for (const node of nodes) {
       const nodeTx = getTxFromRawTxBytes(node.nodeTx);
-      const sequence = nodeTx.getInput(0).sequence;
-      if (sequence === undefined) {
+      const refundTx = getTxFromRawTxBytes(node.refundTx);
+
+      const nodeSequence = nodeTx.getInput(0).sequence;
+      const refundSequence = refundTx.getInput(0).sequence;
+
+      if (nodeSequence === undefined) {
         throw new ValidationError("Invalid node transaction", {
           field: "sequence",
           value: nodeTx.getInput(0),
           expected: "Non-null sequence",
         });
       }
-      const needsRefresh = doesLeafNeedRefresh(sequence, true);
-      if (needsRefresh) {
-        nodesToExtend.push(node);
-        nodeIds.push(node.id);
-      } else {
-        validNodes.push(node);
-      }
-    }
-
-    if (nodesToExtend.length === 0) {
-      return validNodes;
-    }
-
-    const nodesToAdd: TreeNode[] = [];
-    for (const node of nodesToExtend) {
-      const { nodes } = await this.transferService.extendTimelock(node);
-      this.leaves = this.leaves.filter((leaf) => leaf.id !== node.id);
-      const newNodes = await this.transferLeavesToSelf(nodes, {
-        type: KeyDerivationType.LEAF,
-        path: node.id,
-      });
-      nodesToAdd.push(...newNodes);
-    }
-
-    this.updateLeaves(nodeIds, nodesToAdd);
-    validNodes.push(...nodesToAdd);
-
-    return validNodes;
-  }
-
-  /**
-   * Internal method to refresh timelock nodes.
-   *
-   * @param {string} nodeId - The optional ID of the node to refresh. If not provided, all nodes will be checked.
-   * @returns {Promise<void>}
-   * @private
-   */
-  private async checkRefreshTimelockNodes(
-    nodes: TreeNode[],
-  ): Promise<TreeNode[]> {
-    const nodesToRefresh: TreeNode[] = [];
-    const nodeIds: string[] = [];
-    const validNodes: TreeNode[] = [];
-
-    for (const node of nodes) {
-      const refundTx = getTxFromRawTxBytes(node.refundTx);
-      const sequence = refundTx.getInput(0).sequence;
-      if (!sequence) {
+      if (!refundSequence) {
         throw new ValidationError("Invalid refund transaction", {
           field: "sequence",
           value: refundTx.getInput(0),
           expected: "Non-null sequence",
         });
       }
-      const needsRefresh = doesLeafNeedRefresh(sequence);
-      if (needsRefresh) {
-        nodesToRefresh.push(node);
+
+      if (doesTxnNeedRenewed(refundSequence)) {
+        if (isZeroTimelock(nodeSequence)) {
+          nodesToRenewZeroTimelock.push(node);
+        } else if (doesTxnNeedRenewed(nodeSequence)) {
+          nodesToRenewNode.push(node);
+        } else {
+          nodesToRenewRefund.push(node);
+        }
         nodeIds.push(node.id);
       } else {
         validNodes.push(node);
       }
     }
 
-    if (nodesToRefresh.length === 0) {
+    if (
+      nodesToRenewNode.length === 0 &&
+      nodesToRenewRefund.length === 0 &&
+      nodesToRenewZeroTimelock.length === 0
+    ) {
       return validNodes;
     }
 
@@ -2943,7 +2873,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
 
     const nodesToAdd: TreeNode[] = [];
-    for (const node of nodesToRefresh) {
+    for (const node of nodesToRenewNode) {
       if (!node.parentNodeId) {
         throw new Error(`node ${node.id} has no parent`);
       }
@@ -2953,20 +2883,29 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         throw new Error(`parent node ${node.parentNodeId} not found`);
       }
 
-      const { nodes } = await this.transferService.refreshTimelockNodes(
+      const newNode = await this.transferService.renewNodeTxn(node, parentNode);
+      nodesToAdd.push(newNode);
+    }
+
+    for (const node of nodesToRenewRefund) {
+      if (!node.parentNodeId) {
+        throw new Error(`node ${node.id} has no parent`);
+      }
+
+      const parentNode = nodesMap.get(node.parentNodeId);
+      if (!parentNode) {
+        throw new Error(`parent node ${node.parentNodeId} not found`);
+      }
+
+      const newNode = await this.transferService.renewRefundTxn(
         node,
         parentNode,
       );
+      nodesToAdd.push(newNode);
+    }
 
-      if (nodes.length !== 1) {
-        throw new Error(`expected 1 node, got ${nodes.length}`);
-      }
-
-      const newNode = nodes[0];
-      if (!newNode) {
-        throw new Error("Failed to refresh timelock node");
-      }
-
+    for (const node of nodesToRenewZeroTimelock) {
+      const newNode = await this.transferService.renewZeroTimelockNodeTxn(node);
       nodesToAdd.push(newNode);
     }
 
@@ -3022,8 +2961,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     emit?: boolean,
     optimize?: boolean,
   ): Promise<TreeNode[]> {
-    result = await this.checkRefreshTimelockNodes(result);
-    result = await this.checkExtendTimeLockNodes(result);
+    result = await this.checkRenewLeaves(result);
 
     const existingIds = new Set(this.leaves.map((leaf) => leaf.id));
     const uniqueResults = result.filter((node) => !existingIds.has(node.id));
@@ -3509,8 +3447,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         selectedLeaves,
         `no leaves for ${totalAmount}`,
       );
-      leaves = await this.checkRefreshTimelockNodes(leaves);
-      leaves = await this.checkExtendTimeLockNodes(leaves);
+      leaves = await this.checkRenewLeaves(leaves);
 
       const leavesToSend: LeafKeyTweak[] = await Promise.all(
         leaves.map(async (leaf) => ({
@@ -3914,10 +3851,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       leavesToSendToSE = leavesForFee;
     }
 
-    leavesToSendToSsp = await this.checkRefreshTimelockNodes(leavesToSendToSsp);
-    leavesToSendToSsp = await this.checkExtendTimeLockNodes(leavesToSendToSsp);
-    leavesToSendToSE = await this.checkRefreshTimelockNodes(leavesToSendToSE);
-    leavesToSendToSE = await this.checkExtendTimeLockNodes(leavesToSendToSE);
+    leavesToSendToSsp = await this.checkRenewLeaves(leavesToSendToSsp);
+    leavesToSendToSE = await this.checkRenewLeaves(leavesToSendToSE);
 
     const leafKeyTweaks: LeafKeyTweak[] = await Promise.all(
       [...leavesToSendToSE, ...leavesToSendToSsp].map(async (leaf) => ({
@@ -4024,8 +3959,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       `no leaves for ${amountSats}`,
     );
 
-    leaves = await this.checkRefreshTimelockNodes(leaves);
-    leaves = await this.checkExtendTimeLockNodes(leaves);
+    leaves = await this.checkRenewLeaves(leaves);
 
     const feeEstimate = await sspClient.getCoopExitFeeQuote({
       leafExternalIds: leaves.map((leaf) => leaf.id),
@@ -4661,16 +4595,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         );
       }
 
-      if (!nodeInput.sequence) {
-        throw new ValidationError(
-          `Node transaction has no sequence for ${isRootNode ? "root" : "non-root"} node`,
-          {
-            field: "sequence",
-            value: nodeInput.sequence,
-          },
-        );
-      }
-
       const refundInput = refundTx.getInput(0);
       if (!refundInput) {
         throw new ValidationError(
@@ -4705,104 +4629,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         `Failed to check timelock for node ${nodeId}`,
         {
           method: "query_nodes",
-        },
-        error as Error,
-      );
-    }
-  }
-
-  /**
-   * Refresh the timelock of a specific node.
-   *
-   * @param {string} nodeId - The ID of the node to refresh
-   * @returns {Promise<void>} Promise that resolves when the timelock is refreshed
-   */
-  public async testOnly_expireTimelock(nodeId: string): Promise<void> {
-    const sparkClient = await this.connectionManager.createSparkClient(
-      this.config.getCoordinatorAddress(),
-    );
-
-    try {
-      // First, get the node and its parent
-      const response = await sparkClient.query_nodes({
-        source: {
-          $case: "nodeIds",
-          nodeIds: {
-            nodeIds: [nodeId],
-          },
-        },
-        includeParents: true,
-      });
-
-      let leaf = response.nodes[nodeId];
-      if (!leaf) {
-        throw new ValidationError("Node not found", {
-          field: "nodeId",
-          value: nodeId,
-        });
-      }
-
-      let parentNode;
-      let hasParentNode = false;
-      if (!leaf.parentNodeId) {
-        // skip node timelock check
-      } else {
-        hasParentNode = true;
-        parentNode = response.nodes[leaf.parentNodeId];
-        if (!parentNode) {
-          throw new ValidationError("Parent node not found", {
-            field: "parentNodeId",
-            value: leaf.parentNodeId,
-          });
-        }
-      }
-
-      const nodeTx = getTxFromRawTxBytes(leaf.nodeTx);
-      const refundTx = getTxFromRawTxBytes(leaf.refundTx);
-
-      if (hasParentNode) {
-        const nodeTimelock = getCurrentTimelock(nodeTx.getInput(0).sequence);
-        if (nodeTimelock > 100) {
-          const expiredNodeTxLeaf =
-            await this.transferService.testonly_expireTimeLockNodeTx(
-              leaf,
-              parentNode,
-            );
-
-          if (!expiredNodeTxLeaf.nodes[0]) {
-            throw new ValidationError("No expired node tx leaf", {
-              field: "expiredNodeTxLeaf",
-              value: expiredNodeTxLeaf,
-            });
-          }
-          leaf = expiredNodeTxLeaf.nodes[0];
-        }
-      }
-      const refundTimelock = getCurrentTimelock(refundTx.getInput(0).sequence);
-
-      if (refundTimelock > 100) {
-        const expiredTxLeaf =
-          await this.transferService.testonly_expireTimeLockRefundtx(leaf);
-
-        if (!expiredTxLeaf.nodes[0]) {
-          throw new ValidationError("No expired tx leaf", {
-            field: "expiredTxLeaf",
-            value: expiredTxLeaf,
-          });
-        }
-        leaf = expiredTxLeaf.nodes[0];
-      }
-
-      // Update the local leaves if this node is in our wallet
-      const leafIndex = this.leaves.findIndex((leaf) => leaf.id === leaf.id);
-      if (leafIndex !== -1) {
-        this.leaves[leafIndex] = leaf;
-      }
-    } catch (error) {
-      throw new NetworkError(
-        "Failed to refresh timelock",
-        {
-          method: "refresh_timelock",
         },
         error as Error,
       );
@@ -5012,7 +4838,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       "getLightningSendRequest",
       "getCoopExitRequest",
       "checkTimelock",
-      "testOnly_expireTimelock",
     ] as const;
 
     methods.forEach((m) => this.wrapPublicSparkWalletMethodWithOtelSpan(m));

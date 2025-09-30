@@ -4,9 +4,9 @@ import { TokenMetadata } from "../proto/spark_token.js";
 import { ConfigOptions } from "../services/wallet-config.js";
 import type { SparkSigner } from "../signer/signer.js";
 import { KeyDerivation } from "../signer/types.js";
-import { Bech32mTokenIdentifier } from "../utils/token-identifier.js";
-import { SparkAddressFormat } from "../utils/address.js";
 import { WalletTransfer } from "../types/index.js";
+import { SparkAddressFormat } from "../utils/address.js";
+import { Bech32mTokenIdentifier } from "../utils/token-identifier.js";
 import type { SparkWallet } from "./spark-wallet.js";
 
 export type CreateLightningInvoiceParams = {

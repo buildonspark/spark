@@ -18,14 +18,14 @@ import {
   protoToNetwork,
   SparkAddressFormat,
   SparkSdkLogger,
+  SparkWalletEvent,
   validateSparkInvoiceSignature,
   WalletConfig,
-  SparkWalletEvent,
 } from "@buildonspark/spark-sdk";
 import {
+  InvoiceStatus,
   TokenTransactionStatus,
   TreeNode,
-  InvoiceStatus,
 } from "@buildonspark/spark-sdk/proto/spark";
 import { CoopExitFeeQuote, ExitSpeed } from "@buildonspark/spark-sdk/types";
 import { LoggingLevel } from "@lightsparkdev/core";
@@ -352,7 +352,6 @@ const commands = [
   "getleaves",
   "leafidtohex",
   "testonly_generateutxostring",
-  "testonly_expiretimelock",
 
   "fulfillsparkinvoice",
   "querysparkinvoices",
@@ -662,7 +661,6 @@ async function runCLI() {
   testonly_generateexternalwallet                                     - Generate test wallet to fund utxos for fee bumping
   testonly_generateutxostring <txid> <vout> <value> <publicKey>       - Generate correctly formatted UTXO string from your public key
   checktimelock <leafId>                                              - Get the remaining timelock for a given leaf
-  testonly_expiretimelock <leafId>                                    - Refresh the timelock for a given leaf
   leafidtohex <leafId1> [leafId2] [leafId3] ...                       - Convert leaf ID to hex string for unilateral exit
   getleaves                                                           - Get all leaves owned by the wallet
   fulfillsparkinvoice <invoice1[:amount1]> <invoice2[:amount2]> ...   - Fulfill one or more Spark token invoices (append :amount if invoice has no preset amount)
@@ -2080,26 +2078,6 @@ async function runCLI() {
           }
           break;
         }
-        case "testonly_expiretimelock": {
-          if (!wallet) {
-            console.log("Please initialize a wallet first");
-            break;
-          }
-          if (args.length === 0) {
-            console.log("Usage: refreshtimelock <leafId>");
-            break;
-          }
-
-          try {
-            await wallet.testOnly_expireTimelock(args[0]);
-            console.log(`Successfully refreshed timelock for node: ${args[0]}`);
-          } catch (error) {
-            console.log("Unable to expire timelock for node: ", args[0]);
-            console.log("Final error:", error);
-          }
-          break;
-        }
-
         case "leafidtohex": {
           if (!wallet) {
             console.log("Please initialize a wallet first");
@@ -2437,57 +2415,10 @@ async function runCLI() {
             }
             console.log("");
 
-            // Expire timelocks if in test mode for all selected leaves
-            if (isTestMode) {
-              console.log("📋 Step 4: Expiring timelocks (test mode)...");
-
-              for (const leaf of selectedLeaves) {
-                console.log(`🔄 Processing leaf ${leaf.id}...`);
-
-                console.log(
-                  `  🔄 Expiring node timelock for leaf ${leaf.id}...`,
-                );
-
-                try {
-                  await wallet.testOnly_expireTimelock(leaf.id);
-                  console.log(`    ✅ Node timelock expired`);
-                } catch (error) {
-                  console.log(`    ❌ Unable to expire timelock`);
-                }
-                await wallet.getLeaves();
-                console.log("");
-              }
-              const refreshedLeaves = await wallet.getLeaves();
-
-              const refreshedSelectedLeaves = selectedLeaves.map(
-                (originalLeaf) => {
-                  const refreshedLeaf = refreshedLeaves.find(
-                    (leaf) => leaf.id === originalLeaf.id,
-                  );
-                  if (!refreshedLeaf) {
-                    console.log(
-                      `⚠️  Warning: Could not find refreshed data for leaf ${originalLeaf.id}`,
-                    );
-                    return originalLeaf;
-                  }
-                  return refreshedLeaf;
-                },
-              );
-
-              selectedLeaves = refreshedSelectedLeaves;
-              hexStrings = selectedLeaves.map((leaf) => {
-                const encodedBytes = TreeNode.encode(leaf).finish();
-                return bytesToHex(encodedBytes);
-              });
-            } else {
-              console.log(
-                "📋 Step 4: Skipping timelock expiration (normal mode)",
-              );
-              console.log(
-                "ℹ️  Ensure timelocks have naturally expired before proceeding with the exit.",
-              );
-              console.log("");
-            }
+            console.log(
+              "ℹ️  Ensure timelocks have naturally expired before proceeding with the exit.",
+            );
+            console.log("");
 
             // Get fee rate from user
             console.log("📋 Step 5: Fee rate configuration...");

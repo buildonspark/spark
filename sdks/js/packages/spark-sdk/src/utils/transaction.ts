@@ -19,6 +19,8 @@ export const TEST_UNILATERAL_SEQUENCE = (1 << 30) | TEST_UNILATERAL_TIMELOCK;
 export const TEST_UNILATERAL_DIRECT_SEQUENCE =
   (1 << 30) | (TEST_UNILATERAL_TIMELOCK + DIRECT_TIMELOCK_OFFSET);
 
+const INITIAL_ROOT_NODE_SEQUENCE = (1 << 30) | 0;
+
 // Default fee constants matching Go implementation
 const ESTIMATED_TX_SIZE = 191;
 const DEFAULT_SATS_PER_VBYTE = 5;
@@ -80,10 +82,12 @@ function createNodeTx({
 function createNodeTxs({
   parentTx,
   sequence,
+  directSequence,
   vout,
 }: {
   parentTx: Transaction;
   sequence: number;
+  directSequence?: number;
   vout: number;
 }): {
   nodeTx: Transaction;
@@ -91,7 +95,10 @@ function createNodeTxs({
 } {
   const parentOutput = parentTx.getOutput(vout);
   if (!parentOutput.amount || !parentOutput.script) {
-    throw new Error("Parent output amount or script not found");
+    throw new ValidationError("Parent output amount or script not found", {
+      field: "parentOutput",
+      value: parentOutput,
+    });
   }
   const output = {
     script: parentOutput.script,
@@ -111,7 +118,7 @@ function createNodeTxs({
   });
 
   const directNodeTx = createNodeTx({
-    sequence: sequence + DIRECT_TIMELOCK_OFFSET,
+    sequence: directSequence ?? sequence + DIRECT_TIMELOCK_OFFSET,
     txOut: output,
     parentOutPoint: input,
     includeAnchor: false,
@@ -130,7 +137,7 @@ export function createRootNodeTx(
 } {
   return createNodeTxs({
     parentTx,
-    sequence: 0,
+    sequence: INITIAL_ROOT_NODE_SEQUENCE,
     vout,
   });
 }
@@ -141,7 +148,8 @@ export function createZeroTimelockNodeTx(parentTx: Transaction): {
 } {
   return createNodeTxs({
     parentTx,
-    sequence: 0,
+    sequence: INITIAL_ROOT_NODE_SEQUENCE,
+    directSequence: DIRECT_TIMELOCK_OFFSET,
     vout: 0,
   });
 }
@@ -160,7 +168,10 @@ export function createDecrementedTimelockNodeTx(
 ) {
   const currentSequence = currentTx.getInput(0).sequence;
   if (!currentSequence) {
-    throw new Error("Current sequence not found");
+    throw new ValidationError("Current sequence not found", {
+      field: "currentSequence",
+      value: currentSequence,
+    });
   }
 
   return createNodeTxs({
@@ -170,10 +181,21 @@ export function createDecrementedTimelockNodeTx(
   });
 }
 
-export function createTestUnilateralTimelockNodeTx(parentTx: Transaction) {
+export function createTestUnilateralTimelockNodeTx(
+  parentTx: Transaction,
+  nodeTx: Transaction,
+) {
+  const sequence = nodeTx.getInput(0).sequence;
+  if (!sequence) {
+    throw new ValidationError("Sequence not found", {
+      field: "sequence",
+      value: sequence,
+    });
+  }
+  const isBit30Defined = (sequence || 0) & (1 << 30);
   return createNodeTxs({
     parentTx,
-    sequence: TEST_UNILATERAL_SEQUENCE,
+    sequence: isBit30Defined | TEST_UNILATERAL_TIMELOCK,
     vout: 0,
   });
 }
@@ -408,9 +430,11 @@ export function getTransactionSequence(currSequence?: number): {
   nextDirectSequence: number;
 } {
   const timelock = getCurrentTimelock(currSequence);
+  const isBit30Defined = (currSequence || 0) & (1 << 30);
+
   return {
-    nextSequence: (1 << 30) | timelock,
-    nextDirectSequence: (1 << 30) | (timelock + DIRECT_TIMELOCK_OFFSET),
+    nextSequence: isBit30Defined | timelock,
+    nextDirectSequence: isBit30Defined | (timelock + DIRECT_TIMELOCK_OFFSET),
   };
 }
 
@@ -434,6 +458,15 @@ export function checkIfValidSequence(currSequence?: number) {
   }
 }
 
+export function isZeroTimelock(currSequence: number) {
+  return getCurrentTimelock(currSequence) === 0;
+}
+
+export function doesTxnNeedRenewed(currSequence: number) {
+  const currentTimelock = getCurrentTimelock(currSequence);
+  return currentTimelock <= 100;
+}
+
 export function doesLeafNeedRefresh(currSequence: number, isNodeTx?: boolean) {
   const currentTimelock = getCurrentTimelock(currSequence);
 
@@ -453,6 +486,7 @@ export function getNextTransactionSequence(
 } {
   const currentTimelock = getCurrentTimelock(currSequence);
   const nextTimelock = currentTimelock - TIME_LOCK_INTERVAL;
+  const isBit30Defined = (currSequence || 0) & (1 << 30);
 
   if (isNodeTx && nextTimelock < 0) {
     throw new ValidationError("timelock interval is less than 0", {
@@ -469,8 +503,9 @@ export function getNextTransactionSequence(
   }
 
   return {
-    nextSequence: (1 << 30) | nextTimelock,
-    nextDirectSequence: (1 << 30) | (nextTimelock + DIRECT_TIMELOCK_OFFSET),
+    nextSequence: isBit30Defined | nextTimelock,
+    nextDirectSequence:
+      isBit30Defined | (nextTimelock + DIRECT_TIMELOCK_OFFSET),
   };
 }
 
