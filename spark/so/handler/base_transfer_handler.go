@@ -1190,3 +1190,40 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 
 	return transfer, nil
 }
+
+// Handle CommitSwapKeyTweaks gossip message from the coordinator. It is used in
+// Swap V3 to finalize the swap by tweaking the sender keys for both primary and
+// counter transfers. The tweaks are applied in the same DB transaction, so
+// either both of them succeed or both of them fail.
+func (h *BaseTransferHandler) CommitSwapKeyTweaks(
+	ctx context.Context,
+	counterTransferID string,
+) error {
+	logger := logging.GetLoggerFromContext(ctx)
+	counterTransfer, err := h.loadTransferForUpdate(ctx, counterTransferID)
+	if err != nil {
+		return fmt.Errorf("unable to load counter transfer: %w", err)
+	}
+	primaryTransfer, err := counterTransfer.QueryPrimarySwapTransfer().ForUpdate().Only(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to load primary transfer: %w", err)
+	}
+	// Sanity check. This should never happen because key tweaking is atomic.
+	if primaryTransfer.Status == st.TransferStatusSenderKeyTweaked {
+		if counterTransfer.Status != st.TransferStatusSenderKeyTweaked {
+			return fmt.Errorf("primary transfer %s is in sender key tweaked status, but the counter transfer %s is not", primaryTransfer.ID.String(), counterTransfer.ID.String())
+		}
+		return nil
+	}
+
+	logger.Sugar().Infof("Checking commitSwapKeyTweaks for primary transfer %s (status: %s) and counter transfer %s (status: %s)", primaryTransfer.ID, primaryTransfer.Status, counterTransfer.ID, counterTransfer.Status)
+
+	for _, transfer := range []*ent.Transfer{primaryTransfer, counterTransfer} {
+		if _, err := h.commitSenderKeyTweaks(ctx, transfer); err != nil {
+			return fmt.Errorf("commitSenderKeyTweaks failed for transfer %s: %w", transfer.ID, err)
+		}
+	}
+	logger.Sugar().Infof("Successfully tweaked keys for primary transfer %s (status: %s) and counter transfer %s (status: %s)", primaryTransfer.ID, primaryTransfer.Status, counterTransfer.ID, counterTransfer.Status)
+
+	return nil
+}

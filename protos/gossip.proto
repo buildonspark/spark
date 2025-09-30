@@ -29,6 +29,7 @@ message GossipMessage {
         GossipMessagePreimage preimage = 13;
         GossipMessageFinalizeRenewRefundTimelock finalize_refund_timelock = 14;
         GossipMessageFinalizeRenewNodeTimelock finalize_node_timelock = 15;
+        GossipMessageSettleSwapKeyTweak settle_swap_key_tweak = 16;
     }
 }
 
@@ -102,4 +103,11 @@ message GossipMessageDepositCleanup {
 message GossipMessagePreimage {
     bytes preimage = 1;
     bytes payment_hash = 2;
+}
+
+// SettleSwapKeyTweak is called in Swap V3 flow when a counter transfer is
+// created to settle both primary and counter transfer key tweaks atomically in the
+// same DB transaction.
+message GossipMessageSettleSwapKeyTweak {
+    string counter_transfer_id = 1;
 }

@@ -71,6 +71,9 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 	case *pbgossip.GossipMessage_Preimage:
 		preimage := gossipMessage.GetPreimage()
 		h.handlePreimageGossipMessage(ctx, preimage, forCoordinator)
+	case *pbgossip.GossipMessage_SettleSwapKeyTweak:
+		settleSwapKeyTweak := gossipMessage.GetSettleSwapKeyTweak()
+		h.handleSettleSwapKeyTweakGossipMessage(ctx, settleSwapKeyTweak)
 	default:
 		return fmt.Errorf("unsupported gossip message type: %T", gossipMessage.Message)
 	}
@@ -352,5 +355,15 @@ func (h *GossipHandler) handlePreimageGossipMessage(ctx context.Context, gossip 
 		if err != nil {
 			logger.With(zap.Error(err)).Sugar().Errorf("Failed to update preimage request for %x", gossip.PaymentHash)
 		}
+	}
+}
+
+func (h *GossipHandler) handleSettleSwapKeyTweakGossipMessage(ctx context.Context, settleSwapKeyTweak *pbgossip.GossipMessageSettleSwapKeyTweak) {
+	transferHandler := NewBaseTransferHandler(h.config)
+	err := transferHandler.CommitSwapKeyTweaks(ctx, settleSwapKeyTweak.CounterTransferId)
+	if err != nil {
+		// If there's an error, it's still considered the message is delivered successfully.
+		logger := logging.GetLoggerFromContext(ctx)
+		logger.With(zap.Error(err)).Sugar().Errorf("Failed to settle swap key tweak for  counter transfer %s", settleSwapKeyTweak.CounterTransferId)
 	}
 }

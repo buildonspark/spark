@@ -380,6 +380,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 			return nil, fmt.Errorf("unable to commit db before sync transfer init: %w", err)
 		}
 		// Only false for Swap V3 flow when initiating a primary transfer for a swap.
+		// Swap V3 postpones key tweaking for the primary transfer, until a counter transfer is submitted.
 		if tweakKeys {
 			// If all other SOs have settled the sender key tweaks, we can commit the sender key tweaks.
 			// If there's any error, it means one or more of the SOs are down at the time, we will have a
