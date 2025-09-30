@@ -536,6 +536,7 @@ func main() {
 				}
 			}(),
 			sparkgrpc.DatabaseSessionMiddleware(
+				dbClient,
 				db.NewDefaultSessionFactory(dbClient),
 				config.Database.NewTxTimeout,
 			),

@@ -70,27 +70,19 @@ func (n NotifyMixin) Hooks() []ent.Hook {
 func (n NotifyMixin) sendNotification(ctx context.Context, m ent.Mutation, v ent.Value) error {
 	payload := n.buildPayload(v)
 
-	payloadJSON, err := json.Marshal(payload)
+	notifier, err := ent.GetNotifierFromContext(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("no notifier found in context: %w", err)
 	}
 
-	client := m.(interface {
-		Client() *ent.Client
-	}).Client()
-
-	if client == nil {
-		return fmt.Errorf("client is nil, cannot send notification")
+	notification := ent.Notification{
+		Channel: m.Type(),
+		Payload: payload,
 	}
 
-	channel := m.Type()
-	query := fmt.Sprintf("NOTIFY %s, '%s'", channel, payloadJSON)
+	globalNotifyCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("channel", notification.Channel)))
 
-	globalNotifyCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("channel", channel)))
-
-	// nolint:forbidigo
-	_, err = client.ExecContext(ctx, query)
-	return err
+	return notifier.Notify(ctx, notification)
 }
 
 func (n NotifyMixin) buildPayload(v ent.Value) map[string]any {

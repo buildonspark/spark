@@ -177,6 +177,8 @@ type Session struct {
 	// session to ensure that the session can clean those transactions up even if the context in which
 	// the caller is operating is cancelled.
 	ctx context.Context
+	// The underlying ent.Client used to create new transactions and flush notifications.
+	dbClient *ent.Client
 	// TxProvider is used to create a new transaction when needed.
 	provider ent.TxProvider
 	// Mutex for ensuring thread-safe access to `currentTx`.
@@ -184,6 +186,10 @@ type Session struct {
 	// The current transaction being tracked by this session if a transaction has been started. When
 	// the tracked transaction is committed or rolled back successfully, this field is set back to nil.
 	currentTx *ent.Tx
+	// The current set of notifications that have occurred during the transaction. When the current
+	// transaction is committed, these notifications are flushed. If the transaction is rolled back,
+	// these notifications are discarded.
+	currentNotifications *ent.BufferedNotifier
 	// startTime is the time when the current transaction was started.
 	startTime time.Time
 }
@@ -200,6 +206,7 @@ func NewSession(ctx context.Context, dbClient *ent.Client, opts ...SessionOption
 	return &Session{
 		sessionConfig: sessionConfig,
 		ctx:           ctx,
+		dbClient:      dbClient,
 		provider:      provider,
 		currentTx:     nil,
 		mu:            sync.Mutex{},
@@ -230,7 +237,11 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 
 			return nil, err
 		}
+
+		notifier := ent.NewBufferedNotifier(s.dbClient)
+
 		s.currentTx = tx
+		s.currentNotifications = &notifier
 		s.startTime = time.Now()
 
 		addTraceEvent(ctx, "begin", 0, nil)
@@ -250,8 +261,10 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 					attrs = s.getOperationAttributes(attrOperationCommit, attrStatusError)
 					addTraceEvent(ctx, "commit", duration, err)
 				} else {
-					// Only set the current tx to nil if the transaction was committed successfully.
-					// Otherwise, the transaction will be rolled back at last.
+					if s.currentNotifications.Flush(ctx) != nil {
+						logger.Error("Failed to flush notifications after commit", zap.Error(err))
+					}
+
 					attrs = s.getOperationAttributes(attrOperationCommit, attrStatusSuccess)
 					txDurationHistogram.Record(ctx, durationMs, metric.WithAttributes(attrs...))
 					txActiveGauge.Add(ctx, -1, metric.WithAttributes(s.getGaugeAttributes(attrOperationCommit)...))
@@ -259,8 +272,11 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 					addTraceEvent(ctx, "commit", duration, nil)
 				}
 
+				// Only set the current tx to nil if the transaction was committed successfully.
+				// Otherwise, the transaction will be rolled back at last.
 				if err == nil || errors.Is(err, sql.ErrTxDone) || errors.Is(err, context.Canceled) {
 					s.currentTx = nil
+					s.currentNotifications = nil
 				}
 
 				txCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
@@ -290,6 +306,7 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				txCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
 				txActiveGauge.Add(ctx, -1, metric.WithAttributes(s.getGaugeAttributes(attrOperationRollback)...))
 				s.currentTx = nil
+				s.currentNotifications = nil
 				return err
 			})
 		})
@@ -303,6 +320,17 @@ func (s *Session) GetTxIfExists() *ent.Tx {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.currentTx
+}
+
+func (s *Session) Notify(ctx context.Context, n ent.Notification) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.currentNotifications == nil {
+		return fmt.Errorf("no active transaction to buffer notification")
+	}
+
+	return s.currentNotifications.Notify(ctx, n)
 }
 
 // getGaugeAttributes returns the attributes for gauge operations

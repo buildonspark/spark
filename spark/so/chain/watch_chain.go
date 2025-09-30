@@ -346,6 +346,9 @@ func connectBlocks(
 			txs = append(txs, rawTx)
 		}
 
+		notifier := ent.NewBufferedNotifier(dbClient)
+		ctx = ent.InjectNotifier(ctx, &notifier)
+
 		dbTx, err := dbClient.Tx(ctx)
 		if err != nil {
 			return err
@@ -370,6 +373,11 @@ func connectBlocks(
 		err = dbTx.Commit()
 		if err != nil {
 			return err
+		}
+
+		err = notifier.Flush(ctx)
+		if err != nil {
+			logger.Error("Failed to flush notifier", zap.Error(err))
 		}
 
 		// Record current block height

@@ -2,14 +2,17 @@ package ent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 )
 
 // contextKey is a type for context keys.
-type contextKey string
+type txProviderContextKey string
+type notifierContextKey string
 
 // txProviderKey is the context key for the transaction provider.
-const txProviderKey contextKey = "txProvider"
+const txProviderKey txProviderContextKey = "txProvider"
+const notifierKey notifierContextKey = "notifier"
 
 // A TxProvider is an interface that provides a method to either get an existing transaction,
 // or begin a new transaction if none exists.
@@ -81,6 +84,67 @@ func DbRollback(ctx context.Context) error {
 
 	if err := tx.Rollback(); err != nil {
 		return fmt.Errorf("failed to rollback transaction: %w", err)
+	}
+
+	return nil
+}
+
+type Notification struct {
+	Channel string
+	Payload map[string]any
+}
+
+type Notifier interface {
+	Notify(context.Context, Notification) error
+}
+
+func InjectNotifier(ctx context.Context, notifier Notifier) context.Context {
+	return context.WithValue(ctx, notifierKey, notifier)
+}
+
+func GetNotifierFromContext(ctx context.Context) (Notifier, error) {
+	if notifier, ok := ctx.Value(notifierKey).(Notifier); ok {
+		return notifier, nil
+	}
+
+	return nil, fmt.Errorf("no notifier found in context")
+}
+
+type BufferedNotifier struct {
+	dbClient      *Client
+	notifications []Notification
+}
+
+func NewBufferedNotifier(dbClient *Client) BufferedNotifier {
+	return BufferedNotifier{
+		dbClient:      dbClient,
+		notifications: make([]Notification, 0),
+	}
+}
+
+func (b *BufferedNotifier) Notify(ctx context.Context, n Notification) error {
+	b.notifications = append(b.notifications, n)
+	return nil
+}
+
+func (b *BufferedNotifier) Flush(ctx context.Context) error {
+	if len(b.notifications) == 0 {
+		return nil
+	}
+
+	for _, n := range b.notifications {
+		// Serialize as JSON before sending to Postgres
+		jsonPayload, err := json.Marshal(n.Payload)
+		if err != nil {
+			return fmt.Errorf("failed to marshal notification payload: %w", err)
+		}
+
+		// nolint:forbidigo
+		_, err = b.dbClient.ExecContext(ctx, fmt.Sprintf("NOTIFY %s, '%s'", n.Channel, string(jsonPayload)))
+
+		if err != nil {
+			return fmt.Errorf("failed to send notification: %w", err)
+		}
 	}
 
 	return nil
