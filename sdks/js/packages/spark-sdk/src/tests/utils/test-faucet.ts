@@ -311,6 +311,17 @@ export class BitcoinFaucet {
     return await this.generateToAddress(numBlocks, this.miningAddress);
   }
 
+  async mineBlocksAndWaitForMiningToComplete(numBlocks: number) {
+    const startBlock = await this.getBlockCount();
+
+    await this.mineBlocks(numBlocks);
+
+    await this.waitForBlocksMined({
+      startBlock,
+      expectedIncrease: numBlocks,
+    });
+  }
+
   private async call(method: string, params: any[]) {
     try {
       const { fetch, Headers } = getFetch();
@@ -376,17 +387,20 @@ export class BitcoinFaucet {
   async waitForBlocksMined({
     startBlock,
     expectedIncrease,
-    timeoutMs = 15000,
-    intervalMs = 200,
+    timeoutMs = 30000,
+    intervalMs = 5000,
   }: {
     startBlock: number;
     expectedIncrease: number;
     timeoutMs?: number;
     intervalMs?: number;
   }) {
+    const deadline = Date.now() + timeoutMs;
+    // Give some time for the blocks to be mined and the chain watcher to catch up.
+    await new Promise((r) => setTimeout(r, intervalMs));
+
     const start = startBlock;
     const target = start + expectedIncrease;
-    const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const currentBlock = await this.getBlockCount();
       if (currentBlock >= target) return currentBlock;

@@ -17,7 +17,7 @@ describe("SSP static deposit address integration", () => {
       } = await initTestingWallet(DEPOSIT_AMOUNT, "LOCAL");
 
       // Wait for the transaction to be mined
-      await faucet.mineBlocks(6);
+      await faucet.mineBlocksAndWaitForMiningToComplete(6);
 
       const transactionId = signedTx.id;
 
@@ -30,11 +30,9 @@ describe("SSP static deposit address integration", () => {
         fee: 301,
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 10000));
-
       await faucet.broadcastTx(txHex);
 
-      await faucet.mineBlocks(6);
+      await faucet.mineBlocksAndWaitForMiningToComplete(6);
 
       // Second refund attempt should fail
       console.log(
@@ -60,7 +58,7 @@ describe("SSP static deposit address integration", () => {
       } = await initTestingWallet(DEPOSIT_AMOUNT, "LOCAL");
 
       // Wait for the transaction to be mined
-      await faucet.mineBlocks(6);
+      await faucet.mineBlocksAndWaitForMiningToComplete(6);
 
       const transactionId = signedTx.id;
 
@@ -73,8 +71,6 @@ describe("SSP static deposit address integration", () => {
             satsPerVbyteFee: 2,
           }),
       );
-
-      await faucet.mineBlocks(6);
 
       expect(txId).toBeDefined();
     }, 600000);
@@ -91,7 +87,7 @@ describe("SSP static deposit address integration", () => {
       } = await initTestingWallet(DEPOSIT_AMOUNT, "LOCAL");
 
       // Wait for the transaction to be mined
-      await faucet.mineBlocks(6);
+      await faucet.mineBlocksAndWaitForMiningToComplete(6);
 
       const transactionId = signedTx.id;
 
