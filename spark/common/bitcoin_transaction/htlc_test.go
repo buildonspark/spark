@@ -2,6 +2,7 @@ package bitcointransaction
 
 import (
 	"bytes"
+	"encoding/hex"
 	"testing"
 
 	"github.com/btcsuite/btcd/txscript"
@@ -102,4 +103,67 @@ func TestCreateDirectLightningHTLCTransaction_SubtractsFee(t *testing.T) {
 	require.NotNil(t, htlcTx)
 	require.Len(t, htlcTx.TxOut, 1)
 	assert.Equal(t, amount-int64(fee), htlcTx.TxOut[0].Value)
+}
+
+func TestCreateHashLockScript(t *testing.T) {
+	hash, err := hex.DecodeString("02d3bb7a73d1cbdf5193f69bfdac92143703b4e90d7e993dd5644bdda1c0bde1")
+	require.NoError(t, err)
+
+	pk, err := keys.ParsePublicKeyHex("0247997a5c32ccf934257a675c306bf6ec37019358240156628af62baad7066a83")
+	require.NoError(t, err)
+
+	script, err := CreateHashLockScript(hash, pk)
+	require.NoError(t, err)
+
+	require.Equal(
+		t,
+		"a82002d3bb7a73d1cbdf5193f69bfdac92143703b4e90d7e993dd5644bdda1c0bde1882047997a5c32ccf934257a675c306bf6ec37019358240156628af62baad7066a83ac",
+		hex.EncodeToString(script),
+	)
+}
+
+func TestCreateSequenceLockScript(t *testing.T) {
+	pk, err := keys.ParsePublicKeyHex("0247997a5c32ccf934257a675c306bf6ec37019358240156628af62baad7066a83")
+	require.NoError(t, err)
+
+	// Run tests with different sequence values since AddInt64 does some optimizations depending
+	// on how it can pack the value.
+	tests := []struct {
+		name     string
+		pubKey   keys.Public
+		sequence uint32
+		expected string
+	}{
+		{
+			name:     "0 sequence",
+			pubKey:   pk,
+			sequence: 0,
+			expected: "00b2752047997a5c32ccf934257a675c306bf6ec37019358240156628af62baad7066a83ac",
+		},
+		{
+			name:     "< 16 sequence",
+			pubKey:   pk,
+			sequence: 15,
+			expected: "5fb2752047997a5c32ccf934257a675c306bf6ec37019358240156628af62baad7066a83ac",
+		},
+		{
+			name:     "> 16 sequence",
+			pubKey:   pk,
+			sequence: 2160,
+			expected: "027008b2752047997a5c32ccf934257a675c306bf6ec37019358240156628af62baad7066a83ac",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			script, err := CreateSequenceLockScript(tt.sequence, tt.pubKey)
+			require.NoError(t, err)
+
+			require.Equal(
+				t,
+				tt.expected,
+				hex.EncodeToString(script),
+			)
+		})
+	}
 }

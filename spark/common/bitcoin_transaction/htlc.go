@@ -76,7 +76,7 @@ func createHTLCTaprootAddress(network common.Network, hash []byte, hashLockDesti
 	}
 	hashLockLeaf := txscript.NewBaseTapLeaf(hashLockScript)
 
-	sequenceLockScript, err := CreateSequencLockScript(sequence, sequenceLockDestinationPubkey)
+	sequenceLockScript, err := CreateSequenceLockScript(sequence, sequenceLockDestinationPubkey)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func CreateHashLockScript(hash []byte, destinationPubkey keys.Public) (script []
 	return builder.Script()
 }
 
-func CreateSequencLockScript(sequence uint32, destinationPubkey keys.Public) (script []byte, err error) {
+func CreateSequenceLockScript(sequence uint32, destinationPubkey keys.Public) (script []byte, err error) {
 	builder := txscript.NewScriptBuilder()
 	builder.AddInt64(int64(sequence))
 	builder.AddOp(txscript.OP_CHECKSEQUENCEVERIFY)

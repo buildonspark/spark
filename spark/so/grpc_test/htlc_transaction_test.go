@@ -214,7 +214,7 @@ func createSenderSpendTx(t *testing.T, htlcTx *wire.MsgTx, senderKey keys.Privat
 	senderSpendTx.AddTxOut(wire.NewTxOut(outputAmount, senderPkScript))
 
 	// Create the sequence lock script for signing
-	sequenceLockScript, err := bitcointransaction.CreateSequencLockScript(5, senderPubKey)
+	sequenceLockScript, err := bitcointransaction.CreateSequenceLockScript(5, senderPubKey)
 	require.NoError(t, err)
 	sequenceLockLeaf := txscript.NewBaseTapLeaf(sequenceLockScript)
 
@@ -283,7 +283,7 @@ func createReceiverSpendTx(t *testing.T, htlcTx *wire.MsgTx, receiverKey keys.Pr
 	hashLockLeaf := txscript.NewBaseTapLeaf(hashLockScript)
 
 	// Create sequence lock script (needed for taproot tree) - must match HTLC creation
-	sequenceLockScript, err := bitcointransaction.CreateSequencLockScript(5, senderPubKey)
+	sequenceLockScript, err := bitcointransaction.CreateSequenceLockScript(5, senderPubKey)
 	require.NoError(t, err)
 	sequenceLockLeaf := txscript.NewBaseTapLeaf(sequenceLockScript)
 
