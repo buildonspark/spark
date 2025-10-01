@@ -367,6 +367,7 @@ func (h *InternalSignTokenHandler) getPartialRevocationSecretShares(
 	inputOperatorShareMap map[ShareKey]ShareValue,
 ) (map[uuid.UUID][]*ent.TokenPartialRevocationSecretShare, error) {
 	ctx, span := tracer.Start(ctx, "InternalSignTokenHandler.getPartialRevocationSecretShares")
+	defer span.End()
 
 	// Build exclusion arrays for UNNEST
 	var excludeOutputIDs []uuid.UUID
