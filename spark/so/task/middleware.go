@@ -120,6 +120,8 @@ func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration
 		)
 
 		ctx = ent.Inject(ctx, session)
+		ctx = ent.InjectNotifier(ctx, session)
+
 		err := task.Task(ctx, config, knobsService)
 
 		tx := session.GetTxIfExists()
