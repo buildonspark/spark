@@ -15,8 +15,7 @@ import (
 )
 
 func TestGeneratePrivateKey(t *testing.T) {
-	privKey, err := GeneratePrivateKey()
-	require.NoError(t, err)
+	privKey := GeneratePrivateKey()
 	assert.NotNil(t, privKey)
 	assert.Len(t, privKey.Serialize(), 32)
 }

@@ -69,8 +69,7 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 			handler := NewInternalPrepareTokenHandler(cfg)
 
 			// Arrange: create a TokenCreate on tokenNet
-			issuerPriv, err := keys.GeneratePrivateKey()
-			require.NoError(t, err)
+			issuerPriv := keys.GeneratePrivateKey()
 
 			tokenCreate := dbtx.TokenCreate.Create().
 				SetIssuerPublicKey(issuerPriv.Public()).

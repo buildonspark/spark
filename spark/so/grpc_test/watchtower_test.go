@@ -27,8 +27,7 @@ func TestTimelockExpirationHappyPath(t *testing.T) {
 	faucet := sparktesting.GetFaucetInstance(client)
 	require.NoError(t, faucet.Refill())
 
-	leafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(walletConfig, faucet, leafPrivKey, 100_000)
 	require.NoError(t, err)
 
@@ -149,19 +148,16 @@ func TestTimelockExpirationTransferredNode(t *testing.T) {
 	require.NoError(t, faucet.Refill())
 
 	// Create sender wallet and tree
-	senderLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	senderLeafPrivKey := keys.GeneratePrivateKey()
 	senderRootNode, err := wallet.CreateNewTree(walletConfig, faucet, senderLeafPrivKey, 100_000)
 	require.NoError(t, err)
 
 	// Create receiver wallet
-	receiverPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	receiverPrivKey := keys.GeneratePrivateKey()
 	receiverConfig := wallet.NewTestWalletConfigWithIdentityKey(t, receiverPrivKey)
 
 	// Prepare transfer - sender creates new signing key for the transfer
-	newLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	newLeafPrivKey := keys.GeneratePrivateKey()
 
 	transferNode := wallet.LeafKeyTweak{
 		Leaf:              senderRootNode,
@@ -201,8 +197,7 @@ func TestTimelockExpirationTransferredNode(t *testing.T) {
 	require.Equal(t, newLeafPrivKey.Serialize(), leafPrivKeyMap[senderRootNode.Id])
 
 	// Receiver claims the transfer with a final signing key
-	finalLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to create final node signing private key")
+	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              receiverTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    newLeafPrivKey,
@@ -349,14 +344,12 @@ func TestTimelockExpirationAfterLightningTransfer(t *testing.T) {
 	require.NotNil(t, invoice)
 
 	// SSP creates a node of 12345 sats
-	sspLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	sspLeafPrivKey := keys.GeneratePrivateKey()
 	feeSats := uint64(0)
 	nodeToSend, err := wallet.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
 	require.NoError(t, err)
 
-	newLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	newLeafPrivKey := keys.GeneratePrivateKey()
 
 	leaves := []wallet.LeafKeyTweak{{
 		Leaf:              nodeToSend,
@@ -402,8 +395,7 @@ func TestTimelockExpirationAfterLightningTransfer(t *testing.T) {
 	require.Equal(t, leafPrivKeyMap[nodeToSend.Id], newLeafPrivKey.Serialize(), "wrong leaf signing private key")
 
 	// User claims the transfer with a final signing key
-	finalLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to create final node signing private key")
+	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              receiverTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    newLeafPrivKey,

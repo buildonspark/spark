@@ -125,14 +125,12 @@ func TestReceiveLightningPayment(t *testing.T) {
 	assert.NotNil(t, invoice)
 
 	// SSP creates a node of 12345 sats
-	sspLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	sspLeafPrivKey := keys.GeneratePrivateKey()
 	feeSats := uint64(0)
 	nodeToSend, err := wallet.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
 	require.NoError(t, err)
 
-	newLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	newLeafPrivKey := keys.GeneratePrivateKey()
 
 	leaves := []wallet.LeafKeyTweak{{
 		Leaf:              nodeToSend,
@@ -185,20 +183,14 @@ func TestReceiveLightningPayment(t *testing.T) {
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), userConfig, receiverTransfer)
 	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
 
-	finalLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to create new node signing private key")
+	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              receiverTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
-	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
-	_, err = wallet.ClaimTransfer(
-		receiverCtx,
-		receiverTransfer,
-		userConfig,
-		leavesToClaim[:],
-	)
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
+	_, err = wallet.ClaimTransfer(receiverCtx, receiverTransfer, userConfig, leavesToClaim)
 	require.NoError(t, err, "failed to ClaimTransfer")
 }
 
@@ -222,14 +214,12 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 
 	paymentAmountSats := uint64(15000)
 	// SSP creates a node of sats equals to the payment amount
-	sspLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	sspLeafPrivKey := keys.GeneratePrivateKey()
 	feeSats := uint64(0)
 	nodeToSend, err := wallet.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, int64(paymentAmountSats))
 	require.NoError(t, err)
 
-	newLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	newLeafPrivKey := keys.GeneratePrivateKey()
 
 	leaves := []wallet.LeafKeyTweak{{
 		Leaf:              nodeToSend,
@@ -270,20 +260,14 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), userConfig, receiverTransfer)
 	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
 
-	finalLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to create new node signing private key")
+	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              receiverTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
-	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
-	_, err = wallet.ClaimTransfer(
-		receiverCtx,
-		receiverTransfer,
-		userConfig,
-		leavesToClaim[:],
-	)
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
+	_, err = wallet.ClaimTransfer(receiverCtx, receiverTransfer, userConfig, leavesToClaim)
 	require.NoError(t, err, "failed to ClaimTransfer")
 }
 
@@ -303,14 +287,12 @@ func TestReceiveLightningPaymentCannotCancelAfterPreimageReveal(t *testing.T) {
 	assert.NotNil(t, invoice)
 
 	// SSP creates a node of 12345 sats
-	sspLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	sspLeafPrivKey := keys.GeneratePrivateKey()
 	feeSats := uint64(0)
 	nodeToSend, err := wallet.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
 	require.NoError(t, err)
 
-	newLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	newLeafPrivKey := keys.GeneratePrivateKey()
 
 	leaves := []wallet.LeafKeyTweak{{
 		Leaf:              nodeToSend,
@@ -349,14 +331,12 @@ func TestSendLightningPayment(t *testing.T) {
 	defer cleanUp(t, userConfig, paymentHash)
 
 	// User creates a node of 12345 sats
-	userLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	userLeafPrivKey := keys.GeneratePrivateKey()
 	feeSats := uint64(2)
 	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
 	require.NoError(t, err)
 
-	newLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	newLeafPrivKey := keys.GeneratePrivateKey()
 
 	leaves := []wallet.LeafKeyTweak{{
 		Leaf:              nodeToSend,
@@ -404,19 +384,18 @@ func TestSendLightningPayment(t *testing.T) {
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), sspConfig, receiverTransfer)
 	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
 
-	finalLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to create new node signing private key")
+	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              receiverTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
-	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
 	_, err = wallet.ClaimTransfer(
 		receiverCtx,
 		receiverTransfer,
 		sspConfig,
-		leavesToClaim[:],
+		leavesToClaim,
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
 }
@@ -433,14 +412,12 @@ func TestSendLightningPaymentV2(t *testing.T) {
 	defer cleanUp(t, userConfig, paymentHash)
 
 	// User creates a node of 12345 sats
-	userLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	userLeafPrivKey := keys.GeneratePrivateKey()
 	feeSats := uint64(2)
 	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
 	require.NoError(t, err)
 
-	newLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	newLeafPrivKey := keys.GeneratePrivateKey()
 
 	leaves := []wallet.LeafKeyTweak{{
 		Leaf:              nodeToSend,
@@ -488,19 +465,18 @@ func TestSendLightningPaymentV2(t *testing.T) {
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), sspConfig, receiverTransfer)
 	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
 
-	finalLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to create new node signing private key")
+	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              receiverTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
-	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
 	_, err = wallet.ClaimTransfer(
 		receiverCtx,
 		receiverTransfer,
 		sspConfig,
-		leavesToClaim[:],
+		leavesToClaim,
 	)
 	require.NoError(t, err, "failed to ClaimTransfer")
 }
@@ -517,14 +493,12 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 	defer cleanUp(t, userConfig, paymentHash)
 
 	// User creates a node of 12345 sats
-	userLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	userLeafPrivKey := keys.GeneratePrivateKey()
 	feeSats := uint64(2)
 	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
 	require.NoError(t, err)
 
-	newLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	newLeafPrivKey := keys.GeneratePrivateKey()
 
 	leaves := []wallet.LeafKeyTweak{{
 		Leaf:              nodeToSend,
@@ -606,14 +580,12 @@ func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
 	assert.NotNil(t, invoice)
 
 	// SSP creates a node of 12345 sats
-	sspLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	sspLeafPrivKey := keys.GeneratePrivateKey()
 	feeSats := uint64(0)
 	nodeToSend, err := wallet.CreateNewTree(sspConfig, faucet, sspLeafPrivKey, 12345)
 	require.NoError(t, err)
 
-	newLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	newLeafPrivKey := keys.GeneratePrivateKey()
 
 	leaves := []wallet.LeafKeyTweak{{
 		Leaf:              nodeToSend,
@@ -656,14 +628,12 @@ func TestSendLightningPaymentTwice(t *testing.T) {
 	defer cleanUp(t, userConfig, paymentHash)
 
 	// User creates a node of 12345 sats
-	userLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	userLeafPrivKey := keys.GeneratePrivateKey()
 	feeSats := uint64(2)
 	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
 	require.NoError(t, err)
 
-	newLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	newLeafPrivKey := keys.GeneratePrivateKey()
 
 	leaves := []wallet.LeafKeyTweak{{
 		Leaf:              nodeToSend,
@@ -710,7 +680,7 @@ func TestSendLightningPaymentTwice(t *testing.T) {
 		require.NoError(t, err)
 		totalValue += value
 	}
-	assert.Equal(t, totalValue, int64(12345+feeSats))
+	assert.Equal(t, int64(12345+feeSats), totalValue)
 
 	receiverTransfer, err := wallet.ProvidePreimage(t.Context(), sspConfig, preimage[:])
 	require.NoError(t, err)
@@ -724,20 +694,14 @@ func TestSendLightningPaymentTwice(t *testing.T) {
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), sspConfig, receiverTransfer)
 	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
 
-	finalLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to create new node signing private key")
+	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              receiverTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
-	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
-	_, err = wallet.ClaimTransfer(
-		receiverCtx,
-		receiverTransfer,
-		sspConfig,
-		leavesToClaim[:],
-	)
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
+	_, err = wallet.ClaimTransfer(receiverCtx, receiverTransfer, sspConfig, leavesToClaim)
 	require.NoError(t, err, "failed to ClaimTransfer")
 }
 
@@ -755,14 +719,11 @@ func TestSendLightningPaymentWithHTLC(t *testing.T) {
 	defer cleanUp(t, userConfig, paymentHash)
 
 	// User creates a node of 12345 sats
-	userLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	userLeafPrivKey := keys.GeneratePrivateKey()
 	feeSats := uint64(2)
 	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
 	require.NoError(t, err)
-
-	newLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	newLeafPrivKey := keys.GeneratePrivateKey()
 
 	leaves := []wallet.LeafKeyTweak{{
 		Leaf:              nodeToSend,
@@ -809,19 +770,13 @@ func TestSendLightningPaymentWithHTLC(t *testing.T) {
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), sspConfig, receiverTransfer)
 	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, nodeToSend, newLeafPrivKey)
 
-	finalLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to create new node signing private key")
+	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              receiverTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    newLeafPrivKey,
 		NewSigningPrivKey: finalLeafPrivKey,
 	}
-	leavesToClaim := [1]wallet.LeafKeyTweak{claimingNode}
-	_, err = wallet.ClaimTransfer(
-		receiverCtx,
-		receiverTransfer,
-		sspConfig,
-		leavesToClaim[:],
-	)
+	leavesToClaim := []wallet.LeafKeyTweak{claimingNode}
+	_, err = wallet.ClaimTransfer(receiverCtx, receiverTransfer, sspConfig, leavesToClaim)
 	require.NoError(t, err, "failed to ClaimTransfer")
 }

@@ -86,8 +86,7 @@ func TestSigHashFromTx(t *testing.T) {
 }
 
 func TestVerifySignature(t *testing.T) {
-	privKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	privKey := keys.GeneratePrivateKey()
 	addr, err := P2TRAddressFromPublicKey(privKey.Public(), Regtest)
 	require.NoError(t, err)
 	address, err := btcutil.DecodeAddress(addr, &chaincfg.RegressionNetParams)

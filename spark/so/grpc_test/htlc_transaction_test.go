@@ -15,9 +15,7 @@ import (
 )
 
 func createNodeTx(t *testing.T, coin *sparktesting.FaucetCoin, amount int64) (*wire.MsgTx, keys.Private) {
-	signingKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
-
+	signingKey := keys.GeneratePrivateKey()
 	publicKey := signingKey.Public()
 
 	taprootAddr, err := common.P2TRRawAddressFromPublicKey(publicKey, common.Regtest)
@@ -135,8 +133,7 @@ func TestBroadcastAndReceiverSpendHTLCTransaction(t *testing.T) {
 }
 
 func setupHTLCTransaction(t *testing.T, preimage []byte, client *rpcclient.Client) (*wire.MsgTx, keys.Private, keys.Private, keys.Private) {
-	minerKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	minerKey := keys.GeneratePrivateKey()
 
 	minderAddress, err := common.P2TRRawAddressFromPublicKey(minerKey.Public(), common.Regtest)
 	require.NoError(t, err)
@@ -158,12 +155,10 @@ func setupHTLCTransaction(t *testing.T, preimage []byte, client *rpcclient.Clien
 	require.NoError(t, err)
 
 	// Setup HTLC transaction
-	receiverKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	receiverKey := keys.GeneratePrivateKey()
 	receiverPubKey := receiverKey.Public()
 
-	senderKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	senderKey := keys.GeneratePrivateKey()
 	senderPubKey := senderKey.Public()
 
 	paymentHash := sha256.Sum256(preimage)
@@ -171,11 +166,9 @@ func setupHTLCTransaction(t *testing.T, preimage []byte, client *rpcclient.Clien
 	htlcTx, err := bitcointransaction.CreateLightningHTLCTransactionWithSequence(signedNodeTx, 0, common.Regtest, 0, 5, paymentHash[:], receiverPubKey, senderPubKey, true)
 	require.NoError(t, err)
 
-	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(
-		signedNodeTx.TxOut[0].PkScript, signedNodeTx.TxOut[0].Value,
-	)
+	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(signedNodeTx.TxOut[0].PkScript, signedNodeTx.TxOut[0].Value)
 	sighashes := txscript.NewTxSigHashes(htlcTx, prevOutputFetcher)
-	fakeTapscriptRootHash := []byte{}
+	var fakeTapscriptRootHash []byte
 	sig, err := txscript.RawTxInTaprootSignature(
 		htlcTx, sighashes, 0, signedNodeTx.TxOut[0].Value, signedNodeTx.TxOut[0].PkScript,
 		fakeTapscriptRootHash, txscript.SigHashDefault, nodeSigningKey.ToBTCEC(),

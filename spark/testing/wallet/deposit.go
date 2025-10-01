@@ -483,17 +483,9 @@ func ClaimStaticDepositLegacy(
 		return nil, nil, fmt.Errorf("failed to get sighash: %w", err)
 	}
 
-	hidingPriv, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, nil, err
-	}
-	bindingPriv, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, nil, err
-	}
-	hidingPubBytes := hidingPriv.Public().Serialize()
-	bindingPubBytes := bindingPriv.Public().Serialize()
-	spendTxNonceCommitment, err := objects.NewSigningCommitment(bindingPubBytes, hidingPubBytes)
+	hidingPriv := keys.GeneratePrivateKey()
+	bindingPriv := keys.GeneratePrivateKey()
+	spendTxNonceCommitment, err := objects.NewSigningCommitment(bindingPriv.Public().Serialize(), hidingPriv.Public().Serialize())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -673,14 +665,8 @@ func RefundStaticDepositLegacy(
 		return nil, fmt.Errorf("failed to get sighash: %w", err)
 	}
 
-	hidingPriv, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, err
-	}
-	bindingPriv, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, err
-	}
+	hidingPriv := keys.GeneratePrivateKey()
+	bindingPriv := keys.GeneratePrivateKey()
 	hidingPubBytes := hidingPriv.Public().Serialize()
 	bindingPubBytes := bindingPriv.Public().Serialize()
 	spendTxNonceCommitment, err := objects.NewSigningCommitment(bindingPubBytes, hidingPubBytes)
@@ -878,14 +864,8 @@ func RefundStaticDeposit(
 		return nil, fmt.Errorf("failed to get sighash: %w", err)
 	}
 
-	hidingPriv, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, err
-	}
-	bindingPriv, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, err
-	}
+	hidingPriv := keys.GeneratePrivateKey()
+	bindingPriv := keys.GeneratePrivateKey()
 	hidingPubBytes := hidingPriv.Public().Serialize()
 	bindingPubBytes := bindingPriv.Public().Serialize()
 	spendTxNonceCommitment, err := objects.NewSigningCommitment(bindingPubBytes, hidingPubBytes)
@@ -1106,10 +1086,7 @@ func CreateNewTree(config *TestWalletConfig, faucet *sparktesting.Faucet, privKe
 	if err != nil {
 		return nil, fmt.Errorf("failed to broadcast deposit tx: %w", err)
 	}
-	randomKey, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate random key: %w", err)
-	}
+	randomKey := keys.GeneratePrivateKey()
 	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate random address: %w", err)

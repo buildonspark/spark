@@ -1544,14 +1544,10 @@ func TestValidateRevocationKeysErrors(t *testing.T) {
 func TestHashFreezeTokensPayloadErrors(t *testing.T) {
 	t.Parallel()
 
-	ownerPrivKey, _ := keys.GeneratePrivateKey()
-	ownerPubKey := ownerPrivKey.Public()
-	tokenPrivKey, _ := keys.GeneratePrivateKey()
-	tokenPubKey := tokenPrivKey.Public()
-	operatorPrivKey, _ := keys.GeneratePrivateKey()
-	operatorPubKey := operatorPrivKey.Public()
-	tokenIdentifier := make([]byte, 32)
-	copy(tokenIdentifier, "test_token_identifier_32bytes___")
+	ownerPubKey := keys.GeneratePrivateKey().Public()
+	tokenPubKey := keys.GeneratePrivateKey().Public()
+	operatorPubKey := keys.GeneratePrivateKey().Public()
+	tokenIdentifier := []byte("test_token_identifier_32bytes___")
 
 	tests := []struct {
 		name    string

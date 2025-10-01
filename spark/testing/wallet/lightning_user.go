@@ -99,11 +99,7 @@ func CreateLightningInvoiceWithPreimage(
 
 // CreateLightningInvoice creates a Lightning invoice and sends the preimage shares to the signing operators.
 func CreateLightningInvoice(ctx context.Context, config *TestWalletConfig, creator LightningInvoiceCreator, amountSats uint64, memo string) (*string, int64, error) {
-	preimagePrivKey, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, 0, err
-	}
-
+	preimagePrivKey := keys.GeneratePrivateKey()
 	preimage := preimagePrivKey.Serialize()
 	return CreateLightningInvoiceWithPreimage(ctx, config, creator, amountSats, memo, [32]byte(preimage))
 }

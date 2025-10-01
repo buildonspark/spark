@@ -284,8 +284,7 @@ func TestApplySignatures(t *testing.T) {
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 	}
 
-	key, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	key := keys.GeneratePrivateKey()
 
 	// Create test tx bytes
 	btcecPriv := key.ToBTCEC()

@@ -118,16 +118,10 @@ func createTestTokenMintTransaction(config *wallet.TestWalletConfig, tokenIdenti
 
 func createTestTokenMintTransactionWithParams(config *wallet.TestWalletConfig, issuerPublicKey keys.Public) (*pb.TokenTransaction, keys.Private, keys.Private, error) {
 	// Generate two user output key pairs
-	userOutput1PrivKey, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, keys.Private{}, keys.Private{}, err
-	}
+	userOutput1PrivKey := keys.GeneratePrivateKey()
 	userOutput1PubKeyBytes := userOutput1PrivKey.Public().Serialize()
 
-	userOutput2PrivKey, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, keys.Private{}, keys.Private{}, err
-	}
+	userOutput2PrivKey := keys.GeneratePrivateKey()
 	userOutput2PubKeyBytes := userOutput2PrivKey.Public().Serialize()
 
 	mintTokenTransaction := &pb.TokenTransaction{
@@ -165,10 +159,7 @@ func createTestTokenTransferTransactionWithParams(
 	finalIssueTokenTransactionHash []byte,
 	issuerPublicKey keys.Public,
 ) (*pb.TokenTransaction, keys.Private, error) {
-	userOutput3PrivKey, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, keys.Private{}, err
-	}
+	userOutput3PrivKey := keys.GeneratePrivateKey()
 	userOutput3PubKeyBytes := userOutput3PrivKey.Public().Serialize()
 
 	transferTokenTransaction := &pb.TokenTransaction{
@@ -203,16 +194,11 @@ func createTestTokenMintTransactionWithMultipleTokenOutputs(config *wallet.TestW
 	userOutputPrivKeys := make([]keys.Private, numOutputs)
 	outputOutputs := make([]*pb.TokenOutput, numOutputs)
 
-	for i := 0; i < numOutputs; i++ {
-		privKey, err := keys.GeneratePrivateKey()
-		if err != nil {
-			return nil, nil, err
-		}
+	for i := range numOutputs {
+		privKey := keys.GeneratePrivateKey()
 		userOutputPrivKeys[i] = privKey
-		pubKeyBytes := privKey.Public().Serialize()
-
 		outputOutputs[i] = &pb.TokenOutput{
-			OwnerPublicKey: pubKeyBytes,
+			OwnerPublicKey: privKey.Public().Serialize(),
 			TokenPublicKey: issuerPublicKey.Serialize(),
 			TokenAmount:    int64ToUint128Bytes(0, uint64(testIssueMultiplePerOutputAmount)),
 		}
@@ -296,10 +282,7 @@ func TestQueryPartiallySpentTokenOutputsNotReturned(t *testing.T) {
 	mintTxHash, err := utils.HashTokenTransactionV0(broadcastMintResponse, false)
 	require.NoError(t, err, "failed to hash token transaction: %v", err)
 
-	receiverPrivateKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to generate receiver private key: %v", err)
-	receiverPubKeyBytes := receiverPrivateKey.Public().Serialize()
-
+	receiverPrivateKey := keys.GeneratePrivateKey()
 	transferTokenTransaction := &pb.TokenTransaction{
 		TokenInputs: &pb.TokenTransaction_TransferInput{
 			TransferInput: &pb.TokenTransferInput{
@@ -313,7 +296,7 @@ func TestQueryPartiallySpentTokenOutputsNotReturned(t *testing.T) {
 		},
 		TokenOutputs: []*pb.TokenOutput{
 			{
-				OwnerPublicKey: receiverPubKeyBytes,
+				OwnerPublicKey: receiverPrivateKey.Public().Serialize(),
 				TokenPublicKey: tokenIdentityPubkeyBytes,
 				TokenAmount:    int64ToUint128Bytes(0, TestIssueOutput1Amount),
 			},
@@ -633,8 +616,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfOutputs(t *testing.
 	require.NoError(t, err, "failed to hash final issuance token transaction")
 
 	// Create consolidation transaction
-	consolidatedOutputPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to generate private key")
+	consolidatedOutputPrivKey := keys.GeneratePrivateKey()
 
 	consolidatedOutputPubKeyBytes := consolidatedOutputPrivKey.Public().Serialize()
 
@@ -848,8 +830,7 @@ func TestV0FreezeAndUnfreezeTokens(t *testing.T) {
 
 // Enables creation of a unique issuer key for each token creation to avoid duplicate key errors across tests.
 func getRandomPrivateKey(t *testing.T) keys.Private {
-	uniqueIssuerPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to generate unique issuer private key")
+	uniqueIssuerPrivKey := keys.GeneratePrivateKey()
 	return uniqueIssuerPrivKey
 }
 
@@ -950,8 +931,7 @@ func testMintTransactionSigningScenarios(t *testing.T, config *wallet.TestWallet
 
 	if testInvalidSigningOperatorPublicKey {
 		// Generate a new random key to replace the valid one
-		randomKey, err := keys.GeneratePrivateKey()
-		require.NoError(t, err, "failed to generate random key")
+		randomKey := keys.GeneratePrivateKey()
 		for operatorID := range config.SigningOperators {
 			config.SigningOperators[operatorID].IdentityPublicKey = randomKey.Public()
 			break // Only modify the first operator
@@ -1282,8 +1262,7 @@ func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.TestWa
 
 	if testInvalidSigningOperatorPublicKey {
 		// Generate a new random key to replace the valid one
-		randomKey, err := keys.GeneratePrivateKey()
-		require.NoError(t, err, "failed to generate random key")
+		randomKey := keys.GeneratePrivateKey()
 		for operatorID := range config.SigningOperators {
 			config.SigningOperators[operatorID].IdentityPublicKey = randomKey.Public()
 			break // Only modify the first operator

@@ -17,10 +17,8 @@ func TestCreateLightningHTLCTransaction_BuildsExpectedTx(t *testing.T) {
 	// Arrange
 	network := common.Regtest
 	hash := bytes.Repeat([]byte{0x11}, 32)
-	hashLockPriv, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
-	sequenceLockPriv, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	hashLockPriv := keys.GeneratePrivateKey()
+	sequenceLockPriv := keys.GeneratePrivateKey()
 
 	// Build a simple node tx with one input and one output
 	parentOutPoint := &wire.OutPoint{}
@@ -73,10 +71,8 @@ func TestCreateDirectLightningHTLCTransaction_SubtractsFee(t *testing.T) {
 	// Arrange
 	network := common.Regtest
 	hash := bytes.Repeat([]byte{0x22}, 32)
-	hashLockPriv, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
-	sequenceLockPriv, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	hashLockPriv := keys.GeneratePrivateKey()
+	sequenceLockPriv := keys.GeneratePrivateKey()
 
 	parentOutPoint := &wire.OutPoint{}
 	nodeTx := wire.NewMsgTx(3)

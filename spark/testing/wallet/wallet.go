@@ -184,10 +184,7 @@ func (w *SingleKeyTestWallet) PayInvoice(ctx context.Context, invoice string) (s
 	nodeKeyTweaks := make([]LeafKeyTweak, len(nodes))
 	nodesToRemove := make(map[string]bool)
 	for i, node := range nodes {
-		newLeafPrivKey, err := keys.GeneratePrivateKey()
-		if err != nil {
-			return "", fmt.Errorf("failed to generate new leaf private key: %w", err)
-		}
+		newLeafPrivKey := keys.GeneratePrivateKey()
 		nodeKeyTweaks[i] = LeafKeyTweak{
 			Leaf:              node,
 			SigningPrivKey:    w.SigningPrivateKey,
@@ -300,14 +297,10 @@ func (w *SingleKeyTestWallet) RequestLeavesSwap(ctx context.Context, targetAmoun
 	leafKeyTweaks := make([]LeafKeyTweak, len(nodes))
 	nodesToRemove := make(map[string]bool)
 	for i, node := range nodes {
-		newLeafPrivKey, err := keys.GeneratePrivateKey()
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate new leaf private key: %w", err)
-		}
 		leafKeyTweaks[i] = LeafKeyTweak{
 			Leaf:              node,
 			SigningPrivKey:    w.SigningPrivateKey,
-			NewSigningPrivKey: newLeafPrivKey,
+			NewSigningPrivKey: keys.GeneratePrivateKey(),
 		}
 		nodesToRemove[node.Id] = true
 	}
@@ -477,10 +470,7 @@ func (w *SingleKeyTestWallet) SendTransfer(ctx context.Context, receiverIdentity
 	leafKeyTweaks := make([]LeafKeyTweak, 0, len(nodes))
 	nodesToRemove := make(map[string]bool)
 	for _, node := range nodes {
-		newLeafPrivKey, err := keys.GeneratePrivateKey()
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate new leaf private key: %w", err)
-		}
+		newLeafPrivKey := keys.GeneratePrivateKey()
 		leafKeyTweaks = append(leafKeyTweaks, LeafKeyTweak{
 			Leaf:              node,
 			SigningPrivKey:    w.SigningPrivateKey,
@@ -508,14 +498,10 @@ func (w *SingleKeyTestWallet) CoopExit(ctx context.Context, targetAmountSats int
 	leafKeyTweaks := make([]LeafKeyTweak, len(nodes))
 	nodesToRemove := make(map[string]bool)
 	for i, node := range nodes {
-		newLeafPrivKey, err := keys.GeneratePrivateKey()
-		if err != nil {
-			return nil, fmt.Errorf("failed to generate new leaf private key: %w", err)
-		}
 		leafKeyTweaks[i] = LeafKeyTweak{
 			Leaf:              node,
 			SigningPrivKey:    w.SigningPrivateKey,
-			NewSigningPrivKey: newLeafPrivKey,
+			NewSigningPrivKey: keys.GeneratePrivateKey(),
 		}
 		nodesToRemove[node.Id] = true
 		leafIDs[i] = node.Id

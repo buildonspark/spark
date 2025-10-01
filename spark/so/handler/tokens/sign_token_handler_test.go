@@ -164,8 +164,7 @@ func setUpCommonTest(t *testing.T) *testSetupCommon {
 	privKey := cfg.IdentityPrivateKey
 	pubKey := privKey.Public()
 
-	mockOperatorPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	mockOperatorPrivKey := keys.GeneratePrivateKey()
 	mockOperatorPubKey := mockOperatorPrivKey.Public()
 
 	coordinatorPrivKey := cfg.IdentityPrivateKey
@@ -213,8 +212,7 @@ func setUpCommonTest(t *testing.T) *testSetupCommon {
 }
 
 func createCreateTokenTransactionProto(t *testing.T, setup *testSetupCommon) (*tokenpb.TokenTransaction, []byte, []byte, []byte) {
-	creationEntityPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	creationEntityPrivKey := keys.GeneratePrivateKey()
 	createInput := &tokenpb.TokenCreateInput{
 		TokenName:               testTokenName,
 		TokenTicker:             testTokenTicker,

@@ -25,8 +25,7 @@ func setupUsers(t *testing.T, amountSats int64) (*wallet.TestWalletConfig, *wall
 	config := wallet.NewTestWalletConfig(t)
 	sspConfig := wallet.NewTestWalletConfig(t)
 
-	leafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	leafPrivKey := keys.GeneratePrivateKey()
 
 	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, amountSats)
 	require.NoError(t, err)
@@ -66,8 +65,7 @@ func createTestCoopExitAndConnectorOutputs(
 	intermediateOutPoint := wire.NewOutPoint(&exitTxHash, 1)
 	var connectorP2trAddrs []string
 	for range leafCount + 1 {
-		connectorPrivKey, err := keys.GeneratePrivateKey()
-		require.NoError(t, err)
+		connectorPrivKey := keys.GeneratePrivateKey()
 		connectorAddress, err := common.P2TRAddressFromPublicKey(connectorPrivKey.Public(), config.Network)
 		require.NoError(t, err)
 		connectorP2trAddrs = append(connectorP2trAddrs, connectorAddress)
@@ -114,8 +112,7 @@ func TestCoopExitBasic(t *testing.T) {
 	config, sspConfig, transferNode := setupUsers(t, amountSats)
 
 	// SSP creates transactions
-	withdrawPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	withdrawPrivKey := keys.GeneratePrivateKey()
 	exitTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
 		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
 	)
@@ -143,8 +140,7 @@ func TestCoopExitBasic(t *testing.T) {
 	require.NoError(t, err)
 
 	// Make sure the exit tx gets enough confirmations
-	randomKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	randomKey := keys.GeneratePrivateKey()
 	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
 	require.NoError(t, err)
 	// Confirm extra buffer to scan more blocks than needed
@@ -170,8 +166,7 @@ func TestCoopExitBasic(t *testing.T) {
 	// Claim leaf. This requires a loop because sometimes there are
 	// delays in processing blocks, and after the tx initially confirms,
 	// the SO will still reject a claim until the tx has enough confirmations.
-	finalLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              senderTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    sspConfig.IdentityPrivateKey,
@@ -214,8 +209,7 @@ func TestCoopExitCannotClaimBeforeEnoughConfirmations(t *testing.T) {
 	config, sspConfig, transferNode := setupUsers(t, amountSats)
 
 	// SSP creates transactions
-	withdrawPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	withdrawPrivKey := keys.GeneratePrivateKey()
 	exitTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
 		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
 	)
@@ -241,8 +235,7 @@ func TestCoopExitCannotClaimBeforeEnoughConfirmations(t *testing.T) {
 	_, err = client.SendRawTransaction(signedExitTx, true)
 	require.NoError(t, err)
 
-	randomKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	randomKey := keys.GeneratePrivateKey()
 	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
 	require.NoError(t, err)
 	// Confirm half the threshold
@@ -257,8 +250,7 @@ func TestCoopExitCannotClaimBeforeEnoughConfirmations(t *testing.T) {
 	receiverTransfer := waitForPendingTransferToConfirm(sspCtx, t, sspConfig)
 
 	// Try to claim leaf before exit tx confirms -> should fail
-	finalLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              receiverTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    sspConfig.IdentityPrivateKey,
@@ -285,8 +277,7 @@ func TestCoopExitCannotClaimBeforeConfirm(t *testing.T) {
 	config, sspConfig, transferNode := setupUsers(t, amountSats)
 
 	// SSP creates transactions
-	withdrawPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	withdrawPrivKey := keys.GeneratePrivateKey()
 	exitTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
 		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
 	)
@@ -307,8 +298,7 @@ func TestCoopExitCannotClaimBeforeConfirm(t *testing.T) {
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, senderTransfer.Status)
 
 	// Prepare for claim
-	finalLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              senderTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    sspConfig.IdentityPrivateKey,
@@ -340,8 +330,7 @@ func TestCoopExitCancelNoBroadcast(t *testing.T) {
 	amountSats := int64(100_000)
 	config, sspConfig, transferNode := setupUsers(t, amountSats)
 
-	withdrawPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	withdrawPrivKey := keys.GeneratePrivateKey()
 	exitTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
 		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
 	)
@@ -376,8 +365,7 @@ func TestCoopExitCannotCancelAfterBroadcast(t *testing.T) {
 	amountSats := int64(100_000)
 	config, sspConfig, transferNode := setupUsers(t, amountSats)
 
-	withdrawPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	withdrawPrivKey := keys.GeneratePrivateKey()
 	exitTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
 		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
 	)
@@ -405,8 +393,7 @@ func TestCoopExitCannotCancelAfterBroadcast(t *testing.T) {
 	_, err = client.SendRawTransaction(signedExitTx, true)
 	require.NoError(t, err)
 
-	randomKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	randomKey := keys.GeneratePrivateKey()
 	randomPubKey := randomKey.Public()
 	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomPubKey, common.Regtest)
 	require.NoError(t, err)
@@ -444,8 +431,7 @@ func TestCoopExitCannotCancelAfterBroadcast(t *testing.T) {
 	require.Error(t, err, "expected error cancelling transfer after exit tx confirmed")
 
 	// Succeed in claiming
-	finalLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
 		Leaf:              senderTransfer.Leaves[0].Leaf,
 		SigningPrivKey:    sspConfig.IdentityPrivateKey,
@@ -514,8 +500,7 @@ func TestCoopExitFailureToSync(t *testing.T) {
 	}
 
 	// SSP creates transactions
-	withdrawPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	withdrawPrivKey := keys.GeneratePrivateKey()
 	exitTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
 		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
 	)

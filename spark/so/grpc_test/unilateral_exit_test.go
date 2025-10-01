@@ -17,8 +17,7 @@ import (
 func TestUnilateralExitSingleLeaf(t *testing.T) {
 	skipIfGithubActions(t)
 	config := wallet.NewTestWalletConfig(t)
-	leafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, 100_000)
 	require.NoError(t, err)
 

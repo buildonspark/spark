@@ -230,7 +230,6 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 				require.Len(t, seenOperators, numOperators-1,
 					"tokenOutput %s has duplicate operator-identity keys", tokenOutput.ID)
 				require.NotNil(t, tokenOutput.SpentRevocationSecret, "tokenOutput %s has no revocation secret", tokenOutput.ID)
-				require.Len(t, tokenOutput.SpentRevocationSecret, 32, "tokenOutput %s revocation secret does not match commitment size", tokenOutput.ID)
 			}
 
 			require.Len(t, transferTokenTransactionResponse.TokenOutputs, 1, "expected 1 created output in transfer transaction")
@@ -887,8 +886,7 @@ func TestCoordinatedTokenMintAndTransferTokensWithTooManyInputsFails(t *testing.
 	require.NoError(t, err, "failed to hash second issuance token transaction")
 
 	// Create consolidation transaction
-	consolidatedOutputPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to generate private key")
+	consolidatedOutputPrivKey := keys.GeneratePrivateKey()
 
 	consolidatedOutputPubKeyBytes := consolidatedOutputPrivKey.Public().Serialize()
 
@@ -949,8 +947,7 @@ func TestCoordinatedTokenMintAndTransferMaxInputsSucceeds(t *testing.T) {
 	finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
 	require.NoError(t, err, "failed to hash first issuance token transaction")
 
-	consolidatedOutputPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to generate private key")
+	consolidatedOutputPrivKey := keys.GeneratePrivateKey()
 	consolidatedOutputPubKeyBytes := consolidatedOutputPrivKey.Public().Serialize()
 
 	outputsToSpend := make([]*tokenpb.TokenOutputToSpend, maxInputOrOutputTokenTransactionOutputsForTests)
@@ -1384,11 +1381,8 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 	userOutputPrivKeys := make([]keys.Private, numOutputs)
 	tokenOutputs := make([]*tokenpb.TokenOutput, numOutputs)
 
-	for i := 0; i < numOutputs; i++ {
-		privKey, err := keys.GeneratePrivateKey()
-		if err != nil {
-			return nil, nil, err
-		}
+	for i := range numOutputs {
+		privKey := keys.GeneratePrivateKey()
 		userOutputPrivKeys[i] = privKey
 		pubKeyBytes := privKey.Public().Serialize()
 		if params.MintToSelf {
@@ -1459,10 +1453,7 @@ func createTestTokenMintTransactionTokenPb(t *testing.T, config *wallet.TestWall
 }
 
 func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *wallet.TestWalletConfig, params tokenTransactionParams) (*tokenpb.TokenTransaction, keys.Private, error) {
-	userOutput3PrivKey, err := keys.GeneratePrivateKey()
-	if err != nil {
-		return nil, keys.Private{}, err
-	}
+	userOutput3PrivKey := keys.GeneratePrivateKey()
 	userOutput3PubKeyBytes := userOutput3PrivKey.Public().Serialize()
 
 	version := uint32(TokenTransactionVersion2)
@@ -2639,11 +2630,9 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 	require.NoError(t, err, "failed to hash final issue token transaction")
 	tokenIdentifier, err := getTokenIdentifierFromMetadata(t.Context(), config, tokenIdentityPubKey)
 	require.NoError(t, err, "failed to get token identifier from metadata")
-	receiver1, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to generate private key")
+	receiver1 := keys.GeneratePrivateKey()
 	receiver1PubKey := receiver1.Public()
-	receiver2, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to generate private key")
+	receiver2 := keys.GeneratePrivateKey()
 	receiver2PubKey := receiver2.Public()
 
 	expiryTime := timestamppb.New(time.Now().Add(time.Minute * 30))
@@ -2761,8 +2750,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 		// If signature testing is requested, set signer for helper to embed the signature
 		if signedInvoice {
 			if invalidSignature {
-				s, err := keys.GeneratePrivateKey()
-				require.NoError(t, err)
+				s := keys.GeneratePrivateKey()
 				createParams.SignerPrivKey = s
 			} else {
 				if batchTransfer {

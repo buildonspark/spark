@@ -10,7 +10,6 @@ import (
 	"math/big"
 
 	"entgo.io/ent/schema/field"
-
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
@@ -20,12 +19,12 @@ type Private struct {
 }
 
 // GeneratePrivateKey securely generates an secp256k1 private key.
-func GeneratePrivateKey() (Private, error) {
+func GeneratePrivateKey() Private {
 	priv, err := secp256k1.GeneratePrivateKey()
 	if err != nil {
-		return Private{}, err
+		panic(fmt.Sprintf("failed to generate private key; this should be impossible: %v", err))
 	}
-	return Private{key: *priv}, nil
+	return Private{key: *priv}
 }
 
 // MustGeneratePrivateKeyFromRand generates an secp256k1 private key using reader.

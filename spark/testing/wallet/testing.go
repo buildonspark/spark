@@ -8,17 +8,15 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	sparktesting "github.com/lightsparkdev/spark/testing"
-	"github.com/stretchr/testify/require"
 )
 
-// TestWalletConfig returns a wallet configuration that can be used for testing.
+// NewTestWalletConfig returns a wallet configuration that can be used for testing.
 func NewTestWalletConfig(tb testing.TB) *TestWalletConfig {
-	identityPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(tb, err, "failed to generate identity private key")
+	identityPrivKey := keys.GeneratePrivateKey()
 	return NewTestWalletConfigWithIdentityKey(tb, identityPrivKey)
 }
 
-// TestWalletConfigWithIdentityKey returns a wallet configuration with specified identity key that can be used for testing.
+// NewTestWalletConfigWithIdentityKey returns a wallet configuration with specified identity key that can be used for testing.
 func NewTestWalletConfigWithIdentityKey(tb testing.TB, identityPrivKey keys.Private) *TestWalletConfig {
 	return NewTestWalletConfigWithParams(tb,
 		TestWalletConfigParams{
@@ -26,7 +24,7 @@ func NewTestWalletConfigWithIdentityKey(tb testing.TB, identityPrivKey keys.Priv
 		})
 }
 
-// TestWalletConfigWithIdentityKeyAndCoordinator returns a wallet configuration with specified identity key that can be used for testing.
+// NewTestWalletConfigWithIdentityKeyAndCoordinator returns a wallet configuration with specified identity key that can be used for testing.
 func NewTestWalletConfigWithIdentityKeyAndCoordinator(tb testing.TB, identityPrivKey keys.Private, coordinatorIndex int) *TestWalletConfig {
 	return NewTestWalletConfigWithParams(tb,
 		TestWalletConfigParams{
@@ -53,7 +51,7 @@ type TestWalletConfigParams struct {
 	Network common.Network
 }
 
-// TestWalletConfigWithParams creates a wallet.Config suitable for tests using the provided parameters.
+// NewTestWalletConfigWithParams creates a wallet.Config suitable for tests using the provided parameters.
 func NewTestWalletConfigWithParams(tb testing.TB, p TestWalletConfigParams) *TestWalletConfig {
 	rng := rand.NewChaCha8([32]byte{1})
 
@@ -63,9 +61,7 @@ func NewTestWalletConfigWithParams(tb testing.TB, p TestWalletConfigParams) *Tes
 
 	var privKey keys.Private
 	if p.IdentityPrivateKey.IsZero() {
-		var err error
-		privKey, err = keys.GeneratePrivateKey()
-		require.NoError(tb, err, "failed to generate identity private key")
+		privKey = keys.GeneratePrivateKey()
 	} else {
 		privKey = p.IdentityPrivateKey
 	}

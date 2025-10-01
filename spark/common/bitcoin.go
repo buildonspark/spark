@@ -61,10 +61,10 @@ const (
 
 const (
 	// Estimated transaction size in bytes for fee calculation
-	estimatedTxSize = uint64(191)
+	estimatedTxSize = 191
 	// Default fee rate in satoshis per vbyte
-	defaultSatsPerVbyte = uint64(5)
-	// Default fee in satoshis (estimatedTxSize * defaultSatsPerVbyte)
+	defaultSatsPerVbyte = 5
+	// DefaultFeeSats is the default fee in satoshis (estimatedTxSize * defaultSatsPerVbyte)
 	DefaultFeeSats = estimatedTxSize * defaultSatsPerVbyte
 )
 

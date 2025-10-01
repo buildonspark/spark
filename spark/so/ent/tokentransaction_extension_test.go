@@ -14,14 +14,8 @@ import (
 
 func TestMarshalProto_V3_SortsOperatorKeysAndInvoices(t *testing.T) {
 	// Create two deterministic public keys
-	k1, err := keys.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to generate private key 1: %v", err)
-	}
-	k2, err := keys.GeneratePrivateKey()
-	if err != nil {
-		t.Fatalf("failed to generate private key 2: %v", err)
-	}
+	k1 := keys.GeneratePrivateKey()
+	k2 := keys.GeneratePrivateKey()
 
 	// Build operator map in non-deterministic order
 	cfg := &so.Config{

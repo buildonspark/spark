@@ -47,27 +47,25 @@ func TestEventHandlerTransferNotification(t *testing.T) {
 
 	var expectedNodeIDs []string
 	for range numTransfers {
-		leafPrivKey, err := keys.GeneratePrivateKey()
-		require.NoError(t, err, "failed to create node signing private key")
+		leafPrivKey := keys.GeneratePrivateKey()
 
 		rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
 		require.NoError(t, err, "failed to create new tree")
 		expectedNodeIDs = append(expectedNodeIDs, rootNode.Id)
 
-		newLeafPrivKey, err := keys.GeneratePrivateKey()
-		require.NoError(t, err, "failed to create new node signing private key")
+		newLeafPrivKey := keys.GeneratePrivateKey()
 
 		transferNode := wallet.LeafKeyTweak{
 			Leaf:              rootNode,
 			SigningPrivKey:    leafPrivKey,
 			NewSigningPrivKey: newLeafPrivKey,
 		}
-		leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+		leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
 		_, err = wallet.SendTransferWithKeyTweaks(
 			t.Context(),
 			senderConfig,
-			leavesToTransfer[:],
+			leavesToTransfer,
 			receiverConfig.IdentityPublicKey(),
 			time.Now().Add(10*time.Minute),
 		)
@@ -118,8 +116,7 @@ func TestEventHandlerDepositNotification(t *testing.T) {
 		}
 	}()
 
-	leafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err, "failed to create node signing private key")
+	leafPrivKey := keys.GeneratePrivateKey()
 
 	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, 100_000)
 	require.NoError(t, err, "failed to create new tree")
@@ -193,24 +190,22 @@ func TestMultipleSubscriptions(t *testing.T) {
 		t.Fatal("stream2 timed out waiting for connected event")
 	}
 
-	leafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(senderConfig, faucet, leafPrivKey, 100_000)
 	require.NoError(t, err)
 
-	newLeafPrivKey, err := keys.GeneratePrivateKey()
-	require.NoError(t, err)
+	newLeafPrivKey := keys.GeneratePrivateKey()
 	transferNode := wallet.LeafKeyTweak{
 		Leaf:              rootNode,
 		SigningPrivKey:    leafPrivKey,
 		NewSigningPrivKey: newLeafPrivKey,
 	}
-	leavesToTransfer := [1]wallet.LeafKeyTweak{transferNode}
+	leavesToTransfer := []wallet.LeafKeyTweak{transferNode}
 
 	_, err = wallet.SendTransferWithKeyTweaks(
 		t.Context(),
 		senderConfig,
-		leavesToTransfer[:],
+		leavesToTransfer,
 		receiverConfig.IdentityPublicKey(),
 		time.Now().Add(10*time.Minute),
 	)
