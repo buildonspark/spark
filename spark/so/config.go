@@ -234,8 +234,6 @@ type GRPCConfig struct {
 	ServerUnaryHandlerTimeout time.Duration `yaml:"server_unary_handler_timeout"`
 	// ClientTimeout enforces a per-request timeout for unary RPC client calls.
 	ClientTimeout time.Duration `yaml:"client_timeout"`
-	// ServerConcurrencyLimit controls the global concurrency limit for unary RPC handlers.
-	ServerConcurrencyLimit int64 `yaml:"server_concurrency_limit"`
 }
 
 type DatabaseConfig struct {

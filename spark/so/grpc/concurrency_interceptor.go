@@ -14,6 +14,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const knobTargetGlobal = "global"
+
 // Interface for a resource limiter that allows enforcing a budget on acquiring and releasing resources.
 type ResourceLimiter interface {
 	// Attempts to acquire a resource, throwing an error if the limit is reached.
@@ -27,31 +29,29 @@ type ConcurrencyGuard struct {
 	globalCounter int64
 	// A map of gRPC method names to their current count of acquired resources.
 	counterMap map[string]int64
-	// The maximum number of resources that can be acquired overall.
-	defaultGlobalLimit int64
 	// A mutex for synchronizing access to the counter map.
 	mu sync.Mutex
 	// A knobs service for retrieving limit overrides.
 	knobsService knobs.Knobs
 }
 
-func NewConcurrencyGuard(knobsService knobs.Knobs, defaultGlobalLimit int64) ResourceLimiter {
+func NewConcurrencyGuard(knobsService knobs.Knobs) ResourceLimiter {
 	return &ConcurrencyGuard{
-		globalCounter:      0,
-		counterMap:         make(map[string]int64),
-		defaultGlobalLimit: defaultGlobalLimit,
-		mu:                 sync.Mutex{},
-		knobsService:       knobsService,
+		globalCounter: 0,
+		counterMap:    make(map[string]int64),
+		mu:            sync.Mutex{},
+		knobsService:  knobsService,
 	}
 }
 
 // Attempts to acquire a concurrency slot for a gRPC method AND the global limit, throwing an error if either limit is reached.
-// If the limit is 0, no limit is enforced.
-// If the limit is negative, the default limit is used.
+// If the limit is <= 0, no limit is enforced.
 func (c *ConcurrencyGuard) TryAcquireMethod(method string) error {
 	methodLimit := int64(c.knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyLimitLimit, &method, -1))
-
-	globalLimit := int64(c.knobsService.GetValue(knobs.KnobGrpcServerConcurrencyLimitLimit, float64(c.defaultGlobalLimit)))
+	// Global limit is configured via the same knob, using the magic target "global".
+	// If unset, no global limit is enforced.
+	globalTarget := knobTargetGlobal
+	globalLimit := int64(c.knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyLimitLimit, &globalTarget, -1))
 
 	c.mu.Lock()
 	defer c.mu.Unlock()

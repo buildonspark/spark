@@ -500,7 +500,7 @@ func main() {
 		Timeout: grpcKeepaliveTimeout,
 	}))
 
-	concurrencyGuard := sparkgrpc.NewConcurrencyGuard(knobsService, config.GRPC.ServerConcurrencyLimit)
+	concurrencyGuard := sparkgrpc.NewConcurrencyGuard(knobsService)
 
 	var eventsRouter *events.EventRouter
 	if config.Database.DBEventsEnabled != nil && *config.Database.DBEventsEnabled {

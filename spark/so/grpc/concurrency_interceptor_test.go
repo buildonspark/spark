@@ -76,8 +76,9 @@ func TestConcurrencyGuard_Acquire_WithinLimit(t *testing.T) {
 					knobValues[fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, method)] = float64(limit)
 				}
 			}
+			knobValues[fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global")] = float64(tt.globalLimit)
 			mockKnobs := knobs.NewFixedKnobs(knobValues)
-			guard := NewConcurrencyGuard(mockKnobs, tt.globalLimit)
+			guard := NewConcurrencyGuard(mockKnobs)
 
 			// Acquire multiple times
 			for i := 0; i < tt.acquisitions; i++ {
@@ -121,8 +122,10 @@ func TestConcurrencyGuard_AcquireTarget_ExceedsLimit(t *testing.T) {
 					knobValues[fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, method)] = float64(limit)
 				}
 			}
+			// Set global limit via magic target "global"
+			knobValues[fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global")] = float64(tt.globalLimit)
 			mockKnobs := knobs.NewFixedKnobs(knobValues)
-			guard := NewConcurrencyGuard(mockKnobs, tt.globalLimit)
+			guard := NewConcurrencyGuard(mockKnobs)
 
 			var err error
 			for i := 0; i < tt.acquisitions; i++ {
@@ -139,8 +142,10 @@ func TestConcurrencyGuard_AcquireTarget_ExceedsLimit(t *testing.T) {
 
 func TestConcurrencyGuard_Release(t *testing.T) {
 	t.Run("normal release", func(t *testing.T) {
-		mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
-		guard := NewConcurrencyGuard(mockKnobs, 10)
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 10,
+		})
+		guard := NewConcurrencyGuard(mockKnobs)
 
 		// Acquire some resources
 		for i := 0; i < 3; i++ {
@@ -166,8 +171,10 @@ func TestConcurrencyGuard_Release(t *testing.T) {
 	})
 
 	t.Run("release can not go negative", func(t *testing.T) {
-		mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
-		guard := NewConcurrencyGuard(mockKnobs, 10)
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 10,
+		})
+		guard := NewConcurrencyGuard(mockKnobs)
 
 		// Release without acquiring - this will make counter negative
 		guard.ReleaseMethod("TestMethod")
@@ -180,8 +187,10 @@ func TestConcurrencyGuard_Release(t *testing.T) {
 }
 
 func TestConcurrencyGuard_ConcurrentAccess(t *testing.T) {
-	mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
-	guard := NewConcurrencyGuard(mockKnobs, 100) // High limit for concurrent test
+	mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+		fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 100, // High limit for concurrent test
+	})
+	guard := NewConcurrencyGuard(mockKnobs)
 
 	numGoroutines := 50
 	numOperationsPerGoroutine := 20
@@ -228,8 +237,10 @@ func TestConcurrencyGuard_ConcurrentAccess(t *testing.T) {
 
 func TestConcurrencyInterceptor(t *testing.T) {
 	t.Run("successful request within limit", func(t *testing.T) {
-		mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
-		guard := NewConcurrencyGuard(mockKnobs, 1)
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 1,
+		})
+		guard := NewConcurrencyGuard(mockKnobs)
 		interceptor := ConcurrencyInterceptor(guard)
 
 		called := false
@@ -254,8 +265,10 @@ func TestConcurrencyInterceptor(t *testing.T) {
 	})
 
 	t.Run("request exceeding limit", func(t *testing.T) {
-		mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
-		guard := NewConcurrencyGuard(mockKnobs, 1)
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 1,
+		})
+		guard := NewConcurrencyGuard(mockKnobs)
 		interceptor := ConcurrencyInterceptor(guard)
 
 		// First acquire the only slot
@@ -285,8 +298,10 @@ func TestConcurrencyInterceptor(t *testing.T) {
 	})
 
 	t.Run("handler panic still releases resource", func(t *testing.T) {
-		mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
-		guard := NewConcurrencyGuard(mockKnobs, 10)
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 10,
+		})
+		guard := NewConcurrencyGuard(mockKnobs)
 		interceptor := ConcurrencyInterceptor(guard)
 
 		handler := func(ctx context.Context, req any) (any, error) {
@@ -309,8 +324,10 @@ func TestConcurrencyInterceptor(t *testing.T) {
 	})
 
 	t.Run("handler error still releases resource", func(t *testing.T) {
-		mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
-		guard := NewConcurrencyGuard(mockKnobs, 10)
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 10,
+		})
+		guard := NewConcurrencyGuard(mockKnobs)
 		interceptor := ConcurrencyInterceptor(guard)
 
 		expectedErr := fmt.Errorf("handler error")
@@ -356,8 +373,10 @@ func TestConcurrencyInterceptor(t *testing.T) {
 }
 
 func TestConcurrencyGuard_AcquireAfterGlobalLimit(t *testing.T) {
-	mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
-	guard := NewConcurrencyGuard(mockKnobs, 3)
+	mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+		fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 3,
+	})
+	guard := NewConcurrencyGuard(mockKnobs)
 
 	// Acquire some resources
 	for i := 0; i < 3; i++ {

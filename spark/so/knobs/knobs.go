@@ -28,7 +28,6 @@ const (
 	KnobGrpcServerKeepaliveTimeout    = "spark.so.grpc.server.keepalive_timeout"
 	KnobGrpcServerUnaryHandlerTimeout = "spark.so.grpc.server.unary_handler_timeout"
 
-	// Sets the concurrency limiter value globally or, if the target is specified, per method.
 	KnobGrpcServerConcurrencyLimitLimit = "spark.so.grpc.server.concurrency_limit.limit"
 
 	KnobSoGenerateStaticDepositAddressV2 = "spark.so.generate_static_deposit_address_v2"
