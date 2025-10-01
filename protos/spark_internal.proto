@@ -240,6 +240,8 @@ message InitiateTransferRequest {
     map<string, bytes> direct_from_cpfp_refund_signatures = 11;
     // The invoice this transfer pays.
     string spark_invoice = 12;
+    // Adaptor public keys to verify adapted signatures for tree node refund transactions.
+    spark.AdaptorPublicKeyPackage adaptor_public_keys = 13;
 }
 
 message DeliverSenderKeyTweakRequest {
