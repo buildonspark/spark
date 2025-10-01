@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	_ "net/http/pprof" // Add pprof support
 	"os"
 	"os/signal"
 	"strings"
@@ -305,6 +306,31 @@ func main() {
 	// Knobs service is always defined, no need to check for nil.
 	// If the provider is nil, the knobs service will use the default values.
 	knobsService := knobs.New(valuesProvider)
+
+	// Start profiling server if enabled (localhost only)
+	var pprofServer *http.Server
+	if os.Getenv("SPARK_PROFILING_ENABLED") == "true" {
+		profilingPort := "6060" // default port
+		if port := os.Getenv("SPARK_PROFILING_PORT"); port != "" {
+			profilingPort = port
+		}
+
+		pprofServer = &http.Server{
+			Addr:    fmt.Sprintf("127.0.0.1:%s", profilingPort), // localhost only
+			Handler: http.DefaultServeMux,                       // pprof endpoints are registered here
+		}
+
+		errGrp.Go(func() error {
+			profilingLogger := logger.With(zap.String("component", "profiling"))
+			profilingLogger.Info("Starting profiling server", zap.String("port", profilingPort))
+
+			if err := pprofServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+				profilingLogger.Error("Profiling server failed", zap.Error(err))
+				return err
+			}
+			return nil
+		})
+	}
 
 	dbDriver := config.DatabaseDriver()
 	connector, err := so.NewDBConnector(errCtx, config, knobsService)
@@ -674,6 +700,15 @@ func main() {
 		logger.Error("HTTP server failed to shutdown gracefully", zap.Error(err))
 	} else {
 		logger.Info("HTTP server stopped")
+	}
+
+	if pprofServer != nil {
+		logger.Info("Stopping profiling server...")
+		if err := pprofServer.Shutdown(shutdownCtx); err != nil {
+			logger.Error("Profiling server failed to shutdown gracefully", zap.Error(err))
+		} else {
+			logger.Info("Profiling server stopped")
+		}
 	}
 
 	if err := errGrp.Wait(); err != nil {
