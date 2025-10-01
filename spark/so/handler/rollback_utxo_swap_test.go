@@ -150,9 +150,9 @@ func TestRollbackUtxoSwap_NoErrorIfUtxoSwapCreated(t *testing.T) {
 		SetRequestType(st.UtxoSwapRequestTypeRefund).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
-		SetSspIdentityPublicKey(ownerIdentityPubKey.Serialize()).
-		SetUserIdentityPublicKey(ownerIdentityPubKey.Serialize()).
-		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey().Serialize()).
+		SetSspIdentityPublicKey(ownerIdentityPubKey).
+		SetUserIdentityPublicKey(ownerIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -198,9 +198,9 @@ func TestRollbackUtxoSwap_ErrorIfUtxoSwapCompleted(t *testing.T) {
 		SetRequestType(st.UtxoSwapRequestTypeRefund).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
-		SetSspIdentityPublicKey(ownerIdentityPubKey.Serialize()).
-		SetUserIdentityPublicKey(ownerIdentityPubKey.Serialize()).
-		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey().Serialize()).
+		SetSspIdentityPublicKey(ownerIdentityPubKey).
+		SetUserIdentityPublicKey(ownerIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
 		Save(ctx)
 	require.NoError(t, err)
 

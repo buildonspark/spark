@@ -25021,10 +25021,10 @@ type UtxoSwapMutation struct {
 	max_fee_sats                    *uint64
 	addmax_fee_sats                 *int64
 	ssp_signature                   *[]byte
-	ssp_identity_public_key         *[]byte
+	ssp_identity_public_key         *keys.Public
 	user_signature                  *[]byte
-	user_identity_public_key        *[]byte
-	coordinator_identity_public_key *[]byte
+	user_identity_public_key        *keys.Public
+	coordinator_identity_public_key *keys.Public
 	requested_transfer_id           *uuid.UUID
 	spend_tx_signing_result         *[]byte
 	clearedFields                   map[string]struct{}
@@ -25475,12 +25475,12 @@ func (m *UtxoSwapMutation) ResetSspSignature() {
 }
 
 // SetSspIdentityPublicKey sets the "ssp_identity_public_key" field.
-func (m *UtxoSwapMutation) SetSspIdentityPublicKey(b []byte) {
-	m.ssp_identity_public_key = &b
+func (m *UtxoSwapMutation) SetSspIdentityPublicKey(k keys.Public) {
+	m.ssp_identity_public_key = &k
 }
 
 // SspIdentityPublicKey returns the value of the "ssp_identity_public_key" field in the mutation.
-func (m *UtxoSwapMutation) SspIdentityPublicKey() (r []byte, exists bool) {
+func (m *UtxoSwapMutation) SspIdentityPublicKey() (r keys.Public, exists bool) {
 	v := m.ssp_identity_public_key
 	if v == nil {
 		return
@@ -25491,7 +25491,7 @@ func (m *UtxoSwapMutation) SspIdentityPublicKey() (r []byte, exists bool) {
 // OldSspIdentityPublicKey returns the old "ssp_identity_public_key" field's value of the UtxoSwap entity.
 // If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UtxoSwapMutation) OldSspIdentityPublicKey(ctx context.Context) (v []byte, err error) {
+func (m *UtxoSwapMutation) OldSspIdentityPublicKey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldSspIdentityPublicKey is only allowed on UpdateOne operations")
 	}
@@ -25573,12 +25573,12 @@ func (m *UtxoSwapMutation) ResetUserSignature() {
 }
 
 // SetUserIdentityPublicKey sets the "user_identity_public_key" field.
-func (m *UtxoSwapMutation) SetUserIdentityPublicKey(b []byte) {
-	m.user_identity_public_key = &b
+func (m *UtxoSwapMutation) SetUserIdentityPublicKey(k keys.Public) {
+	m.user_identity_public_key = &k
 }
 
 // UserIdentityPublicKey returns the value of the "user_identity_public_key" field in the mutation.
-func (m *UtxoSwapMutation) UserIdentityPublicKey() (r []byte, exists bool) {
+func (m *UtxoSwapMutation) UserIdentityPublicKey() (r keys.Public, exists bool) {
 	v := m.user_identity_public_key
 	if v == nil {
 		return
@@ -25589,7 +25589,7 @@ func (m *UtxoSwapMutation) UserIdentityPublicKey() (r []byte, exists bool) {
 // OldUserIdentityPublicKey returns the old "user_identity_public_key" field's value of the UtxoSwap entity.
 // If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UtxoSwapMutation) OldUserIdentityPublicKey(ctx context.Context) (v []byte, err error) {
+func (m *UtxoSwapMutation) OldUserIdentityPublicKey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldUserIdentityPublicKey is only allowed on UpdateOne operations")
 	}
@@ -25622,12 +25622,12 @@ func (m *UtxoSwapMutation) ResetUserIdentityPublicKey() {
 }
 
 // SetCoordinatorIdentityPublicKey sets the "coordinator_identity_public_key" field.
-func (m *UtxoSwapMutation) SetCoordinatorIdentityPublicKey(b []byte) {
-	m.coordinator_identity_public_key = &b
+func (m *UtxoSwapMutation) SetCoordinatorIdentityPublicKey(k keys.Public) {
+	m.coordinator_identity_public_key = &k
 }
 
 // CoordinatorIdentityPublicKey returns the value of the "coordinator_identity_public_key" field in the mutation.
-func (m *UtxoSwapMutation) CoordinatorIdentityPublicKey() (r []byte, exists bool) {
+func (m *UtxoSwapMutation) CoordinatorIdentityPublicKey() (r keys.Public, exists bool) {
 	v := m.coordinator_identity_public_key
 	if v == nil {
 		return
@@ -25638,7 +25638,7 @@ func (m *UtxoSwapMutation) CoordinatorIdentityPublicKey() (r []byte, exists bool
 // OldCoordinatorIdentityPublicKey returns the old "coordinator_identity_public_key" field's value of the UtxoSwap entity.
 // If the UtxoSwap object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *UtxoSwapMutation) OldCoordinatorIdentityPublicKey(ctx context.Context) (v []byte, err error) {
+func (m *UtxoSwapMutation) OldCoordinatorIdentityPublicKey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldCoordinatorIdentityPublicKey is only allowed on UpdateOne operations")
 	}
@@ -26035,7 +26035,7 @@ func (m *UtxoSwapMutation) SetField(name string, value ent.Value) error {
 		m.SetSspSignature(v)
 		return nil
 	case utxoswap.FieldSspIdentityPublicKey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -26049,14 +26049,14 @@ func (m *UtxoSwapMutation) SetField(name string, value ent.Value) error {
 		m.SetUserSignature(v)
 		return nil
 	case utxoswap.FieldUserIdentityPublicKey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUserIdentityPublicKey(v)
 		return nil
 	case utxoswap.FieldCoordinatorIdentityPublicKey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

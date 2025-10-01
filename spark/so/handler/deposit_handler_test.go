@@ -940,7 +940,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		_, err = tx.UtxoSwap.Create().
 			SetStatus(st.UtxoSwapStatusCreated). // Active status
 			SetRequestType(st.UtxoSwapRequestTypeFixedAmount).
-			SetCoordinatorIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
+			SetCoordinatorIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetUtxo(utxo1).
 			Save(ctx)
 		require.NoError(t, err)
@@ -949,7 +949,7 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		_, err = tx.UtxoSwap.Create().
 			SetStatus(st.UtxoSwapStatusCancelled). // Cancelled status
 			SetRequestType(st.UtxoSwapRequestTypeFixedAmount).
-			SetCoordinatorIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
+			SetCoordinatorIdentityPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetUtxo(utxo2).
 			Save(ctx)
 		require.NoError(t, err)

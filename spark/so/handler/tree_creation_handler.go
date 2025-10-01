@@ -342,11 +342,7 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 			return nil, err
 		}
 
-		userIdentityPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
-		if err != nil {
-			return nil, fmt.Errorf("invalid user identity public key: %w", err)
-		}
-		if !treeNode.OwnerIdentityPubkey.Equals(userIdentityPubKey) {
+		if !reqUserIDPubKey.Equals(treeNode.OwnerIdentityPubkey) {
 			return nil, errors.New("user identity public key does not match tree node owner")
 		}
 

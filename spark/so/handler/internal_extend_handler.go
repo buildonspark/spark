@@ -19,9 +19,7 @@ type InternalExtendLeafHandler struct {
 
 // NewInternalExtendLeafHandler creates a new InternalExtendLeafHandler.
 func NewInternalExtendLeafHandler(config *so.Config) *InternalExtendLeafHandler {
-	return &InternalExtendLeafHandler{
-		config: config,
-	}
+	return &InternalExtendLeafHandler{config: config}
 }
 
 // FinalizeExtendLeaf finalizes an extend leaf.
@@ -32,24 +30,23 @@ func (h *InternalExtendLeafHandler) FinalizeExtendLeaf(ctx context.Context, req 
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	node := req.Node
-	nodeID, err := uuid.Parse(node.Id)
+	node := req.GetNode()
+	nodeID, err := uuid.Parse(node.GetId())
 	if err != nil {
 		return fmt.Errorf("failed to parse node id: %w", err)
 	}
-	treeID, err := uuid.Parse(node.TreeId)
+	treeID, err := uuid.Parse(node.GetId())
 	if err != nil {
 		return fmt.Errorf("failed to parse tree id: %w", err)
 	}
-	signingKeyshareID, err := uuid.Parse(node.SigningKeyshareId)
+	signingKeyshareID, err := uuid.Parse(node.GetSigningKeyshareId())
 	if err != nil {
 		return fmt.Errorf("failed to parse signing keyshare id: %w", err)
 	}
-	parentID, err := uuid.Parse(*node.ParentNodeId)
+	parentID, err := uuid.Parse(node.GetParentNodeId())
 	if err != nil {
 		return fmt.Errorf("failed to parse parent node id: %w", err)
 	}
-
 	ownerIdentityPubKey, err := keys.ParsePublicKey(node.GetOwnerIdentityPubkey())
 	if err != nil {
 		return fmt.Errorf("failed to parse owner identity pubkey: %w", err)
@@ -60,25 +57,22 @@ func (h *InternalExtendLeafHandler) FinalizeExtendLeaf(ctx context.Context, req 
 	}
 	verifyingPubKey, err := keys.ParsePublicKey(node.GetVerifyingPubkey())
 	if err != nil {
-		return fmt.Errorf("failed to parse verifying pubkey: %w", err)
+		return fmt.Errorf("failed to parse verify pubkey: %w", err)
 	}
-
-	_, err = db.
-		TreeNode.
-		Create().
+	_, err = db.TreeNode.Create().
 		SetID(nodeID).
 		SetTreeID(treeID).
 		SetStatus(st.TreeNodeStatusAvailable).
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
 		SetOwnerSigningPubkey(ownerSigningPubKey).
-		SetValue(node.Value).
+		SetValue(node.GetValue()).
 		SetVerifyingPubkey(verifyingPubKey).
 		SetSigningKeyshareID(signingKeyshareID).
-		SetRawTx(node.RawTx).
-		SetRawRefundTx(node.RawRefundTx).
-		SetDirectTx(node.DirectTx).
-		SetDirectRefundTx(node.DirectRefundTx).
-		SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx).
+		SetRawTx(node.GetRawTx()).
+		SetRawRefundTx(node.GetRawRefundTx()).
+		SetDirectTx(node.GetDirectTx()).
+		SetDirectRefundTx(node.GetDirectRefundTx()).
+		SetDirectFromCpfpRefundTx(node.GetDirectFromCpfpRefundTx()).
 		SetVout(int16(0)).
 		SetParentID(parentID).
 		Save(ctx)

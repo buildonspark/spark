@@ -88,9 +88,9 @@ func createTestUtxoSwap(t *testing.T, ctx context.Context, rng io.Reader, client
 		SetRequestType(st.UtxoSwapRequestTypeRefund).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
-		SetSspIdentityPublicKey(userPubKey.Serialize()).
-		SetUserIdentityPublicKey(userPubKey.Serialize()).
-		SetCoordinatorIdentityPublicKey(coordinatorPubKey.Serialize()).
+		SetSspIdentityPublicKey(userPubKey).
+		SetUserIdentityPublicKey(userPubKey).
+		SetCoordinatorIdentityPublicKey(coordinatorPubKey).
 		Save(ctx)
 	require.NoError(t, err)
 	return utxoSwap

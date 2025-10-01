@@ -63,7 +63,7 @@ func createTestEntities(t *testing.T, ctx context.Context, rng io.Reader, tx *en
 			SetCreditAmountSats(900).
 			SetMaxFeeSats(100).
 			SetRequestedTransferID(uuid.Must(uuid.NewRandomFromReader(rng))).
-			SetCoordinatorIdentityPublicKey(coordinatorIdentityPubKey.Serialize()).
+			SetCoordinatorIdentityPublicKey(coordinatorIdentityPubKey).
 			SetUtxo(utxo).
 			Save(ctx)
 		require.NoError(t, err)

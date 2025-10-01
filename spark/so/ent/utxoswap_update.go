@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
@@ -132,8 +133,16 @@ func (usu *UtxoSwapUpdate) ClearSspSignature() *UtxoSwapUpdate {
 }
 
 // SetSspIdentityPublicKey sets the "ssp_identity_public_key" field.
-func (usu *UtxoSwapUpdate) SetSspIdentityPublicKey(b []byte) *UtxoSwapUpdate {
-	usu.mutation.SetSspIdentityPublicKey(b)
+func (usu *UtxoSwapUpdate) SetSspIdentityPublicKey(k keys.Public) *UtxoSwapUpdate {
+	usu.mutation.SetSspIdentityPublicKey(k)
+	return usu
+}
+
+// SetNillableSspIdentityPublicKey sets the "ssp_identity_public_key" field if the given value is not nil.
+func (usu *UtxoSwapUpdate) SetNillableSspIdentityPublicKey(k *keys.Public) *UtxoSwapUpdate {
+	if k != nil {
+		usu.SetSspIdentityPublicKey(*k)
+	}
 	return usu
 }
 
@@ -156,8 +165,16 @@ func (usu *UtxoSwapUpdate) ClearUserSignature() *UtxoSwapUpdate {
 }
 
 // SetUserIdentityPublicKey sets the "user_identity_public_key" field.
-func (usu *UtxoSwapUpdate) SetUserIdentityPublicKey(b []byte) *UtxoSwapUpdate {
-	usu.mutation.SetUserIdentityPublicKey(b)
+func (usu *UtxoSwapUpdate) SetUserIdentityPublicKey(k keys.Public) *UtxoSwapUpdate {
+	usu.mutation.SetUserIdentityPublicKey(k)
+	return usu
+}
+
+// SetNillableUserIdentityPublicKey sets the "user_identity_public_key" field if the given value is not nil.
+func (usu *UtxoSwapUpdate) SetNillableUserIdentityPublicKey(k *keys.Public) *UtxoSwapUpdate {
+	if k != nil {
+		usu.SetUserIdentityPublicKey(*k)
+	}
 	return usu
 }
 
@@ -168,8 +185,16 @@ func (usu *UtxoSwapUpdate) ClearUserIdentityPublicKey() *UtxoSwapUpdate {
 }
 
 // SetCoordinatorIdentityPublicKey sets the "coordinator_identity_public_key" field.
-func (usu *UtxoSwapUpdate) SetCoordinatorIdentityPublicKey(b []byte) *UtxoSwapUpdate {
-	usu.mutation.SetCoordinatorIdentityPublicKey(b)
+func (usu *UtxoSwapUpdate) SetCoordinatorIdentityPublicKey(k keys.Public) *UtxoSwapUpdate {
+	usu.mutation.SetCoordinatorIdentityPublicKey(k)
+	return usu
+}
+
+// SetNillableCoordinatorIdentityPublicKey sets the "coordinator_identity_public_key" field if the given value is not nil.
+func (usu *UtxoSwapUpdate) SetNillableCoordinatorIdentityPublicKey(k *keys.Public) *UtxoSwapUpdate {
+	if k != nil {
+		usu.SetCoordinatorIdentityPublicKey(*k)
+	}
 	return usu
 }
 
@@ -517,8 +542,16 @@ func (usuo *UtxoSwapUpdateOne) ClearSspSignature() *UtxoSwapUpdateOne {
 }
 
 // SetSspIdentityPublicKey sets the "ssp_identity_public_key" field.
-func (usuo *UtxoSwapUpdateOne) SetSspIdentityPublicKey(b []byte) *UtxoSwapUpdateOne {
-	usuo.mutation.SetSspIdentityPublicKey(b)
+func (usuo *UtxoSwapUpdateOne) SetSspIdentityPublicKey(k keys.Public) *UtxoSwapUpdateOne {
+	usuo.mutation.SetSspIdentityPublicKey(k)
+	return usuo
+}
+
+// SetNillableSspIdentityPublicKey sets the "ssp_identity_public_key" field if the given value is not nil.
+func (usuo *UtxoSwapUpdateOne) SetNillableSspIdentityPublicKey(k *keys.Public) *UtxoSwapUpdateOne {
+	if k != nil {
+		usuo.SetSspIdentityPublicKey(*k)
+	}
 	return usuo
 }
 
@@ -541,8 +574,16 @@ func (usuo *UtxoSwapUpdateOne) ClearUserSignature() *UtxoSwapUpdateOne {
 }
 
 // SetUserIdentityPublicKey sets the "user_identity_public_key" field.
-func (usuo *UtxoSwapUpdateOne) SetUserIdentityPublicKey(b []byte) *UtxoSwapUpdateOne {
-	usuo.mutation.SetUserIdentityPublicKey(b)
+func (usuo *UtxoSwapUpdateOne) SetUserIdentityPublicKey(k keys.Public) *UtxoSwapUpdateOne {
+	usuo.mutation.SetUserIdentityPublicKey(k)
+	return usuo
+}
+
+// SetNillableUserIdentityPublicKey sets the "user_identity_public_key" field if the given value is not nil.
+func (usuo *UtxoSwapUpdateOne) SetNillableUserIdentityPublicKey(k *keys.Public) *UtxoSwapUpdateOne {
+	if k != nil {
+		usuo.SetUserIdentityPublicKey(*k)
+	}
 	return usuo
 }
 
@@ -553,8 +594,16 @@ func (usuo *UtxoSwapUpdateOne) ClearUserIdentityPublicKey() *UtxoSwapUpdateOne {
 }
 
 // SetCoordinatorIdentityPublicKey sets the "coordinator_identity_public_key" field.
-func (usuo *UtxoSwapUpdateOne) SetCoordinatorIdentityPublicKey(b []byte) *UtxoSwapUpdateOne {
-	usuo.mutation.SetCoordinatorIdentityPublicKey(b)
+func (usuo *UtxoSwapUpdateOne) SetCoordinatorIdentityPublicKey(k keys.Public) *UtxoSwapUpdateOne {
+	usuo.mutation.SetCoordinatorIdentityPublicKey(k)
+	return usuo
+}
+
+// SetNillableCoordinatorIdentityPublicKey sets the "coordinator_identity_public_key" field if the given value is not nil.
+func (usuo *UtxoSwapUpdateOne) SetNillableCoordinatorIdentityPublicKey(k *keys.Public) *UtxoSwapUpdateOne {
+	if k != nil {
+		usuo.SetCoordinatorIdentityPublicKey(*k)
+	}
 	return usuo
 }
 

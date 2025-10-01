@@ -260,23 +260,22 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if err != nil {
 			return err
 		}
+		if node.Vout > math.MaxInt16 {
+			return fmt.Errorf("node vout value %d overflows int16", node.Vout)
+		}
 		signingKeyshareID, err := uuid.Parse(node.SigningKeyshareId)
 		if err != nil {
 			return err
 		}
-
-		if node.Vout > math.MaxInt16 {
-			return fmt.Errorf("node vout value %d overflows int16", node.Vout)
-		}
-		ownerIdentityPubkey, err := keys.ParsePublicKey(node.GetOwnerIdentityPubkey())
+		ownerIdentityPubKey, err := keys.ParsePublicKey(node.GetOwnerIdentityPubkey())
 		if err != nil {
 			return fmt.Errorf("failed to parse owner identity public key: %w", err)
 		}
-		ownerSigningPubkey, err := keys.ParsePublicKey(node.GetOwnerSigningPubkey())
+		ownerSigningPubKey, err := keys.ParsePublicKey(node.GetOwnerSigningPubkey())
 		if err != nil {
 			return fmt.Errorf("failed to parse owner signing public key: %w", err)
 		}
-		verifyingPubkey, err := keys.ParsePublicKey(node.GetVerifyingPubkey())
+		verifyingPubKey, err := keys.ParsePublicKey(node.GetVerifyingPubkey())
 		if err != nil {
 			return fmt.Errorf("failed to parse verifying public key: %w", err)
 		}
@@ -284,10 +283,10 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			Create().
 			SetID(nodeID).
 			SetTree(tree).
-			SetOwnerIdentityPubkey(ownerIdentityPubkey).
-			SetOwnerSigningPubkey(ownerSigningPubkey).
+			SetOwnerIdentityPubkey(ownerIdentityPubKey).
+			SetOwnerSigningPubkey(ownerSigningPubKey).
 			SetValue(node.Value).
-			SetVerifyingPubkey(verifyingPubkey).
+			SetVerifyingPubkey(verifyingPubKey).
 			SetSigningKeyshareID(signingKeyshareID).
 			SetVout(int16(node.Vout)).
 			SetRawTx(node.RawTx).
@@ -534,19 +533,18 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 	}
 	utxoSwap, err = db.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCreated).
-		// utxo
 		SetUtxo(targetUtxo).
 		// quote
 		SetRequestType(st.UtxoSwapFromProtoRequestType(req.RequestType)).
 		SetCreditAmountSats(totalAmount).
 		// quote signing bytes are the sighash of the spend tx if SSP is not used
 		SetSspSignature(quoteSigningBytes).
-		SetSspIdentityPublicKey(ownerIDPubKey.Serialize()).
+		SetSspIdentityPublicKey(ownerIDPubKey).
 		// authorization from a user to claim this utxo after fulfilling the quote
 		SetUserSignature(req.UserSignature).
-		SetUserIdentityPublicKey(receiverIDPubKey.Serialize()).
+		SetUserIdentityPublicKey(receiverIDPubKey).
 		// Identity of the owner who can cancel this swap (if it's not yet completed), normally -- the coordinator SO
-		SetCoordinatorIdentityPublicKey(reqWithSignature.CoordinatorPublicKey).
+		SetCoordinatorIdentityPublicKey(coordinatorPubKey).
 		SetRequestedTransferID(transferUUID).
 		Save(ctx)
 	if err != nil {
@@ -785,11 +783,13 @@ func (h *InternalDepositHandler) RollbackUtxoSwap(ctx context.Context, config *s
 	}
 
 	utxoSwap, err := db.UtxoSwap.Query().
-		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).
-		Where(utxoswap.Or(utxoswap.StatusEQ(st.UtxoSwapStatusCreated), utxoswap.StatusEQ(st.UtxoSwapStatusCompleted))).
-		// The identity public key of the coordinator that created the utxo swap.
-		// It's been verified above.
-		Where(utxoswap.CoordinatorIdentityPublicKeyEQ(req.CoordinatorPublicKey)).
+		Where(
+			utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID)),
+			utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted),
+			// The identity public key of the coordinator that created the utxo swap.
+			// It's been verified above.
+			utxoswap.CoordinatorIdentityPublicKeyEQ(coordinatorPubKey),
+		).
 		Only(ctx)
 	if err != nil && !ent.IsNotFound(err) {
 		return nil, fmt.Errorf("unable to get utxo swap: %w", err)
@@ -874,10 +874,10 @@ func (h *InternalDepositHandler) UtxoSwapCompleted(ctx context.Context, config *
 
 	utxoSwap, err := db.UtxoSwap.Query().
 		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).
-		Where(utxoswap.Or(utxoswap.StatusEQ(st.UtxoSwapStatusCreated), utxoswap.StatusEQ(st.UtxoSwapStatusCompleted))).
+		Where(utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted)).
 		// The identity public key of the coordinator that created the utxo swap.
 		// It's been verified above.
-		Where(utxoswap.CoordinatorIdentityPublicKeyEQ(coordinatorPubKey.Serialize())).
+		Where(utxoswap.CoordinatorIdentityPublicKeyEQ(coordinatorPubKey)).
 		Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get utxo swap for utxo %s: %w", targetUtxo.ID, err)

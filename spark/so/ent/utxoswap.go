@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
@@ -36,13 +37,13 @@ type UtxoSwap struct {
 	// SspSignature holds the value of the "ssp_signature" field.
 	SspSignature []byte `json:"ssp_signature,omitempty"`
 	// SspIdentityPublicKey holds the value of the "ssp_identity_public_key" field.
-	SspIdentityPublicKey []byte `json:"ssp_identity_public_key,omitempty"`
+	SspIdentityPublicKey keys.Public `json:"ssp_identity_public_key,omitempty"`
 	// UserSignature holds the value of the "user_signature" field.
 	UserSignature []byte `json:"user_signature,omitempty"`
 	// UserIdentityPublicKey holds the value of the "user_identity_public_key" field.
-	UserIdentityPublicKey []byte `json:"user_identity_public_key,omitempty"`
+	UserIdentityPublicKey keys.Public `json:"user_identity_public_key,omitempty"`
 	// CoordinatorIdentityPublicKey holds the value of the "coordinator_identity_public_key" field.
-	CoordinatorIdentityPublicKey []byte `json:"coordinator_identity_public_key,omitempty"`
+	CoordinatorIdentityPublicKey keys.Public `json:"coordinator_identity_public_key,omitempty"`
 	// RequestedTransferID holds the value of the "requested_transfer_id" field.
 	RequestedTransferID uuid.UUID `json:"requested_transfer_id,omitempty"`
 	// SpendTxSigningResult holds the value of the "spend_tx_signing_result" field.
@@ -94,8 +95,10 @@ func (*UtxoSwap) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case utxoswap.FieldSspSignature, utxoswap.FieldSspIdentityPublicKey, utxoswap.FieldUserSignature, utxoswap.FieldUserIdentityPublicKey, utxoswap.FieldCoordinatorIdentityPublicKey, utxoswap.FieldSpendTxSigningResult:
+		case utxoswap.FieldSspSignature, utxoswap.FieldUserSignature, utxoswap.FieldSpendTxSigningResult:
 			values[i] = new([]byte)
+		case utxoswap.FieldSspIdentityPublicKey, utxoswap.FieldUserIdentityPublicKey, utxoswap.FieldCoordinatorIdentityPublicKey:
+			values[i] = new(keys.Public)
 		case utxoswap.FieldCreditAmountSats, utxoswap.FieldMaxFeeSats:
 			values[i] = new(sql.NullInt64)
 		case utxoswap.FieldStatus, utxoswap.FieldRequestType:
@@ -174,7 +177,7 @@ func (us *UtxoSwap) assignValues(columns []string, values []any) error {
 				us.SspSignature = *value
 			}
 		case utxoswap.FieldSspIdentityPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field ssp_identity_public_key", values[i])
 			} else if value != nil {
 				us.SspIdentityPublicKey = *value
@@ -186,13 +189,13 @@ func (us *UtxoSwap) assignValues(columns []string, values []any) error {
 				us.UserSignature = *value
 			}
 		case utxoswap.FieldUserIdentityPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field user_identity_public_key", values[i])
 			} else if value != nil {
 				us.UserIdentityPublicKey = *value
 			}
 		case utxoswap.FieldCoordinatorIdentityPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field coordinator_identity_public_key", values[i])
 			} else if value != nil {
 				us.CoordinatorIdentityPublicKey = *value

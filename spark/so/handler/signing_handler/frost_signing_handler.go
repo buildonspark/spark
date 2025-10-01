@@ -29,14 +29,14 @@ func NewFrostSigningHandler(config *so.Config) *FrostSigningHandler {
 }
 
 func (h *FrostSigningHandler) GenerateRandomNonces(ctx context.Context, count uint32) (*pb.FrostRound1Response, error) {
-	commitments := make([]*pbcommon.SigningCommitment, 0)
-	entSigningNonces := make([]*ent.SigningNonceCreate, 0)
+	commitments := make([]*pbcommon.SigningCommitment, count)
+	entSigningNonces := make([]*ent.SigningNonceCreate, count)
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	for i := 0; i < int(count); i++ {
+	for i := range commitments {
 		nonce, err := objects.RandomSigningNonce()
 		if err != nil {
 			return nil, err
@@ -44,18 +44,15 @@ func (h *FrostSigningHandler) GenerateRandomNonces(ctx context.Context, count ui
 
 		commitment := nonce.SigningCommitment()
 
-		entSigningNonces = append(
-			entSigningNonces,
-			db.SigningNonce.Create().
-				SetNonce(nonce.MarshalBinary()).
-				SetNonceCommitment(commitment.MarshalBinary()),
-		)
+		entSigningNonces[i] = db.SigningNonce.Create().
+			SetNonce(nonce.MarshalBinary()).
+			SetNonceCommitment(commitment.MarshalBinary())
 
 		commitmentProto, err := nonce.SigningCommitment().MarshalProto()
 		if err != nil {
 			return nil, err
 		}
-		commitments = append(commitments, commitmentProto)
+		commitments[i] = commitmentProto
 	}
 
 	if err := db.SigningNonce.CreateBulk(entSigningNonces...).Exec(ctx); err != nil {
@@ -78,7 +75,7 @@ func (h *FrostSigningHandler) FrostRound1(ctx context.Context, req *pb.FrostRoun
 		totalCount = count * uint32(len(req.KeyshareIds))
 	}
 
-	if totalCount > 1000000 {
+	if totalCount > 1_000_000 {
 		return nil, fmt.Errorf("too many nonces requested in one request, please split into multiple requests")
 	}
 
@@ -90,11 +87,11 @@ func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRoun
 	// Fetch key packages in one call.
 	uuids := make([]uuid.UUID, len(req.SigningJobs))
 	for i, job := range req.SigningJobs {
-		uuid, err := uuid.Parse(job.KeyshareId)
+		keyshareID, err := uuid.Parse(job.KeyshareId)
 		if err != nil {
 			return nil, err
 		}
-		uuids[i] = uuid
+		uuids[i] = keyshareID
 	}
 
 	keyPackages, err := ent.GetKeyPackages(ctx, h.config, uuids)
@@ -116,7 +113,7 @@ func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRoun
 		return nil, err
 	}
 
-	signingJobProtos := make([]*pbfrost.FrostSigningJob, 0)
+	var signingJobProtos []*pbfrost.FrostSigningJob
 
 	for _, job := range req.SigningJobs {
 		keyshareID, err := uuid.Parse(job.KeyshareId)

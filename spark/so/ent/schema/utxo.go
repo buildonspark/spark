@@ -8,14 +8,13 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
-// Transaction outputs seen confirmed on chain by chain watcher.
+// Utxo contains transaction outputs seen confirmed on chain by chain watcher.
 // Currently used in static deposit flow, but their generic structure allows
 // them to be used elsewhere.
 type Utxo struct {
 	ent.Schema
 }
 
-// Add generic fields
 func (Utxo) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},

@@ -258,12 +258,12 @@ func TestInitiateStaticDepositUtxoRefund_ErrorIfUtxoSwapAlreadyCompletedAsClaim(
 	utxoSwap, err := sessionCtx.Client.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCompleted).
 		SetRequestType(st.UtxoSwapRequestTypeFixedAmount). // Claim type
-		SetUserIdentityPublicKey(ownerIdentityPubKey.Serialize()).
-		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey().Serialize()).
+		SetUserIdentityPublicKey(ownerIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
 		SetUtxo(testUtxo).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
-		SetSspIdentityPublicKey(ownerIdentityPubKey.Serialize()).
+		SetSspIdentityPublicKey(ownerIdentityPubKey).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -315,12 +315,12 @@ func TestInitiateStaticDepositUtxoRefund_CanRefundAgainIfAlreadyRefinedBySameCal
 	utxoSwap, err := sessionCtx.Client.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCompleted).
 		SetRequestType(st.UtxoSwapRequestTypeRefund).
-		SetUserIdentityPublicKey(ownerIdentityPubKey.Serialize()). // Same owner
-		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey().Serialize()).
+		SetUserIdentityPublicKey(ownerIdentityPubKey). // Same owner
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
 		SetUtxo(testUtxo).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
-		SetSspIdentityPublicKey(ownerIdentityPubKey.Serialize()).
+		SetSspIdentityPublicKey(ownerIdentityPubKey).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -382,12 +382,12 @@ func TestInitiateStaticDepositUtxoRefund_CanRefundEvenWithPreviousFailedAttempts
 	previousRefundSwap, err := sessionCtx.Client.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCancelled).
 		SetRequestType(st.UtxoSwapRequestTypeRefund).
-		SetUserIdentityPublicKey(ownerIdentityPubKey.Serialize()).
-		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey().Serialize()).
+		SetUserIdentityPublicKey(ownerIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
 		SetUtxo(testUtxo).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
-		SetSspIdentityPublicKey(ownerIdentityPubKey.Serialize()).
+		SetSspIdentityPublicKey(ownerIdentityPubKey).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -395,12 +395,12 @@ func TestInitiateStaticDepositUtxoRefund_CanRefundEvenWithPreviousFailedAttempts
 	previousClaimSwap, err := sessionCtx.Client.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCancelled).
 		SetRequestType(st.UtxoSwapRequestTypeFixedAmount).
-		SetUserIdentityPublicKey(ownerIdentityPubKey.Serialize()).
-		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey().Serialize()).
+		SetUserIdentityPublicKey(ownerIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
 		SetUtxo(testUtxo).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
-		SetSspIdentityPublicKey(ownerIdentityPubKey.Serialize()).
+		SetSspIdentityPublicKey(ownerIdentityPubKey).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -547,12 +547,12 @@ func TestInitiateStaticDepositUtxoRefund_CanSignDifferentRefundTxMultipleTimes(t
 	utxoSwap, err := sessionCtx.Client.UtxoSwap.Create().
 		SetStatus(st.UtxoSwapStatusCompleted).
 		SetRequestType(st.UtxoSwapRequestTypeRefund).
-		SetUserIdentityPublicKey(ownerIdentityPubKey.Serialize()).
-		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey().Serialize()).
+		SetUserIdentityPublicKey(ownerIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(cfg.IdentityPublicKey()).
 		SetUtxo(testUtxo).
 		SetCreditAmountSats(10000).
 		SetSspSignature([]byte("test_ssp_signature")).
-		SetSspIdentityPublicKey(ownerIdentityPubKey.Serialize()).
+		SetSspIdentityPublicKey(ownerIdentityPubKey).
 		Save(ctx)
 	require.NoError(t, err)
 

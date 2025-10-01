@@ -33,12 +33,12 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 	if err != nil {
 		return nil, err
 	}
-	ownerIdentityPublicKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
+	ownerIdentityPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
 	}
 	leaves, err := db.TreeNode.Query().
-		Where(treenode.OwnerIdentityPubkey(ownerIdentityPublicKey)).
+		Where(treenode.OwnerIdentityPubkey(ownerIdentityPubKey)).
 		Where(treenode.StatusEQ(st.TreeNodeStatusAvailable)).
 		Where(treenode.HasTreeWith(tree.NetworkEQ(network))).
 		All(ctx)
@@ -54,6 +54,6 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 		}
 		counts[leaf.Value]++
 	}
-	logger.Sugar().Infof("Leaf count (leaves: %d, public key: %x)", len(leaves), ownerIdentityPublicKey)
+	logger.Sugar().Infof("Leaf count (leaves: %d, public key: %x)", len(leaves), ownerIdentityPubKey)
 	return &pb.GetLeafDenominationCountsResponse{Counts: counts}, nil
 }

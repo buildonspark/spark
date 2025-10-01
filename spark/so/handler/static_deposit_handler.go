@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/lightsparkdev/spark/common/keys"
 	"go.uber.org/zap"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -223,10 +222,7 @@ func (o *StaticDepositHandler) InitiateStaticDepositUtxoRefund(ctx context.Conte
 		if err != nil {
 			return nil, fmt.Errorf("failed to get deposit address: %w", err)
 		}
-		userIDPubKey, err := keys.ParsePublicKey(utxoSwap.UserIdentityPublicKey)
-		if err != nil {
-			return nil, fmt.Errorf("invalid identity public key: %w", err)
-		}
+		userIDPubKey := utxoSwap.UserIdentityPublicKey
 
 		if utxoSwap.Status == st.UtxoSwapStatusCompleted && utxoSwap.RequestType == st.UtxoSwapRequestTypeRefund && userIDPubKey.Equals(depositAddress.OwnerIdentityPubkey) {
 			if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, config, userIDPubKey); err != nil {

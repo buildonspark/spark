@@ -108,9 +108,7 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		}
 	}
 
-	response := &pb.QueryNodesResponse{
-		Nodes: protoNodeMap,
-	}
+	response := &pb.QueryNodesResponse{Nodes: protoNodeMap}
 	if offset != -1 {
 		nextOffset := -1
 		if len(nodes) == limit {
@@ -393,7 +391,6 @@ func (h *TreeQueryHandler) QueryNodesDistribution(ctx context.Context, req *pb.Q
 	}
 
 	var results []Result
-
 	err = db.TreeNode.Query().
 		Where(
 			treenode.OwnerIdentityPubkey(ownerIdentityPubKey),
@@ -436,9 +433,11 @@ func (h *TreeQueryHandler) QueryNodesByValue(ctx context.Context, req *pb.QueryN
 	}
 
 	nodes, err := db.TreeNode.Query().
-		Where(treenode.OwnerIdentityPubkey(ownerIdentityPubKey)).
-		Where(treenode.StatusEQ(st.TreeNodeStatusAvailable)).
-		Where(treenode.ValueEQ(uint64(req.GetValue()))).
+		Where(
+			treenode.OwnerIdentityPubkey(ownerIdentityPubKey),
+			treenode.StatusEQ(st.TreeNodeStatusAvailable),
+			treenode.ValueEQ(uint64(req.GetValue())),
+		).
 		Order(ent.Desc(treenode.FieldID)).
 		Offset(offset).
 		Limit(limit).

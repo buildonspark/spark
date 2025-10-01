@@ -15,19 +15,19 @@ import (
 	"go.uber.org/zap"
 )
 
-// InternalExtendLeafHandler is the extend leaf handler for so internal.
+// InternalRenewLeafHandler is the extend leaf handler for so internal.
 type InternalRenewLeafHandler struct {
 	config *so.Config
 }
 
-// NewInternalExtendLeafHandler creates a new InternalExtendLeafHandler.
+// NewInternalRenewLeafHandler creates a new InternalExtendLeafHandler.
 func NewInternalRenewLeafHandler(config *so.Config) *InternalRenewLeafHandler {
 	return &InternalRenewLeafHandler{
 		config: config,
 	}
 }
 
-// FinalizeRenewLeaf finalizes a renew leaf operation.
+// FinalizeRenewNodeTimelock finalizes a renew leaf operation.
 // This creates the new split node and updates the extended leaf.
 func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context, req *pbinternal.FinalizeRenewNodeTimelockRequest) error {
 	db, err := ent.GetDbFromContext(ctx)
@@ -64,44 +64,43 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 	if err != nil {
 		return fmt.Errorf("failed to parse split signing keyshare id: %w", err)
 	}
-	var splitParentID *uuid.UUID
+	splitParentID := uuid.Nil
 	if splitNode.ParentNodeId != nil {
-		parentID, err := uuid.Parse(*splitNode.ParentNodeId)
+		parentID, err := uuid.Parse(splitNode.GetParentNodeId())
 		if err != nil {
 			return fmt.Errorf("failed to parse split parent node id: %w", err)
 		}
-		splitParentID = &parentID
+		splitParentID = parentID
 	}
-	// Create the split node
-	ownerIdentityPubkey, err := keys.ParsePublicKey(splitNode.GetOwnerIdentityPubkey())
+
+	ownerIdentityPubKey, err := keys.ParsePublicKey(splitNode.GetOwnerIdentityPubkey())
 	if err != nil {
 		return fmt.Errorf("failed to parse owner identity pubkey: %w", err)
 	}
-	ownerSigningPubkey, err := keys.ParsePublicKey(splitNode.GetOwnerSigningPubkey())
+	ownerSigningPubKey, err := keys.ParsePublicKey(splitNode.GetOwnerSigningPubkey())
 	if err != nil {
 		return fmt.Errorf("failed to parse owner signing pubkey: %w", err)
 	}
-	verifyingPubkey, err := keys.ParsePublicKey(splitNode.VerifyingPubkey)
+	verifyingPubKey, err := keys.ParsePublicKey(splitNode.GetVerifyingPubkey())
 	if err != nil {
 		return fmt.Errorf("failed to parse verifying pubkey: %w", err)
 	}
 
-	splitNodeMut := db.
-		TreeNode.
-		Create().
+	// Create the split node
+	splitNodeMut := db.TreeNode.Create().
 		SetID(splitNodeID).
 		SetTreeID(splitTreeID).
 		SetStatus(st.TreeNodeStatusSplitLocked).
-		SetOwnerIdentityPubkey(ownerIdentityPubkey).
-		SetOwnerSigningPubkey(ownerSigningPubkey).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey).
+		SetOwnerSigningPubkey(ownerSigningPubKey).
 		SetValue(splitNode.Value).
-		SetVerifyingPubkey(verifyingPubkey).
+		SetVerifyingPubkey(verifyingPubKey).
 		SetSigningKeyshareID(splitSigningKeyshareID).
 		SetRawTx(splitNode.RawTx).
 		SetDirectTx(splitNode.DirectTx).
 		SetVout(int16(splitNode.Vout))
-	if splitParentID != nil {
-		splitNodeMut.SetParentID(*splitParentID)
+	if splitParentID != uuid.Nil {
+		splitNodeMut.SetParentID(splitParentID)
 	}
 	_, err = splitNodeMut.Save(ctx)
 	if err != nil {
@@ -138,9 +137,9 @@ func (h *InternalRenewLeafHandler) FinalizeRenewRefundTimelock(ctx context.Conte
 	}
 
 	// Validate leaf status before any database writes
-	leafID, err := uuid.Parse(req.Node.Id)
+	leafID, err := uuid.Parse(req.GetNode().GetId())
 	if err != nil {
-		return fmt.Errorf("failed to parse leaf %s: %w", req.Node.Id, err)
+		return fmt.Errorf("failed to parse leaf %s: %w", req.GetNode().GetId(), err)
 	}
 
 	leafNode, err := db.TreeNode.Query().Where(treenode.ID(leafID)).ForUpdate().Only(ctx)

@@ -241,11 +241,11 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		SetCreditAmountSats(totalAmount).
 		// quote signing bytes are the sighash of the spend tx if SSP is not used
 		SetSspSignature(quoteSigningBytes).
-		SetSspIdentityPublicKey(reqTransferOwnerIDPubKey.Serialize()).
+		SetSspIdentityPublicKey(reqTransferOwnerIDPubKey).
 		// authorization from a user to claim this utxo after fulfilling the quote
 		SetUserSignature(req.UserSignature).
-		SetUserIdentityPublicKey(reqTransferReceiverIdentityPubKey.Serialize()).
-		SetCoordinatorIdentityPublicKey(reqWithSignature.CoordinatorPublicKey).
+		SetUserIdentityPublicKey(reqTransferReceiverIdentityPubKey).
+		SetCoordinatorIdentityPublicKey(coordinatorPubKey).
 		SetRequestedTransferID(transferUUID).
 		Save(ctx)
 	if err != nil {
@@ -351,7 +351,6 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		return nil, errors.AlreadyExistsDuplicateOperation(fmt.Errorf("utxo swap is already registered"))
 	}
 
-	// Validate user statement
 	if err = validateUserSignature(depositAddress.OwnerIdentityPubkey, req.UserSignature, spendTxSighash, pb.UtxoSwapRequestType_Refund, network, targetUtxo.Txid, targetUtxo.Vout, totalAmount); err != nil {
 		return nil, fmt.Errorf("user signature validation failed: %w", err)
 	}
@@ -374,9 +373,9 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoRefund(ctx context
 		SetCreditAmountSats(totalAmount).
 		// quote signing bytes are the sighash of the spend tx if SSP is not used
 		SetSspSignature(spendTxSighash).
-		SetSspIdentityPublicKey(depositAddress.OwnerIdentityPubkey.Serialize()).
-		SetUserIdentityPublicKey(depositAddress.OwnerIdentityPubkey.Serialize()).
-		SetCoordinatorIdentityPublicKey(reqWithSignature.CoordinatorPublicKey).
+		SetSspIdentityPublicKey(depositAddress.OwnerIdentityPubkey).
+		SetUserIdentityPublicKey(depositAddress.OwnerIdentityPubkey).
+		SetCoordinatorIdentityPublicKey(coordinatorPubKey).
 		Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to store utxo swap: %w", err)

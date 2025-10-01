@@ -62,8 +62,6 @@ func TestFrostSigningHandler_GenerateRandomNonces(t *testing.T) {
 			// Verify each commitment
 			for i, commitment := range resp.SigningCommitments {
 				assert.NotNil(t, commitment, "Commitment %d should not be nil", i)
-				assert.NotEmpty(t, commitment.Binding, "Commitment %d binding should not be empty", i)
-				assert.NotEmpty(t, commitment.Hiding, "Commitment %d hiding should not be empty", i)
 				assert.Len(t, commitment.Binding, 33, "Commitment %d binding should be 33 bytes (compressed public key)", i)
 				assert.Len(t, commitment.Hiding, 33, "Commitment %d hiding should be 33 bytes (compressed public key)", i)
 			}
@@ -78,7 +76,6 @@ func TestFrostSigningHandler_GenerateRandomNonces(t *testing.T) {
 
 			// Verify that each nonce has a corresponding commitment
 			for _, nonce := range nonces {
-				assert.NotEmpty(t, nonce.Nonce, "Nonce should not be empty")
 				assert.NotEmpty(t, nonce.NonceCommitment, "Nonce commitment should not be empty")
 				assert.Len(t, nonce.Nonce, 64, "Nonce should be 64 bytes (32 binding + 32 hiding)")
 			}
@@ -93,22 +90,22 @@ func TestFrostSigningHandler_GenerateRandomNonces_UniqueCommitments(t *testing.T
 	handler := NewFrostSigningHandler(config)
 
 	// Generate multiple nonces
-	count := uint32(10)
+	const count = 10
 	resp, err := handler.GenerateRandomNonces(ctx, count)
 	require.NoError(t, err)
-	assert.Len(t, resp.SigningCommitments, int(count))
+	assert.Len(t, resp.SigningCommitments, count)
 
 	// Verify that all commitments are unique
 	commitmentMap := make(map[string]bool)
 	for i, commitment := range resp.SigningCommitments {
 		// Create a unique key for each commitment by combining binding and hiding
 		key := string(commitment.Binding) + string(commitment.Hiding)
-		assert.False(t, commitmentMap[key], "Commitment %d should be unique", i)
+		assert.NotContains(t, commitmentMap, key, "Commitment %d should be unique", i)
 		commitmentMap[key] = true
 	}
 
 	// Verify that we have exactly the expected number of unique commitments
-	assert.Len(t, commitmentMap, int(count), "Should have exactly %d unique commitments", count)
+	assert.Len(t, commitmentMap, count, "Should have exactly %d unique commitments", count)
 }
 
 func TestFrostSigningHandler_NewFrostSigningHandler(t *testing.T) {

@@ -259,7 +259,6 @@ func (h *RefreshTimelockHandler) refreshTimelock(ctx context.Context, req *pb.Re
 		}
 
 		verifyingPubKey := nodes[i].VerifyingPubkey
-
 		signingJobs = append(signingJobs, &helper.SigningJob{
 			JobID:             uuid.New().String(),
 			SigningKeyshareID: signingKeyshare.ID,
@@ -315,7 +314,5 @@ func (h *RefreshTimelockHandler) refreshTimelock(ctx context.Context, req *pb.Re
 		})
 	}
 
-	return &pb.RefreshTimelockResponse{
-		SigningResults: pbSigningResults,
-	}, nil
+	return &pb.RefreshTimelockResponse{SigningResults: pbSigningResults}, nil
 }

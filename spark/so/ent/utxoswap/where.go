@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -83,7 +84,7 @@ func SspSignature(v []byte) predicate.UtxoSwap {
 }
 
 // SspIdentityPublicKey applies equality check predicate on the "ssp_identity_public_key" field. It's identical to SspIdentityPublicKeyEQ.
-func SspIdentityPublicKey(v []byte) predicate.UtxoSwap {
+func SspIdentityPublicKey(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldEQ(FieldSspIdentityPublicKey, v))
 }
 
@@ -93,12 +94,12 @@ func UserSignature(v []byte) predicate.UtxoSwap {
 }
 
 // UserIdentityPublicKey applies equality check predicate on the "user_identity_public_key" field. It's identical to UserIdentityPublicKeyEQ.
-func UserIdentityPublicKey(v []byte) predicate.UtxoSwap {
+func UserIdentityPublicKey(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldEQ(FieldUserIdentityPublicKey, v))
 }
 
 // CoordinatorIdentityPublicKey applies equality check predicate on the "coordinator_identity_public_key" field. It's identical to CoordinatorIdentityPublicKeyEQ.
-func CoordinatorIdentityPublicKey(v []byte) predicate.UtxoSwap {
+func CoordinatorIdentityPublicKey(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldEQ(FieldCoordinatorIdentityPublicKey, v))
 }
 
@@ -403,42 +404,42 @@ func SspSignatureNotNil() predicate.UtxoSwap {
 }
 
 // SspIdentityPublicKeyEQ applies the EQ predicate on the "ssp_identity_public_key" field.
-func SspIdentityPublicKeyEQ(v []byte) predicate.UtxoSwap {
+func SspIdentityPublicKeyEQ(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldEQ(FieldSspIdentityPublicKey, v))
 }
 
 // SspIdentityPublicKeyNEQ applies the NEQ predicate on the "ssp_identity_public_key" field.
-func SspIdentityPublicKeyNEQ(v []byte) predicate.UtxoSwap {
+func SspIdentityPublicKeyNEQ(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldNEQ(FieldSspIdentityPublicKey, v))
 }
 
 // SspIdentityPublicKeyIn applies the In predicate on the "ssp_identity_public_key" field.
-func SspIdentityPublicKeyIn(vs ...[]byte) predicate.UtxoSwap {
+func SspIdentityPublicKeyIn(vs ...keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldIn(FieldSspIdentityPublicKey, vs...))
 }
 
 // SspIdentityPublicKeyNotIn applies the NotIn predicate on the "ssp_identity_public_key" field.
-func SspIdentityPublicKeyNotIn(vs ...[]byte) predicate.UtxoSwap {
+func SspIdentityPublicKeyNotIn(vs ...keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldNotIn(FieldSspIdentityPublicKey, vs...))
 }
 
 // SspIdentityPublicKeyGT applies the GT predicate on the "ssp_identity_public_key" field.
-func SspIdentityPublicKeyGT(v []byte) predicate.UtxoSwap {
+func SspIdentityPublicKeyGT(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldGT(FieldSspIdentityPublicKey, v))
 }
 
 // SspIdentityPublicKeyGTE applies the GTE predicate on the "ssp_identity_public_key" field.
-func SspIdentityPublicKeyGTE(v []byte) predicate.UtxoSwap {
+func SspIdentityPublicKeyGTE(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldGTE(FieldSspIdentityPublicKey, v))
 }
 
 // SspIdentityPublicKeyLT applies the LT predicate on the "ssp_identity_public_key" field.
-func SspIdentityPublicKeyLT(v []byte) predicate.UtxoSwap {
+func SspIdentityPublicKeyLT(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldLT(FieldSspIdentityPublicKey, v))
 }
 
 // SspIdentityPublicKeyLTE applies the LTE predicate on the "ssp_identity_public_key" field.
-func SspIdentityPublicKeyLTE(v []byte) predicate.UtxoSwap {
+func SspIdentityPublicKeyLTE(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldLTE(FieldSspIdentityPublicKey, v))
 }
 
@@ -503,42 +504,42 @@ func UserSignatureNotNil() predicate.UtxoSwap {
 }
 
 // UserIdentityPublicKeyEQ applies the EQ predicate on the "user_identity_public_key" field.
-func UserIdentityPublicKeyEQ(v []byte) predicate.UtxoSwap {
+func UserIdentityPublicKeyEQ(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldEQ(FieldUserIdentityPublicKey, v))
 }
 
 // UserIdentityPublicKeyNEQ applies the NEQ predicate on the "user_identity_public_key" field.
-func UserIdentityPublicKeyNEQ(v []byte) predicate.UtxoSwap {
+func UserIdentityPublicKeyNEQ(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldNEQ(FieldUserIdentityPublicKey, v))
 }
 
 // UserIdentityPublicKeyIn applies the In predicate on the "user_identity_public_key" field.
-func UserIdentityPublicKeyIn(vs ...[]byte) predicate.UtxoSwap {
+func UserIdentityPublicKeyIn(vs ...keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldIn(FieldUserIdentityPublicKey, vs...))
 }
 
 // UserIdentityPublicKeyNotIn applies the NotIn predicate on the "user_identity_public_key" field.
-func UserIdentityPublicKeyNotIn(vs ...[]byte) predicate.UtxoSwap {
+func UserIdentityPublicKeyNotIn(vs ...keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldNotIn(FieldUserIdentityPublicKey, vs...))
 }
 
 // UserIdentityPublicKeyGT applies the GT predicate on the "user_identity_public_key" field.
-func UserIdentityPublicKeyGT(v []byte) predicate.UtxoSwap {
+func UserIdentityPublicKeyGT(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldGT(FieldUserIdentityPublicKey, v))
 }
 
 // UserIdentityPublicKeyGTE applies the GTE predicate on the "user_identity_public_key" field.
-func UserIdentityPublicKeyGTE(v []byte) predicate.UtxoSwap {
+func UserIdentityPublicKeyGTE(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldGTE(FieldUserIdentityPublicKey, v))
 }
 
 // UserIdentityPublicKeyLT applies the LT predicate on the "user_identity_public_key" field.
-func UserIdentityPublicKeyLT(v []byte) predicate.UtxoSwap {
+func UserIdentityPublicKeyLT(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldLT(FieldUserIdentityPublicKey, v))
 }
 
 // UserIdentityPublicKeyLTE applies the LTE predicate on the "user_identity_public_key" field.
-func UserIdentityPublicKeyLTE(v []byte) predicate.UtxoSwap {
+func UserIdentityPublicKeyLTE(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldLTE(FieldUserIdentityPublicKey, v))
 }
 
@@ -553,42 +554,42 @@ func UserIdentityPublicKeyNotNil() predicate.UtxoSwap {
 }
 
 // CoordinatorIdentityPublicKeyEQ applies the EQ predicate on the "coordinator_identity_public_key" field.
-func CoordinatorIdentityPublicKeyEQ(v []byte) predicate.UtxoSwap {
+func CoordinatorIdentityPublicKeyEQ(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldEQ(FieldCoordinatorIdentityPublicKey, v))
 }
 
 // CoordinatorIdentityPublicKeyNEQ applies the NEQ predicate on the "coordinator_identity_public_key" field.
-func CoordinatorIdentityPublicKeyNEQ(v []byte) predicate.UtxoSwap {
+func CoordinatorIdentityPublicKeyNEQ(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldNEQ(FieldCoordinatorIdentityPublicKey, v))
 }
 
 // CoordinatorIdentityPublicKeyIn applies the In predicate on the "coordinator_identity_public_key" field.
-func CoordinatorIdentityPublicKeyIn(vs ...[]byte) predicate.UtxoSwap {
+func CoordinatorIdentityPublicKeyIn(vs ...keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldIn(FieldCoordinatorIdentityPublicKey, vs...))
 }
 
 // CoordinatorIdentityPublicKeyNotIn applies the NotIn predicate on the "coordinator_identity_public_key" field.
-func CoordinatorIdentityPublicKeyNotIn(vs ...[]byte) predicate.UtxoSwap {
+func CoordinatorIdentityPublicKeyNotIn(vs ...keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldNotIn(FieldCoordinatorIdentityPublicKey, vs...))
 }
 
 // CoordinatorIdentityPublicKeyGT applies the GT predicate on the "coordinator_identity_public_key" field.
-func CoordinatorIdentityPublicKeyGT(v []byte) predicate.UtxoSwap {
+func CoordinatorIdentityPublicKeyGT(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldGT(FieldCoordinatorIdentityPublicKey, v))
 }
 
 // CoordinatorIdentityPublicKeyGTE applies the GTE predicate on the "coordinator_identity_public_key" field.
-func CoordinatorIdentityPublicKeyGTE(v []byte) predicate.UtxoSwap {
+func CoordinatorIdentityPublicKeyGTE(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldGTE(FieldCoordinatorIdentityPublicKey, v))
 }
 
 // CoordinatorIdentityPublicKeyLT applies the LT predicate on the "coordinator_identity_public_key" field.
-func CoordinatorIdentityPublicKeyLT(v []byte) predicate.UtxoSwap {
+func CoordinatorIdentityPublicKeyLT(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldLT(FieldCoordinatorIdentityPublicKey, v))
 }
 
 // CoordinatorIdentityPublicKeyLTE applies the LTE predicate on the "coordinator_identity_public_key" field.
-func CoordinatorIdentityPublicKeyLTE(v []byte) predicate.UtxoSwap {
+func CoordinatorIdentityPublicKeyLTE(v keys.Public) predicate.UtxoSwap {
 	return predicate.UtxoSwap(sql.FieldLTE(FieldCoordinatorIdentityPublicKey, v))
 }
 

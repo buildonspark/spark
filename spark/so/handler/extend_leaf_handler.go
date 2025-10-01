@@ -378,7 +378,6 @@ func validateNewTxOutput(leaf *ent.TreeNode,
 func getLeafSigningResults(signingResults []*helper.SigningResult, leaf *ent.TreeNode) (cpfpNodeSigningResult, cpfpRefundSigningResult *pb.ExtendLeafSigningResult, err error) {
 	cpfpNodeFrostResult := signingResults[0]
 	cpfpRefundFrostResult := signingResults[1]
-	verifyingPubkey := leaf.VerifyingPubkey
 
 	// Prepare response
 	cpfpNodeSigningResultProto, err := cpfpNodeFrostResult.MarshalProto()
@@ -388,7 +387,7 @@ func getLeafSigningResults(signingResults []*helper.SigningResult, leaf *ent.Tre
 
 	cpfpNodeSigningResult = &pb.ExtendLeafSigningResult{
 		SigningResult: cpfpNodeSigningResultProto,
-		VerifyingKey:  verifyingPubkey.Serialize(),
+		VerifyingKey:  leaf.VerifyingPubkey.Serialize(),
 	}
 
 	cpfpRefundSigningResultProto, err := cpfpRefundFrostResult.MarshalProto()
@@ -399,7 +398,7 @@ func getLeafSigningResults(signingResults []*helper.SigningResult, leaf *ent.Tre
 
 	cpfpRefundSigningResult = &pb.ExtendLeafSigningResult{
 		SigningResult: cpfpRefundSigningResultProto,
-		VerifyingKey:  verifyingPubkey.Serialize(),
+		VerifyingKey:  leaf.VerifyingPubkey.Serialize(),
 	}
 
 	return cpfpNodeSigningResult, cpfpRefundSigningResult, nil
@@ -459,12 +458,11 @@ func createSigningJob(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
 	}
-	verifyingPubKey := leaf.VerifyingPubkey
 	return &helper.SigningJob{
 		JobID:             uuid.New().String(),
 		SigningKeyshareID: signingKeyshare.ID,
 		Message:           sigHash,
-		VerifyingKey:      &verifyingPubKey,
+		VerifyingKey:      &leaf.VerifyingPubkey,
 		UserCommitment:    newNodeUserNonceCommitment,
 	}, nil
 }

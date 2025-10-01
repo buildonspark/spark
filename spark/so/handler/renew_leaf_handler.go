@@ -65,8 +65,7 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 		return nil, errors.FailedPreconditionInvalidState(fmt.Errorf("leaf node is not available for renewal, current status: %s", leaf.Status))
 	}
 
-	err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, leaf.OwnerIdentityPubkey)
-	if err != nil {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, leaf.OwnerIdentityPubkey); err != nil {
 		return nil, err
 	}
 

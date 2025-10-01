@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
@@ -102,8 +103,16 @@ func (usc *UtxoSwapCreate) SetSspSignature(b []byte) *UtxoSwapCreate {
 }
 
 // SetSspIdentityPublicKey sets the "ssp_identity_public_key" field.
-func (usc *UtxoSwapCreate) SetSspIdentityPublicKey(b []byte) *UtxoSwapCreate {
-	usc.mutation.SetSspIdentityPublicKey(b)
+func (usc *UtxoSwapCreate) SetSspIdentityPublicKey(k keys.Public) *UtxoSwapCreate {
+	usc.mutation.SetSspIdentityPublicKey(k)
+	return usc
+}
+
+// SetNillableSspIdentityPublicKey sets the "ssp_identity_public_key" field if the given value is not nil.
+func (usc *UtxoSwapCreate) SetNillableSspIdentityPublicKey(k *keys.Public) *UtxoSwapCreate {
+	if k != nil {
+		usc.SetSspIdentityPublicKey(*k)
+	}
 	return usc
 }
 
@@ -114,14 +123,22 @@ func (usc *UtxoSwapCreate) SetUserSignature(b []byte) *UtxoSwapCreate {
 }
 
 // SetUserIdentityPublicKey sets the "user_identity_public_key" field.
-func (usc *UtxoSwapCreate) SetUserIdentityPublicKey(b []byte) *UtxoSwapCreate {
-	usc.mutation.SetUserIdentityPublicKey(b)
+func (usc *UtxoSwapCreate) SetUserIdentityPublicKey(k keys.Public) *UtxoSwapCreate {
+	usc.mutation.SetUserIdentityPublicKey(k)
+	return usc
+}
+
+// SetNillableUserIdentityPublicKey sets the "user_identity_public_key" field if the given value is not nil.
+func (usc *UtxoSwapCreate) SetNillableUserIdentityPublicKey(k *keys.Public) *UtxoSwapCreate {
+	if k != nil {
+		usc.SetUserIdentityPublicKey(*k)
+	}
 	return usc
 }
 
 // SetCoordinatorIdentityPublicKey sets the "coordinator_identity_public_key" field.
-func (usc *UtxoSwapCreate) SetCoordinatorIdentityPublicKey(b []byte) *UtxoSwapCreate {
-	usc.mutation.SetCoordinatorIdentityPublicKey(b)
+func (usc *UtxoSwapCreate) SetCoordinatorIdentityPublicKey(k keys.Public) *UtxoSwapCreate {
+	usc.mutation.SetCoordinatorIdentityPublicKey(k)
 	return usc
 }
 
@@ -545,7 +562,7 @@ func (u *UtxoSwapUpsert) ClearSspSignature() *UtxoSwapUpsert {
 }
 
 // SetSspIdentityPublicKey sets the "ssp_identity_public_key" field.
-func (u *UtxoSwapUpsert) SetSspIdentityPublicKey(v []byte) *UtxoSwapUpsert {
+func (u *UtxoSwapUpsert) SetSspIdentityPublicKey(v keys.Public) *UtxoSwapUpsert {
 	u.Set(utxoswap.FieldSspIdentityPublicKey, v)
 	return u
 }
@@ -581,7 +598,7 @@ func (u *UtxoSwapUpsert) ClearUserSignature() *UtxoSwapUpsert {
 }
 
 // SetUserIdentityPublicKey sets the "user_identity_public_key" field.
-func (u *UtxoSwapUpsert) SetUserIdentityPublicKey(v []byte) *UtxoSwapUpsert {
+func (u *UtxoSwapUpsert) SetUserIdentityPublicKey(v keys.Public) *UtxoSwapUpsert {
 	u.Set(utxoswap.FieldUserIdentityPublicKey, v)
 	return u
 }
@@ -599,7 +616,7 @@ func (u *UtxoSwapUpsert) ClearUserIdentityPublicKey() *UtxoSwapUpsert {
 }
 
 // SetCoordinatorIdentityPublicKey sets the "coordinator_identity_public_key" field.
-func (u *UtxoSwapUpsert) SetCoordinatorIdentityPublicKey(v []byte) *UtxoSwapUpsert {
+func (u *UtxoSwapUpsert) SetCoordinatorIdentityPublicKey(v keys.Public) *UtxoSwapUpsert {
 	u.Set(utxoswap.FieldCoordinatorIdentityPublicKey, v)
 	return u
 }
@@ -817,7 +834,7 @@ func (u *UtxoSwapUpsertOne) ClearSspSignature() *UtxoSwapUpsertOne {
 }
 
 // SetSspIdentityPublicKey sets the "ssp_identity_public_key" field.
-func (u *UtxoSwapUpsertOne) SetSspIdentityPublicKey(v []byte) *UtxoSwapUpsertOne {
+func (u *UtxoSwapUpsertOne) SetSspIdentityPublicKey(v keys.Public) *UtxoSwapUpsertOne {
 	return u.Update(func(s *UtxoSwapUpsert) {
 		s.SetSspIdentityPublicKey(v)
 	})
@@ -859,7 +876,7 @@ func (u *UtxoSwapUpsertOne) ClearUserSignature() *UtxoSwapUpsertOne {
 }
 
 // SetUserIdentityPublicKey sets the "user_identity_public_key" field.
-func (u *UtxoSwapUpsertOne) SetUserIdentityPublicKey(v []byte) *UtxoSwapUpsertOne {
+func (u *UtxoSwapUpsertOne) SetUserIdentityPublicKey(v keys.Public) *UtxoSwapUpsertOne {
 	return u.Update(func(s *UtxoSwapUpsert) {
 		s.SetUserIdentityPublicKey(v)
 	})
@@ -880,7 +897,7 @@ func (u *UtxoSwapUpsertOne) ClearUserIdentityPublicKey() *UtxoSwapUpsertOne {
 }
 
 // SetCoordinatorIdentityPublicKey sets the "coordinator_identity_public_key" field.
-func (u *UtxoSwapUpsertOne) SetCoordinatorIdentityPublicKey(v []byte) *UtxoSwapUpsertOne {
+func (u *UtxoSwapUpsertOne) SetCoordinatorIdentityPublicKey(v keys.Public) *UtxoSwapUpsertOne {
 	return u.Update(func(s *UtxoSwapUpsert) {
 		s.SetCoordinatorIdentityPublicKey(v)
 	})
@@ -1273,7 +1290,7 @@ func (u *UtxoSwapUpsertBulk) ClearSspSignature() *UtxoSwapUpsertBulk {
 }
 
 // SetSspIdentityPublicKey sets the "ssp_identity_public_key" field.
-func (u *UtxoSwapUpsertBulk) SetSspIdentityPublicKey(v []byte) *UtxoSwapUpsertBulk {
+func (u *UtxoSwapUpsertBulk) SetSspIdentityPublicKey(v keys.Public) *UtxoSwapUpsertBulk {
 	return u.Update(func(s *UtxoSwapUpsert) {
 		s.SetSspIdentityPublicKey(v)
 	})
@@ -1315,7 +1332,7 @@ func (u *UtxoSwapUpsertBulk) ClearUserSignature() *UtxoSwapUpsertBulk {
 }
 
 // SetUserIdentityPublicKey sets the "user_identity_public_key" field.
-func (u *UtxoSwapUpsertBulk) SetUserIdentityPublicKey(v []byte) *UtxoSwapUpsertBulk {
+func (u *UtxoSwapUpsertBulk) SetUserIdentityPublicKey(v keys.Public) *UtxoSwapUpsertBulk {
 	return u.Update(func(s *UtxoSwapUpsert) {
 		s.SetUserIdentityPublicKey(v)
 	})
@@ -1336,7 +1353,7 @@ func (u *UtxoSwapUpsertBulk) ClearUserIdentityPublicKey() *UtxoSwapUpsertBulk {
 }
 
 // SetCoordinatorIdentityPublicKey sets the "coordinator_identity_public_key" field.
-func (u *UtxoSwapUpsertBulk) SetCoordinatorIdentityPublicKey(v []byte) *UtxoSwapUpsertBulk {
+func (u *UtxoSwapUpsertBulk) SetCoordinatorIdentityPublicKey(v keys.Public) *UtxoSwapUpsertBulk {
 	return u.Update(func(s *UtxoSwapUpsert) {
 		s.SetCoordinatorIdentityPublicKey(v)
 	})

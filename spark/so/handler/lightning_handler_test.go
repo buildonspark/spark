@@ -33,7 +33,7 @@ import (
 // mockFrostServiceClientConnection implements the FrostServiceClientConnection interface for testing
 type mockFrostServiceClientConnection struct{}
 
-func (m *mockFrostServiceClientConnection) StartFrostServiceClient(h *LightningHandler) (pbfrost.FrostServiceClient, error) {
+func (m *mockFrostServiceClientConnection) StartFrostServiceClient(*LightningHandler) (pbfrost.FrostServiceClient, error) {
 	return &mockFrostServiceClient{}, nil
 }
 
@@ -43,35 +43,35 @@ func (m *mockFrostServiceClientConnection) Close() {
 // mockFrostServiceClient implements the FrostServiceClient interface for testing
 type mockFrostServiceClient struct{}
 
-func (m *mockFrostServiceClient) Echo(ctx context.Context, in *pbfrost.EchoRequest, opts ...grpc.CallOption) (*pbfrost.EchoResponse, error) {
+func (m *mockFrostServiceClient) Echo(context.Context, *pbfrost.EchoRequest, ...grpc.CallOption) (*pbfrost.EchoResponse, error) {
 	return &pbfrost.EchoResponse{}, nil
 }
 
-func (m *mockFrostServiceClient) DkgRound1(ctx context.Context, in *pbfrost.DkgRound1Request, opts ...grpc.CallOption) (*pbfrost.DkgRound1Response, error) {
+func (m *mockFrostServiceClient) DkgRound1(context.Context, *pbfrost.DkgRound1Request, ...grpc.CallOption) (*pbfrost.DkgRound1Response, error) {
 	return &pbfrost.DkgRound1Response{}, nil
 }
 
-func (m *mockFrostServiceClient) DkgRound2(ctx context.Context, in *pbfrost.DkgRound2Request, opts ...grpc.CallOption) (*pbfrost.DkgRound2Response, error) {
+func (m *mockFrostServiceClient) DkgRound2(context.Context, *pbfrost.DkgRound2Request, ...grpc.CallOption) (*pbfrost.DkgRound2Response, error) {
 	return &pbfrost.DkgRound2Response{}, nil
 }
 
-func (m *mockFrostServiceClient) DkgRound3(ctx context.Context, in *pbfrost.DkgRound3Request, opts ...grpc.CallOption) (*pbfrost.DkgRound3Response, error) {
+func (m *mockFrostServiceClient) DkgRound3(context.Context, *pbfrost.DkgRound3Request, ...grpc.CallOption) (*pbfrost.DkgRound3Response, error) {
 	return &pbfrost.DkgRound3Response{}, nil
 }
 
-func (m *mockFrostServiceClient) FrostNonce(ctx context.Context, in *pbfrost.FrostNonceRequest, opts ...grpc.CallOption) (*pbfrost.FrostNonceResponse, error) {
+func (m *mockFrostServiceClient) FrostNonce(context.Context, *pbfrost.FrostNonceRequest, ...grpc.CallOption) (*pbfrost.FrostNonceResponse, error) {
 	return &pbfrost.FrostNonceResponse{}, nil
 }
 
-func (m *mockFrostServiceClient) SignFrost(ctx context.Context, in *pbfrost.SignFrostRequest, opts ...grpc.CallOption) (*pbfrost.SignFrostResponse, error) {
+func (m *mockFrostServiceClient) SignFrost(context.Context, *pbfrost.SignFrostRequest, ...grpc.CallOption) (*pbfrost.SignFrostResponse, error) {
 	return &pbfrost.SignFrostResponse{}, nil
 }
 
-func (m *mockFrostServiceClient) AggregateFrost(ctx context.Context, in *pbfrost.AggregateFrostRequest, opts ...grpc.CallOption) (*pbfrost.AggregateFrostResponse, error) {
+func (m *mockFrostServiceClient) AggregateFrost(context.Context, *pbfrost.AggregateFrostRequest, ...grpc.CallOption) (*pbfrost.AggregateFrostResponse, error) {
 	return &pbfrost.AggregateFrostResponse{}, nil
 }
 
-func (m *mockFrostServiceClient) ValidateSignatureShare(ctx context.Context, in *pbfrost.ValidateSignatureShareRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (m *mockFrostServiceClient) ValidateSignatureShare(context.Context, *pbfrost.ValidateSignatureShareRequest, ...grpc.CallOption) (*emptypb.Empty, error) {
 	// Mock successful validation
 	return &emptypb.Empty{}, nil
 }

@@ -12,6 +12,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/lightsparkdev/spark/common/keys"
+	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
 	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/wire"
@@ -32,7 +33,6 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
-	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
@@ -269,9 +269,8 @@ func (h *BaseTransferHandler) createTransfer(
 	}
 
 	invoiceID := uuid.Nil
-	//nolint:all
+	//nolint:govet,revive // TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
 	if len(sparkInvoice) > 0 {
-		// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
 		return nil, nil, sparkerrors.UnimplementedMethodDisabled(fmt.Errorf("spark invoice support not implemented"))
 		invoiceID, err = createAndLockSparkInvoice(ctx, sparkInvoice)
 		if err != nil {

@@ -105,7 +105,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				Name:         "generate_signing_commitments",
 				RunInTestEnv: false,
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					db, err := ent.GetDbFromContext(ctx)
+					dbTX, err := ent.GetDbFromContext(ctx)
 					if err != nil {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
 					}
@@ -113,7 +113,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					logger := logging.GetLoggerFromContext(ctx)
 					var entCommitments []*ent.SigningCommitmentCreate
 					for _, operator := range config.SigningOperatorMap {
-						count, err := db.SigningCommitment.Query().Where(
+						count, err := dbTX.SigningCommitment.Query().Where(
 							signingcommitment.OperatorIndexEQ(uint(operator.ID)),
 							signingcommitment.StatusEQ(st.SigningCommitmentStatusAvailable),
 						).Count(ctx)
@@ -157,7 +157,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 
 								entCommitments = append(
 									entCommitments,
-									db.SigningCommitment.Create().
+									dbTX.SigningCommitment.Create().
 										SetOperatorIndex(uint(operator.ID)).
 										SetStatus(st.SigningCommitmentStatusAvailable).
 										SetNonceCommitment(commitmentBinary),
@@ -166,7 +166,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						}
 					}
 
-					if err := db.SigningCommitment.CreateBulk(entCommitments...).Exec(ctx); err != nil {
+					if err := dbTX.SigningCommitment.CreateBulk(entCommitments...).Exec(ctx); err != nil {
 						return err
 					}
 
@@ -506,7 +506,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 
 					query := tx.UtxoSwap.Query().
 						Where(utxoswap.StatusEQ(st.UtxoSwapStatusCreated)).
-						Where(utxoswap.CoordinatorIdentityPublicKeyEQ(config.IdentityPublicKey().Serialize())).
+						Where(utxoswap.CoordinatorIdentityPublicKeyEQ(config.IdentityPublicKey())).
 						Order(utxoswap.ByCreateTime(sql.OrderDesc())).
 						Limit(100)
 

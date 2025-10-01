@@ -7,6 +7,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
@@ -15,7 +16,6 @@ type UtxoSwap struct {
 	ent.Schema
 }
 
-// Add generic fields
 func (UtxoSwap) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
@@ -38,12 +38,12 @@ func (UtxoSwap) Fields() []ent.Field {
 		field.Uint64("max_fee_sats").Optional(),
 		field.Bytes("ssp_signature").Optional(),
 		// SspIdentityPublicKey is the owner of the utxo swap. It can be a SSP or a user.
-		field.Bytes("ssp_identity_public_key").Optional(),
+		field.Bytes("ssp_identity_public_key").Optional().GoType(keys.Public{}),
 		// authorization from a user to claim this utxo after fulfilling the quote
 		field.Bytes("user_signature").Optional(),
-		field.Bytes("user_identity_public_key").Optional(),
+		field.Bytes("user_identity_public_key").Optional().GoType(keys.Public{}),
 		// distributed transaction coordinator identity public key
-		field.Bytes("coordinator_identity_public_key"),
+		field.Bytes("coordinator_identity_public_key").GoType(keys.Public{}),
 		// the transfer id that was requested by the user, a unique reference accross all operators
 		field.UUID("requested_transfer_id", uuid.UUID{}).Optional(),
 		// the result of frost signing the spend transaction

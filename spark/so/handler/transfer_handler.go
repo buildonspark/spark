@@ -708,15 +708,13 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			return nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
 		}
 
-		leafVerifyingPubKey := leaf.VerifyingPubkey
-
 		cpfpSigningJobs = append(
 			cpfpSigningJobs,
 			&helper.SigningJob{
 				JobID:             cpfpJobID,
 				SigningKeyshareID: signingKeyshare.ID,
 				Message:           cpfpRefundTxSigHash,
-				VerifyingKey:      &leafVerifyingPubKey,
+				VerifyingKey:      &leaf.VerifyingPubkey,
 				UserCommitment:    cpfpUserNonceCommitment,
 				AdaptorPublicKey:  &cpfpAdaptorPubKey,
 			},
@@ -764,7 +762,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 					JobID:             directJobID,
 					SigningKeyshareID: signingKeyshare.ID,
 					Message:           directRefundTxSigHash,
-					VerifyingKey:      &leafVerifyingPubKey,
+					VerifyingKey:      &leaf.VerifyingPubkey,
 					UserCommitment:    directUserNonceCommitment,
 					AdaptorPublicKey:  &directAdaptorPubKey,
 				},
@@ -775,7 +773,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 					JobID:             directFromCpfpJobID,
 					SigningKeyshareID: signingKeyshare.ID,
 					Message:           directFromCpfpRefundTxSigHash,
-					VerifyingKey:      &leafVerifyingPubKey,
+					VerifyingKey:      &leaf.VerifyingPubkey,
 					UserCommitment:    directFromCpfpUserNonceCommitment,
 					AdaptorPublicKey:  &directFromCpfpAdaptorPubKey,
 				},
@@ -922,10 +920,6 @@ func SignRefundsWithPregeneratedNonce(
 				return nil, nil, nil, fmt.Errorf("cpfp signing commitment is invalid for key %s: hiding or binding is empty", key)
 			}
 		}
-		leafVerifyingPubKey, err := keys.ParsePublicKey(leaf.VerifyingPubkey.Serialize())
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to parse verifying public key: %w", err)
-		}
 		signingJobs = append(
 			signingJobs,
 			&helper.SigningJobWithPregeneratedNonce{
@@ -933,7 +927,7 @@ func SignRefundsWithPregeneratedNonce(
 					JobID:             cpfpJobID,
 					SigningKeyshareID: signingKeyshare.ID,
 					Message:           refundTxSigHash,
-					VerifyingKey:      &leafVerifyingPubKey,
+					VerifyingKey:      &leaf.VerifyingPubkey,
 					UserCommitment:    &userNonceCommitment,
 					AdaptorPublicKey:  &cpfpAdaptorPubKey,
 				},
@@ -984,13 +978,12 @@ func SignRefundsWithPregeneratedNonce(
 			}
 			round1Packages[key] = obj
 		}
-		leafVerifyingPubKey := leaf.VerifyingPubkey
 		signingJobs = append(signingJobs, &helper.SigningJobWithPregeneratedNonce{
 			SigningJob: helper.SigningJob{
 				JobID:             directJobID,
 				SigningKeyshareID: signingKeyshare.ID,
 				Message:           directRefundTxSigHash,
-				VerifyingKey:      &leafVerifyingPubKey,
+				VerifyingKey:      &leaf.VerifyingPubkey,
 				UserCommitment:    &userNonceCommitment,
 				AdaptorPublicKey:  &directAdaptorPubKey,
 			},
@@ -1038,13 +1031,12 @@ func SignRefundsWithPregeneratedNonce(
 			}
 			round1Packages[key] = obj
 		}
-		leafVerifyingPubKey := leaf.VerifyingPubkey
 		signingJobs = append(signingJobs, &helper.SigningJobWithPregeneratedNonce{
 			SigningJob: helper.SigningJob{
 				JobID:             directFromCpfpJobID,
 				SigningKeyshareID: signingKeyshare.ID,
 				Message:           directFromCpfpRefundTxSigHash,
-				VerifyingKey:      &leafVerifyingPubKey,
+				VerifyingKey:      &leaf.VerifyingPubkey,
 				UserCommitment:    &userNonceCommitment,
 				AdaptorPublicKey:  &directFromCpfpAdaptorPubKey,
 			},
@@ -1942,11 +1934,11 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 		return fmt.Errorf("unable to tweak keyshare %v for leaf %v: %w", keyshare.ID, leaf.ID, err)
 	}
 
-	signingPubkey := leaf.VerifyingPubkey.Sub(tweakedKeyshare.PublicKey)
+	signingPubKey := leaf.VerifyingPubkey.Sub(tweakedKeyshare.PublicKey)
 	_, err = leaf.
 		Update().
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
-		SetOwnerSigningPubkey(signingPubkey).
+		SetOwnerSigningPubkey(signingPubKey).
 		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to update leaf %s: %w", req.LeafId, err)
