@@ -8,6 +8,7 @@ import (
 
 	"time"
 
+	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
@@ -198,22 +199,62 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 		}
 	}
 
-	if req.RefundSignatures != nil {
-		cpfpLeafRefundMap, err = applySignatures(ctx, cpfpLeafRefundMap, req.RefundSignatures, false)
+	// Swap V3 requires adapted signatures from the User and AdaptorPublicKeys must be provided for this flow.
+	// If the user intends to use Swap V3 flow, they will call InitiateSwapPrimaryTransfer rpc and
+	// it will validate that the adaptor public keys are provided and then call this generic rpc.
+	// Here we just check if the adaptor public keys are provided and if they are
+	// we assume that Swap V3 flow is used and we need to verify adaptor signatures.
+	if req.AdaptorPublicKeys == nil {
+		// Generic flow
+		if req.RefundSignatures != nil {
+			cpfpLeafRefundMap, err = applySignaturesToTransactionsAndVerify(ctx, cpfpLeafRefundMap, req.RefundSignatures, false, keys.Public{})
+			if err != nil {
+				return fmt.Errorf("failed to apply signatures to leaf cpfp refund map for transfer id: %s and error: %w", req.TransferId, err)
+			}
+		}
+		if req.DirectRefundSignatures != nil && req.DirectFromCpfpRefundSignatures != nil {
+			directLeafRefundMap, err = applySignaturesToTransactionsAndVerify(ctx, directLeafRefundMap, req.DirectRefundSignatures, true, keys.Public{})
+			if err != nil {
+				return fmt.Errorf("failed to apply signatures to leaf direct refund map for transfer id: %s and error: %w", req.TransferId, err)
+			}
+			directFromCpfpLeafRefundMap, err = applySignaturesToTransactionsAndVerify(ctx, directFromCpfpLeafRefundMap, req.DirectFromCpfpRefundSignatures, false, keys.Public{})
+			if err != nil {
+				return fmt.Errorf("failed to apply signatures to leaf direct from cpfp refund map for transfer id: %s and error: %w", req.TransferId, err)
+			}
+		}
+	} else {
+		// Swap V3 flow
+		if req.RefundSignatures == nil {
+			return fmt.Errorf("refund signatures are required when adaptor public keys are provided")
+		}
+		cpfpAdaptorPublicKey, err := keys.ParsePublicKey(req.AdaptorPublicKeys.AdaptorPublicKey)
+		if err != nil || cpfpAdaptorPublicKey.IsZero() {
+			return fmt.Errorf("failed to parse cpfp adaptor public key: %w, is zero: %t, adaptor public key: %s", err, cpfpAdaptorPublicKey.IsZero(), req.AdaptorPublicKeys.AdaptorPublicKey)
+		}
+		cpfpLeafRefundMap, err = applySignaturesToTransactionsAndVerify(ctx, cpfpLeafRefundMap, req.RefundSignatures, false, cpfpAdaptorPublicKey)
 		if err != nil {
 			return fmt.Errorf("failed to apply signatures to leaf cpfp refund map for transfer id: %s and error: %w", req.TransferId, err)
 		}
-	}
-	if req.DirectRefundSignatures != nil && req.DirectFromCpfpRefundSignatures != nil {
-		directLeafRefundMap, err = applySignatures(ctx, directLeafRefundMap, req.DirectRefundSignatures, true)
-		if err != nil {
-			return fmt.Errorf("failed to apply signatures to leaf direct refund map for transfer id: %s and error: %w", req.TransferId, err)
+		if req.DirectRefundSignatures != nil && req.DirectFromCpfpRefundSignatures != nil {
+			directAdaptorPublicKey, err := keys.ParsePublicKey(req.AdaptorPublicKeys.DirectAdaptorPublicKey)
+			if err != nil || directAdaptorPublicKey.IsZero() {
+				return fmt.Errorf("failed to parse direct adaptor public key: %w, is zero: %t, adaptor public key: %s", err, directAdaptorPublicKey.IsZero(), req.AdaptorPublicKeys.DirectAdaptorPublicKey)
+			}
+			directFromCpfpAdaptorPublicKey, err := keys.ParsePublicKey(req.AdaptorPublicKeys.DirectFromCpfpAdaptorPublicKey)
+			if err != nil || directFromCpfpAdaptorPublicKey.IsZero() {
+				return fmt.Errorf("failed to parse direct from cpfp adaptor public key: %w, is zero: %t, adaptor public key: %s", err, directFromCpfpAdaptorPublicKey.IsZero(), req.AdaptorPublicKeys.DirectFromCpfpAdaptorPublicKey)
+			}
+			directLeafRefundMap, err = applySignaturesToTransactionsAndVerify(ctx, directLeafRefundMap, req.DirectRefundSignatures, true, directAdaptorPublicKey)
+			if err != nil {
+				return fmt.Errorf("failed to apply signatures to leaf direct refund map for transfer id: %s and error: %w", req.TransferId, err)
+			}
+			directFromCpfpLeafRefundMap, err = applySignaturesToTransactionsAndVerify(ctx, directFromCpfpLeafRefundMap, req.DirectFromCpfpRefundSignatures, false, directFromCpfpAdaptorPublicKey)
+			if err != nil {
+				return fmt.Errorf("failed to apply signatures to leaf direct from cpfp refund map for transfer id: %s and error: %w", req.TransferId, err)
+			}
 		}
-		directFromCpfpLeafRefundMap, err = applySignatures(ctx, directFromCpfpLeafRefundMap, req.DirectFromCpfpRefundSignatures, false)
-		if err != nil {
-			return fmt.Errorf("failed to apply signatures to leaf direct from cpfp refund map for transfer id: %s and error: %w", req.TransferId, err)
-		}
 	}
+
 	_, _, err = h.createTransfer(
 		ctx,
 		req.TransferId,
@@ -289,7 +330,9 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 	return nil
 }
 
-func applySignatures(ctx context.Context, leafRefundMap map[string][]byte, refundSignatures map[string][]byte, useDirectTx bool) (map[string][]byte, error) {
+// Used to effectively sign Tree Node transactions with provided signatures and
+// execute a Bitcoin VM verification of the resulting transactions confirming that they can be broadcasted.
+func applySignaturesToTransactionsAndVerify(ctx context.Context, leafRefundMap map[string][]byte, refundSignatures map[string][]byte, useDirectTx bool, adaptorPublicKey keys.Public) (map[string][]byte, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -300,23 +343,16 @@ func applySignatures(ctx context.Context, leafRefundMap map[string][]byte, refun
 		if !exists {
 			return nil, fmt.Errorf("no leaf refund found for leaf id: %s", leafID)
 		}
-		updatedTx, err := common.UpdateTxWithSignature(leafRefund, 0, signature)
-		if err != nil {
-			return nil, fmt.Errorf("unable to update leaf signature: %w", err)
-		}
 
-		refundTx, err := common.TxFromRawTxBytes(updatedTx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get refund tx: %w", err)
-		}
 		leafUUID, err := uuid.Parse(leafID)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse leaf id: %w", err)
 		}
 		leaf, err := db.TreeNode.Get(ctx, leafUUID)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get leaf: %w", err)
+			return nil, fmt.Errorf("unable to get tree node %s: %w", leafUUID.String(), err)
 		}
+
 		var nodeTx *wire.MsgTx
 		if useDirectTx {
 			nodeTx, err = common.TxFromRawTxBytes(leaf.DirectTx)
@@ -324,15 +360,50 @@ func applySignatures(ctx context.Context, leafRefundMap map[string][]byte, refun
 			nodeTx, err = common.TxFromRawTxBytes(leaf.RawTx)
 		}
 		if err != nil {
-			return nil, fmt.Errorf("unable to get node tx: %w", err)
+			return nil, fmt.Errorf("unable to get node tx of tree node %s: %w", leaf.ID.String(), err)
 		}
-		err = common.VerifySignatureSingleInput(refundTx, 0, nodeTx.TxOut[0])
+		updatedTx, err := ApplySignatureToTxAndVerify(leafRefund, signature, adaptorPublicKey, nodeTx.TxOut[0], leaf.VerifyingPubkey)
 		if err != nil {
-			return nil, fmt.Errorf("unable to verify leaf signature: %w", err)
+			return nil, fmt.Errorf("unable to apply signature to refund tx of tree node %s and verify: %w", leaf.ID.String(), err)
 		}
 		resultMap[leafID] = updatedTx
 	}
 	return resultMap, nil
+}
+
+// Applies a signature to a transaction and verifies it.
+// This function can take an adaptor public key as an optional parameter to
+// validate adaptor signatures for the Swap V3 flow.
+func ApplySignatureToTxAndVerify(rawTx []byte, signature []byte, adaptorPublicKey keys.Public, outpoint *wire.TxOut, verifyingPubkey keys.Public) ([]byte, error) {
+	updatedTx, err := common.UpdateTxWithSignature(rawTx, 0, signature)
+	if err != nil {
+		return nil, fmt.Errorf("unable to update tx signature: %w", err)
+	}
+
+	tx, err := common.TxFromRawTxBytes(updatedTx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to deserialize tx: %w", err)
+	}
+
+	// Check that the signatures are not adapted and can be verified directly
+	if adaptorPublicKey.IsZero() {
+		err = common.VerifySignatureSingleInput(tx, 0, outpoint)
+		if err != nil {
+			return nil, fmt.Errorf("unable to verify tx signature: %w", err)
+		}
+	} else {
+		// Swap V3 flow
+		taprootKey := txscript.ComputeTaprootKeyNoScript(verifyingPubkey.ToBTCEC())
+		sighash, err := common.SigHashFromTx(tx, 0, outpoint)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get sighash: %w", err)
+		}
+		err = common.ValidateAdaptorSignature(taprootKey, sighash, signature, adaptorPublicKey.Serialize())
+		if err != nil {
+			return nil, fmt.Errorf("unable to validate adaptor signature: %w", err)
+		}
+	}
+	return updatedTx, nil
 }
 
 // InitiateCooperativeExit initiates a cooperative exit by creating transfer and transfer_leaf,

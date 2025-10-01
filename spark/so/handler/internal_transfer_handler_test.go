@@ -14,6 +14,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -327,7 +328,10 @@ func TestApplySignatures(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	// Use the same key for both verifying and the tweaked key used in signing
+	// This ensures signature verification will work correctly
+	verifyingPrivKey := key // Use the same key that generates tweakedPriv
+	verifyingPubKey := verifyingPrivKey.Public()
 	leaf, err := dbCtx.Client.TreeNode.Create().
 		SetStatus(st.TreeNodeStatusAvailable).
 		SetTree(tree).
@@ -383,12 +387,25 @@ func TestApplySignatures(t *testing.T) {
 	testLeafId := "test_leaf_id"
 	unknownLeafId := uuid.New().String()
 
+	// Create adaptor signature test data using the correct transaction context
+	_, adaptorSignature, adaptorPubKey := getTxOutputSignatureWithAdaptor(t, directTx, directRefundTx, tweakedPriv)
+
+	// Create wrong adaptor key for failure test
+	wrongAdaptorPrivKey := keys.GeneratePrivateKey()
+	wrongAdaptorPubKey := wrongAdaptorPrivKey.Public()
+
+	// Create invalid adaptor signature by modifying the real signature
+	invalidAdaptorSig := make([]byte, len(signature)) // Use same length as original signature
+	copy(invalidAdaptorSig, signature)
+	invalidAdaptorSig[0] = ^invalidAdaptorSig[0] // Flip first byte
+
 	var tests = []struct {
 		name                   string
 		leafId                 string
 		rawRefundTx            []byte
 		directRefundTx         []byte
 		directRefundSignatures map[string][]byte
+		adaptorPublicKey       keys.Public
 		expectedError          string
 	}{
 		{
@@ -399,7 +416,41 @@ func TestApplySignatures(t *testing.T) {
 			directRefundSignatures: map[string][]byte{
 				leaf.ID.String(): signature,
 			},
-			expectedError: "",
+			adaptorPublicKey: keys.Public{}, // Empty adaptor key - regular signature verification
+			expectedError:    "",
+		},
+		{
+			name:           "successfully applied adaptor signatures",
+			leafId:         leaf.ID.String(),
+			rawRefundTx:    rawRefundTx,
+			directRefundTx: directRefundTx,
+			directRefundSignatures: map[string][]byte{
+				leaf.ID.String(): adaptorSignature,
+			},
+			adaptorPublicKey: adaptorPubKey, // Valid adaptor key
+			expectedError:    "",
+		},
+		{
+			name:           "failed adaptor signature verification - wrong adaptor key",
+			leafId:         leaf.ID.String(),
+			rawRefundTx:    rawRefundTx,
+			directRefundTx: directRefundTx,
+			directRefundSignatures: map[string][]byte{
+				leaf.ID.String(): adaptorSignature,
+			},
+			adaptorPublicKey: wrongAdaptorPubKey, // Wrong adaptor key
+			expectedError:    "unable to validate adaptor signature",
+		},
+		{
+			name:           "failed adaptor signature verification - invalid adaptor signature",
+			leafId:         leaf.ID.String(),
+			rawRefundTx:    rawRefundTx,
+			directRefundTx: directRefundTx,
+			directRefundSignatures: map[string][]byte{
+				leaf.ID.String(): invalidAdaptorSig,
+			},
+			adaptorPublicKey: adaptorPubKey, // Correct adaptor key but invalid signature
+			expectedError:    "unable to validate adaptor signature",
 		},
 		{
 			name:           "unknown leaf refund signatures",
@@ -410,7 +461,8 @@ func TestApplySignatures(t *testing.T) {
 				leaf.ID.String(): signature,
 				unknownLeafId:    []byte("test_signature"),
 			},
-			expectedError: "no leaf refund found",
+			adaptorPublicKey: keys.Public{},
+			expectedError:    "no leaf refund found",
 		},
 		{
 			name:           "broken leaf id",
@@ -420,17 +472,19 @@ func TestApplySignatures(t *testing.T) {
 			directRefundSignatures: map[string][]byte{
 				testLeafId: signature,
 			},
-			expectedError: "unable to parse leaf id",
+			adaptorPublicKey: keys.Public{},
+			expectedError:    "unable to parse leaf id",
 		},
 		{
-			name:           "unable to get leaf",
+			name:           "unable to get tree node",
 			leafId:         unknownLeafId,
 			rawRefundTx:    rawRefundTx,
 			directRefundTx: directRefundTx,
 			directRefundSignatures: map[string][]byte{
 				unknownLeafId: signature,
 			},
-			expectedError: "unable to get leaf",
+			adaptorPublicKey: keys.Public{},
+			expectedError:    "unable to get tree node",
 		},
 	}
 
@@ -445,7 +499,7 @@ func TestApplySignatures(t *testing.T) {
 			}}
 
 			_, map2, _ := handler.loadLeafRefundMaps(req)
-			_, err = applySignatures(ctx, map2, req.DirectRefundSignatures, true)
+			_, err = applySignaturesToTransactionsAndVerify(ctx, map2, req.DirectRefundSignatures, true, tt.adaptorPublicKey)
 
 			if tt.expectedError != "" {
 				require.ErrorContains(t, err, tt.expectedError)
@@ -478,6 +532,21 @@ func getTxOutputSignature(t *testing.T, directTx, directRefundTx []byte, tweaked
 	require.NoError(t, err)
 
 	return directRefundSig.Serialize()
+}
+
+// Helper function to get both signature and adaptor signature for the same transaction
+func getTxOutputSignatureWithAdaptor(t *testing.T, directTx, directRefundTx []byte, tweakedPriv *btcec.PrivateKey) ([]byte, []byte, keys.Public) {
+	regularSig := getTxOutputSignature(t, directTx, directRefundTx, tweakedPriv)
+
+	// Generate adaptor signature from the regular signature
+	adaptorSignature, adaptorPrivateKeyBytes, err := common.GenerateAdaptorFromSignature(regularSig)
+	require.NoError(t, err)
+
+	_, adaptorPublicKey := btcec.PrivKeyFromBytes(adaptorPrivateKeyBytes)
+	adaptorPubKey, err := keys.ParsePublicKey(adaptorPublicKey.SerializeCompressed())
+	require.NoError(t, err)
+
+	return regularSig, adaptorSignature, adaptorPubKey
 }
 
 func getTxOutpoint(t *testing.T, txBytes []byte, vout uint32) (wire.OutPoint, []byte, int64) {

@@ -243,7 +243,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 				return nil, fmt.Errorf("failed to update transfer leaves signatures: %w", err)
 			}
 		} else {
-			err = h.updateCpfpTransferLeavesSignatures(ctx, transfer, finalCpfpSignatureMap)
+			err = h.UpdateTransferLeavesSignaturesForRefundTxOnly(ctx, transfer, finalCpfpSignatureMap, cpfpAdaptorPubKey)
 			if err != nil {
 				return nil, fmt.Errorf("failed to update CPFP transfer leaves signatures: %w", err)
 			}
@@ -287,7 +287,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 
 	// This call to other SOs will check the validity of the transfer package. If no error is
 	// returned, it means the transfer package is valid and the transfer is considered sent.
-	err = h.syncTransferInit(ctx, req, transferType, finalCpfpSignatureMap, finalDirectSignatureMap, finalDirectFromCpfpSignatureMap)
+	err = h.syncTransferInit(ctx, req, transferType, finalCpfpSignatureMap, finalDirectSignatureMap, finalDirectFromCpfpSignatureMap, cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey)
 	if err != nil {
 		syncErr := err
 		logger.With(zap.Error(syncErr)).Sugar().Errorf("Failed to sync transfer init for transfer %s", req.TransferId)
@@ -402,30 +402,30 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 
 		updatedCpfpRefundTxBytes, err := common.UpdateTxWithSignature(leaf.IntermediateRefundTx, 0, cpfpSignatureMap[leaf.Edges.Leaf.ID.String()])
 		if err != nil {
-			return fmt.Errorf("unable to update leaf cpfp refund tx signature: %w", err)
+			return fmt.Errorf("unable to update leaf cpfp refund tx signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
 		updatedCpfpRefundTx, err := common.TxFromRawTxBytes(updatedCpfpRefundTxBytes)
 		if err != nil {
-			return fmt.Errorf("unable to get cpfp refund tx: %w", err)
+			return fmt.Errorf("unable to get cpfp refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
 		err = common.VerifySignatureSingleInput(updatedCpfpRefundTx, 0, nodeTx.TxOut[0])
 		if err != nil {
-			return fmt.Errorf("unable to verify leaf cpfp refund tx signature: %w", err)
+			return fmt.Errorf("unable to verify leaf cpfp refund tx signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
 
 		var updatedDirectFromCpfpRefundTxBytes []byte
 		if len(leaf.Edges.Leaf.DirectFromCpfpRefundTx) > 0 && len(directFromCpfpSignatureMap[leaf.Edges.Leaf.ID.String()]) > 0 {
 			updatedDirectFromCpfpRefundTxBytes, err := common.UpdateTxWithSignature(leaf.IntermediateDirectFromCpfpRefundTx, 0, directFromCpfpSignatureMap[leaf.Edges.Leaf.ID.String()])
 			if err != nil {
-				return fmt.Errorf("unable to update leaf direct from cpfp refund tx signature: %w", err)
+				return fmt.Errorf("unable to update leaf direct from cpfp refund tx signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
 			updatedDirectFromCpfpRefundTx, err := common.TxFromRawTxBytes(updatedDirectFromCpfpRefundTxBytes)
 			if err != nil {
-				return fmt.Errorf("unable to get direct from cpfp refund tx: %w", err)
+				return fmt.Errorf("unable to get direct from cpfp refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
 			err = common.VerifySignatureSingleInput(updatedDirectFromCpfpRefundTx, 0, nodeTx.TxOut[0])
 			if err != nil {
-				return fmt.Errorf("unable to verify leaf direct from cpfp refund tx signature: %w", err)
+				return fmt.Errorf("unable to verify leaf direct from cpfp refund tx signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
 		}
 
@@ -433,58 +433,53 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 		if len(leaf.Edges.Leaf.DirectTx) > 0 && len(directSignatureMap[leaf.Edges.Leaf.ID.String()]) > 0 {
 			directNodeTx, err := common.TxFromRawTxBytes(leaf.Edges.Leaf.DirectTx)
 			if err != nil {
-				return fmt.Errorf("unable to get direct node tx: %w", err)
+				return fmt.Errorf("unable to get direct node tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
 
 			updatedDirectRefundTxBytes, err := common.UpdateTxWithSignature(leaf.IntermediateDirectRefundTx, 0, directSignatureMap[leaf.Edges.Leaf.ID.String()])
 			if err != nil {
-				return fmt.Errorf("unable to update leaf signature: %w", err)
+				return fmt.Errorf("unable to update leaf signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
 			updatedDirectRefundTx, err := common.TxFromRawTxBytes(updatedDirectRefundTxBytes)
 			if err != nil {
-				return fmt.Errorf("unable to get direct refund tx: %w", err)
+				return fmt.Errorf("unable to get direct refund tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
 
 			err = common.VerifySignatureSingleInput(updatedDirectRefundTx, 0, directNodeTx.TxOut[0])
 			if err != nil {
-				return fmt.Errorf("unable to verify leaf signature: %w", err)
+				return fmt.Errorf("unable to verify leaf signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
 		}
 		_, err = leaf.Update().SetIntermediateRefundTx(updatedCpfpRefundTxBytes).SetIntermediateDirectRefundTx(updatedDirectRefundTxBytes).SetIntermediateDirectFromCpfpRefundTx(updatedDirectFromCpfpRefundTxBytes).Save(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to save leaf: %w", err)
+			return fmt.Errorf("unable to save leaf for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
 	}
 	return nil
 }
 
-func (h *TransferHandler) updateCpfpTransferLeavesSignatures(ctx context.Context, transfer *ent.Transfer, finalSignatureMap map[string][]byte) error {
+// Updates all transfer leaves associated with a transfer by applying final signatures to their intermediate refund transactions only.
+// If the signatures were adapted then cpfpAdaptorPubKey should be provided for the signature verification.
+func (h *TransferHandler) UpdateTransferLeavesSignaturesForRefundTxOnly(ctx context.Context, transfer *ent.Transfer, finalSignatureMap map[string][]byte, cpfpAdaptorPubKey keys.Public) error {
 	transferLeaves, err := transfer.QueryTransferLeaves().WithLeaf().All(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to get transfer leaves: %w", err)
 	}
 	for _, leaf := range transferLeaves {
-		updatedTx, err := common.UpdateTxWithSignature(leaf.IntermediateRefundTx, 0, finalSignatureMap[leaf.Edges.Leaf.ID.String()])
-		if err != nil {
-			return fmt.Errorf("unable to update leaf signature: %w", err)
-		}
-
-		refundTx, err := common.TxFromRawTxBytes(updatedTx)
-		if err != nil {
-			return fmt.Errorf("unable to get cpfp refund tx: %w", err)
-		}
 		nodeTx, err := common.TxFromRawTxBytes(leaf.Edges.Leaf.RawTx)
 		if err != nil {
-			return fmt.Errorf("unable to get cpfp node tx: %w", err)
-		}
-		err = common.VerifySignatureSingleInput(refundTx, 0, nodeTx.TxOut[0])
-		if err != nil {
-			return fmt.Errorf("unable to verify leaf signature: %w", err)
+			return fmt.Errorf("unable to get cpfp node tx for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
 
+		updatedTx, err := ApplySignatureToTxAndVerify(leaf.IntermediateRefundTx, finalSignatureMap[leaf.Edges.Leaf.ID.String()], cpfpAdaptorPubKey, nodeTx.TxOut[0], leaf.Edges.Leaf.VerifyingPubkey)
+		if err != nil {
+			return fmt.Errorf("unable to apply signature to tx and verify for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
+		}
+
+		// Store the updated intermediate refund transaction in the transfer leaf.
 		_, err = leaf.Update().SetIntermediateRefundTx(updatedTx).Save(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to save leaf: %w", err)
+			return fmt.Errorf("unable to save leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
 	}
 	return nil
@@ -531,6 +526,7 @@ func (h *TransferHandler) StartLeafSwapV2(ctx context.Context, req *pb.StartTran
 // Initiate a primary swap transfer in Swap V3 protocol. This will create a
 // transfer to the SSP with adapted refunds with key tweaks stored but not yet
 // applied, awaiting a counter swap transfer.
+// Swap V3 flow requires adapted signatures, so the User must provide the adaptor public keys.
 func (h *TransferHandler) InitiateSwapPrimaryTransfer(ctx context.Context, req *pb.InitiateSwapPrimaryTransferRequest) (*pb.StartTransferResponse, error) {
 	adaptorPublicKey, err := keys.ParsePublicKey(req.AdaptorPublicKeys.AdaptorPublicKey)
 	if err != nil {
@@ -597,7 +593,17 @@ func parsePublicKeyIfPresent(raw []byte) (keys.Public, error) {
 	return keys.ParsePublicKey(raw)
 }
 
-func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartTransferRequest, transferType st.TransferType, cpfpRefundSignatures map[string][]byte, directRefundSignatures map[string][]byte, directFromCpfpRefundSignatures map[string][]byte) error {
+func (h *TransferHandler) syncTransferInit(
+	ctx context.Context,
+	req *pb.StartTransferRequest,
+	transferType st.TransferType,
+	cpfpRefundSignatures map[string][]byte,
+	directRefundSignatures map[string][]byte,
+	directFromCpfpRefundSignatures map[string][]byte,
+	cpfpAdaptorPubKey keys.Public,
+	directAdaptorPubKey keys.Public,
+	directFromCpfpAdaptorPubKey keys.Public,
+) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.syncTransferInit", trace.WithAttributes(
 		transferTypeKey.String(string(transferType)),
 	))
@@ -623,6 +629,17 @@ func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartTra
 	if err != nil {
 		return fmt.Errorf("unable to get transfer type proto: %w", err)
 	}
+
+	// Swap V3 flow requires adaptor public keys to be provided.
+	var adaptorPublicKeyPackage *pb.AdaptorPublicKeyPackage
+	if !cpfpAdaptorPubKey.IsZero() && !directAdaptorPubKey.IsZero() && !directFromCpfpAdaptorPubKey.IsZero() {
+		adaptorPublicKeyPackage = &pb.AdaptorPublicKeyPackage{
+			AdaptorPublicKey:               cpfpAdaptorPubKey.Serialize(),
+			DirectAdaptorPublicKey:         directAdaptorPubKey.Serialize(),
+			DirectFromCpfpAdaptorPublicKey: directFromCpfpAdaptorPubKey.Serialize(),
+		}
+	}
+
 	initTransferRequest := &pbinternal.InitiateTransferRequest{
 		TransferId:                     req.TransferId,
 		SenderIdentityPublicKey:        req.OwnerIdentityPublicKey,
@@ -634,6 +651,7 @@ func (h *TransferHandler) syncTransferInit(ctx context.Context, req *pb.StartTra
 		RefundSignatures:               cpfpRefundSignatures,
 		DirectRefundSignatures:         directRefundSignatures,
 		DirectFromCpfpRefundSignatures: directFromCpfpRefundSignatures,
+		AdaptorPublicKeys:              adaptorPublicKeyPackage,
 	}
 	selection := helper.OperatorSelection{
 		Option: helper.OperatorSelectionOptionExcludeSelf,
