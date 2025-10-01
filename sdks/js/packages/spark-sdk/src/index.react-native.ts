@@ -7,9 +7,15 @@ setCrypto(globalThis.crypto);
 export * from "./errors/index.js";
 export * from "./utils/index.js";
 
-export { ReactNativeSparkSigner } from "./signer/signer.react-native.js";
+export {
+  ReactNativeSparkSigner,
+  ReactNativeTaprootSparkSigner,
+} from "./signer/signer.react-native.js";
 /* Enable some consumers to use named import DefaultSparkSigner regardless of module, see LIG-7662 */
-export { ReactNativeSparkSigner as DefaultSparkSigner } from "./signer/signer.react-native.js";
+export {
+  ReactNativeSparkSigner as DefaultSparkSigner,
+  ReactNativeTaprootSparkSigner as TaprootSparkSigner,
+} from "./signer/signer.react-native.js";
 
 export { SparkWallet } from "./spark-wallet/spark-wallet.react-native.js";
 export * from "./spark-wallet/types.js";

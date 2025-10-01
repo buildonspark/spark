@@ -1,6 +1,11 @@
-pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
+pluginManagement { includeBuild("../../../node_modules/@react-native/gradle-plugin") }
 plugins { id("com.facebook.react.settings") }
-extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> 
+  ex.autolinkLibrariesFromCommand(
+    ["node", "-e", "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"],
+    settings.layout.rootDirectory.dir("../").asFile
+  )
+}
 rootProject.name = 'SparkReactNativeApp'
 include ':app'
-includeBuild('../node_modules/@react-native/gradle-plugin')
+includeBuild('../../../node_modules/@react-native/gradle-plugin')
