@@ -3,9 +3,9 @@ package tokens
 import (
 	"cmp"
 	"context"
+	stderrors "errors"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/lightsparkdev/spark/common/keys"
 
@@ -54,13 +54,13 @@ func (h *InternalFinalizeTokenHandler) FinalizeTokenTransactionInternal(
 	}
 
 	// Verify status of created outputs and spent outputs
-	invalidOutputs := validateOutputs(tokenTransaction.Edges.CreatedOutput, st.TokenOutputStatusCreatedSigned)
+	invalidOutputs := validateOutputStatuses(tokenTransaction.Edges.CreatedOutput, st.TokenOutputStatusCreatedSigned)
 	if len(tokenTransaction.Edges.SpentOutput) > 0 {
-		invalidOutputs = append(invalidOutputs, validateInputs(tokenTransaction.Edges.SpentOutput, st.TokenOutputStatusSpentSigned)...)
+		invalidOutputs = append(invalidOutputs, validateInputStatuses(tokenTransaction.Edges.SpentOutput, st.TokenOutputStatusSpentSigned)...)
 	}
 
 	if len(invalidOutputs) > 0 {
-		return nil, tokens.FormatErrorWithTransactionEnt(fmt.Sprintf("%s: %s", tokens.ErrInvalidOutputs, strings.Join(invalidOutputs, "; ")), tokenTransaction, nil)
+		return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrInvalidOutputs, tokenTransaction, stderrors.Join(invalidOutputs...))
 	}
 
 	if len(tokenTransaction.Edges.SpentOutput) != len(req.RevocationSecrets) {
@@ -145,12 +145,12 @@ func (h *InternalFinalizeTokenHandler) FinalizeCoordinatedTokenTransactionIntern
 				tokenTransaction.Status, fmt.Sprintf("%s or %s", st.TokenTransactionStatusSigned, st.TokenTransactionStatusRevealed)),
 			tokenTransaction, nil)
 	}
-	invalidOutputs := validateOutputs(tokenTransaction.Edges.CreatedOutput, st.TokenOutputStatusCreatedSigned)
+	invalidOutputs := validateOutputStatuses(tokenTransaction.Edges.CreatedOutput, st.TokenOutputStatusCreatedSigned)
 	if len(tokenTransaction.Edges.SpentOutput) > 0 {
-		invalidOutputs = append(invalidOutputs, validateInputs(tokenTransaction.Edges.SpentOutput, st.TokenOutputStatusSpentSigned)...)
+		invalidOutputs = append(invalidOutputs, validateInputStatuses(tokenTransaction.Edges.SpentOutput, st.TokenOutputStatusSpentSigned)...)
 	}
 	if len(invalidOutputs) > 0 {
-		return tokens.FormatErrorWithTransactionEnt(fmt.Sprintf("%s: %s", tokens.ErrInvalidOutputs, strings.Join(invalidOutputs, "; ")), tokenTransaction, nil)
+		return tokens.FormatErrorWithTransactionEnt(tokens.ErrInvalidOutputs, tokenTransaction, stderrors.Join(invalidOutputs...))
 	}
 	if len(tokenTransaction.Edges.SpentOutput) != len(revocationSecretsToFinalize) {
 		return tokens.FormatErrorWithTransactionEnt(

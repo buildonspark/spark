@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	stderrors "errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
@@ -237,19 +237,19 @@ func (h *StartTokenTransactionHandler) regenerateStartResponseForDuplicateReques
 ) (*tokenpb.StartTransactionResponse, error) {
 	_, logger := logging.WithAttrs(ctx, tokens.GetEntTokenTransactionAttrs(tokenTransaction)...)
 	logger.Debug("Regenerating response for a duplicate StartTokenTransaction() Call")
-	var invalidOutputs []string
+	var invalidOutputs []error
 	expectedCreatedOutputStatus := st.TokenOutputStatusCreatedStarted
 
-	invalidOutputs = validateOutputs(tokenTransaction.Edges.CreatedOutput, expectedCreatedOutputStatus)
+	invalidOutputs = validateOutputStatuses(tokenTransaction.Edges.CreatedOutput, expectedCreatedOutputStatus)
 	if len(tokenTransaction.Edges.SpentOutput) > 0 {
-		invalidOutputs = append(invalidOutputs, validateInputs(tokenTransaction.Edges.SpentOutput, st.TokenOutputStatusSpentStarted)...)
+		invalidOutputs = append(invalidOutputs, validateInputStatuses(tokenTransaction.Edges.SpentOutput, st.TokenOutputStatusSpentStarted)...)
 	}
 	if len(invalidOutputs) > 0 {
 		return nil, tokens.FormatErrorWithTransactionEnt(
-			fmt.Sprintf("%s: %s",
-				tokens.ErrInvalidOutputs,
-				strings.Join(invalidOutputs, "; ")),
-			tokenTransaction, nil)
+			tokens.ErrInvalidOutputs,
+			tokenTransaction,
+			stderrors.Join(invalidOutputs...),
+		)
 	}
 
 	// Reconstruct the token transaction from the ent data.

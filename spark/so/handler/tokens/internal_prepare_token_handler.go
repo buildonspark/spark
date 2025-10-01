@@ -383,34 +383,6 @@ func validateIssuerOperatorSpecificSignatures(identityPublicKey keys.Public, ope
 	return nil
 }
 
-// validateOutputs checks if all created outputs have the expected status
-func validateOutputs(outputs []*ent.TokenOutput, expectedStatus st.TokenOutputStatus) []string {
-	var invalidOutputs []string
-	for i, output := range outputs {
-		if output.Status != expectedStatus {
-			invalidOutputs = append(invalidOutputs, fmt.Sprintf("output %d has invalid status %s, expected %s",
-				i, output.Status, expectedStatus))
-		}
-	}
-	return invalidOutputs
-}
-
-// validateInputs checks if all spent outputs have the expected status and aren't withdrawn
-func validateInputs(outputs []*ent.TokenOutput, expectedStatus st.TokenOutputStatus) []string {
-	var invalidOutputs []string
-	for _, output := range outputs {
-		if output.Status != expectedStatus {
-			invalidOutputs = append(invalidOutputs, fmt.Sprintf("input %x has invalid status %s, expected %s",
-				output.ID, output.Status, expectedStatus))
-		}
-		if output.ConfirmedWithdrawBlockHash != nil {
-			invalidOutputs = append(invalidOutputs, fmt.Sprintf("input %x is already withdrawn",
-				output.ID))
-		}
-	}
-	return invalidOutputs
-}
-
 func validateIssuerSignature(
 	tokenTransaction *tokenpb.TokenTransaction,
 	signaturesWithIndex []*tokenpb.SignatureWithIndex,

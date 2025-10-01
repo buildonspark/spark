@@ -762,6 +762,35 @@ func FetchAndLockTokenTransactionDataByHash(ctx context.Context, tokenTransactio
 	return tokenTransaction, nil
 }
 
+// FetchTokenTransactionDataByHashForRead refetches the transaction with all its relations without acquiring a row lock.
+func FetchTokenTransactionDataByHashForRead(ctx context.Context, tokenTransactionHash []byte) (*TokenTransaction, error) {
+	db, err := GetDbFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	tokenTransaction, err := db.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHash(tokenTransactionHash)).
+		WithCreatedOutput().
+		WithSpentOutput(func(q *TokenOutputQuery) {
+			// Needed to enable computation of the progress of a transaction commit.
+			q.WithRevocationKeyshare().
+				WithTokenPartialRevocationSecretShares().
+				// Needed to enable marshalling of the token transaction proto.
+				WithOutputCreatedTokenTransaction()
+		}).
+		WithPeerSignatures().
+		WithMint().
+		WithCreate().
+		WithSparkInvoice().
+		Only(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return tokenTransaction, nil
+}
+
 // MarshalProto converts a TokenTransaction to a token protobuf TokenTransaction.
 // This assumes the transaction already has all its relationships loaded.
 func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) (*tokenpb.TokenTransaction, error) {

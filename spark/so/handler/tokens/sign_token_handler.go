@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"slices"
 	"strings"
@@ -146,7 +147,6 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 	}
 
 	calculatedHash, err := utils.HashTokenTransaction(req.FinalTokenTransaction, false)
-	ctx, logger := logging.WithAttrs(ctx, tokens.GetFinalizedTokenTransactionAttrs(calculatedHash)...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash final token transaction: %w", err)
 	}
@@ -154,9 +154,9 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		return nil, fmt.Errorf("transaction hash mismatch: expected %x, got %x", calculatedHash, req.FinalTokenTransactionHash)
 	}
 
-	tokenTransaction, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
+	tokenTransaction, err := ent.FetchTokenTransactionDataByHashForRead(ctx, req.FinalTokenTransactionHash)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch transaction: %w", err)
+		return nil, fmt.Errorf("failed to fetch transaction (non-locking): %w", err)
 	}
 
 	inferredTxType, err := tokenTransaction.InferTokenTransactionTypeEnt()
@@ -169,32 +169,31 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		return response, err
 	}
 
-	if err := validateTokenTransactionForSigning(h.config, tokenTransaction); err != nil {
+	if err := validateTokenTransactionForSigning(ctx, h.config, tokenTransaction); err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt(err.Error(), tokenTransaction, err)
 	}
 
-	allOperators := helper.OperatorSelection{Option: helper.OperatorSelectionOptionAll}
-	internalSignatures, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &allOperators,
+	inputSignaturesByOperatorHex := make(map[string]*tokenpb.InputTtxoSignaturesPerOperator, len(req.InputTtxoSignaturesPerOperator))
+	for _, opSigs := range req.InputTtxoSignaturesPerOperator {
+		if opSigs == nil || len(opSigs.OperatorIdentityPublicKey) == 0 {
+			continue
+		}
+		inputSignaturesByOperatorHex[hex.EncodeToString(opSigs.OperatorIdentityPublicKey)] = opSigs
+	}
+	selfHex := h.config.IdentityPublicKey().ToHex()
+	selfSignatures, ok := inputSignaturesByOperatorHex[selfHex]
+	if !ok {
+		return nil, fmt.Errorf("no signatures found for local operator %s", h.config.Identifier)
+	}
+
+	excludeSelf := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	internalSignatures, err := helper.ExecuteTaskWithAllOperators(ctx, h.config, &excludeSelf,
 		func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, error) {
-			var foundOperatorSignatures *tokenpb.InputTtxoSignaturesPerOperator
-			for _, operatorSignatures := range req.InputTtxoSignaturesPerOperator {
-				signaturesPubKey, err := keys.ParsePublicKey(operatorSignatures.OperatorIdentityPublicKey)
-				if err != nil {
-					return nil, fmt.Errorf("failed to parse signatures operator ID public key: %w", err)
-				}
-				if signaturesPubKey.Equals(operator.IdentityPublicKey) {
-					foundOperatorSignatures = operatorSignatures
-					break
-				}
-			}
+			opHex := operator.IdentityPublicKey.ToHex()
+			foundOperatorSignatures := inputSignaturesByOperatorHex[opHex]
 			if foundOperatorSignatures == nil {
-				return nil, fmt.Errorf("no signatures found for operator %s: %w", operator.Identifier, err)
+				return nil, fmt.Errorf("no signatures found for operator %s", operator.Identifier)
 			}
-
-			if operator.Identifier == h.config.Identifier {
-				return h.localSignAndCommitTransaction(ctx, foundOperatorSignatures, req.FinalTokenTransactionHash, tokenTransaction)
-			}
-
 			conn, err := operator.NewOperatorGRPCConnection()
 			if err != nil {
 				return nil, fmt.Errorf("failed to connect to operator %s: %w", operator.Identifier, err)
@@ -213,25 +212,41 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		return nil, tokens.FormatErrorWithTransactionEnt("failed to get signatures from operators", tokenTransaction, err)
 	}
 
+	lockedTokenTransaction, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
+	if err != nil {
+		return nil, fmt.Errorf("failed to refetch transaction with lock: %w", err)
+	}
+	if err := validateTokenTransactionForSigning(ctx, h.config, lockedTokenTransaction); err != nil {
+		return nil, tokens.FormatErrorWithTransactionEnt(err.Error(), lockedTokenTransaction, err)
+	}
+	localResp, err := h.localSignAndCommitTransaction(ctx, selfSignatures, req.FinalTokenTransactionHash, lockedTokenTransaction)
+	if err != nil {
+		return nil, tokens.FormatErrorWithTransactionEnt("failed to sign locally", lockedTokenTransaction, err)
+	}
+
 	signatures := make(operatorSignaturesMap)
+	signatures[h.config.Identifier] = localResp.SparkOperatorSignature
 	for operatorID, sig := range internalSignatures {
 		signatures[operatorID] = sig.SparkOperatorSignature
 	}
-
 	internalSignTokenHandler := NewInternalSignTokenHandler(h.config)
-	if err := internalSignTokenHandler.validateSignaturesPackageAndPersistPeerSignatures(ctx, signatures, tokenTransaction); err != nil {
-		return nil, tokens.FormatErrorWithTransactionEnt("failed to validate signature package and persist peer signatures", tokenTransaction, err)
+	if err := internalSignTokenHandler.validateSignaturesPackageAndPersistPeerSignatures(ctx, signatures, lockedTokenTransaction); err != nil {
+		return nil, tokens.FormatErrorWithTransactionEnt("failed to validate signature package and persist peer signatures", lockedTokenTransaction, err)
 	}
-
-	logger.Info("Successfully signed and persisted token transaction")
 
 	switch inferredTxType {
 	case utils.TokenTransactionTypeCreate, utils.TokenTransactionTypeMint:
 		// We validated the signatures package above, so we know that it is finalized.
 		return finalizedCommitTransactionResponse, nil
 	case utils.TokenTransactionTypeTransfer:
-		if response, err := h.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, req.FinalTokenTransaction, internalSignatures, req.FinalTokenTransactionHash); err != nil {
-			return nil, tokens.FormatErrorWithTransactionEnt("failed to exchange revocation secret shares and finalize if possible", tokenTransaction, err)
+		// Include the coordinator's own signature when exchanging shares so peers validate against all operators
+		allOperatorSignatures := make(map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, len(internalSignatures)+1)
+		for k, v := range internalSignatures {
+			allOperatorSignatures[k] = v
+		}
+		allOperatorSignatures[h.config.Identifier] = localResp
+		if response, err := h.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, req.FinalTokenTransaction, allOperatorSignatures, req.FinalTokenTransactionHash); err != nil {
+			return nil, tokens.FormatErrorWithTransactionEnt("failed to exchange revocation secret shares and finalize if possible", lockedTokenTransaction, err)
 		} else {
 			return response, nil
 		}
@@ -240,11 +255,11 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 	}
 }
 
-func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx context.Context, tokenTransactionProto *tokenpb.TokenTransaction, internalSignatures map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, tokenTransactionHash []byte) (*tokenpb.CommitTransactionResponse, error) {
+func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx context.Context, tokenTransactionProto *tokenpb.TokenTransaction, allOperatorSignatures map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, tokenTransactionHash []byte) (*tokenpb.CommitTransactionResponse, error) {
 	ctx, logger := logging.WithAttrs(ctx, tokens.GetFinalizedTokenTransactionAttrs(tokenTransactionHash)...)
 	ctx, span := tracer.Start(ctx, "SignTokenHandler.ExchangeRevocationSecretsAndFinalizeIfPossible", getTokenTransactionAttributes(tokenTransactionProto))
 	defer span.End()
-	response, err := h.exchangeRevocationSecretShares(ctx, internalSignatures, tokenTransactionProto, tokenTransactionHash)
+	response, err := h.exchangeRevocationSecretShares(ctx, allOperatorSignatures, tokenTransactionProto, tokenTransactionHash)
 	if err != nil {
 		return nil, fmt.Errorf("coordinator failed to exchange revocation secret shares with all other operators for token txHash: %x: %w", tokenTransactionHash, err)
 	}
@@ -270,15 +285,15 @@ func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx co
 	}
 
 	if finalized {
-		_, err := h.exchangeRevocationSecretShares(ctx, internalSignatures, tokenTransactionProto, tokenTransactionHash)
+		_, err := h.exchangeRevocationSecretShares(ctx, allOperatorSignatures, tokenTransactionProto, tokenTransactionHash)
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to exchange revocation secret shares after finalization", tokenTransactionProto, err)
 		}
 		return finalizedCommitTransactionResponse, nil
 
 	} else {
-		// Refetch the token transaction to pick up newly committed partial revocation secret shares
-		refetchedTokenTransaction, err := ent.FetchAndLockTokenTransactionDataByHash(ctx, tokenTransactionHash)
+		// Refetch the token transaction (for-read) to pick up newly committed partial revocation secret shares
+		refetchedTokenTransaction, err := ent.FetchTokenTransactionDataByHashForRead(ctx, tokenTransactionHash)
 		if err != nil {
 			return nil, fmt.Errorf("failed to refetch token transaction data: %w", err)
 		}
@@ -390,7 +405,7 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 	})
 	// If there was an error exchanging with all operators, we will roll back to the revealed status.
 	if errorExchangingWithAllOperators != nil {
-		return nil, fmt.Errorf("1 failed to exchange revocation secret shares: %w for token txHash: %x", errorExchangingWithAllOperators, tokenTransactionHash)
+		return nil, fmt.Errorf("failed to exchange revocation secret shares: %w for token txHash: %x", errorExchangingWithAllOperators, tokenTransactionHash)
 	}
 
 	return response, nil
@@ -575,29 +590,6 @@ func (h *SignTokenHandler) getRevocationKeysharesForTokenTransaction(ctx context
 	})
 
 	return revocationKeyshares, nil
-}
-
-func validateTokenTransactionForSigning(config *so.Config, tokenTransactionEnt *ent.TokenTransaction) error {
-	if tokenTransactionEnt.Status != st.TokenTransactionStatusStarted &&
-		tokenTransactionEnt.Status != st.TokenTransactionStatusSigned {
-		return fmt.Errorf("signing failed because transaction is not in correct state, expected %s or %s, current status: %s", st.TokenTransactionStatusStarted, st.TokenTransactionStatusSigned, tokenTransactionEnt.Status)
-	}
-
-	// Get the network-specific transaction expiry duration
-	schemaNetwork, err := tokenTransactionEnt.GetNetworkFromEdges()
-	if err != nil {
-		return fmt.Errorf("failed to get network from edges: %w", err)
-	}
-	network, err := common.NetworkFromSchemaNetwork(schemaNetwork)
-	if err != nil {
-		return fmt.Errorf("failed to get network from schema network: %w", err)
-	}
-	transactionV0ExpiryDuration := config.Lrc20Configs[network.String()].TransactionExpiryDuration
-
-	if err := tokenTransactionEnt.ValidateNotExpired(transactionV0ExpiryDuration); err != nil {
-		return err
-	}
-	return nil
 }
 
 // verifyOperatorSignatures verifies the signatures from each operator for a token transaction.

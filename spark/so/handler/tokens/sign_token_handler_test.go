@@ -30,6 +30,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	othertokens "github.com/lightsparkdev/spark/so/tokens"
 	"github.com/lightsparkdev/spark/so/utils"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
@@ -57,6 +58,10 @@ type mockSparkTokenInternalServiceServer struct {
 	tokeninternalpb.UnimplementedSparkTokenInternalServiceServer
 	privKey     keys.Private
 	errToReturn error
+	// blockSign allows tests to pause the RPC response until they mutate DB state
+	blockSign chan struct{}
+	// hitSign is closed when the RPC is received, letting tests know they can mutate state
+	hitSign chan struct{}
 }
 
 func (s *mockSparkTokenInternalServiceServer) SignTokenTransactionFromCoordination(
@@ -65,6 +70,14 @@ func (s *mockSparkTokenInternalServiceServer) SignTokenTransactionFromCoordinati
 ) (*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, error) {
 	if s.errToReturn != nil {
 		return nil, s.errToReturn
+	}
+	if s.hitSign != nil {
+		// Signal that we've received the RPC and are about to respond
+		close(s.hitSign)
+	}
+	if s.blockSign != nil {
+		// Block until test allows us to respond
+		<-s.blockSign
 	}
 	signature := ecdsa.Sign(s.privKey.ToBTCEC(), req.FinalTokenTransactionHash)
 	return &tokeninternalpb.SignTokenTransactionFromCoordinationResponse{
@@ -139,6 +152,7 @@ type testSetupCommon struct {
 	coordinatorPrivKey  keys.Private
 	coordinatorPubKey   keys.Public
 	mockAddr            string
+	mockServer          *mockSparkTokenInternalServiceServer
 }
 
 // setUpCommonTest sets up common test infrastructure
@@ -194,6 +208,7 @@ func setUpCommonTest(t *testing.T) *testSetupCommon {
 		coordinatorPrivKey:  coordinatorPrivKey,
 		coordinatorPubKey:   coordinatorPubKey,
 		mockAddr:            mockAddr,
+		mockServer:          mockServer,
 	}
 }
 
@@ -673,4 +688,120 @@ func TestCommitTransaction_TransferTransaction_Retry_AfterInternalFinalizeFailed
 		Only(setup.ctx)
 	require.NoError(t, err)
 	assert.Equal(t, schematype.TokenTransactionStatusRevealed, queriedDbTx.Status)
+}
+
+func TestCommitTransaction_TransferTransactionSimulateRace_ControlSucceedsWithValidInputs(t *testing.T) {
+	setup := setUpCommonTest(t)
+	rng := mathrand.NewChaCha8([32]byte{})
+	transferData := setUpTransferTestData(t, rng, setup)
+	tokenTxProto, _, finalTxHash := createTransferTokenTransactionProto(t, setup, transferData)
+	setupDBTransferTokenTransactionInternalSignFailedScenario(t, setup, transferData, tokenTxProto, finalTxHash, finalTxHash)
+
+	hit := make(chan struct{})
+	block := make(chan struct{})
+	setup.mockServer.hitSign = hit
+	setup.mockServer.blockSign = block
+
+	go func() {
+		<-hit
+		close(block) // no mutation; allow response
+	}()
+
+	req := &tokenpb.CommitTransactionRequest{
+		FinalTokenTransaction:          tokenTxProto,
+		FinalTokenTransactionHash:      finalTxHash,
+		OwnerIdentityPublicKey:         setup.pubKey.Serialize(),
+		InputTtxoSignaturesPerOperator: createInputTtxoSignatures(t, setup, finalTxHash, 2),
+	}
+
+	resp, err := setup.handler.CommitTransaction(setup.ctx, req)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	// For transfer, we expect processing state in this test harness
+	assert.Equal(t, tokenpb.CommitStatus_COMMIT_PROCESSING, resp.CommitStatus)
+}
+
+func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputStatusFinalized(t *testing.T) {
+	setup := setUpCommonTest(t)
+	rng := mathrand.NewChaCha8([32]byte{})
+	transferData := setUpTransferTestData(t, rng, setup)
+	tokenTxProto, _, finalTxHash := createTransferTokenTransactionProto(t, setup, transferData)
+	setupDBTransferTokenTransactionInternalSignFailedScenario(t, setup, transferData, tokenTxProto, finalTxHash, finalTxHash)
+
+	// Prepare blocking in mock to simulate race
+	hit := make(chan struct{})
+	block := make(chan struct{})
+	setup.mockServer.hitSign = hit
+	setup.mockServer.blockSign = block
+
+	// Flip one spent input status to SPENT_FINALIZED to trigger validation failure
+	go func() {
+		<-hit // wait until RPC is in-flight to external operator
+		_, err := transferData.prevTokenOutput1.Update().
+			SetStatus(schematype.TokenOutputStatusSpentFinalized).
+			Save(setup.ctx)
+		assert.NoError(t, err)
+		close(block) // allow mock to respond
+	}()
+
+	req := &tokenpb.CommitTransactionRequest{
+		FinalTokenTransaction:          tokenTxProto,
+		FinalTokenTransactionHash:      finalTxHash,
+		OwnerIdentityPublicKey:         setup.pubKey.Serialize(),
+		InputTtxoSignaturesPerOperator: createInputTtxoSignatures(t, setup, finalTxHash, 2),
+	}
+
+	_, commitErr := setup.handler.CommitTransaction(setup.ctx, req)
+	require.Error(t, commitErr)
+	assert.Contains(t, commitErr.Error(), othertokens.ErrInvalidInputs)
+}
+
+func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputRemappedToDifferentTransaction(t *testing.T) {
+	setup := setUpCommonTest(t)
+	rng := mathrand.NewChaCha8([32]byte{})
+	transferData := setUpTransferTestData(t, rng, setup)
+	tokenTxProto, _, finalTxHash := createTransferTokenTransactionProto(t, setup, transferData)
+	setupDBTransferTokenTransactionInternalSignFailedScenario(t, setup, transferData, tokenTxProto, finalTxHash, finalTxHash)
+
+	hit := make(chan struct{})
+	block := make(chan struct{})
+	setup.mockServer.hitSign = hit
+	setup.mockServer.blockSign = block
+
+	// Create a different transaction and remap one input's spent mapping to it
+	go func() {
+		<-hit
+		otherHash := make([]byte, len(finalTxHash))
+		copy(otherHash, finalTxHash)
+		otherHash[0] ^= 0xFF // make it different
+		otherTx, err := setup.sessionCtx.Client.TokenTransaction.Create().
+			SetPartialTokenTransactionHash(otherHash).
+			SetFinalizedTokenTransactionHash(otherHash).
+			SetStatus(schematype.TokenTransactionStatusRevealed).
+			SetVersion(schematype.TokenTransactionVersionV1).
+			SetClientCreatedTimestamp(time.Now()).
+			SetOperatorSignature(setup.coordinatorPrivKey.Public().Serialize()).
+			SetExpiryTime(time.Now().Add(10 * time.Minute)).
+			Save(setup.ctx)
+		assert.NoError(t, err)
+
+		_, err = transferData.prevTokenOutput1.Update().
+			SetOutputSpentTokenTransaction(otherTx).
+			SetStatus(schematype.TokenOutputStatusSpentStarted).
+			Save(setup.ctx)
+		assert.NoError(t, err)
+		close(block)
+	}()
+
+	req := &tokenpb.CommitTransactionRequest{
+		FinalTokenTransaction:          tokenTxProto,
+		FinalTokenTransactionHash:      finalTxHash,
+		OwnerIdentityPublicKey:         setup.pubKey.Serialize(),
+		InputTtxoSignaturesPerOperator: createInputTtxoSignatures(t, setup, finalTxHash, 2),
+	}
+
+	_, commitErr := setup.handler.CommitTransaction(setup.ctx, req)
+	require.Error(t, commitErr)
+	errStr := commitErr.Error()
+	assert.Contains(t, errStr, "number of inputs in proto")
 }

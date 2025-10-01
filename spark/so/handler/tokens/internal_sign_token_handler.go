@@ -2,10 +2,10 @@ package tokens
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"math/big"
 	"strconv"
-	"strings"
 
 	"github.com/lightsparkdev/spark/common/keys"
 
@@ -72,74 +72,12 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 		return signature, nil
 	}
 
-	if err := validateTokenTransactionForSigning(h.config, tokenTransaction); err != nil {
+	if err := validateTokenTransactionForSigning(ctx, h.config, tokenTransaction); err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt(err.Error(), tokenTransaction, err)
 	}
 
 	if err := validateOperatorSpecificSignatures(h.config.IdentityPublicKey(), operatorSpecificSignatures, tokenTransaction); err != nil {
 		return nil, err
-	}
-
-	invalidOutputs := validateOutputs(tokenTransaction.Edges.CreatedOutput, st.TokenOutputStatusCreatedStarted)
-	if len(invalidOutputs) > 0 {
-		return nil, tokens.FormatErrorWithTransactionEnt(fmt.Sprintf("%s: %s", tokens.ErrInvalidOutputs, strings.Join(invalidOutputs, "; ")), tokenTransaction, nil)
-	}
-	txType, err := tokenTransaction.InferTokenTransactionTypeEnt()
-	if err != nil {
-		return nil, fmt.Errorf("failed to check token transaction type: %w", err)
-	}
-	switch txType {
-	case utils.TokenTransactionTypeCreate:
-		if tokenTransaction.Edges.Create == nil {
-			return nil, tokens.FormatErrorWithTransactionEnt("create input ent not found when attempting to sign create transaction", tokenTransaction, nil)
-		}
-	case utils.TokenTransactionTypeMint:
-		// For mint transactions, validate that the mint does not exceed the max supply.
-		// This is also checked during the Start() step, but we check before signing as well
-		// in case two transactions are started at once.
-		err = tokens.ValidateMintDoesNotExceedMaxSupplyEnt(ctx, tokenTransaction)
-		if err != nil {
-			return nil, err
-		}
-	case utils.TokenTransactionTypeTransfer:
-		// If token outputs are being spent, verify the expected status of inputs and check for active freezes.
-		if len(tokenTransaction.Edges.SpentOutput) == 0 {
-			return nil, tokens.FormatErrorWithTransactionEnt("no spent outputs found when attempting to validate transfer transaction", tokenTransaction, nil)
-		}
-		invalidInputs := validateInputs(tokenTransaction.Edges.SpentOutput, st.TokenOutputStatusSpentStarted)
-		if len(invalidInputs) > 0 {
-			return nil, tokens.FormatErrorWithTransactionEnt(fmt.Sprintf("%s: %s", tokens.ErrInvalidInputs, strings.Join(invalidInputs, "; ")), tokenTransaction, nil)
-		}
-		// Collect owner public keys for freeze check.
-		ownerPublicKeys := make([]keys.Public, len(tokenTransaction.Edges.SpentOutput))
-		tokenCreateId := tokenTransaction.Edges.SpentOutput[0].TokenCreateID
-		if tokenCreateId == uuid.Nil {
-			return nil, tokens.FormatErrorWithTransactionEnt("no created token found when attempting to validate transfer transaction", tokenTransaction, nil)
-		}
-		for i, output := range tokenTransaction.Edges.SpentOutput {
-			ownerPublicKeys[i] = output.OwnerPublicKey
-		}
-
-		// Bulk query all input ids to ensure none of them are frozen.
-		activeFreezes, err := ent.GetActiveFreezes(ctx, ownerPublicKeys, tokenCreateId)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", tokens.ErrFailedToQueryTokenFreezeStatus, err)
-		}
-
-		if len(activeFreezes) > 0 {
-			for _, freeze := range activeFreezes {
-				logger := logging.GetLoggerFromContext(ctx)
-				logger.Sugar().Infof(
-					"Found active freeze for owner %x (token: %x, timestamp: %d)",
-					freeze.OwnerPublicKey,
-					freeze.TokenPublicKey,
-					freeze.WalletProvidedFreezeTimestamp,
-				)
-			}
-			return nil, fmt.Errorf("at least one input is frozen. Cannot proceed with transaction")
-		}
-	case utils.TokenTransactionTypeUnknown:
-		return nil, fmt.Errorf("token transaction type unknown")
 	}
 
 	operatorSignature := ecdsa.Sign(h.config.IdentityPrivateKey.ToBTCEC(), finalTokenTransactionHash)
@@ -154,8 +92,7 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 	for i := 0; i < len(operatorSpecificSignatureMap); i++ {
 		operatorSpecificSignaturesArr[i] = operatorSpecificSignatureMap[i]
 	}
-	err = ent.UpdateSignedTransaction(ctx, tokenTransaction, operatorSpecificSignaturesArr, operatorSignature.Serialize())
-	if err != nil {
+	if err := ent.UpdateSignedTransaction(ctx, tokenTransaction, operatorSpecificSignaturesArr, operatorSignature.Serialize()); err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt("failed to update outputs after signing", tokenTransaction, err)
 	}
 
@@ -174,23 +111,23 @@ func (h *InternalSignTokenHandler) regenerateOperatorSignatureForDuplicateReques
 	_, logger := logging.WithAttrs(ctx, tokens.GetEntTokenTransactionAttrs(tokenTransaction)...)
 	logger.Debug("Regenerating response for a duplicate SignTokenTransaction() Call")
 
-	var invalidOutputs []string
+	var invalidOutputs []error
 	isMint := tokenTransaction.Edges.Mint != nil
 	expectedCreatedOutputStatus := st.TokenOutputStatusCreatedSigned
 	if isMint {
 		expectedCreatedOutputStatus = st.TokenOutputStatusCreatedFinalized
 	}
 
-	invalidOutputs = validateOutputs(tokenTransaction.Edges.CreatedOutput, expectedCreatedOutputStatus)
+	invalidOutputs = validateOutputStatuses(tokenTransaction.Edges.CreatedOutput, expectedCreatedOutputStatus)
 	if len(tokenTransaction.Edges.SpentOutput) > 0 {
-		invalidOutputs = append(invalidOutputs, validateInputs(tokenTransaction.Edges.SpentOutput, st.TokenOutputStatusSpentSigned)...)
+		invalidOutputs = append(invalidOutputs, validateInputStatuses(tokenTransaction.Edges.SpentOutput, st.TokenOutputStatusSpentSigned)...)
 	}
 	if len(invalidOutputs) > 0 {
 		return nil, tokens.FormatErrorWithTransactionEnt(
-			fmt.Sprintf("%s: %s",
-				tokens.ErrInvalidOutputs,
-				strings.Join(invalidOutputs, "; ")),
-			tokenTransaction, nil)
+			tokens.ErrInvalidOutputs,
+			tokenTransaction,
+			stderrors.Join(invalidOutputs...),
+		)
 	}
 
 	if err := utils.ValidateOwnershipSignature(tokenTransaction.OperatorSignature, finalTokenTransactionHash, config.IdentityPublicKey()); err != nil {
@@ -255,7 +192,14 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 		return nil, tokens.FormatErrorWithTransactionEnt("failed to validate signature package and persist peer signatures", tokenTransaction, err)
 	}
 	if tokenTransaction.Status == st.TokenTransactionStatusStarted {
-		err = h.validateAndSignTransactionWithProvidedOwnSignature(ctx, tokenTransaction, operatorSignatures[h.config.Identifier])
+		lockedTx, lockErr := ent.FetchAndLockTokenTransactionDataByHash(ctx, req.FinalTokenTransactionHash)
+		if lockErr != nil {
+			return nil, tokens.FormatErrorWithTransactionEnt("failed to refetch transaction with lock", tokenTransaction, lockErr)
+		}
+		if err := validateTokenTransactionForSigning(ctx, h.config, lockedTx); err != nil {
+			return nil, tokens.FormatErrorWithTransactionEnt(err.Error(), lockedTx, err)
+		}
+		err = h.validateAndSignTransactionWithProvidedOwnSignature(ctx, lockedTx, operatorSignatures[h.config.Identifier])
 		if err != nil {
 			return nil, err
 		}
