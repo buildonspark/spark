@@ -105,6 +105,7 @@ export type ConsoleOptions = {
 };
 
 export type OptimizationOptions = {
+  readonly auto?: boolean;
   readonly multiplicity?: number;
 };
 
@@ -159,6 +160,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
   },
   events: {},
   optimizationOptions: {
+    auto: true,
     multiplicity: 0,
   },
 };

@@ -2187,6 +2187,22 @@ async function runCLI() {
           );
           break;
         }
+        case "optimizeleaves": {
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          for await (const { step, total, controller } of wallet.optimizeLeaves(
+            parseInt(args[0]),
+          )) {
+            console.log(`Optimizing leaves: ${step}/${total}`);
+            if (controller.signal.aborted) {
+              break;
+            }
+          }
+          console.log("Leaves optimized successfully");
+          break;
+        }
         case "getleaves": {
           if (!wallet) {
             console.log("Please initialize a wallet first");

@@ -299,7 +299,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           await this.claimTransfer({
             transfer: event.transfer.transfer,
             emit: true,
-            optimize: true,
           });
         }
       } else if (isDepositStreamEvent(event)) {
@@ -669,72 +668,101 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return nodes;
   }
 
-  private async optimizeLeaves() {
-    const multiplicity = this.config.getOptimizationOptions().multiplicity ?? 0;
-    if (multiplicity < 0) {
+  public async *optimizeLeaves(
+    multiplicity: number | undefined = undefined,
+  ): AsyncGenerator<
+    {
+      step: number;
+      total: number;
+      controller: AbortController;
+    },
+    void,
+    void
+  > {
+    const multiplicityValue =
+      multiplicity ?? this.config.getOptimizationOptions().multiplicity ?? 0;
+    if (multiplicityValue < 0) {
       throw new ValidationError("Multiplicity cannot be negative");
-    } else if (multiplicity > 3) {
-      throw new ValidationError("Multiplicity cannot be greater than 3");
+    } else if (multiplicityValue > 5) {
+      throw new ValidationError("Multiplicity cannot be greater than 5");
     }
 
     if (
       this.optimizationInProgress ||
       !shouldOptimize(
         this.leaves.map((leaf) => leaf.value),
-        multiplicity,
+        multiplicityValue,
       )
     ) {
       return;
     }
 
-    await this.withLeaves(async () => {
+    const controller = new AbortController();
+    const release = await this.leavesMutex.acquire();
+    try {
       this.optimizationInProgress = true;
-      try {
-        this.leaves = await this.getLeaves();
-        const swaps = optimize(
-          this.leaves.map((leaf) => leaf.value),
-          multiplicity,
-        );
-        if (swaps.length === 0) {
-          return;
+
+      this.leaves = await this.getLeaves();
+      const swaps = optimize(
+        this.leaves.map((leaf) => leaf.value),
+        multiplicityValue,
+      );
+      if (swaps.length === 0) {
+        return;
+      }
+
+      yield {
+        step: 0,
+        total: swaps.length,
+        controller,
+      };
+
+      // Build a map from the denomination to the indices
+      const valueToNodes = new Map<number, TreeNode[]>();
+      this.leaves.forEach((leaf) => {
+        if (!valueToNodes.has(leaf.value)) {
+          valueToNodes.set(leaf.value, []);
+        }
+        valueToNodes.get(leaf.value)!.push(leaf);
+      });
+
+      // Select the leaves to send for each swap.
+      for (const swap of swaps) {
+        if (controller.signal.aborted) {
+          break;
         }
 
-        // Build a map from the denomination to the nodes
-        const valueToNodes = new Map<number, TreeNode[]>();
-        this.leaves.forEach((leaf) => {
-          if (!valueToNodes.has(leaf.value)) {
-            valueToNodes.set(leaf.value, []);
+        const leavesToSend: TreeNode[] = [];
+        for (const leafValue of swap.inLeaves) {
+          const nodes = valueToNodes.get(leafValue);
+          if (nodes && nodes.length > 0) {
+            const node = nodes.shift()!;
+            leavesToSend.push(node);
+          } else {
+            throw new InternalValidationError(
+              `No unused leaf with value ${leafValue} found in leaves`,
+            );
           }
-          valueToNodes.get(leaf.value)!.push(leaf);
+        }
+
+        // TODO: Parallelize this.
+        await this.requestLeavesSwap({
+          leaves: leavesToSend,
+          targetAmounts: swap.outLeaves,
         });
 
-        // Select the leaves to send for each swap.
-        for (const swap of swaps) {
-          const leavesToSend: TreeNode[] = [];
-          for (const leafValue of swap.inLeaves) {
-            const nodes = valueToNodes.get(leafValue);
-            if (nodes && nodes.length > 0) {
-              const node = nodes.shift()!;
-              leavesToSend.push(node);
-            } else {
-              throw new InternalValidationError(
-                `No unused leaf with value ${leafValue} found in leaves`,
-              );
-            }
-          }
-
-          // TODO: Parallelize this.
-          await this.requestLeavesSwap({
-            leaves: leavesToSend,
-            targetAmounts: swap.outLeaves,
-          });
-        }
-
-        this.leaves = await this.getLeaves();
-      } finally {
-        this.optimizationInProgress = false;
+        yield {
+          step: swaps.indexOf(swap) + 1,
+          total: swaps.length,
+          controller,
+        };
       }
-    });
+
+      this.leaves = await this.getLeaves();
+    } finally {
+      this.optimizationInProgress = false;
+      release();
+    }
   }
 
   private async syncWallet() {
@@ -746,9 +774,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     this.leaves = leaves;
 
-    this.optimizeLeaves().catch((e) => {
-      console.error("Failed to optimize leaves", e);
-    });
+    if (this.config.getOptimizationOptions().auto) {
+      for await (const _ of this.optimizeLeaves()) {
+        // run all optimizer steps, do nothing with them
+      }
+    }
   }
 
   private async withLeaves<T>(operation: () => Promise<T>): Promise<T> {
@@ -1449,7 +1479,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       return await this.claimTransfer({
         transfer: incomingTransfer,
         emit: false,
-        optimize: false,
       });
     } catch (e) {
       console.error("[processSwapBatch] Error details:", {
@@ -2745,7 +2774,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
                 transfer.id,
               );
               if (pending) {
-                await this.claimTransfer({ transfer: pending, optimize: true });
+                await this.claimTransfer({ transfer: pending });
               }
             }
             return {
@@ -2955,7 +2984,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     result: TreeNode[],
     transfer: Transfer,
     emit?: boolean,
-    optimize?: boolean,
   ): Promise<TreeNode[]> {
     result = await this.checkRenewLeaves(result);
 
@@ -2963,8 +2991,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     const uniqueResults = result.filter((node) => !existingIds.has(node.id));
     this.leaves.push(...uniqueResults);
 
-    if (optimize && transfer.type !== TransferType.COUNTER_SWAP) {
-      await this.optimizeLeaves();
+    if (
+      this.config.getOptimizationOptions().auto &&
+      transfer.type !== TransferType.COUNTER_SWAP
+    ) {
+      for await (const _ of this.optimizeLeaves()) {
+        // run all optimizer steps, do nothing with them
+      }
     }
 
     if (emit) {
@@ -2987,11 +3020,9 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   private async claimTransfer({
     transfer,
     emit,
-    optimize,
   }: {
     transfer: Transfer;
     emit?: boolean;
-    optimize?: boolean;
   }) {
     const onError = async (
       context: RetryContext<TreeNode[], Transfer>,
@@ -3049,12 +3080,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         return [];
       }
 
-      return await this.processClaimedTransferResults(
-        result,
-        transfer,
-        emit,
-        optimize,
-      );
+      return await this.processClaimedTransferResults(result, transfer, emit);
     } catch (error) {
       console.warn(
         `Failed to claim transfer after all retries. Please try reinitializing your wallet in a few minutes. Transfer ID: ${transfer.id}`,
@@ -3103,7 +3129,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         continue;
       }
       promises.push(
-        this.claimTransfer({ transfer, emit, optimize: true })
+        this.claimTransfer({ transfer, emit })
           .then(() => transfer.id)
           .catch((error) => {
             console.warn(`Failed to claim transfer ${transfer.id}:`, error);
