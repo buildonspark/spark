@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -343,7 +342,11 @@ func (h *TreeCreationHandler) PrepareTreeAddress(ctx context.Context, req *pb.Pr
 			return nil, err
 		}
 
-		if !bytes.Equal(req.UserIdentityPublicKey, treeNode.OwnerIdentityPubkey) {
+		userIdentityPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
+		if err != nil {
+			return nil, fmt.Errorf("invalid user identity public key: %w", err)
+		}
+		if !treeNode.OwnerIdentityPubkey.Equals(userIdentityPubKey) {
 			return nil, errors.New("user identity public key does not match tree node owner")
 		}
 
@@ -611,10 +614,10 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		createNode := db.TreeNode.Create().
 			SetTree(savedTree).
 			SetStatus(st.TreeNodeStatusCreating).
-			SetOwnerIdentityPubkey(userIDPubKey.Serialize()).
-			SetOwnerSigningPubkey(currentElement.userPubKey.Serialize()).
+			SetOwnerIdentityPubkey(userIDPubKey).
+			SetOwnerSigningPubkey(currentElement.userPubKey).
 			SetValue(uint64(currentElement.output.Value)).
-			SetVerifyingPubkey(verifyingKey.Serialize()).
+			SetVerifyingPubkey(verifyingKey).
 			SetSigningKeyshare(currentElement.keyshare).
 			SetRawTx(currentElement.node.NodeTxSigningJob.RawTx).
 			SetRawRefundTx(cpfpRefundTx).

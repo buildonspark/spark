@@ -664,18 +664,6 @@ func init() {
 	treenode.DefaultUpdateTime = treenodeDescUpdateTime.Default.(func() time.Time)
 	// treenode.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	treenode.UpdateDefaultUpdateTime = treenodeDescUpdateTime.UpdateDefault.(func() time.Time)
-	// treenodeDescVerifyingPubkey is the schema descriptor for verifying_pubkey field.
-	treenodeDescVerifyingPubkey := treenodeFields[2].Descriptor()
-	// treenode.VerifyingPubkeyValidator is a validator for the "verifying_pubkey" field. It is called by the builders before save.
-	treenode.VerifyingPubkeyValidator = treenodeDescVerifyingPubkey.Validators[0].(func([]byte) error)
-	// treenodeDescOwnerIdentityPubkey is the schema descriptor for owner_identity_pubkey field.
-	treenodeDescOwnerIdentityPubkey := treenodeFields[3].Descriptor()
-	// treenode.OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
-	treenode.OwnerIdentityPubkeyValidator = treenodeDescOwnerIdentityPubkey.Validators[0].(func([]byte) error)
-	// treenodeDescOwnerSigningPubkey is the schema descriptor for owner_signing_pubkey field.
-	treenodeDescOwnerSigningPubkey := treenodeFields[4].Descriptor()
-	// treenode.OwnerSigningPubkeyValidator is a validator for the "owner_signing_pubkey" field. It is called by the builders before save.
-	treenode.OwnerSigningPubkeyValidator = treenodeDescOwnerSigningPubkey.Validators[0].(func([]byte) error)
 	// treenodeDescRawTx is the schema descriptor for raw_tx field.
 	treenodeDescRawTx := treenodeFields[8].Descriptor()
 	// treenode.RawTxValidator is a validator for the "raw_tx" field. It is called by the builders before save.

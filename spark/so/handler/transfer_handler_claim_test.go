@@ -128,9 +128,9 @@ func createTestTreeNode(t *testing.T, ctx context.Context, rng io.Reader, client
 		SetTree(tree).
 		SetSigningKeyshare(keyshare).
 		SetValue(1000).
-		SetVerifyingPubkey(verifyingPubKey.Serialize()).
-		SetOwnerIdentityPubkey(ownerPubKey.Serialize()).
-		SetOwnerSigningPubkey(ownerSigningPubKey.Serialize()).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetOwnerIdentityPubkey(ownerPubKey).
+		SetOwnerSigningPubkey(ownerSigningPubKey).
 		SetRawTx(validTx).
 		SetRawRefundTx(validTx).
 		SetDirectTx(validTx).
@@ -177,9 +177,7 @@ func createTestSigningCommitment(rng io.Reader) *pbcommon.SigningCommitment {
 }
 
 func createTestLeafRefundTxSigningJob(t *testing.T, rng io.Reader, leaf *ent.TreeNode) *pb.LeafRefundTxSigningJob {
-	receiverPubKey, err := keys.ParsePublicKey(leaf.OwnerIdentityPubkey)
-	require.NoError(t, err)
-	validTxBytes := createValidBitcoinTxBytes(t, receiverPubKey)
+	validTxBytes := createValidBitcoinTxBytes(t, leaf.OwnerIdentityPubkey)
 
 	return &pb.LeafRefundTxSigningJob{
 		LeafId: leaf.ID.String(),

@@ -113,10 +113,10 @@ func TestPolarityScorer_UpdateLeaves(t *testing.T) {
 	parentNode := dbTx.TreeNode.Create().
 		SetTree(tree).
 		SetStatus(st.TreeNodeStatusAvailable).
-		SetOwnerIdentityPubkey(parentOwner.Serialize()).
-		SetOwnerSigningPubkey(parentOwner.Serialize()).
+		SetOwnerIdentityPubkey(parentOwner).
+		SetOwnerSigningPubkey(parentOwner).
 		SetValue(1000).
-		SetVerifyingPubkey(verifyingPubKey.Serialize()).
+		SetVerifyingPubkey(verifyingPubKey).
 		SetSigningKeyshare(keyshare).
 		SetRawTx([]byte("raw_tx")).
 		SetVout(0).
@@ -128,10 +128,10 @@ func TestPolarityScorer_UpdateLeaves(t *testing.T) {
 	child1 := dbTx.TreeNode.Create().
 		SetTree(tree).
 		SetStatus(st.TreeNodeStatusAvailable).
-		SetOwnerIdentityPubkey(owner1PubKey.Serialize()).
-		SetOwnerSigningPubkey(owner1PubKey.Serialize()).
+		SetOwnerIdentityPubkey(owner1PubKey).
+		SetOwnerSigningPubkey(owner1PubKey).
 		SetValue(500).
-		SetVerifyingPubkey(verifyingPubKey1.Serialize()).
+		SetVerifyingPubkey(verifyingPubKey1).
 		SetSigningKeyshare(keyshare).
 		SetRawTx([]byte("raw_tx1")).
 		SetVout(0).
@@ -143,10 +143,10 @@ func TestPolarityScorer_UpdateLeaves(t *testing.T) {
 	child2 := dbTx.TreeNode.Create().
 		SetTree(tree).
 		SetStatus(st.TreeNodeStatusAvailable).
-		SetOwnerIdentityPubkey(owner2PubKey.Serialize()).
-		SetOwnerSigningPubkey(owner2PubKey.Serialize()).
+		SetOwnerIdentityPubkey(owner2PubKey).
+		SetOwnerSigningPubkey(owner2PubKey).
 		SetValue(500).
-		SetVerifyingPubkey(verifyingPubKey2.Serialize()).
+		SetVerifyingPubkey(verifyingPubKey2).
 		SetSigningKeyshare(keyshare).
 		SetRawTx([]byte("raw_tx2")).
 		SetVout(1).

@@ -265,9 +265,9 @@ func seedTreeNode(t *testing.T, ctx context.Context, network st.Network, opts ..
 	nodes := make([]*ent.TreeNode, len(opts))
 	for i, opt := range opts {
 		node, err := tx.TreeNode.Create().
-			SetOwnerIdentityPubkey(opt.ownerIDPubKey.Serialize()).
-			SetOwnerSigningPubkey(opt.ownerIDPubKey.Serialize()).
-			SetVerifyingPubkey(irrelevantKey.Public().Serialize()).
+			SetOwnerIdentityPubkey(opt.ownerIDPubKey).
+			SetOwnerSigningPubkey(opt.ownerIDPubKey).
+			SetVerifyingPubkey(irrelevantKey.Public()).
 			SetRawTx(irrelevant).
 			SetStatus(opt.status).
 			SetTree(tr).

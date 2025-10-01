@@ -64,11 +64,7 @@ func (h *RefreshTimelockHandler) refreshTimelock(ctx context.Context, req *pb.Re
 	if err != nil {
 		return nil, err
 	}
-	leafOwnerIDPubKey, err := keys.ParsePublicKey(leaf.OwnerIdentityPubkey)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse owner identity public key: %w", err)
-	}
-	if !leafOwnerIDPubKey.Equals(reqOwnerIDPubKey) {
+	if !leaf.OwnerIdentityPubkey.Equals(reqOwnerIDPubKey) {
 		return nil, fmt.Errorf("leaf %s is not owned by the authenticated identity public key %s", leaf.ID, reqOwnerIDPubKey)
 	}
 
@@ -262,10 +258,7 @@ func (h *RefreshTimelockHandler) refreshTimelock(ctx context.Context, req *pb.Re
 			return nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
 		}
 
-		verifyingPubKey, err := keys.ParsePublicKey(nodes[i].VerifyingPubkey)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse verifying public key: %w", err)
-		}
+		verifyingPubKey := nodes[i].VerifyingPubkey
 
 		signingJobs = append(signingJobs, &helper.SigningJob{
 			JobID:             uuid.New().String(),
@@ -318,7 +311,7 @@ func (h *RefreshTimelockHandler) refreshTimelock(ctx context.Context, req *pb.Re
 		}
 		pbSigningResults = append(pbSigningResults, &pb.RefreshTimelockSigningResult{
 			SigningResult: signingResultProto,
-			VerifyingKey:  nodes[i].VerifyingPubkey,
+			VerifyingKey:  nodes[i].VerifyingPubkey.Serialize(),
 		})
 	}
 

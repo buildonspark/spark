@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -48,16 +49,30 @@ func (h *InternalExtendLeafHandler) FinalizeExtendLeaf(ctx context.Context, req 
 	if err != nil {
 		return fmt.Errorf("failed to parse parent node id: %w", err)
 	}
+
+	ownerIdentityPubKey, err := keys.ParsePublicKey(node.GetOwnerIdentityPubkey())
+	if err != nil {
+		return fmt.Errorf("failed to parse owner identity pubkey: %w", err)
+	}
+	ownerSigningPubKey, err := keys.ParsePublicKey(node.GetOwnerSigningPubkey())
+	if err != nil {
+		return fmt.Errorf("failed to parse owner signing pubkey: %w", err)
+	}
+	verifyingPubKey, err := keys.ParsePublicKey(node.GetVerifyingPubkey())
+	if err != nil {
+		return fmt.Errorf("failed to parse verifying pubkey: %w", err)
+	}
+
 	_, err = db.
 		TreeNode.
 		Create().
 		SetID(nodeID).
 		SetTreeID(treeID).
 		SetStatus(st.TreeNodeStatusAvailable).
-		SetOwnerIdentityPubkey(node.OwnerIdentityPubkey).
-		SetOwnerSigningPubkey(node.OwnerSigningPubkey).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey).
+		SetOwnerSigningPubkey(ownerSigningPubKey).
 		SetValue(node.Value).
-		SetVerifyingPubkey(node.VerifyingPubkey).
+		SetVerifyingPubkey(verifyingPubKey).
 		SetSigningKeyshareID(signingKeyshareID).
 		SetRawTx(node.RawTx).
 		SetRawRefundTx(node.RawRefundTx).

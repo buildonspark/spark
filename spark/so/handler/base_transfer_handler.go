@@ -547,9 +547,10 @@ func (h *BaseTransferHandler) validateTransferLeaves(
 func (h *BaseTransferHandler) leafAvailableToTransfer(ctx context.Context, leaf *ent.TreeNode, transfer *ent.Transfer) error {
 	if leaf.Status != st.TreeNodeStatusAvailable {
 		if leaf.Status == st.TreeNodeStatusTransferLocked {
-			transferLeaves, err := transfer.QueryTransferLeaves().Where(
-				enttransferleaf.HasLeafWith(treenode.IDEQ(leaf.ID)),
-			).WithTransfer().All(ctx)
+			transferLeaves, err := transfer.QueryTransferLeaves().
+				Where(enttransferleaf.HasLeafWith(treenode.IDEQ(leaf.ID))).
+				WithTransfer().
+				All(ctx)
 			if err != nil {
 				return fmt.Errorf("unable to find transfer leaf for leaf %v: %w", leaf.ID, err)
 			}
@@ -565,11 +566,7 @@ func (h *BaseTransferHandler) leafAvailableToTransfer(ctx context.Context, leaf 
 		}
 		return fmt.Errorf("leaf %v is not available to transfer, status: %s", leaf.ID, leaf.Status)
 	}
-	ownerIDPubKey, err := keys.ParsePublicKey(leaf.OwnerIdentityPubkey)
-	if err != nil {
-		return fmt.Errorf("unable to parse leaf owner identity public key: %w", err)
-	}
-	if !ownerIDPubKey.Equals(transfer.SenderIdentityPubkey) {
+	if !leaf.OwnerIdentityPubkey.Equals(transfer.SenderIdentityPubkey) {
 		return fmt.Errorf("leaf %v is not owned by sender", leaf.ID)
 	}
 	return nil

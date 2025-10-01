@@ -139,9 +139,9 @@ func TestFinalizeTransfer(t *testing.T) {
 			SetTree(tree).
 			SetSigningKeyshare(signingKeyshare).
 			SetValue(1000).
-			SetVerifyingPubkey(verifyingPrivKey.Public().Serialize()).
-			SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public().Serialize()).
-			SetOwnerSigningPubkey(ownerSigningPrivKey.Public().Serialize()).
+			SetVerifyingPubkey(verifyingPrivKey.Public()).
+			SetOwnerIdentityPubkey(ownerIdentityPrivKey.Public()).
+			SetOwnerSigningPubkey(ownerSigningPrivKey.Public()).
 			SetRawTx(rawTx).
 			SetRawRefundTx(rawRefundTx).
 			SetDirectTx(directTx).
@@ -334,9 +334,9 @@ func TestApplySignatures(t *testing.T) {
 		SetTree(tree).
 		SetSigningKeyshare(signingKeyshare).
 		SetValue(1000).
-		SetVerifyingPubkey(verifyingPubKey.Serialize()).
-		SetOwnerIdentityPubkey(key.Public().Serialize()).
-		SetOwnerSigningPubkey(key.Public().Serialize()).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetOwnerIdentityPubkey(key.Public()).
+		SetOwnerSigningPubkey(key.Public()).
 		SetRawTx(rawTx).
 		SetRawRefundTx(rawRefundTx).
 		SetDirectTx(directTx).

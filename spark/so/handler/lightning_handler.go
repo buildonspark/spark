@@ -133,7 +133,7 @@ func (h *LightningHandler) validateNodeOwnership(ctx context.Context, nodes []*e
 
 	var mismatchedNodes []string
 	for _, node := range nodes {
-		if !bytes.Equal(node.OwnerIdentityPubkey, sessionIdentityPubkeyBytes) {
+		if !node.OwnerIdentityPubkey.Equals(session.IdentityPublicKey()) {
 			mismatchedNodes = append(mismatchedNodes, node.ID.String())
 		}
 	}
@@ -449,19 +449,11 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return fmt.Errorf("unable to get cpfp sighash for cpfpTransaction, tree_node id: %s: %w", nodeID, err)
 		}
 
-		verifyingPubKey, err := keys.ParsePublicKey(node.VerifyingPubkey)
-		if err != nil {
-			return fmt.Errorf("unable to parse verifying public key for cpfpTransaction, tree_node id: %s: %w", nodeID, err)
-		}
-		realUserPublicKey := verifyingPubKey.Sub(keyshare.PublicKey)
+		realUserPublicKey := node.VerifyingPubkey.Sub(keyshare.PublicKey)
 
-		ownerSigningPubKey, err := keys.ParsePublicKey(node.OwnerSigningPubkey)
-		if err != nil {
-			return fmt.Errorf("unable to parse owner signing public key for cpfpTransaction, tree_node id: %s: %w", nodeID, err)
-		}
-		if !realUserPublicKey.Equals(ownerSigningPubKey) {
-			logger.Sugar().Debugf("real user public key mismatch (expected %s, got %s)", ownerSigningPubKey, realUserPublicKey)
-			node, err = node.Update().SetOwnerSigningPubkey(realUserPublicKey.Serialize()).Save(ctx)
+		if !realUserPublicKey.Equals(node.OwnerSigningPubkey) {
+			logger.Sugar().Debugf("real user public key mismatch (expected %s, got %s)", node.OwnerSigningPubkey, realUserPublicKey)
+			node, err = node.Update().SetOwnerSigningPubkey(realUserPublicKey).Save(ctx)
 			if err != nil {
 				return fmt.Errorf("unable to update tree_node: %s: %w", nodeID, err)
 			}
@@ -471,13 +463,13 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			Message:         cpfpSighash,
 			SignatureShare:  cpfpTransaction.UserSignature,
 			Role:            pbfrost.SigningRole_USER,
-			VerifyingKey:    verifyingPubKey.Serialize(),
-			PublicShare:     ownerSigningPubKey.Serialize(),
+			VerifyingKey:    node.VerifyingPubkey.Serialize(),
+			PublicShare:     node.OwnerSigningPubkey.Serialize(),
 			Commitments:     cpfpTransaction.SigningCommitments.SigningCommitments,
 			UserCommitments: cpfpTransaction.SigningNonceCommitment,
 		})
 		if err != nil {
-			return fmt.Errorf("unable to validate cpfp signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(cpfpSighash), ownerSigningPubKey)
+			return fmt.Errorf("unable to validate cpfp signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(cpfpSighash), node.OwnerSigningPubkey)
 		}
 	}
 
@@ -527,13 +519,13 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			Message:         directSighash,
 			SignatureShare:  directTransaction.UserSignature,
 			Role:            pbfrost.SigningRole_USER,
-			VerifyingKey:    node.VerifyingPubkey,
-			PublicShare:     node.OwnerSigningPubkey,
+			VerifyingKey:    node.VerifyingPubkey.Serialize(),
+			PublicShare:     node.OwnerSigningPubkey.Serialize(),
 			Commitments:     directTransaction.SigningCommitments.SigningCommitments,
 			UserCommitments: directTransaction.SigningNonceCommitment,
 		})
 		if err != nil {
-			return fmt.Errorf("unable to validate direct signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(directSighash), hex.EncodeToString(node.OwnerSigningPubkey))
+			return fmt.Errorf("unable to validate direct signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(directSighash), node.OwnerSigningPubkey)
 		}
 	}
 
@@ -582,13 +574,13 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			Message:         directFromCpfpSighash,
 			SignatureShare:  directFromCpfpTransaction.UserSignature,
 			Role:            pbfrost.SigningRole_USER,
-			VerifyingKey:    node.VerifyingPubkey,
-			PublicShare:     node.OwnerSigningPubkey,
+			VerifyingKey:    node.VerifyingPubkey.Serialize(),
+			PublicShare:     node.OwnerSigningPubkey.Serialize(),
 			Commitments:     directFromCpfpTransaction.SigningCommitments.SigningCommitments,
 			UserCommitments: directFromCpfpTransaction.SigningNonceCommitment,
 		})
 		if err != nil {
-			return fmt.Errorf("unable to validate direct from cpfp signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(directFromCpfpSighash), hex.EncodeToString(node.OwnerSigningPubkey))
+			return fmt.Errorf("unable to validate direct from cpfp signature share: %w, for sighash: %v, user pubkey: %v", err, hex.EncodeToString(directFromCpfpSighash), node.OwnerSigningPubkey)
 		}
 	}
 

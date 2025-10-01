@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lightsparkdev/spark/common/keys"
-
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark"
@@ -67,11 +65,7 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 		return nil, errors.FailedPreconditionInvalidState(fmt.Errorf("leaf node is not available for renewal, current status: %s", leaf.Status))
 	}
 
-	ownerIDPubKey, err := keys.ParsePublicKey(leaf.OwnerIdentityPubkey)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse owner identity public key: %w", err)
-	}
-	err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, ownerIDPubKey)
+	err = authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, leaf.OwnerIdentityPubkey)
 	if err != nil {
 		return nil, err
 	}
@@ -161,11 +155,6 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		return nil, fmt.Errorf("failed to get signing keyshare: %w", err)
 	}
 
-	verifyingPubKey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse verifying public key: %w", err)
-	}
-
 	// Get the parent transaction output for the node transaction
 	parentTx, err := common.TxFromRawTxBytes(parentLeaf.RawTx)
 	if err != nil {
@@ -177,7 +166,7 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		ctx,
 		signingJob.NodeTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		nodeTx,
 		splitNodeTx.TxOut[0],
 	)
@@ -191,7 +180,7 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		ctx,
 		signingJob.RefundTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		refundTx,
 		nodeTx.TxOut[0],
 	)
@@ -205,7 +194,7 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		ctx,
 		signingJob.SplitNodeTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		splitNodeTx,
 		parentTx.TxOut[0],
 	)
@@ -219,7 +208,7 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		ctx,
 		signingJob.SplitNodeDirectTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		directSplitNodeTx,
 		parentTx.TxOut[0],
 	)
@@ -233,7 +222,7 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		ctx,
 		signingJob.DirectNodeTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		directNodeTx,
 		splitNodeTx.TxOut[0],
 	)
@@ -247,7 +236,7 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		ctx,
 		signingJob.DirectRefundTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		directRefundTx,
 		directNodeTx.TxOut[0],
 	)
@@ -261,7 +250,7 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		ctx,
 		signingJob.DirectFromCpfpRefundTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		directFromCpfpRefundTx,
 		nodeTx.TxOut[0],
 	)
@@ -499,11 +488,6 @@ func (h *RenewLeafHandler) renewRefundTimelock(ctx context.Context, signingJob *
 		return nil, fmt.Errorf("failed to get signing keyshare: %w", err)
 	}
 
-	verifyingPubKey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse verifying public key: %w", err)
-	}
-
 	// Get the parent transaction output for the node transaction
 	parentTx, err := common.TxFromRawTxBytes(parentLeaf.RawTx)
 	if err != nil {
@@ -515,7 +499,7 @@ func (h *RenewLeafHandler) renewRefundTimelock(ctx context.Context, signingJob *
 		ctx,
 		signingJob.NodeTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		nodeTx,
 		parentTx.TxOut[0],
 	)
@@ -529,7 +513,7 @@ func (h *RenewLeafHandler) renewRefundTimelock(ctx context.Context, signingJob *
 		ctx,
 		signingJob.RefundTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		refundTx,
 		nodeTx.TxOut[0],
 	)
@@ -543,7 +527,7 @@ func (h *RenewLeafHandler) renewRefundTimelock(ctx context.Context, signingJob *
 		ctx,
 		signingJob.DirectNodeTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		directNodeTx,
 		parentTx.TxOut[0],
 	)
@@ -557,7 +541,7 @@ func (h *RenewLeafHandler) renewRefundTimelock(ctx context.Context, signingJob *
 		ctx,
 		signingJob.DirectRefundTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		directRefundTx,
 		directNodeTx.TxOut[0],
 	)
@@ -571,7 +555,7 @@ func (h *RenewLeafHandler) renewRefundTimelock(ctx context.Context, signingJob *
 		ctx,
 		signingJob.DirectFromCpfpRefundTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		directFromCpfpRefundTx,
 		nodeTx.TxOut[0],
 	)
@@ -728,11 +712,6 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 		return nil, fmt.Errorf("failed to get signing keyshare: %w", err)
 	}
 
-	verifyingPubKey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse verifying public key: %w", err)
-	}
-
 	// Get the original leaf transaction for parent output
 	originalTx, err := common.TxFromRawTxBytes(leaf.RawTx)
 	if err != nil {
@@ -744,7 +723,7 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 		ctx,
 		signingJob.NodeTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		nodeTx,
 		originalTx.TxOut[0], // New node tx spends from original tx directly
 	)
@@ -758,7 +737,7 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 		ctx,
 		signingJob.RefundTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		refundTx,
 		nodeTx.TxOut[0],
 	)
@@ -772,7 +751,7 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 		ctx,
 		signingJob.DirectNodeTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		directNodeTx,
 		originalTx.TxOut[0],
 	)
@@ -786,7 +765,7 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 		ctx,
 		signingJob.DirectFromCpfpRefundTxSigningJob,
 		signingKeyshare,
-		verifyingPubKey,
+		leaf.VerifyingPubkey,
 		directFromCpfpRefundTx,
 		nodeTx.TxOut[0],
 	)
@@ -951,10 +930,10 @@ func (h *RenewLeafHandler) aggregateRenewLeafSignature(
 		Message:            signingResult.Message,
 		SignatureShares:    signingResult.SignatureShares,
 		PublicShares:       signingResult.PublicKeys,
-		VerifyingKey:       leaf.VerifyingPubkey,
+		VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
 		Commitments:        userSigningJob.SigningCommitments.SigningCommitments,
 		UserCommitments:    userSigningJob.SigningNonceCommitment,
-		UserPublicKey:      leaf.OwnerSigningPubkey,
+		UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
 		UserSignatureShare: userSigningJob.UserSignature,
 		// Note: No adaptor public key as requested
 	})
@@ -1012,11 +991,7 @@ func (h *RenewLeafHandler) constructRenewNodeTransactions(leaf, parentLeaf *ent.
 		PreviousOutPoint: wire.OutPoint{Hash: parentTx.TxHash(), Index: 0},
 		Sequence:         spark.ZeroSequence,
 	})
-	verifyingPubkey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
-	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("failed to parse verifying pubkey: %w", err)
-	}
-	outputPkScript, err := common.P2TRScriptFromPubKey(verifyingPubkey)
+	outputPkScript, err := common.P2TRScriptFromPubKey(leaf.VerifyingPubkey)
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("failed to construct pkscript: %w", err)
 	}
@@ -1034,11 +1009,7 @@ func (h *RenewLeafHandler) constructRenewNodeTransactions(leaf, parentLeaf *ent.
 	extendedNodeTx.AddTxOut(common.EphemeralAnchorOutput())
 
 	// Create refund tx to spend the extended node tx
-	ownerSigningPubkey, err := keys.ParsePublicKey(leaf.OwnerSigningPubkey)
-	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("failed to parse owner signing pubkey: %w", err)
-	}
-	refundPkScript, err := common.P2TRScriptFromPubKey(ownerSigningPubkey)
+	refundPkScript, err := common.P2TRScriptFromPubKey(leaf.OwnerSigningPubkey)
 	if err != nil {
 		return nil, nil, nil, nil, nil, nil, nil, fmt.Errorf("failed to create refund script: %w", err)
 	}
@@ -1120,11 +1091,7 @@ func (h *RenewLeafHandler) constructRenewRefundTransactions(leaf, parentLeaf *en
 		Sequence:         newNodeSequence,
 	})
 
-	verifyingPubkey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
-	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to parse verifying pubkey: %w", err)
-	}
-	nodePkScript, err := common.P2TRScriptFromPubKey(verifyingPubkey)
+	nodePkScript, err := common.P2TRScriptFromPubKey(leaf.VerifyingPubkey)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to construct pkscript: %w", err)
 	}
@@ -1141,11 +1108,7 @@ func (h *RenewLeafHandler) constructRenewRefundTransactions(leaf, parentLeaf *en
 		Sequence:         spark.InitialSequence(),
 	})
 
-	ownerSigningPubkey, err := keys.ParsePublicKey(leaf.OwnerSigningPubkey)
-	if err != nil {
-		return nil, nil, nil, nil, nil, fmt.Errorf("failed to parse owner signing pubkey: %w", err)
-	}
-	refundPkScript, err := common.P2TRScriptFromPubKey(ownerSigningPubkey)
+	refundPkScript, err := common.P2TRScriptFromPubKey(leaf.OwnerSigningPubkey)
 	if err != nil {
 		return nil, nil, nil, nil, nil, fmt.Errorf("failed to create refund script: %w", err)
 	}
@@ -1205,11 +1168,7 @@ func (h *RenewLeafHandler) constructRenewZeroNodeTransactions(leaf *ent.TreeNode
 	})
 
 	// Use same output value and script as original node tx
-	verifyingPubkey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to parse verifying pubkey: %w", err)
-	}
-	nodePkScript, err := common.P2TRScriptFromPubKey(verifyingPubkey)
+	nodePkScript, err := common.P2TRScriptFromPubKey(leaf.VerifyingPubkey)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to construct pkscript: %w", err)
 	}
@@ -1224,11 +1183,7 @@ func (h *RenewLeafHandler) constructRenewZeroNodeTransactions(leaf *ent.TreeNode
 		Sequence:         spark.InitialSequence(),
 	})
 
-	ownerSigningPubkey, err := keys.ParsePublicKey(leaf.OwnerSigningPubkey)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to parse owner signing pubkey: %w", err)
-	}
-	refundPkScript, err := common.P2TRScriptFromPubKey(ownerSigningPubkey)
+	refundPkScript, err := common.P2TRScriptFromPubKey(leaf.OwnerSigningPubkey)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to create refund script: %w", err)
 	}

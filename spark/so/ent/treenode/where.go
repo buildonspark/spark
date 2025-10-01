@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -73,17 +74,17 @@ func Value(v uint64) predicate.TreeNode {
 }
 
 // VerifyingPubkey applies equality check predicate on the "verifying_pubkey" field. It's identical to VerifyingPubkeyEQ.
-func VerifyingPubkey(v []byte) predicate.TreeNode {
+func VerifyingPubkey(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldVerifyingPubkey, v))
 }
 
 // OwnerIdentityPubkey applies equality check predicate on the "owner_identity_pubkey" field. It's identical to OwnerIdentityPubkeyEQ.
-func OwnerIdentityPubkey(v []byte) predicate.TreeNode {
+func OwnerIdentityPubkey(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerSigningPubkey applies equality check predicate on the "owner_signing_pubkey" field. It's identical to OwnerSigningPubkeyEQ.
-func OwnerSigningPubkey(v []byte) predicate.TreeNode {
+func OwnerSigningPubkey(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldOwnerSigningPubkey, v))
 }
 
@@ -303,122 +304,122 @@ func StatusNotIn(vs ...schematype.TreeNodeStatus) predicate.TreeNode {
 }
 
 // VerifyingPubkeyEQ applies the EQ predicate on the "verifying_pubkey" field.
-func VerifyingPubkeyEQ(v []byte) predicate.TreeNode {
+func VerifyingPubkeyEQ(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldVerifyingPubkey, v))
 }
 
 // VerifyingPubkeyNEQ applies the NEQ predicate on the "verifying_pubkey" field.
-func VerifyingPubkeyNEQ(v []byte) predicate.TreeNode {
+func VerifyingPubkeyNEQ(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldNEQ(FieldVerifyingPubkey, v))
 }
 
 // VerifyingPubkeyIn applies the In predicate on the "verifying_pubkey" field.
-func VerifyingPubkeyIn(vs ...[]byte) predicate.TreeNode {
+func VerifyingPubkeyIn(vs ...keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldIn(FieldVerifyingPubkey, vs...))
 }
 
 // VerifyingPubkeyNotIn applies the NotIn predicate on the "verifying_pubkey" field.
-func VerifyingPubkeyNotIn(vs ...[]byte) predicate.TreeNode {
+func VerifyingPubkeyNotIn(vs ...keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldNotIn(FieldVerifyingPubkey, vs...))
 }
 
 // VerifyingPubkeyGT applies the GT predicate on the "verifying_pubkey" field.
-func VerifyingPubkeyGT(v []byte) predicate.TreeNode {
+func VerifyingPubkeyGT(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldGT(FieldVerifyingPubkey, v))
 }
 
 // VerifyingPubkeyGTE applies the GTE predicate on the "verifying_pubkey" field.
-func VerifyingPubkeyGTE(v []byte) predicate.TreeNode {
+func VerifyingPubkeyGTE(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldGTE(FieldVerifyingPubkey, v))
 }
 
 // VerifyingPubkeyLT applies the LT predicate on the "verifying_pubkey" field.
-func VerifyingPubkeyLT(v []byte) predicate.TreeNode {
+func VerifyingPubkeyLT(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldLT(FieldVerifyingPubkey, v))
 }
 
 // VerifyingPubkeyLTE applies the LTE predicate on the "verifying_pubkey" field.
-func VerifyingPubkeyLTE(v []byte) predicate.TreeNode {
+func VerifyingPubkeyLTE(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldLTE(FieldVerifyingPubkey, v))
 }
 
 // OwnerIdentityPubkeyEQ applies the EQ predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyEQ(v []byte) predicate.TreeNode {
+func OwnerIdentityPubkeyEQ(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerIdentityPubkeyNEQ applies the NEQ predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyNEQ(v []byte) predicate.TreeNode {
+func OwnerIdentityPubkeyNEQ(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldNEQ(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerIdentityPubkeyIn applies the In predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyIn(vs ...[]byte) predicate.TreeNode {
+func OwnerIdentityPubkeyIn(vs ...keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldIn(FieldOwnerIdentityPubkey, vs...))
 }
 
 // OwnerIdentityPubkeyNotIn applies the NotIn predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyNotIn(vs ...[]byte) predicate.TreeNode {
+func OwnerIdentityPubkeyNotIn(vs ...keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldNotIn(FieldOwnerIdentityPubkey, vs...))
 }
 
 // OwnerIdentityPubkeyGT applies the GT predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyGT(v []byte) predicate.TreeNode {
+func OwnerIdentityPubkeyGT(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldGT(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerIdentityPubkeyGTE applies the GTE predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyGTE(v []byte) predicate.TreeNode {
+func OwnerIdentityPubkeyGTE(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldGTE(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerIdentityPubkeyLT applies the LT predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyLT(v []byte) predicate.TreeNode {
+func OwnerIdentityPubkeyLT(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldLT(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerIdentityPubkeyLTE applies the LTE predicate on the "owner_identity_pubkey" field.
-func OwnerIdentityPubkeyLTE(v []byte) predicate.TreeNode {
+func OwnerIdentityPubkeyLTE(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldLTE(FieldOwnerIdentityPubkey, v))
 }
 
 // OwnerSigningPubkeyEQ applies the EQ predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyEQ(v []byte) predicate.TreeNode {
+func OwnerSigningPubkeyEQ(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldEQ(FieldOwnerSigningPubkey, v))
 }
 
 // OwnerSigningPubkeyNEQ applies the NEQ predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyNEQ(v []byte) predicate.TreeNode {
+func OwnerSigningPubkeyNEQ(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldNEQ(FieldOwnerSigningPubkey, v))
 }
 
 // OwnerSigningPubkeyIn applies the In predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyIn(vs ...[]byte) predicate.TreeNode {
+func OwnerSigningPubkeyIn(vs ...keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldIn(FieldOwnerSigningPubkey, vs...))
 }
 
 // OwnerSigningPubkeyNotIn applies the NotIn predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyNotIn(vs ...[]byte) predicate.TreeNode {
+func OwnerSigningPubkeyNotIn(vs ...keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldNotIn(FieldOwnerSigningPubkey, vs...))
 }
 
 // OwnerSigningPubkeyGT applies the GT predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyGT(v []byte) predicate.TreeNode {
+func OwnerSigningPubkeyGT(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldGT(FieldOwnerSigningPubkey, v))
 }
 
 // OwnerSigningPubkeyGTE applies the GTE predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyGTE(v []byte) predicate.TreeNode {
+func OwnerSigningPubkeyGTE(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldGTE(FieldOwnerSigningPubkey, v))
 }
 
 // OwnerSigningPubkeyLT applies the LT predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyLT(v []byte) predicate.TreeNode {
+func OwnerSigningPubkeyLT(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldLT(FieldOwnerSigningPubkey, v))
 }
 
 // OwnerSigningPubkeyLTE applies the LTE predicate on the "owner_signing_pubkey" field.
-func OwnerSigningPubkeyLTE(v []byte) predicate.TreeNode {
+func OwnerSigningPubkeyLTE(v keys.Public) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldLTE(FieldOwnerSigningPubkey, v))
 }
 

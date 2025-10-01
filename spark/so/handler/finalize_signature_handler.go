@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"time"
@@ -247,7 +246,7 @@ func (o *FinalizeSignatureHandler) validateNodeOwnership(ctx context.Context, re
 		return err
 	}
 	for _, node := range nodes {
-		if !bytes.Equal(node.OwnerIdentityPubkey, session.IdentityPublicKey().Serialize()) {
+		if !node.OwnerIdentityPubkey.Equals(session.IdentityPublicKey()) {
 			return fmt.Errorf("node %s is not owned by the authenticated identity public key %x", node.ID.String(), session.IdentityPublicKey().Serialize())
 		}
 	}

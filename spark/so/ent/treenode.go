@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/tree"
@@ -30,11 +31,11 @@ type TreeNode struct {
 	// Status holds the value of the "status" field.
 	Status schematype.TreeNodeStatus `json:"status,omitempty"`
 	// VerifyingPubkey holds the value of the "verifying_pubkey" field.
-	VerifyingPubkey []byte `json:"verifying_pubkey,omitempty"`
+	VerifyingPubkey keys.Public `json:"verifying_pubkey,omitempty"`
 	// OwnerIdentityPubkey holds the value of the "owner_identity_pubkey" field.
-	OwnerIdentityPubkey []byte `json:"owner_identity_pubkey,omitempty"`
+	OwnerIdentityPubkey keys.Public `json:"owner_identity_pubkey,omitempty"`
 	// OwnerSigningPubkey holds the value of the "owner_signing_pubkey" field.
-	OwnerSigningPubkey []byte `json:"owner_signing_pubkey,omitempty"`
+	OwnerSigningPubkey keys.Public `json:"owner_signing_pubkey,omitempty"`
 	// Vout holds the value of the "vout" field.
 	Vout int16 `json:"vout,omitempty"`
 	// NodeConfirmationHeight holds the value of the "node_confirmation_height" field.
@@ -132,8 +133,10 @@ func (*TreeNode) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case treenode.FieldVerifyingPubkey, treenode.FieldOwnerIdentityPubkey, treenode.FieldOwnerSigningPubkey, treenode.FieldRawTx, treenode.FieldDirectTx, treenode.FieldDirectFromCpfpRefundTx, treenode.FieldRawTxid, treenode.FieldDirectTxid, treenode.FieldDirectFromCpfpRefundTxid, treenode.FieldRawRefundTx, treenode.FieldDirectRefundTx, treenode.FieldRawRefundTxid, treenode.FieldDirectRefundTxid:
+		case treenode.FieldRawTx, treenode.FieldDirectTx, treenode.FieldDirectFromCpfpRefundTx, treenode.FieldRawTxid, treenode.FieldDirectTxid, treenode.FieldDirectFromCpfpRefundTxid, treenode.FieldRawRefundTx, treenode.FieldDirectRefundTx, treenode.FieldRawRefundTxid, treenode.FieldDirectRefundTxid:
 			values[i] = new([]byte)
+		case treenode.FieldVerifyingPubkey, treenode.FieldOwnerIdentityPubkey, treenode.FieldOwnerSigningPubkey:
+			values[i] = new(keys.Public)
 		case treenode.FieldValue, treenode.FieldVout, treenode.FieldNodeConfirmationHeight, treenode.FieldRefundConfirmationHeight:
 			values[i] = new(sql.NullInt64)
 		case treenode.FieldStatus:
@@ -194,19 +197,19 @@ func (tn *TreeNode) assignValues(columns []string, values []any) error {
 				tn.Status = schematype.TreeNodeStatus(value.String)
 			}
 		case treenode.FieldVerifyingPubkey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field verifying_pubkey", values[i])
 			} else if value != nil {
 				tn.VerifyingPubkey = *value
 			}
 		case treenode.FieldOwnerIdentityPubkey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field owner_identity_pubkey", values[i])
 			} else if value != nil {
 				tn.OwnerIdentityPubkey = *value
 			}
 		case treenode.FieldOwnerSigningPubkey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field owner_signing_pubkey", values[i])
 			} else if value != nil {
 				tn.OwnerSigningPubkey = *value

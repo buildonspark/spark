@@ -223,9 +223,9 @@ func createTestTree(t *testing.T, ctx context.Context, network st.Network, statu
 		SetTree(tree).
 		SetSigningKeyshare(keyshare).
 		SetValue(1000).
-		SetVerifyingPubkey(verifyingPrivKey.Public().Serialize()).
-		SetOwnerIdentityPubkey(ownerIdentity.Public().Serialize()).
-		SetOwnerSigningPubkey(ownerSigningKey.Public().Serialize()).
+		SetVerifyingPubkey(verifyingPrivKey.Public()).
+		SetOwnerIdentityPubkey(ownerIdentity.Public()).
+		SetOwnerSigningPubkey(ownerSigningKey.Public()).
 		SetRawTx(nodeRawTx).
 		SetRawRefundTx(nodeRawRefundTx).
 		SetVout(0).
@@ -341,9 +341,9 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithChildrenStatus(t *testing.T
 		SetSigningKeyshare(keyshare).
 		SetParent(parentNode).
 		SetValue(500).
-		SetVerifyingPubkey(childVerifyingKey.Public().Serialize()).
-		SetOwnerIdentityPubkey(childOwnerIdentity.Public().Serialize()).
-		SetOwnerSigningPubkey(childOwnerSigning.Public().Serialize()).
+		SetVerifyingPubkey(childVerifyingKey.Public()).
+		SetOwnerIdentityPubkey(childOwnerIdentity.Public()).
+		SetOwnerSigningPubkey(childOwnerSigning.Public()).
 		SetRawTx(rawTx).
 		SetRawRefundTx(rawTx).
 		SetVout(0).
@@ -452,9 +452,9 @@ func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testi
 		SetSigningKeyshare(keyshare).
 		SetParent(parentNode).
 		SetValue(250).
-		SetVerifyingPubkey(child1VerifyingKey.Public().Serialize()).
-		SetOwnerIdentityPubkey(child1OwnerIdentity.Public().Serialize()).
-		SetOwnerSigningPubkey(child1OwnerSigning.Public().Serialize()).
+		SetVerifyingPubkey(child1VerifyingKey.Public()).
+		SetOwnerIdentityPubkey(child1OwnerIdentity.Public()).
+		SetOwnerSigningPubkey(child1OwnerSigning.Public()).
 		SetRawTx(rawTx1).
 		SetRawRefundTx(rawTx1).
 		SetVout(0).
@@ -473,9 +473,9 @@ func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testi
 		SetSigningKeyshare(keyshare).
 		SetParent(parentNode).
 		SetValue(250).
-		SetVerifyingPubkey(child2VerifyingKey.Public().Serialize()).
-		SetOwnerIdentityPubkey(child2OwnerIdentity.Public().Serialize()).
-		SetOwnerSigningPubkey(child2OwnerSigning.Public().Serialize()).
+		SetVerifyingPubkey(child2VerifyingKey.Public()).
+		SetOwnerIdentityPubkey(child2OwnerIdentity.Public()).
+		SetOwnerSigningPubkey(child2OwnerSigning.Public()).
 		SetRawTx(rawTx2).
 		SetRawRefundTx(rawTx2).
 		SetVout(0).
@@ -584,9 +584,9 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 		SetTree(tree).
 		SetSigningKeyshare(keyshare).
 		SetValue(65536).
-		SetVerifyingPubkey(childVerifyingKey.Public().Serialize()).
-		SetOwnerIdentityPubkey(childOwnerIdentity.Public().Serialize()).
-		SetOwnerSigningPubkey(childOwnerSigning.Public().Serialize()).
+		SetVerifyingPubkey(childVerifyingKey.Public()).
+		SetOwnerIdentityPubkey(childOwnerIdentity.Public()).
+		SetOwnerSigningPubkey(childOwnerSigning.Public()).
 		SetRawTx(rawTx).
 		SetRawRefundTx(rawTx).
 		SetVout(0).

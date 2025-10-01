@@ -352,6 +352,7 @@ func createTestNode(t *testing.T, ctx context.Context, rawTx []byte, vout uint32
 	publicShare1 := keys.MustGeneratePrivateKeyFromRand(rng)
 	publicShare2 := keys.MustGeneratePrivateKeyFromRand(rng)
 	publicShare3 := keys.MustGeneratePrivateKeyFromRand(rng)
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	keyshare, err := dbTX.SigningKeyshare.Create().
 		SetID(uuid.New()).
@@ -376,14 +377,14 @@ func createTestNode(t *testing.T, ctx context.Context, rawTx []byte, vout uint32
 	require.NoError(t, err)
 
 	return &pbinternal.TreeNode{
-		Id:                  uuid.New().String(),
+		Id:                  uuid.NewString(),
 		Value:               1000,
-		VerifyingPubkey:     append([]byte("verifying_pubkey_"), []byte(testID.String())...),
+		VerifyingPubkey:     verifyingPubKey.Serialize(),
 		OwnerIdentityPubkey: ownerIdentity.Public().Serialize(),
 		OwnerSigningPubkey:  ownerSigningKey.Public().Serialize(),
 		RawTx:               rawTx,
 		RawRefundTx:         rawTx,
-		TreeId:              uuid.New().String(),
+		TreeId:              uuid.NewString(),
 		ParentNodeId:        nil,
 		SigningKeyshareId:   keyshare.ID.String(),
 		Vout:                vout,

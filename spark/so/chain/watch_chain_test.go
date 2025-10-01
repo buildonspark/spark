@@ -235,12 +235,12 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 		SetDirectFromCpfpRefundTx(rawRefundTx).
 		SetStatus(schematype.TreeNodeStatusOnChain).
 		SetNodeConfirmationHeight(100).
-		SetOwnerIdentityPubkey(ownerIDPubKey.Serialize()).
+		SetOwnerIdentityPubkey(ownerIDPubKey).
 		SetRawTx(rawNodeTx).
 		SetTree(tree).
 		SetValue(1000).
-		SetVerifyingPubkey(verifyingPubKey.Serialize()).
-		SetOwnerSigningPubkey(ownerIDPubKey.Serialize()).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetOwnerSigningPubkey(ownerIDPubKey).
 		SetVout(0).
 		SetSigningKeyshare(signingKeyshare).
 		Save(ctx)

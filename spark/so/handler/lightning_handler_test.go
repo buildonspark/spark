@@ -864,9 +864,9 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 			SetID(nodeID). // Use the specific ID from the test
 			SetValue(1000).
 			SetStatus(st.TreeNodeStatusAvailable).
-			SetVerifyingPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
-			SetOwnerIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
-			SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
+			SetVerifyingPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+			SetOwnerIdentityPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+			SetOwnerSigningPubkey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetRawTx(testTx).
 			SetVout(0).
 			SetSigningKeyshare(keyshare).
@@ -967,9 +967,9 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 		SetID(nodeID).
 		SetValue(500). // This is the value in the tree node, but RawTx will also have 500 sats
 		SetStatus(st.TreeNodeStatusAvailable).
-		SetVerifyingPubkey(verifyingPubKey.Serialize()).
-		SetOwnerIdentityPubkey(validPubKey.Serialize()).
-		SetOwnerSigningPubkey(validPubKey.Serialize()).
+		SetVerifyingPubkey(verifyingPubKey).
+		SetOwnerIdentityPubkey(validPubKey).
+		SetOwnerSigningPubkey(validPubKey).
 		SetRawTx(mockTx).
 		SetDirectTx(mockTx). // Set direct_tx field which is required for direct transaction validation
 		SetVout(0).

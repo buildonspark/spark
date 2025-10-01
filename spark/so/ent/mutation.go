@@ -21433,9 +21433,9 @@ type TreeNodeMutation struct {
 	value                         *uint64
 	addvalue                      *int64
 	status                        *schematype.TreeNodeStatus
-	verifying_pubkey              *[]byte
-	owner_identity_pubkey         *[]byte
-	owner_signing_pubkey          *[]byte
+	verifying_pubkey              *keys.Public
+	owner_identity_pubkey         *keys.Public
+	owner_signing_pubkey          *keys.Public
 	vout                          *int16
 	addvout                       *int16
 	node_confirmation_height      *uint64
@@ -21736,12 +21736,12 @@ func (m *TreeNodeMutation) ResetStatus() {
 }
 
 // SetVerifyingPubkey sets the "verifying_pubkey" field.
-func (m *TreeNodeMutation) SetVerifyingPubkey(b []byte) {
-	m.verifying_pubkey = &b
+func (m *TreeNodeMutation) SetVerifyingPubkey(k keys.Public) {
+	m.verifying_pubkey = &k
 }
 
 // VerifyingPubkey returns the value of the "verifying_pubkey" field in the mutation.
-func (m *TreeNodeMutation) VerifyingPubkey() (r []byte, exists bool) {
+func (m *TreeNodeMutation) VerifyingPubkey() (r keys.Public, exists bool) {
 	v := m.verifying_pubkey
 	if v == nil {
 		return
@@ -21752,7 +21752,7 @@ func (m *TreeNodeMutation) VerifyingPubkey() (r []byte, exists bool) {
 // OldVerifyingPubkey returns the old "verifying_pubkey" field's value of the TreeNode entity.
 // If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldVerifyingPubkey(ctx context.Context) (v []byte, err error) {
+func (m *TreeNodeMutation) OldVerifyingPubkey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldVerifyingPubkey is only allowed on UpdateOne operations")
 	}
@@ -21772,12 +21772,12 @@ func (m *TreeNodeMutation) ResetVerifyingPubkey() {
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (m *TreeNodeMutation) SetOwnerIdentityPubkey(b []byte) {
-	m.owner_identity_pubkey = &b
+func (m *TreeNodeMutation) SetOwnerIdentityPubkey(k keys.Public) {
+	m.owner_identity_pubkey = &k
 }
 
 // OwnerIdentityPubkey returns the value of the "owner_identity_pubkey" field in the mutation.
-func (m *TreeNodeMutation) OwnerIdentityPubkey() (r []byte, exists bool) {
+func (m *TreeNodeMutation) OwnerIdentityPubkey() (r keys.Public, exists bool) {
 	v := m.owner_identity_pubkey
 	if v == nil {
 		return
@@ -21788,7 +21788,7 @@ func (m *TreeNodeMutation) OwnerIdentityPubkey() (r []byte, exists bool) {
 // OldOwnerIdentityPubkey returns the old "owner_identity_pubkey" field's value of the TreeNode entity.
 // If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldOwnerIdentityPubkey(ctx context.Context) (v []byte, err error) {
+func (m *TreeNodeMutation) OldOwnerIdentityPubkey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOwnerIdentityPubkey is only allowed on UpdateOne operations")
 	}
@@ -21808,12 +21808,12 @@ func (m *TreeNodeMutation) ResetOwnerIdentityPubkey() {
 }
 
 // SetOwnerSigningPubkey sets the "owner_signing_pubkey" field.
-func (m *TreeNodeMutation) SetOwnerSigningPubkey(b []byte) {
-	m.owner_signing_pubkey = &b
+func (m *TreeNodeMutation) SetOwnerSigningPubkey(k keys.Public) {
+	m.owner_signing_pubkey = &k
 }
 
 // OwnerSigningPubkey returns the value of the "owner_signing_pubkey" field in the mutation.
-func (m *TreeNodeMutation) OwnerSigningPubkey() (r []byte, exists bool) {
+func (m *TreeNodeMutation) OwnerSigningPubkey() (r keys.Public, exists bool) {
 	v := m.owner_signing_pubkey
 	if v == nil {
 		return
@@ -21824,7 +21824,7 @@ func (m *TreeNodeMutation) OwnerSigningPubkey() (r []byte, exists bool) {
 // OldOwnerSigningPubkey returns the old "owner_signing_pubkey" field's value of the TreeNode entity.
 // If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldOwnerSigningPubkey(ctx context.Context) (v []byte, err error) {
+func (m *TreeNodeMutation) OldOwnerSigningPubkey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOwnerSigningPubkey is only allowed on UpdateOne operations")
 	}
@@ -22917,21 +22917,21 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 		m.SetStatus(v)
 		return nil
 	case treenode.FieldVerifyingPubkey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetVerifyingPubkey(v)
 		return nil
 	case treenode.FieldOwnerIdentityPubkey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOwnerIdentityPubkey(v)
 		return nil
 	case treenode.FieldOwnerSigningPubkey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
@@ -53,14 +54,30 @@ func (tnu *TreeNodeUpdate) SetNillableStatus(sns *schematype.TreeNodeStatus) *Tr
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (tnu *TreeNodeUpdate) SetOwnerIdentityPubkey(b []byte) *TreeNodeUpdate {
-	tnu.mutation.SetOwnerIdentityPubkey(b)
+func (tnu *TreeNodeUpdate) SetOwnerIdentityPubkey(k keys.Public) *TreeNodeUpdate {
+	tnu.mutation.SetOwnerIdentityPubkey(k)
+	return tnu
+}
+
+// SetNillableOwnerIdentityPubkey sets the "owner_identity_pubkey" field if the given value is not nil.
+func (tnu *TreeNodeUpdate) SetNillableOwnerIdentityPubkey(k *keys.Public) *TreeNodeUpdate {
+	if k != nil {
+		tnu.SetOwnerIdentityPubkey(*k)
+	}
 	return tnu
 }
 
 // SetOwnerSigningPubkey sets the "owner_signing_pubkey" field.
-func (tnu *TreeNodeUpdate) SetOwnerSigningPubkey(b []byte) *TreeNodeUpdate {
-	tnu.mutation.SetOwnerSigningPubkey(b)
+func (tnu *TreeNodeUpdate) SetOwnerSigningPubkey(k keys.Public) *TreeNodeUpdate {
+	tnu.mutation.SetOwnerSigningPubkey(k)
+	return tnu
+}
+
+// SetNillableOwnerSigningPubkey sets the "owner_signing_pubkey" field if the given value is not nil.
+func (tnu *TreeNodeUpdate) SetNillableOwnerSigningPubkey(k *keys.Public) *TreeNodeUpdate {
+	if k != nil {
+		tnu.SetOwnerSigningPubkey(*k)
+	}
 	return tnu
 }
 
@@ -402,16 +419,6 @@ func (tnu *TreeNodeUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TreeNode.status": %w`, err)}
 		}
 	}
-	if v, ok := tnu.mutation.OwnerIdentityPubkey(); ok {
-		if err := treenode.OwnerIdentityPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "TreeNode.owner_identity_pubkey": %w`, err)}
-		}
-	}
-	if v, ok := tnu.mutation.OwnerSigningPubkey(); ok {
-		if err := treenode.OwnerSigningPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "owner_signing_pubkey", err: fmt.Errorf(`ent: validator failed for field "TreeNode.owner_signing_pubkey": %w`, err)}
-		}
-	}
 	if v, ok := tnu.mutation.RawTx(); ok {
 		if err := treenode.RawTxValidator(v); err != nil {
 			return &ValidationError{Name: "raw_tx", err: fmt.Errorf(`ent: validator failed for field "TreeNode.raw_tx": %w`, err)}
@@ -704,14 +711,30 @@ func (tnuo *TreeNodeUpdateOne) SetNillableStatus(sns *schematype.TreeNodeStatus)
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (tnuo *TreeNodeUpdateOne) SetOwnerIdentityPubkey(b []byte) *TreeNodeUpdateOne {
-	tnuo.mutation.SetOwnerIdentityPubkey(b)
+func (tnuo *TreeNodeUpdateOne) SetOwnerIdentityPubkey(k keys.Public) *TreeNodeUpdateOne {
+	tnuo.mutation.SetOwnerIdentityPubkey(k)
+	return tnuo
+}
+
+// SetNillableOwnerIdentityPubkey sets the "owner_identity_pubkey" field if the given value is not nil.
+func (tnuo *TreeNodeUpdateOne) SetNillableOwnerIdentityPubkey(k *keys.Public) *TreeNodeUpdateOne {
+	if k != nil {
+		tnuo.SetOwnerIdentityPubkey(*k)
+	}
 	return tnuo
 }
 
 // SetOwnerSigningPubkey sets the "owner_signing_pubkey" field.
-func (tnuo *TreeNodeUpdateOne) SetOwnerSigningPubkey(b []byte) *TreeNodeUpdateOne {
-	tnuo.mutation.SetOwnerSigningPubkey(b)
+func (tnuo *TreeNodeUpdateOne) SetOwnerSigningPubkey(k keys.Public) *TreeNodeUpdateOne {
+	tnuo.mutation.SetOwnerSigningPubkey(k)
+	return tnuo
+}
+
+// SetNillableOwnerSigningPubkey sets the "owner_signing_pubkey" field if the given value is not nil.
+func (tnuo *TreeNodeUpdateOne) SetNillableOwnerSigningPubkey(k *keys.Public) *TreeNodeUpdateOne {
+	if k != nil {
+		tnuo.SetOwnerSigningPubkey(*k)
+	}
 	return tnuo
 }
 
@@ -1064,16 +1087,6 @@ func (tnuo *TreeNodeUpdateOne) check() error {
 	if v, ok := tnuo.mutation.Status(); ok {
 		if err := treenode.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TreeNode.status": %w`, err)}
-		}
-	}
-	if v, ok := tnuo.mutation.OwnerIdentityPubkey(); ok {
-		if err := treenode.OwnerIdentityPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "TreeNode.owner_identity_pubkey": %w`, err)}
-		}
-	}
-	if v, ok := tnuo.mutation.OwnerSigningPubkey(); ok {
-		if err := treenode.OwnerSigningPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "owner_signing_pubkey", err: fmt.Errorf(`ent: validator failed for field "TreeNode.owner_signing_pubkey": %w`, err)}
 		}
 	}
 	if v, ok := tnuo.mutation.RawTx(); ok {

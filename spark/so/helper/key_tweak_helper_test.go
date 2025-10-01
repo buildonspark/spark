@@ -64,9 +64,9 @@ func TestTweakLeafKey(t *testing.T) {
 		SetTree(tree).
 		SetValue(1000).
 		SetStatus(schematype.TreeNodeStatusAvailable).
-		SetVerifyingPubkey(verifyingPub.Serialize()).
-		SetOwnerIdentityPubkey(ownerPub.Serialize()).
-		SetOwnerSigningPubkey(ownerSigningPub.Serialize()).
+		SetVerifyingPubkey(verifyingPub).
+		SetOwnerIdentityPubkey(ownerPub).
+		SetOwnerSigningPubkey(ownerSigningPub).
 		SetRawTx(rawTxBytes).
 		SetVout(0).
 		SetSigningKeyshare(keyshare).
@@ -159,9 +159,9 @@ func TestTweakLeafKey_EmptySecretShareTweakProofsList(t *testing.T) {
 		SetTree(tree).
 		SetValue(1000).
 		SetStatus(schematype.TreeNodeStatusAvailable).
-		SetVerifyingPubkey(verifyingPub.Serialize()).
-		SetOwnerIdentityPubkey(ownerPub.Serialize()).
-		SetOwnerSigningPubkey(ownerSigningPub.Serialize()).
+		SetVerifyingPubkey(verifyingPub).
+		SetOwnerIdentityPubkey(ownerPub).
+		SetOwnerSigningPubkey(ownerSigningPub).
 		SetRawTx(rawTxBytes).
 		SetVout(0).
 		SetSigningKeyshare(keyshare).

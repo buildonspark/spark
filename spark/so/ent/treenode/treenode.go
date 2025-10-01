@@ -153,12 +153,6 @@ var (
 	DefaultUpdateTime func() time.Time
 	// UpdateDefaultUpdateTime holds the default value on update for the "update_time" field.
 	UpdateDefaultUpdateTime func() time.Time
-	// VerifyingPubkeyValidator is a validator for the "verifying_pubkey" field. It is called by the builders before save.
-	VerifyingPubkeyValidator func([]byte) error
-	// OwnerIdentityPubkeyValidator is a validator for the "owner_identity_pubkey" field. It is called by the builders before save.
-	OwnerIdentityPubkeyValidator func([]byte) error
-	// OwnerSigningPubkeyValidator is a validator for the "owner_signing_pubkey" field. It is called by the builders before save.
-	OwnerSigningPubkeyValidator func([]byte) error
 	// RawTxValidator is a validator for the "raw_tx" field. It is called by the builders before save.
 	RawTxValidator func([]byte) error
 	// DefaultID holds the default value on creation for the "id" field.

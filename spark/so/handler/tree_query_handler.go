@@ -56,12 +56,14 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		if limit < 0 || offset < 0 {
 			return nil, fmt.Errorf("expect non-negative offset and limit")
 		}
+		ownerIdentityPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPubkey())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
+		}
 		query = query.
 			Where(treenode.StatusNotIn(st.TreeNodeStatusCreating, st.TreeNodeStatusSplitted, st.TreeNodeStatusInvestigation, st.TreeNodeStatusLost, st.TreeNodeStatusReimbursed)).
-			Where(treenode.HasTreeWith(
-				tree.NetworkEQ(network),
-			)).
-			Where(treenode.OwnerIdentityPubkey(req.GetOwnerIdentityPubkey())).
+			Where(treenode.HasTreeWith(tree.NetworkEQ(network))).
+			Where(treenode.OwnerIdentityPubkey(ownerIdentityPubKey)).
 			Order(ent.Desc(enttreenode.FieldID))
 
 		if limit > 0 {
@@ -136,10 +138,15 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 		}
 	}
 
+	identityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
+	}
+
 	nodes, err := db.TreeNode.Query().
 		Where(treenode.HasTreeWith(tree.NetworkEQ(network))).
 		Where(treenode.StatusEQ(st.TreeNodeStatusAvailable)).
-		Where(treenode.OwnerIdentityPubkey(req.GetIdentityPublicKey())).
+		Where(treenode.OwnerIdentityPubkey(identityPubKey)).
 		All(ctx)
 	if err != nil {
 		return nil, err
@@ -380,11 +387,16 @@ func (h *TreeQueryHandler) QueryNodesDistribution(ctx context.Context, req *pb.Q
 		Count int    `json:"count"`
 	}
 
+	ownerIdentityPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
+	}
+
 	var results []Result
 
 	err = db.TreeNode.Query().
 		Where(
-			treenode.OwnerIdentityPubkey(req.GetOwnerIdentityPublicKey()),
+			treenode.OwnerIdentityPubkey(ownerIdentityPubKey),
 			treenode.StatusEQ(st.TreeNodeStatusAvailable),
 		).
 		GroupBy(treenode.FieldValue).
@@ -418,8 +430,13 @@ func (h *TreeQueryHandler) QueryNodesByValue(ctx context.Context, req *pb.QueryN
 		limit = 100
 	}
 
+	ownerIdentityPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
+	}
+
 	nodes, err := db.TreeNode.Query().
-		Where(treenode.OwnerIdentityPubkey(req.GetOwnerIdentityPublicKey())).
+		Where(treenode.OwnerIdentityPubkey(ownerIdentityPubKey)).
 		Where(treenode.StatusEQ(st.TreeNodeStatusAvailable)).
 		Where(treenode.ValueEQ(uint64(req.GetValue()))).
 		Order(ent.Desc(treenode.FieldID)).

@@ -842,10 +842,10 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		Create().
 		SetTree(entTree).
 		SetStatus(st.TreeNodeStatusCreating).
-		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey.Serialize()).
-		SetOwnerSigningPubkey(depositAddress.OwnerSigningPubkey.Serialize()).
+		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
+		SetOwnerSigningPubkey(depositAddress.OwnerSigningPubkey).
 		SetValue(uint64(onChainOutput.Value)).
-		SetVerifyingPubkey(verifyingKey.Serialize()).
+		SetVerifyingPubkey(verifyingKey).
 		SetSigningKeyshare(signingKeyShare).
 		SetRawTx(req.RootTxSigningJob.RawTx).
 		SetRawRefundTx(req.RefundTxSigningJob.RawTx).
@@ -1187,8 +1187,8 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	}
 	// Check if a tree node already exists for this deposit
 	existingRoot, err := db.TreeNode.Query().
-		Where(treenode.OwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey.Serialize())).
-		Where(treenode.OwnerSigningPubkey(depositAddress.OwnerSigningPubkey.Serialize())).
+		Where(treenode.OwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey)).
+		Where(treenode.OwnerSigningPubkey(depositAddress.OwnerSigningPubkey)).
 		Where(treenode.Value(uint64(onChainOutput.Value))).
 		Where(treenode.Vout(int16(req.OnChainUtxo.Vout))).
 		ForUpdate().
@@ -1226,10 +1226,10 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 			Create().
 			SetTree(entTree).
 			SetStatus(st.TreeNodeStatusCreating).
-			SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey.Serialize()).
-			SetOwnerSigningPubkey(depositAddress.OwnerSigningPubkey.Serialize()).
+			SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
+			SetOwnerSigningPubkey(depositAddress.OwnerSigningPubkey).
 			SetValue(uint64(onChainOutput.Value)).
-			SetVerifyingPubkey(verifyingKey.Serialize()).
+			SetVerifyingPubkey(verifyingKey).
 			SetSigningKeyshare(signingKeyShare).
 			SetRawTx(req.RootTxSigningJob.RawTx).
 			SetRawRefundTx(req.RefundTxSigningJob.RawTx).

@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
 	gen "github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/hook"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -32,10 +33,9 @@ func (TreeNode) Fields() []ent.Field {
 	return []ent.Field{
 		field.Uint64("value").Immutable(),
 		field.Enum("status").GoType(st.TreeNodeStatus("")),
-		field.Bytes("verifying_pubkey").NotEmpty().Immutable(),
-		field.Bytes("owner_identity_pubkey").NotEmpty(),
-		field.Bytes("owner_signing_pubkey").NotEmpty(),
-
+		field.Bytes("verifying_pubkey").Immutable().GoType(keys.Public{}),
+		field.Bytes("owner_identity_pubkey").GoType(keys.Public{}),
+		field.Bytes("owner_signing_pubkey").GoType(keys.Public{}),
 		field.Int16("vout"),
 
 		field.Uint64("node_confirmation_height").Optional(),

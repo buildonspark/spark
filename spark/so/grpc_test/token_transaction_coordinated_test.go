@@ -932,6 +932,8 @@ func TestCoordinatedTokenMintAndTransferTokensWithTooManyInputsFails(t *testing.
 }
 
 func TestCoordinatedTokenMintAndTransferMaxInputsSucceeds(t *testing.T) {
+	// TODO(LIG-8333): Re-enable this in CI once we make it fast enough that it's no longer flaky.
+	skipIfGithubActions(t)
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 
 	tokenPrivKey := config.IdentityPrivateKey

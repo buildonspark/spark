@@ -2,7 +2,9 @@ package tree
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark_tree"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -31,8 +33,12 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 	if err != nil {
 		return nil, err
 	}
+	ownerIdentityPublicKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
+	}
 	leaves, err := db.TreeNode.Query().
-		Where(treenode.OwnerIdentityPubkey(req.OwnerIdentityPublicKey)).
+		Where(treenode.OwnerIdentityPubkey(ownerIdentityPublicKey)).
 		Where(treenode.StatusEQ(st.TreeNodeStatusAvailable)).
 		Where(treenode.HasTreeWith(tree.NetworkEQ(network))).
 		All(ctx)
@@ -48,6 +54,6 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 		}
 		counts[leaf.Value]++
 	}
-	logger.Sugar().Infof("Leaf count (leaves: %d, public key: %x)", len(leaves), req.OwnerIdentityPublicKey)
+	logger.Sugar().Infof("Leaf count (leaves: %d, public key: %x)", len(leaves), ownerIdentityPublicKey)
 	return &pb.GetLeafDenominationCountsResponse{Counts: counts}, nil
 }

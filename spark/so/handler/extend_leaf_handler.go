@@ -222,7 +222,7 @@ func (h *ExtendLeafHandler) extendLeaf(ctx context.Context, req *pb.ExtendLeafRe
 		Create().
 		SetTreeID(treeID.ID).
 		SetStatus(st.TreeNodeStatusAvailable).
-		SetOwnerIdentityPubkey(req.OwnerIdentityPublicKey).
+		SetOwnerIdentityPubkey(reqOwnerIDPubKey).
 		SetOwnerSigningPubkey(leaf.OwnerSigningPubkey).
 		SetValue(leaf.Value).
 		SetVerifyingPubkey(leaf.VerifyingPubkey).
@@ -388,7 +388,7 @@ func getLeafSigningResults(signingResults []*helper.SigningResult, leaf *ent.Tre
 
 	cpfpNodeSigningResult = &pb.ExtendLeafSigningResult{
 		SigningResult: cpfpNodeSigningResultProto,
-		VerifyingKey:  verifyingPubkey,
+		VerifyingKey:  verifyingPubkey.Serialize(),
 	}
 
 	cpfpRefundSigningResultProto, err := cpfpRefundFrostResult.MarshalProto()
@@ -399,7 +399,7 @@ func getLeafSigningResults(signingResults []*helper.SigningResult, leaf *ent.Tre
 
 	cpfpRefundSigningResult = &pb.ExtendLeafSigningResult{
 		SigningResult: cpfpRefundSigningResultProto,
-		VerifyingKey:  verifyingPubkey,
+		VerifyingKey:  verifyingPubkey.Serialize(),
 	}
 
 	return cpfpNodeSigningResult, cpfpRefundSigningResult, nil
@@ -426,15 +426,15 @@ func getDirectSigningResults(signingResults []*helper.SigningResult,
 
 	directNodeSigningResult = &pb.ExtendLeafSigningResult{
 		SigningResult: directNodeSigningResultProto,
-		VerifyingKey:  leaf.VerifyingPubkey,
+		VerifyingKey:  leaf.VerifyingPubkey.Serialize(),
 	}
 	directRefundSigningResult = &pb.ExtendLeafSigningResult{
 		SigningResult: directRefundSigningResultProto,
-		VerifyingKey:  leaf.VerifyingPubkey,
+		VerifyingKey:  leaf.VerifyingPubkey.Serialize(),
 	}
 	directFromCpfpRefundSigningResult = &pb.ExtendLeafSigningResult{
 		SigningResult: directFromCpfpRefundSigningResultProto,
-		VerifyingKey:  leaf.VerifyingPubkey,
+		VerifyingKey:  leaf.VerifyingPubkey.Serialize(),
 	}
 
 	return directNodeSigningResult, directRefundSigningResult, directFromCpfpRefundSigningResult, nil
@@ -459,10 +459,7 @@ func createSigningJob(
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
 	}
-	verifyingPubKey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse verifying public key: %w", err)
-	}
+	verifyingPubKey := leaf.VerifyingPubkey
 	return &helper.SigningJob{
 		JobID:             uuid.New().String(),
 		SigningKeyshareID: signingKeyshare.ID,

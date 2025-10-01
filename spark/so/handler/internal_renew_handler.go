@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -72,16 +73,29 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 		splitParentID = &parentID
 	}
 	// Create the split node
+	ownerIdentityPubkey, err := keys.ParsePublicKey(splitNode.GetOwnerIdentityPubkey())
+	if err != nil {
+		return fmt.Errorf("failed to parse owner identity pubkey: %w", err)
+	}
+	ownerSigningPubkey, err := keys.ParsePublicKey(splitNode.GetOwnerSigningPubkey())
+	if err != nil {
+		return fmt.Errorf("failed to parse owner signing pubkey: %w", err)
+	}
+	verifyingPubkey, err := keys.ParsePublicKey(splitNode.VerifyingPubkey)
+	if err != nil {
+		return fmt.Errorf("failed to parse verifying pubkey: %w", err)
+	}
+
 	splitNodeMut := db.
 		TreeNode.
 		Create().
 		SetID(splitNodeID).
 		SetTreeID(splitTreeID).
 		SetStatus(st.TreeNodeStatusSplitLocked).
-		SetOwnerIdentityPubkey(splitNode.OwnerIdentityPubkey).
-		SetOwnerSigningPubkey(splitNode.OwnerSigningPubkey).
+		SetOwnerIdentityPubkey(ownerIdentityPubkey).
+		SetOwnerSigningPubkey(ownerSigningPubkey).
 		SetValue(splitNode.Value).
-		SetVerifyingPubkey(splitNode.VerifyingPubkey).
+		SetVerifyingPubkey(verifyingPubkey).
 		SetSigningKeyshareID(splitSigningKeyshareID).
 		SetRawTx(splitNode.RawTx).
 		SetDirectTx(splitNode.DirectTx).

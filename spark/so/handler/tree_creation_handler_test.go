@@ -156,6 +156,8 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 	identityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	signingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	verifyingPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	signingKeyshare, err := dbTX.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
@@ -185,10 +187,10 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 	node, err := dbTX.TreeNode.Create().
 		SetTree(tree).
 		SetStatus(st.TreeNodeStatusAvailable).
-		SetOwnerIdentityPubkey(identityPrivKey.Public().Serialize()).
-		SetOwnerSigningPubkey(signingPrivKey.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPrivKey.Public()).
+		SetOwnerSigningPubkey(signingPrivKey.Public()).
 		SetValue(100000).
-		SetVerifyingPubkey(verifyingPrivKey.Public().Serialize()).
+		SetVerifyingPubkey(verifyingPrivKey.Public()).
 		SetSigningKeyshare(signingKeyshare).
 		SetRawTx(txBuf).
 		SetVout(0).
@@ -256,10 +258,10 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 				_, err = dbTX.TreeNode.Create().
 					SetTree(tree).
 					SetStatus(st.TreeNodeStatusAvailable).
-					SetOwnerIdentityPubkey([]byte("test_identity")).
-					SetOwnerSigningPubkey([]byte("test_signing")).
+					SetOwnerIdentityPubkey(ownerIdentityPubKey).
+					SetOwnerSigningPubkey(ownerSigningPubKey).
 					SetValue(50000).
-					SetVerifyingPubkey([]byte("test_verifying")).
+					SetVerifyingPubkey(verifyingPrivKey.Public()).
 					SetSigningKeyshare(signingKeyshare).
 					SetRawTx(txBuf).
 					SetParent(node).
@@ -584,10 +586,10 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	availableNode, err := dbTX.TreeNode.Create().
 		SetTree(tree).
 		SetStatus(st.TreeNodeStatusAvailable).
-		SetOwnerIdentityPubkey(identityPrivKey.Public().Serialize()).
-		SetOwnerSigningPubkey(signingPrivkey.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPrivKey.Public()).
+		SetOwnerSigningPubkey(signingPrivkey.Public()).
 		SetValue(100000).
-		SetVerifyingPubkey(verifyingPrivkey.Public().Serialize()).
+		SetVerifyingPubkey(verifyingPrivkey.Public()).
 		SetSigningKeyshare(signingKeyshare).
 		SetRawTx(rawTx).
 		SetVout(0).
@@ -599,10 +601,10 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	creatingNode, err := dbTX.TreeNode.Create().
 		SetTree(tree).
 		SetStatus(st.TreeNodeStatusCreating).
-		SetOwnerIdentityPubkey(identityPrivKey.Public().Serialize()).
-		SetOwnerSigningPubkey(signingPrivkey.Public().Serialize()).
+		SetOwnerIdentityPubkey(identityPrivKey.Public()).
+		SetOwnerSigningPubkey(signingPrivkey.Public()).
 		SetValue(100000).
-		SetVerifyingPubkey(verifyingPrivkey.Public().Serialize()).
+		SetVerifyingPubkey(verifyingPrivkey.Public()).
 		SetSigningKeyshare(signingKeyshare).
 		SetRawTx(rawTx2).
 		SetVout(1).
@@ -1086,10 +1088,10 @@ func TestTreeNodeDbHooks(t *testing.T) {
 		SetID(nodeID).
 		SetTreeID(treeID).
 		SetStatus(st.TreeNodeStatusAvailable).
-		SetOwnerIdentityPubkey(ownerIdentityPubkey.Serialize()).
-		SetOwnerSigningPubkey(ownerSigningPubkey.Serialize()).
+		SetOwnerIdentityPubkey(ownerIdentityPubkey).
+		SetOwnerSigningPubkey(ownerSigningPubkey).
 		SetValue(nodeValue).
-		SetVerifyingPubkey(nodeVerifyingPubkey.Serialize()).
+		SetVerifyingPubkey(nodeVerifyingPubkey).
 		SetSigningKeyshareID(signingKeyshareID).
 		SetRawTx(nodeRawTxBytes).
 		SetRawRefundTx(nodeRawRefundTxBytes).

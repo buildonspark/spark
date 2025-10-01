@@ -17,19 +17,19 @@ import (
 func (tn *TreeNode) MarshalSparkProto(ctx context.Context) (*pbspark.TreeNode, error) {
 	signingKeyshare, err := tn.QuerySigningKeyshare().Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to query signing keyshare for leaf %s: %w", tn.ID.String(), err)
+		return nil, fmt.Errorf("unable to query signing keyshare for leaf %s: %w", tn.ID, err)
 	}
 	tree, err := tn.QueryTree().Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to query tree for leaf %s: %w", tn.ID.String(), err)
+		return nil, fmt.Errorf("unable to query tree for leaf %s: %w", tn.ID, err)
 	}
 	networkProto, err := tree.Network.MarshalProto()
 	if err != nil {
-		return nil, fmt.Errorf("unable to marshal network of tree %s: %w", tree.ID.String(), err)
+		return nil, fmt.Errorf("unable to marshal network of tree %s: %w", tree.ID, err)
 	}
 	treeID, err := tn.QueryTree().Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to query tree for leaf %s: %w", tn.ID.String(), err)
+		return nil, fmt.Errorf("unable to query tree for leaf %s: %w", tn.ID, err)
 	}
 	return &pbspark.TreeNode{
 		Id:                     tn.ID.String(),
@@ -42,9 +42,9 @@ func (tn *TreeNode) MarshalSparkProto(ctx context.Context) (*pbspark.TreeNode, e
 		DirectRefundTx:         tn.DirectRefundTx,
 		DirectFromCpfpRefundTx: tn.DirectFromCpfpRefundTx,
 		Vout:                   uint32(tn.Vout),
-		VerifyingPublicKey:     tn.VerifyingPubkey,
-		OwnerIdentityPublicKey: tn.OwnerIdentityPubkey,
-		OwnerSigningPublicKey:  tn.OwnerSigningPubkey,
+		VerifyingPublicKey:     tn.VerifyingPubkey.Serialize(),
+		OwnerIdentityPublicKey: tn.OwnerIdentityPubkey.Serialize(),
+		OwnerSigningPublicKey:  tn.OwnerSigningPubkey.Serialize(),
 		SigningKeyshare:        signingKeyshare.MarshalProto(),
 		Status:                 string(tn.Status),
 		Network:                networkProto,
@@ -57,18 +57,18 @@ func (tn *TreeNode) MarshalSparkProto(ctx context.Context) (*pbspark.TreeNode, e
 func (tn *TreeNode) MarshalInternalProto(ctx context.Context) (*pbinternal.TreeNode, error) {
 	tree, err := tn.QueryTree().Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to query tree for leaf %s: %w", tn.ID.String(), err)
+		return nil, fmt.Errorf("unable to query tree for leaf %s: %w", tn.ID, err)
 	}
 	signingKeyshare, err := tn.QuerySigningKeyshare().Only(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to query signing keyshare for leaf %s: %w", tn.ID.String(), err)
+		return nil, fmt.Errorf("unable to query signing keyshare for leaf %s: %w", tn.ID, err)
 	}
 	return &pbinternal.TreeNode{
 		Id:                     tn.ID.String(),
 		Value:                  tn.Value,
-		VerifyingPubkey:        tn.VerifyingPubkey,
-		OwnerIdentityPubkey:    tn.OwnerIdentityPubkey,
-		OwnerSigningPubkey:     tn.OwnerSigningPubkey,
+		VerifyingPubkey:        tn.VerifyingPubkey.Serialize(),
+		OwnerIdentityPubkey:    tn.OwnerIdentityPubkey.Serialize(),
+		OwnerSigningPubkey:     tn.OwnerSigningPubkey.Serialize(),
 		RawTx:                  tn.RawTx,
 		DirectTx:               tn.DirectTx,
 		RawRefundTx:            tn.RawRefundTx,

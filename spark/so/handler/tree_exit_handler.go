@@ -39,11 +39,11 @@ func NewTreeExitHandler(config *so.Config) *TreeExitHandler {
 }
 
 func (h *TreeExitHandler) ExitSingleNodeTrees(ctx context.Context, req *pb.ExitSingleNodeTreesRequest) (*pb.ExitSingleNodeTreesResponse, error) {
-	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	reqOwnerIdentityPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid identity public key: %w", err)
 	}
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIdentityPubKey); err != nil {
 		return nil, err
 	}
 
@@ -60,7 +60,7 @@ func (h *TreeExitHandler) ExitSingleNodeTrees(ctx context.Context, req *pb.ExitS
 		exitingTreeMap[treeUUID] = exitingTree
 	}
 
-	trees, err := h.validateNodeTrees(ctx, treeUUIDs, req.OwnerIdentityPublicKey)
+	trees, err := h.validateNodeTrees(ctx, treeUUIDs, reqOwnerIdentityPubKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid node tree: %w", err)
 	}
@@ -194,10 +194,7 @@ func (h *TreeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 			return nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
 		}
 
-		rootVerifyingPubKey, err := keys.ParsePublicKey(root.VerifyingPubkey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse root verifying public key: %w", err)
-		}
+		rootVerifyingPubKey := root.VerifyingPubkey
 
 		signingJobs = append(
 			signingJobs,
@@ -229,14 +226,14 @@ func (h *TreeExitHandler) signExitTransaction(ctx context.Context, exitingTrees 
 		pbSigningResults = append(pbSigningResults, &pb.ExitSingleNodeTreeSigningResult{
 			TreeId:        id.String(),
 			SigningResult: signingResultProto,
-			VerifyingKey:  root.value.VerifyingPubkey,
+			VerifyingKey:  root.value.VerifyingPubkey.Serialize(),
 		})
 	}
 
 	return pbSigningResults, nil
 }
 
-func (h *TreeExitHandler) validateNodeTrees(ctx context.Context, treeUUIDs []uuid.UUID, ownerIdentityPublicKey []byte) ([]*ent.Tree, error) {
+func (h *TreeExitHandler) validateNodeTrees(ctx context.Context, treeUUIDs []uuid.UUID, ownerIdentityPublicKey keys.Public) ([]*ent.Tree, error) {
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -279,7 +276,7 @@ func (h *TreeExitHandler) validateNodeTrees(ctx context.Context, treeUUIDs []uui
 		if len(leaves) != 1 {
 			return nil, fmt.Errorf("tree %s is not a single node tree", tree.ID.String())
 		}
-		if !bytes.Equal(leaves[0].OwnerIdentityPubkey, ownerIdentityPublicKey) {
+		if !leaves[0].OwnerIdentityPubkey.Equals(ownerIdentityPublicKey) {
 			return nil, fmt.Errorf("not the owner of the tree %s", tree.ID.String())
 		}
 

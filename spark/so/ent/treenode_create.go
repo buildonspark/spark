@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/tree"
@@ -68,20 +69,20 @@ func (tnc *TreeNodeCreate) SetStatus(sns schematype.TreeNodeStatus) *TreeNodeCre
 }
 
 // SetVerifyingPubkey sets the "verifying_pubkey" field.
-func (tnc *TreeNodeCreate) SetVerifyingPubkey(b []byte) *TreeNodeCreate {
-	tnc.mutation.SetVerifyingPubkey(b)
+func (tnc *TreeNodeCreate) SetVerifyingPubkey(k keys.Public) *TreeNodeCreate {
+	tnc.mutation.SetVerifyingPubkey(k)
 	return tnc
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (tnc *TreeNodeCreate) SetOwnerIdentityPubkey(b []byte) *TreeNodeCreate {
-	tnc.mutation.SetOwnerIdentityPubkey(b)
+func (tnc *TreeNodeCreate) SetOwnerIdentityPubkey(k keys.Public) *TreeNodeCreate {
+	tnc.mutation.SetOwnerIdentityPubkey(k)
 	return tnc
 }
 
 // SetOwnerSigningPubkey sets the "owner_signing_pubkey" field.
-func (tnc *TreeNodeCreate) SetOwnerSigningPubkey(b []byte) *TreeNodeCreate {
-	tnc.mutation.SetOwnerSigningPubkey(b)
+func (tnc *TreeNodeCreate) SetOwnerSigningPubkey(k keys.Public) *TreeNodeCreate {
+	tnc.mutation.SetOwnerSigningPubkey(k)
 	return tnc
 }
 
@@ -332,26 +333,11 @@ func (tnc *TreeNodeCreate) check() error {
 	if _, ok := tnc.mutation.VerifyingPubkey(); !ok {
 		return &ValidationError{Name: "verifying_pubkey", err: errors.New(`ent: missing required field "TreeNode.verifying_pubkey"`)}
 	}
-	if v, ok := tnc.mutation.VerifyingPubkey(); ok {
-		if err := treenode.VerifyingPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "verifying_pubkey", err: fmt.Errorf(`ent: validator failed for field "TreeNode.verifying_pubkey": %w`, err)}
-		}
-	}
 	if _, ok := tnc.mutation.OwnerIdentityPubkey(); !ok {
 		return &ValidationError{Name: "owner_identity_pubkey", err: errors.New(`ent: missing required field "TreeNode.owner_identity_pubkey"`)}
 	}
-	if v, ok := tnc.mutation.OwnerIdentityPubkey(); ok {
-		if err := treenode.OwnerIdentityPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "owner_identity_pubkey", err: fmt.Errorf(`ent: validator failed for field "TreeNode.owner_identity_pubkey": %w`, err)}
-		}
-	}
 	if _, ok := tnc.mutation.OwnerSigningPubkey(); !ok {
 		return &ValidationError{Name: "owner_signing_pubkey", err: errors.New(`ent: missing required field "TreeNode.owner_signing_pubkey"`)}
-	}
-	if v, ok := tnc.mutation.OwnerSigningPubkey(); ok {
-		if err := treenode.OwnerSigningPubkeyValidator(v); err != nil {
-			return &ValidationError{Name: "owner_signing_pubkey", err: fmt.Errorf(`ent: validator failed for field "TreeNode.owner_signing_pubkey": %w`, err)}
-		}
 	}
 	if _, ok := tnc.mutation.Vout(); !ok {
 		return &ValidationError{Name: "vout", err: errors.New(`ent: missing required field "TreeNode.vout"`)}
@@ -630,7 +616,7 @@ func (u *TreeNodeUpsert) UpdateStatus() *TreeNodeUpsert {
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (u *TreeNodeUpsert) SetOwnerIdentityPubkey(v []byte) *TreeNodeUpsert {
+func (u *TreeNodeUpsert) SetOwnerIdentityPubkey(v keys.Public) *TreeNodeUpsert {
 	u.Set(treenode.FieldOwnerIdentityPubkey, v)
 	return u
 }
@@ -642,7 +628,7 @@ func (u *TreeNodeUpsert) UpdateOwnerIdentityPubkey() *TreeNodeUpsert {
 }
 
 // SetOwnerSigningPubkey sets the "owner_signing_pubkey" field.
-func (u *TreeNodeUpsert) SetOwnerSigningPubkey(v []byte) *TreeNodeUpsert {
+func (u *TreeNodeUpsert) SetOwnerSigningPubkey(v keys.Public) *TreeNodeUpsert {
 	u.Set(treenode.FieldOwnerSigningPubkey, v)
 	return u
 }
@@ -979,7 +965,7 @@ func (u *TreeNodeUpsertOne) UpdateStatus() *TreeNodeUpsertOne {
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (u *TreeNodeUpsertOne) SetOwnerIdentityPubkey(v []byte) *TreeNodeUpsertOne {
+func (u *TreeNodeUpsertOne) SetOwnerIdentityPubkey(v keys.Public) *TreeNodeUpsertOne {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.SetOwnerIdentityPubkey(v)
 	})
@@ -993,7 +979,7 @@ func (u *TreeNodeUpsertOne) UpdateOwnerIdentityPubkey() *TreeNodeUpsertOne {
 }
 
 // SetOwnerSigningPubkey sets the "owner_signing_pubkey" field.
-func (u *TreeNodeUpsertOne) SetOwnerSigningPubkey(v []byte) *TreeNodeUpsertOne {
+func (u *TreeNodeUpsertOne) SetOwnerSigningPubkey(v keys.Public) *TreeNodeUpsertOne {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.SetOwnerSigningPubkey(v)
 	})
@@ -1539,7 +1525,7 @@ func (u *TreeNodeUpsertBulk) UpdateStatus() *TreeNodeUpsertBulk {
 }
 
 // SetOwnerIdentityPubkey sets the "owner_identity_pubkey" field.
-func (u *TreeNodeUpsertBulk) SetOwnerIdentityPubkey(v []byte) *TreeNodeUpsertBulk {
+func (u *TreeNodeUpsertBulk) SetOwnerIdentityPubkey(v keys.Public) *TreeNodeUpsertBulk {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.SetOwnerIdentityPubkey(v)
 	})
@@ -1553,7 +1539,7 @@ func (u *TreeNodeUpsertBulk) UpdateOwnerIdentityPubkey() *TreeNodeUpsertBulk {
 }
 
 // SetOwnerSigningPubkey sets the "owner_signing_pubkey" field.
-func (u *TreeNodeUpsertBulk) SetOwnerSigningPubkey(v []byte) *TreeNodeUpsertBulk {
+func (u *TreeNodeUpsertBulk) SetOwnerSigningPubkey(v keys.Public) *TreeNodeUpsertBulk {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.SetOwnerSigningPubkey(v)
 	})

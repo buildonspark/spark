@@ -2,7 +2,6 @@ package tree
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
@@ -123,11 +122,7 @@ func (s *PolarityScorer) UpdateLeaves(ctx context.Context, node *ent.TreeNode) {
 
 // buildHelperTree recursively builds the helper tree.
 func buildHelperTree(ctx context.Context, n *ent.TreeNode) (*HelperNode, error) {
-	pubKey, err := keys.ParsePublicKey(n.OwnerIdentityPubkey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key while building helper tree: %w", err)
-	}
-	helperNode := NewHelperNode(pubKey, n.ID)
+	helperNode := NewHelperNode(n.OwnerIdentityPubkey, n.ID)
 
 	// Load and process all children
 	children, err := n.QueryChildren().Where().All(ctx)

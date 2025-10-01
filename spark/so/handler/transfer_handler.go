@@ -280,7 +280,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 				RefundTxSigningResult:               cpfpProto,
 				DirectRefundTxSigningResult:         directProto,
 				DirectFromCpfpRefundTxSigningResult: directFromCpfpProto,
-				VerifyingKey:                        leafMap[leafID].VerifyingPubkey,
+				VerifyingKey:                        leafMap[leafID].VerifyingPubkey.Serialize(),
 			})
 		}
 	}
@@ -708,10 +708,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			return nil, fmt.Errorf("failed to get signing keyshare id: %w", err)
 		}
 
-		leafVerifyingPubKey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse verifying public key: %w", err)
-		}
+		leafVerifyingPubKey := leaf.VerifyingPubkey
 
 		cpfpSigningJobs = append(
 			cpfpSigningJobs,
@@ -816,7 +813,7 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 		resultsByLeafID[leafID] = &pb.LeafRefundTxSigningResult{
 			LeafId:                leafID,
 			RefundTxSigningResult: cpfpSigningResultProto,
-			VerifyingKey:          leaf.VerifyingPubkey,
+			VerifyingKey:          leaf.VerifyingPubkey.Serialize(),
 		}
 	}
 
@@ -925,7 +922,7 @@ func SignRefundsWithPregeneratedNonce(
 				return nil, nil, nil, fmt.Errorf("cpfp signing commitment is invalid for key %s: hiding or binding is empty", key)
 			}
 		}
-		leafVerifyingPubKey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
+		leafVerifyingPubKey, err := keys.ParsePublicKey(leaf.VerifyingPubkey.Serialize())
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to parse verifying public key: %w", err)
 		}
@@ -987,10 +984,7 @@ func SignRefundsWithPregeneratedNonce(
 			}
 			round1Packages[key] = obj
 		}
-		leafVerifyingPubKey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to parse verifying public key: %w", err)
-		}
+		leafVerifyingPubKey := leaf.VerifyingPubkey
 		signingJobs = append(signingJobs, &helper.SigningJobWithPregeneratedNonce{
 			SigningJob: helper.SigningJob{
 				JobID:             directJobID,
@@ -1044,10 +1038,7 @@ func SignRefundsWithPregeneratedNonce(
 			}
 			round1Packages[key] = obj
 		}
-		leafVerifyingPubKey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to parse verifying public key: %w", err)
-		}
+		leafVerifyingPubKey := leaf.VerifyingPubkey
 		signingJobs = append(signingJobs, &helper.SigningJobWithPregeneratedNonce{
 			SigningJob: helper.SigningJob{
 				JobID:             directFromCpfpJobID,
@@ -1142,10 +1133,10 @@ func AggregateSignatures(
 			Message:            signingResult.Message,
 			SignatureShares:    signingResult.SignatureShares,
 			PublicShares:       signingResult.PublicKeys,
-			VerifyingKey:       leaf.VerifyingPubkey,
+			VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
 			Commitments:        cpfpUserSignedRefund.SigningCommitments.SigningCommitments,
 			UserCommitments:    cpfpUserSignedRefund.SigningNonceCommitment,
-			UserPublicKey:      leaf.OwnerSigningPubkey,
+			UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
 			UserSignatureShare: cpfpUserSignedRefund.UserSignature,
 			AdaptorPublicKey:   cpfpAdaptorPubKey.Serialize(),
 		})
@@ -1163,10 +1154,10 @@ func AggregateSignatures(
 			Message:            signingResult.Message,
 			SignatureShares:    signingResult.SignatureShares,
 			PublicShares:       signingResult.PublicKeys,
-			VerifyingKey:       leaf.VerifyingPubkey,
+			VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
 			Commitments:        directUserSignedRefund.SigningCommitments.SigningCommitments,
 			UserCommitments:    directUserSignedRefund.SigningNonceCommitment,
-			UserPublicKey:      leaf.OwnerSigningPubkey,
+			UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
 			UserSignatureShare: directUserSignedRefund.UserSignature,
 			AdaptorPublicKey:   directAdaptorPubKey.Serialize(),
 		})
@@ -1188,10 +1179,10 @@ func AggregateSignatures(
 			Message:            signingResult.Message,
 			SignatureShares:    signingResult.SignatureShares,
 			PublicShares:       signingResult.PublicKeys,
-			VerifyingKey:       leaf.VerifyingPubkey,
+			VerifyingKey:       leaf.VerifyingPubkey.Serialize(),
 			Commitments:        directFromCpfpUserSignedRefund.SigningCommitments.SigningCommitments,
 			UserCommitments:    directFromCpfpUserSignedRefund.SigningNonceCommitment,
-			UserPublicKey:      leaf.OwnerSigningPubkey,
+			UserPublicKey:      leaf.OwnerSigningPubkey.Serialize(),
 			UserSignatureShare: directFromCpfpUserSignedRefund.UserSignature,
 			AdaptorPublicKey:   directFromCpfpAdaptorPubKey.Serialize(),
 		})
@@ -1442,12 +1433,7 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 	if err != nil {
 		return fmt.Errorf("unable to find leaf %s: %w", req.LeafId, err)
 	}
-	ownerIDPubKey, err := keys.ParsePublicKey(leaf.OwnerIdentityPubkey)
-	if err != nil {
-		return fmt.Errorf("unable to parse owner identity public key: %w", err)
-	}
-	if leaf.Status != st.TreeNodeStatusTransferLocked ||
-		!ownerIDPubKey.Equals(transfer.SenderIdentityPubkey) {
+	if leaf.Status != st.TreeNodeStatusTransferLocked || !leaf.OwnerIdentityPubkey.Equals(transfer.SenderIdentityPubkey) {
 		return fmt.Errorf("leaf %s is not available to transfer", req.LeafId)
 	}
 
@@ -1956,15 +1942,11 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 		return fmt.Errorf("unable to tweak keyshare %v for leaf %v: %w", keyshare.ID, leaf.ID, err)
 	}
 
-	verifyingPubKey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
-	if err != nil {
-		return fmt.Errorf("unable to parse verifying public key: %w", err)
-	}
-	signingPubkey := verifyingPubKey.Sub(tweakedKeyshare.PublicKey)
+	signingPubkey := leaf.VerifyingPubkey.Sub(tweakedKeyshare.PublicKey)
 	_, err = leaf.
 		Update().
-		SetOwnerIdentityPubkey(ownerIdentityPubKey.Serialize()).
-		SetOwnerSigningPubkey(signingPubkey.Serialize()).
+		SetOwnerIdentityPubkey(ownerIdentityPubKey).
+		SetOwnerSigningPubkey(signingPubkey).
 		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("unable to update leaf %s: %w", req.LeafId, err)
@@ -2295,7 +2277,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		if !exists {
 			leafResult = &pb.LeafRefundTxSigningResult{
 				LeafId:       leafID.String(),
-				VerifyingKey: leaf.VerifyingPubkey,
+				VerifyingKey: leaf.VerifyingPubkey.Serialize(),
 			}
 			leafSigningResults[leafID.String()] = leafResult
 		}
@@ -2448,11 +2430,7 @@ func (h *TransferHandler) checkIfKeyTweakApplied(ctx context.Context, transfer *
 		sparkPublicKey := leaf.Edges.SigningKeyshare.PublicKey
 		combinedPublicKey := sparkPublicKey.Add(userPublicKey)
 
-		verifyingPubKey, err := keys.ParsePublicKey(leaf.VerifyingPubkey)
-		if err != nil {
-			return false, fmt.Errorf("unable to parse verifying public key for leaf %v: %w", leaf.ID, err)
-		}
-		localTweaked := combinedPublicKey.Equals(verifyingPubKey)
+		localTweaked := combinedPublicKey.Equals(leaf.VerifyingPubkey)
 		if !tweakedSet {
 			tweaked = localTweaked
 			tweakedSet = true
@@ -2555,11 +2533,11 @@ func (h *TransferHandler) ResumeSendTransfer(ctx context.Context, transfer *ent.
 }
 
 func (h *TransferHandler) InvestigateLeaves(ctx context.Context, req *pb.InvestigateLeavesRequest) (*emptypb.Empty, error) {
-	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	reqOwnerIdentityPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("invalid identity public key: %w", err)
 	}
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIdentityPubKey); err != nil {
 		return nil, err
 	}
 
@@ -2612,8 +2590,8 @@ func (h *TransferHandler) InvestigateLeaves(ctx context.Context, req *pb.Investi
 		if node.Status != st.TreeNodeStatusAvailable {
 			return nil, fmt.Errorf("node %s is not available", node.ID)
 		}
-		if !bytes.Equal(node.OwnerIdentityPubkey, req.OwnerIdentityPublicKey) {
-			return nil, fmt.Errorf("node %s is not owned by the identity public key %s", node.ID, req.OwnerIdentityPublicKey)
+		if !node.OwnerIdentityPubkey.Equals(reqOwnerIdentityPubKey) {
+			return nil, fmt.Errorf("node %s is not owned by the identity public key %s", node.ID, reqOwnerIdentityPubKey)
 		}
 		_, err := node.Update().SetStatus(st.TreeNodeStatusInvestigation).Save(ctx)
 		logger.Sugar().Warnf("Tree Node %s is marked as investigation", node.ID)

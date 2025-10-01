@@ -268,14 +268,26 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 		if node.Vout > math.MaxInt16 {
 			return fmt.Errorf("node vout value %d overflows int16", node.Vout)
 		}
+		ownerIdentityPubkey, err := keys.ParsePublicKey(node.GetOwnerIdentityPubkey())
+		if err != nil {
+			return fmt.Errorf("failed to parse owner identity public key: %w", err)
+		}
+		ownerSigningPubkey, err := keys.ParsePublicKey(node.GetOwnerSigningPubkey())
+		if err != nil {
+			return fmt.Errorf("failed to parse owner signing public key: %w", err)
+		}
+		verifyingPubkey, err := keys.ParsePublicKey(node.GetVerifyingPubkey())
+		if err != nil {
+			return fmt.Errorf("failed to parse verifying public key: %w", err)
+		}
 		nodeMutator := db.TreeNode.
 			Create().
 			SetID(nodeID).
 			SetTree(tree).
-			SetOwnerIdentityPubkey(node.OwnerIdentityPubkey).
-			SetOwnerSigningPubkey(node.OwnerSigningPubkey).
+			SetOwnerIdentityPubkey(ownerIdentityPubkey).
+			SetOwnerSigningPubkey(ownerSigningPubkey).
 			SetValue(node.Value).
-			SetVerifyingPubkey(node.VerifyingPubkey).
+			SetVerifyingPubkey(verifyingPubkey).
 			SetSigningKeyshareID(signingKeyshareID).
 			SetVout(int16(node.Vout)).
 			SetRawTx(node.RawTx).
