@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -68,12 +69,12 @@ func UpdateTime(v time.Time) predicate.TokenFreeze {
 }
 
 // OwnerPublicKey applies equality check predicate on the "owner_public_key" field. It's identical to OwnerPublicKeyEQ.
-func OwnerPublicKey(v []byte) predicate.TokenFreeze {
+func OwnerPublicKey(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldEQ(FieldOwnerPublicKey, v))
 }
 
 // TokenPublicKey applies equality check predicate on the "token_public_key" field. It's identical to TokenPublicKeyEQ.
-func TokenPublicKey(v []byte) predicate.TokenFreeze {
+func TokenPublicKey(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldEQ(FieldTokenPublicKey, v))
 }
 
@@ -208,82 +209,82 @@ func StatusNotIn(vs ...schematype.TokenFreezeStatus) predicate.TokenFreeze {
 }
 
 // OwnerPublicKeyEQ applies the EQ predicate on the "owner_public_key" field.
-func OwnerPublicKeyEQ(v []byte) predicate.TokenFreeze {
+func OwnerPublicKeyEQ(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldEQ(FieldOwnerPublicKey, v))
 }
 
 // OwnerPublicKeyNEQ applies the NEQ predicate on the "owner_public_key" field.
-func OwnerPublicKeyNEQ(v []byte) predicate.TokenFreeze {
+func OwnerPublicKeyNEQ(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldNEQ(FieldOwnerPublicKey, v))
 }
 
 // OwnerPublicKeyIn applies the In predicate on the "owner_public_key" field.
-func OwnerPublicKeyIn(vs ...[]byte) predicate.TokenFreeze {
+func OwnerPublicKeyIn(vs ...keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldIn(FieldOwnerPublicKey, vs...))
 }
 
 // OwnerPublicKeyNotIn applies the NotIn predicate on the "owner_public_key" field.
-func OwnerPublicKeyNotIn(vs ...[]byte) predicate.TokenFreeze {
+func OwnerPublicKeyNotIn(vs ...keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldNotIn(FieldOwnerPublicKey, vs...))
 }
 
 // OwnerPublicKeyGT applies the GT predicate on the "owner_public_key" field.
-func OwnerPublicKeyGT(v []byte) predicate.TokenFreeze {
+func OwnerPublicKeyGT(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldGT(FieldOwnerPublicKey, v))
 }
 
 // OwnerPublicKeyGTE applies the GTE predicate on the "owner_public_key" field.
-func OwnerPublicKeyGTE(v []byte) predicate.TokenFreeze {
+func OwnerPublicKeyGTE(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldGTE(FieldOwnerPublicKey, v))
 }
 
 // OwnerPublicKeyLT applies the LT predicate on the "owner_public_key" field.
-func OwnerPublicKeyLT(v []byte) predicate.TokenFreeze {
+func OwnerPublicKeyLT(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldLT(FieldOwnerPublicKey, v))
 }
 
 // OwnerPublicKeyLTE applies the LTE predicate on the "owner_public_key" field.
-func OwnerPublicKeyLTE(v []byte) predicate.TokenFreeze {
+func OwnerPublicKeyLTE(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldLTE(FieldOwnerPublicKey, v))
 }
 
 // TokenPublicKeyEQ applies the EQ predicate on the "token_public_key" field.
-func TokenPublicKeyEQ(v []byte) predicate.TokenFreeze {
+func TokenPublicKeyEQ(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldEQ(FieldTokenPublicKey, v))
 }
 
 // TokenPublicKeyNEQ applies the NEQ predicate on the "token_public_key" field.
-func TokenPublicKeyNEQ(v []byte) predicate.TokenFreeze {
+func TokenPublicKeyNEQ(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldNEQ(FieldTokenPublicKey, v))
 }
 
 // TokenPublicKeyIn applies the In predicate on the "token_public_key" field.
-func TokenPublicKeyIn(vs ...[]byte) predicate.TokenFreeze {
+func TokenPublicKeyIn(vs ...keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldIn(FieldTokenPublicKey, vs...))
 }
 
 // TokenPublicKeyNotIn applies the NotIn predicate on the "token_public_key" field.
-func TokenPublicKeyNotIn(vs ...[]byte) predicate.TokenFreeze {
+func TokenPublicKeyNotIn(vs ...keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldNotIn(FieldTokenPublicKey, vs...))
 }
 
 // TokenPublicKeyGT applies the GT predicate on the "token_public_key" field.
-func TokenPublicKeyGT(v []byte) predicate.TokenFreeze {
+func TokenPublicKeyGT(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldGT(FieldTokenPublicKey, v))
 }
 
 // TokenPublicKeyGTE applies the GTE predicate on the "token_public_key" field.
-func TokenPublicKeyGTE(v []byte) predicate.TokenFreeze {
+func TokenPublicKeyGTE(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldGTE(FieldTokenPublicKey, v))
 }
 
 // TokenPublicKeyLT applies the LT predicate on the "token_public_key" field.
-func TokenPublicKeyLT(v []byte) predicate.TokenFreeze {
+func TokenPublicKeyLT(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldLT(FieldTokenPublicKey, v))
 }
 
 // TokenPublicKeyLTE applies the LTE predicate on the "token_public_key" field.
-func TokenPublicKeyLTE(v []byte) predicate.TokenFreeze {
+func TokenPublicKeyLTE(v keys.Public) predicate.TokenFreeze {
 	return predicate.TokenFreeze(sql.FieldLTE(FieldTokenPublicKey, v))
 }
 

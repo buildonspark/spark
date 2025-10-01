@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
@@ -104,8 +105,16 @@ func (tou *TokenOutputUpdate) ClearSpentTransactionInputVout() *TokenOutputUpdat
 }
 
 // SetSpentRevocationSecret sets the "spent_revocation_secret" field.
-func (tou *TokenOutputUpdate) SetSpentRevocationSecret(b []byte) *TokenOutputUpdate {
-	tou.mutation.SetSpentRevocationSecret(b)
+func (tou *TokenOutputUpdate) SetSpentRevocationSecret(k keys.Private) *TokenOutputUpdate {
+	tou.mutation.SetSpentRevocationSecret(k)
+	return tou
+}
+
+// SetNillableSpentRevocationSecret sets the "spent_revocation_secret" field if the given value is not nil.
+func (tou *TokenOutputUpdate) SetNillableSpentRevocationSecret(k *keys.Private) *TokenOutputUpdate {
+	if k != nil {
+		tou.SetSpentRevocationSecret(*k)
+	}
 	return tou
 }
 
@@ -631,8 +640,16 @@ func (touo *TokenOutputUpdateOne) ClearSpentTransactionInputVout() *TokenOutputU
 }
 
 // SetSpentRevocationSecret sets the "spent_revocation_secret" field.
-func (touo *TokenOutputUpdateOne) SetSpentRevocationSecret(b []byte) *TokenOutputUpdateOne {
-	touo.mutation.SetSpentRevocationSecret(b)
+func (touo *TokenOutputUpdateOne) SetSpentRevocationSecret(k keys.Private) *TokenOutputUpdateOne {
+	touo.mutation.SetSpentRevocationSecret(k)
+	return touo
+}
+
+// SetNillableSpentRevocationSecret sets the "spent_revocation_secret" field if the given value is not nil.
+func (touo *TokenOutputUpdateOne) SetNillableSpentRevocationSecret(k *keys.Private) *TokenOutputUpdateOne {
+	if k != nil {
+		touo.SetSpentRevocationSecret(*k)
+	}
 	return touo
 }
 

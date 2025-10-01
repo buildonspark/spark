@@ -29,7 +29,7 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func setUpInternalSignTokenTestHandlerPostgres(t *testing.T) (*InternalSignTokenHandler, context.Context, *ent.Tx, func()) {
+func setUpInternalSignTokenTestHandlerPostgres(t *testing.T) (*InternalSignTokenHandler, context.Context, *ent.Tx) {
 	t.Helper()
 
 	config := sparktesting.TestConfig(t)
@@ -37,15 +37,7 @@ func setUpInternalSignTokenTestHandlerPostgres(t *testing.T) (*InternalSignToken
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	handler := &InternalSignTokenHandler{config: config}
-
-	cleanup := func() {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil {
-			t.Errorf("rollback failed: %v", rollbackErr)
-		}
-	}
-
-	return handler, ctx, tx, cleanup
+	return &InternalSignTokenHandler{config: config}, ctx, tx
 }
 
 // createTestSpentOutputWithShares creates a spent output with one partial share and returns it.
@@ -56,7 +48,7 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.
 	require.NoError(t, err)
 
 	keyshare := tx.SigningKeyshare.Create().
-		SetSecretShare(secretShare.Serialize()).
+		SetSecretShare(secretShare).
 		SetPublicKey(secretPriv.Public()).
 		SetStatus(st.KeyshareStatusInUse).
 		SetPublicShares(map[string]keys.Public{}).
@@ -90,15 +82,14 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.
 	tx.TokenPartialRevocationSecretShare.Create().
 		SetTokenOutput(output).
 		SetOperatorIdentityPublicKey(opPub).
-		SetSecretShare(share1.Serialize()).
+		SetSecretShare(share1).
 		SaveX(ctx)
 
 	return output
 }
 
 func TestGetSecretSharesNotInInput(t *testing.T) {
-	handler, ctx, tx, cleanup := setUpInternalSignTokenTestHandlerPostgres(t)
-	defer cleanup()
+	handler, ctx, tx := setUpInternalSignTokenTestHandlerPostgres(t)
 	rng := rand.NewChaCha8([32]byte{})
 
 	aliceOperatorPubKey := handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000001"].IdentityPublicKey
@@ -107,7 +98,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 
 	aliceSecret := keys.MustGeneratePrivateKeyFromRand(rng)
 	aliceSigningKeyshare := tx.SigningKeyshare.Create().
-		SetSecretShare(aliceSecret.Serialize()).
+		SetSecretShare(aliceSecret).
 		SetPublicKey(aliceSecret.Public()).
 		SetStatus(st.KeyshareStatusInUse).
 		SetPublicShares(map[string]keys.Public{}).
@@ -117,7 +108,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 
 	bobSecret := keys.MustGeneratePrivateKeyFromRand(rng)
 	bobSigningKeyshare := tx.SigningKeyshare.Create().
-		SetSecretShare(bobSecret.Serialize()).
+		SetSecretShare(bobSecret).
 		SetPublicKey(bobSecret.Public()).
 		SetStatus(st.KeyshareStatusInUse).
 		SetPublicShares(map[string]keys.Public{}).
@@ -127,7 +118,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 
 	carolSecret := keys.MustGeneratePrivateKeyFromRand(rng)
 	carolSigningKeyshare := tx.SigningKeyshare.Create().
-		SetSecretShare(carolSecret.Serialize()).
+		SetSecretShare(carolSecret).
 		SetPublicKey(carolSecret.Public()).
 		SetStatus(st.KeyshareStatusInUse).
 		SetPublicShares(map[string]keys.Public{}).
@@ -198,8 +189,8 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		result, err := handler.getSecretSharesNotInInput(ctx, inputOperatorShareMap)
 		require.NoError(t, err)
 		assert.Len(t, result, 2)
-		assert.Equal(t, bobSigningKeyshare.SecretShare, result[bobOperatorPubKey][0].SecretShare)
-		assert.Equal(t, carolSigningKeyshare.SecretShare, result[carolOperatorPubKey][0].SecretShare)
+		assert.Equal(t, bobSigningKeyshare.SecretShare.Serialize(), result[bobOperatorPubKey][0].SecretShare)
+		assert.Equal(t, carolSigningKeyshare.SecretShare.Serialize(), result[carolOperatorPubKey][0].SecretShare)
 	})
 
 	t.Run("excludes the partial revocation secret share if it is in the input", func(t *testing.T) {
@@ -215,8 +206,8 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		result, err := handler.getSecretSharesNotInInput(ctx, inputOperatorShareMap)
 		require.NoError(t, err)
 		assert.Len(t, result, 2)
-		assert.Equal(t, aliceSigningKeyshare.SecretShare, result[aliceOperatorPubKey][0].SecretShare)
-		assert.Equal(t, carolSigningKeyshare.SecretShare, result[carolOperatorPubKey][0].SecretShare)
+		assert.Equal(t, aliceSigningKeyshare.SecretShare.Serialize(), result[aliceOperatorPubKey][0].SecretShare)
+		assert.Equal(t, carolSigningKeyshare.SecretShare.Serialize(), result[carolOperatorPubKey][0].SecretShare)
 	})
 }
 

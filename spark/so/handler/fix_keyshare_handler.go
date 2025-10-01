@@ -241,7 +241,7 @@ func (h FixKeyshareHandler) createSender(args FixKeyshareArgs) (*secretsharing.I
 	}
 
 	sb := args.badKeyshare.SecretShare
-	ownSecretShare, err := curve.ParseScalar(sb)
+	ownSecretShare, err := curve.ParseScalar(sb.Serialize())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse own secret share: %w", err)
 	}
@@ -464,8 +464,12 @@ func (h FixKeyshareHandler) updateWithFixed(ctx context.Context, outPayload *sec
 		return err
 	}
 
+	secretShare, err := keys.ParsePrivateKey(outPayload.SIssue.Serialize())
+	if err != nil {
+		return fmt.Errorf("failed to parse secret share: %w", err)
+	}
 	_, err = db.SigningKeyshare.UpdateOneID(badKeyshare.ID).
-		SetSecretShare(outPayload.SIssue.Serialize()).
+		SetSecretShare(secretShare).
 		SetPublicShares(pubShares).
 		SetPublicKey(pubKey).
 		Save(ctx)

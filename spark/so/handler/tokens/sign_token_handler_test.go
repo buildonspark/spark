@@ -121,7 +121,7 @@ func createTestSigningKeyshare(_ *testing.T, ctx context.Context, rng io.Reader,
 	secret := keys.MustGeneratePrivateKeyFromRand(rng)
 	return client.SigningKeyshare.Create().
 		SetStatus(schematype.KeyshareStatusAvailable).
-		SetSecretShare(secret.Serialize()).
+		SetSecretShare(secret).
 		SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 		SetMinSigners(1).
 		SetCoordinatorIndex(0).

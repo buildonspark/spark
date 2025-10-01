@@ -215,11 +215,11 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 				require.Len(t, shares, numOperators-1,
 					"tokenOutput %s should have %d secret-share rows", tokenOutput.ID, numOperators-1)
 
-				seenSecrets := make(map[string]struct{})
+				seenSecrets := make(map[keys.Private]struct{})
 				seenOperators := make(map[keys.Public]struct{})
 
 				for _, s := range shares {
-					seenSecrets[string(s.SecretShare)] = struct{}{}
+					seenSecrets[s.SecretShare] = struct{}{}
 					seenOperators[s.OperatorIdentityPublicKey] = struct{}{}
 				}
 

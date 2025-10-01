@@ -8011,7 +8011,7 @@ type SigningKeyshareMutation struct {
 	create_time          *time.Time
 	update_time          *time.Time
 	status               *schematype.SigningKeyshareStatus
-	secret_share         *[]byte
+	secret_share         *keys.Private
 	public_shares        *map[string]keys.Public
 	public_key           *keys.Public
 	min_signers          *int32
@@ -8237,12 +8237,12 @@ func (m *SigningKeyshareMutation) ResetStatus() {
 }
 
 // SetSecretShare sets the "secret_share" field.
-func (m *SigningKeyshareMutation) SetSecretShare(b []byte) {
-	m.secret_share = &b
+func (m *SigningKeyshareMutation) SetSecretShare(k keys.Private) {
+	m.secret_share = &k
 }
 
 // SecretShare returns the value of the "secret_share" field in the mutation.
-func (m *SigningKeyshareMutation) SecretShare() (r []byte, exists bool) {
+func (m *SigningKeyshareMutation) SecretShare() (r keys.Private, exists bool) {
 	v := m.secret_share
 	if v == nil {
 		return
@@ -8253,7 +8253,7 @@ func (m *SigningKeyshareMutation) SecretShare() (r []byte, exists bool) {
 // OldSecretShare returns the old "secret_share" field's value of the SigningKeyshare entity.
 // If the SigningKeyshare object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SigningKeyshareMutation) OldSecretShare(ctx context.Context) (v []byte, err error) {
+func (m *SigningKeyshareMutation) OldSecretShare(ctx context.Context) (v keys.Private, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldSecretShare is only allowed on UpdateOne operations")
 	}
@@ -8595,7 +8595,7 @@ func (m *SigningKeyshareMutation) SetField(name string, value ent.Value) error {
 		m.SetStatus(v)
 		return nil
 	case signingkeyshare.FieldSecretShare:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Private)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -9434,7 +9434,7 @@ type SparkInvoiceMutation struct {
 	update_time              *time.Time
 	spark_invoice            *string
 	expiry_time              *time.Time
-	receiver_public_key      *[]byte
+	receiver_public_key      *keys.Public
 	clearedFields            map[string]struct{}
 	token_transaction        map[uuid.UUID]struct{}
 	removedtoken_transaction map[uuid.UUID]struct{}
@@ -9709,12 +9709,12 @@ func (m *SparkInvoiceMutation) ResetExpiryTime() {
 }
 
 // SetReceiverPublicKey sets the "receiver_public_key" field.
-func (m *SparkInvoiceMutation) SetReceiverPublicKey(b []byte) {
-	m.receiver_public_key = &b
+func (m *SparkInvoiceMutation) SetReceiverPublicKey(k keys.Public) {
+	m.receiver_public_key = &k
 }
 
 // ReceiverPublicKey returns the value of the "receiver_public_key" field in the mutation.
-func (m *SparkInvoiceMutation) ReceiverPublicKey() (r []byte, exists bool) {
+func (m *SparkInvoiceMutation) ReceiverPublicKey() (r keys.Public, exists bool) {
 	v := m.receiver_public_key
 	if v == nil {
 		return
@@ -9725,7 +9725,7 @@ func (m *SparkInvoiceMutation) ReceiverPublicKey() (r []byte, exists bool) {
 // OldReceiverPublicKey returns the old "receiver_public_key" field's value of the SparkInvoice entity.
 // If the SparkInvoice object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *SparkInvoiceMutation) OldReceiverPublicKey(ctx context.Context) (v []byte, err error) {
+func (m *SparkInvoiceMutation) OldReceiverPublicKey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldReceiverPublicKey is only allowed on UpdateOne operations")
 	}
@@ -9977,7 +9977,7 @@ func (m *SparkInvoiceMutation) SetField(name string, value ent.Value) error {
 		m.SetExpiryTime(v)
 		return nil
 	case sparkinvoice.FieldReceiverPublicKey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -11661,8 +11661,8 @@ type TokenFreezeMutation struct {
 	create_time                         *time.Time
 	update_time                         *time.Time
 	status                              *schematype.TokenFreezeStatus
-	owner_public_key                    *[]byte
-	token_public_key                    *[]byte
+	owner_public_key                    *keys.Public
+	token_public_key                    *keys.Public
 	issuer_signature                    *[]byte
 	wallet_provided_freeze_timestamp    *uint64
 	addwallet_provided_freeze_timestamp *int64
@@ -11889,12 +11889,12 @@ func (m *TokenFreezeMutation) ResetStatus() {
 }
 
 // SetOwnerPublicKey sets the "owner_public_key" field.
-func (m *TokenFreezeMutation) SetOwnerPublicKey(b []byte) {
-	m.owner_public_key = &b
+func (m *TokenFreezeMutation) SetOwnerPublicKey(k keys.Public) {
+	m.owner_public_key = &k
 }
 
 // OwnerPublicKey returns the value of the "owner_public_key" field in the mutation.
-func (m *TokenFreezeMutation) OwnerPublicKey() (r []byte, exists bool) {
+func (m *TokenFreezeMutation) OwnerPublicKey() (r keys.Public, exists bool) {
 	v := m.owner_public_key
 	if v == nil {
 		return
@@ -11905,7 +11905,7 @@ func (m *TokenFreezeMutation) OwnerPublicKey() (r []byte, exists bool) {
 // OldOwnerPublicKey returns the old "owner_public_key" field's value of the TokenFreeze entity.
 // If the TokenFreeze object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenFreezeMutation) OldOwnerPublicKey(ctx context.Context) (v []byte, err error) {
+func (m *TokenFreezeMutation) OldOwnerPublicKey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOwnerPublicKey is only allowed on UpdateOne operations")
 	}
@@ -11925,12 +11925,12 @@ func (m *TokenFreezeMutation) ResetOwnerPublicKey() {
 }
 
 // SetTokenPublicKey sets the "token_public_key" field.
-func (m *TokenFreezeMutation) SetTokenPublicKey(b []byte) {
-	m.token_public_key = &b
+func (m *TokenFreezeMutation) SetTokenPublicKey(k keys.Public) {
+	m.token_public_key = &k
 }
 
 // TokenPublicKey returns the value of the "token_public_key" field in the mutation.
-func (m *TokenFreezeMutation) TokenPublicKey() (r []byte, exists bool) {
+func (m *TokenFreezeMutation) TokenPublicKey() (r keys.Public, exists bool) {
 	v := m.token_public_key
 	if v == nil {
 		return
@@ -11941,7 +11941,7 @@ func (m *TokenFreezeMutation) TokenPublicKey() (r []byte, exists bool) {
 // OldTokenPublicKey returns the old "token_public_key" field's value of the TokenFreeze entity.
 // If the TokenFreeze object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenFreezeMutation) OldTokenPublicKey(ctx context.Context) (v []byte, err error) {
+func (m *TokenFreezeMutation) OldTokenPublicKey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldTokenPublicKey is only allowed on UpdateOne operations")
 	}
@@ -12344,14 +12344,14 @@ func (m *TokenFreezeMutation) SetField(name string, value ent.Value) error {
 		m.SetStatus(v)
 		return nil
 	case tokenfreeze.FieldOwnerPublicKey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOwnerPublicKey(v)
 		return nil
 	case tokenfreeze.FieldTokenPublicKey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -13430,7 +13430,7 @@ type TokenOutputMutation struct {
 	spent_operator_specific_ownership_signature    *[]byte
 	spent_transaction_input_vout                   *int32
 	addspent_transaction_input_vout                *int32
-	spent_revocation_secret                        *[]byte
+	spent_revocation_secret                        *keys.Private
 	confirmed_withdraw_block_hash                  *[]byte
 	network                                        *schematype.Network
 	token_identifier                               *[]byte
@@ -14160,12 +14160,12 @@ func (m *TokenOutputMutation) ResetSpentTransactionInputVout() {
 }
 
 // SetSpentRevocationSecret sets the "spent_revocation_secret" field.
-func (m *TokenOutputMutation) SetSpentRevocationSecret(b []byte) {
-	m.spent_revocation_secret = &b
+func (m *TokenOutputMutation) SetSpentRevocationSecret(k keys.Private) {
+	m.spent_revocation_secret = &k
 }
 
 // SpentRevocationSecret returns the value of the "spent_revocation_secret" field in the mutation.
-func (m *TokenOutputMutation) SpentRevocationSecret() (r []byte, exists bool) {
+func (m *TokenOutputMutation) SpentRevocationSecret() (r keys.Private, exists bool) {
 	v := m.spent_revocation_secret
 	if v == nil {
 		return
@@ -14176,7 +14176,7 @@ func (m *TokenOutputMutation) SpentRevocationSecret() (r []byte, exists bool) {
 // OldSpentRevocationSecret returns the old "spent_revocation_secret" field's value of the TokenOutput entity.
 // If the TokenOutput object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenOutputMutation) OldSpentRevocationSecret(ctx context.Context) (v []byte, err error) {
+func (m *TokenOutputMutation) OldSpentRevocationSecret(ctx context.Context) (v keys.Private, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldSpentRevocationSecret is only allowed on UpdateOne operations")
 	}
@@ -14909,7 +14909,7 @@ func (m *TokenOutputMutation) SetField(name string, value ent.Value) error {
 		m.SetSpentTransactionInputVout(v)
 		return nil
 	case tokenoutput.FieldSpentRevocationSecret:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Private)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -15337,7 +15337,7 @@ type TokenPartialRevocationSecretShareMutation struct {
 	create_time                  *time.Time
 	update_time                  *time.Time
 	operator_identity_public_key *keys.Public
-	secret_share                 *[]byte
+	secret_share                 *keys.Private
 	clearedFields                map[string]struct{}
 	token_output                 *uuid.UUID
 	clearedtoken_output          bool
@@ -15559,12 +15559,12 @@ func (m *TokenPartialRevocationSecretShareMutation) ResetOperatorIdentityPublicK
 }
 
 // SetSecretShare sets the "secret_share" field.
-func (m *TokenPartialRevocationSecretShareMutation) SetSecretShare(b []byte) {
-	m.secret_share = &b
+func (m *TokenPartialRevocationSecretShareMutation) SetSecretShare(k keys.Private) {
+	m.secret_share = &k
 }
 
 // SecretShare returns the value of the "secret_share" field in the mutation.
-func (m *TokenPartialRevocationSecretShareMutation) SecretShare() (r []byte, exists bool) {
+func (m *TokenPartialRevocationSecretShareMutation) SecretShare() (r keys.Private, exists bool) {
 	v := m.secret_share
 	if v == nil {
 		return
@@ -15575,7 +15575,7 @@ func (m *TokenPartialRevocationSecretShareMutation) SecretShare() (r []byte, exi
 // OldSecretShare returns the old "secret_share" field's value of the TokenPartialRevocationSecretShare entity.
 // If the TokenPartialRevocationSecretShare object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TokenPartialRevocationSecretShareMutation) OldSecretShare(ctx context.Context) (v []byte, err error) {
+func (m *TokenPartialRevocationSecretShareMutation) OldSecretShare(ctx context.Context) (v keys.Private, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldSecretShare is only allowed on UpdateOne operations")
 	}
@@ -15744,7 +15744,7 @@ func (m *TokenPartialRevocationSecretShareMutation) SetField(name string, value 
 		m.SetOperatorIdentityPublicKey(v)
 		return nil
 	case tokenpartialrevocationsecretshare.FieldSecretShare:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Private)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

@@ -29,7 +29,7 @@ func (TokenPartialRevocationSecretShare) Annotations() []schema.Annotation {
 func (TokenPartialRevocationSecretShare) Fields() []ent.Field {
 	return []ent.Field{
 		field.Bytes("operator_identity_public_key").GoType(keys.Public{}),
-		field.Bytes("secret_share").NotEmpty(),
+		field.Bytes("secret_share").GoType(keys.Private{}),
 	}
 }
 

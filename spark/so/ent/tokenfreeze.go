@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
@@ -27,9 +28,9 @@ type TokenFreeze struct {
 	// Status holds the value of the "status" field.
 	Status schematype.TokenFreezeStatus `json:"status,omitempty"`
 	// OwnerPublicKey holds the value of the "owner_public_key" field.
-	OwnerPublicKey []byte `json:"owner_public_key,omitempty"`
+	OwnerPublicKey keys.Public `json:"owner_public_key,omitempty"`
 	// TokenPublicKey holds the value of the "token_public_key" field.
-	TokenPublicKey []byte `json:"token_public_key,omitempty"`
+	TokenPublicKey keys.Public `json:"token_public_key,omitempty"`
 	// IssuerSignature holds the value of the "issuer_signature" field.
 	IssuerSignature []byte `json:"issuer_signature,omitempty"`
 	// WalletProvidedFreezeTimestamp holds the value of the "wallet_provided_freeze_timestamp" field.
@@ -69,8 +70,10 @@ func (*TokenFreeze) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokenfreeze.FieldOwnerPublicKey, tokenfreeze.FieldTokenPublicKey, tokenfreeze.FieldIssuerSignature:
+		case tokenfreeze.FieldIssuerSignature:
 			values[i] = new([]byte)
+		case tokenfreeze.FieldOwnerPublicKey, tokenfreeze.FieldTokenPublicKey:
+			values[i] = new(keys.Public)
 		case tokenfreeze.FieldWalletProvidedFreezeTimestamp, tokenfreeze.FieldWalletProvidedThawTimestamp:
 			values[i] = new(sql.NullInt64)
 		case tokenfreeze.FieldStatus:
@@ -119,13 +122,13 @@ func (tf *TokenFreeze) assignValues(columns []string, values []any) error {
 				tf.Status = schematype.TokenFreezeStatus(value.String)
 			}
 		case tokenfreeze.FieldOwnerPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field owner_public_key", values[i])
 			} else if value != nil {
 				tf.OwnerPublicKey = *value
 			}
 		case tokenfreeze.FieldTokenPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field token_public_key", values[i])
 			} else if value != nil {
 				tf.TokenPublicKey = *value

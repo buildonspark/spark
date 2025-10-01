@@ -145,7 +145,7 @@ type ShareKey struct {
 	OperatorIdentityPublicKey keys.Public
 }
 type ShareValue struct {
-	SecretShare               []byte
+	SecretShare               keys.Private
 	OperatorIdentityPublicKey keys.Public
 }
 
@@ -476,7 +476,7 @@ func (h *InternalSignTokenHandler) buildOperatorPubkeyToRevocationSecretShareMap
 				operatorShares[operatorIdentityPubkey],
 				&pbtkinternal.RevocationSecretShare{
 					InputTtxoId: to.ID.String(),
-					SecretShare: share.SecretShare,
+					SecretShare: share.SecretShare.Serialize(),
 				},
 			)
 		}
@@ -486,7 +486,7 @@ func (h *InternalSignTokenHandler) buildOperatorPubkeyToRevocationSecretShareMap
 				operatorShares[idPubKey],
 				&pbtkinternal.RevocationSecretShare{
 					InputTtxoId: to.ID.String(),
-					SecretShare: partialShare.SecretShare,
+					SecretShare: partialShare.SecretShare.Serialize(),
 				},
 			)
 		}
@@ -543,8 +543,8 @@ func (h *InternalSignTokenHandler) persistPartialRevocationSecretShares(
 		if sv.OperatorIdentityPublicKey == (keys.Public{}) {
 			return false, fmt.Errorf("nil operator identity public key bytes found in input operator share map")
 		}
-		if sv.SecretShare == nil {
-			return false, fmt.Errorf("nil secret share found in input operator share map")
+		if sv.SecretShare.IsZero() {
+			return false, fmt.Errorf("zero secret share found in input operator share map")
 		}
 		// Do not write shares that belong to this server to the TokenPartialRevocationSecretShare table.
 		if sv.OperatorIdentityPublicKey.Equals(h.config.IdentityPublicKey()) {
@@ -687,7 +687,7 @@ func (h *InternalSignTokenHandler) canRecoverAndFinalizeTransaction(tokenTransac
 			return false, tokens.FormatErrorWithTransactionEnt(
 				"missing revocation key-share on output", tokenTransaction, nil)
 		}
-		if spentOutput.Edges.RevocationKeyshare.SecretShare == nil {
+		if spentOutput.Edges.RevocationKeyshare.SecretShare.IsZero() {
 			return false, tokens.FormatErrorWithTransactionEnt(
 				"nil revocation secret share on output", tokenTransaction, nil)
 		}
@@ -716,7 +716,7 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(tokenTransaction
 		if output.Edges.RevocationKeyshare == nil {
 			return nil, nil, tokens.FormatErrorWithTransactionEnt("missing revocation key-share edge on output. load the edge.", tokenTransaction, nil)
 		}
-		if output.Edges.RevocationKeyshare.SecretShare == nil {
+		if output.Edges.RevocationKeyshare.SecretShare.IsZero() {
 			return nil, nil, tokens.FormatErrorWithTransactionEnt("nil revocation secret share on output", tokenTransaction, nil)
 		}
 		outputToSpendRevocationCommitments = append(outputToSpendRevocationCommitments, commitment)
@@ -730,7 +730,7 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(tokenTransaction
 				FieldModulus: secp256k1.S256().N,
 				Threshold:    int(h.config.Threshold),
 				Index:        big.NewInt(operatorIndex),
-				Share:        new(big.Int).SetBytes(share.SecretShare),
+				Share:        new(big.Int).SetBytes(share.SecretShare.Serialize()),
 			})
 		}
 		coordinatorIndex, err := strconv.ParseInt(h.config.GetOperatorIdentifierFromIdentityPublicKey(h.config.IdentityPublicKey()), 10, 64)
@@ -741,7 +741,7 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(tokenTransaction
 			FieldModulus: secp256k1.S256().N,
 			Threshold:    int(h.config.Threshold),
 			Index:        big.NewInt(coordinatorIndex),
-			Share:        new(big.Int).SetBytes(output.Edges.RevocationKeyshare.SecretShare),
+			Share:        new(big.Int).SetBytes(output.Edges.RevocationKeyshare.SecretShare.Serialize()),
 		})
 		recoveredSecret, err := secretsharing.RecoverSecret(outputShares)
 		if err != nil {
@@ -760,7 +760,7 @@ func (h *InternalSignTokenHandler) recoverFullRevocationSecrets(tokenTransaction
 }
 
 func buildInputOperatorShareMap(operatorShares []*pbtkinternal.OperatorRevocationShares) (map[ShareKey]ShareValue, error) {
-	inputOperatorShareMap := make(map[ShareKey]ShareValue)
+	inputOperatorShares := make(map[ShareKey]ShareValue)
 	for _, operatorShare := range operatorShares {
 		if operatorShare == nil {
 			return nil, fmt.Errorf("nil operator share found in buildInputOperatorShareMap")
@@ -777,16 +777,20 @@ func buildInputOperatorShareMap(operatorShares []*pbtkinternal.OperatorRevocatio
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse operator identity public key: %w", err)
 			}
-			inputOperatorShareMap[ShareKey{
+			secretShare, err := keys.ParsePrivateKey(share.SecretShare)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse secret share: %w", err)
+			}
+			inputOperatorShares[ShareKey{
 				TokenOutputID:             tokenOutputID,
 				OperatorIdentityPublicKey: opIDPubKey,
 			}] = ShareValue{
-				SecretShare:               share.SecretShare,
+				SecretShare:               secretShare,
 				OperatorIdentityPublicKey: opIDPubKey,
 			}
 		}
 	}
-	return inputOperatorShareMap, nil
+	return inputOperatorShares, nil
 }
 
 func (h *InternalSignTokenHandler) validateSignaturesPackageAndPersistPeerSignatures(
@@ -811,10 +815,10 @@ func (h *InternalSignTokenHandler) validateSignaturesPackageAndPersistPeerSignat
 	for identifier, sig := range signatures {
 		// DO NOT WRITE this operator's signature to the peer signatures table
 		if identifier != h.config.Identifier {
-			operatorIdentityPubkey := h.config.SigningOperatorMap[identifier].IdentityPublicKey
+			operatorIdentityPubKey := h.config.SigningOperatorMap[identifier].IdentityPublicKey
 			peerSignatures = append(peerSignatures, db.TokenTransactionPeerSignature.Create().
 				SetTokenTransactionID(tokenTransaction.ID).
-				SetOperatorIdentityPublicKey(operatorIdentityPubkey).
+				SetOperatorIdentityPublicKey(operatorIdentityPubKey).
 				SetSignature(sig))
 		}
 	}

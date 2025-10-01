@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
@@ -75,8 +76,8 @@ func (sic *SparkInvoiceCreate) SetNillableExpiryTime(t *time.Time) *SparkInvoice
 }
 
 // SetReceiverPublicKey sets the "receiver_public_key" field.
-func (sic *SparkInvoiceCreate) SetReceiverPublicKey(b []byte) *SparkInvoiceCreate {
-	sic.mutation.SetReceiverPublicKey(b)
+func (sic *SparkInvoiceCreate) SetReceiverPublicKey(k keys.Public) *SparkInvoiceCreate {
+	sic.mutation.SetReceiverPublicKey(k)
 	return sic
 }
 

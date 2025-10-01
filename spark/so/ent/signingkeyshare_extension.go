@@ -1,7 +1,6 @@
 package ent
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/lightsparkdev/spark"
-	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbdkg "github.com/lightsparkdev/spark/proto/dkg"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
@@ -24,21 +22,17 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// DefaultMinAvailableKeys is the minimum number of DKG keys that should be available at all times.
+// defaultMinAvailableKeys is the minimum number of DKG keys that should be available at all times.
 // If the number of available keys drops below this threshold, DKG will be triggered to generate new
 // keys.
-var DefaultMinAvailableKeys = 100_000
+const defaultMinAvailableKeys = 100_000
 
 // TweakKeyShare tweaks the given keyshare with the given tweak, updates the keyshare in the database and returns the updated keyshare.
 func (sk *SigningKeyshare) TweakKeyShare(ctx context.Context, shareTweak keys.Private, pubKeyTweak keys.Public, pubKeySharesTweak map[string]keys.Public) (*SigningKeyshare, error) {
 	ctx, span := tracer.Start(ctx, "SigningKeyshare.TweakKeyShare")
 	defer span.End()
 
-	secretShare, err := keys.ParsePrivateKey(sk.SecretShare)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse secret share: %w", err)
-	}
-	newSecretShare := secretShare.Add(shareTweak)
+	newSecretShare := sk.SecretShare.Add(shareTweak)
 	newPubKey := sk.PublicKey.Add(pubKeyTweak)
 
 	newPublicShares := make(map[string]keys.Public)
@@ -47,7 +41,7 @@ func (sk *SigningKeyshare) TweakKeyShare(ctx context.Context, shareTweak keys.Pr
 	}
 
 	return sk.Update().
-		SetSecretShare(newSecretShare.Serialize()).
+		SetSecretShare(newSecretShare).
 		SetPublicKey(newPubKey).
 		SetPublicShares(newPublicShares).
 		Save(ctx)
@@ -99,12 +93,7 @@ func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareC
 
 // getUnusedSigningKeysharesTx runs inside an existing *ent.Tx.
 // Caller is responsible for committing/rolling-back the tx.
-func getUnusedSigningKeysharesTx(
-	ctx context.Context,
-	tx *Tx,
-	cfg *so.Config,
-	keyshareCount int,
-) ([]*SigningKeyshare, error) {
+func getUnusedSigningKeysharesTx(ctx context.Context, tx *Tx, cfg *so.Config, keyshareCount int) ([]*SigningKeyshare, error) {
 	ctx, span := tracer.Start(ctx, "SigningKeyshare.getUnusedSigningKeysharesTx")
 	defer span.End()
 
@@ -246,7 +235,7 @@ func GetKeyPackage(ctx context.Context, config *so.Config, keyshareID uuid.UUID)
 
 	keyPackage := &pbfrost.KeyPackage{
 		Identifier:   config.Identifier,
-		SecretShare:  keyshare.SecretShare,
+		SecretShare:  keyshare.SecretShare.Serialize(),
 		PublicShares: keys.ToBytesMap(keyshare.PublicShares),
 		PublicKey:    keyshare.PublicKey.Serialize(),
 		MinSigners:   uint32(keyshare.MinSigners),
@@ -276,7 +265,7 @@ func GetKeyPackages(ctx context.Context, config *so.Config, keyshareIDs []uuid.U
 	for _, keyshare := range keyshares {
 		keyPackages[keyshare.ID] = &pbfrost.KeyPackage{
 			Identifier:   config.Identifier,
-			SecretShare:  keyshare.SecretShare,
+			SecretShare:  keyshare.SecretShare.Serialize(),
 			PublicShares: keys.ToBytesMap(keyshare.PublicShares),
 			PublicKey:    keyshare.PublicKey.Serialize(),
 			MinSigners:   uint32(keyshare.MinSigners),
@@ -331,25 +320,17 @@ func GetSigningKeysharesMap(ctx context.Context, keyshareIDs []uuid.UUID) (map[u
 	return keysharesMap, nil
 }
 
-func sumOfSigningKeyshares(keyshares []*SigningKeyshare) (*SigningKeyshare, error) {
-	resultKeyshares := *keyshares[0]
-	for i, keyshare := range keyshares {
-		if i == 0 {
-			continue
-		}
-		sum, err := common.AddPrivateKeys(resultKeyshares.SecretShare, keyshare.SecretShare)
-		if err != nil {
-			return nil, err
-		}
-		resultKeyshares.SecretShare = sum
-		resultKeyshares.PublicKey = resultKeyshares.PublicKey.Add(keyshare.PublicKey)
+func sumOfSigningKeyshares(keyshares []*SigningKeyshare) *SigningKeyshare {
+	sum := *keyshares[0]
+	for _, keyshare := range keyshares[1:] {
+		sum.SecretShare = sum.SecretShare.Add(keyshare.SecretShare)
+		sum.PublicKey = sum.PublicKey.Add(keyshare.PublicKey)
 
-		for shareID, publicShare := range resultKeyshares.PublicShares {
-			resultKeyshares.PublicShares[shareID] = publicShare.Add(keyshare.PublicShares[shareID])
+		for shareID, publicShare := range sum.PublicShares {
+			sum.PublicShares[shareID] = publicShare.Add(keyshare.PublicShares[shareID])
 		}
 	}
-
-	return &resultKeyshares, nil
+	return &sum
 }
 
 // CalculateAndStoreLastKey calculates the last key from the given keyshares and stores it in the database.
@@ -358,32 +339,18 @@ func CalculateAndStoreLastKey(ctx context.Context, _ *so.Config, target *Signing
 	ctx, span := tracer.Start(ctx, "SigningKeyshare.CalculateAndStoreLastKey")
 	defer span.End()
 
-	logger := logging.GetLoggerFromContext(ctx)
-
 	if len(keyshares) == 0 {
 		return target, nil
 	}
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Sugar().Infof("Calculating last key for %d keyshares", len(keyshares))
 
-	keyshareIDs := make([]uuid.UUID, len(keyshares))
-	for i, keyshare := range keyshares {
-		keyshareIDs[i] = keyshare.ID
-	}
+	sumKeyshare := sumOfSigningKeyshares(keyshares)
 
-	logger.Sugar().Infof("Calculating last key for %d keyshares", len(keyshareIDs))
-	sumKeyshare, err := sumOfSigningKeyshares(keyshares)
-	if err != nil {
-		return nil, err
-	}
+	lastSecretShare := target.SecretShare.Sub(sumKeyshare.SecretShare)
+	verifyLastKey := sumKeyshare.SecretShare.Add(lastSecretShare)
 
-	lastSecretShare, err := common.SubtractPrivateKeys(target.SecretShare, sumKeyshare.SecretShare)
-	if err != nil {
-		return nil, err
-	}
-	verifyLastKey, err := common.AddPrivateKeys(sumKeyshare.SecretShare, lastSecretShare)
-	if err != nil {
-		return nil, err
-	}
-	if !bytes.Equal(verifyLastKey, target.SecretShare) {
+	if !verifyLastKey.Equals(target.SecretShare) {
 		return nil, fmt.Errorf("last key verification failed")
 	}
 
@@ -425,16 +392,12 @@ func AggregateKeyshares(ctx context.Context, _ *so.Config, keyshares []*SigningK
 	ctx, span := tracer.Start(ctx, "SigningKeyshare.AggregateKeyshares")
 	defer span.End()
 
-	sumKeyshare, err := sumOfSigningKeyshares(keyshares)
-	if err != nil {
-		return nil, err
-	}
-
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	sumKeyshare := sumOfSigningKeyshares(keyshares)
 	updateKeyshare, err := db.SigningKeyshare.UpdateOneID(updateKeyshareID).
 		SetSecretShare(sumKeyshare.SecretShare).
 		SetPublicKey(sumKeyshare.PublicKey).
@@ -466,7 +429,7 @@ func RunDKGIfNeeded(ctx context.Context, config *so.Config) error {
 		return err
 	}
 
-	minAvailableKeys := DefaultMinAvailableKeys
+	minAvailableKeys := defaultMinAvailableKeys
 	if config.DKGConfig.MinAvailableKeys != nil && *config.DKGConfig.MinAvailableKeys > 0 {
 		minAvailableKeys = *config.DKGConfig.MinAvailableKeys
 	}

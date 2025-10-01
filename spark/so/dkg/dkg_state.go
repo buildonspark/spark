@@ -299,11 +299,15 @@ func (s *State) Round3(ctx context.Context, requestID string, frostConnection *g
 		if err != nil {
 			return err
 		}
+		secretShare, err := keys.ParsePrivateKey(key.SecretShare)
+		if err != nil {
+			return err
+		}
 		signingKeyshares[i] = db.SigningKeyshare.Create().
 			SetID(keyID).
 			SetStatus(st.KeyshareStatusAvailable).
 			SetMinSigners(int32(s.MinSigners)).
-			SetSecretShare(key.SecretShare).
+			SetSecretShare(secretShare).
 			SetPublicShares(pubKeyMap).
 			SetPublicKey(pubKey).
 			SetCoordinatorIndex(s.CoordinatorIndex)

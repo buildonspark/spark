@@ -362,7 +362,7 @@ func (h *QueryTokenTransactionsHandler) convertTransactionsToResponse(ctx contex
 			for i, spentOutput := range transaction.Edges.SpentOutput {
 				spentTokenOutputsMetadata[i] = &tokenpb.SpentTokenOutputMetadata{
 					OutputId:         spentOutput.ID.String(),
-					RevocationSecret: spentOutput.SpentRevocationSecret,
+					RevocationSecret: spentOutput.SpentRevocationSecret.Serialize(),
 				}
 			}
 			transactionWithStatus.ConfirmationMetadata = &tokenpb.TokenTransactionConfirmationMetadata{

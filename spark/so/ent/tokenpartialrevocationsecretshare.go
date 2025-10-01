@@ -27,7 +27,7 @@ type TokenPartialRevocationSecretShare struct {
 	// OperatorIdentityPublicKey holds the value of the "operator_identity_public_key" field.
 	OperatorIdentityPublicKey keys.Public `json:"operator_identity_public_key,omitempty"`
 	// SecretShare holds the value of the "secret_share" field.
-	SecretShare []byte `json:"secret_share,omitempty"`
+	SecretShare keys.Private `json:"secret_share,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the TokenPartialRevocationSecretShareQuery when eager-loading is set.
 	Edges                                               TokenPartialRevocationSecretShareEdges `json:"edges"`
@@ -61,7 +61,7 @@ func (*TokenPartialRevocationSecretShare) scanValues(columns []string) ([]any, e
 	for i := range columns {
 		switch columns[i] {
 		case tokenpartialrevocationsecretshare.FieldSecretShare:
-			values[i] = new([]byte)
+			values[i] = new(keys.Private)
 		case tokenpartialrevocationsecretshare.FieldOperatorIdentityPublicKey:
 			values[i] = new(keys.Public)
 		case tokenpartialrevocationsecretshare.FieldCreateTime, tokenpartialrevocationsecretshare.FieldUpdateTime:
@@ -110,7 +110,7 @@ func (tprss *TokenPartialRevocationSecretShare) assignValues(columns []string, v
 				tprss.OperatorIdentityPublicKey = *value
 			}
 		case tokenpartialrevocationsecretshare.FieldSecretShare:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Private); !ok {
 				return fmt.Errorf("unexpected type %T for field secret_share", values[i])
 			} else if value != nil {
 				tprss.SecretShare = *value

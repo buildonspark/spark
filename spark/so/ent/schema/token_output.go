@@ -33,7 +33,7 @@ func (TokenOutput) Fields() []ent.Field {
 		field.Bytes("spent_ownership_signature").Optional(),
 		field.Bytes("spent_operator_specific_ownership_signature").Optional(),
 		field.Int32("spent_transaction_input_vout").Optional(),
-		field.Bytes("spent_revocation_secret").Optional(),
+		field.Bytes("spent_revocation_secret").Optional().GoType(keys.Private{}),
 		field.Bytes("confirmed_withdraw_block_hash").Optional(),
 		field.Enum("network").GoType(st.Network("")).Optional(),
 		field.Bytes("token_identifier").Immutable(),

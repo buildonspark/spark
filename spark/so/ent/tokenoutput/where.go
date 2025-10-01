@@ -119,7 +119,7 @@ func SpentTransactionInputVout(v int32) predicate.TokenOutput {
 }
 
 // SpentRevocationSecret applies equality check predicate on the "spent_revocation_secret" field. It's identical to SpentRevocationSecretEQ.
-func SpentRevocationSecret(v []byte) predicate.TokenOutput {
+func SpentRevocationSecret(v keys.Private) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldEQ(FieldSpentRevocationSecret, v))
 }
 
@@ -689,42 +689,42 @@ func SpentTransactionInputVoutNotNil() predicate.TokenOutput {
 }
 
 // SpentRevocationSecretEQ applies the EQ predicate on the "spent_revocation_secret" field.
-func SpentRevocationSecretEQ(v []byte) predicate.TokenOutput {
+func SpentRevocationSecretEQ(v keys.Private) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldEQ(FieldSpentRevocationSecret, v))
 }
 
 // SpentRevocationSecretNEQ applies the NEQ predicate on the "spent_revocation_secret" field.
-func SpentRevocationSecretNEQ(v []byte) predicate.TokenOutput {
+func SpentRevocationSecretNEQ(v keys.Private) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldNEQ(FieldSpentRevocationSecret, v))
 }
 
 // SpentRevocationSecretIn applies the In predicate on the "spent_revocation_secret" field.
-func SpentRevocationSecretIn(vs ...[]byte) predicate.TokenOutput {
+func SpentRevocationSecretIn(vs ...keys.Private) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldIn(FieldSpentRevocationSecret, vs...))
 }
 
 // SpentRevocationSecretNotIn applies the NotIn predicate on the "spent_revocation_secret" field.
-func SpentRevocationSecretNotIn(vs ...[]byte) predicate.TokenOutput {
+func SpentRevocationSecretNotIn(vs ...keys.Private) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldNotIn(FieldSpentRevocationSecret, vs...))
 }
 
 // SpentRevocationSecretGT applies the GT predicate on the "spent_revocation_secret" field.
-func SpentRevocationSecretGT(v []byte) predicate.TokenOutput {
+func SpentRevocationSecretGT(v keys.Private) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldGT(FieldSpentRevocationSecret, v))
 }
 
 // SpentRevocationSecretGTE applies the GTE predicate on the "spent_revocation_secret" field.
-func SpentRevocationSecretGTE(v []byte) predicate.TokenOutput {
+func SpentRevocationSecretGTE(v keys.Private) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldGTE(FieldSpentRevocationSecret, v))
 }
 
 // SpentRevocationSecretLT applies the LT predicate on the "spent_revocation_secret" field.
-func SpentRevocationSecretLT(v []byte) predicate.TokenOutput {
+func SpentRevocationSecretLT(v keys.Private) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldLT(FieldSpentRevocationSecret, v))
 }
 
 // SpentRevocationSecretLTE applies the LTE predicate on the "spent_revocation_secret" field.
-func SpentRevocationSecretLTE(v []byte) predicate.TokenOutput {
+func SpentRevocationSecretLTE(v keys.Private) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldLTE(FieldSpentRevocationSecret, v))
 }
 

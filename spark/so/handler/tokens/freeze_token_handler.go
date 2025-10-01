@@ -44,8 +44,8 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 		return nil, fmt.Errorf("failed to get database: %w", err)
 	}
 	var tokenCreateEnt *ent.TokenCreate
-	if req.FreezeTokensPayload.TokenIdentifier != nil {
-		tokenCreateEnt, err = db.TokenCreate.Query().Where(tokencreate.TokenIdentifier(req.FreezeTokensPayload.TokenIdentifier)).Only(ctx)
+	if freezeTokenID := req.GetFreezeTokensPayload().GetTokenIdentifier(); freezeTokenID != nil {
+		tokenCreateEnt, err = db.TokenCreate.Query().Where(tokencreate.TokenIdentifier(freezeTokenID)).Only(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get single token for freeze request: %w", err)
 		}
@@ -61,7 +61,7 @@ func (h *FreezeTokenHandler) FreezeTokens(ctx context.Context, req *tokenpb.Free
 	}
 	expectedIssuerPublicKey := tokenCreateEnt.IssuerPublicKey
 	if err := utils.ValidateOwnershipSignature(req.IssuerSignature, freezePayloadHash, expectedIssuerPublicKey); err != nil {
-		return nil, fmt.Errorf("invalid issuer signature %s to freeze token with identifier %x with issuer public key %x: %w", req.IssuerSignature, req.FreezeTokensPayload.TokenIdentifier, expectedIssuerPublicKey, err)
+		return nil, fmt.Errorf("invalid issuer signature %s to freeze token with identifier %x with issuer public key %v: %w", req.IssuerSignature, req.GetFreezeTokensPayload().GetTokenIdentifier(), expectedIssuerPublicKey, err)
 	}
 
 	// Check for existing freeze.

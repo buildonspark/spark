@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -56,8 +57,6 @@ func (h *SignTokenHandler) SignTokenTransaction(
 	ctx context.Context,
 	req *sparkpb.SignTokenTransactionRequest,
 ) (*sparkpb.SignTokenTransactionResponse, error) {
-	logger := logging.GetLoggerFromContext(ctx)
-
 	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("invalid identity public key: %w", err)
@@ -105,6 +104,7 @@ func (h *SignTokenHandler) SignTokenTransaction(
 	for _, output := range tokenTransaction.Edges.SpentOutput {
 		keyshare, err := output.QueryRevocationKeyshare().Only(ctx)
 		if err != nil {
+			logger := logging.GetLoggerFromContext(ctx)
 			logger.Info("Failed to get keyshare for output", zap.Error(err))
 			return nil, err
 		}
@@ -112,7 +112,7 @@ func (h *SignTokenHandler) SignTokenTransaction(
 		keyshares[index] = keyshare
 		revocationKeyshares[index] = &sparkpb.KeyshareWithIndex{
 			InputIndex: uint32(index),
-			Keyshare:   keyshare.SecretShare,
+			Keyshare:   keyshare.SecretShare.Serialize(),
 		}
 
 		// Validate that the keyshare's public key is as expected.
@@ -224,7 +224,7 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		return nil, tokens.FormatErrorWithTransactionEnt("failed to sign locally", lockedTokenTransaction, err)
 	}
 
-	signatures := make(operatorSignaturesMap)
+	signatures := make(operatorSignaturesMap, len(internalSignatures))
 	signatures[h.config.Identifier] = localResp.SparkOperatorSignature
 	for operatorID, sig := range internalSignatures {
 		signatures[operatorID] = sig.SparkOperatorSignature
@@ -321,7 +321,7 @@ func (h *SignTokenHandler) checkShouldReturnEarlyWithoutProcessing(
 		// If this SO has all signatures for a create or mint, the transaction is final and fully committed.
 		// Otherwise continue because this SO is in STARTED or SIGNED and needs more signatures.
 		if tokenTransaction.Status == st.TokenTransactionStatusSigned {
-			commitProgress, err := h.getSignedCommitProgress(ctx, tokenTransaction)
+			commitProgress, err := h.getSignedCommitProgress(tokenTransaction)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get create/mint signed commit progress: %w", err)
 			}
@@ -512,7 +512,7 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 			if operatorShares, exists := sharesToReturnMap[h.config.IdentityPublicKey()]; exists {
 				operatorShares.Shares = append(operatorShares.Shares, &tokeninternalpb.RevocationSecretShare{
 					InputTtxoId: outputWithKeyShare.ID.String(),
-					SecretShare: keyshare.SecretShare,
+					SecretShare: keyshare.SecretShare.Serialize(),
 				})
 			}
 		}
@@ -521,19 +521,14 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 				if operatorShares, exists := sharesToReturnMap[partialShare.OperatorIdentityPublicKey]; exists {
 					operatorShares.Shares = append(operatorShares.Shares, &tokeninternalpb.RevocationSecretShare{
 						InputTtxoId: outputWithKeyShare.ID.String(),
-						SecretShare: partialShare.SecretShare,
+						SecretShare: partialShare.SecretShare.Serialize(),
 					})
 				}
 			}
 		}
 	}
 
-	operatorRevocationShares := make([]*tokeninternalpb.OperatorRevocationShares, 0, len(sharesToReturnMap))
-	for _, operatorShares := range sharesToReturnMap {
-		operatorRevocationShares = append(operatorRevocationShares, operatorShares)
-	}
-
-	return operatorRevocationShares, nil
+	return slices.Collect(maps.Values(sharesToReturnMap)), nil
 }
 
 func (h *SignTokenHandler) localSignAndCommitTransaction(
@@ -581,7 +576,7 @@ func (h *SignTokenHandler) getRevocationKeysharesForTokenTransaction(ctx context
 
 		revocationKeyshares[i] = &sparkpb.KeyshareWithIndex{
 			InputIndex: uint32(output.SpentTransactionInputVout),
-			Keyshare:   keyshare.SecretShare,
+			Keyshare:   keyshare.SecretShare.Serialize(),
 		}
 	}
 	// Sort spent output keyshares by their index to ensure a consistent response
@@ -624,7 +619,7 @@ func verifyOperatorSignature(sigBytes []byte, operator *so.SigningOperator, fina
 	return nil
 }
 
-func (h *SignTokenHandler) getSignedCommitProgress(_ context.Context, tt *ent.TokenTransaction) (*tokenpb.CommitProgress, error) {
+func (h *SignTokenHandler) getSignedCommitProgress(tt *ent.TokenTransaction) (*tokenpb.CommitProgress, error) {
 	peerSigs := tt.Edges.PeerSignatures
 	if peerSigs == nil {
 		return nil, fmt.Errorf("no peer signatures")

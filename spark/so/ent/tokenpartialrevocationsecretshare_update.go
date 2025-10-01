@@ -52,8 +52,16 @@ func (tprssu *TokenPartialRevocationSecretShareUpdate) SetNillableOperatorIdenti
 }
 
 // SetSecretShare sets the "secret_share" field.
-func (tprssu *TokenPartialRevocationSecretShareUpdate) SetSecretShare(b []byte) *TokenPartialRevocationSecretShareUpdate {
-	tprssu.mutation.SetSecretShare(b)
+func (tprssu *TokenPartialRevocationSecretShareUpdate) SetSecretShare(k keys.Private) *TokenPartialRevocationSecretShareUpdate {
+	tprssu.mutation.SetSecretShare(k)
+	return tprssu
+}
+
+// SetNillableSecretShare sets the "secret_share" field if the given value is not nil.
+func (tprssu *TokenPartialRevocationSecretShareUpdate) SetNillableSecretShare(k *keys.Private) *TokenPartialRevocationSecretShareUpdate {
+	if k != nil {
+		tprssu.SetSecretShare(*k)
+	}
 	return tprssu
 }
 
@@ -117,11 +125,6 @@ func (tprssu *TokenPartialRevocationSecretShareUpdate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (tprssu *TokenPartialRevocationSecretShareUpdate) check() error {
-	if v, ok := tprssu.mutation.SecretShare(); ok {
-		if err := tokenpartialrevocationsecretshare.SecretShareValidator(v); err != nil {
-			return &ValidationError{Name: "secret_share", err: fmt.Errorf(`ent: validator failed for field "TokenPartialRevocationSecretShare.secret_share": %w`, err)}
-		}
-	}
 	if tprssu.mutation.TokenOutputCleared() && len(tprssu.mutation.TokenOutputIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TokenPartialRevocationSecretShare.token_output"`)
 	}
@@ -219,8 +222,16 @@ func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) SetNillableOperatorId
 }
 
 // SetSecretShare sets the "secret_share" field.
-func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) SetSecretShare(b []byte) *TokenPartialRevocationSecretShareUpdateOne {
-	tprssuo.mutation.SetSecretShare(b)
+func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) SetSecretShare(k keys.Private) *TokenPartialRevocationSecretShareUpdateOne {
+	tprssuo.mutation.SetSecretShare(k)
+	return tprssuo
+}
+
+// SetNillableSecretShare sets the "secret_share" field if the given value is not nil.
+func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) SetNillableSecretShare(k *keys.Private) *TokenPartialRevocationSecretShareUpdateOne {
+	if k != nil {
+		tprssuo.SetSecretShare(*k)
+	}
 	return tprssuo
 }
 
@@ -297,11 +308,6 @@ func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) check() error {
-	if v, ok := tprssuo.mutation.SecretShare(); ok {
-		if err := tokenpartialrevocationsecretshare.SecretShareValidator(v); err != nil {
-			return &ValidationError{Name: "secret_share", err: fmt.Errorf(`ent: validator failed for field "TokenPartialRevocationSecretShare.secret_share": %w`, err)}
-		}
-	}
 	if tprssuo.mutation.TokenOutputCleared() && len(tprssuo.mutation.TokenOutputIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "TokenPartialRevocationSecretShare.token_output"`)
 	}

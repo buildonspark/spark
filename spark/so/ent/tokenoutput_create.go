@@ -141,8 +141,16 @@ func (toc *TokenOutputCreate) SetNillableSpentTransactionInputVout(i *int32) *To
 }
 
 // SetSpentRevocationSecret sets the "spent_revocation_secret" field.
-func (toc *TokenOutputCreate) SetSpentRevocationSecret(b []byte) *TokenOutputCreate {
-	toc.mutation.SetSpentRevocationSecret(b)
+func (toc *TokenOutputCreate) SetSpentRevocationSecret(k keys.Private) *TokenOutputCreate {
+	toc.mutation.SetSpentRevocationSecret(k)
+	return toc
+}
+
+// SetNillableSpentRevocationSecret sets the "spent_revocation_secret" field if the given value is not nil.
+func (toc *TokenOutputCreate) SetNillableSpentRevocationSecret(k *keys.Private) *TokenOutputCreate {
+	if k != nil {
+		toc.SetSpentRevocationSecret(*k)
+	}
 	return toc
 }
 
@@ -722,7 +730,7 @@ func (u *TokenOutputUpsert) ClearSpentTransactionInputVout() *TokenOutputUpsert 
 }
 
 // SetSpentRevocationSecret sets the "spent_revocation_secret" field.
-func (u *TokenOutputUpsert) SetSpentRevocationSecret(v []byte) *TokenOutputUpsert {
+func (u *TokenOutputUpsert) SetSpentRevocationSecret(v keys.Private) *TokenOutputUpsert {
 	u.Set(tokenoutput.FieldSpentRevocationSecret, v)
 	return u
 }
@@ -952,7 +960,7 @@ func (u *TokenOutputUpsertOne) ClearSpentTransactionInputVout() *TokenOutputUpse
 }
 
 // SetSpentRevocationSecret sets the "spent_revocation_secret" field.
-func (u *TokenOutputUpsertOne) SetSpentRevocationSecret(v []byte) *TokenOutputUpsertOne {
+func (u *TokenOutputUpsertOne) SetSpentRevocationSecret(v keys.Private) *TokenOutputUpsertOne {
 	return u.Update(func(s *TokenOutputUpsert) {
 		s.SetSpentRevocationSecret(v)
 	})
@@ -1358,7 +1366,7 @@ func (u *TokenOutputUpsertBulk) ClearSpentTransactionInputVout() *TokenOutputUps
 }
 
 // SetSpentRevocationSecret sets the "spent_revocation_secret" field.
-func (u *TokenOutputUpsertBulk) SetSpentRevocationSecret(v []byte) *TokenOutputUpsertBulk {
+func (u *TokenOutputUpsertBulk) SetSpentRevocationSecret(v keys.Private) *TokenOutputUpsertBulk {
 	return u.Update(func(s *TokenOutputUpsert) {
 		s.SetSpentRevocationSecret(v)
 	})

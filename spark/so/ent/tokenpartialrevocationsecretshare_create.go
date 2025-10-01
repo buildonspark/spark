@@ -61,8 +61,8 @@ func (tprssc *TokenPartialRevocationSecretShareCreate) SetOperatorIdentityPublic
 }
 
 // SetSecretShare sets the "secret_share" field.
-func (tprssc *TokenPartialRevocationSecretShareCreate) SetSecretShare(b []byte) *TokenPartialRevocationSecretShareCreate {
-	tprssc.mutation.SetSecretShare(b)
+func (tprssc *TokenPartialRevocationSecretShareCreate) SetSecretShare(k keys.Private) *TokenPartialRevocationSecretShareCreate {
+	tprssc.mutation.SetSecretShare(k)
 	return tprssc
 }
 
@@ -153,11 +153,6 @@ func (tprssc *TokenPartialRevocationSecretShareCreate) check() error {
 	}
 	if _, ok := tprssc.mutation.SecretShare(); !ok {
 		return &ValidationError{Name: "secret_share", err: errors.New(`ent: missing required field "TokenPartialRevocationSecretShare.secret_share"`)}
-	}
-	if v, ok := tprssc.mutation.SecretShare(); ok {
-		if err := tokenpartialrevocationsecretshare.SecretShareValidator(v); err != nil {
-			return &ValidationError{Name: "secret_share", err: fmt.Errorf(`ent: validator failed for field "TokenPartialRevocationSecretShare.secret_share": %w`, err)}
-		}
 	}
 	if len(tprssc.mutation.TokenOutputIDs()) == 0 {
 		return &ValidationError{Name: "token_output", err: errors.New(`ent: missing required edge "TokenPartialRevocationSecretShare.token_output"`)}
@@ -308,7 +303,7 @@ func (u *TokenPartialRevocationSecretShareUpsert) UpdateOperatorIdentityPublicKe
 }
 
 // SetSecretShare sets the "secret_share" field.
-func (u *TokenPartialRevocationSecretShareUpsert) SetSecretShare(v []byte) *TokenPartialRevocationSecretShareUpsert {
+func (u *TokenPartialRevocationSecretShareUpsert) SetSecretShare(v keys.Private) *TokenPartialRevocationSecretShareUpsert {
 	u.Set(tokenpartialrevocationsecretshare.FieldSecretShare, v)
 	return u
 }
@@ -399,7 +394,7 @@ func (u *TokenPartialRevocationSecretShareUpsertOne) UpdateOperatorIdentityPubli
 }
 
 // SetSecretShare sets the "secret_share" field.
-func (u *TokenPartialRevocationSecretShareUpsertOne) SetSecretShare(v []byte) *TokenPartialRevocationSecretShareUpsertOne {
+func (u *TokenPartialRevocationSecretShareUpsertOne) SetSecretShare(v keys.Private) *TokenPartialRevocationSecretShareUpsertOne {
 	return u.Update(func(s *TokenPartialRevocationSecretShareUpsert) {
 		s.SetSecretShare(v)
 	})
@@ -659,7 +654,7 @@ func (u *TokenPartialRevocationSecretShareUpsertBulk) UpdateOperatorIdentityPubl
 }
 
 // SetSecretShare sets the "secret_share" field.
-func (u *TokenPartialRevocationSecretShareUpsertBulk) SetSecretShare(v []byte) *TokenPartialRevocationSecretShareUpsertBulk {
+func (u *TokenPartialRevocationSecretShareUpsertBulk) SetSecretShare(v keys.Private) *TokenPartialRevocationSecretShareUpsertBulk {
 	return u.Update(func(s *TokenPartialRevocationSecretShareUpsert) {
 		s.SetSecretShare(v)
 	})

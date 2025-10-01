@@ -59,7 +59,7 @@ func createTestTokenOutputs(t *testing.T, ctx context.Context, tx *ent.Tx, count
 	for i := range outputs {
 		keyshare, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
-			SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
+			SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
 			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetMinSigners(1).
 			SetCoordinatorIndex(0).
@@ -114,7 +114,7 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 		// Create two signing keyshares (one for the mint output, one for transfer output)
 		signKS1, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
-			SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
+			SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
 			SetPublicShares(map[string]keys.Public{}).
 			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetMinSigners(1).
@@ -124,7 +124,7 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 
 		signKS2, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
-			SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
+			SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
 			SetPublicShares(map[string]keys.Public{}).
 			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
 			SetMinSigners(1).

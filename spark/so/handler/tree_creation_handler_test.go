@@ -161,7 +161,7 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 
 	signingKeyshare, err := dbTX.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(keysharePrivKey.Serialize()).
+		SetSecretShare(keysharePrivKey).
 		SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
 		SetPublicKey(keysharePrivKey.Public()).
 		SetMinSigners(2).
@@ -563,7 +563,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 
 	signingKeyshare, err := dbTX.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(keysharePrivKey.Serialize()).
+		SetSecretShare(keysharePrivKey).
 		SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
 		SetPublicKey(keysharePrivKey.Public()).
 		SetMinSigners(2).
@@ -753,7 +753,7 @@ func TestPrepareSigningJobs_EnsureConfTxidMatchesUtxoId(t *testing.T) {
 
 	signingKeyshare, err := dbTX.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(keysharePrivKey.Serialize()).
+		SetSecretShare(keysharePrivKey).
 		SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
 		SetPublicKey(keysharePrivKey.Public()).
 		SetMinSigners(2).
@@ -897,7 +897,7 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 
 			signingKeyshare, err := dbTx.SigningKeyshare.Create().
 				SetStatus(st.KeyshareStatusAvailable).
-				SetSecretShare(keysharePrivkey.Serialize()).
+				SetSecretShare(keysharePrivkey).
 				SetPublicShares(map[string]keys.Public{"test": publicSharePrivkey.Public()}).
 				SetPublicKey(keysharePrivkey.Public()).
 				SetMinSigners(2).
@@ -951,7 +951,7 @@ func TestPrepareSigningJobs_InvalidChildrenOutputs(t *testing.T) {
 				childKeysharePubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 				childKeyshare, err := dbTx.SigningKeyshare.Create().
 					SetStatus(st.KeyshareStatusAvailable).
-					SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
+					SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
 					SetPublicShares(map[string]keys.Public{"test": publicSharePrivkey.Public()}).
 					SetPublicKey(childKeysharePubKey).
 					SetMinSigners(2).
@@ -1073,7 +1073,7 @@ func TestTreeNodeDbHooks(t *testing.T) {
 	publicSharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
 	signingKeyshare, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
 		SetPublicShares(map[string]keys.Public{"test": publicSharePrivkey.Public()}).
 		SetPublicKey(keysharePrivkey.Public()).
 		SetMinSigners(2).

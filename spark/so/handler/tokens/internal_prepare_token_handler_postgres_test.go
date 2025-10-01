@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"strings"
 	"testing"
 	"time"
@@ -63,14 +64,14 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
+			rng := rand.NewChaCha8([32]byte{})
 			ctx, _ := db.ConnectToTestPostgres(t)
 			dbtx, err := ent.GetDbFromContext(ctx)
 			require.NoError(t, err)
 			handler := NewInternalPrepareTokenHandler(cfg)
 
 			// Arrange: create a TokenCreate on tokenNet
-			issuerPriv := keys.GeneratePrivateKey()
-
+			issuerPriv := keys.MustGeneratePrivateKeyFromRand(rng)
 			tokenCreate := dbtx.TokenCreate.Create().
 				SetIssuerPublicKey(issuerPriv.Public()).
 				SetTokenName("TT").
@@ -84,8 +85,9 @@ func TestPrepareTokenTransactionInternal_NetworkValidation(t *testing.T) {
 				SaveX(ctx)
 
 			// Create an AVAILABLE signing keyshare to be reserved by prepare handler
+			secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
 			ks := dbtx.SigningKeyshare.Create().
-				SetSecretShare(make([]byte, 32)).
+				SetSecretShare(secretShare).
 				SetPublicKey(issuerPriv.Public()).
 				SetStatus(st.KeyshareStatusAvailable).
 				SetPublicShares(map[string]keys.Public{}).

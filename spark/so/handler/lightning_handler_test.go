@@ -819,14 +819,14 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 			SetOwnerIdentityPubkey(validPubKey).
 			SetStatus(st.TreeStatusAvailable).
 			SetNetwork(st.NetworkMainnet).
-			SetBaseTxid([]byte("test_base_txid_32_bytes_long_")).
+			SetBaseTxid([]byte("test_base_txid_32_bytes_long____")).
 			SetVout(0).
 			Save(authenticatedCtx)
 		require.NoError(t, err)
 
 		wrongKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		// Create a keyshare with proper 33-byte public keys
-		secretShare := keys.MustGeneratePrivateKeyFromRand(rng).Serialize()
+		secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
 		keyshare, err := tx.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusInUse).
 			SetSecretShare(secretShare).
@@ -923,7 +923,7 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 
 	keyshare, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusInUse).
-		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
 		SetPublicShares(map[string]keys.Public{"operator1": validPubKey}).
 		SetPublicKey(validPubKey).
 		SetMinSigners(2).

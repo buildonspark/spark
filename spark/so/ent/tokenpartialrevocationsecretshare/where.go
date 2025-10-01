@@ -73,7 +73,7 @@ func OperatorIdentityPublicKey(v keys.Public) predicate.TokenPartialRevocationSe
 }
 
 // SecretShare applies equality check predicate on the "secret_share" field. It's identical to SecretShareEQ.
-func SecretShare(v []byte) predicate.TokenPartialRevocationSecretShare {
+func SecretShare(v keys.Private) predicate.TokenPartialRevocationSecretShare {
 	return predicate.TokenPartialRevocationSecretShare(sql.FieldEQ(FieldSecretShare, v))
 }
 
@@ -198,42 +198,42 @@ func OperatorIdentityPublicKeyLTE(v keys.Public) predicate.TokenPartialRevocatio
 }
 
 // SecretShareEQ applies the EQ predicate on the "secret_share" field.
-func SecretShareEQ(v []byte) predicate.TokenPartialRevocationSecretShare {
+func SecretShareEQ(v keys.Private) predicate.TokenPartialRevocationSecretShare {
 	return predicate.TokenPartialRevocationSecretShare(sql.FieldEQ(FieldSecretShare, v))
 }
 
 // SecretShareNEQ applies the NEQ predicate on the "secret_share" field.
-func SecretShareNEQ(v []byte) predicate.TokenPartialRevocationSecretShare {
+func SecretShareNEQ(v keys.Private) predicate.TokenPartialRevocationSecretShare {
 	return predicate.TokenPartialRevocationSecretShare(sql.FieldNEQ(FieldSecretShare, v))
 }
 
 // SecretShareIn applies the In predicate on the "secret_share" field.
-func SecretShareIn(vs ...[]byte) predicate.TokenPartialRevocationSecretShare {
+func SecretShareIn(vs ...keys.Private) predicate.TokenPartialRevocationSecretShare {
 	return predicate.TokenPartialRevocationSecretShare(sql.FieldIn(FieldSecretShare, vs...))
 }
 
 // SecretShareNotIn applies the NotIn predicate on the "secret_share" field.
-func SecretShareNotIn(vs ...[]byte) predicate.TokenPartialRevocationSecretShare {
+func SecretShareNotIn(vs ...keys.Private) predicate.TokenPartialRevocationSecretShare {
 	return predicate.TokenPartialRevocationSecretShare(sql.FieldNotIn(FieldSecretShare, vs...))
 }
 
 // SecretShareGT applies the GT predicate on the "secret_share" field.
-func SecretShareGT(v []byte) predicate.TokenPartialRevocationSecretShare {
+func SecretShareGT(v keys.Private) predicate.TokenPartialRevocationSecretShare {
 	return predicate.TokenPartialRevocationSecretShare(sql.FieldGT(FieldSecretShare, v))
 }
 
 // SecretShareGTE applies the GTE predicate on the "secret_share" field.
-func SecretShareGTE(v []byte) predicate.TokenPartialRevocationSecretShare {
+func SecretShareGTE(v keys.Private) predicate.TokenPartialRevocationSecretShare {
 	return predicate.TokenPartialRevocationSecretShare(sql.FieldGTE(FieldSecretShare, v))
 }
 
 // SecretShareLT applies the LT predicate on the "secret_share" field.
-func SecretShareLT(v []byte) predicate.TokenPartialRevocationSecretShare {
+func SecretShareLT(v keys.Private) predicate.TokenPartialRevocationSecretShare {
 	return predicate.TokenPartialRevocationSecretShare(sql.FieldLT(FieldSecretShare, v))
 }
 
 // SecretShareLTE applies the LTE predicate on the "secret_share" field.
-func SecretShareLTE(v []byte) predicate.TokenPartialRevocationSecretShare {
+func SecretShareLTE(v keys.Private) predicate.TokenPartialRevocationSecretShare {
 	return predicate.TokenPartialRevocationSecretShare(sql.FieldLTE(FieldSecretShare, v))
 }
 

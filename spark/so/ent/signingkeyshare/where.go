@@ -68,7 +68,7 @@ func UpdateTime(v time.Time) predicate.SigningKeyshare {
 }
 
 // SecretShare applies equality check predicate on the "secret_share" field. It's identical to SecretShareEQ.
-func SecretShare(v []byte) predicate.SigningKeyshare {
+func SecretShare(v keys.Private) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldEQ(FieldSecretShare, v))
 }
 
@@ -198,42 +198,42 @@ func StatusNotIn(vs ...schematype.SigningKeyshareStatus) predicate.SigningKeysha
 }
 
 // SecretShareEQ applies the EQ predicate on the "secret_share" field.
-func SecretShareEQ(v []byte) predicate.SigningKeyshare {
+func SecretShareEQ(v keys.Private) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldEQ(FieldSecretShare, v))
 }
 
 // SecretShareNEQ applies the NEQ predicate on the "secret_share" field.
-func SecretShareNEQ(v []byte) predicate.SigningKeyshare {
+func SecretShareNEQ(v keys.Private) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldNEQ(FieldSecretShare, v))
 }
 
 // SecretShareIn applies the In predicate on the "secret_share" field.
-func SecretShareIn(vs ...[]byte) predicate.SigningKeyshare {
+func SecretShareIn(vs ...keys.Private) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldIn(FieldSecretShare, vs...))
 }
 
 // SecretShareNotIn applies the NotIn predicate on the "secret_share" field.
-func SecretShareNotIn(vs ...[]byte) predicate.SigningKeyshare {
+func SecretShareNotIn(vs ...keys.Private) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldNotIn(FieldSecretShare, vs...))
 }
 
 // SecretShareGT applies the GT predicate on the "secret_share" field.
-func SecretShareGT(v []byte) predicate.SigningKeyshare {
+func SecretShareGT(v keys.Private) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldGT(FieldSecretShare, v))
 }
 
 // SecretShareGTE applies the GTE predicate on the "secret_share" field.
-func SecretShareGTE(v []byte) predicate.SigningKeyshare {
+func SecretShareGTE(v keys.Private) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldGTE(FieldSecretShare, v))
 }
 
 // SecretShareLT applies the LT predicate on the "secret_share" field.
-func SecretShareLT(v []byte) predicate.SigningKeyshare {
+func SecretShareLT(v keys.Private) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldLT(FieldSecretShare, v))
 }
 
 // SecretShareLTE applies the LTE predicate on the "secret_share" field.
-func SecretShareLTE(v []byte) predicate.SigningKeyshare {
+func SecretShareLTE(v keys.Private) predicate.SigningKeyshare {
 	return predicate.SigningKeyshare(sql.FieldLTE(FieldSecretShare, v))
 }
 

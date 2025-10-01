@@ -9,8 +9,8 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 )
 
+// Error message constants
 const (
-	// Error message constants
 	ErrIdentityPublicKeyAuthFailed        = "identity public key authentication failed"
 	ErrInvalidPartialTokenTransaction     = "invalid partial token transaction"
 	ErrFailedToHashPartialTransaction     = "failed to hash partial token transaction"

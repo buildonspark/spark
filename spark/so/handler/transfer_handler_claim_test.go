@@ -94,7 +94,7 @@ func createTestSigningKeyshare(t *testing.T, ctx context.Context, rng io.Reader,
 
 	signingKeyshare, err := client.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusInUse).
-		SetSecretShare(keysharePrivKey.Serialize()).
+		SetSecretShare(keysharePrivKey).
 		SetPublicShares(map[string]keys.Public{"operator1": pubSharePrivKey.Public()}).
 		SetPublicKey(keysharePrivKey.Public()).
 		SetMinSigners(2).

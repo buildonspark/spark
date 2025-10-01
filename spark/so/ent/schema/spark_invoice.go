@@ -4,13 +4,13 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
+	"github.com/lightsparkdev/spark/common/keys"
 )
 
 type SparkInvoice struct {
 	ent.Schema
 }
 
-// The ID field from the Base Mixin must be overridden by the ID decoded from the invoice string.
 func (SparkInvoice) Mixin() []ent.Mixin {
 	return []ent.Mixin{
 		BaseMixin{},
@@ -30,6 +30,7 @@ func (SparkInvoice) Fields() []ent.Field {
 			Comment("The expiry time of the invoice"),
 		field.Bytes("receiver_public_key").
 			Immutable().
+			GoType(keys.Public{}).
 			Comment("The public key of the receiver of the invoice"),
 	}
 }

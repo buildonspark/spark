@@ -359,7 +359,7 @@ func createAndLockSparkInvoice(ctx context.Context, sparkInvoice string) (uuid.U
 	err = db.SparkInvoice.Create().
 		SetID(decoded.Id).
 		SetSparkInvoice(sparkInvoice).
-		SetReceiverPublicKey(decoded.ReceiverPublicKey.Serialize()).
+		SetReceiverPublicKey(decoded.ReceiverPublicKey).
 		SetNillableExpiryTime(expiry).
 		OnConflictColumns(sparkinvoice.FieldID).
 		DoNothing().

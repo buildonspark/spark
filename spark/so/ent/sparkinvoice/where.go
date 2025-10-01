@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 )
 
@@ -77,7 +78,7 @@ func ExpiryTime(v time.Time) predicate.SparkInvoice {
 }
 
 // ReceiverPublicKey applies equality check predicate on the "receiver_public_key" field. It's identical to ReceiverPublicKeyEQ.
-func ReceiverPublicKey(v []byte) predicate.SparkInvoice {
+func ReceiverPublicKey(v keys.Public) predicate.SparkInvoice {
 	return predicate.SparkInvoice(sql.FieldEQ(FieldReceiverPublicKey, v))
 }
 
@@ -277,42 +278,42 @@ func ExpiryTimeNotNil() predicate.SparkInvoice {
 }
 
 // ReceiverPublicKeyEQ applies the EQ predicate on the "receiver_public_key" field.
-func ReceiverPublicKeyEQ(v []byte) predicate.SparkInvoice {
+func ReceiverPublicKeyEQ(v keys.Public) predicate.SparkInvoice {
 	return predicate.SparkInvoice(sql.FieldEQ(FieldReceiverPublicKey, v))
 }
 
 // ReceiverPublicKeyNEQ applies the NEQ predicate on the "receiver_public_key" field.
-func ReceiverPublicKeyNEQ(v []byte) predicate.SparkInvoice {
+func ReceiverPublicKeyNEQ(v keys.Public) predicate.SparkInvoice {
 	return predicate.SparkInvoice(sql.FieldNEQ(FieldReceiverPublicKey, v))
 }
 
 // ReceiverPublicKeyIn applies the In predicate on the "receiver_public_key" field.
-func ReceiverPublicKeyIn(vs ...[]byte) predicate.SparkInvoice {
+func ReceiverPublicKeyIn(vs ...keys.Public) predicate.SparkInvoice {
 	return predicate.SparkInvoice(sql.FieldIn(FieldReceiverPublicKey, vs...))
 }
 
 // ReceiverPublicKeyNotIn applies the NotIn predicate on the "receiver_public_key" field.
-func ReceiverPublicKeyNotIn(vs ...[]byte) predicate.SparkInvoice {
+func ReceiverPublicKeyNotIn(vs ...keys.Public) predicate.SparkInvoice {
 	return predicate.SparkInvoice(sql.FieldNotIn(FieldReceiverPublicKey, vs...))
 }
 
 // ReceiverPublicKeyGT applies the GT predicate on the "receiver_public_key" field.
-func ReceiverPublicKeyGT(v []byte) predicate.SparkInvoice {
+func ReceiverPublicKeyGT(v keys.Public) predicate.SparkInvoice {
 	return predicate.SparkInvoice(sql.FieldGT(FieldReceiverPublicKey, v))
 }
 
 // ReceiverPublicKeyGTE applies the GTE predicate on the "receiver_public_key" field.
-func ReceiverPublicKeyGTE(v []byte) predicate.SparkInvoice {
+func ReceiverPublicKeyGTE(v keys.Public) predicate.SparkInvoice {
 	return predicate.SparkInvoice(sql.FieldGTE(FieldReceiverPublicKey, v))
 }
 
 // ReceiverPublicKeyLT applies the LT predicate on the "receiver_public_key" field.
-func ReceiverPublicKeyLT(v []byte) predicate.SparkInvoice {
+func ReceiverPublicKeyLT(v keys.Public) predicate.SparkInvoice {
 	return predicate.SparkInvoice(sql.FieldLT(FieldReceiverPublicKey, v))
 }
 
 // ReceiverPublicKeyLTE applies the LTE predicate on the "receiver_public_key" field.
-func ReceiverPublicKeyLTE(v []byte) predicate.SparkInvoice {
+func ReceiverPublicKeyLTE(v keys.Public) predicate.SparkInvoice {
 	return predicate.SparkInvoice(sql.FieldLTE(FieldReceiverPublicKey, v))
 }
 

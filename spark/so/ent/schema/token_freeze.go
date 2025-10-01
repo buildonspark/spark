@@ -6,6 +6,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
@@ -25,8 +26,8 @@ func (TokenFreeze) Mixin() []ent.Mixin {
 func (TokenFreeze) Fields() []ent.Field {
 	return []ent.Field{
 		field.Enum("status").GoType(st.TokenFreezeStatus("")),
-		field.Bytes("owner_public_key").NotEmpty().Immutable(),
-		field.Bytes("token_public_key").Optional().Immutable(),
+		field.Bytes("owner_public_key").Immutable().GoType(keys.Public{}),
+		field.Bytes("token_public_key").Optional().Immutable().GoType(keys.Public{}),
 		field.Bytes("issuer_signature").NotEmpty().Immutable().Unique(),
 		field.Uint64("wallet_provided_freeze_timestamp").Immutable(),
 		field.Uint64("wallet_provided_thaw_timestamp").Optional(),

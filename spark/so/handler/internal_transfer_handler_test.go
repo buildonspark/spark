@@ -115,7 +115,7 @@ func TestFinalizeTransfer(t *testing.T) {
 
 		signingKeyshare, err := dbCtx.Client.SigningKeyshare.Create().
 			SetStatus(st.KeyshareStatusAvailable).
-			SetSecretShare(keysharePrivKey.Serialize()).
+			SetSecretShare(keysharePrivKey).
 			SetPublicShares(map[string]keys.Public{"test": publicSharePrivKey.Public()}).
 			SetPublicKey(keysharePrivKey.Public()).
 			SetMinSigners(2).
@@ -309,7 +309,7 @@ func TestApplySignatures(t *testing.T) {
 	pubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	signingKeyshare, err := dbCtx.Client.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(secret.Serialize()).
+		SetSecretShare(secret).
 		SetPublicShares(map[string]keys.Public{"test": secret.Public()}).
 		SetPublicKey(pubKey).
 		SetMinSigners(2).

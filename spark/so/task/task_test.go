@@ -36,7 +36,7 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 
 	keyshare, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(seededRand).Serialize()).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(seededRand)).
 		SetPublicShares(map[string]keys.Public{}).
 		SetPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
 		SetMinSigners(1).
@@ -162,7 +162,7 @@ func TestBackfillTreeNodeTxids(t *testing.T) {
 	publicSharePrivkey := keys.MustGeneratePrivateKeyFromRand(rng)
 	signingKeyshare, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
 		SetPublicShares(map[string]keys.Public{"test": publicSharePrivkey.Public()}).
 		SetPublicKey(keysharePrivkey.Public()).
 		SetMinSigners(2).

@@ -205,7 +205,7 @@ func createTestTree(t *testing.T, ctx context.Context, network st.Network, statu
 	keyshare, err := dbTX.SigningKeyshare.Create().
 		SetID(uuid.New()).
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(secretShare.Serialize()).
+		SetSecretShare(secretShare).
 		SetPublicShares(map[string]keys.Public{"1": publicShare1.Public(), "2": publicShare2.Public(), "3": publicShare3.Public()}).
 		SetPublicKey(secretShare.Public()).
 		SetMinSigners(2).

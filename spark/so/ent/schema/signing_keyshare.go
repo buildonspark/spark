@@ -42,6 +42,7 @@ func (SigningKeyshare) Fields() []ent.Field {
 			Comment("The status of the signing keyshare (i.e. whether it is in use or not)."),
 		field.
 			Bytes("secret_share").
+			GoType(keys.Private{}).
 			Comment("The secret share of the signing keyshare held by this SO."),
 		field.
 			JSON("public_shares", map[string]keys.Public{}).

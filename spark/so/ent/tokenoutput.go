@@ -50,7 +50,7 @@ type TokenOutput struct {
 	// SpentTransactionInputVout holds the value of the "spent_transaction_input_vout" field.
 	SpentTransactionInputVout int32 `json:"spent_transaction_input_vout,omitempty"`
 	// SpentRevocationSecret holds the value of the "spent_revocation_secret" field.
-	SpentRevocationSecret []byte `json:"spent_revocation_secret,omitempty"`
+	SpentRevocationSecret keys.Private `json:"spent_revocation_secret,omitempty"`
 	// ConfirmedWithdrawBlockHash holds the value of the "confirmed_withdraw_block_hash" field.
 	ConfirmedWithdrawBlockHash []byte `json:"confirmed_withdraw_block_hash,omitempty"`
 	// Network holds the value of the "network" field.
@@ -154,8 +154,10 @@ func (*TokenOutput) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case tokenoutput.FieldWithdrawRevocationCommitment, tokenoutput.FieldTokenAmount, tokenoutput.FieldSpentOwnershipSignature, tokenoutput.FieldSpentOperatorSpecificOwnershipSignature, tokenoutput.FieldSpentRevocationSecret, tokenoutput.FieldConfirmedWithdrawBlockHash, tokenoutput.FieldTokenIdentifier:
+		case tokenoutput.FieldWithdrawRevocationCommitment, tokenoutput.FieldTokenAmount, tokenoutput.FieldSpentOwnershipSignature, tokenoutput.FieldSpentOperatorSpecificOwnershipSignature, tokenoutput.FieldConfirmedWithdrawBlockHash, tokenoutput.FieldTokenIdentifier:
 			values[i] = new([]byte)
+		case tokenoutput.FieldSpentRevocationSecret:
+			values[i] = new(keys.Private)
 		case tokenoutput.FieldOwnerPublicKey, tokenoutput.FieldTokenPublicKey:
 			values[i] = new(keys.Public)
 		case tokenoutput.FieldWithdrawBondSats, tokenoutput.FieldWithdrawRelativeBlockLocktime, tokenoutput.FieldCreatedTransactionOutputVout, tokenoutput.FieldSpentTransactionInputVout:
@@ -272,7 +274,7 @@ func (to *TokenOutput) assignValues(columns []string, values []any) error {
 				to.SpentTransactionInputVout = int32(value.Int64)
 			}
 		case tokenoutput.FieldSpentRevocationSecret:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Private); !ok {
 				return fmt.Errorf("unexpected type %T for field spent_revocation_secret", values[i])
 			} else if value != nil {
 				to.SpentRevocationSecret = *value

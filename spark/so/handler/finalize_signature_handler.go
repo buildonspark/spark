@@ -247,7 +247,7 @@ func (o *FinalizeSignatureHandler) validateNodeOwnership(ctx context.Context, re
 	}
 	for _, node := range nodes {
 		if !node.OwnerIdentityPubkey.Equals(session.IdentityPublicKey()) {
-			return fmt.Errorf("node %s is not owned by the authenticated identity public key %x", node.ID, session.IdentityPublicKey().Serialize())
+			return fmt.Errorf("node %s is not owned by the authenticated identity public key %x", node.ID, session.IdentityPublicKey())
 		}
 	}
 	return nil

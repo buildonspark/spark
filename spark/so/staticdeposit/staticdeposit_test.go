@@ -22,7 +22,7 @@ func createTestEntities(t *testing.T, ctx context.Context, rng io.Reader, tx *en
 	// Create a SigningKeyshare (required for DepositAddress)
 	keyshare, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(secret.Serialize()).
+		SetSecretShare(secret).
 		SetPublicShares(map[string]keys.Public{"test": secret.Public()}).
 		SetPublicKey(pubKey).
 		SetCoordinatorIndex(1).

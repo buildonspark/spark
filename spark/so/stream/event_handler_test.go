@@ -169,7 +169,7 @@ func TestMultipleListenersReceiveNotification(t *testing.T) {
 	pubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	signingKeyshare, err := dbClient.SigningKeyshare.Create().
 		SetStatus(schematype.KeyshareStatusAvailable).
-		SetSecretShare(secret.Serialize()).
+		SetSecretShare(secret).
 		SetPublicShares(map[string]keys.Public{"so1": secret.Public()}).
 		SetPublicKey(pubKey).
 		SetMinSigners(1).

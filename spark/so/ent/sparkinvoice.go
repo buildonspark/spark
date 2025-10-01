@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/sparkinvoice"
 )
 
@@ -27,7 +28,7 @@ type SparkInvoice struct {
 	// The expiry time of the invoice
 	ExpiryTime time.Time `json:"expiry_time,omitempty"`
 	// The public key of the receiver of the invoice
-	ReceiverPublicKey []byte `json:"receiver_public_key,omitempty"`
+	ReceiverPublicKey keys.Public `json:"receiver_public_key,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the SparkInvoiceQuery when eager-loading is set.
 	Edges        SparkInvoiceEdges `json:"edges"`
@@ -69,7 +70,7 @@ func (*SparkInvoice) scanValues(columns []string) ([]any, error) {
 	for i := range columns {
 		switch columns[i] {
 		case sparkinvoice.FieldReceiverPublicKey:
-			values[i] = new([]byte)
+			values[i] = new(keys.Public)
 		case sparkinvoice.FieldSparkInvoice:
 			values[i] = new(sql.NullString)
 		case sparkinvoice.FieldCreateTime, sparkinvoice.FieldUpdateTime, sparkinvoice.FieldExpiryTime:
@@ -122,7 +123,7 @@ func (si *SparkInvoice) assignValues(columns []string, values []any) error {
 				si.ExpiryTime = value.Time
 			}
 		case sparkinvoice.FieldReceiverPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field receiver_public_key", values[i])
 			} else if value != nil {
 				si.ReceiverPublicKey = *value

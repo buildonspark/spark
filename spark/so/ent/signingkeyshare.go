@@ -28,7 +28,7 @@ type SigningKeyshare struct {
 	// The status of the signing keyshare (i.e. whether it is in use or not).
 	Status schematype.SigningKeyshareStatus `json:"status,omitempty"`
 	// The secret share of the signing keyshare held by this SO.
-	SecretShare []byte `json:"secret_share,omitempty"`
+	SecretShare keys.Private `json:"secret_share,omitempty"`
 	// A map from SO identifier to the public key of the secret share held by that SO.
 	PublicShares map[string]keys.Public `json:"public_shares,omitempty"`
 	// The public key of the combined secret represented by this signing keyshare.
@@ -45,8 +45,10 @@ func (*SigningKeyshare) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case signingkeyshare.FieldSecretShare, signingkeyshare.FieldPublicShares:
+		case signingkeyshare.FieldPublicShares:
 			values[i] = new([]byte)
+		case signingkeyshare.FieldSecretShare:
+			values[i] = new(keys.Private)
 		case signingkeyshare.FieldPublicKey:
 			values[i] = new(keys.Public)
 		case signingkeyshare.FieldMinSigners, signingkeyshare.FieldCoordinatorIndex:
@@ -97,7 +99,7 @@ func (sk *SigningKeyshare) assignValues(columns []string, values []any) error {
 				sk.Status = schematype.SigningKeyshareStatus(value.String)
 			}
 		case signingkeyshare.FieldSecretShare:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Private); !ok {
 				return fmt.Errorf("unexpected type %T for field secret_share", values[i])
 			} else if value != nil {
 				sk.SecretShare = *value

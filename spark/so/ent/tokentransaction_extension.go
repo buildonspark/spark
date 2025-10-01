@@ -321,7 +321,7 @@ func CreateStartedTransactionEntities(
 
 func prepareSparkInvoiceCreates(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction, tokenTransactionEnt *TokenTransaction) (map[uuid.UUID]struct{}, []*SparkInvoiceCreate, error) {
 	invoiceIDs := make(map[uuid.UUID]struct{})
-	invoiceCreates := make([]*SparkInvoiceCreate, 0)
+	var invoiceCreates []*SparkInvoiceCreate
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -337,15 +337,12 @@ func prepareSparkInvoiceCreates(ctx context.Context, tokenTransaction *tokenpb.T
 		invoiceToCreate := db.SparkInvoice.Create().
 			SetID(parsedInvoice.Id).
 			SetSparkInvoice(invoiceAttachment.SparkInvoice).
-			SetReceiverPublicKey(parsedInvoice.ReceiverPublicKey.Serialize()).
+			SetReceiverPublicKey(parsedInvoice.ReceiverPublicKey).
 			AddTokenTransactionIDs(tokenTransactionEnt.ID)
 		if expiry := parsedInvoice.ExpiryTime; expiry != nil {
 			invoiceToCreate = invoiceToCreate.SetExpiryTime(expiry.AsTime())
 		}
-		invoiceCreates = append(
-			invoiceCreates,
-			invoiceToCreate,
-		)
+		invoiceCreates = append(invoiceCreates, invoiceToCreate)
 		invoiceIDs[parsedInvoice.Id] = struct{}{}
 	}
 	return invoiceIDs, invoiceCreates, nil
@@ -529,9 +526,13 @@ func UpdateFinalizedTransaction(
 	// Update inputs.
 	for _, outputToSpendEnt := range tokenTransactionEnt.Edges.SpentOutput {
 		inputIndex := outputToSpendEnt.SpentTransactionInputVout
-		_, err := db.TokenOutput.UpdateOne(outputToSpendEnt).
+		secret, err := keys.ParsePrivateKey(revocationSecrets[inputIndex].GetRevocationSecret())
+		if err != nil {
+			return fmt.Errorf("failed to parse revocation secret: %w", err)
+		}
+		_, err = db.TokenOutput.UpdateOne(outputToSpendEnt).
 			SetStatus(st.TokenOutputStatusSpentFinalized).
-			SetSpentRevocationSecret(revocationSecrets[inputIndex].RevocationSecret).
+			SetSpentRevocationSecret(secret).
 			Save(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to update spent output to signed: %w", err)
@@ -602,7 +603,7 @@ func FinalizeCoordinatedTokenTransactionWithRevocationKeys(
 
 		_, err := db.TokenOutput.UpdateOne(outputToSpendEnt).
 			SetStatus(st.TokenOutputStatusSpentFinalized).
-			SetSpentRevocationSecret(revocationSecret.Serialize()).
+			SetSpentRevocationSecret(revocationSecret).
 			Save(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to update spent output for txHash %x: %w", txHash, err)

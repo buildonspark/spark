@@ -101,7 +101,7 @@ func TestPolarityScorer_UpdateLeaves(t *testing.T) {
 	keyshareSecret := keys.MustGeneratePrivateKeyFromRand(seeded)
 	keyshare := dbTx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(keyshareSecret.Serialize()).
+		SetSecretShare(keyshareSecret).
 		SetPublicShares(map[string]keys.Public{}).
 		SetPublicKey(keyshareSecret.Public()).
 		SetMinSigners(2).

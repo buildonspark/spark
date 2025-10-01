@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/tokenfreeze"
@@ -61,14 +62,22 @@ func (tfc *TokenFreezeCreate) SetStatus(sfs schematype.TokenFreezeStatus) *Token
 }
 
 // SetOwnerPublicKey sets the "owner_public_key" field.
-func (tfc *TokenFreezeCreate) SetOwnerPublicKey(b []byte) *TokenFreezeCreate {
-	tfc.mutation.SetOwnerPublicKey(b)
+func (tfc *TokenFreezeCreate) SetOwnerPublicKey(k keys.Public) *TokenFreezeCreate {
+	tfc.mutation.SetOwnerPublicKey(k)
 	return tfc
 }
 
 // SetTokenPublicKey sets the "token_public_key" field.
-func (tfc *TokenFreezeCreate) SetTokenPublicKey(b []byte) *TokenFreezeCreate {
-	tfc.mutation.SetTokenPublicKey(b)
+func (tfc *TokenFreezeCreate) SetTokenPublicKey(k keys.Public) *TokenFreezeCreate {
+	tfc.mutation.SetTokenPublicKey(k)
+	return tfc
+}
+
+// SetNillableTokenPublicKey sets the "token_public_key" field if the given value is not nil.
+func (tfc *TokenFreezeCreate) SetNillableTokenPublicKey(k *keys.Public) *TokenFreezeCreate {
+	if k != nil {
+		tfc.SetTokenPublicKey(*k)
+	}
 	return tfc
 }
 
@@ -190,11 +199,6 @@ func (tfc *TokenFreezeCreate) check() error {
 	}
 	if _, ok := tfc.mutation.OwnerPublicKey(); !ok {
 		return &ValidationError{Name: "owner_public_key", err: errors.New(`ent: missing required field "TokenFreeze.owner_public_key"`)}
-	}
-	if v, ok := tfc.mutation.OwnerPublicKey(); ok {
-		if err := tokenfreeze.OwnerPublicKeyValidator(v); err != nil {
-			return &ValidationError{Name: "owner_public_key", err: fmt.Errorf(`ent: validator failed for field "TokenFreeze.owner_public_key": %w`, err)}
-		}
 	}
 	if _, ok := tfc.mutation.IssuerSignature(); !ok {
 		return &ValidationError{Name: "issuer_signature", err: errors.New(`ent: missing required field "TokenFreeze.issuer_signature"`)}

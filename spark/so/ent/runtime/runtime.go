@@ -434,10 +434,6 @@ func init() {
 	tokenfreeze.DefaultUpdateTime = tokenfreezeDescUpdateTime.Default.(func() time.Time)
 	// tokenfreeze.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	tokenfreeze.UpdateDefaultUpdateTime = tokenfreezeDescUpdateTime.UpdateDefault.(func() time.Time)
-	// tokenfreezeDescOwnerPublicKey is the schema descriptor for owner_public_key field.
-	tokenfreezeDescOwnerPublicKey := tokenfreezeFields[1].Descriptor()
-	// tokenfreeze.OwnerPublicKeyValidator is a validator for the "owner_public_key" field. It is called by the builders before save.
-	tokenfreeze.OwnerPublicKeyValidator = tokenfreezeDescOwnerPublicKey.Validators[0].(func([]byte) error)
 	// tokenfreezeDescIssuerSignature is the schema descriptor for issuer_signature field.
 	tokenfreezeDescIssuerSignature := tokenfreezeFields[3].Descriptor()
 	// tokenfreeze.IssuerSignatureValidator is a validator for the "issuer_signature" field. It is called by the builders before save.
@@ -507,10 +503,6 @@ func init() {
 	tokenpartialrevocationsecretshare.DefaultUpdateTime = tokenpartialrevocationsecretshareDescUpdateTime.Default.(func() time.Time)
 	// tokenpartialrevocationsecretshare.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	tokenpartialrevocationsecretshare.UpdateDefaultUpdateTime = tokenpartialrevocationsecretshareDescUpdateTime.UpdateDefault.(func() time.Time)
-	// tokenpartialrevocationsecretshareDescSecretShare is the schema descriptor for secret_share field.
-	tokenpartialrevocationsecretshareDescSecretShare := tokenpartialrevocationsecretshareFields[1].Descriptor()
-	// tokenpartialrevocationsecretshare.SecretShareValidator is a validator for the "secret_share" field. It is called by the builders before save.
-	tokenpartialrevocationsecretshare.SecretShareValidator = tokenpartialrevocationsecretshareDescSecretShare.Validators[0].(func([]byte) error)
 	// tokenpartialrevocationsecretshareDescID is the schema descriptor for id field.
 	tokenpartialrevocationsecretshareDescID := tokenpartialrevocationsecretshareMixinFields0[0].Descriptor()
 	// tokenpartialrevocationsecretshare.DefaultID holds the default value on creation for the id field.

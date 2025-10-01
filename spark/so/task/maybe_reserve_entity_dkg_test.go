@@ -132,7 +132,7 @@ func TestReserveEntityDkg_OperatorDown(t *testing.T) {
 			secret := keys.MustGeneratePrivateKeyFromRand(rng)
 			sk := client.SigningKeyshare.Create().
 				SetStatus(st.KeyshareStatusAvailable).
-				SetSecretShare(secret.Serialize()).
+				SetSecretShare(secret).
 				SetPublicKey(secret.Public()).
 				SetPublicShares(map[string]keys.Public{}).
 				SetMinSigners(2).
@@ -172,7 +172,7 @@ func TestReserveEntityDkg_Idempotent(t *testing.T) {
 	secret := keys.MustGeneratePrivateKeyFromRand(rng)
 	sk := client.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(secret.Serialize()).
+		SetSecretShare(secret).
 		SetPublicKey(secret.Public()).
 		SetPublicShares(map[string]keys.Public{}).
 		SetMinSigners(2).

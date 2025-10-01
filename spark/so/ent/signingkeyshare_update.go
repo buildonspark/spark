@@ -51,8 +51,16 @@ func (sku *SigningKeyshareUpdate) SetNillableStatus(sks *schematype.SigningKeysh
 }
 
 // SetSecretShare sets the "secret_share" field.
-func (sku *SigningKeyshareUpdate) SetSecretShare(b []byte) *SigningKeyshareUpdate {
-	sku.mutation.SetSecretShare(b)
+func (sku *SigningKeyshareUpdate) SetSecretShare(k keys.Private) *SigningKeyshareUpdate {
+	sku.mutation.SetSecretShare(k)
+	return sku
+}
+
+// SetNillableSecretShare sets the "secret_share" field if the given value is not nil.
+func (sku *SigningKeyshareUpdate) SetNillableSecretShare(k *keys.Private) *SigningKeyshareUpdate {
+	if k != nil {
+		sku.SetSecretShare(*k)
+	}
 	return sku
 }
 
@@ -249,8 +257,16 @@ func (skuo *SigningKeyshareUpdateOne) SetNillableStatus(sks *schematype.SigningK
 }
 
 // SetSecretShare sets the "secret_share" field.
-func (skuo *SigningKeyshareUpdateOne) SetSecretShare(b []byte) *SigningKeyshareUpdateOne {
-	skuo.mutation.SetSecretShare(b)
+func (skuo *SigningKeyshareUpdateOne) SetSecretShare(k keys.Private) *SigningKeyshareUpdateOne {
+	skuo.mutation.SetSecretShare(k)
+	return skuo
+}
+
+// SetNillableSecretShare sets the "secret_share" field if the given value is not nil.
+func (skuo *SigningKeyshareUpdateOne) SetNillableSecretShare(k *keys.Private) *SigningKeyshareUpdateOne {
+	if k != nil {
+		skuo.SetSecretShare(*k)
+	}
 	return skuo
 }
 

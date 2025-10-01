@@ -61,8 +61,8 @@ func (skc *SigningKeyshareCreate) SetStatus(sks schematype.SigningKeyshareStatus
 }
 
 // SetSecretShare sets the "secret_share" field.
-func (skc *SigningKeyshareCreate) SetSecretShare(b []byte) *SigningKeyshareCreate {
-	skc.mutation.SetSecretShare(b)
+func (skc *SigningKeyshareCreate) SetSecretShare(k keys.Private) *SigningKeyshareCreate {
+	skc.mutation.SetSecretShare(k)
 	return skc
 }
 
@@ -329,7 +329,7 @@ func (u *SigningKeyshareUpsert) UpdateStatus() *SigningKeyshareUpsert {
 }
 
 // SetSecretShare sets the "secret_share" field.
-func (u *SigningKeyshareUpsert) SetSecretShare(v []byte) *SigningKeyshareUpsert {
+func (u *SigningKeyshareUpsert) SetSecretShare(v keys.Private) *SigningKeyshareUpsert {
 	u.Set(signingkeyshare.FieldSecretShare, v)
 	return u
 }
@@ -480,7 +480,7 @@ func (u *SigningKeyshareUpsertOne) UpdateStatus() *SigningKeyshareUpsertOne {
 }
 
 // SetSecretShare sets the "secret_share" field.
-func (u *SigningKeyshareUpsertOne) SetSecretShare(v []byte) *SigningKeyshareUpsertOne {
+func (u *SigningKeyshareUpsertOne) SetSecretShare(v keys.Private) *SigningKeyshareUpsertOne {
 	return u.Update(func(s *SigningKeyshareUpsert) {
 		s.SetSecretShare(v)
 	})
@@ -810,7 +810,7 @@ func (u *SigningKeyshareUpsertBulk) UpdateStatus() *SigningKeyshareUpsertBulk {
 }
 
 // SetSecretShare sets the "secret_share" field.
-func (u *SigningKeyshareUpsertBulk) SetSecretShare(v []byte) *SigningKeyshareUpsertBulk {
+func (u *SigningKeyshareUpsertBulk) SetSecretShare(v keys.Private) *SigningKeyshareUpsertBulk {
 	return u.Update(func(s *SigningKeyshareUpsert) {
 		s.SetSecretShare(v)
 	})

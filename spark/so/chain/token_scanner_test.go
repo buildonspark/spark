@@ -41,7 +41,7 @@ func setupIsolatedTest(t *testing.T) (context.Context, *ent.Tx) {
 	entityDkgPublicKey := keys.MustGeneratePrivateKeyFromRand(seededRand).Public()
 	signingKeyshare, err := dbTx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(secretShare.Serialize()).
+		SetSecretShare(secretShare).
 		SetPublicShares(map[string]keys.Public{}).
 		SetPublicKey(entityDkgPublicKey).
 		SetMinSigners(1).
@@ -496,7 +496,7 @@ func TestHandleTokenAnnouncements_DuplicateConstraints(t *testing.T) {
 	entityDkgPublicKey := keys.MustGeneratePrivateKeyFromRand(seededRand).Public()
 	signingKeyshare, err := dbTx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(secretShare.Serialize()).
+		SetSecretShare(secretShare).
 		SetPublicShares(map[string]keys.Public{}).
 		SetPublicKey(entityDkgPublicKey).
 		SetMinSigners(1).
