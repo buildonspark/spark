@@ -104,6 +104,10 @@ export type ConsoleOptions = {
   otel?: boolean;
 };
 
+export type OptimizationOptions = {
+  readonly multiplicity?: number;
+};
+
 export type ConfigOptions = MayHaveSspClientOptions & {
   readonly network?: NetworkType;
   readonly signingOperators?: Readonly<Record<string, SigningOperator>>;
@@ -119,6 +123,7 @@ export type ConfigOptions = MayHaveSspClientOptions & {
   readonly signerWithPreExistingKeys?: boolean;
   readonly console?: ConsoleOptions;
   readonly events?: Partial<SparkWalletEvents>;
+  readonly optimizationOptions?: OptimizationOptions;
 };
 
 const PROD_PUBKEYS = [
@@ -153,6 +158,9 @@ const BASE_CONFIG: Required<ConfigOptions> = {
     otel: false,
   },
   events: {},
+  optimizationOptions: {
+    multiplicity: 0,
+  },
 };
 
 const LOCAL_WALLET_CONFIG: Required<ConfigOptions> = {

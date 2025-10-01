@@ -124,7 +124,6 @@ import {
 import { chunkArray } from "../utils/chunkArray.js";
 import { getFetch } from "../utils/fetch.js";
 import { addPublicKeys } from "../utils/keys.js";
-import { maximizeUnilateralExit } from "../utils/optimize.js";
 import { RetryContext, withRetry } from "../utils/retry.js";
 import {
   Bech32mTokenIdentifier,
@@ -152,6 +151,7 @@ import type {
   UserTokenMetadata,
 } from "./types.js";
 import { SparkWalletEvent } from "./types.js";
+import { optimize, shouldOptimize } from "../utils/optimize.js";
 
 /**
  * The SparkWallet class is the primary interface for interacting with the Spark network.
@@ -669,31 +669,21 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return nodes;
   }
 
-  private areLeavesInefficient() {
-    const totalAmount = this.getInternalBalance();
-
-    if (this.leaves.length <= 1) {
-      return false;
-    }
-
-    const nextLowerPowerOfTwo = 31 - Math.clz32(totalAmount);
-
-    let remainingAmount = totalAmount;
-    let optimalLeavesLength = 0;
-
-    for (let i = nextLowerPowerOfTwo; i >= 0; i--) {
-      const denomination = 2 ** i;
-      while (remainingAmount >= denomination) {
-        remainingAmount -= denomination;
-        optimalLeavesLength++;
-      }
-    }
-
-    return this.leaves.length > optimalLeavesLength * 5;
-  }
-
   private async optimizeLeaves() {
-    if (this.optimizationInProgress || !this.areLeavesInefficient()) {
+    const multiplicity = this.config.getOptimizationOptions().multiplicity ?? 0;
+    if (multiplicity < 0) {
+      throw new ValidationError("Multiplicity cannot be negative");
+    } else if (multiplicity > 3) {
+      throw new ValidationError("Multiplicity cannot be greater than 3");
+    }
+
+    if (
+      this.optimizationInProgress ||
+      !shouldOptimize(
+        this.leaves.map((leaf) => leaf.value),
+        multiplicity,
+      )
+    ) {
       return;
     }
 
@@ -701,9 +691,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       this.optimizationInProgress = true;
       try {
         this.leaves = await this.getLeaves();
-        const swaps = maximizeUnilateralExit(
+        const swaps = optimize(
           this.leaves.map((leaf) => leaf.value),
+          multiplicity,
         );
+        if (swaps.length === 0) {
+          return;
+        }
 
         // Build a map from the denomination to the nodes
         const valueToNodes = new Map<number, TreeNode[]>();
@@ -728,6 +722,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
               );
             }
           }
+
+          // TODO: Parallelize this.
           await this.requestLeavesSwap({
             leaves: leavesToSend,
             targetAmounts: swap.outLeaves,

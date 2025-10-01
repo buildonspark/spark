@@ -224,3 +224,45 @@ export function minimizeTransferSwap(
 
   return swaps;
 }
+
+export function shouldOptimize(
+  inputLeaves: number[],
+  multiplicity: number = 1,
+  maxLeavesPerSwap: number = 64,
+): boolean {
+  if (multiplicity == 0) {
+    // When optimizing for unilateral exits, we should only optimize if it reduces the
+    // number of leaves by more than 5x.
+    const swaps = maximizeUnilateralExit(inputLeaves, maxLeavesPerSwap);
+    const numInputs = sum(swaps.map((swap) => swap.inLeaves.length));
+    const numOutputs = sum(swaps.map((swap) => swap.outLeaves.length));
+    return numOutputs * 5 < numInputs;
+  } else {
+    // When optimizing for swap-minimization, we should only optimize if it changes the
+    // number of active denominations by more than 1.
+    const swaps = minimizeTransferSwap(
+      inputLeaves,
+      multiplicity,
+      maxLeavesPerSwap,
+    );
+    const inputCounter = countOccurrences(
+      swaps.flatMap((swap) => swap.inLeaves),
+    );
+    const outputCounter = countOccurrences(
+      swaps.flatMap((swap) => swap.outLeaves),
+    );
+    return Math.abs(inputCounter.size - outputCounter.size) > 1;
+  }
+}
+
+export function optimize(
+  inputLeaves: number[],
+  multiplicity: number = 1,
+  maxLeavesPerSwap: number = 64,
+): Swap[] {
+  if (multiplicity == 0) {
+    return maximizeUnilateralExit(inputLeaves, maxLeavesPerSwap);
+  } else {
+    return minimizeTransferSwap(inputLeaves, multiplicity, maxLeavesPerSwap);
+  }
+}

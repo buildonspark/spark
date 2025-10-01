@@ -2173,6 +2173,20 @@ async function runCLI() {
           }
           break;
         }
+        case "getleafcount": {
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          const leaves = await wallet.getLeaves();
+          console.log(
+            `Found ${leaves
+              .map((x) => x.value)
+              .sort((a, b) => a - b)
+              .join(", ")} leaves`,
+          );
+          break;
+        }
         case "getleaves": {
           if (!wallet) {
             console.log("Please initialize a wallet first");

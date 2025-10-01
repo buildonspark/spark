@@ -7,6 +7,7 @@ import {
   WalletConfig,
   SigningOperator,
   ConsoleOptions,
+  OptimizationOptions,
 } from "./wallet-config.js";
 import { ConfigurationError } from "../errors/types.js";
 import { SparkWalletEvents } from "../spark-wallet/types.js";
@@ -126,5 +127,9 @@ export class WalletConfigService implements HasSspClientOptions {
 
   public getEvents(): Partial<SparkWalletEvents> {
     return this.config.events;
+  }
+
+  public getOptimizationOptions(): OptimizationOptions {
+    return this.config.optimizationOptions;
   }
 }
