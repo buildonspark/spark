@@ -29,6 +29,25 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
+func setUpInternalSignTokenTestHandlerPostgres(t *testing.T) (*InternalSignTokenHandler, context.Context, *ent.Tx, func()) {
+	t.Helper()
+
+	config := sparktesting.TestConfig(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	handler := &InternalSignTokenHandler{config: config}
+
+	cleanup := func() {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			t.Errorf("rollback failed: %v", rollbackErr)
+		}
+	}
+
+	return handler, ctx, tx, cleanup
+}
+
 // createTestSpentOutputWithShares creates a spent output with one partial share and returns it.
 func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.Tx, handler *InternalSignTokenHandler, tokenCreateID uuid.UUID, secretPriv keys.Private, shares []*secretsharing.SecretShare, operatorIDs []string) *ent.TokenOutput {
 	t.Helper()
@@ -75,6 +94,130 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.
 		SaveX(ctx)
 
 	return output
+}
+
+func TestGetSecretSharesNotInInput(t *testing.T) {
+	handler, ctx, tx, cleanup := setUpInternalSignTokenTestHandlerPostgres(t)
+	defer cleanup()
+	rng := rand.NewChaCha8([32]byte{})
+
+	aliceOperatorPubKey := handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000001"].IdentityPublicKey
+	bobOperatorPubKey := handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000002"].IdentityPublicKey
+	carolOperatorPubKey := handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000003"].IdentityPublicKey
+
+	aliceSecret := keys.MustGeneratePrivateKeyFromRand(rng)
+	aliceSigningKeyshare := tx.SigningKeyshare.Create().
+		SetSecretShare(aliceSecret.Serialize()).
+		SetPublicKey(aliceSecret.Public()).
+		SetStatus(st.KeyshareStatusInUse).
+		SetPublicShares(map[string]keys.Public{}).
+		SetMinSigners(1).
+		SetCoordinatorIndex(1).
+		SaveX(ctx)
+
+	bobSecret := keys.MustGeneratePrivateKeyFromRand(rng)
+	bobSigningKeyshare := tx.SigningKeyshare.Create().
+		SetSecretShare(bobSecret.Serialize()).
+		SetPublicKey(bobSecret.Public()).
+		SetStatus(st.KeyshareStatusInUse).
+		SetPublicShares(map[string]keys.Public{}).
+		SetMinSigners(1).
+		SetCoordinatorIndex(1).
+		SaveX(ctx)
+
+	carolSecret := keys.MustGeneratePrivateKeyFromRand(rng)
+	carolSigningKeyshare := tx.SigningKeyshare.Create().
+		SetSecretShare(carolSecret.Serialize()).
+		SetPublicKey(carolSecret.Public()).
+		SetStatus(st.KeyshareStatusInUse).
+		SetPublicShares(map[string]keys.Public{}).
+		SetMinSigners(1).
+		SetCoordinatorIndex(1).
+		SaveX(ctx)
+
+	// Minimal TokenCreate required for TokenOutput and TokenTransaction relationships
+	tokenCreate := tx.TokenCreate.Create().
+		SetIssuerPublicKey(handler.config.IdentityPublicKey()).
+		SetTokenName("test token").
+		SetTokenTicker("TTK").
+		SetDecimals(8).
+		SetMaxSupply([]byte{1}).
+		SetIsFreezable(true).
+		SetNetwork(st.NetworkRegtest).
+		SetTokenIdentifier([]byte("token_identifier")).
+		SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
+		SaveX(ctx)
+
+	withdrawRevocationCommitment := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	tokenOutputInDb := tx.TokenOutput.Create().
+		SetID(uuid.New()).
+		SetOwnerPublicKey(aliceOperatorPubKey).
+		SetTokenPublicKey(aliceOperatorPubKey).
+		SetTokenAmount([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100}).
+		SetRevocationKeyshare(aliceSigningKeyshare).
+		SetStatus(st.TokenOutputStatusCreatedFinalized).
+		SetWithdrawBondSats(1).
+		SetWithdrawRelativeBlockLocktime(1).
+		SetWithdrawRevocationCommitment(withdrawRevocationCommitment.Serialize()).
+		SetCreatedTransactionOutputVout(0).
+		SetNetwork(st.NetworkRegtest).
+		SetTokenIdentifier([]byte("token_identifier")).
+		SetTokenCreateID(tokenCreate.ID).
+		SaveX(ctx)
+
+	tx.TokenPartialRevocationSecretShare.Create().
+		SetTokenOutput(tokenOutputInDb).
+		SetOperatorIdentityPublicKey(bobOperatorPubKey).
+		SetSecretShare(bobSigningKeyshare.SecretShare).
+		SaveX(ctx)
+
+	tx.TokenPartialRevocationSecretShare.Create().
+		SetTokenOutput(tokenOutputInDb).
+		SetOperatorIdentityPublicKey(carolOperatorPubKey).
+		SetSecretShare(carolSigningKeyshare.SecretShare).
+		SaveX(ctx)
+
+	t.Run("returns empty map when input share map is empty", func(t *testing.T) {
+		inputOperatorShareMap := make(map[ShareKey]ShareValue)
+
+		_, err := handler.getSecretSharesNotInInput(ctx, inputOperatorShareMap)
+
+		require.ErrorContains(t, err, "no input operator shares provided")
+	})
+
+	t.Run("excludes the revocation secret share if it is in the input", func(t *testing.T) {
+		inputOperatorShareMap := make(map[ShareKey]ShareValue)
+		inputOperatorShareMap[ShareKey{
+			TokenOutputID:             tokenOutputInDb.ID,
+			OperatorIdentityPublicKey: aliceOperatorPubKey,
+		}] = ShareValue{
+			SecretShare:               aliceSigningKeyshare.SecretShare,
+			OperatorIdentityPublicKey: aliceOperatorPubKey,
+		}
+
+		result, err := handler.getSecretSharesNotInInput(ctx, inputOperatorShareMap)
+		require.NoError(t, err)
+		assert.Len(t, result, 2)
+		assert.Equal(t, bobSigningKeyshare.SecretShare, result[bobOperatorPubKey][0].SecretShare)
+		assert.Equal(t, carolSigningKeyshare.SecretShare, result[carolOperatorPubKey][0].SecretShare)
+	})
+
+	t.Run("excludes the partial revocation secret share if it is in the input", func(t *testing.T) {
+		inputOperatorShareMap := make(map[ShareKey]ShareValue)
+		inputOperatorShareMap[ShareKey{
+			TokenOutputID:             tokenOutputInDb.ID,
+			OperatorIdentityPublicKey: bobOperatorPubKey,
+		}] = ShareValue{
+			SecretShare:               bobSigningKeyshare.SecretShare,
+			OperatorIdentityPublicKey: bobOperatorPubKey,
+		}
+
+		result, err := handler.getSecretSharesNotInInput(ctx, inputOperatorShareMap)
+		require.NoError(t, err)
+		assert.Len(t, result, 2)
+		assert.Equal(t, aliceSigningKeyshare.SecretShare, result[aliceOperatorPubKey][0].SecretShare)
+		assert.Equal(t, carolSigningKeyshare.SecretShare, result[carolOperatorPubKey][0].SecretShare)
+	})
 }
 
 func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *testing.T) {

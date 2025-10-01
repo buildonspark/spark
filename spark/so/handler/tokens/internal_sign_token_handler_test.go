@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"math/rand/v2"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	sparktokeninternal "github.com/lightsparkdev/spark/proto/spark_token_internal"
@@ -107,130 +105,6 @@ func TestExchangeRevocationSecretsShares(t *testing.T) {
 		_, err := handler.ExchangeRevocationSecretsShares(ctx, req)
 
 		require.ErrorContains(t, err, "unable to parse request operator identity public key")
-	})
-}
-
-func TestGetSecretSharesNotInInput(t *testing.T) {
-	handler, ctx, tx, cleanup := setUpInternalSignTokenTestHandler(t)
-	defer cleanup()
-	rng := rand.NewChaCha8([32]byte{})
-
-	aliceOperatorPubKey := handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000001"].IdentityPublicKey
-	bobOperatorPubKey := handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000002"].IdentityPublicKey
-	carolOperatorPubKey := handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000003"].IdentityPublicKey
-
-	aliceSecret := keys.MustGeneratePrivateKeyFromRand(rng)
-	aliceSigningKeyshare := tx.SigningKeyshare.Create().
-		SetSecretShare(aliceSecret.Serialize()).
-		SetPublicKey(aliceSecret.Public()).
-		SetStatus(st.KeyshareStatusInUse).
-		SetPublicShares(map[string]keys.Public{}).
-		SetMinSigners(1).
-		SetCoordinatorIndex(1).
-		SaveX(ctx)
-
-	bobSecret := keys.MustGeneratePrivateKeyFromRand(rng)
-	bobSigningKeyshare := tx.SigningKeyshare.Create().
-		SetSecretShare(bobSecret.Serialize()).
-		SetPublicKey(bobSecret.Public()).
-		SetStatus(st.KeyshareStatusInUse).
-		SetPublicShares(map[string]keys.Public{}).
-		SetMinSigners(1).
-		SetCoordinatorIndex(1).
-		SaveX(ctx)
-
-	carolSecret := keys.MustGeneratePrivateKeyFromRand(rng)
-	carolSigningKeyshare := tx.SigningKeyshare.Create().
-		SetSecretShare(carolSecret.Serialize()).
-		SetPublicKey(carolSecret.Public()).
-		SetStatus(st.KeyshareStatusInUse).
-		SetPublicShares(map[string]keys.Public{}).
-		SetMinSigners(1).
-		SetCoordinatorIndex(1).
-		SaveX(ctx)
-
-	// Minimal TokenCreate required for TokenOutput and TokenTransaction relationships
-	tokenCreate := tx.TokenCreate.Create().
-		SetIssuerPublicKey(handler.config.IdentityPublicKey()).
-		SetTokenName("test token").
-		SetTokenTicker("TTK").
-		SetDecimals(8).
-		SetMaxSupply([]byte{1}).
-		SetIsFreezable(true).
-		SetNetwork(st.NetworkRegtest).
-		SetTokenIdentifier([]byte("token_identifier")).
-		SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
-		SaveX(ctx)
-
-	withdrawRevocationCommitment := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	tokenOutputInDb := tx.TokenOutput.Create().
-		SetID(uuid.New()).
-		SetOwnerPublicKey(aliceOperatorPubKey).
-		SetTokenPublicKey(aliceOperatorPubKey).
-		SetTokenAmount([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100}).
-		SetRevocationKeyshare(aliceSigningKeyshare).
-		SetStatus(st.TokenOutputStatusCreatedFinalized).
-		SetWithdrawBondSats(1).
-		SetWithdrawRelativeBlockLocktime(1).
-		SetWithdrawRevocationCommitment(withdrawRevocationCommitment.Serialize()).
-		SetCreatedTransactionOutputVout(0).
-		SetNetwork(st.NetworkRegtest).
-		SetTokenIdentifier([]byte("token_identifier")).
-		SetTokenCreateID(tokenCreate.ID).
-		SaveX(ctx)
-
-	tx.TokenPartialRevocationSecretShare.Create().
-		SetTokenOutput(tokenOutputInDb).
-		SetOperatorIdentityPublicKey(bobOperatorPubKey).
-		SetSecretShare(bobSigningKeyshare.SecretShare).
-		SaveX(ctx)
-
-	tx.TokenPartialRevocationSecretShare.Create().
-		SetTokenOutput(tokenOutputInDb).
-		SetOperatorIdentityPublicKey(carolOperatorPubKey).
-		SetSecretShare(carolSigningKeyshare.SecretShare).
-		SaveX(ctx)
-
-	t.Run("returns empty map when input share map is empty", func(t *testing.T) {
-		inputOperatorShareMap := make(map[ShareKey]ShareValue)
-
-		_, err := handler.getSecretSharesNotInInput(ctx, inputOperatorShareMap)
-
-		require.ErrorContains(t, err, "no input operator shares provided")
-	})
-
-	t.Run("excludes the revocation secret share if it is in the input", func(t *testing.T) {
-		inputOperatorShareMap := make(map[ShareKey]ShareValue)
-		inputOperatorShareMap[ShareKey{
-			TokenOutputID:             tokenOutputInDb.ID,
-			OperatorIdentityPublicKey: aliceOperatorPubKey,
-		}] = ShareValue{
-			SecretShare:               aliceSigningKeyshare.SecretShare,
-			OperatorIdentityPublicKey: aliceOperatorPubKey,
-		}
-
-		result, err := handler.getSecretSharesNotInInput(ctx, inputOperatorShareMap)
-		require.NoError(t, err)
-		assert.Len(t, result, 2)
-		assert.Equal(t, bobSigningKeyshare.SecretShare, result[bobOperatorPubKey][0].SecretShare)
-		assert.Equal(t, carolSigningKeyshare.SecretShare, result[carolOperatorPubKey][0].SecretShare)
-	})
-
-	t.Run("excludes the partial revocation secret share if it is in the input", func(t *testing.T) {
-		inputOperatorShareMap := make(map[ShareKey]ShareValue)
-		inputOperatorShareMap[ShareKey{
-			TokenOutputID:             tokenOutputInDb.ID,
-			OperatorIdentityPublicKey: bobOperatorPubKey,
-		}] = ShareValue{
-			SecretShare:               bobSigningKeyshare.SecretShare,
-			OperatorIdentityPublicKey: bobOperatorPubKey,
-		}
-
-		result, err := handler.getSecretSharesNotInInput(ctx, inputOperatorShareMap)
-		require.NoError(t, err)
-		assert.Len(t, result, 2)
-		assert.Equal(t, aliceSigningKeyshare.SecretShare, result[aliceOperatorPubKey][0].SecretShare)
-		assert.Equal(t, carolSigningKeyshare.SecretShare, result[carolOperatorPubKey][0].SecretShare)
 	})
 }
 

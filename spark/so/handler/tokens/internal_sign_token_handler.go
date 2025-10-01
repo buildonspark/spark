@@ -8,18 +8,19 @@ import (
 	"strconv"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/lightsparkdev/spark/common/logging"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbtkinternal "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/ent/predicate"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
@@ -312,21 +313,12 @@ func (h *InternalSignTokenHandler) getSecretSharesNotInInput(ctx context.Context
 		batchOutputIDs := uniqueTokenOutputIDs[i:end]
 
 		var excludeKeyshareTokenOutputIDs []any
-		var excludePartialShareConditions []predicate.TokenPartialRevocationSecretShare
-
-		for shareKey, shareValue := range inputOperatorShareMap {
+		for shareKey := range inputOperatorShareMap {
 			for _, outputID := range batchOutputIDs {
 				if shareKey.TokenOutputID == outputID {
 					if shareKey.OperatorIdentityPublicKey.Equals(thisOperatorIdentityPubkey) {
 						excludeKeyshareTokenOutputIDs = append(excludeKeyshareTokenOutputIDs, shareKey.TokenOutputID)
 					}
-
-					excludePartialShareConditions = append(excludePartialShareConditions,
-						tokenpartialrevocationsecretshare.And(
-							tokenpartialrevocationsecretshare.HasTokenOutputWith(tokenoutput.IDEQ(shareKey.TokenOutputID)),
-							tokenpartialrevocationsecretshare.OperatorIdentityPublicKeyEQ(shareValue.OperatorIdentityPublicKey),
-						),
-					)
 					break
 				}
 			}
@@ -342,16 +334,19 @@ func (h *InternalSignTokenHandler) getSecretSharesNotInInput(ctx context.Context
 					})
 				}
 			}).
-			WithTokenPartialRevocationSecretShares(func(q *ent.TokenPartialRevocationSecretShareQuery) {
-				if len(excludePartialShareConditions) > 0 {
-					q.Where(tokenpartialrevocationsecretshare.Not(
-						tokenpartialrevocationsecretshare.Or(excludePartialShareConditions...),
-					))
-				}
-			}).
 			All(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get token outputs with shares batch %d-%d: %w", i, end-1, err)
+		}
+
+		partialSharesByOutput, err := h.getPartialRevocationSecretShares(ctx, db, batchOutputIDs, inputOperatorShareMap)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get partial shares batch %d-%d: %w", i, end-1, err)
+		}
+
+		// Attach partial shares to outputs
+		for _, output := range batchOutputs {
+			output.Edges.TokenPartialRevocationSecretShares = partialSharesByOutput[output.ID]
 		}
 
 		outputsWithKeyShares = append(outputsWithKeyShares, batchOutputs...)
@@ -362,6 +357,113 @@ func (h *InternalSignTokenHandler) getSecretSharesNotInInput(ctx context.Context
 		return nil, fmt.Errorf("failed to build operator pubkey to revocation secret share map: %w", err)
 	}
 	return operatorShares, nil
+}
+
+// getPartialRevocationSecretShares uses raw SQL for efficient exclusion
+func (h *InternalSignTokenHandler) getPartialRevocationSecretShares(
+	ctx context.Context,
+	db *ent.Tx,
+	batchOutputIDs []uuid.UUID,
+	inputOperatorShareMap map[ShareKey]ShareValue,
+) (map[uuid.UUID][]*ent.TokenPartialRevocationSecretShare, error) {
+	ctx, span := tracer.Start(ctx, "InternalSignTokenHandler.getPartialRevocationSecretShares")
+
+	// Build exclusion arrays for UNNEST
+	var excludeOutputIDs []uuid.UUID
+	var excludeOperatorKeys [][]byte
+	for shareKey, shareValue := range inputOperatorShareMap {
+		for _, outputID := range batchOutputIDs {
+			if shareKey.TokenOutputID == outputID {
+				excludeOutputIDs = append(excludeOutputIDs, shareKey.TokenOutputID)
+				excludeOperatorKeys = append(excludeOperatorKeys, shareValue.OperatorIdentityPublicKey.Serialize())
+				break
+			}
+		}
+	}
+
+	query := `
+		SELECT tprss.id, 
+		       tprss.create_time, 
+		       tprss.update_time, 
+		       tprss.operator_identity_public_key, 
+		       tprss.secret_share, 
+		       tprss.token_output_token_partial_revocation_secret_shares
+		FROM token_partial_revocation_secret_shares tprss
+		WHERE tprss.token_output_token_partial_revocation_secret_shares = ANY($1)
+	`
+
+	args := []any{pq.Array(batchOutputIDs)}
+
+	if len(excludeOutputIDs) > 0 {
+		// Use CTE with LEFT JOIN for efficient exclusion
+		query = `
+			WITH excluded_pairs AS (
+			    SELECT 
+			        excluded_pairs.token_id,
+			        excluded_pairs.operator_key
+			    FROM UNNEST($2::uuid[], $3::bytea[]) AS excluded_pairs(token_id, operator_key)
+			)
+			SELECT tprss.id, 
+			       tprss.create_time, 
+			       tprss.update_time, 
+			       tprss.operator_identity_public_key, 
+			       tprss.secret_share, 
+			       tprss.token_output_token_partial_revocation_secret_shares
+			FROM token_partial_revocation_secret_shares tprss
+			LEFT JOIN excluded_pairs ep ON (
+			    tprss.token_output_token_partial_revocation_secret_shares = ep.token_id
+			    AND tprss.operator_identity_public_key = ep.operator_key
+			)
+			WHERE ep.token_id IS NULL
+			  AND tprss.token_output_token_partial_revocation_secret_shares = ANY($1)
+		`
+		args = append(args, pq.Array(excludeOutputIDs), pq.Array(excludeOperatorKeys))
+	}
+
+	// nolint:forbidigo
+	rows, err := db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute optimized partial shares query: %w", err)
+	}
+
+	defer func() {
+		if cerr := rows.Close(); cerr != nil {
+			logging.GetLoggerFromContext(ctx).Error("failed to close rows", zap.Error(cerr))
+			span.RecordError(cerr)
+		}
+	}()
+
+	// Scan results into a map keyed by token output ID
+	sharesByOutput := make(map[uuid.UUID][]*ent.TokenPartialRevocationSecretShare)
+	for rows.Next() {
+		share := &ent.TokenPartialRevocationSecretShare{}
+		var operatorKeyBytes []byte
+		var tokenOutputID uuid.UUID
+		if err := rows.Scan(
+			&share.ID,
+			&share.CreateTime,
+			&share.UpdateTime,
+			&operatorKeyBytes,
+			&share.SecretShare,
+			&tokenOutputID,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan partial share: %w", err)
+		}
+
+		operatorKey, err := keys.ParsePublicKey(operatorKeyBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse operator identity public key: %w", err)
+		}
+		share.OperatorIdentityPublicKey = operatorKey
+
+		sharesByOutput[tokenOutputID] = append(sharesByOutput[tokenOutputID], share)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating partial shares: %w", err)
+	}
+
+	return sharesByOutput, nil
 }
 
 func (h *InternalSignTokenHandler) buildOperatorPubkeyToRevocationSecretShareMap(tokenOutputs []*ent.TokenOutput) (operatorSharesMap, error) {
