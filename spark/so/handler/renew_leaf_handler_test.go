@@ -123,19 +123,19 @@ func TestConstructRenewNodeTransactions(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test the function
-	splitNodeTx, extendedNodeTx, refundTx, directSplitNodeTx, directNodeTx, directRefundTx, directFromCpfpRefundTx, err := handler.constructRenewNodeTransactions(leafNode, parentNode)
+	renewTxs, err := handler.constructRenewNodeTransactions(leafNode, parentNode)
 	require.NoError(t, err)
 
 	// Verify split node transaction
-	assert.NotNil(t, splitNodeTx)
-	assert.Len(t, splitNodeTx.TxIn, 1)
-	assert.Len(t, splitNodeTx.TxOut, 2) // main output + ephemeral anchor
-	assert.Equal(t, spark.ZeroSequence, splitNodeTx.TxIn[0].Sequence)
+	assert.NotNil(t, renewTxs.SplitNodeTx)
+	assert.Len(t, renewTxs.SplitNodeTx.TxIn, 1)
+	assert.Len(t, renewTxs.SplitNodeTx.TxOut, 2) // main output + ephemeral anchor
+	assert.Equal(t, spark.ZeroSequence, renewTxs.SplitNodeTx.TxIn[0].Sequence)
 	// Verify main output pk script
-	assert.Equal(t, expectedVerifyingPkScript, splitNodeTx.TxOut[0].PkScript)
+	assert.Equal(t, expectedVerifyingPkScript, renewTxs.SplitNodeTx.TxOut[0].PkScript)
 	// Verify second output is ephemeral anchor
-	assert.Equal(t, int64(0), splitNodeTx.TxOut[1].Value)
-	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, splitNodeTx.TxOut[1].PkScript)
+	assert.Equal(t, int64(0), renewTxs.SplitNodeTx.TxOut[1].Value)
+	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, renewTxs.SplitNodeTx.TxOut[1].PkScript)
 
 	// Parse parent tx to check values
 	parentTx, err := common.TxFromRawTxBytes(parentNode.RawTx)
@@ -143,71 +143,71 @@ func TestConstructRenewNodeTransactions(t *testing.T) {
 	parentAmount := parentTx.TxOut[0].Value
 
 	// Split node should use parent tx hash and parent amount
-	assert.Equal(t, parentTx.TxHash(), splitNodeTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, uint32(0), splitNodeTx.TxIn[0].PreviousOutPoint.Index)
-	assert.Equal(t, parentAmount, splitNodeTx.TxOut[0].Value)
+	assert.Equal(t, parentTx.TxHash(), renewTxs.SplitNodeTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, uint32(0), renewTxs.SplitNodeTx.TxIn[0].PreviousOutPoint.Index)
+	assert.Equal(t, parentAmount, renewTxs.SplitNodeTx.TxOut[0].Value)
 
 	// Verify extended node transaction
-	assert.NotNil(t, extendedNodeTx)
-	assert.Len(t, extendedNodeTx.TxIn, 1)
-	assert.Len(t, extendedNodeTx.TxOut, 2) // main output + ephemeral anchor
-	assert.Equal(t, spark.InitialSequence(), extendedNodeTx.TxIn[0].Sequence)
-	assert.Equal(t, splitNodeTx.TxHash(), extendedNodeTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, parentAmount, extendedNodeTx.TxOut[0].Value)
+	assert.NotNil(t, renewTxs.NodeTx)
+	assert.Len(t, renewTxs.NodeTx.TxIn, 1)
+	assert.Len(t, renewTxs.NodeTx.TxOut, 2) // main output + ephemeral anchor
+	assert.Equal(t, spark.InitialSequence(), renewTxs.NodeTx.TxIn[0].Sequence)
+	assert.Equal(t, renewTxs.SplitNodeTx.TxHash(), renewTxs.NodeTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, parentAmount, renewTxs.NodeTx.TxOut[0].Value)
 	// Verify main output pk script
-	assert.Equal(t, expectedVerifyingPkScript, extendedNodeTx.TxOut[0].PkScript)
+	assert.Equal(t, expectedVerifyingPkScript, renewTxs.NodeTx.TxOut[0].PkScript)
 	// Verify second output is ephemeral anchor
-	assert.Equal(t, int64(0), extendedNodeTx.TxOut[1].Value)
-	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, extendedNodeTx.TxOut[1].PkScript)
+	assert.Equal(t, int64(0), renewTxs.NodeTx.TxOut[1].Value)
+	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, renewTxs.NodeTx.TxOut[1].PkScript)
 
 	// Verify refund transaction
-	assert.NotNil(t, refundTx)
-	assert.Len(t, refundTx.TxIn, 1)
-	assert.Len(t, refundTx.TxOut, 2) // main output + ephemeral anchor
-	assert.Equal(t, spark.InitialSequence(), refundTx.TxIn[0].Sequence)
-	assert.Equal(t, extendedNodeTx.TxHash(), refundTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, parentAmount, refundTx.TxOut[0].Value)
+	assert.NotNil(t, renewTxs.RefundTx)
+	assert.Len(t, renewTxs.RefundTx.TxIn, 1)
+	assert.Len(t, renewTxs.RefundTx.TxOut, 2) // main output + ephemeral anchor
+	assert.Equal(t, spark.InitialSequence(), renewTxs.RefundTx.TxIn[0].Sequence)
+	assert.Equal(t, renewTxs.NodeTx.TxHash(), renewTxs.RefundTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, parentAmount, renewTxs.RefundTx.TxOut[0].Value)
 	// Verify main output pk script
-	assert.Equal(t, expectedOwnerSigningPkScript, refundTx.TxOut[0].PkScript)
+	assert.Equal(t, expectedOwnerSigningPkScript, renewTxs.RefundTx.TxOut[0].PkScript)
 	// Verify second output is ephemeral anchor
-	assert.Equal(t, int64(0), refundTx.TxOut[1].Value)
-	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, refundTx.TxOut[1].PkScript)
+	assert.Equal(t, int64(0), renewTxs.RefundTx.TxOut[1].Value)
+	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, renewTxs.RefundTx.TxOut[1].PkScript)
 
 	// Verify direct split node transaction
-	assert.NotNil(t, directSplitNodeTx)
-	assert.Len(t, directSplitNodeTx.TxIn, 1)
-	assert.Len(t, directSplitNodeTx.TxOut, 1)
-	assert.Equal(t, uint32(spark.DirectTimelockOffset), directSplitNodeTx.TxIn[0].Sequence)
-	assert.Equal(t, parentTx.TxHash(), directSplitNodeTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, common.MaybeApplyFee(parentAmount), directSplitNodeTx.TxOut[0].Value)
-	assert.Equal(t, expectedVerifyingPkScript, directSplitNodeTx.TxOut[0].PkScript)
+	assert.NotNil(t, renewTxs.DirectSplitNodeTx)
+	assert.Len(t, renewTxs.DirectSplitNodeTx.TxIn, 1)
+	assert.Len(t, renewTxs.DirectSplitNodeTx.TxOut, 1)
+	assert.Equal(t, uint32(spark.DirectTimelockOffset), renewTxs.DirectSplitNodeTx.TxIn[0].Sequence)
+	assert.Equal(t, parentTx.TxHash(), renewTxs.DirectSplitNodeTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, common.MaybeApplyFee(parentAmount), renewTxs.DirectSplitNodeTx.TxOut[0].Value)
+	assert.Equal(t, expectedVerifyingPkScript, renewTxs.DirectSplitNodeTx.TxOut[0].PkScript)
 
 	// Verify direct node transaction
-	assert.NotNil(t, directNodeTx)
-	assert.Len(t, directNodeTx.TxIn, 1)
-	assert.Len(t, directNodeTx.TxOut, 1)
-	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, directNodeTx.TxIn[0].Sequence)
-	assert.Equal(t, splitNodeTx.TxHash(), directNodeTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, common.MaybeApplyFee(parentAmount), directNodeTx.TxOut[0].Value)
-	assert.Equal(t, expectedVerifyingPkScript, directNodeTx.TxOut[0].PkScript)
+	assert.NotNil(t, renewTxs.DirectNodeTx)
+	assert.Len(t, renewTxs.DirectNodeTx.TxIn, 1)
+	assert.Len(t, renewTxs.DirectNodeTx.TxOut, 1)
+	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, renewTxs.DirectNodeTx.TxIn[0].Sequence)
+	assert.Equal(t, renewTxs.SplitNodeTx.TxHash(), renewTxs.DirectNodeTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, common.MaybeApplyFee(parentAmount), renewTxs.DirectNodeTx.TxOut[0].Value)
+	assert.Equal(t, expectedVerifyingPkScript, renewTxs.DirectNodeTx.TxOut[0].PkScript)
 
 	// Verify direct refund transaction
-	assert.NotNil(t, directRefundTx)
-	assert.Len(t, directRefundTx.TxIn, 1)
-	assert.Len(t, directRefundTx.TxOut, 1)
-	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, directRefundTx.TxIn[0].Sequence)
-	assert.Equal(t, directNodeTx.TxHash(), directRefundTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, common.MaybeApplyFee(common.MaybeApplyFee(parentAmount)), directRefundTx.TxOut[0].Value)
-	assert.Equal(t, expectedOwnerSigningPkScript, directRefundTx.TxOut[0].PkScript)
+	assert.NotNil(t, renewTxs.DirectRefundTx)
+	assert.Len(t, renewTxs.DirectRefundTx.TxIn, 1)
+	assert.Len(t, renewTxs.DirectRefundTx.TxOut, 1)
+	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, renewTxs.DirectRefundTx.TxIn[0].Sequence)
+	assert.Equal(t, renewTxs.DirectNodeTx.TxHash(), renewTxs.DirectRefundTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, common.MaybeApplyFee(common.MaybeApplyFee(parentAmount)), renewTxs.DirectRefundTx.TxOut[0].Value)
+	assert.Equal(t, expectedOwnerSigningPkScript, renewTxs.DirectRefundTx.TxOut[0].PkScript)
 
 	// Verify direct from CPFP refund transaction
-	assert.NotNil(t, directFromCpfpRefundTx)
-	assert.Len(t, directFromCpfpRefundTx.TxIn, 1)
-	assert.Len(t, directFromCpfpRefundTx.TxOut, 1)
-	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, directFromCpfpRefundTx.TxIn[0].Sequence)
-	assert.Equal(t, extendedNodeTx.TxHash(), directFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, common.MaybeApplyFee(parentAmount), directFromCpfpRefundTx.TxOut[0].Value)
-	assert.Equal(t, expectedOwnerSigningPkScript, directFromCpfpRefundTx.TxOut[0].PkScript)
+	assert.NotNil(t, renewTxs.DirectFromCpfpRefundTx)
+	assert.Len(t, renewTxs.DirectFromCpfpRefundTx.TxIn, 1)
+	assert.Len(t, renewTxs.DirectFromCpfpRefundTx.TxOut, 1)
+	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, renewTxs.DirectFromCpfpRefundTx.TxIn[0].Sequence)
+	assert.Equal(t, renewTxs.NodeTx.TxHash(), renewTxs.DirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, common.MaybeApplyFee(parentAmount), renewTxs.DirectFromCpfpRefundTx.TxOut[0].Value)
+	assert.Equal(t, expectedOwnerSigningPkScript, renewTxs.DirectFromCpfpRefundTx.TxOut[0].PkScript)
 }
 
 func TestConstructRenewRefundTransactions(t *testing.T) {
@@ -236,7 +236,7 @@ func TestConstructRenewRefundTransactions(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test the function
-	nodeTx, refundTx, directNodeTx, directRefundTx, directFromCpfpRefundTx, err := handler.constructRenewRefundTransactions(leafNode, parentNode)
+	refundTxs, err := handler.constructRenewRefundTransactions(leafNode, parentNode)
 	require.NoError(t, err)
 
 	// Parse parent tx to get expected values
@@ -251,57 +251,57 @@ func TestConstructRenewRefundTransactions(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify node transaction
-	assert.NotNil(t, nodeTx)
-	assert.Len(t, nodeTx.TxIn, 1)
-	assert.Len(t, nodeTx.TxOut, 2) // main output + ephemeral anchor
-	assert.Equal(t, expectedSequence, nodeTx.TxIn[0].Sequence)
-	assert.Equal(t, parentTx.TxHash(), nodeTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, parentAmount, nodeTx.TxOut[0].Value)
+	assert.NotNil(t, refundTxs.NodeTx)
+	assert.Len(t, refundTxs.NodeTx.TxIn, 1)
+	assert.Len(t, refundTxs.NodeTx.TxOut, 2) // main output + ephemeral anchor
+	assert.Equal(t, expectedSequence, refundTxs.NodeTx.TxIn[0].Sequence)
+	assert.Equal(t, parentTx.TxHash(), refundTxs.NodeTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, parentAmount, refundTxs.NodeTx.TxOut[0].Value)
 	// Verify main output pk script
-	assert.Equal(t, expectedVerifyingPkScript, nodeTx.TxOut[0].PkScript)
+	assert.Equal(t, expectedVerifyingPkScript, refundTxs.NodeTx.TxOut[0].PkScript)
 	// Verify second output is ephemeral anchor
-	assert.Equal(t, int64(0), nodeTx.TxOut[1].Value)
-	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, nodeTx.TxOut[1].PkScript)
+	assert.Equal(t, int64(0), refundTxs.NodeTx.TxOut[1].Value)
+	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, refundTxs.NodeTx.TxOut[1].PkScript)
 
 	// Verify refund transaction
-	assert.NotNil(t, refundTx)
-	assert.Len(t, refundTx.TxIn, 1)
-	assert.Len(t, refundTx.TxOut, 2) // main output + ephemeral anchor
-	assert.Equal(t, spark.InitialSequence(), refundTx.TxIn[0].Sequence)
-	assert.Equal(t, nodeTx.TxHash(), refundTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, parentAmount, refundTx.TxOut[0].Value)
+	assert.NotNil(t, refundTxs.RefundTx)
+	assert.Len(t, refundTxs.RefundTx.TxIn, 1)
+	assert.Len(t, refundTxs.RefundTx.TxOut, 2) // main output + ephemeral anchor
+	assert.Equal(t, spark.InitialSequence(), refundTxs.RefundTx.TxIn[0].Sequence)
+	assert.Equal(t, refundTxs.NodeTx.TxHash(), refundTxs.RefundTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, parentAmount, refundTxs.RefundTx.TxOut[0].Value)
 	// Verify main output pk script
-	assert.Equal(t, expectedOwnerSigningPkScript, refundTx.TxOut[0].PkScript)
+	assert.Equal(t, expectedOwnerSigningPkScript, refundTxs.RefundTx.TxOut[0].PkScript)
 	// Verify second output is ephemeral anchor
-	assert.Equal(t, int64(0), refundTx.TxOut[1].Value)
-	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, refundTx.TxOut[1].PkScript)
+	assert.Equal(t, int64(0), refundTxs.RefundTx.TxOut[1].Value)
+	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, refundTxs.RefundTx.TxOut[1].PkScript)
 
 	// Verify direct node transaction
-	assert.NotNil(t, directNodeTx)
-	assert.Len(t, directNodeTx.TxIn, 1)
-	assert.Len(t, directNodeTx.TxOut, 1)
-	assert.Equal(t, expectedSequence+spark.DirectTimelockOffset, directNodeTx.TxIn[0].Sequence)
-	assert.Equal(t, parentTx.TxHash(), directNodeTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, common.MaybeApplyFee(parentAmount), directNodeTx.TxOut[0].Value)
-	assert.Equal(t, expectedVerifyingPkScript, directNodeTx.TxOut[0].PkScript)
+	assert.NotNil(t, refundTxs.DirectNodeTx)
+	assert.Len(t, refundTxs.DirectNodeTx.TxIn, 1)
+	assert.Len(t, refundTxs.DirectNodeTx.TxOut, 1)
+	assert.Equal(t, expectedSequence+spark.DirectTimelockOffset, refundTxs.DirectNodeTx.TxIn[0].Sequence)
+	assert.Equal(t, parentTx.TxHash(), refundTxs.DirectNodeTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, common.MaybeApplyFee(parentAmount), refundTxs.DirectNodeTx.TxOut[0].Value)
+	assert.Equal(t, expectedVerifyingPkScript, refundTxs.DirectNodeTx.TxOut[0].PkScript)
 
 	// Verify direct refund transaction
-	assert.NotNil(t, directRefundTx)
-	assert.Len(t, directRefundTx.TxIn, 1)
-	assert.Len(t, directRefundTx.TxOut, 1)
-	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, directRefundTx.TxIn[0].Sequence)
-	assert.Equal(t, directNodeTx.TxHash(), directRefundTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, common.MaybeApplyFee(common.MaybeApplyFee(parentAmount)), directRefundTx.TxOut[0].Value)
-	assert.Equal(t, expectedOwnerSigningPkScript, directRefundTx.TxOut[0].PkScript)
+	assert.NotNil(t, refundTxs.DirectRefundTx)
+	assert.Len(t, refundTxs.DirectRefundTx.TxIn, 1)
+	assert.Len(t, refundTxs.DirectRefundTx.TxOut, 1)
+	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, refundTxs.DirectRefundTx.TxIn[0].Sequence)
+	assert.Equal(t, refundTxs.DirectNodeTx.TxHash(), refundTxs.DirectRefundTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, common.MaybeApplyFee(common.MaybeApplyFee(parentAmount)), refundTxs.DirectRefundTx.TxOut[0].Value)
+	assert.Equal(t, expectedOwnerSigningPkScript, refundTxs.DirectRefundTx.TxOut[0].PkScript)
 
 	// Verify direct from CPFP refund transaction
-	assert.NotNil(t, directFromCpfpRefundTx)
-	assert.Len(t, directFromCpfpRefundTx.TxIn, 1)
-	assert.Len(t, directFromCpfpRefundTx.TxOut, 1)
-	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, directFromCpfpRefundTx.TxIn[0].Sequence)
-	assert.Equal(t, nodeTx.TxHash(), directFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, common.MaybeApplyFee(parentAmount), directFromCpfpRefundTx.TxOut[0].Value)
-	assert.Equal(t, expectedOwnerSigningPkScript, directFromCpfpRefundTx.TxOut[0].PkScript)
+	assert.NotNil(t, refundTxs.DirectFromCpfpRefundTx)
+	assert.Len(t, refundTxs.DirectFromCpfpRefundTx.TxIn, 1)
+	assert.Len(t, refundTxs.DirectFromCpfpRefundTx.TxOut, 1)
+	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, refundTxs.DirectFromCpfpRefundTx.TxIn[0].Sequence)
+	assert.Equal(t, refundTxs.NodeTx.TxHash(), refundTxs.DirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, common.MaybeApplyFee(parentAmount), refundTxs.DirectFromCpfpRefundTx.TxOut[0].Value)
+	assert.Equal(t, expectedOwnerSigningPkScript, refundTxs.DirectFromCpfpRefundTx.TxOut[0].PkScript)
 }
 
 func TestConstructRenewZeroNodeTransactions(t *testing.T) {
@@ -327,7 +327,7 @@ func TestConstructRenewZeroNodeTransactions(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test the function
-	nodeTx, refundTx, directNodeTx, directFromCpfpRefundTx, err := handler.constructRenewZeroNodeTransactions(leafNode)
+	zeroTxs, err := handler.constructRenewZeroNodeTransactions(leafNode)
 	require.NoError(t, err)
 
 	// Parse leaf tx to get expected values
@@ -336,48 +336,48 @@ func TestConstructRenewZeroNodeTransactions(t *testing.T) {
 	leafAmount := leafTx.TxOut[0].Value
 
 	// Verify new node transaction (with zero sequence)
-	assert.NotNil(t, nodeTx)
-	assert.Len(t, nodeTx.TxIn, 1)
-	assert.Len(t, nodeTx.TxOut, 2) // main output + ephemeral anchor
-	assert.Equal(t, spark.ZeroSequence, nodeTx.TxIn[0].Sequence)
-	assert.Equal(t, leafTx.TxHash(), nodeTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, leafAmount, nodeTx.TxOut[0].Value)
+	assert.NotNil(t, zeroTxs.NodeTx)
+	assert.Len(t, zeroTxs.NodeTx.TxIn, 1)
+	assert.Len(t, zeroTxs.NodeTx.TxOut, 2) // main output + ephemeral anchor
+	assert.Equal(t, spark.ZeroSequence, zeroTxs.NodeTx.TxIn[0].Sequence)
+	assert.Equal(t, leafTx.TxHash(), zeroTxs.NodeTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, leafAmount, zeroTxs.NodeTx.TxOut[0].Value)
 	// Verify main output pk script
-	assert.Equal(t, expectedVerifyingPkScript, nodeTx.TxOut[0].PkScript)
+	assert.Equal(t, expectedVerifyingPkScript, zeroTxs.NodeTx.TxOut[0].PkScript)
 	// Verify second output is ephemeral anchor
-	assert.Equal(t, int64(0), nodeTx.TxOut[1].Value)
-	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, nodeTx.TxOut[1].PkScript)
+	assert.Equal(t, int64(0), zeroTxs.NodeTx.TxOut[1].Value)
+	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, zeroTxs.NodeTx.TxOut[1].PkScript)
 
 	// Verify refund transaction (with initial sequence)
-	assert.NotNil(t, refundTx)
-	assert.Len(t, refundTx.TxIn, 1)
-	assert.Len(t, refundTx.TxOut, 2) // main output + ephemeral anchor
-	assert.Equal(t, spark.InitialSequence(), refundTx.TxIn[0].Sequence)
-	assert.Equal(t, nodeTx.TxHash(), refundTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, leafAmount, refundTx.TxOut[0].Value)
+	assert.NotNil(t, zeroTxs.RefundTx)
+	assert.Len(t, zeroTxs.RefundTx.TxIn, 1)
+	assert.Len(t, zeroTxs.RefundTx.TxOut, 2) // main output + ephemeral anchor
+	assert.Equal(t, spark.InitialSequence(), zeroTxs.RefundTx.TxIn[0].Sequence)
+	assert.Equal(t, zeroTxs.NodeTx.TxHash(), zeroTxs.RefundTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, leafAmount, zeroTxs.RefundTx.TxOut[0].Value)
 	// Verify main output pk script
-	assert.Equal(t, expectedOwnerSigningPkScript, refundTx.TxOut[0].PkScript)
+	assert.Equal(t, expectedOwnerSigningPkScript, zeroTxs.RefundTx.TxOut[0].PkScript)
 	// Verify second output is ephemeral anchor
-	assert.Equal(t, int64(0), refundTx.TxOut[1].Value)
-	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, refundTx.TxOut[1].PkScript)
+	assert.Equal(t, int64(0), zeroTxs.RefundTx.TxOut[1].Value)
+	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, zeroTxs.RefundTx.TxOut[1].PkScript)
 
 	// Verify direct node transaction
-	assert.NotNil(t, directNodeTx)
-	assert.Len(t, directNodeTx.TxIn, 1)
-	assert.Len(t, directNodeTx.TxOut, 1)
-	assert.Equal(t, uint32(spark.DirectTimelockOffset), directNodeTx.TxIn[0].Sequence)
-	assert.Equal(t, leafTx.TxHash(), directNodeTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, common.MaybeApplyFee(leafAmount), directNodeTx.TxOut[0].Value)
-	assert.Equal(t, expectedVerifyingPkScript, directNodeTx.TxOut[0].PkScript)
+	assert.NotNil(t, zeroTxs.DirectNodeTx)
+	assert.Len(t, zeroTxs.DirectNodeTx.TxIn, 1)
+	assert.Len(t, zeroTxs.DirectNodeTx.TxOut, 1)
+	assert.Equal(t, uint32(spark.DirectTimelockOffset), zeroTxs.DirectNodeTx.TxIn[0].Sequence)
+	assert.Equal(t, leafTx.TxHash(), zeroTxs.DirectNodeTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, common.MaybeApplyFee(leafAmount), zeroTxs.DirectNodeTx.TxOut[0].Value)
+	assert.Equal(t, expectedVerifyingPkScript, zeroTxs.DirectNodeTx.TxOut[0].PkScript)
 
 	// Verify direct from CPFP refund transaction
-	assert.NotNil(t, directFromCpfpRefundTx)
-	assert.Len(t, directFromCpfpRefundTx.TxIn, 1)
-	assert.Len(t, directFromCpfpRefundTx.TxOut, 1)
-	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, directFromCpfpRefundTx.TxIn[0].Sequence)
-	assert.Equal(t, nodeTx.TxHash(), directFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, common.MaybeApplyFee(leafAmount), directFromCpfpRefundTx.TxOut[0].Value)
-	assert.Equal(t, expectedOwnerSigningPkScript, directFromCpfpRefundTx.TxOut[0].PkScript)
+	assert.NotNil(t, zeroTxs.DirectFromCpfpRefundTx)
+	assert.Len(t, zeroTxs.DirectFromCpfpRefundTx.TxIn, 1)
+	assert.Len(t, zeroTxs.DirectFromCpfpRefundTx.TxOut, 1)
+	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, zeroTxs.DirectFromCpfpRefundTx.TxIn[0].Sequence)
+	assert.Equal(t, zeroTxs.NodeTx.TxHash(), zeroTxs.DirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Hash)
+	assert.Equal(t, common.MaybeApplyFee(leafAmount), zeroTxs.DirectFromCpfpRefundTx.TxOut[0].Value)
+	assert.Equal(t, expectedOwnerSigningPkScript, zeroTxs.DirectFromCpfpRefundTx.TxOut[0].PkScript)
 }
 
 func TestValidateRenewNodeTimelocks(t *testing.T) {

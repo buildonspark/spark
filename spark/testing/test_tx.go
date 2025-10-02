@@ -31,14 +31,17 @@ func CreateTestP2TRTransactionWithSequence(t *testing.T, receiverPubKey keys.Pub
 	if err != nil {
 		return nil, fmt.Errorf("error creating P2TR address: %w", err)
 	}
+
 	// Create input with specified sequence
 	inputs := []*wire.TxIn{dummyInputWithSequence(sequence)}
+
 	// Create output
 	txOut, err := createP2TROutput(p2trAddress, amountSats)
 	if err != nil {
 		return nil, fmt.Errorf("error creating output: %w", err)
 	}
 	outputs := []*wire.TxOut{txOut}
+
 	return CreateTestTransaction(inputs, outputs), nil
 }
 
