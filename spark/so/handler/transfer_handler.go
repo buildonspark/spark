@@ -194,27 +194,28 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		req.SparkInvoice,
 	)
 	if err != nil {
+		originalErr := err
 		db, err := ent.GetDbFromContext(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get database transaction: %w", err)
+			return nil, fmt.Errorf("unable to get database transaction: %w while creating transfer: %w", err, originalErr)
 		}
 		err = db.Rollback()
 		if err != nil {
-			return nil, fmt.Errorf("unable to rollback database transaction: %w", err)
+			return nil, fmt.Errorf("unable to rollback database transaction: %w while creating transfer: %w", err, originalErr)
 		}
 		db, err = ent.GetDbFromContext(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to get database transaction: %w", err)
+			return nil, fmt.Errorf("unable to get database transaction: %w while creating transfer: %w", err, originalErr)
 		}
 		_, err = db.PendingSendTransfer.Update().Where(pendingsendtransfer.TransferID(transferUUID)).SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("unable to update pending send transfer: %w", err)
+			return nil, fmt.Errorf("unable to update pending send transfer: %w while creating transfer: %w", err, originalErr)
 		}
 		err = db.Commit()
 		if err != nil {
-			return nil, fmt.Errorf("unable to commit database transaction: %w", err)
+			return nil, fmt.Errorf("unable to commit database transaction: %w while creating transfer: %w", err, originalErr)
 		}
-		return nil, fmt.Errorf("failed to create transfer for transfer %s: %w", req.TransferId, err)
+		return nil, fmt.Errorf("failed to create transfer for transfer %s: %w", req.TransferId, originalErr)
 	}
 
 	var signingResults []*pb.LeafRefundTxSigningResult
