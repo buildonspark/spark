@@ -446,7 +446,9 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		SetDirectTx(directNodeTxBytes).
 		SetDirectRefundTx(directRefundTxBytes).
 		SetDirectFromCpfpRefundTx(directFromCpfpRefundTxBytes)
-	if tree.Status == st.TreeStatusAvailable {
+	if tree.Status == st.TreeStatusAvailable && intent != pbcommon.SignatureIntent_REFRESH {
+		// Existing refresh call won't lock the leaf status, so the leaves can be used in future operations.
+		// This is address by new renew_leaf but this cases leaves to be unlocked during transfer.
 		if len(node.RawRefundTx) > 0 && len(node.Edges.Children) == 0 {
 			nodeMutator.SetStatus(st.TreeNodeStatusAvailable)
 		} else {
