@@ -491,3 +491,24 @@ func CompareTransactions(txA, txB *wire.MsgTx) error {
 	}
 	return nil
 }
+
+// BlockBasedRelativeTimelock returns the block-based relative timelock duration
+// specified by the passed transaction input if it specifies one.
+// If it does not specify one, it returns an error.
+func BlockBasedRelativeTimelock(txIn wire.TxIn) (uint16, error) {
+	return blockBasedRelativeTimelock(txIn.Sequence)
+}
+
+func blockBasedRelativeTimelock(sequence uint32) (uint16, error) {
+	if sequence&wire.SequenceLockTimeDisabled != 0 {
+		return 0, fmt.Errorf("sequence number is not a relative timelock, got %d", sequence)
+	}
+
+	if sequence&wire.SequenceLockTimeIsSeconds != 0 {
+		return 0, fmt.Errorf("sequence number is not a block-based relative timelock, got %d", sequence)
+	}
+
+	durationInBlocks := uint16(sequence & wire.SequenceLockTimeMask)
+
+	return durationInBlocks, nil
+}
