@@ -390,13 +390,36 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		// Only false for Swap V3 flow when initiating a primary transfer for a swap.
 		// Swap V3 postpones key tweaking for the primary transfer, until a counter transfer is submitted.
 		if tweakKeys {
-			// If all other SOs have settled the sender key tweaks, we can commit the sender key tweaks.
-			// If there's any error, it means one or more of the SOs are down at the time, we will have a
-			// cron job to retry the key commit.
-			keyTweakProofMap := make(map[string]*pb.SecretProof)
-			for _, leaf := range leafTweakMap {
-				keyTweakProofMap[leaf.LeafId] = &pb.SecretProof{
-					Proofs: leaf.SecretShareTweak.Proofs,
+			var message pbgossip.GossipMessage
+			// Swap V3 requires both primary and counter transfer tweaks settled at the same time,
+			// so there is a special handler for this case.
+			// primaryTransferId is only passed in for swap v3.
+			if transferType == st.TransferTypeCounterSwap && primaryTransferId != uuid.Nil {
+				message = pbgossip.GossipMessage{
+					Message: &pbgossip.GossipMessage_SettleSwapKeyTweak{
+						SettleSwapKeyTweak: &pbgossip.GossipMessageSettleSwapKeyTweak{
+							CounterTransferId: transfer.ID.String(),
+						},
+					},
+				}
+			} else {
+				// If all other SOs have settled the sender key tweaks, we can commit the sender key tweaks.
+				// If there's any error, it means one or more of the SOs are down at the time, we will have a
+				// cron job to retry the key commit.
+				keyTweakProofMap := make(map[string]*pb.SecretProof)
+				for _, leaf := range leafTweakMap {
+					keyTweakProofMap[leaf.LeafId] = &pb.SecretProof{
+						Proofs: leaf.SecretShareTweak.Proofs,
+					}
+				}
+
+				message = pbgossip.GossipMessage{
+					Message: &pbgossip.GossipMessage_SettleSenderKeyTweak{
+						SettleSenderKeyTweak: &pbgossip.GossipMessageSettleSenderKeyTweak{
+							TransferId:           req.TransferId,
+							SenderKeyTweakProofs: keyTweakProofMap,
+						},
+					},
 				}
 			}
 
@@ -408,14 +431,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 			if err != nil {
 				return nil, fmt.Errorf("unable to get operator list: %w", err)
 			}
-			_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
-				Message: &pbgossip.GossipMessage_SettleSenderKeyTweak{
-					SettleSenderKeyTweak: &pbgossip.GossipMessageSettleSenderKeyTweak{
-						TransferId:           req.TransferId,
-						SenderKeyTweakProofs: keyTweakProofMap,
-					},
-				},
-			}, participants)
+			_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &message, participants)
 			if err != nil {
 				logger.With(zap.Error(err)).Sugar().Errorf(
 					"Failed to create and send gossip message to settle sender key tweak for transfer %s",
