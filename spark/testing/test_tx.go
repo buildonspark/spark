@@ -2,17 +2,38 @@ package sparktesting
 
 import (
 	"fmt"
+	"testing"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
 )
 
 // CreateTestP2TRTransaction creates a test P2TR transaction with a dummy input and output.
 func CreateTestP2TRTransaction(p2trAddress string, amountSats int64) (*wire.MsgTx, error) {
 	inputs := []*wire.TxIn{dummyInput()}
+	txOut, err := createP2TROutput(p2trAddress, amountSats)
+	if err != nil {
+		return nil, fmt.Errorf("error creating output: %w", err)
+	}
+	outputs := []*wire.TxOut{txOut}
+	return CreateTestTransaction(inputs, outputs), nil
+}
+
+// CreateTestP2TRTransactionWithSequence creates a test P2TR transaction with a dummy input (with specified sequence) and output.
+func CreateTestP2TRTransactionWithSequence(t *testing.T, receiverPubKey keys.Public, sequence uint32, amountSats int64) (*wire.MsgTx, error) {
+	// Convert pubkey to P2TR address
+	p2trAddress, err := common.P2TRAddressFromPublicKey(receiverPubKey, common.Regtest)
+	if err != nil {
+		return nil, fmt.Errorf("error creating P2TR address: %w", err)
+	}
+	// Create input with specified sequence
+	inputs := []*wire.TxIn{dummyInputWithSequence(sequence)}
+	// Create output
 	txOut, err := createP2TROutput(p2trAddress, amountSats)
 	if err != nil {
 		return nil, fmt.Errorf("error creating output: %w", err)
@@ -110,6 +131,18 @@ func dummyInput() *wire.TxIn {
 		[]byte{}, // Empty witness element as placeholder
 	}
 
+	return txIn
+}
+
+func dummyInputWithSequence(sequence uint32) *wire.TxIn {
+	prevOut := wire.NewOutPoint(&chainhash.Hash{}, 0) // Empty hash and index 0
+	txIn := wire.NewTxIn(prevOut, nil, [][]byte{})
+	txIn.Sequence = sequence
+	// For taproot, we need some form of witness data
+	// This is just dummy data for testing
+	txIn.Witness = wire.TxWitness{
+		[]byte{}, // Empty witness element as placeholder
+	}
 	return txIn
 }
 
