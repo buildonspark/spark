@@ -22,6 +22,7 @@ test-grpc = """
     --format testname \
     --packages="./so/grpc_test/... ./so/grpc_test_internal/..." \
     -- \
+    -p 1 \
     -tags=lightspark
 """
 test-grpc-minikube = """
@@ -30,5 +31,6 @@ test-grpc-minikube = """
     --format testname \
     --packages="./so/grpc_test/... ./so/grpc_test_internal/..." \
     -- \
+    -p 1 \
     -tags=lightspark
 """
