@@ -38,6 +38,7 @@ const (
 	SparkService_CooperativeExit_FullMethodName                     = "/spark.SparkService/cooperative_exit"
 	SparkService_InitiatePreimageSwap_FullMethodName                = "/spark.SparkService/initiate_preimage_swap"
 	SparkService_ProvidePreimage_FullMethodName                     = "/spark.SparkService/provide_preimage"
+	SparkService_QueryHtlc_FullMethodName                           = "/spark.SparkService/query_htlc"
 	SparkService_StartLeafSwap_FullMethodName                       = "/spark.SparkService/start_leaf_swap"
 	SparkService_LeafSwap_FullMethodName                            = "/spark.SparkService/leaf_swap"
 	SparkService_CounterLeafSwap_FullMethodName                     = "/spark.SparkService/counter_leaf_swap"
@@ -105,6 +106,7 @@ type SparkServiceClient interface {
 	CooperativeExit(ctx context.Context, in *CooperativeExitRequest, opts ...grpc.CallOption) (*CooperativeExitResponse, error)
 	InitiatePreimageSwap(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(ctx context.Context, in *ProvidePreimageRequest, opts ...grpc.CallOption) (*ProvidePreimageResponse, error)
+	QueryHtlc(ctx context.Context, in *QueryHtlcRequest, opts ...grpc.CallOption) (*QueryHtlcResponse, error)
 	// This is the exact same as start_transfer, but expresses to the SO
 	// this transfer is specifically for a leaf swap.
 	StartLeafSwap(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error)
@@ -350,6 +352,16 @@ func (c *sparkServiceClient) ProvidePreimage(ctx context.Context, in *ProvidePre
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ProvidePreimageResponse)
 	err := c.cc.Invoke(ctx, SparkService_ProvidePreimage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkServiceClient) QueryHtlc(ctx context.Context, in *QueryHtlcRequest, opts ...grpc.CallOption) (*QueryHtlcResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryHtlcResponse)
+	err := c.cc.Invoke(ctx, SparkService_QueryHtlc_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -756,6 +768,7 @@ type SparkServiceServer interface {
 	CooperativeExit(context.Context, *CooperativeExitRequest) (*CooperativeExitResponse, error)
 	InitiatePreimageSwap(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(context.Context, *ProvidePreimageRequest) (*ProvidePreimageResponse, error)
+	QueryHtlc(context.Context, *QueryHtlcRequest) (*QueryHtlcResponse, error)
 	// This is the exact same as start_transfer, but expresses to the SO
 	// this transfer is specifically for a leaf swap.
 	StartLeafSwap(context.Context, *StartTransferRequest) (*StartTransferResponse, error)
@@ -878,6 +891,9 @@ func (UnimplementedSparkServiceServer) InitiatePreimageSwap(context.Context, *In
 }
 func (UnimplementedSparkServiceServer) ProvidePreimage(context.Context, *ProvidePreimageRequest) (*ProvidePreimageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ProvidePreimage not implemented")
+}
+func (UnimplementedSparkServiceServer) QueryHtlc(context.Context, *QueryHtlcRequest) (*QueryHtlcResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryHtlc not implemented")
 }
 func (UnimplementedSparkServiceServer) StartLeafSwap(context.Context, *StartTransferRequest) (*StartTransferResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartLeafSwap not implemented")
@@ -1328,6 +1344,24 @@ func _SparkService_ProvidePreimage_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkServiceServer).ProvidePreimage(ctx, req.(*ProvidePreimageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkService_QueryHtlc_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryHtlcRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).QueryHtlc(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_QueryHtlc_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).QueryHtlc(ctx, req.(*QueryHtlcRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2051,6 +2085,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "provide_preimage",
 			Handler:    _SparkService_ProvidePreimage_Handler,
+		},
+		{
+			MethodName: "query_htlc",
+			Handler:    _SparkService_QueryHtlc_Handler,
 		},
 		{
 			MethodName: "start_leaf_swap",

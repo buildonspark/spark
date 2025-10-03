@@ -248,6 +248,11 @@ func (s *SparkServer) QueryUserSignedRefunds(ctx context.Context, req *pb.QueryU
 	return lightningHandler.QueryUserSignedRefunds(ctx, req)
 }
 
+func (s *SparkServer) QueryHtlc(ctx context.Context, req *pb.QueryHtlcRequest) (*pb.QueryHtlcResponse, error) {
+	lightningHandler := handler.NewLightningHandler(s.config)
+	return lightningHandler.QueryHTLC(ctx, req)
+}
+
 func (s *SparkServer) ProvidePreimage(ctx context.Context, req *pb.ProvidePreimageRequest) (*pb.ProvidePreimageResponse, error) {
 	lightningHandler := handler.NewLightningHandler(s.config)
 	return lightningHandler.ProvidePreimage(ctx, req)

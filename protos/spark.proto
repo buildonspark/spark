@@ -40,6 +40,7 @@ service SparkService {
     rpc cooperative_exit(CooperativeExitRequest) returns (CooperativeExitResponse) {}
     rpc initiate_preimage_swap(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc provide_preimage(ProvidePreimageRequest) returns (ProvidePreimageResponse) {}
+    rpc query_htlc(QueryHtlcRequest) returns (QueryHtlcResponse) {}
     // This is the exact same as start_transfer, but expresses to the SO
     // this transfer is specifically for a leaf swap.
     rpc start_leaf_swap(StartTransferRequest) returns (StartTransferResponse) {}
@@ -1257,6 +1258,39 @@ message QueryUserSignedRefundsResponse {
     repeated UserSignedRefund user_signed_refunds = 1;
     reserved 2;
     Transfer transfer = 3;
+}
+
+enum PreimageRequestStatus {
+    PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE = 0;
+    PREIMAGE_REQUEST_STATUS_PREIMAGE_SHARED = 1;
+    PREIMAGE_REQUEST_STATUS_RETURNED = 2;
+}
+
+message PreimageRequestWithTransfer {
+    // Preimage request data
+    bytes payment_hash = 1 [(validate.rules).bytes.len = 32];
+    bytes receiver_identity_pubkey = 2 [(validate.rules).bytes.len = 33];
+    PreimageRequestStatus status = 3;
+    google.protobuf.Timestamp created_time = 4;
+    
+    // Associated transfer (if exists)
+    optional Transfer transfer = 5;
+    
+    // Preimage data (if available)
+    optional bytes preimage = 6;
+}
+
+message QueryHtlcRequest {
+    repeated bytes payment_hashes = 1;
+    bytes identity_public_key = 2;
+    optional PreimageRequestStatus status = 3;
+    int64 limit = 4; // defaults to 100 if not set.
+    int64 offset = 5; // defaults to 0 if not set.
+}
+
+message QueryHtlcResponse {
+    repeated PreimageRequestWithTransfer preimage_requests = 1;
+    int64 offset = 2; // defaults to -1 if there are no more results
 }
 
 message ProvidePreimageRequest {

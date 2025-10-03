@@ -30,6 +30,7 @@ import (
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
+	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -41,6 +42,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -1614,6 +1616,102 @@ func (h *LightningHandler) QueryUserSignedRefunds(ctx context.Context, req *pb.Q
 	return &pb.QueryUserSignedRefundsResponse{
 		UserSignedRefunds: protos,
 		Transfer:          transferProto,
+	}, nil
+}
+
+func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pb.QueryHtlcRequest) (*pb.QueryHtlcResponse, error) {
+	if len(req.IdentityPublicKey) == 0 {
+		return nil, fmt.Errorf("identity public key is required")
+	}
+
+	if req.Limit <= 0 {
+		return nil, fmt.Errorf("expect limit to be greater than 0")
+	}
+
+	if req.Offset < 0 {
+		return nil, fmt.Errorf("expect non-negative offset")
+	}
+
+	tx, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+	}
+
+	reqIdentityPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("invalid identity public key: %w", err)
+	}
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqIdentityPubKey); err != nil {
+		return nil, err
+	}
+
+	conditions := []predicate.PreimageRequest{
+		preimagerequest.ReceiverIdentityPubkeyEQ(reqIdentityPubKey),
+	}
+
+	// Only add payment hash filter if payment hashes are provided
+	if len(req.PaymentHashes) > 0 {
+		conditions = append(conditions, preimagerequest.PaymentHashIn(req.PaymentHashes...))
+	}
+
+	// Only add status filter if status is provided
+	if req.Status != nil {
+		var preimageRequestStatus st.PreimageRequestStatus
+		err := preimageRequestStatus.UnmarshalProto(*req.Status)
+		if err != nil {
+			return nil, fmt.Errorf("failed to unmarshal status: %w", err)
+		}
+		conditions = append(conditions, preimagerequest.StatusEQ(preimageRequestStatus))
+	}
+
+	// Add pagination
+	limit := min(int(req.Limit), 100)
+	offset := max(int(req.Offset), 0)
+
+	preimageRequestsWithTransfers, err := tx.PreimageRequest.Query().Where(
+		preimagerequest.And(
+			conditions...,
+		),
+	).WithTransfers().Limit(limit).Offset(offset).All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query preimage requests: %w", err)
+	}
+
+	// Convert to protobuf response
+	preimageRequests := make([]*pb.PreimageRequestWithTransfer, len(preimageRequestsWithTransfers))
+	for i, current := range preimageRequestsWithTransfers {
+		transfer := current.Edges.Transfers
+		var transferProto *pb.Transfer
+		if transfer != nil {
+			transferProto, err = transfer.MarshalProto(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal transfer: %w", err)
+			}
+		}
+
+		status, err := current.Status.MarshalProto()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal status: %w", err)
+		}
+
+		preimageRequests[i] = &pb.PreimageRequestWithTransfer{
+			PaymentHash:            current.PaymentHash,
+			ReceiverIdentityPubkey: current.ReceiverIdentityPubkey.Serialize(),
+			Status:                 status,
+			CreatedTime:            timestamppb.New(current.CreateTime),
+			Transfer:               transferProto,
+			Preimage:               current.Preimage,
+		}
+	}
+
+	nextOffset := -1
+	if len(preimageRequestsWithTransfers) == limit {
+		nextOffset = offset + limit
+	}
+
+	return &pb.QueryHtlcResponse{
+		PreimageRequests: preimageRequests,
+		Offset:           int64(nextOffset),
 	}, nil
 }
 

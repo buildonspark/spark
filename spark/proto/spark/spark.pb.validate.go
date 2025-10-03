@@ -18789,6 +18789,447 @@ var _ interface {
 	ErrorName() string
 } = QueryUserSignedRefundsResponseValidationError{}
 
+// Validate checks the field values on PreimageRequestWithTransfer with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *PreimageRequestWithTransfer) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on PreimageRequestWithTransfer with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// PreimageRequestWithTransferMultiError, or nil if none found.
+func (m *PreimageRequestWithTransfer) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *PreimageRequestWithTransfer) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetPaymentHash()) != 32 {
+		err := PreimageRequestWithTransferValidationError{
+			field:  "PaymentHash",
+			reason: "value length must be 32 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(m.GetReceiverIdentityPubkey()) != 33 {
+		err := PreimageRequestWithTransferValidationError{
+			field:  "ReceiverIdentityPubkey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for Status
+
+	if all {
+		switch v := interface{}(m.GetCreatedTime()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, PreimageRequestWithTransferValidationError{
+					field:  "CreatedTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, PreimageRequestWithTransferValidationError{
+					field:  "CreatedTime",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetCreatedTime()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return PreimageRequestWithTransferValidationError{
+				field:  "CreatedTime",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if m.Transfer != nil {
+
+		if all {
+			switch v := interface{}(m.GetTransfer()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, PreimageRequestWithTransferValidationError{
+						field:  "Transfer",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, PreimageRequestWithTransferValidationError{
+						field:  "Transfer",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetTransfer()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return PreimageRequestWithTransferValidationError{
+					field:  "Transfer",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	if m.Preimage != nil {
+		// no validation rules for Preimage
+	}
+
+	if len(errors) > 0 {
+		return PreimageRequestWithTransferMultiError(errors)
+	}
+
+	return nil
+}
+
+// PreimageRequestWithTransferMultiError is an error wrapping multiple
+// validation errors returned by PreimageRequestWithTransfer.ValidateAll() if
+// the designated constraints aren't met.
+type PreimageRequestWithTransferMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m PreimageRequestWithTransferMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m PreimageRequestWithTransferMultiError) AllErrors() []error { return m }
+
+// PreimageRequestWithTransferValidationError is the validation error returned
+// by PreimageRequestWithTransfer.Validate if the designated constraints
+// aren't met.
+type PreimageRequestWithTransferValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e PreimageRequestWithTransferValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e PreimageRequestWithTransferValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e PreimageRequestWithTransferValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e PreimageRequestWithTransferValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e PreimageRequestWithTransferValidationError) ErrorName() string {
+	return "PreimageRequestWithTransferValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e PreimageRequestWithTransferValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sPreimageRequestWithTransfer.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = PreimageRequestWithTransferValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = PreimageRequestWithTransferValidationError{}
+
+// Validate checks the field values on QueryHtlcRequest with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *QueryHtlcRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryHtlcRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// QueryHtlcRequestMultiError, or nil if none found.
+func (m *QueryHtlcRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryHtlcRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for IdentityPublicKey
+
+	// no validation rules for Limit
+
+	// no validation rules for Offset
+
+	if m.Status != nil {
+		// no validation rules for Status
+	}
+
+	if len(errors) > 0 {
+		return QueryHtlcRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryHtlcRequestMultiError is an error wrapping multiple validation errors
+// returned by QueryHtlcRequest.ValidateAll() if the designated constraints
+// aren't met.
+type QueryHtlcRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryHtlcRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryHtlcRequestMultiError) AllErrors() []error { return m }
+
+// QueryHtlcRequestValidationError is the validation error returned by
+// QueryHtlcRequest.Validate if the designated constraints aren't met.
+type QueryHtlcRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryHtlcRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryHtlcRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryHtlcRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryHtlcRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryHtlcRequestValidationError) ErrorName() string { return "QueryHtlcRequestValidationError" }
+
+// Error satisfies the builtin error interface
+func (e QueryHtlcRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryHtlcRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryHtlcRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryHtlcRequestValidationError{}
+
+// Validate checks the field values on QueryHtlcResponse with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *QueryHtlcResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryHtlcResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// QueryHtlcResponseMultiError, or nil if none found.
+func (m *QueryHtlcResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryHtlcResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	for idx, item := range m.GetPreimageRequests() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, QueryHtlcResponseValidationError{
+						field:  fmt.Sprintf("PreimageRequests[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, QueryHtlcResponseValidationError{
+						field:  fmt.Sprintf("PreimageRequests[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return QueryHtlcResponseValidationError{
+					field:  fmt.Sprintf("PreimageRequests[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
+	// no validation rules for Offset
+
+	if len(errors) > 0 {
+		return QueryHtlcResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryHtlcResponseMultiError is an error wrapping multiple validation errors
+// returned by QueryHtlcResponse.ValidateAll() if the designated constraints
+// aren't met.
+type QueryHtlcResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryHtlcResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryHtlcResponseMultiError) AllErrors() []error { return m }
+
+// QueryHtlcResponseValidationError is the validation error returned by
+// QueryHtlcResponse.Validate if the designated constraints aren't met.
+type QueryHtlcResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryHtlcResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryHtlcResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryHtlcResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryHtlcResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryHtlcResponseValidationError) ErrorName() string {
+	return "QueryHtlcResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryHtlcResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryHtlcResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryHtlcResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryHtlcResponseValidationError{}
+
 // Validate checks the field values on ProvidePreimageRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.

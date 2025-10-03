@@ -134,6 +134,49 @@ func SwapNodesForPreimage(
 	return response, nil
 }
 
+func QueryHTLC(
+	ctx context.Context,
+	config *TestWalletConfig,
+	limit int64,
+	offset int64,
+	paymentHashes [][]byte,
+	status *pb.PreimageRequestStatus,
+) (*pb.QueryHtlcResponse, error) {
+	conn, err := config.NewCoordinatorGRPCConnection()
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	token, err := AuthenticateWithConnection(ctx, config, conn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to authenticate with server: %w", err)
+	}
+	tmpCtx := ContextWithToken(ctx, token)
+
+	client := pb.NewSparkServiceClient(conn)
+
+	req := &pb.QueryHtlcRequest{
+		IdentityPublicKey: config.IdentityPublicKey().Serialize(),
+		Limit:             limit,
+		Offset:            offset,
+	}
+
+	if len(paymentHashes) > 0 {
+		req.PaymentHashes = paymentHashes
+	}
+
+	if status != nil {
+		req.Status = status
+	}
+
+	response, err := client.QueryHtlc(tmpCtx, req)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 func ReturnLightningPayment(
 	ctx context.Context,
 	config *TestWalletConfig,

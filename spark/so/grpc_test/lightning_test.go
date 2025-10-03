@@ -780,3 +780,300 @@ func TestSendLightningPaymentWithHTLC(t *testing.T) {
 	_, err = wallet.ClaimTransfer(receiverCtx, receiverTransfer, sspConfig, leavesToClaim)
 	require.NoError(t, err, "failed to ClaimTransfer")
 }
+
+func TestQueryHTLCWithNoFilters(t *testing.T) {
+	// Create user and ssp configs
+	userConfig := wallet.NewTestWalletConfig(t)
+
+	// User creates an invoice
+	amountSats := uint64(100)
+	_, paymentHash := testPreimageHash(t, amountSats)
+	invoice := testInvoice
+
+	defer cleanUp(t, userConfig, paymentHash)
+
+	// User creates a node of 12345 sats
+	userLeafPrivKey := keys.GeneratePrivateKey()
+
+	feeSats := uint64(2)
+	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 12347)
+	require.NoError(t, err)
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+
+	leaves := []wallet.LeafKeyTweak{{
+		Leaf:              nodeToSend,
+		SigningPrivKey:    userLeafPrivKey,
+		NewSigningPrivKey: newLeafPrivKey,
+	}}
+
+	response, err := wallet.SwapNodesForPreimage(
+		t.Context(),
+		userConfig,
+		leaves,
+		userConfig.IdentityPublicKey(),
+		paymentHash[:],
+		&invoice,
+		feeSats,
+		false,
+		amountSats,
+	)
+	require.NoError(t, err)
+
+	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.Transfer, leaves, nil)
+	require.NoError(t, err)
+	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.Status)
+
+	htlcs, err := wallet.QueryHTLC(t.Context(), userConfig, 100, 0, nil, nil)
+	require.NoError(t, err, "failed to query htlcs")
+	require.Len(t, htlcs.PreimageRequests, 1)
+	require.Equal(t, paymentHash[:], htlcs.PreimageRequests[0].PaymentHash)
+	require.Equal(t, userConfig.IdentityPublicKey().Serialize(), htlcs.PreimageRequests[0].ReceiverIdentityPubkey)
+	require.Equal(t, spark.PreimageRequestStatus_PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE, htlcs.PreimageRequests[0].Status)
+	require.Equal(t, int64(-1), htlcs.Offset)
+}
+
+func TestQueryHTLCMultipleHTLCs(t *testing.T) {
+	// Create user and ssp configs
+	userConfig := wallet.NewTestWalletConfig(t)
+
+	// User creates an invoice
+	amountSats := uint64(1000)
+	preimage, err := hex.DecodeString("01")
+	require.NoError(t, err)
+	paymentHash := sha256.Sum256(preimage)
+
+	defer cleanUp(t, userConfig, paymentHash)
+
+	// User creates a node of 12345 sats
+	userLeafPrivKey := keys.GeneratePrivateKey()
+	feeSats := uint64(0)
+	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 1000)
+	require.NoError(t, err)
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+
+	leaves := []wallet.LeafKeyTweak{{
+		Leaf:              nodeToSend,
+		SigningPrivKey:    userLeafPrivKey,
+		NewSigningPrivKey: newLeafPrivKey,
+	}}
+
+	response, err := wallet.SwapNodesForPreimage(
+		t.Context(),
+		userConfig,
+		leaves,
+		userConfig.IdentityPublicKey(),
+		paymentHash[:],
+		nil,
+		feeSats,
+		false,
+		amountSats,
+	)
+	require.NoError(t, err)
+
+	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.Transfer, leaves, nil)
+	require.NoError(t, err)
+	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.Status)
+
+	// User creates a second invoice
+	amountSats2 := uint64(2000)
+	preimage2, err := hex.DecodeString("02")
+	require.NoError(t, err)
+	paymentHash2 := sha256.Sum256(preimage2)
+
+	defer cleanUp(t, userConfig, paymentHash2)
+
+	// User creates a second node of 1000 sats
+	userLeafPrivKey2 := keys.GeneratePrivateKey()
+
+	nodeToSend2, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey2, 2000)
+	require.NoError(t, err)
+
+	newLeafPrivKey2 := keys.GeneratePrivateKey()
+	require.NoError(t, err)
+
+	leaves2 := []wallet.LeafKeyTweak{{
+		Leaf:              nodeToSend2,
+		SigningPrivKey:    userLeafPrivKey2,
+		NewSigningPrivKey: newLeafPrivKey2,
+	}}
+	response2, err := wallet.SwapNodesForPreimage(
+		t.Context(),
+		userConfig,
+		leaves2,
+		userConfig.IdentityPublicKey(),
+		paymentHash2[:],
+		nil,
+		feeSats,
+		false,
+		amountSats2,
+	)
+	require.NoError(t, err)
+
+	transfer2, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response2.Transfer, leaves2, nil)
+	require.NoError(t, err)
+	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer2.Status)
+
+	htlcs, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, nil)
+	require.NoError(t, err, "failed to query htlcs")
+	require.Len(t, htlcs.PreimageRequests, 2)
+	require.Equal(t, paymentHash[:], htlcs.PreimageRequests[0].PaymentHash)
+	require.Equal(t, userConfig.IdentityPublicKey().Serialize(), htlcs.PreimageRequests[0].ReceiverIdentityPubkey)
+	require.Equal(t, spark.PreimageRequestStatus_PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE, htlcs.PreimageRequests[0].Status)
+	require.Equal(t, int64(-1), htlcs.Offset)
+
+	require.Equal(t, paymentHash2[:], htlcs.PreimageRequests[1].PaymentHash)
+	require.Equal(t, userConfig.IdentityPublicKey().Serialize(), htlcs.PreimageRequests[1].ReceiverIdentityPubkey)
+	require.Equal(t, spark.PreimageRequestStatus_PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE, htlcs.PreimageRequests[1].Status)
+	require.Equal(t, int64(-1), htlcs.Offset)
+}
+
+func TestQueryHTLCWithPaymentHashFilter(t *testing.T) {
+	// Create user and ssp configs
+	userConfig := wallet.NewTestWalletConfig(t)
+
+	// User creates an invoice
+	amountSats := uint64(1000)
+	preimage, err := hex.DecodeString("01")
+	require.NoError(t, err)
+	paymentHash := sha256.Sum256(preimage)
+
+	defer cleanUp(t, userConfig, paymentHash)
+
+	// User creates a node of 12345 sats
+	userLeafPrivKey := keys.GeneratePrivateKey()
+	feeSats := uint64(0)
+	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 1000)
+	require.NoError(t, err)
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+
+	leaves := []wallet.LeafKeyTweak{{
+		Leaf:              nodeToSend,
+		SigningPrivKey:    userLeafPrivKey,
+		NewSigningPrivKey: newLeafPrivKey,
+	}}
+
+	response, err := wallet.SwapNodesForPreimage(
+		t.Context(),
+		userConfig,
+		leaves,
+		userConfig.IdentityPublicKey(),
+		paymentHash[:],
+		nil,
+		feeSats,
+		false,
+		amountSats,
+	)
+	require.NoError(t, err)
+
+	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.Transfer, leaves, nil)
+	require.NoError(t, err)
+	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.Status)
+
+	// User creates a second invoice
+	amountSats2 := uint64(2000)
+	preimage2, err := hex.DecodeString("02")
+	require.NoError(t, err)
+	paymentHash2 := sha256.Sum256(preimage2)
+
+	defer cleanUp(t, userConfig, paymentHash2)
+
+	// User creates a second node of 1000 sats
+	userLeafPrivKey2 := keys.GeneratePrivateKey()
+	nodeToSend2, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey2, 2000)
+	require.NoError(t, err)
+
+	newLeafPrivKey2 := keys.GeneratePrivateKey()
+	require.NoError(t, err)
+
+	leaves2 := []wallet.LeafKeyTweak{{
+		Leaf:              nodeToSend2,
+		SigningPrivKey:    userLeafPrivKey2,
+		NewSigningPrivKey: newLeafPrivKey2,
+	}}
+	response2, err := wallet.SwapNodesForPreimage(
+		t.Context(),
+		userConfig,
+		leaves2,
+		userConfig.IdentityPublicKey(),
+		paymentHash2[:],
+		nil,
+		feeSats,
+		false,
+		amountSats2,
+	)
+	require.NoError(t, err)
+
+	transfer2, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response2.Transfer, leaves2, nil)
+	require.NoError(t, err)
+	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer2.Status)
+
+	htlcs, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, [][]byte{paymentHash[:]}, nil)
+	require.NoError(t, err, "failed to query htlcs")
+	require.Len(t, htlcs.PreimageRequests, 1)
+	require.Equal(t, paymentHash[:], htlcs.PreimageRequests[0].PaymentHash)
+	require.Equal(t, userConfig.IdentityPublicKey().Serialize(), htlcs.PreimageRequests[0].ReceiverIdentityPubkey)
+	require.Equal(t, spark.PreimageRequestStatus_PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE, htlcs.PreimageRequests[0].Status)
+	require.Equal(t, int64(-1), htlcs.Offset)
+}
+
+func TestQueryHTLCWithStaatusFilter(t *testing.T) {
+	// Create user and ssp configs
+	userConfig := wallet.NewTestWalletConfig(t)
+
+	// User creates an invoice
+	amountSats := uint64(1000)
+	preimage, err := hex.DecodeString("01")
+	require.NoError(t, err)
+	paymentHash := sha256.Sum256(preimage)
+
+	defer cleanUp(t, userConfig, paymentHash)
+
+	// User creates a node of 12345 sats
+	userLeafPrivKey := keys.GeneratePrivateKey()
+	feeSats := uint64(0)
+	nodeToSend, err := wallet.CreateNewTree(userConfig, faucet, userLeafPrivKey, 1000)
+	require.NoError(t, err)
+
+	newLeafPrivKey := keys.GeneratePrivateKey()
+
+	leaves := []wallet.LeafKeyTweak{{
+		Leaf:              nodeToSend,
+		SigningPrivKey:    userLeafPrivKey,
+		NewSigningPrivKey: newLeafPrivKey,
+	}}
+
+	response, err := wallet.SwapNodesForPreimage(
+		t.Context(),
+		userConfig,
+		leaves,
+		userConfig.IdentityPublicKey(),
+		paymentHash[:],
+		nil,
+		feeSats,
+		false,
+		amountSats,
+	)
+	require.NoError(t, err)
+
+	transfer, err := wallet.DeliverTransferPackage(t.Context(), userConfig, response.Transfer, leaves, nil)
+	require.NoError(t, err)
+	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING, transfer.Status)
+
+	status := spark.PreimageRequestStatus_PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE
+	htlcs, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, &status)
+	require.NoError(t, err, "failed to query htlcs")
+	require.Len(t, htlcs.PreimageRequests, 1)
+	require.Equal(t, paymentHash[:], htlcs.PreimageRequests[0].PaymentHash)
+	require.Equal(t, userConfig.IdentityPublicKey().Serialize(), htlcs.PreimageRequests[0].ReceiverIdentityPubkey)
+	require.Equal(t, spark.PreimageRequestStatus_PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE, htlcs.PreimageRequests[0].Status)
+	require.Equal(t, int64(-1), htlcs.Offset)
+
+	status2 := spark.PreimageRequestStatus_PREIMAGE_REQUEST_STATUS_PREIMAGE_SHARED
+	htlcs2, err := wallet.QueryHTLC(t.Context(), userConfig, 5, 0, nil, &status2)
+	require.NoError(t, err, "failed to query htlcs")
+	require.Empty(t, htlcs2.PreimageRequests)
+	require.Equal(t, int64(-1), htlcs2.Offset)
+}
