@@ -24,8 +24,7 @@ const (
 	// SigningCommitmentBatchSize is the batch size for the signing commitments.
 	SigningCommitmentBatchSize = 1000
 
-	// DirectTimelockOffset is how many blocks after its client analog a direct transaction becomes valid.
-	// To allow the watchtower to intervene, this must be less than the timelock interval.
+	// DirectTimelockOffset is added to direct transactions to add a buffer before broadcasting.
 	DirectTimelockOffset = 50
 )
 
