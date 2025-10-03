@@ -15,7 +15,6 @@ import {
   Text,
   useColorScheme,
   View,
-  ActivityIndicator,
 } from 'react-native';
 
 function App() {

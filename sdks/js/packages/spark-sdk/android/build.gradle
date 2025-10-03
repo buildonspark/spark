@@ -38,5 +38,5 @@ dependencies {
     implementation 'com.facebook.react:react-native:+'
     implementation 'com.facebook.react:react-android:+'
 
-    implementation "net.java.dev.jna:jna:5.12.0@aar"
+    implementation "net.java.dev.jna:jna:5.17.0@aar"
 }

@@ -107,3 +107,6 @@ echo "Verifying iOS files..."
 ls -l "$IOS_DIR/spark_frostFFI.xcframework/"
 
 echo "React Native bindings generated successfully!"
+
+echo "Verifying 16kb page size alignment..."
+bash "$SCRIPT_DIR/../../scripts/verify-android-page-size.sh"
