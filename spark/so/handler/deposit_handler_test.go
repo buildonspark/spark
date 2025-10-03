@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -994,4 +995,92 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, response.Utxos, 3)
 	})
+}
+
+func TestVerifyRootTransactionSuccess(t *testing.T) {
+	onChainTx := wire.NewMsgTx(3)
+	onChainTx.AddTxOut(wire.NewTxOut(1000, []byte("test_script")))
+	onChainTxOutPoint := &wire.OutPoint{Hash: onChainTx.TxHash(), Index: uint32(0)}
+
+	rootTx := wire.NewMsgTx(3)
+	rootTx.AddTxIn(wire.NewTxIn(onChainTxOutPoint, nil, nil))
+	rootTx.AddTxOut(wire.NewTxOut(1000, []byte("test_script")))
+
+	config := &so.Config{
+		BitcoindConfigs: map[string]so.BitcoindConfig{
+			"regtest": {
+				DepositConfirmationThreshold: 1,
+			},
+		},
+	}
+	h := NewDepositHandler(config)
+	err := h.verifyRootTransaction(rootTx, onChainTx, 0, false)
+	require.NoError(t, err)
+}
+
+func TestVerifyRootTransactionFailureWrongAmount(t *testing.T) {
+	onChainTx := wire.NewMsgTx(3)
+	onChainTx.AddTxOut(wire.NewTxOut(1000, []byte("deposit_address_script")))
+	onChainTxOutPoint := &wire.OutPoint{Hash: onChainTx.TxHash(), Index: uint32(0)}
+
+	rootTx := wire.NewMsgTx(3)
+	rootTx.AddTxIn(wire.NewTxIn(onChainTxOutPoint, nil, nil))
+	rootTx.AddTxOut(wire.NewTxOut(100, []byte("deposit_address_script")))
+	rootTx.AddTxOut(wire.NewTxOut(900, []byte("attacker_script")))
+
+	config := &so.Config{
+		BitcoindConfigs: map[string]so.BitcoindConfig{
+			"regtest": {
+				DepositConfirmationThreshold: 1,
+			},
+		},
+	}
+	h := NewDepositHandler(config)
+	err := h.verifyRootTransaction(rootTx, onChainTx, 0, false)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "root transaction has wrong value: root tx value 100 != on-chain tx value 1000")
+}
+
+func TestVerifyRootTransactionSuccessDirect(t *testing.T) {
+	onChainTx := wire.NewMsgTx(3)
+	onChainTx.AddTxOut(wire.NewTxOut(1000, []byte("test_script")))
+	onChainTxOutPoint := &wire.OutPoint{Hash: onChainTx.TxHash(), Index: uint32(0)}
+
+	rootTx := wire.NewMsgTx(3)
+	rootTx.AddTxIn(wire.NewTxIn(onChainTxOutPoint, nil, nil))
+	rootTx.AddTxOut(wire.NewTxOut(common.MaybeApplyFee(1000), []byte("test_script")))
+
+	config := &so.Config{
+		BitcoindConfigs: map[string]so.BitcoindConfig{
+			"regtest": {
+				DepositConfirmationThreshold: 1,
+			},
+		},
+	}
+	h := NewDepositHandler(config)
+	err := h.verifyRootTransaction(rootTx, onChainTx, 0, true)
+	require.NoError(t, err)
+}
+
+func TestVerifyRootTransactionFailureWrongAmountDirect(t *testing.T) {
+	onChainTx := wire.NewMsgTx(3)
+	onChainTx.AddTxOut(wire.NewTxOut(1000, []byte("deposit_address_script")))
+	onChainTxOutPoint := &wire.OutPoint{Hash: onChainTx.TxHash(), Index: uint32(0)}
+
+	rootTx := wire.NewMsgTx(3)
+	rootTx.AddTxIn(wire.NewTxIn(onChainTxOutPoint, nil, nil))
+	rootTx.AddTxOut(wire.NewTxOut(common.MaybeApplyFee(100), []byte("deposit_address_script")))
+	rootTx.AddTxOut(wire.NewTxOut(900, []byte("attacker_script")))
+
+	config := &so.Config{
+		BitcoindConfigs: map[string]so.BitcoindConfig{
+			"regtest": {
+				DepositConfirmationThreshold: 1,
+			},
+		},
+	}
+	h := NewDepositHandler(config)
+	err := h.verifyRootTransaction(rootTx, onChainTx, 0, true)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "root transaction has wrong value: root tx value 100 != on-chain tx value 1000")
 }

@@ -627,7 +627,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	if len(cpfpRootTx.TxOut) <= 0 {
 		return nil, fmt.Errorf("vout out of bounds, root tx has no outputs")
 	}
-	err = o.verifyRootTransaction(cpfpRootTx, onChainTx, req.OnChainUtxo.Vout)
+	err = o.verifyRootTransaction(cpfpRootTx, onChainTx, req.OnChainUtxo.Vout, false)
 	if err != nil {
 		return nil, err
 	}
@@ -692,7 +692,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		if err != nil {
 			return nil, err
 		}
-		err = o.verifyRootTransaction(directRootTx, onChainTx, req.OnChainUtxo.Vout)
+		err = o.verifyRootTransaction(directRootTx, onChainTx, req.OnChainUtxo.Vout, true)
 		if err != nil {
 			return nil, err
 		}
@@ -958,7 +958,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	if err != nil {
 		return nil, err
 	}
-	err = o.verifyRootTransaction(cpfpRootTx, onChainTx, req.OnChainUtxo.Vout)
+	err = o.verifyRootTransaction(cpfpRootTx, onChainTx, req.OnChainUtxo.Vout, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1022,7 +1022,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		if err != nil {
 			return nil, err
 		}
-		err = o.verifyRootTransaction(directRootTx, onChainTx, req.OnChainUtxo.Vout)
+		err = o.verifyRootTransaction(directRootTx, onChainTx, req.OnChainUtxo.Vout, true)
 		if err != nil {
 			return nil, err
 		}
@@ -1275,7 +1275,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	}, nil
 }
 
-func (o *DepositHandler) verifyRootTransaction(rootTx *wire.MsgTx, onChainTx *wire.MsgTx, onChainVout uint32) error {
+func (o *DepositHandler) verifyRootTransaction(rootTx *wire.MsgTx, onChainTx *wire.MsgTx, onChainVout uint32, isDirect bool) error {
 	if len(rootTx.TxIn) <= 0 || len(rootTx.TxOut) <= 0 {
 		return fmt.Errorf("root transaction should have at least 1 input and 1 output")
 	}
@@ -1295,10 +1295,13 @@ func (o *DepositHandler) verifyRootTransaction(rootTx *wire.MsgTx, onChainTx *wi
 	}
 
 	// Check root transaction amount
-	if rootTx.TxOut[0].Value > onChainTx.TxOut[onChainVout].Value {
-		return fmt.Errorf("root transaction has wrong value: root tx value %d > on-chain tx value %d", rootTx.TxOut[0].Value, onChainTx.TxOut[onChainVout].Value)
+	onChainValue := onChainTx.TxOut[onChainVout].Value
+	if isDirect {
+		onChainValue = common.MaybeApplyFee(onChainValue)
 	}
-
+	if rootTx.TxOut[0].Value != onChainValue {
+		return fmt.Errorf("root transaction has wrong value: root tx value %d != on-chain tx value %d", rootTx.TxOut[0].Value, onChainTx.TxOut[onChainVout].Value)
+	}
 	return nil
 }
 
