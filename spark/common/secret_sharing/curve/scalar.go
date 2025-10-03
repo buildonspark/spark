@@ -11,7 +11,7 @@ import (
 
 // Scalar is a secp256k1 scalar.
 type Scalar struct {
-	// Make struct not comparable. Otherwise the operator == is available,
+	// Make struct not comparable. Otherwise, the operator == is available,
 	// which does not run in constant time and so can leak the scalar.
 	_ [0]func()
 

@@ -6,7 +6,6 @@ import (
 	"math/big"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 )
 
@@ -161,7 +160,7 @@ func SplitSecret(secret *big.Int, fieldModulus *big.Int, threshold int, numberOf
 		return nil, err
 	}
 
-	shares := make([]*SecretShare, 0)
+	var shares []*SecretShare
 	for i := 1; i <= numberOfShares; i++ {
 		share := polynomial.Evaluate(big.NewInt(int64(i)))
 		shares = append(shares, &SecretShare{
@@ -241,9 +240,9 @@ func ValidateShare(share *VerifiableSecretShare) error {
 		value := new(big.Int).Exp(share.Index, big.NewInt(int64(i)), share.FieldModulus)
 		curve := secp256k1.S256()
 		resX, resY := curve.ScalarMult(pubkey.X(), pubkey.Y(), value.Bytes())
-		resPubkey := common.PublicKeyFromInts(resX, resY)
 
-		resultPubkey = common.AddPublicKeysRaw(resultPubkey, resPubkey)
+		resPubkey := publicKeyFromInts(resX, resY)
+		resultPubkey = addPublicKeysRaw(resultPubkey, resPubkey)
 	}
 
 	if resultPubkey.X().Cmp(targetPubkey.X()) != 0 || resultPubkey.Y().Cmp(targetPubkey.Y()) != 0 {
@@ -251,4 +250,28 @@ func ValidateShare(share *VerifiableSecretShare) error {
 	}
 
 	return nil
+}
+
+// publicKeyFromInts creates a secp256k1 public key from x and y big integers.
+//
+// Deprecated: Use keys.Public
+func publicKeyFromInts(x, y *big.Int) *secp256k1.PublicKey {
+	xFieldVal := secp256k1.FieldVal{}
+	xFieldVal.SetByteSlice(x.Bytes())
+	yFieldVal := secp256k1.FieldVal{}
+	yFieldVal.SetByteSlice(y.Bytes())
+
+	// Normalize both values, because the cost is low, and having non-normalized values will break everything.
+	// See the comments on FieldVal for more information.
+	xFieldVal.Normalize()
+	yFieldVal.Normalize()
+	return secp256k1.NewPublicKey(&xFieldVal, &yFieldVal)
+}
+
+// AddPublicKeysRaw adds two secp256k1 public keys using group addition.
+// Deprecated: Use [github.com/lightsparkdev/spark/common/keys.Public.Add]
+func addPublicKeysRaw(a, b *secp256k1.PublicKey) *secp256k1.PublicKey {
+	curve := secp256k1.S256()
+	sumX, sumY := curve.Add(a.X(), a.Y(), b.X(), b.Y())
+	return publicKeyFromInts(sumX, sumY)
 }

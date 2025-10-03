@@ -25,6 +25,7 @@ func createValidTokenMetadata(rng *rand.ChaCha8) *TokenMetadata {
 }
 
 func TestTokenMetadata_Validate(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
 	t.Run("valid metadata", func(t *testing.T) {
 		tm := createValidTokenMetadata(rng)
 		err := tm.Validate()
@@ -444,6 +445,7 @@ func TestActualProductionSparkTokenIdentifier(t *testing.T) {
 }
 
 func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
+	rng := rand.NewChaCha8([32]byte{})
 	// This initial test ensures that a valid metadata object produces a hash of the correct length.
 	t.Run("valid metadata produces hash", func(t *testing.T) {
 		tm := createValidTokenMetadata(rng)
