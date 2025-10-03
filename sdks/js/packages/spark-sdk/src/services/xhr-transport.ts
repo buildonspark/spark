@@ -169,7 +169,17 @@ function headersToMetadata(headers: string): Metadata {
     const parts = line.split(": ");
     const header = parts.shift() ?? "";
     const value = parts.join(": ");
-    metadata.set(header, value);
+
+    if (header.endsWith("-bin")) {
+      try {
+        metadata.set(header, Base64.toUint8Array(value));
+      } catch (e) {
+        console.warn(`Failed to decode binary metadata ${header}:`, e);
+        metadata.set(header, value);
+      }
+    } else {
+      metadata.set(header, value);
+    }
   });
   return metadata;
 }
@@ -202,8 +212,8 @@ function getErrorDetailsFromHttpResponse(
 ): string {
   return (
     `Received HTTP ${statusCode} response: ` +
-    (responseText.length > 1000
-      ? responseText.slice(0, 1000) + "... (truncated)"
+    (responseText?.length > 1000
+      ? responseText?.slice(0, 1000) + "... (truncated)"
       : responseText)
   );
 }
