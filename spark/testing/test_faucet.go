@@ -16,7 +16,6 @@ import (
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/lightsparkdev/spark/common"
 )
 
@@ -66,7 +65,7 @@ type uTXO struct {
 }
 
 type FaucetCoin struct {
-	Key      *secp256k1.PrivateKey
+	Key      keys.Private
 	OutPoint *wire.OutPoint
 	TxOut    *wire.TxOut
 }
@@ -183,7 +182,7 @@ func (f *Faucet) findSuitableUTXO() (*uTXO, error) {
 }
 
 // Refill mines a block to the faucet if needed, then crafts a new transaction to split it
-// into a bunch outputs (coins), which are then freely given away for various tests to use.
+// into a bunch of outputs (coins), which are then freely given away for various tests to use.
 func (f *Faucet) Refill() error {
 	f.coinsMu.Lock()
 	defer f.coinsMu.Unlock()
@@ -281,7 +280,7 @@ func (f *Faucet) Refill() error {
 		splitTx.AddTxOut(wire.NewTxOut(remainingValue, miningScript))
 	}
 
-	signedSplitTx, err := SignFaucetCoin(splitTx, fundingTxOut, staticMiningKey.ToBTCEC())
+	signedSplitTx, err := SignFaucetCoin(splitTx, fundingTxOut, staticMiningKey)
 	if err != nil {
 		return err
 	}
@@ -293,7 +292,7 @@ func (f *Faucet) Refill() error {
 	splitTxid := signedSplitTx.TxHash()
 	for i := 0; i < int(numCoinsToCreate); i++ {
 		faucetCoin := FaucetCoin{
-			Key:      staticFaucetKey.ToBTCEC(),
+			Key:      staticFaucetKey,
 			OutPoint: wire.NewOutPoint(&splitTxid, uint32(i)),
 			TxOut:    signedSplitTx.TxOut[i],
 		}
@@ -382,15 +381,15 @@ func (f *Faucet) FeeBumpAndConfirmTx(tx *wire.MsgTx) error {
 // SignFaucetCoin signs the first input of the given transaction with the given key,
 // and returns the signed transaction. Note this expects to be spending
 // a taproot output, with the spendingTxOut and key coming from a FaucetCoin from `faucet.Fund()`.
-func SignFaucetCoin(unsignedTx *wire.MsgTx, spendingTxOut *wire.TxOut, key *secp256k1.PrivateKey) (*wire.MsgTx, error) {
+func SignFaucetCoin(unsignedTx *wire.MsgTx, spendingTxOut *wire.TxOut, key keys.Private) (*wire.MsgTx, error) {
 	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(
 		spendingTxOut.PkScript, spendingTxOut.Value,
 	)
 	sighashes := txscript.NewTxSigHashes(unsignedTx, prevOutputFetcher)
-	fakeTapscriptRootHash := []byte{}
+	var fakeTapscriptRootHash []byte
 	sig, err := txscript.RawTxInTaprootSignature(
 		unsignedTx, sighashes, 0, spendingTxOut.Value, spendingTxOut.PkScript,
-		fakeTapscriptRootHash, txscript.SigHashAll, key,
+		fakeTapscriptRootHash, txscript.SigHashAll, key.ToBTCEC(),
 	)
 	if err != nil {
 		return nil, err
@@ -430,10 +429,10 @@ func SignFaucetCoinFeeBump(anchorOutPoint *wire.OutPoint, coin FaucetCoin, outpu
 	prevOuts[*anchorOutPoint] = common.EphemeralAnchorOutput()
 	prevOutputFetcher := txscript.NewMultiPrevOutFetcher(prevOuts)
 	sighashes := txscript.NewTxSigHashes(feeBumpTx, prevOutputFetcher)
-	fakeTapscriptRootHash := []byte{}
+	var fakeTapscriptRootHash []byte
 	sig, err := txscript.RawTxInTaprootSignature(
 		feeBumpTx, sighashes, 0, coin.TxOut.Value, coin.TxOut.PkScript,
-		fakeTapscriptRootHash, txscript.SigHashDefault, coin.Key,
+		fakeTapscriptRootHash, txscript.SigHashDefault, coin.Key.ToBTCEC(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign fee bump tx: %w", err)
