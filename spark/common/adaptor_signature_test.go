@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"testing"
 
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/stretchr/testify/require"
 
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -13,13 +14,12 @@ import (
 
 func TestAdaptorSignature(t *testing.T) {
 	for range 1000 {
-		privKey, err := btcec.NewPrivateKey()
-		require.NoError(t, err)
-		pubkey := privKey.PubKey()
+		privKey := keys.GeneratePrivateKey()
+		pubkey := privKey.Public().ToBTCEC()
 
 		msg := []byte("test")
 		hash := sha256.Sum256(msg)
-		sig, err := schnorr.Sign(privKey, hash[:], schnorr.FastSign())
+		sig, err := schnorr.Sign(privKey.ToBTCEC(), hash[:], schnorr.FastSign())
 		require.NoError(t, err)
 
 		assert.True(t, sig.Verify(hash[:], pubkey))

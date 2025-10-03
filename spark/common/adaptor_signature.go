@@ -6,14 +6,12 @@ import (
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/lightsparkdev/spark/common/keys"
 )
 
 // GenerateAdaptorFromSignature generates creates a hidden value and the adaptor signature for a given signature.s
 func GenerateAdaptorFromSignature(signature []byte) ([]byte, []byte, error) {
-	adaptorPrivateKey, err := btcec.NewPrivateKey()
-	if err != nil {
-		return nil, nil, err
-	}
+	adaptorPrivateKey := keys.GeneratePrivateKey()
 
 	sig, err := parseSignature(signature)
 	if err != nil {
@@ -21,7 +19,7 @@ func GenerateAdaptorFromSignature(signature []byte) ([]byte, []byte, error) {
 	}
 
 	// Calculate sig.s - adaptorPrivateKey
-	t := adaptorPrivateKey.Key
+	t := adaptorPrivateKey.ToBTCEC().Key
 	t.Negate()
 	newS := sig.s
 	newS.Add(&t)
@@ -32,14 +30,17 @@ func GenerateAdaptorFromSignature(signature []byte) ([]byte, []byte, error) {
 }
 
 func GenerateSignatureFromExistingAdaptor(signature []byte, adaptorPrivateKeyBytes []byte) ([]byte, error) {
-	adaptorPrivateKey, _ := btcec.PrivKeyFromBytes(adaptorPrivateKeyBytes)
+	adaptorPrivateKey, err := keys.ParsePrivateKey(adaptorPrivateKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse adaptor private key: %w", err)
+	}
 
 	sig, err := parseSignature(signature)
 	if err != nil {
 		return nil, err
 	}
 
-	t := adaptorPrivateKey.Key
+	t := adaptorPrivateKey.ToBTCEC().Key
 	t.Negate()
 	newS := sig.s
 	newS.Add(&t)
@@ -49,7 +50,7 @@ func GenerateSignatureFromExistingAdaptor(signature []byte, adaptorPrivateKeyByt
 	return newSig.serialize(), nil
 }
 
-// ValidateAdaptorSignature validates a adaptor signature from creator of the adaptor.
+// ValidateAdaptorSignature validates an adaptor signature from creator of the adaptor.
 func ValidateAdaptorSignature(pubkey *btcec.PublicKey, hash []byte, signature []byte, adaptorPubkey []byte) error {
 	sig, err := parseSignature(signature)
 	if err != nil {
@@ -129,12 +130,10 @@ func parseSignature(sig []byte) (*signature, error) {
 	// The signature must be the correct length.
 	sigLen := len(sig)
 	if sigLen < 64 {
-		return nil, fmt.Errorf("malformed signature: too short: %d < %d", sigLen,
-			64)
+		return nil, fmt.Errorf("malformed signature: too short: %d < %d", sigLen, 64)
 	}
 	if sigLen > 64 {
-		return nil, fmt.Errorf("malformed signature: too long: %d > %d", sigLen,
-			64)
+		return nil, fmt.Errorf("malformed signature: too long: %d > %d", sigLen, 64)
 	}
 
 	// The signature is validly encoded at this point, however, enforce
