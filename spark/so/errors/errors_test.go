@@ -11,6 +11,7 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -121,6 +122,37 @@ func TestInternalErrorDetailMasking(t *testing.T) {
 			assert.Equal(t, tt.expectedCode, code)
 			assert.Equal(t, tt.expectedReason, reason)
 		})
+	}
+}
+
+func TestErrorInterceptor_ReactNativeMasking(t *testing.T) {
+	serverInfo := &grpc.UnaryServerInfo{FullMethod: "/spark.SparkService/SomeMethod"}
+	rnMD := metadata.New(map[string]string{"x-client-env": "js-spark-sdk/0.3.7 react-native"})
+	nonRnMD := metadata.New(map[string]string{"x-client-env": "web"})
+
+	// Handler returns a detailed Internal error with a reason
+	handler := func(_ context.Context, _ any) (any, error) { return nil, grpcErr }
+
+	// React Native: should be masked to generic message (even if detailed errors enabled)
+	{
+		ctx := metadata.NewIncomingContext(t.Context(), rnMD)
+		_, err := ErrorInterceptor(true)(ctx, nil, serverInfo, handler)
+		require.Error(t, err)
+		st := status.Convert(err)
+		assert.Equal(t, codes.Internal, st.Code())
+		require.ErrorContains(t, err, msg)
+		assert.Empty(t, st.Details())
+	}
+
+	// Non-React Native: with detailed errors enabled, should preserve original message and details
+	{
+		ctx := metadata.NewIncomingContext(t.Context(), nonRnMD)
+		_, err := ErrorInterceptor(true)(ctx, nil, serverInfo, handler)
+		require.Error(t, err)
+		st := status.Convert(err)
+		assert.Equal(t, codes.Internal, st.Code())
+		require.ErrorContains(t, err, msg)
+		assert.GreaterOrEqual(t, len(st.Details()), 1)
 	}
 }
 

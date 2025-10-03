@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/otel/metric/noop"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -78,13 +79,25 @@ func ErrorInterceptor(returnDetailedErrors bool) grpc.UnaryServerInterceptor {
 		attrs = append(attrs, attribute.String("rpc_grpc_error_reason", reason))
 		grpcErrorsWithReasonTotal.Add(ctx, 1, metric.WithAttributes(attrs...))
 
+		// React Native does not support encoding of status errors with reasons,
+		// so reconstruct error with just code and a generic message (no details).
+		md, ok := metadata.FromIncomingContext(ctx)
+		if ok {
+			envs := md.Get("x-client-env")
+			if len(envs) > 0 {
+				clientEnv := envs[0]
+				if strings.Contains(clientEnv, "react-native") {
+					err = status.Error(st.Code(), st.Message())
+				}
+			}
+		}
+
 		// Mask Internal/Unknown unless detailed errors are enabled or internal RPC.
 		if st, ok := status.FromError(err); ok && (st.Code() == codes.Internal || st.Code() == codes.Unknown) {
 			if !(returnDetailedErrors || isInternalRPC(info.FullMethod)) {
 				err = status.Errorf(codes.Internal, "Something went wrong.")
 			}
 		}
-
 		return resp, err
 	}
 }
