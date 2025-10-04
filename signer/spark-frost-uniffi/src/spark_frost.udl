@@ -14,10 +14,10 @@ namespace spark_frost {
     TransactionResult construct_node_tx(bytes tx, u32 vout, string address, u16 locktime);
 
     [Throws=Error]
-    TransactionResult construct_refund_tx(bytes tx, u32 vout, bytes pubkey, string network, u16 locktime);
+    TransactionResult construct_refund_tx(bytes tx, u32 vout, bytes pubkey, string network, u32 sequence);
 
     [Throws=Error]
-    TransactionResult construct_direct_refund_tx(bytes tx, u32 vout, bytes pubkey, string network, u16 locktime);
+    TransactionResult construct_direct_refund_tx(bytes tx, u32 vout, bytes pubkey, string network, u32 sequence);
 
     [Throws=Error]
     TransactionResult construct_split_tx(bytes tx, u32 vout, sequence<string> addresses, u16 locktime);

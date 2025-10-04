@@ -423,7 +423,7 @@ pub fn construct_refund_tx(
     vout: u32,
     pubkey: Vec<u8>,
     network: String,
-    locktime: u16,
+    sequence: u32,
 ) -> Result<TransactionResult, Error> {
     // Decode the input transaction
     let prev_tx: Transaction = deserialize(&tx).map_err(|e| Error::Spark(e.to_string()))?;
@@ -444,8 +444,8 @@ pub fn construct_refund_tx(
     let input = TxIn {
         previous_output: outpoint,
         script_sig: ScriptBuf::new(), // Empty for now, will be filled by the signing process
-        sequence: Sequence::from_consensus(u32::from(locktime)), // Set high bit for new sequence format
-        witness: Witness::new(),                                 // Empty witness for now
+        sequence: Sequence::from_consensus(sequence), // Set high bit for new sequence format
+        witness: Witness::new(),      // Empty witness for now
     };
 
     let x_only_key = {
@@ -576,7 +576,7 @@ pub fn construct_direct_refund_tx(
     vout: u32,
     pubkey: Vec<u8>,
     network: String,
-    locktime: u16,
+    sequence: u32,
 ) -> Result<TransactionResult, Error> {
     // Decode the input transaction
     let prev_tx: Transaction = deserialize(&tx).map_err(|e| Error::Spark(e.to_string()))?;
@@ -607,8 +607,8 @@ pub fn construct_direct_refund_tx(
     let input = TxIn {
         previous_output: outpoint,
         script_sig: ScriptBuf::new(), // Empty for now, will be filled by the signing process
-        sequence: Sequence::from_consensus(u32::from(locktime)), // Set high bit for new sequence format
-        witness: Witness::new(),                                 // Empty witness for now
+        sequence: Sequence::from_consensus(sequence), // Set high bit for new sequence format
+        witness: Witness::new(),      // Empty witness for now
     };
 
     let x_only_key = {
