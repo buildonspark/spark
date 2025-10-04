@@ -919,7 +919,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).WithTree().ForUpdate().Only(ctx)
+	depositAddress, err := db.DepositAddress.Query().Where(depositaddress.Address(*utxoAddress)).Where(depositaddress.IsStatic(false)).WithTree().ForUpdate().Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			err = errors.NotFoundMissingEntity(fmt.Errorf("the requested deposit address could not be found for address: %s", *utxoAddress))
