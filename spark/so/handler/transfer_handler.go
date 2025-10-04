@@ -290,6 +290,9 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	// returned, it means the transfer package is valid and the transfer is considered sent.
 	err = h.syncTransferInit(ctx, req, transferType, finalCpfpSignatureMap, finalDirectSignatureMap, finalDirectFromCpfpSignatureMap)
 	if err != nil {
+		syncErr := err
+		logger.With(zap.Error(syncErr)).Sugar().Errorf("Failed to sync transfer init for transfer %s", req.TransferId)
+
 		db, err := ent.GetDbFromContext(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get database transaction: %w", err)
@@ -311,12 +314,12 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		if cancelErr != nil {
 			logger.With(zap.Error(cancelErr)).Sugar().Errorf("Failed to create cancel transfer gossip message for transfer %s", req.TransferId)
 		}
-		logger.With(zap.Error(err)).Sugar().Errorf("Failed to sync transfer init for transfer %s", req.TransferId)
 		err = db.Commit()
 		if err != nil {
 			return nil, fmt.Errorf("unable to rollback database transaction: %w", err)
 		}
-		return nil, fmt.Errorf("failed to sync transfer init for transfer %s: %w", req.TransferId, err)
+
+		return nil, fmt.Errorf("failed to sync transfer init for transfer %s: %w", req.TransferId, syncErr)
 	}
 
 	// After this point, the transfer send is considered successful.
