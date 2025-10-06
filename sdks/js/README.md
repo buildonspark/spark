@@ -20,12 +20,38 @@ cd spark/sdks/js
 corepack prepare --activate
 ```
 
-Then install dependencies for all workspaces:
+Then install & build dependencies for all workspaces:
 
 ```
 # cd to js or to any subdirectory of js
 cd spark/sdks/js
 yarn
+yarn build
 ```
 
 Please note there is a postinstall script that runs after install to build some dependencies. This will run automatically when the dependency tree changes or when manually running `yarn rebuild`.
+
+## Running Examples
+
+Example (`spark-node-express`):
+
+```
+cd spark/sdks/js
+yarn
+yarn build
+cd examples/spark-node-express
+yarn start
+```
+
+Refer to the individual README files in each directory for any additional instructions.
+
+**Alternative: Use mise tasks from the repo root for common workflows:**
+
+See root README for instructions on installing mise. Then see `mise.toml` for all tasks. Common ones:
+
+```bash
+# From the spark repo root
+mise spark-cli-regtest      # Run CLI with regtest network
+mise spark-cli-mainnet      # Run CLI with mainnet
+mise test-js                # Run JS tests
+```

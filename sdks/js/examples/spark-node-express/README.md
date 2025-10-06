@@ -21,13 +21,13 @@ npm run start
 To init a new wallet, make an empty POST request to either.
 
 ```
-https://localhost:{PORT}/spark-wallet/init
+http://localhost:{PORT}/spark-wallet/wallet/init
 ```
 
 or
 
 ```
-https://localhost:{PORT}/issuer-wallet/init
+http://localhost:{PORT}/issuer-wallet/wallet/init
 ```
 
 Your mnemonic should then get saved to your local machine and you can explore our api from there.
