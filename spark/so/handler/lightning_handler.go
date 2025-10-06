@@ -675,8 +675,6 @@ func (h *LightningHandler) storeUserSignedTransactions(
 	paymentHash []byte,
 	preimageShare *ent.PreimageShare,
 	cpfpTransactions []*pb.UserSignedTxSigningJob,
-	directTransactions []*pb.UserSignedTxSigningJob,
-	directFromCpfpTransactions []*pb.UserSignedTxSigningJob,
 	transfer *ent.Transfer,
 	status st.PreimageRequestStatus,
 	receiverIdentityPubKey keys.Public,
@@ -735,63 +733,6 @@ func (h *LightningHandler) storeUserSignedTransactions(
 			return nil, fmt.Errorf("unable to update node status: %w", err)
 		}
 	}
-
-	// Store direct transactions if present
-	for i := range directTransactions {
-		directTransaction := directTransactions[i]
-		directCommitmentsBytes, err := proto.Marshal(directTransaction.SigningCommitments)
-		if err != nil {
-			return nil, fmt.Errorf("unable to marshal signing commitments: %w", err)
-		}
-		nodeID, err := uuid.Parse(directTransaction.LeafId)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse node id: %w", err)
-		}
-		directUserSignatureCommitmentBytes, err := proto.Marshal(directTransaction.SigningNonceCommitment)
-		if err != nil {
-			return nil, fmt.Errorf("unable to marshal direct user signature commitment: %w", err)
-		}
-		_, err = tx.UserSignedTransaction.Create().
-			SetTransaction(directTransaction.RawTx).
-			SetUserSignature(directTransaction.UserSignature).
-			SetUserSignatureCommitment(directUserSignatureCommitmentBytes).
-			SetSigningCommitments(directCommitmentsBytes).
-			SetPreimageRequest(preimageRequest).
-			SetTreeNodeID(nodeID).
-			Save(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to store user signed transaction: %w", err)
-		}
-	}
-
-	// Store direct-from-cpfp transactions if present
-	for i := range directFromCpfpTransactions {
-		directFromCpfpTransaction := directFromCpfpTransactions[i]
-		directFromCpfpCommitmentsBytes, err := proto.Marshal(directFromCpfpTransaction.SigningCommitments)
-		if err != nil {
-			return nil, fmt.Errorf("unable to marshal signing commitments: %w", err)
-		}
-		nodeID, err := uuid.Parse(directFromCpfpTransaction.LeafId)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse node id: %w", err)
-		}
-		directFromCpfpUserSignatureCommitmentBytes, err := proto.Marshal(directFromCpfpTransaction.SigningNonceCommitment)
-		if err != nil {
-			return nil, fmt.Errorf("unable to marshal direct from cpfp user signature commitment: %w", err)
-		}
-		_, err = tx.UserSignedTransaction.Create().
-			SetTransaction(directFromCpfpTransaction.RawTx).
-			SetUserSignature(directFromCpfpTransaction.UserSignature).
-			SetUserSignatureCommitment(directFromCpfpUserSignatureCommitmentBytes).
-			SetSigningCommitments(directFromCpfpCommitmentsBytes).
-			SetPreimageRequest(preimageRequest).
-			SetTreeNodeID(nodeID).
-			Save(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to store user signed transaction: %w", err)
-		}
-	}
-
 	return preimageRequest, nil
 }
 
@@ -942,8 +883,6 @@ func (h *LightningHandler) GetPreimageShare(
 		req.PaymentHash,
 		preimageShare,
 		req.Transfer.LeavesToSend,
-		req.Transfer.DirectLeavesToSend,
-		req.Transfer.DirectFromCpfpLeavesToSend,
 		transfer,
 		status,
 		receiverIdentityPubKey,
@@ -1362,8 +1301,6 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		req.PaymentHash,
 		preimageShare,
 		req.Transfer.LeavesToSend,
-		req.Transfer.DirectLeavesToSend,
-		req.Transfer.DirectFromCpfpLeavesToSend,
 		transfer,
 		status,
 		receiverIdentityPubKey,
