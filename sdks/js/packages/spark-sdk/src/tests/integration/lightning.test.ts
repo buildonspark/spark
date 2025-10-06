@@ -555,20 +555,6 @@ describe.each(walletTypes)(
       for (const leaf of transfer!.leaves) {
         const cpfpRefund = getTxFromRawTxBytes(leaf.intermediateRefundTx);
         expectedValue += cpfpRefund.getOutput(0)?.amount || 0n;
-
-        if (leaf.intermediateDirectRefundTx.length > 0) {
-          const directRefund = getTxFromRawTxBytes(
-            leaf.intermediateDirectRefundTx,
-          );
-          expectedValue += directRefund.getOutput(0)?.amount || 0n;
-        }
-
-        if (leaf.intermediateDirectFromCpfpRefundTx.length > 0) {
-          const directFromCpfpRefund = getTxFromRawTxBytes(
-            leaf.intermediateDirectFromCpfpRefundTx,
-          );
-          expectedValue += directFromCpfpRefund.getOutput(0)?.amount || 0n;
-        }
       }
 
       let totalValue = 0n;
