@@ -30,7 +30,7 @@ func (s *SparkServiceAPI) CreateInvoice(
 	paymentHash []byte,
 	memo string,
 	expirySecs int,
-) (*string, int64, error) {
+) (string, int64, error) {
 	variables := map[string]any{
 		"network":      strings.ToUpper(bitcoinNetwork.String()),
 		"amount_sats":  amountSats,
@@ -41,7 +41,7 @@ func (s *SparkServiceAPI) CreateInvoice(
 
 	response, err := s.Requester.ExecuteGraphqlWithContext(context.Background(), RequestLightningReceiveMutation, variables)
 	if err != nil {
-		return nil, 0, err
+		return "", 0, err
 	}
 
 	request := response["request_lightning_receive"].(map[string]any)["request"].(map[string]any)
@@ -49,7 +49,7 @@ func (s *SparkServiceAPI) CreateInvoice(
 
 	fees := request["fee"].(map[string]any)["original_value"].(float64)
 
-	return &encodedInvoice, int64(fees), nil
+	return encodedInvoice, int64(fees), nil
 }
 
 func (s *SparkServiceAPI) PayInvoice(

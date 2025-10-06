@@ -56,16 +56,16 @@ func (w *SingleKeyTestWallet) RemoveOwnedNodes(nodeIDs map[string]bool) {
 	w.OwnedNodes = newOwnedNodes
 }
 
-func (w *SingleKeyTestWallet) CreateLightningInvoice(ctx context.Context, amount int64, memo string) (*string, int64, error) {
+func (w *SingleKeyTestWallet) CreateLightningInvoice(ctx context.Context, amount int64, memo string) (string, int64, error) {
 	identityPublicKeyHex := w.Config.IdentityPublicKey().ToHex()
 	requester, err := sspapi.NewRequesterWithBaseURL(identityPublicKeyHex, "")
 	if err != nil {
-		return nil, 0, err
+		return "", 0, err
 	}
 	api := sspapi.NewSparkServiceAPI(requester)
 	invoice, fees, err := CreateLightningInvoice(ctx, w.Config, api, uint64(amount), memo)
 	if err != nil {
-		return nil, 0, err
+		return "", 0, err
 	}
 	return invoice, fees, nil
 }

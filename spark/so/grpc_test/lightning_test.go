@@ -58,14 +58,14 @@ func testPreimageHash(t *testing.T, amountSats uint64) ([32]byte, [32]byte) {
 
 // CreateInvoice is a fake implementation of the LightningInvoiceCreator interface.
 // It returns a fake invoice string.
-func (f *FakeLightningInvoiceCreator) CreateInvoice(_ common.Network, amountSats uint64, _ []byte, _ string, _ int) (*string, int64, error) {
+func (f *FakeLightningInvoiceCreator) CreateInvoice(_ common.Network, amountSats uint64, _ []byte, _ string, _ int) (string, int64, error) {
 	var invoice string
 	if amountSats == 0 {
 		invoice = f.zeroInvoice
 	} else {
 		invoice = f.invoice
 	}
-	return &invoice, 100, nil
+	return invoice, 100, nil
 }
 
 func cleanUp(t *testing.T, config *wallet.TestWalletConfig, paymentHash [32]byte) {
@@ -90,7 +90,7 @@ func TestCreateLightningInvoice(t *testing.T) {
 
 	invoice, _, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), config, fakeInvoiceCreator, amountSats, "test", preimage)
 	require.NoError(t, err)
-	require.Equal(t, testInvoice, *invoice)
+	require.Equal(t, testInvoice, invoice)
 
 	cleanUp(t, config, paymentHash)
 }
@@ -104,7 +104,7 @@ func TestCreateZeroAmountLightningInvoice(t *testing.T) {
 
 	invoice, _, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), config, fakeInvoiceCreator, amountSats, "test", preimage)
 	require.NoError(t, err)
-	require.Equal(t, testZeroInvoice, *invoice)
+	require.Equal(t, testZeroInvoice, invoice)
 
 	cleanUp(t, config, paymentHash)
 }
@@ -207,8 +207,8 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 
 	invoice, _, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), userConfig, fakeInvoiceCreator, invoiceSats, "test", preimage)
 	require.NoError(t, err)
-	assert.NotNil(t, invoice)
-	bolt11, err := decodepay.Decodepay(*invoice)
+	require.NotNil(t, invoice)
+	bolt11, err := decodepay.Decodepay(invoice)
 	require.NoError(t, err)
 	require.Equal(t, int64(0), bolt11.MSatoshi, "invoice amount should be 0")
 
