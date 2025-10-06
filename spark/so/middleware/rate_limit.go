@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/sethvargo/go-limiter"
@@ -19,35 +20,43 @@ import (
 Rate limiter overview
 
 What this middleware does
-- Enforces per-client-IP rate limits for gRPC unary methods using a token-bucket per tier.
-- Enforcement is always per-method. Only the explicit global scope aggregates across methods.
-- There is no base/window config. Limits are applied only when a tier-suffixed knob is set.
+- Enforces rate limits on gRPC unary methods. If this rate limit is exceeded return early with a ResourceExhaustedError.
+- Supports rate limits at the method, service, or global levelLimits are applied at the method, service, and global level.
+- Supports rate limits for the following windows / tiers: #1s, #1m, #10m, #1h, #24h
+- Supports rate limits over different dimesions: IPs or client public keys
 
-Hardcoded tiers (no discovery)
-- Supported suffixes: #1s, #1m, #10m, #1h, #24h
-
-Configuration via knobs:
+Specific configurations via knobs:
 - Method: spark.so.ratelimit.limit@/pkg.Service/Method#1s = <max_requests>
+- Method (dimension-specific): spark.so.ratelimit.limit@/pkg.Service/Method:ip#1s or :pubkey#1s
 - Service method-name prefix (longest-match on method name):
   spark.so.ratelimit.limit@/pkg.Service/^start#1s = <max_requests>
+  spark.so.ratelimit.limit@/pkg.Service/^start:ip#1s or :pubkey#1s
 - Service: spark.so.ratelimit.limit@/pkg.Service/#1s = <max_requests>
+  spark.so.ratelimit.limit@/pkg.Service/:ip#1s or :pubkey#1s
 - Global: spark.so.ratelimit.limit@global#1s = <max_requests>
+  spark.so.ratelimit.limit@global:ip#1s or :pubkey#1s
 
 Notes on precedence and behavior
-- For each tier, we compute:
-  - Per-method limit from the first configured (>= 0) among: Method (exact FullMethod), Service/^<method-name-prefix> (longest prefix).
-  - Service limit directly from Service/.
-  - Global limit directly from Global.
-- We enforce all configured scopes for the tier: per-method (if > 0), service (if > 0), and global (if > 0).
+- For each tier and dimension, we compute:
+  - For per-method scope limits, Method (exact FullMethod >= 0), takes precedence over prefix scopes. If multiple prefix scopes, the longest prefix is used.
+  - For per-dimension limits, :ip, :pubkey (>= 0) takes precedence over limits without a dimension selector.
+- We enforce all configured scopes for each tier: per-method (if > 0), service (if > 0), and global (if > 0).
 - If none are configured for a tier, that tier is bypassed.
 
-Enforcement in-memory keys (per-client-IP)
-- Per-method scope key: rl:/pkg.Service/Method#<tier>:<ip>
-- Service scope key: rl:/pkg.Service/#<tier>:<ip>
-- Global scope key: rl:global#<tier>:<ip>
+Dimension selector behavior
+- Per-dimension limits are optional. Limits without a dimension selector apply to both (ip and pubkey) by default.
+- Providing both :ip and :pubkey allows different limits per dimension.
+- If a selector is provided for a dimension, the base value is ignored for that dimension.
+
+
+Enforcement in-memory keys (per-dimension)
+- Per-method scope key: rl:/<service-name>/<method-name>#<tier>:<dimension>
+- Service scope key: rl:/<service-name>/#<tier>:<dimension>
+- Global scope key: rl:global#<tier>:<dimension>
 
 Other knobs
-- Exclude an IP entirely: spark.so.ratelimit.exclude_ips@<ip> = 1
+- Exclude an IP from rate limiting: spark.so.ratelimit.exclude_ips@<ip> = 1
+- Exclude a pubkey from rate limiting: spark.so.ratelimit.exclude_pubkeys@<hex_pubkey> = 1
 - Kill switch for a method (independent of rate limiting): spark.so.grpc.server.method.enabled@/pkg.Service/Method = 0.
 */
 
@@ -219,11 +228,11 @@ func (r *RateLimiter) setConfig(key string, tokens uint64, window time.Duration)
 	}
 }
 
-// takeToken enforces a single bucket identified by tierScope and ip.
-// It ensures the store's bucket config matches the desired tokens/window
+// takeToken enforces a single dimension identified by tierScope and ip/pubkey.
+// It ensures the store's dimension config matches the desired tokens/window
 // and attempts to take a token, returning an appropriate error on failure.
-func (r *RateLimiter) takeToken(ctx context.Context, tierScope string, ip string, tokens uint64, window time.Duration, label string) error {
-	tierKey := sanitizeKey(fmt.Sprintf("rl:%s:%s", tierScope, ip))
+func (r *RateLimiter) takeToken(ctx context.Context, tierScope string, dimension string, tokens uint64, window time.Duration, label string) error {
+	tierKey := sanitizeKey(fmt.Sprintf("rl:%s:%s", tierScope, dimension))
 
 	curTokens, curWindow, exists := r.getConfig(tierKey)
 	hasChanged := !exists || curTokens != tokens || curWindow != window
@@ -242,6 +251,89 @@ func (r *RateLimiter) takeToken(ctx context.Context, tierScope string, ip string
 	return nil
 }
 
+func (r *RateLimiter) getLimitForKey(key string) int {
+	return int(r.knobs.GetValueTarget(knobs.KnobRateLimitLimit, &key, -1))
+}
+
+func (r *RateLimiter) resolveMethodLimits(servicePath, methodName, fullMethod, suffix string) (ipLimit int, pubkeyLimit int) {
+	methodBase := r.getLimitForKey(fullMethod + suffix)
+	methodIp := r.getLimitForKey(fullMethod + ":ip" + suffix)
+	methodPub := r.getLimitForKey(fullMethod + ":pubkey" + suffix)
+
+	prefixBase, prefixIp, prefixPub := -1, -1, -1
+	if methodName != "" {
+		for i := len(methodName); i >= 1; i-- {
+			prefix := servicePath + "^" + methodName[:i]
+			if prefixIp < 0 {
+				if v := r.getLimitForKey(prefix + ":ip" + suffix); v >= 0 {
+					prefixIp = v
+				}
+			}
+			if prefixPub < 0 {
+				if v := r.getLimitForKey(prefix + ":pubkey" + suffix); v >= 0 {
+					prefixPub = v
+				}
+			}
+			if prefixBase < 0 {
+				if v := r.getLimitForKey(prefix + suffix); v >= 0 {
+					prefixBase = v
+				}
+			}
+			if prefixIp >= 0 && prefixPub >= 0 && prefixBase >= 0 {
+				break
+			}
+		}
+	}
+
+	resolvedIp := -1
+	switch {
+	case methodIp >= 0:
+		resolvedIp = methodIp
+	case methodBase >= 0:
+		resolvedIp = methodBase
+	case prefixIp >= 0:
+		resolvedIp = prefixIp
+	case prefixBase >= 0:
+		resolvedIp = prefixBase
+	}
+
+	resolvedPub := -1
+	switch {
+	case methodPub >= 0:
+		resolvedPub = methodPub
+	case methodBase >= 0:
+		resolvedPub = methodBase
+	case prefixPub >= 0:
+		resolvedPub = prefixPub
+	case prefixBase >= 0:
+		resolvedPub = prefixBase
+	}
+
+	return resolvedIp, resolvedPub
+}
+
+func (r *RateLimiter) resolveScopeLimits(baseKey string, suffix string) (ipLimit int, pubkeyLimit int) {
+	base := r.getLimitForKey(baseKey + suffix)
+	ip := r.getLimitForKey(baseKey + ":ip" + suffix)
+	pub := r.getLimitForKey(baseKey + ":pubkey" + suffix)
+
+	resolvedIp := -1
+	if ip >= 0 {
+		resolvedIp = ip
+	} else if base >= 0 {
+		resolvedIp = base
+	}
+
+	resolvedPub := -1
+	if pub >= 0 {
+		resolvedPub = pub
+	} else if base >= 0 {
+		resolvedPub = base
+	}
+
+	return resolvedIp, resolvedPub
+}
+
 func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		// Check if the method is enabled.
@@ -250,13 +342,38 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 			return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("the method is currently unavailable, please try again later"))
 		}
 
-		ip, err := GetClientIpFromHeader(ctx, r.config.XffClientIpPosition)
-		if err != nil {
-			return handler(ctx, req)
+		// Build potential dimensions based on availability (dimension selection is driven by knob selectors)
+		var pubkeyBucket, ipBucket string
+		havePubkey, haveIP := false, false
+		var identityHex string
+		var clientIP string
+
+		if session, err := authn.GetSessionFromContext(ctx); err == nil && session != nil {
+			identityHex = session.IdentityPublicKey().ToHex()
 		}
-		// Check for excluded IPs. A value of > 0 means to exclude the IP from rate limiting.
-		isIpExcluded := r.knobs.GetValueTarget(knobs.KnobRateLimitExcludeIps, &ip, 0)
-		if isIpExcluded > 0 {
+
+		if v, err := GetClientIpFromHeader(ctx, r.config.XffClientIpPosition); err == nil && v != "" {
+			clientIP = v
+		}
+
+		// If either IP or pubkey is excluded, bypass all rate limiting entirely.
+		if identityHex != "" {
+			if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludePubkeys, &identityHex, 0) > 0 {
+				return handler(ctx, req)
+			}
+			pubkeyBucket = "pubkey:" + identityHex
+			havePubkey = true
+		}
+		if clientIP != "" {
+			if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludeIps, &clientIP, 0) > 0 {
+				return handler(ctx, req)
+			}
+			ipBucket = "ip:" + clientIP
+			haveIP = true
+		}
+
+		if !havePubkey && !haveIP {
+			// No usable dimension; bypass rate limiting.
 			return handler(ctx, req)
 		}
 
@@ -265,7 +382,6 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 			if suffix == "" {
 				continue
 			}
-			methodTarget := info.FullMethod + suffix
 			serviceEnd := strings.LastIndex(info.FullMethod, "/")
 			servicePath := info.FullMethod
 			methodName := ""
@@ -273,47 +389,41 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 				servicePath = info.FullMethod[:serviceEnd+1] // includes trailing '/'
 				methodName = info.FullMethod[serviceEnd+1:]
 			}
-			serviceTarget := servicePath + suffix // e.g. /pkg.Service/#1s
-			globalTarget := "global" + suffix     // eg. global#1s
-			// Method-name prefix anchor, longest match: /pkg.Service/^prefix#1s
-			prefixTierLimit := -1
-			if len(methodName) > 0 {
-				for i := len(methodName); i >= 1; i-- {
-					candidateKey := servicePath + "^" + methodName[:i] + suffix
-					v := int(r.knobs.GetValueTarget(knobs.KnobRateLimitLimit, &candidateKey, -1))
-					if v >= 0 {
-						prefixTierLimit = v
-						break
-					}
-				}
-			}
-			methodTierLimit := int(r.knobs.GetValueTarget(knobs.KnobRateLimitLimit, &methodTarget, -1))
-			serviceTierLimit := int(r.knobs.GetValueTarget(knobs.KnobRateLimitLimit, &serviceTarget, -1))
-			globalTierLimit := int(r.knobs.GetValueTarget(knobs.KnobRateLimitLimit, &globalTarget, -1))
-
-			// Resolve per-method candidate via precedence (method > prefix)
-			methodCandidate := -1
-			if methodTierLimit >= 0 {
-				methodCandidate = methodTierLimit
-			} else if prefixTierLimit >= 0 {
-				methodCandidate = prefixTierLimit
-			}
+			// Resolve per-scope, per-dimension limits with precedence
+			methodIpLimit, methodPubkeyLimit := r.resolveMethodLimits(servicePath, methodName, info.FullMethod, suffix)
+			serviceIpLimit, servicePubkeyLimit := r.resolveScopeLimits(servicePath, suffix)
+			globalIpLimit, globalPubkeyLimit := r.resolveScopeLimits("global", suffix)
 			tierWindow := t.window
 
-			if methodCandidate > 0 {
-				if err := r.takeToken(ctx, info.FullMethod+suffix, ip, uint64(methodCandidate), tierWindow, "per-method"); err != nil {
+			if havePubkey && methodPubkeyLimit > 0 {
+				if err := r.takeToken(ctx, info.FullMethod+suffix, pubkeyBucket, uint64(methodPubkeyLimit), tierWindow, "per-method"); err != nil {
+					return nil, err
+				}
+			}
+			if haveIP && methodIpLimit > 0 {
+				if err := r.takeToken(ctx, info.FullMethod+suffix, ipBucket, uint64(methodIpLimit), tierWindow, "per-method"); err != nil {
 					return nil, err
 				}
 			}
 
-			if serviceTierLimit > 0 {
-				if err := r.takeToken(ctx, servicePath+suffix, ip, uint64(serviceTierLimit), tierWindow, "service"); err != nil {
+			if havePubkey && servicePubkeyLimit > 0 {
+				if err := r.takeToken(ctx, servicePath+suffix, pubkeyBucket, uint64(servicePubkeyLimit), tierWindow, "service"); err != nil {
+					return nil, err
+				}
+			}
+			if haveIP && serviceIpLimit > 0 {
+				if err := r.takeToken(ctx, servicePath+suffix, ipBucket, uint64(serviceIpLimit), tierWindow, "service"); err != nil {
 					return nil, err
 				}
 			}
 
-			if globalTierLimit > 0 {
-				if err := r.takeToken(ctx, "global"+suffix, ip, uint64(globalTierLimit), tierWindow, "global"); err != nil {
+			if havePubkey && globalPubkeyLimit > 0 {
+				if err := r.takeToken(ctx, "global"+suffix, pubkeyBucket, uint64(globalPubkeyLimit), tierWindow, "global"); err != nil {
+					return nil, err
+				}
+			}
+			if haveIP && globalIpLimit > 0 {
+				if err := r.takeToken(ctx, "global"+suffix, ipBucket, uint64(globalIpLimit), tierWindow, "global"); err != nil {
 					return nil, err
 				}
 			}

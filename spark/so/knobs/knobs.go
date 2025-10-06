@@ -16,6 +16,7 @@ const (
 	KnobDatabaseLockTimeout           = "spark.database.lock_timeout"
 	KnobRateLimitLimit                = "spark.so.ratelimit.limit"
 	KnobRateLimitExcludeIps           = "spark.so.ratelimit.exclude_ips"
+	KnobRateLimitExcludePubkeys       = "spark.so.ratelimit.exclude_pubkeys"
 	KnobSoRollbackUtxoSwapUsingGossip = "spark.so.rollback_utxo_swap_using_gossip"
 	KnobSoTransferLimit               = "spark.so.transfer_limit"
 

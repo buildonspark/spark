@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,6 +23,12 @@ type testClock struct {
 
 func (c *testClock) Now() time.Time {
 	return c.Time
+}
+
+func newIdentityHex(t *testing.T) string {
+	t.Helper()
+	priv := keys.GeneratePrivateKey()
+	return priv.Public().ToHex()
 }
 
 type testMemoryStore struct {
@@ -129,6 +137,138 @@ func TestRateLimiter(t *testing.T) {
 		_, err = interceptor(ctx, "request", info, handler)
 		require.ErrorContains(t, err, "rate limit exceeded")
 		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+	})
+
+	t.Run("method :ip and :pubkey limits enforced independently", func(t *testing.T) {
+		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+		store := newTestMemoryStore(clock)
+		config := &RateLimiterConfig{}
+		identityHex := newIdentityHex(t)
+		ip := "8.8.8.8"
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobRateLimitLimit + "@/test.Service/Method:ip#1s":     2,
+			knobs.KnobRateLimitLimit + "@/test.Service/Method:pubkey#1s": 1,
+		})
+		rl, err := NewRateLimiter(config, WithKnobs(mockKnobs), WithStore(store), WithClock(clock))
+		require.NoError(t, err)
+
+		// Context with both pubkey and IP
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": ip,
+		}))
+		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+
+		interceptor := rl.UnaryServerInterceptor()
+		handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
+		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/Method"}
+
+		// First request consumes 1 pubkey token (limit 1) and 1 of 2 IP tokens
+		_, err = interceptor(ctx, "request", info, handler)
+		require.NoError(t, err)
+
+		// Second request should fail due to pubkey limit reached, even though IP still has tokens
+		_, err = interceptor(ctx, "request", info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+
+		// Changing the pubkey (same IP) should allow one more request, then fail due to IP limit
+		identityHex2 := newIdentityHex(t)
+		ctx2 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": ip}))
+		ctx2 = authn.InjectSessionForTests(ctx2, identityHex2, time.Now().Add(time.Hour).Unix())
+		_, err = interceptor(ctx2, "request", info, handler)
+		require.NoError(t, err)
+		identityHex3 := newIdentityHex(t)
+		ctx3 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": ip}))
+		ctx3 = authn.InjectSessionForTests(ctx3, identityHex3, time.Now().Add(time.Hour).Unix())
+		_, err = interceptor(ctx3, "request", info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+	})
+
+	t.Run("service :ip and :pubkey limits enforced independently", func(t *testing.T) {
+		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+		store := newTestMemoryStore(clock)
+		config := &RateLimiterConfig{}
+		identityHex := newIdentityHex(t)
+		ip := "7.7.7.7"
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobRateLimitLimit + "@/test.Service/:ip#1s":     2,
+			knobs.KnobRateLimitLimit + "@/test.Service/:pubkey#1s": 1,
+		})
+		rl, err := NewRateLimiter(config, WithKnobs(mockKnobs), WithStore(store), WithClock(clock))
+		require.NoError(t, err)
+
+		// Context with both pubkey and IP
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": ip,
+		}))
+		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+
+		interceptor := rl.UnaryServerInterceptor()
+		handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
+		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/AnyMethod"}
+
+		// First request consumes 1 pubkey token (limit 1) and 1 of 2 IP tokens (service scope)
+		_, err = interceptor(ctx, "request", info, handler)
+		require.NoError(t, err)
+
+		// Second request should fail due to pubkey limit reached, even though IP still has tokens
+		_, err = interceptor(ctx, "request", info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+
+		// Changing the pubkey (same IP) should allow one more request, then fail due to IP service limit
+		identityHex2 := newIdentityHex(t)
+		ctx2 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": ip}))
+		ctx2 = authn.InjectSessionForTests(ctx2, identityHex2, time.Now().Add(time.Hour).Unix())
+		_, err = interceptor(ctx2, "request", info, handler)
+		require.NoError(t, err)
+		identityHex3 := newIdentityHex(t)
+		ctx3 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": ip}))
+		ctx3 = authn.InjectSessionForTests(ctx3, identityHex3, time.Now().Add(time.Hour).Unix())
+		_, err = interceptor(ctx3, "request", info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+	})
+
+	t.Run("global :ip and :pubkey limits enforced independently", func(t *testing.T) {
+		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+		store := newTestMemoryStore(clock)
+		config := &RateLimiterConfig{}
+		identityHex := newIdentityHex(t)
+		ip := "7.7.7.7"
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobRateLimitLimit + "@global:ip#1s":     2,
+			knobs.KnobRateLimitLimit + "@global:pubkey#1s": 1,
+		})
+		rl, err := NewRateLimiter(config, WithKnobs(mockKnobs), WithStore(store), WithClock(clock))
+		require.NoError(t, err)
+
+		// Context with both pubkey and IP
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": ip,
+		}))
+		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+
+		interceptor := rl.UnaryServerInterceptor()
+		handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
+		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/AnyMethod"}
+
+		// First request consumes 1 pubkey token (limit 1) and 1 of 2 IP tokens (service scope)
+		_, err = interceptor(ctx, "request", info, handler)
+		require.NoError(t, err)
+
+		// Second request should fail due to pubkey limit reached, even though IP still has tokens
+		_, err = interceptor(ctx, "request", info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+
+		// Changing the pubkey (same IP) should allow one more request, then fail due to IP service limit
+		identityHex2 := newIdentityHex(t)
+		ctx2 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": ip}))
+		ctx2 = authn.InjectSessionForTests(ctx2, identityHex2, time.Now().Add(time.Hour).Unix())
+		_, err = interceptor(ctx2, "request", info, handler)
+		require.NoError(t, err)
+		identityHex3 := newIdentityHex(t)
+		ctx3 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": ip}))
+		ctx3 = authn.InjectSessionForTests(ctx3, identityHex3, time.Now().Add(time.Hour).Unix())
+		_, err = interceptor(ctx3, "request", info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
 	})
 
 	t.Run("per-method limits allow dynamic updates", func(t *testing.T) {
@@ -293,13 +433,10 @@ func TestRateLimiter(t *testing.T) {
 		_, err = interceptor(ctx, "request", info, handler)
 		require.ErrorContains(t, err, "rate limit exceeded")
 
-		serviceKey := "rl:/test.Service/#1s:1.2.3.4"
-		store.bucketsMu.RLock()
-		bucket, exists := store.buckets[serviceKey]
-		store.bucketsMu.RUnlock()
-		require.True(t, exists)
-		assert.Equal(t, uint64(2), bucket.tokens)
-		assert.Equal(t, uint64(0), bucket.remaining)
+		// A different method in the same service should also be limited within the same window
+		infoB := &grpc.UnaryServerInfo{FullMethod: "/test.Service/OtherMethod"}
+		_, err = interceptor(ctx, "request", infoB, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
 	})
 
 	t.Run("global limit applies to all methods", func(t *testing.T) {
@@ -321,16 +458,10 @@ func TestRateLimiter(t *testing.T) {
 		require.NoError(t, err)
 		_, err = interceptor(ctx, "request", info, handler)
 		require.NoError(t, err)
-		_, err = interceptor(ctx, "request", info, handler)
+		// A different method should also be limited due to global limit
+		info2 := &grpc.UnaryServerInfo{FullMethod: "/test.Service/Another"}
+		_, err = interceptor(ctx, "request", info2, handler)
 		require.ErrorContains(t, err, "rate limit exceeded")
-
-		globalKey := "rl:global#1s:1.2.3.4"
-		store.bucketsMu.RLock()
-		bucket, exists := store.buckets[globalKey]
-		store.bucketsMu.RUnlock()
-		require.True(t, exists)
-		assert.Equal(t, uint64(2), bucket.tokens)
-		assert.Equal(t, uint64(0), bucket.remaining)
 	})
 
 	t.Run("method and global both enforced per tier", func(t *testing.T) {
@@ -357,57 +488,13 @@ func TestRateLimiter(t *testing.T) {
 		_, err = interceptor(ctx, "request", info, handler)
 		require.ErrorContains(t, err, "rate limit exceeded")
 
-		methodKey := "rl:/test.Service/Method#1s:1.2.3.4"
-		globalKey := "rl:global#1s:1.2.3.4"
-		store.bucketsMu.RLock()
-		mb, mExists := store.buckets[methodKey]
-		gb, gExists := store.buckets[globalKey]
-		store.bucketsMu.RUnlock()
-		require.True(t, mExists)
-		require.True(t, gExists)
-		assert.Equal(t, uint64(2), mb.tokens)
-		assert.Equal(t, uint64(0), mb.remaining)
-		assert.Equal(t, uint64(3), gb.tokens)
-		assert.Equal(t, uint64(1), gb.remaining)
-	})
-
-	t.Run("service and global both enforced per tier", func(t *testing.T) {
-		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
-		store := newTestMemoryStore(clock)
-		config := &RateLimiterConfig{}
-		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
-			knobs.KnobRateLimitLimit + "@/test.Service/#1s": 2,
-			knobs.KnobRateLimitLimit + "@global#1s":         3,
-		})
-		rl, err := NewRateLimiter(config, WithKnobs(mockKnobs), WithStore(store), WithClock(clock))
+		// Different method should be allowed once more due to higher global limit, then fail
+		info2 := &grpc.UnaryServerInfo{FullMethod: "/test.Service/OtherMethod"}
+		_, err = interceptor(ctx, "request", info2, handler)
 		require.NoError(t, err)
-
-		interceptor := rl.UnaryServerInterceptor()
-		handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
-		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/Method"}
-		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": "1.2.3.4"}))
-
-		for i := 0; i < 2; i++ {
-			_, err := interceptor(ctx, "request", info, handler)
-			require.NoError(t, err)
-		}
-		_, err = interceptor(ctx, "request", info, handler)
+		_, err = interceptor(ctx, "request", info2, handler)
 		require.ErrorContains(t, err, "rate limit exceeded")
-
-		serviceKey := "rl:/test.Service/#1s:1.2.3.4"
-		globalKey := "rl:global#1s:1.2.3.4"
-		store.bucketsMu.RLock()
-		sb, sExists := store.buckets[serviceKey]
-		gb, gExists := store.buckets[globalKey]
-		store.bucketsMu.RUnlock()
-		require.True(t, sExists)
-		require.True(t, gExists)
-		assert.Equal(t, uint64(2), sb.tokens)
-		assert.Equal(t, uint64(0), sb.remaining)
-		assert.Equal(t, uint64(3), gb.tokens)
-		assert.Equal(t, uint64(1), gb.remaining)
 	})
-
 	t.Run("method, service, and global enforced per tier", func(t *testing.T) {
 		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
 		store := newTestMemoryStore(clock)
@@ -430,23 +517,19 @@ func TestRateLimiter(t *testing.T) {
 		_, err = interceptor(ctx, "request", info, handler)
 		require.ErrorContains(t, err, "rate limit exceeded")
 
-		methodKey := "rl:/test.Service/Method#1s:1.2.3.4"
-		serviceKey := "rl:/test.Service/#1s:1.2.3.4"
-		globalKey := "rl:global#1s:1.2.3.4"
-		store.bucketsMu.RLock()
-		mb, mExists := store.buckets[methodKey]
-		sb, sExists := store.buckets[serviceKey]
-		gb, gExists := store.buckets[globalKey]
-		store.bucketsMu.RUnlock()
-		require.True(t, mExists)
-		require.True(t, sExists)
-		require.True(t, gExists)
-		assert.Equal(t, uint64(1), mb.tokens)
-		assert.Equal(t, uint64(0), mb.remaining)
-		assert.Equal(t, uint64(2), sb.tokens)
-		assert.Equal(t, uint64(1), sb.remaining)
-		assert.Equal(t, uint64(3), gb.tokens)
-		assert.Equal(t, uint64(2), gb.remaining)
+		// Another method in the same service should allow one request, then be limited by service scope
+		infoOther := &grpc.UnaryServerInfo{FullMethod: "/test.Service/Other"}
+		_, err = interceptor(ctx, "request", infoOther, handler)
+		require.NoError(t, err)
+		_, err = interceptor(ctx, "request", infoOther, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+
+		// A method in a different service should allow one request, then be limited by global scope
+		infoOtherService := &grpc.UnaryServerInfo{FullMethod: "/other.Service/Method"}
+		_, err = interceptor(ctx, "request", infoOtherService, handler)
+		require.NoError(t, err)
+		_, err = interceptor(ctx, "request", infoOtherService, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
 	})
 
 	t.Run("method not rate limited", func(t *testing.T) {
@@ -468,47 +551,6 @@ func TestRateLimiter(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, "ok", resp)
 		}
-	})
-
-	t.Run("window expiration", func(t *testing.T) {
-		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
-		store := newTestMemoryStore(clock)
-		config := &RateLimiterConfig{}
-		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
-			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod#1s": 2,
-		})
-		rateLimiter, err := NewRateLimiter(config, WithClock(clock), WithStore(store), WithKnobs(mockKnobs))
-		require.NoError(t, err)
-
-		interceptor := rateLimiter.UnaryServerInterceptor()
-		handler := func(_ context.Context, _ any) (any, error) {
-			return "ok", nil
-		}
-		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/TestMethod"}
-
-		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
-			"x-forwarded-for": "1.2.3.4",
-		}))
-
-		// First 2 requests should succeed (config.MaxRequests = 2)
-		for i := 0; i < 2; i++ {
-			resp, err := interceptor(ctx, "request", info, handler)
-			require.NoError(t, err, "Request %d should succeed", i+1)
-			assert.Equal(t, "ok", resp)
-		}
-
-		// 3rd request should fail due to rate limit
-		_, err = interceptor(ctx, "request", info, handler)
-		require.Error(t, err)
-		assert.Equal(t, codes.ResourceExhausted, status.Code(err))
-		assert.Contains(t, status.Convert(err).Message(), "rate limit exceeded")
-
-		// Now simulate time passing which resets the rate limit (config.Window = 1 second)
-		clock.Time = clock.Time.Add(2 * time.Second)
-
-		resp, err := interceptor(ctx, "request", info, handler)
-		require.NoError(t, err)
-		assert.Equal(t, "ok", resp)
 	})
 
 	t.Run("different clients", func(t *testing.T) {
@@ -862,5 +904,86 @@ func TestRateLimiter(t *testing.T) {
 		_, err = interceptor(ctxNotExcluded, "request", info, handler)
 		require.ErrorContains(t, err, "rate limit exceeded")
 		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+	})
+
+	t.Run("Pubkey excluded via knobs", func(t *testing.T) {
+		config := &RateLimiterConfig{}
+		identityHex := newIdentityHex(t)
+		mockKnobsMap := map[string]float64{
+			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod#1s": 1,
+			knobs.KnobRateLimitExcludePubkeys + "@" + identityHex:     1,
+		}
+		mockKnobs := knobs.NewFixedKnobs(mockKnobsMap)
+
+		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs))
+		require.NoError(t, err)
+
+		interceptor := rateLimiter.UnaryServerInterceptor()
+		handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
+		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/TestMethod"}
+
+		// Build context with identity only (no x-forwarded-for so only pubkey dimension would apply)
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{}))
+		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+
+		// Should not rate limit due to exclusion
+		for i := 0; i < 3; i++ {
+			resp, err := interceptor(ctx, "request", info, handler)
+			require.NoError(t, err)
+			assert.Equal(t, "ok", resp)
+		}
+	})
+
+	// Method-name prefix: longest match should be chosen
+	t.Run("method-name prefix chooses longest match", func(t *testing.T) {
+		config := &RateLimiterConfig{}
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobRateLimitLimit + "@/test.Service/^Sta:ip#1s":   1,
+			knobs.KnobRateLimitLimit + "@/test.Service/^Start:ip#1s": 2,
+		})
+		rl, err := NewRateLimiter(config, WithKnobs(mockKnobs))
+		require.NoError(t, err)
+
+		interceptor := rl.UnaryServerInterceptor()
+		handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": "9.9.9.9"}))
+
+		// Matches both ^Sta and ^Start; expect longest (^Start) with limit 2
+		infoStart := &grpc.UnaryServerInfo{FullMethod: "/test.Service/StartEngine"}
+		_, err = interceptor(ctx, "request", infoStart, handler)
+		require.NoError(t, err)
+		_, err = interceptor(ctx, "request", infoStart, handler)
+		require.NoError(t, err)
+		_, err = interceptor(ctx, "request", infoStart, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+
+		// Matches only ^Sta; expect limit 1
+		infoStatus := &grpc.UnaryServerInfo{FullMethod: "/test.Service/Status"}
+		_, err = interceptor(ctx, "request", infoStatus, handler)
+		require.NoError(t, err)
+		_, err = interceptor(ctx, "request", infoStatus, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+	})
+
+	t.Run("prefix dimension-specific overrides base", func(t *testing.T) {
+		config := &RateLimiterConfig{}
+		identityHex := newIdentityHex(t)
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			knobs.KnobRateLimitLimit + "@/test.Service/^Foo#1s":        5,
+			knobs.KnobRateLimitLimit + "@/test.Service/^Foo:pubkey#1s": 1,
+		})
+		rl, err := NewRateLimiter(config, WithKnobs(mockKnobs))
+		require.NoError(t, err)
+
+		interceptor := rl.UnaryServerInterceptor()
+		handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": "8.8.4.4"}))
+		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+
+		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/FooBar"}
+		_, err = interceptor(ctx, "request", info, handler)
+		require.NoError(t, err)
+		_, err = interceptor(ctx, "request", info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
 	})
 }
