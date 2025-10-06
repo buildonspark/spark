@@ -124,6 +124,7 @@ import {
 import { chunkArray } from "../utils/chunkArray.js";
 import { getFetch } from "../utils/fetch.js";
 import { addPublicKeys } from "../utils/keys.js";
+import { optimize, shouldOptimize } from "../utils/optimize.js";
 import { RetryContext, withRetry } from "../utils/retry.js";
 import {
   Bech32mTokenIdentifier,
@@ -151,7 +152,6 @@ import type {
   UserTokenMetadata,
 } from "./types.js";
 import { SparkWalletEvent } from "./types.js";
-import { optimize, shouldOptimize } from "../utils/optimize.js";
 
 /**
  * The SparkWallet class is the primary interface for interacting with the Spark network.

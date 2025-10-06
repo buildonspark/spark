@@ -1,5 +1,12 @@
 # @buildonspark/spark-vite-app
 
+## 0.0.81
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.4.0
+
 ## 0.0.80
 
 ### Patch Changes

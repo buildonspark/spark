@@ -1,5 +1,11 @@
 # @buildonspark/spark-token-cli
 
+## 0.0.62
+
+### Patch Changes
+
+- @buildonspark/issuer-sdk@0.0.103
+
 ## 0.0.61
 
 ### Patch Changes

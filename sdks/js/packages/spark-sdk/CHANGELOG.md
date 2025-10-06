@@ -1,5 +1,16 @@
 # @buildonspark/spark-sdk
 
+## 0.4.0
+
+### Minor Changes
+
+- - Export taproot signer for react-native
+  - Improvements to internal leaf optimization
+    - Enables manual leaf optimization
+    - Make optimization strategy configurable
+  - Upgrade Android library to support 16kb page size
+  - Fix for incorrectly parsed binary headers for react-native
+
 ## 0.3.9
 
 ### Patch Changes

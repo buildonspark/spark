@@ -1,5 +1,12 @@
 # spark-browser-extension
 
+## 0.0.19
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.4.0
+
 ## 0.0.18
 
 ### Patch Changes
