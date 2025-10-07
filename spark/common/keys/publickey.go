@@ -114,6 +114,12 @@ func (p Public) Sub(b Public) Public {
 	return p.Add(negB)
 }
 
+func (p Public) Neg() Public {
+	negY := new(big.Int).Sub(secp256k1.S256().P, p.key.Y())
+	neg := publicKeyFromInts(p.key.X(), negY)
+	return neg
+}
+
 // ToBTCEC converts this [Public] into a [*secp256k1.PublicKey].
 func (p Public) ToBTCEC() *secp256k1.PublicKey {
 	return &p.key

@@ -59,7 +59,20 @@ func ValidateAdaptorSignature(pubkey *btcec.PublicKey, hash []byte, signature []
 
 	pubkeyBytes := schnorr.SerializePubKey(pubkey)
 
-	return schnorrVerifyWithAdaptor(sig, hash, pubkeyBytes, adaptorPubkey)
+	err = schnorrVerifyWithAdaptor(sig, hash, pubkeyBytes, adaptorPubkey)
+	if err != nil {
+		adaptorPub, err := keys.ParsePublicKey(adaptorPubkey)
+		if err != nil {
+			return err
+		}
+		adaptorPubNeg := adaptorPub.Neg()
+		err = schnorrVerifyWithAdaptor(sig, hash, pubkeyBytes, adaptorPubNeg.Serialize())
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // ApplyAdaptorToSignature applies an adaptor to a signature.
