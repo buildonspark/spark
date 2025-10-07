@@ -1184,11 +1184,11 @@ func validateBaseTokenOutputs(tokenTransaction *tokenpb.TokenTransaction, requir
 	for i, output := range tokenTransaction.TokenOutputs {
 		amount := new(big.Int).SetBytes(output.GetTokenAmount())
 		if amount.Cmp(zero) == 0 {
-			return fmt.Errorf("output %d token amount cannot be 0", i)
+			return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("output %d token amount cannot be 0", i))
 		}
 		amt := output.GetTokenAmount()
 		if len(amt) != 16 {
-			return fmt.Errorf("output %d token amount must be exactly 16 bytes, got %d", i, len(amt))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("output %d token amount must be exactly 16 bytes, got %d", i, len(amt)))
 		}
 	}
 
