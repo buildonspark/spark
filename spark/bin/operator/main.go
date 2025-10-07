@@ -297,9 +297,11 @@ func main() {
 
 	var valuesProvider knobs.KnobsValuesProvider
 	if config.Knobs.IsEnabled() {
-		if valuesProvider, err = knobs.NewKnobsK8ValuesProvider(errCtx, config.Knobs.Namespace); err != nil {
+		if provider, err := knobs.NewKnobsK8ValuesProvider(errCtx, config.Knobs.Namespace); err != nil {
 			// Knobs has failed to fetch the config, so the controllers will rely on the default values.
 			logger.Error("Failed to create K8 knobs", zap.Error(err))
+		} else {
+			valuesProvider = provider
 		}
 	}
 
