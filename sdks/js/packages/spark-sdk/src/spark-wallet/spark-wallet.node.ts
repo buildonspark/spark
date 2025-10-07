@@ -7,6 +7,10 @@ import { UndiciInstrumentation } from "@opentelemetry/instrumentation-undici";
 import { ConnectionManagerNodeJS } from "../services/connection/connection.node.js";
 import { WalletConfigService } from "../services/config.js";
 
+// FIXME: Global flag to ensure instrumentations are only registered once
+// Remove when problem fixed
+let instrumentationsRegistered = false;
+
 export class SparkWalletNodeJS extends BaseSparkWallet {
   protected buildConnectionManager(config: WalletConfigService) {
     return new ConnectionManagerNodeJS(config);
@@ -30,23 +34,29 @@ export function initializeTracerEnvNodeJS({
     propagator: new W3CTraceContextPropagator(),
   });
 
-  registerInstrumentations({
-    instrumentations: [
-      new UndiciInstrumentation({
-        ignoreRequestHook: (request) => {
-          /* Since we're wrapping global fetch we should be careful to avoid
-               adding headers or causing errors for unrelated requests */
-          try {
-            return !traceUrls.some((prefix) =>
-              request.origin.startsWith(prefix),
-            );
-          } catch {
-            return true;
-          }
-        },
-      }),
-    ],
-  });
+  /* FIXME: Only register instrumentations once globally to avoid duplicate headers
+  This is a workaround for a bug that causes duplicate headers to be added to requests.
+  */
+  if (!instrumentationsRegistered) {
+    registerInstrumentations({
+      instrumentations: [
+        new UndiciInstrumentation({
+          ignoreRequestHook: (request) => {
+            /* Since we're wrapping global fetch we should be careful to avoid
+                 adding headers or causing errors for unrelated requests */
+            try {
+              return !traceUrls.some((prefix) =>
+                request.origin.startsWith(prefix),
+              );
+            } catch {
+              return true;
+            }
+          },
+        }),
+      ],
+    });
+    instrumentationsRegistered = true;
+  }
 }
 
 export {
