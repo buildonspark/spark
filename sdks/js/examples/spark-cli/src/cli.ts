@@ -1621,7 +1621,10 @@ async function runCLI() {
           }
           const metadata = await wallet.getIssuerTokenMetadata();
           console.log("Token Metadata:", {
-            tokenIdentifier: metadata.rawTokenIdentifier,
+            tokenIdentifier: encodeBech32mTokenIdentifier({
+              tokenIdentifier: metadata.rawTokenIdentifier,
+              network: (wallet as any).config.getNetworkType(),
+            }),
             tokenPublicKey: metadata.tokenPublicKey,
             tokenName: metadata.tokenName,
             tokenTicker: metadata.tokenTicker,
