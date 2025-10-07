@@ -204,77 +204,88 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(req *tokenpb.QueryTo
 		}
 	}
 
-	// Add hash filter parameter if needed
-	txHashFilterArgIndex := 0
-	if len(req.TokenTransactionHashes) > 0 {
-		qb.args = append(qb.args, pq.Array(req.TokenTransactionHashes))
-		txHashFilterArgIndex = qb.argIndex
-		qb.argIndex++
-	}
-
-	qb.txHashFilter = buildTxHashFilter(req, txHashFilterArgIndex)
+	// Build a single CTE with ALL filters combined
+	// This ensures the same output satisfies all conditions
+	var whereConditions []string
 
 	// Handle OutputIds filter
-	// Example query: WITH output_id_filtered AS (SELECT tou.token_output_output_created_token_transaction, tou.token_output_output_spent_token_transaction FROM token_outputs tou WHERE tou.id = ANY($1))
-	//                SELECT tt.id, tt.update_time FROM token_transactions tt JOIN output_id_filtered ON tt.id = output_id_filtered.token_output_output_created_token_transaction
-	//                UNION SELECT tt.id, tt.update_time FROM token_transactions tt JOIN output_id_filtered ON tt.id = output_id_filtered.token_output_output_spent_token_transaction
 	if len(req.OutputIds) > 0 {
-		// Convert string IDs to UUIDs
 		outputUUIDs, err := common.StringUUIDArrayToUUIDArray(req.OutputIds)
 		if err != nil {
 			return "", nil, fmt.Errorf("invalid output ID format: %w", err)
 		}
-		qb.addFilterCTEAndUnions("output_id_filtered", "tou.id = ANY($%d)", pq.Array(outputUUIDs))
+		whereConditions = append(whereConditions, fmt.Sprintf("tou.id = ANY($%d)", qb.argIndex))
+		qb.args = append(qb.args, pq.Array(outputUUIDs))
+		qb.argIndex++
 	}
 
 	// Handle OwnerPublicKeys filter
-	// Example query: WITH owner_key_filtered AS (SELECT tou.token_output_output_created_token_transaction, tou.token_output_output_spent_token_transaction FROM token_outputs tou WHERE tou.owner_public_key = ANY($1))
-	//                SELECT tt.id, tt.update_time FROM token_transactions tt JOIN owner_key_filtered ON tt.id = owner_key_filtered.token_output_output_created_token_transaction
-	//                UNION SELECT tt.id, tt.update_time FROM token_transactions tt JOIN owner_key_filtered ON tt.id = owner_key_filtered.token_output_output_spent_token_transaction
 	if len(ownerPubKeys) > 0 {
 		ownerKeyBytes := make([][]byte, len(ownerPubKeys))
 		for i, key := range ownerPubKeys {
 			ownerKeyBytes[i] = key.Serialize()
 		}
-		qb.addFilterCTEAndUnions("owner_key_filtered", "tou.owner_public_key = ANY($%d)", pq.Array(ownerKeyBytes))
+		whereConditions = append(whereConditions, fmt.Sprintf("tou.owner_public_key = ANY($%d)", qb.argIndex))
+		qb.args = append(qb.args, pq.Array(ownerKeyBytes))
+		qb.argIndex++
 	}
 
 	// Handle IssuerPublicKeys filter
-	// Example query: WITH issuer_key_filtered AS (SELECT tou.token_output_output_created_token_transaction, tou.token_output_output_spent_token_transaction FROM token_outputs tou WHERE tou.token_public_key = ANY($1))
-	//                SELECT tt.id, tt.update_time FROM token_transactions tt JOIN issuer_key_filtered ON tt.id = issuer_key_filtered.token_output_output_created_token_transaction
-	//                UNION SELECT tt.id, tt.update_time FROM token_transactions tt JOIN issuer_key_filtered ON tt.id = issuer_key_filtered.token_output_output_spent_token_transaction
 	if len(issuerPubKeys) > 0 {
 		issuerKeyBytes := make([][]byte, len(issuerPubKeys))
 		for i, key := range issuerPubKeys {
 			issuerKeyBytes[i] = key.Serialize()
 		}
-		qb.addFilterCTEAndUnions("issuer_key_filtered", "tou.token_public_key = ANY($%d)", pq.Array(issuerKeyBytes))
+		whereConditions = append(whereConditions, fmt.Sprintf("tou.token_public_key = ANY($%d)", qb.argIndex))
+		qb.args = append(qb.args, pq.Array(issuerKeyBytes))
+		qb.argIndex++
 	}
 
 	// Handle TokenIdentifiers filter
-	// Example query: WITH token_id_filtered AS (SELECT tou.token_output_output_created_token_transaction, tou.token_output_output_spent_token_transaction FROM token_outputs tou WHERE tou.token_identifier = ANY($1))
-	//                SELECT tt.id, tt.update_time FROM token_transactions tt JOIN token_id_filtered ON tt.id = token_id_filtered.token_output_output_created_token_transaction
-	//                UNION SELECT tt.id, tt.update_time FROM token_transactions tt JOIN token_id_filtered ON tt.id = token_id_filtered.token_output_output_spent_token_transaction
 	if len(req.TokenIdentifiers) > 0 {
-		qb.addFilterCTEAndUnions("token_id_filtered", "tou.token_identifier = ANY($%d)", pq.Array(req.TokenIdentifiers))
+		whereConditions = append(whereConditions, fmt.Sprintf("tou.token_identifier = ANY($%d)", qb.argIndex))
+		qb.args = append(qb.args, pq.Array(req.TokenIdentifiers))
+		qb.argIndex++
 	}
 
-	if len(qb.unions) == 0 {
+	if len(whereConditions) == 0 {
 		return "", nil, fmt.Errorf("no valid filters provided for optimized query")
 	}
 
-	// Build the final query with CTEs
-	var queryBuilder strings.Builder
+	// Build the CTE with all conditions combined with AND
+	cteWhere := strings.Join(whereConditions, " AND ")
+	cte := fmt.Sprintf(`filtered_outputs AS (
+		SELECT 
+			tou.token_output_output_created_token_transaction,
+			tou.token_output_output_spent_token_transaction 
+		FROM token_outputs tou 
+		WHERE %s
+	)`, cteWhere)
 
-	// Add CTEs if any
-	if len(qb.ctes) > 0 {
-		queryBuilder.WriteString("WITH ")
-		queryBuilder.WriteString(strings.Join(qb.ctes, ", "))
-		queryBuilder.WriteString(" ")
+	// Build transaction hash filter if provided
+	var txHashFilter string
+	if len(req.TokenTransactionHashes) > 0 {
+		txHashFilter = fmt.Sprintf(" WHERE tt.finalized_token_transaction_hash = ANY($%d)", qb.argIndex)
+		qb.args = append(qb.args, pq.Array(req.TokenTransactionHashes))
+		qb.argIndex++
 	}
 
-	// Combine unions
-	queryBuilder.WriteString(fmt.Sprintf("SELECT * FROM (%s) combined", strings.Join(qb.unions, " UNION ")))
+	// Build the final query with CTE
+	var queryBuilder strings.Builder
+	queryBuilder.WriteString("WITH ")
+	queryBuilder.WriteString(cte)
+	queryBuilder.WriteString(" SELECT * FROM (")
+
+	// UNION: transactions that created the filtered outputs OR spent the filtered outputs
+	queryBuilder.WriteString("SELECT tt.id, tt.update_time FROM token_transactions tt ")
+	queryBuilder.WriteString("JOIN filtered_outputs ON tt.id = filtered_outputs.token_output_output_created_token_transaction")
+	queryBuilder.WriteString(txHashFilter)
+	queryBuilder.WriteString(" UNION ")
+	queryBuilder.WriteString("SELECT tt.id, tt.update_time FROM token_transactions tt ")
+	queryBuilder.WriteString("JOIN filtered_outputs ON tt.id = filtered_outputs.token_output_output_spent_token_transaction")
+	queryBuilder.WriteString(txHashFilter)
+
+	queryBuilder.WriteString(") combined")
 
 	// Add ordering, limit, and offset
 	queryBuilder.WriteString(" ORDER BY combined.update_time DESC")
@@ -387,41 +398,6 @@ func (h *QueryTokenTransactionsHandler) convertTransactionsToResponse(ctx contex
 }
 
 type queryBuilder struct {
-	ctes         []string
-	unions       []string
-	args         []any
-	argIndex     int
-	txHashFilter string
-}
-
-// addFilterCTEAndUnions adds a CTE and corresponding union queries for a filter condition
-func (qb *queryBuilder) addFilterCTEAndUnions(cteName string, whereClause string, argValue any) {
-	const baseSelect = `SELECT tt.id, tt.update_time FROM token_transactions tt`
-
-	// Create CTE
-	cte := fmt.Sprintf(`%s AS (SELECT tou.token_output_output_created_token_transaction, tou.token_output_output_spent_token_transaction FROM token_outputs tou WHERE %s)`, cteName, fmt.Sprintf(whereClause, qb.argIndex))
-	qb.ctes = append(qb.ctes, cte)
-	qb.args = append(qb.args, argValue)
-	qb.argIndex++
-
-	// Created outputs union
-	createdUnion := fmt.Sprintf(`%s JOIN %s ON tt.id = %s.token_output_output_created_token_transaction`, baseSelect, cteName, cteName)
-	if qb.txHashFilter != "" {
-		createdUnion += fmt.Sprintf(" WHERE %s", qb.txHashFilter)
-	}
-	qb.unions = append(qb.unions, createdUnion)
-
-	// Spent outputs union
-	spentUnion := fmt.Sprintf(`%s JOIN %s ON tt.id = %s.token_output_output_spent_token_transaction`, baseSelect, cteName, cteName)
-	if qb.txHashFilter != "" {
-		spentUnion += fmt.Sprintf(" WHERE %s", qb.txHashFilter)
-	}
-	qb.unions = append(qb.unions, spentUnion)
-}
-
-func buildTxHashFilter(req *tokenpb.QueryTokenTransactionsRequest, hashFilterArgIndex int) string {
-	if len(req.TokenTransactionHashes) > 0 {
-		return fmt.Sprintf("tt.finalized_token_transaction_hash = ANY($%d)", hashFilterArgIndex)
-	}
-	return ""
+	args     []any
+	argIndex int
 }

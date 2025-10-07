@@ -840,6 +840,355 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 	}
 }
 
+// TestQueryTokenTransactionsWithMultipleFilters tests QueryTokenTransactions with various filter combinations
+func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
+	issuerPrivKey := getRandomPrivateKey(t)
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+
+	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
+		IssuerPrivateKey: issuerPrivKey,
+		Name:             "Filter Test Token",
+		Ticker:           "FLTR",
+		MaxSupply:        1000000,
+	})
+	require.NoError(t, err, "failed to create native spark token")
+
+	// Create first mint transaction with 2 outputs
+	mintTransaction1, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
+	require.NoError(t, err, "failed to create first mint transaction")
+
+	finalMintTx1, err := wallet.BroadcastCoordinatedTokenTransfer(
+		t.Context(), config, mintTransaction1, []keys.Private{issuerPrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast first mint transaction")
+
+	mintTxHash1, err := utils.HashTokenTransaction(finalMintTx1, false)
+	require.NoError(t, err, "failed to hash first mint transaction")
+
+	// Create second mint transaction with 2 outputs
+	mintTransaction2, userOutput3PrivKey, userOutput4PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
+	require.NoError(t, err, "failed to create second mint transaction")
+
+	finalMintTx2, err := wallet.BroadcastCoordinatedTokenTransfer(
+		t.Context(), config, mintTransaction2, []keys.Private{issuerPrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast second mint transaction")
+
+	mintTxHash2, err := utils.HashTokenTransaction(finalMintTx2, false)
+	require.NoError(t, err, "failed to hash second mint transaction")
+
+	// Create a transfer transaction
+	transferTx, userOutput5PrivKey, err := createTestTokenTransferTransactionTokenPb(t, config, mintTxHash1, issuerPrivKey.Public())
+	require.NoError(t, err, "failed to create transfer transaction")
+
+	finalTransferTx, err := wallet.BroadcastCoordinatedTokenTransfer(
+		t.Context(), config, transferTx,
+		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast transfer transaction")
+
+	transferTxHash, err := utils.HashTokenTransaction(finalTransferTx, false)
+	require.NoError(t, err, "failed to hash transfer transaction")
+
+	tokenIdentifier, err := getTokenIdentifierFromMetadata(t.Context(), config, issuerPrivKey.Public())
+	require.NoError(t, err, "failed to get token identifier")
+
+	// Create a SECOND token with different identifier to test token identifier filtering
+	issuer2PrivKey := getRandomPrivateKey(t)
+	config2 := wallet.NewTestWalletConfigWithIdentityKey(t, issuer2PrivKey)
+
+	err = testCoordinatedCreateNativeSparkTokenWithParams(t, config2, createNativeSparkTokenParams{
+		IssuerPrivateKey: issuer2PrivKey,
+		Name:             "Second Filter Token",
+		Ticker:           "FLT2",
+		MaxSupply:        500000,
+	})
+	require.NoError(t, err, "failed to create second native spark token")
+
+	// Create mint transaction for second token
+	mintTransaction3, userOutput6PrivKey, _, err := createTestTokenMintTransactionTokenPb(t, config2, issuer2PrivKey.Public())
+	require.NoError(t, err, "failed to create third mint transaction")
+
+	finalMintTx3, err := wallet.BroadcastCoordinatedTokenTransfer(
+		t.Context(), config2, mintTransaction3, []keys.Private{issuer2PrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast third mint transaction")
+
+	mintTxHash3, err := utils.HashTokenTransaction(finalMintTx3, false)
+	require.NoError(t, err, "failed to hash third mint transaction")
+
+	tokenIdentifier2, err := getTokenIdentifierFromMetadata(t.Context(), config2, issuer2PrivKey.Public())
+	require.NoError(t, err, "failed to get second token identifier")
+
+	// Collect output IDs
+	mintTx1Output1ID := *finalMintTx1.TokenOutputs[0].Id
+	mintTx1Output2ID := *finalMintTx1.TokenOutputs[1].Id
+	mintTx2Output1ID := *finalMintTx2.TokenOutputs[0].Id
+	mintTx3Output1ID := *finalMintTx3.TokenOutputs[0].Id
+	transferTxOutputID := *finalTransferTx.TokenOutputs[0].Id
+
+	testCases := []struct {
+		name                  string
+		params                wallet.QueryTokenTransactionsParams
+		expectedTxCount       int
+		shouldContainTxHashes [][]byte
+	}{
+		{
+			name: "filter by issuer public key only",
+			params: wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+				Limit:            10,
+			},
+			expectedTxCount:       3, // 2 mints + 1 transfer
+			shouldContainTxHashes: [][]byte{mintTxHash1, mintTxHash2, transferTxHash},
+		},
+		{
+			name: "filter by owner public key - user output 1",
+			params: wallet.QueryTokenTransactionsParams{
+				OwnerPublicKeys: []keys.Public{userOutput1PrivKey.Public()},
+				Limit:           10,
+			},
+			expectedTxCount:       2, // mint1 (created) + transfer (spent)
+			shouldContainTxHashes: [][]byte{mintTxHash1, transferTxHash},
+		},
+		{
+			name: "filter by owner public key - user output 5 (transfer recipient)",
+			params: wallet.QueryTokenTransactionsParams{
+				OwnerPublicKeys: []keys.Public{userOutput5PrivKey.Public()},
+				Limit:           10,
+			},
+			expectedTxCount:       1, // only transfer
+			shouldContainTxHashes: [][]byte{transferTxHash},
+		},
+		{
+			name: "filter by token identifier - first token",
+			params: wallet.QueryTokenTransactionsParams{
+				TokenIdentifiers: [][]byte{tokenIdentifier},
+				Limit:            10,
+			},
+			expectedTxCount:       3, // first token: 2 mints + 1 transfer
+			shouldContainTxHashes: [][]byte{mintTxHash1, mintTxHash2, transferTxHash},
+		},
+		{
+			name: "filter by token identifier - second token",
+			params: wallet.QueryTokenTransactionsParams{
+				TokenIdentifiers: [][]byte{tokenIdentifier2},
+				Limit:            10,
+			},
+			expectedTxCount:       1, // second token: only 1 mint
+			shouldContainTxHashes: [][]byte{mintTxHash3},
+		},
+		{
+			name: "filter by multiple token identifiers",
+			params: wallet.QueryTokenTransactionsParams{
+				TokenIdentifiers: [][]byte{tokenIdentifier, tokenIdentifier2},
+				Limit:            10,
+			},
+			expectedTxCount:       4, // all transactions from both tokens
+			shouldContainTxHashes: [][]byte{mintTxHash1, mintTxHash2, transferTxHash, mintTxHash3},
+		},
+		{
+			name: "filter by output ID - single output",
+			params: wallet.QueryTokenTransactionsParams{
+				OutputIDs: []string{mintTx1Output1ID},
+				Limit:     10,
+			},
+			expectedTxCount:       2, // mint1 (created) + transfer (spent)
+			shouldContainTxHashes: [][]byte{mintTxHash1, transferTxHash},
+		},
+		{
+			name: "filter by output ID - multiple outputs from same transaction",
+			params: wallet.QueryTokenTransactionsParams{
+				OutputIDs: []string{mintTx1Output1ID, mintTx1Output2ID},
+				Limit:     10,
+			},
+			expectedTxCount:       2, // mint1 (created both) + transfer (spent both)
+			shouldContainTxHashes: [][]byte{mintTxHash1, transferTxHash},
+		},
+		{
+			name: "filter by output ID - outputs from different transactions",
+			params: wallet.QueryTokenTransactionsParams{
+				OutputIDs: []string{mintTx2Output1ID, mintTx3Output1ID},
+				Limit:     10,
+			},
+			expectedTxCount:       2, // mint2 and mint3
+			shouldContainTxHashes: [][]byte{mintTxHash2, mintTxHash3},
+		},
+		{
+			name: "filter by transaction hash - single",
+			params: wallet.QueryTokenTransactionsParams{
+				TransactionHashes: [][]byte{mintTxHash1},
+				Limit:             10,
+			},
+			expectedTxCount:       1,
+			shouldContainTxHashes: [][]byte{mintTxHash1},
+		},
+		{
+			name: "filter by transaction hash - multiple",
+			params: wallet.QueryTokenTransactionsParams{
+				TransactionHashes: [][]byte{mintTxHash1, transferTxHash},
+				Limit:             10,
+			},
+			expectedTxCount:       2,
+			shouldContainTxHashes: [][]byte{mintTxHash1, transferTxHash},
+		},
+		{
+			name: "filter by owner public key AND issuer public key",
+			params: wallet.QueryTokenTransactionsParams{
+				OwnerPublicKeys:  []keys.Public{userOutput1PrivKey.Public()},
+				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+				Limit:            10,
+			},
+			expectedTxCount:       2, // mint1 + transfer
+			shouldContainTxHashes: [][]byte{mintTxHash1, transferTxHash},
+		},
+		{
+			name: "filter by owner public key AND token identifier - first token",
+			params: wallet.QueryTokenTransactionsParams{
+				OwnerPublicKeys:  []keys.Public{userOutput5PrivKey.Public()},
+				TokenIdentifiers: [][]byte{tokenIdentifier},
+				Limit:            10,
+			},
+			expectedTxCount:       1, // only transfer with first token
+			shouldContainTxHashes: [][]byte{transferTxHash},
+		},
+		{
+			name: "filter by owner public key AND token identifier - second token",
+			params: wallet.QueryTokenTransactionsParams{
+				OwnerPublicKeys:  []keys.Public{userOutput6PrivKey.Public()},
+				TokenIdentifiers: [][]byte{tokenIdentifier2},
+				Limit:            10,
+			},
+			expectedTxCount:       1, // only mint3 with second token
+			shouldContainTxHashes: [][]byte{mintTxHash3},
+		},
+		{
+			name: "filter by owner AND token identifier - mismatched token",
+			params: wallet.QueryTokenTransactionsParams{
+				OwnerPublicKeys:  []keys.Public{userOutput6PrivKey.Public()},
+				TokenIdentifiers: [][]byte{tokenIdentifier}, // user6 has token2, filtering for token1
+				Limit:            10,
+			},
+			expectedTxCount:       0, // no match - user6 only has token2 outputs
+			shouldContainTxHashes: [][]byte{},
+		},
+		{
+			name: "filter by output ID AND transaction hash",
+			params: wallet.QueryTokenTransactionsParams{
+				OutputIDs:         []string{mintTx1Output1ID},
+				TransactionHashes: [][]byte{mintTxHash1},
+				Limit:             10,
+			},
+			expectedTxCount:       1, // only mint1
+			shouldContainTxHashes: [][]byte{mintTxHash1},
+		},
+		{
+			name: "filter by output ID AND transaction hash - should match transfer too",
+			params: wallet.QueryTokenTransactionsParams{
+				OutputIDs:         []string{mintTx1Output1ID},
+				TransactionHashes: [][]byte{transferTxHash},
+				Limit:             10,
+			},
+			expectedTxCount:       1, // only transfer (output is spent there)
+			shouldContainTxHashes: [][]byte{transferTxHash},
+		},
+		{
+			name: "filter by owner, issuer, and token identifier - all matching",
+			params: wallet.QueryTokenTransactionsParams{
+				OwnerPublicKeys:  []keys.Public{userOutput1PrivKey.Public()},
+				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+				TokenIdentifiers: [][]byte{tokenIdentifier},
+				Limit:            10,
+			},
+			expectedTxCount:       2, // mint1 + transfer
+			shouldContainTxHashes: [][]byte{mintTxHash1, transferTxHash},
+		},
+		{
+			name: "filter by multiple owner public keys - same transaction",
+			params: wallet.QueryTokenTransactionsParams{
+				OwnerPublicKeys: []keys.Public{userOutput3PrivKey.Public(), userOutput4PrivKey.Public()},
+				Limit:           10,
+			},
+			expectedTxCount:       1, // only mint2 (has both user3 and user4)
+			shouldContainTxHashes: [][]byte{mintTxHash2},
+		},
+		{
+			name: "filter by multiple owner public keys - mixed single and multiple transactions",
+			params: wallet.QueryTokenTransactionsParams{
+				OwnerPublicKeys: []keys.Public{
+					userOutput1PrivKey.Public(), // in mint1 and transfer
+					userOutput2PrivKey.Public(), // in mint1 and transfer
+					userOutput3PrivKey.Public(), // in mint2 only
+				},
+				Limit: 10,
+			},
+			expectedTxCount:       3, // mint1 (has user1 AND user2), mint2 (has user3 only), transfer (has user1 AND user2)
+			shouldContainTxHashes: [][]byte{mintTxHash1, mintTxHash2, transferTxHash},
+		},
+		{
+			name: "filter by output from transfer transaction",
+			params: wallet.QueryTokenTransactionsParams{
+				OutputIDs: []string{transferTxOutputID},
+				Limit:     10,
+			},
+			expectedTxCount:       1, // only transfer
+			shouldContainTxHashes: [][]byte{transferTxHash},
+		},
+		{
+			name: "filter by output from second token",
+			params: wallet.QueryTokenTransactionsParams{
+				OutputIDs: []string{mintTx3Output1ID},
+				Limit:     10,
+			},
+			expectedTxCount:       1, // only mint3
+			shouldContainTxHashes: [][]byte{mintTxHash3},
+		},
+		{
+			name: "filter by non-existent transaction hash",
+			params: wallet.QueryTokenTransactionsParams{
+				TransactionHashes: [][]byte{make([]byte, 32)}, // all zeros
+				Limit:             10,
+			},
+			expectedTxCount:       0,
+			shouldContainTxHashes: [][]byte{},
+		},
+		{
+			name: "filter by non-existent owner public key",
+			params: wallet.QueryTokenTransactionsParams{
+				OwnerPublicKeys: []keys.Public{keys.GeneratePrivateKey().Public()},
+				Limit:           10,
+			},
+			expectedTxCount:       0,
+			shouldContainTxHashes: [][]byte{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := wallet.QueryTokenTransactionsV2(
+				t.Context(),
+				config,
+				tc.params,
+			)
+			require.NoError(t, err, "failed to query token transactions")
+
+			require.Len(t, result.TokenTransactionsWithStatus, tc.expectedTxCount,
+				"expected %d transactions but got %d", tc.expectedTxCount, len(result.TokenTransactionsWithStatus))
+
+			// Verify that all expected transaction hashes are present
+			foundHashes := make(map[string]bool)
+			for _, txWithStatus := range result.TokenTransactionsWithStatus {
+				foundHashes[string(txWithStatus.TokenTransactionHash)] = true
+			}
+
+			for _, expectedHash := range tc.shouldContainTxHashes {
+				require.True(t, foundHashes[string(expectedHash)],
+					"expected to find transaction hash %x in results", expectedHash)
+			}
+		})
+	}
+}
+
 func TestCoordinatedTokenMintAndTransferTokensTooManyOutputsFails(t *testing.T) {
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 

@@ -35,6 +35,7 @@ type OperatorSignatures map[string][]byte
 type QueryTokenTransactionsParams struct {
 	IssuerPublicKeys  []keys.Public
 	OwnerPublicKeys   []keys.Public
+	TokenIdentifiers  [][]byte
 	OutputIDs         []string
 	TransactionHashes [][]byte
 	Offset            int64
@@ -713,6 +714,7 @@ func QueryTokenTransactionsV2(
 	request := &tokenpb.QueryTokenTransactionsRequest{
 		OwnerPublicKeys:        serializeAll(params.OwnerPublicKeys),
 		IssuerPublicKeys:       serializeAll(params.IssuerPublicKeys), // Field name change: TokenPublicKeys -> IssuerPublicKeys
+		TokenIdentifiers:       params.TokenIdentifiers,
 		OutputIds:              params.OutputIDs,
 		TokenTransactionHashes: params.TransactionHashes,
 		Limit:                  params.Limit,
