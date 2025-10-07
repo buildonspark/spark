@@ -26,6 +26,7 @@ import (
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
+	"github.com/lightsparkdev/spark/so/tree"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -452,7 +453,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		directFromCpfpRefundTxBytes = node.DirectFromCpfpRefundTx
 	}
 
-	tree, err := node.QueryTree().Only(ctx)
+	treeEnt, err := node.QueryTree().Only(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get tree: %w", err)
 	}
@@ -464,7 +465,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		SetDirectTx(directNodeTxBytes).
 		SetDirectRefundTx(directRefundTxBytes).
 		SetDirectFromCpfpRefundTx(directFromCpfpRefundTxBytes)
-	if tree.Status == st.TreeStatusAvailable && intent != pbcommon.SignatureIntent_REFRESH {
+	if treeEnt.Status == st.TreeStatusAvailable && intent != pbcommon.SignatureIntent_REFRESH && tree.TreeNodeCanBecomeAvailable(node) {
 		// Existing refresh call won't lock the leaf status, so the leaves can be used in future operations.
 		// This is address by new renew_leaf but this cases leaves to be unlocked during transfer.
 		if len(node.RawRefundTx) > 0 && len(node.Edges.Children) == 0 {

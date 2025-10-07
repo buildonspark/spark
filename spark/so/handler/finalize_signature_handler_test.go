@@ -864,3 +864,44 @@ func TestFinalizeTreeWithNoBlockHeight(t *testing.T) {
 	require.Error(t, err, "should fail with no block height")
 	assert.ErrorContains(t, err, "no block height present in db")
 }
+
+// Test edge case: Tree node in exiting status should not trigger status logic
+func TestFinalizeSignatureHandler_UpdateNode_TreeNodeExitingStatus(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	config := &so.Config{}
+	handler := NewFinalizeSignatureHandler(config)
+
+	for _, status := range []st.TreeNodeStatus{st.TreeNodeStatusOnChain, st.TreeNodeStatusExited, st.TreeNodeStatusParentExited} {
+		dbTx, err := ent.GetDbFromContext(ctx)
+		require.NoError(t, err)
+
+		_, treeNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusAvailable)
+
+		// Set the tree node to a final status
+		treeNode, err = treeNode.Update().
+			SetStatus(status).
+			Save(ctx)
+		require.NoError(t, err)
+
+		// Test: Node without refund tx should be set to Splitted
+		nodeSignatures := &pb.NodeSignatures{
+			NodeId: treeNode.ID.String(),
+			// No RefundTxSignature provided
+		}
+
+		sparkNode, internalNode, err := handler.updateNode(ctx, nodeSignatures, pbcommon.SignatureIntent_TRANSFER, false)
+		require.NoError(t, err)
+		assert.NotNil(t, sparkNode)
+		assert.NotNil(t, internalNode)
+
+		// Verify that the tree node status is not updated because it can not be updated to Available
+		updatedNode, err := dbTx.TreeNode.Get(ctx, treeNode.ID)
+		require.NoError(t, err)
+		assert.Equal(t, status, updatedNode.Status)
+
+		// Clear test data
+		err = dbTx.Rollback()
+		require.NoError(t, err)
+	}
+}
