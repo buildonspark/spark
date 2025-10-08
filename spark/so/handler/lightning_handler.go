@@ -704,10 +704,32 @@ func (h *LightningHandler) storeUserSignedTransactions(
 			return nil, fmt.Errorf("unable to marshal signing commitments: %w", err)
 		}
 
+		transaction, err := common.TxFromRawTxBytes(cpfpTransaction.RawTx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get transaction: %w", err)
+		}
+
 		nodeID, err := uuid.Parse(cpfpTransaction.LeafId)
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse node id: %w", err)
 		}
+		node, err := tx.TreeNode.Get(ctx, nodeID)
+		if err != nil {
+			return nil, fmt.Errorf("unable to get node: %w", err)
+		}
+
+		var amount int64
+		for _, out := range transaction.TxOut {
+			if out.Value < 0 || out.Value > int64(node.Value) {
+				return nil, fmt.Errorf("invalid output value in the signed transaction, for leaf_id: %s, value: %d", cpfpTransaction.LeafId, out.Value)
+			}
+			amount += out.Value
+		}
+
+		if amount != int64(node.Value) {
+			return nil, fmt.Errorf("amount mismatch in the signed transaction, for leaf_id: %s, expected: %d, got: %d", nodeID, node.Value, amount)
+		}
+
 		cpfpUserSignatureCommitmentBytes, err := proto.Marshal(cpfpTransaction.SigningNonceCommitment)
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal cpfp user signature commitment: %w", err)
@@ -724,10 +746,6 @@ func (h *LightningHandler) storeUserSignedTransactions(
 			return nil, fmt.Errorf("unable to store user signed transaction: %w", err)
 		}
 
-		node, err := tx.TreeNode.Get(ctx, nodeID)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get node: %w", err)
-		}
 		_, err = tx.TreeNode.UpdateOne(node).SetStatus(st.TreeNodeStatusTransferLocked).Save(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to update node status: %w", err)
