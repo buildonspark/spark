@@ -341,8 +341,6 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 	reason pb.InitiatePreimageSwapRequest_Reason,
 	validateNodeOwnership bool,
 ) error {
-	logger := logging.GetLoggerFromContext(ctx)
-
 	// Validate input parameters
 	if len(paymentHash) != 32 {
 		return fmt.Errorf("invalid payment hash length: %d bytes, expected 32 bytes", len(paymentHash))
@@ -429,10 +427,6 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if node.Status != st.TreeNodeStatusAvailable {
 			return fmt.Errorf("node %v is not available: %v", node.ID, node.Status)
 		}
-		keyshare, err := node.QuerySigningKeyshare().First(ctx)
-		if err != nil {
-			return fmt.Errorf("unable to get keyshare for cpfpTransaction, tree_node id: %s: %w", nodeID, err)
-		}
 		cpfpTx, err := common.TxFromRawTxBytes(node.RawTx)
 		if err != nil {
 			return fmt.Errorf("unable to get cpfpTx for cpfpTransaction, tree_node id: %s: %w", nodeID, err)
@@ -450,17 +444,6 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if err != nil {
 			return fmt.Errorf("unable to get cpfp sighash for cpfpTransaction, tree_node id: %s: %w", nodeID, err)
 		}
-
-		realUserPublicKey := node.VerifyingPubkey.Sub(keyshare.PublicKey)
-
-		if !realUserPublicKey.Equals(node.OwnerSigningPubkey) {
-			logger.Sugar().Debugf("real user public key mismatch (expected %s, got %s)", node.OwnerSigningPubkey, realUserPublicKey)
-			node, err = node.Update().SetOwnerSigningPubkey(realUserPublicKey).Save(ctx)
-			if err != nil {
-				return fmt.Errorf("unable to update tree_node: %s: %w", nodeID, err)
-			}
-		}
-
 		_, err = client.ValidateSignatureShare(ctx, &pbfrost.ValidateSignatureShareRequest{
 			Message:         cpfpSighash,
 			SignatureShare:  cpfpTransaction.UserSignature,
