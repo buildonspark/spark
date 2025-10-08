@@ -5,11 +5,13 @@ import (
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authz"
@@ -43,6 +45,7 @@ func (h *RefreshTimelockHandler) RefreshTimelockV2(ctx context.Context, req *pb.
 }
 
 func (h *RefreshTimelockHandler) refreshTimelock(ctx context.Context, req *pb.RefreshTimelockRequest, requireDirectTx bool) (*pb.RefreshTimelockResponse, error) {
+	logger := logging.GetLoggerFromContext(ctx)
 	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid identity public key: %w", err)
@@ -131,7 +134,8 @@ func (h *RefreshTimelockHandler) refreshTimelock(ctx context.Context, req *pb.Re
 		}
 
 		if i == len(req.SigningJobs)-1 && node.Status != st.TreeNodeStatusAvailable && node.Status != st.TreeNodeStatusOnChain {
-			return nil, fmt.Errorf("cannot refresh leaf node %s because it is not available or on-chain", node.ID)
+			logger.Warn("skipping refresh for leaf node because it is not available or on-chain", zap.String("node_id", node.ID.String()), zap.String("status", string(node.Status)))
+			continue
 		}
 
 		currentTx, err := common.TxFromRawTxBytes(rawTxBytes)
