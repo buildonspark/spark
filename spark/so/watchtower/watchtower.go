@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -100,6 +101,7 @@ func QueryNodesWithExpiredTimeLocks(ctx context.Context, dbTx *ent.Tx, blockHeig
 				treenode.NodeConfirmationHeightIsNil(),
 				treenode.RefundConfirmationHeightIsNil(),
 			),
+			treenode.HasTreeWith(tree.NetworkEQ(common.SchemaNetwork(network))),
 		).
 		All(ctx)
 	if err != nil {
@@ -116,6 +118,7 @@ func QueryNodesWithExpiredTimeLocks(ctx context.Context, dbTx *ent.Tx, blockHeig
 				),
 			),
 			treenode.NodeConfirmationHeightIsNil(),
+			treenode.HasTreeWith(tree.NetworkEQ(common.SchemaNetwork(network))),
 		).
 		All(ctx)
 	if err != nil {
@@ -127,6 +130,7 @@ func QueryNodesWithExpiredTimeLocks(ctx context.Context, dbTx *ent.Tx, blockHeig
 		Where(
 			treenode.NodeConfirmationHeightNotNil(),
 			treenode.RefundConfirmationHeightIsNil(),
+			treenode.HasTreeWith(tree.NetworkEQ(common.SchemaNetwork(network))),
 		).
 		All(ctx)
 	if err != nil {
