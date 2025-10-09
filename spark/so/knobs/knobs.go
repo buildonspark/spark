@@ -46,6 +46,9 @@ const (
 	// txids for tree nodes that were created before the txids were added to the
 	// database.
 	KnobTasksEnableBackfillTreeNodeTxidsBatchSize = "spark.so.tasks.enable_backfill_tree_node_txids_batch_size"
+
+	// Number of confirmations required before finalizing tree creation
+	KnobNumRequiredConfirmations = "spark.so.num_required_confirmations"
 )
 
 type Config struct {

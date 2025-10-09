@@ -19,6 +19,8 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestNewFinalizeSignatureHandler(t *testing.T) {
@@ -632,6 +634,14 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
+	// Create a block height record for the regtest network
+	_, err = dbTX.BlockHeight.Create().
+		SetID(uuid.New()).
+		SetNetwork(st.NetworkRegtest).
+		SetHeight(103).
+		Save(ctx)
+	require.NoError(t, err)
+
 	req := &pb.FinalizeNodeSignaturesRequest{
 		NodeSignatures: []*pb.NodeSignatures{
 			{NodeId: rootNode.ID.String()},
@@ -642,4 +652,215 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 
 	_, err = handler.FinalizeNodeSignatures(ctx, req)
 	require.ErrorContains(t, err, "confirmation txid does not match tree base txid")
+}
+
+// Test that trees with < 3 confirmations cannot be finalized
+func TestFinalizeTreeWithInsufficientConfirmations(t *testing.T) {
+	t.Parallel()
+	rng := rand.NewChaCha8([32]byte{})
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	config := &so.Config{
+		SigningOperatorMap: map[string]*so.SigningOperator{
+			"test-operator": {
+				ID:         0,
+				Identifier: "test-operator",
+				AddressRpc: "localhost:8080",
+				AddressDkg: "localhost:8081",
+			},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+	handler := NewFinalizeSignatureHandler(config)
+
+	// Create a tree in a not-yet-finalized (PENDING) state
+	tree, rootNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusPending)
+
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	keyshare, err := rootNode.QuerySigningKeyshare().Only(ctx)
+	require.NoError(t, err)
+
+	testID := uuid.Must(uuid.NewRandomFromReader(rng)).String()
+
+	// Create a child node in the tree - this represents a non-root node
+	// that can receive deposits independently of the root node
+	childVerifyingKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	childOwnerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
+	childOwnerSigning := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	rawTx := createTestTxBytesWithIndex(t, 65536, 0)
+	childNode, err := dbTX.TreeNode.Create().
+		SetID(uuid.New()).
+		SetTree(tree).
+		SetSigningKeyshare(keyshare).
+		SetValue(65536).
+		SetVerifyingPubkey(childVerifyingKey.Public()).
+		SetOwnerIdentityPubkey(childOwnerIdentity.Public()).
+		SetOwnerSigningPubkey(childOwnerSigning.Public()).
+		SetRawTx(rawTx).
+		SetRawRefundTx(rawTx).
+		SetVout(0).
+		SetStatus(st.TreeNodeStatusCreating).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create a deposit address for the child node
+	depositAddress, err := dbTX.DepositAddress.Create().
+		SetID(uuid.New()).
+		SetAddress("child_deposit_address_" + testID).
+		SetOwnerIdentityPubkey(childOwnerIdentity.Public()).
+		SetOwnerSigningPubkey(childOwnerSigning.Public()).
+		SetConfirmationHeight(100).
+		SetConfirmationTxid("deposit_txid_" + testID).
+		SetSigningKeyshare(keyshare).
+		SetNetwork(st.NetworkRegtest).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create a UTXO that represents the actual Bitcoin transaction
+	// confirming the deposit to the child node's address
+	_, err = dbTX.Utxo.Create().
+		SetID(uuid.New()).
+		SetBlockHeight(100).
+		SetTxid([]byte("deposit_txid_" + testID)).
+		SetVout(0).
+		SetAmount(65536).
+		SetNetwork(st.NetworkRegtest).
+		SetPkScript([]byte("pk_script_" + testID)).
+		SetDepositAddress(depositAddress).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = tree.Update().
+		SetBaseTxid([]byte("deposit_txid_" + testID)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create a block height record for the regtest network at 102
+	// This gives only 2 confirmations (102 - 100 = 2), which is less than the required 3
+	_, err = dbTX.BlockHeight.Create().
+		SetID(uuid.New()).
+		SetNetwork(st.NetworkRegtest).
+		SetHeight(102).
+		Save(ctx)
+	require.NoError(t, err)
+
+	req := &pb.FinalizeNodeSignaturesRequest{
+		NodeSignatures: []*pb.NodeSignatures{
+			{NodeId: rootNode.ID.String()},
+			{NodeId: childNode.ID.String()},
+		},
+		Intent: pbcommon.SignatureIntent_CREATION,
+	}
+
+	_, err = handler.FinalizeNodeSignatures(ctx, req)
+	require.Error(t, err, "should fail with insufficient confirmations")
+	require.ErrorContains(t, err, "expected at least")
+
+	// Check that the error has the correct gRPC status code
+	grpcError, ok := status.FromError(err)
+	require.True(t, ok, "error should be a gRPC status error")
+	assert.Equal(t, codes.FailedPrecondition, grpcError.Code(), "error should have FailedPrecondition status code (9)")
+}
+
+// Test that trees cannot be finalized when no block height is present in db
+func TestFinalizeTreeWithNoBlockHeight(t *testing.T) {
+	t.Parallel()
+	rng := rand.NewChaCha8([32]byte{})
+	ctx, _ := db.NewTestSQLiteContext(t)
+
+	config := &so.Config{
+		SigningOperatorMap: map[string]*so.SigningOperator{
+			"test-operator": {
+				ID:         0,
+				Identifier: "test-operator",
+				AddressRpc: "localhost:8080",
+				AddressDkg: "localhost:8081",
+			},
+		},
+		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+	}
+	handler := NewFinalizeSignatureHandler(config)
+
+	// Create a tree in a not-yet-finalized (PENDING) state
+	tree, rootNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusPending)
+
+	dbTX, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	keyshare, err := rootNode.QuerySigningKeyshare().Only(ctx)
+	require.NoError(t, err)
+
+	testID := uuid.Must(uuid.NewRandomFromReader(rng)).String()
+
+	// Create a child node in the tree - this represents a non-root node
+	// that can receive deposits independently of the root node
+	childVerifyingKey := keys.MustGeneratePrivateKeyFromRand(rng)
+	childOwnerIdentity := keys.MustGeneratePrivateKeyFromRand(rng)
+	childOwnerSigning := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	rawTx := createTestTxBytesWithIndex(t, 65536, 0)
+	childNode, err := dbTX.TreeNode.Create().
+		SetID(uuid.New()).
+		SetTree(tree).
+		SetSigningKeyshare(keyshare).
+		SetValue(65536).
+		SetVerifyingPubkey(childVerifyingKey.Public()).
+		SetOwnerIdentityPubkey(childOwnerIdentity.Public()).
+		SetOwnerSigningPubkey(childOwnerSigning.Public()).
+		SetRawTx(rawTx).
+		SetRawRefundTx(rawTx).
+		SetVout(0).
+		SetStatus(st.TreeNodeStatusCreating).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create a deposit address for the child node
+	depositAddress, err := dbTX.DepositAddress.Create().
+		SetID(uuid.New()).
+		SetAddress("child_deposit_address_" + testID).
+		SetOwnerIdentityPubkey(childOwnerIdentity.Public()).
+		SetOwnerSigningPubkey(childOwnerSigning.Public()).
+		SetConfirmationHeight(100).
+		SetConfirmationTxid("deposit_txid_" + testID).
+		SetSigningKeyshare(keyshare).
+		SetNetwork(st.NetworkRegtest).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create a UTXO that represents the actual Bitcoin transaction
+	// confirming the deposit to the child node's address
+	_, err = dbTX.Utxo.Create().
+		SetID(uuid.New()).
+		SetBlockHeight(100).
+		SetTxid([]byte("deposit_txid_" + testID)).
+		SetVout(0).
+		SetAmount(65536).
+		SetNetwork(st.NetworkRegtest).
+		SetPkScript([]byte("pk_script_" + testID)).
+		SetDepositAddress(depositAddress).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = tree.Update().
+		SetBaseTxid([]byte("deposit_txid_" + testID)).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Do NOT create a block height record - this simulates the case where
+	// blockchain sync hasn't happened yet or the block height is not tracked
+
+	req := &pb.FinalizeNodeSignaturesRequest{
+		NodeSignatures: []*pb.NodeSignatures{
+			{NodeId: rootNode.ID.String()},
+			{NodeId: childNode.ID.String()},
+		},
+		Intent: pbcommon.SignatureIntent_CREATION,
+	}
+
+	_, err = handler.FinalizeNodeSignatures(ctx, req)
+	require.Error(t, err, "should fail with no block height")
+	assert.ErrorContains(t, err, "no block height present in db")
 }

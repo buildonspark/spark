@@ -16,13 +16,16 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -97,6 +100,21 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 				return nil, fmt.Errorf("failed to get deposit address: %w", err)
 			}
 			if address.ConfirmationHeight != 0 {
+				blockHeight, err := db.BlockHeight.Query().
+					Where(blockheight.NetworkEQ(address.Network)).
+					Order(ent.Desc(blockheight.FieldHeight)).
+					First(ctx)
+				if err != nil {
+					if ent.IsNotFound(err) {
+						return nil, fmt.Errorf("no block height present in db; cannot determine number of confirmations")
+					}
+					return nil, fmt.Errorf("failed to get max block height: %w", err)
+				}
+				numConfirmations := blockHeight.Height - address.ConfirmationHeight
+				requiredConfirmations := int64(knobs.GetKnobsService(ctx).GetValue(knobs.KnobNumRequiredConfirmations, 3))
+				if numConfirmations < requiredConfirmations {
+					return nil, errors.FailedPreconditionInsufficientConfirmations(fmt.Errorf("expected at least %d confirmations, got %d", requiredConfirmations, numConfirmations))
+				}
 				if len(address.ConfirmationTxid) > 0 {
 					var baseHash chainhash.Hash
 					// Convert the tree.BaseTxid back to chainhash so it matches the format of address.ConfirmationTxid
