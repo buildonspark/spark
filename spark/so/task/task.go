@@ -2,7 +2,6 @@ package task
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"maps"
@@ -18,7 +17,6 @@ import (
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/objects"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/go-co-op/gocron/v2"
@@ -27,7 +25,6 @@ import (
 	"github.com/lightsparkdev/spark/common/logging"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
-	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -368,60 +365,18 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					logger.Info(fmt.Sprintf("[cron] Found %d token transactions to finalize", len(tokenTransactions)))
 					internalSignTokenHandler := tokens.NewInternalSignTokenHandler(config)
 					for _, tokenTransaction := range tokenTransactions {
-						var spentOutputs []*tokenpb.TokenOutputToSpend
-						var createdOutputs []*tokenpb.TokenOutput
 						signaturesPackage := make(map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse)
-						if tokenTransaction.Edges.SpentOutput != nil {
-							for _, spentOutput := range tokenTransaction.Edges.SpentOutput {
-								spentOutputs = append(spentOutputs, &tokenpb.TokenOutputToSpend{
-									PrevTokenTransactionHash: spentOutput.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash,
-									PrevTokenTransactionVout: uint32(spentOutput.CreatedTransactionOutputVout),
-								})
-							}
-						}
 						finalized, err := internalSignTokenHandler.RecoverFullRevocationSecretsAndFinalize(ctx, tokenTransaction)
 						if err != nil {
 							logger.Error("failed to recover full revocation secrets and finalize token transaction",
-								zap.Stringer("transaction_id", tokenTransaction.ID),
-								zap.String("transaction_hash", hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash)),
 								zap.Error(err),
 							)
 							continue
 						}
 						if finalized {
-							logger.Info("Successfully finalized token transaction",
-								zap.Stringer("transaction_id", tokenTransaction.ID),
-								zap.String("transaction_hash", hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash)),
-							)
+							logger.Info("Successfully finalized token transaction")
 							continue
 						}
-
-						if tokenTransaction.Edges.CreatedOutput != nil {
-							for _, createdOutput := range tokenTransaction.Edges.CreatedOutput {
-								idStr := createdOutput.ID.String()
-								createdOutputs = append(createdOutputs, &tokenpb.TokenOutput{
-									Id:                            &idStr,
-									OwnerPublicKey:                createdOutput.OwnerPublicKey.Serialize(),
-									RevocationCommitment:          createdOutput.WithdrawRevocationCommitment,
-									WithdrawBondSats:              &createdOutput.WithdrawBondSats,
-									WithdrawRelativeBlockLocktime: &createdOutput.WithdrawRelativeBlockLocktime,
-									TokenPublicKey:                createdOutput.TokenPublicKey.Serialize(),
-									TokenIdentifier:               createdOutput.TokenIdentifier,
-									TokenAmount:                   createdOutput.TokenAmount,
-								})
-							}
-						}
-
-						var protoNetwork pbspark.Network
-						if len(tokenTransaction.Edges.CreatedOutput) > 0 {
-							protoNetwork, err = common.ProtoNetworkFromSchemaNetwork(tokenTransaction.Edges.CreatedOutput[0].Network)
-							if err != nil {
-								return fmt.Errorf("unable to get proto network: %w", err)
-							}
-						} else {
-							return fmt.Errorf("no created outputs found for token transaction: %s", tokenTransaction.ID)
-						}
-
 						if tokenTransaction.Edges.PeerSignatures != nil {
 							for _, signature := range tokenTransaction.Edges.PeerSignatures {
 								identifier := config.GetOperatorIdentifierFromIdentityPublicKey(signature.OperatorIdentityPublicKey)
@@ -436,27 +391,18 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							}
 						}
 
-						tokenPb := &tokenpb.TokenTransaction{
-							Version: uint32(tokenTransaction.Version),
-							TokenInputs: &tokenpb.TokenTransaction_TransferInput{
-								TransferInput: &tokenpb.TokenTransferInput{
-									OutputsToSpend: spentOutputs,
-								},
-							},
-							TokenOutputs: createdOutputs,
-							ExpiryTime:   timestamppb.New(tokenTransaction.ExpiryTime),
-							Network:      protoNetwork,
+						tokenPb, err := tokenTransaction.MarshalProto(ctx, config)
+						if err != nil {
+							return fmt.Errorf("failed to marshal token transaction: %w", err)
 						}
-						logger.With(zap.String("transaction_hash", hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash))).
-							Sugar().
-							Infof("[cron] Finalizing token transaction with operators %+q (signatures: %d)", slices.Collect(maps.Keys(signaturesPackage)), len(signaturesPackage))
+
+						logger.Sugar().Infof("[cron] Finalizing token transaction with operators %+q (signatures: %d)", slices.Collect(maps.Keys(signaturesPackage)), len(signaturesPackage))
 						signTokenHandler := tokens.NewSignTokenHandler(config)
 						commitTransactionResponse, err := signTokenHandler.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, tokenPb, signaturesPackage, tokenTransaction.FinalizedTokenTransactionHash)
 						if err != nil {
-							return fmt.Errorf("cron job failed to exchange revocation secrets and finalize if possible for token txHash: %x: %w", tokenTransaction.FinalizedTokenTransactionHash, err)
+							return fmt.Errorf("cron job failed to exchange revocation secrets and finalize if possible: %w", err)
 						} else {
-							logger.With(zap.String("transaction_hash", hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash))).
-								Sugar().
+							logger.Sugar().
 								Infof("Successfully exchanged revocation secrets and finalized if possible for token tx. Commit response: %v", commitTransactionResponse)
 						}
 					}
