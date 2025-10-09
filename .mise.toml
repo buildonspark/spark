@@ -59,6 +59,40 @@ run = """kubectl --context minikube -n bitcoin exec regtest-bitcoind-0 -- \
     sendtoaddress {{arg(name="addr")}} {{arg(name="amount", default="0.0001")}}
     """
 
+[tasks.mine-mk]
+description = "Mine <blocks> to <address>"
+usage = '''
+arg "<blocks>" "amount of blocks to mine" default="5"
+arg "<addr>" "the l1 address to generate to"
+'''
+run = """kubectl --context minikube -n bitcoin exec regtest-bitcoind-0 -- \
+  bitcoin-cli \
+    -conf=/etc/bitcoin/bitcoin.conf \
+    -datadir=/data \
+    generatetoaddress {{arg(name="blocks", default="5")}} {{arg(name="addr")}}
+    """
+
+[tasks.get-address-mk]
+description = "gets a new l1 address"
+run = """kubectl --context minikube -n bitcoin exec regtest-bitcoind-0 -- \
+  bitcoin-cli \
+    -conf=/etc/bitcoin/bitcoin.conf \
+    -datadir=/data \
+    getnewaddress
+    """
+
+[tasks.broadcast-tx-mk]
+description = "Broadcast a <txn>"
+usage = '''
+arg "<hex>" "raw transaction hex"
+'''
+run = """kubectl --context minikube -n bitcoin exec regtest-bitcoind-0 -- \
+  bitcoin-cli \
+    -conf=/etc/bitcoin/bitcoin.conf \
+    -datadir=/data \
+    sendrawtransaction {{arg(name="hex")}}
+    """
+
 [settings]
 activate_aggressive = true
 disable_backends = ["asdf"]
