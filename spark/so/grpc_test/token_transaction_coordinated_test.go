@@ -418,6 +418,58 @@ func TestRevocationExchangeCronJobDoesNotFinalizeStartedIfSignatureIsInvalid(t *
 	}
 }
 
+func TestRevocationExchangeCronJobSkipsRevealedWithNoSpentOutputs(t *testing.T) {
+	ctx := t.Context()
+	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+	require.NoError(t, err, "failed to create transfer token transaction")
+
+	entClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
+	defer entClient.Close()
+
+	setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t, ctx, entClient, finalTransferTokenTransactionHash)
+
+	tokenTransaction, err := entClient.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)).
+		WithSpentOutput().
+		Only(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, tokenTransaction.Edges.SpentOutput)
+
+	id := tokenTransaction.ID
+
+	require.NoError(t,
+		entClient.TokenTransaction.
+			UpdateOneID(id).
+			ClearSpentOutput().
+			SetUpdateTime(time.Now().Add(-25*time.Minute).UTC()).
+			Exec(ctx),
+	)
+
+	exists, err := entClient.TokenTransaction.
+		Query().
+		Where(tokentransaction.ID(id), tokentransaction.HasSpentOutput()).
+		Exist(ctx)
+	require.NoError(t, err)
+	require.False(t, exists)
+
+	conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000001"].NewOperatorGRPCConnection()
+	require.NoError(t, err)
+	mockClient := pbmock.NewMockServiceClient(conn)
+	_, err = mockClient.TriggerTask(t.Context(), &pbmock.TriggerTaskRequest{TaskName: "finalize_revealed_token_transactions"})
+	// ==== Verify the task does not error in the case where there are no spent outputs ====
+	require.NoError(t, err)
+	conn.Close()
+
+	// ==== Verify the transaction is still revealed ====
+	tokenTransactionAfterFinalizeRevealedTransactions, err := entClient.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)).
+		WithPeerSignatures().
+		WithCreatedOutput().
+		Only(ctx)
+	require.NoError(t, err)
+	require.Equal(t, st.TokenTransactionStatusRevealed, tokenTransactionAfterFinalizeRevealedTransactions.Status)
+}
+
 func createTransferTokenTransactionForWallet(t *testing.T, ctx context.Context) (*wallet.TestWalletConfig, []byte, error) {
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 

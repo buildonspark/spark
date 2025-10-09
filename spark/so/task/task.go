@@ -347,6 +347,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							tokentransaction.UpdateTimeLT(
 								time.Now().Add(-5*time.Minute).UTC(),
 							),
+							tokentransaction.HasSpentOutput(),
 						).
 						WithPeerSignatures().
 						WithSpentOutput(func(q *ent.TokenOutputQuery) {
