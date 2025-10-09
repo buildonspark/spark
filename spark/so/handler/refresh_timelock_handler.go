@@ -101,15 +101,7 @@ func (h *RefreshTimelockHandler) refreshTimelock(ctx context.Context, req *pb.Re
 			case len(req.SigningJobs) - 5:
 				rawTxBytes = node.RawTx
 			default:
-				node, err = node.QueryParent().First(ctx)
-				if err != nil {
-					return nil, fmt.Errorf("unable to query parent node: %w", err)
-				}
-				if i%2 == 0 {
-					rawTxBytes = node.RawTx
-				} else {
-					rawTxBytes = node.DirectTx
-				}
+				continue
 			}
 		} else if requireDirectTx && len(node.DirectTx) > 0 {
 			if len(req.SigningJobs) != 3 && len(req.SigningJobs) != 5 {
@@ -125,11 +117,7 @@ func (h *RefreshTimelockHandler) refreshTimelock(ctx context.Context, req *pb.Re
 			} else if i == len(req.SigningJobs)-2 {
 				rawTxBytes = node.RawTx
 			} else {
-				node, err = node.QueryParent().ForUpdate().First(ctx)
-				if err != nil {
-					return nil, fmt.Errorf("unable to query parent node: %w", err)
-				}
-				rawTxBytes = node.RawTx
+				continue
 			}
 		}
 
