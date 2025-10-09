@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"context"
+	"math/big"
 	"math/rand/v2"
 	"slices"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/entfixtures"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
@@ -48,58 +50,17 @@ func setUpQueryTokenOutputsTestHandler(t *testing.T) *queryTokenOutputsTestFixtu
 func createTestTokenOutputs(t *testing.T, ctx context.Context, tx *ent.Tx, count int, ownerKey keys.Public, tokenCreate *ent.TokenCreate, rng *rand.ChaCha8) []*ent.TokenOutput {
 	t.Helper()
 
-	randomBytes := func(length int) []byte {
-		b := make([]byte, length)
-		_, _ = rng.Read(b)
-		return b
+	f := entfixtures.New(t, ctx, tx).WithRNG(rng)
+
+	outputSpecs := make([]entfixtures.OutputSpec, count)
+	for i := range outputSpecs {
+		outputSpecs[i] = entfixtures.OutputSpec{
+			Amount: big.NewInt(int64(f.RandomBytes(8)[0])),
+			Owner:  ownerKey,
+		}
 	}
 
-	outputs := make([]*ent.TokenOutput, count)
-	for i := range outputs {
-		keyshare, err := tx.SigningKeyshare.Create().
-			SetStatus(st.KeyshareStatusAvailable).
-			SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
-			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
-			SetMinSigners(1).
-			SetCoordinatorIndex(0).
-			SetPublicShares(map[string]keys.Public{}).
-			Save(ctx)
-		require.NoError(t, err)
-
-		mint, err := tx.TokenMint.Create().
-			SetIssuerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
-			SetTokenIdentifier(randomBytes(32)).
-			SetIssuerSignature(randomBytes(64)).
-			SetWalletProvidedTimestamp(uint64(time.Now().UnixMilli())).
-			Save(ctx)
-		require.NoError(t, err)
-
-		mintTx, err := tx.TokenTransaction.Create().
-			SetPartialTokenTransactionHash(randomBytes(32)).
-			SetFinalizedTokenTransactionHash(randomBytes(32)).
-			SetStatus(st.TokenTransactionStatusFinalized).
-			SetMint(mint).
-			Save(ctx)
-		require.NoError(t, err)
-
-		out, err := tx.TokenOutput.Create().
-			SetStatus(st.TokenOutputStatusCreatedFinalized).
-			SetOwnerPublicKey(ownerKey).
-			SetWithdrawBondSats(1_000).
-			SetWithdrawRelativeBlockLocktime(10).
-			SetWithdrawRevocationCommitment(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
-			SetTokenAmount(randomBytes(16)).
-			SetCreatedTransactionOutputVout(0).
-			SetTokenIdentifier(tokenCreate.TokenIdentifier).
-			SetTokenCreateID(tokenCreate.ID).
-			SetOutputCreatedTokenTransactionID(mintTx.ID).
-			SetRevocationKeyshare(keyshare).
-			SetNetwork(st.NetworkRegtest).
-			Save(ctx)
-		require.NoError(t, err)
-		outputs[i] = out
-	}
-
+	_, outputs := f.CreateMintTransaction(tokenCreate, outputSpecs, st.TokenTransactionStatusFinalized)
 	return outputs
 }
 
@@ -112,85 +73,25 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 	require.NoError(t, err)
 	rng := rand.NewChaCha8([32]byte{})
 	t.Run("return output after transaction has expired in signed state", func(t *testing.T) {
-		randomBytes := func(length int) []byte {
-			b := make([]byte, length)
-			_, err := rng.Read(b)
-			require.NoError(t, err)
-			return b
-		}
+		f := entfixtures.New(t, ctx, tx).WithRNG(rng)
 
-		// Create two signing keyshares (one for the mint output, one for transfer output)
-		signKS1, err := tx.SigningKeyshare.Create().
-			SetStatus(st.KeyshareStatusAvailable).
-			SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
-			SetPublicShares(map[string]keys.Public{}).
-			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
-			SetMinSigners(1).
-			SetCoordinatorIndex(0).
-			Save(ctx)
-		require.NoError(t, err)
-
-		signKS2, err := tx.SigningKeyshare.Create().
-			SetStatus(st.KeyshareStatusAvailable).
-			SetSecretShare(keys.MustGeneratePrivateKeyFromRand(rng)).
-			SetPublicShares(map[string]keys.Public{}).
-			SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
-			SetMinSigners(1).
-			SetCoordinatorIndex(0).
-			Save(ctx)
-		require.NoError(t, err)
+		tokenCreate := f.CreateTokenCreate(st.NetworkRegtest, nil)
 
 		// Create a mint transaction that produces an output we will later spend
-		mintEnt, err := tx.TokenMint.Create().
-			SetIssuerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
-			SetWalletProvidedTimestamp(uint64(time.Now().UnixMilli())).
-			SetIssuerSignature(randomBytes(64)).
-			Save(ctx)
-		require.NoError(t, err)
-
-		tokenIdentifier := randomBytes(32)
-		tokenCreate, err := tx.TokenCreate.Create().
-			SetIssuerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
-			SetTokenName("TestToken").
-			SetTokenTicker("TT").
-			SetDecimals(0).
-			SetMaxSupply(randomBytes(16)).
-			SetIsFreezable(true).
-			SetNetwork(st.NetworkRegtest).
-			SetTokenIdentifier(tokenIdentifier).
-			SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
-			Save(ctx)
-		require.NoError(t, err)
-
-		mintTx, err := tx.TokenTransaction.Create().
-			SetPartialTokenTransactionHash(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
-			SetFinalizedTokenTransactionHash(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
-			SetStatus(st.TokenTransactionStatusFinalized).
-			SetMintID(mintEnt.ID).
-			Save(ctx)
-		require.NoError(t, err)
-
-		mintOutput, err := tx.TokenOutput.Create().
-			SetStatus(st.TokenOutputStatusCreatedFinalized).
-			SetOwnerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
-			SetWithdrawBondSats(1_000).
-			SetWithdrawRelativeBlockLocktime(10).
-			SetWithdrawRevocationCommitment(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
-			SetTokenAmount(randomBytes(16)).
-			SetCreatedTransactionOutputVout(0).
-			SetRevocationKeyshareID(signKS1.ID).
-			SetTokenIdentifier(tokenIdentifier).
-			SetTokenCreateID(tokenCreate.ID).
-			SetOutputCreatedTokenTransactionID(mintTx.ID).
-			SetNetwork(st.NetworkRegtest).
-			Save(ctx)
-		require.NoError(t, err)
+		ownerKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		amount := big.NewInt(int64(f.RandomBytes(8)[0]))
+		_, mintOutputs := f.CreateMintTransaction(
+			tokenCreate,
+			entfixtures.OutputSpecsWithOwner(ownerKey, amount),
+			st.TokenTransactionStatusFinalized,
+		)
+		mintOutput := mintOutputs[0]
 
 		// Create a transfer transaction (SIGNED & expired) that spends the mint output
 		expiredAt := time.Now().Add(-1 * time.Hour)
 		transferTx, err := tx.TokenTransaction.Create().
-			SetPartialTokenTransactionHash(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
-			SetFinalizedTokenTransactionHash(keys.MustGeneratePrivateKeyFromRand(rng).Serialize()).
+			SetPartialTokenTransactionHash(f.RandomBytes(32)).
+			SetFinalizedTokenTransactionHash(f.RandomBytes(32)).
 			SetStatus(st.TokenTransactionStatusSigned).
 			SetExpiryTime(expiredAt).
 			Save(ctx)
@@ -205,21 +106,7 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create a new output produced by the transferTx
-		_, err = tx.TokenOutput.Create().
-			SetStatus(st.TokenOutputStatusCreatedSigned).
-			SetOwnerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
-			SetWithdrawBondSats(500).
-			SetWithdrawRelativeBlockLocktime(10).
-			SetWithdrawRevocationCommitment(keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize()).
-			SetTokenAmount(randomBytes(16)).
-			SetCreatedTransactionOutputVout(0).
-			SetRevocationKeyshareID(signKS2.ID).
-			SetTokenIdentifier(tokenIdentifier).
-			SetTokenCreateID(tokenCreate.ID).
-			SetOutputCreatedTokenTransactionID(transferTx.ID).
-			SetNetwork(st.NetworkRegtest).
-			Save(ctx)
-		require.NoError(t, err)
+		_ = f.CreateOutputForTransaction(tokenCreate, amount, transferTx, 0)
 
 		outputsResp, err := handler.QueryTokenOutputsToken(ctx, &tokenpb.QueryTokenOutputsRequest{
 			OwnerPublicKeys: [][]byte{mintOutput.OwnerPublicKey.Serialize()},
@@ -241,28 +128,10 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 	require.NoError(t, err)
 
 	rng := rand.NewChaCha8([32]byte{})
-	randomBytes := func(length int) []byte {
-		b := make([]byte, length)
-		_, _ = rng.Read(b)
-		return b
-	}
-
-	issuerKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	ownerKey := keys.MustGeneratePrivateKeyFromRand(rng)
 
-	tokenIdentifier := randomBytes(32)
-	tokenCreate, err := tx.TokenCreate.Create().
-		SetIssuerPublicKey(issuerKey.Public()).
-		SetTokenName("TestToken").
-		SetTokenTicker("TT").
-		SetDecimals(0).
-		SetMaxSupply(randomBytes(16)).
-		SetIsFreezable(true).
-		SetNetwork(st.NetworkRegtest).
-		SetTokenIdentifier(tokenIdentifier).
-		SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
-		Save(ctx)
-	require.NoError(t, err)
+	f := entfixtures.New(t, ctx, tx).WithRNG(rng)
+	tokenCreate := f.CreateTokenCreate(st.NetworkRegtest, nil)
 
 	createTestTokenOutputs(t, ctx, tx, 7, ownerKey.Public(), tokenCreate, rng)
 

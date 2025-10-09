@@ -2,6 +2,7 @@ package task
 
 import (
 	"bytes"
+	"math/big"
 	"math/rand/v2"
 	"testing"
 	"time"
@@ -15,17 +16,13 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/entfixtures"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
 func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 	seededRand := rand.NewChaCha8([32]byte{})
-	randomBytes := func(n int) []byte {
-		b := make([]byte, n)
-		_, _ = seededRand.Read(b)
-		return b
-	}
 	ctx, _ := db.NewTestSQLiteContext(t)
 
 	tx, err := ent.GetDbFromContext(ctx)
@@ -34,32 +31,14 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 	config.Token.EnableBackfillSpentTokenTransactionHistoryTask = true
 
-	keyshare, err := tx.SigningKeyshare.Create().
-		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(seededRand)).
-		SetPublicShares(map[string]keys.Public{}).
-		SetPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
-		SetMinSigners(1).
-		SetCoordinatorIndex(0).
-		Save(ctx)
-	require.NoError(t, err)
+	f := entfixtures.New(t, ctx, tx).WithRNG(seededRand)
 
-	tokenCreate, err := tx.TokenCreate.Create().
-		SetTokenIdentifier(randomBytes(32)).
-		SetIssuerPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
-		SetMaxSupply(randomBytes(16)).
-		SetTokenName("Test Token").
-		SetTokenTicker("TEST").
-		SetDecimals(8).
-		SetIsFreezable(false).
-		SetNetwork(st.NetworkRegtest).
-		SetCreationEntityPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
-		Save(ctx)
-	require.NoError(t, err)
+	keyshare := f.CreateKeyshare()
+	tokenCreate := f.CreateTokenCreate(st.NetworkRegtest, nil)
 
 	tokenTx, err := tx.TokenTransaction.Create().
-		SetPartialTokenTransactionHash(randomBytes(32)).
-		SetFinalizedTokenTransactionHash(randomBytes(32)).
+		SetPartialTokenTransactionHash(f.RandomBytes(32)).
+		SetFinalizedTokenTransactionHash(f.RandomBytes(32)).
 		SetStatus(st.TokenTransactionStatusSigned).
 		SetExpiryTime(time.Now().Add(time.Hour)).
 		Save(ctx)
@@ -67,15 +46,15 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 
 	// Create a token output with the old relationship structure
 	// (has output_spent_token_transaction but NOT output_spent_started_token_transactions)
-	inputAmount := randomBytes(8)
+	inputAmount := new(big.Int).SetBytes(f.RandomBytes(8))
 	tokenOutput, err := tx.TokenOutput.Create().
 		SetStatus(st.TokenOutputStatusSpentFinalized).
 		SetOwnerPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
-		SetWithdrawBondSats(1000).
-		SetWithdrawRelativeBlockLocktime(144).
+		SetWithdrawBondSats(1000000).
+		SetWithdrawRelativeBlockLocktime(1000).
 		SetWithdrawRevocationCommitment(keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()).
 		SetTokenPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
-		SetTokenAmount(inputAmount).
+		SetTokenAmount(inputAmount.Bytes()).
 		SetCreatedTransactionOutputVout(0).
 		SetNetwork(st.NetworkRegtest).
 		SetTokenIdentifier(tokenCreate.TokenIdentifier).
@@ -85,24 +64,16 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	outputKeyshare, err := tx.SigningKeyshare.Create().
-		SetStatus(st.KeyshareStatusAvailable).
-		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(seededRand)).
-		SetPublicShares(map[string]keys.Public{}).
-		SetPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
-		SetMinSigners(1).
-		SetCoordinatorIndex(0).
-		Save(ctx)
-	require.NoError(t, err)
+	outputKeyshare := f.CreateKeyshare()
 
 	_, err = tx.TokenOutput.Create().
 		SetStatus(st.TokenOutputStatusCreatedFinalized).
 		SetOwnerPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
-		SetWithdrawBondSats(1000).
-		SetWithdrawRelativeBlockLocktime(144).
+		SetWithdrawBondSats(1000000).
+		SetWithdrawRelativeBlockLocktime(1000).
 		SetWithdrawRevocationCommitment(keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()).
 		SetTokenPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
-		SetTokenAmount(inputAmount).
+		SetTokenAmount(inputAmount.Bytes()).
 		SetCreatedTransactionOutputVout(0).
 		SetNetwork(st.NetworkRegtest).
 		SetTokenIdentifier(tokenCreate.TokenIdentifier).
