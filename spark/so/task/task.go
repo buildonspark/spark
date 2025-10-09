@@ -40,6 +40,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 	"github.com/lightsparkdev/spark/so/handler"
+	tokenslogging "github.com/lightsparkdev/spark/so/tokens"
 )
 
 var (
@@ -365,6 +366,8 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					logger.Info(fmt.Sprintf("[cron] Found %d token transactions to finalize", len(tokenTransactions)))
 					internalSignTokenHandler := tokens.NewInternalSignTokenHandler(config)
 					for _, tokenTransaction := range tokenTransactions {
+						ctx, logger = logging.WithAttrs(ctx, tokenslogging.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
+
 						signaturesPackage := make(map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse)
 						finalized, err := internalSignTokenHandler.RecoverFullRevocationSecretsAndFinalize(ctx, tokenTransaction)
 						if err != nil {

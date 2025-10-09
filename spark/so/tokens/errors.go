@@ -3,6 +3,7 @@ package tokens
 import (
 	"fmt"
 
+	"github.com/lightsparkdev/spark/common/logging"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 
@@ -84,29 +85,19 @@ func FormatErrorWithTransactionEnt(msg string, tokenTransaction *ent.TokenTransa
 }
 
 func FormatErrorWithTransactionProto(msg string, tokenTransaction *tokenpb.TokenTransaction, err error) error {
+	formatted := logging.FormatProto("transaction", tokenTransaction)
 	if err != nil {
-		return fmt.Errorf("%s (transaction: %s): %w",
-			msg,
-			tokenTransaction.String(),
-			err)
+		return fmt.Errorf("%s %s: %w", msg, formatted, err)
 	}
-	return fmt.Errorf("%s (transaction: %s)",
-		msg,
-		tokenTransaction.String())
+	return fmt.Errorf("%s %s", msg, formatted)
 }
 
 func FormatErrorWithTransactionProtoAndSparkInvoice(msg string, tokenTransaction *tokenpb.TokenTransaction, sparkInvoice string, err error) error {
+	formatted := logging.FormatProto("transaction", tokenTransaction)
 	if err != nil {
-		return fmt.Errorf("%s (transaction: %s, spark invoice: %s): %w",
-			msg,
-			tokenTransaction.String(),
-			sparkInvoice,
-			err)
+		return fmt.Errorf("%s %s, spark invoice: %s: %w", msg, formatted, sparkInvoice, err)
 	}
-	return fmt.Errorf("%s (transaction: %s, spark invoice: %s)",
-		msg,
-		tokenTransaction.String(),
-		sparkInvoice)
+	return fmt.Errorf("%s %s, spark invoice: %s", msg, formatted, sparkInvoice)
 }
 
 func NewTransactionPreemptedError(tokenTransaction *tokenpb.TokenTransaction, reason, details string) error {

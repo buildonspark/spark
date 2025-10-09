@@ -56,15 +56,9 @@ func NewInternalPrepareTokenHandlerWithPreemption(config *so.Config) *InternalPr
 }
 
 func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx context.Context, req *tokeninternalpb.PrepareTransactionRequest) (*tokeninternalpb.PrepareTransactionResponse, error) {
-	ctx, span := tracer.Start(ctx, "InternalPrepareTokenHandler.PrepareTokenTransactionInternal", getTokenTransactionAttributes(req.FinalTokenTransaction))
+	ctx, span := GetTracer().Start(ctx, "InternalPrepareTokenHandler.PrepareTokenTransactionInternal", GetProtoTokenTransactionTraceAttributes(ctx, req.FinalTokenTransaction))
 	defer span.End()
-	partialTransactionHash, err := utils.HashTokenTransaction(req.FinalTokenTransaction, true)
-	ctx, logger := logging.WithAttrs(ctx, tokens.GetPartialTokenTransactionAttrs(partialTransactionHash)...)
-
-	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto("failed to compute transaction hash", req.FinalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to compute transaction hash: %w", err)))
-	}
-
+	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Starting token transaction (expiry: %s, %+q)", req.FinalTokenTransaction.ExpiryTime, req.KeyshareIds)
 
 	isCoordinator := bytes.Equal(req.CoordinatorPublicKey, h.config.IdentityPublicKey().Serialize())

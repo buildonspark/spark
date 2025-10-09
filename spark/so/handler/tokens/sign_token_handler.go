@@ -69,7 +69,7 @@ func (h *SignTokenHandler) SignTokenTransaction(
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert token transaction to spark token transaction: %w", err)
 	}
-	ctx, span := tracer.Start(ctx, "SignTokenHandler.SignTokenTransaction", getTokenTransactionAttributes(tokenProtoTokenTransaction))
+	ctx, span := GetTracer().Start(ctx, "SignTokenHandler.SignTokenTransaction", GetProtoTokenTransactionTraceAttributes(ctx, tokenProtoTokenTransaction))
 	defer span.End()
 
 	finalTokenTransactionHash, err := utils.HashTokenTransaction(tokenProtoTokenTransaction, false)
@@ -136,7 +136,7 @@ func (h *SignTokenHandler) SignTokenTransaction(
 }
 
 func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.CommitTransactionRequest) (*tokenpb.CommitTransactionResponse, error) {
-	ctx, span := tracer.Start(ctx, "SignTokenHandler.CommitTransaction", getTokenTransactionAttributes(req.FinalTokenTransaction))
+	ctx, span := GetTracer().Start(ctx, "SignTokenHandler.CommitTransaction", GetProtoTokenTransactionTraceAttributes(ctx, req.FinalTokenTransaction))
 	defer span.End()
 	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
 	if err != nil {
@@ -256,9 +256,9 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 }
 
 func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx context.Context, tokenTransactionProto *tokenpb.TokenTransaction, allOperatorSignatures map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, tokenTransactionHash []byte) (*tokenpb.CommitTransactionResponse, error) {
-	ctx, logger := logging.WithAttrs(ctx, tokens.GetFinalizedTokenTransactionAttrs(tokenTransactionHash)...)
-	ctx, span := tracer.Start(ctx, "SignTokenHandler.ExchangeRevocationSecretsAndFinalizeIfPossible", getTokenTransactionAttributes(tokenTransactionProto))
+	ctx, span := GetTracer().Start(ctx, "SignTokenHandler.ExchangeRevocationSecretsAndFinalizeIfPossible", GetProtoTokenTransactionTraceAttributes(ctx, tokenTransactionProto))
 	defer span.End()
+	logger := logging.GetLoggerFromContext(ctx)
 	response, err := h.exchangeRevocationSecretShares(ctx, allOperatorSignatures, tokenTransactionProto, tokenTransactionHash)
 	if err != nil {
 		return nil, fmt.Errorf("coordinator failed to exchange revocation secret shares with all other operators for token txHash: %x: %w", tokenTransactionHash, err)
@@ -352,7 +352,7 @@ func (h *SignTokenHandler) checkShouldReturnEarlyWithoutProcessing(
 }
 
 func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, allOperatorSignaturesResponse map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, tokenTransaction *tokenpb.TokenTransaction, tokenTransactionHash []byte) (map[string]*tokeninternalpb.ExchangeRevocationSecretsSharesResponse, error) {
-	ctx, span := tracer.Start(ctx, "SignTokenHandler.exchangeRevocationSecretShares", getTokenTransactionAttributes(tokenTransaction))
+	ctx, span := GetTracer().Start(ctx, "SignTokenHandler.exchangeRevocationSecretShares", GetProtoTokenTransactionTraceAttributes(ctx, tokenTransaction))
 	defer span.End()
 	// prepare the operator signatures package
 	allOperatorSignaturesPackage := make([]*tokeninternalpb.OperatorTransactionSignature, 0, len(allOperatorSignaturesResponse))
@@ -412,7 +412,7 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 }
 
 func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction) ([]*tokeninternalpb.OperatorRevocationShares, error) {
-	ctx, span := tracer.Start(ctx, "SignTokenHandler.prepareRevocationSecretSharesForExchange", getTokenTransactionAttributes(tokenTransaction))
+	ctx, span := GetTracer().Start(ctx, "SignTokenHandler.prepareRevocationSecretSharesForExchange", GetProtoTokenTransactionTraceAttributes(ctx, tokenTransaction))
 	defer span.End()
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -537,7 +537,7 @@ func (h *SignTokenHandler) localSignAndCommitTransaction(
 	finalTokenTransactionHash []byte,
 	tokenTransaction *ent.TokenTransaction,
 ) (*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, error) {
-	ctx, span := tracer.Start(ctx, "SignTokenHandler.localSignAndCommitTransaction", getTokenTransactionAttributesFromEnt(ctx, tokenTransaction, h.config))
+	ctx, span := GetTracer().Start(ctx, "SignTokenHandler.localSignAndCommitTransaction", GetEntTokenTransactionTraceAttributes(ctx, tokenTransaction))
 	defer span.End()
 	operatorSpecificSignatures := convertTokenProtoSignaturesToOperatorSpecific(
 		foundOperatorSignatures.TtxoSignatures,

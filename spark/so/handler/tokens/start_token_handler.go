@@ -60,9 +60,9 @@ func NewStartTokenTransactionHandlerWithPreemption(config *so.Config) *StartToke
 
 // StartTokenTransaction verifies the token outputs, verifies any attached spark invoices, reserves the keyshares for the token transaction, and returns metadata about the operators that possess the keyshares.
 func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context, req *tokenpb.StartTransactionRequest) (*tokenpb.StartTransactionResponse, error) {
-	ctx, span := tracer.Start(ctx, "StartTokenTransactionHandler.StartTokenTransaction", getTokenTransactionAttributes(req.PartialTokenTransaction))
+	ctx, span := GetTracer().Start(ctx, "StartTokenTransactionHandler.StartTokenTransaction", GetProtoTokenTransactionTraceAttributes(ctx, req.PartialTokenTransaction))
 	defer span.End()
-
+	logger := logging.GetLoggerFromContext(ctx)
 	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("invalid identity public key: %w", err)
@@ -76,11 +76,9 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	}
 
 	partialTokenTransactionHash, err := utils.HashTokenTransaction(req.PartialTokenTransaction, true)
-	ctx, _ = logging.WithAttrs(ctx, tokens.GetPartialTokenTransactionAttrs(partialTokenTransactionHash)...)
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToHashPartialTransaction, req.PartialTokenTransaction, err)
 	}
-
 	previouslyCreatedTokenTransaction, err := ent.FetchPartialTokenTransactionData(ctx, partialTokenTransactionHash)
 	if err != nil && !ent.IsNotFound(err) {
 		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToFetchPartialTransaction, req.PartialTokenTransaction, err)
@@ -96,7 +94,6 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 			return nil, err
 		}
 		if coordinatorPubKey.Equals(h.config.IdentityPublicKey()) {
-			ctx, logger := logging.WithAttrs(ctx, tokens.GetEntTokenTransactionAttrs(previouslyCreatedTokenTransaction)...)
 			logger.Info("Found existing token transaction in started state with matching coordinator")
 			return h.regenerateStartResponseForDuplicateRequest(ctx, previouslyCreatedTokenTransaction)
 		}
@@ -118,11 +115,8 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
-	finalHash, err := utils.HashTokenTransaction(finalTokenTransaction, false)
-	if err != nil {
-		return nil, err
-	}
-	ctx, _ = logging.WithAttrs(ctx, tokens.GetFinalizedTokenTransactionAttrs(finalHash)...)
+	// After constructing the final token transaction, add the attributes to the context for downstream logs.
+	ctx, logger = logging.WithAttrs(ctx, tokens.GetProtoTokenTransactionZapAttrs(ctx, finalTokenTransaction)...)
 
 	// Save the token transaction object to lock in the revocation commitments for each created output within this transaction.
 	// Note that atomicity here is very important to ensure that the unused keyshares queried above are not used by another operation.
@@ -175,7 +169,7 @@ func callPrepareTokenTransactionInternal(ctx context.Context, operator *so.Signi
 	keyshareIDStrings []string, coordinatorPublicKey keys.Public,
 	callSparkTokenInternal bool,
 ) error {
-	ctx, span := tracer.Start(ctx, "StartTokenTransactionHandler.callPrepareTokenTransactionInternal", getTokenTransactionAttributes(finalTokenTransaction))
+	ctx, span := GetTracer().Start(ctx, "StartTokenTransactionHandler.callPrepareTokenTransactionInternal", GetProtoTokenTransactionTraceAttributes(ctx, finalTokenTransaction))
 	defer span.End()
 	conn, err := operator.NewOperatorGRPCConnection()
 	if err != nil {
@@ -235,7 +229,7 @@ func (h *StartTokenTransactionHandler) regenerateStartResponseForDuplicateReques
 	ctx context.Context,
 	tokenTransaction *ent.TokenTransaction,
 ) (*tokenpb.StartTransactionResponse, error) {
-	_, logger := logging.WithAttrs(ctx, tokens.GetEntTokenTransactionAttrs(tokenTransaction)...)
+	_, logger := logging.WithAttrs(ctx, tokens.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
 	logger.Debug("Regenerating response for a duplicate StartTokenTransaction() Call")
 	var invalidOutputs []error
 	expectedCreatedOutputStatus := st.TokenOutputStatusCreatedStarted

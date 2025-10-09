@@ -38,7 +38,7 @@ func NewQueryTokenTransactionsHandler(config *so.Config) *QueryTokenTransactions
 }
 
 func (h *QueryTokenTransactionsHandler) QueryTokenTransactionsSpark(ctx context.Context, req *sparkpb.QueryTokenTransactionsRequest) (*sparkpb.QueryTokenTransactionsResponse, error) {
-	ctx, span := tracer.Start(ctx, "QueryTokenTransactionsHandler.QueryTokenTransactions")
+	ctx, span := GetTracer().Start(ctx, "QueryTokenTransactionsHandler.QueryTokenTransactions")
 	defer span.End()
 	// Convert sparkpb request to tokenpb request
 	tokenReq := protoconverter.TokenProtoQueryTokenTransactionsRequestFromSpark(req)
@@ -58,7 +58,7 @@ func (h *QueryTokenTransactionsHandler) QueryTokenTransactionsSpark(ctx context.
 // b) transactions associated with a particular set of transaction hashes
 // c) all transactions associated with a particular token public key
 func (h *QueryTokenTransactionsHandler) QueryTokenTransactions(ctx context.Context, req *tokenpb.QueryTokenTransactionsRequest) (*tokenpb.QueryTokenTransactionsResponse, error) {
-	ctx, span := tracer.Start(ctx, "QueryTokenTransactionsHandler.queryTokenTransactionsInternal")
+	ctx, span := GetTracer().Start(ctx, "QueryTokenTransactionsHandler.queryTokenTransactionsInternal")
 	defer span.End()
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
@@ -96,7 +96,7 @@ func (h *QueryTokenTransactionsHandler) shouldUseOptimizedQuery(req *tokenpb.Que
 
 // queryTokenTransactionsRawSql uses raw SQL with UNION for better performance
 func (h *QueryTokenTransactionsHandler) queryWithRawSql(ctx context.Context, req *tokenpb.QueryTokenTransactionsRequest, db *ent.Client) ([]*ent.TokenTransaction, error) {
-	ctx, span := tracer.Start(ctx, "QueryTokenTransactionsHandler.queryTokenTransactionsOptimized")
+	ctx, span := GetTracer().Start(ctx, "QueryTokenTransactionsHandler.queryTokenTransactionsOptimized")
 	defer span.End()
 
 	// Build the optimized UNION query

@@ -2,7 +2,6 @@ package grpc
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/handler/tokens"
@@ -30,6 +29,7 @@ func NewSparkTokenInternalServer(soConfig *so.Config, db *ent.Client) *SparkToke
 
 func (s *SparkTokenInternalServer) PrepareTransaction(ctx context.Context, req *tokeninternalpb.PrepareTransactionRequest) (*tokeninternalpb.PrepareTransactionResponse, error) {
 	prepareHandler := tokens.NewInternalPrepareTokenHandlerWithPreemption(s.soConfig)
+	ctx, _ = logging.WithAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
 	resp, err := prepareHandler.PrepareTokenTransactionInternal(ctx, req)
 	return resp, err
 }
@@ -38,10 +38,10 @@ func (s *SparkTokenInternalServer) SignTokenTransactionFromCoordination(
 	ctx context.Context,
 	req *tokeninternalpb.SignTokenTransactionFromCoordinationRequest,
 ) (*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, error) {
-	ctx, _ = logging.WithAttrs(ctx, sotokens.GetFinalizedTokenTransactionAttrs(req.FinalTokenTransactionHash)...)
+	ctx, _ = logging.WithAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
 	tx, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch transaction: %w", err)
+		return nil, sotokens.FormatErrorWithTransactionProto("failed to fetch transaction", req.FinalTokenTransaction, err)
 	}
 
 	// Convert proto signatures to []*sparkpb.OperatorSpecificOwnerSignature
@@ -72,5 +72,6 @@ func (s *SparkTokenInternalServer) ExchangeRevocationSecretsShares(
 	req *tokeninternalpb.ExchangeRevocationSecretsSharesRequest,
 ) (*tokeninternalpb.ExchangeRevocationSecretsSharesResponse, error) {
 	internalTokenTransactionHandler := tokens.NewInternalSignTokenHandler(s.soConfig)
+	ctx, _ = logging.WithAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
 	return internalTokenTransactionHandler.ExchangeRevocationSecretsShares(ctx, req)
 }

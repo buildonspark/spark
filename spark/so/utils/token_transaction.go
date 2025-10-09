@@ -990,6 +990,56 @@ func InferTokenTransactionType(tokenTransaction *tokenpb.TokenTransaction) (Toke
 	return inputType, nil
 }
 
+// IsFinalTokenTransaction checks if a token transaction has all SO-filled fields present,
+// indicating it is a final (not partial) token transaction.
+func IsFinalTokenTransaction(tokenTransaction *tokenpb.TokenTransaction) bool {
+	if tokenTransaction == nil {
+		return false
+	}
+
+	// Check if expiry time is set (required for all final transactions)
+	if tokenTransaction.ExpiryTime == nil {
+		return false
+	}
+
+	inputType, err := InferTokenTransactionType(tokenTransaction)
+	if err != nil {
+		return false
+	}
+
+	switch inputType {
+	case TokenTransactionTypeCreate:
+		// Check if creation entity public key is set
+		createInput := tokenTransaction.GetCreateInput()
+		if createInput == nil || createInput.GetCreationEntityPublicKey() == nil {
+			return false
+		}
+	case TokenTransactionTypeMint, TokenTransactionTypeTransfer:
+		// Check if all outputs have SO-filled fields
+		for _, output := range tokenTransaction.TokenOutputs {
+			if output == nil {
+				return false
+			}
+			if output.GetRevocationCommitment() == nil {
+				return false
+			}
+			if output.WithdrawBondSats == nil {
+				return false
+			}
+			if output.WithdrawRelativeBlockLocktime == nil {
+				return false
+			}
+			if output.Id == nil || *output.Id == "" {
+				return false
+			}
+		}
+	default:
+		return false
+	}
+
+	return true
+}
+
 func validateBaseCreateTransaction(
 	tokenTransaction *tokenpb.TokenTransaction,
 	inputSignatures []*tokenpb.SignatureWithIndex,

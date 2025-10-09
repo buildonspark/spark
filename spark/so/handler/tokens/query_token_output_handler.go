@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -49,7 +50,7 @@ func (h *QueryTokenOutputsHandler) QueryTokenOutputs(
 	ctx context.Context,
 	req *sparkpb.QueryTokenOutputsRequest,
 ) (*sparkpb.QueryTokenOutputsResponse, error) {
-	ctx, span := tracer.Start(ctx, "QueryTokenHandler.QueryTokenOutputs")
+	ctx, span := GetTracer().Start(ctx, "QueryTokenHandler.QueryTokenOutputs")
 	defer span.End()
 	// Convert sparkpb request to tokenpb request
 	tokenReq := protoconverter.TokenProtoQueryTokenOutputsRequestFromSpark(req)
@@ -69,7 +70,7 @@ func (h *QueryTokenOutputsHandler) queryTokenOutputsInternal(
 	ctx context.Context,
 	req *tokenpb.QueryTokenOutputsRequest,
 ) (*tokenpb.QueryTokenOutputsResponse, error) {
-	ctx, span := tracer.Start(ctx, "QueryTokenHandler.queryTokenOutputsInternal")
+	ctx, span := GetTracer().Start(ctx, "QueryTokenHandler.queryTokenOutputsInternal")
 	defer span.End()
 	logger := logging.GetLoggerFromContext(ctx)
 

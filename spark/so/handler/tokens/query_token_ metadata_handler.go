@@ -25,7 +25,7 @@ func NewQueryTokenMetadataHandler(config *so.Config) *QueryTokenMetadataHandler 
 }
 
 func (h *QueryTokenMetadataHandler) QueryTokenMetadata(ctx context.Context, req *tokenpb.QueryTokenMetadataRequest) (*tokenpb.QueryTokenMetadataResponse, error) {
-	ctx, span := tracer.Start(ctx, "QueryTokenMetadataHandler.QueryTokenMetadata")
+	ctx, span := GetTracer().Start(ctx, "QueryTokenMetadataHandler.QueryTokenMetadata")
 	defer span.End()
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {

@@ -61,8 +61,9 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 	finalTokenTransactionHash []byte,
 	operatorSpecificSignatures []*pb.OperatorSpecificOwnerSignature,
 ) ([]byte, error) {
-	ctx, span := tracer.Start(ctx, "InternalSignTokenHandler.SignAndPersistTokenTransaction", getTokenTransactionAttributesFromEnt(ctx, tokenTransaction, h.config))
+	ctx, span := GetTracer().Start(ctx, "InternalSignTokenHandler.SignAndPersistTokenTransaction", GetEntTokenTransactionTraceAttributes(ctx, tokenTransaction))
 	defer span.End()
+	ctx, _ = logging.WithAttrs(ctx, tokens.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
 
 	if tokenTransaction.Status == st.TokenTransactionStatusSigned {
 		// Return stored signature for sign requests if already signed.
@@ -109,7 +110,7 @@ func (h *InternalSignTokenHandler) regenerateOperatorSignatureForDuplicateReques
 	tokenTransaction *ent.TokenTransaction,
 	finalTokenTransactionHash []byte,
 ) ([]byte, error) {
-	_, logger := logging.WithAttrs(ctx, tokens.GetEntTokenTransactionAttrs(tokenTransaction)...)
+	_, logger := logging.WithAttrs(ctx, tokens.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
 	logger.Debug("Regenerating response for a duplicate SignTokenTransaction() Call")
 
 	var invalidOutputs []error
@@ -152,9 +153,9 @@ type ShareValue struct {
 type operatorSharesMap map[keys.Public][]*pbtkinternal.RevocationSecretShare
 
 func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.Context, req *pbtkinternal.ExchangeRevocationSecretsSharesRequest) (*pbtkinternal.ExchangeRevocationSecretsSharesResponse, error) {
-	ctx, span := tracer.Start(ctx, "InternalSignTokenHandler.ExchangeRevocationSecretsShares")
+	ctx, span := GetTracer().Start(ctx, "InternalSignTokenHandler.ExchangeRevocationSecretsShares")
 	defer span.End()
-	ctx, logger := logging.WithAttrs(ctx, tokens.GetFinalizedTokenTransactionAttrs(req.FinalTokenTransactionHash)...)
+	ctx, logger := logging.WithAttrs(ctx, tokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
 
 	if len(req.OperatorShares) == 0 {
 		return nil, fmt.Errorf("no operator shares provided in request")
@@ -366,7 +367,7 @@ func (h *InternalSignTokenHandler) getPartialRevocationSecretShares(
 	batchOutputIDs []uuid.UUID,
 	inputOperatorShareMap map[ShareKey]ShareValue,
 ) (map[uuid.UUID][]*ent.TokenPartialRevocationSecretShare, error) {
-	ctx, span := tracer.Start(ctx, "InternalSignTokenHandler.getPartialRevocationSecretShares")
+	ctx, span := GetTracer().Start(ctx, "InternalSignTokenHandler.getPartialRevocationSecretShares")
 	defer span.End()
 
 	// Build exclusion arrays for UNNEST
@@ -579,7 +580,7 @@ func (h *InternalSignTokenHandler) persistPartialRevocationSecretShares(
 }
 
 func (h *InternalSignTokenHandler) recoverFullRevocationSecretsAndFinalize(ctx context.Context, tokenTransactionHash []byte) (finalized bool, err error) {
-	ctx, span := tracer.Start(ctx, "InternalSignTokenHandler.recoverFullRevocationSecretsAndFinalize")
+	ctx, span := GetTracer().Start(ctx, "InternalSignTokenHandler.recoverFullRevocationSecretsAndFinalize")
 	defer span.End()
 	logger := logging.GetLoggerFromContext(ctx)
 	db, err := ent.GetDbFromContext(ctx)

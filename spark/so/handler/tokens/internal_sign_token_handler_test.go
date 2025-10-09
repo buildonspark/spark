@@ -6,15 +6,19 @@ import (
 	"encoding/hex"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 
+	sparkpb "github.com/lightsparkdev/spark/proto/spark"
+	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	sparktokeninternal "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -41,6 +45,47 @@ func setUpInternalSignTokenTestHandler(t *testing.T) (*InternalSignTokenHandler,
 	return handler, ctx, tx, cleanup
 }
 
+func makeFinalMintTxForTests() *tokenpb.TokenTransaction {
+	issuerPub := bytes.Repeat([]byte{0x02}, 33)
+	ownerPub := bytes.Repeat([]byte{0x03}, 33)
+	op1 := bytes.Repeat([]byte{0x11}, 33)
+	op2 := bytes.Repeat([]byte{0x22}, 33)
+	tokenIdentifier := bytes.Repeat([]byte{0xAA}, 32)
+	amount16 := bytes.Repeat([]byte{0x01}, 16)
+	revKey := bytes.Repeat([]byte{0x04}, 33)
+	withdrawBond := uint64(100)
+	withdrawLock := uint64(100)
+
+	ops := [][]byte{op1, op2}
+	if bytes.Compare(ops[0], ops[1]) > 0 {
+		ops[0], ops[1] = ops[1], ops[0]
+	}
+
+	now := time.Now().UTC()
+	return &tokenpb.TokenTransaction{
+		Version:                         3,
+		Network:                         sparkpb.Network_REGTEST,
+		SparkOperatorIdentityPublicKeys: ops,
+		ClientCreatedTimestamp:          timestamppb.New(now),
+		ExpiryTime:                      timestamppb.New(now.Add(time.Hour)),
+		TokenInputs: &tokenpb.TokenTransaction_MintInput{
+			MintInput: &tokenpb.TokenMintInput{
+				IssuerPublicKey: issuerPub,
+				TokenIdentifier: tokenIdentifier,
+			},
+		},
+		TokenOutputs: []*tokenpb.TokenOutput{
+			{
+				OwnerPublicKey:                ownerPub,
+				TokenIdentifier:               tokenIdentifier,
+				TokenAmount:                   amount16,
+				RevocationCommitment:          revKey,
+				WithdrawBondSats:              &withdrawBond,
+				WithdrawRelativeBlockLocktime: &withdrawLock,
+			},
+		},
+	}
+}
 func TestExchangeRevocationSecretsShares(t *testing.T) {
 	handler, ctx, tx, cleanup := setUpInternalSignTokenTestHandler(t)
 	defer cleanup()
@@ -72,6 +117,15 @@ func TestExchangeRevocationSecretsShares(t *testing.T) {
 	t.Run("fails when no operator shares provided", func(t *testing.T) {
 		req := &sparktokeninternal.ExchangeRevocationSecretsSharesRequest{
 			OperatorShares: []*sparktokeninternal.OperatorRevocationShares{},
+			OperatorTransactionSignatures: []*sparktokeninternal.OperatorTransactionSignature{
+				{
+					OperatorIdentityPublicKey: []byte("invalid_operator"),
+					Signature:                 []byte("invalid_signature"),
+				},
+			},
+			FinalTokenTransaction:     makeFinalMintTxForTests(),
+			FinalTokenTransactionHash: testTransaction.FinalizedTokenTransactionHash,
+			OperatorIdentityPublicKey: []byte("requesting_operator"),
 		}
 
 		_, err := handler.ExchangeRevocationSecretsShares(ctx, req)
@@ -98,6 +152,7 @@ func TestExchangeRevocationSecretsShares(t *testing.T) {
 					Signature:                 []byte("invalid_signature"),
 				},
 			},
+			FinalTokenTransaction:     makeFinalMintTxForTests(),
 			FinalTokenTransactionHash: testTransaction.FinalizedTokenTransactionHash,
 			OperatorIdentityPublicKey: []byte("requesting_operator"),
 		}

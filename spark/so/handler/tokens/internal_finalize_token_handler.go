@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/logging"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
@@ -38,12 +39,13 @@ func (h *InternalFinalizeTokenHandler) FinalizeTokenTransactionInternal(
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert token transaction to spark token transaction: %w", err)
 	}
-	ctx, span := tracer.Start(ctx, "InternalFinalizeTokenHandler.FinalizeTokenTransactionInternal", getTokenTransactionAttributes(tokenProtoTokenTransaction))
+	ctx, span := GetTracer().Start(ctx, "InternalFinalizeTokenHandler.FinalizeTokenTransactionInternal", GetProtoTokenTransactionTraceAttributes(ctx, tokenProtoTokenTransaction))
 	defer span.End()
 	tokenTransaction, err := ent.FetchAndLockTokenTransactionData(ctx, tokenProtoTokenTransaction)
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToFetchTransaction, tokenTransaction, err)
 	}
+	ctx, _ = logging.WithAttrs(ctx, tokens.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
 
 	// Verify that the transaction is in a signed state before finalizing
 	if tokenTransaction.Status != st.TokenTransactionStatusSigned {
@@ -132,7 +134,7 @@ func (h *InternalFinalizeTokenHandler) FinalizeCoordinatedTokenTransactionIntern
 	tokenTransactionHash []byte,
 	revocationSecretsToFinalize []*ent.RecoveredRevocationSecret,
 ) error {
-	ctx, span := tracer.Start(ctx, "InternalFinalizeTokenHandler.FinalizeCoordinatedTokenTransactionInternal")
+	ctx, span := GetTracer().Start(ctx, "InternalFinalizeTokenHandler.FinalizeCoordinatedTokenTransactionInternal")
 	defer span.End()
 	tokenTransaction, err := ent.FetchAndLockTokenTransactionDataByHash(ctx, tokenTransactionHash)
 	if err != nil {
