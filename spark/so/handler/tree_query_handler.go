@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/utils"
 )
 
@@ -87,6 +88,8 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 			nodeIDs = append(nodeIDs, nodeUUID)
 		}
 		query = query.Where(treenode.IDIn(nodeIDs...))
+	default:
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("either owner identity pubkey or node ids to query must be provided"))
 	}
 
 	nodes, err := query.All(ctx)
