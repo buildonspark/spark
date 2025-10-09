@@ -35,7 +35,7 @@ func (h *InternalExtendLeafHandler) FinalizeExtendLeaf(ctx context.Context, req 
 	if err != nil {
 		return fmt.Errorf("failed to parse node id: %w", err)
 	}
-	treeID, err := uuid.Parse(node.GetId())
+	treeID, err := uuid.Parse(node.GetTreeId())
 	if err != nil {
 		return fmt.Errorf("failed to parse tree id: %w", err)
 	}
