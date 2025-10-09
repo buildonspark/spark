@@ -60,13 +60,14 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 	tokenTx, err := tx.TokenTransaction.Create().
 		SetPartialTokenTransactionHash(randomBytes(32)).
 		SetFinalizedTokenTransactionHash(randomBytes(32)).
-		SetStatus(st.TokenTransactionStatusFinalized).
+		SetStatus(st.TokenTransactionStatusSigned).
 		SetExpiryTime(time.Now().Add(time.Hour)).
 		Save(ctx)
 	require.NoError(t, err)
 
 	// Create a token output with the old relationship structure
 	// (has output_spent_token_transaction but NOT output_spent_started_token_transactions)
+	inputAmount := randomBytes(8)
 	tokenOutput, err := tx.TokenOutput.Create().
 		SetStatus(st.TokenOutputStatusSpentFinalized).
 		SetOwnerPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
@@ -74,13 +75,45 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 		SetWithdrawRelativeBlockLocktime(144).
 		SetWithdrawRevocationCommitment(keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()).
 		SetTokenPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
-		SetTokenAmount(randomBytes(8)).
+		SetTokenAmount(inputAmount).
 		SetCreatedTransactionOutputVout(0).
 		SetNetwork(st.NetworkRegtest).
 		SetTokenIdentifier(tokenCreate.TokenIdentifier).
 		SetTokenCreateID(tokenCreate.ID).
 		SetRevocationKeyshare(keyshare).
 		SetOutputSpentTokenTransaction(tokenTx). // This is the old single relationship
+		Save(ctx)
+	require.NoError(t, err)
+
+	outputKeyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(keys.MustGeneratePrivateKeyFromRand(seededRand)).
+		SetPublicShares(map[string]keys.Public{}).
+		SetPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
+		SetMinSigners(1).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	_, err = tx.TokenOutput.Create().
+		SetStatus(st.TokenOutputStatusCreatedFinalized).
+		SetOwnerPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
+		SetWithdrawBondSats(1000).
+		SetWithdrawRelativeBlockLocktime(144).
+		SetWithdrawRevocationCommitment(keys.MustGeneratePrivateKeyFromRand(seededRand).Public().Serialize()).
+		SetTokenPublicKey(keys.MustGeneratePrivateKeyFromRand(seededRand).Public()).
+		SetTokenAmount(inputAmount).
+		SetCreatedTransactionOutputVout(0).
+		SetNetwork(st.NetworkRegtest).
+		SetTokenIdentifier(tokenCreate.TokenIdentifier).
+		SetTokenCreateID(tokenCreate.ID).
+		SetRevocationKeyshare(outputKeyshare).
+		SetOutputCreatedTokenTransaction(tokenTx).
+		Save(ctx)
+	require.NoError(t, err)
+
+	tokenTx, err = tokenTx.Update().
+		SetStatus(st.TokenTransactionStatusFinalized).
 		Save(ctx)
 	require.NoError(t, err)
 
@@ -122,8 +155,8 @@ func TestBackfillTreeNodeTxids(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-	var nodeID = uuid.New()
-	var treeID = uuid.New()
+	nodeID := uuid.New()
+	treeID := uuid.New()
 
 	rng := rand.NewChaCha8([32]byte{})
 	ownerIdentityPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()

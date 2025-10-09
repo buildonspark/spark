@@ -410,7 +410,9 @@ func (ttu *TokenTransactionUpdate) RemoveSparkInvoice(s ...*SparkInvoice) *Token
 
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (ttu *TokenTransactionUpdate) Save(ctx context.Context) (int, error) {
-	ttu.defaults()
+	if err := ttu.defaults(); err != nil {
+		return 0, err
+	}
 	return withHooks(ctx, ttu.sqlSave, ttu.mutation, ttu.hooks)
 }
 
@@ -437,11 +439,15 @@ func (ttu *TokenTransactionUpdate) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (ttu *TokenTransactionUpdate) defaults() {
+func (ttu *TokenTransactionUpdate) defaults() error {
 	if _, ok := ttu.mutation.UpdateTime(); !ok {
+		if tokentransaction.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized tokentransaction.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := tokentransaction.UpdateDefaultUpdateTime()
 		ttu.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -1241,7 +1247,9 @@ func (ttuo *TokenTransactionUpdateOne) Select(field string, fields ...string) *T
 
 // Save executes the query and returns the updated TokenTransaction entity.
 func (ttuo *TokenTransactionUpdateOne) Save(ctx context.Context) (*TokenTransaction, error) {
-	ttuo.defaults()
+	if err := ttuo.defaults(); err != nil {
+		return nil, err
+	}
 	return withHooks(ctx, ttuo.sqlSave, ttuo.mutation, ttuo.hooks)
 }
 
@@ -1268,11 +1276,15 @@ func (ttuo *TokenTransactionUpdateOne) ExecX(ctx context.Context) {
 }
 
 // defaults sets the default values of the builder before save.
-func (ttuo *TokenTransactionUpdateOne) defaults() {
+func (ttuo *TokenTransactionUpdateOne) defaults() error {
 	if _, ok := ttuo.mutation.UpdateTime(); !ok {
+		if tokentransaction.UpdateDefaultUpdateTime == nil {
+			return fmt.Errorf("ent: uninitialized tokentransaction.UpdateDefaultUpdateTime (forgotten import ent/runtime?)")
+		}
 		v := tokentransaction.UpdateDefaultUpdateTime()
 		ttuo.mutation.SetUpdateTime(v)
 	}
+	return nil
 }
 
 // check runs all checks and user-defined validators on the builder.

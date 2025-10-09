@@ -1,14 +1,19 @@
 package schema
 
 import (
+	"context"
 	"fmt"
+	"math/big"
 
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/lightsparkdev/spark/common/keys"
+	entgen "github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	"github.com/lightsparkdev/spark/so/errors"
 )
 
 type TokenTransaction struct {
@@ -68,4 +73,73 @@ func (TokenTransaction) Indexes() []ent.Index {
 		// Needed for query_token_transactions query
 		index.Fields("update_time"),
 	}
+}
+
+func (TokenTransaction) Hooks() []ent.Hook {
+	return []ent.Hook{
+		func(next ent.Mutator) ent.Mutator {
+			return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+				tm, ok := m.(*entgen.TokenTransactionMutation)
+				if !ok {
+					return next.Mutate(ctx, m)
+				}
+
+				result, err := next.Mutate(ctx, m)
+				status, statusExists := tm.Status()
+				txID, exists := tm.ID()
+
+				if err != nil || !statusExists || !exists ||
+					(status != st.TokenTransactionStatusRevealed && status != st.TokenTransactionStatusFinalized) {
+					return result, err
+				}
+
+				ctx, span := tracer.Start(ctx, "TokenTransaction.BalancedTransferValidationHook")
+				defer span.End()
+
+				tx, err := tm.Client().TokenTransaction.Query().
+					Where(tokentransaction.ID(txID)).
+					WithSpentOutput().
+					WithCreatedOutput().
+					WithMint().
+					WithCreate().
+					Only(ctx)
+				if err != nil {
+					return nil, errors.InternalDatabaseError(fmt.Errorf("failed to fetch transaction for balance validation: %w", err))
+				}
+
+				if err := ValidateTransferTransactionBalance(tx); err != nil {
+					return nil, errors.FailedPreconditionTokenRulesViolation(fmt.Errorf("transaction balance validation failed: %w", err))
+				}
+
+				return result, nil
+			})
+		},
+	}
+}
+
+// Validates the inputs and outputs of a transfer transaction are balanced to ensure integrity of the DAG.
+// If it's not a transfer transaction, it will return nil.
+func ValidateTransferTransactionBalance(tx *entgen.TokenTransaction) error {
+	if tx.Edges.Mint != nil || tx.Edges.Create != nil {
+		return nil
+	}
+
+	inputSum := big.NewInt(0)
+	for _, input := range tx.Edges.SpentOutput {
+		amount := new(big.Int).SetBytes(input.TokenAmount)
+		inputSum.Add(inputSum, amount)
+	}
+
+	outputSum := big.NewInt(0)
+	for _, output := range tx.Edges.CreatedOutput {
+		amount := new(big.Int).SetBytes(output.TokenAmount)
+		outputSum.Add(outputSum, amount)
+	}
+
+	if inputSum.Cmp(outputSum) != 0 {
+		return errors.FailedPreconditionTokenRulesViolation(fmt.Errorf("transaction %s in %s state: inputs (%s) must equal outputs (%s)",
+			tx.ID, tx.Status, inputSum.String(), outputSum.String()))
+	}
+
+	return nil
 }

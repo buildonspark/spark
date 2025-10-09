@@ -1,13 +1,20 @@
 package schema
 
 import (
+	"context"
+	"fmt"
+
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	entgen "github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
+	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	"github.com/lightsparkdev/spark/so/errors"
 )
 
 type TokenOutput struct {
@@ -87,4 +94,140 @@ func (TokenOutput) Indexes() []ent.Index {
 		index.Edges("output_created_token_transaction").Fields("created_transaction_output_vout").Unique(),
 		index.Fields("token_create_id"),
 	}
+}
+
+func (TokenOutput) Hooks() []ent.Hook {
+	return []ent.Hook{
+		func(next ent.Mutator) ent.Mutator {
+			// Validates that any REVEALED or FINALIZED token transfer transactions that are or were tied
+			// to this output have balanced inputs and outputs to ensure outputs are not double spent.
+			// This is a data integrity rule but the business logic should also check this.
+			return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+				om, ok := m.(*entgen.TokenOutputMutation)
+				if !ok {
+					return next.Mutate(ctx, m)
+				}
+
+				ctx, span := tracer.Start(ctx, "TokenOutput.BalancedTransferValidationHook_PreMutation")
+				oldTxIDs, err := getOldTransactionIDs(ctx, om)
+				span.End()
+				if err != nil {
+					return nil, err
+				}
+
+				result, err := next.Mutate(ctx, m)
+				if err != nil {
+					return result, err
+				}
+
+				ctx, span = tracer.Start(ctx, "TokenOutput.BalancedTransferValidationHook_PostMutation")
+				defer span.End()
+
+				if err := validateOutputTransactionReassignments(ctx, om, oldTxIDs); err != nil {
+					return nil, err
+				}
+
+				return result, nil
+			})
+		},
+	}
+}
+
+func getOldTransactionIDs(ctx context.Context, m *entgen.TokenOutputMutation) (map[uuid.UUID]struct{}, error) {
+	if !m.Op().Is(ent.OpUpdate | ent.OpUpdateOne) {
+		return nil, nil
+	}
+
+	outputID, exists := m.ID()
+	if !exists {
+		return nil, nil
+	}
+
+	createdTxChanged := m.OutputCreatedTokenTransactionCleared() || len(m.OutputCreatedTokenTransactionIDs()) > 0
+	spentTxChanged := m.OutputSpentTokenTransactionCleared() || len(m.OutputSpentTokenTransactionIDs()) > 0
+
+	if !createdTxChanged && !spentTxChanged {
+		return nil, nil
+	}
+
+	existingOutput, err := m.Client().TokenOutput.Query().
+		Where(tokenoutput.ID(outputID)).
+		WithOutputCreatedTokenTransaction(func(q *entgen.TokenTransactionQuery) {
+			q.Select(tokentransaction.FieldID, tokentransaction.FieldStatus)
+		}).
+		WithOutputSpentTokenTransaction(func(q *entgen.TokenTransactionQuery) {
+			q.Select(tokentransaction.FieldID, tokentransaction.FieldStatus)
+		}).
+		Only(ctx)
+	if err != nil {
+		return nil, errors.InternalDatabaseError(fmt.Errorf("failed to fetch existing output: %w", err))
+	}
+
+	oldTxIDs := make(map[uuid.UUID]struct{})
+	if createdTxChanged && existingOutput.Edges.OutputCreatedTokenTransaction != nil {
+		oldTxIDs[existingOutput.Edges.OutputCreatedTokenTransaction.ID] = struct{}{}
+	}
+
+	if spentTxChanged && existingOutput.Edges.OutputSpentTokenTransaction != nil {
+		oldTxIDs[existingOutput.Edges.OutputSpentTokenTransaction.ID] = struct{}{}
+	}
+
+	return oldTxIDs, nil
+}
+
+func validateOutputTransactionReassignments(ctx context.Context, m *entgen.TokenOutputMutation, oldTxIDs map[uuid.UUID]struct{}) error {
+	newCreatedTxIDs := m.OutputCreatedTokenTransactionIDs()
+	newSpentTxIDs := m.OutputSpentTokenTransactionIDs()
+
+	// Calculate total number of transactions to check and early exit if none
+	expectedSize := len(oldTxIDs) + len(newCreatedTxIDs) + len(newSpentTxIDs)
+	if expectedSize == 0 {
+		return nil
+	}
+
+	// Pre-allocate map with expected capacity to avoid reallocation
+	txIDsToCheck := make(map[uuid.UUID]struct{}, expectedSize)
+
+	// Add old transaction IDs (these now have the output removed)
+	for txID := range oldTxIDs {
+		txIDsToCheck[txID] = struct{}{}
+	}
+
+	// Add new transaction IDs (these now have the output added)
+	for _, txID := range newCreatedTxIDs {
+		txIDsToCheck[txID] = struct{}{}
+	}
+
+	for _, txID := range newSpentTxIDs {
+		txIDsToCheck[txID] = struct{}{}
+	}
+
+	txIDs := make([]uuid.UUID, 0, len(txIDsToCheck))
+	for txID := range txIDsToCheck {
+		txIDs = append(txIDs, txID)
+	}
+
+	txs, err := m.Client().TokenTransaction.Query().
+		Where(
+			tokentransaction.IDIn(txIDs...),
+			tokentransaction.StatusIn(
+				st.TokenTransactionStatusRevealed,
+				st.TokenTransactionStatusFinalized,
+			),
+			tokentransaction.Not(tokentransaction.Or(tokentransaction.HasMint(), tokentransaction.HasCreate())),
+		).
+		WithSpentOutput().
+		WithCreatedOutput().
+		All(ctx)
+	if err != nil {
+		return errors.InternalDatabaseError(fmt.Errorf("failed to fetch affected transactions: %w", err))
+	}
+
+	for _, tx := range txs {
+		if err := ValidateTransferTransactionBalance(tx); err != nil {
+			return errors.FailedPreconditionInvalidState(fmt.Errorf("output reassignment would violate balance constraint: %w", err))
+		}
+	}
+
+	return nil
 }

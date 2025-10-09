@@ -466,6 +466,8 @@ func init() {
 	// tokenmint.DefaultID holds the default value on creation for the id field.
 	tokenmint.DefaultID = tokenmintDescID.Default.(func() uuid.UUID)
 	tokenoutputMixin := schema.TokenOutput{}.Mixin()
+	tokenoutputHooks := schema.TokenOutput{}.Hooks()
+	tokenoutput.Hooks[0] = tokenoutputHooks[0]
 	tokenoutputMixinFields0 := tokenoutputMixin[0].Fields()
 	_ = tokenoutputMixinFields0
 	tokenoutputFields := schema.TokenOutput{}.Fields()
@@ -508,6 +510,8 @@ func init() {
 	// tokenpartialrevocationsecretshare.DefaultID holds the default value on creation for the id field.
 	tokenpartialrevocationsecretshare.DefaultID = tokenpartialrevocationsecretshareDescID.Default.(func() uuid.UUID)
 	tokentransactionMixin := schema.TokenTransaction{}.Mixin()
+	tokentransactionHooks := schema.TokenTransaction{}.Hooks()
+	tokentransaction.Hooks[0] = tokentransactionHooks[0]
 	tokentransactionMixinFields0 := tokentransactionMixin[0].Fields()
 	_ = tokentransactionMixinFields0
 	tokentransactionFields := schema.TokenTransaction{}.Fields()

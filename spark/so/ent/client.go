@@ -3225,7 +3225,8 @@ func (c *TokenOutputClient) QueryTokenCreate(to *TokenOutput) *TokenCreateQuery 
 
 // Hooks returns the client hooks.
 func (c *TokenOutputClient) Hooks() []Hook {
-	return c.hooks.TokenOutput
+	hooks := c.hooks.TokenOutput
+	return append(hooks[:len(hooks):len(hooks)], tokenoutput.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.
@@ -3635,7 +3636,8 @@ func (c *TokenTransactionClient) QuerySparkInvoice(tt *TokenTransaction) *SparkI
 
 // Hooks returns the client hooks.
 func (c *TokenTransactionClient) Hooks() []Hook {
-	return c.hooks.TokenTransaction
+	hooks := c.hooks.TokenTransaction
+	return append(hooks[:len(hooks):len(hooks)], tokentransaction.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.

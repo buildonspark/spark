@@ -1,14 +1,15 @@
 package tokens
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"io"
 	"math/big"
 	"net"
 	"testing"
 	"time"
 
-	"encoding/binary"
 	mathrand "math/rand/v2"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
@@ -339,7 +340,6 @@ func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) 
 			SetNetwork(common.SchemaNetwork(common.Regtest)).
 			SetTokenIdentifier(tokenIdentifier).
 			Save(setup.ctx)
-
 	}
 	require.NoError(t, err)
 
@@ -377,6 +377,15 @@ func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) 
 	require.NoError(t, err)
 
 	prevCoordinatorSignature := ecdsa.Sign(setup.coordinatorPrivKey.ToBTCEC(), prevTxHash)
+
+	mint, err := setup.sessionCtx.Client.TokenMint.Create().
+		SetIssuerPublicKey(setup.pubKey).
+		SetTokenIdentifier(tokenIdentifier).
+		SetIssuerSignature(bytes.Repeat([]byte{0}, 64)).
+		SetWalletProvidedTimestamp(uint64(time.Now().Add(-10 * time.Minute).UnixMilli())).
+		Save(setup.ctx)
+	require.NoError(t, err)
+
 	prevTokenTx, err := setup.sessionCtx.Client.TokenTransaction.Create().
 		SetPartialTokenTransactionHash(prevTxHash).
 		SetFinalizedTokenTransactionHash(prevTxHash).
@@ -385,6 +394,7 @@ func setUpTransferTestData(t *testing.T, rng io.Reader, setup *testSetupCommon) 
 		SetClientCreatedTimestamp(time.Now().Add(-10 * time.Minute)).
 		SetOperatorSignature(prevCoordinatorSignature.Serialize()).
 		SetExpiryTime(time.Now().Add(10 * time.Minute)).
+		SetMint(mint).
 		Save(setup.ctx)
 	require.NoError(t, err)
 	_, err = prevTokenOutput1.Update().SetOutputCreatedTokenTransaction(prevTokenTx).Save(setup.ctx)
@@ -775,11 +785,43 @@ func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputRem
 		otherTx, err := setup.sessionCtx.Client.TokenTransaction.Create().
 			SetPartialTokenTransactionHash(otherHash).
 			SetFinalizedTokenTransactionHash(otherHash).
-			SetStatus(schematype.TokenTransactionStatusRevealed).
+			SetStatus(schematype.TokenTransactionStatusSigned).
 			SetVersion(schematype.TokenTransactionVersionV1).
 			SetClientCreatedTimestamp(time.Now()).
 			SetOperatorSignature(setup.coordinatorPrivKey.Public().Serialize()).
 			SetExpiryTime(time.Now().Add(10 * time.Minute)).
+			Save(setup.ctx)
+		assert.NoError(t, err)
+
+		// Create a matching output to balance the transaction
+		otherKeyshare, err := setup.sessionCtx.Client.SigningKeyshare.Create().
+			SetStatus(schematype.KeyshareStatusAvailable).
+			SetSecretShare(keys.GeneratePrivateKey()).
+			SetPublicShares(map[string]keys.Public{}).
+			SetPublicKey(keys.GeneratePrivateKey().Public()).
+			SetMinSigners(1).
+			SetCoordinatorIndex(0).
+			Save(setup.ctx)
+		assert.NoError(t, err)
+
+		tokenCreate, err := setup.sessionCtx.Client.TokenCreate.Query().
+			Where(tokencreate.TokenIdentifier(transferData.tokenIdentifier)).
+			Only(setup.ctx)
+		assert.NoError(t, err)
+
+		_, err = setup.sessionCtx.Client.TokenOutput.Create().
+			SetStatus(schematype.TokenOutputStatusCreatedStarted).
+			SetOwnerPublicKey(setup.coordinatorPubKey).
+			SetTokenAmount(testTokenAmountBytes).
+			SetCreatedTransactionOutputVout(0).
+			SetWithdrawRevocationCommitment(otherKeyshare.PublicKey.Serialize()).
+			SetWithdrawBondSats(testWithdrawBondSats).
+			SetWithdrawRelativeBlockLocktime(testWithdrawRelativeBlockLocktime).
+			SetRevocationKeyshare(otherKeyshare).
+			SetTokenIdentifier(transferData.tokenIdentifier).
+			SetTokenCreateID(tokenCreate.ID).
+			SetNetwork(common.SchemaNetwork(common.Regtest)).
+			SetOutputCreatedTokenTransaction(otherTx).
 			Save(setup.ctx)
 		assert.NoError(t, err)
 
@@ -788,6 +830,12 @@ func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputRem
 			SetStatus(schematype.TokenOutputStatusSpentStarted).
 			Save(setup.ctx)
 		assert.NoError(t, err)
+
+		otherTx, err = otherTx.Update().
+			SetStatus(schematype.TokenTransactionStatusRevealed).
+			Save(setup.ctx)
+		assert.NoError(t, err)
+
 		close(block)
 	}()
 

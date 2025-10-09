@@ -4,7 +4,6 @@ import (
 	"context"
 	"math/rand/v2"
 	"slices"
-
 	"testing"
 	"time"
 
@@ -67,10 +66,19 @@ func createTestTokenOutputs(t *testing.T, ctx context.Context, tx *ent.Tx, count
 			Save(ctx)
 		require.NoError(t, err)
 
+		mint, err := tx.TokenMint.Create().
+			SetIssuerPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+			SetTokenIdentifier(randomBytes(32)).
+			SetIssuerSignature(randomBytes(64)).
+			SetWalletProvidedTimestamp(uint64(time.Now().UnixMilli())).
+			Save(ctx)
+		require.NoError(t, err)
+
 		mintTx, err := tx.TokenTransaction.Create().
 			SetPartialTokenTransactionHash(randomBytes(32)).
 			SetFinalizedTokenTransactionHash(randomBytes(32)).
 			SetStatus(st.TokenTransactionStatusFinalized).
+			SetMint(mint).
 			Save(ctx)
 		require.NoError(t, err)
 
