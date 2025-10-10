@@ -291,6 +291,14 @@ func TxFromRawTxBytes(rawTxBytes []byte) (*wire.MsgTx, error) {
 	return &tx, nil
 }
 
+// ValidateBitcoinTxVersion validates that a Bitcoin transaction has a valid version (>= 2).
+func ValidateBitcoinTxVersion(tx *wire.MsgTx) error {
+	if tx.Version < 2 {
+		return fmt.Errorf("transaction version must be greater than or equal to 2, got v%d", tx.Version)
+	}
+	return nil
+}
+
 func SerializeTx(tx *wire.MsgTx) ([]byte, error) {
 	buf := bytes.NewBuffer(make([]byte, 0, tx.SerializeSize()))
 	if err := tx.Serialize(buf); err != nil {
@@ -373,6 +381,10 @@ func UpdateTxWithSignature(rawTxBytes []byte, vin int, signature []byte) ([]byte
 // VerifySignatureSingleInput verifies that a signed transaction's input
 // properly spends the prevOutput provided.
 func VerifySignatureSingleInput(signedTx *wire.MsgTx, vin int, prevOutput *wire.TxOut) error {
+	if err := ValidateBitcoinTxVersion(signedTx); err != nil {
+		return fmt.Errorf("transaction version validation failed: %w", err)
+	}
+
 	prevOutputFetcher := txscript.NewCannedPrevOutputFetcher(
 		prevOutput.PkScript, prevOutput.Value,
 	)

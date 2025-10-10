@@ -432,9 +432,17 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return fmt.Errorf("unable to get cpfpTx for cpfpTransaction, tree_node id: %s: %w", nodeID, err)
 		}
 
+		if err := common.ValidateBitcoinTxVersion(cpfpTx); err != nil {
+			return fmt.Errorf("cpfpTx version validation failed for tree_node id: %s: %w", nodeID, err)
+		}
+
 		cpfpRefundTx, err := common.TxFromRawTxBytes(cpfpTransaction.RawTx)
 		if err != nil {
 			return fmt.Errorf("unable to get cpfp refund tx for cpfpTransaction, tree_node id: %s: %w", nodeID, err)
+		}
+
+		if err := common.ValidateBitcoinTxVersion(cpfpRefundTx); err != nil {
+			return fmt.Errorf("cpfp refund tx version validation failed for tree_node id: %s: %w", nodeID, err)
 		}
 
 		if len(cpfpTx.TxOut) <= 0 {
@@ -488,9 +496,18 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if err != nil {
 			return fmt.Errorf("unable to get directTx for directTransaction, tree_node id: %s: %w", nodeID, err)
 		}
+
+		if err := common.ValidateBitcoinTxVersion(directTx); err != nil {
+			return fmt.Errorf("directTx version validation failed for tree_node id: %s: %w", nodeID, err)
+		}
+
 		directRefundTx, err := common.TxFromRawTxBytes(directTransaction.RawTx)
 		if err != nil {
 			return fmt.Errorf("unable to get direct refund tx for directTransaction, tree_node id: %s: %w", nodeID, err)
+		}
+
+		if err := common.ValidateBitcoinTxVersion(directRefundTx); err != nil {
+			return fmt.Errorf("direct refund tx version validation failed for tree_node id: %s: %w", nodeID, err)
 		}
 		if len(directTx.TxOut) <= 0 {
 			return fmt.Errorf("direct tx vout out of bounds for directTransaction, tree_node id: %s", nodeID)
@@ -543,9 +560,18 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 		if err != nil {
 			return fmt.Errorf("unable to get cpfpTx for directFromCpfpTransaction, tree_node id: %s: %w", nodeID, err)
 		}
+
+		if err := common.ValidateBitcoinTxVersion(cpfpTx); err != nil {
+			return fmt.Errorf("cpfpTx version validation failed for directFromCpfpTransaction, tree_node id: %s: %w", nodeID, err)
+		}
+
 		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(directFromCpfpTransaction.RawTx)
 		if err != nil {
 			return fmt.Errorf("unable to get direct from cpfp refund tx for directFromCpfpTransaction, tree_node id: %s: %w", nodeID, err)
+		}
+
+		if err := common.ValidateBitcoinTxVersion(directFromCpfpRefundTx); err != nil {
+			return fmt.Errorf("direct from cpfp refund tx version validation failed for tree_node id: %s: %w", nodeID, err)
 		}
 		if len(cpfpTx.TxOut) <= 0 {
 			return fmt.Errorf("direct from cpfp vout out of bounds for directFromCpfpTransaction, tree_node id: %s", nodeID)

@@ -1276,6 +1276,10 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 }
 
 func (o *DepositHandler) verifyRootTransaction(rootTx *wire.MsgTx, onChainTx *wire.MsgTx, onChainVout uint32, isDirect bool) error {
+	if err := common.ValidateBitcoinTxVersion(rootTx); err != nil {
+		return fmt.Errorf("root tx version validation failed: %w", err)
+	}
+
 	if len(rootTx.TxIn) <= 0 || len(rootTx.TxOut) <= 0 {
 		return fmt.Errorf("root transaction should have at least 1 input and 1 output")
 	}
@@ -1306,6 +1310,14 @@ func (o *DepositHandler) verifyRootTransaction(rootTx *wire.MsgTx, onChainTx *wi
 }
 
 func (o *DepositHandler) verifyRefundTransaction(tx *wire.MsgTx, refundTx *wire.MsgTx) error {
+	if err := common.ValidateBitcoinTxVersion(tx); err != nil {
+		return fmt.Errorf("tx version validation failed: %w", err)
+	}
+
+	if err := common.ValidateBitcoinTxVersion(refundTx); err != nil {
+		return fmt.Errorf("refund tx version validation failed: %w", err)
+	}
+
 	// Refund transaction should have the given tx as input
 	previousTxid := tx.TxHash()
 	for _, refundTxIn := range refundTx.TxIn {

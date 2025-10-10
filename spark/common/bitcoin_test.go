@@ -330,3 +330,24 @@ func TestCompareTransactions(t *testing.T) {
 		assert.Contains(t, err.Error(), "got 999999")
 	})
 }
+
+func TestValidateBitcoinTxVersion(t *testing.T) {
+	t.Run("rejects version 1 transactions", func(t *testing.T) {
+		tx := wire.NewMsgTx(1)
+		err := ValidateBitcoinTxVersion(tx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "transaction version must be greater than or equal to 2, got v1")
+	})
+
+	t.Run("accepts version 2 transactions", func(t *testing.T) {
+		tx := wire.NewMsgTx(2)
+		err := ValidateBitcoinTxVersion(tx)
+		assert.NoError(t, err)
+	})
+
+	t.Run("accepts version 3 transactions", func(t *testing.T) {
+		tx := wire.NewMsgTx(3)
+		err := ValidateBitcoinTxVersion(tx)
+		assert.NoError(t, err)
+	})
+}

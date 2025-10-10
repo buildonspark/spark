@@ -93,8 +93,8 @@ func parseRefundTx(refundBytes []byte) (*wire.MsgTx, error) {
 		return nil, fmt.Errorf("failed to parse bytes: %w", err)
 	}
 
-	if refundTx.Version < 2 {
-		return nil, fmt.Errorf("refund tx must be v2 or above, got v%d", refundTx.Version)
+	if err := common.ValidateBitcoinTxVersion(refundTx); err != nil {
+		return nil, fmt.Errorf("refund tx version validation failed: %w", err)
 	}
 
 	if len(refundTx.TxIn) < 1 {

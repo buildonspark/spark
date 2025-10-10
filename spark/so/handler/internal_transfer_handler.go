@@ -453,9 +453,17 @@ func compareTxs(rawTx1, rawTx2 []byte) (bool, error) {
 		return false, fmt.Errorf("failed to parse tx1: %w", err)
 	}
 
+	if err := common.ValidateBitcoinTxVersion(tx1); err != nil {
+		return false, fmt.Errorf("tx1 version validation failed: %w", err)
+	}
+
 	tx2, err := common.TxFromRawTxBytes(rawTx2)
 	if err != nil {
 		return false, fmt.Errorf("failed to parse tx2: %w", err)
+	}
+
+	if err := common.ValidateBitcoinTxVersion(tx2); err != nil {
+		return false, fmt.Errorf("tx2 version validation failed: %w", err)
 	}
 
 	if len(tx1.TxIn) != len(tx2.TxIn) {
