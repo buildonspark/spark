@@ -13,6 +13,21 @@ export class SparkWalletTesting extends SparkWalletNodeJS {
     return;
   }
 
+  public override async *optimizeLeaves(
+    multiplicity: number | undefined = undefined,
+  ): AsyncGenerator<
+    {
+      step: number;
+      total: number;
+      controller: AbortController;
+    },
+    void,
+    void
+  > {
+    // Optimize is disabled by default.
+    return;
+  }
+
   protected async proxyParentSetupBackgroundStream() {
     return super.setupBackgroundStream();
   }

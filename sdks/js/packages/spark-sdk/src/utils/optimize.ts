@@ -239,7 +239,7 @@ export function shouldOptimize(
     return numOutputs * 5 < numInputs;
   } else {
     // When optimizing for swap-minimization, we should only optimize if it changes the
-    // number of active denominations by more than 1.
+    // number of active denominations by more than 2.
     const swaps = minimizeTransferSwap(
       inputLeaves,
       multiplicity,
@@ -251,7 +251,7 @@ export function shouldOptimize(
     const outputCounter = countOccurrences(
       swaps.flatMap((swap) => swap.outLeaves),
     );
-    return Math.abs(inputCounter.size - outputCounter.size) > 1;
+    return Math.abs(inputCounter.size - outputCounter.size) > 2;
   }
 }
 

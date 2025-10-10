@@ -161,7 +161,7 @@ const BASE_CONFIG: Required<ConfigOptions> = {
   events: {},
   optimizationOptions: {
     auto: true,
-    multiplicity: 0,
+    multiplicity: 1,
   },
 };
 
