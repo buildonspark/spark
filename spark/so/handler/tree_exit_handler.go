@@ -100,21 +100,33 @@ func (h *TreeExitHandler) MarkTreesExited(ctx context.Context, trees []*ent.Tree
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
+	// Collect all tree IDs that need updating
+	var treeIDs []uuid.UUID
 	for _, tree := range trees {
 		if tree.Status != st.TreeStatusExited {
-			if _, err := tree.Update().SetStatus(st.TreeStatusExited).Save(ctx); err != nil {
-				return fmt.Errorf("failed to update tree %s status: %w", tree.ID, err)
-			}
-			err = db.TreeNode.
-				Update().
-				Where(enttreenode.HasTreeWith(enttree.ID(tree.ID))).
-				SetStatus(st.TreeNodeStatusExited).
-				Exec(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to update tree nodes status on tree %s: %w", tree.ID, err)
-			}
+			treeIDs = append(treeIDs, tree.ID)
 		}
 	}
+	if len(treeIDs) == 0 {
+		return nil
+	}
+
+	if _, err := db.Tree.
+		Update().
+		Where(enttree.IDIn(treeIDs...)).
+		SetStatus(st.TreeStatusExited).
+		Save(ctx); err != nil {
+		return fmt.Errorf("failed to update tree statuses: %w", err)
+	}
+
+	if _, err := db.TreeNode.
+		Update().
+		Where(enttreenode.HasTreeWith(enttree.IDIn(treeIDs...))).
+		SetStatus(st.TreeNodeStatusExited).
+		Save(ctx); err != nil {
+		return fmt.Errorf("failed to update tree node statuses: %w", err)
+	}
+
 	return nil
 }
 
