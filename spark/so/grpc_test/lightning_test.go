@@ -454,6 +454,12 @@ func TestSendLightningPaymentV2(t *testing.T) {
 	}
 	assert.Equal(t, int64(12345+feeSats), totalValue)
 
+	// Check that the expiry time is at least 15 days from now
+	htlcs, err := wallet.QueryHTLC(t.Context(), sspConfig, 5, 0, nil, nil)
+	require.NoError(t, err)
+	expiryTime := htlcs.PreimageRequests[0].Transfer.ExpiryTime.AsTime()
+	require.Greater(t, expiryTime, time.Now().Add(15*24*time.Hour))
+
 	receiverTransfer, err := wallet.ProvidePreimage(t.Context(), sspConfig, preimage[:])
 	require.NoError(t, err)
 	assert.Equal(t, spark.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receiverTransfer.Status)

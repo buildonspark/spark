@@ -185,6 +185,12 @@ func (s *SparkServer) InitiatePreimageSwapV2(ctx context.Context, req *pb.Initia
 	return lightningHandler.InitiatePreimageSwapV2(ctx, req)
 }
 
+// InitiatePreimageSwapV2 initiates a preimage swap for the given payment hash.
+func (s *SparkServer) InitiatePreimageSwapV3(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
+	lightningHandler := handler.NewLightningHandler(s.config)
+	return lightningHandler.InitiatePreimageSwapV3(ctx, req)
+}
+
 // CooperativeExit asks for signatures for refund transactions spending leaves
 // and connector outputs on another user's L1 transaction.
 func (s *SparkServer) CooperativeExit(ctx context.Context, req *pb.CooperativeExitRequest) (*pb.CooperativeExitResponse, error) {

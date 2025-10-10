@@ -46,7 +46,7 @@ import (
 )
 
 const (
-	MaximumExpiryTime                = 5 * time.Minute
+	LightningPaymentExpiryDuration   = 16 * 24 * time.Hour
 	HTLCSequenceOffset               = 30
 	DirectSequenceOffset             = 15
 	DefaultMaxSigningCommitmentNodes = 1000
@@ -1127,16 +1127,23 @@ func (h *LightningHandler) signHTLCRefunds(ctx context.Context, transferRequest 
 }
 
 // InitiatePreimageSwapV2 initiates a preimage swap for the given payment hash.
+func (h *LightningHandler) InitiatePreimageSwapV3(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
+	return h.initiatePreimageSwap(ctx, req, true, nil)
+}
+
+// InitiatePreimageSwapV2 initiates a preimage swap for the given payment hash.
 func (h *LightningHandler) InitiatePreimageSwapV2(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
-	return h.initiatePreimageSwap(ctx, req, true)
+	expireTimeOverride := time.Now().Add(LightningPaymentExpiryDuration)
+	return h.initiatePreimageSwap(ctx, req, true, &expireTimeOverride)
 }
 
 func (h *LightningHandler) InitiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest) (*pb.InitiatePreimageSwapResponse, error) {
-	return h.initiatePreimageSwap(ctx, req, false)
+	expireTimeOverride := time.Now().Add(LightningPaymentExpiryDuration)
+	return h.initiatePreimageSwap(ctx, req, false, &expireTimeOverride)
 }
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
-func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest, requireDirectTx bool) (*pb.InitiatePreimageSwapResponse, error) {
+func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.InitiatePreimageSwapRequest, requireDirectTx bool, expireTimeOverride *time.Time) (*pb.InitiatePreimageSwapResponse, error) {
 	if req.Transfer == nil {
 		return nil, fmt.Errorf("transfer is required")
 	}
@@ -1249,8 +1256,11 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 	}
 
 	expiryTime := req.Transfer.ExpiryTime.AsTime()
-	if expiryTime.Unix() != 0 && expiryTime.After(time.Now().Add(MaximumExpiryTime)) {
-		return nil, fmt.Errorf("expiry time is greater than maximum expiry time")
+	if expireTimeOverride != nil {
+		expiryTime = *expireTimeOverride
+	}
+	if expiryTime.Unix() != 0 && expiryTime.Before(time.Now()) {
+		return nil, fmt.Errorf("expiry time is before current time")
 	}
 
 	transferHandler := NewTransferHandler(h.config)
@@ -1288,7 +1298,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		ctx,
 		req.Transfer.TransferId,
 		st.TransferTypePreimageSwap,
-		req.Transfer.ExpiryTime.AsTime(),
+		expiryTime,
 		ownerIdentityPubKey,
 		receiverIdentityPubKey,
 		cpfpLeafRefundMap,

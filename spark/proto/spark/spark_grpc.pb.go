@@ -69,6 +69,7 @@ const (
 	SparkService_ClaimTransferSignRefundsV2_FullMethodName          = "/spark.SparkService/claim_transfer_sign_refunds_v2"
 	SparkService_FinalizeNodeSignaturesV2_FullMethodName            = "/spark.SparkService/finalize_node_signatures_v2"
 	SparkService_InitiatePreimageSwapV2_FullMethodName              = "/spark.SparkService/initiate_preimage_swap_v2"
+	SparkService_InitiatePreimageSwapV3_FullMethodName              = "/spark.SparkService/initiate_preimage_swap_v3"
 	SparkService_StartLeafSwapV2_FullMethodName                     = "/spark.SparkService/start_leaf_swap_v2"
 	SparkService_CounterLeafSwapV2_FullMethodName                   = "/spark.SparkService/counter_leaf_swap_v2"
 	SparkService_StartTransferV2_FullMethodName                     = "/spark.SparkService/start_transfer_v2"
@@ -161,6 +162,7 @@ type SparkServiceClient interface {
 	ClaimTransferSignRefundsV2(ctx context.Context, in *ClaimTransferSignRefundsRequest, opts ...grpc.CallOption) (*ClaimTransferSignRefundsResponse, error)
 	FinalizeNodeSignaturesV2(ctx context.Context, in *FinalizeNodeSignaturesRequest, opts ...grpc.CallOption) (*FinalizeNodeSignaturesResponse, error)
 	InitiatePreimageSwapV2(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
+	InitiatePreimageSwapV3(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	StartLeafSwapV2(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error)
 	CounterLeafSwapV2(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error)
 	StartTransferV2(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error)
@@ -684,6 +686,16 @@ func (c *sparkServiceClient) InitiatePreimageSwapV2(ctx context.Context, in *Ini
 	return out, nil
 }
 
+func (c *sparkServiceClient) InitiatePreimageSwapV3(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InitiatePreimageSwapResponse)
+	err := c.cc.Invoke(ctx, SparkService_InitiatePreimageSwapV3_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sparkServiceClient) StartLeafSwapV2(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(StartTransferResponse)
@@ -837,6 +849,7 @@ type SparkServiceServer interface {
 	ClaimTransferSignRefundsV2(context.Context, *ClaimTransferSignRefundsRequest) (*ClaimTransferSignRefundsResponse, error)
 	FinalizeNodeSignaturesV2(context.Context, *FinalizeNodeSignaturesRequest) (*FinalizeNodeSignaturesResponse, error)
 	InitiatePreimageSwapV2(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
+	InitiatePreimageSwapV3(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	StartLeafSwapV2(context.Context, *StartTransferRequest) (*StartTransferResponse, error)
 	CounterLeafSwapV2(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error)
 	StartTransferV2(context.Context, *StartTransferRequest) (*StartTransferResponse, error)
@@ -1003,6 +1016,9 @@ func (UnimplementedSparkServiceServer) FinalizeNodeSignaturesV2(context.Context,
 }
 func (UnimplementedSparkServiceServer) InitiatePreimageSwapV2(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InitiatePreimageSwapV2 not implemented")
+}
+func (UnimplementedSparkServiceServer) InitiatePreimageSwapV3(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method InitiatePreimageSwapV3 not implemented")
 }
 func (UnimplementedSparkServiceServer) StartLeafSwapV2(context.Context, *StartTransferRequest) (*StartTransferResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartLeafSwapV2 not implemented")
@@ -1921,6 +1937,24 @@ func _SparkService_InitiatePreimageSwapV2_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_InitiatePreimageSwapV3_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitiatePreimageSwapRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).InitiatePreimageSwapV3(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_InitiatePreimageSwapV3_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).InitiatePreimageSwapV3(ctx, req.(*InitiatePreimageSwapRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SparkService_StartLeafSwapV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StartTransferRequest)
 	if err := dec(in); err != nil {
@@ -2245,6 +2279,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "initiate_preimage_swap_v2",
 			Handler:    _SparkService_InitiatePreimageSwapV2_Handler,
+		},
+		{
+			MethodName: "initiate_preimage_swap_v3",
+			Handler:    _SparkService_InitiatePreimageSwapV3_Handler,
 		},
 		{
 			MethodName: "start_leaf_swap_v2",
