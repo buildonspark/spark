@@ -61,11 +61,7 @@ func GetLeafDenominationCounts(ctx context.Context, req *pb.GetLeafDenominationC
 }
 
 // Marks exiting nodes and their children with a proper status and confirmation height in batch update query to the DB.
-// It takes a list of confirmed in a bitcoin block txids and sends it to Postgres to update the tree nodes that have those txids.
-//
-// Each query sends a list of txids to the DB with the length up to 5000 items, amounting to up to 1Mb for the largest query.
-// This should not be a problem for the DB, but one possible optimization is to load the txids to a memory table in the DB
-// and then join it into the queries.
+// It takes a list of confirmed in a bitcoin block transaction id hashes and sends it to Postgres to update the tree nodes that have those txids.
 func MarkExitingNodes(ctx context.Context, dbTx *ent.Tx, confirmedTxHashSet map[[32]byte]bool, blockHeight int64) error {
 	logger := logging.GetLoggerFromContext(ctx)
 

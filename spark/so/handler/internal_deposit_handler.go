@@ -470,7 +470,7 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 			return nil, fmt.Errorf("unable to load leaves: %w", err)
 		}
 		totalAmount = getTotalTransferValue(leaves)
-		if err = validateUserSignature(receiverIDPubKey, req.UserSignature, req.SspSignature, req.RequestType, network, targetUtxo.Txid, targetUtxo.Vout, totalAmount); err != nil {
+		if err = validateUserSignature(receiverIDPubKey, req.UserSignature, req.SspSignature, req.RequestType, network, hex.EncodeToString(targetUtxo.Txid), targetUtxo.Vout, totalAmount); err != nil {
 			return nil, fmt.Errorf("user signature validation failed: %w", err)
 		}
 
@@ -498,7 +498,7 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 			spendTxSighash,
 			req.RequestType,
 			network,
-			targetUtxo.Txid,
+			hex.EncodeToString(targetUtxo.Txid),
 			targetUtxo.Vout,
 			totalAmount); err != nil {
 			return nil, fmt.Errorf("user signature validation failed: %w", err)
@@ -582,17 +582,13 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 	return &pbinternal.CreateUtxoSwapResponse{UtxoDepositAddress: depositAddress.Address}, nil
 }
 
-func ValidateUtxoIsNotSpent(bitcoinClient *rpcclient.Client, txid []byte, vout uint32) error {
-	txidHash, err := chainhash.NewHash(txid)
-	if err != nil {
-		return fmt.Errorf("failed to create txid hash: %w", err)
-	}
-	txOut, err := bitcoinClient.GetTxOut(txidHash, vout, true)
+func ValidateUtxoIsNotSpent(bitcoinClient *rpcclient.Client, txidHash chainhash.Hash, vout uint32) error {
+	txOut, err := bitcoinClient.GetTxOut(&txidHash, vout, true)
 	if err != nil {
 		return fmt.Errorf("failed to call gettxout: %w", err)
 	}
 	if txOut == nil {
-		return fmt.Errorf("utxo is spent on blockchain: %s:%d", hex.EncodeToString(txidHash[:]), vout)
+		return fmt.Errorf("utxo is spent on blockchain: %s:%d", txidHash.String(), vout)
 	}
 	return nil
 }
@@ -616,13 +612,13 @@ func validateTransfer(transferRequest *pb.StartTransferRequest) error {
 }
 
 // validateUserSignature verifies that the user has authorized the UTXO swap by validating their signature.
-func validateUserSignature(userIdentityPubKey keys.Public, userSignature []byte, sspSignature []byte, requestType pb.UtxoSwapRequestType, network common.Network, txid []byte, vout uint32, totalAmount uint64) error {
+func validateUserSignature(userIdentityPubKey keys.Public, userSignature []byte, sspSignature []byte, requestType pb.UtxoSwapRequestType, network common.Network, txIdString string, vout uint32, totalAmount uint64) error {
 	if len(userSignature) == 0 {
 		return fmt.Errorf("user signature is required")
 	}
 
 	// Create user statement to authorize the UTXO swap
-	messageHash := CreateUserStatement(hex.EncodeToString(txid), vout, network, requestType, totalAmount, sspSignature)
+	messageHash := CreateUserStatement(txIdString, vout, network, requestType, totalAmount, sspSignature)
 	return common.VerifyECDSASignature(userIdentityPubKey, userSignature, messageHash)
 }
 

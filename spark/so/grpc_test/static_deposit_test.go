@@ -34,13 +34,8 @@ func TestValidateUtxoIsNotSpent(t *testing.T) {
 	// Test with faucet transaction
 	coin, err := faucet.Fund()
 	require.NoError(t, err)
-	txidString := hex.EncodeToString(coin.OutPoint.Hash[:])
-	txIDBytes, err := hex.DecodeString(txidString)
+	err = handler.ValidateUtxoIsNotSpent(bitcoinClient, coin.OutPoint.Hash, 0)
 	require.NoError(t, err)
-	err = handler.ValidateUtxoIsNotSpent(bitcoinClient, txIDBytes, 0)
-	if err != nil {
-		t.Fatalf("utxo is spent: %v, txid: %s", err, txidString)
-	}
 
 	// Spend the faucet transaction and test with a new one
 	randomKey := keys.GeneratePrivateKey()
@@ -65,11 +60,11 @@ func TestValidateUtxoIsNotSpent(t *testing.T) {
 	require.NoError(t, err)
 
 	// faucet coin is spent
-	err = handler.ValidateUtxoIsNotSpent(bitcoinClient, txIDBytes, 0)
+	err = handler.ValidateUtxoIsNotSpent(bitcoinClient, coin.OutPoint.Hash, 0)
 	require.Error(t, err)
 
 	// deposit tx is not spent
-	err = handler.ValidateUtxoIsNotSpent(bitcoinClient, newTxID[:], 0)
+	err = handler.ValidateUtxoIsNotSpent(bitcoinClient, *newTxID, 0)
 	require.NoError(t, err)
 }
 
@@ -344,7 +339,7 @@ func TestStaticDepositSSPLegacy(t *testing.T) {
 	sparkInternalClient := pbinternal.NewSparkInternalServiceClient(sspConn)
 	rollbackUtxoSwapRequestMessageHash, err := handler.CreateUtxoSwapStatement(
 		handler.UtxoSwapStatementTypeRollback,
-		hex.EncodeToString(depositOutPoint.Hash[:]),
+		depositOutPoint.Hash.String(),
 		depositOutPoint.Index,
 		common.Regtest,
 	)
@@ -518,7 +513,7 @@ func TestStaticDepositUserRefundLegacy(t *testing.T) {
 	sparkInternalClient := pbinternal.NewSparkInternalServiceClient(aliceConn)
 	rollbackUtxoSwapRequestMessageHash, err := handler.CreateUtxoSwapStatement(
 		handler.UtxoSwapStatementTypeRollback,
-		hex.EncodeToString(depositOutPoint.Hash[:]),
+		depositOutPoint.Hash.String(),
 		depositOutPoint.Index,
 		common.Regtest,
 	)
@@ -776,7 +771,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 		sparkInternalClient := pbinternal.NewSparkInternalServiceClient(aliceConn)
 		rollbackUtxoSwapRequestMessageHash, err := handler.CreateUtxoSwapStatement(
 			handler.UtxoSwapStatementTypeRollback,
-			hex.EncodeToString(depositOutPoint.Hash[:]),
+			depositOutPoint.Hash.String(),
 			depositOutPoint.Index,
 			common.Regtest,
 		)

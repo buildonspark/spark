@@ -599,9 +599,9 @@ func handleBlock(
 			continue
 		}
 		if _, ok := confirmedTxHashSet[[32]byte(tree.BaseTxid)]; !ok {
-			logger.Sugar().Debugf("Base txid %s not found in confirmed txids", hex.EncodeToString(tree.BaseTxid))
+			logger.Sugar().Debugf("Base txid %s not found in confirmed txids", chainhash.Hash(tree.BaseTxid).String())
 			for txid := range confirmedTxHashSet {
-				logger.Sugar().Debugf("Found confirmed txid %s", hex.EncodeToString(txid[:]))
+				logger.Sugar().Debugf("Found confirmed txid %s", chainhash.Hash(txid).String())
 			}
 			continue
 		}
@@ -669,12 +669,16 @@ func storeStaticDeposits(ctx context.Context, dbTx *ent.Tx, creditedAddresses []
 	for _, address := range staticDepositAddresses {
 		if utxos, ok := addressToUtxoMap[address.Address]; ok {
 			for _, utxo := range utxos {
-				txidBytes, err := hex.DecodeString(utxo.tx.TxID())
+				// Convert transaction ID string to bytes for storage.
+				// Note: Bitcoin transaction IDs are displayed as hex strings with reversed byte order,
+				// but we convert it to the byte representation in the database for faster lookup
+				// while keeping the reversed byte order.
+				txidStringBytes, err := hex.DecodeString(utxo.tx.TxID())
 				if err != nil {
 					return fmt.Errorf("unable to decode txid for a new utxo: %w", err)
 				}
 				err = dbTx.Utxo.Create().
-					SetTxid(txidBytes).
+					SetTxid(txidStringBytes).
 					SetVout(utxo.idx).
 					SetAmount(utxo.amount).
 					SetPkScript(utxo.tx.TxOut[utxo.idx].PkScript).
@@ -690,7 +694,7 @@ func storeStaticDeposits(ctx context.Context, dbTx *ent.Tx, creditedAddresses []
 				logger.Sugar().Debugf(
 					"Stored an L1 utxo to a static deposit address %s (txid: %x, vout: %s, amount: %s)",
 					address.Address,
-					txidBytes,
+					utxo.tx.TxID(),
 					utxo.idx,
 					utxo.amount,
 				)

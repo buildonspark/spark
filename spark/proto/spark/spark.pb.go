@@ -1422,7 +1422,8 @@ type UTXO struct {
 	Vout uint32 `protobuf:"varint,2,opt,name=vout,proto3" json:"vout,omitempty"`
 	// The network of the bitcoin network. Required.
 	Network Network `protobuf:"varint,3,opt,name=network,proto3,enum=spark.Network" json:"network,omitempty"`
-	// Transaction ID. Required, but older code may not provide it.
+	// Transaction Id string, produced from transaction hash by reversing the bytes,
+	// converted to bytes. Required, but older code may not provide it.
 	Txid          []byte `protobuf:"bytes,4,opt,name=txid,proto3" json:"txid,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

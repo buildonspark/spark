@@ -265,7 +265,8 @@ message UTXO {
     uint32 vout = 2;
     // The network of the bitcoin network. Required.
     Network network = 3 [(validate.rules).enum = {not_in: [0]}];
-    // Transaction ID. Required, but older code may not provide it.
+    // Transaction Id string, produced from transaction hash by reversing the bytes,
+    // converted to bytes. Required, but older code may not provide it.
     bytes txid = 4;
 }
 

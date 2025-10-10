@@ -39,7 +39,6 @@ func TestValidateUserSignature(t *testing.T) {
 	// Create test data
 	network := common.Regtest
 	txidStr := "378dd9b575ef72e28f0addbf6c1f4371d1f33b96ffc9aa9c74fb52b31ec7147d"
-	txID, err := hex.DecodeString(txidStr)
 	require.NoError(t, err)
 	vout := uint32(1)
 	sspSignature := "304502210080012f5565ff92bceb130d793eedd5eb7516ca16e21cb4eaa19a238a412679a10220367f78f4de21d377f61c6970968d5af52959d8df3c312878ac7af422e4a0245e"
@@ -101,7 +100,7 @@ func TestValidateUserSignature(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateUserSignature(tt.userPubKey, tt.userSignature, tt.sspSignature, pb.UtxoSwapRequestType_Fixed, network, txID, vout, tt.totalAmount)
+			err := validateUserSignature(tt.userPubKey, tt.userSignature, tt.sspSignature, pb.UtxoSwapRequestType_Fixed, network, txidStr, vout, tt.totalAmount)
 			if tt.expectedErrMsg == "" {
 				require.NoError(t, err)
 			} else {
@@ -236,7 +235,7 @@ func FuzzValidateUserSignature(f *testing.F) {
 		var userIdentityPublicKey keys.Public
 		var userSignature []byte
 		var sspSignature []byte
-		var txid []byte
+		var txidStr string
 
 		// Try to decode private key to get public key (if valid)
 		if len(privKeyHex) > 0 {
@@ -271,11 +270,11 @@ func FuzzValidateUserSignature(f *testing.F) {
 
 		// Try to decode txid
 		if len(txidHex) > 0 {
-			if decoded, err := hex.DecodeString(string(txidHex)); err == nil {
-				txid = decoded
+			if _, err := hex.DecodeString(string(txidHex)); err == nil {
+				txidStr = string(txidHex)
 			} else {
 				// Use raw bytes if hex decode fails
-				txid = txidHex
+				txidStr = hex.EncodeToString(txidHex)
 			}
 		}
 
@@ -308,12 +307,12 @@ func FuzzValidateUserSignature(f *testing.F) {
 		defer func() {
 			if r := recover(); r != nil {
 				t.Errorf("validateUserSignature panicked with input: userPubKey=%x, userSig=%x, sspSig=%x, requestType=%v, network=%v, txid=%x, vout=%d, amount=%d. Panic: %v",
-					userIdentityPublicKey, userSignature, sspSignature, requestType, network, txid, vout, totalAmount, r)
+					userIdentityPublicKey, userSignature, sspSignature, requestType, network, txidStr, vout, totalAmount, r)
 			}
 		}()
 
 		// Call the function - it may return an error but should not panic
-		err := validateUserSignature(userIdentityPublicKey, userSignature, sspSignature, requestType, network, txid, vout, totalAmount)
+		err := validateUserSignature(userIdentityPublicKey, userSignature, sspSignature, requestType, network, txidStr, vout, totalAmount)
 
 		// We don't assert specific error conditions since we're fuzzing with random data
 		// The main goal is to ensure no panics occur and the function handles all inputs gracefully
@@ -327,7 +326,7 @@ func FuzzValidateUserSignature(f *testing.F) {
 		}
 
 		// If we have valid-looking inputs, we can perform some additional checks
-		if !userIdentityPublicKey.IsZero() && len(userSignature) > 0 && len(sspSignature) > 0 && len(txid) == 32 {
+		if !userIdentityPublicKey.IsZero() && len(userSignature) > 0 && len(sspSignature) > 0 && len(txidStr) == 32 {
 			// These look like valid inputs, so function should at least parse them
 			// Even if signature verification fails, parsing should succeed
 			if err != nil {
