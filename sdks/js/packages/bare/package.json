@@ -28,7 +28,8 @@
           "default": "./dist/index.cjs"
         }
       }
-    }
+    },
+    "./package": "./package.json"
   },
   "scripts": {
     "build": "yarn tsc && rm -rf dist && tsup",
