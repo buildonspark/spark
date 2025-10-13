@@ -172,19 +172,19 @@ func (h *GossipHandler) handleDepositCleanupGossipMessage(ctx context.Context, r
 	}
 
 	// b) Get the count of all tree nodes excluding those that have been extended
-	nonSplitLockedCount := 0
+	nonSplitLeafCount := 0
 	for _, node := range treeNodes {
 		if node.Status != st.TreeNodeStatusSplitted && node.Status != st.TreeNodeStatusSplitLocked {
-			nonSplitLockedCount++
+			nonSplitLeafCount++
 		}
 	}
 
 	// c) Throw an error if this count > 1
-	if nonSplitLockedCount > 1 {
+	if nonSplitLeafCount > 1 {
 		logger.Sugar().Errorf(
 			"Expected at most 1 tree node for tree %s excluding extended leaves (got: %d)",
 			req.TreeId,
-			nonSplitLockedCount,
+			nonSplitLeafCount,
 		)
 		return
 	}
