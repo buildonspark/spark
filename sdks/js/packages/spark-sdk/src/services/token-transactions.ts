@@ -44,8 +44,8 @@ import { WalletConfigService } from "./config.js";
 import { ConnectionManager } from "./connection/connection.js";
 import { SigningOperator } from "./wallet-config.js";
 
-const MAX_TOKEN_OUTPUTS = 500;
 const QUERY_TOKEN_OUTPUTS_PAGE_SIZE = 100;
+export const MAX_TOKEN_OUTPUTS_TX = 500;
 
 export interface FetchOwnedTokenOutputsParams {
   ownerPublicKeys: Uint8Array[];
@@ -134,7 +134,7 @@ export class TokenTransactionService {
       );
     }
 
-    if (outputsToUse.length > MAX_TOKEN_OUTPUTS) {
+    if (outputsToUse.length > MAX_TOKEN_OUTPUTS_TX) {
       const availableOutputs = tokenOutputs.get(tokenIdentifier)!!;
 
       // Sort outputs by the same strategy as in selectTokenOutputs
@@ -142,15 +142,15 @@ export class TokenTransactionService {
       this.sortTokenOutputsByStrategy(sortedOutputs, outputSelectionStrategy);
 
       // Take only the first MAX_TOKEN_OUTPUTS and calculate their total
-      const maxOutputsToUse = sortedOutputs.slice(0, MAX_TOKEN_OUTPUTS);
+      const maxOutputsToUse = sortedOutputs.slice(0, MAX_TOKEN_OUTPUTS_TX);
       const maxAmount = sumAvailableTokens(maxOutputsToUse);
 
       throw new ValidationError(
-        `Cannot transfer more than ${MAX_TOKEN_OUTPUTS} TTXOs in a single transaction (${outputsToUse.length} selected). Maximum transferable amount is: ${maxAmount}`,
+        `Cannot transfer more than ${MAX_TOKEN_OUTPUTS_TX} TTXOs in a single transaction (${outputsToUse.length} selected). Maximum transferable amount is: ${maxAmount}`,
         {
           field: "outputsToUse",
           value: outputsToUse.length,
-          expected: `Less than or equal to ${MAX_TOKEN_OUTPUTS}, with maximum transferable amount of ${maxAmount}`,
+          expected: `Less than or equal to ${MAX_TOKEN_OUTPUTS_TX}, with maximum transferable amount of ${maxAmount}`,
         },
       );
     }

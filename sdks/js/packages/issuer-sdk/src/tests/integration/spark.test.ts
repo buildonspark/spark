@@ -1206,5 +1206,195 @@ describe.each(TEST_CONFIGS)(
       ).balance;
       expect(issuerTokenBalanceAfterBurn).toEqual(initialBalance);
     });
+
+    it("should consolidate token outputs using optimizeTokenOutputs", async () => {
+      const totalAmount = 10000n;
+      const smallTransferAmount = 10n;
+
+      const { wallet: issuerWallet } =
+        await IssuerSparkWalletTesting.initialize({
+          options: config,
+        });
+
+      const { wallet: userWallet } = await SparkWalletTesting.initialize({
+        options: config,
+      });
+
+      // Create token and mint a large amount
+      await issuerWallet.createToken({
+        tokenName: `${name}OPT`,
+        tokenTicker: "OPT",
+        decimals: 0,
+        isFreezable: false,
+        maxSupply: 1_000_000n,
+      });
+
+      await issuerWallet.mintTokens(totalAmount);
+      const tokenIdentifier = await issuerWallet.getIssuerTokenIdentifier();
+      expect(tokenIdentifier).toBeDefined();
+
+      const userSparkAddress = await userWallet.getSparkAddress();
+      const issuerSparkAddress = await issuerWallet.getSparkAddress();
+
+      // Use batch transfer to create many small outputs in a single transaction
+      // First, send 60 small amounts to the user wallet (creates 60 outputs for user)
+      const transfersToUser = Array.from({ length: 60 }, () => ({
+        tokenIdentifier: tokenIdentifier!,
+        tokenAmount: smallTransferAmount,
+        receiverSparkAddress: userSparkAddress,
+      }));
+
+      await issuerWallet.batchTransferTokens(transfersToUser);
+
+      // Then, have the user send them back in 60 small amounts (creates 60 outputs for issuer)
+      const transfersToIssuer = Array.from({ length: 60 }, () => ({
+        tokenIdentifier: tokenIdentifier!,
+        tokenAmount: smallTransferAmount,
+        receiverSparkAddress: issuerSparkAddress,
+      }));
+
+      await userWallet.batchTransferTokens(transfersToIssuer);
+
+      // Get balance before optimization
+      const balanceBeforeOptimization =
+        await issuerWallet.getIssuerTokenBalance();
+      expect(balanceBeforeOptimization.balance).toBe(totalAmount);
+
+      // Check number of outputs before optimization
+      // After minting: 1 output of 10000n
+      // After sending 60 * 10n = 600n: 1 change output of 9400n
+      // After receiving 60 * 10n back: 1 + 60 = 61 outputs
+      const outputsBeforeOptimization = (issuerWallet as any).tokenOutputs.get(
+        tokenIdentifier,
+      );
+      expect(outputsBeforeOptimization).toBeDefined();
+      expect(outputsBeforeOptimization.length).toBe(61);
+
+      // Run optimization
+      await issuerWallet.optimizeTokenOutputs();
+
+      // Sync to get updated outputs
+      await (issuerWallet as any).syncTokenOutputs();
+
+      // Get balance after optimization - should remain the same
+      const balanceAfterOptimization =
+        await issuerWallet.getIssuerTokenBalance();
+      expect(balanceAfterOptimization.balance).toBe(totalAmount);
+
+      // Check that outputs were consolidated into a single output
+      const outputsAfterOptimization = (issuerWallet as any).tokenOutputs.get(
+        tokenIdentifier,
+      );
+      expect(outputsAfterOptimization).toBeDefined();
+      expect(outputsAfterOptimization.length).toBe(1);
+
+      // Verify wallet still functions correctly after optimization by doing a transfer
+      await issuerWallet.transferTokens({
+        tokenAmount: 100n,
+        tokenIdentifier: tokenIdentifier!,
+        receiverSparkAddress: userSparkAddress,
+      });
+
+      const userBalanceObj = await userWallet.getBalance();
+      const userBalance = filterTokenBalanceForTokenIdentifier(
+        userBalanceObj?.tokenBalances,
+        tokenIdentifier!,
+      );
+      expect(userBalance.balance).toBe(100n);
+    });
+
+    it("should prevent concurrent transactions from spending the same outputs using tokenOutputsLocks", async () => {
+      const tokenAmount: bigint = 1000n;
+      const transferAmount: bigint = 100n;
+
+      const { wallet: issuerWallet } =
+        await IssuerSparkWalletTesting.initialize({
+          options: config,
+        });
+
+      const { wallet: userWallet1 } = await SparkWalletTesting.initialize({
+        options: config,
+      });
+
+      const { wallet: userWallet2 } = await SparkWalletTesting.initialize({
+        options: config,
+      });
+
+      // Create token and mint
+      await issuerWallet.createToken({
+        tokenName: `${name}LOCK`,
+        tokenTicker: "LCK",
+        decimals: 0,
+        isFreezable: false,
+        maxSupply: 1_000_000n,
+      });
+
+      await issuerWallet.mintTokens(tokenAmount);
+      const tokenIdentifier = await issuerWallet.getIssuerTokenIdentifier();
+      expect(tokenIdentifier).toBeDefined();
+
+      const user1Address = await userWallet1.getSparkAddress();
+      const user2Address = await userWallet2.getSparkAddress();
+
+      // Get balance before concurrent transfers
+      const balanceBefore = await issuerWallet.getIssuerTokenBalance();
+      expect(balanceBefore.balance).toBe(tokenAmount);
+
+      // Attempt two concurrent transfers that would use the same output
+      // The lock mechanism should ensure only one succeeds
+      const transfer1Promise = issuerWallet.transferTokens({
+        tokenAmount: transferAmount,
+        tokenIdentifier: tokenIdentifier!,
+        receiverSparkAddress: user1Address,
+      });
+
+      const transfer2Promise = issuerWallet.transferTokens({
+        tokenAmount: transferAmount,
+        tokenIdentifier: tokenIdentifier!,
+        receiverSparkAddress: user2Address,
+      });
+
+      // Wait for both transfers to complete
+      const results = await Promise.allSettled([
+        transfer1Promise,
+        transfer2Promise,
+      ]);
+
+      // One should succeed and one should fail
+      const successCount = results.filter(
+        (result) => result.status === "fulfilled",
+      ).length;
+      const failureCount = results.filter(
+        (result) => result.status === "rejected",
+      ).length;
+
+      expect(successCount).toBe(1);
+      expect(failureCount).toBe(1);
+
+      // Verify that only one transfer went through
+      const balanceAfter = await issuerWallet.getIssuerTokenBalance();
+      expect(balanceAfter.balance).toBe(tokenAmount - transferAmount);
+
+      // Check that only one user received tokens
+      const user1BalanceObj = await userWallet1.getBalance();
+      const user1Balance = filterTokenBalanceForTokenIdentifier(
+        user1BalanceObj?.tokenBalances,
+        tokenIdentifier!,
+      );
+
+      const user2BalanceObj = await userWallet2.getBalance();
+      const user2Balance = filterTokenBalanceForTokenIdentifier(
+        user2BalanceObj?.tokenBalances,
+        tokenIdentifier!,
+      );
+
+      // Exactly one user should have received the tokens
+      const totalReceived = user1Balance.balance + user2Balance.balance;
+      expect(totalReceived).toBe(transferAmount);
+      expect(
+        user1Balance.balance === transferAmount ||
+          user2Balance.balance === transferAmount,
+      ).toBe(true);
+    });
   },
 );

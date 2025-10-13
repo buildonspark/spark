@@ -109,6 +109,12 @@ export type OptimizationOptions = {
   readonly multiplicity?: number;
 };
 
+export type TokenOptimizationOptions = {
+  readonly enabled?: boolean;
+  readonly intervalMs?: number;
+  readonly minOutputsThreshold?: number;
+};
+
 export type ConfigOptions = MayHaveSspClientOptions & {
   readonly network?: NetworkType;
   readonly signingOperators?: Readonly<Record<string, SigningOperator>>;
@@ -125,6 +131,7 @@ export type ConfigOptions = MayHaveSspClientOptions & {
   readonly console?: ConsoleOptions;
   readonly events?: Partial<SparkWalletEvents>;
   readonly optimizationOptions?: OptimizationOptions;
+  readonly tokenOptimizationOptions?: TokenOptimizationOptions;
 };
 
 const PROD_PUBKEYS = [
@@ -162,6 +169,11 @@ const BASE_CONFIG: Required<ConfigOptions> = {
   optimizationOptions: {
     auto: true,
     multiplicity: 1,
+  },
+  tokenOptimizationOptions: {
+    enabled: true,
+    intervalMs: 300000, // 5 minutes
+    minOutputsThreshold: 50,
   },
 };
 
