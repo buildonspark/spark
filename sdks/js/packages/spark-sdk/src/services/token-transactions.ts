@@ -653,30 +653,101 @@ export class TokenTransactionService {
       return [exactMatch];
     }
 
-    // Sort based on configured strategy
-    this.sortTokenOutputsByStrategy(tokenOutputs, strategy);
+    // Sort outputs: smallest first for SMALL_FIRST, largest first for LARGE_FIRST
+    const sortedOutputs = [...tokenOutputs].sort((a, b) => {
+      const amountA = bytesToNumberBE(a.output!.tokenAmount!);
+      const amountB = bytesToNumberBE(b.output!.tokenAmount!);
+      return strategy === "SMALL_FIRST"
+        ? Number(amountA - amountB)
+        : Number(amountB - amountA);
+    });
 
-    let remainingAmount = tokenAmount;
-    const selectedOutputs: typeof tokenOutputs = [];
+    // SMALL_FIRST strategy: Maximize use of small outputs while staying within MAX_OUTPUTS limit
+    if (strategy === "SMALL_FIRST") {
+      // First, try to use only the smallest outputs
+      let sum = 0n;
+      let count = 0;
+      for (const output of sortedOutputs) {
+        sum += bytesToNumberBE(output.output!.tokenAmount!);
+        count++;
+        if (sum >= tokenAmount) {
+          // We can reach the target with outputs
+          return sortedOutputs.slice(0, count);
+        }
+        if (count >= MAX_TOKEN_OUTPUTS_TX) break;
+      }
 
-    // Select outputs using a greedy approach
-    for (const outputWithPreviousTransactionData of tokenOutputs) {
-      if (remainingAmount <= 0n) break;
+      // If we've gone through all outputs and still don't have enough, check if we have more outputs available
+      if (count >= sortedOutputs.length) {
+        // No more outputs available - this should have been caught by the earlier check
+        throw new ValidationError("Insufficient funds", {
+          field: "tokenAmount",
+          value: sum,
+          expected: tokenAmount,
+        });
+      }
 
-      selectedOutputs.push(outputWithPreviousTransactionData);
-      remainingAmount -= bytesToNumberBE(
-        outputWithPreviousTransactionData.output!.tokenAmount!,
+      // If we reached MAX_OUTPUTS but don't have enough, we need to swap some small
+      // outputs for larger ones
+      const smallOutputs = sortedOutputs.slice(0, MAX_TOKEN_OUTPUTS_TX);
+      const largeOutputs = sortedOutputs.slice(MAX_TOKEN_OUTPUTS_TX).reverse(); // Largest first
+
+      let smallSum = smallOutputs.reduce(
+        (acc, output) => acc + bytesToNumberBE(output.output!.tokenAmount!),
+        0n,
       );
-    }
 
-    if (remainingAmount > 0n) {
-      throw new ValidationError("Insufficient funds", {
-        field: "remainingAmount",
-        value: remainingAmount,
-      });
-    }
+      const selectedOutputs = [...smallOutputs];
 
-    return selectedOutputs;
+      // While we haven't reached the target, swap the smallest output for a larger one
+      let largeIdx = 0;
+      while (smallSum < tokenAmount && largeIdx < largeOutputs.length) {
+        const largeOutput = largeOutputs[largeIdx]!;
+        const largeAmount = bytesToNumberBE(largeOutput.output!.tokenAmount!);
+
+        // Remove the smallest output from selection
+        const smallestOutput = selectedOutputs.shift()!;
+        const smallestAmount = bytesToNumberBE(
+          smallestOutput.output!.tokenAmount!,
+        );
+
+        selectedOutputs.push(largeOutput);
+
+        smallSum = smallSum - smallestAmount + largeAmount;
+        largeIdx++;
+      }
+
+      if (smallSum < tokenAmount) {
+        throw new ValidationError("Insufficient funds", {
+          field: "tokenAmount",
+          value: smallSum,
+          expected: tokenAmount,
+        });
+      }
+
+      return selectedOutputs;
+    } else {
+      // LARGE_FIRST strategy: simple greedy approach
+      const selectedOutputs: typeof sortedOutputs = [];
+      let remainingAmount = tokenAmount;
+
+      for (const output of sortedOutputs) {
+        if (remainingAmount <= 0n) break;
+        if (selectedOutputs.length >= MAX_TOKEN_OUTPUTS_TX) break;
+
+        selectedOutputs.push(output);
+        remainingAmount -= bytesToNumberBE(output.output!.tokenAmount!);
+      }
+
+      if (remainingAmount > 0n) {
+        throw new ValidationError("Insufficient funds", {
+          field: "remainingAmount",
+          value: remainingAmount,
+        });
+      }
+
+      return selectedOutputs;
+    }
   }
 
   private sortTokenOutputsByStrategy(

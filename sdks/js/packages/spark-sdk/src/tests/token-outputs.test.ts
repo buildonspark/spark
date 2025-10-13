@@ -219,7 +219,6 @@ describe("select token outputs", () => {
         createMockTokenOutput(`output${i}`, amount),
       );
 
-      // SMALL_FIRST
       const smallFirstSorted = [...tokenOutputs];
       sortTokenOutputsByStrategy(smallFirstSorted, "SMALL_FIRST");
 
@@ -234,7 +233,6 @@ describe("select token outputs", () => {
         base + 10000n,
       ]);
 
-      // LARGE_FIRST
       const largeFirstSorted = [...tokenOutputs];
       sortTokenOutputsByStrategy(largeFirstSorted, "LARGE_FIRST");
 
@@ -248,6 +246,137 @@ describe("select token outputs", () => {
         base + 100n,
         base + 1n,
       ]);
+    });
+  });
+
+  describe("500 output limit and swapping mechanism", () => {
+    it("should select smallest outputs when they fit within 500 limit", () => {
+      const tokenOutputs: OutputWithPreviousTransactionData[] = [];
+
+      for (let i = 0; i < 550; i++) {
+        tokenOutputs.push(createMockTokenOutput(`small${i}`, 1n));
+      }
+
+      for (let i = 0; i < 50; i++) {
+        tokenOutputs.push(createMockTokenOutput(`large${i}`, 1000n));
+      }
+
+      const result = tokenTransactionService.selectTokenOutputs(
+        tokenOutputs,
+        400n,
+        "SMALL_FIRST",
+      );
+
+      expect(result).toHaveLength(400);
+      result.forEach((output) => {
+        expect(output.output!.id).toMatch(/^small\d+$/);
+      });
+
+      const total = result.reduce(
+        (sum, output) => sum + bytesToNumberBE(output.output!.tokenAmount!),
+        0n,
+      );
+      expect(total).toBe(400n);
+    });
+
+    it("should swap small for large outputs when 500 small outputs are insufficient", () => {
+      const tokenOutputs: OutputWithPreviousTransactionData[] = [];
+
+      for (let i = 0; i < 500; i++) {
+        tokenOutputs.push(createMockTokenOutput(`small${i}`, 1n));
+      }
+
+      for (let i = 0; i < 20; i++) {
+        tokenOutputs.push(createMockTokenOutput(`large${i}`, 1000n));
+      }
+
+      const result = tokenTransactionService.selectTokenOutputs(
+        tokenOutputs,
+        1200n,
+        "SMALL_FIRST",
+      );
+
+      expect(result).toHaveLength(500);
+
+      const largeCount = result.filter((output) =>
+        output.output!.id!.startsWith("large"),
+      ).length;
+
+      expect(largeCount).toBeGreaterThan(0);
+
+      const total = result.reduce(
+        (sum, output) => sum + bytesToNumberBE(output.output!.tokenAmount!),
+        0n,
+      );
+      expect(total).toBeGreaterThanOrEqual(1200n);
+    });
+
+    it("should minimize large outputs used during swapping", () => {
+      const tokenOutputs: OutputWithPreviousTransactionData[] = [];
+
+      for (let i = 0; i < 500; i++) {
+        tokenOutputs.push(createMockTokenOutput(`small${i}`, 10n));
+      }
+
+      for (let i = 0; i < 50; i++) {
+        tokenOutputs.push(createMockTokenOutput(`large${i}`, 1000n));
+      }
+
+      const result = tokenTransactionService.selectTokenOutputs(
+        tokenOutputs,
+        5500n,
+        "SMALL_FIRST",
+      );
+
+      expect(result).toHaveLength(500);
+
+      const smallCount = result.filter((output) =>
+        output.output!.id!.startsWith("small"),
+      ).length;
+      const largeCount = result.filter((output) =>
+        output.output!.id!.startsWith("large"),
+      ).length;
+
+      expect(largeCount).toBe(1);
+      expect(smallCount).toBe(499);
+
+      const total = result.reduce(
+        (sum, output) => sum + bytesToNumberBE(output.output!.tokenAmount!),
+        0n,
+      );
+      expect(total).toBe(5990n);
+    });
+
+    it("should handle significant swapping when target is much larger than small outputs", () => {
+      const tokenOutputs: OutputWithPreviousTransactionData[] = [];
+
+      for (let i = 0; i < 500; i++) {
+        tokenOutputs.push(createMockTokenOutput(`small${i}`, 1n));
+      }
+
+      for (let i = 0; i < 100; i++) {
+        tokenOutputs.push(createMockTokenOutput(`large${i}`, 100n));
+      }
+
+      const result = tokenTransactionService.selectTokenOutputs(
+        tokenOutputs,
+        5000n,
+        "SMALL_FIRST",
+      );
+
+      expect(result).toHaveLength(500);
+
+      const largeCount = result.filter((output) =>
+        output.output!.id!.startsWith("large"),
+      ).length;
+
+      expect(largeCount).toBeGreaterThanOrEqual(45);
+
+      const total = result.reduce(
+        (sum, output) => sum + bytesToNumberBE(output.output!.tokenAmount!),
+        0n,
+      );
+      expect(total).toBeGreaterThanOrEqual(5000n);
     });
   });
 });
