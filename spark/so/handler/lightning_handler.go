@@ -1274,7 +1274,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.Transfer.TransferId, err)
 	}
-	_, err = db.PendingSendTransfer.Create().SetTransferID(transferUUID).SetStatus(st.PendingSendTransferStatusPending).Save(ctx)
+	_, err = ent.CreateOrResetPendingSendTransfer(ctx, transferUUID)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create pending send transfer: %w", err)
 	}
