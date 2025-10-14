@@ -31,7 +31,7 @@
     "@arethetypeswrong/cli": "^0.17.4",
     "@noble/curves": "^1.8.0",
     "@noble/secp256k1": "^2.3.0",
-    "bare": "^1.21.3",
+    "bare": "^1.23.3",
     "bare-crypto": "^1.9.2",
     "bare-fs": "^4.1.6",
     "bare-make": "^1.5.1",
