@@ -1,6 +1,7 @@
 package grpctest
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"math/big"
 	"math/rand/v2"
@@ -14,12 +15,16 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
-	"github.com/lightsparkdev/spark/proto/spark"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/objects"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const amountSatsToSend = 100_000
@@ -70,7 +75,7 @@ func TestTransfer(t *testing.T) {
 	require.Len(t, pendingTransfer.Transfers, 1)
 	receiverTransfer := pendingTransfer.Transfers[0]
 	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-	require.Equal(t, spark.TransferType_TRANSFER, receiverTransfer.Type)
+	require.Equal(t, pb.TransferType_TRANSFER, receiverTransfer.Type)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
@@ -189,7 +194,7 @@ func TestTransferInterrupt(t *testing.T) {
 	require.Len(t, pendingTransfer.Transfers, 1)
 	receiverTransfer := pendingTransfer.Transfers[0]
 	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-	require.Equal(t, spark.TransferType_TRANSFER, receiverTransfer.Type)
+	require.Equal(t, pb.TransferType_TRANSFER, receiverTransfer.Type)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
@@ -218,7 +223,7 @@ func TestTransferInterrupt(t *testing.T) {
 	require.NoError(t, err, "failed to enable operator 1")
 
 	attempts := 0
-	var claimedNodes []*spark.TreeNode
+	var claimedNodes []*pb.TreeNode
 
 	// In theory we should be able to claim right away, but in practice, depending on the state of
 	// the SOs, it may take a few attempts for it to get back to the right state. Since changing the
@@ -230,7 +235,7 @@ func TestTransferInterrupt(t *testing.T) {
 
 		receiverTransfer = pendingTransfer.Transfers[0]
 		require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-		require.Equal(t, spark.TransferType_TRANSFER, receiverTransfer.Type)
+		require.Equal(t, pb.TransferType_TRANSFER, receiverTransfer.Type)
 
 		res, err := wallet.ClaimTransfer(receiverCtx, receiverTransfer, receiverConfig, leavesToClaim[:])
 		if err != nil {
@@ -283,7 +288,7 @@ func TestTransferRecoverFinalizeSignatures(t *testing.T) {
 	require.Len(t, pendingTransfer.Transfers, 1)
 	receiverTransfer := pendingTransfer.Transfers[0]
 	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
-	require.Equal(t, spark.TransferType_TRANSFER, receiverTransfer.Type)
+	require.Equal(t, pb.TransferType_TRANSFER, receiverTransfer.Type)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
 	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
@@ -721,22 +726,22 @@ func TestQueryTransfers(t *testing.T) {
 	require.NoError(t, err, "failed to QueryAllTransfers")
 	require.Len(t, transfers, 2)
 
-	typeCounts := make(map[spark.TransferType]int)
+	typeCounts := make(map[pb.TransferType]int)
 	for _, transfer := range transfers {
 		typeCounts[transfer.Type]++
 	}
-	assert.Equal(t, 1, typeCounts[spark.TransferType_TRANSFER], "expected 1 transfer")
-	assert.Equal(t, 1, typeCounts[spark.TransferType_COUNTER_SWAP], "expected 1 counter swap transfer")
+	assert.Equal(t, 1, typeCounts[pb.TransferType_TRANSFER], "expected 1 transfer")
+	assert.Equal(t, 1, typeCounts[pb.TransferType_COUNTER_SWAP], "expected 1 counter swap transfer")
 
-	transfers, _, err = wallet.QueryAllTransfersWithTypes(t.Context(), senderConfig, 2, 0, []spark.TransferType{spark.TransferType_TRANSFER})
+	transfers, _, err = wallet.QueryAllTransfersWithTypes(t.Context(), senderConfig, 2, 0, []pb.TransferType{pb.TransferType_TRANSFER})
 	require.NoError(t, err)
 	assert.Len(t, transfers, 1)
 
-	transfers, _, err = wallet.QueryAllTransfersWithTypes(t.Context(), senderConfig, 2, 0, []spark.TransferType{spark.TransferType_COUNTER_SWAP})
+	transfers, _, err = wallet.QueryAllTransfersWithTypes(t.Context(), senderConfig, 2, 0, []pb.TransferType{pb.TransferType_COUNTER_SWAP})
 	require.NoError(t, err)
 	assert.Len(t, transfers, 1)
 
-	transfers, _, err = wallet.QueryAllTransfersWithTypes(t.Context(), senderConfig, 3, 0, []spark.TransferType{spark.TransferType_TRANSFER, spark.TransferType_COUNTER_SWAP})
+	transfers, _, err = wallet.QueryAllTransfersWithTypes(t.Context(), senderConfig, 3, 0, []pb.TransferType{pb.TransferType_TRANSFER, pb.TransferType_COUNTER_SWAP})
 	require.NoError(t, err)
 	assert.Len(t, transfers, 2)
 }
@@ -1497,7 +1502,7 @@ func testTransferWithInvoice(t *testing.T, invoice string, senderPrivKey keys.Pr
 	// With deterministic private key generation, when the test is retried on failure,
 	// transfers from the previous failed run will come back as a pending transfer.
 	// Find the one that matches this run so we can pass retry.
-	var receiverTransfer *spark.Transfer
+	var receiverTransfer *pb.Transfer
 	for _, t := range pendingTransfer.Transfers {
 		if t.Id == senderTransfer.Id {
 			receiverTransfer = t
@@ -1505,7 +1510,7 @@ func testTransferWithInvoice(t *testing.T, invoice string, senderPrivKey keys.Pr
 		}
 	}
 	require.NotNil(t, receiverTransfer)
-	require.Equal(t, spark.TransferType_TRANSFER, receiverTransfer.Type)
+	require.Equal(t, pb.TransferType_TRANSFER, receiverTransfer.Type)
 	require.Equal(t, invoice, receiverTransfer.GetSparkInvoice())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
@@ -1533,7 +1538,7 @@ func sendTransferWithInvoice(
 	invoice string,
 	senderPrivKey keys.Private,
 	receiverPrivKey keys.Private,
-) (senderTransfer *spark.Transfer, rootNode *spark.TreeNode, newLeafPrivKey keys.Private, err error) {
+) (senderTransfer *pb.Transfer, rootNode *pb.TreeNode, newLeafPrivKey keys.Private, err error) {
 	senderConfig := wallet.NewTestWalletConfigWithIdentityKey(t, senderPrivKey)
 
 	// Sender initiates transfer
@@ -1620,6 +1625,98 @@ func TestQuerySparkInvoicesForUnknownInvoiceReturnsNotFound(t *testing.T) {
 	require.NoError(t, err, "failed to query spark invoices")
 	require.Len(t, invoiceResponse.InvoiceStatuses, 1)
 	require.Equal(t, sparkpb.InvoiceStatus_NOT_FOUND, invoiceResponse.InvoiceStatuses[0].Status)
+}
+
+func TestTransferWithDirectFromCpfpRefundOnly(t *testing.T) {
+	// --- setup ---
+
+	config := wallet.NewTestWalletConfig(t)
+	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	// Deposit funds so that they can be transferred.
+	leafPrivKey := keys.GeneratePrivateKey()
+	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, amountSatsToSend)
+	require.NoError(t, err, "failed to create new tree")
+
+	receiverPrivKey := keys.GeneratePrivateKey()
+	// newLeafPrivKey := keys.GeneratePrivateKey()
+
+	// --- test ---
+	//
+	// Test that transfer works even when the direct from CPFP refund transaction
+	// is the only direct transaction passed.
+
+	sparkClient := pb.NewSparkServiceClient(conn)
+
+	// Create a direct from CPFP refund transaction
+	nodeTx, err := common.TxFromRawTxBytes(rootNode.NodeTx)
+	require.NoError(t, err)
+	nodeOutPoint := &wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0}
+
+	// Get the next sequence from the existing refund transaction
+	currRefundTx, err := common.TxFromRawTxBytes(rootNode.RefundTx)
+	require.NoError(t, err)
+	nextSequence, err := spark.NextSequence(currRefundTx.TxIn[0].Sequence)
+	require.NoError(t, err)
+
+	refundTx, directFromCpfpRefundTx, err := wallet.CreateRefundTxs(
+		nextSequence,
+		nodeOutPoint,
+		nodeTx.TxOut[0].Value,
+		receiverPrivKey.Public(),
+		true,
+	)
+	require.NoError(t, err)
+
+	response, err := sparkClient.StartTransfer(ctx, &pb.StartTransferRequest{
+		TransferId:                uuid.NewString(),
+		OwnerIdentityPublicKey:    config.IdentityPublicKey().Serialize(),
+		ReceiverIdentityPublicKey: receiverPrivKey.Public().Serialize(),
+		LeavesToSend: []*pb.LeafRefundTxSigningJob{
+			{
+				LeafId:                           rootNode.Id,
+				RefundTxSigningJob:               createSigningJobFromTx(t, leafPrivKey.Public(), refundTx),
+				DirectFromCpfpRefundTxSigningJob: createSigningJobFromTx(t, leafPrivKey.Public(), directFromCpfpRefundTx),
+			},
+		},
+		ExpiryTime: timestamppb.New(time.Now().Add(10 * time.Minute)),
+	})
+
+	require.NoError(t, err, "Expected StartTransfer to succeed with only direct from CPFP refund transaction")
+
+	// Verify that the response contains the expected signing results
+	require.Len(t, response.SigningResults, 1, "Expected exactly one signing result")
+	signingResult := response.SigningResults[0]
+	require.Equal(t, rootNode.Id, signingResult.LeafId, "Expected signing result for correct leaf")
+
+	// Verify that the regular refund tx signing result is present
+	require.NotNil(t, signingResult.RefundTxSigningResult, "Expected RefundTxSigningResult to be present")
+
+	// Verify that the direct from CPFP refund tx signing result is present (this is the new behavior)
+	require.NotNil(t, signingResult.DirectFromCpfpRefundTxSigningResult, "Expected DirectFromCpfpRefundTxSigningResult to be present when DirectFromCpfpRefundTxSigningJob is provided")
+}
+
+// TODO: remove in favor of signingJobFromTx (identical impl in an unmerged branch)
+func createSigningJobFromTx(t *testing.T, publicKey keys.Public, tx *wire.MsgTx) *pb.SigningJob {
+	var txBuf bytes.Buffer
+	require.NoError(t, tx.Serialize(&txBuf))
+
+	nonce, err := objects.RandomSigningNonce()
+	require.NoError(t, err)
+	nonceCommitmentProto, err := nonce.SigningCommitment().MarshalProto()
+	require.NoError(t, err)
+
+	return &pb.SigningJob{
+		RawTx:                  txBuf.Bytes(),
+		SigningPublicKey:       publicKey.Serialize(),
+		SigningNonceCommitment: nonceCommitmentProto,
+	}
 }
 
 func deterministicSeedFromTestName(testName string) [32]byte {
