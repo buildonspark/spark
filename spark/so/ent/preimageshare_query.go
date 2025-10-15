@@ -280,8 +280,9 @@ func (psq *PreimageShareQuery) Clone() *PreimageShareQuery {
 		predicates:          append([]predicate.PreimageShare{}, psq.predicates...),
 		withPreimageRequest: psq.withPreimageRequest.Clone(),
 		// clone intermediate query.
-		sql:  psq.sql.Clone(),
-		path: psq.path,
+		sql:       psq.sql.Clone(),
+		path:      psq.path,
+		modifiers: append([]func(*sql.Selector){}, psq.modifiers...),
 	}
 }
 
@@ -561,6 +562,12 @@ func (psq *PreimageShareQuery) ForShare(opts ...sql.LockOption) *PreimageShareQu
 	return psq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (psq *PreimageShareQuery) Modify(modifiers ...func(s *sql.Selector)) *PreimageShareSelect {
+	psq.modifiers = append(psq.modifiers, modifiers...)
+	return psq.Select()
+}
+
 // PreimageShareGroupBy is the group-by builder for PreimageShare entities.
 type PreimageShareGroupBy struct {
 	selector
@@ -649,4 +656,10 @@ func (pss *PreimageShareSelect) sqlScan(ctx context.Context, root *PreimageShare
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (pss *PreimageShareSelect) Modify(modifiers ...func(s *sql.Selector)) *PreimageShareSelect {
+	pss.modifiers = append(pss.modifiers, modifiers...)
+	return pss
 }

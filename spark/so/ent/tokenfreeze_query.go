@@ -279,8 +279,9 @@ func (tfq *TokenFreezeQuery) Clone() *TokenFreezeQuery {
 		predicates:      append([]predicate.TokenFreeze{}, tfq.predicates...),
 		withTokenCreate: tfq.withTokenCreate.Clone(),
 		// clone intermediate query.
-		sql:  tfq.sql.Clone(),
-		path: tfq.path,
+		sql:       tfq.sql.Clone(),
+		path:      tfq.path,
+		modifiers: append([]func(*sql.Selector){}, tfq.modifiers...),
 	}
 }
 
@@ -553,6 +554,12 @@ func (tfq *TokenFreezeQuery) ForShare(opts ...sql.LockOption) *TokenFreezeQuery 
 	return tfq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tfq *TokenFreezeQuery) Modify(modifiers ...func(s *sql.Selector)) *TokenFreezeSelect {
+	tfq.modifiers = append(tfq.modifiers, modifiers...)
+	return tfq.Select()
+}
+
 // TokenFreezeGroupBy is the group-by builder for TokenFreeze entities.
 type TokenFreezeGroupBy struct {
 	selector
@@ -641,4 +648,10 @@ func (tfs *TokenFreezeSelect) sqlScan(ctx context.Context, root *TokenFreezeQuer
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tfs *TokenFreezeSelect) Modify(modifiers ...func(s *sql.Selector)) *TokenFreezeSelect {
+	tfs.modifiers = append(tfs.modifiers, modifiers...)
+	return tfs
 }

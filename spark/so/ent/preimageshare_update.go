@@ -20,8 +20,9 @@ import (
 // PreimageShareUpdate is the builder for updating PreimageShare entities.
 type PreimageShareUpdate struct {
 	config
-	hooks    []Hook
-	mutation *PreimageShareMutation
+	hooks     []Hook
+	mutation  *PreimageShareMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the PreimageShareUpdate builder.
@@ -102,6 +103,12 @@ func (psu *PreimageShareUpdate) defaults() {
 	}
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (psu *PreimageShareUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *PreimageShareUpdate {
+	psu.modifiers = append(psu.modifiers, modifiers...)
+	return psu
+}
+
 func (psu *PreimageShareUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	_spec := sqlgraph.NewUpdateSpec(preimageshare.Table, preimageshare.Columns, sqlgraph.NewFieldSpec(preimageshare.FieldID, field.TypeUUID))
 	if ps := psu.mutation.predicates; len(ps) > 0 {
@@ -143,6 +150,7 @@ func (psu *PreimageShareUpdate) sqlSave(ctx context.Context) (n int, err error) 
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(psu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, psu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{preimageshare.Label}
@@ -158,9 +166,10 @@ func (psu *PreimageShareUpdate) sqlSave(ctx context.Context) (n int, err error) 
 // PreimageShareUpdateOne is the builder for updating a single PreimageShare entity.
 type PreimageShareUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *PreimageShareMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *PreimageShareMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -248,6 +257,12 @@ func (psuo *PreimageShareUpdateOne) defaults() {
 	}
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (psuo *PreimageShareUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *PreimageShareUpdateOne {
+	psuo.modifiers = append(psuo.modifiers, modifiers...)
+	return psuo
+}
+
 func (psuo *PreimageShareUpdateOne) sqlSave(ctx context.Context) (_node *PreimageShare, err error) {
 	_spec := sqlgraph.NewUpdateSpec(preimageshare.Table, preimageshare.Columns, sqlgraph.NewFieldSpec(preimageshare.FieldID, field.TypeUUID))
 	id, ok := psuo.mutation.ID()
@@ -306,6 +321,7 @@ func (psuo *PreimageShareUpdateOne) sqlSave(ctx context.Context) (_node *Preimag
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(psuo.modifiers...)
 	_node = &PreimageShare{config: psuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

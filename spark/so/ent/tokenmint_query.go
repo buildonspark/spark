@@ -280,8 +280,9 @@ func (tmq *TokenMintQuery) Clone() *TokenMintQuery {
 		predicates:           append([]predicate.TokenMint{}, tmq.predicates...),
 		withTokenTransaction: tmq.withTokenTransaction.Clone(),
 		// clone intermediate query.
-		sql:  tmq.sql.Clone(),
-		path: tmq.path,
+		sql:       tmq.sql.Clone(),
+		path:      tmq.path,
+		modifiers: append([]func(*sql.Selector){}, tmq.modifiers...),
 	}
 }
 
@@ -556,6 +557,12 @@ func (tmq *TokenMintQuery) ForShare(opts ...sql.LockOption) *TokenMintQuery {
 	return tmq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tmq *TokenMintQuery) Modify(modifiers ...func(s *sql.Selector)) *TokenMintSelect {
+	tmq.modifiers = append(tmq.modifiers, modifiers...)
+	return tmq.Select()
+}
+
 // TokenMintGroupBy is the group-by builder for TokenMint entities.
 type TokenMintGroupBy struct {
 	selector
@@ -644,4 +651,10 @@ func (tms *TokenMintSelect) sqlScan(ctx context.Context, root *TokenMintQuery, v
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tms *TokenMintSelect) Modify(modifiers ...func(s *sql.Selector)) *TokenMintSelect {
+	tms.modifiers = append(tms.modifiers, modifiers...)
+	return tms
 }

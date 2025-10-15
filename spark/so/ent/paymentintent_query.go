@@ -305,8 +305,9 @@ func (piq *PaymentIntentQuery) Clone() *PaymentIntentQuery {
 		withTransfer:         piq.withTransfer.Clone(),
 		withTokenTransaction: piq.withTokenTransaction.Clone(),
 		// clone intermediate query.
-		sql:  piq.sql.Clone(),
-		path: piq.path,
+		sql:       piq.sql.Clone(),
+		path:      piq.path,
+		modifiers: append([]func(*sql.Selector){}, piq.modifiers...),
 	}
 }
 
@@ -631,6 +632,12 @@ func (piq *PaymentIntentQuery) ForShare(opts ...sql.LockOption) *PaymentIntentQu
 	return piq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (piq *PaymentIntentQuery) Modify(modifiers ...func(s *sql.Selector)) *PaymentIntentSelect {
+	piq.modifiers = append(piq.modifiers, modifiers...)
+	return piq.Select()
+}
+
 // PaymentIntentGroupBy is the group-by builder for PaymentIntent entities.
 type PaymentIntentGroupBy struct {
 	selector
@@ -719,4 +726,10 @@ func (pis *PaymentIntentSelect) sqlScan(ctx context.Context, root *PaymentIntent
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (pis *PaymentIntentSelect) Modify(modifiers ...func(s *sql.Selector)) *PaymentIntentSelect {
+	pis.modifiers = append(pis.modifiers, modifiers...)
+	return pis
 }

@@ -280,8 +280,9 @@ func (edkq *EntityDkgKeyQuery) Clone() *EntityDkgKeyQuery {
 		predicates:          append([]predicate.EntityDkgKey{}, edkq.predicates...),
 		withSigningKeyshare: edkq.withSigningKeyshare.Clone(),
 		// clone intermediate query.
-		sql:  edkq.sql.Clone(),
-		path: edkq.path,
+		sql:       edkq.sql.Clone(),
+		path:      edkq.path,
+		modifiers: append([]func(*sql.Selector){}, edkq.modifiers...),
 	}
 }
 
@@ -561,6 +562,12 @@ func (edkq *EntityDkgKeyQuery) ForShare(opts ...sql.LockOption) *EntityDkgKeyQue
 	return edkq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (edkq *EntityDkgKeyQuery) Modify(modifiers ...func(s *sql.Selector)) *EntityDkgKeySelect {
+	edkq.modifiers = append(edkq.modifiers, modifiers...)
+	return edkq.Select()
+}
+
 // EntityDkgKeyGroupBy is the group-by builder for EntityDkgKey entities.
 type EntityDkgKeyGroupBy struct {
 	selector
@@ -649,4 +656,10 @@ func (edks *EntityDkgKeySelect) sqlScan(ctx context.Context, root *EntityDkgKeyQ
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (edks *EntityDkgKeySelect) Modify(modifiers ...func(s *sql.Selector)) *EntityDkgKeySelect {
+	edks.modifiers = append(edks.modifiers, modifiers...)
+	return edks
 }

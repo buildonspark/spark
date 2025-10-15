@@ -18,8 +18,9 @@ import (
 // SigningNonceUpdate is the builder for updating SigningNonce entities.
 type SigningNonceUpdate struct {
 	config
-	hooks    []Hook
-	mutation *SigningNonceMutation
+	hooks     []Hook
+	mutation  *SigningNonceMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the SigningNonceUpdate builder.
@@ -99,6 +100,12 @@ func (snu *SigningNonceUpdate) defaults() {
 	}
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (snu *SigningNonceUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *SigningNonceUpdate {
+	snu.modifiers = append(snu.modifiers, modifiers...)
+	return snu
+}
+
 func (snu *SigningNonceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	_spec := sqlgraph.NewUpdateSpec(signingnonce.Table, signingnonce.Columns, sqlgraph.NewFieldSpec(signingnonce.FieldID, field.TypeUUID))
 	if ps := snu.mutation.predicates; len(ps) > 0 {
@@ -123,6 +130,7 @@ func (snu *SigningNonceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if snu.mutation.RetryFingerprintCleared() {
 		_spec.ClearField(signingnonce.FieldRetryFingerprint, field.TypeBytes)
 	}
+	_spec.AddModifiers(snu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, snu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{signingnonce.Label}
@@ -138,9 +146,10 @@ func (snu *SigningNonceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // SigningNonceUpdateOne is the builder for updating a single SigningNonce entity.
 type SigningNonceUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *SigningNonceMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *SigningNonceMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -227,6 +236,12 @@ func (snuo *SigningNonceUpdateOne) defaults() {
 	}
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (snuo *SigningNonceUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *SigningNonceUpdateOne {
+	snuo.modifiers = append(snuo.modifiers, modifiers...)
+	return snuo
+}
+
 func (snuo *SigningNonceUpdateOne) sqlSave(ctx context.Context) (_node *SigningNonce, err error) {
 	_spec := sqlgraph.NewUpdateSpec(signingnonce.Table, signingnonce.Columns, sqlgraph.NewFieldSpec(signingnonce.FieldID, field.TypeUUID))
 	id, ok := snuo.mutation.ID()
@@ -268,6 +283,7 @@ func (snuo *SigningNonceUpdateOne) sqlSave(ctx context.Context) (_node *SigningN
 	if snuo.mutation.RetryFingerprintCleared() {
 		_spec.ClearField(signingnonce.FieldRetryFingerprint, field.TypeBytes)
 	}
+	_spec.AddModifiers(snuo.modifiers...)
 	_node = &SigningNonce{config: snuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

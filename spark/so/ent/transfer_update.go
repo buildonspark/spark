@@ -23,8 +23,9 @@ import (
 // TransferUpdate is the builder for updating Transfer entities.
 type TransferUpdate struct {
 	config
-	hooks    []Hook
-	mutation *TransferMutation
+	hooks     []Hook
+	mutation  *TransferMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the TransferUpdate builder.
@@ -323,6 +324,12 @@ func (tu *TransferUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (tu *TransferUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TransferUpdate {
+	tu.modifiers = append(tu.modifiers, modifiers...)
+	return tu
+}
+
 func (tu *TransferUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := tu.check(); err != nil {
 		return n, err
@@ -533,6 +540,7 @@ func (tu *TransferUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(tu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{transfer.Label}
@@ -548,9 +556,10 @@ func (tu *TransferUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // TransferUpdateOne is the builder for updating a single Transfer entity.
 type TransferUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *TransferMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *TransferMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -856,6 +865,12 @@ func (tuo *TransferUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (tuo *TransferUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TransferUpdateOne {
+	tuo.modifiers = append(tuo.modifiers, modifiers...)
+	return tuo
+}
+
 func (tuo *TransferUpdateOne) sqlSave(ctx context.Context) (_node *Transfer, err error) {
 	if err := tuo.check(); err != nil {
 		return _node, err
@@ -1083,6 +1098,7 @@ func (tuo *TransferUpdateOne) sqlSave(ctx context.Context) (_node *Transfer, err
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(tuo.modifiers...)
 	_node = &Transfer{config: tuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

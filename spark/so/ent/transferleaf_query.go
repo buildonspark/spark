@@ -305,8 +305,9 @@ func (tlq *TransferLeafQuery) Clone() *TransferLeafQuery {
 		withTransfer: tlq.withTransfer.Clone(),
 		withLeaf:     tlq.withLeaf.Clone(),
 		// clone intermediate query.
-		sql:  tlq.sql.Clone(),
-		path: tlq.path,
+		sql:       tlq.sql.Clone(),
+		path:      tlq.path,
+		modifiers: append([]func(*sql.Selector){}, tlq.modifiers...),
 	}
 }
 
@@ -636,6 +637,12 @@ func (tlq *TransferLeafQuery) ForShare(opts ...sql.LockOption) *TransferLeafQuer
 	return tlq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tlq *TransferLeafQuery) Modify(modifiers ...func(s *sql.Selector)) *TransferLeafSelect {
+	tlq.modifiers = append(tlq.modifiers, modifiers...)
+	return tlq.Select()
+}
+
 // TransferLeafGroupBy is the group-by builder for TransferLeaf entities.
 type TransferLeafGroupBy struct {
 	selector
@@ -724,4 +731,10 @@ func (tls *TransferLeafSelect) sqlScan(ctx context.Context, root *TransferLeafQu
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tls *TransferLeafSelect) Modify(modifiers ...func(s *sql.Selector)) *TransferLeafSelect {
+	tls.modifiers = append(tls.modifiers, modifiers...)
+	return tls
 }

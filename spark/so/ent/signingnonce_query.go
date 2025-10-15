@@ -254,8 +254,9 @@ func (snq *SigningNonceQuery) Clone() *SigningNonceQuery {
 		inters:     append([]Interceptor{}, snq.inters...),
 		predicates: append([]predicate.SigningNonce{}, snq.predicates...),
 		// clone intermediate query.
-		sql:  snq.sql.Clone(),
-		path: snq.path,
+		sql:       snq.sql.Clone(),
+		path:      snq.path,
+		modifiers: append([]func(*sql.Selector){}, snq.modifiers...),
 	}
 }
 
@@ -474,6 +475,12 @@ func (snq *SigningNonceQuery) ForShare(opts ...sql.LockOption) *SigningNonceQuer
 	return snq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (snq *SigningNonceQuery) Modify(modifiers ...func(s *sql.Selector)) *SigningNonceSelect {
+	snq.modifiers = append(snq.modifiers, modifiers...)
+	return snq.Select()
+}
+
 // SigningNonceGroupBy is the group-by builder for SigningNonce entities.
 type SigningNonceGroupBy struct {
 	selector
@@ -562,4 +569,10 @@ func (sns *SigningNonceSelect) sqlScan(ctx context.Context, root *SigningNonceQu
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (sns *SigningNonceSelect) Modify(modifiers ...func(s *sql.Selector)) *SigningNonceSelect {
+	sns.modifiers = append(sns.modifiers, modifiers...)
+	return sns
 }

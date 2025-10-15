@@ -19,8 +19,9 @@ import (
 // BlockHeightUpdate is the builder for updating BlockHeight entities.
 type BlockHeightUpdate struct {
 	config
-	hooks    []Hook
-	mutation *BlockHeightMutation
+	hooks     []Hook
+	mutation  *BlockHeightMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the BlockHeightUpdate builder.
@@ -121,6 +122,12 @@ func (bhu *BlockHeightUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (bhu *BlockHeightUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *BlockHeightUpdate {
+	bhu.modifiers = append(bhu.modifiers, modifiers...)
+	return bhu
+}
+
 func (bhu *BlockHeightUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := bhu.check(); err != nil {
 		return n, err
@@ -145,6 +152,7 @@ func (bhu *BlockHeightUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := bhu.mutation.Network(); ok {
 		_spec.SetField(blockheight.FieldNetwork, field.TypeEnum, value)
 	}
+	_spec.AddModifiers(bhu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, bhu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{blockheight.Label}
@@ -160,9 +168,10 @@ func (bhu *BlockHeightUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // BlockHeightUpdateOne is the builder for updating a single BlockHeight entity.
 type BlockHeightUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *BlockHeightMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *BlockHeightMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -270,6 +279,12 @@ func (bhuo *BlockHeightUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (bhuo *BlockHeightUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *BlockHeightUpdateOne {
+	bhuo.modifiers = append(bhuo.modifiers, modifiers...)
+	return bhuo
+}
+
 func (bhuo *BlockHeightUpdateOne) sqlSave(ctx context.Context) (_node *BlockHeight, err error) {
 	if err := bhuo.check(); err != nil {
 		return _node, err
@@ -311,6 +326,7 @@ func (bhuo *BlockHeightUpdateOne) sqlSave(ctx context.Context) (_node *BlockHeig
 	if value, ok := bhuo.mutation.Network(); ok {
 		_spec.SetField(blockheight.FieldNetwork, field.TypeEnum, value)
 	}
+	_spec.AddModifiers(bhuo.modifiers...)
 	_node = &BlockHeight{config: bhuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

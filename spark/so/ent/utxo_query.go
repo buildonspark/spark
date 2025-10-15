@@ -280,8 +280,9 @@ func (uq *UtxoQuery) Clone() *UtxoQuery {
 		predicates:         append([]predicate.Utxo{}, uq.predicates...),
 		withDepositAddress: uq.withDepositAddress.Clone(),
 		// clone intermediate query.
-		sql:  uq.sql.Clone(),
-		path: uq.path,
+		sql:       uq.sql.Clone(),
+		path:      uq.path,
+		modifiers: append([]func(*sql.Selector){}, uq.modifiers...),
 	}
 }
 
@@ -561,6 +562,12 @@ func (uq *UtxoQuery) ForShare(opts ...sql.LockOption) *UtxoQuery {
 	return uq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (uq *UtxoQuery) Modify(modifiers ...func(s *sql.Selector)) *UtxoSelect {
+	uq.modifiers = append(uq.modifiers, modifiers...)
+	return uq.Select()
+}
+
 // UtxoGroupBy is the group-by builder for Utxo entities.
 type UtxoGroupBy struct {
 	selector
@@ -649,4 +656,10 @@ func (us *UtxoSelect) sqlScan(ctx context.Context, root *UtxoQuery, v any) error
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (us *UtxoSelect) Modify(modifiers ...func(s *sql.Selector)) *UtxoSelect {
+	us.modifiers = append(us.modifiers, modifiers...)
+	return us
 }

@@ -18,8 +18,9 @@ import (
 // EntityDkgKeyUpdate is the builder for updating EntityDkgKey entities.
 type EntityDkgKeyUpdate struct {
 	config
-	hooks    []Hook
-	mutation *EntityDkgKeyMutation
+	hooks     []Hook
+	mutation  *EntityDkgKeyMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the EntityDkgKeyUpdate builder.
@@ -83,6 +84,12 @@ func (edku *EntityDkgKeyUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (edku *EntityDkgKeyUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *EntityDkgKeyUpdate {
+	edku.modifiers = append(edku.modifiers, modifiers...)
+	return edku
+}
+
 func (edku *EntityDkgKeyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := edku.check(); err != nil {
 		return n, err
@@ -98,6 +105,7 @@ func (edku *EntityDkgKeyUpdate) sqlSave(ctx context.Context) (n int, err error) 
 	if value, ok := edku.mutation.UpdateTime(); ok {
 		_spec.SetField(entitydkgkey.FieldUpdateTime, field.TypeTime, value)
 	}
+	_spec.AddModifiers(edku.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, edku.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{entitydkgkey.Label}
@@ -113,9 +121,10 @@ func (edku *EntityDkgKeyUpdate) sqlSave(ctx context.Context) (n int, err error) 
 // EntityDkgKeyUpdateOne is the builder for updating a single EntityDkgKey entity.
 type EntityDkgKeyUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *EntityDkgKeyMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *EntityDkgKeyMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -186,6 +195,12 @@ func (edkuo *EntityDkgKeyUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (edkuo *EntityDkgKeyUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *EntityDkgKeyUpdateOne {
+	edkuo.modifiers = append(edkuo.modifiers, modifiers...)
+	return edkuo
+}
+
 func (edkuo *EntityDkgKeyUpdateOne) sqlSave(ctx context.Context) (_node *EntityDkgKey, err error) {
 	if err := edkuo.check(); err != nil {
 		return _node, err
@@ -218,6 +233,7 @@ func (edkuo *EntityDkgKeyUpdateOne) sqlSave(ctx context.Context) (_node *EntityD
 	if value, ok := edkuo.mutation.UpdateTime(); ok {
 		_spec.SetField(entitydkgkey.FieldUpdateTime, field.TypeTime, value)
 	}
+	_spec.AddModifiers(edkuo.modifiers...)
 	_node = &EntityDkgKey{config: edkuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

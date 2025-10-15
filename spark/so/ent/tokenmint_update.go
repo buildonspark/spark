@@ -20,8 +20,9 @@ import (
 // TokenMintUpdate is the builder for updating TokenMint entities.
 type TokenMintUpdate struct {
 	config
-	hooks    []Hook
-	mutation *TokenMintMutation
+	hooks     []Hook
+	mutation  *TokenMintMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the TokenMintUpdate builder.
@@ -125,6 +126,12 @@ func (tmu *TokenMintUpdate) defaults() {
 	}
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (tmu *TokenMintUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TokenMintUpdate {
+	tmu.modifiers = append(tmu.modifiers, modifiers...)
+	return tmu
+}
+
 func (tmu *TokenMintUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	_spec := sqlgraph.NewUpdateSpec(tokenmint.Table, tokenmint.Columns, sqlgraph.NewFieldSpec(tokenmint.FieldID, field.TypeUUID))
 	if ps := tmu.mutation.predicates; len(ps) > 0 {
@@ -191,6 +198,7 @@ func (tmu *TokenMintUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(tmu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tmu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{tokenmint.Label}
@@ -206,9 +214,10 @@ func (tmu *TokenMintUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // TokenMintUpdateOne is the builder for updating a single TokenMint entity.
 type TokenMintUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *TokenMintMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *TokenMintMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -319,6 +328,12 @@ func (tmuo *TokenMintUpdateOne) defaults() {
 	}
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (tmuo *TokenMintUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TokenMintUpdateOne {
+	tmuo.modifiers = append(tmuo.modifiers, modifiers...)
+	return tmuo
+}
+
 func (tmuo *TokenMintUpdateOne) sqlSave(ctx context.Context) (_node *TokenMint, err error) {
 	_spec := sqlgraph.NewUpdateSpec(tokenmint.Table, tokenmint.Columns, sqlgraph.NewFieldSpec(tokenmint.FieldID, field.TypeUUID))
 	id, ok := tmuo.mutation.ID()
@@ -402,6 +417,7 @@ func (tmuo *TokenMintUpdateOne) sqlSave(ctx context.Context) (_node *TokenMint, 
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(tmuo.modifiers...)
 	_node = &TokenMint{config: tmuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

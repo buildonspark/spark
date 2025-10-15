@@ -20,8 +20,9 @@ import (
 // SigningKeyshareUpdate is the builder for updating SigningKeyshare entities.
 type SigningKeyshareUpdate struct {
 	config
-	hooks    []Hook
-	mutation *SigningKeyshareMutation
+	hooks     []Hook
+	mutation  *SigningKeyshareMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the SigningKeyshareUpdate builder.
@@ -177,6 +178,12 @@ func (sku *SigningKeyshareUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (sku *SigningKeyshareUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *SigningKeyshareUpdate {
+	sku.modifiers = append(sku.modifiers, modifiers...)
+	return sku
+}
+
 func (sku *SigningKeyshareUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := sku.check(); err != nil {
 		return n, err
@@ -216,6 +223,7 @@ func (sku *SigningKeyshareUpdate) sqlSave(ctx context.Context) (n int, err error
 	if value, ok := sku.mutation.AddedCoordinatorIndex(); ok {
 		_spec.AddField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)
 	}
+	_spec.AddModifiers(sku.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, sku.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{signingkeyshare.Label}
@@ -231,9 +239,10 @@ func (sku *SigningKeyshareUpdate) sqlSave(ctx context.Context) (n int, err error
 // SigningKeyshareUpdateOne is the builder for updating a single SigningKeyshare entity.
 type SigningKeyshareUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *SigningKeyshareMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *SigningKeyshareMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -396,6 +405,12 @@ func (skuo *SigningKeyshareUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (skuo *SigningKeyshareUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *SigningKeyshareUpdateOne {
+	skuo.modifiers = append(skuo.modifiers, modifiers...)
+	return skuo
+}
+
 func (skuo *SigningKeyshareUpdateOne) sqlSave(ctx context.Context) (_node *SigningKeyshare, err error) {
 	if err := skuo.check(); err != nil {
 		return _node, err
@@ -452,6 +467,7 @@ func (skuo *SigningKeyshareUpdateOne) sqlSave(ctx context.Context) (_node *Signi
 	if value, ok := skuo.mutation.AddedCoordinatorIndex(); ok {
 		_spec.AddField(signingkeyshare.FieldCoordinatorIndex, field.TypeUint64, value)
 	}
+	_spec.AddModifiers(skuo.modifiers...)
 	_node = &SigningKeyshare{config: skuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

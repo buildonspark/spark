@@ -454,8 +454,9 @@ func (ttq *TokenTransactionQuery) Clone() *TokenTransactionQuery {
 		withPeerSignatures: ttq.withPeerSignatures.Clone(),
 		withSparkInvoice:   ttq.withSparkInvoice.Clone(),
 		// clone intermediate query.
-		sql:  ttq.sql.Clone(),
-		path: ttq.path,
+		sql:       ttq.sql.Clone(),
+		path:      ttq.path,
+		modifiers: append([]func(*sql.Selector){}, ttq.modifiers...),
 	}
 }
 
@@ -1147,6 +1148,12 @@ func (ttq *TokenTransactionQuery) ForShare(opts ...sql.LockOption) *TokenTransac
 	return ttq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (ttq *TokenTransactionQuery) Modify(modifiers ...func(s *sql.Selector)) *TokenTransactionSelect {
+	ttq.modifiers = append(ttq.modifiers, modifiers...)
+	return ttq.Select()
+}
+
 // TokenTransactionGroupBy is the group-by builder for TokenTransaction entities.
 type TokenTransactionGroupBy struct {
 	selector
@@ -1235,4 +1242,10 @@ func (tts *TokenTransactionSelect) sqlScan(ctx context.Context, root *TokenTrans
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tts *TokenTransactionSelect) Modify(modifiers ...func(s *sql.Selector)) *TokenTransactionSelect {
+	tts.modifiers = append(tts.modifiers, modifiers...)
+	return tts
 }

@@ -23,8 +23,9 @@ import (
 // TokenOutputUpdate is the builder for updating TokenOutput entities.
 type TokenOutputUpdate struct {
 	config
-	hooks    []Hook
-	mutation *TokenOutputMutation
+	hooks     []Hook
+	mutation  *TokenOutputMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the TokenOutputUpdate builder.
@@ -346,6 +347,12 @@ func (tou *TokenOutputUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (tou *TokenOutputUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TokenOutputUpdate {
+	tou.modifiers = append(tou.modifiers, modifiers...)
+	return tou
+}
+
 func (tou *TokenOutputUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := tou.check(); err != nil {
 		return n, err
@@ -554,6 +561,7 @@ func (tou *TokenOutputUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(tou.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tou.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{tokenoutput.Label}
@@ -569,9 +577,10 @@ func (tou *TokenOutputUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // TokenOutputUpdateOne is the builder for updating a single TokenOutput entity.
 type TokenOutputUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *TokenOutputMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *TokenOutputMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -900,6 +909,12 @@ func (touo *TokenOutputUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (touo *TokenOutputUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TokenOutputUpdateOne {
+	touo.modifiers = append(touo.modifiers, modifiers...)
+	return touo
+}
+
 func (touo *TokenOutputUpdateOne) sqlSave(ctx context.Context) (_node *TokenOutput, err error) {
 	if err := touo.check(); err != nil {
 		return _node, err
@@ -1125,6 +1140,7 @@ func (touo *TokenOutputUpdateOne) sqlSave(ctx context.Context) (_node *TokenOutp
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(touo.modifiers...)
 	_node = &TokenOutput{config: touo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

@@ -280,8 +280,9 @@ func (ceq *CooperativeExitQuery) Clone() *CooperativeExitQuery {
 		predicates:   append([]predicate.CooperativeExit{}, ceq.predicates...),
 		withTransfer: ceq.withTransfer.Clone(),
 		// clone intermediate query.
-		sql:  ceq.sql.Clone(),
-		path: ceq.path,
+		sql:       ceq.sql.Clone(),
+		path:      ceq.path,
+		modifiers: append([]func(*sql.Selector){}, ceq.modifiers...),
 	}
 }
 
@@ -561,6 +562,12 @@ func (ceq *CooperativeExitQuery) ForShare(opts ...sql.LockOption) *CooperativeEx
 	return ceq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (ceq *CooperativeExitQuery) Modify(modifiers ...func(s *sql.Selector)) *CooperativeExitSelect {
+	ceq.modifiers = append(ceq.modifiers, modifiers...)
+	return ceq.Select()
+}
+
 // CooperativeExitGroupBy is the group-by builder for CooperativeExit entities.
 type CooperativeExitGroupBy struct {
 	selector
@@ -649,4 +656,10 @@ func (ces *CooperativeExitSelect) sqlScan(ctx context.Context, root *Cooperative
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (ces *CooperativeExitSelect) Modify(modifiers ...func(s *sql.Selector)) *CooperativeExitSelect {
+	ces.modifiers = append(ces.modifiers, modifiers...)
+	return ces
 }

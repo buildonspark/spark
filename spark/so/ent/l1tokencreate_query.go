@@ -254,8 +254,9 @@ func (lcq *L1TokenCreateQuery) Clone() *L1TokenCreateQuery {
 		inters:     append([]Interceptor{}, lcq.inters...),
 		predicates: append([]predicate.L1TokenCreate{}, lcq.predicates...),
 		// clone intermediate query.
-		sql:  lcq.sql.Clone(),
-		path: lcq.path,
+		sql:       lcq.sql.Clone(),
+		path:      lcq.path,
+		modifiers: append([]func(*sql.Selector){}, lcq.modifiers...),
 	}
 }
 
@@ -474,6 +475,12 @@ func (lcq *L1TokenCreateQuery) ForShare(opts ...sql.LockOption) *L1TokenCreateQu
 	return lcq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (lcq *L1TokenCreateQuery) Modify(modifiers ...func(s *sql.Selector)) *L1TokenCreateSelect {
+	lcq.modifiers = append(lcq.modifiers, modifiers...)
+	return lcq.Select()
+}
+
 // L1TokenCreateGroupBy is the group-by builder for L1TokenCreate entities.
 type L1TokenCreateGroupBy struct {
 	selector
@@ -562,4 +569,10 @@ func (lcs *L1TokenCreateSelect) sqlScan(ctx context.Context, root *L1TokenCreate
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (lcs *L1TokenCreateSelect) Modify(modifiers ...func(s *sql.Selector)) *L1TokenCreateSelect {
+	lcs.modifiers = append(lcs.modifiers, modifiers...)
+	return lcs
 }

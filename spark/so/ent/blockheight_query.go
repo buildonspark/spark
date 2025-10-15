@@ -254,8 +254,9 @@ func (bhq *BlockHeightQuery) Clone() *BlockHeightQuery {
 		inters:     append([]Interceptor{}, bhq.inters...),
 		predicates: append([]predicate.BlockHeight{}, bhq.predicates...),
 		// clone intermediate query.
-		sql:  bhq.sql.Clone(),
-		path: bhq.path,
+		sql:       bhq.sql.Clone(),
+		path:      bhq.path,
+		modifiers: append([]func(*sql.Selector){}, bhq.modifiers...),
 	}
 }
 
@@ -474,6 +475,12 @@ func (bhq *BlockHeightQuery) ForShare(opts ...sql.LockOption) *BlockHeightQuery 
 	return bhq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (bhq *BlockHeightQuery) Modify(modifiers ...func(s *sql.Selector)) *BlockHeightSelect {
+	bhq.modifiers = append(bhq.modifiers, modifiers...)
+	return bhq.Select()
+}
+
 // BlockHeightGroupBy is the group-by builder for BlockHeight entities.
 type BlockHeightGroupBy struct {
 	selector
@@ -562,4 +569,10 @@ func (bhs *BlockHeightSelect) sqlScan(ctx context.Context, root *BlockHeightQuer
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (bhs *BlockHeightSelect) Modify(modifiers ...func(s *sql.Selector)) *BlockHeightSelect {
+	bhs.modifiers = append(bhs.modifiers, modifiers...)
+	return bhs
 }

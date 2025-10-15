@@ -18,8 +18,9 @@ import (
 // L1TokenCreateUpdate is the builder for updating L1TokenCreate entities.
 type L1TokenCreateUpdate struct {
 	config
-	hooks    []Hook
-	mutation *L1TokenCreateMutation
+	hooks     []Hook
+	mutation  *L1TokenCreateMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the L1TokenCreateUpdate builder.
@@ -75,6 +76,12 @@ func (lcu *L1TokenCreateUpdate) defaults() {
 	}
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (lcu *L1TokenCreateUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *L1TokenCreateUpdate {
+	lcu.modifiers = append(lcu.modifiers, modifiers...)
+	return lcu
+}
+
 func (lcu *L1TokenCreateUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	_spec := sqlgraph.NewUpdateSpec(l1tokencreate.Table, l1tokencreate.Columns, sqlgraph.NewFieldSpec(l1tokencreate.FieldID, field.TypeUUID))
 	if ps := lcu.mutation.predicates; len(ps) > 0 {
@@ -87,6 +94,7 @@ func (lcu *L1TokenCreateUpdate) sqlSave(ctx context.Context) (n int, err error) 
 	if value, ok := lcu.mutation.UpdateTime(); ok {
 		_spec.SetField(l1tokencreate.FieldUpdateTime, field.TypeTime, value)
 	}
+	_spec.AddModifiers(lcu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, lcu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{l1tokencreate.Label}
@@ -102,9 +110,10 @@ func (lcu *L1TokenCreateUpdate) sqlSave(ctx context.Context) (n int, err error) 
 // L1TokenCreateUpdateOne is the builder for updating a single L1TokenCreate entity.
 type L1TokenCreateUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *L1TokenCreateMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *L1TokenCreateMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -167,6 +176,12 @@ func (lcuo *L1TokenCreateUpdateOne) defaults() {
 	}
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (lcuo *L1TokenCreateUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *L1TokenCreateUpdateOne {
+	lcuo.modifiers = append(lcuo.modifiers, modifiers...)
+	return lcuo
+}
+
 func (lcuo *L1TokenCreateUpdateOne) sqlSave(ctx context.Context) (_node *L1TokenCreate, err error) {
 	_spec := sqlgraph.NewUpdateSpec(l1tokencreate.Table, l1tokencreate.Columns, sqlgraph.NewFieldSpec(l1tokencreate.FieldID, field.TypeUUID))
 	id, ok := lcuo.mutation.ID()
@@ -196,6 +211,7 @@ func (lcuo *L1TokenCreateUpdateOne) sqlSave(ctx context.Context) (_node *L1Token
 	if value, ok := lcuo.mutation.UpdateTime(); ok {
 		_spec.SetField(l1tokencreate.FieldUpdateTime, field.TypeTime, value)
 	}
+	_spec.AddModifiers(lcuo.modifiers...)
 	_node = &L1TokenCreate{config: lcuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

@@ -330,8 +330,9 @@ func (tq *TreeQuery) Clone() *TreeQuery {
 		withNodes:          tq.withNodes.Clone(),
 		withDepositAddress: tq.withDepositAddress.Clone(),
 		// clone intermediate query.
-		sql:  tq.sql.Clone(),
-		path: tq.path,
+		sql:       tq.sql.Clone(),
+		path:      tq.path,
+		modifiers: append([]func(*sql.Selector){}, tq.modifiers...),
 	}
 }
 
@@ -711,6 +712,12 @@ func (tq *TreeQuery) ForShare(opts ...sql.LockOption) *TreeQuery {
 	return tq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tq *TreeQuery) Modify(modifiers ...func(s *sql.Selector)) *TreeSelect {
+	tq.modifiers = append(tq.modifiers, modifiers...)
+	return tq.Select()
+}
+
 // TreeGroupBy is the group-by builder for Tree entities.
 type TreeGroupBy struct {
 	selector
@@ -799,4 +806,10 @@ func (ts *TreeSelect) sqlScan(ctx context.Context, root *TreeQuery, v any) error
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (ts *TreeSelect) Modify(modifiers ...func(s *sql.Selector)) *TreeSelect {
+	ts.modifiers = append(ts.modifiers, modifiers...)
+	return ts
 }

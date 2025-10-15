@@ -331,8 +331,9 @@ func (prq *PreimageRequestQuery) Clone() *PreimageRequestQuery {
 		withPreimageShares: prq.withPreimageShares.Clone(),
 		withTransfers:      prq.withTransfers.Clone(),
 		// clone intermediate query.
-		sql:  prq.sql.Clone(),
-		path: prq.path,
+		sql:       prq.sql.Clone(),
+		path:      prq.path,
+		modifiers: append([]func(*sql.Selector){}, prq.modifiers...),
 	}
 }
 
@@ -710,6 +711,12 @@ func (prq *PreimageRequestQuery) ForShare(opts ...sql.LockOption) *PreimageReque
 	return prq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (prq *PreimageRequestQuery) Modify(modifiers ...func(s *sql.Selector)) *PreimageRequestSelect {
+	prq.modifiers = append(prq.modifiers, modifiers...)
+	return prq.Select()
+}
+
 // PreimageRequestGroupBy is the group-by builder for PreimageRequest entities.
 type PreimageRequestGroupBy struct {
 	selector
@@ -798,4 +805,10 @@ func (prs *PreimageRequestSelect) sqlScan(ctx context.Context, root *PreimageReq
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (prs *PreimageRequestSelect) Modify(modifiers ...func(s *sql.Selector)) *PreimageRequestSelect {
+	prs.modifiers = append(prs.modifiers, modifiers...)
+	return prs
 }

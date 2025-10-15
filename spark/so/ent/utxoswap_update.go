@@ -22,8 +22,9 @@ import (
 // UtxoSwapUpdate is the builder for updating UtxoSwap entities.
 type UtxoSwapUpdate struct {
 	config
-	hooks    []Hook
-	mutation *UtxoSwapMutation
+	hooks     []Hook
+	mutation  *UtxoSwapMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the UtxoSwapUpdate builder.
@@ -314,6 +315,12 @@ func (usu *UtxoSwapUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (usu *UtxoSwapUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *UtxoSwapUpdate {
+	usu.modifiers = append(usu.modifiers, modifiers...)
+	return usu
+}
+
 func (usu *UtxoSwapUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := usu.check(); err != nil {
 		return n, err
@@ -421,6 +428,7 @@ func (usu *UtxoSwapUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(usu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, usu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{utxoswap.Label}
@@ -436,9 +444,10 @@ func (usu *UtxoSwapUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // UtxoSwapUpdateOne is the builder for updating a single UtxoSwap entity.
 type UtxoSwapUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *UtxoSwapMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *UtxoSwapMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -736,6 +745,12 @@ func (usuo *UtxoSwapUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (usuo *UtxoSwapUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *UtxoSwapUpdateOne {
+	usuo.modifiers = append(usuo.modifiers, modifiers...)
+	return usuo
+}
+
 func (usuo *UtxoSwapUpdateOne) sqlSave(ctx context.Context) (_node *UtxoSwap, err error) {
 	if err := usuo.check(); err != nil {
 		return _node, err
@@ -860,6 +875,7 @@ func (usuo *UtxoSwapUpdateOne) sqlSave(ctx context.Context) (_node *UtxoSwap, er
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(usuo.modifiers...)
 	_node = &UtxoSwap{config: usuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

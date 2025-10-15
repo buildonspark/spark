@@ -356,8 +356,9 @@ func (daq *DepositAddressQuery) Clone() *DepositAddressQuery {
 		withUtxoswaps:       daq.withUtxoswaps.Clone(),
 		withTree:            daq.withTree.Clone(),
 		// clone intermediate query.
-		sql:  daq.sql.Clone(),
-		path: daq.path,
+		sql:       daq.sql.Clone(),
+		path:      daq.path,
+		modifiers: append([]func(*sql.Selector){}, daq.modifiers...),
 	}
 }
 
@@ -783,6 +784,12 @@ func (daq *DepositAddressQuery) ForShare(opts ...sql.LockOption) *DepositAddress
 	return daq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (daq *DepositAddressQuery) Modify(modifiers ...func(s *sql.Selector)) *DepositAddressSelect {
+	daq.modifiers = append(daq.modifiers, modifiers...)
+	return daq.Select()
+}
+
 // DepositAddressGroupBy is the group-by builder for DepositAddress entities.
 type DepositAddressGroupBy struct {
 	selector
@@ -871,4 +878,10 @@ func (das *DepositAddressSelect) sqlScan(ctx context.Context, root *DepositAddre
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (das *DepositAddressSelect) Modify(modifiers ...func(s *sql.Selector)) *DepositAddressSelect {
+	das.modifiers = append(das.modifiers, modifiers...)
+	return das
 }

@@ -21,8 +21,9 @@ import (
 // PaymentIntentUpdate is the builder for updating PaymentIntent entities.
 type PaymentIntentUpdate struct {
 	config
-	hooks    []Hook
-	mutation *PaymentIntentMutation
+	hooks     []Hook
+	mutation  *PaymentIntentMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the PaymentIntentUpdate builder.
@@ -156,6 +157,12 @@ func (piu *PaymentIntentUpdate) defaults() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (piu *PaymentIntentUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *PaymentIntentUpdate {
+	piu.modifiers = append(piu.modifiers, modifiers...)
+	return piu
+}
+
 func (piu *PaymentIntentUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	_spec := sqlgraph.NewUpdateSpec(paymentintent.Table, paymentintent.Columns, sqlgraph.NewFieldSpec(paymentintent.FieldID, field.TypeUUID))
 	if ps := piu.mutation.predicates; len(ps) > 0 {
@@ -258,6 +265,7 @@ func (piu *PaymentIntentUpdate) sqlSave(ctx context.Context) (n int, err error) 
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(piu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, piu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{paymentintent.Label}
@@ -273,9 +281,10 @@ func (piu *PaymentIntentUpdate) sqlSave(ctx context.Context) (n int, err error) 
 // PaymentIntentUpdateOne is the builder for updating a single PaymentIntent entity.
 type PaymentIntentUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *PaymentIntentMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *PaymentIntentMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -416,6 +425,12 @@ func (piuo *PaymentIntentUpdateOne) defaults() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (piuo *PaymentIntentUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *PaymentIntentUpdateOne {
+	piuo.modifiers = append(piuo.modifiers, modifiers...)
+	return piuo
+}
+
 func (piuo *PaymentIntentUpdateOne) sqlSave(ctx context.Context) (_node *PaymentIntent, err error) {
 	_spec := sqlgraph.NewUpdateSpec(paymentintent.Table, paymentintent.Columns, sqlgraph.NewFieldSpec(paymentintent.FieldID, field.TypeUUID))
 	id, ok := piuo.mutation.ID()
@@ -535,6 +550,7 @@ func (piuo *PaymentIntentUpdateOne) sqlSave(ctx context.Context) (_node *Payment
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(piuo.modifiers...)
 	_node = &PaymentIntent{config: piuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

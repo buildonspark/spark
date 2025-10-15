@@ -27,8 +27,9 @@ import (
 // TokenTransactionUpdate is the builder for updating TokenTransaction entities.
 type TokenTransactionUpdate struct {
 	config
-	hooks    []Hook
-	mutation *TokenTransactionMutation
+	hooks     []Hook
+	mutation  *TokenTransactionMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the TokenTransactionUpdate builder.
@@ -475,6 +476,12 @@ func (ttu *TokenTransactionUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (ttu *TokenTransactionUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TokenTransactionUpdate {
+	ttu.modifiers = append(ttu.modifiers, modifiers...)
+	return ttu
+}
+
 func (ttu *TokenTransactionUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := ttu.check(); err != nil {
 		return n, err
@@ -841,6 +848,7 @@ func (ttu *TokenTransactionUpdate) sqlSave(ctx context.Context) (n int, err erro
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(ttu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, ttu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{tokentransaction.Label}
@@ -856,9 +864,10 @@ func (ttu *TokenTransactionUpdate) sqlSave(ctx context.Context) (n int, err erro
 // TokenTransactionUpdateOne is the builder for updating a single TokenTransaction entity.
 type TokenTransactionUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *TokenTransactionMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *TokenTransactionMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -1312,6 +1321,12 @@ func (ttuo *TokenTransactionUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (ttuo *TokenTransactionUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TokenTransactionUpdateOne {
+	ttuo.modifiers = append(ttuo.modifiers, modifiers...)
+	return ttuo
+}
+
 func (ttuo *TokenTransactionUpdateOne) sqlSave(ctx context.Context) (_node *TokenTransaction, err error) {
 	if err := ttuo.check(); err != nil {
 		return _node, err
@@ -1695,6 +1710,7 @@ func (ttuo *TokenTransactionUpdateOne) sqlSave(ctx context.Context) (_node *Toke
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(ttuo.modifiers...)
 	_node = &TokenTransaction{config: ttuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

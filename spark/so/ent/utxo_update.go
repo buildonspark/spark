@@ -20,8 +20,9 @@ import (
 // UtxoUpdate is the builder for updating Utxo entities.
 type UtxoUpdate struct {
 	config
-	hooks    []Hook
-	mutation *UtxoMutation
+	hooks     []Hook
+	mutation  *UtxoMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the UtxoUpdate builder.
@@ -123,6 +124,12 @@ func (uu *UtxoUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (uu *UtxoUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *UtxoUpdate {
+	uu.modifiers = append(uu.modifiers, modifiers...)
+	return uu
+}
+
 func (uu *UtxoUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := uu.check(); err != nil {
 		return n, err
@@ -173,6 +180,7 @@ func (uu *UtxoUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(uu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, uu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{utxo.Label}
@@ -188,9 +196,10 @@ func (uu *UtxoUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // UtxoUpdateOne is the builder for updating a single Utxo entity.
 type UtxoUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *UtxoMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *UtxoMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -299,6 +308,12 @@ func (uuo *UtxoUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (uuo *UtxoUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *UtxoUpdateOne {
+	uuo.modifiers = append(uuo.modifiers, modifiers...)
+	return uuo
+}
+
 func (uuo *UtxoUpdateOne) sqlSave(ctx context.Context) (_node *Utxo, err error) {
 	if err := uuo.check(); err != nil {
 		return _node, err
@@ -366,6 +381,7 @@ func (uuo *UtxoUpdateOne) sqlSave(ctx context.Context) (_node *Utxo, err error) 
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(uuo.modifiers...)
 	_node = &Utxo{config: uuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

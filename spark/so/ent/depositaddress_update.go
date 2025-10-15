@@ -22,8 +22,9 @@ import (
 // DepositAddressUpdate is the builder for updating DepositAddress entities.
 type DepositAddressUpdate struct {
 	config
-	hooks    []Hook
-	mutation *DepositAddressMutation
+	hooks     []Hook
+	mutation  *DepositAddressMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the DepositAddressUpdate builder.
@@ -309,6 +310,12 @@ func (dau *DepositAddressUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (dau *DepositAddressUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *DepositAddressUpdate {
+	dau.modifiers = append(dau.modifiers, modifiers...)
+	return dau
+}
+
 func (dau *DepositAddressUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := dau.check(); err != nil {
 		return n, err
@@ -485,6 +492,7 @@ func (dau *DepositAddressUpdate) sqlSave(ctx context.Context) (n int, err error)
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(dau.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, dau.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{depositaddress.Label}
@@ -500,9 +508,10 @@ func (dau *DepositAddressUpdate) sqlSave(ctx context.Context) (n int, err error)
 // DepositAddressUpdateOne is the builder for updating a single DepositAddress entity.
 type DepositAddressUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *DepositAddressMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *DepositAddressMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -795,6 +804,12 @@ func (dauo *DepositAddressUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (dauo *DepositAddressUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *DepositAddressUpdateOne {
+	dauo.modifiers = append(dauo.modifiers, modifiers...)
+	return dauo
+}
+
 func (dauo *DepositAddressUpdateOne) sqlSave(ctx context.Context) (_node *DepositAddress, err error) {
 	if err := dauo.check(); err != nil {
 		return _node, err
@@ -988,6 +1003,7 @@ func (dauo *DepositAddressUpdateOne) sqlSave(ctx context.Context) (_node *Deposi
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(dauo.modifiers...)
 	_node = &DepositAddress{config: dauo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

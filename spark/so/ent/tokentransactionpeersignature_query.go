@@ -280,8 +280,9 @@ func (ttpsq *TokenTransactionPeerSignatureQuery) Clone() *TokenTransactionPeerSi
 		predicates:           append([]predicate.TokenTransactionPeerSignature{}, ttpsq.predicates...),
 		withTokenTransaction: ttpsq.withTokenTransaction.Clone(),
 		// clone intermediate query.
-		sql:  ttpsq.sql.Clone(),
-		path: ttpsq.path,
+		sql:       ttpsq.sql.Clone(),
+		path:      ttpsq.path,
+		modifiers: append([]func(*sql.Selector){}, ttpsq.modifiers...),
 	}
 }
 
@@ -561,6 +562,12 @@ func (ttpsq *TokenTransactionPeerSignatureQuery) ForShare(opts ...sql.LockOption
 	return ttpsq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (ttpsq *TokenTransactionPeerSignatureQuery) Modify(modifiers ...func(s *sql.Selector)) *TokenTransactionPeerSignatureSelect {
+	ttpsq.modifiers = append(ttpsq.modifiers, modifiers...)
+	return ttpsq.Select()
+}
+
 // TokenTransactionPeerSignatureGroupBy is the group-by builder for TokenTransactionPeerSignature entities.
 type TokenTransactionPeerSignatureGroupBy struct {
 	selector
@@ -649,4 +656,10 @@ func (ttpss *TokenTransactionPeerSignatureSelect) sqlScan(ctx context.Context, r
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (ttpss *TokenTransactionPeerSignatureSelect) Modify(modifiers ...func(s *sql.Selector)) *TokenTransactionPeerSignatureSelect {
+	ttpss.modifiers = append(ttpss.modifiers, modifiers...)
+	return ttpss
 }

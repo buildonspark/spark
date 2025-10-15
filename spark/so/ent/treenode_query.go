@@ -354,8 +354,9 @@ func (tnq *TreeNodeQuery) Clone() *TreeNodeQuery {
 		withSigningKeyshare: tnq.withSigningKeyshare.Clone(),
 		withChildren:        tnq.withChildren.Clone(),
 		// clone intermediate query.
-		sql:  tnq.sql.Clone(),
-		path: tnq.path,
+		sql:       tnq.sql.Clone(),
+		path:      tnq.path,
+		modifiers: append([]func(*sql.Selector){}, tnq.modifiers...),
 	}
 }
 
@@ -785,6 +786,12 @@ func (tnq *TreeNodeQuery) ForShare(opts ...sql.LockOption) *TreeNodeQuery {
 	return tnq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tnq *TreeNodeQuery) Modify(modifiers ...func(s *sql.Selector)) *TreeNodeSelect {
+	tnq.modifiers = append(tnq.modifiers, modifiers...)
+	return tnq.Select()
+}
+
 // TreeNodeGroupBy is the group-by builder for TreeNode entities.
 type TreeNodeGroupBy struct {
 	selector
@@ -873,4 +880,10 @@ func (tns *TreeNodeSelect) sqlScan(ctx context.Context, root *TreeNodeQuery, v a
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tns *TreeNodeSelect) Modify(modifiers ...func(s *sql.Selector)) *TreeNodeSelect {
+	tns.modifiers = append(tns.modifiers, modifiers...)
+	return tns
 }

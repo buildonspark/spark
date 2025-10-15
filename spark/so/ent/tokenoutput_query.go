@@ -404,8 +404,9 @@ func (toq *TokenOutputQuery) Clone() *TokenOutputQuery {
 		withTokenPartialRevocationSecretShares:  toq.withTokenPartialRevocationSecretShares.Clone(),
 		withTokenCreate:                         toq.withTokenCreate.Clone(),
 		// clone intermediate query.
-		sql:  toq.sql.Clone(),
-		path: toq.path,
+		sql:       toq.sql.Clone(),
+		path:      toq.path,
+		modifiers: append([]func(*sql.Selector){}, toq.modifiers...),
 	}
 }
 
@@ -971,6 +972,12 @@ func (toq *TokenOutputQuery) ForShare(opts ...sql.LockOption) *TokenOutputQuery 
 	return toq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (toq *TokenOutputQuery) Modify(modifiers ...func(s *sql.Selector)) *TokenOutputSelect {
+	toq.modifiers = append(toq.modifiers, modifiers...)
+	return toq.Select()
+}
+
 // TokenOutputGroupBy is the group-by builder for TokenOutput entities.
 type TokenOutputGroupBy struct {
 	selector
@@ -1059,4 +1066,10 @@ func (tos *TokenOutputSelect) sqlScan(ctx context.Context, root *TokenOutputQuer
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tos *TokenOutputSelect) Modify(modifiers ...func(s *sql.Selector)) *TokenOutputSelect {
+	tos.modifiers = append(tos.modifiers, modifiers...)
+	return tos
 }

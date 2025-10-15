@@ -19,8 +19,9 @@ import (
 // PendingSendTransferUpdate is the builder for updating PendingSendTransfer entities.
 type PendingSendTransferUpdate struct {
 	config
-	hooks    []Hook
-	mutation *PendingSendTransferMutation
+	hooks     []Hook
+	mutation  *PendingSendTransferMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the PendingSendTransferUpdate builder.
@@ -100,6 +101,12 @@ func (pstu *PendingSendTransferUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (pstu *PendingSendTransferUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *PendingSendTransferUpdate {
+	pstu.modifiers = append(pstu.modifiers, modifiers...)
+	return pstu
+}
+
 func (pstu *PendingSendTransferUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := pstu.check(); err != nil {
 		return n, err
@@ -118,6 +125,7 @@ func (pstu *PendingSendTransferUpdate) sqlSave(ctx context.Context) (n int, err 
 	if value, ok := pstu.mutation.Status(); ok {
 		_spec.SetField(pendingsendtransfer.FieldStatus, field.TypeEnum, value)
 	}
+	_spec.AddModifiers(pstu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, pstu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{pendingsendtransfer.Label}
@@ -133,9 +141,10 @@ func (pstu *PendingSendTransferUpdate) sqlSave(ctx context.Context) (n int, err 
 // PendingSendTransferUpdateOne is the builder for updating a single PendingSendTransfer entity.
 type PendingSendTransferUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *PendingSendTransferMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *PendingSendTransferMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -222,6 +231,12 @@ func (pstuo *PendingSendTransferUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (pstuo *PendingSendTransferUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *PendingSendTransferUpdateOne {
+	pstuo.modifiers = append(pstuo.modifiers, modifiers...)
+	return pstuo
+}
+
 func (pstuo *PendingSendTransferUpdateOne) sqlSave(ctx context.Context) (_node *PendingSendTransfer, err error) {
 	if err := pstuo.check(); err != nil {
 		return _node, err
@@ -257,6 +272,7 @@ func (pstuo *PendingSendTransferUpdateOne) sqlSave(ctx context.Context) (_node *
 	if value, ok := pstuo.mutation.Status(); ok {
 		_spec.SetField(pendingsendtransfer.FieldStatus, field.TypeEnum, value)
 	}
+	_spec.AddModifiers(pstuo.modifiers...)
 	_node = &PendingSendTransfer{config: pstuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

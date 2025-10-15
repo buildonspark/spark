@@ -20,8 +20,9 @@ import (
 // CooperativeExitUpdate is the builder for updating CooperativeExit entities.
 type CooperativeExitUpdate struct {
 	config
-	hooks    []Hook
-	mutation *CooperativeExitMutation
+	hooks     []Hook
+	mutation  *CooperativeExitMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the CooperativeExitUpdate builder.
@@ -129,6 +130,12 @@ func (ceu *CooperativeExitUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (ceu *CooperativeExitUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *CooperativeExitUpdate {
+	ceu.modifiers = append(ceu.modifiers, modifiers...)
+	return ceu
+}
+
 func (ceu *CooperativeExitUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := ceu.check(); err != nil {
 		return n, err
@@ -182,6 +189,7 @@ func (ceu *CooperativeExitUpdate) sqlSave(ctx context.Context) (n int, err error
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(ceu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, ceu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{cooperativeexit.Label}
@@ -197,9 +205,10 @@ func (ceu *CooperativeExitUpdate) sqlSave(ctx context.Context) (n int, err error
 // CooperativeExitUpdateOne is the builder for updating a single CooperativeExit entity.
 type CooperativeExitUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *CooperativeExitMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *CooperativeExitMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -314,6 +323,12 @@ func (ceuo *CooperativeExitUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (ceuo *CooperativeExitUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *CooperativeExitUpdateOne {
+	ceuo.modifiers = append(ceuo.modifiers, modifiers...)
+	return ceuo
+}
+
 func (ceuo *CooperativeExitUpdateOne) sqlSave(ctx context.Context) (_node *CooperativeExit, err error) {
 	if err := ceuo.check(); err != nil {
 		return _node, err
@@ -384,6 +399,7 @@ func (ceuo *CooperativeExitUpdateOne) sqlSave(ctx context.Context) (_node *Coope
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(ceuo.modifiers...)
 	_node = &CooperativeExit{config: ceuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

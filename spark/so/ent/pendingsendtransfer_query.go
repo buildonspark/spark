@@ -254,8 +254,9 @@ func (pstq *PendingSendTransferQuery) Clone() *PendingSendTransferQuery {
 		inters:     append([]Interceptor{}, pstq.inters...),
 		predicates: append([]predicate.PendingSendTransfer{}, pstq.predicates...),
 		// clone intermediate query.
-		sql:  pstq.sql.Clone(),
-		path: pstq.path,
+		sql:       pstq.sql.Clone(),
+		path:      pstq.path,
+		modifiers: append([]func(*sql.Selector){}, pstq.modifiers...),
 	}
 }
 
@@ -474,6 +475,12 @@ func (pstq *PendingSendTransferQuery) ForShare(opts ...sql.LockOption) *PendingS
 	return pstq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (pstq *PendingSendTransferQuery) Modify(modifiers ...func(s *sql.Selector)) *PendingSendTransferSelect {
+	pstq.modifiers = append(pstq.modifiers, modifiers...)
+	return pstq.Select()
+}
+
 // PendingSendTransferGroupBy is the group-by builder for PendingSendTransfer entities.
 type PendingSendTransferGroupBy struct {
 	selector
@@ -562,4 +569,10 @@ func (psts *PendingSendTransferSelect) sqlScan(ctx context.Context, root *Pendin
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (psts *PendingSendTransferSelect) Modify(modifiers ...func(s *sql.Selector)) *PendingSendTransferSelect {
+	psts.modifiers = append(psts.modifiers, modifiers...)
+	return psts
 }

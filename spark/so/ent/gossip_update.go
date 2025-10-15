@@ -19,8 +19,9 @@ import (
 // GossipUpdate is the builder for updating Gossip entities.
 type GossipUpdate struct {
 	config
-	hooks    []Hook
-	mutation *GossipMutation
+	hooks     []Hook
+	mutation  *GossipMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the GossipUpdate builder.
@@ -106,6 +107,12 @@ func (gu *GossipUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (gu *GossipUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *GossipUpdate {
+	gu.modifiers = append(gu.modifiers, modifiers...)
+	return gu
+}
+
 func (gu *GossipUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := gu.check(); err != nil {
 		return n, err
@@ -127,6 +134,7 @@ func (gu *GossipUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := gu.mutation.Status(); ok {
 		_spec.SetField(gossip.FieldStatus, field.TypeEnum, value)
 	}
+	_spec.AddModifiers(gu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, gu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{gossip.Label}
@@ -142,9 +150,10 @@ func (gu *GossipUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // GossipUpdateOne is the builder for updating a single Gossip entity.
 type GossipUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *GossipMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *GossipMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -237,6 +246,12 @@ func (guo *GossipUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (guo *GossipUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *GossipUpdateOne {
+	guo.modifiers = append(guo.modifiers, modifiers...)
+	return guo
+}
+
 func (guo *GossipUpdateOne) sqlSave(ctx context.Context) (_node *Gossip, err error) {
 	if err := guo.check(); err != nil {
 		return _node, err
@@ -275,6 +290,7 @@ func (guo *GossipUpdateOne) sqlSave(ctx context.Context) (_node *Gossip, err err
 	if value, ok := guo.mutation.Status(); ok {
 		_spec.SetField(gossip.FieldStatus, field.TypeEnum, value)
 	}
+	_spec.AddModifiers(guo.modifiers...)
 	_node = &Gossip{config: guo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

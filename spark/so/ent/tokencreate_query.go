@@ -356,8 +356,9 @@ func (tcq *TokenCreateQuery) Clone() *TokenCreateQuery {
 		withTokenOutput:      tcq.withTokenOutput.Clone(),
 		withTokenFreeze:      tcq.withTokenFreeze.Clone(),
 		// clone intermediate query.
-		sql:  tcq.sql.Clone(),
-		path: tcq.path,
+		sql:       tcq.sql.Clone(),
+		path:      tcq.path,
+		modifiers: append([]func(*sql.Selector){}, tcq.modifiers...),
 	}
 }
 
@@ -788,6 +789,12 @@ func (tcq *TokenCreateQuery) ForShare(opts ...sql.LockOption) *TokenCreateQuery 
 	return tcq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tcq *TokenCreateQuery) Modify(modifiers ...func(s *sql.Selector)) *TokenCreateSelect {
+	tcq.modifiers = append(tcq.modifiers, modifiers...)
+	return tcq.Select()
+}
+
 // TokenCreateGroupBy is the group-by builder for TokenCreate entities.
 type TokenCreateGroupBy struct {
 	selector
@@ -876,4 +883,10 @@ func (tcs *TokenCreateSelect) sqlScan(ctx context.Context, root *TokenCreateQuer
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tcs *TokenCreateSelect) Modify(modifiers ...func(s *sql.Selector)) *TokenCreateSelect {
+	tcs.modifiers = append(tcs.modifiers, modifiers...)
+	return tcs
 }

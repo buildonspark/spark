@@ -21,8 +21,9 @@ import (
 // SparkInvoiceUpdate is the builder for updating SparkInvoice entities.
 type SparkInvoiceUpdate struct {
 	config
-	hooks    []Hook
-	mutation *SparkInvoiceMutation
+	hooks     []Hook
+	mutation  *SparkInvoiceMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the SparkInvoiceUpdate builder.
@@ -150,6 +151,12 @@ func (siu *SparkInvoiceUpdate) defaults() {
 	}
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (siu *SparkInvoiceUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *SparkInvoiceUpdate {
+	siu.modifiers = append(siu.modifiers, modifiers...)
+	return siu
+}
+
 func (siu *SparkInvoiceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	_spec := sqlgraph.NewUpdateSpec(sparkinvoice.Table, sparkinvoice.Columns, sqlgraph.NewFieldSpec(sparkinvoice.FieldID, field.TypeUUID))
 	if ps := siu.mutation.predicates; len(ps) > 0 {
@@ -255,6 +262,7 @@ func (siu *SparkInvoiceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(siu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, siu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{sparkinvoice.Label}
@@ -270,9 +278,10 @@ func (siu *SparkInvoiceUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // SparkInvoiceUpdateOne is the builder for updating a single SparkInvoice entity.
 type SparkInvoiceUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *SparkInvoiceMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *SparkInvoiceMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -407,6 +416,12 @@ func (siuo *SparkInvoiceUpdateOne) defaults() {
 	}
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (siuo *SparkInvoiceUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *SparkInvoiceUpdateOne {
+	siuo.modifiers = append(siuo.modifiers, modifiers...)
+	return siuo
+}
+
 func (siuo *SparkInvoiceUpdateOne) sqlSave(ctx context.Context) (_node *SparkInvoice, err error) {
 	_spec := sqlgraph.NewUpdateSpec(sparkinvoice.Table, sparkinvoice.Columns, sqlgraph.NewFieldSpec(sparkinvoice.FieldID, field.TypeUUID))
 	id, ok := siuo.mutation.ID()
@@ -529,6 +544,7 @@ func (siuo *SparkInvoiceUpdateOne) sqlSave(ctx context.Context) (_node *SparkInv
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(siuo.modifiers...)
 	_node = &SparkInvoice{config: siuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

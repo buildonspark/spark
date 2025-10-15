@@ -254,8 +254,9 @@ func (gq *GossipQuery) Clone() *GossipQuery {
 		inters:     append([]Interceptor{}, gq.inters...),
 		predicates: append([]predicate.Gossip{}, gq.predicates...),
 		// clone intermediate query.
-		sql:  gq.sql.Clone(),
-		path: gq.path,
+		sql:       gq.sql.Clone(),
+		path:      gq.path,
+		modifiers: append([]func(*sql.Selector){}, gq.modifiers...),
 	}
 }
 
@@ -474,6 +475,12 @@ func (gq *GossipQuery) ForShare(opts ...sql.LockOption) *GossipQuery {
 	return gq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (gq *GossipQuery) Modify(modifiers ...func(s *sql.Selector)) *GossipSelect {
+	gq.modifiers = append(gq.modifiers, modifiers...)
+	return gq.Select()
+}
+
 // GossipGroupBy is the group-by builder for Gossip entities.
 type GossipGroupBy struct {
 	selector
@@ -562,4 +569,10 @@ func (gs *GossipSelect) sqlScan(ctx context.Context, root *GossipQuery, v any) e
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (gs *GossipSelect) Modify(modifiers ...func(s *sql.Selector)) *GossipSelect {
+	gs.modifiers = append(gs.modifiers, modifiers...)
+	return gs
 }

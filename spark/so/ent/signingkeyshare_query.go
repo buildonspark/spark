@@ -254,8 +254,9 @@ func (skq *SigningKeyshareQuery) Clone() *SigningKeyshareQuery {
 		inters:     append([]Interceptor{}, skq.inters...),
 		predicates: append([]predicate.SigningKeyshare{}, skq.predicates...),
 		// clone intermediate query.
-		sql:  skq.sql.Clone(),
-		path: skq.path,
+		sql:       skq.sql.Clone(),
+		path:      skq.path,
+		modifiers: append([]func(*sql.Selector){}, skq.modifiers...),
 	}
 }
 
@@ -474,6 +475,12 @@ func (skq *SigningKeyshareQuery) ForShare(opts ...sql.LockOption) *SigningKeysha
 	return skq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (skq *SigningKeyshareQuery) Modify(modifiers ...func(s *sql.Selector)) *SigningKeyshareSelect {
+	skq.modifiers = append(skq.modifiers, modifiers...)
+	return skq.Select()
+}
+
 // SigningKeyshareGroupBy is the group-by builder for SigningKeyshare entities.
 type SigningKeyshareGroupBy struct {
 	selector
@@ -562,4 +569,10 @@ func (sks *SigningKeyshareSelect) sqlScan(ctx context.Context, root *SigningKeys
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (sks *SigningKeyshareSelect) Modify(modifiers ...func(s *sql.Selector)) *SigningKeyshareSelect {
+	sks.modifiers = append(sks.modifiers, modifiers...)
+	return sks
 }

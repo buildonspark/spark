@@ -21,8 +21,9 @@ import (
 // TokenTransactionPeerSignatureUpdate is the builder for updating TokenTransactionPeerSignature entities.
 type TokenTransactionPeerSignatureUpdate struct {
 	config
-	hooks    []Hook
-	mutation *TokenTransactionPeerSignatureMutation
+	hooks     []Hook
+	mutation  *TokenTransactionPeerSignatureMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the TokenTransactionPeerSignatureUpdate builder.
@@ -128,6 +129,12 @@ func (ttpsu *TokenTransactionPeerSignatureUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (ttpsu *TokenTransactionPeerSignatureUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TokenTransactionPeerSignatureUpdate {
+	ttpsu.modifiers = append(ttpsu.modifiers, modifiers...)
+	return ttpsu
+}
+
 func (ttpsu *TokenTransactionPeerSignatureUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := ttpsu.check(); err != nil {
 		return n, err
@@ -178,6 +185,7 @@ func (ttpsu *TokenTransactionPeerSignatureUpdate) sqlSave(ctx context.Context) (
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(ttpsu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, ttpsu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{tokentransactionpeersignature.Label}
@@ -193,9 +201,10 @@ func (ttpsu *TokenTransactionPeerSignatureUpdate) sqlSave(ctx context.Context) (
 // TokenTransactionPeerSignatureUpdateOne is the builder for updating a single TokenTransactionPeerSignature entity.
 type TokenTransactionPeerSignatureUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *TokenTransactionPeerSignatureMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *TokenTransactionPeerSignatureMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -308,6 +317,12 @@ func (ttpsuo *TokenTransactionPeerSignatureUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (ttpsuo *TokenTransactionPeerSignatureUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TokenTransactionPeerSignatureUpdateOne {
+	ttpsuo.modifiers = append(ttpsuo.modifiers, modifiers...)
+	return ttpsuo
+}
+
 func (ttpsuo *TokenTransactionPeerSignatureUpdateOne) sqlSave(ctx context.Context) (_node *TokenTransactionPeerSignature, err error) {
 	if err := ttpsuo.check(); err != nil {
 		return _node, err
@@ -375,6 +390,7 @@ func (ttpsuo *TokenTransactionPeerSignatureUpdateOne) sqlSave(ctx context.Contex
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(ttpsuo.modifiers...)
 	_node = &TokenTransactionPeerSignature{config: ttpsuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

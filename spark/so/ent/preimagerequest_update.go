@@ -24,8 +24,9 @@ import (
 // PreimageRequestUpdate is the builder for updating PreimageRequest entities.
 type PreimageRequestUpdate struct {
 	config
-	hooks    []Hook
-	mutation *PreimageRequestMutation
+	hooks     []Hook
+	mutation  *PreimageRequestMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the PreimageRequestUpdate builder.
@@ -234,6 +235,12 @@ func (pru *PreimageRequestUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (pru *PreimageRequestUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *PreimageRequestUpdate {
+	pru.modifiers = append(pru.modifiers, modifiers...)
+	return pru
+}
+
 func (pru *PreimageRequestUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := pru.check(); err != nil {
 		return n, err
@@ -370,6 +377,7 @@ func (pru *PreimageRequestUpdate) sqlSave(ctx context.Context) (n int, err error
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(pru.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, pru.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{preimagerequest.Label}
@@ -385,9 +393,10 @@ func (pru *PreimageRequestUpdate) sqlSave(ctx context.Context) (n int, err error
 // PreimageRequestUpdateOne is the builder for updating a single PreimageRequest entity.
 type PreimageRequestUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *PreimageRequestMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *PreimageRequestMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -603,6 +612,12 @@ func (pruo *PreimageRequestUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (pruo *PreimageRequestUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *PreimageRequestUpdateOne {
+	pruo.modifiers = append(pruo.modifiers, modifiers...)
+	return pruo
+}
+
 func (pruo *PreimageRequestUpdateOne) sqlSave(ctx context.Context) (_node *PreimageRequest, err error) {
 	if err := pruo.check(); err != nil {
 		return _node, err
@@ -756,6 +771,7 @@ func (pruo *PreimageRequestUpdateOne) sqlSave(ctx context.Context) (_node *Preim
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(pruo.modifiers...)
 	_node = &PreimageRequest{config: pruo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

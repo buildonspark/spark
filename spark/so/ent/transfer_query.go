@@ -379,8 +379,9 @@ func (tq *TransferQuery) Clone() *TransferQuery {
 		withCounterSwapTransfer: tq.withCounterSwapTransfer.Clone(),
 		withPrimarySwapTransfer: tq.withPrimarySwapTransfer.Clone(),
 		// clone intermediate query.
-		sql:  tq.sql.Clone(),
-		path: tq.path,
+		sql:       tq.sql.Clone(),
+		path:      tq.path,
+		modifiers: append([]func(*sql.Selector){}, tq.modifiers...),
 	}
 }
 
@@ -860,6 +861,12 @@ func (tq *TransferQuery) ForShare(opts ...sql.LockOption) *TransferQuery {
 	return tq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tq *TransferQuery) Modify(modifiers ...func(s *sql.Selector)) *TransferSelect {
+	tq.modifiers = append(tq.modifiers, modifiers...)
+	return tq.Select()
+}
+
 // TransferGroupBy is the group-by builder for Transfer entities.
 type TransferGroupBy struct {
 	selector
@@ -948,4 +955,10 @@ func (ts *TransferSelect) sqlScan(ctx context.Context, root *TransferQuery, v an
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (ts *TransferSelect) Modify(modifiers ...func(s *sql.Selector)) *TransferSelect {
+	ts.modifiers = append(ts.modifiers, modifiers...)
+	return ts
 }

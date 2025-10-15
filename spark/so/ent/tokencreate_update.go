@@ -23,8 +23,9 @@ import (
 // TokenCreateUpdate is the builder for updating TokenCreate entities.
 type TokenCreateUpdate struct {
 	config
-	hooks    []Hook
-	mutation *TokenCreateMutation
+	hooks     []Hook
+	mutation  *TokenCreateMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the TokenCreateUpdate builder.
@@ -247,6 +248,12 @@ func (tcu *TokenCreateUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (tcu *TokenCreateUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TokenCreateUpdate {
+	tcu.modifiers = append(tcu.modifiers, modifiers...)
+	return tcu
+}
+
 func (tcu *TokenCreateUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := tcu.check(); err != nil {
 		return n, err
@@ -441,6 +448,7 @@ func (tcu *TokenCreateUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(tcu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tcu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{tokencreate.Label}
@@ -456,9 +464,10 @@ func (tcu *TokenCreateUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // TokenCreateUpdateOne is the builder for updating a single TokenCreate entity.
 type TokenCreateUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *TokenCreateMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *TokenCreateMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -688,6 +697,12 @@ func (tcuo *TokenCreateUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (tcuo *TokenCreateUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TokenCreateUpdateOne {
+	tcuo.modifiers = append(tcuo.modifiers, modifiers...)
+	return tcuo
+}
+
 func (tcuo *TokenCreateUpdateOne) sqlSave(ctx context.Context) (_node *TokenCreate, err error) {
 	if err := tcuo.check(); err != nil {
 		return _node, err
@@ -899,6 +914,7 @@ func (tcuo *TokenCreateUpdateOne) sqlSave(ctx context.Context) (_node *TokenCrea
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(tcuo.modifiers...)
 	_node = &TokenCreate{config: tcuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

@@ -19,8 +19,9 @@ import (
 // SigningCommitmentUpdate is the builder for updating SigningCommitment entities.
 type SigningCommitmentUpdate struct {
 	config
-	hooks    []Hook
-	mutation *SigningCommitmentMutation
+	hooks     []Hook
+	mutation  *SigningCommitmentMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the SigningCommitmentUpdate builder.
@@ -100,6 +101,12 @@ func (scu *SigningCommitmentUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (scu *SigningCommitmentUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *SigningCommitmentUpdate {
+	scu.modifiers = append(scu.modifiers, modifiers...)
+	return scu
+}
+
 func (scu *SigningCommitmentUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := scu.check(); err != nil {
 		return n, err
@@ -118,6 +125,7 @@ func (scu *SigningCommitmentUpdate) sqlSave(ctx context.Context) (n int, err err
 	if value, ok := scu.mutation.Status(); ok {
 		_spec.SetField(signingcommitment.FieldStatus, field.TypeEnum, value)
 	}
+	_spec.AddModifiers(scu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, scu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{signingcommitment.Label}
@@ -133,9 +141,10 @@ func (scu *SigningCommitmentUpdate) sqlSave(ctx context.Context) (n int, err err
 // SigningCommitmentUpdateOne is the builder for updating a single SigningCommitment entity.
 type SigningCommitmentUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *SigningCommitmentMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *SigningCommitmentMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -222,6 +231,12 @@ func (scuo *SigningCommitmentUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (scuo *SigningCommitmentUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *SigningCommitmentUpdateOne {
+	scuo.modifiers = append(scuo.modifiers, modifiers...)
+	return scuo
+}
+
 func (scuo *SigningCommitmentUpdateOne) sqlSave(ctx context.Context) (_node *SigningCommitment, err error) {
 	if err := scuo.check(); err != nil {
 		return _node, err
@@ -257,6 +272,7 @@ func (scuo *SigningCommitmentUpdateOne) sqlSave(ctx context.Context) (_node *Sig
 	if value, ok := scuo.mutation.Status(); ok {
 		_spec.SetField(signingcommitment.FieldStatus, field.TypeEnum, value)
 	}
+	_spec.AddModifiers(scuo.modifiers...)
 	_node = &SigningCommitment{config: scuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

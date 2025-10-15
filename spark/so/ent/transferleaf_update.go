@@ -21,8 +21,9 @@ import (
 // TransferLeafUpdate is the builder for updating TransferLeaf entities.
 type TransferLeafUpdate struct {
 	config
-	hooks    []Hook
-	mutation *TransferLeafMutation
+	hooks     []Hook
+	mutation  *TransferLeafMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the TransferLeafUpdate builder.
@@ -218,6 +219,12 @@ func (tlu *TransferLeafUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (tlu *TransferLeafUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TransferLeafUpdate {
+	tlu.modifiers = append(tlu.modifiers, modifiers...)
+	return tlu
+}
+
 func (tlu *TransferLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := tlu.check(); err != nil {
 		return n, err
@@ -342,6 +349,7 @@ func (tlu *TransferLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(tlu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tlu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{transferleaf.Label}
@@ -357,9 +365,10 @@ func (tlu *TransferLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // TransferLeafUpdateOne is the builder for updating a single TransferLeaf entity.
 type TransferLeafUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *TransferLeafMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *TransferLeafMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -562,6 +571,12 @@ func (tluo *TransferLeafUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (tluo *TransferLeafUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TransferLeafUpdateOne {
+	tluo.modifiers = append(tluo.modifiers, modifiers...)
+	return tluo
+}
+
 func (tluo *TransferLeafUpdateOne) sqlSave(ctx context.Context) (_node *TransferLeaf, err error) {
 	if err := tluo.check(); err != nil {
 		return _node, err
@@ -703,6 +718,7 @@ func (tluo *TransferLeafUpdateOne) sqlSave(ctx context.Context) (_node *Transfer
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(tluo.modifiers...)
 	_node = &TransferLeaf{config: tluo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

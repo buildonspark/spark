@@ -23,8 +23,9 @@ import (
 // TreeNodeUpdate is the builder for updating TreeNode entities.
 type TreeNodeUpdate struct {
 	config
-	hooks    []Hook
-	mutation *TreeNodeMutation
+	hooks     []Hook
+	mutation  *TreeNodeMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the TreeNodeUpdate builder.
@@ -433,6 +434,12 @@ func (tnu *TreeNodeUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (tnu *TreeNodeUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TreeNodeUpdate {
+	tnu.modifiers = append(tnu.modifiers, modifiers...)
+	return tnu
+}
+
 func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := tnu.check(); err != nil {
 		return n, err
@@ -670,6 +677,7 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(tnu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tnu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{treenode.Label}
@@ -685,9 +693,10 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // TreeNodeUpdateOne is the builder for updating a single TreeNode entity.
 type TreeNodeUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *TreeNodeMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *TreeNodeMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -1103,6 +1112,12 @@ func (tnuo *TreeNodeUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (tnuo *TreeNodeUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TreeNodeUpdateOne {
+	tnuo.modifiers = append(tnuo.modifiers, modifiers...)
+	return tnuo
+}
+
 func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, err error) {
 	if err := tnuo.check(); err != nil {
 		return _node, err
@@ -1357,6 +1372,7 @@ func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, er
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(tnuo.modifiers...)
 	_node = &TreeNode{config: tnuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

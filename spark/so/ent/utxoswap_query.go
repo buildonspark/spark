@@ -305,8 +305,9 @@ func (usq *UtxoSwapQuery) Clone() *UtxoSwapQuery {
 		withUtxo:     usq.withUtxo.Clone(),
 		withTransfer: usq.withTransfer.Clone(),
 		// clone intermediate query.
-		sql:  usq.sql.Clone(),
-		path: usq.path,
+		sql:       usq.sql.Clone(),
+		path:      usq.path,
+		modifiers: append([]func(*sql.Selector){}, usq.modifiers...),
 	}
 }
 
@@ -636,6 +637,12 @@ func (usq *UtxoSwapQuery) ForShare(opts ...sql.LockOption) *UtxoSwapQuery {
 	return usq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (usq *UtxoSwapQuery) Modify(modifiers ...func(s *sql.Selector)) *UtxoSwapSelect {
+	usq.modifiers = append(usq.modifiers, modifiers...)
+	return usq.Select()
+}
+
 // UtxoSwapGroupBy is the group-by builder for UtxoSwap entities.
 type UtxoSwapGroupBy struct {
 	selector
@@ -724,4 +731,10 @@ func (uss *UtxoSwapSelect) sqlScan(ctx context.Context, root *UtxoSwapQuery, v a
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (uss *UtxoSwapSelect) Modify(modifiers ...func(s *sql.Selector)) *UtxoSwapSelect {
+	uss.modifiers = append(uss.modifiers, modifiers...)
+	return uss
 }

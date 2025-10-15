@@ -305,8 +305,9 @@ func (siq *SparkInvoiceQuery) Clone() *SparkInvoiceQuery {
 		withTokenTransaction: siq.withTokenTransaction.Clone(),
 		withTransfer:         siq.withTransfer.Clone(),
 		// clone intermediate query.
-		sql:  siq.sql.Clone(),
-		path: siq.path,
+		sql:       siq.sql.Clone(),
+		path:      siq.path,
+		modifiers: append([]func(*sql.Selector){}, siq.modifiers...),
 	}
 }
 
@@ -661,6 +662,12 @@ func (siq *SparkInvoiceQuery) ForShare(opts ...sql.LockOption) *SparkInvoiceQuer
 	return siq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (siq *SparkInvoiceQuery) Modify(modifiers ...func(s *sql.Selector)) *SparkInvoiceSelect {
+	siq.modifiers = append(siq.modifiers, modifiers...)
+	return siq.Select()
+}
+
 // SparkInvoiceGroupBy is the group-by builder for SparkInvoice entities.
 type SparkInvoiceGroupBy struct {
 	selector
@@ -749,4 +756,10 @@ func (sis *SparkInvoiceSelect) sqlScan(ctx context.Context, root *SparkInvoiceQu
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (sis *SparkInvoiceSelect) Modify(modifiers ...func(s *sql.Selector)) *SparkInvoiceSelect {
+	sis.modifiers = append(sis.modifiers, modifiers...)
+	return sis
 }

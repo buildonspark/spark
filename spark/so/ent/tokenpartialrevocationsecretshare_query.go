@@ -280,8 +280,9 @@ func (tprssq *TokenPartialRevocationSecretShareQuery) Clone() *TokenPartialRevoc
 		predicates:      append([]predicate.TokenPartialRevocationSecretShare{}, tprssq.predicates...),
 		withTokenOutput: tprssq.withTokenOutput.Clone(),
 		// clone intermediate query.
-		sql:  tprssq.sql.Clone(),
-		path: tprssq.path,
+		sql:       tprssq.sql.Clone(),
+		path:      tprssq.path,
+		modifiers: append([]func(*sql.Selector){}, tprssq.modifiers...),
 	}
 }
 
@@ -561,6 +562,12 @@ func (tprssq *TokenPartialRevocationSecretShareQuery) ForShare(opts ...sql.LockO
 	return tprssq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tprssq *TokenPartialRevocationSecretShareQuery) Modify(modifiers ...func(s *sql.Selector)) *TokenPartialRevocationSecretShareSelect {
+	tprssq.modifiers = append(tprssq.modifiers, modifiers...)
+	return tprssq.Select()
+}
+
 // TokenPartialRevocationSecretShareGroupBy is the group-by builder for TokenPartialRevocationSecretShare entities.
 type TokenPartialRevocationSecretShareGroupBy struct {
 	selector
@@ -649,4 +656,10 @@ func (tprsss *TokenPartialRevocationSecretShareSelect) sqlScan(ctx context.Conte
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (tprsss *TokenPartialRevocationSecretShareSelect) Modify(modifiers ...func(s *sql.Selector)) *TokenPartialRevocationSecretShareSelect {
+	tprsss.modifiers = append(tprsss.modifiers, modifiers...)
+	return tprsss
 }

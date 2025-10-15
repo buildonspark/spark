@@ -21,8 +21,9 @@ import (
 // TokenPartialRevocationSecretShareUpdate is the builder for updating TokenPartialRevocationSecretShare entities.
 type TokenPartialRevocationSecretShareUpdate struct {
 	config
-	hooks    []Hook
-	mutation *TokenPartialRevocationSecretShareMutation
+	hooks     []Hook
+	mutation  *TokenPartialRevocationSecretShareMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the TokenPartialRevocationSecretShareUpdate builder.
@@ -131,6 +132,12 @@ func (tprssu *TokenPartialRevocationSecretShareUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (tprssu *TokenPartialRevocationSecretShareUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TokenPartialRevocationSecretShareUpdate {
+	tprssu.modifiers = append(tprssu.modifiers, modifiers...)
+	return tprssu
+}
+
 func (tprssu *TokenPartialRevocationSecretShareUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := tprssu.check(); err != nil {
 		return n, err
@@ -181,6 +188,7 @@ func (tprssu *TokenPartialRevocationSecretShareUpdate) sqlSave(ctx context.Conte
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(tprssu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tprssu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{tokenpartialrevocationsecretshare.Label}
@@ -196,9 +204,10 @@ func (tprssu *TokenPartialRevocationSecretShareUpdate) sqlSave(ctx context.Conte
 // TokenPartialRevocationSecretShareUpdateOne is the builder for updating a single TokenPartialRevocationSecretShare entity.
 type TokenPartialRevocationSecretShareUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *TokenPartialRevocationSecretShareMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *TokenPartialRevocationSecretShareMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -314,6 +323,12 @@ func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TokenPartialRevocationSecretShareUpdateOne {
+	tprssuo.modifiers = append(tprssuo.modifiers, modifiers...)
+	return tprssuo
+}
+
 func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) sqlSave(ctx context.Context) (_node *TokenPartialRevocationSecretShare, err error) {
 	if err := tprssuo.check(); err != nil {
 		return _node, err
@@ -381,6 +396,7 @@ func (tprssuo *TokenPartialRevocationSecretShareUpdateOne) sqlSave(ctx context.C
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(tprssuo.modifiers...)
 	_node = &TokenPartialRevocationSecretShare{config: tprssuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

@@ -254,8 +254,9 @@ func (scq *SigningCommitmentQuery) Clone() *SigningCommitmentQuery {
 		inters:     append([]Interceptor{}, scq.inters...),
 		predicates: append([]predicate.SigningCommitment{}, scq.predicates...),
 		// clone intermediate query.
-		sql:  scq.sql.Clone(),
-		path: scq.path,
+		sql:       scq.sql.Clone(),
+		path:      scq.path,
+		modifiers: append([]func(*sql.Selector){}, scq.modifiers...),
 	}
 }
 
@@ -474,6 +475,12 @@ func (scq *SigningCommitmentQuery) ForShare(opts ...sql.LockOption) *SigningComm
 	return scq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (scq *SigningCommitmentQuery) Modify(modifiers ...func(s *sql.Selector)) *SigningCommitmentSelect {
+	scq.modifiers = append(scq.modifiers, modifiers...)
+	return scq.Select()
+}
+
 // SigningCommitmentGroupBy is the group-by builder for SigningCommitment entities.
 type SigningCommitmentGroupBy struct {
 	selector
@@ -562,4 +569,10 @@ func (scs *SigningCommitmentSelect) sqlScan(ctx context.Context, root *SigningCo
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (scs *SigningCommitmentSelect) Modify(modifiers ...func(s *sql.Selector)) *SigningCommitmentSelect {
+	scs.modifiers = append(scs.modifiers, modifiers...)
+	return scs
 }

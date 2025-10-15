@@ -21,8 +21,9 @@ import (
 // UserSignedTransactionUpdate is the builder for updating UserSignedTransaction entities.
 type UserSignedTransactionUpdate struct {
 	config
-	hooks    []Hook
-	mutation *UserSignedTransactionMutation
+	hooks     []Hook
+	mutation  *UserSignedTransactionMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the UserSignedTransactionUpdate builder.
@@ -123,6 +124,12 @@ func (ustu *UserSignedTransactionUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (ustu *UserSignedTransactionUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *UserSignedTransactionUpdate {
+	ustu.modifiers = append(ustu.modifiers, modifiers...)
+	return ustu
+}
+
 func (ustu *UserSignedTransactionUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := ustu.check(); err != nil {
 		return n, err
@@ -196,6 +203,7 @@ func (ustu *UserSignedTransactionUpdate) sqlSave(ctx context.Context) (n int, er
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(ustu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, ustu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{usersignedtransaction.Label}
@@ -211,9 +219,10 @@ func (ustu *UserSignedTransactionUpdate) sqlSave(ctx context.Context) (n int, er
 // UserSignedTransactionUpdateOne is the builder for updating a single UserSignedTransaction entity.
 type UserSignedTransactionUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *UserSignedTransactionMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *UserSignedTransactionMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -321,6 +330,12 @@ func (ustuo *UserSignedTransactionUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (ustuo *UserSignedTransactionUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *UserSignedTransactionUpdateOne {
+	ustuo.modifiers = append(ustuo.modifiers, modifiers...)
+	return ustuo
+}
+
 func (ustuo *UserSignedTransactionUpdateOne) sqlSave(ctx context.Context) (_node *UserSignedTransaction, err error) {
 	if err := ustuo.check(); err != nil {
 		return _node, err
@@ -411,6 +426,7 @@ func (ustuo *UserSignedTransactionUpdateOne) sqlSave(ctx context.Context) (_node
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	_spec.AddModifiers(ustuo.modifiers...)
 	_node = &UserSignedTransaction{config: ustuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues

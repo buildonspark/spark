@@ -305,8 +305,9 @@ func (ustq *UserSignedTransactionQuery) Clone() *UserSignedTransactionQuery {
 		withTreeNode:        ustq.withTreeNode.Clone(),
 		withPreimageRequest: ustq.withPreimageRequest.Clone(),
 		// clone intermediate query.
-		sql:  ustq.sql.Clone(),
-		path: ustq.path,
+		sql:       ustq.sql.Clone(),
+		path:      ustq.path,
+		modifiers: append([]func(*sql.Selector){}, ustq.modifiers...),
 	}
 }
 
@@ -636,6 +637,12 @@ func (ustq *UserSignedTransactionQuery) ForShare(opts ...sql.LockOption) *UserSi
 	return ustq
 }
 
+// Modify adds a query modifier for attaching custom logic to queries.
+func (ustq *UserSignedTransactionQuery) Modify(modifiers ...func(s *sql.Selector)) *UserSignedTransactionSelect {
+	ustq.modifiers = append(ustq.modifiers, modifiers...)
+	return ustq.Select()
+}
+
 // UserSignedTransactionGroupBy is the group-by builder for UserSignedTransaction entities.
 type UserSignedTransactionGroupBy struct {
 	selector
@@ -724,4 +731,10 @@ func (usts *UserSignedTransactionSelect) sqlScan(ctx context.Context, root *User
 	}
 	defer rows.Close()
 	return sql.ScanSlice(rows, v)
+}
+
+// Modify adds a query modifier for attaching custom logic to queries.
+func (usts *UserSignedTransactionSelect) Modify(modifiers ...func(s *sql.Selector)) *UserSignedTransactionSelect {
+	usts.modifiers = append(usts.modifiers, modifiers...)
+	return usts
 }

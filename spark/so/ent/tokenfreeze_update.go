@@ -19,8 +19,9 @@ import (
 // TokenFreezeUpdate is the builder for updating TokenFreeze entities.
 type TokenFreezeUpdate struct {
 	config
-	hooks    []Hook
-	mutation *TokenFreezeMutation
+	hooks     []Hook
+	mutation  *TokenFreezeMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // Where appends a list predicates to the TokenFreezeUpdate builder.
@@ -130,6 +131,12 @@ func (tfu *TokenFreezeUpdate) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (tfu *TokenFreezeUpdate) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TokenFreezeUpdate {
+	tfu.modifiers = append(tfu.modifiers, modifiers...)
+	return tfu
+}
+
 func (tfu *TokenFreezeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if err := tfu.check(); err != nil {
 		return n, err
@@ -160,6 +167,7 @@ func (tfu *TokenFreezeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if tfu.mutation.WalletProvidedThawTimestampCleared() {
 		_spec.ClearField(tokenfreeze.FieldWalletProvidedThawTimestamp, field.TypeUint64)
 	}
+	_spec.AddModifiers(tfu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tfu.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{tokenfreeze.Label}
@@ -175,9 +183,10 @@ func (tfu *TokenFreezeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 // TokenFreezeUpdateOne is the builder for updating a single TokenFreeze entity.
 type TokenFreezeUpdateOne struct {
 	config
-	fields   []string
-	hooks    []Hook
-	mutation *TokenFreezeMutation
+	fields    []string
+	hooks     []Hook
+	mutation  *TokenFreezeMutation
+	modifiers []func(*sql.UpdateBuilder)
 }
 
 // SetUpdateTime sets the "update_time" field.
@@ -294,6 +303,12 @@ func (tfuo *TokenFreezeUpdateOne) check() error {
 	return nil
 }
 
+// Modify adds a statement modifier for attaching custom logic to the UPDATE statement.
+func (tfuo *TokenFreezeUpdateOne) Modify(modifiers ...func(u *sql.UpdateBuilder)) *TokenFreezeUpdateOne {
+	tfuo.modifiers = append(tfuo.modifiers, modifiers...)
+	return tfuo
+}
+
 func (tfuo *TokenFreezeUpdateOne) sqlSave(ctx context.Context) (_node *TokenFreeze, err error) {
 	if err := tfuo.check(); err != nil {
 		return _node, err
@@ -341,6 +356,7 @@ func (tfuo *TokenFreezeUpdateOne) sqlSave(ctx context.Context) (_node *TokenFree
 	if tfuo.mutation.WalletProvidedThawTimestampCleared() {
 		_spec.ClearField(tokenfreeze.FieldWalletProvidedThawTimestamp, field.TypeUint64)
 	}
+	_spec.AddModifiers(tfuo.modifiers...)
 	_node = &TokenFreeze{config: tfuo.config}
 	_spec.Assign = _node.assignValues
 	_spec.ScanValues = _node.scanValues
