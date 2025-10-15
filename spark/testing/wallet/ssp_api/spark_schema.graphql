@@ -736,7 +736,7 @@ input RequestLightningReceiveInput {
     The expiry of the lightning invoice in seconds. Default value is 86400 (1 day).
     """
     expiry_secs: Int = null
-
+    
     """
     The memo to include in the lightning invoice. Should not be provided if the description_hash is provided.
     """

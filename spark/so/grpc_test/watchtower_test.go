@@ -339,7 +339,7 @@ func TestTimelockExpirationAfterLightningTransfer(t *testing.T) {
 		invoice: testInvoice,
 	}
 
-	invoice, _, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), userConfig, fakeInvoiceCreator, 100, "test", preimage)
+	invoice, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), userConfig, fakeInvoiceCreator, 100, "test", preimage)
 	require.NoError(t, err)
 	require.NotNil(t, invoice)
 

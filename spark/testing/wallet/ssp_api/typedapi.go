@@ -7,6 +7,7 @@ import (
 	"log"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
@@ -31,10 +32,10 @@ func (s *TypedSparkServiceAPI) CreateInvoice(
 	amountSats int64,
 	paymentHash []byte,
 	memo string,
-	expirySecs int,
+	expiry time.Duration,
 ) (string, error) {
 	network := mutations.BitcoinNetwork(strings.ToUpper(bitcoinNetwork.String()))
-	response, err := mutations.RequestLightningReceive(ctx, s.requester, network, amountSats, paymentHash, expirySecs, memo)
+	response, err := mutations.RequestLightningReceive(ctx, s.requester, network, amountSats, paymentHash, int(expiry.Seconds()), memo)
 	if err != nil {
 		return "", err
 	}
@@ -42,7 +43,7 @@ func (s *TypedSparkServiceAPI) CreateInvoice(
 }
 
 func (s *TypedSparkServiceAPI) PayInvoice(ctx context.Context, invoice string) (string, error) {
-	idempotencyKey := uuid.New().String()
+	idempotencyKey := uuid.NewString()
 	response, err := mutations.RequestLightningSend(ctx, s.requester, invoice, idempotencyKey)
 	if err != nil {
 		return "", err
@@ -109,7 +110,7 @@ func (s *TypedSparkServiceAPI) InitiateCoopExit(
 	address string,
 	speed mutations.ExitSpeed,
 ) (string, []byte, *wire.MsgTx, error) {
-	idempotencyKey := uuid.New().String()
+	idempotencyKey := uuid.NewString()
 
 	response, err := mutations.RequestCoopExit(ctx, s.requester, leafExternalIDs, address, idempotencyKey, speed)
 	if err != nil {

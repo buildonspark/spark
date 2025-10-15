@@ -1,6 +1,7 @@
 package grpctest
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"testing"
@@ -58,14 +59,14 @@ func testPreimageHash(t *testing.T, amountSats uint64) ([32]byte, [32]byte) {
 
 // CreateInvoice is a fake implementation of the LightningInvoiceCreator interface.
 // It returns a fake invoice string.
-func (f *FakeLightningInvoiceCreator) CreateInvoice(_ common.Network, amountSats uint64, _ []byte, _ string, _ int) (string, int64, error) {
+func (f *FakeLightningInvoiceCreator) CreateInvoice(_ context.Context, _ common.Network, amountSats int64, _ []byte, _ string, _ time.Duration) (string, error) {
 	var invoice string
 	if amountSats == 0 {
 		invoice = f.zeroInvoice
 	} else {
 		invoice = f.invoice
 	}
-	return invoice, 100, nil
+	return invoice, nil
 }
 
 func cleanUp(t *testing.T, config *wallet.TestWalletConfig, paymentHash [32]byte) {
@@ -88,7 +89,7 @@ func TestCreateLightningInvoice(t *testing.T) {
 	amountSats := uint64(100)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
 
-	invoice, _, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), config, fakeInvoiceCreator, amountSats, "test", preimage)
+	invoice, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), config, fakeInvoiceCreator, amountSats, "test", preimage)
 	require.NoError(t, err)
 	require.Equal(t, testInvoice, invoice)
 
@@ -102,7 +103,7 @@ func TestCreateZeroAmountLightningInvoice(t *testing.T) {
 	amountSats := uint64(0)
 	preimage, paymentHash := testPreimageHash(t, amountSats)
 
-	invoice, _, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), config, fakeInvoiceCreator, amountSats, "test", preimage)
+	invoice, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), config, fakeInvoiceCreator, amountSats, "test", preimage)
 	require.NoError(t, err)
 	require.Equal(t, testZeroInvoice, invoice)
 
@@ -120,7 +121,7 @@ func TestReceiveLightningPayment(t *testing.T) {
 
 	defer cleanUp(t, userConfig, paymentHash)
 
-	invoice, _, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), userConfig, fakeInvoiceCreator, amountSats, "test", preimage)
+	invoice, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), userConfig, fakeInvoiceCreator, amountSats, "test", preimage)
 	require.NoError(t, err)
 	assert.NotNil(t, invoice)
 
@@ -205,7 +206,7 @@ func TestReceiveZeroAmountLightningInvoicePayment(t *testing.T) {
 
 	defer cleanUp(t, userConfig, paymentHash)
 
-	invoice, _, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), userConfig, fakeInvoiceCreator, invoiceSats, "test", preimage)
+	invoice, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), userConfig, fakeInvoiceCreator, invoiceSats, "test", preimage)
 	require.NoError(t, err)
 	require.NotNil(t, invoice)
 	bolt11, err := decodepay.Decodepay(invoice)
@@ -282,7 +283,7 @@ func TestReceiveLightningPaymentCannotCancelAfterPreimageReveal(t *testing.T) {
 
 	defer cleanUp(t, userConfig, paymentHash)
 
-	invoice, _, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), userConfig, fakeInvoiceCreator, amountSats, "test", preimage)
+	invoice, err := wallet.CreateLightningInvoiceWithPreimage(t.Context(), userConfig, fakeInvoiceCreator, amountSats, "test", preimage)
 	require.NoError(t, err)
 	assert.NotNil(t, invoice)
 
@@ -575,7 +576,7 @@ func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
 
 	defer cleanUp(t, userConfig, wrongPaymentHash)
 
-	invoice, _, err := wallet.CreateLightningInvoiceWithPreimageAndHash(t.Context(), userConfig, fakeInvoiceCreator, amountSats, "test", preimage, wrongPaymentHash)
+	invoice, err := wallet.CreateLightningInvoiceWithPreimageAndHash(t.Context(), userConfig, fakeInvoiceCreator, amountSats, "test", preimage, wrongPaymentHash)
 	require.NoError(t, err)
 	assert.NotNil(t, invoice)
 

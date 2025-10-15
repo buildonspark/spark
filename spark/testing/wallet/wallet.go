@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/testing/wallet/ssp_api/mutations"
 
 	"github.com/lightsparkdev/spark/so/protoconverter"
 
@@ -56,18 +57,14 @@ func (w *SingleKeyTestWallet) RemoveOwnedNodes(nodeIDs map[string]bool) {
 	w.OwnedNodes = newOwnedNodes
 }
 
-func (w *SingleKeyTestWallet) CreateLightningInvoice(ctx context.Context, amount int64, memo string) (string, int64, error) {
+func (w *SingleKeyTestWallet) CreateLightningInvoice(ctx context.Context, amount int64, memo string) (string, error) {
 	identityPublicKeyHex := w.Config.IdentityPublicKey().ToHex()
 	requester, err := sspapi.NewRequesterWithBaseURL(identityPublicKeyHex, "")
 	if err != nil {
-		return "", 0, err
+		return "", err
 	}
-	api := sspapi.NewSparkServiceAPI(requester)
-	invoice, fees, err := CreateLightningInvoice(ctx, w.Config, api, uint64(amount), memo)
-	if err != nil {
-		return "", 0, err
-	}
-	return invoice, fees, nil
+	api := sspapi.NewTypedSparkServiceAPI(requester)
+	return CreateLightningInvoice(ctx, w.Config, api, uint64(amount), memo)
 }
 
 func (w *SingleKeyTestWallet) ClaimAllTransfers(ctx context.Context) ([]*pb.TreeNode, error) {
@@ -213,9 +210,9 @@ func (w *SingleKeyTestWallet) PayInvoice(ctx context.Context, invoice string) (s
 	if err != nil {
 		return "", fmt.Errorf("failed to create requester: %w", err)
 	}
-	api := sspapi.NewSparkServiceAPI(requester)
+	api := sspapi.NewTypedSparkServiceAPI(requester)
 
-	requestID, err := api.PayInvoice(invoice)
+	requestID, err := api.PayInvoice(ctx, invoice)
 	if err != nil {
 		return "", fmt.Errorf("failed to pay invoice: %w", err)
 	}
@@ -355,9 +352,9 @@ func (w *SingleKeyTestWallet) RequestLeavesSwap(ctx context.Context, targetAmoun
 		})
 	}
 
-	api := sspapi.NewSparkServiceAPI(requester)
+	api := sspapi.NewTypedSparkServiceAPI(requester)
 
-	requestID, leaves, err := api.RequestLeavesSwap(adaptorPrivateKey.Public().ToHex(), uint64(totalAmount), uint64(targetAmount), 0, userLeaves)
+	requestID, leaves, err := api.RequestLeavesSwap(ctx, adaptorPrivateKey.Public().ToHex(), totalAmount, targetAmount, 0, userLeaves)
 	if err != nil {
 		_, cancelErr := CancelTransfer(ctx, w.Config, transfer)
 		if cancelErr != nil {
@@ -429,8 +426,11 @@ func (w *SingleKeyTestWallet) RequestLeavesSwap(ctx context.Context, targetAmoun
 	if err != nil {
 		return nil, fmt.Errorf("failed to send transfer: %w", err)
 	}
-
-	_, err = api.CompleteLeavesSwap(hex.EncodeToString(adaptorPrivKeyBytes), transfer.Id, requestID)
+	transferID, err := uuid.Parse(transfer.Id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse transfer ID: %w", err)
+	}
+	_, err = api.CompleteLeavesSwap(ctx, hex.EncodeToString(adaptorPrivKeyBytes), transferID, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to complete leaves swap: %w", err)
 	}
@@ -488,13 +488,13 @@ func (w *SingleKeyTestWallet) SendTransfer(ctx context.Context, receiverIdentity
 	return transfer, nil
 }
 
-func (w *SingleKeyTestWallet) CoopExit(ctx context.Context, targetAmountSats int64, onchainAddress string) (*pb.Transfer, error) {
+func (w *SingleKeyTestWallet) CoopExit(ctx context.Context, targetAmountSats int64, onchainAddress string, exitSpeed mutations.ExitSpeed) (*pb.Transfer, error) {
 	// Prepare leaves to send
 	nodes, err := w.leafSelection(targetAmountSats)
 	if err != nil {
 		return nil, fmt.Errorf("failed to select nodes: %w", err)
 	}
-	leafIDs := make([]string, len(nodes))
+	leafIDs := make([]uuid.UUID, len(nodes))
 	leafKeyTweaks := make([]LeafKeyTweak, len(nodes))
 	nodesToRemove := make(map[string]bool)
 	for i, node := range nodes {
@@ -504,7 +504,11 @@ func (w *SingleKeyTestWallet) CoopExit(ctx context.Context, targetAmountSats int
 			NewSigningPrivKey: keys.GeneratePrivateKey(),
 		}
 		nodesToRemove[node.Id] = true
-		leafIDs[i] = node.Id
+		parsedID, err := uuid.Parse(node.Id)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse node ID as UUID: %w", err)
+		}
+		leafIDs[i] = parsedID
 	}
 
 	// Get tx from SSP
@@ -513,8 +517,8 @@ func (w *SingleKeyTestWallet) CoopExit(ctx context.Context, targetAmountSats int
 	if err != nil {
 		return nil, fmt.Errorf("failed to create requester: %w", err)
 	}
-	api := sspapi.NewSparkServiceAPI(requester)
-	coopExitID, coopExitTxid, connectorTx, err := api.InitiateCoopExit(leafIDs, onchainAddress)
+	api := sspapi.NewTypedSparkServiceAPI(requester)
+	coopExitID, coopExitTxid, connectorTx, err := api.InitiateCoopExit(ctx, leafIDs, onchainAddress, exitSpeed)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initiate coop exit: %w", err)
 	}
@@ -533,7 +537,11 @@ func (w *SingleKeyTestWallet) CoopExit(ctx context.Context, targetAmountSats int
 		return nil, fmt.Errorf("failed to get connector refund signatures: %w", err)
 	}
 
-	completeID, err := api.CompleteCoopExit(transfer.Id, coopExitID)
+	transferID, err := uuid.Parse(transfer.Id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse transfer ID: %w", err)
+	}
+	completeID, err := api.CompleteCoopExit(ctx, transferID, coopExitID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to complete coop exit: %w", err)
 	}
@@ -963,8 +971,8 @@ func (w *SingleKeyTestWallet) SendToPhone(ctx context.Context, amount int64, pho
 	if err != nil {
 		return nil, fmt.Errorf("failed to create requester: %w", err)
 	}
-	api := sspapi.NewSparkServiceAPI(requester)
-	publicKeyHex, err := api.FetchPublicKeyByPhoneNumber(phoneNumber)
+	api := sspapi.NewTypedSparkServiceAPI(requester)
+	publicKeyHex, err := api.FetchPublicKeyByPhoneNumber(ctx, phoneNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch public key: %w", err)
 	}
@@ -980,33 +988,33 @@ func (w *SingleKeyTestWallet) SendToPhone(ctx context.Context, amount int64, pho
 	if err != nil {
 		return nil, fmt.Errorf("failed to send transfer: %w", err)
 	}
-	err = api.NotifyReceiverTransfer(phoneNumber, uint64(amount))
+	err = api.NotifyReceiverTransfer(ctx, phoneNumber, amount)
 	if err != nil {
 		return transfer, fmt.Errorf("failed to notify receiver transfer: %w", err)
 	}
 	return transfer, nil
 }
 
-func (w *SingleKeyTestWallet) StartReleaseSeed(phoneNumber string) error {
+func (w *SingleKeyTestWallet) StartReleaseSeed(ctx context.Context, phoneNumber string) error {
 	requester, err := sspapi.NewRequesterWithBaseURL("", "")
 	if err != nil {
 		return fmt.Errorf("failed to create requester: %w", err)
 	}
-	api := sspapi.NewSparkServiceAPI(requester)
-	err = api.StartReleaseSeed(phoneNumber)
+	api := sspapi.NewTypedSparkServiceAPI(requester)
+	err = api.StartReleaseSeed(ctx, phoneNumber)
 	if err != nil {
 		return fmt.Errorf("failed to start release seed: %w", err)
 	}
 	return nil
 }
 
-func (w *SingleKeyTestWallet) CompleteReleaseSeed(phoneNumber string, code string) ([]byte, error) {
+func (w *SingleKeyTestWallet) CompleteReleaseSeed(ctx context.Context, phoneNumber string, code string) ([]byte, error) {
 	requester, err := sspapi.NewRequesterWithBaseURL("", "")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create requester: %w", err)
 	}
-	api := sspapi.NewSparkServiceAPI(requester)
-	seed, err := api.CompleteReleaseSeed(phoneNumber, code)
+	api := sspapi.NewTypedSparkServiceAPI(requester)
+	seed, err := api.CompleteReleaseSeed(ctx, phoneNumber, code)
 	if err != nil {
 		return nil, fmt.Errorf("failed to complete release seed: %w", err)
 	}
