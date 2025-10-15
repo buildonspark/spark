@@ -10,7 +10,6 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"go.uber.org/zap"
 
-	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
@@ -238,7 +237,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		}
 
 		// Update the leaves with the final signatures for refunds
-		if len(finalDirectSignatureMap) > 0 && len(finalDirectFromCpfpSignatureMap) > 0 {
+		if len(finalDirectSignatureMap) > 0 || len(finalDirectFromCpfpSignatureMap) > 0 {
 			err = h.UpdateTransferLeavesSignatures(ctx, transfer, finalCpfpSignatureMap, finalDirectSignatureMap, finalDirectFromCpfpSignatureMap)
 			if err != nil {
 				return nil, fmt.Errorf("failed to update transfer leaves signatures: %w", err)
@@ -744,12 +743,9 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 		)
 		leafJobMap[cpfpJobID] = leaf
 
-		if req.DirectRefundTxSigningJob != nil && req.DirectFromCpfpRefundTxSigningJob != nil && len(leaf.DirectTx) > 0 {
+		// Create direct refund tx signing job if present and direct tx exists
+		if req.DirectRefundTxSigningJob != nil && len(leaf.DirectTx) > 0 {
 			directRefundTx, err := common.TxFromRawTxBytes(req.DirectRefundTxSigningJob.RawTx)
-			if err != nil {
-				return nil, fmt.Errorf("unable to load new refund tx: %w", err)
-			}
-			directFromCpfpRefundTx, err := common.TxFromRawTxBytes(req.DirectFromCpfpRefundTxSigningJob.RawTx)
 			if err != nil {
 				return nil, fmt.Errorf("unable to load new refund tx: %w", err)
 			}
@@ -764,20 +760,11 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 			if err != nil {
 				return nil, fmt.Errorf("unable to calculate sighash from direct refund tx: %w", err)
 			}
-			directFromCpfpRefundTxSigHash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpLeafTx.TxOut[0])
-			if err != nil {
-				return nil, fmt.Errorf("unable to calculate sighash from direct from cpfp refund tx: %w", err)
-			}
 			directUserNonceCommitment, err := objects.NewSigningCommitment(req.DirectRefundTxSigningJob.SigningNonceCommitment.Binding, req.DirectRefundTxSigningJob.SigningNonceCommitment.Hiding)
 			if err != nil {
 				return nil, fmt.Errorf("unable to create direct signing commitment: %w", err)
 			}
-			directFromCpfpUserNonceCommitment, err := objects.NewSigningCommitment(req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Binding, req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Hiding)
-			if err != nil {
-				return nil, fmt.Errorf("unable to create direct from cpfp signing commitment: %w", err)
-			}
 			directJobID := uuid.New().String()
-			directFromCpfpJobID := uuid.New().String()
 
 			directSigningJobs = append(
 				directSigningJobs,
@@ -790,6 +777,25 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 					AdaptorPublicKey:  &directAdaptorPubKey,
 				},
 			)
+			leafJobMap[directJobID] = leaf
+		}
+
+		// Always create direct from cpfp refund tx signing job if present
+		if req.DirectFromCpfpRefundTxSigningJob != nil {
+			directFromCpfpRefundTx, err := common.TxFromRawTxBytes(req.DirectFromCpfpRefundTxSigningJob.RawTx)
+			if err != nil {
+				return nil, fmt.Errorf("unable to load new refund tx: %w", err)
+			}
+			directFromCpfpRefundTxSigHash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpLeafTx.TxOut[0])
+			if err != nil {
+				return nil, fmt.Errorf("unable to calculate sighash from direct from cpfp refund tx: %w", err)
+			}
+			directFromCpfpUserNonceCommitment, err := objects.NewSigningCommitment(req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Binding, req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Hiding)
+			if err != nil {
+				return nil, fmt.Errorf("unable to create direct from cpfp signing commitment: %w", err)
+			}
+			directFromCpfpJobID := uuid.New().String()
+
 			directFromCpfpSigningJobs = append(
 				directFromCpfpSigningJobs,
 				&helper.SigningJob{
@@ -801,7 +807,6 @@ func signRefunds(ctx context.Context, config *so.Config, requests *pb.StartTrans
 					AdaptorPublicKey:  &directFromCpfpAdaptorPubKey,
 				},
 			)
-			leafJobMap[directJobID] = leaf
 			leafJobMap[directFromCpfpJobID] = leaf
 		}
 	}
@@ -1484,11 +1489,13 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 	}
 	var directRefundTxBytes []byte
 	var directFromCpfpRefundTxBytes []byte
-	if transferLeaf.IntermediateDirectRefundTx != nil && req.DirectRefundSignature != nil && transferLeaf.IntermediateDirectFromCpfpRefundTx != nil && req.DirectFromCpfpRefundSignature != nil {
+	if transferLeaf.IntermediateDirectRefundTx != nil && req.DirectRefundSignature != nil {
 		directRefundTxBytes, err = common.UpdateTxWithSignature(transferLeaf.IntermediateDirectRefundTx, 0, req.DirectRefundSignature)
 		if err != nil {
 			return fmt.Errorf("unable to update direct refund tx with signature: %w", err)
 		}
+	}
+	if transferLeaf.IntermediateDirectFromCpfpRefundTx != nil && req.DirectFromCpfpRefundSignature != nil {
 		directFromCpfpRefundTxBytes, err = common.UpdateTxWithSignature(transferLeaf.IntermediateDirectFromCpfpRefundTx, 0, req.DirectFromCpfpRefundSignature)
 		if err != nil {
 			return fmt.Errorf("unable to update direct from cpfp refund tx with signature: %w", err)
@@ -1519,16 +1526,11 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 			return fmt.Errorf("unable to verify cpfp refund tx signature: %w", err)
 		}
 
-		directRefundTx := &wire.MsgTx{}
-		directFromCpfpRefundTx := &wire.MsgTx{}
-		if len(directRefundTxBytes) > 0 && len(directFromCpfpRefundTxBytes) > 0 {
-			directRefundTx, err = common.TxFromRawTxBytes(directRefundTxBytes)
+		// Verify direct refund tx if present
+		if len(directRefundTxBytes) > 0 {
+			directRefundTx, err := common.TxFromRawTxBytes(directRefundTxBytes)
 			if err != nil {
 				return fmt.Errorf("unable to deserialize direct refund tx: %w", err)
-			}
-			directFromCpfpRefundTx, err = common.TxFromRawTxBytes(directFromCpfpRefundTxBytes)
-			if err != nil {
-				return fmt.Errorf("unable to deserialize direct from cpfp refund tx: %w", err)
 			}
 			directLeafNodeTx, err := common.TxFromRawTxBytes(leaf.DirectTx)
 			if err != nil {
@@ -1540,13 +1542,21 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 			if !directRefundTx.HasWitness() {
 				logger.Sugar().Warnf("Transaction with txid %s has no witness", directRefundTx.TxID())
 			}
-			if !directFromCpfpRefundTx.HasWitness() {
-				logger.Sugar().Warnf("Transaction with txid %s has no witness", directFromCpfpRefundTx.TxID())
-			}
 			err = common.VerifySignatureSingleInput(directRefundTx, 0, directLeafNodeTx.TxOut[0])
 			if err != nil {
 				logger.With(zap.Error(err)).Sugar().Errorf("Unable to verify direct refund tx signature for txid %s", directRefundTx.TxID())
 				return fmt.Errorf("unable to verify direct refund tx signature: %w", err)
+			}
+		}
+
+		// Verify direct from cpfp refund tx if present
+		if len(directFromCpfpRefundTxBytes) > 0 {
+			directFromCpfpRefundTx, err := common.TxFromRawTxBytes(directFromCpfpRefundTxBytes)
+			if err != nil {
+				return fmt.Errorf("unable to deserialize direct from cpfp refund tx: %w", err)
+			}
+			if !directFromCpfpRefundTx.HasWitness() {
+				logger.Sugar().Warnf("Transaction with txid %s has no witness", directFromCpfpRefundTx.TxID())
 			}
 			err = common.VerifySignatureSingleInput(directFromCpfpRefundTx, 0, cpfpLeafNodeTx.TxOut[0])
 			if err != nil {
@@ -2261,10 +2271,13 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		jobToLeafMap[cpfpSigningJob.JobID] = leaf.ID
 		isDirectSigningJob[cpfpSigningJob.JobID] = false
 		isDirectFromCpfpSigningJob[cpfpSigningJob.JobID] = false
-		if directSigningJob != nil && directFromCpfpSigningJob != nil {
-			signingJobs = append(signingJobs, directSigningJob, directFromCpfpSigningJob)
+		if directSigningJob != nil {
+			signingJobs = append(signingJobs, directSigningJob)
 			jobToLeafMap[directSigningJob.JobID] = leaf.ID
 			isDirectSigningJob[directSigningJob.JobID] = true
+		}
+		if directFromCpfpSigningJob != nil {
+			signingJobs = append(signingJobs, directFromCpfpSigningJob)
 			jobToLeafMap[directFromCpfpSigningJob.JobID] = leaf.ID
 			isDirectFromCpfpSigningJob[directFromCpfpSigningJob.JobID] = true
 		}
@@ -2330,7 +2343,9 @@ func (h *TransferHandler) getRefundTxSigningJobs(ctx context.Context, leaf *ent.
 	}
 	directRefundSigningJob := (*helper.SigningJob)(nil)
 	directFromCpfpRefundSigningJob := (*helper.SigningJob)(nil)
-	if len(leaf.DirectTx) > 0 && directJob != nil && directFromCpfpJob != nil {
+
+	// Create direct refund signing job if direct tx exists and job is provided
+	if len(leaf.DirectTx) > 0 && directJob != nil {
 		directLeafTx, err := common.TxFromRawTxBytes(leaf.DirectTx)
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to load direct leaf tx for leaf %s: %w", leaf.ID.String(), err)
@@ -2342,6 +2357,10 @@ func (h *TransferHandler) getRefundTxSigningJobs(ctx context.Context, leaf *ent.
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to create direct signing job for leaf %s: %w", leaf.ID.String(), err)
 		}
+	}
+
+	// Always create direct from cpfp refund signing job if provided
+	if directFromCpfpJob != nil {
 		directFromCpfpRefundSigningJob, _, err = helper.NewSigningJob(keyshare, directFromCpfpJob, cpfpLeafTx.TxOut[0])
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("unable to create direct from cpfp signing job for leaf %s: %w", leaf.ID.String(), err)
