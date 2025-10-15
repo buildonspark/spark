@@ -305,9 +305,16 @@ func GetSigningKeysharesMap(ctx context.Context, keyshareIDs []uuid.UUID) (map[u
 		return nil, err
 	}
 
-	keyshares, err := db.SigningKeyshare.Query().Where(
-		signingkeyshare.IDIn(keyshareIDs...),
-	).All(ctx)
+	keyshares, err := db.SigningKeyshare.Query().
+		Modify(func(s *sql.Selector) {
+			s.Where(sql.P(func(b *sql.Builder) {
+				b.Ident(signingkeyshare.FieldID).
+					WriteString(" = ANY(").
+					Arg(pq.Array(keyshareIDs)).
+					WriteByte(')')
+			}))
+		}).
+		All(ctx)
 	if err != nil {
 		return nil, err
 	}
