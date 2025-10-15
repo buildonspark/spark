@@ -289,7 +289,7 @@ export class LightningService {
     let response: InitiatePreimageSwapResponse;
     // TODO(LIG-8126): Remove transfer inputs once SDK upgrade is complete
     try {
-      response = await sparkClient.initiate_preimage_swap_v2({
+      response = await sparkClient.initiate_preimage_swap_v3({
         paymentHash,
         invoiceAmount: {
           invoiceAmountProof: {

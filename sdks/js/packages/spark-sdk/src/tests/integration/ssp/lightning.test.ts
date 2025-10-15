@@ -2,11 +2,16 @@ import { describe, expect, it } from "@jest/globals";
 import { ConfigOptions } from "../../../services/wallet-config.js";
 import { SparkWallet } from "../../../spark-wallet/spark-wallet.node.js";
 import {
-  BitcoinNetwork,
   CurrencyUnit,
   LightningReceiveRequestStatus,
 } from "../../../types/index.js";
 import { ValidationError } from "../../../errors/types.js";
+import { BitcoinFaucet } from "../../utils/test-faucet.js";
+import { SparkWalletTestingWithStream } from "../../utils/spark-testing-wallet.js";
+import { waitForClaim } from "../../utils/utils.js";
+
+const DEPOSIT_AMOUNT = 10000n;
+const INVOICE_AMOUNT = 1000;
 
 const options: ConfigOptions = {
   network: "LOCAL",
@@ -52,6 +57,67 @@ describe("Lightning Network provider", () => {
       },
       30000,
     );
+  });
+
+  describe("should pay lightning invoice", () => {
+    it("should pay lightning invoice created by another wallet", async () => {
+      const faucet = BitcoinFaucet.getInstance();
+
+      const { wallet: aliceWallet } =
+        await SparkWalletTestingWithStream.initialize({
+          options: {
+            network: "LOCAL",
+          },
+        });
+
+      const { wallet: bobWallet } =
+        await SparkWalletTestingWithStream.initialize({
+          options: {
+            network: "LOCAL",
+          },
+        });
+
+      const depositAddress = await aliceWallet.getSingleUseDepositAddress();
+      expect(depositAddress).toBeDefined();
+
+      const signedTx = await faucet.sendToAddress(
+        depositAddress,
+        DEPOSIT_AMOUNT,
+      );
+
+      // Wait for the transaction to be mined
+      await faucet.mineBlocksAndWaitForMiningToComplete(6);
+
+      await aliceWallet.claimDeposit(signedTx.id);
+
+      await waitForClaim({ wallet: aliceWallet });
+
+      const { balance } = await aliceWallet.getBalance();
+      expect(balance).toBe(DEPOSIT_AMOUNT);
+
+      const invoice = await bobWallet.createLightningInvoice({
+        amountSats: INVOICE_AMOUNT,
+        memo: "test",
+        expirySeconds: 10,
+      });
+
+      expect(invoice).toBeDefined();
+
+      await aliceWallet.payLightningInvoice({
+        invoice: invoice.invoice.encodedInvoice,
+        maxFeeSats: 100,
+      });
+
+      await waitForClaim({ wallet: bobWallet });
+
+      const { balance: bobBalance } = await bobWallet.getBalance();
+      expect(bobBalance).toBe(BigInt(INVOICE_AMOUNT));
+
+      const { balance: aliceBalance } = await aliceWallet.getBalance();
+      expect(aliceBalance).toBeLessThan(
+        DEPOSIT_AMOUNT - BigInt(INVOICE_AMOUNT),
+      );
+    }, 120000);
   });
 
   describe("should fail to create lightning invoice", () => {

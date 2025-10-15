@@ -1811,7 +1811,6 @@ export class TransferService extends BaseTransferService {
       nodeTxSigningJob: userSignedTxSigningJobs.get("node"),
       refundTxSigningJob: userSignedTxSigningJobs.get("cpfp"),
       directNodeTxSigningJob: userSignedTxSigningJobs.get("directNode"),
-      directRefundTxSigningJob: undefined,
       directFromCpfpRefundTxSigningJob:
         userSignedTxSigningJobs.get("directFromCpfp"),
     };

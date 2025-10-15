@@ -3657,7 +3657,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     // Pay over Lightning
     return await this.withLeaves(async () => {
-      const expiryTime = new Date(Date.now() + 2 * 60 * 1000);
+      // Make expiry time 16 days from now.
+      const expiryTime = new Date(Date.now() + 16 * 24 * 60 * 60 * 1000);
       const sspClient = this.getSspClient();
 
       // If 0 amount lightning invoice, use amountSatsToSend for fee estimate

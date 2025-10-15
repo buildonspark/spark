@@ -338,6 +338,45 @@ export function orderToJSON(object: Order): string {
   }
 }
 
+export enum PreimageRequestStatus {
+  PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE = 0,
+  PREIMAGE_REQUEST_STATUS_PREIMAGE_SHARED = 1,
+  PREIMAGE_REQUEST_STATUS_RETURNED = 2,
+  UNRECOGNIZED = -1,
+}
+
+export function preimageRequestStatusFromJSON(object: any): PreimageRequestStatus {
+  switch (object) {
+    case 0:
+    case "PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE":
+      return PreimageRequestStatus.PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE;
+    case 1:
+    case "PREIMAGE_REQUEST_STATUS_PREIMAGE_SHARED":
+      return PreimageRequestStatus.PREIMAGE_REQUEST_STATUS_PREIMAGE_SHARED;
+    case 2:
+    case "PREIMAGE_REQUEST_STATUS_RETURNED":
+      return PreimageRequestStatus.PREIMAGE_REQUEST_STATUS_RETURNED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return PreimageRequestStatus.UNRECOGNIZED;
+  }
+}
+
+export function preimageRequestStatusToJSON(object: PreimageRequestStatus): string {
+  switch (object) {
+    case PreimageRequestStatus.PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE:
+      return "PREIMAGE_REQUEST_STATUS_WAITING_FOR_PREIMAGE";
+    case PreimageRequestStatus.PREIMAGE_REQUEST_STATUS_PREIMAGE_SHARED:
+      return "PREIMAGE_REQUEST_STATUS_PREIMAGE_SHARED";
+    case PreimageRequestStatus.PREIMAGE_REQUEST_STATUS_RETURNED:
+      return "PREIMAGE_REQUEST_STATUS_RETURNED";
+    case PreimageRequestStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 /** Static deposit address flow messages */
 export enum UtxoSwapRequestType {
   Fixed = 0,
@@ -715,7 +754,6 @@ export interface RenewNodeZeroTimelockSigningJob {
    */
   refundTxSigningJob: UserSignedTxSigningJob | undefined;
   directNodeTxSigningJob: UserSignedTxSigningJob | undefined;
-  directRefundTxSigningJob: UserSignedTxSigningJob | undefined;
   directFromCpfpRefundTxSigningJob: UserSignedTxSigningJob | undefined;
 }
 
@@ -1206,6 +1244,10 @@ export interface LeafRefundTxSigningJob {
 export interface UserSignedTxSigningJob {
   leafId: string;
   signingPublicKey: Uint8Array;
+  /**
+   * CPFP Refund Tx that is created when the User signs refunds. It spends the
+   * node transaction to the receiver.
+   */
   rawTx: Uint8Array;
   signingNonceCommitment: SigningCommitment | undefined;
   userSignature: Uint8Array;
@@ -1682,6 +1724,40 @@ export interface QueryUserSignedRefundsResponse {
   transfer: Transfer | undefined;
 }
 
+export interface PreimageRequestWithTransfer {
+  /** Preimage request data */
+  paymentHash: Uint8Array;
+  receiverIdentityPubkey: Uint8Array;
+  status: PreimageRequestStatus;
+  createdTime:
+    | Date
+    | undefined;
+  /** Associated transfer (if exists) */
+  transfer?:
+    | Transfer
+    | undefined;
+  /** Preimage data (if available) */
+  preimage?: Uint8Array | undefined;
+}
+
+export interface QueryHtlcRequest {
+  paymentHashes: Uint8Array[];
+  identityPublicKey: Uint8Array;
+  status?:
+    | PreimageRequestStatus
+    | undefined;
+  /** defaults to 100 if not set. */
+  limit: number;
+  /** defaults to 0 if not set. */
+  offset: number;
+}
+
+export interface QueryHtlcResponse {
+  preimageRequests: PreimageRequestWithTransfer[];
+  /** defaults to -1 if there are no more results */
+  offset: number;
+}
+
 export interface ProvidePreimageRequest {
   paymentHash: Uint8Array;
   preimage: Uint8Array;
@@ -1980,6 +2056,35 @@ export interface SatsTransfer {
 
 export interface TokenTransfer {
   finalTokenTransactionHash: Uint8Array;
+}
+
+export interface InitiateSwapPrimaryTransferRequest {
+  /** Transfer with refunds and key tweaks signed */
+  transfer:
+    | StartTransferRequest
+    | undefined;
+  /**
+   * Adaptor public keys to verify the signatures of refunds for the primary
+   * transfer in the swap
+   */
+  adaptorPublicKeys: AdaptorPublicKeyPackage | undefined;
+}
+
+export interface InitiateSwapPrimaryTransferResponse {
+  transfer: Transfer | undefined;
+  signingResults: LeafRefundTxSigningResult[];
+}
+
+/**
+ * Adaptor public key is derived from the secret `t` using formula:
+ * ```
+ * T = t * G
+ * ```
+ */
+export interface AdaptorPublicKeyPackage {
+  adaptorPublicKey: Uint8Array;
+  directAdaptorPublicKey: Uint8Array;
+  directFromCpfpAdaptorPublicKey: Uint8Array;
 }
 
 function createBaseSubscribeToEventsRequest(): SubscribeToEventsRequest {
@@ -4612,7 +4717,6 @@ function createBaseRenewNodeZeroTimelockSigningJob(): RenewNodeZeroTimelockSigni
     nodeTxSigningJob: undefined,
     refundTxSigningJob: undefined,
     directNodeTxSigningJob: undefined,
-    directRefundTxSigningJob: undefined,
     directFromCpfpRefundTxSigningJob: undefined,
   };
 }
@@ -4627,9 +4731,6 @@ export const RenewNodeZeroTimelockSigningJob: MessageFns<RenewNodeZeroTimelockSi
     }
     if (message.directNodeTxSigningJob !== undefined) {
       UserSignedTxSigningJob.encode(message.directNodeTxSigningJob, writer.uint32(26).fork()).join();
-    }
-    if (message.directRefundTxSigningJob !== undefined) {
-      UserSignedTxSigningJob.encode(message.directRefundTxSigningJob, writer.uint32(34).fork()).join();
     }
     if (message.directFromCpfpRefundTxSigningJob !== undefined) {
       UserSignedTxSigningJob.encode(message.directFromCpfpRefundTxSigningJob, writer.uint32(42).fork()).join();
@@ -4668,14 +4769,6 @@ export const RenewNodeZeroTimelockSigningJob: MessageFns<RenewNodeZeroTimelockSi
           message.directNodeTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
           continue;
         }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.directRefundTxSigningJob = UserSignedTxSigningJob.decode(reader, reader.uint32());
-          continue;
-        }
         case 5: {
           if (tag !== 42) {
             break;
@@ -4704,9 +4797,6 @@ export const RenewNodeZeroTimelockSigningJob: MessageFns<RenewNodeZeroTimelockSi
       directNodeTxSigningJob: isSet(object.directNodeTxSigningJob)
         ? UserSignedTxSigningJob.fromJSON(object.directNodeTxSigningJob)
         : undefined,
-      directRefundTxSigningJob: isSet(object.directRefundTxSigningJob)
-        ? UserSignedTxSigningJob.fromJSON(object.directRefundTxSigningJob)
-        : undefined,
       directFromCpfpRefundTxSigningJob: isSet(object.directFromCpfpRefundTxSigningJob)
         ? UserSignedTxSigningJob.fromJSON(object.directFromCpfpRefundTxSigningJob)
         : undefined,
@@ -4723,9 +4813,6 @@ export const RenewNodeZeroTimelockSigningJob: MessageFns<RenewNodeZeroTimelockSi
     }
     if (message.directNodeTxSigningJob !== undefined) {
       obj.directNodeTxSigningJob = UserSignedTxSigningJob.toJSON(message.directNodeTxSigningJob);
-    }
-    if (message.directRefundTxSigningJob !== undefined) {
-      obj.directRefundTxSigningJob = UserSignedTxSigningJob.toJSON(message.directRefundTxSigningJob);
     }
     if (message.directFromCpfpRefundTxSigningJob !== undefined) {
       obj.directFromCpfpRefundTxSigningJob = UserSignedTxSigningJob.toJSON(message.directFromCpfpRefundTxSigningJob);
@@ -4747,10 +4834,6 @@ export const RenewNodeZeroTimelockSigningJob: MessageFns<RenewNodeZeroTimelockSi
     message.directNodeTxSigningJob =
       (object.directNodeTxSigningJob !== undefined && object.directNodeTxSigningJob !== null)
         ? UserSignedTxSigningJob.fromPartial(object.directNodeTxSigningJob)
-        : undefined;
-    message.directRefundTxSigningJob =
-      (object.directRefundTxSigningJob !== undefined && object.directRefundTxSigningJob !== null)
-        ? UserSignedTxSigningJob.fromPartial(object.directRefundTxSigningJob)
         : undefined;
     message.directFromCpfpRefundTxSigningJob =
       (object.directFromCpfpRefundTxSigningJob !== undefined && object.directFromCpfpRefundTxSigningJob !== null)
@@ -16044,6 +16127,363 @@ export const QueryUserSignedRefundsResponse: MessageFns<QueryUserSignedRefundsRe
   },
 };
 
+function createBasePreimageRequestWithTransfer(): PreimageRequestWithTransfer {
+  return {
+    paymentHash: new Uint8Array(0),
+    receiverIdentityPubkey: new Uint8Array(0),
+    status: 0,
+    createdTime: undefined,
+    transfer: undefined,
+    preimage: undefined,
+  };
+}
+
+export const PreimageRequestWithTransfer: MessageFns<PreimageRequestWithTransfer> = {
+  encode(message: PreimageRequestWithTransfer, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.paymentHash.length !== 0) {
+      writer.uint32(10).bytes(message.paymentHash);
+    }
+    if (message.receiverIdentityPubkey.length !== 0) {
+      writer.uint32(18).bytes(message.receiverIdentityPubkey);
+    }
+    if (message.status !== 0) {
+      writer.uint32(24).int32(message.status);
+    }
+    if (message.createdTime !== undefined) {
+      Timestamp.encode(toTimestamp(message.createdTime), writer.uint32(34).fork()).join();
+    }
+    if (message.transfer !== undefined) {
+      Transfer.encode(message.transfer, writer.uint32(42).fork()).join();
+    }
+    if (message.preimage !== undefined) {
+      writer.uint32(50).bytes(message.preimage);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PreimageRequestWithTransfer {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePreimageRequestWithTransfer();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.paymentHash = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.receiverIdentityPubkey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.createdTime = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.transfer = Transfer.decode(reader, reader.uint32());
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.preimage = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): PreimageRequestWithTransfer {
+    return {
+      paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0),
+      receiverIdentityPubkey: isSet(object.receiverIdentityPubkey)
+        ? bytesFromBase64(object.receiverIdentityPubkey)
+        : new Uint8Array(0),
+      status: isSet(object.status) ? preimageRequestStatusFromJSON(object.status) : 0,
+      createdTime: isSet(object.createdTime) ? fromJsonTimestamp(object.createdTime) : undefined,
+      transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined,
+      preimage: isSet(object.preimage) ? bytesFromBase64(object.preimage) : undefined,
+    };
+  },
+
+  toJSON(message: PreimageRequestWithTransfer): unknown {
+    const obj: any = {};
+    if (message.paymentHash.length !== 0) {
+      obj.paymentHash = base64FromBytes(message.paymentHash);
+    }
+    if (message.receiverIdentityPubkey.length !== 0) {
+      obj.receiverIdentityPubkey = base64FromBytes(message.receiverIdentityPubkey);
+    }
+    if (message.status !== 0) {
+      obj.status = preimageRequestStatusToJSON(message.status);
+    }
+    if (message.createdTime !== undefined) {
+      obj.createdTime = message.createdTime.toISOString();
+    }
+    if (message.transfer !== undefined) {
+      obj.transfer = Transfer.toJSON(message.transfer);
+    }
+    if (message.preimage !== undefined) {
+      obj.preimage = base64FromBytes(message.preimage);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<PreimageRequestWithTransfer>): PreimageRequestWithTransfer {
+    return PreimageRequestWithTransfer.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<PreimageRequestWithTransfer>): PreimageRequestWithTransfer {
+    const message = createBasePreimageRequestWithTransfer();
+    message.paymentHash = object.paymentHash ?? new Uint8Array(0);
+    message.receiverIdentityPubkey = object.receiverIdentityPubkey ?? new Uint8Array(0);
+    message.status = object.status ?? 0;
+    message.createdTime = object.createdTime ?? undefined;
+    message.transfer = (object.transfer !== undefined && object.transfer !== null)
+      ? Transfer.fromPartial(object.transfer)
+      : undefined;
+    message.preimage = object.preimage ?? undefined;
+    return message;
+  },
+};
+
+function createBaseQueryHtlcRequest(): QueryHtlcRequest {
+  return { paymentHashes: [], identityPublicKey: new Uint8Array(0), status: undefined, limit: 0, offset: 0 };
+}
+
+export const QueryHtlcRequest: MessageFns<QueryHtlcRequest> = {
+  encode(message: QueryHtlcRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.paymentHashes) {
+      writer.uint32(10).bytes(v!);
+    }
+    if (message.identityPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.identityPublicKey);
+    }
+    if (message.status !== undefined) {
+      writer.uint32(24).int32(message.status);
+    }
+    if (message.limit !== 0) {
+      writer.uint32(32).int64(message.limit);
+    }
+    if (message.offset !== 0) {
+      writer.uint32(40).int64(message.offset);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryHtlcRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryHtlcRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.paymentHashes.push(reader.bytes());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.identityPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.limit = longToNumber(reader.int64());
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryHtlcRequest {
+    return {
+      paymentHashes: globalThis.Array.isArray(object?.paymentHashes)
+        ? object.paymentHashes.map((e: any) => bytesFromBase64(e))
+        : [],
+      identityPublicKey: isSet(object.identityPublicKey)
+        ? bytesFromBase64(object.identityPublicKey)
+        : new Uint8Array(0),
+      status: isSet(object.status) ? preimageRequestStatusFromJSON(object.status) : undefined,
+      limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+    };
+  },
+
+  toJSON(message: QueryHtlcRequest): unknown {
+    const obj: any = {};
+    if (message.paymentHashes?.length) {
+      obj.paymentHashes = message.paymentHashes.map((e) => base64FromBytes(e));
+    }
+    if (message.identityPublicKey.length !== 0) {
+      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
+    }
+    if (message.status !== undefined) {
+      obj.status = preimageRequestStatusToJSON(message.status);
+    }
+    if (message.limit !== 0) {
+      obj.limit = Math.round(message.limit);
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryHtlcRequest>): QueryHtlcRequest {
+    return QueryHtlcRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryHtlcRequest>): QueryHtlcRequest {
+    const message = createBaseQueryHtlcRequest();
+    message.paymentHashes = object.paymentHashes?.map((e) => e) || [];
+    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
+    message.status = object.status ?? undefined;
+    message.limit = object.limit ?? 0;
+    message.offset = object.offset ?? 0;
+    return message;
+  },
+};
+
+function createBaseQueryHtlcResponse(): QueryHtlcResponse {
+  return { preimageRequests: [], offset: 0 };
+}
+
+export const QueryHtlcResponse: MessageFns<QueryHtlcResponse> = {
+  encode(message: QueryHtlcResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.preimageRequests) {
+      PreimageRequestWithTransfer.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.offset !== 0) {
+      writer.uint32(16).int64(message.offset);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryHtlcResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryHtlcResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.preimageRequests.push(PreimageRequestWithTransfer.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.offset = longToNumber(reader.int64());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryHtlcResponse {
+    return {
+      preimageRequests: globalThis.Array.isArray(object?.preimageRequests)
+        ? object.preimageRequests.map((e: any) => PreimageRequestWithTransfer.fromJSON(e))
+        : [],
+      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
+    };
+  },
+
+  toJSON(message: QueryHtlcResponse): unknown {
+    const obj: any = {};
+    if (message.preimageRequests?.length) {
+      obj.preimageRequests = message.preimageRequests.map((e) => PreimageRequestWithTransfer.toJSON(e));
+    }
+    if (message.offset !== 0) {
+      obj.offset = Math.round(message.offset);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryHtlcResponse>): QueryHtlcResponse {
+    return QueryHtlcResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryHtlcResponse>): QueryHtlcResponse {
+    const message = createBaseQueryHtlcResponse();
+    message.preimageRequests = object.preimageRequests?.map((e) => PreimageRequestWithTransfer.fromPartial(e)) || [];
+    message.offset = object.offset ?? 0;
+    return message;
+  },
+};
+
 function createBaseProvidePreimageRequest(): ProvidePreimageRequest {
   return { paymentHash: new Uint8Array(0), preimage: new Uint8Array(0), identityPublicKey: new Uint8Array(0) };
 }
@@ -20147,6 +20587,268 @@ export const TokenTransfer: MessageFns<TokenTransfer> = {
   },
 };
 
+function createBaseInitiateSwapPrimaryTransferRequest(): InitiateSwapPrimaryTransferRequest {
+  return { transfer: undefined, adaptorPublicKeys: undefined };
+}
+
+export const InitiateSwapPrimaryTransferRequest: MessageFns<InitiateSwapPrimaryTransferRequest> = {
+  encode(message: InitiateSwapPrimaryTransferRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transfer !== undefined) {
+      StartTransferRequest.encode(message.transfer, writer.uint32(10).fork()).join();
+    }
+    if (message.adaptorPublicKeys !== undefined) {
+      AdaptorPublicKeyPackage.encode(message.adaptorPublicKeys, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): InitiateSwapPrimaryTransferRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseInitiateSwapPrimaryTransferRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transfer = StartTransferRequest.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.adaptorPublicKeys = AdaptorPublicKeyPackage.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): InitiateSwapPrimaryTransferRequest {
+    return {
+      transfer: isSet(object.transfer) ? StartTransferRequest.fromJSON(object.transfer) : undefined,
+      adaptorPublicKeys: isSet(object.adaptorPublicKeys)
+        ? AdaptorPublicKeyPackage.fromJSON(object.adaptorPublicKeys)
+        : undefined,
+    };
+  },
+
+  toJSON(message: InitiateSwapPrimaryTransferRequest): unknown {
+    const obj: any = {};
+    if (message.transfer !== undefined) {
+      obj.transfer = StartTransferRequest.toJSON(message.transfer);
+    }
+    if (message.adaptorPublicKeys !== undefined) {
+      obj.adaptorPublicKeys = AdaptorPublicKeyPackage.toJSON(message.adaptorPublicKeys);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<InitiateSwapPrimaryTransferRequest>): InitiateSwapPrimaryTransferRequest {
+    return InitiateSwapPrimaryTransferRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<InitiateSwapPrimaryTransferRequest>): InitiateSwapPrimaryTransferRequest {
+    const message = createBaseInitiateSwapPrimaryTransferRequest();
+    message.transfer = (object.transfer !== undefined && object.transfer !== null)
+      ? StartTransferRequest.fromPartial(object.transfer)
+      : undefined;
+    message.adaptorPublicKeys = (object.adaptorPublicKeys !== undefined && object.adaptorPublicKeys !== null)
+      ? AdaptorPublicKeyPackage.fromPartial(object.adaptorPublicKeys)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseInitiateSwapPrimaryTransferResponse(): InitiateSwapPrimaryTransferResponse {
+  return { transfer: undefined, signingResults: [] };
+}
+
+export const InitiateSwapPrimaryTransferResponse: MessageFns<InitiateSwapPrimaryTransferResponse> = {
+  encode(message: InitiateSwapPrimaryTransferResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.transfer !== undefined) {
+      Transfer.encode(message.transfer, writer.uint32(10).fork()).join();
+    }
+    for (const v of message.signingResults) {
+      LeafRefundTxSigningResult.encode(v!, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): InitiateSwapPrimaryTransferResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseInitiateSwapPrimaryTransferResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.transfer = Transfer.decode(reader, reader.uint32());
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.signingResults.push(LeafRefundTxSigningResult.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): InitiateSwapPrimaryTransferResponse {
+    return {
+      transfer: isSet(object.transfer) ? Transfer.fromJSON(object.transfer) : undefined,
+      signingResults: globalThis.Array.isArray(object?.signingResults)
+        ? object.signingResults.map((e: any) => LeafRefundTxSigningResult.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: InitiateSwapPrimaryTransferResponse): unknown {
+    const obj: any = {};
+    if (message.transfer !== undefined) {
+      obj.transfer = Transfer.toJSON(message.transfer);
+    }
+    if (message.signingResults?.length) {
+      obj.signingResults = message.signingResults.map((e) => LeafRefundTxSigningResult.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<InitiateSwapPrimaryTransferResponse>): InitiateSwapPrimaryTransferResponse {
+    return InitiateSwapPrimaryTransferResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<InitiateSwapPrimaryTransferResponse>): InitiateSwapPrimaryTransferResponse {
+    const message = createBaseInitiateSwapPrimaryTransferResponse();
+    message.transfer = (object.transfer !== undefined && object.transfer !== null)
+      ? Transfer.fromPartial(object.transfer)
+      : undefined;
+    message.signingResults = object.signingResults?.map((e) => LeafRefundTxSigningResult.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseAdaptorPublicKeyPackage(): AdaptorPublicKeyPackage {
+  return {
+    adaptorPublicKey: new Uint8Array(0),
+    directAdaptorPublicKey: new Uint8Array(0),
+    directFromCpfpAdaptorPublicKey: new Uint8Array(0),
+  };
+}
+
+export const AdaptorPublicKeyPackage: MessageFns<AdaptorPublicKeyPackage> = {
+  encode(message: AdaptorPublicKeyPackage, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.adaptorPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.adaptorPublicKey);
+    }
+    if (message.directAdaptorPublicKey.length !== 0) {
+      writer.uint32(18).bytes(message.directAdaptorPublicKey);
+    }
+    if (message.directFromCpfpAdaptorPublicKey.length !== 0) {
+      writer.uint32(26).bytes(message.directFromCpfpAdaptorPublicKey);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): AdaptorPublicKeyPackage {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAdaptorPublicKeyPackage();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.adaptorPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.directAdaptorPublicKey = reader.bytes();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.directFromCpfpAdaptorPublicKey = reader.bytes();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): AdaptorPublicKeyPackage {
+    return {
+      adaptorPublicKey: isSet(object.adaptorPublicKey) ? bytesFromBase64(object.adaptorPublicKey) : new Uint8Array(0),
+      directAdaptorPublicKey: isSet(object.directAdaptorPublicKey)
+        ? bytesFromBase64(object.directAdaptorPublicKey)
+        : new Uint8Array(0),
+      directFromCpfpAdaptorPublicKey: isSet(object.directFromCpfpAdaptorPublicKey)
+        ? bytesFromBase64(object.directFromCpfpAdaptorPublicKey)
+        : new Uint8Array(0),
+    };
+  },
+
+  toJSON(message: AdaptorPublicKeyPackage): unknown {
+    const obj: any = {};
+    if (message.adaptorPublicKey.length !== 0) {
+      obj.adaptorPublicKey = base64FromBytes(message.adaptorPublicKey);
+    }
+    if (message.directAdaptorPublicKey.length !== 0) {
+      obj.directAdaptorPublicKey = base64FromBytes(message.directAdaptorPublicKey);
+    }
+    if (message.directFromCpfpAdaptorPublicKey.length !== 0) {
+      obj.directFromCpfpAdaptorPublicKey = base64FromBytes(message.directFromCpfpAdaptorPublicKey);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AdaptorPublicKeyPackage>): AdaptorPublicKeyPackage {
+    return AdaptorPublicKeyPackage.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AdaptorPublicKeyPackage>): AdaptorPublicKeyPackage {
+    const message = createBaseAdaptorPublicKeyPackage();
+    message.adaptorPublicKey = object.adaptorPublicKey ?? new Uint8Array(0);
+    message.directAdaptorPublicKey = object.directAdaptorPublicKey ?? new Uint8Array(0);
+    message.directFromCpfpAdaptorPublicKey = object.directFromCpfpAdaptorPublicKey ?? new Uint8Array(0);
+    return message;
+  },
+};
+
 export type SparkServiceDefinition = typeof SparkServiceDefinition;
 export const SparkServiceDefinition = {
   name: "SparkService",
@@ -20308,6 +21010,14 @@ export const SparkServiceDefinition = {
       requestType: ProvidePreimageRequest,
       requestStream: false,
       responseType: ProvidePreimageResponse,
+      responseStream: false,
+      options: {},
+    },
+    query_htlc: {
+      name: "query_htlc",
+      requestType: QueryHtlcRequest,
+      requestStream: false,
+      responseType: QueryHtlcResponse,
       responseStream: false,
       options: {},
     },
@@ -20590,6 +21300,14 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    initiate_preimage_swap_v3: {
+      name: "initiate_preimage_swap_v3",
+      requestType: InitiatePreimageSwapRequest,
+      requestStream: false,
+      responseType: InitiatePreimageSwapResponse,
+      responseStream: false,
+      options: {},
+    },
     start_leaf_swap_v2: {
       name: "start_leaf_swap_v2",
       requestType: StartTransferRequest,
@@ -20635,6 +21353,19 @@ export const SparkServiceDefinition = {
       requestType: QuerySparkInvoicesRequest,
       requestStream: false,
       responseType: QuerySparkInvoicesResponse,
+      responseStream: false,
+      options: {},
+    },
+    /**
+     * Inititiates a primary transfer in a Swap V3 protocol. The sender submits the
+     * transfer package, but the SOs will not tweak the keys at this stage of the flow.
+     * It will be done later, when the SSP initiates a counter swap.
+     */
+    initiate_swap_primary_transfer: {
+      name: "initiate_swap_primary_transfer",
+      requestType: InitiateSwapPrimaryTransferRequest,
+      requestStream: false,
+      responseType: InitiateSwapPrimaryTransferResponse,
       responseStream: false,
       options: {},
     },
@@ -20729,6 +21460,7 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: ProvidePreimageRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<ProvidePreimageResponse>>;
+  query_htlc(request: QueryHtlcRequest, context: CallContext & CallContextExt): Promise<DeepPartial<QueryHtlcResponse>>;
   /**
    * This is the exact same as start_transfer, but expresses to the SO
    * this transfer is specifically for a leaf swap.
@@ -20885,6 +21617,10 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: InitiatePreimageSwapRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<InitiatePreimageSwapResponse>>;
+  initiate_preimage_swap_v3(
+    request: InitiatePreimageSwapRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<InitiatePreimageSwapResponse>>;
   start_leaf_swap_v2(
     request: StartTransferRequest,
     context: CallContext & CallContextExt,
@@ -20909,6 +21645,15 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: QuerySparkInvoicesRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<QuerySparkInvoicesResponse>>;
+  /**
+   * Inititiates a primary transfer in a Swap V3 protocol. The sender submits the
+   * transfer package, but the SOs will not tweak the keys at this stage of the flow.
+   * It will be done later, when the SSP initiates a counter swap.
+   */
+  initiate_swap_primary_transfer(
+    request: InitiateSwapPrimaryTransferRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<InitiateSwapPrimaryTransferResponse>>;
 }
 
 export interface SparkServiceClient<CallOptionsExt = {}> {
@@ -20999,6 +21744,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<ProvidePreimageRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<ProvidePreimageResponse>;
+  query_htlc(
+    request: DeepPartial<QueryHtlcRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<QueryHtlcResponse>;
   /**
    * This is the exact same as start_transfer, but expresses to the SO
    * this transfer is specifically for a leaf swap.
@@ -21158,6 +21907,10 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<InitiatePreimageSwapRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<InitiatePreimageSwapResponse>;
+  initiate_preimage_swap_v3(
+    request: DeepPartial<InitiatePreimageSwapRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<InitiatePreimageSwapResponse>;
   start_leaf_swap_v2(
     request: DeepPartial<StartTransferRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -21182,6 +21935,15 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<QuerySparkInvoicesRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<QuerySparkInvoicesResponse>;
+  /**
+   * Inititiates a primary transfer in a Swap V3 protocol. The sender submits the
+   * transfer package, but the SOs will not tweak the keys at this stage of the flow.
+   * It will be done later, when the SSP initiates a counter swap.
+   */
+  initiate_swap_primary_transfer(
+    request: DeepPartial<InitiateSwapPrimaryTransferRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<InitiateSwapPrimaryTransferResponse>;
 }
 
 function bytesFromBase64(b64: string): Uint8Array {
