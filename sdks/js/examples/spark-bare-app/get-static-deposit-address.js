@@ -15,6 +15,7 @@ async function getStaticDepositAddress(mnemonicInit) {
     },
   });
   const staticDepositAddress = await wallet.getStaticDepositAddress();
+  await wallet.cleanupConnections();
   return staticDepositAddress;
 }
 
@@ -42,7 +43,6 @@ if (!config.mnemonic) {
 try {
   const staticDepositAddress = await getStaticDepositAddress(config.mnemonic);
   console.log(staticDepositAddress);
-  process.exit(0);
 } catch (error) {
   console.error(error);
   process.exit(1);

@@ -16,6 +16,7 @@ async function getWalletDetails(mnemonicInit) {
   });
   const balance = await wallet.getBalance();
   const sparkAddress = await wallet.getSparkAddress();
+  await wallet.cleanupConnections();
   return {
     mnemonic,
     balance,
@@ -41,11 +42,9 @@ try {
   if (config) {
     const wDetails = await getWalletDetails(config.mnemonic);
     console.log("Initialized wallet", wDetails);
-    process.exit(0);
   } else {
     const wDetails = await getWalletDetails();
     console.log("Created a new wallet", wDetails);
-    process.exit(0);
   }
 } catch (error) {
   console.error(error);

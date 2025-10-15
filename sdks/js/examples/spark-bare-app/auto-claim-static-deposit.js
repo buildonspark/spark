@@ -20,6 +20,7 @@ async function autoclaimStaticDeposit(mnemonicInit, transactionId) {
     creditAmountSats: quote.creditAmountSats,
     sspSignature: quote.signature,
   });
+  await wallet.cleanupConnections();
   return claimResult;
 }
 
@@ -48,7 +49,6 @@ try {
     transactionId,
   );
   console.log("Claimed static deposit:", claimDepositResult);
-  process.exit(0);
 } catch (error) {
   console.error(error);
   process.exit(1);

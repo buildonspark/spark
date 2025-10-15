@@ -17,6 +17,7 @@ async function createLightningInvoice(mnemonicInit, amountSats) {
   const invoice = await wallet.createLightningInvoice({
     amountSats: Number(amountSats),
   });
+  await wallet.cleanupConnections();
   return invoice;
 }
 
@@ -35,7 +36,6 @@ if (!config.mnemonic) {
 try {
   const result = await createLightningInvoice(config.mnemonic, args[0]);
   console.log(result.invoice.encodedInvoice);
-  process.exit(0);
 } catch (error) {
   console.error(error);
   process.exit(1);
