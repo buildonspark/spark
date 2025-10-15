@@ -49,6 +49,8 @@ const (
 
 	// Number of confirmations required before finalizing tree creation
 	KnobNumRequiredConfirmations = "spark.so.num_required_confirmations"
+
+	KnobOctoberDeprecationEnabled = "spark.so.october_deprecation_enabled"
 )
 
 type Config struct {
