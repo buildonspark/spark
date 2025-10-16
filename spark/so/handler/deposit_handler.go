@@ -687,7 +687,39 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	directRootTxSigningJob := req.GetDirectRootTxSigningJob()
 	directRefundTxSigningJob := req.GetDirectRefundTxSigningJob()
 	directFromCpfpRefundTxSigningJob := req.GetDirectFromCpfpRefundTxSigningJob()
-	if directRootTxSigningJob != nil && directRefundTxSigningJob != nil && directFromCpfpRefundTxSigningJob != nil {
+
+	// Always process direct from cpfp refund tx if provided
+	if directFromCpfpRefundTxSigningJob != nil {
+		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(req.DirectFromCpfpRefundTxSigningJob.RawTx)
+		if err != nil {
+			return nil, err
+		}
+		err = o.verifyRefundTransaction(cpfpRootTx, directFromCpfpRefundTx)
+		if err != nil {
+			return nil, err
+		}
+		directFromCpfpRefundTxSigHash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpRootTx.TxOut[0])
+		if err != nil {
+			return nil, err
+		}
+		userDirectFromCpfpRefundTxNonceCommitment, err := objects.NewSigningCommitment(req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Binding, req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Hiding)
+		if err != nil {
+			return nil, err
+		}
+		signingJobs = append(
+			signingJobs,
+			&helper.SigningJob{
+				JobID:             uuid.New().String(),
+				SigningKeyshareID: signingKeyShare.ID,
+				Message:           directFromCpfpRefundTxSigHash,
+				VerifyingKey:      &verifyingKey,
+				UserCommitment:    userDirectFromCpfpRefundTxNonceCommitment,
+			},
+		)
+	}
+
+	// Process direct root and refund txs if both are provided
+	if directRootTxSigningJob != nil && directRefundTxSigningJob != nil {
 		directRootTx, err := common.TxFromRawTxBytes(directRootTxSigningJob.RawTx)
 		if err != nil {
 			return nil, err
@@ -709,20 +741,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 		if err != nil {
 			return nil, err
 		}
-
-		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(req.DirectFromCpfpRefundTxSigningJob.RawTx)
-		if err != nil {
-			return nil, err
-		}
-		err = o.verifyRefundTransaction(cpfpRootTx, directFromCpfpRefundTx)
-		if err != nil {
-			return nil, err
-		}
 		directRefundTxSigHash, err := common.SigHashFromTx(directRefundTx, 0, directRootTx.TxOut[0])
-		if err != nil {
-			return nil, err
-		}
-		directFromCpfpRefundTxSigHash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpRootTx.TxOut[0])
 		if err != nil {
 			return nil, err
 		}
@@ -731,10 +750,6 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 			return nil, err
 		}
 		userDirectRefundTxNonceCommitment, err := objects.NewSigningCommitment(req.DirectRefundTxSigningJob.SigningNonceCommitment.Binding, req.DirectRefundTxSigningJob.SigningNonceCommitment.Hiding)
-		if err != nil {
-			return nil, err
-		}
-		userDirectFromCpfpRefundTxNonceCommitment, err := objects.NewSigningCommitment(req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Binding, req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Hiding)
 		if err != nil {
 			return nil, err
 		}
@@ -754,16 +769,9 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 				VerifyingKey:      &verifyingKey,
 				UserCommitment:    userDirectRefundTxNonceCommitment,
 			},
-			&helper.SigningJob{
-				JobID:             uuid.New().String(),
-				SigningKeyshareID: signingKeyShare.ID,
-				Message:           directFromCpfpRefundTxSigHash,
-				VerifyingKey:      &verifyingKey,
-				UserCommitment:    userDirectFromCpfpRefundTxNonceCommitment,
-			},
 		)
-	} else if directRootTxSigningJob != nil || directRefundTxSigningJob != nil || directFromCpfpRefundTxSigningJob != nil {
-		return nil, fmt.Errorf("direct root tx signing job, direct refund tx signing job, and direct from cpfp refund tx signing job must all be provided or none of them")
+	} else if directRootTxSigningJob != nil || directRefundTxSigningJob != nil {
+		return nil, fmt.Errorf("direct root tx signing job and direct refund tx signing job must both be provided or neither of them")
 	}
 
 	signingResults, err := helper.SignFrost(ctx, config, signingJobs)
@@ -784,22 +792,20 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	}
 
 	var directNodeTxSigningResult, directRefundTxSigningResult, directFromCpfpRefundTxSigningResult *pb.SigningResult
-	if req.GetDirectRootTxSigningJob() != nil && req.GetDirectRefundTxSigningJob() != nil && req.GetDirectFromCpfpRefundTxSigningJob() != nil {
-		// First 2 signing results are always for cpfpNodeTx and cpfpRefundTx.
-		// If all three direct jobs (root, refund, fromCpfpRefund) are present,
-		// they produce 3 additional signing results (indexes 2, 3, 4), so the total must be at least 5.
-		if len(signingResults) < 5 {
-			return nil, fmt.Errorf("expected at least 5 signing results, got %d", len(signingResults))
-		}
-		directNodeTxSigningResult, err = signingResults[2].MarshalProto()
+	resultIndex := 2
+	if req.GetDirectFromCpfpRefundTxSigningJob() != nil {
+		directFromCpfpRefundTxSigningResult, err = signingResults[resultIndex].MarshalProto()
 		if err != nil {
 			return nil, err
 		}
-		directRefundTxSigningResult, err = signingResults[3].MarshalProto()
+		resultIndex++
+	}
+	if req.GetDirectRootTxSigningJob() != nil && req.GetDirectRefundTxSigningJob() != nil {
+		directNodeTxSigningResult, err = signingResults[resultIndex].MarshalProto()
 		if err != nil {
 			return nil, err
 		}
-		directFromCpfpRefundTxSigningResult, err = signingResults[4].MarshalProto()
+		directRefundTxSigningResult, err = signingResults[resultIndex+1].MarshalProto()
 		if err != nil {
 			return nil, err
 		}
@@ -1016,8 +1022,41 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	directRefundTxSigningJob := req.GetDirectRefundTxSigningJob()
 	directFromCpfpRefundTxSigningJob := req.GetDirectFromCpfpRefundTxSigningJob()
 
-	if directRootTxSigningJob != nil && directRefundTxSigningJob != nil && directFromCpfpRefundTxSigningJob != nil {
+	// Always process direct from cpfp refund tx if provided
+	if directFromCpfpRefundTxSigningJob != nil {
+		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(req.DirectFromCpfpRefundTxSigningJob.RawTx)
+		if err != nil {
+			return nil, err
+		}
+		err = o.verifyRefundTransaction(cpfpRootTx, directFromCpfpRefundTx)
+		if err != nil {
+			return nil, err
+		}
+		if len(cpfpRootTx.TxOut) <= 0 {
+			return nil, fmt.Errorf("vout out of bounds, root tx has no outputs")
+		}
+		directFromCpfpRefundTxSigHash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpRootTx.TxOut[0])
+		if err != nil {
+			return nil, err
+		}
+		userDirectFromCpfpRefundTxNonceCommitment, err := objects.NewSigningCommitment(req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Binding, req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Hiding)
+		if err != nil {
+			return nil, err
+		}
+		signingJobs = append(
+			signingJobs,
+			&helper.SigningJob{
+				JobID:             uuid.New().String(),
+				SigningKeyshareID: signingKeyShare.ID,
+				Message:           directFromCpfpRefundTxSigHash,
+				VerifyingKey:      &verifyingKey,
+				UserCommitment:    userDirectFromCpfpRefundTxNonceCommitment,
+			},
+		)
+	}
 
+	// Process direct root and refund txs if both are provided
+	if directRootTxSigningJob != nil && directRefundTxSigningJob != nil {
 		directRootTx, err := common.TxFromRawTxBytes(req.DirectRootTxSigningJob.RawTx)
 		if err != nil {
 			return nil, err
@@ -1034,19 +1073,11 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		if err != nil {
 			return nil, err
 		}
-		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(req.DirectFromCpfpRefundTxSigningJob.RawTx)
-		if err != nil {
-			return nil, err
-		}
 		err = o.verifyRefundTransaction(cpfpRootTx, cpfpRefundTx)
 		if err != nil {
 			return nil, err
 		}
 		err = o.verifyRefundTransaction(directRootTx, directRefundTx)
-		if err != nil {
-			return nil, err
-		}
-		err = o.verifyRefundTransaction(cpfpRootTx, directFromCpfpRefundTx)
 		if err != nil {
 			return nil, err
 		}
@@ -1057,20 +1088,12 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		if err != nil {
 			return nil, err
 		}
-		directFromCpfpRefundTxSigHash, err := common.SigHashFromTx(directFromCpfpRefundTx, 0, cpfpRootTx.TxOut[0])
-		if err != nil {
-			return nil, err
-		}
 
 		userDirectRootTxNonceCommitment, err := objects.NewSigningCommitment(req.DirectRootTxSigningJob.SigningNonceCommitment.Binding, req.DirectRootTxSigningJob.SigningNonceCommitment.Hiding)
 		if err != nil {
 			return nil, err
 		}
 		userDirectRefundTxNonceCommitment, err := objects.NewSigningCommitment(req.DirectRefundTxSigningJob.SigningNonceCommitment.Binding, req.DirectRefundTxSigningJob.SigningNonceCommitment.Hiding)
-		if err != nil {
-			return nil, err
-		}
-		userDirectFromCpfpRefundTxNonceCommitment, err := objects.NewSigningCommitment(req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Binding, req.DirectFromCpfpRefundTxSigningJob.SigningNonceCommitment.Hiding)
 		if err != nil {
 			return nil, err
 		}
@@ -1090,16 +1113,9 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 				VerifyingKey:      &verifyingKey,
 				UserCommitment:    userDirectRefundTxNonceCommitment,
 			},
-			&helper.SigningJob{
-				JobID:             uuid.New().String(),
-				SigningKeyshareID: signingKeyShare.ID,
-				Message:           directFromCpfpRefundTxSigHash,
-				VerifyingKey:      &verifyingKey,
-				UserCommitment:    userDirectFromCpfpRefundTxNonceCommitment,
-			},
 		)
-	} else if directRootTxSigningJob != nil || directRefundTxSigningJob != nil || directFromCpfpRefundTxSigningJob != nil {
-		return nil, fmt.Errorf("direct root tx signing job, direct refund tx signing job, and direct from cpfp refund tx signing job must all be provided or none of them")
+	} else if directRootTxSigningJob != nil || directRefundTxSigningJob != nil {
+		return nil, fmt.Errorf("direct root tx signing job and direct refund tx signing job must both be provided or neither of them")
 	}
 	signingResults, err := helper.SignFrost(ctx, config, signingJobs)
 	if err != nil {
@@ -1118,16 +1134,20 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		return nil, err
 	}
 	var directNodeTxSigningResult, directRefundTxSigningResult, directFromCpfpRefundTxSigningResult *pb.SigningResult
-	if len(signingResults) > 4 {
-		directNodeTxSigningResult, err = signingResults[2].MarshalProto()
+	resultIndex := 2
+	if directFromCpfpRefundTxSigningJob != nil {
+		directFromCpfpRefundTxSigningResult, err = signingResults[resultIndex].MarshalProto()
 		if err != nil {
 			return nil, err
 		}
-		directRefundTxSigningResult, err = signingResults[3].MarshalProto()
+		resultIndex++
+	}
+	if directRootTxSigningJob != nil && directRefundTxSigningJob != nil {
+		directNodeTxSigningResult, err = signingResults[resultIndex].MarshalProto()
 		if err != nil {
 			return nil, err
 		}
-		directFromCpfpRefundTxSigningResult, err = signingResults[4].MarshalProto()
+		directRefundTxSigningResult, err = signingResults[resultIndex+1].MarshalProto()
 		if err != nil {
 			return nil, err
 		}
