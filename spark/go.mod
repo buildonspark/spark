@@ -5,7 +5,7 @@ go 1.25.1
 require google.golang.org/grpc v1.74.2
 
 require (
-	entgo.io/ent v0.14.5
+	entgo.io/ent v0.14.3
 	github.com/Khan/genqlient v0.8.1
 	github.com/XSAM/otelsql v0.38.0
 	github.com/aws/aws-sdk-go-v2 v1.36.1
@@ -54,7 +54,7 @@ require (
 )
 
 require (
-	ariga.io/atlas v0.37.0 // indirect
+	ariga.io/atlas v0.32.1-0.20250325101103-175b25e1c1b9 // indirect
 	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
 	github.com/aead/siphash v1.0.1 // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
