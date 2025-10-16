@@ -173,6 +173,13 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		if transferLimit > 0 && (len(leafTweakMap) > int(transferLimit) || len(req.LeavesToSend) > int(transferLimit)) {
 			return nil, status.Errorf(codes.InvalidArgument, "transfer limit reached, please send %d leaves at a time", int(transferLimit))
 		}
+
+		// Validate that TransferTypeTransfer requires a transfer package when October deprecation is enabled
+		if knobService.GetValue(knobs.KnobOctoberDeprecationEnabled, 0) >= 1 &&
+			req.TransferPackage == nil &&
+			transferType == st.TransferTypeTransfer {
+			return nil, status.Errorf(codes.InvalidArgument, "transfer package is required for TransferTypeTransfer")
+		}
 	}
 
 	leafCpfpRefundMap := h.loadCpfpLeafRefundMap(req)
