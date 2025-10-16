@@ -1,5 +1,13 @@
 # @buildonspark/bare
 
+## 0.0.22
+
+### Patch Changes
+
+- - Export package.json as /package
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.4.1
+
 ## 0.0.21
 
 ### Patch Changes

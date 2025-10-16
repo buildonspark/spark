@@ -1,5 +1,29 @@
 # @buildonspark/spark-sdk
 
+## 0.4.1
+
+### Patch Changes
+
+- - Prevent duplicate otel headers in requests
+  - Update default leaf optimization mode for faster transfers
+  - Added token output optimization functionality to consolidate token
+    outputs when they exceed a configurable threshold.
+  - Added tokenOptimizationOptions to SparkWallet config:
+
+  ```js
+  const wallet = await SparkWallet.initialize({
+    options: {
+      tokenOptimizationOptions: {
+        enabled: true,
+        intervalMs: 300000,
+        minOutputsThreshold: 50,
+      },
+    },
+  });
+  ```
+
+  - Add BareHttpTransport to unref sockets for responseStream RPCs. Enable process to exit after abort signal received from cleanupConnections.
+
 ## 0.4.0
 
 ### Minor Changes
