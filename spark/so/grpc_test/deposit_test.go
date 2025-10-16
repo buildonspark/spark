@@ -11,11 +11,14 @@ import (
 
 	"github.com/lightsparkdev/spark/common/keys"
 
+	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/dkg"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/objects"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
@@ -1099,5 +1102,99 @@ func TestQueryUnusedDepositAddressesBackwardsCompatibility(t *testing.T) {
 
 	if len(unusedDepositAddresses.DepositAddresses) != 225 {
 		t.Fatalf("expected 225 unused deposit addresses, got %d", len(unusedDepositAddresses.DepositAddresses))
+	}
+}
+
+func TestStartDepositTreeCreationWithDirectFromCpfpRefundAlongsideRegularRefund(t *testing.T) {
+	// --- setup ---
+
+	config := wallet.NewTestWalletConfig(t)
+	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	privKey := keys.GeneratePrivateKey()
+	leafID := uuid.NewString()
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+	require.NoError(t, err)
+
+	client := sparktesting.GetBitcoinClient()
+	coin, err := faucet.Fund()
+	require.NoError(t, err)
+
+	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+	require.NoError(t, err)
+	vout := 0
+	var depositTxSerial bytes.Buffer
+	err = depositTx.Serialize(&depositTxSerial)
+	require.NoError(t, err)
+
+	// // Sign, broadcast, and mine the deposit tx.
+	// signedDepositTx, err := sparktesting.SignFaucetCoin(depositTx, coin.TxOut, coin.Key)
+	// require.NoError(t, err)
+	// _, err = client.SendRawTransaction(signedDepositTx, true)
+	// require.NoError(t, err)
+
+	randomKey := keys.GeneratePrivateKey()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	require.NoError(t, err)
+	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	require.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
+
+	// --- test ---
+	//
+	// Test that tree creation works even when the direct from CPFP refund transaction
+	// is the only direct transaction passed.
+
+	sparkClient := pb.NewSparkServiceClient(conn)
+
+	// Create root transaction (required) - this acts as the "node tx"
+	rootTx := wire.NewMsgTx(3)
+	rootTx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: depositTx.TxHash(), Index: uint32(vout)}, nil, nil))
+	rootTx.AddTxOut(wire.NewTxOut(depositTx.TxOut[0].Value, depositTx.TxOut[0].PkScript))
+
+	refundTx, directFromCpfpRefundTx, err := wallet.CreateRefundTxs(
+		spark.InitialSequence(),
+		&wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
+		rootTx.TxOut[0].Value,
+		privKey.Public(),
+		true,
+	)
+	require.NoError(t, err)
+
+	_, err = sparkClient.StartDepositTreeCreation(ctx, &pb.StartDepositTreeCreationRequest{
+		IdentityPublicKey: config.IdentityPublicKey().Serialize(),
+		OnChainUtxo: &pb.UTXO{
+			Vout:    uint32(vout),
+			RawTx:   depositTxSerial.Bytes(),
+			Network: config.ProtoNetwork(),
+		},
+		RootTxSigningJob:                 signingJobFromTx(t, privKey.Public(), rootTx),
+		RefundTxSigningJob:               signingJobFromTx(t, privKey.Public(), refundTx),
+		DirectFromCpfpRefundTxSigningJob: signingJobFromTx(t, privKey.Public(), directFromCpfpRefundTx),
+	})
+
+	require.NoError(t, err, "Expected StartDepositTreeCreation to succeed with direct from CPFP refund transaction alongside regular refund transaction")
+}
+
+func signingJobFromTx(t *testing.T, publicKey keys.Public, tx *wire.MsgTx) *pb.SigningJob {
+	var txBuf bytes.Buffer
+	require.NoError(t, tx.Serialize(&txBuf))
+
+	nonce, err := objects.RandomSigningNonce()
+	require.NoError(t, err)
+	nonceCommitmentProto, err := nonce.SigningCommitment().MarshalProto()
+	require.NoError(t, err)
+
+	return &pb.SigningJob{
+		RawTx:                  txBuf.Bytes(),
+		SigningPublicKey:       publicKey.Serialize(),
+		SigningNonceCommitment: nonceCommitmentProto,
 	}
 }
