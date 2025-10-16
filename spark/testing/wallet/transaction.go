@@ -9,6 +9,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/btcsuite/btcd/wire"
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 )
 
@@ -99,7 +100,7 @@ func CreateRefundTxs(
 		PreviousOutPoint: *nodeOutPoint,
 		SignatureScript:  nil,
 		Witness:          nil,
-		Sequence:         sequence,
+		Sequence:         sequence + spark.DirectTimelockOffset,
 	})
 
 	outputAmount := amountSats
