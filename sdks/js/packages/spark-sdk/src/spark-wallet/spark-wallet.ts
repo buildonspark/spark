@@ -5,13 +5,15 @@ import {
   bytesToNumberBE,
   equalBytes,
   hexToBytes,
+  numberToVarBytesBE,
 } from "@noble/curves/utils";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { Mutex } from "async-mutex";
-import { uuidv7 } from "uuidv7";
+import { uuidv7, uuidv7obj } from "uuidv7";
+import { HashSparkInvoice } from "../utils/invoice-hashing.js";
 import {
   ConfigurationError,
   InternalValidationError,
@@ -121,8 +123,10 @@ import {
 import {
   decodeSparkAddress,
   encodeSparkAddress,
+  encodeSparkAddressWithSignature,
   isSafeForNumber,
   SparkAddressFormat,
+  validateSparkInvoiceFields,
 } from "../utils/address.js";
 import { chunkArray } from "../utils/chunkArray.js";
 import { getFetch } from "../utils/fetch.js";
@@ -954,8 +958,49 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     senderPublicKey?: string;
     expiryTime?: Date;
   }): Promise<SparkAddressFormat> {
-    // TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
-    throw new NotImplementedError("Invoice functionality is not enabled");
+    const MAX_SATS_AMOUNT = 2_100_000_000_000_000; // 21_000_000 BTC * 100_000_000 sats/BTC
+    if (amount && (amount < 0 || amount > MAX_SATS_AMOUNT)) {
+      throw new ValidationError(
+        `Amount must be between 0 and ${MAX_SATS_AMOUNT} sats`,
+        {
+          field: "amount",
+          value: amount,
+          expected: `less than or equal to ${MAX_SATS_AMOUNT}`,
+        },
+      );
+    }
+    const protoPayment = {
+      $case: "satsPayment",
+      satsPayment: {
+        amount: amount,
+      },
+    } as const;
+    const invoiceFields = {
+      version: 1,
+      id: uuidv7obj().bytes,
+      paymentType: protoPayment,
+      memo: memo,
+      senderPublicKey: senderPublicKey
+        ? hexToBytes(senderPublicKey)
+        : undefined,
+      expiryTime: expiryTime ?? undefined,
+    };
+    validateSparkInvoiceFields(invoiceFields);
+    const identityPublicKey = await this.config.signer.getIdentityPublicKey();
+    const hash = HashSparkInvoice(
+      invoiceFields,
+      identityPublicKey,
+      this.config.getNetworkType(),
+    );
+    const signature = await this.config.signer.signSchnorrWithIdentityKey(hash);
+    return encodeSparkAddressWithSignature(
+      {
+        identityPublicKey: bytesToHex(identityPublicKey),
+        network: this.config.getNetworkType(),
+        sparkInvoiceFields: invoiceFields,
+      },
+      signature,
+    );
   }
 
   /**
@@ -982,8 +1027,54 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     senderPublicKey?: string;
     expiryTime?: Date;
   }): Promise<SparkAddressFormat> {
-    // TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
-    throw new NotImplementedError("Invoice functionality is not enabled");
+    const MAX_UINT128 = BigInt(2 ** 128 - 1);
+    if (amount && (amount < 0 || amount > MAX_UINT128)) {
+      throw new ValidationError(`Amount must be between 0 and ${MAX_UINT128}`, {
+        field: "amount",
+        value: amount,
+        expected: `greater than or equal to 0 and less than or equal to ${MAX_UINT128}`,
+      });
+    }
+    let decodedTokenIdentifier: Uint8Array | undefined = undefined;
+    if (tokenIdentifier) {
+      decodedTokenIdentifier = decodeBech32mTokenIdentifier(
+        tokenIdentifier,
+        this.config.getNetworkType(),
+      ).tokenIdentifier;
+    }
+    const protoPayment = {
+      $case: "tokensPayment",
+      tokensPayment: {
+        tokenIdentifier: decodedTokenIdentifier ?? undefined,
+        amount: amount ? numberToVarBytesBE(amount) : undefined,
+      },
+    } as const;
+    const invoiceFields = {
+      version: 1,
+      id: uuidv7obj().bytes,
+      paymentType: protoPayment,
+      memo: memo ?? undefined,
+      senderPublicKey: senderPublicKey
+        ? hexToBytes(senderPublicKey)
+        : undefined,
+      expiryTime: expiryTime ?? undefined,
+    };
+    validateSparkInvoiceFields(invoiceFields);
+    const identityPublicKey = await this.config.signer.getIdentityPublicKey();
+    const hash = HashSparkInvoice(
+      invoiceFields,
+      identityPublicKey,
+      this.config.getNetworkType(),
+    );
+    const signature = await this.config.signer.signSchnorrWithIdentityKey(hash);
+    return encodeSparkAddressWithSignature(
+      {
+        identityPublicKey: bytesToHex(identityPublicKey),
+        network: this.config.getNetworkType(),
+        sparkInvoiceFields: invoiceFields,
+      },
+      signature,
+    );
   }
 
   /**
@@ -3660,8 +3751,110 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       amount?: bigint;
     }[],
   ): Promise<FulfillSparkInvoiceResponse> {
-    // TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
-    throw new NotImplementedError("Invoice functionality is not enabled");
+    if (!Array.isArray(sparkInvoices) || sparkInvoices.length === 0) {
+      throw new ValidationError("No Spark invoices provided", {
+        field: "sparkInvoices",
+        value: sparkInvoices,
+        expected: "Non-empty array",
+      });
+    }
+    const satsTransactionSuccess: {
+      invoice: SparkAddressFormat;
+      transferResponse: WalletTransfer;
+    }[] = [];
+    const satsTransactionErrors: {
+      invoice: string;
+      error: Error;
+    }[] = [];
+    const tokenTransactionSuccess: {
+      tokenIdentifier: Bech32mTokenIdentifier;
+      txid: string;
+    }[] = [];
+    const tokenTransactionErrors: {
+      tokenIdentifier: Bech32mTokenIdentifier;
+      error: Error;
+    }[] = [];
+    const { satsInvoices, tokenInvoices, invalidInvoices } =
+      await this.groupSparkInvoicesByPaymentType(sparkInvoices);
+    if (invalidInvoices.length > 0) {
+      return {
+        satsTransactionSuccess,
+        satsTransactionErrors,
+        tokenTransactionSuccess,
+        tokenTransactionErrors,
+        invalidInvoices,
+      };
+    }
+    if (tokenInvoices.size > 0) {
+      await this.syncTokenOutputs();
+      const tokenTransferTasks: Promise<
+        | { ok: true; tokenIdentifier: Bech32mTokenIdentifier; txid: string }
+        | { ok: false; tokenIdentifier: Bech32mTokenIdentifier; error: Error }
+      >[] = [];
+      for (const [identifierHex, decodedInvoices] of tokenInvoices.entries()) {
+        const tokenIdentifier = hexToBytes(identifierHex);
+        const tokenIdB32 = encodeBech32mTokenIdentifier({
+          tokenIdentifier,
+          network: this.config.getNetworkType(),
+        }) as Bech32mTokenIdentifier;
+        const receiverOutputs = decodedInvoices.map((d) => ({
+          tokenIdentifier: tokenIdB32,
+          tokenAmount: d.amount!,
+          receiverSparkAddress: d.invoice,
+        }));
+        tokenTransferTasks.push(
+          this.tokenTransactionService
+            .tokenTransfer({ tokenOutputs: this.tokenOutputs, receiverOutputs })
+            .then((txid) => ({
+              ok: true as const,
+              tokenIdentifier: tokenIdB32,
+              txid,
+            }))
+            .catch((e: any) => ({
+              ok: false as const,
+              tokenIdentifier: tokenIdB32,
+              error: e instanceof Error ? e : new Error(String(e)),
+            })),
+        );
+      }
+      const results = await Promise.all(tokenTransferTasks);
+      for (const r of results) {
+        if (r.ok) {
+          tokenTransactionSuccess.push({
+            tokenIdentifier: r.tokenIdentifier,
+            txid: r.txid,
+          });
+        } else {
+          tokenTransactionErrors.push({
+            tokenIdentifier: r.tokenIdentifier,
+            error: r.error,
+          });
+        }
+      }
+    }
+    if (satsInvoices.length > 0) {
+      const transfers = await this.transferWithInvoice(satsInvoices);
+      for (const transfer of transfers) {
+        if (transfer.ok) {
+          satsTransactionSuccess.push({
+            invoice: transfer.param.sparkInvoice ?? ("" as SparkAddressFormat),
+            transferResponse: transfer.transfer,
+          });
+        } else {
+          satsTransactionErrors.push({
+            invoice: transfer.param.sparkInvoice ?? ("" as SparkAddressFormat),
+            error: transfer.error,
+          });
+        }
+      }
+    }
+    return {
+      satsTransactionSuccess,
+      satsTransactionErrors,
+      tokenTransactionSuccess,
+      tokenTransactionErrors,
+      invalidInvoices,
+    };
   }
 
   private async groupSparkInvoicesByPaymentType(
@@ -3818,8 +4011,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   public async querySparkInvoices(
     invoices: string[],
   ): Promise<QuerySparkInvoicesResponse> {
-    // TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
-    throw new NotImplementedError("Invoice functionality is not enabled");
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+    return await sparkClient.query_spark_invoices({
+      invoice: invoices,
+    });
   }
 
   /**

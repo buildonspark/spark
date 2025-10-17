@@ -1319,8 +1319,7 @@ describe.each(walletTypes)("transfer v2", ({ name, Signer, createTree }) => {
   });
 });
 
-// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
-describe.skip.each(walletTypes)(
+describe.each(walletTypes)(
   "fulfill spark invoice",
   ({ name, Signer, createTree }) => {
     jest.setTimeout(25_000);
