@@ -105,8 +105,9 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	}
 
 	if req.PartialTokenTransaction.Version >= 2 && len(req.PartialTokenTransaction.InvoiceAttachments) > 0 {
-		// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
-		return nil, sparkerrors.UnimplementedMethodDisabled(fmt.Errorf("spark invoice support not implemented"))
+		if err := validateSparkInvoicesForTransaction(ctx, req.PartialTokenTransaction); err != nil {
+			return nil, err
+		}
 	}
 
 	validitySecs := req.GetValidityDurationSeconds()

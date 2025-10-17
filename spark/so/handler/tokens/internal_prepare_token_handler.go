@@ -33,7 +33,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/utils"
-	"google.golang.org/grpc/codes"
 )
 
 type InternalPrepareTokenHandler struct {
@@ -82,9 +81,7 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 		return nil, err
 	}
 
-	//nolint:govet,revive // TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
 	if finalTokenTX.Version >= 2 && finalTokenTX.GetInvoiceAttachments() != nil {
-		return nil, sparkerrors.WrapErrorWithCodeAndReason(fmt.Errorf("spark invoice support not implemented"), codes.Unimplemented, "NOT_IMPLEMENTED")
 		if err := validateSparkInvoicesForTransaction(ctx, finalTokenTX); err != nil {
 			return nil, err
 		}
