@@ -108,109 +108,6 @@ func isAllowlistedLocalhost(parsedURL *url.URL, hostNameTLD string) bool {
 
 var graphQLPattern = regexp.MustCompile(`(?i)\s*(?:query|mutation)\s+(?P<OperationName>\w+)`)
 
-func (r *Requester) ExecuteGraphqlWithContext(ctx context.Context, query string, variables map[string]any) (map[string]any, error) {
-	matches := graphQLPattern.FindStringSubmatch(query)
-	index := graphQLPattern.SubexpIndex("OperationName")
-	if len(matches) <= index {
-		return nil, errors.New("invalid query payload")
-	}
-	operationName := matches[index]
-
-	payload := map[string]any{
-		"operationName": operationName,
-		"query":         query,
-		"variables":     variables,
-	}
-
-	encodedPayload, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("error when encoding payload: %w", err)
-	}
-
-	body := encodedPayload
-	compressed := len(encodedPayload) > 1024
-	if compressed {
-		body, err = zstd.Compress(nil, encodedPayload)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	var serverURL string
-	if len(r.baseURL) > 0 {
-		serverURL = r.baseURL
-	} else {
-		serverURL = defaultBaseURL
-	}
-	if err := validateBaseURL(serverURL); err != nil {
-		return nil, err
-	}
-
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, serverURL, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, err
-	}
-
-	if len(r.identityPublicKey) != 0 {
-		request.Header.Add("Spark-Identity-Public-Key", r.identityPublicKey)
-	}
-	request.Header.Add("Content-Type", "application/json")
-	if compressed {
-		request.Header.Add("Content-Encoding", "zstd")
-	}
-	request.Header.Add("Accept-Encoding", "zstd")
-	request.Header.Add("X-GraphQL-Operation", operationName)
-	request.Header.Add("User-Agent", userAgent)
-	request.Header.Add("X-Lightspark-SDK", userAgent)
-
-	httpClient := r.httpClient
-	if httpClient == nil {
-		httpClient = &http.Client{}
-	}
-	response, err := httpClient.Do(request)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close() //nolint:errcheck
-	if response.StatusCode < 200 || response.StatusCode > 299 {
-		return nil, RequestError{Message: response.Status, StatusCode: response.StatusCode}
-	}
-
-	data, err := io.ReadAll(response.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if response.Header.Get("Content-Encoding") == "zstd" {
-		data, err = zstd.Decompress(nil, data)
-		if err != nil {
-			return nil, fmt.Errorf("invalid zstd compression: %w", err)
-		}
-	}
-
-	var result map[string]any
-	if err = json.Unmarshal(data, &result); err != nil {
-		return nil, fmt.Errorf("invalid JSON: %w", err)
-	}
-
-	if errs, ok := result["errors"]; ok {
-		err := errs.([]any)[0]
-		errMap := err.(map[string]any)
-		errorMessage := errMap["message"].(string)
-		if errMap["extensions"] == nil {
-			return nil, GraphQLInternalError{Message: errorMessage}
-		}
-		extensions := errMap["extensions"].(map[string]any)
-		if extensions["error_name"] == nil {
-			return nil, GraphQLInternalError{Message: errorMessage}
-		}
-		errorName := extensions["error_name"].(string)
-		return nil, GraphQLError{Message: errorMessage, Type: errorName}
-	}
-
-	return result["data"].(map[string]any), nil
-}
-
 // MakeRequest makes the given GraphQL request. It implements the graphql.Client interface.
 func (r *Requester) MakeRequest(ctx context.Context, req *graphql.Request, resp *graphql.Response) error {
 	payload := map[string]any{
@@ -257,7 +154,7 @@ func (r *Requester) MakeRequest(ctx context.Context, req *graphql.Request, resp 
 	if err != nil {
 		return err
 	}
-	defer response.Body.Close() //nolint:errcheck
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode < 200 || response.StatusCode > 299 {
 		return RequestError{Message: response.Status, StatusCode: response.StatusCode}
 	}

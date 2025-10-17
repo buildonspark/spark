@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"log"
 	"slices"
 	"strings"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/testing/wallet/ssp_api/mutations"
 )
 
@@ -51,6 +51,12 @@ func (s *TypedSparkServiceAPI) PayInvoice(ctx context.Context, invoice string) (
 	return response.RequestLightningSend.Request.Id, nil
 }
 
+type SwapLeaf struct {
+	LeafID                       string `json:"leaf_id"`
+	RawUnsignedRefundTransaction string `json:"raw_unsigned_refund_transaction"`
+	AdaptorAddedSignature        string `json:"adaptor_added_signature"`
+}
+
 func (s *TypedSparkServiceAPI) RequestLeavesSwap(
 	ctx context.Context,
 	adaptorPubkey string,
@@ -59,7 +65,7 @@ func (s *TypedSparkServiceAPI) RequestLeavesSwap(
 	feeSats int64,
 	userLeaves []SwapLeaf,
 ) (string, []SwapLeaf, error) {
-	idempotencyKey := uuid.New().String()
+	idempotencyKey := uuid.NewString()
 	asLeafInput := make([]mutations.UserLeafInput, len(userLeaves))
 	for i, leaf := range userLeaves {
 		id, err := uuid.Parse(leaf.LeafID)
@@ -120,13 +126,14 @@ func (s *TypedSparkServiceAPI) InitiateCoopExit(
 	request := response.RequestCoopExit.Request
 	coopExitID := request.Id
 	connectorTxString := request.RawConnectorTransaction
-	log.Printf("connectorTxString: %s\n", connectorTxString)
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Sugar().Infof("connectorTxString: %s", connectorTxString)
 	connectorTxBytes, err := hex.DecodeString(connectorTxString)
 	if err != nil {
 		return "", nil, nil, err
 	}
 	var connectorTx wire.MsgTx
-	if err = connectorTx.Deserialize(bytes.NewReader(connectorTxBytes)); err != nil {
+	if err := connectorTx.Deserialize(bytes.NewReader(connectorTxBytes)); err != nil {
 		return "", nil, nil, err
 	}
 	coopExitTxid := connectorTx.TxIn[0].PreviousOutPoint.Hash[:]

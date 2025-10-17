@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/DataDog/zstd"
-
+	"github.com/Khan/genqlient/graphql"
 	"github.com/stretchr/testify/require"
 
 	"github.com/stretchr/testify/assert"
@@ -197,9 +197,10 @@ func TestValidateBaseURL_AllowlistedHosts(t *testing.T) {
 	}
 }
 
-func TestExecuteGraphqlWithContext(t *testing.T) {
+func TestMakeRequest(t *testing.T) {
 	tests := []struct {
 		name              string
+		opName            string
 		query             string
 		variables         map[string]any
 		identityPublicKey string
@@ -208,6 +209,7 @@ func TestExecuteGraphqlWithContext(t *testing.T) {
 	}{
 		{
 			name:      "simple query",
+			opName:    "GetUser",
 			query:     "query GetUser { user { id name } }",
 			variables: map[string]any{"id": "123"},
 			wantData: map[string]any{
@@ -219,6 +221,7 @@ func TestExecuteGraphqlWithContext(t *testing.T) {
 		},
 		{
 			name:      "mutation success",
+			opName:    "CreateUser",
 			query:     "mutation CreateUser($name: String!) { createUser(name: $name) { id name } }",
 			variables: map[string]any{"name": "Jane Doe"},
 			wantData: map[string]any{
@@ -230,6 +233,7 @@ func TestExecuteGraphqlWithContext(t *testing.T) {
 		},
 		{
 			name:              "with identity public key",
+			opName:            "GetUser",
 			query:             "query GetUser { user { id } }",
 			variables:         map[string]any{},
 			identityPublicKey: "test-public-key",
@@ -237,19 +241,22 @@ func TestExecuteGraphqlWithContext(t *testing.T) {
 		},
 		{
 			name:      "with custom base URL",
+			opName:    "GetUser",
 			query:     "query GetUser { user { id } }",
 			variables: map[string]any{},
 			wantData:  map[string]any{"user": map[string]any{"id": "999"}},
 		},
 		{
 			name:      "empty base URL",
+			opName:    "GetUser",
 			query:     "query GetUser { user { id } }",
 			variables: map[string]any{},
 			wantData:  map[string]any{"user": map[string]any{"id": "999"}},
 		},
 		{
-			name:  "large payload with compression",
-			query: "query GetLargeData { largeData { content } }",
+			name:   "large payload with compression",
+			opName: "GetLargeData",
+			query:  "query GetLargeData { largeData { content } }",
 			variables: map[string]any{
 				"largeParam": string(make([]byte, 2000)), // Large payload to trigger compression
 			},
@@ -258,6 +265,7 @@ func TestExecuteGraphqlWithContext(t *testing.T) {
 		},
 		{
 			name:      "compressed response decompression",
+			opName:    "GetCompressedData",
 			query:     "query GetCompressedData { compressedData { content } }",
 			variables: map[string]any{},
 			wantData: map[string]any{
@@ -269,6 +277,7 @@ func TestExecuteGraphqlWithContext(t *testing.T) {
 		},
 		{
 			name:      "compressed response with large data",
+			opName:    "GetLargeCompressedData",
 			query:     "query GetLargeCompressedData { largeCompressedData { content } }",
 			variables: map[string]any{},
 			wantData: map[string]any{
@@ -288,17 +297,25 @@ func TestExecuteGraphqlWithContext(t *testing.T) {
 			requester, err := NewRequesterWithBaseURL(tt.identityPublicKey, server.URL)
 			require.NoError(t, err)
 
-			result, err := requester.ExecuteGraphqlWithContext(t.Context(), tt.query, tt.variables)
+			request := &graphql.Request{
+				Query:     tt.query,
+				Variables: tt.variables,
+				OpName:    tt.opName,
+			}
+			response := &graphql.Response{}
+			err = requester.MakeRequest(t.Context(), request, response)
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantData, result)
+			want := &graphql.Response{Data: tt.wantData}
+			assert.Equal(t, want, response)
 		})
 	}
 }
 
-func TestExecuteGraphqlWithContext_Errors(t *testing.T) {
+func TestMakeRequest_Errors(t *testing.T) {
 	tests := []struct {
 		name           string
+		opName         string
 		query          string
 		serverResponse map[string]any
 		serverStatus   int
@@ -306,24 +323,28 @@ func TestExecuteGraphqlWithContext_Errors(t *testing.T) {
 	}{
 		{
 			name:    "invalid query payload",
+			opName:  "InvalidQuery",
 			query:   "invalid query",
-			wantErr: "invalid query payload",
+			wantErr: "invalid JSON",
 		},
 		{
 			name:         "HTTP 400 error",
+			opName:       "GetUser",
 			query:        "query GetUser { user { id } }",
 			serverStatus: http.StatusBadRequest,
 			wantErr:      "lightspark request failed: 400:",
 		},
 		{
 			name:         "HTTP 500 error",
+			opName:       "GetUser",
 			query:        "query GetUser { user { id } }",
 			serverStatus: http.StatusInternalServerError,
 			wantErr:      "lightspark request failed: 500:",
 		},
 		{
-			name:  "GraphQL internal error",
-			query: "query GetUser { user { id } }",
+			name:   "GraphQL internal error",
+			opName: "GetUser",
+			query:  "query GetUser { user { id } }",
 			serverResponse: map[string]any{
 				"errors": []any{
 					map[string]any{
@@ -334,8 +355,9 @@ func TestExecuteGraphqlWithContext_Errors(t *testing.T) {
 			wantErr: "lightspark request failed: Internal server error",
 		},
 		{
-			name:  "GraphQL user error",
-			query: "query GetUser { user { id } }",
+			name:   "GraphQL user error",
+			opName: "GetUser",
+			query:  "query GetUser { user { id } }",
 			serverResponse: map[string]any{
 				"errors": []any{
 					map[string]any{
@@ -349,8 +371,9 @@ func TestExecuteGraphqlWithContext_Errors(t *testing.T) {
 			wantErr: "USER_NOT_FOUND: User not found",
 		},
 		{
-			name:  "GraphQL error with extensions but no error_name",
-			query: "query GetUser { user { id } }",
+			name:   "GraphQL error with extensions but no error_name",
+			opName: "GetUser",
+			query:  "query GetUser { user { id } }",
 			serverResponse: map[string]any{
 				"errors": []any{
 					map[string]any{
@@ -373,56 +396,61 @@ func TestExecuteGraphqlWithContext_Errors(t *testing.T) {
 			requester, err := NewRequesterWithBaseURL("", server.URL)
 			require.NoError(t, err)
 
-			result, err := requester.ExecuteGraphqlWithContext(t.Context(), tt.query, nil)
+			request := &graphql.Request{
+				Query:  tt.query,
+				OpName: tt.opName,
+			}
+			response := &graphql.Response{}
+			err = requester.MakeRequest(t.Context(), request, response)
+
 			require.ErrorContains(t, err, tt.wantErr)
-			assert.Nil(t, result)
 		})
 	}
 }
 
-func TestExecuteGraphqlWithContext_DecompressionErrors(t *testing.T) {
-	query := "query GetUser { user { id } }"
+func TestMakeRequest_DecompressionErrors(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		corruptedData := []byte{0x28, 0xB5, 0x2F, 0xFD, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 		w.Header().Set("Content-Encoding", "zstd")
-		_, err := w.Write(corruptedData)
-		if err != nil {
-			t.Error(err) // We have to call Error since we're in a goroutine.
-		}
+		_, _ = w.Write(corruptedData)
 	}))
 	defer server.Close()
 
 	requester, err := NewRequesterWithBaseURL("", server.URL)
 	require.NoError(t, err)
 
-	result, err := requester.ExecuteGraphqlWithContext(t.Context(), query, nil)
+	request := &graphql.Request{
+		Query:  "query GetUser { user { id } }",
+		OpName: "GetUser",
+	}
+	response := &graphql.Response{}
+	err = requester.MakeRequest(t.Context(), request, response)
+
 	require.ErrorContains(t, err, "invalid zstd compression")
-	assert.Nil(t, result)
 }
 
-func TestExecuteGraphqlWithContext_InvalidCompressedJSON_Errors(t *testing.T) {
-	query := "query GetUser { user { id } }"
+func TestMakeRequest_InvalidCompressedJSON_Errors(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		compressed, err := zstd.Compress(nil, []byte("not-valid-json"))
-		if err != nil {
-			t.Error(err) // We have to call Error since we're in a goroutine.
-		}
+		compressed, _ := zstd.Compress(nil, []byte("not-valid-json"))
 		w.Header().Set("Content-Encoding", "zstd")
-		if _, err = w.Write(compressed); err != nil {
-			t.Error(err) // We have to call Error since we're in a goroutine.
-		}
+		_, _ = w.Write(compressed)
 	}))
 	defer server.Close()
 
 	requester, err := NewRequesterWithBaseURL("", server.URL)
 	require.NoError(t, err)
 
-	result, err := requester.ExecuteGraphqlWithContext(t.Context(), query, nil)
+	request := &graphql.Request{
+		Query:  "query GetUser { user { id } }",
+		OpName: "GetUser",
+	}
+	response := &graphql.Response{}
+	err = requester.MakeRequest(t.Context(), request, response)
+
 	require.ErrorContains(t, err, "invalid JSON")
-	assert.Nil(t, result)
 }
 
-func TestExecuteGraphqlWithContext_InvalidBaseURL(t *testing.T) {
+func TestNewRequesterWithBaseURL_InvalidBaseURL(t *testing.T) {
 	_, err := NewRequesterWithBaseURL("", "http://invalid-url")
 	require.ErrorContains(t, err, `invalid base url: "http://invalid-url" must be https:// if not targeting localhost`)
 }
