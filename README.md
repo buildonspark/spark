@@ -105,6 +105,37 @@ mise lint
 golangci-lint run
 ```
 
+## Logging
+
+We use [Zap](https://github.com/uber-go/zap) for logging in the SO. Here are some best practices:
+- Zap includes APIs both for structured logging (with key-value pairs) and unstructured logging
+  (with `fmt`-style formatting), called "Sugared" and "Unsugared" respectively. Since we index
+  structured attribute keys in our logging backend, they should be reserved for common attributes
+  that we want searchable. For example:
+    - `error`: we use this for logging all errors (through `zap.Error`).
+    - `identity_public_key`: we use this for logging the identity of the public key that is making
+      a particular request.
+  It should _not_ be used for logging one-off attributes that don't have a clear purpose or common
+  meaning across the codebase, i.e. `count`, `value`, etc. Use unstructured logging for those. If
+  you're unsure, err towards unstructured logging.
+- Converting between `zap.Logger` and `zap.SugaredLogger` is easy and cheap. Use `Logger.Sugar()`
+  to go from `zap.Logger` to `zap.SugaredLogger`, and `SugaredLogger.Desugar()` to go the other way.
+- Most places in the codebase have a `zap.Logger` injected into the `Context` with common fields
+  already present. This includes all requests, tasks, and most other major components (i.e.
+  chainwatcher). Use `logging.GetLoggerFromContext` to get the logger instance from the context.
+- Structured and unstructured logging can be mixed for a given log message. For example, the
+  following example is perfectly acceptable:
+```go
+	logger := logging.GetLoggerFromContext(ctx)
+    ...
+    logger.With(zap.Error(err)).Sugar().Infof("Failed to broadcast node tx for node %s", node.ID)
+
+```
+- Be mindful with what you log. Be extremely selective on logs that are logged on every request
+  (i.e. logs in middleware). Logs that describe regular execution are discouraged, instead logs
+  should be reserved for important events (abnormalities or errors). This is especially true
+  on high-traffic endpoints (i.e. read endpoints).
+
 ## Run tests
 
 ### Unit tests
