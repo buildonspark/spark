@@ -9,7 +9,6 @@ import (
 	"slices"
 	"time"
 
-	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/google/uuid"
@@ -50,26 +49,24 @@ func CreateStartedTransactionEntities(
 	coordinatorPublicKey keys.Public,
 ) (*TokenTransaction, error) {
 	// Ordered fields are ordered according to the order of the input in the token transaction proto.
-	logger := logging.GetLoggerFromContext(ctx)
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
-		return nil, err
+		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
 	}
 
 	partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash partial token transaction: %w", err)
+		return nil, err
 	}
 	finalTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash final token transaction: %w", err)
+		return nil, err
 	}
 
 	var network st.Network
 	err = network.UnmarshalProto(tokenTransaction.Network)
 	if err != nil {
-		logger.Error("Failed to unmarshal network", zap.Error(err))
-		return nil, err
+		return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to unmarshal network: %w", err))
 	}
 
 	var tokenTransactionEnt *TokenTransaction
@@ -91,11 +88,11 @@ func CreateStartedTransactionEntities(
 
 		issuerPubKey, err := keys.ParsePublicKey(createInput.GetIssuerPublicKey())
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse issuer public key: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse issuer public key: %w", err))
 		}
 		creationEntityPubKey, err := keys.ParsePublicKey(createInput.GetCreationEntityPublicKey())
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse creation entity public key: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse creation entity public key: %w", err))
 		}
 		tokenCreateEnt, err := db.TokenCreate.Create().
 			SetIssuerPublicKey(issuerPubKey).
@@ -110,7 +107,7 @@ func CreateStartedTransactionEntities(
 			SetTokenIdentifier(computedTokenIdentifier).
 			Save(ctx)
 		if err != nil {
-			return nil, sparkerrors.InternalDatabaseError(fmt.Errorf("failed to create token create ent, likely due to attempting to restart a create transaction with a different operator: %w", err))
+			return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to create token create ent, likely due to attempting to restart a create transaction with a different operator: %w", err))
 		}
 		txBuilder := db.TokenTransaction.Create().
 			SetPartialTokenTransactionHash(partialTokenTransactionHash).
@@ -124,12 +121,12 @@ func CreateStartedTransactionEntities(
 		}
 		tokenTransactionEnt, err = txBuilder.Save(ctx)
 		if err != nil {
-			return nil, sparkerrors.InternalDatabaseError(fmt.Errorf("failed to create create token transaction: %w", err))
+			return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to create create token transaction: %w", err))
 		}
 	case utils.TokenTransactionTypeMint:
 		issuerPubKey, err := keys.ParsePublicKey(tokenTransaction.GetMintInput().GetIssuerPublicKey())
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse issuer public key: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse issuer public key: %w", err))
 		}
 		tokenMintEnt, err := db.TokenMint.Create().
 			SetIssuerPublicKey(issuerPubKey).
@@ -139,7 +136,7 @@ func CreateStartedTransactionEntities(
 			SetTokenIdentifier(tokenTransaction.GetMintInput().GetTokenIdentifier()).
 			Save(ctx)
 		if err != nil {
-			return nil, sparkerrors.InternalDatabaseError(fmt.Errorf("failed to create token mint ent, likely due to attempting to restart a mint transaction with a different operator: %w", err))
+			return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to create token mint ent, likely due to attempting to restart a mint transaction with a different operator: %w", err))
 		}
 		txMintBuilder := db.TokenTransaction.Create().
 			SetPartialTokenTransactionHash(partialTokenTransactionHash).
@@ -154,7 +151,7 @@ func CreateStartedTransactionEntities(
 		}
 		tokenTransactionEnt, err = txMintBuilder.Save(ctx)
 		if err != nil {
-			return nil, sparkerrors.InternalDatabaseError(fmt.Errorf("failed to create mint token transaction: %w", err))
+			return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to create mint token transaction: %w", err))
 		}
 	case utils.TokenTransactionTypeTransfer:
 		if len(signaturesWithIndex) != len(orderedOutputToSpendEnts) {
@@ -176,7 +173,7 @@ func CreateStartedTransactionEntities(
 		}
 		tokenTransactionEnt, err = txTransferBuilder.Save(ctx)
 		if err != nil {
-			return nil, sparkerrors.InternalDatabaseError(fmt.Errorf("failed to create transfer token transaction: %w", err))
+			return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to create transfer token transaction: %w", err))
 		}
 		for outputIndex, outputToSpendEnt := range orderedOutputToSpendEnts {
 			_, err = db.TokenOutput.UpdateOne(outputToSpendEnt).
@@ -187,12 +184,12 @@ func CreateStartedTransactionEntities(
 				SetSpentTransactionInputVout(int32(outputIndex)).
 				Save(ctx)
 			if err != nil {
-				return nil, sparkerrors.InternalDatabaseError(fmt.Errorf("failed to update output to spend: %w", err))
+				return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update output to spend: %w", err))
 			}
 		}
 	case utils.TokenTransactionTypeUnknown:
 	default:
-		return nil, fmt.Errorf("token transaction type unknown")
+		return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("token transaction type unknown"))
 	}
 	if tokenTransaction.Version >= 2 && tokenTransaction.GetInvoiceAttachments() != nil {
 		sparkInvoiceIDs, sparkInvoicesToCreate, err := prepareSparkInvoiceCreates(ctx, tokenTransaction, tokenTransactionEnt)
@@ -205,7 +202,7 @@ func CreateStartedTransactionEntities(
 				DoNothing().
 				Exec(ctx)
 			if err != nil {
-				return nil, sparkerrors.InternalDatabaseError(fmt.Errorf("failed to create spark invoices: %w", err))
+				return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to create spark invoices: %w", err))
 			}
 			sparkInvoiceIDsToAdd := make([]uuid.UUID, 0, len(sparkInvoiceIDs))
 			for sparkInvoiceID := range sparkInvoiceIDs {
@@ -222,7 +219,7 @@ func CreateStartedTransactionEntities(
 				AddTokenTransactionIDs(tokenTransactionEnt.ID).
 				Exec(ctx)
 			if err != nil {
-				return nil, sparkerrors.InternalDatabaseError(fmt.Errorf("failed to attach token transaction edge: %w", err))
+				return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to attach token transaction edge: %w", err))
 			}
 		}
 	}
@@ -247,19 +244,25 @@ func CreateStartedTransactionEntities(
 				Only(ctx)
 			if err != nil {
 				// An error occured when fetching the spark token create ent.
-				return nil, fmt.Errorf("failed to fetch token create ent: %w", err)
+				if IsNotFound(err) {
+					return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token create entity not found for provided token identifier: %w", err))
+				}
+				return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch token create ent: %w", err))
 			}
 			issuerPublicKeyToWrite = tokenCreateEnt.IssuerPublicKey
 		} else if len(tokenOutputs[0].TokenPublicKey) != 0 {
 			tokenPubKey, err := keys.ParsePublicKey(tokenOutputs[0].TokenPublicKey)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse token public key: %w", err)
+				return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse token public key: %w", err))
 			}
 			tokenCreateEnt, err = db.TokenCreate.Query().
 				Where(tokencreate.IssuerPublicKey(tokenPubKey)).
 				Only(ctx)
 			if err != nil {
-				return nil, fmt.Errorf("failed to fetch token create ent: %w", err)
+				if IsNotFound(err) {
+					return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token create entity not found for issuer public key: %w", err))
+				}
+				return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch token create ent: %w", err))
 			}
 			tokenIdentifierToWrite = tokenCreateEnt.TokenIdentifier
 		}
@@ -279,7 +282,7 @@ func CreateStartedTransactionEntities(
 		if issuerPublicKeyToWrite.IsZero() {
 			outputPubKey, err := keys.ParsePublicKey(output.GetTokenPublicKey())
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse output token public key: %w", err)
+				return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse output token public key: %w", err))
 			}
 			issuerPublicKeyToWrite = outputPubKey
 		}
@@ -289,7 +292,7 @@ func CreateStartedTransactionEntities(
 
 		ownerPubKey, err := keys.ParsePublicKey(output.OwnerPublicKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse output token owner public key: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse output token owner public key: %w", err))
 		}
 		outputEnts = append(
 			outputEnts,
@@ -314,7 +317,7 @@ func CreateStartedTransactionEntities(
 	}
 	_, err = db.TokenOutput.CreateBulk(outputEnts...).Save(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create token outputs: %w", err)
+		return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to create token outputs: %w", err))
 	}
 	return tokenTransactionEnt, nil
 }
@@ -324,15 +327,15 @@ func prepareSparkInvoiceCreates(ctx context.Context, tokenTransaction *tokenpb.T
 	var invoiceCreates []*SparkInvoiceCreate
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
 	}
 	for _, invoiceAttachment := range tokenTransaction.GetInvoiceAttachments() {
 		if invoiceAttachment == nil {
-			return nil, nil, fmt.Errorf("invoice attachment is nil")
+			return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invoice attachment is nil"))
 		}
 		parsedInvoice, err := common.ParseSparkInvoice(invoiceAttachment.SparkInvoice)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to decode spark invoice: %w", err)
+			return nil, nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to decode spark invoice: %w", err))
 		}
 		invoiceToCreate := db.SparkInvoice.Create().
 			SetID(parsedInvoice.Id).
@@ -358,7 +361,7 @@ func UpdateSignedTransaction(
 ) error {
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
-		return err
+		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
 	}
 
 	// Update the token transaction with the operator signature and new status
@@ -367,7 +370,7 @@ func UpdateSignedTransaction(
 		SetStatus(st.TokenTransactionStatusSigned).
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to update token transaction with operator signature and status: %w", err)
+		return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update token transaction with operator signature and status: %w", err))
 	}
 
 	newInputStatus := st.TokenOutputStatusSpentSigned
@@ -378,17 +381,17 @@ func UpdateSignedTransaction(
 		newInputStatus = st.TokenOutputStatusSpentFinalized
 		newOutputLeafStatus = st.TokenOutputStatusCreatedFinalized
 		if len(operatorSpecificOwnershipSignatures) != 1 {
-			return fmt.Errorf(
+			return sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf(
 				"expected 1 ownership signature for mint, got %d",
 				len(operatorSpecificOwnershipSignatures),
-			)
+			))
 		}
 
 		_, err := db.TokenMint.UpdateOne(tokenTransactionEnt.Edges.Mint).
 			SetOperatorSpecificIssuerSignature(operatorSpecificOwnershipSignatures[0]).
 			Save(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to update mint with signature: %w", err)
+			return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update mint with signature: %w", err))
 		}
 	}
 
@@ -397,16 +400,16 @@ func UpdateSignedTransaction(
 		for _, outputToSpendEnt := range tokenTransactionEnt.Edges.SpentOutput {
 			spentLeaves := tokenTransactionEnt.Edges.SpentOutput
 			if len(spentLeaves) == 0 {
-				return fmt.Errorf("no spent outputs found for transaction. cannot finalize")
+				return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no spent outputs found for transaction. cannot finalize"))
 			}
 
 			// Validate that we have the right number of revocation keys.
 			if len(operatorSpecificOwnershipSignatures) != len(spentLeaves) {
-				return fmt.Errorf(
+				return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf(
 					"number of operator specific ownership signatures (%d) does not match number of spent outputs (%d)",
 					len(operatorSpecificOwnershipSignatures),
 					len(spentLeaves),
-				)
+				))
 			}
 
 			inputIndex := outputToSpendEnt.SpentTransactionInputVout
@@ -415,7 +418,7 @@ func UpdateSignedTransaction(
 				SetSpentOperatorSpecificOwnershipSignature(operatorSpecificOwnershipSignatures[inputIndex]).
 				Save(ctx)
 			if err != nil {
-				return fmt.Errorf("failed to update spent output to signed: %w", err)
+				return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update spent output to signed: %w", err))
 			}
 		}
 	}
@@ -431,7 +434,7 @@ func UpdateSignedTransaction(
 			SetStatus(newOutputLeafStatus).
 			Save(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to bulk update output status to signed: %w", err)
+			return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to bulk update output status to signed: %w", err))
 		}
 	}
 
@@ -448,7 +451,7 @@ func UpdateSignedTransferTransactionWithoutOperatorSpecificOwnershipSignatures(
 ) error {
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
-		return err
+		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
 	}
 
 	// Update the token transaction with the operator signature and new status
@@ -457,7 +460,7 @@ func UpdateSignedTransferTransactionWithoutOperatorSpecificOwnershipSignatures(
 		SetStatus(st.TokenTransactionStatusSigned).
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to update token transaction with operator signature and status: %w", err)
+		return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update token transaction with operator signature and status: %w", err))
 	}
 
 	// Update inputs.
@@ -471,7 +474,7 @@ func UpdateSignedTransferTransactionWithoutOperatorSpecificOwnershipSignatures(
 			SetStatus(st.TokenOutputStatusSpentSigned).
 			Save(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to bulk update spent output status to signed: %w", err)
+			return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to bulk update spent output status to signed: %w", err))
 		}
 	}
 
@@ -486,7 +489,7 @@ func UpdateSignedTransferTransactionWithoutOperatorSpecificOwnershipSignatures(
 			SetStatus(st.TokenOutputStatusCreatedSigned).
 			Save(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to bulk update output status to signed: %w", err)
+			return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to bulk update output status to signed: %w", err))
 		}
 	}
 
@@ -501,7 +504,7 @@ func UpdateFinalizedTransaction(
 ) error {
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
-		return err
+		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
 	}
 
 	// Update the token transaction with the operator signature and new status
@@ -509,19 +512,19 @@ func UpdateFinalizedTransaction(
 		SetStatus(st.TokenTransactionStatusFinalized).
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to update token transaction with finalized status: %w", err)
+		return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update token transaction with finalized status: %w", err))
 	}
 
 	spentLeaves := tokenTransactionEnt.Edges.SpentOutput
 	if len(spentLeaves) == 0 {
-		return fmt.Errorf("no spent outputs found for transaction. cannot finalize")
+		return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no spent outputs found for transaction. cannot finalize"))
 	}
 	if len(revocationSecrets) != len(spentLeaves) {
-		return fmt.Errorf(
+		return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf(
 			"number of revocation keys (%d) does not match number of spent outputs (%d)",
 			len(revocationSecrets),
 			len(spentLeaves),
-		)
+		))
 	}
 	// Update inputs.
 	for _, outputToSpendEnt := range tokenTransactionEnt.Edges.SpentOutput {
@@ -535,7 +538,7 @@ func UpdateFinalizedTransaction(
 			SetSpentRevocationSecret(secret).
 			Save(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to update spent output to signed: %w", err)
+			return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update spent output to signed: %w", err))
 		}
 	}
 
@@ -549,7 +552,7 @@ func UpdateFinalizedTransaction(
 		SetStatus(st.TokenOutputStatusCreatedFinalized).
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to bulk update output status to finalized: %w", err)
+		return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to bulk update output status to finalized: %w", err))
 	}
 	return nil
 }
@@ -567,15 +570,15 @@ func FinalizeCoordinatedTokenTransactionWithRevocationKeys(
 	spentOutputs := tokenTransactionEnt.Edges.SpentOutput
 	txHash := tokenTransactionEnt.FinalizedTokenTransactionHash
 	if len(spentOutputs) == 0 {
-		return fmt.Errorf("no spent outputs found for txHash %x. cannot finalize", txHash)
+		return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no spent outputs found for txHash %x. cannot finalize", txHash))
 	}
 	if len(revocationSecrets) != len(spentOutputs) {
-		return fmt.Errorf(
+		return sparkerrors.InternalKeyshareError(fmt.Errorf(
 			"number of revocation keys (%d) does not match number of spent outputs (%d) for txHash %x",
 			len(revocationSecrets),
 			len(spentOutputs),
 			txHash,
-		)
+		))
 	}
 
 	revocationSecretMap := make(map[uint32]keys.Private, len(revocationSecrets))
@@ -585,20 +588,20 @@ func FinalizeCoordinatedTokenTransactionWithRevocationKeys(
 
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
-		return err
+		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
 	}
 
 	for _, outputToSpendEnt := range spentOutputs {
 		if outputToSpendEnt.SpentTransactionInputVout < 0 {
-			return fmt.Errorf("spent transaction input vout is negative: %d for txHash %x", outputToSpendEnt.SpentTransactionInputVout, txHash)
+			return sparkerrors.InternalObjectMalformedField(fmt.Errorf("spent transaction input vout is negative: %d for txHash %x", outputToSpendEnt.SpentTransactionInputVout, txHash))
 		}
 		inputIndex := uint32(outputToSpendEnt.SpentTransactionInputVout)
 		revocationSecret, ok := revocationSecretMap[inputIndex]
 		if !ok {
-			return fmt.Errorf("no revocation secret found for input index %d for txHash %x", inputIndex, txHash)
+			return sparkerrors.InternalKeyshareError(fmt.Errorf("no revocation secret found for input index %d for txHash %x", inputIndex, txHash))
 		}
 		if revocationSecret.IsZero() {
-			return fmt.Errorf("revocation secret is zero for input index %d for txHash %x", inputIndex, txHash)
+			return sparkerrors.InternalKeyshareError(fmt.Errorf("revocation secret is zero for input index %d for txHash %x", inputIndex, txHash))
 		}
 
 		_, err := db.TokenOutput.UpdateOne(outputToSpendEnt).
@@ -606,7 +609,7 @@ func FinalizeCoordinatedTokenTransactionWithRevocationKeys(
 			SetSpentRevocationSecret(revocationSecret).
 			Save(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to update spent output for txHash %x: %w", txHash, err)
+			return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update spent output for txHash %x: %w", txHash, err))
 		}
 	}
 
@@ -620,7 +623,7 @@ func FinalizeCoordinatedTokenTransactionWithRevocationKeys(
 		SetStatus(st.TokenOutputStatusCreatedFinalized).
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to bulk update output status to finalized for txHash %x: %w", txHash, err)
+		return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to bulk update output status to finalized for txHash %x: %w", txHash, err))
 	}
 
 	// Update the token transaction status to Finalized.
@@ -628,10 +631,10 @@ func FinalizeCoordinatedTokenTransactionWithRevocationKeys(
 		SetStatus(st.TokenTransactionStatusFinalized).
 		Save(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to update token transaction with finalized status for txHash %x: %w", txHash, err)
+		return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update token transaction with finalized status for txHash %x: %w", txHash, err))
 	}
 	if err := db.Commit(); err != nil {
-		return fmt.Errorf("failed to commit and replace transaction after finalizing token transaction: %w", err)
+		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to commit and replace transaction after finalizing token transaction: %w", err))
 	}
 
 	return nil
@@ -640,7 +643,7 @@ func FinalizeCoordinatedTokenTransactionWithRevocationKeys(
 func FetchPartialTokenTransactionData(ctx context.Context, partialTokenTransactionHash []byte) (*TokenTransaction, error) {
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
-		return nil, err
+		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
 	}
 
 	tokenTransaction, err := db.TokenTransaction.Query().
@@ -654,7 +657,10 @@ func FetchPartialTokenTransactionData(ctx context.Context, partialTokenTransacti
 		WithCreate().
 		Only(ctx)
 	if err != nil {
-		return nil, err
+		if IsNotFound(err) {
+			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("partial token transaction not found for hash %x: %w", partialTokenTransactionHash, err))
+		}
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch partial token transaction by hash: %w", err))
 	}
 	return tokenTransaction, nil
 }
@@ -675,45 +681,45 @@ func FetchAndLockTokenTransactionData(ctx context.Context, finalTokenTransaction
 	// Also ensure the database entity type matches the protobuf type.
 	sparkTx, err := protoconverter.SparkTokenTransactionFromTokenProto(finalTokenTransaction)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert token transaction: %w", err)
+		return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to convert token transaction: %w", err))
 	}
 
 	txType, err := utils.InferTokenTransactionTypeSparkProtos(sparkTx)
 	if err != nil {
-		return nil, fmt.Errorf("invalid token transaction inputs: %w", err)
+		return nil, err
 	}
 
 	switch txType {
 	case utils.TokenTransactionTypeCreate:
 		if tokenTransaction.Edges.Create == nil {
-			return nil, fmt.Errorf("database has no create transaction but protobuf has create input - transaction type mismatch")
+			return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("database has no create transaction but protobuf has create input - transaction type mismatch"))
 		}
 	case utils.TokenTransactionTypeMint:
 		if tokenTransaction.Edges.Mint == nil {
-			return nil, fmt.Errorf("database has no mint transaction but protobuf has mint input - transaction type mismatch")
+			return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("database has no mint transaction but protobuf has mint input - transaction type mismatch"))
 		}
 	case utils.TokenTransactionTypeTransfer:
 		if tokenTransaction.Edges.Create != nil || tokenTransaction.Edges.Mint != nil {
-			return nil, fmt.Errorf("database has create/mint transaction but protobuf has transfer input - transaction type mismatch")
+			return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("database has create/mint transaction but protobuf has transfer input - transaction type mismatch"))
 		}
 		transferInput := finalTokenTransaction.GetTransferInput()
 		if len(transferInput.GetOutputsToSpend()) != len(tokenTransaction.Edges.SpentOutput) {
-			return nil, fmt.Errorf(
+			return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf(
 				"number of inputs in proto (%d) does not match number of spent outputs started with this transaction in the database (%d)",
 				len(transferInput.GetOutputsToSpend()),
 				len(tokenTransaction.Edges.SpentOutput),
-			)
+			))
 		}
 	default:
-		return nil, fmt.Errorf("token transaction type unknown")
+		return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("token transaction type unknown"))
 	}
 
 	if len(finalTokenTransaction.TokenOutputs) != len(tokenTransaction.Edges.CreatedOutput) {
-		return nil, fmt.Errorf(
+		return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf(
 			"number of outputs in proto (%d) does not match number of created outputs started with this transaction in the database (%d)",
 			len(finalTokenTransaction.TokenOutputs),
 			len(tokenTransaction.Edges.CreatedOutput),
-		)
+		))
 	}
 	return tokenTransaction, nil
 }
@@ -721,7 +727,7 @@ func FetchAndLockTokenTransactionData(ctx context.Context, finalTokenTransaction
 func FetchAndLockTokenTransactionDataByHash(ctx context.Context, tokenTransactionHash []byte) (*TokenTransaction, error) {
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
-		return nil, err
+		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
 	}
 
 	tokenTransaction, err := db.TokenTransaction.Query().
@@ -757,7 +763,10 @@ func FetchAndLockTokenTransactionDataByHash(ctx context.Context, tokenTransactio
 		ForUpdate().
 		Only(ctx)
 	if err != nil {
-		return nil, err
+		if IsNotFound(err) {
+			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token transaction not found for hash %x: %w", tokenTransactionHash, err))
+		}
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch and lock token transaction by hash: %w", err))
 	}
 
 	return tokenTransaction, nil
@@ -767,7 +776,7 @@ func FetchAndLockTokenTransactionDataByHash(ctx context.Context, tokenTransactio
 func FetchTokenTransactionDataByHashForRead(ctx context.Context, tokenTransactionHash []byte) (*TokenTransaction, error) {
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
-		return nil, err
+		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
 	}
 
 	tokenTransaction, err := db.TokenTransaction.Query().
@@ -786,7 +795,10 @@ func FetchTokenTransactionDataByHashForRead(ctx context.Context, tokenTransactio
 		WithSparkInvoice().
 		Only(ctx)
 	if err != nil {
-		return nil, err
+		if IsNotFound(err) {
+			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token transaction not found for hash %x: %w", tokenTransactionHash, err))
+		}
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch token transaction for read by hash: %w", err))
 	}
 
 	return tokenTransaction, nil
@@ -833,11 +845,11 @@ func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) 
 
 	network, err := t.GetNetworkFromEdges()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get network from edges: %w", err)
+		return nil, err
 	}
 	networkProto, err := network.MarshalProto()
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal network from schema type: %w", err)
+		return nil, err
 	}
 	tokenTransaction.Network = networkProto
 
@@ -898,7 +910,7 @@ func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) 
 		for i, output := range sortedSpentOutputs {
 			// Since we assume all relationships are loaded, we can directly access the created transaction.
 			if output.Edges.OutputCreatedTokenTransaction == nil {
-				return nil, fmt.Errorf("output spent transaction edge not loaded for output %s", output.ID)
+				return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("output spent transaction edge not loaded for output %s", output.ID))
 			}
 
 			transferInput.OutputsToSpend[i] = &tokenpb.TokenOutputToSpend{
@@ -926,43 +938,39 @@ func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) 
 			t.FinalizedTokenTransactionHash,
 		)
 	} else {
-		return nil, fmt.Errorf("Signed/Finalized transaction unexpectedly does not map to input TTXOs and cannot be marshalled: %s", t.ID)
+		return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("Signed/Finalized transaction unexpectedly does not map to input TTXOs and cannot be marshalled: %s", t.ID))
 	}
 	return tokenTransaction, nil
 }
 
 func (t *TokenTransaction) GetNetworkFromEdges() (st.Network, error) {
-	txType, err := t.InferTokenTransactionTypeEnt()
-	if err != nil {
-		return st.NetworkUnspecified, fmt.Errorf("invalid token transaction inputs: %w", err)
-	}
-
+	txType := t.InferTokenTransactionTypeEnt()
 	switch txType {
 	case utils.TokenTransactionTypeCreate:
 		return t.Edges.Create.Network, nil
 	case utils.TokenTransactionTypeMint, utils.TokenTransactionTypeTransfer:
 		if len(t.Edges.CreatedOutput) == 0 {
-			return st.NetworkUnspecified, fmt.Errorf("no outputs were found when reconstructing token transaction with ID: %s", t.ID)
+			return st.NetworkUnspecified, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no outputs were found when reconstructing token transaction with ID: %s", t.ID))
 		}
 		// All token transaction outputs must have the same network (confirmed in validation when signing
 		// the transaction, so its safe to use the first output).
 		return t.Edges.CreatedOutput[0].Network, nil
 	default:
-		return st.NetworkUnspecified, fmt.Errorf("unknown token transaction type: %s", txType)
+		return st.NetworkUnspecified, sparkerrors.InternalObjectMissingField(fmt.Errorf("unknown token transaction type: %s", txType))
 	}
 }
 
 // InferTokenTransactionTypeEnt determines the transaction type based on the Ent entity's edges.
 // This is more efficient than converting to proto and then inferring the type.
-func (t *TokenTransaction) InferTokenTransactionTypeEnt() (utils.TokenTransactionType, error) {
+func (t *TokenTransaction) InferTokenTransactionTypeEnt() utils.TokenTransactionType {
 	if t.Edges.Create != nil {
-		return utils.TokenTransactionTypeCreate, nil
+		return utils.TokenTransactionTypeCreate
 	}
 	if t.Edges.Mint != nil {
-		return utils.TokenTransactionTypeMint, nil
+		return utils.TokenTransactionTypeMint
 	}
 	// If no create or mint, assume its a transfer.
-	return utils.TokenTransactionTypeTransfer, nil
+	return utils.TokenTransactionTypeTransfer
 }
 
 // ValidateNotExpired checks if a token transaction has expired and returns an error if it has.
@@ -970,14 +978,12 @@ func (t *TokenTransaction) ValidateNotExpired(defaultV0TransactionExpiryDuration
 	now := time.Now().UTC()
 	if !t.ExpiryTime.IsZero() {
 		if now.After(t.ExpiryTime.UTC()) {
-			return fmt.Errorf("signing failed because token transaction %s has expired at %s, current time: %s",
-				t.ID, t.ExpiryTime.UTC().Format(time.RFC3339), now.Format(time.RFC3339))
+			return sparkerrors.FailedPreconditionExpired(fmt.Errorf("signing failed because token transaction %s has expired at %s, current time: %s", t.ID, t.ExpiryTime.UTC().Format(time.RFC3339), now.Format(time.RFC3339)))
 		}
 	} else if t.Version == 0 {
 		v0ComputedExpirationTime := t.CreateTime.Add(defaultV0TransactionExpiryDuration)
 		if now.After(v0ComputedExpirationTime) {
-			return fmt.Errorf("signing failed because v0 token transaction %s has computed expiration time %s, current time: %s",
-				t.ID, v0ComputedExpirationTime.Format(time.RFC3339), now.Format(time.RFC3339))
+			return sparkerrors.FailedPreconditionExpired(fmt.Errorf("signing failed because v0 token transaction %s has computed expiration time %s, current time: %s", t.ID, v0ComputedExpirationTime.Format(time.RFC3339), now.Format(time.RFC3339)))
 		}
 	}
 	return nil

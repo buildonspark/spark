@@ -160,7 +160,7 @@ func getOldTransactionIDs(ctx context.Context, m *entgen.TokenOutputMutation) (m
 		}).
 		Only(ctx)
 	if err != nil {
-		return nil, errors.InternalDatabaseError(fmt.Errorf("failed to fetch existing output: %w", err))
+		return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to fetch existing output: %w", err))
 	}
 
 	oldTxIDs := make(map[uuid.UUID]struct{})
@@ -220,12 +220,12 @@ func validateOutputTransactionReassignments(ctx context.Context, m *entgen.Token
 		WithCreatedOutput().
 		All(ctx)
 	if err != nil {
-		return errors.InternalDatabaseError(fmt.Errorf("failed to fetch affected transactions: %w", err))
+		return errors.InternalDatabaseReadError(fmt.Errorf("failed to fetch affected transactions: %w", err))
 	}
 
 	for _, tx := range txs {
 		if err := ValidateTransferTransactionBalance(tx); err != nil {
-			return errors.FailedPreconditionInvalidState(fmt.Errorf("output reassignment would violate balance constraint: %w", err))
+			return errors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output reassignment would violate balance constraint: %w", err))
 		}
 	}
 

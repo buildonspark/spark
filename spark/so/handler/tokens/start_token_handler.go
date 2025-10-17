@@ -26,7 +26,6 @@ import (
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/errors"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/protoconverter"
@@ -65,7 +64,7 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	logger := logging.GetLoggerFromContext(ctx)
 	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("invalid identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("invalid identity public key: %w", err))
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, idPubKey); err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrIdentityPublicKeyAuthFailed, req.PartialTokenTransaction, err)
@@ -77,7 +76,7 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 
 	partialTokenTransactionHash, err := utils.HashTokenTransaction(req.PartialTokenTransaction, true)
 	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToHashPartialTransaction, req.PartialTokenTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionProto("failed to hash partial token transaction", req.PartialTokenTransaction, err)
 	}
 	previouslyCreatedTokenTransaction, err := ent.FetchPartialTokenTransactionData(ctx, partialTokenTransactionHash)
 	if err != nil && !ent.IsNotFound(err) {
@@ -136,7 +135,7 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 	})
 	if err != nil {
 		formattedError := tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToExecuteWithNonCoordinator, req.PartialTokenTransaction, err)
-		return nil, errors.WrapErrorWithReasonPrefix(formattedError, errors.ErrorReasonPrefixFailedWithExternalCoordinator)
+		return nil, sparkerrors.WrapErrorWithReasonPrefix(formattedError, sparkerrors.ErrorReasonPrefixFailedWithExternalCoordinator)
 	}
 
 	// Only save in the coordinator SO after receiving confirmation from all other SOs. This ensures that if
@@ -173,7 +172,7 @@ func callPrepareTokenTransactionInternal(ctx context.Context, operator *so.Signi
 	defer span.End()
 	conn, err := operator.NewOperatorGRPCConnection()
 	if err != nil {
-		return tokens.FormatErrorWithTransactionProto(fmt.Sprintf(tokens.ErrFailedToConnectToOperator, operator.Identifier), finalTokenTransaction, err)
+		return sparkerrors.UnavailableExternalOperator(tokens.FormatErrorWithTransactionProto(fmt.Sprintf(tokens.ErrFailedToConnectToOperator, operator.Identifier), finalTokenTransaction, err))
 	}
 	defer conn.Close()
 
@@ -359,7 +358,7 @@ func preemptOrRejectTransaction(
 	existingPartialHash := existingTransaction.PartialTokenTransactionHash
 	newPartialHash, err := utils.HashTokenTransaction(newTransaction, true)
 	if err != nil {
-		return tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToHashPartialTransaction, newTransaction, err)
+		return tokens.FormatErrorWithTransactionProto("failed to hash new transaction for comparison", newTransaction, err)
 	}
 
 	if bytes.Compare(newPartialHash, existingPartialHash) < 0 {

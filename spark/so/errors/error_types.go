@@ -6,9 +6,18 @@ import (
 
 // Canonical reason constants for ErrorInfo.Reason. Keep stable, UPPER_SNAKE_CASE.  All errors should have a grpc error code prefix.
 const (
-	ReasonInternalDatabaseError       = "DATABASE_ERROR"
-	ReasonInternalTypeConversionError = "TYPE_CONVERSION_ERROR"
-	ReasonInternalUnhandledError      = "UNHANDLED_ERROR"
+	ReasonInternalDatabaseMissingEdge          = "MISSING_EDGE"
+	ReasonInternalDatabaseTransactionLifecycle = "DATABASE_TRANSACTION_LIFECYCLE"
+	ReasonInternalDatabaseWrite                = "DATABASE_WRITE"
+	ReasonInternalDatabaseRead                 = "DATABASE_READ"
+	ReasonInternalTypeConversion               = "TYPE_CONVERSION"
+	ReasonInternalUnhandled                    = "UNHANDLED"
+	ReasonInternalObjectNull                   = "INTERNAL_OBJECT_NULL"
+	ReasonInternalObjectMissingField           = "INTERNAL_OBJECT_MISSING_FIELD"
+	ReasonInternalObjectMalformedField         = "INTERNAL_OBJECT_MALFORMED_FIELD"
+	ReasonInternalObjectOutOfRange             = "INTERNAL_OBJECT_OUT_OF_RANGE"
+	ReasonInternalKeyshareError                = "INTERNAL_KEYSHARE_ERROR"
+	ReasonInternalInvalidOperatorResponse      = "INVALID_OPERATOR_RESPONSE"
 
 	ReasonInvalidArgumentMissingField      = "MISSING_FIELD"
 	ReasonInvalidArgumentMalformedField    = "MALFORMED_FIELD"
@@ -31,14 +40,14 @@ const (
 	ReasonAlreadyExistsDuplicateOperation = "DUPLICATE_OPERATION"
 
 	ReasonNotFoundMissingEntity = "MISSING_ENTITY"
-	ReasonNotFoundMissingEdge   = "MISSING_EDGE"
 
 	ReasonResourceExhaustedRateLimitExceeded        = "RATE_LIMIT_EXCEEDED"
 	ReasonResourceExhaustedConcurrencyLimitExceeded = "CONCURRENCY_LIMIT_EXCEEDED"
 
-	ReasonUnavailableMethodDisabled  = "METHOD_DISABLED"
-	ReasonUnavailableDataStore       = "DATA_STORE_UNAVAILABLE"
-	ReasonUnavailableDatabaseTimeout = "DATABASE_TIMEOUT"
+	ReasonUnavailableMethodDisabled   = "METHOD_DISABLED"
+	ReasonUnavailableDataStore        = "DATA_STORE_UNAVAILABLE"
+	ReasonUnavailableDatabaseTimeout  = "DATABASE_TIMEOUT"
+	ReasonUnavailableExternalOperator = "EXTERNAL_OPERATOR_UNAVAILABLE"
 
 	// ErrorReasonPrefixFailedWithExternalCoordinator is a prefix for errors that occur when the coordinator calls out to another
 	// coordinator and that call fails. The underlying reason from the external coordinator should be appended after a colon.
@@ -46,37 +55,82 @@ const (
 )
 
 func InternalTypeConversionError(err error) error {
-	return newGRPCError(codes.Internal, err, ReasonInternalTypeConversionError)
+	return newGRPCError(codes.Internal, err, ReasonInternalTypeConversion)
 }
 
 func InternalUnhandledError(err error) error {
-	return newGRPCError(codes.Internal, err, ReasonInternalUnhandledError)
+	return newGRPCError(codes.Internal, err, ReasonInternalUnhandled)
 }
 
-func InternalDatabaseError(err error) error {
-	return newGRPCError(codes.Internal, err, ReasonInternalDatabaseError)
+func InternalDatabaseTransactionLifecycleError(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalDatabaseTransactionLifecycle)
 }
 
+func InternalDatabaseWriteError(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalDatabaseWrite)
+}
+
+func InternalDatabaseReadError(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalDatabaseRead)
+}
+
+func InternalDatabaseMissingEdge(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalDatabaseMissingEdge)
+}
+
+// Use for internal objects not provided by the caller.
+func InternalObjectNull(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalObjectNull)
+}
+
+// Use for internal objects not provided by the caller.
+func InternalObjectMissingField(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalObjectMissingField)
+}
+
+// Use for internal objects not provided by the caller.
+func InternalObjectMalformedField(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalObjectMalformedField)
+}
+
+func InternalInvalidOperatorResponse(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalInvalidOperatorResponse)
+}
+
+func InternalKeyshareError(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalKeyshareError)
+}
+
+func InternalObjectOutOfRange(err error) error {
+	return newGRPCError(codes.Internal, err, ReasonInternalObjectOutOfRange)
+}
+
+// Use for external objects provided by the caller
 func InvalidArgumentMissingField(err error) error {
 	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentMissingField)
 }
 
+// Use for external objects provided by the caller
 func InvalidArgumentMalformedField(err error) error {
 	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentMalformedField)
 }
 
+// Use for external objects provided by the caller
 func InvalidArgumentDuplicateField(err error) error {
 	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentDuplicateField)
 }
 
+// Use for external objects provided by the caller
 func InvalidArgumentMalformedKey(err error) error {
 	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumenMalformedKey)
 }
 
+// Use for external objects provided by the caller
 func InvalidArgumentInvalidVersion(err error) error {
 	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentInvalidVersion)
 }
 
+// Use for external objects provided by the caller
 func InvalidArgumentPublicKeyMismatch(err error) error {
 	return newGRPCError(codes.InvalidArgument, err, ReasonInvalidArgumentPublicKeyMismatch)
 }
@@ -125,10 +179,6 @@ func NotFoundMissingEntity(err error) error {
 	return newGRPCError(codes.NotFound, err, ReasonNotFoundMissingEntity)
 }
 
-func NotFoundMissingEdge(err error) error {
-	return newGRPCError(codes.NotFound, err, ReasonNotFoundMissingEdge)
-}
-
 func ResourceExhaustedRateLimitExceeded(err error) error {
 	return newGRPCError(codes.ResourceExhausted, err, ReasonResourceExhaustedRateLimitExceeded)
 }
@@ -147,4 +197,8 @@ func UnavailableDatabaseTimeout(err error) error {
 
 func UnavailableDataStore(err error) error {
 	return newGRPCError(codes.Unavailable, err, ReasonUnavailableDataStore)
+}
+
+func UnavailableExternalOperator(err error) error {
+	return newGRPCError(codes.Unavailable, err, ReasonUnavailableExternalOperator)
 }

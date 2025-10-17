@@ -11,6 +11,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"golang.org/x/text/unicode/norm"
 )
 
@@ -71,11 +72,11 @@ func NewTokenMetadataFromCreateInput(
 ) (*TokenMetadata, error) {
 	network, err := NetworkFromProtoNetwork(networkProto)
 	if err != nil {
-		return nil, fmt.Errorf("invalid network: %w", err)
+		return nil, err
 	}
 	issuerPubKey, err := keys.ParsePublicKey(createInput.GetIssuerPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("invalid issuer public key: %w", err)
+		return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("invalid issuer public key: %w", err))
 	}
 	return &TokenMetadata{
 		IssuerPublicKey:         issuerPubKey,
@@ -142,7 +143,7 @@ func (tm *TokenMetadata) ComputeTokenIdentifierV1() (TokenIdentifier, error) {
 	// Hash network (4 bytes)
 	networkMagic, err := BitcoinNetworkIdentifierFromNetwork(tm.Network)
 	if err != nil {
-		return nil, fmt.Errorf("invalid network: %w", err)
+		return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("invalid network: %w", err))
 	}
 	h.Write(sha256Slice(binary.BigEndian.AppendUint32(nil, networkMagic)))
 
@@ -182,7 +183,7 @@ func (tm *TokenMetadata) GetTokenCreateLayer() (TokenCreateLayer, error) {
 		return TokenCreateLayerUnknown, ErrCreationEntityPublicKeyEmpty
 	}
 	if len(tm.CreationEntityPublicKey) != CreationEntityPublicKeyLength {
-		return TokenCreateLayerUnknown, fmt.Errorf("%w: creation entity public key must be %d bytes", ErrInvalidCreationEntityPublicKeyLength, CreationEntityPublicKeyLength)
+		return TokenCreateLayerUnknown, sparkerrors.InternalObjectMalformedField(fmt.Errorf("%w: creation entity public key must be %d bytes", ErrInvalidCreationEntityPublicKeyLength, CreationEntityPublicKeyLength))
 	}
 	if bytes.Equal(tm.CreationEntityPublicKey, L1CreationEntityPublicKey) {
 		return TokenCreateLayerL1, nil
@@ -194,32 +195,32 @@ func (tm *TokenMetadata) GetTokenCreateLayer() (TokenCreateLayer, error) {
 // This allows validation of a partial token metadata object before the creation entity public key is set
 func (tm *TokenMetadata) ValidatePartial() error {
 	if tm.IssuerPublicKey.IsZero() {
-		return ErrInvalidIssuerPublicKey
+		return sparkerrors.InternalObjectMissingField(ErrInvalidIssuerPublicKey)
 	}
 	if tm.TokenName == "" {
-		return ErrTokenNameEmpty
+		return sparkerrors.InternalObjectMissingField(ErrTokenNameEmpty)
 	}
 	if !utf8.ValidString(tm.TokenName) || !norm.NFC.IsNormalString(tm.TokenName) {
 		return ErrTokenNameUTF8
 	}
 	if len(tm.TokenName) < 3 || len(tm.TokenName) > 20 {
-		return fmt.Errorf("%w: got %d", ErrTokenNameLength, len(tm.TokenName))
+		return sparkerrors.InternalObjectMalformedField(fmt.Errorf("%w: got %d", ErrTokenNameLength, len(tm.TokenName)))
 	}
 	if tm.TokenTicker == "" {
-		return ErrTokenTickerEmpty
+		return sparkerrors.InternalObjectMissingField(ErrTokenTickerEmpty)
 	}
 	if !utf8.ValidString(tm.TokenTicker) || !norm.NFC.IsNormalString(tm.TokenTicker) {
-		return ErrTokenTickerUTF8
+		return sparkerrors.InternalObjectMalformedField(ErrTokenTickerUTF8)
 	}
 	if len(tm.TokenTicker) < 3 || len(tm.TokenTicker) > 6 {
-		return fmt.Errorf("%w: got %d", ErrTokenTickerLength, len(tm.TokenTicker))
+		return sparkerrors.InternalObjectMalformedField(fmt.Errorf("%w: got %d", ErrTokenTickerLength, len(tm.TokenTicker)))
 	}
 	if len(tm.MaxSupply) != 16 {
-		return fmt.Errorf("%w: got %d", ErrInvalidMaxSupplyLength, len(tm.MaxSupply))
+		return sparkerrors.InternalObjectMalformedField(fmt.Errorf("%w: got %d", ErrInvalidMaxSupplyLength, len(tm.MaxSupply)))
 	}
 
 	if tm.Network == Unspecified {
-		return fmt.Errorf("%w: got %s", ErrNetworkUnspecified, tm.Network)
+		return sparkerrors.InternalObjectMalformedField(fmt.Errorf("%w: got %s", ErrNetworkUnspecified, tm.Network))
 	}
 
 	return nil
@@ -231,7 +232,7 @@ func (tm *TokenMetadata) Validate() error {
 		return err
 	}
 	if len(tm.CreationEntityPublicKey) != CreationEntityPublicKeyLength {
-		return fmt.Errorf("%w: got %d", ErrInvalidCreationEntityPublicKeyLength, len(tm.CreationEntityPublicKey))
+		return sparkerrors.InternalObjectMalformedField(fmt.Errorf("%w: got %d", ErrInvalidCreationEntityPublicKeyLength, len(tm.CreationEntityPublicKey)))
 	}
 	return nil
 }

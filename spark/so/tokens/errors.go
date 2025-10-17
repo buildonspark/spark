@@ -10,11 +10,9 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 )
 
-// Error message constants
 const (
 	ErrIdentityPublicKeyAuthFailed        = "identity public key authentication failed"
 	ErrInvalidPartialTokenTransaction     = "invalid partial token transaction"
-	ErrFailedToHashPartialTransaction     = "failed to hash partial token transaction"
 	ErrFailedToFetchPartialTransaction    = "failed to fetch partial token transaction data"
 	ErrFailedToFetchTransaction           = "failed to fetch transaction"
 	ErrFailedToGetUnusedKeyshares         = "failed to get unused signing keyshares"
@@ -24,7 +22,6 @@ const (
 	ErrFailedToExecuteWithCoordinator     = "failed to execute start token transaction with coordinator"
 	ErrFailedToGetKeyshareInfo            = "failed to get keyshare info"
 	ErrFailedToGetCreationEntityPublicKey = "failed to get creation entity public key"
-	ErrFailedToHashFinalTransaction       = "failed to hash final token transaction"
 	ErrFailedToConnectToOperator          = "failed to connect to operator: %s"
 	ErrFailedToExecuteWithOperator        = "failed to execute start token transaction with operator: %s"
 	ErrFailedToGetOperatorList            = "failed to get operator list"

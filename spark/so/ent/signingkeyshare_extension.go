@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -302,7 +303,7 @@ func GetSigningKeysharesMap(ctx context.Context, keyshareIDs []uuid.UUID) (map[u
 
 	db, err := GetDbFromContext(ctx)
 	if err != nil {
-		return nil, err
+		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(err)
 	}
 
 	keyshares, err := db.SigningKeyshare.Query().
@@ -316,7 +317,7 @@ func GetSigningKeysharesMap(ctx context.Context, keyshareIDs []uuid.UUID) (map[u
 		}).
 		All(ctx)
 	if err != nil {
-		return nil, err
+		return nil, sparkerrors.InternalDatabaseReadError(err)
 	}
 
 	keysharesMap := make(map[uuid.UUID]*SigningKeyshare, len(keyshares))

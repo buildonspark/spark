@@ -62,14 +62,7 @@ func GetTokenTxAttrStringsFromEnt(ctx context.Context, tx *ent.TokenTransaction)
 		return TokenTransactionAttributes{Type: "unknown", PartialHashHex: "unknown", FinalHashHex: "unknown"}
 	}
 	var attrs TokenTransactionAttributes
-	if tt, err := tx.InferTokenTransactionTypeEnt(); err != nil {
-		logger.Warn("Failed to infer token transaction type from ent when computing attributes",
-			zap.Stringer("transaction_uuid", tx.ID),
-			zap.Error(err))
-		attrs.Type = "unknown"
-	} else {
-		attrs.Type = tt.String()
-	}
+	attrs.Type = tx.InferTokenTransactionTypeEnt().String()
 	if len(tx.PartialTokenTransactionHash) == 0 {
 		logger.Warn("Partial token transaction hash is empty when computing attributes",
 			zap.Stringer("transaction_uuid", tx.ID))

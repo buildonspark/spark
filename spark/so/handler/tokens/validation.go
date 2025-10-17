@@ -14,6 +14,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/errors"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/tokens"
 	"github.com/lightsparkdev/spark/so/utils"
 )
@@ -78,11 +79,11 @@ func validateTokenTransactionForSigning(ctx context.Context, config *so.Config, 
 	// Get the network-specific transaction expiry duration
 	schemaNetwork, err := tokenTransactionEnt.GetNetworkFromEdges()
 	if err != nil {
-		return fmt.Errorf("failed to get network from edges: %w", err)
+		return err
 	}
 	network, err := common.NetworkFromSchemaNetwork(schemaNetwork)
 	if err != nil {
-		return fmt.Errorf("failed to get network from schema network: %w", err)
+		return err
 	}
 	transactionV0ExpiryDuration := config.Lrc20Configs[network.String()].TransactionExpiryDuration
 
@@ -98,14 +99,11 @@ func validateTokenTransactionForSigning(ctx context.Context, config *so.Config, 
 	}
 
 	// Type-specific validations
-	txType, err := tokenTransactionEnt.InferTokenTransactionTypeEnt()
-	if err != nil {
-		return fmt.Errorf("failed to check token transaction type: %w", err)
-	}
+	txType := tokenTransactionEnt.InferTokenTransactionTypeEnt()
 	switch txType {
 	case utils.TokenTransactionTypeCreate:
 		if tokenTransactionEnt.Edges.Create == nil {
-			return fmt.Errorf("create input ent not found when attempting to sign create transaction")
+			return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("create input ent not found when attempting to sign create transaction"))
 		}
 	case utils.TokenTransactionTypeMint:
 		// For mint transactions, validate that the mint does not exceed the max supply.
@@ -117,7 +115,7 @@ func validateTokenTransactionForSigning(ctx context.Context, config *so.Config, 
 	case utils.TokenTransactionTypeTransfer:
 		// If token outputs are being spent, verify the expected status of inputs and check for active freezes.
 		if len(tokenTransactionEnt.Edges.SpentOutput) == 0 {
-			return fmt.Errorf("no spent outputs found when attempting to validate transfer transaction")
+			return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no spent outputs found when attempting to validate transfer transaction"))
 		}
 
 		invalidInputs := validateInputStatuses(tokenTransactionEnt.Edges.SpentOutput, st.TokenOutputStatusSpentStarted, st.TokenOutputStatusSpentSigned)

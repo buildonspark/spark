@@ -69,9 +69,10 @@ func (t TokenTransactionType) String() string {
 // If partialHash is true generate a partial hash even if the provided transaction is final.
 func HashTokenTransaction(tokenTransaction *tokenpb.TokenTransaction, partialHash bool) ([]byte, error) {
 	if tokenTransaction == nil {
-		return nil, fmt.Errorf("token transaction cannot be nil")
+		return nil, sparkerrors.InternalObjectNull(fmt.Errorf("token transaction cannot be nil"))
 	}
 
+	var hasher func() ([]byte, error)
 	switch tokenTransaction.Version {
 	case 0:
 		{
@@ -79,29 +80,31 @@ func HashTokenTransaction(tokenTransaction *tokenpb.TokenTransaction, partialHas
 			if err != nil {
 				return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to convert token transaction: %w", err))
 			}
-			return HashTokenTransactionV0(sparkTx, partialHash)
+			hasher = func() ([]byte, error) { return HashTokenTransactionV0(sparkTx, partialHash) }
 		}
 	case 1:
-		return HashTokenTransactionV1(tokenTransaction, partialHash)
+		hasher = func() ([]byte, error) { return HashTokenTransactionV1(tokenTransaction, partialHash) }
 	case 2:
-		return HashTokenTransactionV2(tokenTransaction, partialHash)
+		hasher = func() ([]byte, error) { return HashTokenTransactionV2(tokenTransaction, partialHash) }
 	case 3:
-		return HashTokenTransactionV3(tokenTransaction, partialHash)
+		hasher = func() ([]byte, error) { return HashTokenTransactionV3(tokenTransaction, partialHash) }
 	default:
 		return nil, sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("unsupported token transaction version: %d", tokenTransaction.Version))
 	}
+
+	return hasher()
 }
 
 func HashTokenTransactionV3(tokenTransaction *tokenpb.TokenTransaction, partialHash bool) ([]byte, error) {
 	if tokenTransaction == nil {
-		return nil, fmt.Errorf("token transaction cannot be nil")
+		return nil, sparkerrors.InternalObjectNull(fmt.Errorf("token transaction cannot be nil"))
 	}
 
 	if partialHash {
 		// Clone to avoid mutating the caller's message.
 		cloned, ok := proto.Clone(tokenTransaction).(*tokenpb.TokenTransaction)
 		if !ok || cloned == nil {
-			return nil, fmt.Errorf("failed to clone token transaction for hashing")
+			return nil, sparkerrors.InternalObjectNull(fmt.Errorf("failed to clone token transaction for hashing"))
 		}
 		cloned.ExpiryTime = nil
 
@@ -127,18 +130,18 @@ func HashTokenTransactionV3(tokenTransaction *tokenpb.TokenTransaction, partialH
 			}
 		case TokenTransactionTypeUnknown:
 		default:
-			return nil, fmt.Errorf("unsupported token transaction type: %s", inputType)
+			return nil, sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("unsupported token transaction type: %s", inputType))
 		}
 
 		hash, err := protohash.Hash(cloned)
 		if err != nil {
-			return nil, fmt.Errorf("failed to hash partial token transaction: %w", err)
+			return nil, sparkerrors.InternalUnhandledError(fmt.Errorf("failed to hash partial token transaction: %w", err))
 		}
 		return hash, nil
 	} else {
 		hash, err := protohash.Hash(tokenTransaction)
 		if err != nil {
-			return nil, fmt.Errorf("failed to hash final token transaction: %w", err)
+			return nil, sparkerrors.InternalUnhandledError(fmt.Errorf("failed to hash final token transaction: %w", err))
 		}
 		return hash, nil
 	}
@@ -146,7 +149,7 @@ func HashTokenTransactionV3(tokenTransaction *tokenpb.TokenTransaction, partialH
 
 func HashTokenTransactionV2(tokenTransaction *tokenpb.TokenTransaction, partialHash bool) ([]byte, error) {
 	if tokenTransaction == nil {
-		return nil, fmt.Errorf("token transaction cannot be nil")
+		return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("token transaction cannot be nil"))
 	}
 
 	allHashes, err := hashTokenTransactionV1(tokenTransaction, partialHash)
@@ -172,12 +175,12 @@ func HashTokenTransactionV2(tokenTransaction *tokenpb.TokenTransaction, partialH
 	sortedInvoices := make([]keyedInvoice, 0, len(invoices))
 	for i, attachment := range invoices {
 		if attachment == nil {
-			return nil, fmt.Errorf("invoice attachment at index %d cannot be nil", i)
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("invoice attachment at index %d cannot be nil", i))
 		}
 		rawInvoice := attachment.GetSparkInvoice()
 		parsedInvoice, err := common.ParseSparkInvoice(rawInvoice)
 		if err != nil {
-			return nil, fmt.Errorf("invalid invoice at %d: %w", i, err)
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid invoice at %d: %w", i, err))
 		}
 		sortedInvoices = append(sortedInvoices, keyedInvoice{id: parsedInvoice.Id, raw: rawInvoice})
 	}
@@ -196,7 +199,7 @@ func HashTokenTransactionV2(tokenTransaction *tokenpb.TokenTransaction, partialH
 
 func HashTokenTransactionV1(tokenTransaction *tokenpb.TokenTransaction, partialHash bool) ([]byte, error) {
 	if tokenTransaction == nil {
-		return nil, fmt.Errorf("token transaction cannot be nil")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token transaction cannot be nil"))
 	}
 
 	allHashes, err := hashTokenTransactionV1(tokenTransaction, partialHash)
@@ -224,7 +227,7 @@ func hashTokenTransactionV1(tokenTransaction *tokenpb.TokenTransaction, partialH
 	// Hash input type of transaction
 	inputType, err := InferTokenTransactionType(tokenTransaction)
 	if err != nil {
-		return nil, fmt.Errorf("failed to infer token transaction type: %w", err)
+		return nil, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to infer token transaction type: %w", err))
 	}
 
 	h.Reset()
@@ -241,7 +244,7 @@ func hashTokenTransactionV1(tokenTransaction *tokenpb.TokenTransaction, partialH
 	case TokenTransactionTypeMint:
 		inputHashes, err = hashMintInputV1(h, tokenTransaction.GetMintInput())
 	default:
-		return nil, fmt.Errorf("token transaction type %s is not valid", inputType)
+		return nil, sparkerrors.InternalObjectOutOfRange(fmt.Errorf("token transaction type %s is not valid", inputType))
 	}
 	if err != nil {
 		return nil, err
@@ -260,7 +263,7 @@ func hashTokenTransactionV1(tokenTransaction *tokenpb.TokenTransaction, partialH
 	allHashes = append(allHashes, h.Sum(nil)...)
 	for i, output := range tokenTransaction.TokenOutputs {
 		if output == nil {
-			return nil, fmt.Errorf("token output at index %d cannot be nil", i)
+			return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token output at index %d cannot be nil", i))
 		}
 		h.Reset()
 
@@ -268,14 +271,14 @@ func hashTokenTransactionV1(tokenTransaction *tokenpb.TokenTransaction, partialH
 		if !partialHash {
 			id := []byte(output.GetId())
 			if len(id) == 0 {
-				return nil, fmt.Errorf("token output ID at index %d cannot be nil or empty", i)
+				return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token output ID at index %d cannot be nil or empty", i))
 			}
 			h.Write(id)
 		}
 
 		ownerPubKey := output.GetOwnerPublicKey()
 		if len(ownerPubKey) == 0 {
-			return nil, fmt.Errorf("owner public key at index %d cannot be nil or empty", i)
+			return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("owner public key at index %d cannot be nil or empty", i))
 		}
 		h.Write(ownerPubKey)
 
@@ -283,7 +286,7 @@ func hashTokenTransactionV1(tokenTransaction *tokenpb.TokenTransaction, partialH
 		if !partialHash {
 			revPubKey := output.GetRevocationCommitment()
 			if len(revPubKey) == 0 {
-				return nil, fmt.Errorf("revocation public key at index %d cannot be nil or empty", i)
+				return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("revocation public key at index %d cannot be nil or empty", i))
 			}
 			h.Write(revPubKey)
 
@@ -312,7 +315,7 @@ func hashTokenTransactionV1(tokenTransaction *tokenpb.TokenTransaction, partialH
 
 		tokenAmount := output.GetTokenAmount()
 		if len(tokenAmount) == 0 {
-			return nil, fmt.Errorf("token amount at index %d cannot be nil or empty", i)
+			return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token amount at index %d cannot be nil or empty", i))
 		}
 		h.Write(tokenAmount)
 
@@ -321,7 +324,7 @@ func hashTokenTransactionV1(tokenTransaction *tokenpb.TokenTransaction, partialH
 
 	operatorPublicKeys := tokenTransaction.GetSparkOperatorIdentityPublicKeys()
 	if operatorPublicKeys == nil {
-		return nil, fmt.Errorf("operator public keys cannot be nil")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("operator public keys cannot be nil"))
 	}
 
 	// Sort operator keys for consistent hashing
@@ -337,10 +340,10 @@ func hashTokenTransactionV1(tokenTransaction *tokenpb.TokenTransaction, partialH
 
 	for i, pubKey := range operatorPublicKeys {
 		if pubKey == nil {
-			return nil, fmt.Errorf("operator public key at index %d cannot be nil", i)
+			return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("operator public key at index %d cannot be nil", i))
 		}
 		if len(pubKey) == 0 {
-			return nil, fmt.Errorf("operator public key at index %d cannot be empty", i)
+			return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("operator public key at index %d cannot be empty", i))
 		}
 		h.Reset()
 		h.Write(pubKey)
@@ -358,7 +361,7 @@ func hashTokenTransactionV1(tokenTransaction *tokenpb.TokenTransaction, partialH
 	h.Reset()
 	clientCreatedTimestampBytes := make([]byte, 8)
 	if ts := tokenTransaction.GetClientCreatedTimestamp(); ts == nil {
-		return nil, fmt.Errorf("client created timestamp cannot be empty")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("client created timestamp cannot be empty"))
 	} else {
 		binary.BigEndian.PutUint64(clientCreatedTimestampBytes, uint64(ts.AsTime().UnixMilli()))
 	}
@@ -370,7 +373,7 @@ func hashTokenTransactionV1(tokenTransaction *tokenpb.TokenTransaction, partialH
 		h.Reset()
 		expiryTimeBytes := make([]byte, 8)
 		if tokenTransaction.GetExpiryTime() == nil {
-			return nil, fmt.Errorf("expiry time cannot be empty")
+			return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("expiry time cannot be empty"))
 		}
 		binary.BigEndian.PutUint64(expiryTimeBytes, uint64(tokenTransaction.GetExpiryTime().AsTime().Unix()))
 		h.Write(expiryTimeBytes)
@@ -395,13 +398,13 @@ func hashTransferInputV1(h hash.Hash, transferSource *tokenpb.TokenTransferInput
 	transferHashes = append(transferHashes, h.Sum(nil)...)
 	for i, output := range transferSource.GetOutputsToSpend() {
 		if output == nil {
-			return nil, fmt.Errorf("transfer input token output at index %d cannot be nil", i)
+			return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("transfer input token output at index %d cannot be nil", i))
 		}
 		h.Reset()
 
 		if txHash := output.GetPrevTokenTransactionHash(); txHash != nil {
 			if len(txHash) != 32 {
-				return nil, fmt.Errorf("invalid previous transaction hash length at index %d: expected 32 bytes, got %d", i, len(txHash))
+				return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("invalid previous transaction hash length at index %d: expected 32 bytes, got %d", i, len(txHash)))
 			}
 			h.Write(txHash)
 		}
@@ -416,13 +419,13 @@ func hashTransferInputV1(h hash.Hash, transferSource *tokenpb.TokenTransferInput
 
 func hashCreateInputV1(h hash.Hash, createInput *tokenpb.TokenCreateInput, partialHash bool) ([]byte, error) {
 	if createInput == nil {
-		return nil, fmt.Errorf("create input cannot be nil when hashing create transaction")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("create input cannot be nil when hashing create transaction"))
 	}
 	var createHashes []byte
 	h.Reset()
 	pubKey := createInput.GetIssuerPublicKey()
 	if len(pubKey) == 0 {
-		return nil, fmt.Errorf("issuer public key cannot be nil or empty")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("issuer public key cannot be nil or empty"))
 	}
 	h.Write(pubKey)
 	createHashes = append(createHashes, h.Sum(nil)...)
@@ -430,7 +433,7 @@ func hashCreateInputV1(h hash.Hash, createInput *tokenpb.TokenCreateInput, parti
 	h.Reset()
 	tokenName := createInput.GetTokenName()
 	if len(tokenName) == 0 {
-		return nil, fmt.Errorf("token name cannot be empty")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token name cannot be empty"))
 	}
 	h.Write([]byte(tokenName))
 	createHashes = append(createHashes, h.Sum(nil)...)
@@ -438,7 +441,7 @@ func hashCreateInputV1(h hash.Hash, createInput *tokenpb.TokenCreateInput, parti
 	h.Reset()
 	tokenTicker := createInput.GetTokenTicker()
 	if len(tokenTicker) == 0 {
-		return nil, fmt.Errorf("token ticker cannot be empty")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token ticker cannot be empty"))
 	}
 	tokenTickerBytes := []byte(tokenTicker)
 	h.Write(tokenTickerBytes)
@@ -453,10 +456,10 @@ func hashCreateInputV1(h hash.Hash, createInput *tokenpb.TokenCreateInput, parti
 	h.Reset()
 	maxSupply := createInput.GetMaxSupply()
 	if maxSupply == nil {
-		return nil, fmt.Errorf("max supply cannot be nil")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("max supply cannot be nil"))
 	}
 	if len(maxSupply) != 16 {
-		return nil, fmt.Errorf("max supply must be exactly 16 bytes, got %d", len(maxSupply))
+		return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("max supply must be exactly 16 bytes, got %d", len(maxSupply)))
 	}
 	h.Write(maxSupply)
 	createHashes = append(createHashes, h.Sum(nil)...)
@@ -482,13 +485,13 @@ func hashCreateInputV1(h hash.Hash, createInput *tokenpb.TokenCreateInput, parti
 
 func hashMintInputV1(h hash.Hash, mintInput *tokenpb.TokenMintInput) ([]byte, error) {
 	if mintInput == nil {
-		return nil, fmt.Errorf("mint input cannot be nil when hashing mint transaction")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("mint input cannot be nil when hashing mint transaction"))
 	}
 	var mintHashes []byte
 	h.Reset()
 	pubKey := mintInput.GetIssuerPublicKey()
 	if len(pubKey) == 0 {
-		return nil, fmt.Errorf("issuer public key cannot be nil or empty")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("issuer public key cannot be nil or empty"))
 	}
 	h.Write(pubKey)
 	mintHashes = append(mintHashes, h.Sum(nil)...)
@@ -507,7 +510,7 @@ func hashMintInputV1(h hash.Hash, mintInput *tokenpb.TokenMintInput) ([]byte, er
 
 func HashTokenTransactionV0(tokenTransaction *sparkpb.TokenTransaction, partialHash bool) ([]byte, error) {
 	if tokenTransaction == nil {
-		return nil, fmt.Errorf("token transaction cannot be nil")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token transaction cannot be nil"))
 	}
 
 	inputType, err := InferTokenTransactionTypeSparkProtos(tokenTransaction)
@@ -527,7 +530,7 @@ func HashTokenTransactionV0(tokenTransaction *sparkpb.TokenTransaction, partialH
 	case TokenTransactionTypeMint:
 		inputHashes, err = hashMintInputV0(h, tokenTransaction.GetMintInput())
 	default:
-		return nil, fmt.Errorf("token transaction type %s is not valid", inputType)
+		return nil, sparkerrors.InternalObjectOutOfRange(fmt.Errorf("token transaction type %s is not valid", inputType))
 	}
 	if err != nil {
 		return nil, err
@@ -536,20 +539,17 @@ func HashTokenTransactionV0(tokenTransaction *sparkpb.TokenTransaction, partialH
 
 	outputHashes, err := hashTokenOutputs(h, tokenTransaction.TokenOutputs, partialHash)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash token outputs: %w", err)
+		return nil, err
 	}
 	allHashes = append(allHashes, outputHashes...)
 
 	operatorHashes, err := hashOperators(h, tokenTransaction.GetSparkOperatorIdentityPublicKeys())
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash operators: %w", err)
+		return nil, err
 	}
 	allHashes = append(allHashes, operatorHashes...)
 
-	networkHash, err := hashNetwork(h, tokenTransaction.GetNetwork())
-	if err != nil {
-		return nil, fmt.Errorf("failed to hash network: %w", err)
-	}
+	networkHash := hashNetwork(h, tokenTransaction.GetNetwork())
 	allHashes = append(allHashes, networkHash...)
 
 	// Final hash of all concatenated hashes
@@ -591,14 +591,14 @@ func hashTransferInputV0(h hash.Hash, transferSource *pb.TokenTransferInput) ([]
 
 func hashCreateInputV0(h hash.Hash, createInput *pb.TokenCreateInput, partialHash bool) ([]byte, error) {
 	if createInput == nil {
-		return nil, fmt.Errorf("create input cannot be nil when hashing create transaction")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("create input cannot be nil when hashing create transaction"))
 	}
 	var allHashes []byte
 
 	h.Reset()
 	pubKey := createInput.GetIssuerPublicKey()
 	if len(pubKey) == 0 {
-		return nil, fmt.Errorf("issuer public key cannot be nil or empty")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("issuer public key cannot be nil or empty"))
 	}
 	h.Write(pubKey)
 	allHashes = append(allHashes, h.Sum(nil)...)
@@ -606,10 +606,10 @@ func hashCreateInputV0(h hash.Hash, createInput *pb.TokenCreateInput, partialHas
 	h.Reset()
 	tokenName := createInput.GetTokenName()
 	if len(tokenName) == 0 {
-		return nil, fmt.Errorf("token name cannot be empty")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token name cannot be empty"))
 	}
 	if len(tokenName) > 20 {
-		return nil, fmt.Errorf("token name cannot be longer than 20 bytes")
+		return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("token name cannot be longer than 20 bytes"))
 	}
 	tokenNameBytes := make([]byte, 20)
 	copy(tokenNameBytes, tokenName)
@@ -619,10 +619,10 @@ func hashCreateInputV0(h hash.Hash, createInput *pb.TokenCreateInput, partialHas
 	h.Reset()
 	tokenTicker := createInput.GetTokenTicker()
 	if len(tokenTicker) == 0 {
-		return nil, fmt.Errorf("token ticker cannot be empty")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token ticker cannot be empty"))
 	}
 	if len(tokenTicker) > 6 {
-		return nil, fmt.Errorf("token ticker cannot be longer than 6 bytes")
+		return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("token ticker cannot be longer than 6 bytes"))
 	}
 	tokenTickerBytes := make([]byte, 6)
 	copy(tokenTickerBytes, tokenTicker)
@@ -638,10 +638,10 @@ func hashCreateInputV0(h hash.Hash, createInput *pb.TokenCreateInput, partialHas
 	h.Reset()
 	maxSupply := createInput.GetMaxSupply()
 	if maxSupply == nil {
-		return nil, fmt.Errorf("max supply cannot be nil")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("max supply cannot be nil"))
 	}
 	if len(maxSupply) != 16 {
-		return nil, fmt.Errorf("max supply must be exactly 16 bytes, got %d", len(maxSupply))
+		return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("max supply must be exactly 16 bytes, got %d", len(maxSupply)))
 	}
 	h.Write(maxSupply)
 	allHashes = append(allHashes, h.Sum(nil)...)
@@ -667,14 +667,14 @@ func hashCreateInputV0(h hash.Hash, createInput *pb.TokenCreateInput, partialHas
 
 func hashMintInputV0(h hash.Hash, mintInput *pb.TokenMintInput) ([]byte, error) {
 	if mintInput == nil {
-		return nil, fmt.Errorf("mint input cannot be nil when hashing mint transaction")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("mint input cannot be nil when hashing mint transaction"))
 	}
 	var allHashes []byte
 	h.Reset()
 	pubKey := mintInput.GetIssuerPublicKey()
 	if pubKey != nil {
 		if len(pubKey) == 0 {
-			return nil, fmt.Errorf("issuer public key cannot be empty")
+			return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("issuer public key cannot be empty"))
 		}
 		h.Write(pubKey)
 	}
@@ -693,7 +693,7 @@ func hashTokenOutputs(h hash.Hash, tokenOutputs []*pb.TokenOutput, partialHash b
 	var allHashes []byte
 	for i, output := range tokenOutputs {
 		if output == nil {
-			return nil, fmt.Errorf("token output at index %d cannot be nil", i)
+			return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token output at index %d cannot be nil", i))
 		}
 		h.Reset()
 
@@ -701,7 +701,7 @@ func hashTokenOutputs(h hash.Hash, tokenOutputs []*pb.TokenOutput, partialHash b
 		if !partialHash && output.GetId() != "" {
 			id := []byte(output.GetId())
 			if len(id) == 0 {
-				return nil, fmt.Errorf("token output ID at index %d cannot be empty", i)
+				return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token output ID at index %d cannot be empty", i))
 			}
 			h.Write(id)
 		}
@@ -709,7 +709,7 @@ func hashTokenOutputs(h hash.Hash, tokenOutputs []*pb.TokenOutput, partialHash b
 		ownerPubKey := output.GetOwnerPublicKey()
 		if ownerPubKey != nil {
 			if len(ownerPubKey) == 0 {
-				return nil, fmt.Errorf("owner public key at index %d cannot be empty", i)
+				return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("owner public key at index %d cannot be empty", i))
 			}
 			h.Write(ownerPubKey)
 		}
@@ -719,7 +719,7 @@ func hashTokenOutputs(h hash.Hash, tokenOutputs []*pb.TokenOutput, partialHash b
 			revPubKey := output.GetRevocationCommitment()
 			if revPubKey != nil {
 				if len(revPubKey) == 0 {
-					return nil, fmt.Errorf("revocation public key at index %d cannot be empty", i)
+					return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("revocation public key at index %d cannot be empty", i))
 				}
 				h.Write(revPubKey)
 			}
@@ -736,7 +736,7 @@ func hashTokenOutputs(h hash.Hash, tokenOutputs []*pb.TokenOutput, partialHash b
 		tokenPubKey := output.GetTokenPublicKey()
 		if tokenPubKey != nil {
 			if len(tokenPubKey) == 0 {
-				return nil, fmt.Errorf("token public key at index %d cannot be empty", i)
+				return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token public key at index %d cannot be empty", i))
 			}
 			h.Write(tokenPubKey)
 		}
@@ -744,10 +744,10 @@ func hashTokenOutputs(h hash.Hash, tokenOutputs []*pb.TokenOutput, partialHash b
 		tokenAmount := output.GetTokenAmount()
 		if tokenAmount != nil {
 			if len(tokenAmount) == 0 {
-				return nil, fmt.Errorf("token amount at index %d cannot be empty", i)
+				return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token amount at index %d cannot be empty", i))
 			}
 			if len(tokenAmount) > 16 {
-				return nil, fmt.Errorf("token amount at index %d exceeds maximum length: got %d bytes, max 16", i, len(tokenAmount))
+				return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("token amount at index %d exceeds maximum length: got %d bytes, max 16", i, len(tokenAmount)))
 			}
 			h.Write(tokenAmount)
 		}
@@ -760,7 +760,7 @@ func hashTokenOutputs(h hash.Hash, tokenOutputs []*pb.TokenOutput, partialHash b
 func hashOperators(h hash.Hash, operatorPublicKeys [][]byte) ([]byte, error) {
 	var allHashes []byte
 	if operatorPublicKeys == nil {
-		return nil, fmt.Errorf("operator public keys cannot be nil")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("operator public keys cannot be nil"))
 	}
 
 	// Sort operator keys for consistent hashing
@@ -768,10 +768,10 @@ func hashOperators(h hash.Hash, operatorPublicKeys [][]byte) ([]byte, error) {
 
 	for i, pubKey := range operatorPublicKeys {
 		if pubKey == nil {
-			return nil, fmt.Errorf("operator public key at index %d cannot be nil", i)
+			return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("operator public key at index %d cannot be nil", i))
 		}
 		if len(pubKey) == 0 {
-			return nil, fmt.Errorf("operator public key at index %d cannot be empty", i)
+			return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("operator public key at index %d cannot be empty", i))
 		}
 		h.Reset()
 		h.Write(pubKey)
@@ -781,12 +781,12 @@ func hashOperators(h hash.Hash, operatorPublicKeys [][]byte) ([]byte, error) {
 	return allHashes, nil
 }
 
-func hashNetwork(h hash.Hash, network pb.Network) ([]byte, error) {
+func hashNetwork(h hash.Hash, network pb.Network) []byte {
 	h.Reset()
 	networkBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(networkBytes, uint32(network))
 	h.Write(networkBytes)
-	return h.Sum(nil), nil
+	return h.Sum(nil)
 }
 
 // HashOperatorSpecificTokenTransactionSignablePayload generates a hash of the operator-specific payload
@@ -827,7 +827,7 @@ func HashOperatorSpecificTokenTransactionSignablePayload(payload *sparkpb.Operat
 
 func HashFreezeTokensPayload(payload *tokenpb.FreezeTokensPayload) ([]byte, error) {
 	if payload == nil {
-		return nil, fmt.Errorf("freeze tokens payload cannot be nil")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("freeze tokens payload cannot be nil"))
 	}
 
 	switch payload.Version {
@@ -836,13 +836,13 @@ func HashFreezeTokensPayload(payload *tokenpb.FreezeTokensPayload) ([]byte, erro
 	case 1:
 		return HashFreezeTokensPayloadV1(payload)
 	default:
-		return nil, fmt.Errorf("unsupported payload version: %d", payload.Version)
+		return nil, sparkerrors.InternalObjectOutOfRange(fmt.Errorf("unsupported payload version: %d", payload.Version))
 	}
 }
 
 func HashFreezeTokensPayloadV1(payload *tokenpb.FreezeTokensPayload) ([]byte, error) {
 	if payload == nil {
-		return nil, fmt.Errorf("payload cannot be nil")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("payload cannot be nil"))
 	}
 
 	h := sha256.New()
@@ -857,7 +857,7 @@ func HashFreezeTokensPayloadV1(payload *tokenpb.FreezeTokensPayload) ([]byte, er
 
 	operatorHashes, err := hashFreezePayloadContents(h, payload)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash freeze payload contents: %w", err)
+		return nil, sparkerrors.InternalUnhandledError(fmt.Errorf("failed to hash freeze payload contents: %w", err))
 	}
 	allHashes = append(allHashes, operatorHashes...)
 
@@ -871,7 +871,7 @@ func HashFreezeTokensPayloadV1(payload *tokenpb.FreezeTokensPayload) ([]byte, er
 // hashes of the owner public key, token public key, freeze status, timestamp and operator key.
 func HashFreezeTokensPayloadV0(payload *tokenpb.FreezeTokensPayload) ([]byte, error) {
 	if payload == nil {
-		return nil, fmt.Errorf("freeze tokens payload cannot be nil")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("freeze tokens payload cannot be nil"))
 	}
 	h := sha256.New()
 
@@ -894,7 +894,7 @@ func hashFreezePayloadContents(h hash.Hash, payload *tokenpb.FreezeTokensPayload
 	h.Reset()
 	ownerPubKey := payload.GetOwnerPublicKey()
 	if len(ownerPubKey) == 0 {
-		return nil, fmt.Errorf("owner public key cannot be empty")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("owner public key cannot be empty"))
 	}
 	h.Write(ownerPubKey)
 	allHashes = append(allHashes, h.Sum(nil)...)
@@ -904,13 +904,13 @@ func hashFreezePayloadContents(h hash.Hash, payload *tokenpb.FreezeTokensPayload
 	case 0:
 		tokenPublicKey := payload.GetTokenPublicKey()
 		if len(tokenPublicKey) == 0 {
-			return nil, fmt.Errorf("token public key cannot be empty")
+			return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token public key cannot be empty"))
 		}
 		h.Write(tokenPublicKey)
 	default:
 		tokenIdentifier := payload.GetTokenIdentifier()
 		if tokenIdentifier == nil {
-			return nil, fmt.Errorf("token identifier cannot be nil")
+			return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("token identifier cannot be nil"))
 		}
 		h.Write(tokenIdentifier)
 	}
@@ -926,7 +926,7 @@ func hashFreezePayloadContents(h hash.Hash, payload *tokenpb.FreezeTokensPayload
 
 	h.Reset()
 	if payload.GetIssuerProvidedTimestamp() == 0 {
-		return nil, fmt.Errorf("issuer provided timestamp cannot be 0")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("issuer provided timestamp cannot be 0"))
 	}
 	nonceBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(nonceBytes, payload.GetIssuerProvidedTimestamp())
@@ -936,7 +936,7 @@ func hashFreezePayloadContents(h hash.Hash, payload *tokenpb.FreezeTokensPayload
 	h.Reset()
 	operatorPubKey := payload.GetOperatorIdentityPublicKey()
 	if len(operatorPubKey) == 0 {
-		return nil, fmt.Errorf("operator identity public key cannot be empty")
+		return nil, sparkerrors.InternalObjectMissingField(fmt.Errorf("operator identity public key cannot be empty"))
 	}
 	h.Write(operatorPubKey)
 	allHashes = append(allHashes, h.Sum(nil)...)
@@ -967,7 +967,7 @@ func InferTokenTransactionTypeSparkProtos(tokenTransaction *sparkpb.TokenTransac
 	}
 
 	if inputCount != 1 {
-		return TokenTransactionTypeUnknown, fmt.Errorf("token transaction must have exactly one of create_input, mint_input, or transfer_input")
+		return TokenTransactionTypeUnknown, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token transaction must have exactly one of create_input, mint_input, or transfer_input"))
 	}
 
 	return inputType, nil
@@ -1047,23 +1047,24 @@ func validateBaseCreateTransaction(
 	createInput := tokenTransaction.GetCreateInput()
 
 	if len(inputSignatures) != 1 {
-		return fmt.Errorf("create transactions must have exactly one signature")
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("create transactions must have exactly one signature"))
 	}
 	createSignature := inputSignatures[0]
 	if createSignature == nil {
-		return fmt.Errorf("create signature cannot be nil")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("create signature cannot be nil"))
 	}
 
 	if len(tokenTransaction.TokenOutputs) > 0 {
-		return fmt.Errorf("create transactions must not have any outputs")
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("create transactions must not have any outputs"))
 	}
 
 	tokenMetadata, err := common.NewTokenMetadataFromCreateInput(createInput, tokenTransaction.Network)
 	if err != nil {
-		return fmt.Errorf("failed to create token metadata: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to create token metadata: %w", err))
 	}
 	if err := tokenMetadata.ValidatePartial(); err != nil {
-		return fmt.Errorf("token metadata validation failed: %w", err)
+		// Wrap internal error to an InvalidArgumentMalformedField error because this is direct user-provided data.
+		return fmt.Errorf("failed to validate token metadata: %w", err)
 	}
 
 	return nil
@@ -1082,19 +1083,19 @@ func validateBaseMintTransaction(
 	mintInput := tokenTransaction.GetMintInput()
 
 	if tokenTransaction.GetClientCreatedTimestamp() == nil {
-		return fmt.Errorf("client created timestamp cannot be nil")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("client created timestamp cannot be nil"))
 	}
 
 	if tokenTransaction.TokenOutputs == nil {
-		return fmt.Errorf("mint outputs to create cannot be nil")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("mint outputs to create cannot be nil"))
 	}
 	if len(tokenTransaction.TokenOutputs) == 0 {
-		return fmt.Errorf("mint outputs to create cannot be empty")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("mint outputs to create cannot be empty"))
 	}
 
 	if requireTokenIdentifierForMints {
 		if mintInput.GetTokenIdentifier() == nil || len(mintInput.GetTokenIdentifier()) != 32 {
-			return fmt.Errorf("token identifier cannot be nil and must be 32 bytes")
+			return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("token identifier cannot be nil and must be 32 bytes"))
 		}
 	}
 
@@ -1103,23 +1104,23 @@ func validateBaseMintTransaction(
 		// Validate that the token identifier matches the mint input
 		expectedTokenIdentifier := tokenTransaction.TokenOutputs[0].GetTokenIdentifier()
 		if !bytes.Equal(mintInput.GetTokenIdentifier(), expectedTokenIdentifier) {
-			return fmt.Errorf("output token identifiers must match input token identifier: %x != %x", mintInput.GetTokenIdentifier(), expectedTokenIdentifier)
+			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output token identifiers must match input token identifier: %x != %x", mintInput.GetTokenIdentifier(), expectedTokenIdentifier))
 		}
 	} else {
 		// When using token public key, validate token public key matches the issuer public key
 		expectedTokenPublicKey := tokenTransaction.TokenOutputs[0].GetTokenPublicKey()
 		if !bytes.Equal(mintInput.GetIssuerPublicKey(), expectedTokenPublicKey) {
-			return fmt.Errorf("output token public keys must match input issuer public key")
+			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output token public keys must match input issuer public key"))
 		}
 	}
 
 	if len(inputSignatures) != 1 {
-		return fmt.Errorf("mint transactions must have exactly one signature")
+		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("mint transactions must have exactly one signature"))
 	}
 
 	issueSignature := inputSignatures[0]
 	if issueSignature == nil {
-		return fmt.Errorf("mint signature cannot be nil")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("mint signature cannot be nil"))
 	}
 
 	return nil
@@ -1132,33 +1133,33 @@ func validateBaseTransferTransaction(
 ) error {
 	err := validateBaseTokenOutputs(tokenTransaction, requireTokenIdentifierForTransfers)
 	if err != nil {
-		return fmt.Errorf("token output consistency validation failed: %w", err)
+		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token output consistency validation failed: %w", err))
 	}
 
 	transferInput := tokenTransaction.GetTransferInput()
 	if tokenTransaction.TokenOutputs == nil {
-		return fmt.Errorf("transfer outputs to create cannot be nil")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("transfer outputs to create cannot be nil"))
 	}
 	if len(tokenTransaction.TokenOutputs) == 0 {
-		return fmt.Errorf("transfer outputs to create cannot be empty")
+		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("transfer outputs to create cannot be empty"))
 	}
 
 	if len(transferInput.GetOutputsToSpend()) == 0 {
-		return fmt.Errorf("transfer outputs to spend cannot be empty")
+		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("transfer outputs to spend cannot be empty"))
 	}
 	if len(tokenTransaction.GetTransferInput().OutputsToSpend) > MaxInputOrOutputTokenTransactionOutputs {
-		return fmt.Errorf("too many outputs to spend, maximum is %d", MaxInputOrOutputTokenTransactionOutputs)
+		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("too many outputs to spend, maximum is %d", MaxInputOrOutputTokenTransactionOutputs))
 	}
 
 	// Validate there is the correct number of signatures for outputs to spend.
 	if len(inputSignatures) != len(transferInput.GetOutputsToSpend()) {
-		return fmt.Errorf("number of signatures must match number of outputs to spend")
+		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("number of signatures must match number of outputs to spend"))
 	}
 
 	if requireTokenIdentifierForTransfers {
 		for _, output := range tokenTransaction.TokenOutputs {
 			if output.GetTokenIdentifier() == nil {
-				return fmt.Errorf("token identifier cannot be nil")
+				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token identifier cannot be nil"))
 			}
 		}
 	}
@@ -1190,7 +1191,7 @@ func ValidatePartialTokenTransaction(
 	}
 
 	if tokenTransaction.ExpiryTime != nil {
-		return fmt.Errorf("expiry time should not be set by the client")
+		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("expiry time should not be set by the client"))
 	}
 
 	inputType, err := InferTokenTransactionType(tokenTransaction)
@@ -1203,32 +1204,32 @@ func ValidatePartialTokenTransaction(
 	case TokenTransactionTypeCreate:
 		createInput := tokenTransaction.GetCreateInput()
 		if createInput.GetCreationEntityPublicKey() != nil {
-			return fmt.Errorf("creation entity public key will be added by the SO - do not set this field when starting transactions")
+			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("creation entity public key will be added by the SO - do not set this field when starting transactions"))
 		}
 	case TokenTransactionTypeMint, TokenTransactionTypeTransfer:
 		for i, output := range tokenTransaction.TokenOutputs {
 			if output.GetRevocationCommitment() != nil {
-				return fmt.Errorf("output %d revocation commitment will be added by the SO - do not set this field when starting transactions", i)
+				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d revocation commitment will be added by the SO - do not set this field when starting transactions", i))
 			}
 			if output.WithdrawBondSats != nil {
-				return fmt.Errorf("output %d withdraw bond sats will be added by the SO - do not set this field when starting transactions", i)
+				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d withdraw bond sats will be added by the SO - do not set this field when starting transactions", i))
 			}
 			if output.WithdrawRelativeBlockLocktime != nil {
-				return fmt.Errorf("output %d withdraw relative block locktime will be added by the SO - do not set this field when starting transactions", i)
+				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d withdraw relative block locktime will be added by the SO - do not set this field when starting transactions", i))
 			}
 			if output.Id != nil && *output.Id != "" {
-				return fmt.Errorf("output %d ID will be added by the SO - do not set this field when starting transactions", i)
+				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d ID will be added by the SO - do not set this field when starting transactions", i))
 			}
 		}
 	default:
-		return fmt.Errorf("token transaction type unknown")
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token transaction type unknown"))
 	}
 	return nil
 }
 
 func validateBaseTokenOutputs(tokenTransaction *tokenpb.TokenTransaction, requireTokenIdentifier bool) error {
 	if len(tokenTransaction.TokenOutputs) == 0 {
-		return fmt.Errorf("token outputs cannot be empty for mint and transfer transactions")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token outputs cannot be empty for mint and transfer transactions"))
 	}
 
 	for i, output := range tokenTransaction.TokenOutputs {
@@ -1244,49 +1245,49 @@ func validateBaseTokenOutputs(tokenTransaction *tokenpb.TokenTransaction, requir
 
 	hasTokenIdentifier := tokenTransaction.TokenOutputs[0].GetTokenIdentifier() != nil
 	if requireTokenIdentifier && !hasTokenIdentifier {
-		return fmt.Errorf("token identifier must be set when token identifier is required")
+		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token identifier must be set when token identifier is required"))
 	}
 	if hasTokenIdentifier {
 		// Verify all outputs have the same token identifier
 		expectedTokenIdentifier := tokenTransaction.TokenOutputs[0].GetTokenIdentifier()
 		expectedTokenPublicKey := tokenTransaction.TokenOutputs[0].GetTokenPublicKey()
 		if expectedTokenIdentifier == nil {
-			return fmt.Errorf("first output must have token identifier if any output has one")
+			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("first output must have token identifier if any output has one"))
 		}
 		for i, output := range tokenTransaction.TokenOutputs {
 			if output.GetTokenIdentifier() == nil {
-				return fmt.Errorf("output %d missing token identifier", i)
+				return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("output %d missing token identifier", i))
 			}
 			if len(output.GetTokenIdentifier()) != 32 {
-				return fmt.Errorf("output %d token identifier must be exactly 32 bytes, got %d", i, len(output.GetTokenIdentifier()))
+				return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("output %d token identifier must be exactly 32 bytes, got %d", i, len(output.GetTokenIdentifier())))
 			}
 			if !bytes.Equal(output.GetTokenIdentifier(), expectedTokenIdentifier) {
-				return fmt.Errorf("output %d token identifier (%x) must match mint input token identifier (%x)",
-					i, output.GetTokenIdentifier(), expectedTokenIdentifier)
+				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d token identifier (%x) must match mint input token identifier (%x)",
+					i, output.GetTokenIdentifier(), expectedTokenIdentifier))
 			}
 			if !bytes.Equal(output.GetTokenPublicKey(), expectedTokenPublicKey) {
-				return fmt.Errorf("output %d token public key (%x) must match expected token public key (%x)",
-					i, output.GetTokenPublicKey(), expectedTokenPublicKey)
+				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d token public key (%x) must match expected token public key (%x)",
+					i, output.GetTokenPublicKey(), expectedTokenPublicKey))
 			}
 		}
 		// Verify that token public key is not set if token identifier is set
 		for i, output := range tokenTransaction.TokenOutputs {
 			if output.GetTokenPublicKey() != nil {
-				return fmt.Errorf("output %d cannot have token public key when token identifier is set", i)
+				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d cannot have token public key when token identifier is set", i))
 			}
 		}
 	} else {
 		// If token identifier is not set, conduct legacy validation logic of token public key.
 		expectedTokenPublicKey := tokenTransaction.TokenOutputs[0].GetTokenPublicKey()
 		if expectedTokenPublicKey == nil {
-			return fmt.Errorf("token public key cannot be nil when token identifier is not set")
+			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token public key cannot be nil when token identifier is not set"))
 		}
 		for i, output := range tokenTransaction.TokenOutputs {
 			if output.GetTokenPublicKey() == nil {
-				return fmt.Errorf("output %d token public key cannot be nil when token identifier is not set", i)
+				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d token public key cannot be nil when token identifier is not set", i))
 			}
 			if !bytes.Equal(output.GetTokenPublicKey(), expectedTokenPublicKey) {
-				return fmt.Errorf("all outputs must have the same token public key")
+				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("all outputs must have the same token public key"))
 			}
 		}
 	}
@@ -1333,40 +1334,40 @@ func ValidateOwnershipSignature(signature []byte, hash []byte, issuerOrOwnerPubl
 
 func ValidateFreezeTokensPayload(payload *tokenpb.FreezeTokensPayload, expectedSparkOperatorPublicKey keys.Public) error {
 	if payload == nil {
-		return fmt.Errorf("freeze tokens payload cannot be nil")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("freeze tokens payload cannot be nil"))
 	}
 
 	if len(payload.GetOwnerPublicKey()) == 0 {
-		return fmt.Errorf("owner public key cannot be empty")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("owner public key cannot be empty"))
 	}
 	switch payload.Version {
 	case 0:
 		if payload.GetTokenIdentifier() != nil {
-			return fmt.Errorf("token identifier must be nil for version 0")
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token identifier must be nil for version 0"))
 		}
 		if payload.GetTokenPublicKey() == nil {
-			return fmt.Errorf("token public key cannot be nil for version 0")
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token public key cannot be nil for version 0"))
 		}
 	case 1:
 		if payload.GetTokenPublicKey() != nil {
-			return fmt.Errorf("token public key must be nil for version 1")
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token public key must be nil for version 1"))
 		}
 		if len(payload.GetTokenIdentifier()) != 32 {
-			return fmt.Errorf("token identifier must be exactly 32 bytes, got %d", len(payload.GetTokenIdentifier()))
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token identifier must be exactly 32 bytes, got %d", len(payload.GetTokenIdentifier())))
 		}
 	default:
-		return fmt.Errorf("invalid freeze tokens payload version: %d", payload.Version)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid freeze tokens payload version: %d", payload.Version))
 	}
 	if payload.GetIssuerProvidedTimestamp() == 0 {
-		return fmt.Errorf("issuer provided timestamp cannot be 0")
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("issuer provided timestamp cannot be 0"))
 	}
 
 	payloadOpIDPubKey, err := keys.ParsePublicKey(payload.GetOperatorIdentityPublicKey())
 	if err != nil {
-		return fmt.Errorf("failed to parse operator identity public key: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse operator identity public key: %w", err))
 	}
 	if !payloadOpIDPubKey.Equals(expectedSparkOperatorPublicKey) {
-		return fmt.Errorf("operator identity public key %s does not match expected operator %s from config", payload.GetOperatorIdentityPublicKey(), expectedSparkOperatorPublicKey)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("operator identity public key %s does not match expected operator %s from config", payload.GetOperatorIdentityPublicKey(), expectedSparkOperatorPublicKey))
 	}
 	return nil
 }
@@ -1375,25 +1376,25 @@ func ValidateFreezeTokensPayload(payload *tokenpb.FreezeTokensPayload, expectedS
 // It ensures the private keys can correctly derive the expected public keys, preventing key mismatches.
 func ValidateRevocationKeys(revocationPrivateKeys []keys.Private, expectedRevocationPublicKeys []keys.Public) error {
 	if revocationPrivateKeys == nil {
-		return fmt.Errorf("revocation private keys cannot be nil")
+		return sparkerrors.InternalKeyshareError(fmt.Errorf("revocation private keys cannot be nil"))
 	}
 	if expectedRevocationPublicKeys == nil {
-		return fmt.Errorf("expected revocation public keys cannot be nil")
+		return sparkerrors.InternalKeyshareError(fmt.Errorf("expected revocation public keys cannot be nil"))
 	}
 	if len(expectedRevocationPublicKeys) != len(revocationPrivateKeys) {
-		return fmt.Errorf("number of revocation private keys (%d) does not match number of expected public keys (%d)",
-			len(revocationPrivateKeys), len(expectedRevocationPublicKeys))
+		return sparkerrors.InternalKeyshareError(fmt.Errorf("number of revocation private keys (%d) does not match number of expected public keys (%d)",
+			len(revocationPrivateKeys), len(expectedRevocationPublicKeys)))
 	}
 
 	for i, revocationKey := range revocationPrivateKeys {
 		expectedPubKey := expectedRevocationPublicKeys[i]
 		switch {
 		case revocationKey.IsZero():
-			return fmt.Errorf("revocation private key at index %d cannot be empty", i)
+			return sparkerrors.InternalKeyshareError(fmt.Errorf("revocation private key at index %d cannot be empty", i))
 		case expectedPubKey.IsZero():
-			return fmt.Errorf("expected revocation public key at index %d cannot be empty", i)
+			return sparkerrors.InternalKeyshareError(fmt.Errorf("expected revocation public key at index %d cannot be empty", i))
 		case !expectedPubKey.Equals(revocationKey.Public()):
-			return fmt.Errorf("revocation key mismatch at index %d: derived public key does not match expected", i)
+			return sparkerrors.InternalKeyshareError(fmt.Errorf("revocation key mismatch at index %d: derived public key does not match expected", i))
 		}
 	}
 	return nil
@@ -1408,15 +1409,15 @@ func isNetworkSupported(providedNetwork common.Network, networks []common.Networ
 // in a token transaction by summing all output amounts.
 func CalculateMintAmountFromTransaction(tokenTransaction *tokenpb.TokenTransaction) (*big.Int, error) {
 	if tokenTransaction == nil {
-		return nil, fmt.Errorf("mint token transaction cannot be nil")
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("mint token transaction cannot be nil"))
 	}
 	if len(tokenTransaction.TokenOutputs) == 0 {
-		return nil, fmt.Errorf("mint token transaction must have outputs")
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("mint token transaction must have outputs"))
 	}
 	totalAmount := new(big.Int)
 	for i, output := range tokenTransaction.TokenOutputs {
 		if output.GetTokenAmount() == nil {
-			return nil, fmt.Errorf("token amount at output %d cannot be nil", i)
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token amount at output %d cannot be nil", i))
 		}
 		amount := new(big.Int).SetBytes(output.GetTokenAmount())
 		totalAmount.Add(totalAmount, amount)
@@ -1429,20 +1430,20 @@ func CalculateMintAmountFromTransaction(tokenTransaction *tokenpb.TokenTransacti
 func ValidateTransactionMintAgainstMaxSupply(tokenTransaction *tokenpb.TokenTransaction, currentSupply, maxSupply *big.Int) error {
 	newMintAmount, err := CalculateMintAmountFromTransaction(tokenTransaction)
 	if err != nil {
-		return fmt.Errorf("failed to calculate mint amount: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to calculate mint amount: %w", err))
 	}
 
 	if currentSupply == nil {
-		return fmt.Errorf("current supply cannot be nil")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("current supply cannot be nil"))
 	}
 	if maxSupply == nil {
-		return fmt.Errorf("max supply cannot be nil")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("max supply cannot be nil"))
 	}
 
 	newTotalSupply := new(big.Int).Add(currentSupply, newMintAmount)
 	if newTotalSupply.Cmp(maxSupply) > 0 {
-		return fmt.Errorf("mint would exceed max supply: total supply after mint (%s) would exceed max supply (%s)",
-			newTotalSupply.String(), maxSupply.String())
+		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("mint would exceed max supply: total supply after mint (%s) would exceed max supply (%s)",
+			newTotalSupply.String(), maxSupply.String()))
 	}
 
 	return nil
@@ -1459,22 +1460,22 @@ func validateBaseTokenTransaction(
 	requireTokenIdentifierForTransfers bool,
 ) error {
 	if tokenTransaction == nil {
-		return fmt.Errorf("token transaction cannot be nil")
+		return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("token transaction cannot be nil"))
 	}
 	if len(tokenTransaction.TokenOutputs) > MaxInputOrOutputTokenTransactionOutputs {
-		return fmt.Errorf("too many token outputs, maximum is %d", MaxInputOrOutputTokenTransactionOutputs)
+		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("too many token outputs, maximum is %d", MaxInputOrOutputTokenTransactionOutputs))
 	}
 	network, err := common.NetworkFromProtoNetwork(tokenTransaction.Network)
 	if err != nil {
-		return fmt.Errorf("failed to convert network: %w", err)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to convert network: %w", err))
 	}
 
 	if !isNetworkSupported(network, supportedNetworks) {
-		return fmt.Errorf("network %s is not supported", network)
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("network %s is not supported", network))
 	}
 
 	if !st.TokenTransactionVersion(tokenTransaction.Version).IsValid() {
-		return fmt.Errorf("invalid token transaction version: %d", tokenTransaction.Version)
+		return sparkerrors.InvalidArgumentInvalidVersion(fmt.Errorf("invalid token transaction version: %d", tokenTransaction.Version))
 	}
 
 	inputCount := 0
@@ -1488,7 +1489,7 @@ func validateBaseTokenTransaction(
 		inputCount++
 	}
 	if inputCount != 1 {
-		return fmt.Errorf("token transaction must have exactly one of create_input, mint_input, or transfer_input")
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token transaction must have exactly one of create_input, mint_input, or transfer_input"))
 	}
 
 	// Validate that the transaction has exactly one input type
@@ -1511,7 +1512,7 @@ func validateBaseTokenTransaction(
 			return err
 		}
 	default:
-		return fmt.Errorf("token transaction type unknown")
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token transaction type unknown"))
 	}
 
 	// Check that each operator's public key is present.
@@ -1525,7 +1526,7 @@ func validateBaseTokenTransaction(
 			}
 		}
 		if !found {
-			return fmt.Errorf("missing spark operator identity public key for operator %s", expectedOperator.GetIdentifier())
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing spark operator identity public key for operator %s", expectedOperator.GetIdentifier()))
 		}
 	}
 
@@ -1536,7 +1537,7 @@ func validateBaseTokenTransaction(
 		ops := tokenTransaction.GetSparkOperatorIdentityPublicKeys()
 		for i := 1; i < len(ops); i++ {
 			if bytes.Compare(ops[i-1], ops[i]) >= 0 {
-				return fmt.Errorf("spark_operator_identity_public_keys must be strictly bytewise ascending; order violation at index %d", i)
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("spark_operator_identity_public_keys must be strictly bytewise ascending; order violation at index %d", i))
 			}
 		}
 
@@ -1545,10 +1546,10 @@ func validateBaseTokenTransaction(
 			prev := invoices[i-1]
 			cur := invoices[i]
 			if prev == nil || cur == nil {
-				return fmt.Errorf("invoice_attachments must not contain nil entries; nil at index %d", i)
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invoice_attachments must not contain nil entries; nil at index %d", i))
 			}
 			if strings.Compare(prev.GetSparkInvoice(), cur.GetSparkInvoice()) >= 0 {
-				return fmt.Errorf("invoice_attachments must be strictly bytewise ascending by spark_invoice; order violation at index %d", i)
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invoice_attachments must be strictly bytewise ascending by spark_invoice; order violation at index %d", i))
 			}
 		}
 	}
@@ -1598,32 +1599,32 @@ func ValidateFinalTokenTransaction(
 		createInput := tokenTransaction.GetCreateInput()
 		creationPubKey, err := keys.ParsePublicKey(createInput.GetCreationEntityPublicKey())
 		if err != nil {
-			return fmt.Errorf("unable to parse creation entity public key: %w", err)
+			return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse creation entity public key: %w", err))
 		}
 		if !creationPubKey.Equals(config.ExpectedCreationEntityPublicKey) {
-			return fmt.Errorf("creation entity public key does not match the reserved entity public key")
+			return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("creation entity public key does not match the reserved entity public key"))
 		}
 	case TokenTransactionTypeMint, TokenTransactionTypeTransfer:
 		for i, output := range tokenTransaction.TokenOutputs {
 			revocationCommitment, err := keys.ParsePublicKey(output.GetRevocationCommitment())
 			if err != nil {
-				return fmt.Errorf("unable to parse revocation commitment: %w", err)
+				return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse revocation commitment: %w", err))
 			}
 			if !revocationCommitment.Equals(config.ExpectedRevocationPublicKeys[i]) {
-				return fmt.Errorf("revocation commitment mismatch for output %d", i)
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("revocation commitment mismatch for output %d", i))
 			}
 			if output.WithdrawBondSats == nil || output.WithdrawRelativeBlockLocktime == nil {
-				return fmt.Errorf("withdrawal params not set for output %d", i)
+				return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("withdrawal params not set for output %d", i))
 			}
 			if output.GetWithdrawBondSats() != config.ExpectedBondSats {
-				return fmt.Errorf("withdrawal bond sats mismatch for output %d", i)
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("withdrawal bond sats mismatch for output %d", i))
 			}
 			if output.GetWithdrawRelativeBlockLocktime() != config.ExpectedRelativeBlockLocktime {
-				return fmt.Errorf("withdrawal locktime mismatch for output %d", i)
+				return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("withdrawal locktime mismatch for output %d", i))
 			}
 		}
 	default:
-		return fmt.Errorf("token transaction type unknown")
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token transaction type unknown"))
 	}
 	return nil
 }

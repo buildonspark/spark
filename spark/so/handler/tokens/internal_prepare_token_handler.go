@@ -79,7 +79,7 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 	finalTokenTX := req.GetFinalTokenTransaction()
 	err = validateFinalTokenTransaction(h.config, finalTokenTX, req.TokenTransactionSignatures, expectedRevocationPublicKeys, expectedCreationEntityPublicKey)
 	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto("invalid final token transaction", req.FinalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid final token transaction: %w", err)))
+		return nil, err
 	}
 
 	//nolint:govet,revive // TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
@@ -178,7 +178,7 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 	}
 	_, err = ent.CreateStartedTransactionEntities(ctx, finalTokenTX, req.TokenTransactionSignatures, req.KeyshareIds, inputTtxos, coordinatorPubKey)
 	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto("failed to save token transaction and output ent", req.FinalTokenTransaction, sparkerrors.InternalDatabaseError(fmt.Errorf("failed to save token transaction and output ent: %w", err)))
+		return nil, tokens.FormatErrorWithTransactionProto("failed to save token transaction and output ent", req.FinalTokenTransaction, err)
 	}
 
 	return &tokeninternalpb.PrepareTransactionResponse{}, nil
@@ -202,7 +202,7 @@ func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Co
 	for i, id := range keyshareIDs {
 		keyshareUUID, err := uuid.Parse(id)
 		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("failed to parse keyshare ID", finalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to parse keyshare ID: %w", err)))
+			return nil, tokens.FormatErrorWithTransactionProto("failed to parse keyshare ID", finalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(err))
 		}
 		if seenUUIDs[keyshareUUID] {
 			return nil, tokens.FormatErrorWithTransactionProto("duplicate keyshare UUID found", finalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("duplicate keyshare UUID found: %s", keyshareUUID)))
@@ -218,7 +218,7 @@ func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Co
 		keyshares, err := ent.MarkSigningKeysharesAsUsed(ctx, h.config, keyshareUUIDs)
 		addTraceEvent(ctx, "mark_keyshares", attribute.String("keyshare_ids", strings.Join(keyshareIDs, ",")), attribute.Bool("success", err == nil), attribute.Bool("skipped", false))
 		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionProto("failed to mark keyshares as used", finalTokenTransaction, sparkerrors.InternalDatabaseError(fmt.Errorf("failed to mark keyshares as used: %w", err)))
+			return nil, tokens.FormatErrorWithTransactionProto("failed to mark keyshares as used", finalTokenTransaction, sparkerrors.InternalKeyshareError(err))
 		}
 		logger.Info("Keyshares marked as used")
 		keysharesMap = make(map[uuid.UUID]*ent.SigningKeyshare, len(keyshares))
@@ -556,7 +556,7 @@ func validateFinalTokenTransaction(
 
 	err = utils.ValidateFinalTokenTransaction(tokenTransaction, signaturesWithIndex, validationConfig)
 	if err != nil {
-		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("failed to validate final token transaction structure: %w", err))
+		return tokens.FormatErrorWithTransactionProto("failed to validate final token transaction structure", tokenTransaction, err)
 	}
 
 	return nil
@@ -565,7 +565,7 @@ func validateFinalTokenTransaction(
 func validateIssuerTokenNotAlreadyCreated(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction) error {
 	existingTokenCreateMetadata, err := ent.GetTokenMetadataForTokenTransaction(ctx, tokenTransaction)
 	if err != nil {
-		return tokens.FormatErrorWithTransactionProto("failed to search for existing token create entity", tokenTransaction, sparkerrors.InternalDatabaseError(fmt.Errorf("failed to search for existing token create entity: %w", err)))
+		return tokens.FormatErrorWithTransactionProto("failed to search for existing token create entity", tokenTransaction, err)
 	}
 	if existingTokenCreateMetadata != nil {
 		return tokens.NewTokenAlreadyCreatedError(tokenTransaction)
@@ -626,12 +626,12 @@ func validateSparkInvoicesForTransaction(ctx context.Context, tokenTransaction *
 		outputCountByAmount, ok := createdOutputAmountMap[receiver]
 		if !ok {
 			return tokens.FormatErrorWithTransactionProto("no created outputs for receiver",
-				tokenTransaction, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("no created outputs for receiver %x", receiver[:])))
+				tokenTransaction, sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("no created outputs for receiver %x", receiver[:])))
 		}
 		for amt, invoiceCount := range invoiceCountByAmount {
 			if outputCountByAmount[amt] < invoiceCount {
 				return tokens.FormatErrorWithTransactionProto("created output amount mismatch for fixed amount invoices",
-					tokenTransaction, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("not enough created outputs for amount %x for receiver %x", amt, receiver[:])))
+					tokenTransaction, sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("not enough created outputs for amount %x for receiver %x", amt, receiver[:])))
 			}
 		}
 	}
@@ -647,7 +647,7 @@ func validateSparkInvoicesForTransaction(ctx context.Context, tokenTransaction *
 		}
 		if numOutputsWithoutMatchingInvoice < countNilAmountInvoicesMap[receiver] {
 			return tokens.FormatErrorWithTransactionProto("created output amount mismatch for nil amount invoices",
-				tokenTransaction, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("not enough created outputs to cover %d nil-amount invoices; outputs=%d for receiver %x",
+				tokenTransaction, sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("not enough created outputs to cover %d nil-amount invoices; outputs=%d for receiver %x",
 					countNilAmountInvoicesMap[receiver], numOutputsWithoutMatchingInvoice, receiver[:])))
 		}
 	}

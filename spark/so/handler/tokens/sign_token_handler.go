@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/lightsparkdev/spark/common/keys"
-	"go.uber.org/zap"
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
@@ -25,6 +24,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/protoconverter"
 	"github.com/lightsparkdev/spark/so/tokens"
@@ -59,7 +59,7 @@ func (h *SignTokenHandler) SignTokenTransaction(
 ) (*sparkpb.SignTokenTransactionResponse, error) {
 	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("invalid identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(err)
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, idPubKey); err != nil {
 		return nil, err
@@ -67,19 +67,19 @@ func (h *SignTokenHandler) SignTokenTransaction(
 
 	tokenProtoTokenTransaction, err := protoconverter.TokenProtoFromSparkTokenTransaction(req.FinalTokenTransaction)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert token transaction to spark token transaction: %w", err)
+		return nil, sparkerrors.InternalTypeConversionError(err)
 	}
 	ctx, span := GetTracer().Start(ctx, "SignTokenHandler.SignTokenTransaction", GetProtoTokenTransactionTraceAttributes(ctx, tokenProtoTokenTransaction))
 	defer span.End()
 
 	finalTokenTransactionHash, err := utils.HashTokenTransaction(tokenProtoTokenTransaction, false)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", tokens.ErrFailedToHashFinalTransaction, err)
+		return nil, tokens.FormatErrorWithTransactionProto("failed to hash final token transaction", tokenProtoTokenTransaction, err)
 	}
 
 	tokenTransaction, err := ent.FetchAndLockTokenTransactionData(ctx, tokenProtoTokenTransaction)
 	if err != nil {
-		return nil, fmt.Errorf("%s %s: %w", tokens.ErrFailedToFetchTransaction, logging.FormatProto("final_token_transaction", req.FinalTokenTransaction), err)
+		return nil, err
 	}
 
 	internalSignTokenHandler := NewInternalSignTokenHandler(h.config)
@@ -91,7 +91,7 @@ func (h *SignTokenHandler) SignTokenTransaction(
 	if tokenTransaction.Status == st.TokenTransactionStatusSigned {
 		revocationKeyshares, err := h.getRevocationKeysharesForTokenTransaction(ctx, tokenTransaction)
 		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToGetRevocationKeyshares, tokenTransaction, err)
+			return nil, sparkerrors.InternalDatabaseReadError(tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToGetRevocationKeyshares, tokenTransaction, err))
 		}
 		return &sparkpb.SignTokenTransactionResponse{
 			SparkOperatorSignature: operatorSignature,
@@ -104,9 +104,7 @@ func (h *SignTokenHandler) SignTokenTransaction(
 	for _, output := range tokenTransaction.Edges.SpentOutput {
 		keyshare, err := output.QueryRevocationKeyshare().Only(ctx)
 		if err != nil {
-			logger := logging.GetLoggerFromContext(ctx)
-			logger.Info("Failed to get keyshare for output", zap.Error(err))
-			return nil, err
+			return nil, sparkerrors.InternalDatabaseReadError(tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToGetKeyshareForOutput, tokenTransaction, err))
 		}
 		index := output.SpentTransactionInputVout
 		keyshares[index] = keyshare
@@ -118,14 +116,10 @@ func (h *SignTokenHandler) SignTokenTransaction(
 		// Validate that the keyshare's public key is as expected.
 		withdrawRevocationCommitment, err := keys.ParsePublicKey(output.WithdrawRevocationCommitment)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse withdraw revocation commitment: %w", err)
+			return nil, sparkerrors.InvalidArgumentMalformedKey(err)
 		}
 		if !keyshare.PublicKey.Equals(withdrawRevocationCommitment) {
-			return nil, fmt.Errorf(
-				"keyshare public key %v does not match output revocation commitment %v",
-				keyshare.PublicKey,
-				withdrawRevocationCommitment,
-			)
+			return nil, sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("keyshare public key %v does not match output revocation commitment %v", keyshare.PublicKey, withdrawRevocationCommitment))
 		}
 	}
 
@@ -140,37 +134,33 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 	defer span.End()
 	ownerIDPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("invalid identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(err)
 	}
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, ownerIDPubKey); err != nil {
-		return nil, fmt.Errorf("identity public key authentication failed: %w", err)
+		return nil, err
 	}
 
 	calculatedHash, err := utils.HashTokenTransaction(req.FinalTokenTransaction, false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash final token transaction: %w", err)
+		return nil, err
 	}
 	if !bytes.Equal(calculatedHash, req.FinalTokenTransactionHash) {
-		return nil, fmt.Errorf("transaction hash mismatch: expected %x, got %x", calculatedHash, req.FinalTokenTransactionHash)
+		return nil, sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf("transaction hash mismatch: expected %x, got %x", calculatedHash, req.FinalTokenTransactionHash))
 	}
 
 	tokenTransaction, err := ent.FetchTokenTransactionDataByHashForRead(ctx, req.FinalTokenTransactionHash)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch transaction (non-locking): %w", err)
+		return nil, err
 	}
 
-	inferredTxType, err := tokenTransaction.InferTokenTransactionTypeEnt()
-	if err != nil {
-		return nil, fmt.Errorf("failed to infer token transaction type: %w", err)
-	}
-
+	inferredTxType := tokenTransaction.InferTokenTransactionTypeEnt()
 	// Check if we should return early without further processing
 	if response, err := h.checkShouldReturnEarlyWithoutProcessing(ctx, tokenTransaction, inferredTxType); response != nil || err != nil {
 		return response, err
 	}
 
 	if err := validateTokenTransactionForSigning(ctx, h.config, tokenTransaction); err != nil {
-		return nil, tokens.FormatErrorWithTransactionEnt(err.Error(), tokenTransaction, err)
+		return nil, err
 	}
 
 	inputSignaturesByOperatorHex := make(map[string]*tokenpb.InputTtxoSignaturesPerOperator, len(req.InputTtxoSignaturesPerOperator))
@@ -183,7 +173,7 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 	selfHex := h.config.IdentityPublicKey().ToHex()
 	selfSignatures, ok := inputSignaturesByOperatorHex[selfHex]
 	if !ok {
-		return nil, fmt.Errorf("no signatures found for local operator %s", h.config.Identifier)
+		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no signatures found for local operator %s", h.config.Identifier))
 	}
 
 	excludeSelf := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
@@ -192,11 +182,11 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 			opHex := operator.IdentityPublicKey.ToHex()
 			foundOperatorSignatures := inputSignaturesByOperatorHex[opHex]
 			if foundOperatorSignatures == nil {
-				return nil, fmt.Errorf("no signatures found for operator %s", operator.Identifier)
+				return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no signatures found for operator %s", operator.Identifier))
 			}
 			conn, err := operator.NewOperatorGRPCConnection()
 			if err != nil {
-				return nil, fmt.Errorf("failed to connect to operator %s: %w", operator.Identifier, err)
+				return nil, sparkerrors.UnavailableExternalOperator(fmt.Errorf("failed to connect to operator %s: %w", operator.Identifier, err))
 			}
 			defer conn.Close()
 			client := tokeninternalpb.NewSparkTokenInternalServiceClient(conn)
@@ -209,19 +199,20 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		},
 	)
 	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionEnt("failed to get signatures from operators", tokenTransaction, err)
+		return nil, sparkerrors.WrapErrorWithReasonPrefix(tokens.FormatErrorWithTransactionEnt("failed to get signatures from operators", tokenTransaction, err),
+			sparkerrors.ErrorReasonPrefixFailedWithExternalCoordinator)
 	}
 
 	lockedTokenTransaction, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
 	if err != nil {
-		return nil, fmt.Errorf("failed to refetch transaction with lock: %w", err)
+		return nil, err
 	}
 	if err := validateTokenTransactionForSigning(ctx, h.config, lockedTokenTransaction); err != nil {
-		return nil, tokens.FormatErrorWithTransactionEnt(err.Error(), lockedTokenTransaction, err)
+		return nil, err
 	}
 	localResp, err := h.localSignAndCommitTransaction(ctx, selfSignatures, req.FinalTokenTransactionHash, lockedTokenTransaction)
 	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionEnt("failed to sign locally", lockedTokenTransaction, err)
+		return nil, err
 	}
 
 	signatures := make(operatorSignaturesMap, len(internalSignatures))
@@ -231,7 +222,7 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 	}
 	internalSignTokenHandler := NewInternalSignTokenHandler(h.config)
 	if err := internalSignTokenHandler.validateSignaturesPackageAndPersistPeerSignatures(ctx, signatures, lockedTokenTransaction); err != nil {
-		return nil, tokens.FormatErrorWithTransactionEnt("failed to validate signature package and persist peer signatures", lockedTokenTransaction, err)
+		return nil, err
 	}
 
 	switch inferredTxType {
@@ -246,12 +237,12 @@ func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.C
 		}
 		allOperatorSignatures[h.config.Identifier] = localResp
 		if response, err := h.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, req.FinalTokenTransaction, allOperatorSignatures, req.FinalTokenTransactionHash); err != nil {
-			return nil, tokens.FormatErrorWithTransactionEnt("failed to exchange revocation secret shares and finalize if possible", lockedTokenTransaction, err)
+			return nil, err
 		} else {
 			return response, nil
 		}
 	default:
-		return nil, fmt.Errorf("token transaction type not supported: %s", inferredTxType)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token transaction type not supported: %s", inferredTxType))
 	}
 }
 
@@ -261,20 +252,20 @@ func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx co
 	logger := logging.GetLoggerFromContext(ctx)
 	response, err := h.exchangeRevocationSecretShares(ctx, allOperatorSignatures, tokenTransactionProto, tokenTransactionHash)
 	if err != nil {
-		return nil, fmt.Errorf("coordinator failed to exchange revocation secret shares with all other operators for token txHash: %x: %w", tokenTransactionHash, err)
+		return nil, tokens.FormatErrorWithTransactionProto("coordinator failed to exchange revocation secret shares with all other operators", tokenTransactionProto, err)
 	}
 
 	// Collect the secret shares from all operators.
 	var operatorShares []*tokeninternalpb.OperatorRevocationShares
 	for _, exchangeResponse := range response {
 		if exchangeResponse == nil {
-			return nil, fmt.Errorf("nil exchange response received from operator for token txHash: %x", tokenTransactionHash)
+			return nil, tokens.FormatErrorWithTransactionProto("nil exchange response received from operator", tokenTransactionProto, sparkerrors.InternalInvalidOperatorResponse(err))
 		}
 		operatorShares = append(operatorShares, exchangeResponse.ReceivedOperatorShares...)
 	}
 	inputOperatorShareMap, err := buildInputOperatorShareMap(operatorShares)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build input operator share map for token txHash: %x: %w", tokenTransactionHash, err)
+		return nil, tokens.FormatErrorWithTransactionProto("failed to build input operator share map", tokenTransactionProto, err)
 	}
 	logger.Sugar().Infof("Length of inputOperatorShareMap: %d", len(inputOperatorShareMap))
 	// Persist the secret shares from all operators.
@@ -295,12 +286,12 @@ func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx co
 		// Refetch the token transaction (for-read) to pick up newly committed partial revocation secret shares
 		refetchedTokenTransaction, err := ent.FetchTokenTransactionDataByHashForRead(ctx, tokenTransactionHash)
 		if err != nil {
-			return nil, fmt.Errorf("failed to refetch token transaction data: %w", err)
+			return nil, tokens.FormatErrorWithTransactionProto("failed to fetch token transaction after finalization", tokenTransactionProto, err)
 		}
 
 		commitProgress, err := h.getRevealCommitProgress(ctx, refetchedTokenTransaction)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get reveal commit progress: %w", err)
+			return nil, tokens.FormatErrorWithTransactionProto("failed to get reveal commit progress", tokenTransactionProto, err)
 		}
 		return &tokenpb.CommitTransactionResponse{
 			CommitStatus:   tokenpb.CommitStatus_COMMIT_PROCESSING,
@@ -346,7 +337,7 @@ func (h *SignTokenHandler) checkShouldReturnEarlyWithoutProcessing(
 			}, nil
 		}
 	default:
-		return nil, fmt.Errorf("token transaction type not supported: %s", inferredTxType)
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token transaction type not supported: %s", inferredTxType))
 	}
 	return nil, nil
 }
@@ -365,13 +356,13 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 
 	revocationSecretShares, err := h.prepareRevocationSecretSharesForExchange(ctx, tokenTransaction)
 	if err != nil {
-		return nil, fmt.Errorf("failed to prepare coordinator revocation secret shares for exchange: %w for token txHash: %x", err, tokenTransactionHash)
+		return nil, fmt.Errorf("failed to prepare coordinator revocation secret shares for exchange: %w", err)
 	}
 
 	// We are about to reveal our revocation secrets. Mark as revealed, then reveal.
 	tx, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get or create current tx for request: %w", err))
 	}
 	if _, err := tx.TokenTransaction.Update().
 		Where(
@@ -380,10 +371,10 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 		).
 		SetStatus(st.TokenTransactionStatusRevealed).
 		Save(ctx); err != nil {
-		return nil, fmt.Errorf("failed to update token transaction status to Revealed: %w for token txHash: %x", err, tokenTransactionHash)
+		return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update token transaction status to Revealed: %w for token txHash: %x", err, tokenTransactionHash))
 	}
 	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("failed to commit and replace transaction after setting status to revealed: %w for token txHash: %x", err, tokenTransactionHash)
+		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to commit and replace transaction after setting status to revealed: %w for token txHash: %x", err, tokenTransactionHash))
 	}
 
 	// exchange the revocation secret shares with all other operators
@@ -391,7 +382,7 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 	response, errorExchangingWithAllOperators := helper.ExecuteTaskWithAllOperators(ctx, h.config, &opSelection, func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.ExchangeRevocationSecretsSharesResponse, error) {
 		conn, err := operator.NewOperatorGRPCConnection()
 		if err != nil {
-			return nil, fmt.Errorf("failed to connect to operator %s: %w for token txHash: %x", operator.Identifier, err, tokenTransactionHash)
+			return nil, sparkerrors.UnavailableExternalOperator(fmt.Errorf("failed to connect to operator %s: %w for token txHash: %x", operator.Identifier, err, tokenTransactionHash))
 		}
 		defer conn.Close()
 		client := tokeninternalpb.NewSparkTokenInternalServiceClient(conn)
@@ -405,7 +396,7 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 	})
 	// If there was an error exchanging with all operators, we will roll back to the revealed status.
 	if errorExchangingWithAllOperators != nil {
-		return nil, fmt.Errorf("failed to exchange revocation secret shares: %w for token txHash: %x", errorExchangingWithAllOperators, tokenTransactionHash)
+		return nil, sparkerrors.WrapErrorWithMessage(errorExchangingWithAllOperators, fmt.Sprintf("failed to exchange revocation secret shares for token txHash: %x", tokenTransactionHash))
 	}
 
 	return response, nil
@@ -416,7 +407,7 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 	defer span.End()
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get or create current tx for request: %w", err))
 	}
 
 	outputsToSpend := tokenTransaction.GetTransferInput().GetOutputsToSpend()
@@ -457,7 +448,7 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 		WithCreatedOutput().
 		All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch matching transactions and outputs: %w", err)
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch matching transactions and outputs: %w", err))
 	}
 
 	transactionMap := make(map[string]*ent.TokenTransaction)
@@ -470,7 +461,7 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 	for prevHash, vouts := range voutsByPrevHash {
 		transaction, ok := transactionMap[prevHash]
 		if !ok {
-			return nil, fmt.Errorf("no transaction found for prev tx hash %x", hashBytesByKey[prevHash])
+			return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("no transaction found for prev tx hash %x", hashBytesByKey[prevHash]))
 		}
 
 		// Find matching outputs by vout
@@ -490,7 +481,7 @@ func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.
 		WithTokenPartialRevocationSecretShares().
 		All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query TokenOutputs with key shares: %w", err)
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to query TokenOutputs with key shares: %w", err))
 	}
 
 	sharesToReturnMap := make(map[keys.Public]*tokeninternalpb.OperatorRevocationShares)
@@ -561,17 +552,17 @@ func (h *SignTokenHandler) getRevocationKeysharesForTokenTransaction(ctx context
 	for i, output := range spentOutputs {
 		keyshare, err := output.QueryRevocationKeyshare().Only(ctx)
 		if err != nil {
-			return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToGetKeyshareForOutput, tokenTransaction, err)
+			return nil, sparkerrors.InternalDatabaseReadError(tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToGetKeyshareForOutput, tokenTransaction, err))
 		}
 		// Validate that the keyshare's public key is as expected.
 		withdrawRevocationCommitment, err := keys.ParsePublicKey(output.WithdrawRevocationCommitment)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse withdraw revocation commitment: %w", err)
+			return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("failed to parse withdraw revocation commitment: %w", err))
 		}
 		if !keyshare.PublicKey.Equals(withdrawRevocationCommitment) {
-			return nil, tokens.FormatErrorWithTransactionEnt(
+			return nil, sparkerrors.InternalKeyshareError(tokens.FormatErrorWithTransactionEnt(
 				fmt.Sprintf("%s: %v does not match %v", tokens.ErrRevocationKeyMismatch, keyshare.PublicKey, output.WithdrawRevocationCommitment),
-				tokenTransaction, nil)
+				tokenTransaction, nil))
 		}
 
 		revocationKeyshares[i] = &sparkpb.KeyshareWithIndex{
@@ -597,7 +588,7 @@ func verifyOperatorSignatures(
 	for operatorID, sigBytes := range signatures {
 		operator, ok := operatorMap[operatorID]
 		if !ok {
-			return fmt.Errorf("operator %s not found in operator map", operatorID)
+			return sparkerrors.InternalObjectMalformedField(fmt.Errorf("operator %s not found in operator map", operatorID))
 		}
 		if err := verifyOperatorSignature(sigBytes, operator, finalTokenTransactionHash); err != nil {
 			errors = append(errors, err.Error())
@@ -605,7 +596,7 @@ func verifyOperatorSignatures(
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("signature verification failed: %s", strings.Join(errors, "; "))
+		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("signature verification failed: %s", strings.Join(errors, "; ")))
 	}
 
 	return nil
@@ -614,7 +605,7 @@ func verifyOperatorSignatures(
 func verifyOperatorSignature(sigBytes []byte, operator *so.SigningOperator, finalTokenTransactionHash []byte) error {
 	pubKey := operator.IdentityPublicKey
 	if err := common.VerifyECDSASignature(pubKey, sigBytes, finalTokenTransactionHash); err != nil {
-		return fmt.Errorf("failed to verify operator signature for operator %s: %w", operator.Identifier, err)
+		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("failed to verify operator signature for operator %s: %w", operator.Identifier, err))
 	}
 	return nil
 }
@@ -622,7 +613,7 @@ func verifyOperatorSignature(sigBytes []byte, operator *so.SigningOperator, fina
 func (h *SignTokenHandler) getSignedCommitProgress(tt *ent.TokenTransaction) (*tokenpb.CommitProgress, error) {
 	peerSigs := tt.Edges.PeerSignatures
 	if peerSigs == nil {
-		return nil, fmt.Errorf("no peer signatures")
+		return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no peer signatures"))
 	}
 
 	seen := map[keys.Public]struct{}{}
@@ -663,7 +654,7 @@ func (h *SignTokenHandler) getRevealCommitProgress(ctx context.Context, tokenTra
 
 	outputsToCheck := tokenTransaction.Edges.SpentOutput
 	if len(outputsToCheck) == 0 {
-		return nil, fmt.Errorf("no spent outputs found for transfer token transaction %x", tokenTransaction.FinalizedTokenTransactionHash)
+		return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no spent outputs found for transfer token transaction %x", tokenTransaction.FinalizedTokenTransactionHash))
 	}
 
 	for i := range outputsToCheck {

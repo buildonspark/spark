@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 )
 
 // Network is the network type.
@@ -29,7 +30,7 @@ func (n Network) MarshalProto() (pb.Network, error) {
 	case NetworkSignet:
 		return pb.Network_SIGNET, nil
 	default:
-		return pb.Network_UNSPECIFIED, fmt.Errorf("unknown network: %s", n)
+		return pb.Network_UNSPECIFIED, sparkerrors.InternalTypeConversionError(fmt.Errorf("unknown network: %s", n))
 	}
 }
 
@@ -45,7 +46,7 @@ func (n *Network) UnmarshalProto(proto pb.Network) error {
 	case pb.Network_SIGNET:
 		*n = NetworkSignet
 	default:
-		return fmt.Errorf("unknown network: %d", proto)
+		return sparkerrors.InternalTypeConversionError(fmt.Errorf("unknown network: %d", proto))
 	}
 	return nil
 }

@@ -104,7 +104,7 @@ func (TokenTransaction) Hooks() []ent.Hook {
 					WithCreate().
 					Only(ctx)
 				if err != nil {
-					return nil, errors.InternalDatabaseError(fmt.Errorf("failed to fetch transaction for balance validation: %w", err))
+					return nil, errors.InternalDatabaseReadError(fmt.Errorf("failed to fetch transaction for balance validation: %w", err))
 				}
 
 				if err := ValidateTransferTransactionBalance(tx); err != nil {

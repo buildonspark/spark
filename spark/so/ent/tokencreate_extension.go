@@ -2,14 +2,13 @@ package ent
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
-	"github.com/lightsparkdev/spark/common/logging"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
+	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 )
 
 func getTokenIdentifierFromTransaction(tokenTransaction *tokenpb.TokenTransaction) common.TokenIdentifier {
@@ -28,14 +27,12 @@ func getIssuerPublicKeyFromTransaction(tokenTransaction *tokenpb.TokenTransactio
 	if tokenTransaction.GetCreateInput().GetIssuerPublicKey() != nil {
 		return keys.ParsePublicKey(tokenTransaction.GetCreateInput().GetIssuerPublicKey())
 	}
-	return keys.Public{}, fmt.Errorf("no token identifier or issuer public key found for token transaction: %v", tokenTransaction)
+	return keys.Public{}, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("no token identifier or issuer public key found for token transaction: %v", tokenTransaction))
 }
 
 // GetTokenMetadataForTokenTransaction returns the token metadata for the given token transaction.
 // It searches for the token metadata in the TokenCreate table.
 func GetTokenMetadataForTokenTransaction(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction) (*common.TokenMetadata, error) {
-	logger := logging.GetLoggerFromContext(ctx)
-
 	tx, err := GetDbFromContext(ctx)
 	if err != nil {
 		return nil, err
@@ -48,10 +45,8 @@ func GetTokenMetadataForTokenTransaction(ctx context.Context, tokenTransaction *
 			return tokenCreate.ToTokenMetadata()
 		}
 		if !IsNotFound(err) {
-			return nil, fmt.Errorf("error querying TokenCreate table: %w", err)
+			return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("error querying TokenCreate table: %w", err))
 		}
-
-		logger.Sugar().Warnf("no token found for token transaction by token identifier %s", hex.EncodeToString(tokenIdentifier))
 		return nil, nil
 	}
 
@@ -73,9 +68,7 @@ func GetTokenMetadataForTokenTransaction(ctx context.Context, tokenTransaction *
 		return tokenCreate.ToTokenMetadata()
 	}
 	if !IsNotFound(err) {
-		return nil, fmt.Errorf("error querying TokenCreate table: %w", err)
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("error querying TokenCreate table: %w", err))
 	}
-
-	logger.Sugar().Warnf("no token found for token transaction by issuer public key %s", issuerPublicKey)
 	return nil, nil
 }
