@@ -1,0 +1,338 @@
+package bitcointransaction
+
+import (
+	"bytes"
+	"testing"
+
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
+	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark"
+	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+const (
+	testTimeLock         = 1000
+	testSourceValue      = 100000
+	expectedCpfpTimelock = testTimeLock - spark.TimeLockInterval
+)
+
+// newTestTx creates a new transaction for testing.
+func newTestTx(value int64, pkScript []byte, sequence uint32, prevTxHash *chainhash.Hash) *wire.MsgTx {
+	tx := wire.NewMsgTx(defaultVersion)
+
+	// Create a dummy previous outpoint if none provided
+	if prevTxHash == nil {
+		prevTxHash = &chainhash.Hash{}
+	}
+
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  *prevTxHash,
+			Index: 0,
+		},
+		Sequence: sequence,
+	})
+
+	tx.AddTxOut(&wire.TxOut{
+		Value:    value,
+		PkScript: pkScript,
+	})
+	return tx
+}
+
+// serializeTx serializes a transaction to bytes.
+func serializeTx(t *testing.T, tx *wire.MsgTx) []byte {
+	var buf bytes.Buffer
+	err := tx.Serialize(&buf)
+	require.NoError(t, err)
+	return buf.Bytes()
+}
+
+// newTestLeafNode creates a new tree node for testing.
+func newTestLeafNode(t *testing.T) (*ent.TreeNode, keys.Public) {
+	pubKey := keys.GeneratePrivateKey().Public()
+	pkScript, err := common.P2TRScriptFromPubKey(pubKey)
+	require.NoError(t, err)
+
+	// Create source transactions
+	nodeTx := newTestTx(testSourceValue, pkScript, 0, nil)
+	nodeTxHash := nodeTx.TxHash()
+	directTx := newTestTx(testSourceValue, pkScript, 0, nil)
+	directTxHash := directTx.TxHash()
+
+	// Create refund transactions to be stored in the DB leaf
+	cpfpRefundTx := newTestTx(testSourceValue, pkScript, testTimeLock, &nodeTxHash)
+	directRefundTx := newTestTx(testSourceValue, pkScript, testTimeLock, &directTxHash)
+	directFromCpfpRefundTx := newTestTx(testSourceValue, pkScript, testTimeLock, &nodeTxHash)
+
+	return &ent.TreeNode{
+		ID:                     uuid.New(),
+		RawTx:                  serializeTx(t, nodeTx),
+		RawTxid:                nodeTxHash[:],
+		DirectTx:               serializeTx(t, directTx),
+		DirectTxid:             directTxHash[:],
+		RawRefundTx:            serializeTx(t, cpfpRefundTx),
+		DirectRefundTx:         serializeTx(t, directRefundTx),
+		DirectFromCpfpRefundTx: serializeTx(t, directFromCpfpRefundTx),
+	}, pubKey
+}
+
+func TestVerifyTransactionWithDatabase(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	// Helper to create a client transaction
+	createClientTx := func(prevTxHash chainhash.Hash, sequence uint32, outputs ...*wire.TxOut) []byte {
+		tx := wire.NewMsgTx(defaultVersion)
+		tx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: wire.OutPoint{Hash: prevTxHash, Index: 0},
+			Sequence:         sequence,
+		})
+		for _, out := range outputs {
+			tx.AddTxOut(out)
+		}
+		return serializeTx(t, tx)
+	}
+
+	testCases := []struct {
+		name          string
+		clientRawTx   []byte
+		txType        RefundTxType
+		dbLeaf        *ent.TreeNode
+		refundDestKey keys.Public
+		expectErr     bool
+		errContains   string
+	}{
+		{
+			name:   "Happy Path - CPFP",
+			txType: RefundTxTypeCPFP,
+			clientRawTx: createClientTx(
+				chainhash.Hash(dbLeaf.RawTxid),
+				expectedCpfpTimelock,
+				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
+				common.EphemeralAnchorOutput(),
+			),
+			dbLeaf:        dbLeaf,
+			refundDestKey: refundDestPubkey,
+			expectErr:     false,
+		},
+		{
+			name:   "Happy Path - Direct",
+			txType: RefundTxTypeDirect,
+			clientRawTx: createClientTx(
+				chainhash.Hash(dbLeaf.DirectTxid),
+				expectedCpfpTimelock+50,
+				&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript},
+			),
+			dbLeaf:        dbLeaf,
+			refundDestKey: refundDestPubkey,
+			expectErr:     false,
+		},
+		{
+			name:   "Happy Path - DirectFromCPFP",
+			txType: RefundTxTypeDirectFromCPFP,
+			clientRawTx: createClientTx(
+				chainhash.Hash(dbLeaf.RawTxid),
+				expectedCpfpTimelock+50,
+				&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript},
+			),
+			dbLeaf:        dbLeaf,
+			refundDestKey: refundDestPubkey,
+			expectErr:     false,
+		},
+		{
+			name:          "Error - Invalid client tx bytes",
+			txType:        RefundTxTypeCPFP,
+			clientRawTx:   []byte("invalid tx"),
+			dbLeaf:        dbLeaf,
+			refundDestKey: refundDestPubkey,
+			expectErr:     true,
+			errContains:   "failed to parse client tx",
+		},
+		{
+			name:   "Error - Client tx no inputs",
+			txType: RefundTxTypeCPFP,
+			clientRawTx: func() []byte {
+				tx := wire.NewMsgTx(defaultVersion)
+				tx.AddTxIn(&wire.TxIn{
+					PreviousOutPoint: wire.OutPoint{
+						Hash:  chainhash.Hash{},
+						Index: 0,
+					},
+					Sequence: 0,
+				})
+				tx.AddTxOut(&wire.TxOut{
+					Value:    testSourceValue,
+					PkScript: userScript,
+				})
+				// Remove the input to create a transaction with no inputs
+				tx.TxIn = tx.TxIn[:0]
+				return serializeTx(t, tx)
+			}(),
+			dbLeaf:        dbLeaf,
+			refundDestKey: refundDestPubkey,
+			expectErr:     true,
+			errContains:   "failed to parse client tx",
+		},
+		{
+			name:   "Error - Mismatched transaction",
+			txType: RefundTxTypeCPFP,
+			clientRawTx: createClientTx(
+				chainhash.Hash(dbLeaf.RawTxid),
+				expectedCpfpTimelock,
+				&wire.TxOut{Value: testSourceValue - 1, PkScript: userScript},
+				common.EphemeralAnchorOutput(),
+			),
+			dbLeaf:        dbLeaf,
+			refundDestKey: refundDestPubkey,
+			expectErr:     true,
+			errContains:   "transaction does not match expected construction",
+		},
+		{
+			name:   "Error - Sequence validation bit 31 set",
+			txType: RefundTxTypeCPFP,
+			clientRawTx: createClientTx(
+				chainhash.Hash(dbLeaf.RawTxid),
+				expectedCpfpTimelock|(1<<31),
+				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
+				common.EphemeralAnchorOutput(),
+			),
+			dbLeaf:        dbLeaf,
+			refundDestKey: refundDestPubkey,
+			expectErr:     true,
+			errContains:   "client sequence has bit 31 set",
+		},
+		{
+			name:   "Error - Sequence validation bit 22 set",
+			txType: RefundTxTypeCPFP,
+			clientRawTx: createClientTx(
+				chainhash.Hash(dbLeaf.RawTxid),
+				expectedCpfpTimelock|(1<<22),
+				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
+				common.EphemeralAnchorOutput(),
+			),
+			dbLeaf:        dbLeaf,
+			refundDestKey: refundDestPubkey,
+			expectErr:     true,
+			errContains:   "client sequence has bit 22 set",
+		},
+		{
+			name:   "Error - Timelock mismatch",
+			txType: RefundTxTypeCPFP,
+			clientRawTx: createClientTx(
+				chainhash.Hash(dbLeaf.RawTxid),
+				expectedCpfpTimelock+spark.DirectTimelockOffset, // Wrong timelock
+				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
+				common.EphemeralAnchorOutput(),
+			),
+			dbLeaf:        dbLeaf,
+			refundDestKey: refundDestPubkey,
+			expectErr:     true,
+			errContains:   "does not match expected timelock",
+		},
+		{
+			name:   "Error - Corrupted DB data",
+			txType: RefundTxTypeCPFP,
+			clientRawTx: createClientTx(
+				chainhash.Hash(dbLeaf.RawTxid),
+				expectedCpfpTimelock,
+				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
+				common.EphemeralAnchorOutput(),
+			),
+			dbLeaf: func() *ent.TreeNode {
+				badLeaf, _ := newTestLeafNode(t)
+				badLeaf.RawTx = []byte("bad raw tx")
+				return badLeaf
+			}(),
+			refundDestKey: refundDestPubkey,
+			expectErr:     true,
+			errContains:   "failed to parse node tx",
+		},
+		{
+			name:   "Error - Insufficient timelock in DB",
+			txType: RefundTxTypeCPFP,
+			clientRawTx: createClientTx(
+				chainhash.Hash(dbLeaf.RawTxid),
+				expectedCpfpTimelock,
+				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
+				common.EphemeralAnchorOutput(),
+			),
+			dbLeaf: func() *ent.TreeNode {
+				badLeaf, key := newTestLeafNode(t)
+				pkScript, _ := common.P2TRScriptFromPubKey(key)
+				nodeTxHash := chainhash.Hash(badLeaf.RawTxid)
+				// Create a refund tx with a timelock smaller than the interval
+				badRefundTx := newTestTx(testSourceValue, pkScript, spark.TimeLockInterval-1, &nodeTxHash)
+				badLeaf.RawRefundTx = serializeTx(t, badRefundTx)
+				return badLeaf
+			}(),
+			refundDestKey: refundDestPubkey,
+			expectErr:     true,
+			errContains:   "is too small to subtract TimeLockInterval",
+		},
+		{
+			name:   "Error - Unknown tx type",
+			txType: RefundTxType(99),
+			clientRawTx: createClientTx(
+				chainhash.Hash(dbLeaf.RawTxid),
+				expectedCpfpTimelock,
+				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
+				common.EphemeralAnchorOutput(),
+			),
+			dbLeaf:        dbLeaf,
+			refundDestKey: refundDestPubkey,
+			expectErr:     true,
+			errContains:   "unknown transaction type: 99",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := VerifyTransactionWithDatabase(tc.clientRawTx, tc.dbLeaf, tc.txType, tc.refundDestKey)
+			if tc.expectErr {
+				require.ErrorContains(t, err, tc.errContains)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+// TestConstructExpectedTransaction covers the sub-flows of constructing transactions.
+func TestConstructExpectedTransaction(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+
+	// Test case for unknown transaction type
+	t.Run("Unknown transaction type", func(t *testing.T) {
+		_, err := constructExpectedTransaction(dbLeaf, RefundTxType(99), refundDestPubkey, 0)
+		require.ErrorContains(t, err, "unknown transaction type: 99")
+	})
+
+	// Test case for failure in P2TR script creation
+	t.Run("P2TR script creation failure", func(t *testing.T) {
+		var invalidPubKey keys.Public
+		_, err := constructExpectedTransaction(dbLeaf, RefundTxTypeCPFP, invalidPubKey, expectedCpfpTimelock)
+		require.ErrorContains(t, err, "public key is zero")
+	})
+}
+
+// TestP2TRScriptFromPubKey tests the P2TR script creation from a public key.
+func TestP2TRScriptFromPubKey(t *testing.T) {
+	pubKey := keys.GeneratePrivateKey().Public()
+
+	// Create the P2TR script.
+	script, err := common.P2TRScriptFromPubKey(pubKey)
+	require.NoError(t, err)
+
+	// The script should be 34 bytes long: 1 byte for OP_1, 1 byte for data push, 32 bytes for the key.
+	require.Len(t, script, 34)
+	assert.Equal(t, byte(txscript.OP_1), script[0])
+	assert.Equal(t, byte(txscript.OP_DATA_32), script[1])
+}
