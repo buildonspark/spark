@@ -4,6 +4,7 @@
     "module": "nodenext",
     "target": "esnext",
     "moduleResolution": "nodenext",
+    "isolatedModules": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
