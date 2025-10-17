@@ -27,35 +27,33 @@ import (
 // Test token amounts for various operations
 const (
 	// Amount for first created output in issuance transaction
-	TestIssueOutput1Amount = 11
+	testIssueOutput1Amount = 11
 	// Amount for second created output in issuance transaction
-	TestIssueOutput2Amount = 22
+	testIssueOutput2Amount = 22
 	// Amount for first (and only) created output in transfer transaction
-	TestTransferOutput1Amount = 33
+	testTransferOutput1Amount = 33
 	// Configured at SO level. We validate in the tests to ensure these are populated correctly
-	WithdrawalBondSatsInConfig              = 10000
-	WithdrawalRelativeBlockLocktimeInConfig = 1000
-	MinikubeTokenTransactionExpiryTimeSecs  = 30
-	// Expiry cleanup tasks run every 30 seconds, + 3 seconds for processing time
-	TokenTransactionExpiryProcessingTimeSecs = 33
+	withdrawalBondSatsInConfig              = 10000
+	withdrawalRelativeBlockLocktimeInConfig = 1000
+	minikubeTokenTransactionExpiryTime      = 30 * time.Second
 	// Test token parameters shared between tokenMetadata and token transaction creation
 	// In order to support L1 token creation enforcement testing, these should match
 	// the params used when creating the static L1 token as part of test harness setup.
-	TestTokenName        = "TestToken"
-	TestTokenTicker      = "TEST"
-	TestTokenDecimals    = 8
-	TestTokenIsFreezable = true
-	TestTokenMaxSupply   = 0
+	testTokenName        = "TestToken"
+	testTokenTicker      = "TEST"
+	testTokenDecimals    = 8
+	testTokenIsFreezable = true
+	testTokenMaxSupply   = 0
 )
 
-var maxInputOrOutputTokenTransactionOutputsForTests = func() int {
-	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		return int(math.Floor(float64(utils.MaxInputOrOutputTokenTransactionOutputs) * 0.5))
-	}
-	return utils.MaxInputOrOutputTokenTransactionOutputs
-}()
-
 var (
+	maxInputOrOutputTokenTransactionOutputsForTests = func() int {
+		if os.Getenv("GITHUB_ACTIONS") == "true" {
+			return int(math.Floor(float64(utils.MaxInputOrOutputTokenTransactionOutputs) * 0.5))
+		}
+		return utils.MaxInputOrOutputTokenTransactionOutputs
+	}()
+
 	// The expected maximum number of outputs which can be created in a single transaction.
 	manyOutputsCount = maxInputOrOutputTokenTransactionOutputsForTests
 	// Amount for second created output in multiple output issuance transaction
@@ -135,12 +133,12 @@ func createTestTokenMintTransactionWithParams(config *wallet.TestWalletConfig, i
 			{
 				OwnerPublicKey: userOutput1PubKeyBytes,
 				TokenPublicKey: issuerPublicKey.Serialize(),
-				TokenAmount:    int64ToUint128Bytes(0, TestIssueOutput1Amount),
+				TokenAmount:    int64ToUint128Bytes(0, testIssueOutput1Amount),
 			},
 			{
 				OwnerPublicKey: userOutput2PubKeyBytes,
 				TokenPublicKey: issuerPublicKey.Serialize(),
-				TokenAmount:    int64ToUint128Bytes(0, TestIssueOutput2Amount),
+				TokenAmount:    int64ToUint128Bytes(0, testIssueOutput2Amount),
 			},
 		},
 		Network:                         config.ProtoNetwork(),
@@ -181,7 +179,7 @@ func createTestTokenTransferTransactionWithParams(
 			{
 				OwnerPublicKey: userOutput3PubKeyBytes,
 				TokenPublicKey: issuerPublicKey.Serialize(),
-				TokenAmount:    int64ToUint128Bytes(0, TestTransferOutput1Amount),
+				TokenAmount:    int64ToUint128Bytes(0, testTransferOutput1Amount),
 			},
 		},
 		Network:                         config.ProtoNetwork(),
@@ -260,12 +258,12 @@ func TestQueryPartiallySpentTokenOutputsNotReturned(t *testing.T) {
 			{
 				OwnerPublicKey: tokenIdentityPubkeyBytes,
 				TokenPublicKey: tokenIdentityPubkeyBytes,
-				TokenAmount:    int64ToUint128Bytes(0, TestIssueOutput1Amount),
+				TokenAmount:    int64ToUint128Bytes(0, testIssueOutput1Amount),
 			},
 			{
 				OwnerPublicKey: tokenIdentityPubkeyBytes,
 				TokenPublicKey: tokenIdentityPubkeyBytes,
-				TokenAmount:    int64ToUint128Bytes(0, TestIssueOutput2Amount),
+				TokenAmount:    int64ToUint128Bytes(0, testIssueOutput2Amount),
 			},
 		},
 		Network:                         config.ProtoNetwork(),
@@ -298,7 +296,7 @@ func TestQueryPartiallySpentTokenOutputsNotReturned(t *testing.T) {
 			{
 				OwnerPublicKey: receiverPrivateKey.Public().Serialize(),
 				TokenPublicKey: tokenIdentityPubkeyBytes,
-				TokenAmount:    int64ToUint128Bytes(0, TestIssueOutput1Amount),
+				TokenAmount:    int64ToUint128Bytes(0, testIssueOutput1Amount),
 			},
 		},
 		Network:                         config.ProtoNetwork(),
@@ -335,7 +333,7 @@ func TestQueryPartiallySpentTokenOutputsNotReturned(t *testing.T) {
 	require.NoError(t, err, "failed to query token on not enough signatures")
 
 	require.Len(t, notEnoughSignedOutput.OutputsWithPreviousTransactionData, 1, "expected one output when using not enough signatures to transfer one of two outputs")
-	require.Equal(t, uint64ToBigInt(TestIssueOutput2Amount), bytesToBigInt(notEnoughSignedOutput.OutputsWithPreviousTransactionData[0].Output.TokenAmount), "expected the second output to be returned when using not enough signatures to transfer one of two outputs")
+	require.Equal(t, uint64ToBigInt(testIssueOutput2Amount), bytesToBigInt(notEnoughSignedOutput.OutputsWithPreviousTransactionData[0].Output.TokenAmount), "expected the second output to be returned when using not enough signatures to transfer one of two outputs")
 }
 
 func TestQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t *testing.T) {
@@ -379,9 +377,9 @@ func TestBroadcastTokenTransactionMintAndTransferTokensExpectedOutputAndTxRetrie
 	// mint/transfer operations are scoped to this isolated token.
 	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
 		IssuerPrivateKey: issuerPrivKey,
-		Name:             TestTokenName,
-		Ticker:           TestTokenTicker,
-		MaxSupply:        TestTokenMaxSupply,
+		Name:             testTokenName,
+		Ticker:           testTokenTicker,
+		MaxSupply:        testTokenMaxSupply,
 	})
 	require.NoError(t, err, "failed to create native spark token")
 
@@ -398,10 +396,10 @@ func TestBroadcastTokenTransactionMintAndTransferTokensExpectedOutputAndTxRetrie
 
 	// Validate withdrawal params match config
 	for i, output := range finalIssueTokenTransaction.TokenOutputs {
-		if output.GetWithdrawBondSats() != WithdrawalBondSatsInConfig {
+		if output.GetWithdrawBondSats() != withdrawalBondSatsInConfig {
 			t.Errorf("output %d: expected withdrawal bond sats 10000, got %d", i, output.GetWithdrawBondSats())
 		}
-		if output.GetWithdrawRelativeBlockLocktime() != uint64(WithdrawalRelativeBlockLocktimeInConfig) {
+		if output.GetWithdrawRelativeBlockLocktime() != uint64(withdrawalRelativeBlockLocktimeInConfig) {
 			t.Errorf("output %d: expected withdrawal relative block locktime 1000, got %d", i, output.GetWithdrawRelativeBlockLocktime())
 		}
 	}
@@ -531,7 +529,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensExpectedOutputAndTxRetrie
 		t.Fatalf("expected 1 created output in transfer transaction, got %d", len(transferTx.TokenOutputs))
 	}
 	transferAmount := new(big.Int).SetBytes(transferTx.TokenOutputs[0].TokenAmount)
-	expectedTransferAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestTransferOutput1Amount))
+	expectedTransferAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, testTransferOutput1Amount))
 	if transferAmount.Cmp(expectedTransferAmount) != 0 {
 		t.Fatalf("transfer amount %d does not match expected %d", transferAmount, expectedTransferAmount)
 	}
@@ -550,13 +548,13 @@ func TestBroadcastTokenTransactionMintAndTransferTokensExpectedOutputAndTxRetrie
 	if bytes.Equal(mintTx.TokenOutputs[0].OwnerPublicKey, userOutput1Pubkey) {
 		assert.Equal(t, mintTx.TokenOutputs[1].OwnerPublicKey, userOutput2Pubkey)
 
-		assert.Equal(t, bytesToBigInt(mintTx.TokenOutputs[0].TokenAmount), uint64ToBigInt(TestIssueOutput1Amount))
-		assert.Equal(t, bytesToBigInt(mintTx.TokenOutputs[1].TokenAmount), uint64ToBigInt(TestIssueOutput2Amount))
+		assert.Equal(t, bytesToBigInt(mintTx.TokenOutputs[0].TokenAmount), uint64ToBigInt(testIssueOutput1Amount))
+		assert.Equal(t, bytesToBigInt(mintTx.TokenOutputs[1].TokenAmount), uint64ToBigInt(testIssueOutput2Amount))
 	} else if bytes.Equal(mintTx.TokenOutputs[0].OwnerPublicKey, userOutput2Pubkey) {
 		assert.Equal(t, mintTx.TokenOutputs[1].OwnerPublicKey, userOutput1Pubkey)
 
-		assert.Equal(t, bytesToBigInt(mintTx.TokenOutputs[0].TokenAmount), uint64ToBigInt(TestIssueOutput2Amount))
-		assert.Equal(t, bytesToBigInt(mintTx.TokenOutputs[1].TokenAmount), uint64ToBigInt(TestIssueOutput1Amount))
+		assert.Equal(t, bytesToBigInt(mintTx.TokenOutputs[0].TokenAmount), uint64ToBigInt(testIssueOutput2Amount))
+		assert.Equal(t, bytesToBigInt(mintTx.TokenOutputs[1].TokenAmount), uint64ToBigInt(testIssueOutput1Amount))
 	} else {
 		t.Fatalf("mint transaction output keys (%x, %x) do not match expected (%x, %x)",
 			mintTx.TokenOutputs[0].OwnerPublicKey,
@@ -743,10 +741,10 @@ func TestV0FreezeAndUnfreezeTokens(t *testing.T) {
 
 	// Validate withdrawal params match config
 	for i, output := range finalIssueTokenTransaction.TokenOutputs {
-		require.Equal(t, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats(),
-			"output %d: expected withdrawal bond sats %d, got %d", i, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats())
-		require.Equal(t, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime(),
-			"output %d: expected withdrawal relative block locktime %d, got %d", i, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime())
+		require.Equal(t, uint64(withdrawalBondSatsInConfig), output.GetWithdrawBondSats(),
+			"output %d: expected withdrawal bond sats %d, got %d", i, uint64(withdrawalBondSatsInConfig), output.GetWithdrawBondSats())
+		require.Equal(t, uint64(withdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime(),
+			"output %d: expected withdrawal relative block locktime %d, got %d", i, uint64(withdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime())
 	}
 
 	// Call FreezeTokens to freeze the created output
@@ -765,7 +763,7 @@ func TestV0FreezeAndUnfreezeTokens(t *testing.T) {
 	frozenAmount := new(big.Int).SetBytes(freezeResponse.ImpactedTokenAmount)
 
 	// Calculate total amount from transaction created outputs
-	expectedAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestIssueOutput1Amount))
+	expectedAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, testIssueOutput1Amount))
 	expectedOutputID := finalIssueTokenTransaction.TokenOutputs[0].Id
 
 	require.Equal(t, 0, frozenAmount.Cmp(expectedAmount),
@@ -957,8 +955,8 @@ func testMintTransactionSigningScenarios(t *testing.T, config *wallet.TestWallet
 
 	if testSignExpired {
 		// Wait for the transaction to expire (MinikubeTokenTransactionExpiryTimeSecs seconds)
-		t.Logf("Waiting for %d seconds for transaction to expire...", MinikubeTokenTransactionExpiryTimeSecs)
-		time.Sleep(time.Duration(MinikubeTokenTransactionExpiryTimeSecs) * time.Second)
+		t.Logf("Waiting for %v seconds for transaction to expire...", minikubeTokenTransactionExpiryTime.Seconds())
+		time.Sleep(minikubeTokenTransactionExpiryTime)
 	}
 
 	// Complete the transaction signing with either the original or different transaction
@@ -1088,7 +1086,7 @@ func TestTokenMintTransactionSigning(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivateKey)
 
 			if tc.createNativeSparkToken {
-				err := testCreateNativeSparkTokenWithParams(t, config, issuerPrivateKey, TestTokenName, TestTokenTicker, TestTokenMaxSupply)
+				err := testCreateNativeSparkTokenWithParams(t, config, issuerPrivateKey, testTokenName, testTokenTicker, testTokenMaxSupply)
 				require.NoError(t, err, "failed to create native spark token")
 			}
 			testMintTransactionSigningScenarios(
@@ -1287,8 +1285,8 @@ func testTransferTransactionSigningScenarios(t *testing.T, config *wallet.TestWa
 
 	if testSignExpired {
 		// Wait for the transaction to expire (MinikubeTokenTransactionExpiryTimeSecs seconds)
-		t.Logf("Waiting for %d seconds for transaction to expire...", MinikubeTokenTransactionExpiryTimeSecs)
-		time.Sleep(time.Duration(MinikubeTokenTransactionExpiryTimeSecs) * time.Second)
+		t.Logf("Waiting for %v seconds for transaction to expire...", minikubeTokenTransactionExpiryTime)
+		time.Sleep(minikubeTokenTransactionExpiryTime)
 	}
 
 	// Complete the transaction signing with either the original or different transaction
@@ -1481,7 +1479,7 @@ func TestTokenTransferTransactionSigning(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivateKey)
 
 			if tc.createNativeSparkToken {
-				err := testCreateNativeSparkTokenWithParams(t, config, issuerPrivateKey, TestTokenName, TestTokenTicker, TestTokenMaxSupply)
+				err := testCreateNativeSparkTokenWithParams(t, config, issuerPrivateKey, testTokenName, testTokenTicker, testTokenMaxSupply)
 				require.NoError(t, err, "failed to create native spark token")
 			}
 
@@ -1548,10 +1546,10 @@ func TestBroadcastTokenTransactionMintAndTransferTokensSchnorr(t *testing.T) {
 
 	// Validate withdrawal params match config
 	for i, output := range finalIssueTokenTransaction.TokenOutputs {
-		require.Equal(t, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats(),
-			"output %d: expected withdrawal bond sats %d, got %d", i, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats())
-		require.Equal(t, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime(),
-			"output %d: expected withdrawal relative block locktime %d, got %d", i, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime())
+		require.Equal(t, uint64(withdrawalBondSatsInConfig), output.GetWithdrawBondSats(),
+			"output %d: expected withdrawal bond sats %d, got %d", i, uint64(withdrawalBondSatsInConfig), output.GetWithdrawBondSats())
+		require.Equal(t, uint64(withdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime(),
+			"output %d: expected withdrawal relative block locktime %d, got %d", i, uint64(withdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime())
 	}
 
 	finalIssueTokenTransactionHash, err := utils.HashTokenTransactionV0(finalIssueTokenTransaction, false)
@@ -1645,7 +1643,7 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 			{
 				OwnerPublicKey: userOutput1PrivKey.Public().Serialize(),
 				TokenPublicKey: tokenPrivKey.Public().Serialize(),
-				TokenAmount:    int64ToUint128Bytes(0, TestTransferOutput1Amount),
+				TokenAmount:    int64ToUint128Bytes(0, testTransferOutput1Amount),
 			},
 		},
 		Network:                         config.ProtoNetwork(),
@@ -1688,7 +1686,7 @@ func TestBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T) {
 			{
 				OwnerPublicKey: userOutput1PrivKey.Public().Serialize(),
 				TokenPublicKey: tokenPrivKey.Public().Serialize(),
-				TokenAmount:    int64ToUint128Bytes(0, TestTransferOutput1Amount),
+				TokenAmount:    int64ToUint128Bytes(0, testTransferOutput1Amount),
 			},
 		},
 		Network:                         config.ProtoNetwork(),
@@ -1778,15 +1776,15 @@ func TestCreateNativeSparkToken(t *testing.T) {
 			name: "create second token with same issuer key should fail",
 			firstTokenParams: sparkTokenCreationTestParams{
 				issuerPrivateKey: fixedRandomKey,
-				name:             TestTokenName,
-				ticker:           TestTokenTicker,
-				maxSupply:        TestTokenMaxSupply,
+				name:             testTokenName,
+				ticker:           testTokenTicker,
+				maxSupply:        testTokenMaxSupply,
 			},
 			secondTokenParams: &sparkTokenCreationTestParams{
 				issuerPrivateKey: fixedRandomKey,
 				name:             "Different Name",
 				ticker:           "DIFF",
-				maxSupply:        TestTokenMaxSupply + 1000,
+				maxSupply:        testTokenMaxSupply + 1000,
 				expectedError:    true,
 			},
 		},
@@ -1794,30 +1792,30 @@ func TestCreateNativeSparkToken(t *testing.T) {
 			name: "create two tokens with same metadata but different random keys should succeed",
 			firstTokenParams: sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
-				name:             TestTokenName,
-				ticker:           TestTokenTicker,
-				maxSupply:        TestTokenMaxSupply,
+				name:             testTokenName,
+				ticker:           testTokenTicker,
+				maxSupply:        testTokenMaxSupply,
 			},
 			secondTokenParams: &sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
 				name:             "Different Name",
 				ticker:           "DIFF",
-				maxSupply:        TestTokenMaxSupply,
+				maxSupply:        testTokenMaxSupply,
 			},
 		},
 		{
 			name: "create two tokens with different metadata and different random keys should succeed",
 			firstTokenParams: sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
-				name:             TestTokenName,
-				ticker:           TestTokenTicker,
-				maxSupply:        TestTokenMaxSupply,
+				name:             testTokenName,
+				ticker:           testTokenTicker,
+				maxSupply:        testTokenMaxSupply,
 			},
 			secondTokenParams: &sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
 				name:             "Different Name",
 				ticker:           "DIFF",
-				maxSupply:        TestTokenMaxSupply + 1000,
+				maxSupply:        testTokenMaxSupply + 1000,
 			},
 		},
 		{
@@ -1825,8 +1823,8 @@ func TestCreateNativeSparkToken(t *testing.T) {
 			firstTokenParams: sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
 				name:             "This Token Name Is Way Too Long For The System",
-				ticker:           TestTokenTicker,
-				maxSupply:        TestTokenMaxSupply,
+				ticker:           testTokenTicker,
+				maxSupply:        testTokenMaxSupply,
 				expectedError:    true,
 			},
 		},
@@ -1835,8 +1833,8 @@ func TestCreateNativeSparkToken(t *testing.T) {
 			firstTokenParams: sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
 				name:             "",
-				ticker:           TestTokenTicker,
-				maxSupply:        TestTokenMaxSupply,
+				ticker:           testTokenTicker,
+				maxSupply:        testTokenMaxSupply,
 				expectedError:    true,
 			},
 		},
@@ -1844,9 +1842,9 @@ func TestCreateNativeSparkToken(t *testing.T) {
 			name: "create token with empty ticker should fail",
 			firstTokenParams: sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
-				name:             TestTokenName,
+				name:             testTokenName,
 				ticker:           "",
-				maxSupply:        TestTokenMaxSupply,
+				maxSupply:        testTokenMaxSupply,
 				expectedError:    true,
 			},
 		},
@@ -1854,9 +1852,9 @@ func TestCreateNativeSparkToken(t *testing.T) {
 			name: "create token with ticker longer than 5 characters should fail",
 			firstTokenParams: sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
-				name:             TestTokenName,
+				name:             testTokenName,
 				ticker:           "TOOLONG",
-				maxSupply:        TestTokenMaxSupply,
+				maxSupply:        testTokenMaxSupply,
 				expectedError:    true,
 			},
 		},
@@ -1912,8 +1910,8 @@ func createTestTokenCreateTransactionWithParams(config *wallet.TestWalletConfig,
 				IssuerPublicKey: issuerPubKey.Serialize(),
 				TokenName:       name,
 				TokenTicker:     ticker,
-				Decimals:        uint32(TestTokenDecimals),
-				IsFreezable:     TestTokenIsFreezable,
+				Decimals:        uint32(testTokenDecimals),
+				IsFreezable:     testTokenIsFreezable,
 				MaxSupply:       getTokenMaxSupplyBytes(maxSupply),
 			},
 		},

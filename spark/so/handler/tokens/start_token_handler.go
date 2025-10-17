@@ -104,13 +104,17 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 		}
 	}
 
-	//nolint:all
 	if req.PartialTokenTransaction.Version >= 2 && len(req.PartialTokenTransaction.InvoiceAttachments) > 0 {
 		// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
 		return nil, sparkerrors.UnimplementedMethodDisabled(fmt.Errorf("spark invoice support not implemented"))
 	}
 
-	finalTokenTransaction, keyshareIDStrings, err := h.constructFinalTokenTransaction(ctx, req.PartialTokenTransaction, req.ValidityDurationSeconds)
+	validitySecs := req.GetValidityDurationSeconds()
+	if validitySecs < 1 || validitySecs > 300 {
+		return nil, sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("invalid validity duration seconds not in range [1,300]: %d", validitySecs))
+	}
+
+	finalTokenTransaction, keyshareIDStrings, err := h.constructFinalTokenTransaction(ctx, req.PartialTokenTransaction, time.Duration(validitySecs)*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -395,14 +399,13 @@ func getPreviousEntTokenTransactionAttrs(tokenTransaction *ent.TokenTransaction)
 func (h *StartTokenTransactionHandler) constructFinalTokenTransaction(
 	ctx context.Context,
 	partialTokenTransaction *tokenpb.TokenTransaction,
-	validityDurationSeconds uint64,
+	validityDuration time.Duration,
 ) (*tokenpb.TokenTransaction, []string, error) {
 	finalTokenTransaction := partialTokenTransaction
-	if validityDurationSeconds > spark.TokenMaxValidityDuration {
+	if validityDuration > spark.TokenMaxValidityDuration {
 		return nil, nil, tokens.FormatErrorWithTransactionProto(tokens.ErrInvalidValidityDuration, partialTokenTransaction,
-			fmt.Errorf("validity duration seconds too large: %d, maximum value: %d", validityDurationSeconds, spark.TokenMaxValidityDuration))
+			fmt.Errorf("validity duration seconds too large: %d, maximum value: %d", validityDuration, spark.TokenMaxValidityDuration))
 	}
-	validityDuration := time.Duration(validityDurationSeconds) * time.Second
 	finalTokenTransaction.ExpiryTime = timestamppb.New(time.Now().Add(validityDuration))
 
 	if partialTokenTransaction.InvoiceAttachments != nil {

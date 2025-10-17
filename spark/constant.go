@@ -1,6 +1,9 @@
 package spark
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 const (
 	// DKGKeyCount is the number of keyshares to generate during the DKG.
@@ -16,7 +19,7 @@ const (
 	WatchtowerTimeLockBuffer = 60
 
 	// TokenMaxValidityDuration is the max duration a token transaction can be valid for
-	TokenMaxValidityDuration = 300
+	TokenMaxValidityDuration = 300 * time.Second
 
 	// SigningCommitmentReserve is the reserve for the signing commitments.
 	SigningCommitmentReserve = 100000

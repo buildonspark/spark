@@ -21,9 +21,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-const (
-	DefaultValidityDurationSecs = 180
-)
+const DefaultValidityDuration = 180 * time.Second
 
 // StartTokenTransactionCoordinated calls the start_transaction endpoint on the SparkTokenService.
 func StartTokenTransactionCoordinated(
@@ -31,7 +29,7 @@ func StartTokenTransactionCoordinated(
 	config *TestWalletConfig,
 	tokenTransaction *tokenpb.TokenTransaction,
 	ownerPrivateKeys []keys.Private,
-	validityDurationSeconds uint64,
+	validityDuration time.Duration,
 	startSignatureIndexOrder []uint32,
 ) (*tokenpb.StartTransactionResponse, []byte, error) {
 	sparkConn, err := config.NewCoordinatorGRPCConnection()
@@ -110,7 +108,7 @@ func StartTokenTransactionCoordinated(
 		IdentityPublicKey:                      config.IdentityPublicKey().Serialize(),
 		PartialTokenTransaction:                tokenTransaction,
 		PartialTokenTransactionOwnerSignatures: ownerSignaturesWithIndex,
-		ValidityDurationSeconds:                validityDurationSeconds,
+		ValidityDurationSeconds:                uint64(validityDuration.Seconds()),
 	})
 	if err != nil {
 		log.Printf("Error while calling StartTokenTransaction: %v", err)
@@ -171,7 +169,7 @@ func BroadcastCoordinatedTokenTransfer(
 		ctx,
 		config,
 		tokenTransaction,
-		DefaultValidityDurationSecs,
+		DefaultValidityDuration,
 		ownerPrivateKeys,
 	)
 }
@@ -183,7 +181,7 @@ func BroadcastCoordinatedTokenTransferWithExpiryDuration(
 	ctx context.Context,
 	config *TestWalletConfig,
 	tokenTransaction *tokenpb.TokenTransaction,
-	validityDurationSeconds uint64,
+	validityDuration time.Duration,
 	ownerPrivateKeys []keys.Private,
 ) (*tokenpb.TokenTransaction, error) {
 	startResp, finalTxHash, err := StartTokenTransactionCoordinated(
@@ -191,7 +189,7 @@ func BroadcastCoordinatedTokenTransferWithExpiryDuration(
 		config,
 		tokenTransaction,
 		ownerPrivateKeys,
-		validityDurationSeconds,
+		validityDuration,
 		nil,
 	)
 	if err != nil {

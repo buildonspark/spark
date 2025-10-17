@@ -435,7 +435,7 @@ func TestStaticDepositUserRefundLegacy(t *testing.T) {
 	// So that we don't race the chain watcher in this test
 	_, err = bitcoinClient.GenerateToAddress(6, randomAddress, nil)
 	require.NoError(t, err)
-	time.Sleep(10000 * time.Millisecond)
+	time.Sleep(10 * time.Second)
 
 	// *********************************************************************************
 	// Create spend tx from Alice's deposit to an Alice wallet address

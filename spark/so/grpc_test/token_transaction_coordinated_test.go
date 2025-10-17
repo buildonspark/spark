@@ -37,13 +37,9 @@ import (
 )
 
 const (
-	TestValidityDurationSecs      = 30
-	TestValidityDurationSecsPlus1 = TestValidityDurationSecs + 1
-	TooLongValidityDurationSecs   = 300 + 1
-	TooShortValidityDurationSecs  = 0
-	TokenTransactionVersion1      = 1
-	TokenTransactionVersion2      = 2
-	TokenTransactionVersion3      = 3
+	testValidityDuration     = 30 * time.Second
+	tooLongValidityDuration  = (300 + 1) * time.Second
+	tooShortValidityDuration = 0
 )
 
 // Parameter structs for WithParams functions
@@ -127,11 +123,11 @@ func TestCoordinatedL1TokenMint(t *testing.T) {
 
 			require.Len(t, userOneBalance.OutputsWithPreviousTransactionData, 1, "expected one output for user one")
 			userOneAmount := bytesToBigInt(userOneBalance.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
-			require.Equal(t, uint64ToBigInt(TestIssueOutput1Amount), userOneAmount, "user one should have the first mint output amount")
+			require.Equal(t, uint64ToBigInt(testIssueOutput1Amount), userOneAmount, "user one should have the first mint output amount")
 
 			require.Len(t, userTwoBalance.OutputsWithPreviousTransactionData, 1, "expected one output for user two")
 			userTwoAmount := bytesToBigInt(userTwoBalance.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
-			require.Equal(t, uint64ToBigInt(TestIssueOutput2Amount), userTwoAmount, "user two should have the second mint output amount")
+			require.Equal(t, uint64ToBigInt(testIssueOutput2Amount), userTwoAmount, "user two should have the second mint output amount")
 		})
 	}
 }
@@ -151,10 +147,10 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 			require.NoError(t, err, "failed to broadcast issuance token transaction")
 
 			for i, output := range finalIssueTokenTransaction.TokenOutputs {
-				if output.GetWithdrawBondSats() != WithdrawalBondSatsInConfig {
+				if output.GetWithdrawBondSats() != withdrawalBondSatsInConfig {
 					t.Errorf("output %d: expected withdrawal bond sats 10000, got %d", i, output.GetWithdrawBondSats())
 				}
-				if output.GetWithdrawRelativeBlockLocktime() != uint64(WithdrawalRelativeBlockLocktimeInConfig) {
+				if output.GetWithdrawRelativeBlockLocktime() != uint64(withdrawalRelativeBlockLocktimeInConfig) {
 					t.Errorf("output %d: expected withdrawal relative block locktime 1000, got %d", i, output.GetWithdrawRelativeBlockLocktime())
 				}
 			}
@@ -203,7 +199,7 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 			require.Len(t, createdTokenOutputs, 1, "should have exactly one created output")
 			require.Equal(t, st.TokenOutputStatusCreatedFinalized, createdTokenOutputs[0].Status)
 			createdTokenAmount := new(big.Int).SetBytes(createdTokenOutputs[0].TokenAmount)
-			expectedCreatedTokenAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestTransferOutput1Amount))
+			expectedCreatedTokenAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, testTransferOutput1Amount))
 			require.Equal(t, expectedCreatedTokenAmount, createdTokenAmount, "created token amount does not match expected")
 
 			// We expect to see both the tokenPublicKey and the tokenIdentifier
@@ -234,7 +230,7 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 
 			require.Len(t, transferTokenTransactionResponse.TokenOutputs, 1, "expected 1 created output in transfer transaction")
 			transferAmount := new(big.Int).SetBytes(transferTokenTransactionResponse.TokenOutputs[0].TokenAmount)
-			expectedTransferAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestTransferOutput1Amount))
+			expectedTransferAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, testTransferOutput1Amount))
 			require.Equal(t, 0, transferAmount.Cmp(expectedTransferAmount), "transfer amount does not match expected")
 			require.Equal(t, userOutput3PubKeyBytes, transferTokenTransactionResponse.TokenOutputs[0].OwnerPublicKey, "transfer created output owner public key does not match expected")
 		})
@@ -740,9 +736,9 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 	// mint/transfer operations are scoped to this isolated token.
 	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
 		IssuerPrivateKey: issuerPrivKey,
-		Name:             TestTokenName,
-		Ticker:           TestTokenTicker,
-		MaxSupply:        TestTokenMaxSupply,
+		Name:             testTokenName,
+		Ticker:           testTokenTicker,
+		MaxSupply:        testTokenMaxSupply,
 	})
 	require.NoError(t, err, "failed to create native spark token")
 
@@ -756,10 +752,10 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
 
 	for i, output := range finalIssueTokenTransaction.TokenOutputs {
-		if output.GetWithdrawBondSats() != WithdrawalBondSatsInConfig {
+		if output.GetWithdrawBondSats() != withdrawalBondSatsInConfig {
 			t.Errorf("output %d: expected withdrawal bond sats 10000, got %d", i, output.GetWithdrawBondSats())
 		}
-		if output.GetWithdrawRelativeBlockLocktime() != uint64(WithdrawalRelativeBlockLocktimeInConfig) {
+		if output.GetWithdrawRelativeBlockLocktime() != uint64(withdrawalRelativeBlockLocktimeInConfig) {
 			t.Errorf("output %d: expected withdrawal relative block locktime 1000, got %d", i, output.GetWithdrawRelativeBlockLocktime())
 		}
 	}
@@ -782,7 +778,7 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 
 	require.Len(t, transferTokenTransactionResponse.TokenOutputs, 1, "expected 1 created output in transfer transaction")
 	transferAmount := new(big.Int).SetBytes(transferTokenTransactionResponse.TokenOutputs[0].TokenAmount)
-	expectedTransferAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestTransferOutput1Amount))
+	expectedTransferAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, testTransferOutput1Amount))
 	require.Equal(t, 0, transferAmount.Cmp(expectedTransferAmount), "transfer amount does not match expected")
 	require.Equal(t, userOutput3PubKeyBytes, transferTokenTransactionResponse.TokenOutputs[0].OwnerPublicKey, "transfer created output owner public key does not match expected")
 
@@ -876,12 +872,12 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 
 	if bytes.Equal(mintTx.TokenOutputs[0].OwnerPublicKey, userOutput1Pubkey) {
 		require.Equal(t, mintTx.TokenOutputs[1].OwnerPublicKey, userOutput2Pubkey)
-		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[0].TokenAmount), uint64ToBigInt(TestIssueOutput1Amount))
-		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[1].TokenAmount), uint64ToBigInt(TestIssueOutput2Amount))
+		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[0].TokenAmount), uint64ToBigInt(testIssueOutput1Amount))
+		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[1].TokenAmount), uint64ToBigInt(testIssueOutput2Amount))
 	} else if bytes.Equal(mintTx.TokenOutputs[0].OwnerPublicKey, userOutput2Pubkey) {
 		require.Equal(t, mintTx.TokenOutputs[1].OwnerPublicKey, userOutput1Pubkey)
-		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[0].TokenAmount), uint64ToBigInt(TestIssueOutput2Amount))
-		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[1].TokenAmount), uint64ToBigInt(TestIssueOutput1Amount))
+		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[0].TokenAmount), uint64ToBigInt(testIssueOutput2Amount))
+		require.Equal(t, bytesToBigInt(mintTx.TokenOutputs[1].TokenAmount), uint64ToBigInt(testIssueOutput1Amount))
 	} else {
 		t.Fatalf("mint transaction output keys (%x, %x) do not match expected (%x, %x)",
 			mintTx.TokenOutputs[0].OwnerPublicKey,
@@ -1473,7 +1469,7 @@ func TestCoordinatedNativeTokenMaxSupplyEnforcement(t *testing.T) {
 					config,
 					mintTransaction,
 					[]keys.Private{tokenPrivKey},
-					TestValidityDurationSecs,
+					testValidityDuration,
 					nil,
 				)
 				require.NoError(t, err, "failed to start mint transaction before")
@@ -1524,11 +1520,11 @@ func TestV1FreezeAndUnfreezeTokens(t *testing.T) {
 			require.NoError(t, err, "failed to broadcast issuance token transaction")
 
 			for i, output := range finalIssueTokenTransaction.TokenOutputs {
-				if output.GetWithdrawBondSats() != WithdrawalBondSatsInConfig {
-					t.Errorf("output %d: expected withdrawal bond sats %d, got %d", i, uint64(WithdrawalBondSatsInConfig), output.GetWithdrawBondSats())
+				if output.GetWithdrawBondSats() != withdrawalBondSatsInConfig {
+					t.Errorf("output %d: expected withdrawal bond sats %d, got %d", i, uint64(withdrawalBondSatsInConfig), output.GetWithdrawBondSats())
 				}
-				if output.GetWithdrawRelativeBlockLocktime() != uint64(WithdrawalRelativeBlockLocktimeInConfig) {
-					t.Errorf("output %d: expected withdrawal relative block locktime %d, got %d", i, uint64(WithdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime())
+				if output.GetWithdrawRelativeBlockLocktime() != uint64(withdrawalRelativeBlockLocktimeInConfig) {
+					t.Errorf("output %d: expected withdrawal relative block locktime %d, got %d", i, uint64(withdrawalRelativeBlockLocktimeInConfig), output.GetWithdrawRelativeBlockLocktime())
 				}
 			}
 
@@ -1542,7 +1538,7 @@ func TestV1FreezeAndUnfreezeTokens(t *testing.T) {
 			frozenAmount := new(big.Int).SetBytes(freezeResponse.ImpactedTokenAmount)
 
 			// Calculate total amount from transaction created outputs
-			expectedAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, TestIssueOutput1Amount))
+			expectedAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, testIssueOutput1Amount))
 			expectedOutputID := finalIssueTokenTransaction.TokenOutputs[0].Id
 
 			require.Equal(t, expectedAmount, frozenAmount,
@@ -1637,7 +1633,7 @@ func TestCoordinatedBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T)
 					{
 						OwnerPublicKey: userOutput1PrivKey.Public().Serialize(),
 						TokenPublicKey: tokenIdentityPubKeyBytes,
-						TokenAmount:    int64ToUint128Bytes(0, TestTransferOutput1Amount),
+						TokenAmount:    int64ToUint128Bytes(0, testTransferOutput1Amount),
 					},
 				},
 				Network:                         config.ProtoNetwork(),
@@ -1690,7 +1686,7 @@ func TestCoordinatedBroadcastTokenTransactionTooLongValidityDuration(t *testing.
 			issueTokenTransaction.Network = sparkpb.Network_UNSPECIFIED
 
 			_, err = wallet.BroadcastCoordinatedTokenTransferWithExpiryDuration(
-				t.Context(), config, issueTokenTransaction, TooLongValidityDurationSecs,
+				t.Context(), config, issueTokenTransaction, tooLongValidityDuration,
 				[]keys.Private{tokenPrivKey},
 			)
 
@@ -1711,7 +1707,7 @@ func TestCoordinatedBroadcastTokenTransactionTooShortValidityDuration(t *testing
 			issueTokenTransaction.Network = sparkpb.Network_UNSPECIFIED
 
 			_, err = wallet.BroadcastCoordinatedTokenTransferWithExpiryDuration(
-				t.Context(), config, issueTokenTransaction, TooShortValidityDurationSecs, []keys.Private{tokenPrivKey},
+				t.Context(), config, issueTokenTransaction, tooShortValidityDuration, []keys.Private{tokenPrivKey},
 			)
 
 			require.Error(t, err, "expected transaction with 0 validity duration to be rejected")
@@ -1798,7 +1794,7 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 	}
 
 	now := time.Now()
-	version := uint32(TokenTransactionVersion2)
+	version := uint32(2)
 	if params.Version != 0 {
 		version = uint32(params.Version)
 	}
@@ -1842,7 +1838,7 @@ func createTestTokenMintTransactionTokenPb(t *testing.T, config *wallet.TestWall
 		IsNativeSparkToken:  false,
 		UseTokenIdentifier:  true,
 		NumOutputs:          2,
-		OutputAmounts:       []uint64{uint64(TestIssueOutput1Amount), uint64(TestIssueOutput2Amount)},
+		OutputAmounts:       []uint64{uint64(testIssueOutput1Amount), uint64(testIssueOutput2Amount)},
 	})
 	if err != nil {
 		return nil, keys.Private{}, keys.Private{}, err
@@ -1857,7 +1853,7 @@ func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *w
 	userOutput3PrivKey := keys.GeneratePrivateKey()
 	userOutput3PubKeyBytes := userOutput3PrivKey.Public().Serialize()
 
-	version := uint32(TokenTransactionVersion2)
+	version := uint32(2)
 	if params.Version != 0 {
 		version = uint32(params.Version)
 	}
@@ -1881,7 +1877,7 @@ func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *w
 			{
 				OwnerPublicKey: userOutput3PubKeyBytes,
 				TokenPublicKey: params.TokenIdentityPubKey.Serialize(),
-				TokenAmount:    int64ToUint128Bytes(0, TestTransferOutput1Amount),
+				TokenAmount:    int64ToUint128Bytes(0, testTransferOutput1Amount),
 			},
 		},
 		Network:                         config.ProtoNetwork(),
@@ -1919,7 +1915,7 @@ func createTestTokenTransferTransactionTokenPb(
 		UseTokenIdentifier:             true,
 		FinalIssueTokenTransactionHash: finalIssueTokenTransactionHash,
 		NumOutputs:                     1,
-		OutputAmounts:                  []uint64{uint64(TestTransferOutput1Amount)},
+		OutputAmounts:                  []uint64{uint64(testTransferOutput1Amount)},
 	})
 }
 
@@ -1961,7 +1957,7 @@ func testCoordinatedTransactionSigningScenarios(
 		converted[i] = key
 	}
 	startResp, finalTxHash, startErr := wallet.StartTokenTransactionCoordinated(
-		t.Context(), config, tokenTransaction, converted, TestValidityDurationSecs, nil,
+		t.Context(), config, tokenTransaction, converted, testValidityDuration, nil,
 	)
 
 	if expectedStartError {
@@ -1973,7 +1969,7 @@ func testCoordinatedTransactionSigningScenarios(
 
 	if doubleStartSameTx {
 		startResp2, finalTxHash2, startErr2 := wallet.StartTokenTransactionCoordinated(
-			t.Context(), config, tokenTransaction, converted, TestValidityDurationSecs, nil,
+			t.Context(), config, tokenTransaction, converted, testValidityDuration, nil,
 		)
 		require.NoError(t, startErr2, "unexpected error on second start")
 		hash1, _ := utils.HashTokenTransaction(startResp.FinalTokenTransaction, false)
@@ -1987,7 +1983,7 @@ func testCoordinatedTransactionSigningScenarios(
 		// broadcasted transaction succeed.
 		tokenTransaction.ClientCreatedTimestamp = timestamppb.New(tokenTransaction.ClientCreatedTimestamp.AsTime().Add(-time.Second * 1))
 		startResp2, finalTxHash2, startErr2 := wallet.StartTokenTransactionCoordinated(
-			t.Context(), config, tokenTransaction, converted, TestValidityDurationSecs, nil,
+			t.Context(), config, tokenTransaction, converted, testValidityDuration, nil,
 		)
 		require.NoError(t, startErr2, "unexpected error on second start")
 		hash1, _ := utils.HashTokenTransaction(startResp.FinalTokenTransaction, false)
@@ -2039,7 +2035,7 @@ func testCoordinatedTransactionSigningScenarios(
 	}
 
 	if expiredCommit {
-		wait := time.Duration(TestValidityDurationSecsPlus1) * time.Second
+		wait := testValidityDuration + time.Second
 		t.Logf("Waiting %v for transaction expiry", wait)
 		time.Sleep(wait)
 	}
@@ -2115,15 +2111,15 @@ func testCoordinatedCreateNativeSparkTokenWithParams(t *testing.T, config *walle
 func createTestCoordinatedTokenCreateTransactionWithParams(config *wallet.TestWalletConfig, params createNativeSparkTokenParams) (*tokenpb.TokenTransaction, error) {
 	issuerPubKeyBytes := params.IssuerPrivateKey.Public().Serialize()
 	createTokenTransaction := &tokenpb.TokenTransaction{
-		Version: TokenTransactionVersion2,
+		Version: 2,
 		TokenInputs: &tokenpb.TokenTransaction_CreateInput{
 			CreateInput: &tokenpb.TokenCreateInput{
 				IssuerPublicKey: issuerPubKeyBytes,
 				TokenName:       params.Name,
 				TokenTicker:     params.Ticker,
-				Decimals:        TestTokenDecimals,
+				Decimals:        testTokenDecimals,
 				MaxSupply:       getTokenMaxSupplyBytes(params.MaxSupply),
-				IsFreezable:     TestTokenIsFreezable,
+				IsFreezable:     testTokenIsFreezable,
 			},
 		},
 		TokenOutputs:                    []*tokenpb.TokenOutput{},
@@ -2139,8 +2135,8 @@ func verifyTokenMetadata(t *testing.T, metadata *tokenpb.TokenMetadata, expected
 	issuerPublicKey := expectedParams.issuerPrivateKey.Public().Serialize()
 	require.Equal(t, expectedParams.name, metadata.TokenName, "%s: token name should match, expected: %s, found: %s", queryMethod, expectedParams.name, metadata.TokenName)
 	require.Equal(t, expectedParams.ticker, metadata.TokenTicker, "%s: token ticker should match, expected: %s, found: %s", queryMethod, expectedParams.ticker, metadata.TokenTicker)
-	require.Equal(t, uint32(TestTokenDecimals), metadata.Decimals, "%s: token decimals should match, expected: %d, found: %d", queryMethod, uint32(TestTokenDecimals), metadata.Decimals)
-	require.Equal(t, TestTokenIsFreezable, metadata.IsFreezable, "%s: token freezable flag should match, expected: %t, found: %t", queryMethod, TestTokenIsFreezable, metadata.IsFreezable)
+	require.Equal(t, uint32(testTokenDecimals), metadata.Decimals, "%s: token decimals should match, expected: %d, found: %d", queryMethod, uint32(testTokenDecimals), metadata.Decimals)
+	require.Equal(t, testTokenIsFreezable, metadata.IsFreezable, "%s: token freezable flag should match, expected: %t, found: %t", queryMethod, testTokenIsFreezable, metadata.IsFreezable)
 	require.True(t, bytes.Equal(issuerPublicKey, metadata.IssuerPublicKey), "%s: issuer public key should match, expected: %x, found: %x", queryMethod, issuerPublicKey, metadata.IssuerPublicKey)
 	require.True(t, bytes.Equal(getTokenMaxSupplyBytes(expectedParams.maxSupply), metadata.MaxSupply), "%s: max supply should match, expected: %x, found: %x", queryMethod, getTokenMaxSupplyBytes(expectedParams.maxSupply), metadata.MaxSupply)
 }
@@ -2264,9 +2260,9 @@ func TestQueryTokenMetadataL1Token(t *testing.T) {
 	// Verify the L1 token metadata using the helper function
 	l1TokenParams := sparkTokenCreationTestParams{
 		issuerPrivateKey: config.IdentityPrivateKey,
-		name:             TestTokenName,
-		ticker:           TestTokenTicker,
-		maxSupply:        TestTokenMaxSupply,
+		name:             testTokenName,
+		ticker:           testTokenTicker,
+		maxSupply:        testTokenMaxSupply,
 		// Don't specify a creation entity key to validate for L1 token creation. It will be set to the SOs entity DKG key,
 		// but because this token was created automatically by scanning L1, we don't know exactly what it is ahead of time.
 		expectedError: false,
@@ -2326,9 +2322,9 @@ func TestQueryTokenMetadataMixedParams(t *testing.T) {
 	var foundNativeToken, foundL1Token bool
 	l1TokenParams := sparkTokenCreationTestParams{
 		issuerPrivateKey: config.IdentityPrivateKey,
-		name:             TestTokenName,
-		ticker:           TestTokenTicker,
-		maxSupply:        TestTokenMaxSupply,
+		name:             testTokenName,
+		ticker:           testTokenTicker,
+		maxSupply:        testTokenMaxSupply,
 	}
 
 	for _, metadata := range mixedResp.TokenMetadata {
@@ -2357,15 +2353,15 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 			name: "create second token with same issuer key should fail",
 			firstTokenParams: &sparkTokenCreationTestParams{
 				issuerPrivateKey: fixedRandomKey,
-				name:             TestTokenName,
-				ticker:           TestTokenTicker,
-				maxSupply:        TestTokenMaxSupply,
+				name:             testTokenName,
+				ticker:           testTokenTicker,
+				maxSupply:        testTokenMaxSupply,
 			},
 			secondTokenParams: &sparkTokenCreationTestParams{
 				issuerPrivateKey: fixedRandomKey,
 				name:             "Different Name",
 				ticker:           "DIFF",
-				maxSupply:        TestTokenMaxSupply + 1000,
+				maxSupply:        testTokenMaxSupply + 1000,
 				expectedError:    true,
 			},
 		},
@@ -2373,30 +2369,30 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 			name: "create two tokens with same metadata but different random keys should succeed",
 			firstTokenParams: &sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
-				name:             TestTokenName,
-				ticker:           TestTokenTicker,
-				maxSupply:        TestTokenMaxSupply,
+				name:             testTokenName,
+				ticker:           testTokenTicker,
+				maxSupply:        testTokenMaxSupply,
 			},
 			secondTokenParams: &sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
 				name:             "Different Name",
 				ticker:           "DIFF",
-				maxSupply:        TestTokenMaxSupply,
+				maxSupply:        testTokenMaxSupply,
 			},
 		},
 		{
 			name: "create two tokens with different metadata and different random keys should succeed",
 			firstTokenParams: &sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
-				name:             TestTokenName,
-				ticker:           TestTokenTicker,
-				maxSupply:        TestTokenMaxSupply,
+				name:             testTokenName,
+				ticker:           testTokenTicker,
+				maxSupply:        testTokenMaxSupply,
 			},
 			secondTokenParams: &sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
 				name:             "Different Name",
 				ticker:           "DIFF",
-				maxSupply:        TestTokenMaxSupply + 1000,
+				maxSupply:        testTokenMaxSupply + 1000,
 			},
 		},
 		{
@@ -2404,8 +2400,8 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 			firstTokenParams: &sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
 				name:             "This Token Name Is Way Too Long For The System",
-				ticker:           TestTokenTicker,
-				maxSupply:        TestTokenMaxSupply,
+				ticker:           testTokenTicker,
+				maxSupply:        testTokenMaxSupply,
 				expectedError:    true,
 			},
 		},
@@ -2414,8 +2410,8 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 			firstTokenParams: &sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
 				name:             "",
-				ticker:           TestTokenTicker,
-				maxSupply:        TestTokenMaxSupply,
+				ticker:           testTokenTicker,
+				maxSupply:        testTokenMaxSupply,
 				expectedError:    true,
 			},
 		},
@@ -2423,9 +2419,9 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 			name: "create token with empty ticker should fail",
 			firstTokenParams: &sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
-				name:             TestTokenName,
+				name:             testTokenName,
 				ticker:           "",
-				maxSupply:        TestTokenMaxSupply,
+				maxSupply:        testTokenMaxSupply,
 				expectedError:    true,
 			},
 		},
@@ -2433,9 +2429,9 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 			name: "create token with ticker longer than 5 characters should fail",
 			firstTokenParams: &sparkTokenCreationTestParams{
 				issuerPrivateKey: getRandomPrivateKey(t),
-				name:             TestTokenName,
+				name:             testTokenName,
 				ticker:           "TOOLONG",
-				maxSupply:        TestTokenMaxSupply,
+				maxSupply:        testTokenMaxSupply,
 				expectedError:    true,
 			},
 		},
@@ -2531,7 +2527,7 @@ func testCoordinatedTransferTransactionSigningScenarios(t *testing.T, config *wa
 		UseTokenIdentifier:             useTokenIdentifier,
 		FinalIssueTokenTransactionHash: finalIssueTokenTransactionHash,
 		NumOutputs:                     1,
-		OutputAmounts:                  []uint64{uint64(TestTransferOutput1Amount)},
+		OutputAmounts:                  []uint64{uint64(testTransferOutput1Amount)},
 	})
 	require.NoError(t, err, "failed to create test token transfer transaction")
 
@@ -2576,7 +2572,7 @@ func testCoordinatedMintTransactionSigningScenarios(t *testing.T, config *wallet
 		IsNativeSparkToken:  isNativeSparkToken,
 		UseTokenIdentifier:  useTokenIdentifier,
 		NumOutputs:          2,
-		OutputAmounts:       []uint64{uint64(TestIssueOutput1Amount), uint64(TestIssueOutput2Amount)},
+		OutputAmounts:       []uint64{uint64(testIssueOutput1Amount), uint64(testIssueOutput2Amount)},
 	})
 	require.NoError(t, err, "failed to create test token mint transaction")
 	require.Len(t, userOutputPrivKeys, 2)
@@ -2703,9 +2699,9 @@ func TestCoordinatedMintTransactionSigning(t *testing.T) {
 			if tc.createNativeSparkToken {
 				err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
 					IssuerPrivateKey: issuerPrivateKey,
-					Name:             TestTokenName,
-					Ticker:           TestTokenTicker,
-					MaxSupply:        TestTokenMaxSupply,
+					Name:             testTokenName,
+					Ticker:           testTokenTicker,
+					MaxSupply:        testTokenMaxSupply,
 				})
 				require.NoError(t, err, "failed to create native spark token")
 			}
@@ -2823,9 +2819,9 @@ func TestCoordinatedTransferTransactionSigning(t *testing.T) {
 			if tc.createNativeSparkToken {
 				err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
 					IssuerPrivateKey: issuerPrivateKey,
-					Name:             TestTokenName,
-					Ticker:           TestTokenTicker,
-					MaxSupply:        TestTokenMaxSupply,
+					Name:             testTokenName,
+					Ticker:           testTokenTicker,
+					MaxSupply:        testTokenMaxSupply,
 				})
 				require.NoError(t, err, "failed to create native spark token")
 			}
@@ -2982,9 +2978,9 @@ func TestCoordinatedTransferTransactionWithSparkInvoices(t *testing.T) {
 			tokenPrivKey := config.IdentityPrivateKey
 			err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
 				IssuerPrivateKey: issuerPrivateKey,
-				Name:             TestTokenName,
-				Ticker:           TestTokenTicker,
-				MaxSupply:        TestTokenMaxSupply,
+				Name:             testTokenName,
+				Ticker:           testTokenTicker,
+				MaxSupply:        testTokenMaxSupply,
 			})
 			require.NoError(t, err, "failed to create native spark token")
 
@@ -2993,7 +2989,7 @@ func TestCoordinatedTransferTransactionWithSparkInvoices(t *testing.T) {
 				IsNativeSparkToken:  false,
 				UseTokenIdentifier:  true,
 				NumOutputs:          2,
-				OutputAmounts:       []uint64{uint64(TestIssueOutput1Amount), uint64(TestIssueOutput2Amount)},
+				OutputAmounts:       []uint64{uint64(testIssueOutput1Amount), uint64(testIssueOutput2Amount)},
 				MintToSelf:          true,
 			})
 			require.NoError(t, err, "failed to create test token issuance transaction")
@@ -3052,12 +3048,12 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 			UseTokenIdentifier:             true,
 			FinalIssueTokenTransactionHash: finalMintTransactionHash,
 			NumOutputs:                     1,
-			OutputAmounts:                  []uint64{uint64(TestTransferOutput1Amount)},
+			OutputAmounts:                  []uint64{uint64(testTransferOutput1Amount)},
 		})
 		require.NoError(t, err, "failed to create transfer transaction")
 	} else {
 		transferTransaction = &tokenpb.TokenTransaction{
-			Version: TokenTransactionVersion2,
+			Version: 2,
 			TokenInputs: &tokenpb.TokenTransaction_TransferInput{
 				TransferInput: &tokenpb.TokenTransferInput{
 					OutputsToSpend: []*tokenpb.TokenOutputToSpend{
@@ -3076,12 +3072,12 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 				{
 					OwnerPublicKey:  receiver1PubKey.Serialize(),
 					TokenIdentifier: tokenIdentifier,
-					TokenAmount:     int64ToUint128Bytes(0, TestIssueOutput1Amount),
+					TokenAmount:     int64ToUint128Bytes(0, testIssueOutput1Amount),
 				},
 				{
 					OwnerPublicKey:  receiver2PubKey.Serialize(),
 					TokenIdentifier: tokenIdentifier,
-					TokenAmount:     int64ToUint128Bytes(0, TestIssueOutput2Amount),
+					TokenAmount:     int64ToUint128Bytes(0, testIssueOutput2Amount),
 				},
 			},
 			Network:                         config.ProtoNetwork(),
@@ -3179,7 +3175,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 		config,
 		transferTransaction,
 		[]keys.Private{config.IdentityPrivateKey, config.IdentityPrivateKey},
-		wallet.DefaultValidityDurationSecs,
+		wallet.DefaultValidityDuration,
 		nil,
 	)
 
@@ -3220,7 +3216,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 			IsNativeSparkToken:  false,
 			UseTokenIdentifier:  true,
 			NumOutputs:          2,
-			OutputAmounts:       []uint64{uint64(TestIssueOutput1Amount), uint64(TestIssueOutput2Amount)},
+			OutputAmounts:       []uint64{uint64(testIssueOutput1Amount), uint64(testIssueOutput2Amount)},
 			MintToSelf:          true,
 		})
 		require.NoError(t, err, "failed to create test token issuance transaction")
@@ -3238,7 +3234,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 			require.NoError(t, err, "failed to create transfer transaction")
 		} else {
 			shouldFailTransfer = &tokenpb.TokenTransaction{
-				Version: TokenTransactionVersion2,
+				Version: 2,
 				TokenInputs: &tokenpb.TokenTransaction_TransferInput{
 					TransferInput: &tokenpb.TokenTransferInput{
 						OutputsToSpend: []*tokenpb.TokenOutputToSpend{
@@ -3257,12 +3253,12 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 					{
 						OwnerPublicKey:  receiver1PubKey.Serialize(),
 						TokenIdentifier: tokenIdentifier,
-						TokenAmount:     int64ToUint128Bytes(0, TestIssueOutput1Amount),
+						TokenAmount:     int64ToUint128Bytes(0, testIssueOutput1Amount),
 					},
 					{
 						OwnerPublicKey:  receiver2PubKey.Serialize(),
 						TokenIdentifier: tokenIdentifier,
-						TokenAmount:     int64ToUint128Bytes(0, TestIssueOutput2Amount),
+						TokenAmount:     int64ToUint128Bytes(0, testIssueOutput2Amount),
 					},
 				},
 				Network:                         config.ProtoNetwork(),
@@ -3277,7 +3273,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 			config,
 			shouldFailTransfer,
 			[]keys.Private{config.IdentityPrivateKey, config.IdentityPrivateKey},
-			wallet.DefaultValidityDurationSecs,
+			wallet.DefaultValidityDuration,
 			nil,
 		)
 		require.Error(t, err, "expected error when transfer fails if unexpired transaction exists")
@@ -3567,9 +3563,9 @@ func TestCoordinatedTokenTransferPreemption(t *testing.T) {
 			txPartialHash2, err := utils.HashTokenTransaction(transaction2, true)
 			require.NoError(t, err, "failed to hash second transfer transaction")
 
-			t1ExpiryDuration := uint64(180)
+			t1ExpiryDuration := 180 * time.Second
 			if tc.timestampMode == TimestampScenarioExpired {
-				t1ExpiryDuration = 1
+				t1ExpiryDuration = time.Second
 			}
 
 			resp1, resp1Hash, err := wallet.StartTokenTransactionCoordinated(t.Context(), config1, transaction1, []keys.Private{userOutput1PrivKey, userOutput2PrivKey}, t1ExpiryDuration, nil)
@@ -3592,10 +3588,10 @@ func TestCoordinatedTokenTransferPreemption(t *testing.T) {
 			}
 
 			if tc.timestampMode == TimestampScenarioExpired {
-				time.Sleep(time.Second * 1)
+				time.Sleep(time.Second)
 			}
 
-			resp2, resp2Hash, err := wallet.StartTokenTransactionCoordinated(t.Context(), config2, transaction2, []keys.Private{userOutput1PrivKey, userOutput2PrivKey}, 180, nil)
+			resp2, resp2Hash, err := wallet.StartTokenTransactionCoordinated(t.Context(), config2, transaction2, []keys.Private{userOutput1PrivKey, userOutput2PrivKey}, 180*time.Second, nil)
 			queryAndVerifyTokenOutputs(t, []string{config1.CoordinatorIdentifier, config2.CoordinatorIdentifier}, finalMintTransaction, userOutput1PrivKey)
 
 			winningResult, losingResult := determineWinningAndLosingTransactions(
@@ -3717,11 +3713,11 @@ func TestQueryTokenOutputsWithStartTransaction(t *testing.T) {
 				TokenIdentityPubKey:            issuerPrivKey.Public(),
 				FinalIssueTokenTransactionHash: mintTxHash,
 				NumOutputs:                     1,
-				OutputAmounts:                  []uint64{uint64(TestTransferOutput1Amount)},
+				OutputAmounts:                  []uint64{uint64(testTransferOutput1Amount)},
 			})
 			require.NoError(t, err, "failed to create transfer transaction")
 
-			_, _, err = wallet.StartTokenTransactionCoordinated(t.Context(), config, transferTx, []keys.Private{owner1PrivKey, owner2PrivKey}, 1, nil)
+			_, _, err = wallet.StartTokenTransactionCoordinated(t.Context(), config, transferTx, []keys.Private{owner1PrivKey, owner2PrivKey}, time.Second, nil)
 			require.NoError(t, err, "failed to start transfer transaction")
 
 			outputsResp, err := wallet.QueryTokenOutputsV2(
@@ -3757,12 +3753,12 @@ func TestQueryTokenOutputsWithRevealedRevocationSecrets(t *testing.T) {
 		TokenIdentityPubKey:            issuerPrivKey.Public(),
 		FinalIssueTokenTransactionHash: mintTxHash,
 		NumOutputs:                     1,
-		OutputAmounts:                  []uint64{uint64(TestTransferOutput1Amount)},
+		OutputAmounts:                  []uint64{uint64(testTransferOutput1Amount)},
 	})
 	require.NoError(t, err, "failed to create transfer transaction")
 
 	// Start the coordinated transaction
-	startResp, finalTxHash, err := wallet.StartTokenTransactionCoordinated(t.Context(), config, transferTx, []keys.Private{owner1PrivKey, owner2PrivKey}, 1, nil)
+	startResp, finalTxHash, err := wallet.StartTokenTransactionCoordinated(t.Context(), config, transferTx, []keys.Private{owner1PrivKey, owner2PrivKey}, time.Second, nil)
 	require.NoError(t, err, "failed to start transfer transaction")
 	require.NotNil(t, startResp)
 
@@ -3919,7 +3915,7 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 			tc.modifyTx(tokenTransaction)
 
 			_, _, err := wallet.StartTokenTransactionCoordinated(
-				t.Context(), config, tokenTransaction, ownerPrivateKeys, TestValidityDurationSecs, nil,
+				t.Context(), config, tokenTransaction, ownerPrivateKeys, testValidityDuration, nil,
 			)
 
 			require.ErrorContains(t, err, tc.expectedErrorSubstr, "error message should contain expected substring")
@@ -3936,9 +3932,9 @@ func TestCoordinatedTokenMintV3(t *testing.T) {
 
 			err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
 				IssuerPrivateKey: issuerPrivKey,
-				Name:             TestTokenName,
-				Ticker:           TestTokenTicker,
-				MaxSupply:        TestTokenMaxSupply,
+				Name:             testTokenName,
+				Ticker:           testTokenTicker,
+				MaxSupply:        testTokenMaxSupply,
 			})
 			require.NoError(t, err, "failed to create native spark token")
 
@@ -3948,8 +3944,8 @@ func TestCoordinatedTokenMintV3(t *testing.T) {
 				IsNativeSparkToken:  true,
 				UseTokenIdentifier:  true,
 				NumOutputs:          2,
-				OutputAmounts:       []uint64{uint64(TestIssueOutput1Amount), uint64(TestIssueOutput2Amount)},
-				Version:             TokenTransactionVersion3,
+				OutputAmounts:       []uint64{uint64(testIssueOutput1Amount), uint64(testIssueOutput2Amount)},
+				Version:             3,
 			})
 			require.NoError(t, err, "failed to create test token issuance transaction")
 			require.Len(t, userPrivKeys, 2)
@@ -3962,7 +3958,7 @@ func TestCoordinatedTokenMintV3(t *testing.T) {
 			)
 			require.NoError(t, err, "failed to broadcast V3 issuance token transaction")
 			require.Len(t, finalIssueTokenTransaction.TokenOutputs, 2, "expected 2 created outputs in V3 mint transaction")
-			require.Equal(t, TokenTransactionVersion3, int(finalIssueTokenTransaction.Version), "final transaction should be V3")
+			require.Equal(t, 3, int(finalIssueTokenTransaction.Version), "final transaction should be V3")
 
 			userOneConfig := wallet.NewTestWalletConfigWithIdentityKey(t, userOutput1PrivKey)
 			userTwoConfig := wallet.NewTestWalletConfigWithIdentityKey(t, userOutput2PrivKey)
@@ -3985,12 +3981,12 @@ func TestCoordinatedTokenMintV3(t *testing.T) {
 
 			require.Len(t, userOneBalance.OutputsWithPreviousTransactionData, 1, "expected one output for user one")
 			userOneAmount := bytesToBigInt(userOneBalance.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
-			require.Equal(t, uint64ToBigInt(TestIssueOutput1Amount), userOneAmount,
+			require.Equal(t, uint64ToBigInt(testIssueOutput1Amount), userOneAmount,
 				"user one should have correct token amount")
 
 			require.Len(t, userTwoBalance.OutputsWithPreviousTransactionData, 1, "expected one output for user two")
 			userTwoAmount := bytesToBigInt(userTwoBalance.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
-			require.Equal(t, uint64ToBigInt(TestIssueOutput2Amount), userTwoAmount,
+			require.Equal(t, uint64ToBigInt(testIssueOutput2Amount), userTwoAmount,
 				"user two should have correct token amount")
 		})
 	}
@@ -4005,9 +4001,9 @@ func TestCoordinatedTokenTransferV3(t *testing.T) {
 
 			err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
 				IssuerPrivateKey: issuerPrivKey,
-				Name:             TestTokenName,
-				Ticker:           TestTokenTicker,
-				MaxSupply:        TestTokenMaxSupply,
+				Name:             testTokenName,
+				Ticker:           testTokenTicker,
+				MaxSupply:        testTokenMaxSupply,
 			})
 			require.NoError(t, err, "failed to create native spark token")
 
@@ -4016,8 +4012,8 @@ func TestCoordinatedTokenTransferV3(t *testing.T) {
 				IsNativeSparkToken:  true,
 				UseTokenIdentifier:  true,
 				NumOutputs:          2,
-				OutputAmounts:       []uint64{uint64(TestIssueOutput1Amount), uint64(TestIssueOutput2Amount)},
-				Version:             TokenTransactionVersion3,
+				OutputAmounts:       []uint64{uint64(testIssueOutput1Amount), uint64(testIssueOutput2Amount)},
+				Version:             3,
 			})
 			require.NoError(t, err, "failed to create test token issuance transaction")
 			require.Len(t, userPrivKeys, 2)
@@ -4037,7 +4033,7 @@ func TestCoordinatedTokenTransferV3(t *testing.T) {
 				TokenIdentityPubKey:            issuerPrivKey.Public(),
 				UseTokenIdentifier:             true,
 				FinalIssueTokenTransactionHash: finalIssueTokenTransactionHash,
-				Version:                        TokenTransactionVersion3,
+				Version:                        3,
 			})
 			require.NoError(t, err, "failed to create test token transfer transaction")
 
@@ -4066,7 +4062,7 @@ func TestCoordinatedTokenTransferV3(t *testing.T) {
 			*/
 
 			// Verify V3 version is set
-			require.Equal(t, TokenTransactionVersion3, int(transferTokenTransaction.Version), "expected V3 version")
+			require.EqualValues(t, 3, transferTokenTransaction.Version, "expected V3 version")
 
 			// Verify invoice attachments are sorted
 			// TODO: Uncomment this when we have re-enabled spark invoices
@@ -4086,7 +4082,7 @@ func TestCoordinatedTokenTransferV3(t *testing.T) {
 			require.NoError(t, err, "failed to broadcast V3 transfer token transaction")
 
 			// Verify that the transaction was processed with V3 version
-			require.Equal(t, TokenTransactionVersion3, int(transferTokenTransactionResponse.Version), "final transfer transaction should be V3")
+			require.Equal(t, 3, int(transferTokenTransactionResponse.Version), "final transfer transaction should be V3")
 
 			require.Len(t, transferTokenTransactionResponse.TokenOutputs, 1, "expected 1 created output in V3 transfer transaction")
 
@@ -4101,7 +4097,7 @@ func TestCoordinatedTokenTransferV3(t *testing.T) {
 
 			require.Len(t, userThreeBalance.OutputsWithPreviousTransactionData, 1, "expected one output for user three")
 			userThreeAmount := bytesToBigInt(userThreeBalance.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
-			require.Equal(t, uint64ToBigInt(TestTransferOutput1Amount), userThreeAmount,
+			require.Equal(t, uint64ToBigInt(testTransferOutput1Amount), userThreeAmount,
 				"user three should have correct token amount from V3 transfer")
 		})
 	}
@@ -4156,10 +4152,9 @@ func TestCoordinatedTokenTransferPreemptionPreventionRevealed(t *testing.T) {
 
 	_, _, err = wallet.StartTokenTransactionCoordinated(
 		t.Context(), config, transaction2,
-		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey}, TestValidityDurationSecs, nil,
+		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey}, testValidityDuration, nil,
 	)
-	require.Error(t, err, "expected error when trying to pre-empt a REVEALED transaction")
-	require.Contains(t, err.Error(), "cannot be spent", "error should indicate output cannot be spent")
+	require.ErrorContains(t, err, "cannot be spent", "expected error indicating output cannot be spent when trying to preempt a REVEALED transaction")
 }
 
 // TestCoordinatedTokenTransferPreemptionPreventionFinalized tests that FINALIZED transactions cannot be pre-empted
@@ -4202,8 +4197,7 @@ func TestCoordinatedTokenTransferPreemptionPreventionFinalized(t *testing.T) {
 	// Attempt to start the second transaction - this should fail because the first is FINALIZED
 	_, _, err = wallet.StartTokenTransactionCoordinated(
 		t.Context(), config, transaction2,
-		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey}, TestValidityDurationSecs, nil,
+		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey}, testValidityDuration, nil,
 	)
-	require.Error(t, err, "expected error when trying to pre-empt a FINALIZED transaction")
-	require.Contains(t, err.Error(), "cannot be spent", "error should indicate output cannot be spent")
+	require.ErrorContains(t, err, "cannot be spent", "expected error indicating output cannot be spent when trying to preempt a FINALIZED transaction")
 }
