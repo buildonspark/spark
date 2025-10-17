@@ -11,6 +11,7 @@ use bitcoin::{
     hashes::Hash,
     key::Parity,
     key::{Secp256k1, TapTweak},
+    secp256k1::{ecdsa::Signature, rand, Message, PublicKey, SecretKey},
     sighash::{Prevouts, SighashCache},
     transaction::Version,
     Address, Amount, OutPoint, ScriptBuf, Sequence, TapSighashType, Transaction, TxIn, TxOut,
@@ -721,6 +722,53 @@ pub fn get_taproot_pubkey(verifying_pubkey: Vec<u8>) -> Result<Vec<u8>, Error> {
     buf[1..].clone_from_slice(&tweaked_pubkey.serialize());
 
     Ok(buf.to_vec())
+}
+
+#[wasm_bindgen]
+pub fn get_public_key_bytes(
+    private_key_bytes: Vec<u8>,
+    compressed: bool,
+) -> Result<Vec<u8>, Error> {
+    let secp = Secp256k1::new();
+    let secret_key = SecretKey::from_slice(&private_key_bytes)
+        .map_err(|e| format!("Invalid private key: {}", e))?; // String auto-converts to Error
+    let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+
+    Ok(if compressed {
+        public_key.serialize().to_vec()
+    } else {
+        public_key.serialize_uncompressed().to_vec()
+    })
+}
+
+#[wasm_bindgen]
+pub fn verify_signature_bytes(
+    signature: Vec<u8>,
+    message: Vec<u8>,
+    public_key: Vec<u8>,
+) -> Result<bool, Error> {
+    let secp = Secp256k1::new();
+
+    let sig = if signature.len() == 64 {
+        Signature::from_compact(&signature)
+            .map_err(|e| Error::Spark(format!("Invalid compact signature: {}", e)))?
+    } else {
+        Signature::from_der(&signature)
+            .map_err(|e| Error::Spark(format!("Invalid DER signature: {}", e)))?
+    };
+
+    let msg = Message::from_digest_slice(&message)
+        .map_err(|e| Error::Spark(format!("Invalid message: {}", e)))?;
+    let pubkey = PublicKey::from_slice(&public_key)
+        .map_err(|e| Error::Spark(format!("Invalid pubkey: {}", e)))?;
+
+    Ok(secp.verify_ecdsa(&msg, &sig, &pubkey).is_ok())
+}
+
+#[wasm_bindgen]
+pub fn random_secret_key_bytes() -> Result<Vec<u8>, Error> {
+    let secret_key: SecretKey = SecretKey::new(&mut rand::thread_rng());
+    Ok(secret_key.secret_bytes().to_vec())
 }
 
 #[cfg(test)]

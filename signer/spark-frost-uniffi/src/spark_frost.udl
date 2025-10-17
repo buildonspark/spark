@@ -33,6 +33,15 @@ namespace spark_frost {
 
     [Throws=Error]
     bytes get_taproot_pubkey(bytes verifying_pubkey);
+
+    [Throws=Error]
+    bytes get_public_key_bytes(bytes private_key_bytes, boolean compressed);
+
+    [Throws=Error]
+    boolean verify_signature_bytes(bytes signature, bytes message, bytes pubkey);
+
+    [Throws=Error]
+    bytes random_secret_key_bytes();
 };
 
 [Error]

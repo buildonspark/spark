@@ -13,7 +13,7 @@ hex = { workspace = true }
 uuid = { workspace = true }
 ecies = { workspace = true }
 uniffi = "0.28.3"
-bitcoin = "0.32.5"
+bitcoin = { version = "0.32.5", features = ["rand"] }
 serde-wasm-bindgen = "0.6.5"
 
 [build-dependencies]
