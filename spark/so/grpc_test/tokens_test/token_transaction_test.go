@@ -1,4 +1,4 @@
-package grpctest
+package tokens_test
 
 import (
 	"bytes"
@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so/testutil"
 	"github.com/lightsparkdev/spark/so/utils"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
@@ -237,8 +238,6 @@ func splitOperatorIdentityPublicKeys(config *wallet.TestWalletConfig) operatorKe
 		secondHalf: publicKeys[halfOperatorCount:],
 	}
 }
-
-// skipIfGithubActions skips the test if running in GitHub Actions
 
 func TestQueryPartiallySpentTokenOutputsNotReturned(t *testing.T) {
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
@@ -566,7 +565,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensExpectedOutputAndTxRetrie
 }
 
 func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfOutputs(t *testing.T) {
-	skipIfGithubActions(t)
+	testutil.SkipIfGithubActions(t)
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 
 	tokenPrivKey := config.IdentityPrivateKey

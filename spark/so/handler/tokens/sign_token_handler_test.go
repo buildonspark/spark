@@ -44,8 +44,8 @@ const (
 	testTokenAmount      = 100
 	testTokenIsFreezable = true
 	// LRC20 Regtest config values
-	testWithdrawBondSats              = 10000 // From WithdrawalBondSatsInConfig
-	testWithdrawRelativeBlockLocktime = 1000  // From WithdrawalRelativeBlockLocktimeInConfig
+	testWithdrawBondSats              = 10000 // From withdrawalBondSatsInConfig
+	testWithdrawRelativeBlockLocktime = 1000  // From withdrawalRelativeBlockLocktimeInConfig
 )
 
 var (

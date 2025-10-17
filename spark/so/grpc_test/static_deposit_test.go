@@ -21,6 +21,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 	"github.com/lightsparkdev/spark/so/handler"
 	"github.com/lightsparkdev/spark/so/objects"
+	"github.com/lightsparkdev/spark/so/testutil"
 	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
@@ -28,7 +29,7 @@ import (
 )
 
 func TestValidateUtxoIsNotSpent(t *testing.T) {
-	skipIfGithubActions(t)
+	testutil.SkipIfGithubActions(t)
 	bitcoinClient := sparktesting.GetBitcoinClient()
 
 	// Test with faucet transaction

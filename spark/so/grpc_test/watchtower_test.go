@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/lightsparkdev/spark"
@@ -13,14 +14,14 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"github.com/lightsparkdev/spark/so/testutil"
 	"github.com/lightsparkdev/spark/so/watchtower"
-	"github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
 )
 
 func TestTimelockExpirationHappyPath(t *testing.T) {
-	skipIfGithubActions(t)
+	testutil.SkipIfGithubActions(t)
 	walletConfig := wallet.NewTestWalletConfig(t)
 	config := sparktesting.TestConfig(t)
 	client := sparktesting.GetBitcoinClient()
@@ -140,7 +141,7 @@ func TestTimelockExpirationHappyPath(t *testing.T) {
 }
 
 func TestTimelockExpirationTransferredNode(t *testing.T) {
-	skipIfGithubActions(t)
+	testutil.SkipIfGithubActions(t)
 	walletConfig := wallet.NewTestWalletConfig(t)
 	config := sparktesting.TestConfig(t)
 	client := sparktesting.GetBitcoinClient()
@@ -320,7 +321,7 @@ func TestTimelockExpirationTransferredNode(t *testing.T) {
 }
 
 func TestTimelockExpirationAfterLightningTransfer(t *testing.T) {
-	skipIfGithubActions(t)
+	testutil.SkipIfGithubActions(t)
 	// Create user and ssp configs
 	userConfig := wallet.NewTestWalletConfig(t)
 	sspConfig := wallet.NewTestWalletConfig(t)
