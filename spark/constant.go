@@ -9,6 +9,9 @@ const (
 	// DKGKeyCount is the number of keyshares to generate during the DKG.
 	DKGKeyCount = 1000
 
+	// Used in renew leaf flow to set for the node tx
+	ZeroTimelock = 0
+
 	// InitialTimeLock is the initial time lock for the deposit.
 	InitialTimeLock = 2000
 

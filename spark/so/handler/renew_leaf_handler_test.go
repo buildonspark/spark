@@ -1,14 +1,20 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"math/rand/v2"
+	"strings"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
+	pbcommon "github.com/lightsparkdev/spark/proto/common"
+	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -25,9 +31,75 @@ func createTestRenewLeafHandler() *RenewLeafHandler {
 	return NewRenewLeafHandler(config)
 }
 
-func createTestRenewSigningKeyshare(t *testing.T, ctx context.Context, rng io.Reader, tx *ent.Tx) *ent.SigningKeyshare {
+func createValidTestTransactionBytesWithSequence(t *testing.T, sequence uint32) []byte {
+	tx := wire.NewMsgTx(2)
+	prevHash, _ := chainhash.NewHashFromStr(strings.Repeat("0", 64))
+
+	// Create TxIn with specific sequence value
+	txIn := wire.NewTxIn(&wire.OutPoint{Hash: *prevHash, Index: 0}, nil, nil)
+	txIn.Sequence = sequence
+	tx.AddTxIn(txIn)
+
+	tx.AddTxOut(wire.NewTxOut(100000, []byte("test-pkscript")))
+
+	var buf bytes.Buffer
+	err := tx.Serialize(&buf)
+	require.NoError(t, err)
+	return buf.Bytes()
+}
+
+func createTestUserSignedTxSigningJob(t *testing.T, rng io.Reader, leafNode *ent.TreeNode, rawTx []byte) *pb.UserSignedTxSigningJob {
+	return &pb.UserSignedTxSigningJob{
+		LeafId:           leafNode.ID.String(),
+		SigningPublicKey: leafNode.OwnerSigningPubkey.Serialize(),
+		RawTx:            rawTx,
+		SigningNonceCommitment: &pbcommon.SigningCommitment{
+			Hiding:  keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
+			Binding: keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
+		},
+		UserSignature: []byte("test_user_signature"),
+		SigningCommitments: &pb.SigningCommitments{
+			SigningCommitments: map[string]*pbcommon.SigningCommitment{
+				"test_operator": {
+					Hiding:  keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
+					Binding: keys.MustGeneratePrivateKeyFromRand(rng).Public().Serialize(),
+				},
+			},
+		},
+	}
+}
+
+func createTestRenewNodeTimelockSigningJob(t *testing.T, rng io.Reader, leafNode *ent.TreeNode, updateBits uint32) *pb.RenewNodeTimelockSigningJob {
+	// Create transaction data with appropriate Spark sequence values for each type
+	// Based on the proto comments and Spark constants:
+	// - Split node tx should have spark.ZeroSequence (0x40000000)
+	// - Split node direct tx should have just spark.DirectTimelockOffset (0x32)
+	// - Updated node tx should have spark.InitialSequence() (0x400007D0)
+	// - Updated refund tx should have spark.InitialSequence() (0x400007D0)
+	// - Other direct transactions add DirectTimelockOffset to InitialSequence (0x40000802)
+	splitNodeTx := createValidTestTransactionBytesWithSequence(t, spark.ZeroSequence|updateBits)
+	splitNodeDirectTx := createValidTestTransactionBytesWithSequence(t, spark.DirectTimelockOffset|updateBits)
+	nodeTx := createValidTestTransactionBytesWithSequence(t, spark.InitialSequence()|updateBits)
+	refundTx := createValidTestTransactionBytesWithSequence(t, spark.InitialSequence()|updateBits)
+	directTx := createValidTestTransactionBytesWithSequence(t, (spark.InitialSequence()+spark.DirectTimelockOffset)|updateBits)
+
+	return &pb.RenewNodeTimelockSigningJob{
+		SplitNodeTxSigningJob:            createTestUserSignedTxSigningJob(t, rng, leafNode, splitNodeTx),
+		SplitNodeDirectTxSigningJob:      createTestUserSignedTxSigningJob(t, rng, leafNode, splitNodeDirectTx),
+		NodeTxSigningJob:                 createTestUserSignedTxSigningJob(t, rng, leafNode, nodeTx),
+		RefundTxSigningJob:               createTestUserSignedTxSigningJob(t, rng, leafNode, refundTx),
+		DirectNodeTxSigningJob:           createTestUserSignedTxSigningJob(t, rng, leafNode, directTx),
+		DirectRefundTxSigningJob:         createTestUserSignedTxSigningJob(t, rng, leafNode, directTx),
+		DirectFromCpfpRefundTxSigningJob: createTestUserSignedTxSigningJob(t, rng, leafNode, directTx),
+	}
+}
+
+func createTestRenewSigningKeyshare(t *testing.T, ctx context.Context, rng io.Reader) *ent.SigningKeyshare {
 	keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	pubSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
 
 	signingKeyshare, err := tx.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusInUse).
@@ -41,12 +113,16 @@ func createTestRenewSigningKeyshare(t *testing.T, ctx context.Context, rng io.Re
 	return signingKeyshare
 }
 
-func createTestRenewTree(t *testing.T, ctx context.Context, ownerIdentityPubKey keys.Public, tx *ent.Tx) *ent.Tree {
+func createTestRenewTree(t *testing.T, ctx context.Context, ownerIdentityPubKey keys.Public) *ent.Tree {
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
 	tree, err := tx.Tree.Create().
 		SetStatus(st.TreeStatusAvailable).
 		SetNetwork(st.NetworkRegtest).
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
-		SetBaseTxid([]byte("test_base_txid")).
+		// Simply setting random bytes for unique tree
+		SetBaseTxid(ownerIdentityPubKey.ToBTCEC().SerializeCompressed()).
 		SetVout(0).
 		Save(ctx)
 	require.NoError(t, err)
@@ -103,125 +179,143 @@ func TestConstructRenewNodeTransactions(t *testing.T) {
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	handler := createTestRenewLeafHandler()
+	tests := []struct {
+		name       string
+		updateBits uint32
+	}{
+		{
+			name:       "normal case",
+			updateBits: 0,
+		},
+		{
+			name:       "30th bit set",
+			updateBits: (1 << 30),
+		},
+	}
 
-	// Create test data
-	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	keyshare := createTestRenewSigningKeyshare(t, ctx, rng, tx)
-	tree := createTestRenewTree(t, ctx, ownerPubKey, tx)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create test data
+			ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+			keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
+			tree := createTestRenewTree(t, ctx, ownerPubKey)
 
-	// Create parent node
-	parentNode := createTestRenewTreeNode(t, ctx, rng, tx, tree, keyshare, nil)
+			// Create parent node
+			parentNode := createTestRenewTreeNode(t, ctx, rng, tx, tree, keyshare, nil)
 
-	// Create leaf node with parent
-	leafNode := createTestRenewTreeNode(t, ctx, rng, tx, tree, keyshare, parentNode)
+			// Create leaf node with parent
+			leafNode := createTestRenewTreeNode(t, ctx, rng, tx, tree, keyshare, parentNode)
 
-	// Get expected pk scripts
-	expectedVerifyingPkScript, err := common.P2TRScriptFromPubKey(leafNode.VerifyingPubkey)
-	require.NoError(t, err)
-	expectedOwnerSigningPkScript, err := common.P2TRScriptFromPubKey(leafNode.OwnerSigningPubkey)
-	require.NoError(t, err)
+			// Get expected pk scripts
+			expectedVerifyingPkScript, err := common.P2TRScriptFromPubKey(leafNode.VerifyingPubkey)
+			require.NoError(t, err)
+			expectedOwnerSigningPkScript, err := common.P2TRScriptFromPubKey(leafNode.OwnerSigningPubkey)
+			require.NoError(t, err)
 
-	// Test the function
-	renewTxs, err := handler.constructRenewNodeTransactions(leafNode, parentNode)
-	require.NoError(t, err)
+			// Create a test signing job with the specific updateBits
+			signingJob := createTestRenewNodeTimelockSigningJob(t, rng, leafNode, tt.updateBits)
 
-	// Verify split node transaction
-	assert.NotNil(t, renewTxs.SplitNodeTx)
-	assert.Len(t, renewTxs.SplitNodeTx.TxIn, 1)
-	assert.Len(t, renewTxs.SplitNodeTx.TxOut, 2) // main output + ephemeral anchor
-	assert.Equal(t, spark.ZeroSequence, renewTxs.SplitNodeTx.TxIn[0].Sequence)
-	// Verify main output pk script
-	assert.Equal(t, expectedVerifyingPkScript, renewTxs.SplitNodeTx.TxOut[0].PkScript)
-	// Verify second output is ephemeral anchor
-	assert.Equal(t, int64(0), renewTxs.SplitNodeTx.TxOut[1].Value)
-	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, renewTxs.SplitNodeTx.TxOut[1].PkScript)
+			// Test the function
+			renewTxs, err := constructRenewNodeTransactions(leafNode, parentNode, signingJob)
+			require.NoError(t, err)
 
-	// Parse parent tx to check values
-	parentTx, err := common.TxFromRawTxBytes(parentNode.RawTx)
-	require.NoError(t, err)
-	parentAmount := parentTx.TxOut[0].Value
+			// Verify split node transaction
+			assert.NotNil(t, renewTxs.SplitNodeTx)
+			assert.Len(t, renewTxs.SplitNodeTx.TxIn, 1)
+			assert.Len(t, renewTxs.SplitNodeTx.TxOut, 2) // main output + ephemeral anchor
+			assert.Equal(t, spark.ZeroSequence|tt.updateBits, renewTxs.SplitNodeTx.TxIn[0].Sequence)
+			// Verify main output pk script
+			assert.Equal(t, expectedVerifyingPkScript, renewTxs.SplitNodeTx.TxOut[0].PkScript)
+			// Verify second output is ephemeral anchor
+			assert.Equal(t, int64(0), renewTxs.SplitNodeTx.TxOut[1].Value)
+			assert.Equal(t, common.EphemeralAnchorOutput().PkScript, renewTxs.SplitNodeTx.TxOut[1].PkScript)
 
-	// Split node should use parent tx hash and parent amount
-	assert.Equal(t, parentTx.TxHash(), renewTxs.SplitNodeTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, uint32(0), renewTxs.SplitNodeTx.TxIn[0].PreviousOutPoint.Index)
-	assert.Equal(t, parentAmount, renewTxs.SplitNodeTx.TxOut[0].Value)
+			// Parse parent tx to check values
+			parentTx, err := common.TxFromRawTxBytes(parentNode.RawTx)
+			require.NoError(t, err)
+			parentAmount := parentTx.TxOut[0].Value
 
-	// Verify extended node transaction
-	assert.NotNil(t, renewTxs.NodeTx)
-	assert.Len(t, renewTxs.NodeTx.TxIn, 1)
-	assert.Len(t, renewTxs.NodeTx.TxOut, 2) // main output + ephemeral anchor
-	assert.Equal(t, spark.InitialSequence(), renewTxs.NodeTx.TxIn[0].Sequence)
-	assert.Equal(t, renewTxs.SplitNodeTx.TxHash(), renewTxs.NodeTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, parentAmount, renewTxs.NodeTx.TxOut[0].Value)
-	// Verify main output pk script
-	assert.Equal(t, expectedVerifyingPkScript, renewTxs.NodeTx.TxOut[0].PkScript)
-	// Verify second output is ephemeral anchor
-	assert.Equal(t, int64(0), renewTxs.NodeTx.TxOut[1].Value)
-	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, renewTxs.NodeTx.TxOut[1].PkScript)
+			// Split node should use parent tx hash and parent amount
+			assert.Equal(t, parentTx.TxHash(), renewTxs.SplitNodeTx.TxIn[0].PreviousOutPoint.Hash)
+			assert.Equal(t, uint32(0), renewTxs.SplitNodeTx.TxIn[0].PreviousOutPoint.Index)
+			assert.Equal(t, parentAmount, renewTxs.SplitNodeTx.TxOut[0].Value)
 
-	// Verify refund transaction
-	assert.NotNil(t, renewTxs.RefundTx)
-	assert.Len(t, renewTxs.RefundTx.TxIn, 1)
-	assert.Len(t, renewTxs.RefundTx.TxOut, 2) // main output + ephemeral anchor
-	assert.Equal(t, spark.InitialSequence(), renewTxs.RefundTx.TxIn[0].Sequence)
-	assert.Equal(t, renewTxs.NodeTx.TxHash(), renewTxs.RefundTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, parentAmount, renewTxs.RefundTx.TxOut[0].Value)
-	// Verify main output pk script
-	assert.Equal(t, expectedOwnerSigningPkScript, renewTxs.RefundTx.TxOut[0].PkScript)
-	// Verify second output is ephemeral anchor
-	assert.Equal(t, int64(0), renewTxs.RefundTx.TxOut[1].Value)
-	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, renewTxs.RefundTx.TxOut[1].PkScript)
+			// Verify extended node transaction
+			assert.NotNil(t, renewTxs.NodeTx)
+			assert.Len(t, renewTxs.NodeTx.TxIn, 1)
+			assert.Len(t, renewTxs.NodeTx.TxOut, 2) // main output + ephemeral anchor
+			assert.Equal(t, spark.InitialSequence()|tt.updateBits, renewTxs.NodeTx.TxIn[0].Sequence)
+			assert.Equal(t, renewTxs.SplitNodeTx.TxHash(), renewTxs.NodeTx.TxIn[0].PreviousOutPoint.Hash)
+			assert.Equal(t, parentAmount, renewTxs.NodeTx.TxOut[0].Value)
+			// Verify main output pk script
+			assert.Equal(t, expectedVerifyingPkScript, renewTxs.NodeTx.TxOut[0].PkScript)
+			// Verify second output is ephemeral anchor
+			assert.Equal(t, int64(0), renewTxs.NodeTx.TxOut[1].Value)
+			assert.Equal(t, common.EphemeralAnchorOutput().PkScript, renewTxs.NodeTx.TxOut[1].PkScript)
 
-	// Verify direct split node transaction
-	assert.NotNil(t, renewTxs.DirectSplitNodeTx)
-	assert.Len(t, renewTxs.DirectSplitNodeTx.TxIn, 1)
-	assert.Len(t, renewTxs.DirectSplitNodeTx.TxOut, 1)
-	assert.Equal(t, uint32(spark.DirectTimelockOffset), renewTxs.DirectSplitNodeTx.TxIn[0].Sequence)
-	assert.Equal(t, parentTx.TxHash(), renewTxs.DirectSplitNodeTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, common.MaybeApplyFee(parentAmount), renewTxs.DirectSplitNodeTx.TxOut[0].Value)
-	assert.Equal(t, expectedVerifyingPkScript, renewTxs.DirectSplitNodeTx.TxOut[0].PkScript)
+			// Verify refund transaction
+			assert.NotNil(t, renewTxs.RefundTx)
+			assert.Len(t, renewTxs.RefundTx.TxIn, 1)
+			assert.Len(t, renewTxs.RefundTx.TxOut, 2) // main output + ephemeral anchor
+			assert.Equal(t, spark.InitialSequence()|tt.updateBits, renewTxs.RefundTx.TxIn[0].Sequence)
+			assert.Equal(t, renewTxs.NodeTx.TxHash(), renewTxs.RefundTx.TxIn[0].PreviousOutPoint.Hash)
+			assert.Equal(t, parentAmount, renewTxs.RefundTx.TxOut[0].Value)
+			// Verify main output pk script
+			assert.Equal(t, expectedOwnerSigningPkScript, renewTxs.RefundTx.TxOut[0].PkScript)
+			// Verify second output is ephemeral anchor
+			assert.Equal(t, int64(0), renewTxs.RefundTx.TxOut[1].Value)
+			assert.Equal(t, common.EphemeralAnchorOutput().PkScript, renewTxs.RefundTx.TxOut[1].PkScript)
 
-	// Verify direct node transaction
-	assert.NotNil(t, renewTxs.DirectNodeTx)
-	assert.Len(t, renewTxs.DirectNodeTx.TxIn, 1)
-	assert.Len(t, renewTxs.DirectNodeTx.TxOut, 1)
-	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, renewTxs.DirectNodeTx.TxIn[0].Sequence)
-	assert.Equal(t, renewTxs.SplitNodeTx.TxHash(), renewTxs.DirectNodeTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, common.MaybeApplyFee(parentAmount), renewTxs.DirectNodeTx.TxOut[0].Value)
-	assert.Equal(t, expectedVerifyingPkScript, renewTxs.DirectNodeTx.TxOut[0].PkScript)
+			// Verify direct split node transaction
+			assert.NotNil(t, renewTxs.DirectSplitNodeTx)
+			assert.Len(t, renewTxs.DirectSplitNodeTx.TxIn, 1)
+			assert.Len(t, renewTxs.DirectSplitNodeTx.TxOut, 1)
+			assert.Equal(t, uint32(spark.DirectTimelockOffset)|tt.updateBits, renewTxs.DirectSplitNodeTx.TxIn[0].Sequence)
+			assert.Equal(t, parentTx.TxHash(), renewTxs.DirectSplitNodeTx.TxIn[0].PreviousOutPoint.Hash)
+			assert.Equal(t, common.MaybeApplyFee(parentAmount), renewTxs.DirectSplitNodeTx.TxOut[0].Value)
+			assert.Equal(t, expectedVerifyingPkScript, renewTxs.DirectSplitNodeTx.TxOut[0].PkScript)
 
-	// Verify direct refund transaction
-	assert.NotNil(t, renewTxs.DirectRefundTx)
-	assert.Len(t, renewTxs.DirectRefundTx.TxIn, 1)
-	assert.Len(t, renewTxs.DirectRefundTx.TxOut, 1)
-	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, renewTxs.DirectRefundTx.TxIn[0].Sequence)
-	assert.Equal(t, renewTxs.DirectNodeTx.TxHash(), renewTxs.DirectRefundTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, common.MaybeApplyFee(common.MaybeApplyFee(parentAmount)), renewTxs.DirectRefundTx.TxOut[0].Value)
-	assert.Equal(t, expectedOwnerSigningPkScript, renewTxs.DirectRefundTx.TxOut[0].PkScript)
+			// Verify direct node transaction
+			assert.NotNil(t, renewTxs.DirectNodeTx)
+			assert.Len(t, renewTxs.DirectNodeTx.TxIn, 1)
+			assert.Len(t, renewTxs.DirectNodeTx.TxOut, 1)
+			assert.Equal(t, (spark.InitialSequence()+spark.DirectTimelockOffset)|tt.updateBits, renewTxs.DirectNodeTx.TxIn[0].Sequence)
+			assert.Equal(t, renewTxs.SplitNodeTx.TxHash(), renewTxs.DirectNodeTx.TxIn[0].PreviousOutPoint.Hash)
+			assert.Equal(t, common.MaybeApplyFee(parentAmount), renewTxs.DirectNodeTx.TxOut[0].Value)
+			assert.Equal(t, expectedVerifyingPkScript, renewTxs.DirectNodeTx.TxOut[0].PkScript)
 
-	// Verify direct from CPFP refund transaction
-	assert.NotNil(t, renewTxs.DirectFromCpfpRefundTx)
-	assert.Len(t, renewTxs.DirectFromCpfpRefundTx.TxIn, 1)
-	assert.Len(t, renewTxs.DirectFromCpfpRefundTx.TxOut, 1)
-	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, renewTxs.DirectFromCpfpRefundTx.TxIn[0].Sequence)
-	assert.Equal(t, renewTxs.NodeTx.TxHash(), renewTxs.DirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, common.MaybeApplyFee(parentAmount), renewTxs.DirectFromCpfpRefundTx.TxOut[0].Value)
-	assert.Equal(t, expectedOwnerSigningPkScript, renewTxs.DirectFromCpfpRefundTx.TxOut[0].PkScript)
+			// Verify direct refund transaction
+			assert.NotNil(t, renewTxs.DirectRefundTx)
+			assert.Len(t, renewTxs.DirectRefundTx.TxIn, 1)
+			assert.Len(t, renewTxs.DirectRefundTx.TxOut, 1)
+			assert.Equal(t, (spark.InitialSequence()+spark.DirectTimelockOffset)|tt.updateBits, renewTxs.DirectRefundTx.TxIn[0].Sequence)
+			assert.Equal(t, renewTxs.DirectNodeTx.TxHash(), renewTxs.DirectRefundTx.TxIn[0].PreviousOutPoint.Hash)
+			assert.Equal(t, common.MaybeApplyFee(common.MaybeApplyFee(parentAmount)), renewTxs.DirectRefundTx.TxOut[0].Value)
+			assert.Equal(t, expectedOwnerSigningPkScript, renewTxs.DirectRefundTx.TxOut[0].PkScript)
+
+			// Verify direct from CPFP refund transaction
+			assert.NotNil(t, renewTxs.DirectFromCpfpRefundTx)
+			assert.Len(t, renewTxs.DirectFromCpfpRefundTx.TxIn, 1)
+			assert.Len(t, renewTxs.DirectFromCpfpRefundTx.TxOut, 1)
+			assert.Equal(t, (spark.InitialSequence()+spark.DirectTimelockOffset)|tt.updateBits, renewTxs.DirectFromCpfpRefundTx.TxIn[0].Sequence)
+			assert.Equal(t, renewTxs.NodeTx.TxHash(), renewTxs.DirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Hash)
+			assert.Equal(t, common.MaybeApplyFee(parentAmount), renewTxs.DirectFromCpfpRefundTx.TxOut[0].Value)
+			assert.Equal(t, expectedOwnerSigningPkScript, renewTxs.DirectFromCpfpRefundTx.TxOut[0].PkScript)
+		})
+	}
 }
 
 func TestConstructRenewRefundTransactions(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
+	handler := createTestRenewLeafHandler()
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	handler := createTestRenewLeafHandler()
-
 	// Create test data
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	keyshare := createTestRenewSigningKeyshare(t, ctx, rng, tx)
-	tree := createTestRenewTree(t, ctx, ownerPubKey, tx)
+	keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
+	tree := createTestRenewTree(t, ctx, ownerPubKey)
 
 	// Create parent node
 	parentNode := createTestRenewTreeNode(t, ctx, rng, tx, tree, keyshare, nil)
@@ -307,15 +401,14 @@ func TestConstructRenewRefundTransactions(t *testing.T) {
 func TestConstructRenewZeroNodeTransactions(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
+	handler := createTestRenewLeafHandler()
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	handler := createTestRenewLeafHandler()
-
 	// Create test data
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	keyshare := createTestRenewSigningKeyshare(t, ctx, rng, tx)
-	tree := createTestRenewTree(t, ctx, ownerPubKey, tx)
+	keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
+	tree := createTestRenewTree(t, ctx, ownerPubKey)
 
 	// Create leaf node (no parent needed for zero timelock)
 	leafNode := createTestRenewTreeNode(t, ctx, rng, tx, tree, keyshare, nil)
@@ -390,8 +483,8 @@ func TestValidateRenewNodeTimelocks(t *testing.T) {
 
 	// Create test data
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	keyshare := createTestRenewSigningKeyshare(t, ctx, rng, tx)
-	tree := createTestRenewTree(t, ctx, ownerPubKey, tx)
+	keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
+	tree := createTestRenewTree(t, ctx, ownerPubKey)
 
 	tests := []struct {
 		name           string
@@ -498,8 +591,8 @@ func TestValidateRenewRefundTimelock(t *testing.T) {
 
 	// Create test data
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	keyshare := createTestRenewSigningKeyshare(t, ctx, rng, tx)
-	tree := createTestRenewTree(t, ctx, ownerPubKey, tx)
+	keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
+	tree := createTestRenewTree(t, ctx, ownerPubKey)
 
 	tests := []struct {
 		name           string
@@ -599,8 +692,8 @@ func TestValidateRenewNodeZeroTimelock(t *testing.T) {
 
 	// Create test data
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	keyshare := createTestRenewSigningKeyshare(t, ctx, rng, tx)
-	tree := createTestRenewTree(t, ctx, ownerPubKey, tx)
+	keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
+	tree := createTestRenewTree(t, ctx, ownerPubKey)
 
 	tests := []struct {
 		name           string

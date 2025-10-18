@@ -31,10 +31,10 @@ func VerifyTransactionWithDatabase(clientRawTxBytes []byte, dbLeaf *ent.TreeNode
 		return fmt.Errorf("failed to parse client tx for leaf %s: %w", dbLeaf.ID, err)
 	}
 
-	if len(clientTx.TxIn) == 0 {
-		return fmt.Errorf("client tx has no inputs for leaf %s", dbLeaf.ID)
+	clientSequence, err := GetAndValidateUserSequence(clientRawTxBytes)
+	if err != nil {
+		return fmt.Errorf("failed to validate user sequence: %w", err)
 	}
-	clientSequence := clientTx.TxIn[0].Sequence
 
 	// Construct the expected transaction based on the type
 	expectedTx, err := constructExpectedTransaction(dbLeaf, txType, refundDestPubkey, clientSequence)
@@ -187,19 +187,6 @@ func constructDirectFromCPFPRefundTransaction(dbLeaf *ent.TreeNode, refundDestPu
 
 // validateSequence validates the client's sequence number against existing database transactions
 func validateSequence(dbLeaf *ent.TreeNode, txType RefundTxType, clientSequence uint32) error {
-	// Validate that bit 31 (disable flag) and bit 22 (type flag) are NOT set
-	const (
-		disableBit = uint32(1 << 31) // Bit 31: disables BIP68 relative timelock
-		typeBit    = uint32(1 << 22) // Bit 22: 0=block height, 1=time-based
-	)
-
-	if clientSequence&disableBit != 0 {
-		return fmt.Errorf("client sequence has bit 31 set (timelock disabled)")
-	}
-	if clientSequence&typeBit != 0 {
-		return fmt.Errorf("client sequence has bit 22 set (time-based timelock not supported)")
-	}
-
 	// Parse the transaction
 	rawRefundTx, err := common.TxFromRawTxBytes(dbLeaf.RawRefundTx)
 	if err != nil {
@@ -234,11 +221,49 @@ func validateSequence(dbLeaf *ent.TreeNode, txType RefundTxType, clientSequence 
 	}
 
 	// Validate that the client's timelock (bits 0-15) matches expected
-	clientTimelock := clientSequence & 0xFFFF
-	if clientTimelock != expectedTimelock {
-		return fmt.Errorf("client timelock %d does not match expected timelock %d for tx type %d",
-			clientTimelock, expectedTimelock, txType)
+	err = ValidateSequenceTimelock(clientSequence, expectedTimelock)
+	if err != nil {
+		return fmt.Errorf("failed to validate client sequence timelock for tx type %d: %w", txType, err)
 	}
 
+	return nil
+}
+
+func GetAndValidateUserSequence(rawTxBytes []byte) (uint32, error) {
+	// Validate that bit 31 (disable flag) and bit 22 (type flag) are NOT set
+	const (
+		disableBit = uint32(1 << 31) // Bit 31: disables BIP68 relative timelock
+		typeBit    = uint32(1 << 22) // Bit 22: 0=block height, 1=time-based
+	)
+
+	tx, err := common.TxFromRawTxBytes(rawTxBytes)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(tx.TxIn) == 0 {
+		return 0, fmt.Errorf("transaction has no inputs")
+	}
+	userSequence := tx.TxIn[0].Sequence
+
+	if userSequence&disableBit != 0 {
+		return 0, fmt.Errorf("client sequence has bit 31 set (timelock disabled)")
+	}
+	if userSequence&typeBit != 0 {
+		return 0, fmt.Errorf("client sequence has bit 22 set (time-based timelock not supported)")
+	}
+
+	return userSequence, nil
+}
+
+func GetTimelockFromSequence(sequence uint32) uint32 {
+	return sequence & 0xFFFF
+}
+
+func ValidateSequenceTimelock(sequence uint32, expectedTimelock uint32) error {
+	providedTimelock := GetTimelockFromSequence(sequence)
+	if providedTimelock != expectedTimelock {
+		return fmt.Errorf("provided timelock %d does not match expected timelock %d", providedTimelock, expectedTimelock)
+	}
 	return nil
 }
