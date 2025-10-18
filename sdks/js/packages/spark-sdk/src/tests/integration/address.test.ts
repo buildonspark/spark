@@ -13,7 +13,7 @@ describe("address", () => {
   ])(
     ".seedOrMnemonic(%s)",
     (seedOrMnemonic) => {
-      test.each([["LOCAL", "spl", "bcrt"]])(
+      test.each([["LOCAL", "sparkl", "bcrt"]])(
         `.network(%s)`,
         async (network, sparkAddressPrefix, blockchainAddressPrefix) => {
           const options: ConfigOptions = {
@@ -32,9 +32,6 @@ describe("address", () => {
             new RegExp(`^${sparkAddressPrefix}1[a-zA-Z0-9]{62}$`),
           );
           expect(sparkAddress).toEqual(await wallet.getSparkAddress());
-
-          // TODO: Remove this once we upgrade to the new spark address format
-          expect(isLegacySparkAddress(sparkAddress)).toBe(true);
 
           const depositAddresses = await Promise.all([
             wallet.getSingleUseDepositAddress(),

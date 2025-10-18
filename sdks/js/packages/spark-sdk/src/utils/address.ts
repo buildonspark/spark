@@ -63,14 +63,14 @@ export interface DecodedSparkAddressData {
 
 export function encodeSparkAddress(
   payload: SparkAddressData,
-): LegacySparkAddressFormat {
+): SparkAddressFormat {
   return encodeSparkAddressWithSignature(payload);
 }
 
 export function encodeSparkAddressWithSignature(
   payload: SparkAddressData,
   signature?: Uint8Array,
-): LegacySparkAddressFormat {
+): SparkAddressFormat {
   try {
     isValidPublicKey(payload.identityPublicKey);
     const identityPublicKey = hexToBytes(payload.identityPublicKey);
@@ -99,9 +99,9 @@ export function encodeSparkAddressWithSignature(
     const words = bech32m.toWords(serializedPayload);
 
     return bech32mEncode(
-      LegacyAddressNetwork[payload.network],
+      AddressNetwork[payload.network],
       words,
-    ) as LegacySparkAddressFormat;
+    ) as SparkAddressFormat;
   } catch (error) {
     throw new ValidationError(
       "Failed to encode Spark address",
@@ -193,6 +193,7 @@ export function decodeSparkAddress(
 const PrefixToNetwork: Record<string, NetworkType> = Object.fromEntries(
   Object.entries(AddressNetwork).map(([k, v]) => [v, k as NetworkType]),
 ) as Record<string, NetworkType>;
+
 const LegacyPrefixToNetwork: Record<string, NetworkType> = Object.fromEntries(
   Object.entries(LegacyAddressNetwork).map(([k, v]) => [v, k as NetworkType]),
 ) as Record<string, NetworkType>;
@@ -210,6 +211,7 @@ export function getNetworkFromSparkAddress(address: string): NetworkType {
   }
   return network;
 }
+
 export function isLegacySparkAddress(
   address: string,
 ): address is LegacySparkAddressFormat {
