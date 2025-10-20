@@ -111,6 +111,20 @@ func createTestRenewRefundTimelockSigningJob(t *testing.T, rng io.Reader, leafNo
 	}
 }
 
+func createTestRenewNodeZeroTimelockSigningJob(t *testing.T, rng io.Reader, leafNode *ent.TreeNode, updateBits uint32) *pb.RenewNodeZeroTimelockSigningJob {
+	nodeTx := createValidTestTransactionBytesWithSequence(t, spark.ZeroTimelock|updateBits)
+	refundTx := createValidTestTransactionBytesWithSequence(t, spark.InitialTimeLock|updateBits)
+	directTx := createValidTestTransactionBytesWithSequence(t, spark.DirectTimelockOffset|updateBits)
+	directFromCpfpRefundTx := createValidTestTransactionBytesWithSequence(t, (spark.InitialTimeLock+spark.DirectTimelockOffset)|updateBits)
+
+	return &pb.RenewNodeZeroTimelockSigningJob{
+		NodeTxSigningJob:                 createTestUserSignedTxSigningJob(t, rng, leafNode, nodeTx),
+		RefundTxSigningJob:               createTestUserSignedTxSigningJob(t, rng, leafNode, refundTx),
+		DirectNodeTxSigningJob:           createTestUserSignedTxSigningJob(t, rng, leafNode, directTx),
+		DirectFromCpfpRefundTxSigningJob: createTestUserSignedTxSigningJob(t, rng, leafNode, directFromCpfpRefundTx),
+	}
+}
+
 func createTestRenewSigningKeyshare(t *testing.T, ctx context.Context, rng io.Reader) *ent.SigningKeyshare {
 	keysharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	pubSharePrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
@@ -441,72 +455,94 @@ func TestConstructRenewZeroNodeTransactions(t *testing.T) {
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	// Create test data
-	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
-	tree := createTestRenewTree(t, ctx, ownerPubKey)
+	tests := []struct {
+		name       string
+		updateBits uint32
+	}{
+		{
+			name:       "normal case",
+			updateBits: 0,
+		},
+		{
+			name:       "30th bit set",
+			updateBits: (1 << 30),
+		},
+	}
 
-	// Create leaf node (no parent needed for zero timelock)
-	leafNode := createTestRenewTreeNode(t, ctx, rng, tx, tree, keyshare, nil, 0)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 
-	// Get expected pk scripts
-	expectedVerifyingPkScript, err := common.P2TRScriptFromPubKey(leafNode.VerifyingPubkey)
-	require.NoError(t, err)
-	expectedOwnerSigningPkScript, err := common.P2TRScriptFromPubKey(leafNode.OwnerSigningPubkey)
-	require.NoError(t, err)
+			// Create test data
+			ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+			keyshare := createTestRenewSigningKeyshare(t, ctx, rng)
+			tree := createTestRenewTree(t, ctx, ownerPubKey)
 
-	// Test the function
-	zeroTxs, err := handler.constructRenewZeroNodeTransactions(leafNode)
-	require.NoError(t, err)
+			// Create leaf node (no parent needed for zero timelock)
+			leafNode := createTestRenewTreeNode(t, ctx, rng, tx, tree, keyshare, nil, tt.updateBits)
 
-	// Parse leaf tx to get expected values
-	leafTx, err := common.TxFromRawTxBytes(leafNode.RawTx)
-	require.NoError(t, err)
-	leafAmount := leafTx.TxOut[0].Value
+			// Get expected pk scripts
+			expectedVerifyingPkScript, err := common.P2TRScriptFromPubKey(leafNode.VerifyingPubkey)
+			require.NoError(t, err)
+			expectedOwnerSigningPkScript, err := common.P2TRScriptFromPubKey(leafNode.OwnerSigningPubkey)
+			require.NoError(t, err)
 
-	// Verify new node transaction (with zero sequence)
-	assert.NotNil(t, zeroTxs.NodeTx)
-	assert.Len(t, zeroTxs.NodeTx.TxIn, 1)
-	assert.Len(t, zeroTxs.NodeTx.TxOut, 2) // main output + ephemeral anchor
-	assert.Equal(t, spark.ZeroSequence, zeroTxs.NodeTx.TxIn[0].Sequence)
-	assert.Equal(t, leafTx.TxHash(), zeroTxs.NodeTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, leafAmount, zeroTxs.NodeTx.TxOut[0].Value)
-	// Verify main output pk script
-	assert.Equal(t, expectedVerifyingPkScript, zeroTxs.NodeTx.TxOut[0].PkScript)
-	// Verify second output is ephemeral anchor
-	assert.Equal(t, int64(0), zeroTxs.NodeTx.TxOut[1].Value)
-	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, zeroTxs.NodeTx.TxOut[1].PkScript)
+			// Create a test signing job with the specific updateBits
+			signingJob := createTestRenewNodeZeroTimelockSigningJob(t, rng, leafNode, tt.updateBits)
 
-	// Verify refund transaction (with initial sequence)
-	assert.NotNil(t, zeroTxs.RefundTx)
-	assert.Len(t, zeroTxs.RefundTx.TxIn, 1)
-	assert.Len(t, zeroTxs.RefundTx.TxOut, 2) // main output + ephemeral anchor
-	assert.Equal(t, spark.InitialSequence(), zeroTxs.RefundTx.TxIn[0].Sequence)
-	assert.Equal(t, zeroTxs.NodeTx.TxHash(), zeroTxs.RefundTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, leafAmount, zeroTxs.RefundTx.TxOut[0].Value)
-	// Verify main output pk script
-	assert.Equal(t, expectedOwnerSigningPkScript, zeroTxs.RefundTx.TxOut[0].PkScript)
-	// Verify second output is ephemeral anchor
-	assert.Equal(t, int64(0), zeroTxs.RefundTx.TxOut[1].Value)
-	assert.Equal(t, common.EphemeralAnchorOutput().PkScript, zeroTxs.RefundTx.TxOut[1].PkScript)
+			// Test the function
+			zeroTxs, err := handler.constructRenewZeroNodeTransactions(leafNode, signingJob)
+			require.NoError(t, err)
 
-	// Verify direct node transaction
-	assert.NotNil(t, zeroTxs.DirectNodeTx)
-	assert.Len(t, zeroTxs.DirectNodeTx.TxIn, 1)
-	assert.Len(t, zeroTxs.DirectNodeTx.TxOut, 1)
-	assert.Equal(t, spark.DirectTimelockOffset, zeroTxs.DirectNodeTx.TxIn[0].Sequence)
-	assert.Equal(t, leafTx.TxHash(), zeroTxs.DirectNodeTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, common.MaybeApplyFee(leafAmount), zeroTxs.DirectNodeTx.TxOut[0].Value)
-	assert.Equal(t, expectedVerifyingPkScript, zeroTxs.DirectNodeTx.TxOut[0].PkScript)
+			// Parse leaf tx to get expected values
+			leafTx, err := common.TxFromRawTxBytes(leafNode.RawTx)
+			require.NoError(t, err)
+			leafAmount := leafTx.TxOut[0].Value
 
-	// Verify direct from CPFP refund transaction
-	assert.NotNil(t, zeroTxs.DirectFromCpfpRefundTx)
-	assert.Len(t, zeroTxs.DirectFromCpfpRefundTx.TxIn, 1)
-	assert.Len(t, zeroTxs.DirectFromCpfpRefundTx.TxOut, 1)
-	assert.Equal(t, spark.InitialSequence()+spark.DirectTimelockOffset, zeroTxs.DirectFromCpfpRefundTx.TxIn[0].Sequence)
-	assert.Equal(t, zeroTxs.NodeTx.TxHash(), zeroTxs.DirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Hash)
-	assert.Equal(t, common.MaybeApplyFee(leafAmount), zeroTxs.DirectFromCpfpRefundTx.TxOut[0].Value)
-	assert.Equal(t, expectedOwnerSigningPkScript, zeroTxs.DirectFromCpfpRefundTx.TxOut[0].PkScript)
+			// Verify new node transaction (with zero sequence)
+			assert.NotNil(t, zeroTxs.NodeTx)
+			assert.Len(t, zeroTxs.NodeTx.TxIn, 1)
+			assert.Len(t, zeroTxs.NodeTx.TxOut, 2) // main output + ephemeral anchor
+			assert.Equal(t, spark.ZeroTimelock|tt.updateBits, zeroTxs.NodeTx.TxIn[0].Sequence)
+			assert.Equal(t, leafTx.TxHash(), zeroTxs.NodeTx.TxIn[0].PreviousOutPoint.Hash)
+			assert.Equal(t, leafAmount, zeroTxs.NodeTx.TxOut[0].Value)
+			// Verify main output pk script
+			assert.Equal(t, expectedVerifyingPkScript, zeroTxs.NodeTx.TxOut[0].PkScript)
+			// Verify second output is ephemeral anchor
+			assert.Equal(t, int64(0), zeroTxs.NodeTx.TxOut[1].Value)
+			assert.Equal(t, common.EphemeralAnchorOutput().PkScript, zeroTxs.NodeTx.TxOut[1].PkScript)
+
+			// Verify refund transaction (with initial sequence)
+			assert.NotNil(t, zeroTxs.RefundTx)
+			assert.Len(t, zeroTxs.RefundTx.TxIn, 1)
+			assert.Len(t, zeroTxs.RefundTx.TxOut, 2) // main output + ephemeral anchor
+			assert.Equal(t, spark.InitialTimeLock|tt.updateBits, zeroTxs.RefundTx.TxIn[0].Sequence)
+			assert.Equal(t, zeroTxs.NodeTx.TxHash(), zeroTxs.RefundTx.TxIn[0].PreviousOutPoint.Hash)
+			assert.Equal(t, leafAmount, zeroTxs.RefundTx.TxOut[0].Value)
+			// Verify main output pk script
+			assert.Equal(t, expectedOwnerSigningPkScript, zeroTxs.RefundTx.TxOut[0].PkScript)
+			// Verify second output is ephemeral anchor
+			assert.Equal(t, int64(0), zeroTxs.RefundTx.TxOut[1].Value)
+			assert.Equal(t, common.EphemeralAnchorOutput().PkScript, zeroTxs.RefundTx.TxOut[1].PkScript)
+
+			// Verify direct node transaction
+			assert.NotNil(t, zeroTxs.DirectNodeTx)
+			assert.Len(t, zeroTxs.DirectNodeTx.TxIn, 1)
+			assert.Len(t, zeroTxs.DirectNodeTx.TxOut, 1)
+			assert.Equal(t, spark.DirectTimelockOffset|tt.updateBits, zeroTxs.DirectNodeTx.TxIn[0].Sequence)
+			assert.Equal(t, leafTx.TxHash(), zeroTxs.DirectNodeTx.TxIn[0].PreviousOutPoint.Hash)
+			assert.Equal(t, common.MaybeApplyFee(leafAmount), zeroTxs.DirectNodeTx.TxOut[0].Value)
+			assert.Equal(t, expectedVerifyingPkScript, zeroTxs.DirectNodeTx.TxOut[0].PkScript)
+
+			// Verify direct from CPFP refund transaction
+			assert.NotNil(t, zeroTxs.DirectFromCpfpRefundTx)
+			assert.Len(t, zeroTxs.DirectFromCpfpRefundTx.TxIn, 1)
+			assert.Len(t, zeroTxs.DirectFromCpfpRefundTx.TxOut, 1)
+			assert.Equal(t, (spark.InitialTimeLock+spark.DirectTimelockOffset)|tt.updateBits, zeroTxs.DirectFromCpfpRefundTx.TxIn[0].Sequence)
+			assert.Equal(t, zeroTxs.NodeTx.TxHash(), zeroTxs.DirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint.Hash)
+			assert.Equal(t, common.MaybeApplyFee(leafAmount), zeroTxs.DirectFromCpfpRefundTx.TxOut[0].Value)
+			assert.Equal(t, expectedOwnerSigningPkScript, zeroTxs.DirectFromCpfpRefundTx.TxOut[0].PkScript)
+		})
+	}
 }
 
 func TestValidateRenewNodeTimelocks(t *testing.T) {

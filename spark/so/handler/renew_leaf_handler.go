@@ -720,7 +720,7 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 	}
 
 	// Construct transactions
-	zeroTxs, err := h.constructRenewZeroNodeTransactions(leaf)
+	zeroTxs, err := h.constructRenewZeroNodeTransactions(leaf, signingJob)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct renew zero timelock transactions: %w", err)
 	}
@@ -1309,18 +1309,31 @@ func (h *RenewLeafHandler) constructRenewRefundTransactions(leaf, parentLeaf *en
 }
 
 // constructRenewZeroNodeTransactions creates the node and refund transactions for zero timelock renewal
-func (h *RenewLeafHandler) constructRenewZeroNodeTransactions(leaf *ent.TreeNode) (*RenewZeroNodeTransactions, error) {
+func (h *RenewLeafHandler) constructRenewZeroNodeTransactions(leaf *ent.TreeNode, signingJob *pb.RenewNodeZeroTimelockSigningJob) (*RenewZeroNodeTransactions, error) {
 	leafNodeTx, err := common.TxFromRawTxBytes(leaf.RawTx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse leaf node transaction: %w", err)
 	}
+	if len(leafNodeTx.TxOut) == 0 {
+		return nil, fmt.Errorf("tree node node transaction has zero outputs")
+	}
 	leafAmount := leafNodeTx.TxOut[0].Value
 
-	// Create new node tx with zero sequence (timelock = 0)
+	userNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.NodeTxSigningJob.RawTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate old leaf node tx sequence: %w", err)
+	}
+	if err := bitcointransaction.ValidateSequenceTimelock(userNodeSequence, spark.ZeroTimelock); err != nil {
+		return nil, fmt.Errorf("failed to validate user provided node tx timelock: %w", err)
+	}
+
+	// ******************************************************************
+	// NODE TX
+	// ******************************************************************
 	newNodeTx := wire.NewMsgTx(3)
 	newNodeTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: leafNodeTx.TxHash(), Index: 0},
-		Sequence:         spark.ZeroSequence,
+		Sequence:         userNodeSequence,
 	})
 
 	// Use same output value and script as original node tx
@@ -1332,11 +1345,20 @@ func (h *RenewLeafHandler) constructRenewZeroNodeTransactions(leaf *ent.TreeNode
 	// Add ephemeral anchor output for CPFP
 	newNodeTx.AddTxOut(common.EphemeralAnchorOutput())
 
-	// Create refund tx to spend the new node tx with initial sequence (timelock = 2000)
+	// ******************************************************************
+	// REFUND TX
+	// ******************************************************************
+	userRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.RefundTxSigningJob.RawTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate old leaf node tx sequence: %w", err)
+	}
+	if err := bitcointransaction.ValidateSequenceTimelock(userRefundSequence, spark.InitialTimeLock); err != nil {
+		return nil, fmt.Errorf("failed to validate user provided refund tx timelock: %w", err)
+	}
 	refundTx := wire.NewMsgTx(3)
 	refundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: newNodeTx.TxHash(), Index: 0},
-		Sequence:         spark.InitialSequence(),
+		Sequence:         userRefundSequence,
 	})
 
 	refundPkScript, err := common.P2TRScriptFromPubKey(leaf.OwnerSigningPubkey)
@@ -1350,20 +1372,40 @@ func (h *RenewLeafHandler) constructRenewZeroNodeTransactions(leaf *ent.TreeNode
 	// Add ephemeral anchor output for CPFP
 	refundTx.AddTxOut(common.EphemeralAnchorOutput())
 
+	// ******************************************************************
+	// DIRECT NODE TX
+	// ******************************************************************
+	userDirectNodeSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.DirectNodeTxSigningJob.RawTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate user provided direct split node tx sequence: %w", err)
+	}
+	if err := bitcointransaction.ValidateSequenceTimelock(userDirectNodeSequence, spark.DirectTimelockOffset); err != nil {
+		return nil, fmt.Errorf("failed to validate user provided direct node tx timelock: %w", err)
+	}
 	directNodeTx := wire.NewMsgTx(3)
 	directNodeTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: leafNodeTx.TxHash(), Index: 0},
-		Sequence:         spark.DirectTimelockOffset,
+		Sequence:         userDirectNodeSequence,
 	})
 	directNodeTx.AddTxOut(&wire.TxOut{
 		Value:    common.MaybeApplyFee(leafAmount),
 		PkScript: nodePkScript,
 	})
 
+	// ******************************************************************
+	// DIRECT FROM CPFP REFUND TX
+	// ******************************************************************
+	userDirectFromCpfpRefundSequence, err := bitcointransaction.GetAndValidateUserSequence(signingJob.DirectFromCpfpRefundTxSigningJob.RawTx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate user provided direct from cpfp refund tx sequence: %w", err)
+	}
+	if err := bitcointransaction.ValidateSequenceTimelock(userDirectFromCpfpRefundSequence, spark.InitialTimeLock+spark.DirectTimelockOffset); err != nil {
+		return nil, fmt.Errorf("failed to validate user provided direct from cpfp tx timelock: %w", err)
+	}
 	directFromCpfpRefundTx := wire.NewMsgTx(3)
 	directFromCpfpRefundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: wire.OutPoint{Hash: newNodeTx.TxHash(), Index: 0},
-		Sequence:         spark.InitialSequence() + spark.DirectTimelockOffset,
+		Sequence:         userDirectFromCpfpRefundSequence,
 	})
 	directFromCpfpRefundTx.AddTxOut(&wire.TxOut{
 		Value:    common.MaybeApplyFee(leafAmount),
