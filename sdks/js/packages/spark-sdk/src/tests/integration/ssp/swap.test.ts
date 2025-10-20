@@ -1,5 +1,4 @@
 import { describe, expect, it } from "@jest/globals";
-import { SparkWalletTesting } from "../../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../../utils/test-faucet.js";
 import { SparkWalletTestingWithStream } from "../../utils/spark-testing-wallet.js";
 

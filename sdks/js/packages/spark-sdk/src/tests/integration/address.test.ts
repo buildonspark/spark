@@ -1,7 +1,4 @@
 import { describe, expect } from "@jest/globals";
-import { ConfigOptions } from "../../services/wallet-config.js";
-import { isLegacySparkAddress } from "../../utils/address.js";
-import { NetworkType } from "../../utils/network.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 
 describe("address", () => {
@@ -13,15 +10,12 @@ describe("address", () => {
   ])(
     ".seedOrMnemonic(%s)",
     (seedOrMnemonic) => {
-      test.each([["LOCAL", "sparkl", "bcrt"]])(
+      test.each([["LOCAL", "sparkl", "bcrt"] as const])(
         `.network(%s)`,
         async (network, sparkAddressPrefix, blockchainAddressPrefix) => {
-          const options: ConfigOptions = {
-            network: network as NetworkType,
-          };
-          const { wallet, ...rest } = await SparkWalletTesting.initialize({
+          const { wallet } = await SparkWalletTesting.initialize({
             mnemonicOrSeed: seedOrMnemonic,
-            options,
+            options: { network },
           });
 
           expect(wallet).toBeDefined();
@@ -48,11 +42,10 @@ describe("address", () => {
           expect(addressMap.size).toBe(1);
 
           // Create a new wallet with the same seed or mnemonic
-          const { wallet: wallet2, ...rest2 } =
-            await SparkWalletTesting.initialize({
-              mnemonicOrSeed: seedOrMnemonic,
-              options,
-            });
+          const { wallet: wallet2 } = await SparkWalletTesting.initialize({
+            mnemonicOrSeed: seedOrMnemonic,
+            options: { network },
+          });
 
           expect(await wallet2.getIdentityPublicKey()).toEqual(
             await wallet.getIdentityPublicKey(),

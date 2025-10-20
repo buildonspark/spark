@@ -5,8 +5,6 @@ import { wordlist } from "@scure/bip39/wordlists/english";
 import { uuidv7 } from "uuidv7";
 import { RPCError } from "../../errors/types.js";
 import {
-  decodeSparkAddress,
-  isLegacySparkAddress,
   KeyDerivation,
   KeyDerivationType,
   SparkWalletEvent,
@@ -18,7 +16,7 @@ import { SigningService } from "../../services/signing.js";
 import type { LeafKeyTweak } from "../../services/transfer.js";
 import { TransferService } from "../../services/transfer.js";
 import {
-  ConfigOptions,
+  type ConfigOptions,
   getLocalSigningOperators,
   WalletConfig,
 } from "../../services/wallet-config.js";

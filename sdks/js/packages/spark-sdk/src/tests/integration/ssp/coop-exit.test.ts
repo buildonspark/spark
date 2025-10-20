@@ -5,7 +5,6 @@ import {
   SparkWalletTesting,
 } from "../../utils/spark-testing-wallet.js";
 import { getNewAddress } from "../../utils/regtest-test-faucet.js";
-import { ValidationError } from "../../../index.node.js";
 
 export const DEPOSIT_AMOUNT = 30_000n;
 

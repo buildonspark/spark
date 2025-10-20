@@ -6,7 +6,6 @@ import {
   CurrencyUnit,
   LightningReceiveRequestStatus,
 } from "../../../types/index.js";
-import { NetworkType } from "../../../utils/network.js";
 import { ValidationError } from "../../../errors/types.js";
 
 const options: ConfigOptions = {
