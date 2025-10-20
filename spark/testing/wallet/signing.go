@@ -42,6 +42,105 @@ func prepareFrostSigningJobsForUserSignedRefund(
 	signingCommitments []*pb.RequestedSigningCommitments,
 	receiverIdentityPubKey keys.Public,
 ) ([]*pbfrost.FrostSigningJob, [][]byte, []*objects.SigningCommitment, error) {
+	return prepareFrostSigningJobsForUserSignedRefundWithType(leaves, signingCommitments, receiverIdentityPubKey, true)
+}
+
+// prepareFrostSigningJobsForUserSignedRefundDirect creates signing jobs for direct refund transactions (with fee deduction)
+// This is used for DirectFromCPFP path, which spends from NodeTx
+func prepareFrostSigningJobsForUserSignedRefundDirect(
+	leaves []LeafKeyTweak,
+	signingCommitments []*pb.RequestedSigningCommitments,
+	receiverIdentityPubKey keys.Public,
+) ([]*pbfrost.FrostSigningJob, [][]byte, []*objects.SigningCommitment, error) {
+	return prepareFrostSigningJobsForUserSignedRefundWithType(leaves, signingCommitments, receiverIdentityPubKey, false)
+}
+
+// prepareFrostSigningJobsForDirectRefund creates signing jobs for direct refund transactions
+// This is used for Direct path, which spends from DirectTx (not NodeTx)
+func prepareFrostSigningJobsForDirectRefund(
+	leaves []LeafKeyTweak,
+	signingCommitments []*pb.RequestedSigningCommitments,
+	receiverIdentityPubKey keys.Public,
+) ([]*pbfrost.FrostSigningJob, [][]byte, []*objects.SigningCommitment, error) {
+	var signingJobs []*pbfrost.FrostSigningJob
+	refundTxs := make([][]byte, len(leaves))
+	userCommitments := make([]*objects.SigningCommitment, len(leaves))
+	if len(leaves) != len(signingCommitments) {
+		return nil, nil, nil, fmt.Errorf("mismatched lengths: leaves: %d, commitments: %d", len(leaves), len(signingCommitments))
+	}
+	for i, leaf := range leaves {
+		// Parse DirectTx (the parent transaction for direct refunds)
+		directTx, err := common.TxFromRawTxBytes(leaf.Leaf.DirectTx)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to parse direct tx: %w", err)
+		}
+		directOutPoint := wire.OutPoint{Hash: directTx.TxHash(), Index: 0}
+
+		// Parse current DirectRefundTx to get the timelock
+		currDirectRefundTx, err := common.TxFromRawTxBytes(leaf.Leaf.DirectRefundTx)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to parse direct refund tx: %w", err)
+		}
+		nextSequence, err := spark.NextSequence(currDirectRefundTx.TxIn[0].Sequence)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to get next sequence: %w", err)
+		}
+		nextSequence -= spark.DirectTimelockOffset
+		amountSats := directTx.TxOut[0].Value
+
+		// Create new direct refund tx with shorter timelock
+		_, directRefundTx, err := CreateRefundTxs(nextSequence, &directOutPoint, amountSats, receiverIdentityPubKey, true)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+
+		var refundBuf bytes.Buffer
+		err = directRefundTx.Serialize(&refundBuf)
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		refundTxs[i] = refundBuf.Bytes()
+
+		sighash, err := common.SigHashFromTx(directRefundTx, 0, directTx.TxOut[0])
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to calculate sighash: %w", err)
+		}
+
+		signingNonce, err := objects.RandomSigningNonce()
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		signingNonceProto, err := signingNonce.MarshalProto()
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		userCommitmentProto, err := signingNonce.SigningCommitment().MarshalProto()
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		userCommitments[i] = signingNonce.SigningCommitment()
+
+		userKeyPackage := CreateUserKeyPackage(leaf.SigningPrivKey)
+
+		signingJobs = append(signingJobs, &pbfrost.FrostSigningJob{
+			JobId:           leaf.Leaf.Id,
+			Message:         sighash,
+			KeyPackage:      userKeyPackage,
+			VerifyingKey:    leaf.Leaf.VerifyingPublicKey,
+			Nonce:           signingNonceProto,
+			Commitments:     signingCommitments[i].SigningNonceCommitments,
+			UserCommitments: userCommitmentProto,
+		})
+	}
+	return signingJobs, refundTxs, userCommitments, nil
+}
+
+func prepareFrostSigningJobsForUserSignedRefundWithType(
+	leaves []LeafKeyTweak,
+	signingCommitments []*pb.RequestedSigningCommitments,
+	receiverIdentityPubKey keys.Public,
+	useCPFP bool,
+) ([]*pbfrost.FrostSigningJob, [][]byte, []*objects.SigningCommitment, error) {
 	var signingJobs []*pbfrost.FrostSigningJob
 	refundTxs := make([][]byte, len(leaves))
 	userCommitments := make([]*objects.SigningCommitment, len(leaves))
@@ -62,19 +161,36 @@ func prepareFrostSigningJobsForUserSignedRefund(
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to get next sequence: %w", err)
 		}
-		amountSats := nodeTx.TxOut[0].Value
-		cpfpRefundTx, _, err := CreateRefundTxs(nextSequence, &nodeOutPoint, amountSats, receiverIdentityPubKey, false)
-		if err != nil {
-			return nil, nil, nil, err
+
+		if !useCPFP {
+			nextSequence = nextSequence + spark.DirectTimelockOffset
 		}
+
+		amountSats := nodeTx.TxOut[0].Value
+
+		var refundTx *wire.MsgTx
+		if useCPFP {
+			cpfpRefundTx, _, err := CreateRefundTxs(nextSequence, &nodeOutPoint, amountSats, receiverIdentityPubKey, false)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			refundTx = cpfpRefundTx
+		} else {
+			_, directRefundTx, err := CreateRefundTxs(nextSequence, &nodeOutPoint, amountSats, receiverIdentityPubKey, true)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			refundTx = directRefundTx
+		}
+
 		var refundBuf bytes.Buffer
-		err = cpfpRefundTx.Serialize(&refundBuf)
+		err = refundTx.Serialize(&refundBuf)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 		refundTxs[i] = refundBuf.Bytes()
 
-		sighash, err := common.SigHashFromTx(cpfpRefundTx, 0, nodeTx.TxOut[0])
+		sighash, err := common.SigHashFromTx(refundTx, 0, nodeTx.TxOut[0])
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("failed to calculate sighash: %w", err)
 		}
@@ -146,12 +262,12 @@ func prepareFrostSigningJobsForUserSignedRefundHTLC(
 				return nil, nil, nil, fmt.Errorf("failed to parse direct from cpfp refund tx: %w", err)
 			}
 		case PrepareFrostSigningJobsForUserSignedRefundHTLCTypeDirectRefund:
-			if len(leaf.Leaf.DirectRefundTx) == 0 {
-				return nil, nil, nil, fmt.Errorf("direct refund tx is empty for leaf id: %s", leaf.Leaf.Id)
+			if len(leaf.Leaf.DirectTx) == 0 {
+				return nil, nil, nil, fmt.Errorf("direct tx is empty for leaf id: %s", leaf.Leaf.Id)
 			}
-			nodeTx, err = common.TxFromRawTxBytes(leaf.Leaf.DirectRefundTx)
+			nodeTx, err = common.TxFromRawTxBytes(leaf.Leaf.DirectTx)
 			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to parse direct refund tx: %w", err)
+				return nil, nil, nil, fmt.Errorf("failed to parse direct tx: %w", err)
 			}
 		}
 

@@ -258,6 +258,55 @@ func QueryStaticDepositAddresses(
 	return addresses, nil
 }
 
+// preparedTxSigningArtifacts bundles the common artifacts needed to submit a tx
+// for signing and to later include in user signing jobs.
+type preparedTxSigningArtifacts struct {
+	rawTx      []byte
+	sighash    []byte
+	nonce      *pbfrost.SigningNonce
+	commitment *pbcommon.SigningCommitment
+	signingJob *pb.SigningJob
+}
+
+func prepareTxSigningArtifacts(tx *wire.MsgTx, prevTxOut *wire.TxOut, signingPublicKey []byte) (*preparedTxSigningArtifacts, error) {
+	var buf bytes.Buffer
+	if err := tx.Serialize(&buf); err != nil {
+		return nil, err
+	}
+
+	nonce, err := objects.RandomSigningNonce()
+	if err != nil {
+		return nil, err
+	}
+	nonceProto, err := nonce.MarshalProto()
+	if err != nil {
+		return nil, err
+	}
+	commitmentProto, err := nonce.SigningCommitment().MarshalProto()
+	if err != nil {
+		return nil, err
+	}
+
+	sighash, err := common.SigHashFromTx(tx, 0, prevTxOut)
+	if err != nil {
+		return nil, err
+	}
+
+	job := &pb.SigningJob{
+		RawTx:                  buf.Bytes(),
+		SigningPublicKey:       signingPublicKey,
+		SigningNonceCommitment: commitmentProto,
+	}
+
+	return &preparedTxSigningArtifacts{
+		rawTx:      buf.Bytes(),
+		sighash:    sighash,
+		nonce:      nonceProto,
+		commitment: commitmentProto,
+		signingJob: job,
+	}, nil
+}
+
 // CreateTreeRoot creates a tree root for a given deposit transaction.
 func CreateTreeRoot(
 	ctx context.Context,
@@ -273,23 +322,7 @@ func CreateTreeRoot(
 	// Create root tx
 	depositOutPoint := &wire.OutPoint{Hash: depositTx.TxHash(), Index: uint32(vout)}
 	rootTx := createRootTx(depositOutPoint, depositTx.TxOut[0])
-	var rootBuf bytes.Buffer
-	if err := rootTx.Serialize(&rootBuf); err != nil {
-		return nil, err
-	}
-	rootNonce, err := objects.RandomSigningNonce()
-	if err != nil {
-		return nil, err
-	}
-	rootNonceProto, err := rootNonce.MarshalProto()
-	if err != nil {
-		return nil, err
-	}
-	rootNonceCommitmentProto, err := rootNonce.SigningCommitment().MarshalProto()
-	if err != nil {
-		return nil, err
-	}
-	rootTxSighash, err := common.SigHashFromTx(rootTx, 0, depositTx.TxOut[0])
+	rootPrepared, err := prepareTxSigningArtifacts(rootTx, depositTx.TxOut[0], signingPubKeyBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -299,9 +332,56 @@ func CreateTreeRoot(
 		return nil, err
 	}
 
-	// Create refund tx
+	initialRefundSequence, err := spark.NextSequence(spark.InitialSequence())
+	if err != nil {
+		return nil, err
+	}
+
+	// Create CPFP refund tx
 	cpfpRefundTx, _, err := CreateRefundTxs(
-		spark.InitialSequence(),
+		initialRefundSequence,
+		&wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
+		rootTx.TxOut[0].Value,
+		signingPubKey,
+		false,
+	)
+	if err != nil {
+		return nil, err
+	}
+	refundPrepared, err := prepareTxSigningArtifacts(cpfpRefundTx, rootTx.TxOut[0], signingPubKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create Direct Root Tx
+	directRootTx := wire.NewMsgTx(3)
+	directRootTx.AddTxIn(wire.NewTxIn(depositOutPoint, nil, nil))
+	directRootAmount := common.MaybeApplyFee(depositTx.TxOut[vout].Value)
+	directRootTx.AddTxOut(wire.NewTxOut(directRootAmount, depositTx.TxOut[vout].PkScript))
+	directRootPrepared, err := prepareTxSigningArtifacts(directRootTx, depositTx.TxOut[vout], signingPubKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create Direct Refund Tx
+	_, directRefundTx, err := CreateRefundTxs(
+		initialRefundSequence,
+		&wire.OutPoint{Hash: directRootTx.TxHash(), Index: 0},
+		directRootTx.TxOut[0].Value,
+		signingPubKey,
+		true,
+	)
+	if err != nil {
+		return nil, err
+	}
+	directRefundPrepared, err := prepareTxSigningArtifacts(directRefundTx, directRootTx.TxOut[0], signingPubKeyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create Direct-From-CPFP Refund Tx
+	_, directFromCpfpRefundTx, err := CreateRefundTxs(
+		initialRefundSequence,
 		&wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
 		rootTx.TxOut[0].Value,
 		signingPubKey,
@@ -310,24 +390,7 @@ func CreateTreeRoot(
 	if err != nil {
 		return nil, err
 	}
-	var refundBuf bytes.Buffer
-	err = cpfpRefundTx.Serialize(&refundBuf)
-	if err != nil {
-		return nil, err
-	}
-	refundNonce, err := objects.RandomSigningNonce()
-	if err != nil {
-		return nil, err
-	}
-	refundNonceProto, err := refundNonce.MarshalProto()
-	if err != nil {
-		return nil, err
-	}
-	refundNonceCommitmentProto, err := refundNonce.SigningCommitment().MarshalProto()
-	if err != nil {
-		return nil, err
-	}
-	refundTxSighash, err := common.SigHashFromTx(cpfpRefundTx, 0, rootTx.TxOut[0])
+	directFromCpfpRefundPrepared, err := prepareTxSigningArtifacts(directFromCpfpRefundTx, rootTx.TxOut[0], signingPubKeyBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -346,16 +409,11 @@ func CreateTreeRoot(
 			RawTx:   depositBuf.Bytes(),
 			Network: config.ProtoNetwork(),
 		},
-		RootTxSigningJob: &pb.SigningJob{
-			RawTx:                  rootBuf.Bytes(),
-			SigningPublicKey:       signingPubKeyBytes,
-			SigningNonceCommitment: rootNonceCommitmentProto,
-		},
-		RefundTxSigningJob: &pb.SigningJob{
-			RawTx:                  refundBuf.Bytes(),
-			SigningPublicKey:       signingPubKeyBytes,
-			SigningNonceCommitment: refundNonceCommitmentProto,
-		},
+		RootTxSigningJob:                 rootPrepared.signingJob,
+		RefundTxSigningJob:               refundPrepared.signingJob,
+		DirectRootTxSigningJob:           directRootPrepared.signingJob,
+		DirectRefundTxSigningJob:         directRefundPrepared.signingJob,
+		DirectFromCpfpRefundTxSigningJob: directFromCpfpRefundPrepared.signingJob,
 	})
 	if err != nil {
 		return nil, err
@@ -377,24 +435,54 @@ func CreateTreeRoot(
 
 	nodeJobID := uuid.NewString()
 	refundJobID := uuid.NewString()
+	directRootJobID := uuid.NewString()
+	directRefundJobID := uuid.NewString()
+	directFromCpfpRefundJobID := uuid.NewString()
 	userSigningJobs := []*pbfrost.FrostSigningJob{
 		{
 			JobId:           nodeJobID,
-			Message:         rootTxSighash,
+			Message:         rootPrepared.sighash,
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    verifyingKey.Serialize(),
-			Nonce:           rootNonceProto,
+			Nonce:           rootPrepared.nonce,
 			Commitments:     treeResponse.RootNodeSignatureShares.NodeTxSigningResult.SigningNonceCommitments,
-			UserCommitments: rootNonceCommitmentProto,
+			UserCommitments: rootPrepared.commitment,
 		},
 		{
 			JobId:           refundJobID,
-			Message:         refundTxSighash,
+			Message:         refundPrepared.sighash,
 			KeyPackage:      userKeyPackage,
 			VerifyingKey:    treeResponse.RootNodeSignatureShares.VerifyingKey,
-			Nonce:           refundNonceProto,
+			Nonce:           refundPrepared.nonce,
 			Commitments:     treeResponse.RootNodeSignatureShares.RefundTxSigningResult.SigningNonceCommitments,
-			UserCommitments: refundNonceCommitmentProto,
+			UserCommitments: refundPrepared.commitment,
+		},
+		{
+			JobId:           directRootJobID,
+			Message:         directRootPrepared.sighash,
+			KeyPackage:      userKeyPackage,
+			VerifyingKey:    treeResponse.RootNodeSignatureShares.VerifyingKey,
+			Nonce:           directRootPrepared.nonce,
+			Commitments:     treeResponse.RootNodeSignatureShares.DirectNodeTxSigningResult.SigningNonceCommitments,
+			UserCommitments: directRootPrepared.commitment,
+		},
+		{
+			JobId:           directRefundJobID,
+			Message:         directRefundPrepared.sighash,
+			KeyPackage:      userKeyPackage,
+			VerifyingKey:    treeResponse.RootNodeSignatureShares.VerifyingKey,
+			Nonce:           directRefundPrepared.nonce,
+			Commitments:     treeResponse.RootNodeSignatureShares.DirectRefundTxSigningResult.SigningNonceCommitments,
+			UserCommitments: directRefundPrepared.commitment,
+		},
+		{
+			JobId:           directFromCpfpRefundJobID,
+			Message:         directFromCpfpRefundPrepared.sighash,
+			KeyPackage:      userKeyPackage,
+			VerifyingKey:    treeResponse.RootNodeSignatureShares.VerifyingKey,
+			Nonce:           directFromCpfpRefundPrepared.nonce,
+			Commitments:     treeResponse.RootNodeSignatureShares.DirectFromCpfpRefundTxSigningResult.SigningNonceCommitments,
+			UserCommitments: directFromCpfpRefundPrepared.commitment,
 		},
 	}
 
@@ -415,12 +503,12 @@ func CreateTreeRoot(
 	}
 
 	rootSignature, err := frostClient.AggregateFrost(context.Background(), &pbfrost.AggregateFrostRequest{
-		Message:            rootTxSighash,
+		Message:            rootPrepared.sighash,
 		SignatureShares:    treeResponse.RootNodeSignatureShares.NodeTxSigningResult.SignatureShares,
 		PublicShares:       treeResponse.RootNodeSignatureShares.NodeTxSigningResult.PublicKeys,
 		VerifyingKey:       verifyingKey.Serialize(),
 		Commitments:        treeResponse.RootNodeSignatureShares.NodeTxSigningResult.SigningNonceCommitments,
-		UserCommitments:    rootNonceCommitmentProto,
+		UserCommitments:    rootPrepared.commitment,
 		UserPublicKey:      signingPubKeyBytes,
 		UserSignatureShare: userSignatures.Results[nodeJobID].SignatureShare,
 	})
@@ -429,14 +517,56 @@ func CreateTreeRoot(
 	}
 
 	refundSignature, err := frostClient.AggregateFrost(context.Background(), &pbfrost.AggregateFrostRequest{
-		Message:            refundTxSighash,
+		Message:            refundPrepared.sighash,
 		SignatureShares:    treeResponse.RootNodeSignatureShares.RefundTxSigningResult.SignatureShares,
 		PublicShares:       treeResponse.RootNodeSignatureShares.RefundTxSigningResult.PublicKeys,
 		VerifyingKey:       verifyingKey.Serialize(),
 		Commitments:        treeResponse.RootNodeSignatureShares.RefundTxSigningResult.SigningNonceCommitments,
-		UserCommitments:    refundNonceCommitmentProto,
+		UserCommitments:    refundPrepared.commitment,
 		UserPublicKey:      signingPubKeyBytes,
 		UserSignatureShare: userSignatures.Results[refundJobID].SignatureShare,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	directRootSignature, err := frostClient.AggregateFrost(context.Background(), &pbfrost.AggregateFrostRequest{
+		Message:            directRootPrepared.sighash,
+		SignatureShares:    treeResponse.RootNodeSignatureShares.DirectNodeTxSigningResult.SignatureShares,
+		PublicShares:       treeResponse.RootNodeSignatureShares.DirectNodeTxSigningResult.PublicKeys,
+		VerifyingKey:       verifyingKey.Serialize(),
+		Commitments:        treeResponse.RootNodeSignatureShares.DirectNodeTxSigningResult.SigningNonceCommitments,
+		UserCommitments:    directRootPrepared.commitment,
+		UserPublicKey:      signingPubKeyBytes,
+		UserSignatureShare: userSignatures.Results[directRootJobID].SignatureShare,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	directRefundSignature, err := frostClient.AggregateFrost(context.Background(), &pbfrost.AggregateFrostRequest{
+		Message:            directRefundPrepared.sighash,
+		SignatureShares:    treeResponse.RootNodeSignatureShares.DirectRefundTxSigningResult.SignatureShares,
+		PublicShares:       treeResponse.RootNodeSignatureShares.DirectRefundTxSigningResult.PublicKeys,
+		VerifyingKey:       verifyingKey.Serialize(),
+		Commitments:        treeResponse.RootNodeSignatureShares.DirectRefundTxSigningResult.SigningNonceCommitments,
+		UserCommitments:    directRefundPrepared.commitment,
+		UserPublicKey:      signingPubKeyBytes,
+		UserSignatureShare: userSignatures.Results[directRefundJobID].SignatureShare,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	directFromCpfpRefundSignature, err := frostClient.AggregateFrost(context.Background(), &pbfrost.AggregateFrostRequest{
+		Message:            directFromCpfpRefundPrepared.sighash,
+		SignatureShares:    treeResponse.RootNodeSignatureShares.DirectFromCpfpRefundTxSigningResult.SignatureShares,
+		PublicShares:       treeResponse.RootNodeSignatureShares.DirectFromCpfpRefundTxSigningResult.PublicKeys,
+		VerifyingKey:       verifyingKey.Serialize(),
+		Commitments:        treeResponse.RootNodeSignatureShares.DirectFromCpfpRefundTxSigningResult.SigningNonceCommitments,
+		UserCommitments:    directFromCpfpRefundPrepared.commitment,
+		UserPublicKey:      signingPubKeyBytes,
+		UserSignatureShare: userSignatures.Results[directFromCpfpRefundJobID].SignatureShare,
 	})
 	if err != nil {
 		return nil, err
@@ -446,9 +576,12 @@ func CreateTreeRoot(
 		Intent: pbcommon.SignatureIntent_CREATION,
 		NodeSignatures: []*pb.NodeSignatures{
 			{
-				NodeId:            treeResponse.RootNodeSignatureShares.NodeId,
-				NodeTxSignature:   rootSignature.Signature,
-				RefundTxSignature: refundSignature.Signature,
+				NodeId:                          treeResponse.RootNodeSignatureShares.NodeId,
+				NodeTxSignature:                 rootSignature.Signature,
+				RefundTxSignature:               refundSignature.Signature,
+				DirectNodeTxSignature:           directRootSignature.Signature,
+				DirectRefundTxSignature:         directRefundSignature.Signature,
+				DirectFromCpfpRefundTxSignature: directFromCpfpRefundSignature.Signature,
 			},
 		},
 	})
