@@ -19242,30 +19242,33 @@ func (m *TransferMutation) ResetEdge(name string) error {
 // TransferLeafMutation represents an operation that mutates the TransferLeaf nodes in the graph.
 type TransferLeafMutation struct {
 	config
-	op                                      Op
-	typ                                     string
-	id                                      *uuid.UUID
-	create_time                             *time.Time
-	update_time                             *time.Time
-	secret_cipher                           *[]byte
-	signature                               *[]byte
-	previous_refund_tx                      *[]byte
-	previous_direct_refund_tx               *[]byte
-	previous_direct_from_cpfp_refund_tx     *[]byte
-	intermediate_refund_tx                  *[]byte
-	intermediate_direct_refund_tx           *[]byte
-	intermediate_direct_from_cpfp_refund_tx *[]byte
-	key_tweak                               *[]byte
-	sender_key_tweak_proof                  *[]byte
-	receiver_key_tweak                      *[]byte
-	clearedFields                           map[string]struct{}
-	transfer                                *uuid.UUID
-	clearedtransfer                         bool
-	leaf                                    *uuid.UUID
-	clearedleaf                             bool
-	done                                    bool
-	oldValue                                func(context.Context) (*TransferLeaf, error)
-	predicates                              []predicate.TransferLeaf
+	op                                        Op
+	typ                                       string
+	id                                        *uuid.UUID
+	create_time                               *time.Time
+	update_time                               *time.Time
+	secret_cipher                             *[]byte
+	signature                                 *[]byte
+	previous_refund_tx                        *[]byte
+	previous_direct_refund_tx                 *[]byte
+	previous_direct_from_cpfp_refund_tx       *[]byte
+	intermediate_refund_tx                    *[]byte
+	intermediate_direct_refund_tx             *[]byte
+	intermediate_direct_from_cpfp_refund_tx   *[]byte
+	intermediate_refund_txid                  *[]byte
+	intermediate_direct_refund_txid           *[]byte
+	intermediate_direct_from_cpfp_refund_txid *[]byte
+	key_tweak                                 *[]byte
+	sender_key_tweak_proof                    *[]byte
+	receiver_key_tweak                        *[]byte
+	clearedFields                             map[string]struct{}
+	transfer                                  *uuid.UUID
+	clearedtransfer                           bool
+	leaf                                      *uuid.UUID
+	clearedleaf                               bool
+	done                                      bool
+	oldValue                                  func(context.Context) (*TransferLeaf, error)
+	predicates                                []predicate.TransferLeaf
 }
 
 var _ ent.Mutation = (*TransferLeafMutation)(nil)
@@ -19810,6 +19813,153 @@ func (m *TransferLeafMutation) ResetIntermediateDirectFromCpfpRefundTx() {
 	delete(m.clearedFields, transferleaf.FieldIntermediateDirectFromCpfpRefundTx)
 }
 
+// SetIntermediateRefundTxid sets the "intermediate_refund_txid" field.
+func (m *TransferLeafMutation) SetIntermediateRefundTxid(b []byte) {
+	m.intermediate_refund_txid = &b
+}
+
+// IntermediateRefundTxid returns the value of the "intermediate_refund_txid" field in the mutation.
+func (m *TransferLeafMutation) IntermediateRefundTxid() (r []byte, exists bool) {
+	v := m.intermediate_refund_txid
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIntermediateRefundTxid returns the old "intermediate_refund_txid" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldIntermediateRefundTxid(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIntermediateRefundTxid is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIntermediateRefundTxid requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIntermediateRefundTxid: %w", err)
+	}
+	return oldValue.IntermediateRefundTxid, nil
+}
+
+// ClearIntermediateRefundTxid clears the value of the "intermediate_refund_txid" field.
+func (m *TransferLeafMutation) ClearIntermediateRefundTxid() {
+	m.intermediate_refund_txid = nil
+	m.clearedFields[transferleaf.FieldIntermediateRefundTxid] = struct{}{}
+}
+
+// IntermediateRefundTxidCleared returns if the "intermediate_refund_txid" field was cleared in this mutation.
+func (m *TransferLeafMutation) IntermediateRefundTxidCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldIntermediateRefundTxid]
+	return ok
+}
+
+// ResetIntermediateRefundTxid resets all changes to the "intermediate_refund_txid" field.
+func (m *TransferLeafMutation) ResetIntermediateRefundTxid() {
+	m.intermediate_refund_txid = nil
+	delete(m.clearedFields, transferleaf.FieldIntermediateRefundTxid)
+}
+
+// SetIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field.
+func (m *TransferLeafMutation) SetIntermediateDirectRefundTxid(b []byte) {
+	m.intermediate_direct_refund_txid = &b
+}
+
+// IntermediateDirectRefundTxid returns the value of the "intermediate_direct_refund_txid" field in the mutation.
+func (m *TransferLeafMutation) IntermediateDirectRefundTxid() (r []byte, exists bool) {
+	v := m.intermediate_direct_refund_txid
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIntermediateDirectRefundTxid returns the old "intermediate_direct_refund_txid" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldIntermediateDirectRefundTxid(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIntermediateDirectRefundTxid is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIntermediateDirectRefundTxid requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIntermediateDirectRefundTxid: %w", err)
+	}
+	return oldValue.IntermediateDirectRefundTxid, nil
+}
+
+// ClearIntermediateDirectRefundTxid clears the value of the "intermediate_direct_refund_txid" field.
+func (m *TransferLeafMutation) ClearIntermediateDirectRefundTxid() {
+	m.intermediate_direct_refund_txid = nil
+	m.clearedFields[transferleaf.FieldIntermediateDirectRefundTxid] = struct{}{}
+}
+
+// IntermediateDirectRefundTxidCleared returns if the "intermediate_direct_refund_txid" field was cleared in this mutation.
+func (m *TransferLeafMutation) IntermediateDirectRefundTxidCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldIntermediateDirectRefundTxid]
+	return ok
+}
+
+// ResetIntermediateDirectRefundTxid resets all changes to the "intermediate_direct_refund_txid" field.
+func (m *TransferLeafMutation) ResetIntermediateDirectRefundTxid() {
+	m.intermediate_direct_refund_txid = nil
+	delete(m.clearedFields, transferleaf.FieldIntermediateDirectRefundTxid)
+}
+
+// SetIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field.
+func (m *TransferLeafMutation) SetIntermediateDirectFromCpfpRefundTxid(b []byte) {
+	m.intermediate_direct_from_cpfp_refund_txid = &b
+}
+
+// IntermediateDirectFromCpfpRefundTxid returns the value of the "intermediate_direct_from_cpfp_refund_txid" field in the mutation.
+func (m *TransferLeafMutation) IntermediateDirectFromCpfpRefundTxid() (r []byte, exists bool) {
+	v := m.intermediate_direct_from_cpfp_refund_txid
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIntermediateDirectFromCpfpRefundTxid returns the old "intermediate_direct_from_cpfp_refund_txid" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldIntermediateDirectFromCpfpRefundTxid(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIntermediateDirectFromCpfpRefundTxid is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIntermediateDirectFromCpfpRefundTxid requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIntermediateDirectFromCpfpRefundTxid: %w", err)
+	}
+	return oldValue.IntermediateDirectFromCpfpRefundTxid, nil
+}
+
+// ClearIntermediateDirectFromCpfpRefundTxid clears the value of the "intermediate_direct_from_cpfp_refund_txid" field.
+func (m *TransferLeafMutation) ClearIntermediateDirectFromCpfpRefundTxid() {
+	m.intermediate_direct_from_cpfp_refund_txid = nil
+	m.clearedFields[transferleaf.FieldIntermediateDirectFromCpfpRefundTxid] = struct{}{}
+}
+
+// IntermediateDirectFromCpfpRefundTxidCleared returns if the "intermediate_direct_from_cpfp_refund_txid" field was cleared in this mutation.
+func (m *TransferLeafMutation) IntermediateDirectFromCpfpRefundTxidCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldIntermediateDirectFromCpfpRefundTxid]
+	return ok
+}
+
+// ResetIntermediateDirectFromCpfpRefundTxid resets all changes to the "intermediate_direct_from_cpfp_refund_txid" field.
+func (m *TransferLeafMutation) ResetIntermediateDirectFromCpfpRefundTxid() {
+	m.intermediate_direct_from_cpfp_refund_txid = nil
+	delete(m.clearedFields, transferleaf.FieldIntermediateDirectFromCpfpRefundTxid)
+}
+
 // SetKeyTweak sets the "key_tweak" field.
 func (m *TransferLeafMutation) SetKeyTweak(b []byte) {
 	m.key_tweak = &b
@@ -20069,7 +20219,7 @@ func (m *TransferLeafMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TransferLeafMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 16)
 	if m.create_time != nil {
 		fields = append(fields, transferleaf.FieldCreateTime)
 	}
@@ -20099,6 +20249,15 @@ func (m *TransferLeafMutation) Fields() []string {
 	}
 	if m.intermediate_direct_from_cpfp_refund_tx != nil {
 		fields = append(fields, transferleaf.FieldIntermediateDirectFromCpfpRefundTx)
+	}
+	if m.intermediate_refund_txid != nil {
+		fields = append(fields, transferleaf.FieldIntermediateRefundTxid)
+	}
+	if m.intermediate_direct_refund_txid != nil {
+		fields = append(fields, transferleaf.FieldIntermediateDirectRefundTxid)
+	}
+	if m.intermediate_direct_from_cpfp_refund_txid != nil {
+		fields = append(fields, transferleaf.FieldIntermediateDirectFromCpfpRefundTxid)
 	}
 	if m.key_tweak != nil {
 		fields = append(fields, transferleaf.FieldKeyTweak)
@@ -20137,6 +20296,12 @@ func (m *TransferLeafMutation) Field(name string) (ent.Value, bool) {
 		return m.IntermediateDirectRefundTx()
 	case transferleaf.FieldIntermediateDirectFromCpfpRefundTx:
 		return m.IntermediateDirectFromCpfpRefundTx()
+	case transferleaf.FieldIntermediateRefundTxid:
+		return m.IntermediateRefundTxid()
+	case transferleaf.FieldIntermediateDirectRefundTxid:
+		return m.IntermediateDirectRefundTxid()
+	case transferleaf.FieldIntermediateDirectFromCpfpRefundTxid:
+		return m.IntermediateDirectFromCpfpRefundTxid()
 	case transferleaf.FieldKeyTweak:
 		return m.KeyTweak()
 	case transferleaf.FieldSenderKeyTweakProof:
@@ -20172,6 +20337,12 @@ func (m *TransferLeafMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldIntermediateDirectRefundTx(ctx)
 	case transferleaf.FieldIntermediateDirectFromCpfpRefundTx:
 		return m.OldIntermediateDirectFromCpfpRefundTx(ctx)
+	case transferleaf.FieldIntermediateRefundTxid:
+		return m.OldIntermediateRefundTxid(ctx)
+	case transferleaf.FieldIntermediateDirectRefundTxid:
+		return m.OldIntermediateDirectRefundTxid(ctx)
+	case transferleaf.FieldIntermediateDirectFromCpfpRefundTxid:
+		return m.OldIntermediateDirectFromCpfpRefundTxid(ctx)
 	case transferleaf.FieldKeyTweak:
 		return m.OldKeyTweak(ctx)
 	case transferleaf.FieldSenderKeyTweakProof:
@@ -20257,6 +20428,27 @@ func (m *TransferLeafMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetIntermediateDirectFromCpfpRefundTx(v)
 		return nil
+	case transferleaf.FieldIntermediateRefundTxid:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIntermediateRefundTxid(v)
+		return nil
+	case transferleaf.FieldIntermediateDirectRefundTxid:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIntermediateDirectRefundTxid(v)
+		return nil
+	case transferleaf.FieldIntermediateDirectFromCpfpRefundTxid:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIntermediateDirectFromCpfpRefundTxid(v)
+		return nil
 	case transferleaf.FieldKeyTweak:
 		v, ok := value.([]byte)
 		if !ok {
@@ -20326,6 +20518,15 @@ func (m *TransferLeafMutation) ClearedFields() []string {
 	if m.FieldCleared(transferleaf.FieldIntermediateDirectFromCpfpRefundTx) {
 		fields = append(fields, transferleaf.FieldIntermediateDirectFromCpfpRefundTx)
 	}
+	if m.FieldCleared(transferleaf.FieldIntermediateRefundTxid) {
+		fields = append(fields, transferleaf.FieldIntermediateRefundTxid)
+	}
+	if m.FieldCleared(transferleaf.FieldIntermediateDirectRefundTxid) {
+		fields = append(fields, transferleaf.FieldIntermediateDirectRefundTxid)
+	}
+	if m.FieldCleared(transferleaf.FieldIntermediateDirectFromCpfpRefundTxid) {
+		fields = append(fields, transferleaf.FieldIntermediateDirectFromCpfpRefundTxid)
+	}
 	if m.FieldCleared(transferleaf.FieldKeyTweak) {
 		fields = append(fields, transferleaf.FieldKeyTweak)
 	}
@@ -20366,6 +20567,15 @@ func (m *TransferLeafMutation) ClearField(name string) error {
 		return nil
 	case transferleaf.FieldIntermediateDirectFromCpfpRefundTx:
 		m.ClearIntermediateDirectFromCpfpRefundTx()
+		return nil
+	case transferleaf.FieldIntermediateRefundTxid:
+		m.ClearIntermediateRefundTxid()
+		return nil
+	case transferleaf.FieldIntermediateDirectRefundTxid:
+		m.ClearIntermediateDirectRefundTxid()
+		return nil
+	case transferleaf.FieldIntermediateDirectFromCpfpRefundTxid:
+		m.ClearIntermediateDirectFromCpfpRefundTxid()
 		return nil
 	case transferleaf.FieldKeyTweak:
 		m.ClearKeyTweak()
@@ -20413,6 +20623,15 @@ func (m *TransferLeafMutation) ResetField(name string) error {
 		return nil
 	case transferleaf.FieldIntermediateDirectFromCpfpRefundTx:
 		m.ResetIntermediateDirectFromCpfpRefundTx()
+		return nil
+	case transferleaf.FieldIntermediateRefundTxid:
+		m.ResetIntermediateRefundTxid()
+		return nil
+	case transferleaf.FieldIntermediateDirectRefundTxid:
+		m.ResetIntermediateDirectRefundTxid()
+		return nil
+	case transferleaf.FieldIntermediateDirectFromCpfpRefundTxid:
+		m.ResetIntermediateDirectFromCpfpRefundTxid()
 		return nil
 	case transferleaf.FieldKeyTweak:
 		m.ResetKeyTweak()

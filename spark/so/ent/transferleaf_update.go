@@ -92,6 +92,42 @@ func (tlu *TransferLeafUpdate) ClearIntermediateDirectFromCpfpRefundTx() *Transf
 	return tlu
 }
 
+// SetIntermediateRefundTxid sets the "intermediate_refund_txid" field.
+func (tlu *TransferLeafUpdate) SetIntermediateRefundTxid(b []byte) *TransferLeafUpdate {
+	tlu.mutation.SetIntermediateRefundTxid(b)
+	return tlu
+}
+
+// ClearIntermediateRefundTxid clears the value of the "intermediate_refund_txid" field.
+func (tlu *TransferLeafUpdate) ClearIntermediateRefundTxid() *TransferLeafUpdate {
+	tlu.mutation.ClearIntermediateRefundTxid()
+	return tlu
+}
+
+// SetIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field.
+func (tlu *TransferLeafUpdate) SetIntermediateDirectRefundTxid(b []byte) *TransferLeafUpdate {
+	tlu.mutation.SetIntermediateDirectRefundTxid(b)
+	return tlu
+}
+
+// ClearIntermediateDirectRefundTxid clears the value of the "intermediate_direct_refund_txid" field.
+func (tlu *TransferLeafUpdate) ClearIntermediateDirectRefundTxid() *TransferLeafUpdate {
+	tlu.mutation.ClearIntermediateDirectRefundTxid()
+	return tlu
+}
+
+// SetIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field.
+func (tlu *TransferLeafUpdate) SetIntermediateDirectFromCpfpRefundTxid(b []byte) *TransferLeafUpdate {
+	tlu.mutation.SetIntermediateDirectFromCpfpRefundTxid(b)
+	return tlu
+}
+
+// ClearIntermediateDirectFromCpfpRefundTxid clears the value of the "intermediate_direct_from_cpfp_refund_txid" field.
+func (tlu *TransferLeafUpdate) ClearIntermediateDirectFromCpfpRefundTxid() *TransferLeafUpdate {
+	tlu.mutation.ClearIntermediateDirectFromCpfpRefundTxid()
+	return tlu
+}
+
 // SetKeyTweak sets the "key_tweak" field.
 func (tlu *TransferLeafUpdate) SetKeyTweak(b []byte) *TransferLeafUpdate {
 	tlu.mutation.SetKeyTweak(b)
@@ -273,6 +309,24 @@ func (tlu *TransferLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if tlu.mutation.IntermediateDirectFromCpfpRefundTxCleared() {
 		_spec.ClearField(transferleaf.FieldIntermediateDirectFromCpfpRefundTx, field.TypeBytes)
 	}
+	if value, ok := tlu.mutation.IntermediateRefundTxid(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateRefundTxid, field.TypeBytes, value)
+	}
+	if tlu.mutation.IntermediateRefundTxidCleared() {
+		_spec.ClearField(transferleaf.FieldIntermediateRefundTxid, field.TypeBytes)
+	}
+	if value, ok := tlu.mutation.IntermediateDirectRefundTxid(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateDirectRefundTxid, field.TypeBytes, value)
+	}
+	if tlu.mutation.IntermediateDirectRefundTxidCleared() {
+		_spec.ClearField(transferleaf.FieldIntermediateDirectRefundTxid, field.TypeBytes)
+	}
+	if value, ok := tlu.mutation.IntermediateDirectFromCpfpRefundTxid(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateDirectFromCpfpRefundTxid, field.TypeBytes, value)
+	}
+	if tlu.mutation.IntermediateDirectFromCpfpRefundTxidCleared() {
+		_spec.ClearField(transferleaf.FieldIntermediateDirectFromCpfpRefundTxid, field.TypeBytes)
+	}
 	if value, ok := tlu.mutation.KeyTweak(); ok {
 		_spec.SetField(transferleaf.FieldKeyTweak, field.TypeBytes, value)
 	}
@@ -428,6 +482,42 @@ func (tluo *TransferLeafUpdateOne) SetIntermediateDirectFromCpfpRefundTx(b []byt
 // ClearIntermediateDirectFromCpfpRefundTx clears the value of the "intermediate_direct_from_cpfp_refund_tx" field.
 func (tluo *TransferLeafUpdateOne) ClearIntermediateDirectFromCpfpRefundTx() *TransferLeafUpdateOne {
 	tluo.mutation.ClearIntermediateDirectFromCpfpRefundTx()
+	return tluo
+}
+
+// SetIntermediateRefundTxid sets the "intermediate_refund_txid" field.
+func (tluo *TransferLeafUpdateOne) SetIntermediateRefundTxid(b []byte) *TransferLeafUpdateOne {
+	tluo.mutation.SetIntermediateRefundTxid(b)
+	return tluo
+}
+
+// ClearIntermediateRefundTxid clears the value of the "intermediate_refund_txid" field.
+func (tluo *TransferLeafUpdateOne) ClearIntermediateRefundTxid() *TransferLeafUpdateOne {
+	tluo.mutation.ClearIntermediateRefundTxid()
+	return tluo
+}
+
+// SetIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field.
+func (tluo *TransferLeafUpdateOne) SetIntermediateDirectRefundTxid(b []byte) *TransferLeafUpdateOne {
+	tluo.mutation.SetIntermediateDirectRefundTxid(b)
+	return tluo
+}
+
+// ClearIntermediateDirectRefundTxid clears the value of the "intermediate_direct_refund_txid" field.
+func (tluo *TransferLeafUpdateOne) ClearIntermediateDirectRefundTxid() *TransferLeafUpdateOne {
+	tluo.mutation.ClearIntermediateDirectRefundTxid()
+	return tluo
+}
+
+// SetIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field.
+func (tluo *TransferLeafUpdateOne) SetIntermediateDirectFromCpfpRefundTxid(b []byte) *TransferLeafUpdateOne {
+	tluo.mutation.SetIntermediateDirectFromCpfpRefundTxid(b)
+	return tluo
+}
+
+// ClearIntermediateDirectFromCpfpRefundTxid clears the value of the "intermediate_direct_from_cpfp_refund_txid" field.
+func (tluo *TransferLeafUpdateOne) ClearIntermediateDirectFromCpfpRefundTxid() *TransferLeafUpdateOne {
+	tluo.mutation.ClearIntermediateDirectFromCpfpRefundTxid()
 	return tluo
 }
 
@@ -641,6 +731,24 @@ func (tluo *TransferLeafUpdateOne) sqlSave(ctx context.Context) (_node *Transfer
 	}
 	if tluo.mutation.IntermediateDirectFromCpfpRefundTxCleared() {
 		_spec.ClearField(transferleaf.FieldIntermediateDirectFromCpfpRefundTx, field.TypeBytes)
+	}
+	if value, ok := tluo.mutation.IntermediateRefundTxid(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateRefundTxid, field.TypeBytes, value)
+	}
+	if tluo.mutation.IntermediateRefundTxidCleared() {
+		_spec.ClearField(transferleaf.FieldIntermediateRefundTxid, field.TypeBytes)
+	}
+	if value, ok := tluo.mutation.IntermediateDirectRefundTxid(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateDirectRefundTxid, field.TypeBytes, value)
+	}
+	if tluo.mutation.IntermediateDirectRefundTxidCleared() {
+		_spec.ClearField(transferleaf.FieldIntermediateDirectRefundTxid, field.TypeBytes)
+	}
+	if value, ok := tluo.mutation.IntermediateDirectFromCpfpRefundTxid(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateDirectFromCpfpRefundTxid, field.TypeBytes, value)
+	}
+	if tluo.mutation.IntermediateDirectFromCpfpRefundTxidCleared() {
+		_spec.ClearField(transferleaf.FieldIntermediateDirectFromCpfpRefundTxid, field.TypeBytes)
 	}
 	if value, ok := tluo.mutation.KeyTweak(); ok {
 		_spec.SetField(transferleaf.FieldKeyTweak, field.TypeBytes, value)

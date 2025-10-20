@@ -102,6 +102,24 @@ func (tlc *TransferLeafCreate) SetIntermediateDirectFromCpfpRefundTx(b []byte) *
 	return tlc
 }
 
+// SetIntermediateRefundTxid sets the "intermediate_refund_txid" field.
+func (tlc *TransferLeafCreate) SetIntermediateRefundTxid(b []byte) *TransferLeafCreate {
+	tlc.mutation.SetIntermediateRefundTxid(b)
+	return tlc
+}
+
+// SetIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field.
+func (tlc *TransferLeafCreate) SetIntermediateDirectRefundTxid(b []byte) *TransferLeafCreate {
+	tlc.mutation.SetIntermediateDirectRefundTxid(b)
+	return tlc
+}
+
+// SetIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field.
+func (tlc *TransferLeafCreate) SetIntermediateDirectFromCpfpRefundTxid(b []byte) *TransferLeafCreate {
+	tlc.mutation.SetIntermediateDirectFromCpfpRefundTxid(b)
+	return tlc
+}
+
 // SetKeyTweak sets the "key_tweak" field.
 func (tlc *TransferLeafCreate) SetKeyTweak(b []byte) *TransferLeafCreate {
 	tlc.mutation.SetKeyTweak(b)
@@ -311,6 +329,18 @@ func (tlc *TransferLeafCreate) createSpec() (*TransferLeaf, *sqlgraph.CreateSpec
 		_spec.SetField(transferleaf.FieldIntermediateDirectFromCpfpRefundTx, field.TypeBytes, value)
 		_node.IntermediateDirectFromCpfpRefundTx = value
 	}
+	if value, ok := tlc.mutation.IntermediateRefundTxid(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateRefundTxid, field.TypeBytes, value)
+		_node.IntermediateRefundTxid = value
+	}
+	if value, ok := tlc.mutation.IntermediateDirectRefundTxid(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateDirectRefundTxid, field.TypeBytes, value)
+		_node.IntermediateDirectRefundTxid = value
+	}
+	if value, ok := tlc.mutation.IntermediateDirectFromCpfpRefundTxid(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateDirectFromCpfpRefundTxid, field.TypeBytes, value)
+		_node.IntermediateDirectFromCpfpRefundTxid = value
+	}
 	if value, ok := tlc.mutation.KeyTweak(); ok {
 		_spec.SetField(transferleaf.FieldKeyTweak, field.TypeBytes, value)
 		_node.KeyTweak = value
@@ -502,6 +532,60 @@ func (u *TransferLeafUpsert) UpdateIntermediateDirectFromCpfpRefundTx() *Transfe
 // ClearIntermediateDirectFromCpfpRefundTx clears the value of the "intermediate_direct_from_cpfp_refund_tx" field.
 func (u *TransferLeafUpsert) ClearIntermediateDirectFromCpfpRefundTx() *TransferLeafUpsert {
 	u.SetNull(transferleaf.FieldIntermediateDirectFromCpfpRefundTx)
+	return u
+}
+
+// SetIntermediateRefundTxid sets the "intermediate_refund_txid" field.
+func (u *TransferLeafUpsert) SetIntermediateRefundTxid(v []byte) *TransferLeafUpsert {
+	u.Set(transferleaf.FieldIntermediateRefundTxid, v)
+	return u
+}
+
+// UpdateIntermediateRefundTxid sets the "intermediate_refund_txid" field to the value that was provided on create.
+func (u *TransferLeafUpsert) UpdateIntermediateRefundTxid() *TransferLeafUpsert {
+	u.SetExcluded(transferleaf.FieldIntermediateRefundTxid)
+	return u
+}
+
+// ClearIntermediateRefundTxid clears the value of the "intermediate_refund_txid" field.
+func (u *TransferLeafUpsert) ClearIntermediateRefundTxid() *TransferLeafUpsert {
+	u.SetNull(transferleaf.FieldIntermediateRefundTxid)
+	return u
+}
+
+// SetIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field.
+func (u *TransferLeafUpsert) SetIntermediateDirectRefundTxid(v []byte) *TransferLeafUpsert {
+	u.Set(transferleaf.FieldIntermediateDirectRefundTxid, v)
+	return u
+}
+
+// UpdateIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field to the value that was provided on create.
+func (u *TransferLeafUpsert) UpdateIntermediateDirectRefundTxid() *TransferLeafUpsert {
+	u.SetExcluded(transferleaf.FieldIntermediateDirectRefundTxid)
+	return u
+}
+
+// ClearIntermediateDirectRefundTxid clears the value of the "intermediate_direct_refund_txid" field.
+func (u *TransferLeafUpsert) ClearIntermediateDirectRefundTxid() *TransferLeafUpsert {
+	u.SetNull(transferleaf.FieldIntermediateDirectRefundTxid)
+	return u
+}
+
+// SetIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field.
+func (u *TransferLeafUpsert) SetIntermediateDirectFromCpfpRefundTxid(v []byte) *TransferLeafUpsert {
+	u.Set(transferleaf.FieldIntermediateDirectFromCpfpRefundTxid, v)
+	return u
+}
+
+// UpdateIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field to the value that was provided on create.
+func (u *TransferLeafUpsert) UpdateIntermediateDirectFromCpfpRefundTxid() *TransferLeafUpsert {
+	u.SetExcluded(transferleaf.FieldIntermediateDirectFromCpfpRefundTxid)
+	return u
+}
+
+// ClearIntermediateDirectFromCpfpRefundTxid clears the value of the "intermediate_direct_from_cpfp_refund_txid" field.
+func (u *TransferLeafUpsert) ClearIntermediateDirectFromCpfpRefundTxid() *TransferLeafUpsert {
+	u.SetNull(transferleaf.FieldIntermediateDirectFromCpfpRefundTxid)
 	return u
 }
 
@@ -728,6 +812,69 @@ func (u *TransferLeafUpsertOne) UpdateIntermediateDirectFromCpfpRefundTx() *Tran
 func (u *TransferLeafUpsertOne) ClearIntermediateDirectFromCpfpRefundTx() *TransferLeafUpsertOne {
 	return u.Update(func(s *TransferLeafUpsert) {
 		s.ClearIntermediateDirectFromCpfpRefundTx()
+	})
+}
+
+// SetIntermediateRefundTxid sets the "intermediate_refund_txid" field.
+func (u *TransferLeafUpsertOne) SetIntermediateRefundTxid(v []byte) *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetIntermediateRefundTxid(v)
+	})
+}
+
+// UpdateIntermediateRefundTxid sets the "intermediate_refund_txid" field to the value that was provided on create.
+func (u *TransferLeafUpsertOne) UpdateIntermediateRefundTxid() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateIntermediateRefundTxid()
+	})
+}
+
+// ClearIntermediateRefundTxid clears the value of the "intermediate_refund_txid" field.
+func (u *TransferLeafUpsertOne) ClearIntermediateRefundTxid() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearIntermediateRefundTxid()
+	})
+}
+
+// SetIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field.
+func (u *TransferLeafUpsertOne) SetIntermediateDirectRefundTxid(v []byte) *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetIntermediateDirectRefundTxid(v)
+	})
+}
+
+// UpdateIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field to the value that was provided on create.
+func (u *TransferLeafUpsertOne) UpdateIntermediateDirectRefundTxid() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateIntermediateDirectRefundTxid()
+	})
+}
+
+// ClearIntermediateDirectRefundTxid clears the value of the "intermediate_direct_refund_txid" field.
+func (u *TransferLeafUpsertOne) ClearIntermediateDirectRefundTxid() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearIntermediateDirectRefundTxid()
+	})
+}
+
+// SetIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field.
+func (u *TransferLeafUpsertOne) SetIntermediateDirectFromCpfpRefundTxid(v []byte) *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetIntermediateDirectFromCpfpRefundTxid(v)
+	})
+}
+
+// UpdateIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field to the value that was provided on create.
+func (u *TransferLeafUpsertOne) UpdateIntermediateDirectFromCpfpRefundTxid() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateIntermediateDirectFromCpfpRefundTxid()
+	})
+}
+
+// ClearIntermediateDirectFromCpfpRefundTxid clears the value of the "intermediate_direct_from_cpfp_refund_txid" field.
+func (u *TransferLeafUpsertOne) ClearIntermediateDirectFromCpfpRefundTxid() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearIntermediateDirectFromCpfpRefundTxid()
 	})
 }
 
@@ -1130,6 +1277,69 @@ func (u *TransferLeafUpsertBulk) UpdateIntermediateDirectFromCpfpRefundTx() *Tra
 func (u *TransferLeafUpsertBulk) ClearIntermediateDirectFromCpfpRefundTx() *TransferLeafUpsertBulk {
 	return u.Update(func(s *TransferLeafUpsert) {
 		s.ClearIntermediateDirectFromCpfpRefundTx()
+	})
+}
+
+// SetIntermediateRefundTxid sets the "intermediate_refund_txid" field.
+func (u *TransferLeafUpsertBulk) SetIntermediateRefundTxid(v []byte) *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetIntermediateRefundTxid(v)
+	})
+}
+
+// UpdateIntermediateRefundTxid sets the "intermediate_refund_txid" field to the value that was provided on create.
+func (u *TransferLeafUpsertBulk) UpdateIntermediateRefundTxid() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateIntermediateRefundTxid()
+	})
+}
+
+// ClearIntermediateRefundTxid clears the value of the "intermediate_refund_txid" field.
+func (u *TransferLeafUpsertBulk) ClearIntermediateRefundTxid() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearIntermediateRefundTxid()
+	})
+}
+
+// SetIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field.
+func (u *TransferLeafUpsertBulk) SetIntermediateDirectRefundTxid(v []byte) *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetIntermediateDirectRefundTxid(v)
+	})
+}
+
+// UpdateIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field to the value that was provided on create.
+func (u *TransferLeafUpsertBulk) UpdateIntermediateDirectRefundTxid() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateIntermediateDirectRefundTxid()
+	})
+}
+
+// ClearIntermediateDirectRefundTxid clears the value of the "intermediate_direct_refund_txid" field.
+func (u *TransferLeafUpsertBulk) ClearIntermediateDirectRefundTxid() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearIntermediateDirectRefundTxid()
+	})
+}
+
+// SetIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field.
+func (u *TransferLeafUpsertBulk) SetIntermediateDirectFromCpfpRefundTxid(v []byte) *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetIntermediateDirectFromCpfpRefundTxid(v)
+	})
+}
+
+// UpdateIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field to the value that was provided on create.
+func (u *TransferLeafUpsertBulk) UpdateIntermediateDirectFromCpfpRefundTxid() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateIntermediateDirectFromCpfpRefundTxid()
+	})
+}
+
+// ClearIntermediateDirectFromCpfpRefundTxid clears the value of the "intermediate_direct_from_cpfp_refund_txid" field.
+func (u *TransferLeafUpsertBulk) ClearIntermediateDirectFromCpfpRefundTxid() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearIntermediateDirectFromCpfpRefundTxid()
 	})
 }
 

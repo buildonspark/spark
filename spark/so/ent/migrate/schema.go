@@ -837,6 +837,9 @@ var (
 		{Name: "intermediate_refund_tx", Type: field.TypeBytes},
 		{Name: "intermediate_direct_refund_tx", Type: field.TypeBytes, Nullable: true},
 		{Name: "intermediate_direct_from_cpfp_refund_tx", Type: field.TypeBytes, Nullable: true},
+		{Name: "intermediate_refund_txid", Type: field.TypeBytes, Nullable: true},
+		{Name: "intermediate_direct_refund_txid", Type: field.TypeBytes, Nullable: true},
+		{Name: "intermediate_direct_from_cpfp_refund_txid", Type: field.TypeBytes, Nullable: true},
 		{Name: "key_tweak", Type: field.TypeBytes, Nullable: true},
 		{Name: "sender_key_tweak_proof", Type: field.TypeBytes, Nullable: true},
 		{Name: "receiver_key_tweak", Type: field.TypeBytes, Nullable: true},
@@ -851,13 +854,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "transfer_leafs_transfers_transfer",
-				Columns:    []*schema.Column{TransferLeafsColumns[14]},
+				Columns:    []*schema.Column{TransferLeafsColumns[17]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "transfer_leafs_tree_nodes_leaf",
-				Columns:    []*schema.Column{TransferLeafsColumns[15]},
+				Columns:    []*schema.Column{TransferLeafsColumns[18]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -866,12 +869,36 @@ var (
 			{
 				Name:    "transferleaf_transfer_leaf_transfer",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[14]},
+				Columns: []*schema.Column{TransferLeafsColumns[17]},
 			},
 			{
 				Name:    "transferleaf_transfer_leaf_leaf",
 				Unique:  false,
-				Columns: []*schema.Column{TransferLeafsColumns[15]},
+				Columns: []*schema.Column{TransferLeafsColumns[18]},
+			},
+			{
+				Name:    "transferleaf_intermediate_refund_txid",
+				Unique:  false,
+				Columns: []*schema.Column{TransferLeafsColumns[11]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "intermediate_refund_txid is not null",
+				},
+			},
+			{
+				Name:    "transferleaf_intermediate_direct_refund_txid",
+				Unique:  false,
+				Columns: []*schema.Column{TransferLeafsColumns[12]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "intermediate_direct_refund_txid is not null",
+				},
+			},
+			{
+				Name:    "transferleaf_intermediate_direct_from_cpfp_refund_txid",
+				Unique:  false,
+				Columns: []*schema.Column{TransferLeafsColumns[13]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "intermediate_direct_from_cpfp_refund_txid is not null",
+				},
 			},
 		},
 	}

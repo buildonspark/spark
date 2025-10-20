@@ -35,6 +35,12 @@ const (
 	FieldIntermediateDirectRefundTx = "intermediate_direct_refund_tx"
 	// FieldIntermediateDirectFromCpfpRefundTx holds the string denoting the intermediate_direct_from_cpfp_refund_tx field in the database.
 	FieldIntermediateDirectFromCpfpRefundTx = "intermediate_direct_from_cpfp_refund_tx"
+	// FieldIntermediateRefundTxid holds the string denoting the intermediate_refund_txid field in the database.
+	FieldIntermediateRefundTxid = "intermediate_refund_txid"
+	// FieldIntermediateDirectRefundTxid holds the string denoting the intermediate_direct_refund_txid field in the database.
+	FieldIntermediateDirectRefundTxid = "intermediate_direct_refund_txid"
+	// FieldIntermediateDirectFromCpfpRefundTxid holds the string denoting the intermediate_direct_from_cpfp_refund_txid field in the database.
+	FieldIntermediateDirectFromCpfpRefundTxid = "intermediate_direct_from_cpfp_refund_txid"
 	// FieldKeyTweak holds the string denoting the key_tweak field in the database.
 	FieldKeyTweak = "key_tweak"
 	// FieldSenderKeyTweakProof holds the string denoting the sender_key_tweak_proof field in the database.
@@ -76,6 +82,9 @@ var Columns = []string{
 	FieldIntermediateRefundTx,
 	FieldIntermediateDirectRefundTx,
 	FieldIntermediateDirectFromCpfpRefundTx,
+	FieldIntermediateRefundTxid,
+	FieldIntermediateDirectRefundTxid,
+	FieldIntermediateDirectFromCpfpRefundTxid,
 	FieldKeyTweak,
 	FieldSenderKeyTweakProof,
 	FieldReceiverKeyTweak,
