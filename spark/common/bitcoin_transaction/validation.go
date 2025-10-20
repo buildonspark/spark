@@ -263,7 +263,27 @@ func GetTimelockFromSequence(sequence uint32) uint32 {
 func ValidateSequenceTimelock(sequence uint32, expectedTimelock uint32) error {
 	providedTimelock := GetTimelockFromSequence(sequence)
 	if providedTimelock != expectedTimelock {
-		return fmt.Errorf("provided timelock %d does not match expected timelock %d", providedTimelock, expectedTimelock)
+		return fmt.Errorf("provided timelock 0x%08X does not match expected timelock 0x%08X", providedTimelock, expectedTimelock)
 	}
 	return nil
+}
+
+// Decrement the timelock in the provided sequence by one step, preserving any other bits that are set.
+// Use GetAndValidateUserSequence to get the valid currSequence for this function.
+func NextSequence(currSequence uint32) (nextSequence uint32, nextDirectSequence uint32, err error) {
+	currTimelock := currSequence & 0xFFFF
+	nextTimelock := int32(currTimelock) - spark.TimeLockInterval
+
+	if nextTimelock < 0 {
+		return 0, 0, fmt.Errorf("next timelock interval is less than 0, call renew node timelock")
+	}
+
+	// reset timelock
+	currSequence = currSequence & 0xFFFF0000
+
+	// Construct the new sequence
+	nextSequence = uint32(nextTimelock) | currSequence
+	nextDirectSequence = nextSequence + spark.DirectTimelockOffset
+
+	return
 }

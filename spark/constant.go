@@ -13,7 +13,7 @@ const (
 	ZeroTimelock = 0
 
 	// InitialTimeLock is the initial time lock for the deposit.
-	InitialTimeLock = 2000
+	InitialTimeLock uint32 = 2000
 
 	// TimeLockInterval is the interval between time locks.
 	TimeLockInterval = 100
@@ -31,7 +31,7 @@ const (
 	SigningCommitmentBatchSize = 1000
 
 	// DirectTimelockOffset is added to direct transactions to add a buffer before broadcasting.
-	DirectTimelockOffset = 50
+	DirectTimelockOffset uint32 = 50
 )
 
 // Our sequences have the 30th bit set. This bit is meaningless and was likely
@@ -39,10 +39,12 @@ const (
 
 var ZeroSequence = uint32(1 << 30)
 
+// Deprecated: Use InitialTimeLock instead.
 func InitialSequence() uint32 {
-	return uint32((1 << 30) | InitialTimeLock)
+	return (1 << 30) | InitialTimeLock
 }
 
+// Deprecated: Use bitcointransaction.NextSequence instead.
 func NextSequence(currSequence uint32) (uint32, error) {
 	if currSequence&0xFFFF <= TimeLockInterval {
 		return 0, fmt.Errorf("timelock interval is less than or equal to 0")
