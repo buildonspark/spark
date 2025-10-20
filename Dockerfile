@@ -37,7 +37,7 @@ RUN GRPC_HEALTH_PROBE_VERSION=v0.4.13 && \
 
 
 # (1) create rust env with cargo chef crate
-FROM --platform=$BUILDPLATFORM rust:1.84-slim-bookworm AS chef
+FROM --platform=$BUILDPLATFORM rust:1.90-slim-bookworm AS chef
 WORKDIR /signer
 RUN cargo install cargo-chef
 
