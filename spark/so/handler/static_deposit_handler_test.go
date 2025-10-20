@@ -1,14 +1,18 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"testing"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -21,6 +25,99 @@ import (
 )
 
 var testTransferID = uuid.Must(uuid.Parse("550e8400-e29b-41d4-a716-446655440000"))
+
+func createVersion3ParentTx(t *testing.T, receiverPubKey keys.Public, amount int64, vout uint32) ([]byte, chainhash.Hash) {
+	tx := wire.NewMsgTx(3)
+
+	prevHash, _ := chainhash.NewHashFromStr("1111111111111111111111111111111111111111111111111111111111111111")
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  *prevHash,
+			Index: 0,
+		},
+		Sequence: spark.InitialSequence(),
+	})
+
+	p2trScript, err := common.P2TRScriptFromPubKey(receiverPubKey)
+	require.NoError(t, err)
+
+	tx.AddTxOut(&wire.TxOut{
+		Value:    amount,
+		PkScript: p2trScript,
+	})
+
+	var buf bytes.Buffer
+	err = tx.Serialize(&buf)
+	require.NoError(t, err)
+
+	return buf.Bytes(), tx.TxHash()
+}
+
+func createVersion3CPFPRefundTx(t *testing.T, parentTxHash chainhash.Hash, vout uint32, receiverPubKey keys.Public, amount int64, sequence uint32) []byte {
+	tx := wire.NewMsgTx(3)
+
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  parentTxHash,
+			Index: vout,
+		},
+		Sequence: sequence,
+	})
+
+	p2trScript, err := common.P2TRScriptFromPubKey(receiverPubKey)
+	require.NoError(t, err)
+
+	tx.AddTxOut(&wire.TxOut{
+		Value:    amount,
+		PkScript: p2trScript,
+	})
+
+	tx.AddTxOut(common.EphemeralAnchorOutput())
+
+	var buf bytes.Buffer
+	err = tx.Serialize(&buf)
+	require.NoError(t, err)
+
+	return buf.Bytes()
+}
+
+func createVersion3DirectRefundTx(t *testing.T, parentTxHash chainhash.Hash, vout uint32, receiverPubKey keys.Public, amount int64, sequence uint32) []byte {
+	tx := wire.NewMsgTx(3)
+
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  parentTxHash,
+			Index: vout,
+		},
+		Sequence: sequence,
+	})
+
+	p2trScript, err := common.P2TRScriptFromPubKey(receiverPubKey)
+	require.NoError(t, err)
+
+	refundAmount := common.MaybeApplyFee(amount)
+
+	tx.AddTxOut(&wire.TxOut{
+		Value:    refundAmount,
+		PkScript: p2trScript,
+	})
+
+	var buf bytes.Buffer
+	err = tx.Serialize(&buf)
+	require.NoError(t, err)
+
+	return buf.Bytes()
+}
+
+func getRefundTxSigHash(t *testing.T, refundTxBytes []byte, parentTxOut *wire.TxOut) []byte {
+	refundTx, err := common.TxFromRawTxBytes(refundTxBytes)
+	require.NoError(t, err, "failed to parse refund transaction")
+
+	sighash, err := common.SigHashFromTx(refundTx, 0, parentTxOut)
+	require.NoError(t, err, "failed to calculate sighash")
+
+	return sighash
+}
 
 func createOldBitcoinTxBytes(t *testing.T, receiverPubKey keys.Public) []byte {
 	p2trScript, err := common.P2TRScriptFromPubKey(receiverPubKey)

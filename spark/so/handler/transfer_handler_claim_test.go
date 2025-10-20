@@ -121,22 +121,30 @@ func createTestTreeNode(t *testing.T, ctx context.Context, rng io.Reader, client
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	validTx := createOldBitcoinTxBytes(t, ownerPubKey)
+	leafAmount := int64(1000)
+	leafVout := int16(0)
+	parentTxBytes, parentTxHash := createVersion3ParentTx(t, ownerPubKey, leafAmount, uint32(leafVout))
+
+	cpfpRefundTx := createVersion3CPFPRefundTx(t, parentTxHash, uint32(leafVout), ownerPubKey, leafAmount, (1<<30)|1900)
+
+	directRefundTx := createVersion3DirectRefundTx(t, parentTxHash, uint32(leafVout), ownerPubKey, leafAmount, (1<<30)|1900)
+
+	directFromCpfpRefundTx := createVersion3DirectRefundTx(t, parentTxHash, uint32(leafVout), ownerPubKey, leafAmount, (1<<30)|1900)
 
 	leaf, err := client.TreeNode.Create().
 		SetStatus(st.TreeNodeStatusTransferLocked).
 		SetTree(tree).
 		SetSigningKeyshare(keyshare).
-		SetValue(1000).
+		SetValue(uint64(leafAmount)).
 		SetVerifyingPubkey(verifyingPubKey).
 		SetOwnerIdentityPubkey(ownerPubKey).
 		SetOwnerSigningPubkey(ownerSigningPubKey).
-		SetRawTx(validTx).
-		SetRawRefundTx(validTx).
-		SetDirectTx(validTx).
-		SetDirectRefundTx(validTx).
-		SetDirectFromCpfpRefundTx(validTx).
-		SetVout(0).
+		SetRawTx(parentTxBytes).
+		SetRawRefundTx(cpfpRefundTx).
+		SetDirectTx(parentTxBytes).
+		SetDirectRefundTx(directRefundTx).
+		SetDirectFromCpfpRefundTx(directFromCpfpRefundTx).
+		SetVout(leafVout).
 		Save(ctx)
 	require.NoError(t, err)
 	return leaf
