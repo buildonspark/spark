@@ -17,8 +17,8 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	"github.com/lightsparkdev/spark/so/testutil"
 	"github.com/lightsparkdev/spark/so/utils"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -565,7 +565,7 @@ func TestBroadcastTokenTransactionMintAndTransferTokensExpectedOutputAndTxRetrie
 }
 
 func TestBroadcastTokenTransactionMintAndTransferTokensLotsOfOutputs(t *testing.T) {
-	testutil.SkipIfGithubActions(t)
+	sparktesting.SkipIfGithubActions(t)
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 
 	tokenPrivKey := config.IdentityPrivateKey

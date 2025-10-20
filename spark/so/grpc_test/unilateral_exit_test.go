@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/lightsparkdev/spark/common/keys"
-	"github.com/lightsparkdev/spark/so/testutil"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
@@ -16,7 +16,7 @@ import (
 // Test we can unilateral exit a leaf node after depositing funds into
 // a single leaf tree.
 func TestUnilateralExitSingleLeaf(t *testing.T) {
-	testutil.SkipIfGithubActions(t)
+	sparktesting.SkipIfGithubActions(t)
 	config := wallet.NewTestWalletConfig(t)
 	leafPrivKey := keys.GeneratePrivateKey()
 	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, 100_000)

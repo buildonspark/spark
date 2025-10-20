@@ -9,8 +9,8 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
-	"github.com/lightsparkdev/spark/so/testutil"
 	"github.com/lightsparkdev/spark/so/utils"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -341,7 +341,7 @@ func TestCoordinatedTokenMintAndTransferTokensWithTooManyInputsFails(t *testing.
 }
 
 func TestCoordinatedTokenMintAndTransferMaxInputsSucceeds(t *testing.T) {
-	testutil.SkipIfGithubActions(t)
+	sparktesting.SkipIfGithubActions(t)
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 
 	tokenPrivKey := config.IdentityPrivateKey

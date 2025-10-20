@@ -17,3 +17,10 @@ func RequireGripMock(t testing.TB) {
 func PostgresTestsEnabled() bool {
 	return os.Getenv("SKIP_POSTGRES_TESTS") != "true"
 }
+
+// SkipIfGithubActions skips the test if running in GitHub Actions
+func SkipIfGithubActions(t *testing.T) {
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		t.Skip("Skipping test on GitHub Actions CI")
+	}
+}

@@ -12,8 +12,8 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
-	"github.com/lightsparkdev/spark/so/testutil"
 	"github.com/lightsparkdev/spark/so/utils"
+	sparktesting "github.com/lightsparkdev/spark/testing"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -21,7 +21,7 @@ import (
 
 func TestCoordinatedTransferTransactionWithSparkInvoices(t *testing.T) {
 	// TODO: (CNT-493) Re-enable invoice functionality once spark address migration is complete
-	testutil.SkipIfGithubActions(t)
+	sparktesting.SkipIfGithubActions(t)
 	testCases := []struct {
 		name                                      string
 		batchTransfer                             bool
