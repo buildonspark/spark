@@ -11,6 +11,10 @@ import (
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	msdk "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	md "go.opentelemetry.io/otel/sdk/metric/metricdata"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -137,6 +141,147 @@ func TestRateLimiter(t *testing.T) {
 		_, err = interceptor(ctx, "request", info, handler)
 		require.ErrorContains(t, err, "rate limit exceeded")
 		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+	})
+
+	t.Run("telemetry for limits and utilization on non-exceeded request", func(t *testing.T) {
+		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+		store := newTestMemoryStore(clock)
+		config := &RateLimiterConfig{}
+		identityHex := newIdentityHex(t)
+		ip := "9.9.9.9"
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			// method
+			knobs.KnobRateLimitLimit + "@/test.Service/Method:ip#1s":     2,
+			knobs.KnobRateLimitLimit + "@/test.Service/Method:pubkey#1s": 3,
+			// service
+			knobs.KnobRateLimitLimit + "@/test.Service/:ip#1s":     5,
+			knobs.KnobRateLimitLimit + "@/test.Service/:pubkey#1s": 7,
+			// global
+			knobs.KnobRateLimitLimit + "@global:ip#1s":     11,
+			knobs.KnobRateLimitLimit + "@global:pubkey#1s": 13,
+		})
+		reader := msdk.NewManualReader()
+		provider := msdk.NewMeterProvider(msdk.WithReader(reader))
+		otel.SetMeterProvider(provider)
+
+		rl, err := NewRateLimiter(config, WithKnobs(mockKnobs), WithStore(store), WithClock(clock))
+		require.NoError(t, err)
+
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": ip,
+		}))
+		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+
+		interceptor := rl.UnaryServerInterceptor()
+		handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
+		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/Method"}
+
+		_, err = interceptor(ctx, "request", info, handler)
+		require.NoError(t, err)
+
+		// Collect metrics snapshot
+		var rm md.ResourceMetrics
+		require.NoError(t, reader.Collect(t.Context(), &rm))
+		// Find our histogram and verify 6 data points with expected values
+		foundUtil := false
+		for _, sm := range rm.ScopeMetrics {
+			for _, m := range sm.Metrics {
+				if m.Name == "rpc.server.ratelimit_utilization" {
+					foundUtil = true
+					// Expect histogram points with utilization for each scope/dimension
+					hs := m.Data.(metricdata.Histogram[float64])
+					// Sum of counts across all histograms should be 6
+					count := 0
+					for _, dp := range hs.DataPoints {
+						count += int(dp.Count)
+					}
+					assert.Equal(t, 6, count)
+				}
+			}
+		}
+		assert.True(t, foundUtil, "utilization histogram not found")
+	})
+
+	t.Run("telemetry for utilization and breach on exceeded request", func(t *testing.T) {
+		clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+		store := newTestMemoryStore(clock)
+		config := &RateLimiterConfig{}
+		ip := "1.1.1.1"
+		mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+			// Only configure method ip at #1s with capacity 1 to isolate behavior
+			knobs.KnobRateLimitLimit + "@/test.Service/Method:ip#1s": 1,
+		})
+
+		// Setup in-memory OTel reader and meter provider to capture metrics BEFORE constructing the rate limiter
+		reader := msdk.NewManualReader()
+		provider := msdk.NewMeterProvider(msdk.WithReader(reader))
+		otel.SetMeterProvider(provider)
+		rl, err := NewRateLimiter(config, WithKnobs(mockKnobs), WithStore(store), WithClock(clock))
+		require.NoError(t, err)
+
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": ip,
+		}))
+
+		interceptor := rl.UnaryServerInterceptor()
+		handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
+		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/Method"}
+
+		// First request should pass and record utilization 1.0 (capacity 1, remaining 0)
+		_, err = interceptor(ctx, "request", info, handler)
+		require.NoError(t, err)
+		// Collect and assert there's exactly 1 utilization datapoint with value 1.0
+		var rm md.ResourceMetrics
+		require.NoError(t, reader.Collect(t.Context(), &rm))
+		utilCount := 0
+		breachCount := 0
+		for _, sm := range rm.ScopeMetrics {
+			for _, m := range sm.Metrics {
+				switch m.Name {
+				case "rpc.server.ratelimit_utilization":
+					hs := m.Data.(metricdata.Histogram[float64])
+					for _, dp := range hs.DataPoints {
+						utilCount += int(dp.Count)
+					}
+				case "rpc.server.ratelimit_exceeded_total":
+					cn := m.Data.(metricdata.Sum[int64])
+					for _, dp := range cn.DataPoints {
+						breachCount += int(dp.Value)
+					}
+				}
+			}
+		}
+		assert.Equal(t, 1, utilCount)
+		assert.Equal(t, 0, breachCount)
+
+		// Second request should be ResourceExhausted and must not add a new utilization record
+		// When a request exceeds the limit, utilization should not be recorded for that attempt
+		_, err = interceptor(ctx, "request", info, handler)
+		require.Error(t, err)
+		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+		// Collect a fresh snapshot and assert utilization count still 1 and breach counter incremented
+		rm = md.ResourceMetrics{}
+		require.NoError(t, reader.Collect(t.Context(), &rm))
+		utilCount = 0
+		breachCount = 0
+		for _, sm := range rm.ScopeMetrics {
+			for _, m := range sm.Metrics {
+				switch m.Name {
+				case "rpc.server.ratelimit_utilization":
+					hs := m.Data.(metricdata.Histogram[float64])
+					for _, dp := range hs.DataPoints {
+						utilCount += int(dp.Count)
+					}
+				case "rpc.server.ratelimit_exceeded_total":
+					cn := m.Data.(metricdata.Sum[int64])
+					for _, dp := range cn.DataPoints {
+						breachCount += int(dp.Value)
+					}
+				}
+			}
+		}
+		assert.Equal(t, 1, utilCount)
+		assert.Equal(t, 1, breachCount)
 	})
 
 	t.Run("method :ip and :pubkey limits enforced independently", func(t *testing.T) {
