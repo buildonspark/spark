@@ -4165,7 +4165,8 @@ func (c *TransferLeafClient) QueryLeaf(tl *TransferLeaf) *TreeNodeQuery {
 
 // Hooks returns the client hooks.
 func (c *TransferLeafClient) Hooks() []Hook {
-	return c.hooks.TransferLeaf
+	hooks := c.hooks.TransferLeaf
+	return append(hooks[:len(hooks):len(hooks)], transferleaf.Hooks[:]...)
 }
 
 // Interceptors returns the client interceptors.

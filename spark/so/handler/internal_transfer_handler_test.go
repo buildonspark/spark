@@ -169,8 +169,8 @@ func TestFinalizeTransfer(t *testing.T) {
 		_, err = dbCtx.Client.TransferLeaf.Create().
 			SetTransfer(transfer).
 			SetLeaf(leaf).
-			SetPreviousRefundTx([]byte("test_previous_refund_tx")).
-			SetIntermediateRefundTx([]byte("test_intermediate_refund_tx")).
+			SetPreviousRefundTx(createTestTxBytes(t, 2000)).
+			SetIntermediateRefundTx(createTestTxBytes(t, 2001)).
 			Save(ctx)
 		require.NoError(t, err)
 
@@ -364,8 +364,8 @@ func TestApplySignatures(t *testing.T) {
 	_, err = dbCtx.Client.TransferLeaf.Create().
 		SetLeaf(leaf).
 		SetTransfer(transfer).
-		SetPreviousRefundTx([]byte("test_previous_refund_tx")).
-		SetIntermediateRefundTx([]byte("test_intermediate_refund_tx")).
+		SetPreviousRefundTx(createTestTxBytes(t, 2000)).
+		SetIntermediateRefundTx(createTestTxBytes(t, 2001)).
 		Save(ctx)
 	require.NoError(t, err)
 

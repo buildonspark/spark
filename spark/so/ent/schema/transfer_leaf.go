@@ -1,11 +1,17 @@
 package schema
 
 import (
+	"context"
+	"fmt"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/lightsparkdev/spark/common"
+	gen "github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/hook"
 )
 
 // TransferLeaf is the junction schema between Transfer and TreeNode.
@@ -68,4 +74,134 @@ func (TransferLeaf) Indexes() []ent.Index {
 			entsql.IndexWhere("intermediate_direct_from_cpfp_refund_txid is not null"),
 		),
 	}
+}
+
+func (TransferLeaf) Hooks() []ent.Hook {
+	return []ent.Hook{
+		// Define helper hooks that will populate TXIDs for the transactions in the mutation.
+		// Clearing a field will also clear a corresponding TXID.
+		// If a transaction is set to nil the corresponding TXID will be cleared.
+		// Be mindful that updates on transactions are slower because the DB indexes on TXIDs are also updated.
+		// The first hook handles single entity updates and the second hook handles creations.
+		// These hooks will not be called if the entity is part of a batch update.
+		hook.On(
+			func(next ent.Mutator) ent.Mutator {
+				return hook.TransferLeafFunc(func(ctx context.Context, m *gen.TransferLeafMutation) (ent.Value, error) {
+					err := checkTransferLeafTxids(m)
+					if err != nil {
+						return nil, err
+					}
+
+					leafIdUuid, _ := m.ID()
+					leafId := leafIdUuid.String()
+
+					// Handling an update on a field
+					// intermediate_refund_tx is NotEmpty() so it cannot be cleared, only updated
+					if intermediateRefundTxBytes, ok := m.IntermediateRefundTx(); ok {
+						intermediateRefundTx, err := common.TxFromRawTxBytes(intermediateRefundTxBytes)
+						if err != nil {
+							return nil, fmt.Errorf("failed to parse intermediate_refund_tx for transfer leaf %s: %w", leafId, err)
+						}
+						intermediateRefundTxid := intermediateRefundTx.TxHash()
+						m.SetIntermediateRefundTxid(intermediateRefundTxid[:])
+					}
+
+					if m.IntermediateDirectRefundTxCleared() {
+						m.ClearIntermediateDirectRefundTxid()
+					} else {
+						if intermediateDirectRefundTxBytes, ok := m.IntermediateDirectRefundTx(); ok {
+							if intermediateDirectRefundTxBytes == nil {
+								m.ClearIntermediateDirectRefundTxid()
+							} else {
+								intermediateDirectRefundTx, err := common.TxFromRawTxBytes(intermediateDirectRefundTxBytes)
+								if err != nil {
+									return nil, fmt.Errorf("failed to parse intermediate_direct_refund_tx for transfer leaf %s: %w", leafId, err)
+								}
+								intermediateDirectRefundTxid := intermediateDirectRefundTx.TxHash()
+								m.SetIntermediateDirectRefundTxid(intermediateDirectRefundTxid[:])
+							}
+						}
+					}
+
+					if m.IntermediateDirectFromCpfpRefundTxCleared() {
+						m.ClearIntermediateDirectFromCpfpRefundTxid()
+					} else {
+						if intermediateDirectFromCpfpRefundTxBytes, ok := m.IntermediateDirectFromCpfpRefundTx(); ok {
+							if intermediateDirectFromCpfpRefundTxBytes == nil {
+								m.ClearIntermediateDirectFromCpfpRefundTxid()
+							} else {
+								intermediateDirectFromCpfpRefundTx, err := common.TxFromRawTxBytes(intermediateDirectFromCpfpRefundTxBytes)
+								if err != nil {
+									return nil, fmt.Errorf("failed to parse intermediate_direct_from_cpfp_refund_tx for transfer leaf %s: %w", leafId, err)
+								}
+								intermediateDirectFromCpfpRefundTxid := intermediateDirectFromCpfpRefundTx.TxHash()
+								m.SetIntermediateDirectFromCpfpRefundTxid(intermediateDirectFromCpfpRefundTxid[:])
+							}
+						}
+					}
+					return next.Mutate(ctx, m)
+				})
+			},
+			ent.OpUpdateOne|ent.OpUpdate,
+		),
+		// Create ent hook
+		hook.On(
+			func(next ent.Mutator) ent.Mutator {
+				return hook.TransferLeafFunc(func(ctx context.Context, m *gen.TransferLeafMutation) (ent.Value, error) {
+					err := checkTransferLeafTxids(m)
+					if err != nil {
+						return nil, err
+					}
+
+					leafIdUuid, _ := m.ID()
+					leafId := leafIdUuid.String()
+
+					intermediateRefundTxBytes, _ := m.IntermediateRefundTx()
+					intermediateRefundTx, err := common.TxFromRawTxBytes(intermediateRefundTxBytes)
+					if err != nil {
+						return nil, fmt.Errorf("failed to parse intermediate_refund_tx for transfer leaf %s: %w", leafId, err)
+					}
+					intermediateRefundTxid := intermediateRefundTx.TxHash()
+					m.SetIntermediateRefundTxid(intermediateRefundTxid[:])
+
+					intermediateDirectRefundTxBytes, _ := m.IntermediateDirectRefundTx()
+					if intermediateDirectRefundTxBytes != nil {
+						intermediateDirectRefundTx, err := common.TxFromRawTxBytes(intermediateDirectRefundTxBytes)
+						if err != nil {
+							return nil, fmt.Errorf("failed to parse intermediate_direct_refund_tx for transfer leaf %s: %w", leafId, err)
+						}
+						intermediateDirectRefundTxid := intermediateDirectRefundTx.TxHash()
+						m.SetIntermediateDirectRefundTxid(intermediateDirectRefundTxid[:])
+					}
+
+					intermediateDirectFromCpfpRefundTxBytes, _ := m.IntermediateDirectFromCpfpRefundTx()
+					if intermediateDirectFromCpfpRefundTxBytes != nil {
+						intermediateDirectFromCpfpRefundTx, err := common.TxFromRawTxBytes(intermediateDirectFromCpfpRefundTxBytes)
+						if err != nil {
+							return nil, fmt.Errorf("failed to parse intermediate_direct_from_cpfp_refund_tx for transfer leaf %s: %w", leafId, err)
+						}
+						intermediateDirectFromCpfpRefundTxid := intermediateDirectFromCpfpRefundTx.TxHash()
+						m.SetIntermediateDirectFromCpfpRefundTxid(intermediateDirectFromCpfpRefundTxid[:])
+					}
+					return next.Mutate(ctx, m)
+				})
+			},
+			ent.OpCreate,
+		),
+	}
+}
+
+// Checks if the txids are set directly.
+// This is not allowed because the txids are generated by hooks from the transactions.
+func checkTransferLeafTxids(m *gen.TransferLeafMutation) error {
+	if _, ok := m.IntermediateRefundTxid(); ok {
+		return fmt.Errorf("intermediate_refund_txid is not allowed to be set directly")
+	}
+	if _, ok := m.IntermediateDirectRefundTxid(); ok {
+		return fmt.Errorf("intermediate_direct_refund_txid is not allowed to be set directly")
+	}
+	if _, ok := m.IntermediateDirectFromCpfpRefundTxid(); ok {
+		return fmt.Errorf("intermediate_direct_from_cpfp_refund_txid is not allowed to be set directly")
+	}
+	return nil
 }

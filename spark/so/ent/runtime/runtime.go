@@ -589,6 +589,9 @@ func init() {
 	// transfer.DefaultID holds the default value on creation for the id field.
 	transfer.DefaultID = transferDescID.Default.(func() uuid.UUID)
 	transferleafMixin := schema.TransferLeaf{}.Mixin()
+	transferleafHooks := schema.TransferLeaf{}.Hooks()
+	transferleaf.Hooks[0] = transferleafHooks[0]
+	transferleaf.Hooks[1] = transferleafHooks[1]
 	transferleafMixinFields0 := transferleafMixin[0].Fields()
 	_ = transferleafMixinFields0
 	transferleafFields := schema.TransferLeaf{}.Fields()
