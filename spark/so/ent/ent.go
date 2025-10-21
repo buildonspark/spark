@@ -40,6 +40,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
+	"github.com/lightsparkdev/spark/so/ent/walletsetting"
 )
 
 // ent aliases to avoid import conflicts in user's code.
@@ -128,6 +129,7 @@ func checkColumn(table, column string) error {
 			usersignedtransaction.Table:             usersignedtransaction.ValidColumn,
 			utxo.Table:                              utxo.ValidColumn,
 			utxoswap.Table:                          utxoswap.ValidColumn,
+			walletsetting.Table:                     walletsetting.ValidColumn,
 		})
 	})
 	return columnCheck(table, column)

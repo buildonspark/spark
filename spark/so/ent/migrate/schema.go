@@ -1209,6 +1209,27 @@ var (
 			},
 		},
 	}
+	// WalletSettingsColumns holds the columns for the "wallet_settings" table.
+	WalletSettingsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "owner_identity_public_key", Type: field.TypeBytes, Unique: true},
+		{Name: "private_enabled", Type: field.TypeBool, Default: false},
+	}
+	// WalletSettingsTable holds the schema information for the "wallet_settings" table.
+	WalletSettingsTable = &schema.Table{
+		Name:       "wallet_settings",
+		Columns:    WalletSettingsColumns,
+		PrimaryKey: []*schema.Column{WalletSettingsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "walletsetting_owner_identity_public_key",
+				Unique:  false,
+				Columns: []*schema.Column{WalletSettingsColumns[3]},
+			},
+		},
+	}
 	// TokenOutputOutputSpentStartedTokenTransactionsColumns holds the columns for the "token_output_output_spent_started_token_transactions" table.
 	TokenOutputOutputSpentStartedTokenTransactionsColumns = []*schema.Column{
 		{Name: "token_output_id", Type: field.TypeUUID},
@@ -1289,6 +1310,7 @@ var (
 		UserSignedTransactionsTable,
 		UtxosTable,
 		UtxoSwapsTable,
+		WalletSettingsTable,
 		TokenOutputOutputSpentStartedTokenTransactionsTable,
 		TokenTransactionSparkInvoiceTable,
 	}

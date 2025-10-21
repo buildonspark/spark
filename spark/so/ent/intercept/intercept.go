@@ -37,6 +37,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
+	"github.com/lightsparkdev/spark/so/ent/walletsetting"
 )
 
 // The Query interface represents an operation that queries a graph.
@@ -851,6 +852,33 @@ func (f TraverseUtxoSwap) Traverse(ctx context.Context, q ent.Query) error {
 	return fmt.Errorf("unexpected query type %T. expect *ent.UtxoSwapQuery", q)
 }
 
+// The WalletSettingFunc type is an adapter to allow the use of ordinary function as a Querier.
+type WalletSettingFunc func(context.Context, *ent.WalletSettingQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f WalletSettingFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.WalletSettingQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.WalletSettingQuery", q)
+}
+
+// The TraverseWalletSetting type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseWalletSetting func(context.Context, *ent.WalletSettingQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseWalletSetting) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseWalletSetting) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.WalletSettingQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.WalletSettingQuery", q)
+}
+
 // NewQuery returns the generic Query interface for the given typed query.
 func NewQuery(q ent.Query) (Query, error) {
 	switch q := q.(type) {
@@ -910,6 +938,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.UtxoQuery, predicate.Utxo, utxo.OrderOption]{typ: ent.TypeUtxo, tq: q}, nil
 	case *ent.UtxoSwapQuery:
 		return &query[*ent.UtxoSwapQuery, predicate.UtxoSwap, utxoswap.OrderOption]{typ: ent.TypeUtxoSwap, tq: q}, nil
+	case *ent.WalletSettingQuery:
+		return &query[*ent.WalletSettingQuery, predicate.WalletSetting, walletsetting.OrderOption]{typ: ent.TypeWalletSetting, tq: q}, nil
 	default:
 		return nil, fmt.Errorf("unknown query type %T", q)
 	}

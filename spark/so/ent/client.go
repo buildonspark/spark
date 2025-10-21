@@ -44,6 +44,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
+	"github.com/lightsparkdev/spark/so/ent/walletsetting"
 
 	stdsql "database/sql"
 )
@@ -109,6 +110,8 @@ type Client struct {
 	Utxo *UtxoClient
 	// UtxoSwap is the client for interacting with the UtxoSwap builders.
 	UtxoSwap *UtxoSwapClient
+	// WalletSetting is the client for interacting with the WalletSetting builders.
+	WalletSetting *WalletSettingClient
 }
 
 // NewClient creates a new client configured with the given options.
@@ -148,6 +151,7 @@ func (c *Client) init() {
 	c.UserSignedTransaction = NewUserSignedTransactionClient(c.config)
 	c.Utxo = NewUtxoClient(c.config)
 	c.UtxoSwap = NewUtxoSwapClient(c.config)
+	c.WalletSetting = NewWalletSettingClient(c.config)
 }
 
 type (
@@ -268,6 +272,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		UserSignedTransaction:             NewUserSignedTransactionClient(cfg),
 		Utxo:                              NewUtxoClient(cfg),
 		UtxoSwap:                          NewUtxoSwapClient(cfg),
+		WalletSetting:                     NewWalletSettingClient(cfg),
 	}, nil
 }
 
@@ -315,6 +320,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		UserSignedTransaction:             NewUserSignedTransactionClient(cfg),
 		Utxo:                              NewUtxoClient(cfg),
 		UtxoSwap:                          NewUtxoSwapClient(cfg),
+		WalletSetting:                     NewWalletSettingClient(cfg),
 	}, nil
 }
 
@@ -350,7 +356,7 @@ func (c *Client) Use(hooks ...Hook) {
 		c.SparkInvoice, c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
 		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
 		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.Tree,
-		c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap,
+		c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
 	} {
 		n.Use(hooks...)
 	}
@@ -366,7 +372,7 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.SparkInvoice, c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
 		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
 		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.Tree,
-		c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap,
+		c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -431,6 +437,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Utxo.mutate(ctx, m)
 	case *UtxoSwapMutation:
 		return c.UtxoSwap.mutate(ctx, m)
+	case *WalletSettingMutation:
+		return c.WalletSetting.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
 	}
@@ -5047,6 +5055,139 @@ func (c *UtxoSwapClient) mutate(ctx context.Context, m *UtxoSwapMutation) (Value
 	}
 }
 
+// WalletSettingClient is a client for the WalletSetting schema.
+type WalletSettingClient struct {
+	config
+}
+
+// NewWalletSettingClient returns a client for the WalletSetting from the given config.
+func NewWalletSettingClient(c config) *WalletSettingClient {
+	return &WalletSettingClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `walletsetting.Hooks(f(g(h())))`.
+func (c *WalletSettingClient) Use(hooks ...Hook) {
+	c.hooks.WalletSetting = append(c.hooks.WalletSetting, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `walletsetting.Intercept(f(g(h())))`.
+func (c *WalletSettingClient) Intercept(interceptors ...Interceptor) {
+	c.inters.WalletSetting = append(c.inters.WalletSetting, interceptors...)
+}
+
+// Create returns a builder for creating a WalletSetting entity.
+func (c *WalletSettingClient) Create() *WalletSettingCreate {
+	mutation := newWalletSettingMutation(c.config, OpCreate)
+	return &WalletSettingCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of WalletSetting entities.
+func (c *WalletSettingClient) CreateBulk(builders ...*WalletSettingCreate) *WalletSettingCreateBulk {
+	return &WalletSettingCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *WalletSettingClient) MapCreateBulk(slice any, setFunc func(*WalletSettingCreate, int)) *WalletSettingCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &WalletSettingCreateBulk{err: fmt.Errorf("calling to WalletSettingClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*WalletSettingCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &WalletSettingCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for WalletSetting.
+func (c *WalletSettingClient) Update() *WalletSettingUpdate {
+	mutation := newWalletSettingMutation(c.config, OpUpdate)
+	return &WalletSettingUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *WalletSettingClient) UpdateOne(ws *WalletSetting) *WalletSettingUpdateOne {
+	mutation := newWalletSettingMutation(c.config, OpUpdateOne, withWalletSetting(ws))
+	return &WalletSettingUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *WalletSettingClient) UpdateOneID(id uuid.UUID) *WalletSettingUpdateOne {
+	mutation := newWalletSettingMutation(c.config, OpUpdateOne, withWalletSettingID(id))
+	return &WalletSettingUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for WalletSetting.
+func (c *WalletSettingClient) Delete() *WalletSettingDelete {
+	mutation := newWalletSettingMutation(c.config, OpDelete)
+	return &WalletSettingDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *WalletSettingClient) DeleteOne(ws *WalletSetting) *WalletSettingDeleteOne {
+	return c.DeleteOneID(ws.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *WalletSettingClient) DeleteOneID(id uuid.UUID) *WalletSettingDeleteOne {
+	builder := c.Delete().Where(walletsetting.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &WalletSettingDeleteOne{builder}
+}
+
+// Query returns a query builder for WalletSetting.
+func (c *WalletSettingClient) Query() *WalletSettingQuery {
+	return &WalletSettingQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeWalletSetting},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a WalletSetting entity by its id.
+func (c *WalletSettingClient) Get(ctx context.Context, id uuid.UUID) (*WalletSetting, error) {
+	return c.Query().Where(walletsetting.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *WalletSettingClient) GetX(ctx context.Context, id uuid.UUID) *WalletSetting {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *WalletSettingClient) Hooks() []Hook {
+	return c.hooks.WalletSetting
+}
+
+// Interceptors returns the client interceptors.
+func (c *WalletSettingClient) Interceptors() []Interceptor {
+	return c.inters.WalletSetting
+}
+
+func (c *WalletSettingClient) mutate(ctx context.Context, m *WalletSettingMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&WalletSettingCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&WalletSettingUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&WalletSettingUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&WalletSettingDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown WalletSetting mutation op: %q", m.Op())
+	}
+}
+
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
@@ -5056,7 +5197,7 @@ type (
 		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
 		TokenPartialRevocationSecretShare, TokenTransaction,
 		TokenTransactionPeerSignature, Transfer, TransferLeaf, Tree, TreeNode,
-		UserSignedTransaction, Utxo, UtxoSwap []ent.Hook
+		UserSignedTransaction, Utxo, UtxoSwap, WalletSetting []ent.Hook
 	}
 	inters struct {
 		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, Gossip,
@@ -5065,7 +5206,7 @@ type (
 		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
 		TokenPartialRevocationSecretShare, TokenTransaction,
 		TokenTransactionPeerSignature, Transfer, TransferLeaf, Tree, TreeNode,
-		UserSignedTransaction, Utxo, UtxoSwap []ent.Interceptor
+		UserSignedTransaction, Utxo, UtxoSwap, WalletSetting []ent.Interceptor
 	}
 )
 

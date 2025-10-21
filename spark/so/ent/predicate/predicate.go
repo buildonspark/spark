@@ -89,3 +89,6 @@ type Utxo func(*sql.Selector)
 
 // UtxoSwap is the predicate function for utxoswap builders.
 type UtxoSwap func(*sql.Selector)
+
+// WalletSetting is the predicate function for walletsetting builders.
+type WalletSetting func(*sql.Selector)

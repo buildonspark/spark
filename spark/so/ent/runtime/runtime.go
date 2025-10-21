@@ -36,6 +36,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/usersignedtransaction"
 	"github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
+	"github.com/lightsparkdev/spark/so/ent/walletsetting"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -748,6 +749,29 @@ func init() {
 	utxoswapDescID := utxoswapMixinFields0[0].Descriptor()
 	// utxoswap.DefaultID holds the default value on creation for the id field.
 	utxoswap.DefaultID = utxoswapDescID.Default.(func() uuid.UUID)
+	walletsettingMixin := schema.WalletSetting{}.Mixin()
+	walletsettingMixinFields0 := walletsettingMixin[0].Fields()
+	_ = walletsettingMixinFields0
+	walletsettingFields := schema.WalletSetting{}.Fields()
+	_ = walletsettingFields
+	// walletsettingDescCreateTime is the schema descriptor for create_time field.
+	walletsettingDescCreateTime := walletsettingMixinFields0[1].Descriptor()
+	// walletsetting.DefaultCreateTime holds the default value on creation for the create_time field.
+	walletsetting.DefaultCreateTime = walletsettingDescCreateTime.Default.(func() time.Time)
+	// walletsettingDescUpdateTime is the schema descriptor for update_time field.
+	walletsettingDescUpdateTime := walletsettingMixinFields0[2].Descriptor()
+	// walletsetting.DefaultUpdateTime holds the default value on creation for the update_time field.
+	walletsetting.DefaultUpdateTime = walletsettingDescUpdateTime.Default.(func() time.Time)
+	// walletsetting.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	walletsetting.UpdateDefaultUpdateTime = walletsettingDescUpdateTime.UpdateDefault.(func() time.Time)
+	// walletsettingDescPrivateEnabled is the schema descriptor for private_enabled field.
+	walletsettingDescPrivateEnabled := walletsettingFields[1].Descriptor()
+	// walletsetting.DefaultPrivateEnabled holds the default value on creation for the private_enabled field.
+	walletsetting.DefaultPrivateEnabled = walletsettingDescPrivateEnabled.Default.(bool)
+	// walletsettingDescID is the schema descriptor for id field.
+	walletsettingDescID := walletsettingMixinFields0[0].Descriptor()
+	// walletsetting.DefaultID holds the default value on creation for the id field.
+	walletsetting.DefaultID = walletsettingDescID.Default.(func() uuid.UUID)
 }
 
 const (

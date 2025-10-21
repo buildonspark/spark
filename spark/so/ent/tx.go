@@ -70,6 +70,8 @@ type Tx struct {
 	Utxo *UtxoClient
 	// UtxoSwap is the client for interacting with the UtxoSwap builders.
 	UtxoSwap *UtxoSwapClient
+	// WalletSetting is the client for interacting with the WalletSetting builders.
+	WalletSetting *WalletSettingClient
 
 	// lazily loaded.
 	client     *Client
@@ -229,6 +231,7 @@ func (tx *Tx) init() {
 	tx.UserSignedTransaction = NewUserSignedTransactionClient(tx.config)
 	tx.Utxo = NewUtxoClient(tx.config)
 	tx.UtxoSwap = NewUtxoSwapClient(tx.config)
+	tx.WalletSetting = NewWalletSettingClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.
