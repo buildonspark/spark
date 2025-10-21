@@ -20,6 +20,11 @@ url = "https://dl.google.com/go/go1.25.1.darwin-arm64.tar.gz"
 version = "2.4.0"
 backend = "aqua:golangci/golangci-lint"
 
+[tools.golangci-lint.platforms.linux-x64]
+checksum = "sha256:fae792524c04424c0ac369f5b8076f04b45cf29fc945a370e55d369a8dc11840"
+size = 14126779
+url = "https://github.com/golangci/golangci-lint/releases/download/v2.4.0/golangci-lint-2.4.0-linux-amd64.tar.gz"
+
 [[tools.gotestsum]]
 version = "1.13.0"
 backend = "aqua:gotestyourself/gotestsum"
@@ -30,13 +35,13 @@ size = 2472317
 url = "https://github.com/gotestyourself/gotestsum/releases/download/v1.13.0/gotestsum_1.13.0_darwin_arm64.tar.gz"
 
 [[tools.lefthook]]
-version = "1.11.14"
+version = "2.0.0"
 backend = "aqua:evilmartians/lefthook"
 
 [tools.lefthook.platforms.macos-arm64]
-checksum = "sha256:b9c68fabb3c9b71b18335fb886317ae068e0d4a8640f40ae21720fcbae130579"
-size = 5286540
-url = "https://github.com/evilmartians/lefthook/releases/download/v1.11.14/lefthook_1.11.14_MacOS_arm64.gz"
+checksum = "sha256:0cf763fb55c05de17f7a7842fc9fd7044f1b7d1542129c1b2b8ae27c5769afb9"
+size = 5747200
+url = "https://github.com/evilmartians/lefthook/releases/download/v2.0.0/lefthook_2.0.0_MacOS_arm64.gz"
 
 [[tools.node]]
 version = "20.19.0"
@@ -51,6 +56,11 @@ url = "https://nodejs.org/dist/v20.19.0/node-v20.19.0-darwin-arm64.tar.gz"
 version = "29.3"
 backend = "aqua:protocolbuffers/protobuf/protoc"
 
+[tools.protoc.platforms.linux-x64]
+checksum = "blake3:e69b7d6f33637cccd4e4cf4839b3d799ed02ae436e0eb555b0816b85cf341fb1"
+size = 3288836
+url = "https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-linux-x86_64.zip"
+
 [tools.protoc.platforms.macos-arm64]
 checksum = "blake3:c5796cef7cf2c50cfc889d1cd821170c3d9158972175d46062879ff3757e42a4"
 size = 2290929
@@ -59,6 +69,11 @@ url = "https://github.com/protocolbuffers/protobuf/releases/download/v29.3/proto
 [[tools.protoc-gen-go]]
 version = "1.36.6"
 backend = "aqua:protocolbuffers/protobuf-go/protoc-gen-go"
+
+[tools.protoc-gen-go.platforms.linux-x64]
+checksum = "blake3:404ea4268ed7ca4a4e2229ca6787558abf8b9fa6e1fb1052b13bec638a3f08fe"
+size = 2389291
+url = "https://github.com/protocolbuffers/protobuf-go/releases/download/v1.36.6/protoc-gen-go.v1.36.6.linux.amd64.tar.gz"
 
 [tools.protoc-gen-go.platforms.macos-arm64]
 checksum = "blake3:63a7dcee5c191e2527ec2f4da9e98cc97e8ef8b21beb97057e4aefbdd22f7286"
@@ -69,6 +84,11 @@ url = "https://github.com/protocolbuffers/protobuf-go/releases/download/v1.36.6/
 version = "1.5.1"
 backend = "aqua:grpc/grpc-go/protoc-gen-go-grpc"
 
+[tools.protoc-gen-go-grpc.platforms.linux-x64]
+checksum = "blake3:197739132f0408f017d0c83773ac1ace85c0572473fdd658ec6e4ccbf20e0552"
+size = 4859466
+url = "https://github.com/grpc/grpc-go/releases/download/cmd/protoc-gen-go-grpc/v1.5.1/protoc-gen-go-grpc.v1.5.1.linux.amd64.tar.gz"
+
 [tools.protoc-gen-go-grpc.platforms.macos-arm64]
 checksum = "blake3:3c668207565d23ea2cf006d699207e3a804ebb929a534bd38a3b4ff4e941e00c"
 size = 4565944
@@ -77,6 +97,11 @@ url = "https://github.com/grpc/grpc-go/releases/download/cmd/protoc-gen-go-grpc/
 [[tools.protoc-gen-validate]]
 version = "1.2.1"
 backend = "aqua:bufbuild/protoc-gen-validate"
+
+[tools.protoc-gen-validate.platforms.linux-x64]
+checksum = "sha256:e7a1d7256184dc6824e8f8e4b672b1281013e321579daffd19b2e3e90b6f7d9f"
+size = 13452368
+url = "https://github.com/bufbuild/protoc-gen-validate/releases/download/v1.2.1/protoc-gen-validate_1.2.1_linux_amd64.tar.gz"
 
 [tools.protoc-gen-validate.platforms.macos-arm64]
 checksum = "sha256:44dfd7778a49febdfb088dacee835b5d649218b5277bdd7c98e2a1f8eb328b34"

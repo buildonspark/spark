@@ -87,13 +87,9 @@ func (w *SingleKeyTestWallet) ClaimAllTransfers(ctx context.Context) ([]*pb.Tree
 		}
 		leaves := make([]LeafKeyTweak, len(transfer.Leaves))
 		for i, leaf := range transfer.Leaves {
-			leafPrivKeyBytes, ok := leavesMap[leaf.Leaf.Id]
+			leafPrivKey, ok := leavesMap[leaf.Leaf.Id]
 			if !ok {
 				return nil, fmt.Errorf("leaf %s not found", leaf.Leaf.Id)
-			}
-			leafPrivKey, err := keys.ParsePrivateKey(leafPrivKeyBytes)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse leaf private key: %w", err)
 			}
 			leaves[i] = LeafKeyTweak{
 				Leaf:              leaf.Leaf,

@@ -47,8 +47,7 @@ func createTestCoopExitAndConnectorOutputs(
 	userPubKey keys.Public, userAmountSats int64,
 ) (*wire.MsgTx, []*wire.OutPoint) {
 	// Get arbitrary SSP address, using identity for convenience
-	identityPubKey, err := keys.ParsePublicKey(config.IdentityPublicKey().Serialize())
-	require.NoError(t, err)
+	identityPubKey := config.IdentityPublicKey()
 	sspIntermediateAddress, err := common.P2TRAddressFromPublicKey(identityPubKey, config.Network)
 	require.NoError(t, err)
 
@@ -161,7 +160,7 @@ func TestCoopExitBasic(t *testing.T) {
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), sspConfig, receiverTransfer)
 	require.NoError(t, err)
 	assert.Len(t, leafPrivKeyMap, 1)
-	assert.Equal(t, leafPrivKeyMap[transferNode.Leaf.Id], sspConfig.IdentityPrivateKey.Serialize())
+	assert.Equal(t, leafPrivKeyMap[transferNode.Leaf.Id], sspConfig.IdentityPrivateKey)
 
 	// Claim leaf. This requires a loop because sometimes there are
 	// delays in processing blocks, and after the tx initially confirms,
@@ -424,7 +423,7 @@ func TestCoopExitCannotCancelAfterBroadcast(t *testing.T) {
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), sspConfig, receiverTransfer)
 	require.NoError(t, err)
 	assert.Len(t, leafPrivKeyMap, 1)
-	assert.Equal(t, leafPrivKeyMap[transferNode.Leaf.Id], sspConfig.IdentityPrivateKey.Serialize())
+	assert.Equal(t, leafPrivKeyMap[transferNode.Leaf.Id], sspConfig.IdentityPrivateKey)
 
 	// Fail to cancel
 	_, err = wallet.CancelTransfer(t.Context(), config, senderTransfer)

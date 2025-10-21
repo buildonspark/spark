@@ -141,7 +141,7 @@ func TestSwap(t *testing.T) {
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverPendingTransfer)
 	require.NoError(t, err, "unable to verify pending transfer")
 	require.Len(t, leafPrivKeyMap, 1)
-	require.Equal(t, senderNewLeafPrivKey.Serialize(), leafPrivKeyMap[senderRootNode.Id])
+	require.Equal(t, senderNewLeafPrivKey, leafPrivKeyMap[senderRootNode.Id])
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
@@ -181,7 +181,7 @@ func TestSwap(t *testing.T) {
 	leafPrivKeyMap, err = wallet.VerifyPendingTransfer(t.Context(), senderConfig, senderPendingTransfer)
 	require.NoError(t, err, "unable to verify pending transfer")
 	require.Len(t, leafPrivKeyMap, 1, "expected 1 leaf to transfer")
-	require.Equal(t, receiverNewLeafPrivKey.Serialize(), leafPrivKeyMap[receiverRootNode.Id])
+	require.Equal(t, receiverNewLeafPrivKey, leafPrivKeyMap[receiverRootNode.Id])
 
 	finalLeafPrivKey = keys.GeneratePrivateKey()
 	claimingNode = wallet.LeafKeyTweak{
@@ -330,7 +330,7 @@ func TestSwapDeliverTransferPackageTwice(t *testing.T) {
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverPendingTransfer)
 	require.NoError(t, err, "unable to verify pending transfer")
 	require.Len(t, leafPrivKeyMap, 1)
-	require.Equal(t, senderNewLeafPrivKey.Serialize(), leafPrivKeyMap[senderRootNode.Id])
+	require.Equal(t, senderNewLeafPrivKey, leafPrivKeyMap[senderRootNode.Id])
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
@@ -374,7 +374,7 @@ func TestSwapDeliverTransferPackageTwice(t *testing.T) {
 	leafPrivKeyMap, err = wallet.VerifyPendingTransfer(t.Context(), senderConfig, senderPendingTransfer)
 	require.NoError(t, err, "unable to verify pending transfer")
 	require.Len(t, leafPrivKeyMap, 1)
-	require.Equal(t, receiverNewLeafPrivKey.Serialize(), leafPrivKeyMap[receiverRootNode.Id])
+	require.Equal(t, receiverNewLeafPrivKey, leafPrivKeyMap[receiverRootNode.Id])
 
 	finalLeafPrivKey = keys.GeneratePrivateKey()
 	claimingNode = wallet.LeafKeyTweak{

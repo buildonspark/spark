@@ -78,7 +78,8 @@ func TestTransfer(t *testing.T) {
 	require.Equal(t, pb.TransferType_TRANSFER, receiverTransfer.Type)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
@@ -197,7 +198,8 @@ func TestTransferInterrupt(t *testing.T) {
 	require.Equal(t, pb.TransferType_TRANSFER, receiverTransfer.Type)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
@@ -291,7 +293,8 @@ func TestTransferRecoverFinalizeSignatures(t *testing.T) {
 	require.Equal(t, pb.TransferType_TRANSFER, receiverTransfer.Type)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
@@ -375,7 +378,8 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
@@ -400,7 +404,8 @@ func TestTransferWithSeparateSteps(t *testing.T) {
 	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
 
 	leafPrivKeyMap, err = wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
 
 	_, err = wallet.ClaimTransferSignRefunds(
 		receiverCtx,
@@ -482,7 +487,8 @@ func TestCancelTransfer(t *testing.T) {
 	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
@@ -660,7 +666,8 @@ func TestQueryTransfers(t *testing.T) {
 	require.Equal(t, senderTransfer.Id, receiverPendingTransfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverPendingTransfer)
-	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, senderRootNode, senderNewLeafPrivKey)
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{senderRootNode.Id: senderNewLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
@@ -696,7 +703,8 @@ func TestQueryTransfers(t *testing.T) {
 	require.Equal(t, senderTransfer.Id, receiverPendingTransfer.Id)
 
 	leafPrivKeyMap, err = wallet.VerifyPendingTransfer(t.Context(), senderConfig, senderPendingTransfer)
-	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, receiverRootNode, receiverNewLeafPrivKey)
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{receiverRootNode.Id: receiverNewLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey = keys.GeneratePrivateKey()
 	claimingNode = wallet.LeafKeyTweak{
@@ -783,7 +791,8 @@ func TestDoubleClaimTransfer(t *testing.T) {
 	require.Equal(t, senderTransfer.Id, receiverTransfer.Id)
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{
@@ -1484,7 +1493,8 @@ func testTransferWithInvoice(t *testing.T, invoice string, senderPrivKey keys.Pr
 	require.Equal(t, invoice, receiverTransfer.GetSparkInvoice())
 
 	leafPrivKeyMap, err := wallet.VerifyPendingTransfer(t.Context(), receiverConfig, receiverTransfer)
-	sparktesting.AssertVerifiedPendingTransfer(t, err, leafPrivKeyMap, rootNode, newLeafPrivKey)
+	require.NoError(t, err)
+	require.Equal(t, map[string]keys.Private{rootNode.Id: newLeafPrivKey}, leafPrivKeyMap)
 
 	finalLeafPrivKey := keys.GeneratePrivateKey()
 	claimingNode := wallet.LeafKeyTweak{

@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"math/big"
+	"slices"
 	"sync"
 	"time"
 
@@ -711,9 +712,10 @@ func QuerySparkInvoicesByRawString(
 }
 
 // VerifyPendingTransfer verifies signature and decrypt secret cipher for all leaves in the transfer.
-func VerifyPendingTransfer(_ context.Context, config *TestWalletConfig, transfer *pb.Transfer) (map[string][]byte, error) {
-	leafPrivKeyMap := make(map[string][]byte)
-	senderPubkey, err := secp256k1.ParsePubKey(transfer.SenderIdentityPublicKey)
+// It returns a map of leaf IDs to their corresponding pending secret keys for the leaf.
+func VerifyPendingTransfer(_ context.Context, config *TestWalletConfig, transfer *pb.Transfer) (map[string]keys.Private, error) {
+	leafPrivKeyMap := make(map[string]keys.Private)
+	senderPubKey, err := keys.ParsePublicKey(transfer.GetSenderIdentityPublicKey())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse sender public key: %w", err)
 	}
@@ -733,9 +735,10 @@ func VerifyPendingTransfer(_ context.Context, config *TestWalletConfig, transfer
 				return nil, fmt.Errorf("failed to parse signature: %w", err)
 			}
 		}
-		payload := append(append([]byte(leaf.Leaf.Id), []byte(transfer.Id)...), leaf.SecretCipher...)
+
+		payload := slices.Concat([]byte(leaf.Leaf.Id), []byte(transfer.Id), leaf.SecretCipher)
 		payloadHash := sha256.Sum256(payload)
-		if !signature.Verify(payloadHash[:], senderPubkey) {
+		if !signature.Verify(payloadHash[:], senderPubKey.ToBTCEC()) {
 			return nil, fmt.Errorf("failed to verify signature: %w", err)
 		}
 
@@ -744,8 +747,12 @@ func VerifyPendingTransfer(_ context.Context, config *TestWalletConfig, transfer
 		if err != nil {
 			return nil, fmt.Errorf("failed to decrypt secret cipher: %w", err)
 		}
-		leafPrivKeyMap[leaf.Leaf.Id] = leafSecret
 
+		leafSecretKey, err := keys.ParsePrivateKey(leafSecret)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse leaf secret private key: %w", err)
+		}
+		leafPrivKeyMap[leaf.Leaf.Id] = leafSecretKey
 	}
 	return leafPrivKeyMap, nil
 }
@@ -878,16 +885,18 @@ func prepareClaimLeafKeyTweaks(config *TestWalletConfig, leaf LeafKeyTweak) (map
 	}
 
 	// Calculate pubkey shares tweak
-	pubkeySharesTweak := make(map[string][]byte)
+	pubkeySharesTweak := make(map[string]keys.Public)
 	for identifier, operator := range config.SigningOperators {
 		share := findShare(shares, operator.ID)
 		if share == nil {
 			return nil, nil, fmt.Errorf("failed to find share for operator %d", operator.ID)
 		}
-		var shareScalar secp256k1.ModNScalar
-		shareScalar.SetByteSlice(share.Share.Bytes())
-		pubkeyTweak := secp256k1.NewPrivateKey(&shareScalar).PubKey()
-		pubkeySharesTweak[identifier] = pubkeyTweak.SerializeCompressed()
+
+		shareTweak, err := keys.PrivateKeyFromBigInt(share.GetShare())
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to parse share: %w", err)
+		}
+		pubkeySharesTweak[identifier] = shareTweak.Public()
 	}
 
 	leafTweaksMap := make(map[string]*pb.ClaimLeafKeyTweak)
@@ -906,7 +915,7 @@ func prepareClaimLeafKeyTweaks(config *TestWalletConfig, leaf LeafKeyTweak) (map
 				SecretShare: secretShareBytes,
 				Proofs:      share.Proofs,
 			},
-			PubkeySharesTweak: pubkeySharesTweak,
+			PubkeySharesTweak: keys.ToBytesMap(pubkeySharesTweak),
 		}
 	}
 	return leafTweaksMap, shares[0].Proofs, nil
