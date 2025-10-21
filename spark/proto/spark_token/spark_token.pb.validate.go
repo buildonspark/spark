@@ -3079,6 +3079,8 @@ func (m *QueryTokenTransactionsRequest) validate(all bool) error {
 
 	}
 
+	// no validation rules for Order
+
 	// no validation rules for Limit
 
 	// no validation rules for Offset

@@ -219,6 +219,7 @@ message QueryTokenTransactionsRequest {
     repeated bytes token_identifiers = 7 [(validate.rules).repeated.items.bytes.len = 32];
     // Returns transactions that match the provided transaction hashes.
     repeated bytes token_transaction_hashes = 4 [(validate.rules).repeated.items.bytes.len = 32];
+    spark.Order order = 8;
     int64 limit = 5;
     int64 offset = 6;
 }

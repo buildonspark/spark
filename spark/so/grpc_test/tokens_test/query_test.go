@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/utils"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
@@ -553,4 +554,102 @@ func TestQueryTokenOutputsWithStartTransaction(t *testing.T) {
 			require.Equal(t, mintTxHash, outputsResp.OutputsWithPreviousTransactionData[0].PreviousTransactionHash, "expected the same previous transaction hash")
 		})
 	}
+}
+
+// TestQueryTokenTransactionsOrdering tests that QueryTokenTransactions returns results in the correct order
+func TestQueryTokenTransactionsOrdering(t *testing.T) {
+	issuerPrivKey := getRandomPrivateKey(t)
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+
+	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
+		IssuerPrivateKey: issuerPrivKey,
+		Name:             "Order Test Token",
+		Ticker:           "ORD",
+		MaxSupply:        1000000,
+	})
+	require.NoError(t, err, "failed to create native spark token")
+
+	var transactionHashes [][]byte
+
+	mintTx1, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
+	require.NoError(t, err, "failed to create first mint transaction")
+
+	finalMintTx1, err := wallet.BroadcastCoordinatedTokenTransfer(
+		t.Context(), config, mintTx1, []keys.Private{issuerPrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast first mint transaction")
+
+	mintTxHash1, err := utils.HashTokenTransaction(finalMintTx1, false)
+	require.NoError(t, err, "failed to hash first mint transaction")
+	transactionHashes = append(transactionHashes, mintTxHash1)
+
+	time.Sleep(100 * time.Millisecond)
+
+	mintTx2, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
+	require.NoError(t, err, "failed to create second mint transaction")
+
+	finalMintTx2, err := wallet.BroadcastCoordinatedTokenTransfer(
+		t.Context(), config, mintTx2, []keys.Private{issuerPrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast second mint transaction")
+
+	mintTxHash2, err := utils.HashTokenTransaction(finalMintTx2, false)
+	require.NoError(t, err, "failed to hash second mint transaction")
+	transactionHashes = append(transactionHashes, mintTxHash2)
+
+	time.Sleep(100 * time.Millisecond)
+
+	mintTx3, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
+	require.NoError(t, err, "failed to create third mint transaction")
+
+	finalMintTx3, err := wallet.BroadcastCoordinatedTokenTransfer(
+		t.Context(), config, mintTx3, []keys.Private{issuerPrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast third mint transaction")
+
+	mintTxHash3, err := utils.HashTokenTransaction(finalMintTx3, false)
+	require.NoError(t, err, "failed to hash third mint transaction")
+	transactionHashes = append(transactionHashes, mintTxHash3)
+
+	t.Run("ascending order", func(t *testing.T) {
+		result, err := wallet.QueryTokenTransactionsV2(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+				Order:            sparkpb.Order_ASCENDING,
+				Limit:            10,
+			},
+		)
+		require.NoError(t, err, "failed to query token transactions with ascending order")
+		require.Len(t, result.TokenTransactionsWithStatus, 3, "expected 3 transactions")
+
+		require.Equal(t, transactionHashes[0], result.TokenTransactionsWithStatus[0].TokenTransactionHash,
+			"first transaction should be mintTxHash1")
+		require.Equal(t, transactionHashes[1], result.TokenTransactionsWithStatus[1].TokenTransactionHash,
+			"second transaction should be mintTxHash2")
+		require.Equal(t, transactionHashes[2], result.TokenTransactionsWithStatus[2].TokenTransactionHash,
+			"third transaction should be mintTxHash3")
+	})
+
+	t.Run("descending order", func(t *testing.T) {
+		result, err := wallet.QueryTokenTransactionsV2(
+			t.Context(),
+			config,
+			wallet.QueryTokenTransactionsParams{
+				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+				Order:            sparkpb.Order_DESCENDING,
+				Limit:            10,
+			},
+		)
+		require.NoError(t, err, "failed to query token transactions with descending order")
+		require.Len(t, result.TokenTransactionsWithStatus, 3, "expected 3 transactions")
+
+		require.Equal(t, transactionHashes[2], result.TokenTransactionsWithStatus[0].TokenTransactionHash,
+			"first transaction should be mintTxHash3")
+		require.Equal(t, transactionHashes[1], result.TokenTransactionsWithStatus[1].TokenTransactionHash,
+			"second transaction should be mintTxHash2")
+		require.Equal(t, transactionHashes[0], result.TokenTransactionsWithStatus[2].TokenTransactionHash,
+			"third transaction should be mintTxHash1")
+	})
 }

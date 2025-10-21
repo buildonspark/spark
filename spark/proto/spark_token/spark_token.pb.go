@@ -1439,9 +1439,10 @@ type QueryTokenTransactionsRequest struct {
 	// Returns transactions that related to this token identifier.
 	TokenIdentifiers [][]byte `protobuf:"bytes,7,rep,name=token_identifiers,json=tokenIdentifiers,proto3" json:"token_identifiers,omitempty"`
 	// Returns transactions that match the provided transaction hashes.
-	TokenTransactionHashes [][]byte `protobuf:"bytes,4,rep,name=token_transaction_hashes,json=tokenTransactionHashes,proto3" json:"token_transaction_hashes,omitempty"`
-	Limit                  int64    `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
-	Offset                 int64    `protobuf:"varint,6,opt,name=offset,proto3" json:"offset,omitempty"`
+	TokenTransactionHashes [][]byte    `protobuf:"bytes,4,rep,name=token_transaction_hashes,json=tokenTransactionHashes,proto3" json:"token_transaction_hashes,omitempty"`
+	Order                  spark.Order `protobuf:"varint,8,opt,name=order,proto3,enum=spark.Order" json:"order,omitempty"`
+	Limit                  int64       `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset                 int64       `protobuf:"varint,6,opt,name=offset,proto3" json:"offset,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -1509,6 +1510,13 @@ func (x *QueryTokenTransactionsRequest) GetTokenTransactionHashes() [][]byte {
 		return x.TokenTransactionHashes
 	}
 	return nil
+}
+
+func (x *QueryTokenTransactionsRequest) GetOrder() spark.Order {
+	if x != nil {
+		return x.Order
+	}
+	return spark.Order(0)
 }
 
 func (x *QueryTokenTransactionsRequest) GetLimit() int64 {
@@ -2161,7 +2169,7 @@ const file_spark_token_proto_rawDesc = "" +
 	"\x12issuer_public_keys\x18\x02 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x10issuerPublicKeys\x129\n" +
 	"\x11token_identifiers\x18\x04 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h R\x10tokenIdentifiers\x12(\n" +
 	"\anetwork\x18\x03 \x01(\x0e2\x0e.spark.NetworkR\anetwork\x125\n" +
-	"\fpage_request\x18\x05 \x01(\v2\x12.spark.PageRequestR\vpageRequest\"\xf4\x02\n" +
+	"\fpage_request\x18\x05 \x01(\v2\x12.spark.PageRequestR\vpageRequest\"\x98\x03\n" +
 	"\x1dQueryTokenTransactionsRequest\x12,\n" +
 	"\n" +
 	"output_ids\x18\x01 \x03(\tB\r\xfaB\n" +
@@ -2169,7 +2177,8 @@ const file_spark_token_proto_rawDesc = "" +
 	"\x11owner_public_keys\x18\x02 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x0fownerPublicKeys\x12:\n" +
 	"\x12issuer_public_keys\x18\x03 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h!R\x10issuerPublicKeys\x129\n" +
 	"\x11token_identifiers\x18\a \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h R\x10tokenIdentifiers\x12F\n" +
-	"\x18token_transaction_hashes\x18\x04 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h R\x16tokenTransactionHashes\x12\x14\n" +
+	"\x18token_transaction_hashes\x18\x04 \x03(\fB\f\xfaB\t\x92\x01\x06\"\x04z\x02h R\x16tokenTransactionHashes\x12\"\n" +
+	"\x05order\x18\b \x01(\x0e2\f.spark.OrderR\x05order\x12\x14\n" +
 	"\x05limit\x18\x05 \x01(\x03R\x05limit\x12\x16\n" +
 	"\x06offset\x18\x06 \x01(\x03R\x06offset\"\xa6\x01\n" +
 	"\x1eQueryTokenTransactionsResponse\x12l\n" +
@@ -2285,7 +2294,8 @@ var file_spark_token_proto_goTypes = []any{
 	(spark.Network)(0),                           // 32: spark.Network
 	(*spark.SigningKeyshare)(nil),                // 33: spark.SigningKeyshare
 	(*spark.PageRequest)(nil),                    // 34: spark.PageRequest
-	(*spark.PageResponse)(nil),                   // 35: spark.PageResponse
+	(spark.Order)(0),                             // 35: spark.Order
+	(*spark.PageResponse)(nil),                   // 36: spark.PageResponse
 }
 var file_spark_token_proto_depIdxs = []int32{
 	3,  // 0: spark_token.TokenTransferInput.outputs_to_spend:type_name -> spark_token.TokenOutputToSpend
@@ -2309,32 +2319,33 @@ var file_spark_token_proto_depIdxs = []int32{
 	18, // 18: spark_token.QueryTokenMetadataResponse.token_metadata:type_name -> spark_token.TokenMetadata
 	32, // 19: spark_token.QueryTokenOutputsRequest.network:type_name -> spark.Network
 	34, // 20: spark_token.QueryTokenOutputsRequest.page_request:type_name -> spark.PageRequest
-	27, // 21: spark_token.QueryTokenTransactionsResponse.token_transactions_with_status:type_name -> spark_token.TokenTransactionWithStatus
-	7,  // 22: spark_token.OutputWithPreviousTransactionData.output:type_name -> spark_token.TokenOutput
-	23, // 23: spark_token.QueryTokenOutputsResponse.outputs_with_previous_transaction_data:type_name -> spark_token.OutputWithPreviousTransactionData
-	35, // 24: spark_token.QueryTokenOutputsResponse.page_response:type_name -> spark.PageResponse
-	25, // 25: spark_token.TokenTransactionConfirmationMetadata.spent_token_outputs_metadata:type_name -> spark_token.SpentTokenOutputMetadata
-	8,  // 26: spark_token.TokenTransactionWithStatus.token_transaction:type_name -> spark_token.TokenTransaction
-	2,  // 27: spark_token.TokenTransactionWithStatus.status:type_name -> spark_token.TokenTransactionStatus
-	26, // 28: spark_token.TokenTransactionWithStatus.confirmation_metadata:type_name -> spark_token.TokenTransactionConfirmationMetadata
-	28, // 29: spark_token.FreezeTokensRequest.freeze_tokens_payload:type_name -> spark_token.FreezeTokensPayload
-	12, // 30: spark_token.SparkTokenService.start_transaction:input_type -> spark_token.StartTransactionRequest
-	14, // 31: spark_token.SparkTokenService.commit_transaction:input_type -> spark_token.CommitTransactionRequest
-	17, // 32: spark_token.SparkTokenService.query_token_metadata:input_type -> spark_token.QueryTokenMetadataRequest
-	21, // 33: spark_token.SparkTokenService.query_token_transactions:input_type -> spark_token.QueryTokenTransactionsRequest
-	20, // 34: spark_token.SparkTokenService.query_token_outputs:input_type -> spark_token.QueryTokenOutputsRequest
-	29, // 35: spark_token.SparkTokenService.freeze_tokens:input_type -> spark_token.FreezeTokensRequest
-	13, // 36: spark_token.SparkTokenService.start_transaction:output_type -> spark_token.StartTransactionResponse
-	16, // 37: spark_token.SparkTokenService.commit_transaction:output_type -> spark_token.CommitTransactionResponse
-	19, // 38: spark_token.SparkTokenService.query_token_metadata:output_type -> spark_token.QueryTokenMetadataResponse
-	22, // 39: spark_token.SparkTokenService.query_token_transactions:output_type -> spark_token.QueryTokenTransactionsResponse
-	24, // 40: spark_token.SparkTokenService.query_token_outputs:output_type -> spark_token.QueryTokenOutputsResponse
-	30, // 41: spark_token.SparkTokenService.freeze_tokens:output_type -> spark_token.FreezeTokensResponse
-	36, // [36:42] is the sub-list for method output_type
-	30, // [30:36] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	35, // 21: spark_token.QueryTokenTransactionsRequest.order:type_name -> spark.Order
+	27, // 22: spark_token.QueryTokenTransactionsResponse.token_transactions_with_status:type_name -> spark_token.TokenTransactionWithStatus
+	7,  // 23: spark_token.OutputWithPreviousTransactionData.output:type_name -> spark_token.TokenOutput
+	23, // 24: spark_token.QueryTokenOutputsResponse.outputs_with_previous_transaction_data:type_name -> spark_token.OutputWithPreviousTransactionData
+	36, // 25: spark_token.QueryTokenOutputsResponse.page_response:type_name -> spark.PageResponse
+	25, // 26: spark_token.TokenTransactionConfirmationMetadata.spent_token_outputs_metadata:type_name -> spark_token.SpentTokenOutputMetadata
+	8,  // 27: spark_token.TokenTransactionWithStatus.token_transaction:type_name -> spark_token.TokenTransaction
+	2,  // 28: spark_token.TokenTransactionWithStatus.status:type_name -> spark_token.TokenTransactionStatus
+	26, // 29: spark_token.TokenTransactionWithStatus.confirmation_metadata:type_name -> spark_token.TokenTransactionConfirmationMetadata
+	28, // 30: spark_token.FreezeTokensRequest.freeze_tokens_payload:type_name -> spark_token.FreezeTokensPayload
+	12, // 31: spark_token.SparkTokenService.start_transaction:input_type -> spark_token.StartTransactionRequest
+	14, // 32: spark_token.SparkTokenService.commit_transaction:input_type -> spark_token.CommitTransactionRequest
+	17, // 33: spark_token.SparkTokenService.query_token_metadata:input_type -> spark_token.QueryTokenMetadataRequest
+	21, // 34: spark_token.SparkTokenService.query_token_transactions:input_type -> spark_token.QueryTokenTransactionsRequest
+	20, // 35: spark_token.SparkTokenService.query_token_outputs:input_type -> spark_token.QueryTokenOutputsRequest
+	29, // 36: spark_token.SparkTokenService.freeze_tokens:input_type -> spark_token.FreezeTokensRequest
+	13, // 37: spark_token.SparkTokenService.start_transaction:output_type -> spark_token.StartTransactionResponse
+	16, // 38: spark_token.SparkTokenService.commit_transaction:output_type -> spark_token.CommitTransactionResponse
+	19, // 39: spark_token.SparkTokenService.query_token_metadata:output_type -> spark_token.QueryTokenMetadataResponse
+	22, // 40: spark_token.SparkTokenService.query_token_transactions:output_type -> spark_token.QueryTokenTransactionsResponse
+	24, // 41: spark_token.SparkTokenService.query_token_outputs:output_type -> spark_token.QueryTokenOutputsResponse
+	30, // 42: spark_token.SparkTokenService.freeze_tokens:output_type -> spark_token.FreezeTokensResponse
+	37, // [37:43] is the sub-list for method output_type
+	31, // [31:37] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_spark_token_proto_init() }

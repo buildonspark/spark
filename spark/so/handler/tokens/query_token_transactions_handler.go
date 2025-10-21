@@ -117,16 +117,16 @@ func (h *QueryTokenTransactionsHandler) queryWithRawSql(ctx context.Context, req
 		}
 	}()
 
-	// Scan the results into a simple struct for ID and update_time
+	// Scan the results into a simple struct for ID and create_time
 	type transactionResult struct {
 		ID         uuid.UUID `json:"id"`
-		UpdateTime time.Time `json:"update_time"`
+		CreateTime time.Time `json:"create_time"`
 	}
 
 	var results []transactionResult
 	for rows.Next() {
 		var result transactionResult
-		if err := rows.Scan(&result.ID, &result.UpdateTime); err != nil {
+		if err := rows.Scan(&result.ID, &result.CreateTime); err != nil {
 			return nil, fmt.Errorf("failed to scan transaction result: %w", err)
 		}
 		results = append(results, result)
@@ -277,18 +277,23 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(req *tokenpb.QueryTo
 	queryBuilder.WriteString(" SELECT * FROM (")
 
 	// UNION: transactions that created the filtered outputs OR spent the filtered outputs
-	queryBuilder.WriteString("SELECT tt.id, tt.update_time FROM token_transactions tt ")
+	queryBuilder.WriteString("SELECT tt.id, tt.create_time FROM token_transactions tt ")
 	queryBuilder.WriteString("JOIN filtered_outputs ON tt.id = filtered_outputs.token_output_output_created_token_transaction")
 	queryBuilder.WriteString(txHashFilter)
 	queryBuilder.WriteString(" UNION ")
-	queryBuilder.WriteString("SELECT tt.id, tt.update_time FROM token_transactions tt ")
+	queryBuilder.WriteString("SELECT tt.id, tt.create_time FROM token_transactions tt ")
 	queryBuilder.WriteString("JOIN filtered_outputs ON tt.id = filtered_outputs.token_output_output_spent_token_transaction")
 	queryBuilder.WriteString(txHashFilter)
 
 	queryBuilder.WriteString(") combined")
 
 	// Add ordering, limit, and offset
-	queryBuilder.WriteString(" ORDER BY combined.update_time DESC")
+	// Only apply ordering if explicitly specified
+	if req.GetOrder() == sparkpb.Order_ASCENDING {
+		queryBuilder.WriteString(" ORDER BY combined.create_time ASC")
+	} else {
+		queryBuilder.WriteString(" ORDER BY combined.create_time DESC")
+	}
 
 	limit := req.GetLimit()
 	if limit == 0 {
@@ -316,7 +321,14 @@ func (h *QueryTokenTransactionsHandler) queryWithEnt(ctx context.Context, req *t
 		baseQuery = baseQuery.Where(tokentransaction.FinalizedTokenTransactionHashIn(req.TokenTransactionHashes...))
 	}
 
-	query := baseQuery.Order(ent.Desc(tokentransaction.FieldUpdateTime))
+	// Apply ordering based on request
+	// Only apply ordering if explicitly specified
+	query := baseQuery
+	if req.GetOrder() == sparkpb.Order_ASCENDING {
+		query = query.Order(ent.Asc(tokentransaction.FieldCreateTime))
+	} else {
+		query = query.Order(ent.Desc(tokentransaction.FieldCreateTime))
+	}
 
 	limit := req.GetLimit()
 	if limit == 0 {

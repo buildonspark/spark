@@ -38,6 +38,7 @@ type QueryTokenTransactionsParams struct {
 	TokenIdentifiers  [][]byte
 	OutputIDs         []string
 	TransactionHashes [][]byte
+	Order             pb.Order
 	Offset            int64
 	Limit             int64
 }
@@ -717,6 +718,7 @@ func QueryTokenTransactionsV2(
 		TokenIdentifiers:       params.TokenIdentifiers,
 		OutputIds:              params.OutputIDs,
 		TokenTransactionHashes: params.TransactionHashes,
+		Order:                  params.Order,
 		Limit:                  params.Limit,
 		Offset:                 params.Offset,
 	}
