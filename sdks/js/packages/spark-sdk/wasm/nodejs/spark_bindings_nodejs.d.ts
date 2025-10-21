@@ -11,14 +11,19 @@ export function create_dummy_tx(address: string, amount_sats: bigint): DummyTx;
 export function encrypt_ecies(msg: Uint8Array, public_key_bytes: Uint8Array): Uint8Array;
 export function decrypt_ecies(encrypted_msg: Uint8Array, private_key_bytes: Uint8Array): Uint8Array;
 export function get_taproot_pubkey(verifying_pubkey: Uint8Array): Uint8Array;
+export function get_public_key_bytes(private_key_bytes: Uint8Array, compressed: boolean): Uint8Array;
+export function verify_signature_bytes(signature: Uint8Array, message: Uint8Array, public_key: Uint8Array): boolean;
+export function random_secret_key_bytes(): Uint8Array;
 export class DummyTx {
   private constructor();
   free(): void;
+  [Symbol.dispose](): void;
   tx: Uint8Array;
   txid: string;
 }
 export class KeyPackage {
   free(): void;
+  [Symbol.dispose](): void;
   constructor(secret_key: Uint8Array, public_key: Uint8Array, verifying_key: Uint8Array);
   secret_key: Uint8Array;
   public_key: Uint8Array;
@@ -27,17 +32,20 @@ export class KeyPackage {
 export class NonceResult {
   private constructor();
   free(): void;
+  [Symbol.dispose](): void;
   nonce: SigningNonce;
   commitment: SigningCommitment;
 }
 export class SigningCommitment {
   free(): void;
+  [Symbol.dispose](): void;
   constructor(hiding: Uint8Array, binding: Uint8Array);
   hiding: Uint8Array;
   binding: Uint8Array;
 }
 export class SigningNonce {
   free(): void;
+  [Symbol.dispose](): void;
   constructor(hiding: Uint8Array, binding: Uint8Array);
   hiding: Uint8Array;
   binding: Uint8Array;
@@ -45,6 +53,7 @@ export class SigningNonce {
 export class TransactionResult {
   private constructor();
   free(): void;
+  [Symbol.dispose](): void;
   tx: Uint8Array;
   sighash: Uint8Array;
 }
