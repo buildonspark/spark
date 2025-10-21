@@ -9,7 +9,7 @@ protoc = "29.3"
 protoc-gen-go = "1.36.6"
 protoc-gen-go-grpc = "1.5.1"
 protoc-gen-validate = "1.2.1"
-rust = "1.90.0"
+rust = { version = "latest", profile = "minimal" }
 
 [env]
 MISE_NODE_COREPACK = true
@@ -96,3 +96,5 @@ run = """kubectl --context minikube -n bitcoin exec regtest-bitcoind-0 -- \
 [settings]
 activate_aggressive = true
 disable_backends = ["asdf"]
+experimental = true
+lockfile = true

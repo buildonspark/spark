@@ -1,4 +1,4 @@
-[tools.atlas]
+[[tools.atlas]]
 version = "0.35.0"
 backend = "aqua:ariga/atlas"
 
@@ -7,7 +7,7 @@ checksum = "sha256:86db4b4abee45969c06fe4a0a34674c853df316ac3a59ae8d07e296ac6ce3
 size = 93071218
 url = "https://release.ariga.io/atlas/atlas-darwin-arm64-v0.35.0"
 
-[tools.go]
+[[tools.go]]
 version = "1.25.1"
 backend = "core:go"
 
@@ -16,11 +16,11 @@ checksum = "sha256:68deebb214f39d542e518ebb0598a406ab1b5a22bba8ec9ade9f55fb4dd94
 size = 57906702
 url = "https://dl.google.com/go/go1.25.1.darwin-arm64.tar.gz"
 
-[tools.golangci-lint]
+[[tools.golangci-lint]]
 version = "2.4.0"
 backend = "aqua:golangci/golangci-lint"
 
-[tools.gotestsum]
+[[tools.gotestsum]]
 version = "1.13.0"
 backend = "aqua:gotestyourself/gotestsum"
 
@@ -29,7 +29,7 @@ checksum = "sha256:509cb27aef747f48faf9bce424f59dcf79572c905204b990ee935bbfcc7fa
 size = 2472317
 url = "https://github.com/gotestyourself/gotestsum/releases/download/v1.13.0/gotestsum_1.13.0_darwin_arm64.tar.gz"
 
-[tools.lefthook]
+[[tools.lefthook]]
 version = "1.11.14"
 backend = "aqua:evilmartians/lefthook"
 
@@ -38,7 +38,7 @@ checksum = "sha256:b9c68fabb3c9b71b18335fb886317ae068e0d4a8640f40ae21720fcbae130
 size = 5286540
 url = "https://github.com/evilmartians/lefthook/releases/download/v1.11.14/lefthook_1.11.14_MacOS_arm64.gz"
 
-[tools.node]
+[[tools.node]]
 version = "20.19.0"
 backend = "core:node"
 
@@ -47,7 +47,7 @@ checksum = "sha256:c016cd1975a264a29dc1b07c6fbe60d5df0a0c2beb4113c0450e3d998d1a0
 size = 41487879
 url = "https://nodejs.org/dist/v20.19.0/node-v20.19.0-darwin-arm64.tar.gz"
 
-[tools.protoc]
+[[tools.protoc]]
 version = "29.3"
 backend = "aqua:protocolbuffers/protobuf/protoc"
 
@@ -56,7 +56,7 @@ checksum = "blake3:c5796cef7cf2c50cfc889d1cd821170c3d9158972175d46062879ff3757e4
 size = 2290929
 url = "https://github.com/protocolbuffers/protobuf/releases/download/v29.3/protoc-29.3-osx-aarch_64.zip"
 
-[tools.protoc-gen-go]
+[[tools.protoc-gen-go]]
 version = "1.36.6"
 backend = "aqua:protocolbuffers/protobuf-go/protoc-gen-go"
 
@@ -65,7 +65,7 @@ checksum = "blake3:63a7dcee5c191e2527ec2f4da9e98cc97e8ef8b21beb97057e4aefbdd22f7
 size = 2283775
 url = "https://github.com/protocolbuffers/protobuf-go/releases/download/v1.36.6/protoc-gen-go.v1.36.6.darwin.arm64.tar.gz"
 
-[tools.protoc-gen-go-grpc]
+[[tools.protoc-gen-go-grpc]]
 version = "1.5.1"
 backend = "aqua:grpc/grpc-go/protoc-gen-go-grpc"
 
@@ -74,7 +74,7 @@ checksum = "blake3:3c668207565d23ea2cf006d699207e3a804ebb929a534bd38a3b4ff4e941e
 size = 4565944
 url = "https://github.com/grpc/grpc-go/releases/download/cmd/protoc-gen-go-grpc/v1.5.1/protoc-gen-go-grpc.v1.5.1.darwin.arm64.tar.gz"
 
-[tools.protoc-gen-validate]
+[[tools.protoc-gen-validate]]
 version = "1.2.1"
 backend = "aqua:bufbuild/protoc-gen-validate"
 
@@ -83,6 +83,6 @@ checksum = "sha256:44dfd7778a49febdfb088dacee835b5d649218b5277bdd7c98e2a1f8eb328
 size = 13557390
 url = "https://github.com/bufbuild/protoc-gen-validate/releases/download/v1.2.1/protoc-gen-validate_1.2.1_darwin_arm64.tar.gz"
 
-[tools.rust]
-version = "1.85.0"
+[[tools.rust]]
+version = "1.90.0"
 backend = "core:rust"
