@@ -8,7 +8,7 @@ import { Network } from "./network.js";
 const INITIAL_TIMELOCK = 2000;
 const TEST_UNILATERAL_TIMELOCK = 100;
 
-const TIME_LOCK_INTERVAL = 100;
+export const TIME_LOCK_INTERVAL = 100;
 export const DIRECT_TIMELOCK_OFFSET = 50;
 export const HTLC_TIMELOCK_OFFSET = 70;
 export const DIRECT_HTLC_TIMELOCK_OFFSET = 85;
@@ -286,6 +286,7 @@ interface RefundTxParams {
 
 interface RefundTxWithSequenceParams extends RefundTxParams {
   sequence: number;
+  enforceTimelocks?: boolean;
 }
 
 interface RefundTxWithSequenceAndConnectorOutputParams
@@ -305,7 +306,18 @@ function createRefundTxs({
   receivingPubkey,
   network,
   sequence,
+  enforceTimelocks = false,
 }: RefundTxWithSequenceParams): RefundTxs {
+  // When we claim, we should enforce the timelock to be X00 or X50.
+  if (enforceTimelocks) {
+    let currentTimelock = getCurrentTimelock(sequence);
+    const remainder = currentTimelock % TIME_LOCK_INTERVAL;
+    if (remainder !== 0) {
+      currentTimelock = currentTimelock - remainder;
+    }
+
+    sequence = (currentTimelock & 0xffff) | ((sequence & (1 << 30)) >>> 0);
+  }
   const refundInput: TransactionInput = {
     txid: hexToBytes(getTxId(nodeTx)!),
     index: 0,
@@ -391,7 +403,10 @@ export function createDecrementedTimelockRefundTxs(
 export function createCurrentTimelockRefundTxs(
   params: RefundTxWithSequenceParams,
 ): RefundTxs {
-  return createRefundTxs(params);
+  return createRefundTxs({
+    ...params,
+    enforceTimelocks: true,
+  });
 }
 
 export function createTestUnilateralRefundTxs(
