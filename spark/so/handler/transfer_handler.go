@@ -2336,6 +2336,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 	jobToLeafMap := make(map[string]uuid.UUID)
 	isDirectSigningJob := make(map[string]bool)
 	isDirectFromCpfpSigningJob := make(map[string]bool)
+	isSwap := transfer.Type == st.TransferTypeCounterSwap || transfer.Type == st.TransferTypeSwap
 	for _, job := range req.SigningJobs {
 		leaf, exists := leaves[job.LeafId]
 		if !exists {
@@ -2346,12 +2347,12 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		directFromCpfpRefundTxSigningJob := (*pb.SigningJob)(nil)
 		if job.DirectRefundTxSigningJob != nil {
 			directRefundTxSigningJob = job.DirectRefundTxSigningJob
-		} else if requireDirectTx && len(leaf.DirectTx) > 0 {
+		} else if !isSwap && requireDirectTx && len(leaf.DirectTx) > 0 {
 			return nil, fmt.Errorf("DirectRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 		}
 		if job.DirectFromCpfpRefundTxSigningJob != nil {
 			directFromCpfpRefundTxSigningJob = job.DirectFromCpfpRefundTxSigningJob
-		} else if requireDirectTx && len(leaf.DirectTx) > 0 {
+		} else if !isSwap && requireDirectTx && len(leaf.DirectTx) > 0 {
 			return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
 		}
 		var directRefundTx []byte
