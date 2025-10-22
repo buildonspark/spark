@@ -13,17 +13,17 @@ const patched = content
   .replace("require(`util`)", "globalThis")
   // handle class exports (https://bit.ly/421kbmk):
   .replace(/\nclass (.*?) \{/g, "\nclass $1Src {")
-  .replace(
-    /\nmodule\.exports\.(.*?) = \1;/g,
-    "\nexport const $1 = imports.$1 = $1Src ",
-  )
-  // attach to `imports` instead of module.exports
+  .replace(/\.prototype/g, "Src.prototype")
+  .replace(/\nexports\.(.*?) = \1;/g, "\nexport const $1 = imports.$1 = $1Src ")
+  // attach to `imports` instead of exports
+  .replace("= exports", "= imports")
   .replace("= module.exports", "= imports")
-  .replace(/\nmodule\.exports\.(.*?)\s+/g, "\nexport const $1 = imports.$1 ")
+  .replace(/\nexports\.(.*?)\s+/g, "\nexport const $1 = imports.$1 ")
   .replace(/$/, "export default imports")
+  .replace(/\nconst\swasmPath\s=\s.*/g, "")
   // inline bytes Uint8Array
   .replace(
-    /\nconst path.*\nconst bytes.*\n/,
+    /\nconst wasmBytes.*\n/,
     `
 var __toBinary = /* @__PURE__ */ (() => {
   var table = new Uint8Array(128);
@@ -42,7 +42,7 @@ var __toBinary = /* @__PURE__ */ (() => {
   };
 })();
 
-const bytes = __toBinary(${JSON.stringify(
+const wasmBytes = __toBinary(${JSON.stringify(
       await readFile(`${generatedDir}/${name}_bg.wasm`, "base64"),
     )});
 `,
