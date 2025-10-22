@@ -2,6 +2,7 @@ import { IssuerSparkWallet } from "@buildonspark/issuer-sdk";
 import {
   Bech32mTokenIdentifier,
   ConfigOptions,
+  constructFeeBumpTx,
   constructUnilateralExitFeeBumpPackages,
   decodeBech32mTokenIdentifier,
   decodeSparkAddress,
@@ -21,7 +22,6 @@ import {
   SparkWalletEvent,
   validateSparkInvoiceSignature,
   WalletConfig,
-  constructFeeBumpTx,
 } from "@buildonspark/spark-sdk";
 import {
   InvoiceStatus,
@@ -1576,12 +1576,38 @@ async function runCLI() {
             );
             break;
           }
+
+          const exitSpeed = args[2].toUpperCase() as ExitSpeed;
+
+          let feeAmountSats: number | undefined;
+          switch (exitSpeed) {
+            case ExitSpeed.FAST:
+              feeAmountSats =
+                coopExitFeeQuote.l1BroadcastFeeFast?.originalValue +
+                coopExitFeeQuote.userFeeFast?.originalValue;
+              break;
+            case ExitSpeed.MEDIUM:
+              feeAmountSats =
+                coopExitFeeQuote.l1BroadcastFeeMedium?.originalValue +
+                coopExitFeeQuote.userFeeMedium?.originalValue;
+              break;
+            case ExitSpeed.SLOW:
+              feeAmountSats =
+                coopExitFeeQuote.l1BroadcastFeeSlow?.originalValue +
+                coopExitFeeQuote.userFeeSlow?.originalValue;
+              break;
+            default:
+              console.log("Invalid exit speed");
+              break;
+          }
+
           const withdrawal = await wallet.withdraw({
             amountSats: parseInt(args[0]),
             onchainAddress: args[1],
             exitSpeed: args[2].toUpperCase() as ExitSpeed,
             deductFeeFromWithdrawalAmount: args[3] === "true",
-            feeQuote: coopExitFeeQuote,
+            feeAmountSats: feeAmountSats,
+            feeQuoteId: coopExitFeeQuote?.id,
           });
           console.log(withdrawal);
           break;

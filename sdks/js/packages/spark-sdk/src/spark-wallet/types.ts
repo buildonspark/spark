@@ -4,10 +4,23 @@ import { TokenMetadata } from "../proto/spark_token.js";
 import { ConfigOptions } from "../services/wallet-config.js";
 import type { SparkSigner } from "../signer/signer.js";
 import { KeyDerivation } from "../signer/types.js";
-import { WalletTransfer } from "../types/index.js";
+import { CoopExitFeeQuote, ExitSpeed, WalletTransfer } from "../types/index.js";
 import { SparkAddressFormat } from "../utils/address.js";
 import { Bech32mTokenIdentifier } from "../utils/token-identifier.js";
 import type { SparkWallet } from "./spark-wallet.js";
+
+export type WithdrawParams = {
+  onchainAddress: string;
+  exitSpeed: ExitSpeed;
+  /**
+   * @deprecated Use feeQuoteId and feeAmountSats instead
+   */
+  feeQuote?: CoopExitFeeQuote;
+  amountSats?: number;
+  feeQuoteId?: string;
+  feeAmountSats?: number;
+  deductFeeFromWithdrawalAmount?: boolean;
+};
 
 export type CreateLightningInvoiceParams = {
   amountSats: number;

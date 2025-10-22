@@ -13,12 +13,10 @@ import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { Mutex } from "async-mutex";
 import { uuidv7, uuidv7obj } from "uuidv7";
-import { HashSparkInvoice } from "../utils/invoice-hashing.js";
 import {
   ConfigurationError,
   InternalValidationError,
   NetworkError,
-  NotImplementedError,
   RPCError,
   ValidationError,
 } from "../errors/types.js";
@@ -84,6 +82,7 @@ import {
   getTxFromRawTxHex,
   getTxId,
 } from "../utils/bitcoin.js";
+import { HashSparkInvoice } from "../utils/invoice-hashing.js";
 import {
   getNetwork,
   Network,
@@ -158,6 +157,7 @@ import type {
   TransferWithInvoiceOutcome,
   TransferWithInvoiceParams,
   UserTokenMetadata,
+  WithdrawParams,
 } from "./types.js";
 import { SparkWalletEvent } from "./types.js";
 
@@ -4127,14 +4127,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     exitSpeed,
     feeQuote,
     amountSats,
+    feeAmountSats,
+    feeQuoteId,
     deductFeeFromWithdrawalAmount = true,
-  }: {
-    onchainAddress: string;
-    exitSpeed: ExitSpeed;
-    feeQuote: CoopExitFeeQuote;
-    amountSats?: number;
-    deductFeeFromWithdrawalAmount?: boolean;
-  }) {
+  }: WithdrawParams) {
     if (!Number.isSafeInteger(amountSats)) {
       throw new ValidationError("Sats amount must be less than 2^53", {
         field: "amountSats",
@@ -4142,10 +4138,53 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         expected: "smaller or equal to " + Number.MAX_SAFE_INTEGER,
       });
     }
+
+    if (feeQuote) {
+      switch (exitSpeed) {
+        case ExitSpeed.FAST:
+          feeAmountSats =
+            (feeQuote.l1BroadcastFeeFast?.originalValue || 0) +
+            (feeQuote.userFeeFast?.originalValue || 0);
+          break;
+        case ExitSpeed.MEDIUM:
+          feeAmountSats =
+            (feeQuote.l1BroadcastFeeMedium?.originalValue || 0) +
+            (feeQuote.userFeeMedium?.originalValue || 0);
+          break;
+        case ExitSpeed.SLOW:
+          feeAmountSats =
+            (feeQuote.l1BroadcastFeeSlow?.originalValue || 0) +
+            (feeQuote.userFeeSlow?.originalValue || 0);
+          break;
+        default:
+          throw new ValidationError("Invalid exit speed", {
+            field: "exitSpeed",
+            value: exitSpeed,
+            expected: "FAST, MEDIUM, or SLOW",
+          });
+      }
+
+      feeQuoteId = feeQuote.id;
+    }
+    if (!feeAmountSats) {
+      throw new ValidationError("No fee quote or fee amount provided", {
+        field: "feeQuote",
+        value: feeQuote,
+      });
+    }
+
+    if (!feeQuoteId) {
+      throw new ValidationError("No fee quote ID provided", {
+        field: "feeQuoteId",
+        value: feeQuoteId,
+      });
+    }
+
     return await this.withLeaves(async () => {
       return await this.coopExit(
         onchainAddress,
-        feeQuote,
+        feeAmountSats,
+        feeQuoteId,
         exitSpeed,
         deductFeeFromWithdrawalAmount,
         amountSats,
@@ -4163,7 +4202,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    */
   private async coopExit(
     onchainAddress: string,
-    feeEstimate: CoopExitFeeQuote,
+    feeAmountSats: number,
+    feeQuoteId: string,
     exitSpeed: ExitSpeed,
     deductFeeFromWithdrawalAmount: boolean,
     targetAmountSats?: number,
@@ -4180,31 +4220,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       deductFeeFromWithdrawalAmount = true;
     }
 
-    let fee: number | undefined;
-    switch (exitSpeed) {
-      case ExitSpeed.FAST:
-        fee =
-          (feeEstimate.l1BroadcastFeeFast?.originalValue || 0) +
-          (feeEstimate.userFeeFast?.originalValue || 0);
-        break;
-      case ExitSpeed.MEDIUM:
-        fee =
-          (feeEstimate.l1BroadcastFeeMedium?.originalValue || 0) +
-          (feeEstimate.userFeeMedium?.originalValue || 0);
-        break;
-      case ExitSpeed.SLOW:
-        fee =
-          (feeEstimate.l1BroadcastFeeSlow?.originalValue || 0) +
-          (feeEstimate.userFeeSlow?.originalValue || 0);
-        break;
-      default:
-        throw new ValidationError("Invalid exit speed", {
-          field: "exitSpeed",
-          value: exitSpeed,
-          expected: "FAST, MEDIUM, or SLOW",
-        });
-    }
-
     let leavesToSendToSsp: TreeNode[] = [];
     let leavesToSendToSE: TreeNode[] = [];
 
@@ -4218,12 +4233,15 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           )
         : this.leaves;
 
-      if (fee > leavesToSendToSsp.reduce((acc, leaf) => acc + leaf.value, 0)) {
+      if (
+        feeAmountSats >
+        leavesToSendToSsp.reduce((acc, leaf) => acc + leaf.value, 0)
+      ) {
         throw new ValidationError(
           "The fee for the withdrawal is greater than the target withdrawal amount",
           {
             field: "fee",
-            value: fee,
+            value: feeAmountSats,
             expected: "less than or equal to the target amount",
           },
         );
@@ -4240,15 +4258,15 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         );
       }
 
-      const leaves = await this.selectLeaves([targetAmountSats, fee]);
+      const leaves = await this.selectLeaves([targetAmountSats, feeAmountSats]);
 
       const leavesForTargetAmount = this.popOrThrow(
         leaves.get(targetAmountSats)!,
         `failed to get leaves leaves for targetAmount, val: ${targetAmountSats}`,
       );
       const leavesForFee = this.popOrThrow(
-        leaves.get(fee)!,
-        `failed to get leaves leaves for fee, val: ${fee}`,
+        leaves.get(feeAmountSats)!,
+        `failed to get leaves leaves for fee, val: ${feeAmountSats}`,
       );
 
       if (!leavesForTargetAmount || !leavesForFee) {
@@ -4286,7 +4304,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     };
 
     if (!deductFeeFromWithdrawalAmount) {
-      requestCoopExitParams.feeQuoteId = feeEstimate.id;
+      requestCoopExitParams.feeQuoteId = feeQuoteId;
       requestCoopExitParams.feeLeafExternalIds = leavesToSendToSE.map(
         (leaf) => leaf.id,
       );
