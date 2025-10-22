@@ -8,7 +8,17 @@
 import { BinaryReader, BinaryWriter } from "@bufbuild/protobuf/wire";
 import type { CallContext, CallOptions } from "nice-grpc-common";
 import { Timestamp } from "./google/protobuf/timestamp.js";
-import { Network, networkFromJSON, networkToJSON, PageRequest, PageResponse, SigningKeyshare } from "./spark.js";
+import {
+  Network,
+  networkFromJSON,
+  networkToJSON,
+  Order,
+  orderFromJSON,
+  orderToJSON,
+  PageRequest,
+  PageResponse,
+  SigningKeyshare,
+} from "./spark.js";
 
 export const protobufPackage = "spark_token";
 
@@ -359,6 +369,7 @@ export interface QueryTokenTransactionsRequest {
   tokenIdentifiers: Uint8Array[];
   /** Returns transactions that match the provided transaction hashes. */
   tokenTransactionHashes: Uint8Array[];
+  order: Order;
   limit: number;
   offset: number;
 }
@@ -2424,6 +2435,7 @@ function createBaseQueryTokenTransactionsRequest(): QueryTokenTransactionsReques
     issuerPublicKeys: [],
     tokenIdentifiers: [],
     tokenTransactionHashes: [],
+    order: 0,
     limit: 0,
     offset: 0,
   };
@@ -2445,6 +2457,9 @@ export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsReq
     }
     for (const v of message.tokenTransactionHashes) {
       writer.uint32(34).bytes(v!);
+    }
+    if (message.order !== 0) {
+      writer.uint32(64).int32(message.order);
     }
     if (message.limit !== 0) {
       writer.uint32(40).int64(message.limit);
@@ -2502,6 +2517,14 @@ export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsReq
           message.tokenTransactionHashes.push(reader.bytes());
           continue;
         }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.order = reader.int32() as any;
+          continue;
+        }
         case 5: {
           if (tag !== 40) {
             break;
@@ -2544,6 +2567,7 @@ export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsReq
       tokenTransactionHashes: globalThis.Array.isArray(object?.tokenTransactionHashes)
         ? object.tokenTransactionHashes.map((e: any) => bytesFromBase64(e))
         : [],
+      order: isSet(object.order) ? orderFromJSON(object.order) : 0,
       limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
       offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
     };
@@ -2566,6 +2590,9 @@ export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsReq
     if (message.tokenTransactionHashes?.length) {
       obj.tokenTransactionHashes = message.tokenTransactionHashes.map((e) => base64FromBytes(e));
     }
+    if (message.order !== 0) {
+      obj.order = orderToJSON(message.order);
+    }
     if (message.limit !== 0) {
       obj.limit = Math.round(message.limit);
     }
@@ -2585,6 +2612,7 @@ export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsReq
     message.issuerPublicKeys = object.issuerPublicKeys?.map((e) => e) || [];
     message.tokenIdentifiers = object.tokenIdentifiers?.map((e) => e) || [];
     message.tokenTransactionHashes = object.tokenTransactionHashes?.map((e) => e) || [];
+    message.order = object.order ?? 0;
     message.limit = object.limit ?? 0;
     message.offset = object.offset ?? 0;
     return message;

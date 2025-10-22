@@ -8,6 +8,7 @@ import { NetworkError, ValidationError } from "../errors/types.js";
 import {
   Direction,
   OperatorSpecificTokenTransactionSignablePayload,
+  Order,
   OutputWithPreviousTransactionData,
   RevocationSecretWithIndex,
 } from "../proto/spark.js";
@@ -59,6 +60,7 @@ export interface QueryTokenTransactionsParams {
   tokenTransactionHashes?: string[];
   tokenIdentifiers?: string[];
   outputIds?: string[];
+  order?: "asc" | "desc";
   pageSize?: number;
   offset?: number;
 }
@@ -583,6 +585,7 @@ export class TokenTransactionService {
       tokenTransactionHashes,
       tokenIdentifiers,
       outputIds,
+      order,
       pageSize,
       offset,
     } = params;
@@ -603,6 +606,7 @@ export class TokenTransactionService {
       })!,
       tokenTransactionHashes: tokenTransactionHashes?.map(hexToBytes)!,
       outputIds: outputIds || [],
+      order: order === "asc" ? Order.ASCENDING : Order.DESCENDING,
       limit: pageSize!,
       offset: offset!,
     };
