@@ -398,25 +398,84 @@ func validateTransferTokenTransactionUsingPreviousTransactionData(
 	outputToSpendEnts []*ent.TokenOutput,
 	v0DefaultTransactionExpiryDuration time.Duration,
 ) error {
-	// All created outputs having the same token identifier is validated upstream, so only need to check against the first one.
+	type tokenBalance struct {
+		inputSum  *big.Int
+		outputSum *big.Int
+		hasInputs bool
+	}
+	tokenBalances := make(map[string]*tokenBalance)
+
+	// Build mappings from token_identifier and token_public_key to token_create_id
+	// This allows us to correctly match proto outputs to their token regardless of
+	// whether they use token_identifier or token_public_key
+	tokenIdentifierToCreateID := make(map[string]string)
+	tokenPublicKeyToCreateID := make(map[string]string)
+
 	expectedTokenIdentifier := tokenTransaction.TokenOutputs[0].GetTokenIdentifier()
-	if expectedTokenIdentifier != nil {
-		// Validate that all spent outputs have the same token identifier
-		for i, outputEnt := range outputToSpendEnts {
-			if !bytes.Equal(outputEnt.TokenIdentifier, expectedTokenIdentifier) {
-				return tokens.FormatErrorWithTransactionProto("token identifier mismatch", tokenTransaction, sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d has different token identifier", i)))
+	useTokenIdentifier := expectedTokenIdentifier != nil
+
+	for _, outputEnt := range outputToSpendEnts {
+		tokenKey := outputEnt.TokenCreateID.String()
+
+		// Build mapping for outputs to use
+		if len(outputEnt.TokenIdentifier) > 0 {
+			tokenIdentifierToCreateID[hex.EncodeToString(outputEnt.TokenIdentifier)] = tokenKey
+		}
+		if !outputEnt.TokenPublicKey.IsZero() {
+			tokenPublicKeyToCreateID[hex.EncodeToString(outputEnt.TokenPublicKey.Serialize())] = tokenKey
+		}
+
+		if tokenBalances[tokenKey] == nil {
+			tokenBalances[tokenKey] = &tokenBalance{
+				inputSum:  big.NewInt(0),
+				outputSum: big.NewInt(0),
+				hasInputs: false,
 			}
 		}
-	} else {
-		expectedTokenPubKey, err := keys.ParsePublicKey(tokenTransaction.TokenOutputs[0].GetTokenPublicKey())
-		if err != nil {
-			return tokens.FormatErrorWithTransactionProto("invalid token public key", tokenTransaction, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse token public key: %w", err)))
-		}
-		// Validate that all spent outputs have the same token public key
-		for i, outputEnt := range outputToSpendEnts {
-			if !outputEnt.TokenPublicKey.Equals(expectedTokenPubKey) {
-				return tokens.FormatErrorWithTransactionProto("token public key mismatch", tokenTransaction, sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d has different token public key", i)))
+		tokenBalances[tokenKey].hasInputs = true
+		inputAmount := new(big.Int).SetBytes(outputEnt.TokenAmount)
+		tokenBalances[tokenKey].inputSum.Add(tokenBalances[tokenKey].inputSum, inputAmount)
+	}
+
+	// Sum outputs per token type by mapping to token_create_id
+	for _, output := range tokenTransaction.TokenOutputs {
+		var tokenKey string
+		var found bool
+
+		if useTokenIdentifier {
+			tokenKey, found = tokenIdentifierToCreateID[hex.EncodeToString(output.GetTokenIdentifier())]
+			if !found {
+				return tokens.FormatErrorWithTransactionProto("token not found in inputs", tokenTransaction,
+					sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output token identifier %x does not match any input", output.GetTokenIdentifier())))
 			}
+		} else {
+			tokenKey, found = tokenPublicKeyToCreateID[hex.EncodeToString(output.TokenPublicKey)]
+			if !found {
+				return tokens.FormatErrorWithTransactionProto("token not found in inputs", tokenTransaction,
+					sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output token public key %x does not match any input", output.TokenPublicKey)))
+			}
+		}
+
+		if tokenBalances[tokenKey] == nil {
+			tokenBalances[tokenKey] = &tokenBalance{
+				inputSum:  big.NewInt(0),
+				outputSum: big.NewInt(0),
+				hasInputs: false,
+			}
+		}
+		outputAmount := new(big.Int).SetBytes(output.GetTokenAmount())
+		tokenBalances[tokenKey].outputSum.Add(tokenBalances[tokenKey].outputSum, outputAmount)
+	}
+
+	for tokenKey, balance := range tokenBalances {
+		if !balance.hasInputs {
+			return tokens.FormatErrorWithTransactionProto("token has outputs but no inputs", tokenTransaction,
+				sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token %s has outputs but no corresponding inputs", tokenKey)))
+		}
+		if balance.inputSum.Cmp(balance.outputSum) != 0 {
+			return tokens.FormatErrorWithTransactionProto("token amount mismatch", tokenTransaction,
+				sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token %s: input amount %s does not match output amount %s",
+					tokenKey, balance.inputSum.String(), balance.outputSum.String())))
 		}
 	}
 
@@ -431,20 +490,6 @@ func validateTransferTokenTransactionUsingPreviousTransactionData(
 				return tokens.FormatErrorWithTransactionProto("network mismatch", tokenTransaction, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d: %d != %d", i, entNetwork, tokenTransaction.Network)))
 			}
 		}
-	}
-	// Validate token conservation in inputs + outputs.
-	totalInputAmount := new(big.Int)
-	for _, outputEnt := range outputToSpendEnts {
-		inputAmount := new(big.Int).SetBytes(outputEnt.TokenAmount)
-		totalInputAmount.Add(totalInputAmount, inputAmount)
-	}
-	totalOutputAmount := new(big.Int)
-	for _, outputLeaf := range tokenTransaction.TokenOutputs {
-		outputAmount := new(big.Int).SetBytes(outputLeaf.GetTokenAmount())
-		totalOutputAmount.Add(totalOutputAmount, outputAmount)
-	}
-	if totalInputAmount.Cmp(totalOutputAmount) != 0 {
-		return tokens.FormatErrorWithTransactionProto("token amount mismatch", tokenTransaction, sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("total input amount %s does not match total output amount %s", totalInputAmount.String(), totalOutputAmount.String())))
 	}
 
 	// Validate that the ownership signatures match the ownership public keys in the outputs to spend.

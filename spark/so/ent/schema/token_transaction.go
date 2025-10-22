@@ -119,26 +119,66 @@ func (TokenTransaction) Hooks() []ent.Hook {
 
 // Validates the inputs and outputs of a transfer transaction are balanced to ensure integrity of the DAG.
 // If it's not a transfer transaction, it will return nil.
+// Validates balance per token type using token_create_id to ensure consistent matching between inputs and outputs.
 func ValidateTransferTransactionBalance(tx *entgen.TokenTransaction) error {
 	if tx.Edges.Mint != nil || tx.Edges.Create != nil {
 		return nil
 	}
 
-	inputSum := big.NewInt(0)
+	type tokenBalance struct {
+		inputSum          *big.Int
+		outputSum         *big.Int
+		displayIdentifier string
+	}
+
+	getTokenDisplay := func(output *entgen.TokenOutput) string {
+		if !output.TokenPublicKey.IsZero() {
+			return output.TokenPublicKey.String()
+		}
+		return fmt.Sprintf("0x%x", output.TokenIdentifier)
+	}
+
+	// Use token_create_id as the canonical identifier for balance validation
+	// This ensures consistent matching between inputs and outputs regardless of whether
+	// they use token_identifier or token_public_key
+	balances := make(map[string]*tokenBalance)
+
+	// Sum inputs per token type
 	for _, input := range tx.Edges.SpentOutput {
+		tokenKey := input.TokenCreateID.String()
+
+		if balances[tokenKey] == nil {
+			balances[tokenKey] = &tokenBalance{
+				inputSum:          big.NewInt(0),
+				outputSum:         big.NewInt(0),
+				displayIdentifier: getTokenDisplay(input),
+			}
+		}
 		amount := new(big.Int).SetBytes(input.TokenAmount)
-		inputSum.Add(inputSum, amount)
+		balances[tokenKey].inputSum.Add(balances[tokenKey].inputSum, amount)
 	}
 
-	outputSum := big.NewInt(0)
+	// Sum outputs per token type
 	for _, output := range tx.Edges.CreatedOutput {
+		tokenKey := output.TokenCreateID.String()
+
+		if balances[tokenKey] == nil {
+			balances[tokenKey] = &tokenBalance{
+				inputSum:          big.NewInt(0),
+				outputSum:         big.NewInt(0),
+				displayIdentifier: getTokenDisplay(output),
+			}
+		}
 		amount := new(big.Int).SetBytes(output.TokenAmount)
-		outputSum.Add(outputSum, amount)
+		balances[tokenKey].outputSum.Add(balances[tokenKey].outputSum, amount)
 	}
 
-	if inputSum.Cmp(outputSum) != 0 {
-		return errors.FailedPreconditionTokenRulesViolation(fmt.Errorf("transaction %s in %s state: inputs (%s) must equal outputs (%s)",
-			tx.ID, tx.Status, inputSum.String(), outputSum.String()))
+	// Validate balance for each token type
+	for _, balance := range balances {
+		if balance.inputSum.Cmp(balance.outputSum) != 0 {
+			return errors.FailedPreconditionTokenRulesViolation(fmt.Errorf("transaction %s in %s state: token %s inputs (%s) must equal outputs (%s)",
+				tx.ID, tx.Status, balance.displayIdentifier, balance.inputSum.String(), balance.outputSum.String()))
+		}
 	}
 
 	return nil

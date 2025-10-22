@@ -227,47 +227,64 @@ func CreateStartedTransactionEntities(
 	// Clients provide one of tokenIdentifier or tokenPublicKey to the server to make transactions.
 	// Older clients provide only tokenPublicKey. Newer clients provide only tokenIdentifier.
 	//
-	// To ensure both backwards and forwards compatibility, fetch and write the missing field.
-	// Since we have already hashed the final token transaction, the txHash still represents
-	// the original token transaction that was passed by the client.
-	var tokenIdentifierToWrite []byte
-	var issuerPublicKeyToWrite keys.Public
+	// For multi-token transactions, batch fetch all TokenCreate entities to minimize database roundtrips
+	// Collect unique token_identifiers and token_public_keys
+	tokenIdentifiersToFetch := make([][]byte, 0)
+	tokenPublicKeysToFetch := make([]keys.Public, 0)
+	tokenIdentifierMap := make(map[string]struct{})
+	tokenPublicKeyMap := make(map[string]struct{})
 
-	tokenOutputs := tokenTransaction.GetTokenOutputs()
-	var tokenCreateEnt *TokenCreate
-	if len(tokenOutputs) > 0 {
-		// We enforce one of tokenIdentifier or tokenPublicKey from the client.
-		// Query for the missing field
-		if tokenOutputs[0].TokenIdentifier != nil {
-			tokenCreateEnt, err = db.TokenCreate.Query().
-				Where(tokencreate.TokenIdentifier(tokenOutputs[0].TokenIdentifier)).
-				Only(ctx)
-			if err != nil {
-				// An error occured when fetching the spark token create ent.
-				if IsNotFound(err) {
-					return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token create entity not found for provided token identifier: %w", err))
-				}
-				return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch token create ent: %w", err))
+	for _, output := range tokenTransaction.TokenOutputs {
+		if output.TokenIdentifier != nil {
+			key := string(output.TokenIdentifier)
+			if _, exists := tokenIdentifierMap[key]; !exists {
+				tokenIdentifiersToFetch = append(tokenIdentifiersToFetch, output.TokenIdentifier)
+				tokenIdentifierMap[key] = struct{}{}
 			}
-			issuerPublicKeyToWrite = tokenCreateEnt.IssuerPublicKey
-		} else if len(tokenOutputs[0].TokenPublicKey) != 0 {
-			tokenPubKey, err := keys.ParsePublicKey(tokenOutputs[0].TokenPublicKey)
+		} else if len(output.TokenPublicKey) != 0 {
+			tokenPubKey, err := keys.ParsePublicKey(output.GetTokenPublicKey())
 			if err != nil {
 				return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse token public key: %w", err))
 			}
-			tokenCreateEnt, err = db.TokenCreate.Query().
-				Where(tokencreate.IssuerPublicKey(tokenPubKey)).
-				Only(ctx)
-			if err != nil {
-				if IsNotFound(err) {
-					return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token create entity not found for issuer public key: %w", err))
-				}
-				return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch token create ent: %w", err))
+			key := string(tokenPubKey.Serialize())
+			if _, exists := tokenPublicKeyMap[key]; !exists {
+				tokenPublicKeysToFetch = append(tokenPublicKeysToFetch, tokenPubKey)
+				tokenPublicKeyMap[key] = struct{}{}
 			}
-			tokenIdentifierToWrite = tokenCreateEnt.TokenIdentifier
 		}
 	}
 
+	// Batch fetch TokenCreate entities
+	var tokenCreatesByIdentifier map[string]*TokenCreate
+	var tokenCreatesByIssuerPubKey map[string]*TokenCreate
+
+	if len(tokenIdentifiersToFetch) > 0 {
+		tokenCreates, err := db.TokenCreate.Query().
+			Where(tokencreate.TokenIdentifierIn(tokenIdentifiersToFetch...)).
+			All(ctx)
+		if err != nil {
+			return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to batch fetch token creates by identifier: %w", err))
+		}
+		tokenCreatesByIdentifier = make(map[string]*TokenCreate, len(tokenCreates))
+		for _, tc := range tokenCreates {
+			tokenCreatesByIdentifier[string(tc.TokenIdentifier)] = tc
+		}
+	}
+
+	if len(tokenPublicKeysToFetch) > 0 {
+		tokenCreates, err := db.TokenCreate.Query().
+			Where(tokencreate.IssuerPublicKeyIn(tokenPublicKeysToFetch...)).
+			All(ctx)
+		if err != nil {
+			return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to batch fetch token creates by issuer public key: %w", err))
+		}
+		tokenCreatesByIssuerPubKey = make(map[string]*TokenCreate, len(tokenCreates))
+		for _, tc := range tokenCreates {
+			tokenCreatesByIssuerPubKey[string(tc.IssuerPublicKey.Serialize())] = tc
+		}
+	}
+
+	// Now create outputs using the fetched TokenCreate entities
 	outputEnts := make([]*TokenOutputCreate, 0, len(tokenTransaction.TokenOutputs))
 	for outputIndex, output := range tokenTransaction.TokenOutputs {
 		revocationUUID, err := uuid.Parse(orderedOutputToCreateRevocationKeyshareIDs[outputIndex])
@@ -279,15 +296,33 @@ func CreateStartedTransactionEntities(
 			return nil, err
 		}
 
-		if issuerPublicKeyToWrite.IsZero() {
-			outputPubKey, err := keys.ParsePublicKey(output.GetTokenPublicKey())
-			if err != nil {
-				return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse output token public key: %w", err))
+		// Look up the TokenCreate entity for this specific output
+		var tokenCreateEnt *TokenCreate
+		var tokenIdentifierToWrite []byte
+		var issuerPublicKeyToWrite keys.Public
+
+		if output.TokenIdentifier != nil {
+			var found bool
+			tokenCreateEnt, found = tokenCreatesByIdentifier[string(output.TokenIdentifier)]
+			if !found {
+				return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token create entity not found for token identifier %x at output %d", output.TokenIdentifier, outputIndex))
 			}
-			issuerPublicKeyToWrite = outputPubKey
-		}
-		if len(tokenIdentifierToWrite) == 0 {
+			issuerPublicKeyToWrite = tokenCreateEnt.IssuerPublicKey
 			tokenIdentifierToWrite = output.TokenIdentifier
+		} else if len(output.TokenPublicKey) != 0 {
+			tokenPubKey, err := keys.ParsePublicKey(output.GetTokenPublicKey())
+			if err != nil {
+				return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse token public key for output %d: %w", outputIndex, err))
+			}
+			var found bool
+			tokenCreateEnt, found = tokenCreatesByIssuerPubKey[string(tokenPubKey.Serialize())]
+			if !found {
+				return nil, sparkerrors.NotFoundMissingEntity(fmt.Errorf("token create entity not found for issuer public key %x at output %d", output.TokenPublicKey, outputIndex))
+			}
+			tokenIdentifierToWrite = tokenCreateEnt.TokenIdentifier
+			issuerPublicKeyToWrite = tokenPubKey
+		} else {
+			return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("output %d must have either token_identifier or token_public_key", outputIndex))
 		}
 
 		ownerPubKey, err := keys.ParsePublicKey(output.OwnerPublicKey)

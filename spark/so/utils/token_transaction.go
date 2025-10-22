@@ -1101,16 +1101,20 @@ func validateBaseMintTransaction(
 
 	hasTokenIdentifier := tokenTransaction.TokenOutputs[0].GetTokenIdentifier() != nil
 	if hasTokenIdentifier {
-		// Validate that the token identifier matches the mint input
-		expectedTokenIdentifier := tokenTransaction.TokenOutputs[0].GetTokenIdentifier()
-		if !bytes.Equal(mintInput.GetTokenIdentifier(), expectedTokenIdentifier) {
-			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output token identifiers must match input token identifier: %x != %x", mintInput.GetTokenIdentifier(), expectedTokenIdentifier))
+		// Validate that all output token identifiers match the mint input
+		expectedTokenIdentifier := mintInput.GetTokenIdentifier()
+		for i, output := range tokenTransaction.TokenOutputs {
+			if !bytes.Equal(output.GetTokenIdentifier(), expectedTokenIdentifier) {
+				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d token identifier must match mint input token identifier: %x != %x", i, output.GetTokenIdentifier(), expectedTokenIdentifier))
+			}
 		}
 	} else {
-		// When using token public key, validate token public key matches the issuer public key
-		expectedTokenPublicKey := tokenTransaction.TokenOutputs[0].GetTokenPublicKey()
-		if !bytes.Equal(mintInput.GetIssuerPublicKey(), expectedTokenPublicKey) {
-			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output token public keys must match input issuer public key"))
+		// When using token public key, validate all output token public keys match the issuer public key
+		expectedTokenPublicKey := mintInput.GetIssuerPublicKey()
+		for i, output := range tokenTransaction.TokenOutputs {
+			if !bytes.Equal(output.GetTokenPublicKey(), expectedTokenPublicKey) {
+				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d token public key must match mint input issuer public key", i))
+			}
 		}
 	}
 
@@ -1248,12 +1252,8 @@ func validateBaseTokenOutputs(tokenTransaction *tokenpb.TokenTransaction, requir
 		return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token identifier must be set when token identifier is required"))
 	}
 	if hasTokenIdentifier {
-		// Verify all outputs have the same token identifier
-		expectedTokenIdentifier := tokenTransaction.TokenOutputs[0].GetTokenIdentifier()
-		expectedTokenPublicKey := tokenTransaction.TokenOutputs[0].GetTokenPublicKey()
-		if expectedTokenIdentifier == nil {
-			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("first output must have token identifier if any output has one"))
-		}
+		// Validate each output has a valid token identifier and no token public key
+		// Multiple token types are allowed in a single transaction
 		for i, output := range tokenTransaction.TokenOutputs {
 			if output.GetTokenIdentifier() == nil {
 				return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("output %d missing token identifier", i))
@@ -1261,17 +1261,6 @@ func validateBaseTokenOutputs(tokenTransaction *tokenpb.TokenTransaction, requir
 			if len(output.GetTokenIdentifier()) != 32 {
 				return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("output %d token identifier must be exactly 32 bytes, got %d", i, len(output.GetTokenIdentifier())))
 			}
-			if !bytes.Equal(output.GetTokenIdentifier(), expectedTokenIdentifier) {
-				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d token identifier (%x) must match mint input token identifier (%x)",
-					i, output.GetTokenIdentifier(), expectedTokenIdentifier))
-			}
-			if !bytes.Equal(output.GetTokenPublicKey(), expectedTokenPublicKey) {
-				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d token public key (%x) must match expected token public key (%x)",
-					i, output.GetTokenPublicKey(), expectedTokenPublicKey))
-			}
-		}
-		// Verify that token public key is not set if token identifier is set
-		for i, output := range tokenTransaction.TokenOutputs {
 			if output.GetTokenPublicKey() != nil {
 				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output %d cannot have token public key when token identifier is set", i))
 			}
