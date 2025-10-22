@@ -112,7 +112,13 @@ type TransferAdaptorPublicKeys struct {
 // A helper function to call startTransferInternal from the SSP handler for Swap V3 counter swap initiation.
 // Will pass adaptor pubkeys and enable key tweak for both transfers of the swap.
 func (h *TransferHandler) StartCounterTransferInternal(ctx context.Context, req *pb.StartTransferRequest, adaptorPublicKeys TransferAdaptorPublicKeys, primaryTransferId uuid.UUID) (*pb.StartTransferResponse, error) {
-	return h.startTransferInternal(ctx, req, st.TransferTypeCounterSwap, adaptorPublicKeys.cpfpAdaptorPubKey, adaptorPublicKeys.directAdaptorPubKey, adaptorPublicKeys.directFromCpfpAdaptorPubKey, false, true, primaryTransferId)
+	return h.startTransferInternal(ctx, req, st.TransferTypeCounterSwap, adaptorPublicKeys.cpfpAdaptorPubKey, adaptorPublicKeys.directAdaptorPubKey, adaptorPublicKeys.directFromCpfpAdaptorPubKey, false, &SwapV3Package{transferType: st.TransferTypeCounterSwap, primaryTransferId: primaryTransferId})
+}
+
+// If this package is provided then the handler should execute SwapV3 logic.
+type SwapV3Package struct {
+	transferType      st.TransferType
+	primaryTransferId uuid.UUID
 }
 
 // startTransferInternal initiates a transfer between two parties by validating the transfer request,
@@ -146,7 +152,7 @@ func (h *TransferHandler) StartCounterTransferInternal(ctx context.Context, req 
 //
 // The method ensures atomicity by rolling back changes if any step fails, and marks the transfer
 // as successful only after all service operators have validated the transfer package.
-func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.StartTransferRequest, transferType st.TransferType, cpfpAdaptorPubKey keys.Public, directAdaptorPubKey keys.Public, directFromCpfpAdaptorPubKey keys.Public, requireDirectTx bool, tweakKeys bool, primaryTransferId uuid.UUID) (*pb.StartTransferResponse, error) {
+func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.StartTransferRequest, transferType st.TransferType, cpfpAdaptorPubKey keys.Public, directAdaptorPubKey keys.Public, directFromCpfpAdaptorPubKey keys.Public, requireDirectTx bool, swapV3Package *SwapV3Package) (*pb.StartTransferResponse, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	ctx, span := tracer.Start(ctx, "TransferHandler.startTransferInternal", trace.WithAttributes(
@@ -224,10 +230,18 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	}
 
 	role := TransferRoleCoordinator
+	var primaryTransferId uuid.UUID
+	tweakKeys := true
+
 	// Swap V3 flow: If skipping tweaks is enabled then set role to Participant to
 	// disable retry settling key tweaks in `resume_send_transfer` cron task.
-	if !tweakKeys {
-		role = TransferRoleParticipant
+	if swapV3Package != nil {
+		if swapV3Package.transferType == st.TransferTypeSwap {
+			role = TransferRoleParticipant
+			tweakKeys = false
+		} else {
+			primaryTransferId = swapV3Package.primaryTransferId
+		}
 	}
 	transfer, leafMap, err := h.createTransfer(
 		ctx,
@@ -340,7 +354,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 
 	// This call to other SOs will check the validity of the transfer package. If no error is
 	// returned, it means the transfer package is valid and the transfer is considered sent.
-	err = h.syncTransferInit(ctx, req, transferType, finalCpfpSignatureMap, finalDirectSignatureMap, finalDirectFromCpfpSignatureMap, cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey, primaryTransferId)
+	err = h.syncTransferInit(ctx, req, transferType, finalCpfpSignatureMap, finalDirectSignatureMap, finalDirectFromCpfpSignatureMap, cpfpAdaptorPubKey, directAdaptorPubKey, directFromCpfpAdaptorPubKey, swapV3Package)
 	if err != nil {
 		syncErr := err
 		logger.With(zap.Error(syncErr)).Sugar().Errorf("Failed to sync transfer init for transfer %s", req.TransferId)
@@ -581,19 +595,19 @@ func (h *TransferHandler) settleSenderKeyTweaks(ctx context.Context, transferID 
 
 // StartTransfer initiates a transfer from sender.
 func (h *TransferHandler) StartTransfer(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	return h.startTransferInternal(ctx, req, st.TransferTypeTransfer, keys.Public{}, keys.Public{}, keys.Public{}, false, true, uuid.Nil)
+	return h.startTransferInternal(ctx, req, st.TransferTypeTransfer, keys.Public{}, keys.Public{}, keys.Public{}, false, nil)
 }
 
 func (h *TransferHandler) StartTransferV2(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	return h.startTransferInternal(ctx, req, st.TransferTypeTransfer, keys.Public{}, keys.Public{}, keys.Public{}, true, true, uuid.Nil)
+	return h.startTransferInternal(ctx, req, st.TransferTypeTransfer, keys.Public{}, keys.Public{}, keys.Public{}, true, nil)
 }
 
 func (h *TransferHandler) StartLeafSwap(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	return h.startTransferInternal(ctx, req, st.TransferTypeSwap, keys.Public{}, keys.Public{}, keys.Public{}, false, true, uuid.Nil)
+	return h.startTransferInternal(ctx, req, st.TransferTypeSwap, keys.Public{}, keys.Public{}, keys.Public{}, false, nil)
 }
 
 func (h *TransferHandler) StartLeafSwapV2(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
-	return h.startTransferInternal(ctx, req, st.TransferTypeSwap, keys.Public{}, keys.Public{}, keys.Public{}, true, true, uuid.Nil)
+	return h.startTransferInternal(ctx, req, st.TransferTypeSwap, keys.Public{}, keys.Public{}, keys.Public{}, true, nil)
 }
 
 // Initiate a primary swap transfer in Swap V3 protocol. This will create a
@@ -605,15 +619,12 @@ func (h *TransferHandler) InitiateSwapPrimaryTransfer(ctx context.Context, req *
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse adaptor public key: %w", err)
 	}
-	directAdaptorPublicKey, err := parsePublicKeyIfPresent(req.AdaptorPublicKeys.DirectAdaptorPublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse direct adaptor public key: %w", err)
+
+	if len(req.GetTransfer().TransferPackage.DirectLeavesToSend) > 0 || len(req.GetTransfer().TransferPackage.DirectFromCpfpLeavesToSend) > 0 {
+		return nil, fmt.Errorf("direct transactions should not be provided for primary transfer %s", req.Transfer.TransferId)
 	}
-	directFromCpfpAdaptorPublicKey, err := parsePublicKeyIfPresent(req.AdaptorPublicKeys.DirectFromCpfpAdaptorPublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("unable to parse direct from cpfp adaptor public key: %w", err)
-	}
-	return h.startTransferInternal(ctx, req.GetTransfer(), st.TransferTypeSwap, adaptorPublicKey, directAdaptorPublicKey, directFromCpfpAdaptorPublicKey, true, false, uuid.Nil)
+
+	return h.startTransferInternal(ctx, req.GetTransfer(), st.TransferTypeSwap, adaptorPublicKey, keys.Public{}, keys.Public{}, true, &SwapV3Package{transferType: st.TransferTypeSwap, primaryTransferId: uuid.Nil})
 }
 
 // CounterLeafSwap initiates a leaf swap for the other side, signing refunds with an adaptor public key.
@@ -630,7 +641,7 @@ func (h *TransferHandler) CounterLeafSwap(ctx context.Context, req *pb.CounterLe
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse direct from cpfp adaptor public key: %w", err)
 	}
-	startTransferResponse, err := h.startTransferInternal(ctx, req.Transfer, st.TransferTypeCounterSwap, adaptorPublicKey, directAdaptorPublicKey, directFromCpfpAdaptorPublicKey, false, true, uuid.Nil)
+	startTransferResponse, err := h.startTransferInternal(ctx, req.Transfer, st.TransferTypeCounterSwap, adaptorPublicKey, directAdaptorPublicKey, directFromCpfpAdaptorPublicKey, false, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start counter leaf swap for request %s: %w", logging.FormatProto("counter_leaf_swap_request", req), err)
 	}
@@ -652,7 +663,7 @@ func (h *TransferHandler) CounterLeafSwapV2(ctx context.Context, req *pb.Counter
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse direct from cpfp adaptor public key: %w", err)
 	}
-	startTransferResponse, err := h.startTransferInternal(ctx, req.Transfer, st.TransferTypeCounterSwap, adaptorPublicKey, directAdaptorPublicKey, directFromCpfpAdaptorPublicKey, true, true, uuid.Nil)
+	startTransferResponse, err := h.startTransferInternal(ctx, req.Transfer, st.TransferTypeCounterSwap, adaptorPublicKey, directAdaptorPublicKey, directFromCpfpAdaptorPublicKey, true, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start counter leaf swap for request %s: %w", logging.FormatProto("counter_leaf_swap_request", req), err)
 	}
@@ -676,7 +687,7 @@ func (h *TransferHandler) syncTransferInit(
 	cpfpAdaptorPubKey keys.Public,
 	directAdaptorPubKey keys.Public,
 	directFromCpfpAdaptorPubKey keys.Public,
-	primaryTransferId uuid.UUID,
+	swapV3Package *SwapV3Package,
 ) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.syncTransferInit", trace.WithAttributes(
 		transferTypeKey.String(string(transferType)),
@@ -705,12 +716,18 @@ func (h *TransferHandler) syncTransferInit(
 	}
 
 	// Swap V3 flow requires adaptor public keys to be provided.
+	// However direct transactions are not used so these adaptors
+	// are not required.
 	var adaptorPublicKeyPackage *pb.AdaptorPublicKeyPackage
-	if !cpfpAdaptorPubKey.IsZero() && !directAdaptorPubKey.IsZero() && !directFromCpfpAdaptorPubKey.IsZero() {
+	var primaryTransferId uuid.UUID
+	if swapV3Package != nil {
 		adaptorPublicKeyPackage = &pb.AdaptorPublicKeyPackage{
 			AdaptorPublicKey:               cpfpAdaptorPubKey.Serialize(),
 			DirectAdaptorPublicKey:         directAdaptorPubKey.Serialize(),
 			DirectFromCpfpAdaptorPublicKey: directFromCpfpAdaptorPubKey.Serialize(),
+		}
+		if swapV3Package.transferType == st.TransferTypeCounterSwap {
+			primaryTransferId = swapV3Package.primaryTransferId
 		}
 	}
 

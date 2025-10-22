@@ -1509,8 +1509,7 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 			keys.Public{},
 			keys.Public{},
 			false,
-			true,
-			uuid.Nil,
+			nil,
 		)
 		if err != nil {
 			if err := internalDepositHandler.RollbackSwapForAllOperators(ctx, config, createdUtxoSwapRequest); err != nil {
