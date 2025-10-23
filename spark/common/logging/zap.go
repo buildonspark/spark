@@ -3,6 +3,7 @@ package logging
 import (
 	"context"
 	"runtime"
+	"sync"
 
 	"github.com/lightsparkdev/spark/common/keys"
 	"go.uber.org/zap"
@@ -13,10 +14,36 @@ type loggerContextKey string
 
 const loggerKey = loggerContextKey("logger")
 
+type requestFieldsContextKey string
+
+const requestFieldsKey = requestFieldsContextKey("requestFields")
+
+type requestFields struct {
+	fields []zap.Field
+	mu     sync.Mutex
+}
+
 // Inject the logger into the context. This should ONLY be called from the start of a request
 // or worker context (e.g. in a top-level gRPC interceptor).
 func Inject(ctx context.Context, logger *zap.Logger) context.Context {
 	return context.WithValue(ctx, loggerKey, logger)
+}
+
+func InitRequestFields(ctx context.Context) context.Context {
+	return context.WithValue(ctx, requestFieldsKey, &requestFields{
+		fields: make([]zap.Field, 0),
+		mu:     sync.Mutex{},
+	})
+}
+
+func addRequestFields(ctx context.Context, fields ...zap.Field) {
+	fieldsContainer, ok := ctx.Value(requestFieldsKey).(*requestFields)
+	if !ok {
+		return
+	}
+	fieldsContainer.mu.Lock()
+	defer fieldsContainer.mu.Unlock()
+	fieldsContainer.fields = append(fieldsContainer.fields, fields...)
 }
 
 // Get an instance of zap.SugaredLogger from the current context. If no logger is found, returns a
@@ -29,13 +56,44 @@ func GetLoggerFromContext(ctx context.Context) *zap.Logger {
 	return logger
 }
 
-func WithIdentityPubkey(ctx context.Context, pubKey keys.Public) (context.Context, *zap.Logger) {
-	return WithAttrs(ctx, zap.Stringer("identity_public_key", pubKey))
+// GetLoggerWithAccumulatedRequestFields returns a logger with all fields that have been accumulated
+// via WithRequestAttrs during the request lifecycle. This is primarily intended for use in the
+// LogInterceptor to ensure table logging includes fields added by later interceptors.
+func GetLoggerWithAccumulatedRequestFields(ctx context.Context) *zap.Logger {
+	logger := GetLoggerFromContext(ctx)
+
+	fieldsContainer, ok := ctx.Value(requestFieldsKey).(*requestFields)
+	if !ok || fieldsContainer == nil {
+		return logger
+	}
+
+	fieldsContainer.mu.Lock()
+	defer fieldsContainer.mu.Unlock()
+
+	if len(fieldsContainer.fields) == 0 {
+		return logger
+	}
+
+	return logger.With(fieldsContainer.fields...)
 }
 
+func WithIdentityPubkey(ctx context.Context, pubKey keys.Public) (context.Context, *zap.Logger) {
+	return WithRequestAttrs(ctx, zap.Stringer("identity_public_key", pubKey))
+}
+
+// WithAttrs adds fields to the logger in the context. These fields are NOT included in
+// accumulated fields for table logging - use WithRequestAttrs for that.
 func WithAttrs(ctx context.Context, fields ...zap.Field) (context.Context, *zap.Logger) {
 	logger := GetLoggerFromContext(ctx).With(fields...)
 	return Inject(ctx, logger), logger
+}
+
+// WithRequestAttrs adds fields to both the logger in the context AND the accumulated
+// fields container. These fields will be included in table logging at the end of the request.
+// Use this for important request-level fields like identity_public_key.
+func WithRequestAttrs(ctx context.Context, fields ...zap.Field) (context.Context, *zap.Logger) {
+	addRequestFields(ctx, fields...)
+	return WithAttrs(ctx, fields...)
 }
 
 // Custom core that automatically adds source information to every log entry

@@ -57,6 +57,7 @@ func LogInterceptor(rootLogger *zap.Logger, tableLogger *logging.TableLogger) gr
 
 		ctx = logging.Inject(ctx, logger)
 		ctx = logging.InitTable(ctx)
+		ctx = logging.InitRequestFields(ctx)
 
 		startTime := time.Now()
 		response, err := handler(ctx, req)
@@ -65,12 +66,15 @@ func LogInterceptor(rootLogger *zap.Logger, tableLogger *logging.TableLogger) gr
 		reqProto, _ := req.(proto.Message)
 		respProto, _ := response.(proto.Message)
 
+		loggerWithAccumulatedRequestFields := logging.GetLoggerWithAccumulatedRequestFields(ctx)
+		ctx = logging.Inject(ctx, loggerWithAccumulatedRequestFields)
+
 		if tableLogger != nil {
 			tableLogger.Log(ctx, duration, reqProto, respProto, err)
 		}
 
 		if err != nil {
-			logger.Error("error in grpc", zap.Error(err))
+			loggerWithAccumulatedRequestFields.Error("error in grpc", zap.Error(err))
 		}
 
 		return response, err
@@ -113,10 +117,13 @@ func StreamLogInterceptor(rootLogger *zap.Logger) grpc.StreamServerInterceptor {
 		)
 
 		ctx := logging.Inject(ss.Context(), logger)
+		ctx = logging.InitRequestFields(ctx)
 
 		err := handler(srv, WrapServerStream(ctx, ss))
+
+		loggerWithAccumulatedRequestFields := logging.GetLoggerWithAccumulatedRequestFields(ctx)
 		if err != nil {
-			logger.Error("error in grpc stream", zap.Error(err))
+			loggerWithAccumulatedRequestFields.Error("error in grpc stream", zap.Error(err))
 		}
 
 		return err
