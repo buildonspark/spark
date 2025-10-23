@@ -7,7 +7,6 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/lightsparkdev/spark/so/errors"
-	"github.com/lightsparkdev/spark/so/limiter"
 	"github.com/lightsparkdev/spark/so/protoconverter"
 
 	"github.com/lightsparkdev/spark/so/handler/tokens"
@@ -25,19 +24,15 @@ import (
 // It will be used by the user or Spark service provider.
 type SparkServer struct {
 	pb.UnimplementedSparkServiceServer
-	config *so.Config
-
-	// ResourceGuard to limit concurrent ClaimTransferSignRefunds calls for the same transfer ID. This
-	// is already enforced through row locking, but is more to prevent unnecessary load on the DB.
-	claimTransferSignRefundsTransferGuard limiter.ResourceGuard
-	eventsRouter                          *events.EventRouter
+	config       *so.Config
+	eventsRouter *events.EventRouter
 }
 
 var emptyResponse = &emptypb.Empty{}
 
 // NewSparkServer creates a new SparkServer.
 func NewSparkServer(config *so.Config, eventsRouter *events.EventRouter) *SparkServer {
-	return &SparkServer{config: config, claimTransferSignRefundsTransferGuard: limiter.NewResourceGuard(), eventsRouter: eventsRouter}
+	return &SparkServer{config: config, eventsRouter: eventsRouter}
 }
 
 // GenerateDepositAddress generates a deposit address for the given public key.
@@ -135,10 +130,6 @@ func (s *SparkServer) ClaimTransferTweakKeys(ctx context.Context, req *pb.ClaimT
 
 // ClaimTransferSignRefundsV2 signs new refund transactions as part of the transfer.
 func (s *SparkServer) ClaimTransferSignRefundsV2(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
-	if !s.claimTransferSignRefundsTransferGuard.Acquire(req.TransferId) {
-		return nil, errors.ResourceExhaustedConcurrencyLimitExceeded(fmt.Errorf("concurrency limit exceeded"))
-	}
-	defer s.claimTransferSignRefundsTransferGuard.Release(req.TransferId)
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.ClaimTransferSignRefundsV2(ctx, req)
 }
@@ -148,11 +139,6 @@ func (s *SparkServer) ClaimTransferSignRefunds(ctx context.Context, req *pb.Clai
 	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
 		return nil, err
 	}
-	if !s.claimTransferSignRefundsTransferGuard.Acquire(req.TransferId) {
-		return nil, errors.ResourceExhaustedConcurrencyLimitExceeded(fmt.Errorf("concurrency limit exceeded"))
-	}
-	defer s.claimTransferSignRefundsTransferGuard.Release(req.TransferId)
-
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.ClaimTransferSignRefunds(ctx, req)
 }
