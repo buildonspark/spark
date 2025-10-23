@@ -3,7 +3,7 @@ import { bytesToHex } from "@noble/hashes/utils";
 
 import { RPCError } from "../../errors/types.js";
 import { Network } from "../../utils/network.js";
-import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
+import { SparkWalletTestingIntegration } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
 import { waitForClaim } from "../utils/utils.js";
 import {
@@ -12,18 +12,17 @@ import {
 } from "../../utils/unilateral-exit.js";
 import { signPsbtWithExternalKey } from "../utils/signing.js";
 import { TreeNode } from "../../proto/spark.js";
-import { WalletConfigService } from "../../services/config.js";
-import { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
 
 describe("unilateral exit", () => {
   it("should unilateral exit", async () => {
     const faucet = BitcoinFaucet.getInstance();
 
-    const { wallet: userWallet } = await SparkWalletTesting.initialize({
-      options: {
-        network: "LOCAL",
-      },
-    });
+    const { wallet: userWallet } =
+      await SparkWalletTestingIntegration.initialize({
+        options: {
+          network: "LOCAL",
+        },
+      });
 
     const depositResp = await userWallet.getSingleUseDepositAddress();
 
@@ -73,11 +72,8 @@ describe("unilateral exit", () => {
     ];
 
     // Create a spark client to be used for signing fee bump transactions.
-    const configService = new WalletConfigService(
-      { network: "LOCAL" },
-      userWallet.getSigner(),
-    );
-    const connectionManager = new ConnectionManagerNodeJS(configService);
+    const configService = userWallet.getConfigService();
+    const connectionManager = userWallet.getConnectionManager();
     const sparkClient = await connectionManager.createSparkClient(
       configService.getCoordinatorAddress(),
     );
