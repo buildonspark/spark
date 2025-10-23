@@ -28,7 +28,7 @@ func NewSparkTokenServer(authzConfig authz.Config, soConfig *so.Config, db *ent.
 }
 
 func (s *SparkTokenServer) StartTransaction(ctx context.Context, req *tokenpb.StartTransactionRequest) (*tokenpb.StartTransactionResponse, error) {
-	ctx, _ = logging.WithAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.PartialTokenTransaction)...)
+	ctx, _ = logging.WithRequestAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.PartialTokenTransaction)...)
 	tokenTransactionHandler := tokens.NewStartTokenTransactionHandlerWithPreemption(s.soConfig)
 	resp, err := tokenTransactionHandler.StartTokenTransaction(ctx, req)
 	return resp, err
@@ -36,7 +36,7 @@ func (s *SparkTokenServer) StartTransaction(ctx context.Context, req *tokenpb.St
 
 // CommitTransaction is called by the client to initiate the coordinated signing process.
 func (s *SparkTokenServer) CommitTransaction(ctx context.Context, req *tokenpb.CommitTransactionRequest) (*tokenpb.CommitTransactionResponse, error) {
-	ctx, _ = logging.WithAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
+	ctx, _ = logging.WithRequestAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
 	signTokenHandler := tokens.NewSignTokenHandler(s.soConfig)
 	resp, err := signTokenHandler.CommitTransaction(ctx, req)
 	return resp, err

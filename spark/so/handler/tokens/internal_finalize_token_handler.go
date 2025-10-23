@@ -45,7 +45,7 @@ func (h *InternalFinalizeTokenHandler) FinalizeTokenTransactionInternal(
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToFetchTransaction, tokenTransaction, err)
 	}
-	ctx, _ = logging.WithAttrs(ctx, tokens.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
+	ctx, _ = logging.WithRequestAttrs(ctx, tokens.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
 
 	// Verify that the transaction is in a signed state before finalizing
 	if tokenTransaction.Status != st.TokenTransactionStatusSigned {

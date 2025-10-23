@@ -65,7 +65,7 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 ) ([]byte, error) {
 	ctx, span := GetTracer().Start(ctx, "InternalSignTokenHandler.SignAndPersistTokenTransaction", GetEntTokenTransactionTraceAttributes(ctx, tokenTransaction))
 	defer span.End()
-	ctx, _ = logging.WithAttrs(ctx, tokens.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
+	ctx, _ = logging.WithRequestAttrs(ctx, tokens.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
 
 	if tokenTransaction.Status == st.TokenTransactionStatusSigned {
 		// Return stored signature for sign requests if already signed.
@@ -112,7 +112,7 @@ func (h *InternalSignTokenHandler) regenerateOperatorSignatureForDuplicateReques
 	tokenTransaction *ent.TokenTransaction,
 	finalTokenTransactionHash []byte,
 ) ([]byte, error) {
-	_, logger := logging.WithAttrs(ctx, tokens.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
+	_, logger := logging.WithRequestAttrs(ctx, tokens.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
 	logger.Debug("Regenerating response for a duplicate SignTokenTransaction() Call")
 
 	var invalidOutputs []error
@@ -157,7 +157,7 @@ type operatorSharesMap map[keys.Public][]*pbtkinternal.RevocationSecretShare
 func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.Context, req *pbtkinternal.ExchangeRevocationSecretsSharesRequest) (*pbtkinternal.ExchangeRevocationSecretsSharesResponse, error) {
 	ctx, span := GetTracer().Start(ctx, "InternalSignTokenHandler.ExchangeRevocationSecretsShares")
 	defer span.End()
-	ctx, logger := logging.WithAttrs(ctx, tokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
+	ctx, logger := logging.WithRequestAttrs(ctx, tokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
 
 	if len(req.OperatorShares) == 0 {
 		return nil, fmt.Errorf("no operator shares provided in request")
@@ -386,11 +386,11 @@ func (h *InternalSignTokenHandler) getPartialRevocationSecretShares(
 	}
 
 	query := `
-		SELECT tprss.id, 
-		       tprss.create_time, 
-		       tprss.update_time, 
-		       tprss.operator_identity_public_key, 
-		       tprss.secret_share, 
+		SELECT tprss.id,
+		       tprss.create_time,
+		       tprss.update_time,
+		       tprss.operator_identity_public_key,
+		       tprss.secret_share,
 		       tprss.token_output_token_partial_revocation_secret_shares
 		FROM token_partial_revocation_secret_shares tprss
 		WHERE tprss.token_output_token_partial_revocation_secret_shares = ANY($1)
@@ -402,16 +402,16 @@ func (h *InternalSignTokenHandler) getPartialRevocationSecretShares(
 		// Use CTE with LEFT JOIN for efficient exclusion
 		query = `
 			WITH excluded_pairs AS (
-			    SELECT 
+			    SELECT
 			        excluded_pairs.token_id,
 			        excluded_pairs.operator_key
 			    FROM UNNEST($2::uuid[], $3::bytea[]) AS excluded_pairs(token_id, operator_key)
 			)
-			SELECT tprss.id, 
-			       tprss.create_time, 
-			       tprss.update_time, 
-			       tprss.operator_identity_public_key, 
-			       tprss.secret_share, 
+			SELECT tprss.id,
+			       tprss.create_time,
+			       tprss.update_time,
+			       tprss.operator_identity_public_key,
+			       tprss.secret_share,
 			       tprss.token_output_token_partial_revocation_secret_shares
 			FROM token_partial_revocation_secret_shares tprss
 			LEFT JOIN excluded_pairs ep ON (

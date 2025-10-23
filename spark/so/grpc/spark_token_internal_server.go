@@ -29,7 +29,7 @@ func NewSparkTokenInternalServer(soConfig *so.Config, db *ent.Client) *SparkToke
 
 func (s *SparkTokenInternalServer) PrepareTransaction(ctx context.Context, req *tokeninternalpb.PrepareTransactionRequest) (*tokeninternalpb.PrepareTransactionResponse, error) {
 	prepareHandler := tokens.NewInternalPrepareTokenHandlerWithPreemption(s.soConfig)
-	ctx, _ = logging.WithAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
+	ctx, _ = logging.WithRequestAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
 	resp, err := prepareHandler.PrepareTokenTransactionInternal(ctx, req)
 	return resp, err
 }
@@ -38,7 +38,7 @@ func (s *SparkTokenInternalServer) SignTokenTransactionFromCoordination(
 	ctx context.Context,
 	req *tokeninternalpb.SignTokenTransactionFromCoordinationRequest,
 ) (*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, error) {
-	ctx, _ = logging.WithAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
+	ctx, _ = logging.WithRequestAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
 	tx, err := ent.FetchAndLockTokenTransactionData(ctx, req.FinalTokenTransaction)
 	if err != nil {
 		return nil, sotokens.FormatErrorWithTransactionProto("failed to fetch transaction", req.FinalTokenTransaction, err)
@@ -72,6 +72,6 @@ func (s *SparkTokenInternalServer) ExchangeRevocationSecretsShares(
 	req *tokeninternalpb.ExchangeRevocationSecretsSharesRequest,
 ) (*tokeninternalpb.ExchangeRevocationSecretsSharesResponse, error) {
 	internalTokenTransactionHandler := tokens.NewInternalSignTokenHandler(s.soConfig)
-	ctx, _ = logging.WithAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
+	ctx, _ = logging.WithRequestAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
 	return internalTokenTransactionHandler.ExchangeRevocationSecretsShares(ctx, req)
 }
