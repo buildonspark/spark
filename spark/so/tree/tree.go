@@ -10,6 +10,7 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark_tree"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 )
@@ -133,5 +134,33 @@ func MarkExitingNodes(ctx context.Context, dbTx *ent.Tx, confirmedTxHashSet map[
 			"count", countParentExited,
 			"block_height", blockHeight)
 	}
+
+	// Query TreeNode IDs that have TransferLeaf entities with confirmed intermediate refund TXIDs
+	transferLeafNodeIDs, err := dbTx.TransferLeaf.Query().
+		Where(transferleaf.Or(
+			transferleaf.IntermediateRefundTxidIn(confirmedTxids...),
+			transferleaf.IntermediateDirectRefundTxidIn(confirmedTxids...),
+			transferleaf.IntermediateDirectFromCpfpRefundTxidIn(confirmedTxids...),
+		)).
+		QueryLeaf().
+		IDs(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query tree node IDs from transfer leaves with confirmed txids: %w", err)
+	}
+
+	// Batch update TreeNodes to OnChain status based on confirmed TransferLeaf transactions
+	if len(transferLeafNodeIDs) > 0 {
+		count, err := dbTx.TreeNode.Update().
+			SetStatus(st.TreeNodeStatusOnChain).
+			SetRefundConfirmationHeight(uint64(blockHeight)).
+			Where(treenode.IDIn(transferLeafNodeIDs...)).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to mark tree nodes as on chain from transfer leaves: %w", err)
+		}
+		logger.Sugar().Infof("MarkExitingNodes: marked %d tree nodes as %v from transfer leaves at block height %d",
+			count, st.TreeNodeStatusOnChain, blockHeight)
+	}
+
 	return nil
 }
