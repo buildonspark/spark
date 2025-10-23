@@ -148,16 +148,6 @@ func (h *LightningHandler) validateNodeOwnership(ctx context.Context, nodes []*e
 	return nil
 }
 
-func (h *LightningHandler) validateHasSession(ctx context.Context) error {
-	if h.config.IsAuthzEnforced() {
-		_, err := authn.GetSessionFromContext(ctx)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (h *LightningHandler) ValidateDuplicateLeaves(
 	ctx context.Context,
 	leavesToSend []*pb.UserSignedTxSigningJob,

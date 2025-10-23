@@ -319,7 +319,7 @@ func TestGetSigningCommitments(t *testing.T) {
 		FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
 	}
 
-	lightningHandler := NewLightningHandler(config)
+	signingHandler := NewSigningHandler(config)
 
 	manyNodeIDs := make([]string, 1001)
 	for i := 0; i < 1001; i++ {
@@ -393,7 +393,7 @@ func TestGetSigningCommitments(t *testing.T) {
 				Count:   tt.count,
 			}
 
-			resp, err := lightningHandler.GetSigningCommitments(ctx, req)
+			resp, err := signingHandler.GetSigningCommitments(ctx, req)
 
 			if tt.expectError {
 				require.ErrorContains(t, err, tt.expectedErrMsg)
