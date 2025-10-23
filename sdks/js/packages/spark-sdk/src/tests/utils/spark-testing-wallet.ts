@@ -53,6 +53,50 @@ export class SparkWalletTestingWithStream extends SparkWalletTesting {
   }
 }
 
+export class SparkWalletTestingIntegration extends SparkWalletTesting {
+  constructor(options?: ConfigOptions, signer?: SparkSigner) {
+    super(options, signer);
+  }
+
+  public getConfigService() {
+    return this.config;
+  }
+
+  public getConnectionManager() {
+    return this.connectionManager;
+  }
+
+  public getTransferService() {
+    return this.transferService;
+  }
+
+  public getDepositService() {
+    return this.depositService;
+  }
+
+  public getLightningService() {
+    return this.lightningService;
+  }
+
+  public getCoopExitService() {
+    return this.coopExitService;
+  }
+
+  public getSigningService() {
+    return this.signingService;
+  }
+
+  public getTokenTransactionService() {
+    return this.tokenTransactionService;
+  }
+}
+
+export class SparkWalletTestingIntegrationWithStream extends SparkWalletTestingIntegration {
+  protected override async setupBackgroundStream() {
+    return this.proxyParentSetupBackgroundStream();
+  }
+}
+
 export async function initTestingWallet(
   amount: bigint,
   network: NetworkType,

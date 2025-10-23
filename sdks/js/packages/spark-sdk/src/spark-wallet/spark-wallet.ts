@@ -173,11 +173,11 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   protected transferService: TransferService;
   protected tracerId = "spark-sdk";
 
-  private depositService: DepositService;
-  private lightningService: LightningService;
-  private coopExitService: CoopExitService;
-  private signingService: SigningService;
-  private tokenTransactionService: TokenTransactionService;
+  protected depositService: DepositService;
+  protected lightningService: LightningService;
+  protected coopExitService: CoopExitService;
+  protected signingService: SigningService;
+  protected tokenTransactionService: TokenTransactionService;
 
   private claimTransferMutex = new Mutex();
   private leavesMutex = new Mutex();
@@ -3758,7 +3758,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   /**
    * Fulfills one or more Spark invoices.
    *
-   * Processes each provided invoice and attempts to pay it according to the wallet’s
+   * Processes each provided invoice and attempts to pay it according to the wallet's
    * funding/selection strategy.
    *
    * @param sparkInvoices - Invoices to fulfill.
