@@ -384,6 +384,7 @@ interface QueryTokenTransactionsArgs {
   useWalletIdentityKeyForIssuer: boolean;
   pageSize?: number;
   offset?: number;
+  sortOrder?: "asc" | "desc";
 }
 
 function showQueryTokenTransactionsHelp() {
@@ -405,6 +406,9 @@ function showQueryTokenTransactionsHelp() {
   console.log(
     "  --outputIds <ids>            Comma-separated list of output IDs",
   );
+  console.log(
+    "  --sortOrder <order>          Sort order: 'asc' or 'desc' (default: desc)",
+  );
   console.log("  --help                        Show this help message");
   console.log("");
   console.log("Examples:");
@@ -422,6 +426,7 @@ function showQueryTokenTransactionsHelp() {
     "  querytokentransactions --ownerPublicKeys , --tokenIdentifiers def456...",
   );
   console.log("  querytokentransactions --pageSize 10 --offset 0");
+  console.log("  querytokentransactions --sortOrder desc");
 }
 
 function parseQueryTokenTransactionsArgsWithYargs(
@@ -478,6 +483,12 @@ function parseQueryTokenTransactionsArgsWithYargs(
         description: "Offset the results",
         default: 0,
       })
+      .option("sortOrder", {
+        type: "string",
+        description: "Sort order: 'asc' or 'desc'",
+        default: "desc",
+        choices: ["asc", "desc"],
+      })
       .help(false) // Disable yargs built-in help
       .parseSync();
 
@@ -515,6 +526,7 @@ function parseQueryTokenTransactionsArgsWithYargs(
       useWalletIdentityKeyForIssuer: useWalletForIssuer,
       pageSize: parsed.pageSize,
       offset: parsed.offset,
+      sortOrder: parsed.sortOrder as "asc" | "desc",
     };
   } catch (error) {
     showQueryTokenTransactionsHelp();
@@ -674,7 +686,7 @@ async function runCLI() {
   Token Holder Commands:
     transfertokens <tokenIdentifier> <receiverAddress> <amount>        - Transfer tokens
     batchtransfertokens <tokenIdentifier> <receiverAddress1:amount1> <receiverAddress2:amount2> ... - Transfer tokens with multiple outputs
-    querytokentransactions [--ownerPublicKeys] [--issuerPublicKeys] [--tokenTransactionHashes] [--tokenIdentifiers] [--outputIds] - Query token transaction history
+    querytokentransactions [--ownerPublicKeys] [--issuerPublicKeys] [--tokenTransactionHashes] [--tokenIdentifiers] [--outputIds] [--sortOrder] - Query token transaction history
 
   Token Issuer Commands:
   gettokenl1address                                                   - Get the L1 address for on-chain token operations
@@ -1799,6 +1811,7 @@ async function runCLI() {
             outputIds: parsedArgs.outputIds,
             pageSize: parsedArgs.pageSize,
             offset: parsedArgs.offset,
+            order: parsedArgs.sortOrder,
           });
           const transactions = res.tokenTransactionsWithStatus;
 
