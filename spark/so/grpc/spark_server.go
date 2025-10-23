@@ -85,6 +85,9 @@ func (s *SparkServer) FinalizeNodeSignaturesV2(ctx context.Context, req *pb.Fina
 
 // StartTransfer initiates a transfer from sender.
 func (s *SparkServer) StartTransfer(ctx context.Context, req *pb.StartTransferRequest) (*pb.StartTransferResponse, error) {
+	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
+		return nil, err
+	}
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.StartTransfer(ctx, req)
 }
@@ -132,12 +135,19 @@ func (s *SparkServer) ClaimTransferTweakKeys(ctx context.Context, req *pb.ClaimT
 
 // ClaimTransferSignRefundsV2 signs new refund transactions as part of the transfer.
 func (s *SparkServer) ClaimTransferSignRefundsV2(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
+	if !s.claimTransferSignRefundsTransferGuard.Acquire(req.TransferId) {
+		return nil, errors.ResourceExhaustedConcurrencyLimitExceeded(fmt.Errorf("concurrency limit exceeded"))
+	}
+	defer s.claimTransferSignRefundsTransferGuard.Release(req.TransferId)
 	transferHander := handler.NewTransferHandler(s.config)
 	return transferHander.ClaimTransferSignRefundsV2(ctx, req)
 }
 
 // ClaimTransferSignRefunds signs new refund transactions as part of the transfer.
 func (s *SparkServer) ClaimTransferSignRefunds(ctx context.Context, req *pb.ClaimTransferSignRefundsRequest) (*pb.ClaimTransferSignRefundsResponse, error) {
+	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
+		return nil, err
+	}
 	if !s.claimTransferSignRefundsTransferGuard.Acquire(req.TransferId) {
 		return nil, errors.ResourceExhaustedConcurrencyLimitExceeded(fmt.Errorf("concurrency limit exceeded"))
 	}
