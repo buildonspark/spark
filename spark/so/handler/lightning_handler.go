@@ -784,6 +784,7 @@ func (h *LightningHandler) GetPreimageShare(
 		ctx,
 		req.Transfer.TransferId,
 		st.TransferTypePreimageSwap,
+		// TODO: (LIG-8397) Remove once we can remove transfer
 		req.Transfer.ExpiryTime.AsTime(),
 		ownerIdentityPubKey,
 		receiverIdentityPubKey,
@@ -1162,10 +1163,16 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		directFromCpfpLeafRefundMap[directFromCpfpTransaction.LeafId] = directFromCpfpTransaction.RawTx
 	}
 
-	expiryTime := req.Transfer.ExpiryTime.AsTime()
-	if expireTimeOverride != nil {
-		expiryTime = *expireTimeOverride
+	// Only override expiry time for send preimage swap.
+	// Receive preimage swap has no expiry time, so we don't need to override it.
+	if expireTimeOverride != nil && req.Reason == pb.InitiatePreimageSwapRequest_REASON_SEND {
+		req.Transfer.ExpiryTime = timestamppb.New(*expireTimeOverride)
+		if req.TransferRequest != nil {
+			req.TransferRequest.ExpiryTime = timestamppb.New(*expireTimeOverride)
+		}
 	}
+	// TODO: (LIG-8397) Remove once we can remove transfer
+	expiryTime := req.Transfer.ExpiryTime.AsTime()
 	if expiryTime.Unix() != 0 && expiryTime.Before(time.Now()) {
 		return nil, fmt.Errorf("expiry time is before current time")
 	}
@@ -1205,7 +1212,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		ctx,
 		req.Transfer.TransferId,
 		st.TransferTypePreimageSwap,
-		expiryTime,
+		req.Transfer.ExpiryTime.AsTime(),
 		ownerIdentityPubKey,
 		receiverIdentityPubKey,
 		cpfpLeafRefundMap,
