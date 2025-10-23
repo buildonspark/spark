@@ -285,12 +285,6 @@ func (s *SparkServer) ExtendLeafV2(ctx context.Context, req *pb.ExtendLeafReques
 }
 
 func (s *SparkServer) RenewLeaf(ctx context.Context, req *pb.RenewLeafRequest) (*pb.RenewLeafResponse, error) {
-	// Check if RenewLeaf feature is disabled via knob
-	knobsService := knobs.GetKnobsService(ctx)
-	if knobsService == nil || knobsService.GetValue(knobs.KnobRenewLeafDisabled, 0) >= 1 {
-		return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("RenewLeaf endpoint is currently unavailable"))
-	}
-
 	leafHandler := handler.NewRenewLeafHandler(s.config)
 	return leafHandler.RenewLeaf(ctx, req)
 }
