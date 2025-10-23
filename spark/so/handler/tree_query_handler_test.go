@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	pb "github.com/lightsparkdev/spark/proto/spark"
+	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -82,4 +84,228 @@ func TestQueryStaticDepositAddresses(t *testing.T) {
 		SetIsStatic(true).
 		Save(ctx)
 	require.NoError(t, err)
+}
+
+func TestQueryNodes_StatusField(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	tx, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	rng := rand.NewChaCha8([32]byte{})
+
+	// Create test keys
+	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	signingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	secretShare := keys.MustGeneratePrivateKeyFromRand(rng)
+
+	// Create signing keyshare
+	signingKeyshare, err := tx.SigningKeyshare.Create().
+		SetStatus(st.KeyshareStatusAvailable).
+		SetSecretShare(secretShare).
+		SetPublicShares(map[string]keys.Public{"test": secretShare.Public()}).
+		SetPublicKey(keys.MustGeneratePrivateKeyFromRand(rng).Public()).
+		SetMinSigners(2).
+		SetCoordinatorIndex(0).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create tree
+	tree, err := tx.Tree.Create().
+		SetOwnerIdentityPubkey(identityPubKey).
+		SetNetwork(st.NetworkRegtest).
+		SetStatus(st.TreeStatusAvailable).
+		SetBaseTxid([]byte{1, 2, 3, 4}).
+		SetVout(1).
+		Save(ctx)
+	require.NoError(t, err)
+
+	// Create valid test transaction bytes using the same function as other tests
+	rawTx := createOldBitcoinTxBytes(t, verifyingPubKey)
+	refundTx := createOldBitcoinTxBytes(t, signingPubKey)
+
+	// Test different status values
+	statusTests := []struct {
+		name          string
+		status        st.TreeNodeStatus
+		shouldBeFound bool // Whether this status should be returned by QueryNodes (not filtered out)
+	}{
+		{
+			name:          "Available status",
+			status:        st.TreeNodeStatusAvailable,
+			shouldBeFound: true,
+		},
+		{
+			name:          "Frozen by issuer status",
+			status:        st.TreeNodeStatusFrozenByIssuer,
+			shouldBeFound: true,
+		},
+		{
+			name:          "Transfer locked status",
+			status:        st.TreeNodeStatusTransferLocked,
+			shouldBeFound: true,
+		},
+		{
+			name:          "Split locked status",
+			status:        st.TreeNodeStatusSplitLocked,
+			shouldBeFound: true,
+		},
+		{
+			name:          "Aggregated status",
+			status:        st.TreeNodeStatusAggregated,
+			shouldBeFound: true,
+		},
+		{
+			name:          "On chain status",
+			status:        st.TreeNodeStatusOnChain,
+			shouldBeFound: true,
+		},
+		{
+			name:          "Exited status",
+			status:        st.TreeNodeStatusExited,
+			shouldBeFound: true,
+		},
+		{
+			name:          "Aggregate lock status",
+			status:        st.TreeNodeStatusAggregateLock,
+			shouldBeFound: true,
+		},
+		{
+			name:          "Creating status - should be filtered out",
+			status:        st.TreeNodeStatusCreating,
+			shouldBeFound: false,
+		},
+		{
+			name:          "Splitted status - should be filtered out",
+			status:        st.TreeNodeStatusSplitted,
+			shouldBeFound: false,
+		},
+		{
+			name:          "Investigation status - should be filtered out",
+			status:        st.TreeNodeStatusInvestigation,
+			shouldBeFound: false,
+		},
+		{
+			name:          "Lost status - should be filtered out",
+			status:        st.TreeNodeStatusLost,
+			shouldBeFound: false,
+		},
+		{
+			name:          "Reimbursed status - should be filtered out",
+			status:        st.TreeNodeStatusReimbursed,
+			shouldBeFound: false,
+		},
+	}
+
+	// Create tree nodes with different statuses
+	createdNodes := make(map[st.TreeNodeStatus]*ent.TreeNode)
+	for _, tt := range statusTests {
+		node, err := tx.TreeNode.Create().
+			SetTree(tree).
+			SetStatus(tt.status).
+			SetOwnerIdentityPubkey(identityPubKey).
+			SetOwnerSigningPubkey(signingPubKey).
+			SetValue(100000).
+			SetVerifyingPubkey(verifyingPubKey).
+			SetSigningKeyshare(signingKeyshare).
+			SetRawTx(rawTx).
+			SetRawRefundTx(refundTx).
+			SetDirectTx(rawTx).
+			SetDirectRefundTx(refundTx).
+			SetDirectFromCpfpRefundTx(refundTx).
+			SetVout(1).
+			Save(ctx)
+		require.NoError(t, err)
+		createdNodes[tt.status] = node
+	}
+
+	// Create handler
+	handler := NewTreeQueryHandler(&so.Config{})
+
+	// Test QueryNodes with owner identity pubkey
+	req := &pb.QueryNodesRequest{
+		Source: &pb.QueryNodesRequest_OwnerIdentityPubkey{
+			OwnerIdentityPubkey: identityPubKey.Serialize(),
+		},
+		Network: pb.Network_REGTEST,
+		Limit:   100,
+	}
+
+	resp, err := handler.QueryNodes(ctx, req, false)
+	require.NoError(t, err)
+
+	// Verify that only non-filtered statuses are returned
+	foundStatuses := make(map[string]bool)
+	for _, node := range resp.Nodes {
+		foundStatuses[node.Status] = true
+	}
+
+	for _, tt := range statusTests {
+		t.Run(tt.name, func(t *testing.T) {
+			expectedStatusString := string(tt.status)
+			if tt.shouldBeFound {
+				require.True(t, foundStatuses[expectedStatusString],
+					"Status %s should be found in response", expectedStatusString)
+			} else {
+				require.False(t, foundStatuses[expectedStatusString],
+					"Status %s should be filtered out from response", expectedStatusString)
+			}
+		})
+	}
+
+	// Test QueryNodes with specific status filter using protobuf enums
+	reqWithStatus := &pb.QueryNodesRequest{
+		Source: &pb.QueryNodesRequest_OwnerIdentityPubkey{
+			OwnerIdentityPubkey: identityPubKey.Serialize(),
+		},
+		Network: pb.Network_REGTEST,
+		Limit:   100,
+		Statuses: []pb.TreeNodeStatus{
+			pb.TreeNodeStatus_TREE_NODE_STATUS_AVAILABLE,
+			pb.TreeNodeStatus_TREE_NODE_STATUS_FROZEN_BY_ISSUER,
+		},
+	}
+
+	respWithStatus, err := handler.QueryNodes(ctx, reqWithStatus, false)
+	require.NoError(t, err)
+
+	// Verify only the requested statuses are returned
+	require.Len(t, respWithStatus.Nodes, 2)
+	for _, node := range respWithStatus.Nodes {
+		require.Contains(t, []string{
+			string(st.TreeNodeStatusAvailable),
+			string(st.TreeNodeStatusFrozenByIssuer),
+		}, node.Status, "Node should have one of the requested statuses")
+	}
+
+	// Test QueryNodes with node IDs (should return all statuses, no filtering)
+	nodeIDs := make([]string, 0, len(createdNodes))
+	for _, node := range createdNodes {
+		nodeIDs = append(nodeIDs, node.ID.String())
+	}
+
+	reqByIDs := &pb.QueryNodesRequest{
+		Source: &pb.QueryNodesRequest_NodeIds{
+			NodeIds: &pb.TreeNodeIds{
+				NodeIds: nodeIDs,
+			},
+		},
+	}
+
+	respByIDs, err := handler.QueryNodes(ctx, reqByIDs, false)
+	require.NoError(t, err)
+
+	// Should return all nodes regardless of status when querying by IDs
+	require.Len(t, respByIDs.Nodes, len(createdNodes))
+	allStatusesFound := make(map[string]bool)
+	for _, node := range respByIDs.Nodes {
+		allStatusesFound[node.Status] = true
+	}
+
+	// Verify all statuses are present in the response
+	for _, tt := range statusTests {
+		expectedStatusString := string(tt.status)
+		t.Logf("Status %s should be found when querying by node IDs", expectedStatusString)
+		require.True(t, allStatusesFound[expectedStatusString],
+			"Status %s should be found when querying by node IDs", expectedStatusString)
+	}
 }

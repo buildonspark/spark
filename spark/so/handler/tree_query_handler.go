@@ -61,8 +61,12 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
 		}
+		if len(req.Statuses) == 0 {
+			query = query.Where(treenode.StatusNotIn(st.TreeNodeStatusCreating, st.TreeNodeStatusSplitted))
+		}
+
 		query = query.
-			Where(treenode.StatusNotIn(st.TreeNodeStatusCreating, st.TreeNodeStatusSplitted, st.TreeNodeStatusInvestigation, st.TreeNodeStatusLost, st.TreeNodeStatusReimbursed)).
+			Where(treenode.StatusNotIn(st.TreeNodeStatusInvestigation, st.TreeNodeStatusLost, st.TreeNodeStatusReimbursed)).
 			Where(treenode.HasTreeWith(tree.NetworkEQ(network))).
 			Where(treenode.OwnerIdentityPubkey(ownerIdentityPubKey)).
 			Order(ent.Desc(enttreenode.FieldID))
@@ -90,6 +94,18 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		query = query.Where(treenode.IDIn(nodeIDs...))
 	default:
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("either owner identity pubkey or node ids to query must be provided"))
+	}
+
+	if len(req.Statuses) > 0 {
+		statuses := make([]st.TreeNodeStatus, len(req.Statuses))
+		for i, stat := range req.Statuses {
+			var err error
+			statuses[i], err = ent.TreeNodeStatusSchema(stat)
+			if err != nil {
+				return nil, fmt.Errorf("invalid transfer status: %w", err)
+			}
+		}
+		query = query.Where(treenode.StatusIn(statuses...))
 	}
 
 	nodes, err := query.All(ctx)

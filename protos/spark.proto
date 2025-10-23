@@ -1330,6 +1330,7 @@ message QueryNodesRequest {
     int64 limit = 4;
     int64 offset = 5;
     Network network = 6; // defaults to mainnet when no network is provided. Does not check network when querying by node_ids
+    repeated TreeNodeStatus statuses = 7;
 }
 
 message QueryNodesResponse {
@@ -1584,7 +1585,6 @@ enum InvoiceStatus {
     RETURNED = 4;
 }
 
-
 message InitiateSwapPrimaryTransferRequest {
     // Transfer with refunds and key tweaks signed
     StartTransferRequest transfer = 1;
@@ -1606,4 +1606,17 @@ message AdaptorPublicKeyPackage {
     bytes adaptor_public_key = 1;
     bytes direct_adaptor_public_key = 2;
     bytes direct_from_cpfp_adaptor_public_key = 3;
+}
+
+enum TreeNodeStatus {
+    TREE_NODE_STATUS_CREATING = 0;
+    TREE_NODE_STATUS_AVAILABLE = 1;
+    TREE_NODE_STATUS_FROZEN_BY_ISSUER = 2;
+    TREE_NODE_STATUS_TRANSFER_LOCKED = 3;
+    TREE_NODE_STATUS_SPLIT_LOCKED = 4;
+    TREE_NODE_STATUS_SPLITTED = 5;
+    TREE_NODE_STATUS_AGGREGATED = 6;
+    TREE_NODE_STATUS_ON_CHAIN = 7;
+    TREE_NODE_STATUS_AGGREGATE_LOCK = 8;
+    TREE_NODE_STATUS_EXITED = 9;
 }

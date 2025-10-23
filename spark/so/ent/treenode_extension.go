@@ -129,3 +129,28 @@ func MarkNodeAsLocked(ctx context.Context, nodeID uuid.UUID, nodeStatus st.TreeN
 
 	return db.TreeNode.UpdateOne(node).SetStatus(nodeStatus).Exec(ctx)
 }
+
+func TreeNodeStatusSchema(status pbspark.TreeNodeStatus) (st.TreeNodeStatus, error) {
+	switch status {
+	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_AVAILABLE:
+		return st.TreeNodeStatusAvailable, nil
+	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_FROZEN_BY_ISSUER:
+		return st.TreeNodeStatusFrozenByIssuer, nil
+	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_TRANSFER_LOCKED:
+		return st.TreeNodeStatusTransferLocked, nil
+	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_SPLIT_LOCKED:
+		return st.TreeNodeStatusSplitLocked, nil
+	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_SPLITTED:
+		return st.TreeNodeStatusSplitted, nil
+	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_AGGREGATED:
+		return st.TreeNodeStatusAggregated, nil
+	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_ON_CHAIN:
+		return st.TreeNodeStatusOnChain, nil
+	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_AGGREGATE_LOCK:
+		return st.TreeNodeStatusAggregateLock, nil
+	case pbspark.TreeNodeStatus_TREE_NODE_STATUS_EXITED:
+		return st.TreeNodeStatusExited, nil
+	default:
+		return "", fmt.Errorf("unknown tree node status: %s", status)
+	}
+}
