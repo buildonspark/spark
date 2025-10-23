@@ -5125,7 +5125,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   private async queryNodes(
-    baseRequest: Omit<QueryNodesRequest, "limit" | "offset">,
+    baseRequest: Omit<QueryNodesRequest, "limit" | "offset" | "statuses">,
     sparkClientAddress?: string,
     pageSize: number = 100,
   ): Promise<QueryNodesResponse> {

@@ -462,6 +462,87 @@ export function invoiceStatusToJSON(object: InvoiceStatus): string {
   }
 }
 
+export enum TreeNodeStatus {
+  TREE_NODE_STATUS_CREATING = 0,
+  TREE_NODE_STATUS_AVAILABLE = 1,
+  TREE_NODE_STATUS_FROZEN_BY_ISSUER = 2,
+  TREE_NODE_STATUS_TRANSFER_LOCKED = 3,
+  TREE_NODE_STATUS_SPLIT_LOCKED = 4,
+  TREE_NODE_STATUS_SPLITTED = 5,
+  TREE_NODE_STATUS_AGGREGATED = 6,
+  TREE_NODE_STATUS_ON_CHAIN = 7,
+  TREE_NODE_STATUS_AGGREGATE_LOCK = 8,
+  TREE_NODE_STATUS_EXITED = 9,
+  UNRECOGNIZED = -1,
+}
+
+export function treeNodeStatusFromJSON(object: any): TreeNodeStatus {
+  switch (object) {
+    case 0:
+    case "TREE_NODE_STATUS_CREATING":
+      return TreeNodeStatus.TREE_NODE_STATUS_CREATING;
+    case 1:
+    case "TREE_NODE_STATUS_AVAILABLE":
+      return TreeNodeStatus.TREE_NODE_STATUS_AVAILABLE;
+    case 2:
+    case "TREE_NODE_STATUS_FROZEN_BY_ISSUER":
+      return TreeNodeStatus.TREE_NODE_STATUS_FROZEN_BY_ISSUER;
+    case 3:
+    case "TREE_NODE_STATUS_TRANSFER_LOCKED":
+      return TreeNodeStatus.TREE_NODE_STATUS_TRANSFER_LOCKED;
+    case 4:
+    case "TREE_NODE_STATUS_SPLIT_LOCKED":
+      return TreeNodeStatus.TREE_NODE_STATUS_SPLIT_LOCKED;
+    case 5:
+    case "TREE_NODE_STATUS_SPLITTED":
+      return TreeNodeStatus.TREE_NODE_STATUS_SPLITTED;
+    case 6:
+    case "TREE_NODE_STATUS_AGGREGATED":
+      return TreeNodeStatus.TREE_NODE_STATUS_AGGREGATED;
+    case 7:
+    case "TREE_NODE_STATUS_ON_CHAIN":
+      return TreeNodeStatus.TREE_NODE_STATUS_ON_CHAIN;
+    case 8:
+    case "TREE_NODE_STATUS_AGGREGATE_LOCK":
+      return TreeNodeStatus.TREE_NODE_STATUS_AGGREGATE_LOCK;
+    case 9:
+    case "TREE_NODE_STATUS_EXITED":
+      return TreeNodeStatus.TREE_NODE_STATUS_EXITED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return TreeNodeStatus.UNRECOGNIZED;
+  }
+}
+
+export function treeNodeStatusToJSON(object: TreeNodeStatus): string {
+  switch (object) {
+    case TreeNodeStatus.TREE_NODE_STATUS_CREATING:
+      return "TREE_NODE_STATUS_CREATING";
+    case TreeNodeStatus.TREE_NODE_STATUS_AVAILABLE:
+      return "TREE_NODE_STATUS_AVAILABLE";
+    case TreeNodeStatus.TREE_NODE_STATUS_FROZEN_BY_ISSUER:
+      return "TREE_NODE_STATUS_FROZEN_BY_ISSUER";
+    case TreeNodeStatus.TREE_NODE_STATUS_TRANSFER_LOCKED:
+      return "TREE_NODE_STATUS_TRANSFER_LOCKED";
+    case TreeNodeStatus.TREE_NODE_STATUS_SPLIT_LOCKED:
+      return "TREE_NODE_STATUS_SPLIT_LOCKED";
+    case TreeNodeStatus.TREE_NODE_STATUS_SPLITTED:
+      return "TREE_NODE_STATUS_SPLITTED";
+    case TreeNodeStatus.TREE_NODE_STATUS_AGGREGATED:
+      return "TREE_NODE_STATUS_AGGREGATED";
+    case TreeNodeStatus.TREE_NODE_STATUS_ON_CHAIN:
+      return "TREE_NODE_STATUS_ON_CHAIN";
+    case TreeNodeStatus.TREE_NODE_STATUS_AGGREGATE_LOCK:
+      return "TREE_NODE_STATUS_AGGREGATE_LOCK";
+    case TreeNodeStatus.TREE_NODE_STATUS_EXITED:
+      return "TREE_NODE_STATUS_EXITED";
+    case TreeNodeStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export interface SubscribeToEventsRequest {
   identityPublicKey: Uint8Array;
 }
@@ -586,7 +667,10 @@ export interface UTXO {
   vout: number;
   /** The network of the bitcoin network. Required. */
   network: Network;
-  /** Transaction ID. Required, but older code may not provide it. */
+  /**
+   * Transaction Id string, produced from transaction hash by reversing the bytes,
+   * converted to bytes. Required, but older code may not provide it.
+   */
   txid: Uint8Array;
 }
 
@@ -1787,6 +1871,7 @@ export interface QueryNodesRequest {
   offset: number;
   /** defaults to mainnet when no network is provided. Does not check network when querying by node_ids */
   network: Network;
+  statuses: TreeNodeStatus[];
 }
 
 export interface QueryNodesResponse {
@@ -16777,7 +16862,7 @@ export const TreeNodeIds: MessageFns<TreeNodeIds> = {
 };
 
 function createBaseQueryNodesRequest(): QueryNodesRequest {
-  return { source: undefined, includeParents: false, limit: 0, offset: 0, network: 0 };
+  return { source: undefined, includeParents: false, limit: 0, offset: 0, network: 0, statuses: [] };
 }
 
 export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
@@ -16802,6 +16887,11 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
     if (message.network !== 0) {
       writer.uint32(48).int32(message.network);
     }
+    writer.uint32(58).fork();
+    for (const v of message.statuses) {
+      writer.int32(v);
+    }
+    writer.join();
     return writer;
   },
 
@@ -16860,6 +16950,24 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
           message.network = reader.int32() as any;
           continue;
         }
+        case 7: {
+          if (tag === 56) {
+            message.statuses.push(reader.int32() as any);
+
+            continue;
+          }
+
+          if (tag === 58) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.statuses.push(reader.int32() as any);
+            }
+
+            continue;
+          }
+
+          break;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -16880,6 +16988,9 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
       limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
       offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
       network: isSet(object.network) ? networkFromJSON(object.network) : 0,
+      statuses: globalThis.Array.isArray(object?.statuses)
+        ? object.statuses.map((e: any) => treeNodeStatusFromJSON(e))
+        : [],
     };
   },
 
@@ -16901,6 +17012,9 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
     }
     if (message.network !== 0) {
       obj.network = networkToJSON(message.network);
+    }
+    if (message.statuses?.length) {
+      obj.statuses = message.statuses.map((e) => treeNodeStatusToJSON(e));
     }
     return obj;
   },
@@ -16928,6 +17042,7 @@ export const QueryNodesRequest: MessageFns<QueryNodesRequest> = {
     message.limit = object.limit ?? 0;
     message.offset = object.offset ?? 0;
     message.network = object.network ?? 0;
+    message.statuses = object.statuses?.map((e) => e) || [];
     return message;
   },
 };
