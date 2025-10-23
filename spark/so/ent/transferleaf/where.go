@@ -121,6 +121,21 @@ func IntermediateDirectFromCpfpRefundTxid(v []byte) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateDirectFromCpfpRefundTxid, v))
 }
 
+// IntermediateRefundTimelock applies equality check predicate on the "intermediate_refund_timelock" field. It's identical to IntermediateRefundTimelockEQ.
+func IntermediateRefundTimelock(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateRefundTimelock, v))
+}
+
+// IntermediateDirectRefundTimelock applies equality check predicate on the "intermediate_direct_refund_timelock" field. It's identical to IntermediateDirectRefundTimelockEQ.
+func IntermediateDirectRefundTimelock(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateDirectRefundTimelock, v))
+}
+
+// IntermediateDirectFromCpfpRefundTimelock applies equality check predicate on the "intermediate_direct_from_cpfp_refund_timelock" field. It's identical to IntermediateDirectFromCpfpRefundTimelockEQ.
+func IntermediateDirectFromCpfpRefundTimelock(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateDirectFromCpfpRefundTimelock, v))
+}
+
 // KeyTweak applies equality check predicate on the "key_tweak" field. It's identical to KeyTweakEQ.
 func KeyTweak(v []byte) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldKeyTweak, v))
@@ -744,6 +759,156 @@ func IntermediateDirectFromCpfpRefundTxidIsNil() predicate.TransferLeaf {
 // IntermediateDirectFromCpfpRefundTxidNotNil applies the NotNil predicate on the "intermediate_direct_from_cpfp_refund_txid" field.
 func IntermediateDirectFromCpfpRefundTxidNotNil() predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldNotNull(FieldIntermediateDirectFromCpfpRefundTxid))
+}
+
+// IntermediateRefundTimelockEQ applies the EQ predicate on the "intermediate_refund_timelock" field.
+func IntermediateRefundTimelockEQ(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateRefundTimelock, v))
+}
+
+// IntermediateRefundTimelockNEQ applies the NEQ predicate on the "intermediate_refund_timelock" field.
+func IntermediateRefundTimelockNEQ(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNEQ(FieldIntermediateRefundTimelock, v))
+}
+
+// IntermediateRefundTimelockIn applies the In predicate on the "intermediate_refund_timelock" field.
+func IntermediateRefundTimelockIn(vs ...uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIn(FieldIntermediateRefundTimelock, vs...))
+}
+
+// IntermediateRefundTimelockNotIn applies the NotIn predicate on the "intermediate_refund_timelock" field.
+func IntermediateRefundTimelockNotIn(vs ...uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotIn(FieldIntermediateRefundTimelock, vs...))
+}
+
+// IntermediateRefundTimelockGT applies the GT predicate on the "intermediate_refund_timelock" field.
+func IntermediateRefundTimelockGT(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldGT(FieldIntermediateRefundTimelock, v))
+}
+
+// IntermediateRefundTimelockGTE applies the GTE predicate on the "intermediate_refund_timelock" field.
+func IntermediateRefundTimelockGTE(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldGTE(FieldIntermediateRefundTimelock, v))
+}
+
+// IntermediateRefundTimelockLT applies the LT predicate on the "intermediate_refund_timelock" field.
+func IntermediateRefundTimelockLT(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldLT(FieldIntermediateRefundTimelock, v))
+}
+
+// IntermediateRefundTimelockLTE applies the LTE predicate on the "intermediate_refund_timelock" field.
+func IntermediateRefundTimelockLTE(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldLTE(FieldIntermediateRefundTimelock, v))
+}
+
+// IntermediateRefundTimelockIsNil applies the IsNil predicate on the "intermediate_refund_timelock" field.
+func IntermediateRefundTimelockIsNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIsNull(FieldIntermediateRefundTimelock))
+}
+
+// IntermediateRefundTimelockNotNil applies the NotNil predicate on the "intermediate_refund_timelock" field.
+func IntermediateRefundTimelockNotNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotNull(FieldIntermediateRefundTimelock))
+}
+
+// IntermediateDirectRefundTimelockEQ applies the EQ predicate on the "intermediate_direct_refund_timelock" field.
+func IntermediateDirectRefundTimelockEQ(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateDirectRefundTimelock, v))
+}
+
+// IntermediateDirectRefundTimelockNEQ applies the NEQ predicate on the "intermediate_direct_refund_timelock" field.
+func IntermediateDirectRefundTimelockNEQ(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNEQ(FieldIntermediateDirectRefundTimelock, v))
+}
+
+// IntermediateDirectRefundTimelockIn applies the In predicate on the "intermediate_direct_refund_timelock" field.
+func IntermediateDirectRefundTimelockIn(vs ...uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIn(FieldIntermediateDirectRefundTimelock, vs...))
+}
+
+// IntermediateDirectRefundTimelockNotIn applies the NotIn predicate on the "intermediate_direct_refund_timelock" field.
+func IntermediateDirectRefundTimelockNotIn(vs ...uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotIn(FieldIntermediateDirectRefundTimelock, vs...))
+}
+
+// IntermediateDirectRefundTimelockGT applies the GT predicate on the "intermediate_direct_refund_timelock" field.
+func IntermediateDirectRefundTimelockGT(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldGT(FieldIntermediateDirectRefundTimelock, v))
+}
+
+// IntermediateDirectRefundTimelockGTE applies the GTE predicate on the "intermediate_direct_refund_timelock" field.
+func IntermediateDirectRefundTimelockGTE(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldGTE(FieldIntermediateDirectRefundTimelock, v))
+}
+
+// IntermediateDirectRefundTimelockLT applies the LT predicate on the "intermediate_direct_refund_timelock" field.
+func IntermediateDirectRefundTimelockLT(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldLT(FieldIntermediateDirectRefundTimelock, v))
+}
+
+// IntermediateDirectRefundTimelockLTE applies the LTE predicate on the "intermediate_direct_refund_timelock" field.
+func IntermediateDirectRefundTimelockLTE(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldLTE(FieldIntermediateDirectRefundTimelock, v))
+}
+
+// IntermediateDirectRefundTimelockIsNil applies the IsNil predicate on the "intermediate_direct_refund_timelock" field.
+func IntermediateDirectRefundTimelockIsNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIsNull(FieldIntermediateDirectRefundTimelock))
+}
+
+// IntermediateDirectRefundTimelockNotNil applies the NotNil predicate on the "intermediate_direct_refund_timelock" field.
+func IntermediateDirectRefundTimelockNotNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotNull(FieldIntermediateDirectRefundTimelock))
+}
+
+// IntermediateDirectFromCpfpRefundTimelockEQ applies the EQ predicate on the "intermediate_direct_from_cpfp_refund_timelock" field.
+func IntermediateDirectFromCpfpRefundTimelockEQ(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateDirectFromCpfpRefundTimelock, v))
+}
+
+// IntermediateDirectFromCpfpRefundTimelockNEQ applies the NEQ predicate on the "intermediate_direct_from_cpfp_refund_timelock" field.
+func IntermediateDirectFromCpfpRefundTimelockNEQ(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNEQ(FieldIntermediateDirectFromCpfpRefundTimelock, v))
+}
+
+// IntermediateDirectFromCpfpRefundTimelockIn applies the In predicate on the "intermediate_direct_from_cpfp_refund_timelock" field.
+func IntermediateDirectFromCpfpRefundTimelockIn(vs ...uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIn(FieldIntermediateDirectFromCpfpRefundTimelock, vs...))
+}
+
+// IntermediateDirectFromCpfpRefundTimelockNotIn applies the NotIn predicate on the "intermediate_direct_from_cpfp_refund_timelock" field.
+func IntermediateDirectFromCpfpRefundTimelockNotIn(vs ...uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotIn(FieldIntermediateDirectFromCpfpRefundTimelock, vs...))
+}
+
+// IntermediateDirectFromCpfpRefundTimelockGT applies the GT predicate on the "intermediate_direct_from_cpfp_refund_timelock" field.
+func IntermediateDirectFromCpfpRefundTimelockGT(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldGT(FieldIntermediateDirectFromCpfpRefundTimelock, v))
+}
+
+// IntermediateDirectFromCpfpRefundTimelockGTE applies the GTE predicate on the "intermediate_direct_from_cpfp_refund_timelock" field.
+func IntermediateDirectFromCpfpRefundTimelockGTE(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldGTE(FieldIntermediateDirectFromCpfpRefundTimelock, v))
+}
+
+// IntermediateDirectFromCpfpRefundTimelockLT applies the LT predicate on the "intermediate_direct_from_cpfp_refund_timelock" field.
+func IntermediateDirectFromCpfpRefundTimelockLT(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldLT(FieldIntermediateDirectFromCpfpRefundTimelock, v))
+}
+
+// IntermediateDirectFromCpfpRefundTimelockLTE applies the LTE predicate on the "intermediate_direct_from_cpfp_refund_timelock" field.
+func IntermediateDirectFromCpfpRefundTimelockLTE(v uint64) predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldLTE(FieldIntermediateDirectFromCpfpRefundTimelock, v))
+}
+
+// IntermediateDirectFromCpfpRefundTimelockIsNil applies the IsNil predicate on the "intermediate_direct_from_cpfp_refund_timelock" field.
+func IntermediateDirectFromCpfpRefundTimelockIsNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldIsNull(FieldIntermediateDirectFromCpfpRefundTimelock))
+}
+
+// IntermediateDirectFromCpfpRefundTimelockNotNil applies the NotNil predicate on the "intermediate_direct_from_cpfp_refund_timelock" field.
+func IntermediateDirectFromCpfpRefundTimelockNotNil() predicate.TransferLeaf {
+	return predicate.TransferLeaf(sql.FieldNotNull(FieldIntermediateDirectFromCpfpRefundTimelock))
 }
 
 // KeyTweakEQ applies the EQ predicate on the "key_tweak" field.

@@ -128,6 +128,87 @@ func (tlu *TransferLeafUpdate) ClearIntermediateDirectFromCpfpRefundTxid() *Tran
 	return tlu
 }
 
+// SetIntermediateRefundTimelock sets the "intermediate_refund_timelock" field.
+func (tlu *TransferLeafUpdate) SetIntermediateRefundTimelock(u uint64) *TransferLeafUpdate {
+	tlu.mutation.ResetIntermediateRefundTimelock()
+	tlu.mutation.SetIntermediateRefundTimelock(u)
+	return tlu
+}
+
+// SetNillableIntermediateRefundTimelock sets the "intermediate_refund_timelock" field if the given value is not nil.
+func (tlu *TransferLeafUpdate) SetNillableIntermediateRefundTimelock(u *uint64) *TransferLeafUpdate {
+	if u != nil {
+		tlu.SetIntermediateRefundTimelock(*u)
+	}
+	return tlu
+}
+
+// AddIntermediateRefundTimelock adds u to the "intermediate_refund_timelock" field.
+func (tlu *TransferLeafUpdate) AddIntermediateRefundTimelock(u int64) *TransferLeafUpdate {
+	tlu.mutation.AddIntermediateRefundTimelock(u)
+	return tlu
+}
+
+// ClearIntermediateRefundTimelock clears the value of the "intermediate_refund_timelock" field.
+func (tlu *TransferLeafUpdate) ClearIntermediateRefundTimelock() *TransferLeafUpdate {
+	tlu.mutation.ClearIntermediateRefundTimelock()
+	return tlu
+}
+
+// SetIntermediateDirectRefundTimelock sets the "intermediate_direct_refund_timelock" field.
+func (tlu *TransferLeafUpdate) SetIntermediateDirectRefundTimelock(u uint64) *TransferLeafUpdate {
+	tlu.mutation.ResetIntermediateDirectRefundTimelock()
+	tlu.mutation.SetIntermediateDirectRefundTimelock(u)
+	return tlu
+}
+
+// SetNillableIntermediateDirectRefundTimelock sets the "intermediate_direct_refund_timelock" field if the given value is not nil.
+func (tlu *TransferLeafUpdate) SetNillableIntermediateDirectRefundTimelock(u *uint64) *TransferLeafUpdate {
+	if u != nil {
+		tlu.SetIntermediateDirectRefundTimelock(*u)
+	}
+	return tlu
+}
+
+// AddIntermediateDirectRefundTimelock adds u to the "intermediate_direct_refund_timelock" field.
+func (tlu *TransferLeafUpdate) AddIntermediateDirectRefundTimelock(u int64) *TransferLeafUpdate {
+	tlu.mutation.AddIntermediateDirectRefundTimelock(u)
+	return tlu
+}
+
+// ClearIntermediateDirectRefundTimelock clears the value of the "intermediate_direct_refund_timelock" field.
+func (tlu *TransferLeafUpdate) ClearIntermediateDirectRefundTimelock() *TransferLeafUpdate {
+	tlu.mutation.ClearIntermediateDirectRefundTimelock()
+	return tlu
+}
+
+// SetIntermediateDirectFromCpfpRefundTimelock sets the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (tlu *TransferLeafUpdate) SetIntermediateDirectFromCpfpRefundTimelock(u uint64) *TransferLeafUpdate {
+	tlu.mutation.ResetIntermediateDirectFromCpfpRefundTimelock()
+	tlu.mutation.SetIntermediateDirectFromCpfpRefundTimelock(u)
+	return tlu
+}
+
+// SetNillableIntermediateDirectFromCpfpRefundTimelock sets the "intermediate_direct_from_cpfp_refund_timelock" field if the given value is not nil.
+func (tlu *TransferLeafUpdate) SetNillableIntermediateDirectFromCpfpRefundTimelock(u *uint64) *TransferLeafUpdate {
+	if u != nil {
+		tlu.SetIntermediateDirectFromCpfpRefundTimelock(*u)
+	}
+	return tlu
+}
+
+// AddIntermediateDirectFromCpfpRefundTimelock adds u to the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (tlu *TransferLeafUpdate) AddIntermediateDirectFromCpfpRefundTimelock(u int64) *TransferLeafUpdate {
+	tlu.mutation.AddIntermediateDirectFromCpfpRefundTimelock(u)
+	return tlu
+}
+
+// ClearIntermediateDirectFromCpfpRefundTimelock clears the value of the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (tlu *TransferLeafUpdate) ClearIntermediateDirectFromCpfpRefundTimelock() *TransferLeafUpdate {
+	tlu.mutation.ClearIntermediateDirectFromCpfpRefundTimelock()
+	return tlu
+}
+
 // SetKeyTweak sets the "key_tweak" field.
 func (tlu *TransferLeafUpdate) SetKeyTweak(b []byte) *TransferLeafUpdate {
 	tlu.mutation.SetKeyTweak(b)
@@ -333,6 +414,33 @@ func (tlu *TransferLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if tlu.mutation.IntermediateDirectFromCpfpRefundTxidCleared() {
 		_spec.ClearField(transferleaf.FieldIntermediateDirectFromCpfpRefundTxid, field.TypeBytes)
 	}
+	if value, ok := tlu.mutation.IntermediateRefundTimelock(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateRefundTimelock, field.TypeUint64, value)
+	}
+	if value, ok := tlu.mutation.AddedIntermediateRefundTimelock(); ok {
+		_spec.AddField(transferleaf.FieldIntermediateRefundTimelock, field.TypeUint64, value)
+	}
+	if tlu.mutation.IntermediateRefundTimelockCleared() {
+		_spec.ClearField(transferleaf.FieldIntermediateRefundTimelock, field.TypeUint64)
+	}
+	if value, ok := tlu.mutation.IntermediateDirectRefundTimelock(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateDirectRefundTimelock, field.TypeUint64, value)
+	}
+	if value, ok := tlu.mutation.AddedIntermediateDirectRefundTimelock(); ok {
+		_spec.AddField(transferleaf.FieldIntermediateDirectRefundTimelock, field.TypeUint64, value)
+	}
+	if tlu.mutation.IntermediateDirectRefundTimelockCleared() {
+		_spec.ClearField(transferleaf.FieldIntermediateDirectRefundTimelock, field.TypeUint64)
+	}
+	if value, ok := tlu.mutation.IntermediateDirectFromCpfpRefundTimelock(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock, field.TypeUint64, value)
+	}
+	if value, ok := tlu.mutation.AddedIntermediateDirectFromCpfpRefundTimelock(); ok {
+		_spec.AddField(transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock, field.TypeUint64, value)
+	}
+	if tlu.mutation.IntermediateDirectFromCpfpRefundTimelockCleared() {
+		_spec.ClearField(transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock, field.TypeUint64)
+	}
 	if value, ok := tlu.mutation.KeyTweak(); ok {
 		_spec.SetField(transferleaf.FieldKeyTweak, field.TypeBytes, value)
 	}
@@ -524,6 +632,87 @@ func (tluo *TransferLeafUpdateOne) SetIntermediateDirectFromCpfpRefundTxid(b []b
 // ClearIntermediateDirectFromCpfpRefundTxid clears the value of the "intermediate_direct_from_cpfp_refund_txid" field.
 func (tluo *TransferLeafUpdateOne) ClearIntermediateDirectFromCpfpRefundTxid() *TransferLeafUpdateOne {
 	tluo.mutation.ClearIntermediateDirectFromCpfpRefundTxid()
+	return tluo
+}
+
+// SetIntermediateRefundTimelock sets the "intermediate_refund_timelock" field.
+func (tluo *TransferLeafUpdateOne) SetIntermediateRefundTimelock(u uint64) *TransferLeafUpdateOne {
+	tluo.mutation.ResetIntermediateRefundTimelock()
+	tluo.mutation.SetIntermediateRefundTimelock(u)
+	return tluo
+}
+
+// SetNillableIntermediateRefundTimelock sets the "intermediate_refund_timelock" field if the given value is not nil.
+func (tluo *TransferLeafUpdateOne) SetNillableIntermediateRefundTimelock(u *uint64) *TransferLeafUpdateOne {
+	if u != nil {
+		tluo.SetIntermediateRefundTimelock(*u)
+	}
+	return tluo
+}
+
+// AddIntermediateRefundTimelock adds u to the "intermediate_refund_timelock" field.
+func (tluo *TransferLeafUpdateOne) AddIntermediateRefundTimelock(u int64) *TransferLeafUpdateOne {
+	tluo.mutation.AddIntermediateRefundTimelock(u)
+	return tluo
+}
+
+// ClearIntermediateRefundTimelock clears the value of the "intermediate_refund_timelock" field.
+func (tluo *TransferLeafUpdateOne) ClearIntermediateRefundTimelock() *TransferLeafUpdateOne {
+	tluo.mutation.ClearIntermediateRefundTimelock()
+	return tluo
+}
+
+// SetIntermediateDirectRefundTimelock sets the "intermediate_direct_refund_timelock" field.
+func (tluo *TransferLeafUpdateOne) SetIntermediateDirectRefundTimelock(u uint64) *TransferLeafUpdateOne {
+	tluo.mutation.ResetIntermediateDirectRefundTimelock()
+	tluo.mutation.SetIntermediateDirectRefundTimelock(u)
+	return tluo
+}
+
+// SetNillableIntermediateDirectRefundTimelock sets the "intermediate_direct_refund_timelock" field if the given value is not nil.
+func (tluo *TransferLeafUpdateOne) SetNillableIntermediateDirectRefundTimelock(u *uint64) *TransferLeafUpdateOne {
+	if u != nil {
+		tluo.SetIntermediateDirectRefundTimelock(*u)
+	}
+	return tluo
+}
+
+// AddIntermediateDirectRefundTimelock adds u to the "intermediate_direct_refund_timelock" field.
+func (tluo *TransferLeafUpdateOne) AddIntermediateDirectRefundTimelock(u int64) *TransferLeafUpdateOne {
+	tluo.mutation.AddIntermediateDirectRefundTimelock(u)
+	return tluo
+}
+
+// ClearIntermediateDirectRefundTimelock clears the value of the "intermediate_direct_refund_timelock" field.
+func (tluo *TransferLeafUpdateOne) ClearIntermediateDirectRefundTimelock() *TransferLeafUpdateOne {
+	tluo.mutation.ClearIntermediateDirectRefundTimelock()
+	return tluo
+}
+
+// SetIntermediateDirectFromCpfpRefundTimelock sets the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (tluo *TransferLeafUpdateOne) SetIntermediateDirectFromCpfpRefundTimelock(u uint64) *TransferLeafUpdateOne {
+	tluo.mutation.ResetIntermediateDirectFromCpfpRefundTimelock()
+	tluo.mutation.SetIntermediateDirectFromCpfpRefundTimelock(u)
+	return tluo
+}
+
+// SetNillableIntermediateDirectFromCpfpRefundTimelock sets the "intermediate_direct_from_cpfp_refund_timelock" field if the given value is not nil.
+func (tluo *TransferLeafUpdateOne) SetNillableIntermediateDirectFromCpfpRefundTimelock(u *uint64) *TransferLeafUpdateOne {
+	if u != nil {
+		tluo.SetIntermediateDirectFromCpfpRefundTimelock(*u)
+	}
+	return tluo
+}
+
+// AddIntermediateDirectFromCpfpRefundTimelock adds u to the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (tluo *TransferLeafUpdateOne) AddIntermediateDirectFromCpfpRefundTimelock(u int64) *TransferLeafUpdateOne {
+	tluo.mutation.AddIntermediateDirectFromCpfpRefundTimelock(u)
+	return tluo
+}
+
+// ClearIntermediateDirectFromCpfpRefundTimelock clears the value of the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (tluo *TransferLeafUpdateOne) ClearIntermediateDirectFromCpfpRefundTimelock() *TransferLeafUpdateOne {
+	tluo.mutation.ClearIntermediateDirectFromCpfpRefundTimelock()
 	return tluo
 }
 
@@ -761,6 +950,33 @@ func (tluo *TransferLeafUpdateOne) sqlSave(ctx context.Context) (_node *Transfer
 	}
 	if tluo.mutation.IntermediateDirectFromCpfpRefundTxidCleared() {
 		_spec.ClearField(transferleaf.FieldIntermediateDirectFromCpfpRefundTxid, field.TypeBytes)
+	}
+	if value, ok := tluo.mutation.IntermediateRefundTimelock(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateRefundTimelock, field.TypeUint64, value)
+	}
+	if value, ok := tluo.mutation.AddedIntermediateRefundTimelock(); ok {
+		_spec.AddField(transferleaf.FieldIntermediateRefundTimelock, field.TypeUint64, value)
+	}
+	if tluo.mutation.IntermediateRefundTimelockCleared() {
+		_spec.ClearField(transferleaf.FieldIntermediateRefundTimelock, field.TypeUint64)
+	}
+	if value, ok := tluo.mutation.IntermediateDirectRefundTimelock(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateDirectRefundTimelock, field.TypeUint64, value)
+	}
+	if value, ok := tluo.mutation.AddedIntermediateDirectRefundTimelock(); ok {
+		_spec.AddField(transferleaf.FieldIntermediateDirectRefundTimelock, field.TypeUint64, value)
+	}
+	if tluo.mutation.IntermediateDirectRefundTimelockCleared() {
+		_spec.ClearField(transferleaf.FieldIntermediateDirectRefundTimelock, field.TypeUint64)
+	}
+	if value, ok := tluo.mutation.IntermediateDirectFromCpfpRefundTimelock(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock, field.TypeUint64, value)
+	}
+	if value, ok := tluo.mutation.AddedIntermediateDirectFromCpfpRefundTimelock(); ok {
+		_spec.AddField(transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock, field.TypeUint64, value)
+	}
+	if tluo.mutation.IntermediateDirectFromCpfpRefundTimelockCleared() {
+		_spec.ClearField(transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock, field.TypeUint64)
 	}
 	if value, ok := tluo.mutation.KeyTweak(); ok {
 		_spec.SetField(transferleaf.FieldKeyTweak, field.TypeBytes, value)

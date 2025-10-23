@@ -42,6 +42,12 @@ const (
 	FieldIntermediateDirectRefundTxid = "intermediate_direct_refund_txid"
 	// FieldIntermediateDirectFromCpfpRefundTxid holds the string denoting the intermediate_direct_from_cpfp_refund_txid field in the database.
 	FieldIntermediateDirectFromCpfpRefundTxid = "intermediate_direct_from_cpfp_refund_txid"
+	// FieldIntermediateRefundTimelock holds the string denoting the intermediate_refund_timelock field in the database.
+	FieldIntermediateRefundTimelock = "intermediate_refund_timelock"
+	// FieldIntermediateDirectRefundTimelock holds the string denoting the intermediate_direct_refund_timelock field in the database.
+	FieldIntermediateDirectRefundTimelock = "intermediate_direct_refund_timelock"
+	// FieldIntermediateDirectFromCpfpRefundTimelock holds the string denoting the intermediate_direct_from_cpfp_refund_timelock field in the database.
+	FieldIntermediateDirectFromCpfpRefundTimelock = "intermediate_direct_from_cpfp_refund_timelock"
 	// FieldKeyTweak holds the string denoting the key_tweak field in the database.
 	FieldKeyTweak = "key_tweak"
 	// FieldSenderKeyTweakProof holds the string denoting the sender_key_tweak_proof field in the database.
@@ -86,6 +92,9 @@ var Columns = []string{
 	FieldIntermediateRefundTxid,
 	FieldIntermediateDirectRefundTxid,
 	FieldIntermediateDirectFromCpfpRefundTxid,
+	FieldIntermediateRefundTimelock,
+	FieldIntermediateDirectRefundTimelock,
+	FieldIntermediateDirectFromCpfpRefundTimelock,
 	FieldKeyTweak,
 	FieldSenderKeyTweakProof,
 	FieldReceiverKeyTweak,
@@ -150,6 +159,21 @@ func ByCreateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdateTime orders the results by the update_time field.
 func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdateTime, opts...).ToFunc()
+}
+
+// ByIntermediateRefundTimelock orders the results by the intermediate_refund_timelock field.
+func ByIntermediateRefundTimelock(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIntermediateRefundTimelock, opts...).ToFunc()
+}
+
+// ByIntermediateDirectRefundTimelock orders the results by the intermediate_direct_refund_timelock field.
+func ByIntermediateDirectRefundTimelock(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIntermediateDirectRefundTimelock, opts...).ToFunc()
+}
+
+// ByIntermediateDirectFromCpfpRefundTimelock orders the results by the intermediate_direct_from_cpfp_refund_timelock field.
+func ByIntermediateDirectFromCpfpRefundTimelock(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIntermediateDirectFromCpfpRefundTimelock, opts...).ToFunc()
 }
 
 // ByTransferField orders the results by transfer field.

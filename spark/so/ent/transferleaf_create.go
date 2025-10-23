@@ -120,6 +120,48 @@ func (tlc *TransferLeafCreate) SetIntermediateDirectFromCpfpRefundTxid(b []byte)
 	return tlc
 }
 
+// SetIntermediateRefundTimelock sets the "intermediate_refund_timelock" field.
+func (tlc *TransferLeafCreate) SetIntermediateRefundTimelock(u uint64) *TransferLeafCreate {
+	tlc.mutation.SetIntermediateRefundTimelock(u)
+	return tlc
+}
+
+// SetNillableIntermediateRefundTimelock sets the "intermediate_refund_timelock" field if the given value is not nil.
+func (tlc *TransferLeafCreate) SetNillableIntermediateRefundTimelock(u *uint64) *TransferLeafCreate {
+	if u != nil {
+		tlc.SetIntermediateRefundTimelock(*u)
+	}
+	return tlc
+}
+
+// SetIntermediateDirectRefundTimelock sets the "intermediate_direct_refund_timelock" field.
+func (tlc *TransferLeafCreate) SetIntermediateDirectRefundTimelock(u uint64) *TransferLeafCreate {
+	tlc.mutation.SetIntermediateDirectRefundTimelock(u)
+	return tlc
+}
+
+// SetNillableIntermediateDirectRefundTimelock sets the "intermediate_direct_refund_timelock" field if the given value is not nil.
+func (tlc *TransferLeafCreate) SetNillableIntermediateDirectRefundTimelock(u *uint64) *TransferLeafCreate {
+	if u != nil {
+		tlc.SetIntermediateDirectRefundTimelock(*u)
+	}
+	return tlc
+}
+
+// SetIntermediateDirectFromCpfpRefundTimelock sets the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (tlc *TransferLeafCreate) SetIntermediateDirectFromCpfpRefundTimelock(u uint64) *TransferLeafCreate {
+	tlc.mutation.SetIntermediateDirectFromCpfpRefundTimelock(u)
+	return tlc
+}
+
+// SetNillableIntermediateDirectFromCpfpRefundTimelock sets the "intermediate_direct_from_cpfp_refund_timelock" field if the given value is not nil.
+func (tlc *TransferLeafCreate) SetNillableIntermediateDirectFromCpfpRefundTimelock(u *uint64) *TransferLeafCreate {
+	if u != nil {
+		tlc.SetIntermediateDirectFromCpfpRefundTimelock(*u)
+	}
+	return tlc
+}
+
 // SetKeyTweak sets the "key_tweak" field.
 func (tlc *TransferLeafCreate) SetKeyTweak(b []byte) *TransferLeafCreate {
 	tlc.mutation.SetKeyTweak(b)
@@ -352,6 +394,18 @@ func (tlc *TransferLeafCreate) createSpec() (*TransferLeaf, *sqlgraph.CreateSpec
 	if value, ok := tlc.mutation.IntermediateDirectFromCpfpRefundTxid(); ok {
 		_spec.SetField(transferleaf.FieldIntermediateDirectFromCpfpRefundTxid, field.TypeBytes, value)
 		_node.IntermediateDirectFromCpfpRefundTxid = value
+	}
+	if value, ok := tlc.mutation.IntermediateRefundTimelock(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateRefundTimelock, field.TypeUint64, value)
+		_node.IntermediateRefundTimelock = value
+	}
+	if value, ok := tlc.mutation.IntermediateDirectRefundTimelock(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateDirectRefundTimelock, field.TypeUint64, value)
+		_node.IntermediateDirectRefundTimelock = value
+	}
+	if value, ok := tlc.mutation.IntermediateDirectFromCpfpRefundTimelock(); ok {
+		_spec.SetField(transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock, field.TypeUint64, value)
+		_node.IntermediateDirectFromCpfpRefundTimelock = value
 	}
 	if value, ok := tlc.mutation.KeyTweak(); ok {
 		_spec.SetField(transferleaf.FieldKeyTweak, field.TypeBytes, value)
@@ -598,6 +652,78 @@ func (u *TransferLeafUpsert) UpdateIntermediateDirectFromCpfpRefundTxid() *Trans
 // ClearIntermediateDirectFromCpfpRefundTxid clears the value of the "intermediate_direct_from_cpfp_refund_txid" field.
 func (u *TransferLeafUpsert) ClearIntermediateDirectFromCpfpRefundTxid() *TransferLeafUpsert {
 	u.SetNull(transferleaf.FieldIntermediateDirectFromCpfpRefundTxid)
+	return u
+}
+
+// SetIntermediateRefundTimelock sets the "intermediate_refund_timelock" field.
+func (u *TransferLeafUpsert) SetIntermediateRefundTimelock(v uint64) *TransferLeafUpsert {
+	u.Set(transferleaf.FieldIntermediateRefundTimelock, v)
+	return u
+}
+
+// UpdateIntermediateRefundTimelock sets the "intermediate_refund_timelock" field to the value that was provided on create.
+func (u *TransferLeafUpsert) UpdateIntermediateRefundTimelock() *TransferLeafUpsert {
+	u.SetExcluded(transferleaf.FieldIntermediateRefundTimelock)
+	return u
+}
+
+// AddIntermediateRefundTimelock adds v to the "intermediate_refund_timelock" field.
+func (u *TransferLeafUpsert) AddIntermediateRefundTimelock(v uint64) *TransferLeafUpsert {
+	u.Add(transferleaf.FieldIntermediateRefundTimelock, v)
+	return u
+}
+
+// ClearIntermediateRefundTimelock clears the value of the "intermediate_refund_timelock" field.
+func (u *TransferLeafUpsert) ClearIntermediateRefundTimelock() *TransferLeafUpsert {
+	u.SetNull(transferleaf.FieldIntermediateRefundTimelock)
+	return u
+}
+
+// SetIntermediateDirectRefundTimelock sets the "intermediate_direct_refund_timelock" field.
+func (u *TransferLeafUpsert) SetIntermediateDirectRefundTimelock(v uint64) *TransferLeafUpsert {
+	u.Set(transferleaf.FieldIntermediateDirectRefundTimelock, v)
+	return u
+}
+
+// UpdateIntermediateDirectRefundTimelock sets the "intermediate_direct_refund_timelock" field to the value that was provided on create.
+func (u *TransferLeafUpsert) UpdateIntermediateDirectRefundTimelock() *TransferLeafUpsert {
+	u.SetExcluded(transferleaf.FieldIntermediateDirectRefundTimelock)
+	return u
+}
+
+// AddIntermediateDirectRefundTimelock adds v to the "intermediate_direct_refund_timelock" field.
+func (u *TransferLeafUpsert) AddIntermediateDirectRefundTimelock(v uint64) *TransferLeafUpsert {
+	u.Add(transferleaf.FieldIntermediateDirectRefundTimelock, v)
+	return u
+}
+
+// ClearIntermediateDirectRefundTimelock clears the value of the "intermediate_direct_refund_timelock" field.
+func (u *TransferLeafUpsert) ClearIntermediateDirectRefundTimelock() *TransferLeafUpsert {
+	u.SetNull(transferleaf.FieldIntermediateDirectRefundTimelock)
+	return u
+}
+
+// SetIntermediateDirectFromCpfpRefundTimelock sets the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (u *TransferLeafUpsert) SetIntermediateDirectFromCpfpRefundTimelock(v uint64) *TransferLeafUpsert {
+	u.Set(transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock, v)
+	return u
+}
+
+// UpdateIntermediateDirectFromCpfpRefundTimelock sets the "intermediate_direct_from_cpfp_refund_timelock" field to the value that was provided on create.
+func (u *TransferLeafUpsert) UpdateIntermediateDirectFromCpfpRefundTimelock() *TransferLeafUpsert {
+	u.SetExcluded(transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock)
+	return u
+}
+
+// AddIntermediateDirectFromCpfpRefundTimelock adds v to the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (u *TransferLeafUpsert) AddIntermediateDirectFromCpfpRefundTimelock(v uint64) *TransferLeafUpsert {
+	u.Add(transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock, v)
+	return u
+}
+
+// ClearIntermediateDirectFromCpfpRefundTimelock clears the value of the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (u *TransferLeafUpsert) ClearIntermediateDirectFromCpfpRefundTimelock() *TransferLeafUpsert {
+	u.SetNull(transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock)
 	return u
 }
 
@@ -887,6 +1013,90 @@ func (u *TransferLeafUpsertOne) UpdateIntermediateDirectFromCpfpRefundTxid() *Tr
 func (u *TransferLeafUpsertOne) ClearIntermediateDirectFromCpfpRefundTxid() *TransferLeafUpsertOne {
 	return u.Update(func(s *TransferLeafUpsert) {
 		s.ClearIntermediateDirectFromCpfpRefundTxid()
+	})
+}
+
+// SetIntermediateRefundTimelock sets the "intermediate_refund_timelock" field.
+func (u *TransferLeafUpsertOne) SetIntermediateRefundTimelock(v uint64) *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetIntermediateRefundTimelock(v)
+	})
+}
+
+// AddIntermediateRefundTimelock adds v to the "intermediate_refund_timelock" field.
+func (u *TransferLeafUpsertOne) AddIntermediateRefundTimelock(v uint64) *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.AddIntermediateRefundTimelock(v)
+	})
+}
+
+// UpdateIntermediateRefundTimelock sets the "intermediate_refund_timelock" field to the value that was provided on create.
+func (u *TransferLeafUpsertOne) UpdateIntermediateRefundTimelock() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateIntermediateRefundTimelock()
+	})
+}
+
+// ClearIntermediateRefundTimelock clears the value of the "intermediate_refund_timelock" field.
+func (u *TransferLeafUpsertOne) ClearIntermediateRefundTimelock() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearIntermediateRefundTimelock()
+	})
+}
+
+// SetIntermediateDirectRefundTimelock sets the "intermediate_direct_refund_timelock" field.
+func (u *TransferLeafUpsertOne) SetIntermediateDirectRefundTimelock(v uint64) *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetIntermediateDirectRefundTimelock(v)
+	})
+}
+
+// AddIntermediateDirectRefundTimelock adds v to the "intermediate_direct_refund_timelock" field.
+func (u *TransferLeafUpsertOne) AddIntermediateDirectRefundTimelock(v uint64) *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.AddIntermediateDirectRefundTimelock(v)
+	})
+}
+
+// UpdateIntermediateDirectRefundTimelock sets the "intermediate_direct_refund_timelock" field to the value that was provided on create.
+func (u *TransferLeafUpsertOne) UpdateIntermediateDirectRefundTimelock() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateIntermediateDirectRefundTimelock()
+	})
+}
+
+// ClearIntermediateDirectRefundTimelock clears the value of the "intermediate_direct_refund_timelock" field.
+func (u *TransferLeafUpsertOne) ClearIntermediateDirectRefundTimelock() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearIntermediateDirectRefundTimelock()
+	})
+}
+
+// SetIntermediateDirectFromCpfpRefundTimelock sets the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (u *TransferLeafUpsertOne) SetIntermediateDirectFromCpfpRefundTimelock(v uint64) *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetIntermediateDirectFromCpfpRefundTimelock(v)
+	})
+}
+
+// AddIntermediateDirectFromCpfpRefundTimelock adds v to the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (u *TransferLeafUpsertOne) AddIntermediateDirectFromCpfpRefundTimelock(v uint64) *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.AddIntermediateDirectFromCpfpRefundTimelock(v)
+	})
+}
+
+// UpdateIntermediateDirectFromCpfpRefundTimelock sets the "intermediate_direct_from_cpfp_refund_timelock" field to the value that was provided on create.
+func (u *TransferLeafUpsertOne) UpdateIntermediateDirectFromCpfpRefundTimelock() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateIntermediateDirectFromCpfpRefundTimelock()
+	})
+}
+
+// ClearIntermediateDirectFromCpfpRefundTimelock clears the value of the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (u *TransferLeafUpsertOne) ClearIntermediateDirectFromCpfpRefundTimelock() *TransferLeafUpsertOne {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearIntermediateDirectFromCpfpRefundTimelock()
 	})
 }
 
@@ -1352,6 +1562,90 @@ func (u *TransferLeafUpsertBulk) UpdateIntermediateDirectFromCpfpRefundTxid() *T
 func (u *TransferLeafUpsertBulk) ClearIntermediateDirectFromCpfpRefundTxid() *TransferLeafUpsertBulk {
 	return u.Update(func(s *TransferLeafUpsert) {
 		s.ClearIntermediateDirectFromCpfpRefundTxid()
+	})
+}
+
+// SetIntermediateRefundTimelock sets the "intermediate_refund_timelock" field.
+func (u *TransferLeafUpsertBulk) SetIntermediateRefundTimelock(v uint64) *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetIntermediateRefundTimelock(v)
+	})
+}
+
+// AddIntermediateRefundTimelock adds v to the "intermediate_refund_timelock" field.
+func (u *TransferLeafUpsertBulk) AddIntermediateRefundTimelock(v uint64) *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.AddIntermediateRefundTimelock(v)
+	})
+}
+
+// UpdateIntermediateRefundTimelock sets the "intermediate_refund_timelock" field to the value that was provided on create.
+func (u *TransferLeafUpsertBulk) UpdateIntermediateRefundTimelock() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateIntermediateRefundTimelock()
+	})
+}
+
+// ClearIntermediateRefundTimelock clears the value of the "intermediate_refund_timelock" field.
+func (u *TransferLeafUpsertBulk) ClearIntermediateRefundTimelock() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearIntermediateRefundTimelock()
+	})
+}
+
+// SetIntermediateDirectRefundTimelock sets the "intermediate_direct_refund_timelock" field.
+func (u *TransferLeafUpsertBulk) SetIntermediateDirectRefundTimelock(v uint64) *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetIntermediateDirectRefundTimelock(v)
+	})
+}
+
+// AddIntermediateDirectRefundTimelock adds v to the "intermediate_direct_refund_timelock" field.
+func (u *TransferLeafUpsertBulk) AddIntermediateDirectRefundTimelock(v uint64) *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.AddIntermediateDirectRefundTimelock(v)
+	})
+}
+
+// UpdateIntermediateDirectRefundTimelock sets the "intermediate_direct_refund_timelock" field to the value that was provided on create.
+func (u *TransferLeafUpsertBulk) UpdateIntermediateDirectRefundTimelock() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateIntermediateDirectRefundTimelock()
+	})
+}
+
+// ClearIntermediateDirectRefundTimelock clears the value of the "intermediate_direct_refund_timelock" field.
+func (u *TransferLeafUpsertBulk) ClearIntermediateDirectRefundTimelock() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearIntermediateDirectRefundTimelock()
+	})
+}
+
+// SetIntermediateDirectFromCpfpRefundTimelock sets the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (u *TransferLeafUpsertBulk) SetIntermediateDirectFromCpfpRefundTimelock(v uint64) *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.SetIntermediateDirectFromCpfpRefundTimelock(v)
+	})
+}
+
+// AddIntermediateDirectFromCpfpRefundTimelock adds v to the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (u *TransferLeafUpsertBulk) AddIntermediateDirectFromCpfpRefundTimelock(v uint64) *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.AddIntermediateDirectFromCpfpRefundTimelock(v)
+	})
+}
+
+// UpdateIntermediateDirectFromCpfpRefundTimelock sets the "intermediate_direct_from_cpfp_refund_timelock" field to the value that was provided on create.
+func (u *TransferLeafUpsertBulk) UpdateIntermediateDirectFromCpfpRefundTimelock() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.UpdateIntermediateDirectFromCpfpRefundTimelock()
+	})
+}
+
+// ClearIntermediateDirectFromCpfpRefundTimelock clears the value of the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (u *TransferLeafUpsertBulk) ClearIntermediateDirectFromCpfpRefundTimelock() *TransferLeafUpsertBulk {
+	return u.Update(func(s *TransferLeafUpsert) {
+		s.ClearIntermediateDirectFromCpfpRefundTimelock()
 	})
 }
 

@@ -69,8 +69,10 @@ func makeP2TRSpendTx(prevOut wire.OutPoint, prevPkScript []byte, prevAmt int64, 
 }
 
 func createTestTxBytes(t *testing.T, value int64) []byte {
-	tx := wire.NewMsgTx(2)
-	tx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: chainhash.Hash{1}, Index: 0}, nil, nil))
+	tx := wire.NewMsgTx(3)
+	input := wire.NewTxIn(&wire.OutPoint{Hash: chainhash.Hash{1}, Index: 0}, nil, nil)
+	input.Sequence = 2000
+	tx.AddTxIn(input)
 	pkScript, err := txscript.NewScriptBuilder().AddOp(txscript.OP_TRUE).Script()
 	require.NoError(t, err)
 	tx.AddTxOut(wire.NewTxOut(value, pkScript))

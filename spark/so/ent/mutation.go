@@ -19244,33 +19244,39 @@ func (m *TransferMutation) ResetEdge(name string) error {
 // TransferLeafMutation represents an operation that mutates the TransferLeaf nodes in the graph.
 type TransferLeafMutation struct {
 	config
-	op                                        Op
-	typ                                       string
-	id                                        *uuid.UUID
-	create_time                               *time.Time
-	update_time                               *time.Time
-	secret_cipher                             *[]byte
-	signature                                 *[]byte
-	previous_refund_tx                        *[]byte
-	previous_direct_refund_tx                 *[]byte
-	previous_direct_from_cpfp_refund_tx       *[]byte
-	intermediate_refund_tx                    *[]byte
-	intermediate_direct_refund_tx             *[]byte
-	intermediate_direct_from_cpfp_refund_tx   *[]byte
-	intermediate_refund_txid                  *[]byte
-	intermediate_direct_refund_txid           *[]byte
-	intermediate_direct_from_cpfp_refund_txid *[]byte
-	key_tweak                                 *[]byte
-	sender_key_tweak_proof                    *[]byte
-	receiver_key_tweak                        *[]byte
-	clearedFields                             map[string]struct{}
-	transfer                                  *uuid.UUID
-	clearedtransfer                           bool
-	leaf                                      *uuid.UUID
-	clearedleaf                               bool
-	done                                      bool
-	oldValue                                  func(context.Context) (*TransferLeaf, error)
-	predicates                                []predicate.TransferLeaf
+	op                                               Op
+	typ                                              string
+	id                                               *uuid.UUID
+	create_time                                      *time.Time
+	update_time                                      *time.Time
+	secret_cipher                                    *[]byte
+	signature                                        *[]byte
+	previous_refund_tx                               *[]byte
+	previous_direct_refund_tx                        *[]byte
+	previous_direct_from_cpfp_refund_tx              *[]byte
+	intermediate_refund_tx                           *[]byte
+	intermediate_direct_refund_tx                    *[]byte
+	intermediate_direct_from_cpfp_refund_tx          *[]byte
+	intermediate_refund_txid                         *[]byte
+	intermediate_direct_refund_txid                  *[]byte
+	intermediate_direct_from_cpfp_refund_txid        *[]byte
+	intermediate_refund_timelock                     *uint64
+	addintermediate_refund_timelock                  *int64
+	intermediate_direct_refund_timelock              *uint64
+	addintermediate_direct_refund_timelock           *int64
+	intermediate_direct_from_cpfp_refund_timelock    *uint64
+	addintermediate_direct_from_cpfp_refund_timelock *int64
+	key_tweak                                        *[]byte
+	sender_key_tweak_proof                           *[]byte
+	receiver_key_tweak                               *[]byte
+	clearedFields                                    map[string]struct{}
+	transfer                                         *uuid.UUID
+	clearedtransfer                                  bool
+	leaf                                             *uuid.UUID
+	clearedleaf                                      bool
+	done                                             bool
+	oldValue                                         func(context.Context) (*TransferLeaf, error)
+	predicates                                       []predicate.TransferLeaf
 }
 
 var _ ent.Mutation = (*TransferLeafMutation)(nil)
@@ -19962,6 +19968,216 @@ func (m *TransferLeafMutation) ResetIntermediateDirectFromCpfpRefundTxid() {
 	delete(m.clearedFields, transferleaf.FieldIntermediateDirectFromCpfpRefundTxid)
 }
 
+// SetIntermediateRefundTimelock sets the "intermediate_refund_timelock" field.
+func (m *TransferLeafMutation) SetIntermediateRefundTimelock(u uint64) {
+	m.intermediate_refund_timelock = &u
+	m.addintermediate_refund_timelock = nil
+}
+
+// IntermediateRefundTimelock returns the value of the "intermediate_refund_timelock" field in the mutation.
+func (m *TransferLeafMutation) IntermediateRefundTimelock() (r uint64, exists bool) {
+	v := m.intermediate_refund_timelock
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIntermediateRefundTimelock returns the old "intermediate_refund_timelock" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldIntermediateRefundTimelock(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIntermediateRefundTimelock is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIntermediateRefundTimelock requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIntermediateRefundTimelock: %w", err)
+	}
+	return oldValue.IntermediateRefundTimelock, nil
+}
+
+// AddIntermediateRefundTimelock adds u to the "intermediate_refund_timelock" field.
+func (m *TransferLeafMutation) AddIntermediateRefundTimelock(u int64) {
+	if m.addintermediate_refund_timelock != nil {
+		*m.addintermediate_refund_timelock += u
+	} else {
+		m.addintermediate_refund_timelock = &u
+	}
+}
+
+// AddedIntermediateRefundTimelock returns the value that was added to the "intermediate_refund_timelock" field in this mutation.
+func (m *TransferLeafMutation) AddedIntermediateRefundTimelock() (r int64, exists bool) {
+	v := m.addintermediate_refund_timelock
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearIntermediateRefundTimelock clears the value of the "intermediate_refund_timelock" field.
+func (m *TransferLeafMutation) ClearIntermediateRefundTimelock() {
+	m.intermediate_refund_timelock = nil
+	m.addintermediate_refund_timelock = nil
+	m.clearedFields[transferleaf.FieldIntermediateRefundTimelock] = struct{}{}
+}
+
+// IntermediateRefundTimelockCleared returns if the "intermediate_refund_timelock" field was cleared in this mutation.
+func (m *TransferLeafMutation) IntermediateRefundTimelockCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldIntermediateRefundTimelock]
+	return ok
+}
+
+// ResetIntermediateRefundTimelock resets all changes to the "intermediate_refund_timelock" field.
+func (m *TransferLeafMutation) ResetIntermediateRefundTimelock() {
+	m.intermediate_refund_timelock = nil
+	m.addintermediate_refund_timelock = nil
+	delete(m.clearedFields, transferleaf.FieldIntermediateRefundTimelock)
+}
+
+// SetIntermediateDirectRefundTimelock sets the "intermediate_direct_refund_timelock" field.
+func (m *TransferLeafMutation) SetIntermediateDirectRefundTimelock(u uint64) {
+	m.intermediate_direct_refund_timelock = &u
+	m.addintermediate_direct_refund_timelock = nil
+}
+
+// IntermediateDirectRefundTimelock returns the value of the "intermediate_direct_refund_timelock" field in the mutation.
+func (m *TransferLeafMutation) IntermediateDirectRefundTimelock() (r uint64, exists bool) {
+	v := m.intermediate_direct_refund_timelock
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIntermediateDirectRefundTimelock returns the old "intermediate_direct_refund_timelock" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldIntermediateDirectRefundTimelock(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIntermediateDirectRefundTimelock is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIntermediateDirectRefundTimelock requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIntermediateDirectRefundTimelock: %w", err)
+	}
+	return oldValue.IntermediateDirectRefundTimelock, nil
+}
+
+// AddIntermediateDirectRefundTimelock adds u to the "intermediate_direct_refund_timelock" field.
+func (m *TransferLeafMutation) AddIntermediateDirectRefundTimelock(u int64) {
+	if m.addintermediate_direct_refund_timelock != nil {
+		*m.addintermediate_direct_refund_timelock += u
+	} else {
+		m.addintermediate_direct_refund_timelock = &u
+	}
+}
+
+// AddedIntermediateDirectRefundTimelock returns the value that was added to the "intermediate_direct_refund_timelock" field in this mutation.
+func (m *TransferLeafMutation) AddedIntermediateDirectRefundTimelock() (r int64, exists bool) {
+	v := m.addintermediate_direct_refund_timelock
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearIntermediateDirectRefundTimelock clears the value of the "intermediate_direct_refund_timelock" field.
+func (m *TransferLeafMutation) ClearIntermediateDirectRefundTimelock() {
+	m.intermediate_direct_refund_timelock = nil
+	m.addintermediate_direct_refund_timelock = nil
+	m.clearedFields[transferleaf.FieldIntermediateDirectRefundTimelock] = struct{}{}
+}
+
+// IntermediateDirectRefundTimelockCleared returns if the "intermediate_direct_refund_timelock" field was cleared in this mutation.
+func (m *TransferLeafMutation) IntermediateDirectRefundTimelockCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldIntermediateDirectRefundTimelock]
+	return ok
+}
+
+// ResetIntermediateDirectRefundTimelock resets all changes to the "intermediate_direct_refund_timelock" field.
+func (m *TransferLeafMutation) ResetIntermediateDirectRefundTimelock() {
+	m.intermediate_direct_refund_timelock = nil
+	m.addintermediate_direct_refund_timelock = nil
+	delete(m.clearedFields, transferleaf.FieldIntermediateDirectRefundTimelock)
+}
+
+// SetIntermediateDirectFromCpfpRefundTimelock sets the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (m *TransferLeafMutation) SetIntermediateDirectFromCpfpRefundTimelock(u uint64) {
+	m.intermediate_direct_from_cpfp_refund_timelock = &u
+	m.addintermediate_direct_from_cpfp_refund_timelock = nil
+}
+
+// IntermediateDirectFromCpfpRefundTimelock returns the value of the "intermediate_direct_from_cpfp_refund_timelock" field in the mutation.
+func (m *TransferLeafMutation) IntermediateDirectFromCpfpRefundTimelock() (r uint64, exists bool) {
+	v := m.intermediate_direct_from_cpfp_refund_timelock
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIntermediateDirectFromCpfpRefundTimelock returns the old "intermediate_direct_from_cpfp_refund_timelock" field's value of the TransferLeaf entity.
+// If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferLeafMutation) OldIntermediateDirectFromCpfpRefundTimelock(ctx context.Context) (v uint64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIntermediateDirectFromCpfpRefundTimelock is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIntermediateDirectFromCpfpRefundTimelock requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIntermediateDirectFromCpfpRefundTimelock: %w", err)
+	}
+	return oldValue.IntermediateDirectFromCpfpRefundTimelock, nil
+}
+
+// AddIntermediateDirectFromCpfpRefundTimelock adds u to the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (m *TransferLeafMutation) AddIntermediateDirectFromCpfpRefundTimelock(u int64) {
+	if m.addintermediate_direct_from_cpfp_refund_timelock != nil {
+		*m.addintermediate_direct_from_cpfp_refund_timelock += u
+	} else {
+		m.addintermediate_direct_from_cpfp_refund_timelock = &u
+	}
+}
+
+// AddedIntermediateDirectFromCpfpRefundTimelock returns the value that was added to the "intermediate_direct_from_cpfp_refund_timelock" field in this mutation.
+func (m *TransferLeafMutation) AddedIntermediateDirectFromCpfpRefundTimelock() (r int64, exists bool) {
+	v := m.addintermediate_direct_from_cpfp_refund_timelock
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearIntermediateDirectFromCpfpRefundTimelock clears the value of the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (m *TransferLeafMutation) ClearIntermediateDirectFromCpfpRefundTimelock() {
+	m.intermediate_direct_from_cpfp_refund_timelock = nil
+	m.addintermediate_direct_from_cpfp_refund_timelock = nil
+	m.clearedFields[transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock] = struct{}{}
+}
+
+// IntermediateDirectFromCpfpRefundTimelockCleared returns if the "intermediate_direct_from_cpfp_refund_timelock" field was cleared in this mutation.
+func (m *TransferLeafMutation) IntermediateDirectFromCpfpRefundTimelockCleared() bool {
+	_, ok := m.clearedFields[transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock]
+	return ok
+}
+
+// ResetIntermediateDirectFromCpfpRefundTimelock resets all changes to the "intermediate_direct_from_cpfp_refund_timelock" field.
+func (m *TransferLeafMutation) ResetIntermediateDirectFromCpfpRefundTimelock() {
+	m.intermediate_direct_from_cpfp_refund_timelock = nil
+	m.addintermediate_direct_from_cpfp_refund_timelock = nil
+	delete(m.clearedFields, transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock)
+}
+
 // SetKeyTweak sets the "key_tweak" field.
 func (m *TransferLeafMutation) SetKeyTweak(b []byte) {
 	m.key_tweak = &b
@@ -20221,7 +20437,7 @@ func (m *TransferLeafMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TransferLeafMutation) Fields() []string {
-	fields := make([]string, 0, 16)
+	fields := make([]string, 0, 19)
 	if m.create_time != nil {
 		fields = append(fields, transferleaf.FieldCreateTime)
 	}
@@ -20260,6 +20476,15 @@ func (m *TransferLeafMutation) Fields() []string {
 	}
 	if m.intermediate_direct_from_cpfp_refund_txid != nil {
 		fields = append(fields, transferleaf.FieldIntermediateDirectFromCpfpRefundTxid)
+	}
+	if m.intermediate_refund_timelock != nil {
+		fields = append(fields, transferleaf.FieldIntermediateRefundTimelock)
+	}
+	if m.intermediate_direct_refund_timelock != nil {
+		fields = append(fields, transferleaf.FieldIntermediateDirectRefundTimelock)
+	}
+	if m.intermediate_direct_from_cpfp_refund_timelock != nil {
+		fields = append(fields, transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock)
 	}
 	if m.key_tweak != nil {
 		fields = append(fields, transferleaf.FieldKeyTweak)
@@ -20304,6 +20529,12 @@ func (m *TransferLeafMutation) Field(name string) (ent.Value, bool) {
 		return m.IntermediateDirectRefundTxid()
 	case transferleaf.FieldIntermediateDirectFromCpfpRefundTxid:
 		return m.IntermediateDirectFromCpfpRefundTxid()
+	case transferleaf.FieldIntermediateRefundTimelock:
+		return m.IntermediateRefundTimelock()
+	case transferleaf.FieldIntermediateDirectRefundTimelock:
+		return m.IntermediateDirectRefundTimelock()
+	case transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock:
+		return m.IntermediateDirectFromCpfpRefundTimelock()
 	case transferleaf.FieldKeyTweak:
 		return m.KeyTweak()
 	case transferleaf.FieldSenderKeyTweakProof:
@@ -20345,6 +20576,12 @@ func (m *TransferLeafMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldIntermediateDirectRefundTxid(ctx)
 	case transferleaf.FieldIntermediateDirectFromCpfpRefundTxid:
 		return m.OldIntermediateDirectFromCpfpRefundTxid(ctx)
+	case transferleaf.FieldIntermediateRefundTimelock:
+		return m.OldIntermediateRefundTimelock(ctx)
+	case transferleaf.FieldIntermediateDirectRefundTimelock:
+		return m.OldIntermediateDirectRefundTimelock(ctx)
+	case transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock:
+		return m.OldIntermediateDirectFromCpfpRefundTimelock(ctx)
 	case transferleaf.FieldKeyTweak:
 		return m.OldKeyTweak(ctx)
 	case transferleaf.FieldSenderKeyTweakProof:
@@ -20451,6 +20688,27 @@ func (m *TransferLeafMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetIntermediateDirectFromCpfpRefundTxid(v)
 		return nil
+	case transferleaf.FieldIntermediateRefundTimelock:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIntermediateRefundTimelock(v)
+		return nil
+	case transferleaf.FieldIntermediateDirectRefundTimelock:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIntermediateDirectRefundTimelock(v)
+		return nil
+	case transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock:
+		v, ok := value.(uint64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIntermediateDirectFromCpfpRefundTimelock(v)
+		return nil
 	case transferleaf.FieldKeyTweak:
 		v, ok := value.([]byte)
 		if !ok {
@@ -20479,13 +20737,31 @@ func (m *TransferLeafMutation) SetField(name string, value ent.Value) error {
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
 func (m *TransferLeafMutation) AddedFields() []string {
-	return nil
+	var fields []string
+	if m.addintermediate_refund_timelock != nil {
+		fields = append(fields, transferleaf.FieldIntermediateRefundTimelock)
+	}
+	if m.addintermediate_direct_refund_timelock != nil {
+		fields = append(fields, transferleaf.FieldIntermediateDirectRefundTimelock)
+	}
+	if m.addintermediate_direct_from_cpfp_refund_timelock != nil {
+		fields = append(fields, transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock)
+	}
+	return fields
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
 func (m *TransferLeafMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case transferleaf.FieldIntermediateRefundTimelock:
+		return m.AddedIntermediateRefundTimelock()
+	case transferleaf.FieldIntermediateDirectRefundTimelock:
+		return m.AddedIntermediateDirectRefundTimelock()
+	case transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock:
+		return m.AddedIntermediateDirectFromCpfpRefundTimelock()
+	}
 	return nil, false
 }
 
@@ -20494,6 +20770,27 @@ func (m *TransferLeafMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *TransferLeafMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case transferleaf.FieldIntermediateRefundTimelock:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddIntermediateRefundTimelock(v)
+		return nil
+	case transferleaf.FieldIntermediateDirectRefundTimelock:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddIntermediateDirectRefundTimelock(v)
+		return nil
+	case transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddIntermediateDirectFromCpfpRefundTimelock(v)
+		return nil
 	}
 	return fmt.Errorf("unknown TransferLeaf numeric field %s", name)
 }
@@ -20528,6 +20825,15 @@ func (m *TransferLeafMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(transferleaf.FieldIntermediateDirectFromCpfpRefundTxid) {
 		fields = append(fields, transferleaf.FieldIntermediateDirectFromCpfpRefundTxid)
+	}
+	if m.FieldCleared(transferleaf.FieldIntermediateRefundTimelock) {
+		fields = append(fields, transferleaf.FieldIntermediateRefundTimelock)
+	}
+	if m.FieldCleared(transferleaf.FieldIntermediateDirectRefundTimelock) {
+		fields = append(fields, transferleaf.FieldIntermediateDirectRefundTimelock)
+	}
+	if m.FieldCleared(transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock) {
+		fields = append(fields, transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock)
 	}
 	if m.FieldCleared(transferleaf.FieldKeyTweak) {
 		fields = append(fields, transferleaf.FieldKeyTweak)
@@ -20578,6 +20884,15 @@ func (m *TransferLeafMutation) ClearField(name string) error {
 		return nil
 	case transferleaf.FieldIntermediateDirectFromCpfpRefundTxid:
 		m.ClearIntermediateDirectFromCpfpRefundTxid()
+		return nil
+	case transferleaf.FieldIntermediateRefundTimelock:
+		m.ClearIntermediateRefundTimelock()
+		return nil
+	case transferleaf.FieldIntermediateDirectRefundTimelock:
+		m.ClearIntermediateDirectRefundTimelock()
+		return nil
+	case transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock:
+		m.ClearIntermediateDirectFromCpfpRefundTimelock()
 		return nil
 	case transferleaf.FieldKeyTweak:
 		m.ClearKeyTweak()
@@ -20634,6 +20949,15 @@ func (m *TransferLeafMutation) ResetField(name string) error {
 		return nil
 	case transferleaf.FieldIntermediateDirectFromCpfpRefundTxid:
 		m.ResetIntermediateDirectFromCpfpRefundTxid()
+		return nil
+	case transferleaf.FieldIntermediateRefundTimelock:
+		m.ResetIntermediateRefundTimelock()
+		return nil
+	case transferleaf.FieldIntermediateDirectRefundTimelock:
+		m.ResetIntermediateDirectRefundTimelock()
+		return nil
+	case transferleaf.FieldIntermediateDirectFromCpfpRefundTimelock:
+		m.ResetIntermediateDirectFromCpfpRefundTimelock()
 		return nil
 	case transferleaf.FieldKeyTweak:
 		m.ResetKeyTweak()

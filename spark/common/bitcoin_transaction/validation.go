@@ -260,6 +260,14 @@ func GetTimelockFromSequence(sequence uint32) uint32 {
 	return sequence & 0xFFFF
 }
 
+func GetAndValidateUserTimelock(rawTxBytes []byte) (uint32, error) {
+	sequence, err := GetAndValidateUserSequence(rawTxBytes)
+	if err != nil {
+		return 0, err
+	}
+	return GetTimelockFromSequence(sequence), nil
+}
+
 func ValidateSequenceTimelock(sequence uint32, expectedTimelock uint32) error {
 	providedTimelock := GetTimelockFromSequence(sequence)
 	if providedTimelock != expectedTimelock {
