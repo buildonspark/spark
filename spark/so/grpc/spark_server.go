@@ -394,7 +394,7 @@ func (s *SparkServer) QueryTokenOutputs(ctx context.Context, req *pb.QueryTokenO
 
 func (s *SparkServer) QueryAllTransfers(ctx context.Context, req *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {
 	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.QueryAllTransfers(ctx, req)
+	return transferHander.QueryAllTransfers(ctx, req, false)
 }
 
 func (s *SparkServer) QueryUnusedDepositAddresses(ctx context.Context, req *pb.QueryUnusedDepositAddressesRequest) (*pb.QueryUnusedDepositAddressesResponse, error) {

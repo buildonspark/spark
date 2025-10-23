@@ -1718,7 +1718,7 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 	return nil
 }
 
-func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.TransferFilter, isPending bool) (*pb.QueryTransfersResponse, error) {
+func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.TransferFilter, isPending bool, _ bool) (*pb.QueryTransfersResponse, error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.queryTransfers")
 	defer span.End()
 
@@ -1900,11 +1900,11 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 }
 
 func (h *TransferHandler) QueryPendingTransfers(ctx context.Context, filter *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {
-	return h.queryTransfers(ctx, filter, true)
+	return h.queryTransfers(ctx, filter, true, false)
 }
 
-func (h *TransferHandler) QueryAllTransfers(ctx context.Context, filter *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {
-	return h.queryTransfers(ctx, filter, false)
+func (h *TransferHandler) QueryAllTransfers(ctx context.Context, filter *pb.TransferFilter, isSSP bool) (*pb.QueryTransfersResponse, error) {
+	return h.queryTransfers(ctx, filter, false, isSSP)
 }
 
 const CoopExitConfirmationThreshold = 6
