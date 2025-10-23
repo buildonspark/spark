@@ -29,32 +29,8 @@ func TestCoordinatedL1TokenMint(t *testing.T) {
 			require.NoError(t, err, "failed to broadcast issuance token transaction")
 			require.Len(t, finalIssueTokenTransaction.TokenOutputs, 2, "expected 2 created outputs in mint transaction")
 
-			userOneConfig := wallet.NewTestWalletConfigWithIdentityKey(t, userOutput1PrivKey)
-			userTwoConfig := wallet.NewTestWalletConfigWithIdentityKey(t, userOutput2PrivKey)
-
-			userOneBalance, err := wallet.QueryTokenOutputsV2(
-				t.Context(),
-				userOneConfig,
-				[]keys.Public{userOneConfig.IdentityPublicKey()},
-				[]keys.Public{tokenPrivKey.Public()},
-			)
-			require.NoError(t, err, "failed to query user one token outputs")
-
-			userTwoBalance, err := wallet.QueryTokenOutputsV2(
-				t.Context(),
-				userTwoConfig,
-				[]keys.Public{userTwoConfig.IdentityPublicKey()},
-				[]keys.Public{tokenPrivKey.Public()},
-			)
-			require.NoError(t, err, "failed to query user two token outputs")
-
-			require.Len(t, userOneBalance.OutputsWithPreviousTransactionData, 1, "expected one output for user one")
-			userOneAmount := bytesToBigInt(userOneBalance.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
-			require.Equal(t, uint64ToBigInt(testIssueOutput1Amount), userOneAmount, "user one should have the first mint output amount")
-
-			require.Len(t, userTwoBalance.OutputsWithPreviousTransactionData, 1, "expected one output for user two")
-			userTwoAmount := bytesToBigInt(userTwoBalance.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
-			require.Equal(t, uint64ToBigInt(testIssueOutput2Amount), userTwoAmount, "user two should have the second mint output amount")
+			verifyTokenBalance(t, userOutput1PrivKey, tokenPrivKey.Public(), testIssueOutput1Amount, "user one")
+			verifyTokenBalance(t, userOutput2PrivKey, tokenPrivKey.Public(), testIssueOutput2Amount, "user two")
 		})
 	}
 }
@@ -111,11 +87,11 @@ func TestCoordinatedTokenMintV3(t *testing.T) {
 			issuerPrivKey := getRandomPrivateKey(t)
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
-			err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
-				IssuerPrivateKey: issuerPrivKey,
-				Name:             testTokenName,
-				Ticker:           testTokenTicker,
-				MaxSupply:        testTokenMaxSupply,
+			err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+				issuerPrivateKey: issuerPrivKey,
+				name:             testTokenName,
+				ticker:           testTokenTicker,
+				maxSupply:        testTokenMaxSupply,
 			})
 			require.NoError(t, err, "failed to create native spark token")
 
@@ -140,34 +116,8 @@ func TestCoordinatedTokenMintV3(t *testing.T) {
 			require.Len(t, finalIssueTokenTransaction.TokenOutputs, 2, "expected 2 created outputs in V3 mint transaction")
 			require.Equal(t, TokenTransactionVersion3, int(finalIssueTokenTransaction.Version), "final transaction should be V3")
 
-			userOneConfig := wallet.NewTestWalletConfigWithIdentityKey(t, userOutput1PrivKey)
-			userTwoConfig := wallet.NewTestWalletConfigWithIdentityKey(t, userOutput2PrivKey)
-
-			userOneBalance, err := wallet.QueryTokenOutputsV2(
-				t.Context(),
-				userOneConfig,
-				[]keys.Public{userOneConfig.IdentityPublicKey()},
-				[]keys.Public{issuerPrivKey.Public()},
-			)
-			require.NoError(t, err, "failed to query user one token outputs")
-
-			userTwoBalance, err := wallet.QueryTokenOutputsV2(
-				t.Context(),
-				userTwoConfig,
-				[]keys.Public{userTwoConfig.IdentityPublicKey()},
-				[]keys.Public{issuerPrivKey.Public()},
-			)
-			require.NoError(t, err, "failed to query user two token outputs")
-
-			require.Len(t, userOneBalance.OutputsWithPreviousTransactionData, 1, "expected one output for user one")
-			userOneAmount := bytesToBigInt(userOneBalance.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
-			require.Equal(t, uint64ToBigInt(testIssueOutput1Amount), userOneAmount,
-				"user one should have correct token amount")
-
-			require.Len(t, userTwoBalance.OutputsWithPreviousTransactionData, 1, "expected one output for user two")
-			userTwoAmount := bytesToBigInt(userTwoBalance.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
-			require.Equal(t, uint64ToBigInt(testIssueOutput2Amount), userTwoAmount,
-				"user two should have correct token amount")
+			verifyTokenBalance(t, userOutput1PrivKey, issuerPrivKey.Public(), testIssueOutput1Amount, "user one")
+			verifyTokenBalance(t, userOutput2PrivKey, issuerPrivKey.Public(), testIssueOutput2Amount, "user two")
 		})
 	}
 }
@@ -178,11 +128,11 @@ func TestCoordinatedTokenTransferV3(t *testing.T) {
 			issuerPrivKey := getRandomPrivateKey(t)
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
-			err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
-				IssuerPrivateKey: issuerPrivKey,
-				Name:             testTokenName,
-				Ticker:           testTokenTicker,
-				MaxSupply:        testTokenMaxSupply,
+			err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+				issuerPrivateKey: issuerPrivKey,
+				name:             testTokenName,
+				ticker:           testTokenTicker,
+				maxSupply:        testTokenMaxSupply,
 			})
 			require.NoError(t, err, "failed to create native spark token")
 
@@ -227,19 +177,7 @@ func TestCoordinatedTokenTransferV3(t *testing.T) {
 			require.Equal(t, TokenTransactionVersion3, int(transferTokenTransactionResponse.Version), "final transfer transaction should be V3")
 			require.Len(t, transferTokenTransactionResponse.TokenOutputs, 1, "expected 1 created output in V3 transfer transaction")
 
-			userThreeConfig := wallet.NewTestWalletConfigWithIdentityKey(t, userOutput3PrivKey)
-			userThreeBalance, err := wallet.QueryTokenOutputsV2(
-				t.Context(),
-				userThreeConfig,
-				[]keys.Public{userThreeConfig.IdentityPublicKey()},
-				[]keys.Public{issuerPrivKey.Public()},
-			)
-			require.NoError(t, err, "failed to query user three token outputs")
-
-			require.Len(t, userThreeBalance.OutputsWithPreviousTransactionData, 1, "expected one output for user three")
-			userThreeAmount := bytesToBigInt(userThreeBalance.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
-			require.Equal(t, uint64ToBigInt(testTransferOutput1Amount), userThreeAmount,
-				"user three should have correct token amount from V3 transfer")
+			verifyTokenBalance(t, userOutput3PrivKey, issuerPrivKey.Public(), testTransferOutput1Amount, "user three")
 		})
 	}
 }
@@ -251,75 +189,25 @@ func TestCoordinatedTokenTransferWithMultipleTokenTypes(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
-			// Create two different native spark tokens
-			token1IssuerPrivKey := getRandomPrivateKey(t)
-			token2IssuerPrivKey := getRandomPrivateKey(t)
+			// Setup two different native spark tokens with mints
+			token1, err := setupNativeTokenWithMint(t, "Token A", "TKA", 1000000, []uint64{1000})
+			require.NoError(t, err, "failed to setup token 1")
+			require.Len(t, token1.OutputOwners, 1, "expected 1 output owner for token 1")
+			userPrivKey := token1.OutputOwners[0]
 
-			config1 := wallet.NewTestWalletConfigWithIdentityKey(t, token1IssuerPrivKey)
-			config2 := wallet.NewTestWalletConfigWithIdentityKey(t, token2IssuerPrivKey)
+			token2, err := setupNativeTokenWithMint(t, "Token B", "TKB", 2000000, []uint64{2000})
+			require.NoError(t, err, "failed to setup token 2")
+			require.Len(t, token2.OutputOwners, 1, "expected 1 output owner for token 2")
 
-			err := testCoordinatedCreateNativeSparkTokenWithParams(t, config1, createNativeSparkTokenParams{
-				IssuerPrivateKey: token1IssuerPrivKey,
-				Name:             "Token A",
-				Ticker:           "TKA",
-				MaxSupply:        1000000,
-			})
-			require.NoError(t, err, "failed to create token A")
-
-			err = testCoordinatedCreateNativeSparkTokenWithParams(t, config2, createNativeSparkTokenParams{
-				IssuerPrivateKey: token2IssuerPrivKey,
-				Name:             "Token B",
-				Ticker:           "TKB",
-				MaxSupply:        2000000,
-			})
-			require.NoError(t, err, "failed to create token B")
-
-			token1Identifier, err := getTokenIdentifierFromMetadata(t.Context(), config1, token1IssuerPrivKey.Public())
-			require.NoError(t, err, "failed to get token A identifier")
-
-			token2Identifier, err := getTokenIdentifierFromMetadata(t.Context(), config2, token2IssuerPrivKey.Public())
-			require.NoError(t, err, "failed to get token B identifier")
-
-			// Mint token A to a user
-			userPrivKey := keys.GeneratePrivateKey()
-			mintToken1Tx, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config1, tokenTransactionParams{
-				TokenIdentityPubKey: token1IssuerPrivKey.Public(),
-				IsNativeSparkToken:  true,
-				UseTokenIdentifier:  true,
-				NumOutputs:          1,
-				OutputAmounts:       []uint64{1000},
-			})
-			require.NoError(t, err, "failed to create mint transaction for token A")
-			mintToken1Tx.TokenOutputs[0].OwnerPublicKey = userPrivKey.Public().Serialize()
-
-			finalMintToken1, err := wallet.BroadcastCoordinatedTokenTransfer(
-				t.Context(), config1, mintToken1Tx,
-				[]keys.Private{token1IssuerPrivKey},
-			)
-			require.NoError(t, err, "failed to broadcast mint transaction for token A")
-
-			mintToken1Hash, err := utils.HashTokenTransaction(finalMintToken1, false)
-			require.NoError(t, err, "failed to hash mint transaction for token A")
-
-			// Mint token B to the same user
-			mintToken2Tx, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config2, tokenTransactionParams{
-				TokenIdentityPubKey: token2IssuerPrivKey.Public(),
-				IsNativeSparkToken:  true,
-				UseTokenIdentifier:  true,
-				NumOutputs:          1,
-				OutputAmounts:       []uint64{2000},
-			})
-			require.NoError(t, err, "failed to create mint transaction for token B")
-			mintToken2Tx.TokenOutputs[0].OwnerPublicKey = userPrivKey.Public().Serialize()
-
+			// Re-broadcast token 2's mint with the same user as owner for both tokens
+			token2.MintTxBeforeBroadcast.TokenOutputs[0].OwnerPublicKey = userPrivKey.Public().Serialize()
 			finalMintToken2, err := wallet.BroadcastCoordinatedTokenTransfer(
-				t.Context(), config2, mintToken2Tx,
-				[]keys.Private{token2IssuerPrivKey},
+				t.Context(), token2.Config, token2.MintTxBeforeBroadcast,
+				[]keys.Private{token2.IssuerPrivateKey},
 			)
-			require.NoError(t, err, "failed to broadcast mint transaction for token B")
-
+			require.NoError(t, err, "failed to broadcast updated mint transaction for token 2")
 			mintToken2Hash, err := utils.HashTokenTransaction(finalMintToken2, false)
-			require.NoError(t, err, "failed to hash mint transaction for token B")
+			require.NoError(t, err, "failed to hash mint transaction for token 2")
 
 			// Create a transfer transaction that spends both token types and creates outputs in both token types
 			recipient1PrivKey := keys.GeneratePrivateKey()
@@ -331,7 +219,7 @@ func TestCoordinatedTokenTransferWithMultipleTokenTypes(t *testing.T) {
 					TransferInput: &tokenpb.TokenTransferInput{
 						OutputsToSpend: []*tokenpb.TokenOutputToSpend{
 							{
-								PrevTokenTransactionHash: mintToken1Hash,
+								PrevTokenTransactionHash: token1.MintTxHash,
 								PrevTokenTransactionVout: 0,
 							},
 							{
@@ -344,22 +232,22 @@ func TestCoordinatedTokenTransferWithMultipleTokenTypes(t *testing.T) {
 				TokenOutputs: []*tokenpb.TokenOutput{
 					{
 						OwnerPublicKey:  recipient1PrivKey.Public().Serialize(),
-						TokenIdentifier: token1Identifier,
+						TokenIdentifier: token1.TokenIdentifier,
 						TokenAmount:     int64ToUint128Bytes(0, 600),
 					},
 					{
 						OwnerPublicKey:  recipient2PrivKey.Public().Serialize(),
-						TokenIdentifier: token1Identifier,
+						TokenIdentifier: token1.TokenIdentifier,
 						TokenAmount:     int64ToUint128Bytes(0, 400),
 					},
 					{
 						OwnerPublicKey:  recipient1PrivKey.Public().Serialize(),
-						TokenIdentifier: token2Identifier,
+						TokenIdentifier: token2.TokenIdentifier,
 						TokenAmount:     int64ToUint128Bytes(0, 1200),
 					},
 					{
 						OwnerPublicKey:  recipient2PrivKey.Public().Serialize(),
-						TokenIdentifier: token2Identifier,
+						TokenIdentifier: token2.TokenIdentifier,
 						TokenAmount:     int64ToUint128Bytes(0, 800),
 					},
 				},
@@ -377,52 +265,12 @@ func TestCoordinatedTokenTransferWithMultipleTokenTypes(t *testing.T) {
 			require.Len(t, finalTransferTx.TokenOutputs, 4, "expected 4 outputs in multi-token transfer")
 
 			// Verify recipient 1 received correct amounts of both tokens
-			recipient1Config := wallet.NewTestWalletConfigWithIdentityKey(t, recipient1PrivKey)
-			recipient1Token1Outputs, err := wallet.QueryTokenOutputsV2(
-				t.Context(),
-				recipient1Config,
-				[]keys.Public{recipient1PrivKey.Public()},
-				[]keys.Public{token1IssuerPrivKey.Public()},
-			)
-			require.NoError(t, err, "failed to query recipient 1 token A outputs")
-			require.Len(t, recipient1Token1Outputs.OutputsWithPreviousTransactionData, 1, "expected 1 token A output for recipient 1")
-			recipient1Token1Amount := bytesToBigInt(recipient1Token1Outputs.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
-			require.Equal(t, uint64ToBigInt(600), recipient1Token1Amount, "recipient 1 should have 600 token A")
-
-			recipient1Token2Outputs, err := wallet.QueryTokenOutputsV2(
-				t.Context(),
-				recipient1Config,
-				[]keys.Public{recipient1PrivKey.Public()},
-				[]keys.Public{token2IssuerPrivKey.Public()},
-			)
-			require.NoError(t, err, "failed to query recipient 1 token B outputs")
-			require.Len(t, recipient1Token2Outputs.OutputsWithPreviousTransactionData, 1, "expected 1 token B output for recipient 1")
-			recipient1Token2Amount := bytesToBigInt(recipient1Token2Outputs.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
-			require.Equal(t, uint64ToBigInt(1200), recipient1Token2Amount, "recipient 1 should have 1200 token B")
+			verifyTokenBalance(t, recipient1PrivKey, token1.IssuerPrivateKey.Public(), 600, "recipient 1 token 1")
+			verifyTokenBalance(t, recipient1PrivKey, token2.IssuerPrivateKey.Public(), 1200, "recipient 1 token 2")
 
 			// Verify recipient 2 received correct amounts of both tokens
-			recipient2Config := wallet.NewTestWalletConfigWithIdentityKey(t, recipient2PrivKey)
-			recipient2Token1Outputs, err := wallet.QueryTokenOutputsV2(
-				t.Context(),
-				recipient2Config,
-				[]keys.Public{recipient2PrivKey.Public()},
-				[]keys.Public{token1IssuerPrivKey.Public()},
-			)
-			require.NoError(t, err, "failed to query recipient 2 token A outputs")
-			require.Len(t, recipient2Token1Outputs.OutputsWithPreviousTransactionData, 1, "expected 1 token A output for recipient 2")
-			recipient2Token1Amount := bytesToBigInt(recipient2Token1Outputs.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
-			require.Equal(t, uint64ToBigInt(400), recipient2Token1Amount, "recipient 2 should have 400 token A")
-
-			recipient2Token2Outputs, err := wallet.QueryTokenOutputsV2(
-				t.Context(),
-				recipient2Config,
-				[]keys.Public{recipient2PrivKey.Public()},
-				[]keys.Public{token2IssuerPrivKey.Public()},
-			)
-			require.NoError(t, err, "failed to query recipient 2 token B outputs")
-			require.Len(t, recipient2Token2Outputs.OutputsWithPreviousTransactionData, 1, "expected 1 token B output for recipient 2")
-			recipient2Token2Amount := bytesToBigInt(recipient2Token2Outputs.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
-			require.Equal(t, uint64ToBigInt(800), recipient2Token2Amount, "recipient 2 should have 800 token B")
+			verifyTokenBalance(t, recipient2PrivKey, token1.IssuerPrivateKey.Public(), 400, "recipient 2 token 1")
+			verifyTokenBalance(t, recipient2PrivKey, token2.IssuerPrivateKey.Public(), 800, "recipient 2 token 2")
 
 			// Verify token conservation: inputs of each type equal outputs of each type
 			// Token A: 1000 (input) = 600 + 400 (outputs) ✓

@@ -374,11 +374,11 @@ func TestBroadcastTokenTransactionMintAndTransferTokensExpectedOutputAndTxRetrie
 
 	// Create a native Spark token for this issuer so that subsequent
 	// mint/transfer operations are scoped to this isolated token.
-	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
-		IssuerPrivateKey: issuerPrivKey,
-		Name:             testTokenName,
-		Ticker:           testTokenTicker,
-		MaxSupply:        testTokenMaxSupply,
+	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+		issuerPrivateKey: issuerPrivKey,
+		name:             testTokenName,
+		ticker:           testTokenTicker,
+		maxSupply:        testTokenMaxSupply,
 	})
 	require.NoError(t, err, "failed to create native spark token")
 

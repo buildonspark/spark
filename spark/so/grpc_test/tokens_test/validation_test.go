@@ -189,11 +189,11 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 		{
 			name: "create transaction with creation entity public key should fail",
 			setupTx: func() (*tokenpb.TokenTransaction, []keys.Private) {
-				tx, err := createTestCoordinatedTokenCreateTransactionWithParams(config, createNativeSparkTokenParams{
-					IssuerPrivateKey: config.IdentityPrivateKey,
-					Name:             "Test Token",
-					Ticker:           "TEST",
-					MaxSupply:        1000000,
+				tx, err := createTestCoordinatedTokenCreateTransactionWithParams(config, sparkTokenCreationTestParams{
+					issuerPrivateKey: config.IdentityPrivateKey,
+					name:             "Test Token",
+					ticker:           "TEST",
+					maxSupply:        1000000,
 				})
 				require.NoError(t, err)
 				return tx, []keys.Private{config.IdentityPrivateKey}

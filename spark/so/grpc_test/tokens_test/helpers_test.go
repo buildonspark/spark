@@ -10,8 +10,10 @@ import (
 
 	"github.com/lightsparkdev/spark/common/keys"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
+	"github.com/lightsparkdev/spark/so/utils"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -36,13 +38,6 @@ type tokenTransactionParams struct {
 	MintToSelf                     bool
 	InvoiceAttachments             []*tokenpb.InvoiceAttachment
 	Version                        int // Optional explicit token transaction version (defaults to V2 if 0)
-}
-
-type createNativeSparkTokenParams struct {
-	IssuerPrivateKey keys.Private
-	Name             string
-	Ticker           string
-	MaxSupply        uint64
 }
 
 type sparkTokenCreationTestParams struct {
@@ -295,7 +290,7 @@ func createTestTokenMintTransactionWithMultipleTokenOutputsTokenPb(t *testing.T,
 }
 
 // testCoordinatedCreateNativeSparkTokenWithParams creates a native Spark token with custom parameters
-func testCoordinatedCreateNativeSparkTokenWithParams(t *testing.T, config *wallet.TestWalletConfig, params createNativeSparkTokenParams) error {
+func testCoordinatedCreateNativeSparkTokenWithParams(t *testing.T, config *wallet.TestWalletConfig, params sparkTokenCreationTestParams) error {
 	createTx, err := createTestCoordinatedTokenCreateTransactionWithParams(config, params)
 	if err != nil {
 		return err
@@ -304,23 +299,23 @@ func testCoordinatedCreateNativeSparkTokenWithParams(t *testing.T, config *walle
 		t.Context(),
 		config,
 		createTx,
-		[]keys.Private{params.IssuerPrivateKey},
+		[]keys.Private{params.issuerPrivateKey},
 	)
 	return err
 }
 
 // createTestCoordinatedTokenCreateTransactionWithParams creates a token create transaction
-func createTestCoordinatedTokenCreateTransactionWithParams(config *wallet.TestWalletConfig, params createNativeSparkTokenParams) (*tokenpb.TokenTransaction, error) {
-	issuerPubKeyBytes := params.IssuerPrivateKey.Public().Serialize()
+func createTestCoordinatedTokenCreateTransactionWithParams(config *wallet.TestWalletConfig, params sparkTokenCreationTestParams) (*tokenpb.TokenTransaction, error) {
+	issuerPubKeyBytes := params.issuerPrivateKey.Public().Serialize()
 	createTokenTransaction := &tokenpb.TokenTransaction{
 		Version: TokenTransactionVersion2,
 		TokenInputs: &tokenpb.TokenTransaction_CreateInput{
 			CreateInput: &tokenpb.TokenCreateInput{
 				IssuerPublicKey: issuerPubKeyBytes,
-				TokenName:       params.Name,
-				TokenTicker:     params.Ticker,
+				TokenName:       params.name,
+				TokenTicker:     params.ticker,
 				Decimals:        testTokenDecimals,
-				MaxSupply:       getTokenMaxSupplyBytes(params.MaxSupply),
+				MaxSupply:       getTokenMaxSupplyBytes(params.maxSupply),
 				IsFreezable:     testTokenIsFreezable,
 			},
 		},
@@ -346,15 +341,7 @@ func verifyTokenMetadata(t *testing.T, metadata *tokenpb.TokenMetadata, expected
 // createNativeToken creates a native token (no verification)
 func createNativeToken(t *testing.T, params sparkTokenCreationTestParams) error {
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, params.issuerPrivateKey)
-
-	return testCoordinatedCreateNativeSparkTokenWithParams(t,
-		config,
-		createNativeSparkTokenParams{
-			IssuerPrivateKey: params.issuerPrivateKey,
-			Name:             params.name,
-			Ticker:           params.ticker,
-			MaxSupply:        params.maxSupply,
-		})
+	return testCoordinatedCreateNativeSparkTokenWithParams(t, config, params)
 }
 
 // verifyNativeToken verifies a token exists and returns its identifier
@@ -507,4 +494,99 @@ func sumUint64Slice(values []uint64) uint64 {
 		sum += v
 	}
 	return sum
+}
+
+// tokenSetupResult contains the result of setting up a token with minted outputs
+type tokenSetupResult struct {
+	IssuerPrivateKey      keys.Private
+	Config                *wallet.TestWalletConfig
+	TokenIdentifier       []byte
+	MintTxHash            []byte
+	MintTx                *tokenpb.TokenTransaction
+	MintTxBeforeBroadcast *tokenpb.TokenTransaction
+	OutputOwners          []keys.Private
+}
+
+// setupNativeTokenWithMint creates a native token, mints to outputs, and returns all relevant data
+func setupNativeTokenWithMint(
+	t *testing.T,
+	name string,
+	ticker string,
+	maxSupply uint64,
+	mintOutputAmounts []uint64,
+) (*tokenSetupResult, error) {
+	issuerPrivKey := getRandomPrivateKey(t)
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+
+	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+		issuerPrivateKey: issuerPrivKey,
+		name:             name,
+		ticker:           ticker,
+		maxSupply:        maxSupply,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create native spark token: %w", err)
+	}
+
+	tokenIdentifier, err := getTokenIdentifierFromMetadata(t.Context(), config, issuerPrivKey.Public())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token identifier: %w", err)
+	}
+
+	mintTxBeforeBroadcast, outputOwners, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+		TokenIdentityPubKey: issuerPrivKey.Public(),
+		IsNativeSparkToken:  true,
+		UseTokenIdentifier:  true,
+		NumOutputs:          len(mintOutputAmounts),
+		OutputAmounts:       mintOutputAmounts,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create mint transaction: %w", err)
+	}
+
+	mintTxForBroadcast := proto.Clone(mintTxBeforeBroadcast).(*tokenpb.TokenTransaction)
+	finalMintTx, err := wallet.BroadcastCoordinatedTokenTransfer(
+		t.Context(), config, mintTxForBroadcast,
+		[]keys.Private{issuerPrivKey},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to broadcast mint transaction: %w", err)
+	}
+
+	mintTxHash, err := utils.HashTokenTransaction(finalMintTx, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash mint transaction: %w", err)
+	}
+
+	return &tokenSetupResult{
+		IssuerPrivateKey:      issuerPrivKey,
+		Config:                config,
+		TokenIdentifier:       tokenIdentifier,
+		MintTxHash:            mintTxHash,
+		MintTx:                finalMintTx,
+		MintTxBeforeBroadcast: mintTxBeforeBroadcast,
+		OutputOwners:          outputOwners,
+	}, nil
+}
+
+// verifyTokenBalance verifies that a user has the expected token balance
+func verifyTokenBalance(
+	t *testing.T,
+	ownerPrivKey keys.Private,
+	issuerPubKey keys.Public,
+	expectedAmount uint64,
+	description string,
+) {
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, ownerPrivKey)
+	outputs, err := wallet.QueryTokenOutputsV2(
+		t.Context(),
+		config,
+		[]keys.Public{ownerPrivKey.Public()},
+		[]keys.Public{issuerPubKey},
+	)
+	require.NoError(t, err, "failed to query token outputs for %s", description)
+	require.Len(t, outputs.OutputsWithPreviousTransactionData, 1, "expected 1 output for %s", description)
+
+	amount := bytesToBigInt(outputs.OutputsWithPreviousTransactionData[0].Output.TokenAmount)
+	require.Equal(t, uint64ToBigInt(expectedAmount), amount, "%s should have %d tokens", description, expectedAmount)
 }

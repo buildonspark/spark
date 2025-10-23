@@ -238,12 +238,7 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 			if tc.secondTokenParams != nil {
 				secondTokenConfig := wallet.NewTestWalletConfigWithIdentityKey(t, tc.secondTokenParams.issuerPrivateKey)
 
-				err = testCoordinatedCreateNativeSparkTokenWithParams(t, secondTokenConfig, createNativeSparkTokenParams{
-					IssuerPrivateKey: tc.secondTokenParams.issuerPrivateKey,
-					Name:             tc.secondTokenParams.name,
-					Ticker:           tc.secondTokenParams.ticker,
-					MaxSupply:        tc.secondTokenParams.maxSupply,
-				})
+				err = testCoordinatedCreateNativeSparkTokenWithParams(t, secondTokenConfig, *tc.secondTokenParams)
 				if tc.secondTokenParams.expectedError {
 					require.Error(t, err, "expected error but got none for second token creation")
 					stat, ok := status.FromError(err)
@@ -316,11 +311,11 @@ func TestCoordinatedNativeTokenMaxSupplyEnforcement(t *testing.T) {
 		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 
 		tokenPrivKey := getRandomPrivateKey(t)
-		err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
-			IssuerPrivateKey: tokenPrivKey,
-			Name:             "MaxTest",
-			Ticker:           "MAXT",
-			MaxSupply:        tc.maxSupply,
+		err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+			issuerPrivateKey: tokenPrivKey,
+			name:             "MaxTest",
+			ticker:           "MAXT",
+			maxSupply:        tc.maxSupply,
 		})
 		require.NoError(t, err, "failed to create native spark token with max supply %d", tc.maxSupply)
 

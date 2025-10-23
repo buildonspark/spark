@@ -137,11 +137,11 @@ func TestCoordinatedTransferTransactionWithSparkInvoices(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivateKey)
 
 			tokenPrivKey := config.IdentityPrivateKey
-			err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
-				IssuerPrivateKey: issuerPrivateKey,
-				Name:             testTokenName,
-				Ticker:           testTokenTicker,
-				MaxSupply:        testTokenMaxSupply,
+			err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+				issuerPrivateKey: issuerPrivateKey,
+				name:             testTokenName,
+				ticker:           testTokenTicker,
+				maxSupply:        testTokenMaxSupply,
 			})
 			require.NoError(t, err, "failed to create native spark token")
 

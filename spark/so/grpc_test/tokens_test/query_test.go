@@ -19,11 +19,11 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 	issuerPrivKey := getRandomPrivateKey(t)
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
-	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
-		IssuerPrivateKey: issuerPrivKey,
-		Name:             testTokenName,
-		Ticker:           testTokenTicker,
-		MaxSupply:        testTokenMaxSupply,
+	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+		issuerPrivateKey: issuerPrivKey,
+		name:             testTokenName,
+		ticker:           testTokenTicker,
+		maxSupply:        testTokenMaxSupply,
 	})
 	require.NoError(t, err, "failed to create native spark token")
 
@@ -167,11 +167,11 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	issuerPrivKey := getRandomPrivateKey(t)
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
-	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
-		IssuerPrivateKey: issuerPrivKey,
-		Name:             "Filter Test Token",
-		Ticker:           "FLTR",
-		MaxSupply:        1000000,
+	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+		issuerPrivateKey: issuerPrivKey,
+		name:             "Filter Test Token",
+		ticker:           "FLTR",
+		maxSupply:        1000000,
 	})
 	require.NoError(t, err, "failed to create native spark token")
 
@@ -219,11 +219,11 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	issuer2PrivKey := getRandomPrivateKey(t)
 	config2 := wallet.NewTestWalletConfigWithIdentityKey(t, issuer2PrivKey)
 
-	err = testCoordinatedCreateNativeSparkTokenWithParams(t, config2, createNativeSparkTokenParams{
-		IssuerPrivateKey: issuer2PrivKey,
-		Name:             "Second Filter Token",
-		Ticker:           "FLT2",
-		MaxSupply:        500000,
+	err = testCoordinatedCreateNativeSparkTokenWithParams(t, config2, sparkTokenCreationTestParams{
+		issuerPrivateKey: issuer2PrivKey,
+		name:             "Second Filter Token",
+		ticker:           "FLT2",
+		maxSupply:        500000,
 	})
 	require.NoError(t, err, "failed to create second native spark token")
 
@@ -561,11 +561,11 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 	issuerPrivKey := getRandomPrivateKey(t)
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
-	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, createNativeSparkTokenParams{
-		IssuerPrivateKey: issuerPrivKey,
-		Name:             "Order Test Token",
-		Ticker:           "ORD",
-		MaxSupply:        1000000,
+	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+		issuerPrivateKey: issuerPrivKey,
+		name:             "Order Test Token",
+		ticker:           "ORD",
+		maxSupply:        1000000,
 	})
 	require.NoError(t, err, "failed to create native spark token")
 
