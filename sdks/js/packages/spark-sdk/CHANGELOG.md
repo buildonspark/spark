@@ -1,5 +1,16 @@
 # @buildonspark/spark-sdk
 
+## 0.4.2
+
+### Patch Changes
+
+- - readability changes to test files
+  - loadtest CLI
+  - enable spark invoices
+  - return spark1 address
+  - update lightning flow to use v3 endpoint
+  - match rust-toolchain.toml with signer
+
 ## 0.4.1
 
 ### Patch Changes
