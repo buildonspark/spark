@@ -19,9 +19,8 @@ import (
 )
 
 const (
-	// Private constants to avoid conflicts with lightning_handler.go
-	defaultMaxSigningCommitmentNodes = 1000
-	defaultMaxSigningCommitmentCount = 10
+	DefaultMaxSigningCommitmentNodes = 1000
+	DefaultMaxSigningCommitmentCount = 10
 )
 
 // The SigningHandler is responsible for handling signing commitment related requests.
@@ -98,14 +97,14 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 
 	maxNodeIDs := int(knobsService.GetValue(
 		knobs.KnobSoSigningCommitmentNodeLimit,
-		defaultMaxSigningCommitmentNodes,
+		DefaultMaxSigningCommitmentNodes,
 	))
 
 	if len(nodeIDs) > maxNodeIDs {
 		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("too many node ids: %d", len(nodeIDs)))
 	}
 
-	maxCount := uint32(knobsService.GetValue(knobs.KnobSoSigningCommitmentCountLimit, defaultMaxSigningCommitmentCount))
+	maxCount := uint32(knobsService.GetValue(knobs.KnobSoSigningCommitmentCountLimit, DefaultMaxSigningCommitmentCount))
 	count := req.Count
 	if count == 0 {
 		count = 1
