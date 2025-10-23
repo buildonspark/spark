@@ -705,13 +705,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       throw new ValidationError("Multiplicity cannot be greater than 5");
     }
 
-    if (
-      this.optimizationInProgress ||
-      !shouldOptimize(
-        this.leaves.map((leaf) => leaf.value),
-        multiplicityValue,
-      )
-    ) {
+    if (this.optimizationInProgress) {
       return;
     }
 
@@ -886,7 +880,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
     this.leaves = leaves;
 
-    if (this.config.getOptimizationOptions().auto) {
+    if (
+      this.config.getOptimizationOptions().auto &&
+      shouldOptimize(
+        this.leaves.map((leaf) => leaf.value),
+        this.config.getOptimizationOptions().multiplicity ?? 0,
+      )
+    ) {
       for await (const _ of this.optimizeLeaves()) {
         // run all optimizer steps, do nothing with them
       }
@@ -3215,8 +3215,12 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     this.leaves.push(...uniqueResults);
 
     if (
+      transfer.type !== TransferType.COUNTER_SWAP &&
       this.config.getOptimizationOptions().auto &&
-      transfer.type !== TransferType.COUNTER_SWAP
+      shouldOptimize(
+        this.leaves.map((leaf) => leaf.value),
+        this.config.getOptimizationOptions().multiplicity ?? 0,
+      )
     ) {
       for await (const _ of this.optimizeLeaves()) {
         // run all optimizer steps, do nothing with them
