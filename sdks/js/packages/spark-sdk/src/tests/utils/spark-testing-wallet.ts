@@ -6,6 +6,7 @@ import { BitcoinFaucet } from "./test-faucet.js";
 import { Transaction } from "@scure/btc-signer";
 import { NetworkType } from "../../index.node.js";
 import { SparkWalletNodeJS } from "../../spark-wallet/spark-wallet.node.js";
+import type { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
 
 export class SparkWalletTesting extends SparkWalletNodeJS {
   protected override async setupBackgroundStream() {
@@ -54,16 +55,12 @@ export class SparkWalletTestingWithStream extends SparkWalletTesting {
 }
 
 export class SparkWalletTestingIntegration extends SparkWalletTesting {
-  constructor(options?: ConfigOptions, signer?: SparkSigner) {
-    super(options, signer);
-  }
-
   public getConfigService() {
     return this.config;
   }
 
   public getConnectionManager() {
-    return this.connectionManager;
+    return this.connectionManager as ConnectionManagerNodeJS;
   }
 
   public getTransferService() {
