@@ -151,8 +151,8 @@ func (s *SparkServer) StorePreimageShare(ctx context.Context, req *pb.StorePreim
 
 // GetSigningCommitments gets the signing commitments for the given node ids.
 func (s *SparkServer) GetSigningCommitments(ctx context.Context, req *pb.GetSigningCommitmentsRequest) (*pb.GetSigningCommitmentsResponse, error) {
-	lightningHandler := handler.NewLightningHandler(s.config)
-	return lightningHandler.GetSigningCommitments(ctx, req)
+	signingHandler := handler.NewSigningHandler(s.config)
+	return signingHandler.GetSigningCommitments(ctx, req)
 }
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.
