@@ -181,3 +181,52 @@ func (h *WalletSettingHandler) marshalWalletSettingToProto(ws *ent.WalletSetting
 		PrivateEnabled:         ws.PrivateEnabled,
 	}
 }
+
+func (h *WalletSettingHandler) QueryWalletSetting(ctx context.Context, _ *pb.QueryWalletSettingRequest) (*pb.QueryWalletSettingResponse, error) {
+	logger := logging.GetLoggerFromContext(ctx)
+
+	// Get session and identity public key
+	session, err := authn.GetSessionFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	identityPubKey := session.IdentityPublicKey()
+
+	// Get current wallet setting from database
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get database from context: %w", err)
+	}
+
+	walletSetting, err := db.WalletSetting.
+		Query().
+		Where(walletsetting.OwnerIdentityPublicKey(identityPubKey)).
+		Only(ctx)
+
+	if err == nil {
+		// Wallet setting exists, return it
+		response := &pb.QueryWalletSettingResponse{
+			WalletSetting: h.marshalWalletSettingToProto(walletSetting),
+		}
+		return response, nil
+	} else if ent.IsNotFound(err) {
+		// Wallet setting doesn't exist, create a default one
+		defaultSetting, err := db.WalletSetting.
+			Create().
+			SetOwnerIdentityPublicKey(identityPubKey).
+			Save(ctx)
+		if err != nil {
+			logger.Error("failed to create default wallet setting", zap.Error(err))
+			return nil, status.Error(codes.Internal, "failed to create default wallet setting")
+		}
+
+		response := &pb.QueryWalletSettingResponse{
+			WalletSetting: h.marshalWalletSettingToProto(defaultSetting),
+		}
+		return response, nil
+	} else {
+		// Other database error
+		logger.Error("failed to query wallet setting", zap.Error(err))
+		return nil, status.Error(codes.Internal, "failed to query wallet setting")
+	}
+}

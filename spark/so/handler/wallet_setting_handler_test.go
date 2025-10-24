@@ -231,3 +231,67 @@ func TestIsPrivacyEnabled_WithWalletSetting(t *testing.T) {
 		})
 	}
 }
+
+func TestQueryWalletSetting_Existing(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{})
+
+	// Generate test identity public key
+	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Create existing wallet setting
+	db, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	existingSetting, err := db.WalletSetting.
+		Create().
+		SetOwnerIdentityPublicKey(identityPubKey).
+		SetPrivateEnabled(true).
+		Save(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, existingSetting)
+
+	// Set up session context
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+
+	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
+	resp, err := walletSettingHandler.QueryWalletSetting(ctx, &pb.QueryWalletSettingRequest{})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.WalletSetting)
+
+	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
+	assert.True(t, resp.WalletSetting.PrivateEnabled)
+}
+
+func TestQueryWalletSetting_NotExisting(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{})
+
+	// Generate test identity public key
+	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	// Set up session context
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(identityPubKey.Serialize()), 9999999999)
+
+	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
+	resp, err := walletSettingHandler.QueryWalletSetting(ctx, &pb.QueryWalletSettingRequest{})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.WalletSetting)
+
+	assert.Equal(t, identityPubKey.Serialize(), resp.WalletSetting.OwnerIdentityPublicKey)
+	assert.False(t, resp.WalletSetting.PrivateEnabled) // default value from schema
+
+	// Verify it was saved to database
+	database, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+	savedSetting, err := database.WalletSetting.
+		Query().
+		Where(walletsetting.OwnerIdentityPublicKey(identityPubKey)).
+		Only(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, identityPubKey, savedSetting.OwnerIdentityPublicKey)
+	assert.False(t, savedSetting.PrivateEnabled) // default value from schema
+}

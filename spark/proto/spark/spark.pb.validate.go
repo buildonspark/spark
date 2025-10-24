@@ -25459,3 +25459,236 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = UpdateWalletSettingResponseValidationError{}
+
+// Validate checks the field values on QueryWalletSettingRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *QueryWalletSettingRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryWalletSettingRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// QueryWalletSettingRequestMultiError, or nil if none found.
+func (m *QueryWalletSettingRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryWalletSettingRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return QueryWalletSettingRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryWalletSettingRequestMultiError is an error wrapping multiple validation
+// errors returned by QueryWalletSettingRequest.ValidateAll() if the
+// designated constraints aren't met.
+type QueryWalletSettingRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryWalletSettingRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryWalletSettingRequestMultiError) AllErrors() []error { return m }
+
+// QueryWalletSettingRequestValidationError is the validation error returned by
+// QueryWalletSettingRequest.Validate if the designated constraints aren't met.
+type QueryWalletSettingRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryWalletSettingRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryWalletSettingRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryWalletSettingRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryWalletSettingRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryWalletSettingRequestValidationError) ErrorName() string {
+	return "QueryWalletSettingRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryWalletSettingRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryWalletSettingRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryWalletSettingRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryWalletSettingRequestValidationError{}
+
+// Validate checks the field values on QueryWalletSettingResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *QueryWalletSettingResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on QueryWalletSettingResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// QueryWalletSettingResponseMultiError, or nil if none found.
+func (m *QueryWalletSettingResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *QueryWalletSettingResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetWalletSetting()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, QueryWalletSettingResponseValidationError{
+					field:  "WalletSetting",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, QueryWalletSettingResponseValidationError{
+					field:  "WalletSetting",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetWalletSetting()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return QueryWalletSettingResponseValidationError{
+				field:  "WalletSetting",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return QueryWalletSettingResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// QueryWalletSettingResponseMultiError is an error wrapping multiple
+// validation errors returned by QueryWalletSettingResponse.ValidateAll() if
+// the designated constraints aren't met.
+type QueryWalletSettingResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m QueryWalletSettingResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m QueryWalletSettingResponseMultiError) AllErrors() []error { return m }
+
+// QueryWalletSettingResponseValidationError is the validation error returned
+// by QueryWalletSettingResponse.Validate if the designated constraints aren't met.
+type QueryWalletSettingResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e QueryWalletSettingResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e QueryWalletSettingResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e QueryWalletSettingResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e QueryWalletSettingResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e QueryWalletSettingResponseValidationError) ErrorName() string {
+	return "QueryWalletSettingResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e QueryWalletSettingResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sQueryWalletSettingResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = QueryWalletSettingResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = QueryWalletSettingResponseValidationError{}

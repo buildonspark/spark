@@ -126,6 +126,7 @@ service SparkService {
     rpc initiate_swap_primary_transfer(InitiateSwapPrimaryTransferRequest) returns (InitiateSwapPrimaryTransferResponse) {}
 
     rpc update_wallet_setting(UpdateWalletSettingRequest) returns (UpdateWalletSettingResponse) {}
+    rpc query_wallet_setting(QueryWalletSettingRequest) returns (QueryWalletSettingResponse) {}
 }
 
 message SubscribeToEventsRequest {
@@ -1634,5 +1635,13 @@ message UpdateWalletSettingRequest {
 }
 
 message UpdateWalletSettingResponse {
+    WalletSetting wallet_setting = 1;
+}
+
+
+message QueryWalletSettingRequest {
+}
+
+message QueryWalletSettingResponse {
     WalletSetting wallet_setting = 1;
 }

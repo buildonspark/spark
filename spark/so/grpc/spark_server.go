@@ -492,6 +492,11 @@ func (s *SparkServer) UpdateWalletSetting(ctx context.Context, req *pb.UpdateWal
 	return walletSettingHandler.UpdateWalletSetting(ctx, req)
 }
 
+func (s *SparkServer) QueryWalletSetting(ctx context.Context, req *pb.QueryWalletSettingRequest) (*pb.QueryWalletSettingResponse, error) {
+	walletSettingHandler := handler.NewWalletSettingHandler(s.config)
+	return walletSettingHandler.QueryWalletSetting(ctx, req)
+}
+
 func errIfOctoberDeprecationEnabled(ctx context.Context) error {
 	knobsService := knobs.GetKnobsService(ctx)
 	if knobsService.GetValue(knobs.KnobOctoberDeprecationEnabled, 0) >= 1 {
