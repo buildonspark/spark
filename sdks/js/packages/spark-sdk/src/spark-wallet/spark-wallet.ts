@@ -3576,6 +3576,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     preferSpark = false,
     amountSatsToSend,
   }: PayLightningInvoiceParams) {
+    invoice = invoice.toLowerCase();
+
     const invoiceNetwork = getNetworkFromInvoice(invoice);
     const walletNetwork = this.config.getNetwork();
 
