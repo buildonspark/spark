@@ -638,6 +638,47 @@ func (m *GossipMessage) validate(all bool) error {
 			}
 		}
 
+	case *GossipMessage_UpdateWalletSetting:
+		if v == nil {
+			err := GossipMessageValidationError{
+				field:  "Message",
+				reason: "oneof value cannot be a typed-nil",
+			}
+			if !all {
+				return err
+			}
+			errors = append(errors, err)
+		}
+
+		if all {
+			switch v := interface{}(m.GetUpdateWalletSetting()).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "UpdateWalletSetting",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, GossipMessageValidationError{
+						field:  "UpdateWalletSetting",
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(m.GetUpdateWalletSetting()).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return GossipMessageValidationError{
+					field:  "UpdateWalletSetting",
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
 	default:
 		_ = v // ensures v is used
 	}
@@ -2521,3 +2562,114 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = GossipMessageSettleSwapKeyTweakValidationError{}
+
+// Validate checks the field values on GossipMessageUpdateWalletSetting with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the first error encountered is returned, or nil if there are
+// no violations.
+func (m *GossipMessageUpdateWalletSetting) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on GossipMessageUpdateWalletSetting with
+// the rules defined in the proto definition for this message. If any rules
+// are violated, the result is a list of violation errors wrapped in
+// GossipMessageUpdateWalletSettingMultiError, or nil if none found.
+func (m *GossipMessageUpdateWalletSetting) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *GossipMessageUpdateWalletSetting) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for OwnerIdentityPublicKey
+
+	if m.PrivateEnabled != nil {
+		// no validation rules for PrivateEnabled
+	}
+
+	if len(errors) > 0 {
+		return GossipMessageUpdateWalletSettingMultiError(errors)
+	}
+
+	return nil
+}
+
+// GossipMessageUpdateWalletSettingMultiError is an error wrapping multiple
+// validation errors returned by
+// GossipMessageUpdateWalletSetting.ValidateAll() if the designated
+// constraints aren't met.
+type GossipMessageUpdateWalletSettingMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m GossipMessageUpdateWalletSettingMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m GossipMessageUpdateWalletSettingMultiError) AllErrors() []error { return m }
+
+// GossipMessageUpdateWalletSettingValidationError is the validation error
+// returned by GossipMessageUpdateWalletSetting.Validate if the designated
+// constraints aren't met.
+type GossipMessageUpdateWalletSettingValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e GossipMessageUpdateWalletSettingValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e GossipMessageUpdateWalletSettingValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e GossipMessageUpdateWalletSettingValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e GossipMessageUpdateWalletSettingValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e GossipMessageUpdateWalletSettingValidationError) ErrorName() string {
+	return "GossipMessageUpdateWalletSettingValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e GossipMessageUpdateWalletSettingValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sGossipMessageUpdateWalletSetting.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = GossipMessageUpdateWalletSettingValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = GossipMessageUpdateWalletSettingValidationError{}

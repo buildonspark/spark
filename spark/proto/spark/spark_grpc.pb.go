@@ -77,6 +77,7 @@ const (
 	SparkService_GetUtxosForAddress_FullMethodName                  = "/spark.SparkService/get_utxos_for_address"
 	SparkService_QuerySparkInvoices_FullMethodName                  = "/spark.SparkService/query_spark_invoices"
 	SparkService_InitiateSwapPrimaryTransfer_FullMethodName         = "/spark.SparkService/initiate_swap_primary_transfer"
+	SparkService_UpdateWalletSetting_FullMethodName                 = "/spark.SparkService/update_wallet_setting"
 )
 
 // SparkServiceClient is the client API for SparkService service.
@@ -173,6 +174,7 @@ type SparkServiceClient interface {
 	// transfer package, but the SOs will not tweak the keys at this stage of the flow.
 	// It will be done later, when the SSP initiates a counter swap.
 	InitiateSwapPrimaryTransfer(ctx context.Context, in *InitiateSwapPrimaryTransferRequest, opts ...grpc.CallOption) (*InitiateSwapPrimaryTransferResponse, error)
+	UpdateWalletSetting(ctx context.Context, in *UpdateWalletSettingRequest, opts ...grpc.CallOption) (*UpdateWalletSettingResponse, error)
 }
 
 type sparkServiceClient struct {
@@ -766,6 +768,16 @@ func (c *sparkServiceClient) InitiateSwapPrimaryTransfer(ctx context.Context, in
 	return out, nil
 }
 
+func (c *sparkServiceClient) UpdateWalletSetting(ctx context.Context, in *UpdateWalletSettingRequest, opts ...grpc.CallOption) (*UpdateWalletSettingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateWalletSettingResponse)
+	err := c.cc.Invoke(ctx, SparkService_UpdateWalletSetting_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkServiceServer is the server API for SparkService service.
 // All implementations must embed UnimplementedSparkServiceServer
 // for forward compatibility.
@@ -860,6 +872,7 @@ type SparkServiceServer interface {
 	// transfer package, but the SOs will not tweak the keys at this stage of the flow.
 	// It will be done later, when the SSP initiates a counter swap.
 	InitiateSwapPrimaryTransfer(context.Context, *InitiateSwapPrimaryTransferRequest) (*InitiateSwapPrimaryTransferResponse, error)
+	UpdateWalletSetting(context.Context, *UpdateWalletSettingRequest) (*UpdateWalletSettingResponse, error)
 	mustEmbedUnimplementedSparkServiceServer()
 }
 
@@ -1040,6 +1053,9 @@ func (UnimplementedSparkServiceServer) QuerySparkInvoices(context.Context, *Quer
 }
 func (UnimplementedSparkServiceServer) InitiateSwapPrimaryTransfer(context.Context, *InitiateSwapPrimaryTransferRequest) (*InitiateSwapPrimaryTransferResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InitiateSwapPrimaryTransfer not implemented")
+}
+func (UnimplementedSparkServiceServer) UpdateWalletSetting(context.Context, *UpdateWalletSettingRequest) (*UpdateWalletSettingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateWalletSetting not implemented")
 }
 func (UnimplementedSparkServiceServer) mustEmbedUnimplementedSparkServiceServer() {}
 func (UnimplementedSparkServiceServer) testEmbeddedByValue()                      {}
@@ -2081,6 +2097,24 @@ func _SparkService_InitiateSwapPrimaryTransfer_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkService_UpdateWalletSetting_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateWalletSettingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkServiceServer).UpdateWalletSetting(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkService_UpdateWalletSetting_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkServiceServer).UpdateWalletSetting(ctx, req.(*UpdateWalletSettingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkService_ServiceDesc is the grpc.ServiceDesc for SparkService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -2311,6 +2345,10 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "initiate_swap_primary_transfer",
 			Handler:    _SparkService_InitiateSwapPrimaryTransfer_Handler,
+		},
+		{
+			MethodName: "update_wallet_setting",
+			Handler:    _SparkService_UpdateWalletSetting_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

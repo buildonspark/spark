@@ -30,6 +30,7 @@ message GossipMessage {
         GossipMessageFinalizeRenewRefundTimelock finalize_refund_timelock = 14;
         GossipMessageFinalizeRenewNodeTimelock finalize_node_timelock = 15;
         GossipMessageSettleSwapKeyTweak settle_swap_key_tweak = 16;
+        GossipMessageUpdateWalletSetting update_wallet_setting = 17;
     }
 }
 
@@ -110,4 +111,9 @@ message GossipMessagePreimage {
 // same DB transaction.
 message GossipMessageSettleSwapKeyTweak {
     string counter_transfer_id = 1;
+}
+
+message GossipMessageUpdateWalletSetting {
+    bytes owner_identity_public_key = 1;
+    optional bool private_enabled = 2;
 }

@@ -25108,3 +25108,354 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = AdaptorPublicKeyPackageValidationError{}
+
+// Validate checks the field values on WalletSetting with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *WalletSetting) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on WalletSetting with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in WalletSettingMultiError, or
+// nil if none found.
+func (m *WalletSetting) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *WalletSetting) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetOwnerIdentityPublicKey()) != 33 {
+		err := WalletSettingValidationError{
+			field:  "OwnerIdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for PrivateEnabled
+
+	if len(errors) > 0 {
+		return WalletSettingMultiError(errors)
+	}
+
+	return nil
+}
+
+// WalletSettingMultiError is an error wrapping multiple validation errors
+// returned by WalletSetting.ValidateAll() if the designated constraints
+// aren't met.
+type WalletSettingMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m WalletSettingMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m WalletSettingMultiError) AllErrors() []error { return m }
+
+// WalletSettingValidationError is the validation error returned by
+// WalletSetting.Validate if the designated constraints aren't met.
+type WalletSettingValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e WalletSettingValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e WalletSettingValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e WalletSettingValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e WalletSettingValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e WalletSettingValidationError) ErrorName() string { return "WalletSettingValidationError" }
+
+// Error satisfies the builtin error interface
+func (e WalletSettingValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sWalletSetting.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = WalletSettingValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = WalletSettingValidationError{}
+
+// Validate checks the field values on UpdateWalletSettingRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *UpdateWalletSettingRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on UpdateWalletSettingRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// UpdateWalletSettingRequestMultiError, or nil if none found.
+func (m *UpdateWalletSettingRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *UpdateWalletSettingRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if m.PrivateEnabled != nil {
+		// no validation rules for PrivateEnabled
+	}
+
+	if len(errors) > 0 {
+		return UpdateWalletSettingRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// UpdateWalletSettingRequestMultiError is an error wrapping multiple
+// validation errors returned by UpdateWalletSettingRequest.ValidateAll() if
+// the designated constraints aren't met.
+type UpdateWalletSettingRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m UpdateWalletSettingRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m UpdateWalletSettingRequestMultiError) AllErrors() []error { return m }
+
+// UpdateWalletSettingRequestValidationError is the validation error returned
+// by UpdateWalletSettingRequest.Validate if the designated constraints aren't met.
+type UpdateWalletSettingRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e UpdateWalletSettingRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e UpdateWalletSettingRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e UpdateWalletSettingRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e UpdateWalletSettingRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e UpdateWalletSettingRequestValidationError) ErrorName() string {
+	return "UpdateWalletSettingRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e UpdateWalletSettingRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sUpdateWalletSettingRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = UpdateWalletSettingRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = UpdateWalletSettingRequestValidationError{}
+
+// Validate checks the field values on UpdateWalletSettingResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *UpdateWalletSettingResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on UpdateWalletSettingResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// UpdateWalletSettingResponseMultiError, or nil if none found.
+func (m *UpdateWalletSettingResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *UpdateWalletSettingResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if all {
+		switch v := interface{}(m.GetWalletSetting()).(type) {
+		case interface{ ValidateAll() error }:
+			if err := v.ValidateAll(); err != nil {
+				errors = append(errors, UpdateWalletSettingResponseValidationError{
+					field:  "WalletSetting",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		case interface{ Validate() error }:
+			if err := v.Validate(); err != nil {
+				errors = append(errors, UpdateWalletSettingResponseValidationError{
+					field:  "WalletSetting",
+					reason: "embedded message failed validation",
+					cause:  err,
+				})
+			}
+		}
+	} else if v, ok := interface{}(m.GetWalletSetting()).(interface{ Validate() error }); ok {
+		if err := v.Validate(); err != nil {
+			return UpdateWalletSettingResponseValidationError{
+				field:  "WalletSetting",
+				reason: "embedded message failed validation",
+				cause:  err,
+			}
+		}
+	}
+
+	if len(errors) > 0 {
+		return UpdateWalletSettingResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// UpdateWalletSettingResponseMultiError is an error wrapping multiple
+// validation errors returned by UpdateWalletSettingResponse.ValidateAll() if
+// the designated constraints aren't met.
+type UpdateWalletSettingResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m UpdateWalletSettingResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m UpdateWalletSettingResponseMultiError) AllErrors() []error { return m }
+
+// UpdateWalletSettingResponseValidationError is the validation error returned
+// by UpdateWalletSettingResponse.Validate if the designated constraints
+// aren't met.
+type UpdateWalletSettingResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e UpdateWalletSettingResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e UpdateWalletSettingResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e UpdateWalletSettingResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e UpdateWalletSettingResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e UpdateWalletSettingResponseValidationError) ErrorName() string {
+	return "UpdateWalletSettingResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e UpdateWalletSettingResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sUpdateWalletSettingResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = UpdateWalletSettingResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = UpdateWalletSettingResponseValidationError{}

@@ -62,6 +62,9 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 	case *pbgossip.GossipMessage_FinalizeRefundTimelock:
 		finalizeRenewRefundTimelock := gossipMessage.GetFinalizeRefundTimelock()
 		h.handleFinalizeRefundTimelockGossipMessage(ctx, finalizeRenewRefundTimelock, forCoordinator)
+	case *pbgossip.GossipMessage_UpdateWalletSetting:
+		updateWalletSetting := gossipMessage.GetUpdateWalletSetting()
+		h.handleUpdateWalletSettingGossipMessage(ctx, updateWalletSetting, forCoordinator)
 	case *pbgossip.GossipMessage_RollbackUtxoSwap:
 		rollbackUtxoSwap := gossipMessage.GetRollbackUtxoSwap()
 		h.handleRollbackUtxoSwapGossipMessage(ctx, rollbackUtxoSwap)
@@ -366,4 +369,24 @@ func (h *GossipHandler) handleSettleSwapKeyTweakGossipMessage(ctx context.Contex
 		logger := logging.GetLoggerFromContext(ctx)
 		logger.With(zap.Error(err)).Sugar().Errorf("Failed to settle swap key tweak for  counter transfer %s", settleSwapKeyTweak.CounterTransferId)
 	}
+}
+
+func (h *GossipHandler) handleUpdateWalletSettingGossipMessage(ctx context.Context, updateWalletSetting *pbgossip.GossipMessageUpdateWalletSetting, forCoordinator bool) {
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Info("Handling update wallet setting gossip message")
+
+	if forCoordinator {
+		return
+	}
+
+	logger.Sugar().Infof("Handling wallet setting update gossip message for identity public key %x", updateWalletSetting.OwnerIdentityPublicKey)
+
+	walletSettingHandler := NewWalletSettingHandler(h.config)
+	_, err := walletSettingHandler.UpdateWalletSettingInternal(ctx, updateWalletSetting.OwnerIdentityPublicKey, updateWalletSetting.PrivateEnabled)
+	if err != nil {
+		logger.Error("failed to update wallet setting from gossip message", zap.Error(err))
+		return
+	}
+
+	logger.Sugar().Infof("Successfully updated wallet setting from gossip message for identity public key %x", updateWalletSetting.OwnerIdentityPublicKey)
 }

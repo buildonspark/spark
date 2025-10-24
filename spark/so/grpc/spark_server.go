@@ -487,6 +487,11 @@ func (s *SparkServer) InitiateSwapPrimaryTransfer(ctx context.Context, req *pb.I
 	return &pb.InitiateSwapPrimaryTransferResponse{Transfer: res.Transfer, SigningResults: res.SigningResults}, nil
 }
 
+func (s *SparkServer) UpdateWalletSetting(ctx context.Context, req *pb.UpdateWalletSettingRequest) (*pb.UpdateWalletSettingResponse, error) {
+	walletSettingHandler := handler.NewWalletSettingHandler(s.config)
+	return walletSettingHandler.UpdateWalletSetting(ctx, req)
+}
+
 func errIfOctoberDeprecationEnabled(ctx context.Context) error {
 	knobsService := knobs.GetKnobsService(ctx)
 	if knobsService.GetValue(knobs.KnobOctoberDeprecationEnabled, 0) >= 1 {
