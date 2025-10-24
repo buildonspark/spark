@@ -14,6 +14,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/walletsetting"
 	"github.com/lightsparkdev/spark/so/helper"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -134,6 +135,37 @@ func (h *WalletSettingHandler) sendWalletSettingUpdateGossipMessage(ctx context.
 	}
 
 	return nil
+}
+
+// IsPrivacyEnabled checks if privacy is enabled for the given identity public key.
+// Returns the stored privacy_enabled value if wallet setting exists, otherwise returns false (default).
+func (h *WalletSettingHandler) IsPrivacyEnabled(ctx context.Context, identityPublicKey []byte) (bool, error) {
+	knobService := knobs.GetKnobsService(ctx)
+	if knobService != nil {
+		if !knobService.RolloutRandom(knobs.KnobPrivacyEnabled, 0) {
+			return false, nil
+		}
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get database from context: %w", err)
+	}
+
+	walletSetting, err := db.WalletSetting.
+		Query().
+		Where(walletsetting.OwnerIdentityPublicKey(identityPublicKey)).
+		Only(ctx)
+
+	if err != nil {
+		if ent.IsNotFound(err) {
+			// No wallet setting exists, return default value (false)
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to query wallet setting: %w", err)
+	}
+
+	return walletSetting.PrivateEnabled, nil
 }
 
 // marshalWalletSettingToProto converts a WalletSetting to a spark protobuf WalletSetting.

@@ -55,6 +55,8 @@ const (
 	KnobNumRequiredConfirmations = "spark.so.num_required_confirmations"
 
 	KnobOctoberDeprecationEnabled = "spark.so.october_deprecation_enabled"
+
+	KnobPrivacyEnabled = "spark.so.privacy.enabled"
 )
 
 type Config struct {
