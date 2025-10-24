@@ -23,6 +23,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
+	"github.com/lightsparkdev/spark/common/uint128"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
@@ -47,6 +48,7 @@ var (
 	defaultTaskTimeout              = 1 * time.Minute
 	dkgTaskTimeout                  = 3 * time.Minute
 	deleteStaleTreeNodesTaskTimeout = 10 * time.Minute
+	backfillTokenOutputTimeout      = 10 * time.Minute
 	backfillTreeNodeTxidsTimeout    = 25 * time.Second
 )
 
@@ -744,13 +746,61 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				},
 			},
 		},
+		{
+			ExecutionInterval: 30 * time.Second,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "backfill_token_output_amounts",
+				Timeout:      &backfillTokenOutputTimeout,
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					logger := logging.GetLoggerFromContext(ctx)
+
+					batchSize := int(knobsService.GetValue(knobs.KnobTasksEnableBackfillTokenOutputAmountBatchSize, 5000))
+					if batchSize == 0 {
+						logger.Info("Backfill token output amounts is disabled, skipping")
+						return nil
+					}
+
+					tx, err := ent.GetDbFromContext(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get or create current tx for request: %w", err)
+					}
+
+					outputs, err := tx.TokenOutput.Query().
+						Order(ent.Asc(tokenoutput.FieldID)).
+						Where(tokenoutput.AmountIsNil()).
+						Limit(batchSize).
+						All(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to fetch outputs for backfill: %w", err)
+					}
+
+					// Process batch
+					for _, output := range outputs {
+						var u128Amount uint128.Uint128
+						err = u128Amount.SafeSetBytes(output.TokenAmount)
+						if err != nil {
+							return fmt.Errorf("failed to set token output numeric amount: %w", err)
+						}
+
+						_, err := tx.TokenOutput.UpdateOne(output).
+							SetAmount(u128Amount).
+							Save(ctx)
+						if err != nil {
+							return fmt.Errorf("failed to backfill output %s: %w", output.ID, err)
+						}
+					}
+
+					return nil
+				},
+			},
+		},
 	}
 }
 
 func AllStartupTasks() []StartupTaskSpec {
 	entityDkgTaskTimeout := 5 * time.Minute
 	entityDkgRetryInterval := 10 * time.Second
-	backfillTokenOutputTimeout := 10 * time.Minute
 
 	return []StartupTaskSpec{
 		{
