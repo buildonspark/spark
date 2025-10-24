@@ -116,18 +116,22 @@ func (e *DBEvents) listenForEvents() error {
 	for {
 		err := e.waitForNotification()
 		if err != nil {
-			e.logger.With(zap.Error(err)).Error("error waiting for notification")
+			if errors.Is(err, context.Canceled) {
+				// We have two different contexts, one that can be cancelled when adding or removing listeners,
+				// and the main context for the entire DBEvents. We only want to return if the latter is cancelled.
+				if errors.Is(e.ctx.Err(), context.Canceled) {
+					return nil
+				}
+			} else {
+				e.logger.With(zap.Error(err)).Error("error waiting for notification")
 
-			if e.ctx.Err() != nil {
-				return e.ctx.Err()
-			}
-
-			if e.conn.PgConn().IsClosed() {
-				if err := e.reconnect(); err != nil {
-					if errors.Is(err, context.Canceled) || errors.Is(err, puddle.ErrClosedPool) {
-						return err
+				if e.conn.PgConn().IsClosed() {
+					if err := e.reconnect(); err != nil {
+						if errors.Is(err, context.Canceled) || errors.Is(err, puddle.ErrClosedPool) {
+							return nil
+						}
+						e.logger.With(zap.Error(err)).Error("error reconnecting")
 					}
-					e.logger.With(zap.Error(err)).Error("error reconnecting")
 				}
 			}
 		}
@@ -146,9 +150,6 @@ func (e *DBEvents) waitForNotification() error {
 
 	notification, err := e.conn.WaitForNotification(ctx)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			return nil
-		}
 		return err
 	}
 
