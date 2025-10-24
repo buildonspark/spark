@@ -1,4 +1,4 @@
-h1:ZrrFSl3giG3S1vv6qXLq3uZNwgIm0PDpxOMfJLVwWw4=
+h1:s9KGXLWW6Pe8wCcIq6932MDSOjoKGRCsFWodZgQABMY=
 20250228224813_baseline.sql h1:9WqkxKWZU7tp4fFZCPiExVqT+q76qkZ74xM64j7aTzc=
 20250306203211_fix_atlas.sql h1:SdaYEBYWDFvvhIBx5VYOWBtfZMHiaoKxO4EEkxGxOhc=
 20250306211926_transfer_leaf_index.sql h1:JpwabFVlmvWwmtbbMU7IR+dix+8+z4xdfHzuflYA6Xg=
@@ -84,3 +84,4 @@ h1:ZrrFSl3giG3S1vv6qXLq3uZNwgIm0PDpxOMfJLVwWw4=
 20251015193208_transfer_leaf_txids.sql h1:3UsI/xQ+PAr9vp9bSHMt2XwwRHoZYz4z3n67HJesg5o=
 20251021202107_wallet_settings.sql h1:0SQkIuI2truuSrkMf3KFN2fZEd3ni/eimdGfQsIa/Tc=
 20251021210100_add_timelocks_transfer_leaf.sql h1:erGGeZ5swGUU3mLFWcjRuEe8KGc2b11KFoMuMSfXwAY=
+20251024001036_add_numeric_amount_to_token_output.sql h1:jpswJr9+cofFSvnwr+2MCv9L3+DT616+K81eo/UgBng=

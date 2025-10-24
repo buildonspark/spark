@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
@@ -51,6 +52,26 @@ func (tou *TokenOutputUpdate) SetNillableStatus(sos *schematype.TokenOutputStatu
 	if sos != nil {
 		tou.SetStatus(*sos)
 	}
+	return tou
+}
+
+// SetAmount sets the "amount" field.
+func (tou *TokenOutputUpdate) SetAmount(u uint128.Uint128) *TokenOutputUpdate {
+	tou.mutation.SetAmount(u)
+	return tou
+}
+
+// SetNillableAmount sets the "amount" field if the given value is not nil.
+func (tou *TokenOutputUpdate) SetNillableAmount(u *uint128.Uint128) *TokenOutputUpdate {
+	if u != nil {
+		tou.SetAmount(*u)
+	}
+	return tou
+}
+
+// ClearAmount clears the value of the "amount" field.
+func (tou *TokenOutputUpdate) ClearAmount() *TokenOutputUpdate {
+	tou.mutation.ClearAmount()
 	return tou
 }
 
@@ -333,6 +354,11 @@ func (tou *TokenOutputUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.status": %w`, err)}
 		}
 	}
+	if v, ok := tou.mutation.Amount(); ok {
+		if err := v.Validate(); err != nil {
+			return &ValidationError{Name: "amount", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.amount": %w`, err)}
+		}
+	}
 	if v, ok := tou.mutation.Network(); ok {
 		if err := tokenoutput.NetworkValidator(v); err != nil {
 			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.network": %w`, err)}
@@ -373,6 +399,12 @@ func (tou *TokenOutputUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if tou.mutation.TokenPublicKeyCleared() {
 		_spec.ClearField(tokenoutput.FieldTokenPublicKey, field.TypeBytes)
+	}
+	if value, ok := tou.mutation.Amount(); ok {
+		_spec.SetField(tokenoutput.FieldAmount, field.TypeOther, value)
+	}
+	if tou.mutation.AmountCleared() {
+		_spec.ClearField(tokenoutput.FieldAmount, field.TypeOther)
 	}
 	if value, ok := tou.mutation.SpentOwnershipSignature(); ok {
 		_spec.SetField(tokenoutput.FieldSpentOwnershipSignature, field.TypeBytes, value)
@@ -600,6 +632,26 @@ func (touo *TokenOutputUpdateOne) SetNillableStatus(sos *schematype.TokenOutputS
 	if sos != nil {
 		touo.SetStatus(*sos)
 	}
+	return touo
+}
+
+// SetAmount sets the "amount" field.
+func (touo *TokenOutputUpdateOne) SetAmount(u uint128.Uint128) *TokenOutputUpdateOne {
+	touo.mutation.SetAmount(u)
+	return touo
+}
+
+// SetNillableAmount sets the "amount" field if the given value is not nil.
+func (touo *TokenOutputUpdateOne) SetNillableAmount(u *uint128.Uint128) *TokenOutputUpdateOne {
+	if u != nil {
+		touo.SetAmount(*u)
+	}
+	return touo
+}
+
+// ClearAmount clears the value of the "amount" field.
+func (touo *TokenOutputUpdateOne) ClearAmount() *TokenOutputUpdateOne {
+	touo.mutation.ClearAmount()
 	return touo
 }
 
@@ -895,6 +947,11 @@ func (touo *TokenOutputUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.status": %w`, err)}
 		}
 	}
+	if v, ok := touo.mutation.Amount(); ok {
+		if err := v.Validate(); err != nil {
+			return &ValidationError{Name: "amount", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.amount": %w`, err)}
+		}
+	}
 	if v, ok := touo.mutation.Network(); ok {
 		if err := tokenoutput.NetworkValidator(v); err != nil {
 			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.network": %w`, err)}
@@ -952,6 +1009,12 @@ func (touo *TokenOutputUpdateOne) sqlSave(ctx context.Context) (_node *TokenOutp
 	}
 	if touo.mutation.TokenPublicKeyCleared() {
 		_spec.ClearField(tokenoutput.FieldTokenPublicKey, field.TypeBytes)
+	}
+	if value, ok := touo.mutation.Amount(); ok {
+		_spec.SetField(tokenoutput.FieldAmount, field.TypeOther, value)
+	}
+	if touo.mutation.AmountCleared() {
+		_spec.ClearField(tokenoutput.FieldAmount, field.TypeOther)
 	}
 	if value, ok := touo.mutation.SpentOwnershipSignature(); ok {
 		_spec.SetField(tokenoutput.FieldSpentOwnershipSignature, field.TypeBytes, value)

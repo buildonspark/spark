@@ -5,11 +5,13 @@ import (
 	"fmt"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/uint128"
 	entgen "github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
@@ -35,7 +37,17 @@ func (TokenOutput) Fields() []ent.Field {
 		field.Uint64("withdraw_relative_block_locktime").Immutable(),
 		field.Bytes("withdraw_revocation_commitment").Immutable(),
 		field.Bytes("token_public_key").Immutable().Optional().GoType(keys.Public{}),
-		field.Bytes("token_amount").NotEmpty().Immutable(),
+		field.Bytes("token_amount").
+			NotEmpty().
+			Immutable().
+			Comment("The uint128 token amount in this output as a byte array."),
+		field.Other("amount", uint128.Uint128{}).
+			SchemaType(map[string]string{
+				dialect.Postgres: "NUMERIC(39,0)",
+				dialect.SQLite:   "TEXT", // Go driver reads SQLite NUMERIC as float, causing a loss of precision. Use TEXT instead.
+			}).
+			Optional().
+			Comment("The uint128 token amount in this output as a numeric."),
 		field.Int32("created_transaction_output_vout").Immutable(),
 		field.Bytes("spent_ownership_signature").Optional(),
 		field.Bytes("spent_operator_specific_ownership_signature").Optional(),

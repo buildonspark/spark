@@ -15,6 +15,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
+	"github.com/lightsparkdev/spark/common/uint128"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so"
@@ -329,6 +330,16 @@ func CreateStartedTransactionEntities(
 		if err != nil {
 			return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse output token owner public key: %w", err))
 		}
+
+		var u128Amount uint128.Uint128
+		if len(output.TokenAmount) != 16 {
+			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("token amount must be 16 bytes"))
+		}
+		err = u128Amount.SafeSetBytes(output.TokenAmount)
+		if err != nil {
+			return nil, fmt.Errorf("invalid token amount when converting proto bytes to uint128: %w", err)
+		}
+
 		outputEnts = append(
 			outputEnts,
 			db.TokenOutput.
@@ -342,6 +353,7 @@ func CreateStartedTransactionEntities(
 				SetTokenPublicKey(issuerPublicKeyToWrite).
 				SetTokenIdentifier(tokenIdentifierToWrite).
 				SetTokenAmount(output.TokenAmount).
+				SetAmount(u128Amount).
 				SetNetwork(network).
 				SetCreatedTransactionOutputVout(int32(outputIndex)).
 				SetRevocationKeyshareID(revocationUUID).

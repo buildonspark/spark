@@ -11,6 +11,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
@@ -39,8 +40,10 @@ type TokenOutput struct {
 	WithdrawRevocationCommitment []byte `json:"withdraw_revocation_commitment,omitempty"`
 	// TokenPublicKey holds the value of the "token_public_key" field.
 	TokenPublicKey keys.Public `json:"token_public_key,omitempty"`
-	// TokenAmount holds the value of the "token_amount" field.
+	// The uint128 token amount in this output as a byte array.
 	TokenAmount []byte `json:"token_amount,omitempty"`
+	// The uint128 token amount in this output as a numeric.
+	Amount uint128.Uint128 `json:"amount,omitempty"`
 	// CreatedTransactionOutputVout holds the value of the "created_transaction_output_vout" field.
 	CreatedTransactionOutputVout int32 `json:"created_transaction_output_vout,omitempty"`
 	// SpentOwnershipSignature holds the value of the "spent_ownership_signature" field.
@@ -166,6 +169,8 @@ func (*TokenOutput) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullString)
 		case tokenoutput.FieldCreateTime, tokenoutput.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
+		case tokenoutput.FieldAmount:
+			values[i] = new(uint128.Uint128)
 		case tokenoutput.FieldID, tokenoutput.FieldTokenCreateID:
 			values[i] = new(uuid.UUID)
 		case tokenoutput.ForeignKeys[0]: // token_output_revocation_keyshare
@@ -248,6 +253,12 @@ func (to *TokenOutput) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field token_amount", values[i])
 			} else if value != nil {
 				to.TokenAmount = *value
+			}
+		case tokenoutput.FieldAmount:
+			if value, ok := values[i].(*uint128.Uint128); !ok {
+				return fmt.Errorf("unexpected type %T for field amount", values[i])
+			} else if value != nil {
+				to.Amount = *value
 			}
 		case tokenoutput.FieldCreatedTransactionOutputVout:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -416,6 +427,9 @@ func (to *TokenOutput) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("token_amount=")
 	builder.WriteString(fmt.Sprintf("%v", to.TokenAmount))
+	builder.WriteString(", ")
+	builder.WriteString("amount=")
+	builder.WriteString(fmt.Sprintf("%v", to.Amount))
 	builder.WriteString(", ")
 	builder.WriteString("created_transaction_output_vout=")
 	builder.WriteString(fmt.Sprintf("%v", to.CreatedTransactionOutputVout))

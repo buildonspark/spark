@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/tokencreate"
@@ -105,6 +106,20 @@ func (toc *TokenOutputCreate) SetNillableTokenPublicKey(k *keys.Public) *TokenOu
 // SetTokenAmount sets the "token_amount" field.
 func (toc *TokenOutputCreate) SetTokenAmount(b []byte) *TokenOutputCreate {
 	toc.mutation.SetTokenAmount(b)
+	return toc
+}
+
+// SetAmount sets the "amount" field.
+func (toc *TokenOutputCreate) SetAmount(u uint128.Uint128) *TokenOutputCreate {
+	toc.mutation.SetAmount(u)
+	return toc
+}
+
+// SetNillableAmount sets the "amount" field if the given value is not nil.
+func (toc *TokenOutputCreate) SetNillableAmount(u *uint128.Uint128) *TokenOutputCreate {
+	if u != nil {
+		toc.SetAmount(*u)
+	}
 	return toc
 }
 
@@ -381,6 +396,11 @@ func (toc *TokenOutputCreate) check() error {
 			return &ValidationError{Name: "token_amount", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.token_amount": %w`, err)}
 		}
 	}
+	if v, ok := toc.mutation.Amount(); ok {
+		if err := v.Validate(); err != nil {
+			return &ValidationError{Name: "amount", err: fmt.Errorf(`ent: validator failed for field "TokenOutput.amount": %w`, err)}
+		}
+	}
 	if _, ok := toc.mutation.CreatedTransactionOutputVout(); !ok {
 		return &ValidationError{Name: "created_transaction_output_vout", err: errors.New(`ent: missing required field "TokenOutput.created_transaction_output_vout"`)}
 	}
@@ -472,6 +492,10 @@ func (toc *TokenOutputCreate) createSpec() (*TokenOutput, *sqlgraph.CreateSpec) 
 	if value, ok := toc.mutation.TokenAmount(); ok {
 		_spec.SetField(tokenoutput.FieldTokenAmount, field.TypeBytes, value)
 		_node.TokenAmount = value
+	}
+	if value, ok := toc.mutation.Amount(); ok {
+		_spec.SetField(tokenoutput.FieldAmount, field.TypeOther, value)
+		_node.Amount = value
 	}
 	if value, ok := toc.mutation.CreatedTransactionOutputVout(); ok {
 		_spec.SetField(tokenoutput.FieldCreatedTransactionOutputVout, field.TypeInt32, value)
@@ -678,6 +702,24 @@ func (u *TokenOutputUpsert) SetStatus(v schematype.TokenOutputStatus) *TokenOutp
 // UpdateStatus sets the "status" field to the value that was provided on create.
 func (u *TokenOutputUpsert) UpdateStatus() *TokenOutputUpsert {
 	u.SetExcluded(tokenoutput.FieldStatus)
+	return u
+}
+
+// SetAmount sets the "amount" field.
+func (u *TokenOutputUpsert) SetAmount(v uint128.Uint128) *TokenOutputUpsert {
+	u.Set(tokenoutput.FieldAmount, v)
+	return u
+}
+
+// UpdateAmount sets the "amount" field to the value that was provided on create.
+func (u *TokenOutputUpsert) UpdateAmount() *TokenOutputUpsert {
+	u.SetExcluded(tokenoutput.FieldAmount)
+	return u
+}
+
+// ClearAmount clears the value of the "amount" field.
+func (u *TokenOutputUpsert) ClearAmount() *TokenOutputUpsert {
+	u.SetNull(tokenoutput.FieldAmount)
 	return u
 }
 
@@ -898,6 +940,27 @@ func (u *TokenOutputUpsertOne) SetStatus(v schematype.TokenOutputStatus) *TokenO
 func (u *TokenOutputUpsertOne) UpdateStatus() *TokenOutputUpsertOne {
 	return u.Update(func(s *TokenOutputUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetAmount sets the "amount" field.
+func (u *TokenOutputUpsertOne) SetAmount(v uint128.Uint128) *TokenOutputUpsertOne {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.SetAmount(v)
+	})
+}
+
+// UpdateAmount sets the "amount" field to the value that was provided on create.
+func (u *TokenOutputUpsertOne) UpdateAmount() *TokenOutputUpsertOne {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.UpdateAmount()
+	})
+}
+
+// ClearAmount clears the value of the "amount" field.
+func (u *TokenOutputUpsertOne) ClearAmount() *TokenOutputUpsertOne {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.ClearAmount()
 	})
 }
 
@@ -1304,6 +1367,27 @@ func (u *TokenOutputUpsertBulk) SetStatus(v schematype.TokenOutputStatus) *Token
 func (u *TokenOutputUpsertBulk) UpdateStatus() *TokenOutputUpsertBulk {
 	return u.Update(func(s *TokenOutputUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetAmount sets the "amount" field.
+func (u *TokenOutputUpsertBulk) SetAmount(v uint128.Uint128) *TokenOutputUpsertBulk {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.SetAmount(v)
+	})
+}
+
+// UpdateAmount sets the "amount" field to the value that was provided on create.
+func (u *TokenOutputUpsertBulk) UpdateAmount() *TokenOutputUpsertBulk {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.UpdateAmount()
+	})
+}
+
+// ClearAmount clears the value of the "amount" field.
+func (u *TokenOutputUpsertBulk) ClearAmount() *TokenOutputUpsertBulk {
+	return u.Update(func(s *TokenOutputUpsert) {
+		s.ClearAmount()
 	})
 }
 

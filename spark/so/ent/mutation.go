@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
@@ -13426,6 +13427,7 @@ type TokenOutputMutation struct {
 	withdraw_revocation_commitment                 *[]byte
 	token_public_key                               *keys.Public
 	token_amount                                   *[]byte
+	amount                                         *uint128.Uint128
 	created_transaction_output_vout                *int32
 	addcreated_transaction_output_vout             *int32
 	spent_ownership_signature                      *[]byte
@@ -13935,6 +13937,55 @@ func (m *TokenOutputMutation) OldTokenAmount(ctx context.Context) (v []byte, err
 // ResetTokenAmount resets all changes to the "token_amount" field.
 func (m *TokenOutputMutation) ResetTokenAmount() {
 	m.token_amount = nil
+}
+
+// SetAmount sets the "amount" field.
+func (m *TokenOutputMutation) SetAmount(u uint128.Uint128) {
+	m.amount = &u
+}
+
+// Amount returns the value of the "amount" field in the mutation.
+func (m *TokenOutputMutation) Amount() (r uint128.Uint128, exists bool) {
+	v := m.amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAmount returns the old "amount" field's value of the TokenOutput entity.
+// If the TokenOutput object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TokenOutputMutation) OldAmount(ctx context.Context) (v uint128.Uint128, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAmount: %w", err)
+	}
+	return oldValue.Amount, nil
+}
+
+// ClearAmount clears the value of the "amount" field.
+func (m *TokenOutputMutation) ClearAmount() {
+	m.amount = nil
+	m.clearedFields[tokenoutput.FieldAmount] = struct{}{}
+}
+
+// AmountCleared returns if the "amount" field was cleared in this mutation.
+func (m *TokenOutputMutation) AmountCleared() bool {
+	_, ok := m.clearedFields[tokenoutput.FieldAmount]
+	return ok
+}
+
+// ResetAmount resets all changes to the "amount" field.
+func (m *TokenOutputMutation) ResetAmount() {
+	m.amount = nil
+	delete(m.clearedFields, tokenoutput.FieldAmount)
 }
 
 // SetCreatedTransactionOutputVout sets the "created_transaction_output_vout" field.
@@ -14666,7 +14717,7 @@ func (m *TokenOutputMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TokenOutputMutation) Fields() []string {
-	fields := make([]string, 0, 18)
+	fields := make([]string, 0, 19)
 	if m.create_time != nil {
 		fields = append(fields, tokenoutput.FieldCreateTime)
 	}
@@ -14693,6 +14744,9 @@ func (m *TokenOutputMutation) Fields() []string {
 	}
 	if m.token_amount != nil {
 		fields = append(fields, tokenoutput.FieldTokenAmount)
+	}
+	if m.amount != nil {
+		fields = append(fields, tokenoutput.FieldAmount)
 	}
 	if m.created_transaction_output_vout != nil {
 		fields = append(fields, tokenoutput.FieldCreatedTransactionOutputVout)
@@ -14747,6 +14801,8 @@ func (m *TokenOutputMutation) Field(name string) (ent.Value, bool) {
 		return m.TokenPublicKey()
 	case tokenoutput.FieldTokenAmount:
 		return m.TokenAmount()
+	case tokenoutput.FieldAmount:
+		return m.Amount()
 	case tokenoutput.FieldCreatedTransactionOutputVout:
 		return m.CreatedTransactionOutputVout()
 	case tokenoutput.FieldSpentOwnershipSignature:
@@ -14792,6 +14848,8 @@ func (m *TokenOutputMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldTokenPublicKey(ctx)
 	case tokenoutput.FieldTokenAmount:
 		return m.OldTokenAmount(ctx)
+	case tokenoutput.FieldAmount:
+		return m.OldAmount(ctx)
 	case tokenoutput.FieldCreatedTransactionOutputVout:
 		return m.OldCreatedTransactionOutputVout(ctx)
 	case tokenoutput.FieldSpentOwnershipSignature:
@@ -14881,6 +14939,13 @@ func (m *TokenOutputMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTokenAmount(v)
+		return nil
+	case tokenoutput.FieldAmount:
+		v, ok := value.(uint128.Uint128)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAmount(v)
 		return nil
 	case tokenoutput.FieldCreatedTransactionOutputVout:
 		v, ok := value.(int32)
@@ -15029,6 +15094,9 @@ func (m *TokenOutputMutation) ClearedFields() []string {
 	if m.FieldCleared(tokenoutput.FieldTokenPublicKey) {
 		fields = append(fields, tokenoutput.FieldTokenPublicKey)
 	}
+	if m.FieldCleared(tokenoutput.FieldAmount) {
+		fields = append(fields, tokenoutput.FieldAmount)
+	}
 	if m.FieldCleared(tokenoutput.FieldSpentOwnershipSignature) {
 		fields = append(fields, tokenoutput.FieldSpentOwnershipSignature)
 	}
@@ -15063,6 +15131,9 @@ func (m *TokenOutputMutation) ClearField(name string) error {
 	switch name {
 	case tokenoutput.FieldTokenPublicKey:
 		m.ClearTokenPublicKey()
+		return nil
+	case tokenoutput.FieldAmount:
+		m.ClearAmount()
 		return nil
 	case tokenoutput.FieldSpentOwnershipSignature:
 		m.ClearSpentOwnershipSignature()
@@ -15116,6 +15187,9 @@ func (m *TokenOutputMutation) ResetField(name string) error {
 		return nil
 	case tokenoutput.FieldTokenAmount:
 		m.ResetTokenAmount()
+		return nil
+	case tokenoutput.FieldAmount:
+		m.ResetAmount()
 		return nil
 	case tokenoutput.FieldCreatedTransactionOutputVout:
 		m.ResetCreatedTransactionOutputVout()

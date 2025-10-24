@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -96,6 +97,11 @@ func TokenPublicKey(v keys.Public) predicate.TokenOutput {
 // TokenAmount applies equality check predicate on the "token_amount" field. It's identical to TokenAmountEQ.
 func TokenAmount(v []byte) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldEQ(FieldTokenAmount, v))
+}
+
+// Amount applies equality check predicate on the "amount" field. It's identical to AmountEQ.
+func Amount(v uint128.Uint128) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldEQ(FieldAmount, v))
 }
 
 // CreatedTransactionOutputVout applies equality check predicate on the "created_transaction_output_vout" field. It's identical to CreatedTransactionOutputVoutEQ.
@@ -496,6 +502,56 @@ func TokenAmountLT(v []byte) predicate.TokenOutput {
 // TokenAmountLTE applies the LTE predicate on the "token_amount" field.
 func TokenAmountLTE(v []byte) predicate.TokenOutput {
 	return predicate.TokenOutput(sql.FieldLTE(FieldTokenAmount, v))
+}
+
+// AmountEQ applies the EQ predicate on the "amount" field.
+func AmountEQ(v uint128.Uint128) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldEQ(FieldAmount, v))
+}
+
+// AmountNEQ applies the NEQ predicate on the "amount" field.
+func AmountNEQ(v uint128.Uint128) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNEQ(FieldAmount, v))
+}
+
+// AmountIn applies the In predicate on the "amount" field.
+func AmountIn(vs ...uint128.Uint128) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldIn(FieldAmount, vs...))
+}
+
+// AmountNotIn applies the NotIn predicate on the "amount" field.
+func AmountNotIn(vs ...uint128.Uint128) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNotIn(FieldAmount, vs...))
+}
+
+// AmountGT applies the GT predicate on the "amount" field.
+func AmountGT(v uint128.Uint128) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldGT(FieldAmount, v))
+}
+
+// AmountGTE applies the GTE predicate on the "amount" field.
+func AmountGTE(v uint128.Uint128) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldGTE(FieldAmount, v))
+}
+
+// AmountLT applies the LT predicate on the "amount" field.
+func AmountLT(v uint128.Uint128) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldLT(FieldAmount, v))
+}
+
+// AmountLTE applies the LTE predicate on the "amount" field.
+func AmountLTE(v uint128.Uint128) predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldLTE(FieldAmount, v))
+}
+
+// AmountIsNil applies the IsNil predicate on the "amount" field.
+func AmountIsNil() predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldIsNull(FieldAmount))
+}
+
+// AmountNotNil applies the NotNil predicate on the "amount" field.
+func AmountNotNil() predicate.TokenOutput {
+	return predicate.TokenOutput(sql.FieldNotNull(FieldAmount))
 }
 
 // CreatedTransactionOutputVoutEQ applies the EQ predicate on the "created_transaction_output_vout" field.

@@ -36,6 +36,8 @@ const (
 	FieldTokenPublicKey = "token_public_key"
 	// FieldTokenAmount holds the string denoting the token_amount field in the database.
 	FieldTokenAmount = "token_amount"
+	// FieldAmount holds the string denoting the amount field in the database.
+	FieldAmount = "amount"
 	// FieldCreatedTransactionOutputVout holds the string denoting the created_transaction_output_vout field in the database.
 	FieldCreatedTransactionOutputVout = "created_transaction_output_vout"
 	// FieldSpentOwnershipSignature holds the string denoting the spent_ownership_signature field in the database.
@@ -122,6 +124,7 @@ var Columns = []string{
 	FieldWithdrawRevocationCommitment,
 	FieldTokenPublicKey,
 	FieldTokenAmount,
+	FieldAmount,
 	FieldCreatedTransactionOutputVout,
 	FieldSpentOwnershipSignature,
 	FieldSpentOperatorSpecificOwnershipSignature,
@@ -232,6 +235,11 @@ func ByWithdrawBondSats(opts ...sql.OrderTermOption) OrderOption {
 // ByWithdrawRelativeBlockLocktime orders the results by the withdraw_relative_block_locktime field.
 func ByWithdrawRelativeBlockLocktime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldWithdrawRelativeBlockLocktime, opts...).ToFunc()
+}
+
+// ByAmount orders the results by the amount field.
+func ByAmount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAmount, opts...).ToFunc()
 }
 
 // ByCreatedTransactionOutputVout orders the results by the created_transaction_output_vout field.
