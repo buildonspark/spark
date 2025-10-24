@@ -10,6 +10,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/walletsetting"
 )
 
@@ -22,8 +23,8 @@ type WalletSetting struct {
 	CreateTime time.Time `json:"create_time,omitempty"`
 	// UpdateTime holds the value of the "update_time" field.
 	UpdateTime time.Time `json:"update_time,omitempty"`
-	// OwnerIdentityPublicKey holds the value of the "owner_identity_public_key" field.
-	OwnerIdentityPublicKey []byte `json:"owner_identity_public_key,omitempty"`
+	// Signing public key of the owner of the deposit address.
+	OwnerIdentityPublicKey keys.Public `json:"owner_identity_public_key,omitempty"`
 	// PrivateEnabled holds the value of the "private_enabled" field.
 	PrivateEnabled bool `json:"private_enabled,omitempty"`
 	selectValues   sql.SelectValues
@@ -35,7 +36,7 @@ func (*WalletSetting) scanValues(columns []string) ([]any, error) {
 	for i := range columns {
 		switch columns[i] {
 		case walletsetting.FieldOwnerIdentityPublicKey:
-			values[i] = new([]byte)
+			values[i] = new(keys.Public)
 		case walletsetting.FieldPrivateEnabled:
 			values[i] = new(sql.NullBool)
 		case walletsetting.FieldCreateTime, walletsetting.FieldUpdateTime:
@@ -76,7 +77,7 @@ func (ws *WalletSetting) assignValues(columns []string, values []any) error {
 				ws.UpdateTime = value.Time
 			}
 		case walletsetting.FieldOwnerIdentityPublicKey:
-			if value, ok := values[i].(*[]byte); !ok {
+			if value, ok := values[i].(*keys.Public); !ok {
 				return fmt.Errorf("unexpected type %T for field owner_identity_public_key", values[i])
 			} else if value != nil {
 				ws.OwnerIdentityPublicKey = *value

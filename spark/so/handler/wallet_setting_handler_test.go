@@ -55,10 +55,10 @@ func TestUpdateWalletSetting_CreateNew(t *testing.T) {
 
 	savedSetting, err := database.WalletSetting.
 		Query().
-		Where(walletsetting.OwnerIdentityPublicKey(identityPubKey.Serialize())).
+		Where(walletsetting.OwnerIdentityPublicKey(identityPubKey)).
 		Only(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, identityPubKey.Serialize(), savedSetting.OwnerIdentityPublicKey)
+	assert.Equal(t, identityPubKey, savedSetting.OwnerIdentityPublicKey)
 	assert.True(t, savedSetting.PrivateEnabled)
 }
 
@@ -79,7 +79,7 @@ func TestUpdateWalletSetting_UpdateExisting(t *testing.T) {
 
 	existingSetting, err := database.WalletSetting.
 		Create().
-		SetOwnerIdentityPublicKey(identityPubKey.Serialize()).
+		SetOwnerIdentityPublicKey(identityPubKey).
 		SetPrivateEnabled(false).
 		Save(ctx)
 	require.NoError(t, err)
@@ -104,10 +104,10 @@ func TestUpdateWalletSetting_UpdateExisting(t *testing.T) {
 	// Verify it was updated in database
 	updatedSetting, err := database.WalletSetting.
 		Query().
-		Where(walletsetting.OwnerIdentityPublicKey(identityPubKey.Serialize())).
+		Where(walletsetting.OwnerIdentityPublicKey(identityPubKey)).
 		Only(ctx)
 	require.NoError(t, err)
-	assert.Equal(t, identityPubKey.Serialize(), updatedSetting.OwnerIdentityPublicKey)
+	assert.Equal(t, identityPubKey, updatedSetting.OwnerIdentityPublicKey)
 	assert.True(t, updatedSetting.PrivateEnabled)
 	assert.Equal(t, existingSetting.ID, updatedSetting.ID) // Same record
 }
@@ -180,7 +180,7 @@ func TestIsPrivacyEnabled_NoWalletSetting(t *testing.T) {
 	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
 
 	// Test when no wallet setting exists - should return false (default)
-	isEnabled, err := walletSettingHandler.IsPrivacyEnabled(ctx, identityPubKey.Serialize())
+	isEnabled, err := walletSettingHandler.IsPrivacyEnabled(ctx, identityPubKey)
 	require.NoError(t, err)
 	assert.False(t, isEnabled)
 }
@@ -217,7 +217,7 @@ func TestIsPrivacyEnabled_WithWalletSetting(t *testing.T) {
 
 			_, err = database.WalletSetting.
 				Create().
-				SetOwnerIdentityPublicKey(identityPubKey.Serialize()).
+				SetOwnerIdentityPublicKey(identityPubKey).
 				SetPrivateEnabled(tc.privateEnabled).
 				Save(ctx)
 			require.NoError(t, err)
@@ -225,7 +225,7 @@ func TestIsPrivacyEnabled_WithWalletSetting(t *testing.T) {
 			walletSettingHandler := handler.NewWalletSettingHandler(cfg)
 
 			// Test the IsPrivacyEnabled function
-			isEnabled, err := walletSettingHandler.IsPrivacyEnabled(ctx, identityPubKey.Serialize())
+			isEnabled, err := walletSettingHandler.IsPrivacyEnabled(ctx, identityPubKey)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectedResult, isEnabled)
 		})

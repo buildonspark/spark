@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+	"github.com/lightsparkdev/spark/common/keys"
 )
 
 type WalletSetting struct {
@@ -20,7 +21,11 @@ func (WalletSetting) Mixin() []ent.Mixin {
 // Fields are the fields for the WalletSetting table.
 func (WalletSetting) Fields() []ent.Field {
 	return []ent.Field{
-		field.Bytes("owner_identity_public_key").Unique().Immutable(),
+		field.Bytes("owner_identity_public_key").
+			Unique().
+			Immutable().
+			GoType(keys.Public{}).
+			Comment("Signing public key of the owner of the deposit address."),
 		field.Bool("private_enabled").Default(false),
 	}
 }

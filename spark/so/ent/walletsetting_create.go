@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/walletsetting"
 )
 
@@ -53,8 +54,8 @@ func (wsc *WalletSettingCreate) SetNillableUpdateTime(t *time.Time) *WalletSetti
 }
 
 // SetOwnerIdentityPublicKey sets the "owner_identity_public_key" field.
-func (wsc *WalletSettingCreate) SetOwnerIdentityPublicKey(b []byte) *WalletSettingCreate {
-	wsc.mutation.SetOwnerIdentityPublicKey(b)
+func (wsc *WalletSettingCreate) SetOwnerIdentityPublicKey(k keys.Public) *WalletSettingCreate {
+	wsc.mutation.SetOwnerIdentityPublicKey(k)
 	return wsc
 }
 

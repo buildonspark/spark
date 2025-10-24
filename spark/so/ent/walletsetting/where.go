@@ -7,6 +7,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 )
 
@@ -66,7 +67,7 @@ func UpdateTime(v time.Time) predicate.WalletSetting {
 }
 
 // OwnerIdentityPublicKey applies equality check predicate on the "owner_identity_public_key" field. It's identical to OwnerIdentityPublicKeyEQ.
-func OwnerIdentityPublicKey(v []byte) predicate.WalletSetting {
+func OwnerIdentityPublicKey(v keys.Public) predicate.WalletSetting {
 	return predicate.WalletSetting(sql.FieldEQ(FieldOwnerIdentityPublicKey, v))
 }
 
@@ -156,42 +157,42 @@ func UpdateTimeLTE(v time.Time) predicate.WalletSetting {
 }
 
 // OwnerIdentityPublicKeyEQ applies the EQ predicate on the "owner_identity_public_key" field.
-func OwnerIdentityPublicKeyEQ(v []byte) predicate.WalletSetting {
+func OwnerIdentityPublicKeyEQ(v keys.Public) predicate.WalletSetting {
 	return predicate.WalletSetting(sql.FieldEQ(FieldOwnerIdentityPublicKey, v))
 }
 
 // OwnerIdentityPublicKeyNEQ applies the NEQ predicate on the "owner_identity_public_key" field.
-func OwnerIdentityPublicKeyNEQ(v []byte) predicate.WalletSetting {
+func OwnerIdentityPublicKeyNEQ(v keys.Public) predicate.WalletSetting {
 	return predicate.WalletSetting(sql.FieldNEQ(FieldOwnerIdentityPublicKey, v))
 }
 
 // OwnerIdentityPublicKeyIn applies the In predicate on the "owner_identity_public_key" field.
-func OwnerIdentityPublicKeyIn(vs ...[]byte) predicate.WalletSetting {
+func OwnerIdentityPublicKeyIn(vs ...keys.Public) predicate.WalletSetting {
 	return predicate.WalletSetting(sql.FieldIn(FieldOwnerIdentityPublicKey, vs...))
 }
 
 // OwnerIdentityPublicKeyNotIn applies the NotIn predicate on the "owner_identity_public_key" field.
-func OwnerIdentityPublicKeyNotIn(vs ...[]byte) predicate.WalletSetting {
+func OwnerIdentityPublicKeyNotIn(vs ...keys.Public) predicate.WalletSetting {
 	return predicate.WalletSetting(sql.FieldNotIn(FieldOwnerIdentityPublicKey, vs...))
 }
 
 // OwnerIdentityPublicKeyGT applies the GT predicate on the "owner_identity_public_key" field.
-func OwnerIdentityPublicKeyGT(v []byte) predicate.WalletSetting {
+func OwnerIdentityPublicKeyGT(v keys.Public) predicate.WalletSetting {
 	return predicate.WalletSetting(sql.FieldGT(FieldOwnerIdentityPublicKey, v))
 }
 
 // OwnerIdentityPublicKeyGTE applies the GTE predicate on the "owner_identity_public_key" field.
-func OwnerIdentityPublicKeyGTE(v []byte) predicate.WalletSetting {
+func OwnerIdentityPublicKeyGTE(v keys.Public) predicate.WalletSetting {
 	return predicate.WalletSetting(sql.FieldGTE(FieldOwnerIdentityPublicKey, v))
 }
 
 // OwnerIdentityPublicKeyLT applies the LT predicate on the "owner_identity_public_key" field.
-func OwnerIdentityPublicKeyLT(v []byte) predicate.WalletSetting {
+func OwnerIdentityPublicKeyLT(v keys.Public) predicate.WalletSetting {
 	return predicate.WalletSetting(sql.FieldLT(FieldOwnerIdentityPublicKey, v))
 }
 
 // OwnerIdentityPublicKeyLTE applies the LTE predicate on the "owner_identity_public_key" field.
-func OwnerIdentityPublicKeyLTE(v []byte) predicate.WalletSetting {
+func OwnerIdentityPublicKeyLTE(v keys.Public) predicate.WalletSetting {
 	return predicate.WalletSetting(sql.FieldLTE(FieldOwnerIdentityPublicKey, v))
 }
 

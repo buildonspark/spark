@@ -26891,7 +26891,7 @@ type WalletSettingMutation struct {
 	id                        *uuid.UUID
 	create_time               *time.Time
 	update_time               *time.Time
-	owner_identity_public_key *[]byte
+	owner_identity_public_key *keys.Public
 	private_enabled           *bool
 	clearedFields             map[string]struct{}
 	done                      bool
@@ -27076,12 +27076,12 @@ func (m *WalletSettingMutation) ResetUpdateTime() {
 }
 
 // SetOwnerIdentityPublicKey sets the "owner_identity_public_key" field.
-func (m *WalletSettingMutation) SetOwnerIdentityPublicKey(b []byte) {
-	m.owner_identity_public_key = &b
+func (m *WalletSettingMutation) SetOwnerIdentityPublicKey(k keys.Public) {
+	m.owner_identity_public_key = &k
 }
 
 // OwnerIdentityPublicKey returns the value of the "owner_identity_public_key" field in the mutation.
-func (m *WalletSettingMutation) OwnerIdentityPublicKey() (r []byte, exists bool) {
+func (m *WalletSettingMutation) OwnerIdentityPublicKey() (r keys.Public, exists bool) {
 	v := m.owner_identity_public_key
 	if v == nil {
 		return
@@ -27092,7 +27092,7 @@ func (m *WalletSettingMutation) OwnerIdentityPublicKey() (r []byte, exists bool)
 // OldOwnerIdentityPublicKey returns the old "owner_identity_public_key" field's value of the WalletSetting entity.
 // If the WalletSetting object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *WalletSettingMutation) OldOwnerIdentityPublicKey(ctx context.Context) (v []byte, err error) {
+func (m *WalletSettingMutation) OldOwnerIdentityPublicKey(ctx context.Context) (v keys.Public, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldOwnerIdentityPublicKey is only allowed on UpdateOne operations")
 	}
@@ -27251,7 +27251,7 @@ func (m *WalletSettingMutation) SetField(name string, value ent.Value) error {
 		m.SetUpdateTime(v)
 		return nil
 	case walletsetting.FieldOwnerIdentityPublicKey:
-		v, ok := value.([]byte)
+		v, ok := value.(keys.Public)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

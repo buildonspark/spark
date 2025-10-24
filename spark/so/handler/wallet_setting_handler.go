@@ -6,6 +6,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -65,13 +66,18 @@ func (h *WalletSettingHandler) UpdateWalletSetting(ctx context.Context, request 
 	return response, nil
 }
 
-func (h *WalletSettingHandler) UpdateWalletSettingInternal(ctx context.Context, ownerIdentityPublicKey []byte, privateEnabled *bool) (*ent.WalletSetting, error) {
+func (h *WalletSettingHandler) UpdateWalletSettingInternal(ctx context.Context, ownerIdentityPublicKeyBytes []byte, privateEnabled *bool) (*ent.WalletSetting, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	// Get current wallet setting from database
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get database from context: %w", err)
+	}
+
+	ownerIdentityPublicKey, err := keys.ParsePublicKey(ownerIdentityPublicKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
 	}
 
 	walletSetting, err := db.WalletSetting.
@@ -139,7 +145,7 @@ func (h *WalletSettingHandler) sendWalletSettingUpdateGossipMessage(ctx context.
 
 // IsPrivacyEnabled checks if privacy is enabled for the given identity public key.
 // Returns the stored privacy_enabled value if wallet setting exists, otherwise returns false (default).
-func (h *WalletSettingHandler) IsPrivacyEnabled(ctx context.Context, identityPublicKey []byte) (bool, error) {
+func (h *WalletSettingHandler) IsPrivacyEnabled(ctx context.Context, identityPublicKey keys.Public) (bool, error) {
 	knobService := knobs.GetKnobsService(ctx)
 	if knobService != nil {
 		if !knobService.RolloutRandom(knobs.KnobPrivacyEnabled, 0) {
@@ -171,7 +177,7 @@ func (h *WalletSettingHandler) IsPrivacyEnabled(ctx context.Context, identityPub
 // marshalWalletSettingToProto converts a WalletSetting to a spark protobuf WalletSetting.
 func (h *WalletSettingHandler) marshalWalletSettingToProto(ws *ent.WalletSetting) *pb.WalletSetting {
 	return &pb.WalletSetting{
-		OwnerIdentityPublicKey: ws.OwnerIdentityPublicKey,
+		OwnerIdentityPublicKey: ws.OwnerIdentityPublicKey.Serialize(),
 		PrivateEnabled:         ws.PrivateEnabled,
 	}
 }
