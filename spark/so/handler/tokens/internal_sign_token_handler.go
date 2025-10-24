@@ -167,7 +167,7 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 		return nil, fmt.Errorf("unable to parse request operator identity public key: %w", err)
 	}
 	reqOperatorIdentifier := h.config.GetOperatorIdentifierFromIdentityPublicKey(reqPubKey)
-	logger.Sugar().Infof("exchanging revocation secret shares with operator %d", reqOperatorIdentifier)
+	logger.Sugar().Infof("exchanging revocation secret shares with operator %s", reqOperatorIdentifier)
 
 	// Verify the incoming operator signatures package
 	operatorSignatures := make(operatorSignaturesMap)

@@ -1384,7 +1384,7 @@ func (o *DepositHandler) InitiateUtxoSwap(ctx context.Context, config *so.Config
 	defer span.End()
 
 	logger := logging.GetLoggerFromContext(ctx)
-	logger.Sugar().Infof("Starting InitiateUtxoSwap request for on-chain utxo %x:%d with coordinator %d", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout, config.Identifier)
+	logger.Sugar().Infof("Starting InitiateUtxoSwap request for on-chain utxo %x:%d with coordinator %s", req.OnChainUtxo.Txid, req.OnChainUtxo.Vout, config.Identifier)
 
 	// Check if the swap is already completed for the caller
 	db, err := ent.GetDbFromContext(ctx)

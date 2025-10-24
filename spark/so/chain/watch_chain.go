@@ -492,7 +492,7 @@ func handleBlock(
 		}
 		for _, node := range nodes {
 			if err := watchtower.CheckExpiredTimeLocks(ctx, bitcoinClient, node, blockHeight, network); err != nil {
-				logger.Sugar().Errorf("Failed to check expired time locks for node %s: %w", node.ID.String(), err)
+				logger.Sugar().Errorf("Failed to check expired time locks for node %s: %v", node.ID, err)
 			}
 		}
 	}
@@ -508,7 +508,7 @@ func handleBlock(
 		}
 	}
 
-	logger.Sugar().Infof("Started processing coop exits", "height", blockHeight)
+	logger.Sugar().Infow("Started processing coop exits", "height", blockHeight)
 	// TODO: expire pending coop exits after some time so this doesn't become too large
 	pendingCoopExits, err := dbTx.CooperativeExit.Query().Where(cooperativeexit.ConfirmationHeightIsNil()).All(ctx)
 	if err != nil {
@@ -698,7 +698,7 @@ func storeStaticDeposits(ctx context.Context, dbTx *ent.Tx, creditedAddresses []
 					return fmt.Errorf("unable to store a new utxo: %w", err)
 				}
 				logger.Sugar().Debugf(
-					"Stored an L1 utxo to a static deposit address %s (txid: %x, vout: %s, amount: %s)",
+					"Stored an L1 utxo to a static deposit address %s (txid: %x, vout: %v, amount: %v)",
 					address.Address,
 					utxo.tx.TxID(),
 					utxo.idx,

@@ -73,7 +73,7 @@ func (h *SendGossipHandler) sendGossipMessageToParticipant(ctx context.Context, 
 		return nil
 	}
 
-	logger.Sugar().Infof("Gossip message sent to participant", participant)
+	logger.Sugar().Infof("Gossip message sent to participant: %s", participant)
 	return nil
 }
 

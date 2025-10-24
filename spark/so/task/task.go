@@ -529,7 +529,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						logger.Sugar().Infof("Pending send transfer %s is still pending", pendingSendTransfer.ID)
 						transfer, err := tx.Transfer.Query().Where(transfer.IDEQ(pendingSendTransfer.TransferID)).Only(ctx)
 						if err != nil && !ent.IsNotFound(err) {
-							logger.Sugar().Errorf("failed to get transfer", zap.Error(err))
+							logger.Sugar().Errorw("failed to get transfer", zap.Error(err))
 							continue
 						}
 						shouldCancel := ent.IsNotFound(err) || transfer.Status == st.TransferStatusReturned
@@ -538,19 +538,19 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							transferHandler := handler.NewTransferHandler(config)
 							err := transferHandler.CreateCancelTransferGossipMessage(ctx, pendingSendTransfer.TransferID.String())
 							if err != nil {
-								logger.Sugar().Errorf("failed to cancel transfer", zap.Error(err))
+								logger.Sugar().Errorw("failed to cancel transfer", zap.Error(err))
 							} else {
 								logger.Sugar().Infof("Successfully cancelled transfer %s", pendingSendTransfer.TransferID)
 								_, err = pendingSendTransfer.Update().SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
 								if err != nil {
-									logger.Sugar().Errorf("failed to update pending send transfer", zap.Error(err))
+									logger.Sugar().Errorw("failed to update pending send transfer", zap.Error(err))
 								}
 							}
 						} else {
 							logger.Sugar().Infof("Transfer %s is not ready to be cancelled", pendingSendTransfer.TransferID)
 							_, err = pendingSendTransfer.Update().SetStatus(st.PendingSendTransferStatusFinished).Save(ctx)
 							if err != nil {
-								logger.Sugar().Errorf("failed to update pending send transfer", zap.Error(err))
+								logger.Sugar().Errorw("failed to update pending send transfer", zap.Error(err))
 							}
 						}
 					}
@@ -608,7 +608,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						if len(treeNode.DirectTx) > 0 {
 							_, err := common.TxFromRawTxBytes(treeNode.DirectTx)
 							if err != nil {
-								logger.Sugar().Errorf("failed to parse direct tx for tree node %s: %w (directTx: %#v)", treeNode.ID, err, treeNode.DirectTx)
+								logger.Sugar().With(zap.Error(err)).Errorf("failed to parse direct tx for tree node %s (directTx: %#v)", treeNode.ID, treeNode.DirectTx)
 								continue
 							}
 							query = query.SetDirectTx(treeNode.DirectTx)
@@ -616,7 +616,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						if len(treeNode.RawRefundTx) > 0 {
 							_, err := common.TxFromRawTxBytes(treeNode.RawRefundTx)
 							if err != nil {
-								logger.Sugar().Errorf("failed to parse raw refund tx for tree node %s: %w (rawRefundTx: %#v)", treeNode.ID, err, treeNode.RawRefundTx)
+								logger.Sugar().With(zap.Error(err)).Errorf("failed to parse raw refund tx for tree node %s (rawRefundTx: %#v)", treeNode.ID, treeNode.RawRefundTx)
 								continue
 							}
 							query = query.SetRawRefundTx(treeNode.RawRefundTx)
@@ -624,7 +624,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						if len(treeNode.DirectRefundTx) > 0 {
 							_, err := common.TxFromRawTxBytes(treeNode.DirectRefundTx)
 							if err != nil {
-								logger.Sugar().Errorf("failed to parse direct refund tx for tree node %s: %w (directRefundTx: %#v)", treeNode.ID, err, treeNode.DirectRefundTx)
+								logger.Sugar().With(zap.Error(err)).Errorf("failed to parse direct refund tx for tree node %s (directRefundTx: %#v)", treeNode.ID, treeNode.DirectRefundTx)
 								continue
 							}
 							query = query.SetDirectRefundTx(treeNode.DirectRefundTx)
@@ -632,7 +632,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						if len(treeNode.DirectFromCpfpRefundTx) > 0 {
 							_, err := common.TxFromRawTxBytes(treeNode.DirectFromCpfpRefundTx)
 							if err != nil {
-								logger.Sugar().Errorf("failed to parse direct from cpfp refund tx for tree node %s: %w (directFromCpfpRefundTx: %#v)", treeNode.ID, err, treeNode.DirectFromCpfpRefundTx)
+								logger.Sugar().With(zap.Error(err)).Errorf("failed to parse direct from cpfp refund tx for tree node %s: (directFromCpfpRefundTx: %#v)", treeNode.ID, treeNode.DirectFromCpfpRefundTx)
 								continue
 							}
 							query = query.SetDirectFromCpfpRefundTx(treeNode.DirectFromCpfpRefundTx)
@@ -646,10 +646,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						return fmt.Errorf("backfill tree nodes failed to commit tree nodes: %w", err)
 					}
 
-					logger.Sugar().Infof(
-						"Tree Node Txids backfill progress: processed %d tree nodes",
-						batchSize,
-					)
+					logger.Sugar().Infof("Tree Node Txids backfill progress: processed %d tree nodes", batchSize)
 
 					return nil
 				},
@@ -700,7 +697,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						if len(treeNode.DirectTx) > 0 {
 							_, err := common.TxFromRawTxBytes(treeNode.DirectTx)
 							if err != nil {
-								logger.Sugar().Errorf("failed to parse direct tx for tree node %s: %w (directTx: %#v)", treeNode.ID, err, treeNode.DirectTx)
+								logger.Sugar().Errorf("failed to parse direct tx for tree node %s: %v (directTx: %#v)", treeNode.ID, err, treeNode.DirectTx)
 								continue
 							}
 							query = query.SetDirectTx(treeNode.DirectTx)
@@ -708,7 +705,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						if len(treeNode.RawRefundTx) > 0 {
 							_, err := common.TxFromRawTxBytes(treeNode.RawRefundTx)
 							if err != nil {
-								logger.Sugar().Errorf("failed to parse raw refund tx for tree node %s: %w (rawRefundTx: %#v)", treeNode.ID, err, treeNode.RawRefundTx)
+								logger.Sugar().Errorf("failed to parse raw refund tx for tree node %s: %v (rawRefundTx: %#v)", treeNode.ID, err, treeNode.RawRefundTx)
 								continue
 							}
 							query = query.SetRawRefundTx(treeNode.RawRefundTx)
@@ -716,7 +713,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						if len(treeNode.DirectRefundTx) > 0 {
 							_, err := common.TxFromRawTxBytes(treeNode.DirectRefundTx)
 							if err != nil {
-								logger.Sugar().Errorf("failed to parse direct refund tx for tree node %s: %w (directRefundTx: %#v)", treeNode.ID, err, treeNode.DirectRefundTx)
+								logger.Sugar().Errorf("failed to parse direct refund tx for tree node %s: %v (directRefundTx: %#v)", treeNode.ID, err, treeNode.DirectRefundTx)
 								continue
 							}
 							query = query.SetDirectRefundTx(treeNode.DirectRefundTx)
@@ -724,7 +721,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						if len(treeNode.DirectFromCpfpRefundTx) > 0 {
 							_, err := common.TxFromRawTxBytes(treeNode.DirectFromCpfpRefundTx)
 							if err != nil {
-								logger.Sugar().Errorf("failed to parse direct from cpfp refund tx for tree node %s: %w (directFromCpfpRefundTx: %#v)", treeNode.ID, err, treeNode.DirectFromCpfpRefundTx)
+								logger.Sugar().Errorf("failed to parse direct from cpfp refund tx for tree node %s: %v (directFromCpfpRefundTx: %#v)", treeNode.ID, err, treeNode.DirectFromCpfpRefundTx)
 								continue
 							}
 							query = query.SetDirectFromCpfpRefundTx(treeNode.DirectFromCpfpRefundTx)

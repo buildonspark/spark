@@ -125,7 +125,7 @@ func MarkExitingNodes(ctx context.Context, dbTx *ent.Tx, confirmedTxHashSet map[
 		if err != nil {
 			return fmt.Errorf("failed to update child nodes status: %w", err)
 		}
-		logger.Sugar().Infof("Child tree nodes marked as unusable because parent node is exiting",
+		logger.Sugar().Infow("Child tree nodes marked as unusable because parent node is exiting",
 			"node_ids", exitedTreeNodesIds,
 			"count", countParentExited,
 			"block_height", blockHeight)

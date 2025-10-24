@@ -1670,7 +1670,7 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 			}
 			err = common.VerifySignatureSingleInput(directFromCpfpRefundTx, 0, cpfpLeafNodeTx.TxOut[0])
 			if err != nil {
-				logger.With(zap.Error(err)).Sugar().Errorf("Unable to verify direct from cpfp refund tx signature", directFromCpfpRefundTx.TxID())
+				logger.Sugar().Errorw("Unable to verify direct from cpfp refund tx signature", "txid", directFromCpfpRefundTx.TxID(), "error", err)
 				return fmt.Errorf("unable to verify direct from cpfp refund tx signature: %w", err)
 			}
 		}

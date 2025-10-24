@@ -133,7 +133,7 @@ func (o *StaticDepositHandler) rollbackUtxoSwap(ctx context.Context, config *so.
 		internalResp, err := client.RollbackUtxoSwap(ctx, rollbackRequest)
 		if err != nil {
 			logger.Sugar().Errorf(
-				"Failed to execute rollback utxo swap for %x:%d task with operator %s",
+				"Failed to execute rollback utxo swap for %s:%x task with operator %v",
 				operator.Identifier,
 				rollbackRequest.OnChainUtxo.Txid,
 				rollbackRequest.OnChainUtxo.Vout,

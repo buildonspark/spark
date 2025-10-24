@@ -1252,7 +1252,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		receiverIdentityPubKey,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("unable to store user signed transactions for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID.String(), err)
+		return nil, fmt.Errorf("unable to store user signed transactions for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
 	}
 
 	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
@@ -1271,7 +1271,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 			DirectFromCpfpRefundSignatures: directFromCpfpSignatureMap,
 		})
 		if err != nil {
-			return nil, fmt.Errorf("unable to initiate preimage swap for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID.String(), err)
+			return nil, fmt.Errorf("unable to initiate preimage swap for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
 		}
 		return response.PreimageShare, nil
 	})
@@ -1287,7 +1287,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	transferProto, err := transfer.MarshalProto(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to marshal transfer for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID.String(), err)
+		return nil, fmt.Errorf("unable to marshal transfer for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
 	}
 
 	// Recover secret if necessary
@@ -1314,7 +1314,7 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	secret, err := secretsharing.RecoverSecret(shares)
 	if err != nil {
-		return nil, fmt.Errorf("unable to recover secret for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID.String(), err)
+		return nil, fmt.Errorf("unable to recover secret for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
 	}
 
 	secretBytes := secret.Bytes()
@@ -1338,17 +1338,17 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 			logger.Error("Unable to commit transaction after canceling transfer", zap.Error(commitErr))
 		}
 
-		return nil, fmt.Errorf("recovered preimage did not match payment hash: %x and transfer id: %s", req.PaymentHash, transfer.ID.String())
+		return nil, fmt.Errorf("recovered preimage did not match payment hash: %x and transfer id: %s", req.PaymentHash, transfer.ID)
 	} else {
 		err = h.sendPreimageGossipMessage(ctx, secretBytes, req.PaymentHash)
 		if err != nil {
-			logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to send preimage gossip message for payment hash %x")
+			logger.With(zap.Error(err)).Sugar().Errorf("InitiatePreimageSwap: unable to send preimage gossip message for payment hash %x", req.PaymentHash)
 		}
 	}
 
 	err = preimageRequest.Update().SetStatus(st.PreimageRequestStatusPreimageShared).Exec(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to update preimage request status for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID.String(), err)
+		return nil, fmt.Errorf("unable to update preimage request status for payment hash: %x and transfer id: %s: %w", req.PaymentHash, transfer.ID, err)
 	}
 
 	if req.TransferRequest != nil {
