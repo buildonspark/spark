@@ -10,12 +10,12 @@ import (
 )
 
 // GenerateAdaptorFromSignature generates creates a hidden value and the adaptor signature for a given signature.s
-func GenerateAdaptorFromSignature(signature []byte) ([]byte, []byte, error) {
+func GenerateAdaptorFromSignature(signature []byte) ([]byte, keys.Private, error) {
 	adaptorPrivateKey := keys.GeneratePrivateKey()
 
 	sig, err := parseSignature(signature)
 	if err != nil {
-		return nil, nil, err
+		return nil, keys.Private{}, err
 	}
 
 	// Calculate sig.s - adaptorPrivateKey
@@ -26,15 +26,10 @@ func GenerateAdaptorFromSignature(signature []byte) ([]byte, []byte, error) {
 
 	newSig := newSignature(&sig.r, &newS)
 
-	return newSig.serialize(), adaptorPrivateKey.Serialize(), nil
+	return newSig.serialize(), adaptorPrivateKey, nil
 }
 
-func GenerateSignatureFromExistingAdaptor(signature []byte, adaptorPrivateKeyBytes []byte) ([]byte, error) {
-	adaptorPrivateKey, err := keys.ParsePrivateKey(adaptorPrivateKeyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse adaptor private key: %w", err)
-	}
-
+func GenerateSignatureFromExistingAdaptor(signature []byte, adaptorPrivateKey keys.Private) ([]byte, error) {
 	sig, err := parseSignature(signature)
 	if err != nil {
 		return nil, err
@@ -51,22 +46,16 @@ func GenerateSignatureFromExistingAdaptor(signature []byte, adaptorPrivateKeyByt
 }
 
 // ValidateAdaptorSignature validates an adaptor signature from creator of the adaptor.
-func ValidateAdaptorSignature(pubkey *btcec.PublicKey, hash []byte, signature []byte, adaptorPubkey []byte) error {
+func ValidateAdaptorSignature(pubKey keys.Public, hash []byte, signature []byte, adaptorPubKey keys.Public) error {
 	sig, err := parseSignature(signature)
 	if err != nil {
 		return err
 	}
 
-	pubkeyBytes := schnorr.SerializePubKey(pubkey)
-
-	err = schnorrVerifyWithAdaptor(sig, hash, pubkeyBytes, adaptorPubkey)
+	err = schnorrVerifyWithAdaptor(sig, hash, pubKey, adaptorPubKey)
 	if err != nil {
-		adaptorPub, err := keys.ParsePublicKey(adaptorPubkey)
-		if err != nil {
-			return err
-		}
-		adaptorPubNeg := adaptorPub.Neg()
-		err = schnorrVerifyWithAdaptor(sig, hash, pubkeyBytes, adaptorPubNeg.Serialize())
+		adaptorPubNeg := adaptorPubKey.Neg()
+		err = schnorrVerifyWithAdaptor(sig, hash, pubKey, adaptorPubNeg)
 		if err != nil {
 			return err
 		}
@@ -76,21 +65,18 @@ func ValidateAdaptorSignature(pubkey *btcec.PublicKey, hash []byte, signature []
 }
 
 // ApplyAdaptorToSignature applies an adaptor to a signature.
-func ApplyAdaptorToSignature(pubkey *btcec.PublicKey, hash []byte, signature []byte, adaptorPrivateKeyBytes []byte) ([]byte, error) {
+func ApplyAdaptorToSignature(pubKey keys.Public, hash []byte, signature []byte, adaptorPrivateKey keys.Private) ([]byte, error) {
 	sig, err := parseSignature(signature)
 	if err != nil {
 		return nil, err
 	}
 
-	adaptorPrivateKey, _ := btcec.PrivKeyFromBytes(adaptorPrivateKeyBytes)
-
-	t := adaptorPrivateKey.Key
+	t := adaptorPrivateKey.ToBTCEC().Key
 	newS := sig.s
 	newS.Add(&t)
 
 	newSig := schnorr.NewSignature(&sig.r, &newS)
-
-	if newSig.Verify(hash, pubkey) {
+	if pubKey.Verify(newSig, hash) {
 		return newSig.Serialize(), nil
 	}
 
@@ -99,7 +85,7 @@ func ApplyAdaptorToSignature(pubkey *btcec.PublicKey, hash []byte, signature []b
 	newS.Add(&t)
 
 	newSig = schnorr.NewSignature(&sig.r, &newS)
-	if !newSig.Verify(hash, pubkey) {
+	if !pubKey.Verify(newSig, hash) {
 		return nil, fmt.Errorf("cannot apply adaptor to signature")
 	}
 
@@ -167,7 +153,10 @@ func parseSignature(sig []byte) (*signature, error) {
 }
 
 // This is copied and modified with adaptor from the schnorrVerify function in the btcd library.
-func schnorrVerifyWithAdaptor(sig *signature, hash []byte, pubKeyBytes []byte, adaptorPubkey []byte) error {
+func schnorrVerifyWithAdaptor(sig *signature, hash []byte, publicKey keys.Public, adaptorPubKey keys.Public) error {
+	pubKeyBytes := publicKey.SerializeXOnly()
+	adaptorPub := adaptorPubKey.ToBTCEC()
+
 	// The algorithm for producing a BIP-340 signature is described in
 	// README.md and is reproduced here for reference:
 	//
@@ -187,8 +176,7 @@ func schnorrVerifyWithAdaptor(sig *signature, hash []byte, pubKeyBytes []byte, a
 	//
 	// Fail if m is not 32 bytes
 	if len(hash) != 32 {
-		return fmt.Errorf("wrong size for message (got %v, want %v)",
-			len(hash), 32)
+		return fmt.Errorf("wrong size for message (got %v, want %v)", len(hash), 32)
 	}
 
 	// Step 2.
@@ -248,10 +236,6 @@ func schnorrVerifyWithAdaptor(sig *signature, hash []byte, pubKeyBytes []byte, a
 	// Step 6.5
 	//
 	// Add adaptorPubkey to R
-	adaptorPub, err := btcec.ParsePubKey(adaptorPubkey)
-	if err != nil {
-		return err
-	}
 	var adaptorPubJacobian btcec.JacobianPoint
 	adaptorPub.AsJacobian(&adaptorPubJacobian)
 	var newR btcec.JacobianPoint
@@ -285,6 +269,6 @@ func schnorrVerifyWithAdaptor(sig *signature, hash []byte, pubKeyBytes []byte, a
 
 	// Step 10.
 	//
-	// Return success iff not failure occured before reachign this
+	// Return success iff no failure occured before reaching this
 	return nil
 }

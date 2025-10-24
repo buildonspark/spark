@@ -586,16 +586,14 @@ func TestQueryTransfers(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create adaptor from that signature
-	adaptorAddedSignature, adaptorPrivKeyBytes, err := common.GenerateAdaptorFromSignature(signature)
-	require.NoError(t, err)
-	adaptorPrivKey, err := keys.ParsePrivateKey(adaptorPrivKeyBytes)
+	adaptorAddedSignature, adaptorPrivKey, err := common.GenerateAdaptorFromSignature(signature)
 	require.NoError(t, err)
 
 	// Alice sends adaptor and signature to Bob, Bob validates the adaptor
 	nodeVerifyingPubKey, err := keys.ParsePublicKey(senderRootNode.VerifyingPublicKey)
 	require.NoError(t, err)
-	taprootKey := txscript.ComputeTaprootKeyNoScript(nodeVerifyingPubKey.ToBTCEC())
-	err = common.ValidateAdaptorSignature(taprootKey, sighash, adaptorAddedSignature, adaptorPrivKey.Public().Serialize())
+	taprootKey := keys.PublicKeyFromKey(*txscript.ComputeTaprootKeyNoScript(nodeVerifyingPubKey.ToBTCEC()))
+	err = common.ValidateAdaptorSignature(taprootKey, sighash, adaptorAddedSignature, adaptorPrivKey.Public())
 	require.NoError(t, err)
 
 	// Bob signs refunds with adaptor
@@ -606,11 +604,11 @@ func TestQueryTransfers(t *testing.T) {
 		SigningPrivKey:    receiverLeafPrivKey,
 		NewSigningPrivKey: receiverNewLeafPrivKey,
 	}
-	receiverLeavesToTransfer := [1]wallet.LeafKeyTweak{receiverTransferNode}
+	receiverLeavesToTransfer := []wallet.LeafKeyTweak{receiverTransferNode}
 	receiverTransfer, receiverRefundSignatureMap, leafDataMap, operatorSigningResults, err := wallet.CounterSwapSignRefund(
 		t.Context(),
 		receiverConfig,
-		receiverLeavesToTransfer[:],
+		receiverLeavesToTransfer,
 		senderConfig.IdentityPublicKey(),
 		time.Now().Add(10*time.Minute),
 		adaptorPrivKey.Public(),
@@ -623,9 +621,9 @@ func TestQueryTransfers(t *testing.T) {
 
 	receiverKey, err := keys.ParsePublicKey(receiverLeavesToTransfer[0].Leaf.VerifyingPublicKey)
 	require.NoError(t, err)
-	receiverTaprootKey := txscript.ComputeTaprootKeyNoScript(receiverKey.ToBTCEC())
+	receiverTaprootKey := keys.PublicKeyFromKey(*txscript.ComputeTaprootKeyNoScript(receiverKey.ToBTCEC()))
 
-	_, err = common.ApplyAdaptorToSignature(receiverTaprootKey, receiverSighash, receiverRefundSignatureMap[receiverLeavesToTransfer[0].Leaf.Id], adaptorPrivKeyBytes)
+	_, err = common.ApplyAdaptorToSignature(receiverTaprootKey, receiverSighash, receiverRefundSignatureMap[receiverLeavesToTransfer[0].Leaf.Id], adaptorPrivKey)
 	require.NoError(t, err)
 
 	// Alice reveals adaptor secret to Bob, Bob combines with existing adaptor signatures to get valid signatures
@@ -641,8 +639,8 @@ func TestQueryTransfers(t *testing.T) {
 			}
 		}
 		assert.NotNil(t, verifyingPubkey, "expected signing result for leaf %s", nodeID)
-		taprootKey := txscript.ComputeTaprootKeyNoScript(verifyingPubkey.ToBTCEC())
-		adaptorSig, err := common.ApplyAdaptorToSignature(taprootKey, sighash, signature, adaptorPrivKeyBytes)
+		taprootKey := keys.PublicKeyFromKey(*txscript.ComputeTaprootKeyNoScript(verifyingPubkey.ToBTCEC()))
+		adaptorSig, err := common.ApplyAdaptorToSignature(taprootKey, sighash, signature, adaptorPrivKey)
 		require.NoError(t, err)
 		newReceiverRefundSignatureMap[nodeID] = adaptorSig
 	}

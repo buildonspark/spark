@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/google/uuid"
 	sparkProto "github.com/lightsparkdev/spark/proto/spark"
@@ -27,10 +26,10 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func makeP2TRFundingTx(value int64, internalPriv *btcec.PrivateKey) (txBytes []byte, outpoint wire.OutPoint, pkScript []byte, prevAmt int64, tweakedPriv *btcec.PrivateKey, err error) {
-	tweakedPriv = txscript.TweakTaprootPrivKey(*internalPriv, nil)
-	xonly := schnorr.SerializePubKey(tweakedPriv.PubKey())
-	pkScript = append([]byte{txscript.OP_1, 32}, xonly...)
+func makeP2TRFundingTx(value int64, internalPriv keys.Private) (txBytes []byte, outpoint wire.OutPoint, pkScript []byte, prevAmt int64, tweakedPriv keys.Private, err error) {
+	tweakedPriv = keys.PrivateFromKey(*txscript.TweakTaprootPrivKey(*internalPriv.ToBTCEC(), nil))
+	xOnly := tweakedPriv.Public().SerializeXOnly()
+	pkScript = append([]byte{txscript.OP_1, 32}, xOnly...)
 	tx := wire.NewMsgTx(2)
 	tx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: chainhash.Hash{1}, Index: 0}, nil, nil))
 	tx.AddTxOut(wire.NewTxOut(value, pkScript))
@@ -45,7 +44,7 @@ func makeP2TRFundingTx(value int64, internalPriv *btcec.PrivateKey) (txBytes []b
 	return
 }
 
-func makeP2TRSpendTx(prevOut wire.OutPoint, prevPkScript []byte, prevAmt int64, tweakedPriv *btcec.PrivateKey, sendValue int64, destScript []byte) ([]byte, error) {
+func makeP2TRSpendTx(prevOut wire.OutPoint, prevPkScript []byte, prevAmt int64, tweakedPriv keys.Private, sendValue int64, destScript []byte) ([]byte, error) {
 	tx := wire.NewMsgTx(2)
 	tx.AddTxIn(wire.NewTxIn(&prevOut, nil, nil))
 	tx.AddTxOut(wire.NewTxOut(sendValue, destScript))
@@ -55,7 +54,7 @@ func makeP2TRSpendTx(prevOut wire.OutPoint, prevPkScript []byte, prevAmt int64, 
 	if err != nil {
 		return nil, err
 	}
-	sig, err := schnorr.Sign(tweakedPriv, sighash)
+	sig, err := schnorr.Sign(tweakedPriv.ToBTCEC(), sighash)
 	if err != nil {
 		return nil, err
 	}
@@ -288,11 +287,7 @@ func TestApplySignatures(t *testing.T) {
 	}
 
 	key := keys.GeneratePrivateKey()
-
-	// Create test tx bytes
-	btcecPriv := key.ToBTCEC()
-	rawTx, outpoint, pkScript, prevAmt, tweakedPriv, err := makeP2TRFundingTx(1000, btcecPriv)
-
+	rawTx, outpoint, pkScript, prevAmt, tweakedPriv, err := makeP2TRFundingTx(1000, key)
 	require.NoError(t, err)
 	destScript := pkScript
 	rawRefundTx, err := makeP2TRSpendTx(outpoint, pkScript, prevAmt, tweakedPriv, 900, destScript)
@@ -513,42 +508,32 @@ func TestApplySignatures(t *testing.T) {
 
 }
 
-func getTxOutputSignature(t *testing.T, directTx, directRefundTx []byte, tweakedPriv *btcec.PrivateKey) []byte {
+func getTxOutputSignature(t *testing.T, directTx, directRefundTx []byte, tweakedPriv keys.Private) []byte {
 	var dr wire.MsgTx
 	require.NoError(t, dr.Deserialize(bytes.NewReader(directRefundTx)))
 
-	prevOut1, prevPk1, prevAmt1 := getTxOutpoint(t, directTx, 0)
-	_ = prevOut1
+	_, prevPk1, prevAmt1 := getTxOutpoint(t, directTx, 0)
 
 	prevFetcher := txscript.NewCannedPrevOutputFetcher(prevPk1, prevAmt1)
 	hashes := txscript.NewTxSigHashes(&dr, prevFetcher)
 
-	sigHash, err := txscript.CalcTaprootSignatureHash(
-		hashes,
-		txscript.SigHashDefault,
-		&dr, 0, prevFetcher,
-	)
+	sigHash, err := txscript.CalcTaprootSignatureHash(hashes, txscript.SigHashDefault, &dr, 0, prevFetcher)
 	require.NoError(t, err)
 
-	directRefundSig, err := schnorr.Sign(tweakedPriv, sigHash)
+	directRefundSig, err := schnorr.Sign(tweakedPriv.ToBTCEC(), sigHash)
 	require.NoError(t, err)
 
 	return directRefundSig.Serialize()
 }
 
 // Helper function to get both signature and adaptor signature for the same transaction
-func getTxOutputSignatureWithAdaptor(t *testing.T, directTx, directRefundTx []byte, tweakedPriv *btcec.PrivateKey) ([]byte, []byte, keys.Public) {
+func getTxOutputSignatureWithAdaptor(t *testing.T, directTx, directRefundTx []byte, tweakedPriv keys.Private) ([]byte, []byte, keys.Public) {
 	regularSig := getTxOutputSignature(t, directTx, directRefundTx, tweakedPriv)
 
 	// Generate adaptor signature from the regular signature
-	adaptorSignature, adaptorPrivateKeyBytes, err := common.GenerateAdaptorFromSignature(regularSig)
+	adaptorSignature, adaptorPrivateKey, err := common.GenerateAdaptorFromSignature(regularSig)
 	require.NoError(t, err)
-
-	_, adaptorPublicKey := btcec.PrivKeyFromBytes(adaptorPrivateKeyBytes)
-	adaptorPubKey, err := keys.ParsePublicKey(adaptorPublicKey.SerializeCompressed())
-	require.NoError(t, err)
-
-	return regularSig, adaptorSignature, adaptorPubKey
+	return regularSig, adaptorSignature, adaptorPrivateKey.Public()
 }
 
 func getTxOutpoint(t *testing.T, txBytes []byte, vout uint32) (wire.OutPoint, []byte, int64) {

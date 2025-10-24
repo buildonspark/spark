@@ -308,7 +308,7 @@ func (s *AuthnServer) verifyClientSignatureSchnorr(challengeBytes []byte, pubKey
 	}
 
 	hash := sha256.Sum256(challengeBytes)
-	if !schnorrSig.Verify(hash[:], pubKey.ToBTCEC()) {
+	if !pubKey.Verify(schnorrSig, hash[:]) {
 		return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("%w: Schnorr signature verification failed", ErrInvalidSignature))
 	}
 

@@ -58,7 +58,7 @@ func validateRound1Signature(round1Packages []map[string][]byte, round1Signature
 			continue
 		}
 
-		if !sig.Verify(hash, operator.IdentityPublicKey.ToBTCEC()) {
+		if !operator.IdentityPublicKey.Verify(sig, hash) {
 			validationFailures = append(validationFailures, identifier)
 		}
 	}

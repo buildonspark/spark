@@ -236,16 +236,13 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 	senderSig, err := schnorr.Sign(sk.ToBTCEC(), msgHash[:], schnorr.FastSign())
 	require.NoError(t, err)
 
-	assert.True(t, senderSig.Verify(msgHash[:], pk.ToBTCEC()))
+	assert.True(t, pk.Verify(senderSig, msgHash[:]))
 
-	adaptorSig, adaptorPrivKeyBytes, err := common.GenerateAdaptorFromSignature(senderSig.Serialize())
-	require.NoError(t, err)
-
-	adaptorPrivKey, err := keys.ParsePrivateKey(adaptorPrivKeyBytes)
+	adaptorSig, adaptorPrivKey, err := common.GenerateAdaptorFromSignature(senderSig.Serialize())
 	require.NoError(t, err)
 	adaptorPub := adaptorPrivKey.Public()
 
-	err = common.ValidateAdaptorSignature(pk.ToBTCEC(), msgHash[:], adaptorSig, adaptorPub.Serialize())
+	err = common.ValidateAdaptorSignature(pk, msgHash[:], adaptorSig, adaptorPub)
 	require.NoError(t, err)
 
 	// Step 1: Setup config
@@ -347,8 +344,8 @@ func TestFrostSignWithAdaptor(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	taprootKey := txscript.ComputeTaprootKeyNoScript(verifyingKey.ToBTCEC())
-	_, err = common.ApplyAdaptorToSignature(taprootKey, msgHash[:], signatureResp.Signature, adaptorPrivKeyBytes)
+	taprootKey := keys.PublicKeyFromKey(*txscript.ComputeTaprootKeyNoScript(verifyingKey.ToBTCEC()))
+	_, err = common.ApplyAdaptorToSignature(taprootKey, msgHash[:], signatureResp.Signature, adaptorPrivKey)
 	require.NoError(t, err)
 }
 

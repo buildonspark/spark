@@ -84,7 +84,7 @@ func validateDepositAddress(config *TestWalletConfig, address *pb.Address, signi
 			return err
 		}
 
-		if !sig.Verify(addrHash[:], operator.IdentityPublicKey.ToBTCEC()) {
+		if !operator.IdentityPublicKey.Verify(sig, addrHash[:]) {
 			return fmt.Errorf("signature verification failed for operator %s", operator.Identifier)
 		}
 	}

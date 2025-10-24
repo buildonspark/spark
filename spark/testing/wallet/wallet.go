@@ -18,7 +18,6 @@ import (
 
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
@@ -311,7 +310,7 @@ func (w *SingleKeyTestWallet) RequestLeavesSwap(ctx context.Context, targetAmoun
 	}
 
 	// This signature needs to be sent to the SSP.
-	adaptorSignature, adaptorPrivKeyBytes, err := common.GenerateAdaptorFromSignature(refundSignatureMap[transfer.Leaves[0].Leaf.Id])
+	adaptorSignature, adaptorPrivKey, err := common.GenerateAdaptorFromSignature(refundSignatureMap[transfer.Leaves[0].Leaf.Id])
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate adaptor: %w", err)
 	}
@@ -321,11 +320,6 @@ func (w *SingleKeyTestWallet) RequestLeavesSwap(ctx context.Context, targetAmoun
 		RawUnsignedRefundTransaction: hex.EncodeToString(transfer.Leaves[0].IntermediateRefundTx),
 		AdaptorAddedSignature:        hex.EncodeToString(adaptorSignature),
 	}}
-
-	adaptorPrivateKey, err := keys.ParsePrivateKey(adaptorPrivKeyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse adaptor: %w", err)
-	}
 
 	identityPublicKeyHex := w.Config.IdentityPublicKey().ToHex()
 	requester, err := sspapi.NewRequesterWithBaseURL(identityPublicKeyHex, "")
@@ -337,7 +331,7 @@ func (w *SingleKeyTestWallet) RequestLeavesSwap(ctx context.Context, targetAmoun
 		if i == 0 {
 			continue
 		}
-		signature, err := common.GenerateSignatureFromExistingAdaptor(refundSignatureMap[leaf.Leaf.Id], adaptorPrivKeyBytes)
+		signature, err := common.GenerateSignatureFromExistingAdaptor(refundSignatureMap[leaf.Leaf.Id], adaptorPrivKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate signature: %w", err)
 		}
@@ -350,7 +344,7 @@ func (w *SingleKeyTestWallet) RequestLeavesSwap(ctx context.Context, targetAmoun
 
 	api := sspapi.NewTypedSparkServiceAPI(requester)
 
-	requestID, leaves, err := api.RequestLeavesSwap(ctx, adaptorPrivateKey.Public().ToHex(), totalAmount, targetAmount, 0, userLeaves)
+	requestID, leaves, err := api.RequestLeavesSwap(ctx, adaptorPrivKey.Public().ToHex(), totalAmount, targetAmount, 0, userLeaves)
 	if err != nil {
 		_, cancelErr := CancelTransfer(ctx, w.Config, transfer)
 		if cancelErr != nil {
@@ -402,16 +396,16 @@ func (w *SingleKeyTestWallet) RequestLeavesSwap(ctx context.Context, targetAmoun
 			return nil, fmt.Errorf("failed to get sighash: %w", err)
 		}
 
-		nodePublicKey, err := secp256k1.ParsePubKey(response.Nodes[leaf.LeafID].VerifyingPublicKey)
+		nodePublicKey, err := keys.ParsePublicKey(response.Nodes[leaf.LeafID].VerifyingPublicKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse node public key: %w", err)
 		}
-		taprootKey := txscript.ComputeTaprootKeyNoScript(nodePublicKey)
+		taprootKey := keys.PublicKeyFromKey(*txscript.ComputeTaprootKeyNoScript(nodePublicKey.ToBTCEC()))
 		adaptorSignatureBytes, err := hex.DecodeString(leaf.AdaptorAddedSignature)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode adaptor signature: %w", err)
 		}
-		_, err = common.ApplyAdaptorToSignature(taprootKey, sighash, adaptorSignatureBytes, adaptorPrivKeyBytes)
+		_, err = common.ApplyAdaptorToSignature(taprootKey, sighash, adaptorSignatureBytes, adaptorPrivKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply adaptor to signature: %w", err)
 		}
@@ -426,7 +420,7 @@ func (w *SingleKeyTestWallet) RequestLeavesSwap(ctx context.Context, targetAmoun
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse transfer ID: %w", err)
 	}
-	_, err = api.CompleteLeavesSwap(ctx, hex.EncodeToString(adaptorPrivKeyBytes), transferID, requestID)
+	_, err = api.CompleteLeavesSwap(ctx, adaptorPrivKey.ToHex(), transferID, requestID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to complete leaves swap: %w", err)
 	}

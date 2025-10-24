@@ -403,12 +403,12 @@ func ApplySignatureToTxAndVerify(rawTx []byte, signature []byte, adaptorPublicKe
 		}
 	} else {
 		// Swap V3 flow
-		taprootKey := txscript.ComputeTaprootKeyNoScript(verifyingPubkey.ToBTCEC())
+		taprootKey := keys.PublicKeyFromKey(*txscript.ComputeTaprootKeyNoScript(verifyingPubkey.ToBTCEC()))
 		sighash, err := common.SigHashFromTx(tx, 0, outpoint)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get sighash: %w", err)
 		}
-		err = common.ValidateAdaptorSignature(taprootKey, sighash, signature, adaptorPublicKey.Serialize())
+		err = common.ValidateAdaptorSignature(taprootKey, sighash, signature, adaptorPublicKey)
 		if err != nil {
 			return nil, fmt.Errorf("unable to validate adaptor signature: %w", err)
 		}

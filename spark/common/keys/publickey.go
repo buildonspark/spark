@@ -8,7 +8,6 @@ import (
 	"math/big"
 
 	"entgo.io/ent/schema/field"
-
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
@@ -79,14 +78,14 @@ func ParsePublicKeys(asBytes [][]byte) ([]Public, error) {
 // on the secp256k1 curve.
 func publicKeyFromInts(x, y *big.Int) Public {
 	xFieldVal := secp256k1.FieldVal{}
-	xFieldVal.SetByteSlice(x.Bytes())
+	if xFieldVal.SetByteSlice(x.Bytes()) {
+		xFieldVal.Normalize()
+	}
 	yFieldVal := secp256k1.FieldVal{}
-	yFieldVal.SetByteSlice(y.Bytes())
+	if yFieldVal.SetByteSlice(y.Bytes()) {
+		yFieldVal.Normalize()
+	}
 
-	// Normalize both values, because the cost is low, and having non-normalized values will break everything.
-	// See the comments on FieldVal for more information.
-	xFieldVal.Normalize()
-	yFieldVal.Normalize()
 	return Public{key: *secp256k1.NewPublicKey(&xFieldVal, &yFieldVal)}
 }
 
@@ -123,6 +122,15 @@ func (p Public) Neg() Public {
 // ToBTCEC converts this [Public] into a [*secp256k1.PublicKey].
 func (p Public) ToBTCEC() *secp256k1.PublicKey {
 	return &p.key
+}
+
+type signature interface {
+	Verify([]byte, *secp256k1.PublicKey) bool
+}
+
+// Verify returns whether the provided signature is valid for the provided hash and this public key.
+func (p Public) Verify(sig signature, hash []byte) bool {
+	return sig.Verify(hash, &p.key)
 }
 
 // Equals returns true if p and other represent equivalent public keys, and false otherwise.

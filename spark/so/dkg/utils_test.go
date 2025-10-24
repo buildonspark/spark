@@ -32,7 +32,7 @@ func TestSignAndVerifyMessage(t *testing.T) {
 
 	sig, _ := ecdsa.ParseDERSignature(signatureBytes)
 
-	assert.True(t, sig.Verify(messageHash[:], priv.Public().ToBTCEC()), "signature verification failed")
+	assert.True(t, priv.Public().Verify(sig, messageHash[:]), "signature verification failed")
 }
 
 func TestRound1PackageHash(t *testing.T) {
@@ -118,7 +118,7 @@ func TestSignHash(t *testing.T) {
 	sig, err := ecdsa.ParseDERSignature(signature)
 
 	require.NoError(t, err)
-	assert.True(t, sig.Verify(hash[:], priv1.Public().ToBTCEC()), "signHash() produced invalid signature")
+	assert.True(t, priv1.Public().Verify(sig, hash[:]), "signHash() produced invalid signature")
 }
 
 func TestSignRound1Packages(t *testing.T) {
@@ -132,7 +132,7 @@ func TestSignRound1Packages(t *testing.T) {
 	sig, err := ecdsa.ParseDERSignature(signature)
 
 	require.NoError(t, err)
-	assert.True(t, sig.Verify(hash, priv1.ToBTCEC().PubKey()), "signRound1Packages() produced invalid signature")
+	assert.True(t, priv1.Public().Verify(sig, hash), "signRound1Packages() produced invalid signature")
 }
 
 func TestValidateRound1Signature(t *testing.T) {
@@ -217,7 +217,7 @@ func TestSignRound2Packages(t *testing.T) {
 	sig, err := ecdsa.ParseDERSignature(signature)
 
 	require.NoError(t, err)
-	assert.True(t, sig.Verify(hash, priv1.Public().ToBTCEC()), "signRound2Packages() produced invalid signature")
+	assert.True(t, priv1.Public().Verify(sig, hash), "signRound2Packages() produced invalid signature")
 }
 
 func TestDeriveKeyIndex(t *testing.T) {

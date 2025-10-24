@@ -450,7 +450,7 @@ func VerifyECDSASignature(pubKey keys.Public, signatureBytes []byte, messageHash
 	}
 
 	// Verify the signature
-	if !sig.Verify(messageHash, pubKey.ToBTCEC()) {
+	if !pubKey.Verify(sig, messageHash) {
 		return fmt.Errorf("invalid signature")
 	}
 
