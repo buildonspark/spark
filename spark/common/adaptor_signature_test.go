@@ -41,9 +41,9 @@ func TestAdaptorSignature(t *testing.T) {
 }
 
 func TestValidateAdaptorSignature_ValidSignature(t *testing.T) {
-	// Setup valid test data
+	// Set up valid test data
 	privKey := keys.GeneratePrivateKey()
-	pubkey := privKey.Public().ToBTCEC()
+	pubKey := privKey.Public()
 
 	msg := []byte("test message for adaptor signature")
 	hash := sha256.Sum256(msg)
@@ -56,20 +56,18 @@ func TestValidateAdaptorSignature_ValidSignature(t *testing.T) {
 	adaptorSig, adaptorPrivKey, err := GenerateAdaptorFromSignature(sig.Serialize())
 	require.NoError(t, err)
 
-	_, adaptorPub := btcec.PrivKeyFromBytes(adaptorPrivKey)
-
 	// Test: Valid adaptor signature should validate successfully
-	err = ValidateAdaptorSignature(pubkey, hash[:], adaptorSig, adaptorPub.SerializeCompressed())
-	assert.NoError(t, err)
+	err = ValidateAdaptorSignature(pubKey, hash[:], adaptorSig, adaptorPrivKey.Public())
+	require.NoError(t, err)
 }
 
 func TestValidateAdaptorSignature_InvalidSignatureBytes(t *testing.T) {
 	privKey := keys.GeneratePrivateKey()
-	pubkey := privKey.Public().ToBTCEC()
+	pubKey := privKey.Public()
 	hash := sha256.Sum256([]byte("test"))
 
 	adaptorPrivKey := keys.GeneratePrivateKey()
-	_, adaptorPub := btcec.PrivKeyFromBytes(adaptorPrivKey.Serialize())
+	adaptorPubKey := adaptorPrivKey.Public()
 
 	tests := []struct {
 		name        string
@@ -117,10 +115,9 @@ func TestValidateAdaptorSignature_InvalidSignatureBytes(t *testing.T) {
 				}
 			}
 
-			err := ValidateAdaptorSignature(pubkey, hash[:], tt.signature, adaptorPub.SerializeCompressed())
+			err := ValidateAdaptorSignature(pubKey, hash[:], tt.signature, adaptorPubKey)
 			if tt.expectError {
-				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.errorMsg)
+				require.ErrorContains(t, err, tt.errorMsg)
 			} else {
 				// Even if signature parsing succeeds, validation should fail for invalid signature
 				require.Error(t, err)
@@ -131,7 +128,7 @@ func TestValidateAdaptorSignature_InvalidSignatureBytes(t *testing.T) {
 
 func TestValidateAdaptorSignature_InvalidHash(t *testing.T) {
 	privKey := keys.GeneratePrivateKey()
-	pubkey := privKey.Public().ToBTCEC()
+	pubKey := privKey.Public()
 
 	// Create valid signature and adaptor
 	hash := sha256.Sum256([]byte("test"))
@@ -140,8 +137,7 @@ func TestValidateAdaptorSignature_InvalidHash(t *testing.T) {
 
 	adaptorSig, adaptorPrivKey, err := GenerateAdaptorFromSignature(sig.Serialize())
 	require.NoError(t, err)
-
-	_, adaptorPub := btcec.PrivKeyFromBytes(adaptorPrivKey)
+	adaptorPubKey := adaptorPrivKey.Public()
 
 	tests := []struct {
 		name      string
@@ -177,69 +173,15 @@ func TestValidateAdaptorSignature_InvalidHash(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateAdaptorSignature(pubkey, tt.hash, adaptorSig, adaptorPub.SerializeCompressed())
-			require.Error(t, err)
-			require.Contains(t, err.Error(), tt.errorMsg)
-		})
-	}
-}
-
-func TestValidateAdaptorSignature_InvalidAdaptorPubkey(t *testing.T) {
-	privKey := keys.GeneratePrivateKey()
-	pubkey := privKey.Public().ToBTCEC()
-
-	hash := sha256.Sum256([]byte("test"))
-	sig, err := schnorr.Sign(privKey.ToBTCEC(), hash[:], schnorr.FastSign())
-	require.NoError(t, err)
-
-	adaptorSig, _, err := GenerateAdaptorFromSignature(sig.Serialize())
-	require.NoError(t, err)
-
-	tests := []struct {
-		name          string
-		adaptorPubkey []byte
-		expectError   bool
-		errorMsg      string
-	}{
-		{
-			name:          "empty adaptor pubkey",
-			adaptorPubkey: []byte{},
-			expectError:   true,
-			errorMsg:      "invalid public key",
-		},
-		{
-			name:          "nil adaptor pubkey",
-			adaptorPubkey: nil,
-			expectError:   true,
-			errorMsg:      "invalid public key",
-		},
-		{
-			name:          "invalid adaptor pubkey bytes",
-			adaptorPubkey: []byte{0x01, 0x02, 0x03},
-			expectError:   true,
-			errorMsg:      "invalid public key",
-		},
-		{
-			name:          "wrong length adaptor pubkey",
-			adaptorPubkey: make([]byte, 32),
-			expectError:   true,
-			errorMsg:      "invalid public key",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateAdaptorSignature(pubkey, hash[:], adaptorSig, tt.adaptorPubkey)
-			require.Error(t, err)
-			// The error message may vary depending on the btcec library implementation
-			require.Error(t, err)
+			err := ValidateAdaptorSignature(pubKey, tt.hash, adaptorSig, adaptorPubKey)
+			require.ErrorContains(t, err, tt.errorMsg)
 		})
 	}
 }
 
 func TestValidateAdaptorSignature_SignatureMismatch(t *testing.T) {
 	privKey := keys.GeneratePrivateKey()
-	pubkey := privKey.Public().ToBTCEC()
+	pubKey := privKey.Public()
 
 	hash := sha256.Sum256([]byte("test message"))
 	sig, err := schnorr.Sign(privKey.ToBTCEC(), hash[:], schnorr.FastSign())
@@ -250,11 +192,10 @@ func TestValidateAdaptorSignature_SignatureMismatch(t *testing.T) {
 	require.NoError(t, err)
 
 	// Use a different adaptor public key
-	differentAdaptorPrivKey := keys.GeneratePrivateKey()
-	_, differentAdaptorPub := btcec.PrivKeyFromBytes(differentAdaptorPrivKey.Serialize())
+	differentAdaptorPub := keys.GeneratePrivateKey().Public()
 
 	// Test: Signature should not validate with wrong adaptor pubkey
-	err = ValidateAdaptorSignature(pubkey, hash[:], adaptorSig, differentAdaptorPub.SerializeCompressed())
+	err = ValidateAdaptorSignature(pubKey, hash[:], adaptorSig, differentAdaptorPub)
 	require.Error(t, err)
 
 	// Test: Create another signature with different message
@@ -262,20 +203,18 @@ func TestValidateAdaptorSignature_SignatureMismatch(t *testing.T) {
 	differentSig, err := schnorr.Sign(privKey.ToBTCEC(), differentHash[:], schnorr.FastSign())
 	require.NoError(t, err)
 
-	differentAdaptorSig, differentAdaptorPrivKeyBytes, err := GenerateAdaptorFromSignature(differentSig.Serialize())
+	differentAdaptorSig, differentAdaptorPrivKey, err := GenerateAdaptorFromSignature(differentSig.Serialize())
 	require.NoError(t, err)
 
-	_, correctAdaptorPub := btcec.PrivKeyFromBytes(differentAdaptorPrivKeyBytes)
-
 	// Test: Wrong hash should fail validation
-	err = ValidateAdaptorSignature(pubkey, hash[:], differentAdaptorSig, correctAdaptorPub.SerializeCompressed())
+	err = ValidateAdaptorSignature(pubKey, hash[:], differentAdaptorSig, differentAdaptorPrivKey.Public())
 	require.Error(t, err)
 }
 
 func TestValidateAdaptorSignature_WrongPublicKey(t *testing.T) {
 	privKey := keys.GeneratePrivateKey()
 	wrongPrivKey := keys.GeneratePrivateKey()
-	wrongPubkey := wrongPrivKey.Public().ToBTCEC()
+	wrongPubkey := wrongPrivKey.Public()
 
 	hash := sha256.Sum256([]byte("test"))
 	sig, err := schnorr.Sign(privKey.ToBTCEC(), hash[:], schnorr.FastSign())
@@ -283,17 +222,16 @@ func TestValidateAdaptorSignature_WrongPublicKey(t *testing.T) {
 
 	adaptorSig, adaptorPrivKey, err := GenerateAdaptorFromSignature(sig.Serialize())
 	require.NoError(t, err)
-
-	_, adaptorPub := btcec.PrivKeyFromBytes(adaptorPrivKey)
+	adaptorPubKey := adaptorPrivKey.Public()
 
 	// Test: Signature should not validate with wrong public key
-	err = ValidateAdaptorSignature(wrongPubkey, hash[:], adaptorSig, adaptorPub.SerializeCompressed())
-	assert.Error(t, err)
+	err = ValidateAdaptorSignature(wrongPubkey, hash[:], adaptorSig, adaptorPubKey)
+	require.Error(t, err)
 }
 
 func TestValidateAdaptorSignature_EdgeCases(t *testing.T) {
 	privKey := keys.GeneratePrivateKey()
-	pubkey := privKey.Public().ToBTCEC()
+	pubkey := privKey.Public()
 
 	hash := sha256.Sum256([]byte("test"))
 	sig, err := schnorr.Sign(privKey.ToBTCEC(), hash[:], schnorr.FastSign())
@@ -301,14 +239,13 @@ func TestValidateAdaptorSignature_EdgeCases(t *testing.T) {
 
 	adaptorSig, adaptorPrivKey, err := GenerateAdaptorFromSignature(sig.Serialize())
 	require.NoError(t, err)
-
-	_, adaptorPub := btcec.PrivKeyFromBytes(adaptorPrivKey)
+	adaptorPubKey := adaptorPrivKey.Public()
 
 	t.Run("repeated validation should work", func(t *testing.T) {
 		// Test that validation can be called multiple times
 		for i := 0; i < 10; i++ {
-			err := ValidateAdaptorSignature(pubkey, hash[:], adaptorSig, adaptorPub.SerializeCompressed())
-			assert.NoError(t, err)
+			err := ValidateAdaptorSignature(pubkey, hash[:], adaptorSig, adaptorPubKey)
+			require.NoError(t, err)
 		}
 	})
 
@@ -317,9 +254,8 @@ func TestValidateAdaptorSignature_EdgeCases(t *testing.T) {
 		invalidLengths := []int{0, 1, 16, 31, 33, 64, 128}
 		for _, length := range invalidLengths {
 			invalidHash := make([]byte, length)
-			err := ValidateAdaptorSignature(pubkey, invalidHash, adaptorSig, adaptorPub.SerializeCompressed())
-			require.Error(t, err)
-			require.Contains(t, err.Error(), "wrong size for message")
+			err := ValidateAdaptorSignature(pubkey, invalidHash, adaptorSig, adaptorPubKey)
+			require.ErrorContains(t, err, "wrong size for message")
 		}
 	})
 }
@@ -347,7 +283,7 @@ func TestValidateAdaptorSignature_KnownTestVectors(t *testing.T) {
 		require.NoError(t, err)
 
 		// Parse the taproot public key
-		taprootPubkey, err := btcec.ParsePubKey(taprootKeyBytes)
+		taprootPubkey, err := keys.ParsePublicKey(taprootKeyBytes)
 		require.NoError(t, err)
 
 		// Debug: Log the parsed components for analysis
@@ -369,16 +305,16 @@ func TestValidateAdaptorSignature_KnownTestVectors(t *testing.T) {
 		}
 
 		// Check if we can parse the adaptor public key
-		adaptorPub, adaptorParseErr := btcec.ParsePubKey(adaptorPubkeyBytes)
-		if adaptorParseErr != nil {
-			t.Logf("Adaptor pubkey parsing failed: %v", adaptorParseErr)
+		adaptorPubKey, adaptorParseErr := keys.ParsePublicKey(adaptorPubkeyBytes)
+		if adaptorParseErr == nil {
+			t.Logf("Adaptor pubkey parsed successfully: %x", adaptorPubKey)
 		} else {
-			t.Logf("Adaptor pubkey parsed successfully: %x", adaptorPub.SerializeCompressed())
+			t.Logf("Adaptor pubkey parsing failed: %v", adaptorParseErr)
 		}
 
 		// Test if this would be a valid regular schnorr signature (without adaptor)
 		if parseErr == nil {
-			regularVerify := schnorrSig.Verify(sighashBytes, taprootPubkey)
+			regularVerify := taprootPubkey.Verify(schnorrSig, sighashBytes)
 			t.Logf("Regular schnorr verification (without adaptor): %v", regularVerify)
 			if !regularVerify {
 				t.Logf("The signature doesn't verify as a regular schnorr signature either")
@@ -389,7 +325,7 @@ func TestValidateAdaptorSignature_KnownTestVectors(t *testing.T) {
 		// Test: Try validation with the provided test vectors
 		// Note: These test vectors might be from a different implementation or context
 		// The test documents the expected behavior but may not pass with this specific implementation
-		err = ValidateAdaptorSignature(taprootPubkey, sighashBytes, signatureBytes, adaptorPubkeyBytes)
+		err = ValidateAdaptorSignature(taprootPubkey, sighashBytes, signatureBytes, adaptorPubKey)
 
 		// If this test fails, it indicates the test vectors may not be compatible with this implementation
 		// This is acceptable as the test documents the expected inputs/outputs for reference
@@ -427,7 +363,7 @@ func TestValidateAdaptorSignature_KnownTestVectors(t *testing.T) {
 		// Generate our own test vectors that we know should work with this implementation
 		// This ensures we have a working test case that validates the function correctly
 		privKey := keys.GeneratePrivateKey()
-		pubkey := privKey.Public().ToBTCEC()
+		pubkey := privKey.Public()
 
 		msg := []byte("test vector for adaptor signature validation")
 		hash := sha256.Sum256(msg)
@@ -439,11 +375,10 @@ func TestValidateAdaptorSignature_KnownTestVectors(t *testing.T) {
 		// Generate adaptor signature
 		adaptorSig, adaptorPrivKey, err := GenerateAdaptorFromSignature(sig.Serialize())
 		require.NoError(t, err)
-
-		_, adaptorPub := btcec.PrivKeyFromBytes(adaptorPrivKey)
+		adaptorPubKey := adaptorPrivKey.Public()
 
 		// Test: This should always validate successfully with our implementation
-		err = ValidateAdaptorSignature(pubkey, hash[:], adaptorSig, adaptorPub.SerializeCompressed())
+		err = ValidateAdaptorSignature(pubkey, hash[:], adaptorSig, adaptorPubKey)
 		require.NoError(t, err, "Generated test vectors should validate successfully")
 	})
 }
