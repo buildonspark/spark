@@ -462,9 +462,13 @@ export function isZeroTimelock(currSequence: number) {
   return getCurrentTimelock(currSequence) === 0;
 }
 
+// A transaction's timelock should never go below 100 blocks following a
+// transfer or renewal operation, as this risks interfering with watchtowers
 export function doesTxnNeedRenewed(currSequence: number) {
   const currentTimelock = getCurrentTimelock(currSequence);
-  return currentTimelock <= 100;
+  const { nextSequence: nextTimelock, nextDirectSequence: _ } =
+    getNextTransactionSequence(currentTimelock);
+  return nextTimelock < 100;
 }
 
 export function doesLeafNeedRefresh(currSequence: number, isNodeTx?: boolean) {
