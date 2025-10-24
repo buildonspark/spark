@@ -500,7 +500,8 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 			return fmt.Errorf("unable to verify leaf cpfp refund tx signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
 
-		var updatedDirectFromCpfpRefundTxBytes []byte
+		leafUpdate := leaf.Update().SetIntermediateRefundTx(updatedCpfpRefundTxBytes)
+
 		if len(leaf.Edges.Leaf.DirectFromCpfpRefundTx) > 0 && len(directFromCpfpSignatureMap[leaf.Edges.Leaf.ID.String()]) > 0 {
 			updatedDirectFromCpfpRefundTxBytes, err := common.UpdateTxWithSignature(leaf.IntermediateDirectFromCpfpRefundTx, 0, directFromCpfpSignatureMap[leaf.Edges.Leaf.ID.String()])
 			if err != nil {
@@ -514,9 +515,12 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 			if err != nil {
 				return fmt.Errorf("unable to verify leaf direct from cpfp refund tx signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
+
+			leafUpdate.SetIntermediateDirectFromCpfpRefundTx(updatedDirectFromCpfpRefundTxBytes)
+		} else {
+			leafUpdate.ClearIntermediateDirectFromCpfpRefundTx()
 		}
 
-		var updatedDirectRefundTxBytes []byte
 		if len(leaf.Edges.Leaf.DirectTx) > 0 && len(directSignatureMap[leaf.Edges.Leaf.ID.String()]) > 0 {
 			directNodeTx, err := common.TxFromRawTxBytes(leaf.Edges.Leaf.DirectTx)
 			if err != nil {
@@ -536,8 +540,12 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 			if err != nil {
 				return fmt.Errorf("unable to verify leaf signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
+
+			leafUpdate.SetIntermediateDirectRefundTx(updatedDirectRefundTxBytes)
+		} else {
+			leafUpdate.ClearIntermediateDirectRefundTx()
 		}
-		_, err = leaf.Update().SetIntermediateRefundTx(updatedCpfpRefundTxBytes).SetIntermediateDirectRefundTx(updatedDirectRefundTxBytes).SetIntermediateDirectFromCpfpRefundTx(updatedDirectFromCpfpRefundTxBytes).Save(ctx)
+		_, err = leafUpdate.Save(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to save leaf for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
