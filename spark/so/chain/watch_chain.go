@@ -508,7 +508,7 @@ func handleBlock(
 		}
 	}
 
-	logger.Sugar().Infow("Started processing coop exits", "height", blockHeight)
+	logger.Sugar().Infof("Started processing coop exits at block height %d", blockHeight)
 	// TODO: expire pending coop exits after some time so this doesn't become too large
 	pendingCoopExits, err := dbTx.CooperativeExit.Query().Where(cooperativeexit.ConfirmationHeightIsNil()).All(ctx)
 	if err != nil {

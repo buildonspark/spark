@@ -125,10 +125,11 @@ func MarkExitingNodes(ctx context.Context, dbTx *ent.Tx, confirmedTxHashSet map[
 		if err != nil {
 			return fmt.Errorf("failed to update child nodes status: %w", err)
 		}
-		logger.Sugar().Infow("Child tree nodes marked as unusable because parent node is exiting",
-			"node_ids", exitedTreeNodesIds,
-			"count", countParentExited,
-			"block_height", blockHeight)
+		logger.Sugar().Infof("Child tree nodes %+q marked as unusable because %d parent nodes are exiting at block height %d",
+			exitedTreeNodesIds,
+			countParentExited,
+			blockHeight,
+		)
 	}
 
 	// Query TreeNode IDs that have TransferLeaf entities with confirmed intermediate refund TXIDs
