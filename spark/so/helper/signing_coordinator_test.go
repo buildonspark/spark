@@ -288,7 +288,7 @@ func TestSignFrostInternal(t *testing.T) {
 		// Test with missing keyshare in getKeyPackages response
 		t.Run("MissingKeyshare", func(t *testing.T) {
 			keyshareID := uuid.New()
-			mockGetKeyPackages := func(_ context.Context, _ *so.Config, _ []uuid.UUID) (map[uuid.UUID]*pbfrost.KeyPackage, error) {
+			getKeyPackages := func(_ context.Context, _ *so.Config, _ []uuid.UUID) (map[uuid.UUID]*pbfrost.KeyPackage, error) {
 				return make(map[uuid.UUID]*pbfrost.KeyPackage), nil // Return empty map, missing the requested keyshare
 			}
 
@@ -304,7 +304,7 @@ func TestSignFrostInternal(t *testing.T) {
 				UserCommitment:    &objects.SigningCommitment{Binding: pubKey.Serialize(), Hiding: pubKey.Serialize()},
 			}
 
-			_, err := helper.SignFrostInternal(t.Context(), config, []*helper.SigningJob{job}, mockGetKeyPackages, frostSignerFactory)
+			_, err := helper.SignFrostInternal(t.Context(), config, []*helper.SigningJob{job}, getKeyPackages, frostSignerFactory)
 			require.Error(t, err)
 		})
 
@@ -368,7 +368,7 @@ func TestSignFrostInternal(t *testing.T) {
 			keyshareID1 := uuid.New()
 			keyshareID2 := uuid.New()
 
-			mockGetKeyPackages := func(_ context.Context, _ *so.Config, keyshareIDs []uuid.UUID) (map[uuid.UUID]*pbfrost.KeyPackage, error) {
+			getKeyPackages := func(_ context.Context, _ *so.Config, keyshareIDs []uuid.UUID) (map[uuid.UUID]*pbfrost.KeyPackage, error) {
 				result := make(map[uuid.UUID]*pbfrost.KeyPackage)
 				for _, id := range keyshareIDs {
 					result[id] = &pbfrost.KeyPackage{
@@ -424,7 +424,7 @@ func TestSignFrostInternal(t *testing.T) {
 				},
 			}
 
-			results, err := helper.SignFrostInternal(t.Context(), config, jobs, mockGetKeyPackages, frostSignerFactory)
+			results, err := helper.SignFrostInternal(t.Context(), config, jobs, getKeyPackages, frostSignerFactory)
 			require.NoError(t, err)
 			require.Len(t, results, 2)
 
@@ -659,7 +659,7 @@ func TestSignFrostWithPregeneratedNonce(t *testing.T) {
 			}
 			config.SigningOperatorMap["operator1"] = &so.SigningOperator{Identifier: "operator1"}
 
-			mockGetKeyPackages := func(_ context.Context, _ *so.Config, _ []uuid.UUID) (map[uuid.UUID]*pbfrost.KeyPackage, error) {
+			getKeyPackages := func(_ context.Context, _ *so.Config, _ []uuid.UUID) (map[uuid.UUID]*pbfrost.KeyPackage, error) {
 				return nil, errors.New("database connection failed")
 			}
 
@@ -680,7 +680,7 @@ func TestSignFrostWithPregeneratedNonce(t *testing.T) {
 				},
 			}
 
-			_, err := helper.SignFrostWithPregeneratedNonceInternal(t.Context(), config, []*helper.SigningJobWithPregeneratedNonce{job}, mockGetKeyPackages, frostSignerFactory)
+			_, err := helper.SignFrostWithPregeneratedNonceInternal(t.Context(), config, []*helper.SigningJobWithPregeneratedNonce{job}, getKeyPackages, frostSignerFactory)
 			require.ErrorContains(t, err, "database connection failed")
 		})
 

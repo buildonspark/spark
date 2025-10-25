@@ -509,12 +509,12 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		// Create static deposit address with no UTXOs
 		staticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e2"
 		rng := rand.NewChaCha8([32]byte{2})
-		testIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-		testSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		noUtxoTestIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		noUtxoTestSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		_, err = tx.DepositAddress.Create().
 			SetAddress(staticAddress).
-			SetOwnerIdentityPubkey(testIdentityPubKey).
-			SetOwnerSigningPubkey(testSigningPubKey).
+			SetOwnerIdentityPubkey(noUtxoTestIdentityPubKey).
+			SetOwnerSigningPubkey(noUtxoTestSigningPubKey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
 			SetNetwork(st.NetworkRegtest).
@@ -603,12 +603,12 @@ func TestGetUtxosFromAddress(t *testing.T) {
 		// Create static deposit address
 		staticAddress := "bcrt1p52zf7gf7pvhvpsje2z0uzcr8nhdd79lund68qaea54kprnxcsdqqt2jz6e5"
 		rng := rand.NewChaCha8([32]byte{3})
-		testIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-		testSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		paginationLimitTestIdentityPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		paginationLimitTestSigningPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		depositAddress, err := tx.DepositAddress.Create().
 			SetAddress(staticAddress).
-			SetOwnerIdentityPubkey(testIdentityPubKey).
-			SetOwnerSigningPubkey(testSigningPubKey).
+			SetOwnerIdentityPubkey(paginationLimitTestIdentityPubkey).
+			SetOwnerSigningPubkey(paginationLimitTestSigningPubkey).
 			SetSigningKeyshare(signingKeyshare).
 			SetIsStatic(true).
 			SetNetwork(st.NetworkRegtest).

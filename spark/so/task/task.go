@@ -1103,7 +1103,7 @@ func (t *BaseTaskSpec) chainMiddleware(
 	currTask := t
 
 	for i := len(middlewares) - 1; i >= 0; i-- {
-		innerTask, i := currTask, i
+		innerTask := currTask
 		currTask = innerTask.wrapMiddleware(middlewares[i])
 	}
 

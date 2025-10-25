@@ -28,6 +28,10 @@ linters:
     generated: lax
     presets:
       - comments
+    rules:
+      - linters:
+          - govet
+        text: 'shadow: declaration of "(err|ctx)" shadows declaration at'
   settings:
     depguard:
       rules:
@@ -91,7 +95,6 @@ linters:
       enable-all: true
       disable:
         - fieldalignment
-        - shadow
     usetesting:
       context-background: true
 formatters:

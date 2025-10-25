@@ -487,7 +487,8 @@ func (h *InternalDepositHandler) CreateUtxoSwap(ctx context.Context, config *so.
 			return nil, fmt.Errorf("receiver identity public key is required")
 		}
 
-		spendTxSighash, totalAmount, err := GetTxSigningInfo(ctx, targetUtxo, req.SpendTxSigningJob.RawTx)
+		var spendTxSighash []byte
+		spendTxSighash, totalAmount, err = GetTxSigningInfo(ctx, targetUtxo, req.SpendTxSigningJob.RawTx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get spend tx sighash: %w", err)
 		}

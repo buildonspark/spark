@@ -179,15 +179,15 @@ func (e *DBEvents) AddListeners(subscriptions []Subscription) (chan EventData, f
 			})
 		}
 
-		listenerKey := listenerKey{
+		key := listenerKey{
 			Field: subscription.Field,
 			Value: subscription.Value,
 		}
 
-		if existingChannels, exists := e.listeners[subscription.EventName][listenerKey]; exists {
-			e.listeners[subscription.EventName][listenerKey] = append(existingChannels, channel)
+		if existingChannels, exists := e.listeners[subscription.EventName][key]; exists {
+			e.listeners[subscription.EventName][key] = append(existingChannels, channel)
 		} else {
-			e.listeners[subscription.EventName][listenerKey] = []chan EventData{channel}
+			e.listeners[subscription.EventName][key] = []chan EventData{channel}
 		}
 	}
 
@@ -197,18 +197,18 @@ func (e *DBEvents) AddListeners(subscriptions []Subscription) (chan EventData, f
 
 		for _, subscription := range subscriptions {
 			if channels, exists := e.listeners[subscription.EventName]; exists {
-				listenerKey := listenerKey{
+				key := listenerKey{
 					Field: subscription.Field,
 					Value: subscription.Value,
 				}
 
-				if channelSlice, exists := channels[listenerKey]; exists {
+				if channelSlice, exists := channels[key]; exists {
 					for i, ch := range channelSlice {
 						if ch == channel {
 							channelSlice = append(channelSlice[:i], channelSlice[i+1:]...)
 
 							if len(channelSlice) == 0 {
-								delete(channels, listenerKey)
+								delete(channels, key)
 
 								if len(channels) == 0 {
 									delete(e.listeners, subscription.EventName)
@@ -218,7 +218,7 @@ func (e *DBEvents) AddListeners(subscriptions []Subscription) (chan EventData, f
 									})
 								}
 							} else {
-								channels[listenerKey] = channelSlice
+								channels[key] = channelSlice
 							}
 							break
 						}
@@ -254,8 +254,8 @@ func (e *DBEvents) processNotification(notification *pgconn.Notification) {
 		}
 
 		for field, value := range payload {
-			listenerKey := listenerKey{Field: field, Value: value}
-			if listeners, exists := c[listenerKey]; exists {
+			key := listenerKey{Field: field, Value: value}
+			if listeners, exists := c[key]; exists {
 				eventData := EventData{
 					Channel: notification.Channel,
 					Payload: notification.Payload,

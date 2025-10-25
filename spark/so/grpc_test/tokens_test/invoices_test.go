@@ -251,8 +251,8 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 	var invoiceAttachments []*tokenpb.InvoiceAttachment
 	for _, output := range transferTransaction.TokenOutputs {
 		receiverPublicKey, _ := keys.ParsePublicKey(output.GetOwnerPublicKey())
-		tokenIdentifier := make([]byte, len(output.TokenIdentifier))
-		copy(tokenIdentifier, output.TokenIdentifier)
+		newTokenIdentifier := make([]byte, len(output.TokenIdentifier))
+		copy(newTokenIdentifier, output.TokenIdentifier)
 		version := uint32(1)
 		senderPublicKey := config.IdentityPrivateKey.Public()
 		memo := "Test memo"
@@ -271,7 +271,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 			*amount = amountToEncode
 		}
 		if mismatchedIdentifier {
-			tokenIdentifier[0] ^= 0xFF
+			newTokenIdentifier[0] ^= 0xFF
 		}
 		if mismatchedOwner {
 			receiverPublicKey = keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -300,7 +300,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 			Amount:            amount,
 			ExpiryTime:        expiryTime,
 			Memo:              &memo,
-			TokenIdentifier:   tokenIdentifier,
+			TokenIdentifier:   newTokenIdentifier,
 			Network:           network,
 			SatsPayment:       satsPayment,
 		}

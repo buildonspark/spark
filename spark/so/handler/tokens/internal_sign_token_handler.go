@@ -268,12 +268,12 @@ func (h *InternalSignTokenHandler) validateAndSignTransactionWithProvidedOwnSign
 }
 
 func (h *InternalSignTokenHandler) prepareResponseForExchangeRevocationSecretsShare(ctx context.Context, inputOperatorShareMap map[ShareKey]ShareValue) (*pbtkinternal.ExchangeRevocationSecretsSharesResponse, error) {
-	operatorSharesMap, err := h.getSecretSharesNotInInput(ctx, inputOperatorShareMap)
+	operatorShares, err := h.getSecretSharesNotInInput(ctx, inputOperatorShareMap)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get token outputs with shares: %w", err)
 	}
-	secretSharesToReturn := make([]*pbtkinternal.OperatorRevocationShares, 0, len(operatorSharesMap))
-	for operatorIdentity, shares := range operatorSharesMap {
+	secretSharesToReturn := make([]*pbtkinternal.OperatorRevocationShares, 0, len(operatorShares))
+	for operatorIdentity, shares := range operatorShares {
 		secretSharesToReturn = append(secretSharesToReturn, &pbtkinternal.OperatorRevocationShares{
 			OperatorIdentityPublicKey: operatorIdentity.Serialize(),
 			Shares:                    shares,

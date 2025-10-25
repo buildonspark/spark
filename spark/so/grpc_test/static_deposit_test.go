@@ -669,7 +669,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 		require.NoError(t, err)
 		bobCtx := wallet.ContextWithToken(t.Context(), bobConnectionToken)
 
-		userSignature := wallet.CreateUserSignature(
+		wrongUserSignature := wallet.CreateUserSignature(
 			signedDepositTx.TxHash().String(),
 			uint32(vout),
 			common.Regtest,
@@ -686,7 +686,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 				Network:                 common.Regtest,
 				SpendTx:                 spendTx,
 				DepositAddressSecretKey: aliceDepositPrivKey,
-				UserSignature:           userSignature,
+				UserSignature:           wrongUserSignature,
 				PrevTxOut:               signedDepositTx.TxOut[vout],
 			},
 		)
