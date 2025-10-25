@@ -66,7 +66,7 @@ We use atlas to manage our database migrations. Install via `mise install`.
 
 To make a migration, follow these steps:
 
-- Make your change to the schema, run `make ent`
+- Make your change to the schema, run `mise gen-ent`
 - Generate migration files by running `./scripts/gen-migration.sh <name>`:
 - With `run-everything.sh`, the migration will be automatically
   applied to each operator's database. But if you want to apply a migration manually, you can run (e.g. DB name is `sparkoperator_0`):

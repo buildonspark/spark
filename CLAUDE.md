@@ -20,7 +20,7 @@ lefthook install
 make
 
 # Generate Ent entities (required after schema changes)
-make ent
+mise gen-ent
 ```
 
 ### Testing
@@ -159,7 +159,7 @@ This repository implements **Spark**, a Bitcoin-based system with the following 
 - Separate unit tests from integration tests
 
 ### When Working with Database Code
-- Modify schemas in `spark/so/ent/schema/`, then run `make ent`
+- Modify schemas in `spark/so/ent/schema/`, then run `mise gen-ent`
 - Generate migrations with `./scripts/gen-migration.sh` after schema changes
 - Use proper foreign key relationships in Ent schemas
 - Test database code with both SQLite (unit) and PostgreSQL (integration)

@@ -93,6 +93,33 @@ run = """kubectl --context minikube -n bitcoin exec regtest-bitcoind-0 -- \
     sendrawtransaction {{arg(name="hex")}}
     """
 
+[tasks.gen-ent]
+description = "Generate ent code for Spark schemas"
+dir = "{{config_root}}/spark"
+run = """
+echo "Generating ent schemas..."
+go generate ./so/ent/...
+echo ""
+echo "!!!!"
+echo "Ents generated. Remember to add migration changes with atlas! See README.md for more info."
+echo "!!!!"
+"""
+
+[tasks.gen-ssp]
+description = "Generate SSP API code"
+dir = "{{config_root}}/spark"
+run = "go generate ./testing/wallet/ssp_api/..."
+
+[tasks.gen-protos]
+description = "Generate Go code from proto files (via Make)"
+dir = "{{config_root}}"
+run = "make all"
+
+[tasks.clean-protos]
+description = "Clean generated proto files"
+dir = "{{config_root}}"
+run = "make clean"
+
 [settings]
 activate_aggressive = true
 disable_backends = ["asdf"]

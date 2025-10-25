@@ -1,3 +1,7 @@
+# DEPRECATED: Simple targets in this Makefile are being phased out in favor of mise tasks.
+# Please use `mise <task>` instead. Run `mise tasks` to see all available tasks.
+# Proto compilation targets will remain in this Makefile as they benefit from Make's dependency tracking.
+
 # Directory containing .proto files
 PROTO_DIR := protos
 
@@ -36,12 +40,14 @@ clean:
 	rm -rf spark/proto/*/*.pb.validate.go
 
 ent:
-	cd spark && go generate ./so/ent/...
+	@echo "DEPRECATED: Use 'mise gen-ent' instead"
+	@cd spark && go generate ./so/ent/...
 	@echo "\n!!!!\nEnts generated. Remember to add migration changes with atlas! See README.md for more info.\n!!!!\n"
 
 ssp:
-	cd spark && go generate ./testing/wallet/ssp_api/...
+	@echo "DEPRECATED: Use 'mise gen-ssp' instead"
+	@cd spark && go generate ./testing/wallet/ssp_api/...
 
 copy-protos:
-	cp protos/common.proto signer/spark-frost/protos/
-	cp protos/frost.proto signer/spark-frost/protos/
+	@cp protos/common.proto signer/spark-frost/protos/
+	@cp protos/frost.proto signer/spark-frost/protos/
