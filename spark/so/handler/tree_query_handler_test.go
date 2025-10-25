@@ -512,3 +512,81 @@ func TestQueryNodes_SSPBypassPrivacy(t *testing.T) {
 	assert.Len(t, resp.Nodes, 1, "SSP should be able to see nodes even when owner has privacy enabled")
 	assert.Equal(t, testData.Node.ID.String(), resp.Nodes[testData.Node.ID.String()].Id)
 }
+
+func TestQueryBalance_PrivacyEnabled_DifferentRequester(t *testing.T) {
+	// Create test data with privacy enabled and different requester/owner
+	ctx, cfg, testData := createPrivacyTestData(t, true, false, true)
+
+	// Create handler
+	handler := NewTreeQueryHandler(cfg)
+
+	// Test QueryBalance with different requester - should return empty balance
+	req := &pb.QueryBalanceRequest{
+		IdentityPublicKey: testData.OwnerIdentityPubKey.Serialize(),
+		Network:           pb.Network_REGTEST,
+	}
+
+	resp, err := handler.QueryBalance(ctx, req)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(0), resp.Balance, "Balance should be 0 when privacy is enabled and requester is not the owner")
+	assert.Empty(t, resp.NodeBalances, "NodeBalances should be empty when privacy is enabled and requester is not the owner")
+}
+
+func TestQueryBalance_PrivacyDisabled_DifferentRequester(t *testing.T) {
+	// Create test data with privacy disabled and different requester/owner
+	ctx, cfg, testData := createPrivacyTestData(t, false, false, true)
+
+	// Create handler
+	handler := NewTreeQueryHandler(cfg)
+
+	// Test QueryBalance with different requester - should return actual balance
+	req := &pb.QueryBalanceRequest{
+		IdentityPublicKey: testData.OwnerIdentityPubKey.Serialize(),
+		Network:           pb.Network_REGTEST,
+	}
+
+	resp, err := handler.QueryBalance(ctx, req)
+	require.NoError(t, err)
+	assert.Equal(t, testData.Node.Value, resp.Balance, "Balance should be returned when privacy is disabled")
+	assert.Len(t, resp.NodeBalances, 1, "NodeBalances should contain the node when privacy is disabled")
+	assert.Equal(t, testData.Node.Value, resp.NodeBalances[testData.Node.ID.String()])
+}
+
+func TestQueryBalance_PrivacyEnabled_OwnerCanSeeOwnBalance(t *testing.T) {
+	// Create test data with privacy enabled and same requester/owner
+	ctx, cfg, testData := createPrivacyTestData(t, true, true, true)
+
+	// Create handler
+	handler := NewTreeQueryHandler(cfg)
+
+	// Test QueryBalance with owner as requester - should return actual balance
+	req := &pb.QueryBalanceRequest{
+		IdentityPublicKey: testData.OwnerIdentityPubKey.Serialize(),
+		Network:           pb.Network_REGTEST,
+	}
+
+	resp, err := handler.QueryBalance(ctx, req)
+	require.NoError(t, err)
+	assert.Equal(t, testData.Node.Value, resp.Balance, "Owner should be able to see their own balance even when privacy is enabled")
+	assert.Len(t, resp.NodeBalances, 1, "Owner should be able to see their own node balances even when privacy is enabled")
+	assert.Equal(t, testData.Node.Value, resp.NodeBalances[testData.Node.ID.String()])
+}
+
+func TestQueryBalance_NoSession(t *testing.T) {
+	// Create test data with privacy enabled but no session injected
+	ctx, cfg, testData := createPrivacyTestData(t, true, false, false)
+
+	// Create handler
+	handler := NewTreeQueryHandler(cfg)
+
+	// Test QueryBalance without session - should return empty balance
+	req := &pb.QueryBalanceRequest{
+		IdentityPublicKey: testData.OwnerIdentityPubKey.Serialize(),
+		Network:           pb.Network_REGTEST,
+	}
+
+	resp, err := handler.QueryBalance(ctx, req)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(0), resp.Balance, "Balance should be 0 when no session is provided and privacy is enabled")
+	assert.Empty(t, resp.NodeBalances, "NodeBalances should be empty when no session is provided and privacy is enabled")
+}

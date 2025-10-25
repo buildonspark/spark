@@ -180,6 +180,17 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
 	}
 
+	privacyEnabled, err := NewWalletSettingHandler(h.config).IsPrivacyEnabled(ctx, identityPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if privacy is enabled for owner: %w", err)
+	}
+	if privacyEnabled {
+		session, err := authn.GetSessionFromContext(ctx)
+		if err != nil || !session.IdentityPublicKey().Equals(identityPubKey) {
+			return &pb.QueryBalanceResponse{}, nil
+		}
+	}
+
 	nodes, err := db.TreeNode.Query().
 		Where(treenode.HasTreeWith(tree.NetworkEQ(network))).
 		Where(treenode.StatusEQ(st.TreeNodeStatusAvailable)).
