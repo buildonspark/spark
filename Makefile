@@ -32,7 +32,7 @@ spark/proto/%/%.pb.go: $(PROTO_DIR)/%.proto
 	fi
 
 # Default target
-all: $(GO_OUT) copy-protos
+all: $(GO_OUT)
 
 # Clean target
 clean:
@@ -47,7 +47,3 @@ ent:
 ssp:
 	@echo "DEPRECATED: Use 'mise gen-ssp' instead"
 	@cd spark && go generate ./testing/wallet/ssp_api/...
-
-copy-protos:
-	@cp protos/common.proto signer/spark-frost/protos/
-	@cp protos/frost.proto signer/spark-frost/protos/

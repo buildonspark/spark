@@ -55,7 +55,10 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 # (4) build app
 FROM chef AS builder-rust
-COPY protos protos
+
+WORKDIR /
+COPY protos ./protos
+
 WORKDIR /signer
 COPY signer/. ./
 COPY --from=cacher-rust /signer/target target
