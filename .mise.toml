@@ -97,4 +97,5 @@ run = """kubectl --context minikube -n bitcoin exec regtest-bitcoind-0 -- \
 activate_aggressive = true
 disable_backends = ["asdf"]
 experimental = true
+idiomatic_version_file_enable_tools = ["rust"]
 lockfile = true
