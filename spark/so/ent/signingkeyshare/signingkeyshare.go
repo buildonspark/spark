@@ -73,7 +73,7 @@ var (
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schematype.SigningKeyshareStatus) error {
 	switch s {
-	case "AVAILABLE", "IN_USE":
+	case "PENDING", "ABANDONED", "AVAILABLE", "IN_USE":
 		return nil
 	default:
 		return fmt.Errorf("signingkeyshare: invalid enum value for status field: %q", s)

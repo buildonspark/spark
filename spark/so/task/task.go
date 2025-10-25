@@ -28,12 +28,14 @@ import (
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so"
+	sodkg "github.com/lightsparkdev/spark/so/dkg"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingcommitment"
+	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
@@ -45,6 +47,7 @@ import (
 )
 
 var (
+	confirmPendingDKGKeysCutoffAge  = 15 * time.Minute
 	defaultTaskTimeout              = 1 * time.Minute
 	dkgTaskTimeout                  = 3 * time.Minute
 	deleteStaleTreeNodesTaskTimeout = 10 * time.Minute
@@ -96,6 +99,81 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				RunInTestEnv: true,
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					return ent.RunDKGIfNeeded(ctx, config)
+				},
+			},
+		},
+		{
+			ExecutionInterval: 5 * time.Minute,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "confirm_pending_dkg_keys",
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					logger := logging.GetLoggerFromContext(ctx)
+					cutoff := time.Now().Add(-confirmPendingDKGKeysCutoffAge)
+
+					// Find local coordinator PENDING keyshares and attempt confirmation fanout
+					tx, err := ent.GetDbFromContext(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get or create current tx for request: %w", err)
+					}
+					if abandonedCount, err := tx.SigningKeyshare.Update().
+						Where(
+							signingkeyshare.StatusEQ(st.KeyshareStatusPending),
+							signingkeyshare.CoordinatorIndexEQ(config.Index),
+							signingkeyshare.CreateTimeLT(cutoff),
+						).
+						SetStatus(st.KeyshareStatusAbandoned).
+						Save(ctx); err != nil {
+						return err
+					} else if abandonedCount > 0 {
+						logger.Sugar().Errorf("Abandoned %d stale pending DKG keyshares (older than %s)", abandonedCount, cutoff)
+					}
+
+					// Attempt to confirm keys with all operators.
+					// Use best-effort mode: if some keys are missing on some operators
+					// (e.g., due to transaction rollback), we still mark the keys that
+					// ARE available across all operators as AVAILABLE.
+					// Paginate at the DB level to avoid building a huge in-memory list.
+					const chunkSize = 1000
+					var lastID uuid.UUID
+					for {
+						query := tx.SigningKeyshare.Query().
+							Where(
+								signingkeyshare.StatusEQ(st.KeyshareStatusPending),
+								signingkeyshare.CoordinatorIndexEQ(config.Index),
+								signingkeyshare.CreateTimeGTE(cutoff),
+							)
+						if lastID != uuid.Nil {
+							query = query.Where(signingkeyshare.IDGT(lastID))
+						}
+						rows, err := query.
+							Order(
+								signingkeyshare.ByID(sql.OrderAsc()),
+							).
+							Limit(chunkSize).
+							All(ctx)
+						if err != nil {
+							return err
+						}
+						if len(rows) == 0 {
+							return nil
+						}
+
+						keyIDs := make([]uuid.UUID, 0, len(rows))
+						for _, r := range rows {
+							keyIDs = append(keyIDs, r.ID)
+						}
+
+						batchID := uuid.New()
+						logger.Sugar().Warnf("Confirming batch of %d pending DKG keys (batch_id: %s)", len(keyIDs), batchID)
+						if err := sodkg.ConfirmAndMarkAvailableKeys(ctx, config, keyIDs, batchID); err != nil {
+							// Log error but continue with next batch
+							logger.With(zap.Error(err)).Sugar().Warnf("Failed to confirm batch of %d keys (batch_id: %s)", len(keyIDs), batchID)
+						}
+
+						last := rows[len(rows)-1]
+						lastID = last.ID
+					}
 				},
 			},
 		},

@@ -250,7 +250,7 @@ func (s *States) ProceedToRound3(ctx context.Context, requestID string, frostCon
 
 // Round3 performs the round 3 of the DKG protocol.
 // This will generate the keyshares and store them in the database.
-func (s *State) Round3(ctx context.Context, requestID string, frostConnection *grpc.ClientConn, _ *so.Config) error {
+func (s *State) Round3(ctx context.Context, requestID string, frostConnection *grpc.ClientConn, config *so.Config) error {
 	round1PackagesMaps := make([]*pbcommon.PackageMap, len(s.ReceivedRound1Packages))
 	for i, p := range s.ReceivedRound1Packages {
 		round1PackagesMaps[i] = &pbcommon.PackageMap{
@@ -284,33 +284,44 @@ func (s *State) Round3(ctx context.Context, requestID string, frostConnection *g
 		return err
 	}
 
-	signingKeyshares := make([]*ent.SigningKeyshareCreate, len(response.KeyPackages))
-	for i, key := range response.KeyPackages {
-		batchID, err := uuid.Parse(requestID)
-		if err != nil {
-			return err
-		}
+	// Non-coordinators start as AVAILABLE. Coordinators start as PENDING only when key confirmation is enabled,
+	// and will flip to AVAILABLE after confirming other operators have persisted their keyshare.
+	startingStatus := st.KeyshareStatusAvailable
+	if config != nil && config.DKGConfig.EnableKeyConfirmation && config.Index == s.CoordinatorIndex {
+		startingStatus = st.KeyshareStatusPending
+	}
+
+	batchID, err := uuid.Parse(requestID)
+	if err != nil {
+		return err
+	}
+
+	signingKeyshares := make([]*ent.SigningKeyshareCreate, 0, len(response.KeyPackages))
+	for i, kp := range response.KeyPackages {
 		keyID := deriveKeyIndex(batchID, uint16(i))
-		pubKeyMap, err := keys.ParsePublicKeyMap(key.PublicShares)
+
+		publicShares, err := keys.ParsePublicKeyMap(kp.PublicShares)
 		if err != nil {
 			return err
 		}
-		pubKey, err := keys.ParsePublicKey(key.PublicKey)
+		publicKey, err := keys.ParsePublicKey(kp.PublicKey)
 		if err != nil {
 			return err
 		}
-		secretShare, err := keys.ParsePrivateKey(key.SecretShare)
+		secretShare, err := keys.ParsePrivateKey(kp.SecretShare)
 		if err != nil {
 			return err
 		}
-		signingKeyshares[i] = db.SigningKeyshare.Create().
+
+		create := db.SigningKeyshare.Create().
 			SetID(keyID).
-			SetStatus(st.KeyshareStatusAvailable).
+			SetStatus(startingStatus).
 			SetMinSigners(int32(s.MinSigners)).
 			SetSecretShare(secretShare).
-			SetPublicShares(pubKeyMap).
-			SetPublicKey(pubKey).
+			SetPublicShares(publicShares).
+			SetPublicKey(publicKey).
 			SetCoordinatorIndex(s.CoordinatorIndex)
+		signingKeyshares = append(signingKeyshares, create)
 	}
 
 	err = db.SigningKeyshare.CreateBulk(signingKeyshares...).Exec(ctx)

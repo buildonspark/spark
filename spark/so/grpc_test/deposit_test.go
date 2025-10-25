@@ -16,7 +16,6 @@ import (
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
-	"github.com/lightsparkdev/spark/so/dkg"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/objects"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -1027,13 +1026,6 @@ func TestStartDepositTreeCreationDoubleClaim(t *testing.T) {
 
 func TestQueryUnusedDepositAddresses(t *testing.T) {
 	config := wallet.NewTestWalletConfig(t)
-	soConfig := sparktesting.TestConfig(t)
-
-	err := dkg.GenerateKeys(t.Context(), soConfig, 500)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
 	if err != nil {
 		t.Fatalf("failed to connect to operator: %v", err)
@@ -1068,12 +1060,6 @@ func TestQueryUnusedDepositAddresses(t *testing.T) {
 
 func TestQueryUnusedDepositAddressesBackwardsCompatibility(t *testing.T) {
 	config := wallet.NewTestWalletConfig(t)
-	soConfig := sparktesting.TestConfig(t)
-
-	err := dkg.GenerateKeys(t.Context(), soConfig, 500)
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	conn, err := config.NewCoordinatorGRPCConnection()
 	if err != nil {

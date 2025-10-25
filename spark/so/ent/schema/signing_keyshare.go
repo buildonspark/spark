@@ -25,11 +25,14 @@ func (SigningKeyshare) Mixin() []ent.Mixin {
 func (SigningKeyshare) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("coordinator_index"),
-		index.Fields("coordinator_index").
+		// Partial index for AVAILABLE and PENDING keys only - optimized for hot path (claiming keys)
+		// and confirming pending keys (marking keys as AVAILABLE).
+		// This is smaller and faster than the composite index for the common case
+		index.Fields("coordinator_index", "status").
 			Annotations(
-				entsql.IndexWhere("status = 'AVAILABLE'"),
+				entsql.IndexWhere("CAST(status AS TEXT) IN ('AVAILABLE', 'PENDING')"),
 			).
-			StorageKey("idx_signing_keyshares_coordinator_available"),
+			StorageKey("idx_signing_keyshares_coordinator_available_or_pending"),
 	}
 }
 

@@ -183,6 +183,14 @@ type DkgConfig struct {
 	// The minimum number of available keys. If the number of available keys falls below this
 	// threshold, DKG will be run to replenish the pool of available keys.
 	MinAvailableKeys *int `yaml:"min_available_keys"`
+	// EnableKeyConfirmation gates coordinator-only pending creation and post-round confirmation.
+	// When true, coordinators will create their keyshares as PENDING and later flip them to
+	// AVAILABLE after confirming other operators have persisted the same keys.
+	EnableKeyConfirmation bool `yaml:"enable_key_confirmation"`
+	// InitialDelayBeforeConfirmation is the delay before starting the confirmation round after Round2.
+	// This gives participants time to complete Round3 (crypto + DB writes).
+	// Defaults to 5 seconds if not set or set to 0.
+	InitialDelayBeforeConfirmation *time.Duration `yaml:"initial_delay_before_confirmation"`
 }
 
 // BitcoindConfig is the configuration for a bitcoind node.

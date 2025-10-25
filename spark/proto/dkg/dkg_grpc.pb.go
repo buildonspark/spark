@@ -20,11 +20,12 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DKGService_StartDkg_FullMethodName        = "/dkg.DKGService/start_dkg"
-	DKGService_InitiateDkg_FullMethodName     = "/dkg.DKGService/initiate_dkg"
-	DKGService_Round1Packages_FullMethodName  = "/dkg.DKGService/round1_packages"
-	DKGService_Round1Signature_FullMethodName = "/dkg.DKGService/round1_signature"
-	DKGService_Round2Packages_FullMethodName  = "/dkg.DKGService/round2_packages"
+	DKGService_StartDkg_FullMethodName          = "/dkg.DKGService/start_dkg"
+	DKGService_InitiateDkg_FullMethodName       = "/dkg.DKGService/initiate_dkg"
+	DKGService_Round1Packages_FullMethodName    = "/dkg.DKGService/round1_packages"
+	DKGService_Round1Signature_FullMethodName   = "/dkg.DKGService/round1_signature"
+	DKGService_Round2Packages_FullMethodName    = "/dkg.DKGService/round2_packages"
+	DKGService_RoundConfirmation_FullMethodName = "/dkg.DKGService/round_confirmation"
 )
 
 // DKGServiceClient is the client API for DKGService service.
@@ -73,6 +74,15 @@ type DKGServiceClient interface {
 	//
 	// This will return the acknowledgement of the round2 packages by the participant.
 	Round2Packages(ctx context.Context, in *Round2PackagesRequest, opts ...grpc.CallOption) (*Round2PackagesResponse, error)
+	// Round confirmation
+	//
+	// After round 3 has completed, the coordinator asks each participant which
+	// of the provided key IDs are present and AVAILABLE. The coordinator then
+	// marks only the keys that are available on ALL participants as AVAILABLE.
+	//
+	// Always returns OK with a list of available/unavailable keys. The cron job
+	// retries periodically to catch keys that become available later.
+	RoundConfirmation(ctx context.Context, in *RoundConfirmationRequest, opts ...grpc.CallOption) (*RoundConfirmationResponse, error)
 }
 
 type dKGServiceClient struct {
@@ -133,6 +143,16 @@ func (c *dKGServiceClient) Round2Packages(ctx context.Context, in *Round2Package
 	return out, nil
 }
 
+func (c *dKGServiceClient) RoundConfirmation(ctx context.Context, in *RoundConfirmationRequest, opts ...grpc.CallOption) (*RoundConfirmationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RoundConfirmationResponse)
+	err := c.cc.Invoke(ctx, DKGService_RoundConfirmation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DKGServiceServer is the server API for DKGService service.
 // All implementations must embed UnimplementedDKGServiceServer
 // for forward compatibility.
@@ -179,6 +199,15 @@ type DKGServiceServer interface {
 	//
 	// This will return the acknowledgement of the round2 packages by the participant.
 	Round2Packages(context.Context, *Round2PackagesRequest) (*Round2PackagesResponse, error)
+	// Round confirmation
+	//
+	// After round 3 has completed, the coordinator asks each participant which
+	// of the provided key IDs are present and AVAILABLE. The coordinator then
+	// marks only the keys that are available on ALL participants as AVAILABLE.
+	//
+	// Always returns OK with a list of available/unavailable keys. The cron job
+	// retries periodically to catch keys that become available later.
+	RoundConfirmation(context.Context, *RoundConfirmationRequest) (*RoundConfirmationResponse, error)
 	mustEmbedUnimplementedDKGServiceServer()
 }
 
@@ -203,6 +232,9 @@ func (UnimplementedDKGServiceServer) Round1Signature(context.Context, *Round1Sig
 }
 func (UnimplementedDKGServiceServer) Round2Packages(context.Context, *Round2PackagesRequest) (*Round2PackagesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Round2Packages not implemented")
+}
+func (UnimplementedDKGServiceServer) RoundConfirmation(context.Context, *RoundConfirmationRequest) (*RoundConfirmationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RoundConfirmation not implemented")
 }
 func (UnimplementedDKGServiceServer) mustEmbedUnimplementedDKGServiceServer() {}
 func (UnimplementedDKGServiceServer) testEmbeddedByValue()                    {}
@@ -315,6 +347,24 @@ func _DKGService_Round2Packages_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DKGService_RoundConfirmation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RoundConfirmationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DKGServiceServer).RoundConfirmation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DKGService_RoundConfirmation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DKGServiceServer).RoundConfirmation(ctx, req.(*RoundConfirmationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DKGService_ServiceDesc is the grpc.ServiceDesc for DKGService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -341,6 +391,10 @@ var DKGService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "round2_packages",
 			Handler:    _DKGService_Round2Packages_Handler,
+		},
+		{
+			MethodName: "round_confirmation",
+			Handler:    _DKGService_RoundConfirmation_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

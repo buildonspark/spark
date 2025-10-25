@@ -331,7 +331,7 @@ var (
 		{Name: "id", Type: field.TypeUUID},
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"AVAILABLE", "IN_USE"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"PENDING", "ABANDONED", "AVAILABLE", "IN_USE"}},
 		{Name: "secret_share", Type: field.TypeBytes},
 		{Name: "public_shares", Type: field.TypeJSON},
 		{Name: "public_key", Type: field.TypeBytes, Unique: true},
@@ -350,11 +350,11 @@ var (
 				Columns: []*schema.Column{SigningKeysharesColumns[8]},
 			},
 			{
-				Name:    "idx_signing_keyshares_coordinator_available",
+				Name:    "idx_signing_keyshares_coordinator_available_or_pending",
 				Unique:  false,
-				Columns: []*schema.Column{SigningKeysharesColumns[8]},
+				Columns: []*schema.Column{SigningKeysharesColumns[8], SigningKeysharesColumns[3]},
 				Annotation: &entsql.IndexAnnotation{
-					Where: "status = 'AVAILABLE'",
+					Where: "CAST(status AS TEXT) IN ('AVAILABLE', 'PENDING')",
 				},
 			},
 		},

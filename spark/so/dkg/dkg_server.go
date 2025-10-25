@@ -2,12 +2,18 @@ package dkg
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
+	"github.com/google/uuid"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbdkg "github.com/lightsparkdev/spark/proto/dkg"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
+	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -87,6 +93,60 @@ func (s *Server) Round1Packages(_ context.Context, req *pbdkg.Round1PackagesRequ
 	return &pbdkg.Round1PackagesResponse{
 		Identifier:      s.config.Identifier,
 		Round1Signature: signature,
+	}, nil
+}
+
+// RoundConfirmation checks which of the provided key IDs exist and are AVAILABLE locally.
+// Returns a structured response with available and unavailable key lists.
+func (s *Server) RoundConfirmation(ctx context.Context, req *pbdkg.RoundConfirmationRequest) (*pbdkg.RoundConfirmationResponse, error) {
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(req.KeyIds) == 0 {
+		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("no key IDs to confirm"))
+	}
+	if len(req.KeyIds) > 5000 {
+		return nil, errors.InvalidArgumentOutOfRange(fmt.Errorf("too many key IDs to confirm: %d", len(req.KeyIds)))
+	}
+	ids := make([]uuid.UUID, 0, len(req.KeyIds))
+	for _, idStr := range req.KeyIds {
+		id, err := uuid.Parse(idStr)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	rows, err := db.SigningKeyshare.Query().
+		Where(
+			signingkeyshare.IDIn(ids...),
+			signingkeyshare.StatusEQ(st.KeyshareStatusAvailable),
+		).
+		Limit(5000).
+		All(ctx)
+	if err != nil {
+		return nil, errors.InternalDatabaseReadError(err)
+	}
+
+	found := make(map[uuid.UUID]struct{}, len(rows))
+	for _, r := range rows {
+		found[r.ID] = struct{}{}
+	}
+
+	available := make([]string, 0, len(found))
+	unavailable := make([]string, 0)
+
+	for _, id := range ids {
+		if _, ok := found[id]; ok {
+			available = append(available, id.String())
+		} else {
+			unavailable = append(unavailable, id.String())
+		}
+	}
+
+	return &pbdkg.RoundConfirmationResponse{
+		AvailableKeyIds:   available,
+		UnavailableKeyIds: unavailable,
 	}, nil
 }
 

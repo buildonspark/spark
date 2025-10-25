@@ -486,6 +486,108 @@ func (*Round2PackagesResponse) Descriptor() ([]byte, []int) {
 	return file_dkg_proto_rawDescGZIP(), []int{7}
 }
 
+// RoundConfirmationRequest is sent by the coordinator to each participant to
+// confirm the presence and availability of the generated keyshares.
+type RoundConfirmationRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The list of keyshare IDs (UUID strings) to check.
+	KeyIds        []string `protobuf:"bytes,1,rep,name=key_ids,json=keyIds,proto3" json:"key_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RoundConfirmationRequest) Reset() {
+	*x = RoundConfirmationRequest{}
+	mi := &file_dkg_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoundConfirmationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoundConfirmationRequest) ProtoMessage() {}
+
+func (x *RoundConfirmationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_dkg_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoundConfirmationRequest.ProtoReflect.Descriptor instead.
+func (*RoundConfirmationRequest) Descriptor() ([]byte, []int) {
+	return file_dkg_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *RoundConfirmationRequest) GetKeyIds() []string {
+	if x != nil {
+		return x.KeyIds
+	}
+	return nil
+}
+
+// RoundConfirmationResponse contains which keys are available.
+type RoundConfirmationResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The list of key IDs that are AVAILABLE on this participant.
+	AvailableKeyIds []string `protobuf:"bytes,1,rep,name=available_key_ids,json=availableKeyIds,proto3" json:"available_key_ids,omitempty"`
+	// The list of key IDs that are NOT available (missing or PENDING).
+	UnavailableKeyIds []string `protobuf:"bytes,2,rep,name=unavailable_key_ids,json=unavailableKeyIds,proto3" json:"unavailable_key_ids,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *RoundConfirmationResponse) Reset() {
+	*x = RoundConfirmationResponse{}
+	mi := &file_dkg_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RoundConfirmationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RoundConfirmationResponse) ProtoMessage() {}
+
+func (x *RoundConfirmationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_dkg_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RoundConfirmationResponse.ProtoReflect.Descriptor instead.
+func (*RoundConfirmationResponse) Descriptor() ([]byte, []int) {
+	return file_dkg_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RoundConfirmationResponse) GetAvailableKeyIds() []string {
+	if x != nil {
+		return x.AvailableKeyIds
+	}
+	return nil
+}
+
+func (x *RoundConfirmationResponse) GetUnavailableKeyIds() []string {
+	if x != nil {
+		return x.UnavailableKeyIds
+	}
+	return nil
+}
+
 type StartDkgRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The number of participants in the signing group.
@@ -496,7 +598,7 @@ type StartDkgRequest struct {
 
 func (x *StartDkgRequest) Reset() {
 	*x = StartDkgRequest{}
-	mi := &file_dkg_proto_msgTypes[8]
+	mi := &file_dkg_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -508,7 +610,7 @@ func (x *StartDkgRequest) String() string {
 func (*StartDkgRequest) ProtoMessage() {}
 
 func (x *StartDkgRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_dkg_proto_msgTypes[8]
+	mi := &file_dkg_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -521,7 +623,7 @@ func (x *StartDkgRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartDkgRequest.ProtoReflect.Descriptor instead.
 func (*StartDkgRequest) Descriptor() ([]byte, []int) {
-	return file_dkg_proto_rawDescGZIP(), []int{8}
+	return file_dkg_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *StartDkgRequest) GetCount() int32 {
@@ -579,16 +681,22 @@ const file_dkg_proto_rawDesc = "" +
 	"identifier\x12'\n" +
 	"\x0fround2_packages\x18\x03 \x03(\fR\x0eround2Packages\x12)\n" +
 	"\x10round2_signature\x18\x04 \x01(\fR\x0fround2Signature\"\x18\n" +
-	"\x16Round2PackagesResponse\"'\n" +
+	"\x16Round2PackagesResponse\"3\n" +
+	"\x18RoundConfirmationRequest\x12\x17\n" +
+	"\akey_ids\x18\x01 \x03(\tR\x06keyIds\"w\n" +
+	"\x19RoundConfirmationResponse\x12*\n" +
+	"\x11available_key_ids\x18\x01 \x03(\tR\x0favailableKeyIds\x12.\n" +
+	"\x13unavailable_key_ids\x18\x02 \x03(\tR\x11unavailableKeyIds\"'\n" +
 	"\x0fStartDkgRequest\x12\x14\n" +
-	"\x05count\x18\x01 \x01(\x05R\x05count2\xfb\x02\n" +
+	"\x05count\x18\x01 \x01(\x05R\x05count2\xd2\x03\n" +
 	"\n" +
 	"DKGService\x12;\n" +
 	"\tstart_dkg\x12\x14.dkg.StartDkgRequest\x1a\x16.google.protobuf.Empty\"\x00\x12C\n" +
 	"\finitiate_dkg\x12\x17.dkg.InitiateDkgRequest\x1a\x18.dkg.InitiateDkgResponse\"\x00\x12L\n" +
 	"\x0fround1_packages\x12\x1a.dkg.Round1PackagesRequest\x1a\x1b.dkg.Round1PackagesResponse\"\x00\x12O\n" +
 	"\x10round1_signature\x12\x1b.dkg.Round1SignatureRequest\x1a\x1c.dkg.Round1SignatureResponse\"\x00\x12L\n" +
-	"\x0fround2_packages\x12\x1a.dkg.Round2PackagesRequest\x1a\x1b.dkg.Round2PackagesResponse\"\x00B*Z(github.com/lightsparkdev/spark/proto/dkgb\x06proto3"
+	"\x0fround2_packages\x12\x1a.dkg.Round2PackagesRequest\x1a\x1b.dkg.Round2PackagesResponse\"\x00\x12U\n" +
+	"\x12round_confirmation\x12\x1d.dkg.RoundConfirmationRequest\x1a\x1e.dkg.RoundConfirmationResponse\"\x00B*Z(github.com/lightsparkdev/spark/proto/dkgb\x06proto3"
 
 var (
 	file_dkg_proto_rawDescOnce sync.Once
@@ -602,36 +710,40 @@ func file_dkg_proto_rawDescGZIP() []byte {
 	return file_dkg_proto_rawDescData
 }
 
-var file_dkg_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_dkg_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_dkg_proto_goTypes = []any{
-	(*InitiateDkgRequest)(nil),      // 0: dkg.InitiateDkgRequest
-	(*InitiateDkgResponse)(nil),     // 1: dkg.InitiateDkgResponse
-	(*Round1PackagesRequest)(nil),   // 2: dkg.Round1PackagesRequest
-	(*Round1PackagesResponse)(nil),  // 3: dkg.Round1PackagesResponse
-	(*Round1SignatureRequest)(nil),  // 4: dkg.Round1SignatureRequest
-	(*Round1SignatureResponse)(nil), // 5: dkg.Round1SignatureResponse
-	(*Round2PackagesRequest)(nil),   // 6: dkg.Round2PackagesRequest
-	(*Round2PackagesResponse)(nil),  // 7: dkg.Round2PackagesResponse
-	(*StartDkgRequest)(nil),         // 8: dkg.StartDkgRequest
-	nil,                             // 9: dkg.Round1SignatureRequest.Round1SignaturesEntry
-	(*common.PackageMap)(nil),       // 10: common.PackageMap
-	(*emptypb.Empty)(nil),           // 11: google.protobuf.Empty
+	(*InitiateDkgRequest)(nil),        // 0: dkg.InitiateDkgRequest
+	(*InitiateDkgResponse)(nil),       // 1: dkg.InitiateDkgResponse
+	(*Round1PackagesRequest)(nil),     // 2: dkg.Round1PackagesRequest
+	(*Round1PackagesResponse)(nil),    // 3: dkg.Round1PackagesResponse
+	(*Round1SignatureRequest)(nil),    // 4: dkg.Round1SignatureRequest
+	(*Round1SignatureResponse)(nil),   // 5: dkg.Round1SignatureResponse
+	(*Round2PackagesRequest)(nil),     // 6: dkg.Round2PackagesRequest
+	(*Round2PackagesResponse)(nil),    // 7: dkg.Round2PackagesResponse
+	(*RoundConfirmationRequest)(nil),  // 8: dkg.RoundConfirmationRequest
+	(*RoundConfirmationResponse)(nil), // 9: dkg.RoundConfirmationResponse
+	(*StartDkgRequest)(nil),           // 10: dkg.StartDkgRequest
+	nil,                               // 11: dkg.Round1SignatureRequest.Round1SignaturesEntry
+	(*common.PackageMap)(nil),         // 12: common.PackageMap
+	(*emptypb.Empty)(nil),             // 13: google.protobuf.Empty
 }
 var file_dkg_proto_depIdxs = []int32{
-	10, // 0: dkg.Round1PackagesRequest.round1_packages:type_name -> common.PackageMap
-	9,  // 1: dkg.Round1SignatureRequest.round1_signatures:type_name -> dkg.Round1SignatureRequest.Round1SignaturesEntry
-	8,  // 2: dkg.DKGService.start_dkg:input_type -> dkg.StartDkgRequest
+	12, // 0: dkg.Round1PackagesRequest.round1_packages:type_name -> common.PackageMap
+	11, // 1: dkg.Round1SignatureRequest.round1_signatures:type_name -> dkg.Round1SignatureRequest.Round1SignaturesEntry
+	10, // 2: dkg.DKGService.start_dkg:input_type -> dkg.StartDkgRequest
 	0,  // 3: dkg.DKGService.initiate_dkg:input_type -> dkg.InitiateDkgRequest
 	2,  // 4: dkg.DKGService.round1_packages:input_type -> dkg.Round1PackagesRequest
 	4,  // 5: dkg.DKGService.round1_signature:input_type -> dkg.Round1SignatureRequest
 	6,  // 6: dkg.DKGService.round2_packages:input_type -> dkg.Round2PackagesRequest
-	11, // 7: dkg.DKGService.start_dkg:output_type -> google.protobuf.Empty
-	1,  // 8: dkg.DKGService.initiate_dkg:output_type -> dkg.InitiateDkgResponse
-	3,  // 9: dkg.DKGService.round1_packages:output_type -> dkg.Round1PackagesResponse
-	5,  // 10: dkg.DKGService.round1_signature:output_type -> dkg.Round1SignatureResponse
-	7,  // 11: dkg.DKGService.round2_packages:output_type -> dkg.Round2PackagesResponse
-	7,  // [7:12] is the sub-list for method output_type
-	2,  // [2:7] is the sub-list for method input_type
+	8,  // 7: dkg.DKGService.round_confirmation:input_type -> dkg.RoundConfirmationRequest
+	13, // 8: dkg.DKGService.start_dkg:output_type -> google.protobuf.Empty
+	1,  // 9: dkg.DKGService.initiate_dkg:output_type -> dkg.InitiateDkgResponse
+	3,  // 10: dkg.DKGService.round1_packages:output_type -> dkg.Round1PackagesResponse
+	5,  // 11: dkg.DKGService.round1_signature:output_type -> dkg.Round1SignatureResponse
+	7,  // 12: dkg.DKGService.round2_packages:output_type -> dkg.Round2PackagesResponse
+	9,  // 13: dkg.DKGService.round_confirmation:output_type -> dkg.RoundConfirmationResponse
+	8,  // [8:14] is the sub-list for method output_type
+	2,  // [2:8] is the sub-list for method input_type
 	2,  // [2:2] is the sub-list for extension type_name
 	2,  // [2:2] is the sub-list for extension extendee
 	0,  // [0:2] is the sub-list for field type_name
@@ -648,7 +760,7 @@ func file_dkg_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_dkg_proto_rawDesc), len(file_dkg_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   10,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -122,6 +122,7 @@ func (s *SigningOperator) NewOperatorGRPCConnection() (*grpc.ClientConn, error) 
 	return s.newGrpcConnection(s.AddressRpc)
 }
 
+// NewOperatorGRPCConnectionForDKG creates a DKG connection to the AddressDkg endpoint.
 func (s *SigningOperator) NewOperatorGRPCConnectionForDKG() (*grpc.ClientConn, error) {
 	return s.newGrpcConnection(s.AddressDkg)
 }

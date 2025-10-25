@@ -66,6 +66,18 @@ service DKGService {
      * This will return the acknowledgement of the round2 packages by the participant.
      */
     rpc round2_packages(Round2PackagesRequest) returns (Round2PackagesResponse) {}
+
+    /*
+     * Round confirmation
+     *
+     * After round 3 has completed, the coordinator asks each participant which
+     * of the provided key IDs are present and AVAILABLE. The coordinator then
+     * marks only the keys that are available on ALL participants as AVAILABLE.
+     * 
+     * Always returns OK with a list of available/unavailable keys. The cron job
+     * retries periodically to catch keys that become available later.
+     */
+    rpc round_confirmation(RoundConfirmationRequest) returns (RoundConfirmationResponse) {}
 }
 
 /*
@@ -149,6 +161,22 @@ message Round2PackagesRequest {
 
 // Acknowledge the round2 packages from the participant.
 message Round2PackagesResponse {}
+
+// RoundConfirmationRequest is sent by the coordinator to each participant to
+// confirm the presence and availability of the generated keyshares.
+message RoundConfirmationRequest {
+    // The list of keyshare IDs (UUID strings) to check.
+    repeated string key_ids = 1;
+}
+
+// RoundConfirmationResponse contains which keys are available.
+message RoundConfirmationResponse {
+    // The list of key IDs that are AVAILABLE on this participant.
+    repeated string available_key_ids = 1;
+    
+    // The list of key IDs that are NOT available (missing or PENDING).
+    repeated string unavailable_key_ids = 2;
+}
 
 message StartDkgRequest {
     // The number of participants in the signing group.

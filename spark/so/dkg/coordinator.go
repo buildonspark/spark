@@ -2,13 +2,22 @@ package dkg
 
 import (
 	"context"
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/logging"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbdkg "github.com/lightsparkdev/spark/proto/dkg"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/ent"
+	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/helper"
 )
+
+const defaultDelayBeforeConfirmation = 15 * time.Second
 
 // GenerateKeys runs the DKG protocol to generate the keys.
 func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error {
@@ -93,6 +102,108 @@ func GenerateKeys(ctx context.Context, config *so.Config, keyCount uint64) error
 	}
 
 	wg.Wait()
+
+	// Optionally confirm and mark keys AVAILABLE only when the feature is enabled.
+	if config.DKGConfig.EnableKeyConfirmation {
+
+		keyIDs := make([]uuid.UUID, 0, int(keyCount))
+		for i := uint64(0); i < keyCount; i++ {
+			id := deriveKeyIndex(requestID, uint16(i))
+			keyIDs = append(keyIDs, id)
+		}
+
+		// Give participants time to complete Round3 (crypto + DB writes) before polling for confirmation
+		delay := defaultDelayBeforeConfirmation
+		if config.DKGConfig.InitialDelayBeforeConfirmation != nil && *config.DKGConfig.InitialDelayBeforeConfirmation > 0 {
+			delay = *config.DKGConfig.InitialDelayBeforeConfirmation
+		}
+		select {
+		case <-time.After(delay):
+			return ConfirmAndMarkAvailableKeys(ctx, config, keyIDs, requestID)
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	return nil
+}
+
+// ConfirmAndMarkAvailableKeys queries each operator to see which of the provided keys are AVAILABLE,
+// then marks only the subset of keys that are available on ALL operators as AVAILABLE locally.
+// This allows partial batches to complete even if some keys were lost (e.g., due to rollback).
+func ConfirmAndMarkAvailableKeys(ctx context.Context, config *so.Config, keyIDs []uuid.UUID, batchID uuid.UUID) error {
+	logger := logging.GetLoggerFromContext(ctx)
+
+	if len(keyIDs) == 0 {
+		return nil
+	}
+	keyIDsStr := make([]string, 0, len(keyIDs))
+	for _, id := range keyIDs {
+		keyIDsStr = append(keyIDsStr, id.String())
+	}
+
+	// Query each operator for which keys are unavailable (no lock needed - each goroutine writes to its own result)
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	unavailablePerOperator, _ := helper.ExecuteTaskWithAllOperators(ctx, config, &selection, func(ctx context.Context, operator *so.SigningOperator) ([]string, error) {
+		conn, err := operator.NewOperatorGRPCConnectionForDKG()
+		if err != nil {
+			// Connection error - all keys unavailable for this operator
+			return keyIDsStr, nil
+		}
+		defer conn.Close()
+
+		client := pbdkg.NewDKGServiceClient(conn)
+
+		resp, err := client.RoundConfirmation(ctx, &pbdkg.RoundConfirmationRequest{
+			KeyIds: keyIDsStr,
+		})
+		if err != nil {
+			// RPC error - all keys unavailable for this operator
+			return keyIDsStr, nil
+		}
+		return resp.UnavailableKeyIds, nil
+	})
+
+	missingPerKey := make(map[string][]string) // keyID -> list of operator identifiers
+	for operatorID, unavailableKeys := range unavailablePerOperator {
+		for _, keyID := range unavailableKeys {
+			missingPerKey[keyID] = append(missingPerKey[keyID], operatorID)
+		}
+	}
+
+	availableOnAll := make([]uuid.UUID, 0)
+	for _, id := range keyIDs {
+		idStr := id.String()
+		if _, missing := missingPerKey[idStr]; !missing {
+			availableOnAll = append(availableOnAll, id)
+		}
+	}
+
+	unconfirmedCount := len(missingPerKey)
+	if len(availableOnAll) == 0 {
+		logger.Sugar().Warnf("No keys available across all operators yet (checked: %d, unconfirmed: %d, batch_id: %s)", len(keyIDs), unconfirmedCount, batchID)
+		return fmt.Errorf("no keys available across all operators yet (checked %d)", len(keyIDs))
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	if err := db.SigningKeyshare.Update().
+		Where(
+			signingkeyshare.IDIn(availableOnAll...),
+			signingkeyshare.StatusEQ(st.KeyshareStatusPending),
+			signingkeyshare.CoordinatorIndexEQ(config.Index),
+		).
+		SetStatus(st.KeyshareStatusAvailable).
+		Exec(ctx); err != nil {
+		return err
+	}
+
+	if len(availableOnAll) < len(keyIDs) {
+		logger.Sugar().Warnf("Partial key confirmation (available: %d, requested: %d, unconfirmed: %d, batch_id: %s)", len(availableOnAll), len(keyIDs), unconfirmedCount, batchID)
+	}
 
 	return nil
 }

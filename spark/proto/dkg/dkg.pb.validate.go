@@ -915,6 +915,210 @@ var _ interface {
 	ErrorName() string
 } = Round2PackagesResponseValidationError{}
 
+// Validate checks the field values on RoundConfirmationRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RoundConfirmationRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RoundConfirmationRequest with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RoundConfirmationRequestMultiError, or nil if none found.
+func (m *RoundConfirmationRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RoundConfirmationRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return RoundConfirmationRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// RoundConfirmationRequestMultiError is an error wrapping multiple validation
+// errors returned by RoundConfirmationRequest.ValidateAll() if the designated
+// constraints aren't met.
+type RoundConfirmationRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RoundConfirmationRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RoundConfirmationRequestMultiError) AllErrors() []error { return m }
+
+// RoundConfirmationRequestValidationError is the validation error returned by
+// RoundConfirmationRequest.Validate if the designated constraints aren't met.
+type RoundConfirmationRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RoundConfirmationRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RoundConfirmationRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RoundConfirmationRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RoundConfirmationRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RoundConfirmationRequestValidationError) ErrorName() string {
+	return "RoundConfirmationRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RoundConfirmationRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRoundConfirmationRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RoundConfirmationRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RoundConfirmationRequestValidationError{}
+
+// Validate checks the field values on RoundConfirmationResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *RoundConfirmationResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on RoundConfirmationResponse with the
+// rules defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// RoundConfirmationResponseMultiError, or nil if none found.
+func (m *RoundConfirmationResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *RoundConfirmationResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return RoundConfirmationResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// RoundConfirmationResponseMultiError is an error wrapping multiple validation
+// errors returned by RoundConfirmationResponse.ValidateAll() if the
+// designated constraints aren't met.
+type RoundConfirmationResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m RoundConfirmationResponseMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m RoundConfirmationResponseMultiError) AllErrors() []error { return m }
+
+// RoundConfirmationResponseValidationError is the validation error returned by
+// RoundConfirmationResponse.Validate if the designated constraints aren't met.
+type RoundConfirmationResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e RoundConfirmationResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e RoundConfirmationResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e RoundConfirmationResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e RoundConfirmationResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e RoundConfirmationResponseValidationError) ErrorName() string {
+	return "RoundConfirmationResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e RoundConfirmationResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sRoundConfirmationResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = RoundConfirmationResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = RoundConfirmationResponseValidationError{}
+
 // Validate checks the field values on StartDkgRequest with the rules defined
 // in the proto definition for this message. If any rules are violated, the
 // first error encountered is returned, or nil if there are no violations.
