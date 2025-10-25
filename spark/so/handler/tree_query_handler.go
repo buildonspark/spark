@@ -482,6 +482,20 @@ func (h *TreeQueryHandler) QueryNodesByValue(ctx context.Context, req *pb.QueryN
 		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
 	}
 
+	privacyEnabled, err := NewWalletSettingHandler(h.config).IsPrivacyEnabled(ctx, ownerIdentityPubKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if privacy is enabled for owner: %w", err)
+	}
+	if privacyEnabled {
+		session, err := authn.GetSessionFromContext(ctx)
+		if err != nil || !session.IdentityPublicKey().Equals(ownerIdentityPubKey) {
+			return &pb.QueryNodesByValueResponse{
+				Nodes:  make(map[string]*pb.TreeNode),
+				Offset: -1,
+			}, nil
+		}
+	}
+
 	nodes, err := db.TreeNode.Query().
 		Where(
 			treenode.OwnerIdentityPubkey(ownerIdentityPubKey),

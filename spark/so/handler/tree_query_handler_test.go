@@ -590,3 +590,89 @@ func TestQueryBalance_NoSession(t *testing.T) {
 	assert.Equal(t, uint64(0), resp.Balance, "Balance should be 0 when no session is provided and privacy is enabled")
 	assert.Empty(t, resp.NodeBalances, "NodeBalances should be empty when no session is provided and privacy is enabled")
 }
+
+func TestQueryNodesByValue_PrivacyEnabled_DifferentRequester(t *testing.T) {
+	// Create test data with privacy enabled and different requester/owner
+	ctx, cfg, testData := createPrivacyTestData(t, true, false, true)
+
+	// Create handler
+	handler := NewTreeQueryHandler(cfg)
+
+	// Test QueryNodesByValue with different requester - should return empty result
+	req := &pb.QueryNodesByValueRequest{
+		OwnerIdentityPublicKey: testData.OwnerIdentityPubKey.Serialize(),
+		Value:                  int64(testData.Node.Value),
+		Limit:                  100,
+		Offset:                 0,
+	}
+
+	resp, err := handler.QueryNodesByValue(ctx, req)
+	require.NoError(t, err)
+	assert.Empty(t, resp.Nodes, "Nodes should be empty when privacy is enabled and requester is not the owner")
+	assert.Equal(t, int64(-1), resp.Offset, "Offset should be -1 when privacy blocks access")
+}
+
+func TestQueryNodesByValue_PrivacyDisabled_DifferentRequester(t *testing.T) {
+	// Create test data with privacy disabled and different requester/owner
+	ctx, cfg, testData := createPrivacyTestData(t, false, false, true)
+
+	// Create handler
+	handler := NewTreeQueryHandler(cfg)
+
+	// Test QueryNodesByValue with different requester - should return actual nodes
+	req := &pb.QueryNodesByValueRequest{
+		OwnerIdentityPublicKey: testData.OwnerIdentityPubKey.Serialize(),
+		Value:                  int64(testData.Node.Value),
+		Limit:                  100,
+		Offset:                 0,
+	}
+
+	resp, err := handler.QueryNodesByValue(ctx, req)
+	require.NoError(t, err)
+	assert.Len(t, resp.Nodes, 1, "Nodes should be returned when privacy is disabled")
+	assert.Equal(t, testData.Node.ID.String(), resp.Nodes[testData.Node.ID.String()].Id)
+	assert.Equal(t, int64(-1), resp.Offset, "Offset should be -1 when all results are returned")
+}
+
+func TestQueryNodesByValue_PrivacyEnabled_OwnerCanSeeOwnNodes(t *testing.T) {
+	// Create test data with privacy enabled and same requester/owner
+	ctx, cfg, testData := createPrivacyTestData(t, true, true, true)
+
+	// Create handler
+	handler := NewTreeQueryHandler(cfg)
+
+	// Test QueryNodesByValue with owner as requester - should return actual nodes
+	req := &pb.QueryNodesByValueRequest{
+		OwnerIdentityPublicKey: testData.OwnerIdentityPubKey.Serialize(),
+		Value:                  int64(testData.Node.Value),
+		Limit:                  100,
+		Offset:                 0,
+	}
+
+	resp, err := handler.QueryNodesByValue(ctx, req)
+	require.NoError(t, err)
+	assert.Len(t, resp.Nodes, 1, "Owner should be able to see their own nodes even when privacy is enabled")
+	assert.Equal(t, testData.Node.ID.String(), resp.Nodes[testData.Node.ID.String()].Id)
+	assert.Equal(t, int64(-1), resp.Offset, "Offset should be -1 when all results are returned")
+}
+
+func TestQueryNodesByValue_NoSession(t *testing.T) {
+	// Create test data with privacy enabled but no session injected
+	ctx, cfg, testData := createPrivacyTestData(t, true, false, false)
+
+	// Create handler
+	handler := NewTreeQueryHandler(cfg)
+
+	// Test QueryNodesByValue without session - should return empty result
+	req := &pb.QueryNodesByValueRequest{
+		OwnerIdentityPublicKey: testData.OwnerIdentityPubKey.Serialize(),
+		Value:                  int64(testData.Node.Value),
+		Limit:                  100,
+		Offset:                 0,
+	}
+
+	resp, err := handler.QueryNodesByValue(ctx, req)
+	require.NoError(t, err)
+	assert.Empty(t, resp.Nodes, "Nodes should be empty when no session is provided and privacy is enabled")
+	assert.Equal(t, int64(-1), resp.Offset, "Offset should be -1 when privacy blocks access")
+}
