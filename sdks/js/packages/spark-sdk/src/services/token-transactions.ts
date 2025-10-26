@@ -55,6 +55,7 @@ export interface FetchOwnedTokenOutputsParams {
 }
 
 export interface QueryTokenTransactionsParams {
+  sparkAddresses?: string[];
   ownerPublicKeys?: string[];
   issuerPublicKeys?: string[];
   tokenTransactionHashes?: string[];
@@ -580,6 +581,7 @@ export class TokenTransactionService {
     params: QueryTokenTransactionsParams,
   ): Promise<QueryTokenTransactionsResponse> {
     const {
+      sparkAddresses,
       ownerPublicKeys,
       issuerPublicKeys,
       tokenTransactionHashes,
@@ -590,13 +592,26 @@ export class TokenTransactionService {
       offset,
     } = params;
 
+    const decodedOwnerPublicKeys = sparkAddresses?.map((address) => {
+      const decoded = decodeSparkAddress(address, this.config.getNetworkType());
+      return decoded.identityPublicKey;
+    });
+
+    const allOwnerPublicKeys = [
+      ...(decodedOwnerPublicKeys || []),
+      ...(ownerPublicKeys || []),
+    ];
+
     const tokenClient = await this.connectionManager.createSparkTokenClient(
       this.config.getCoordinatorAddress(),
     );
 
     let queryParams: QueryTokenTransactionsRequestV1 = {
       issuerPublicKeys: issuerPublicKeys?.map(hexToBytes)!,
-      ownerPublicKeys: ownerPublicKeys?.map(hexToBytes)!,
+      ownerPublicKeys:
+        allOwnerPublicKeys.length > 0
+          ? allOwnerPublicKeys.map(hexToBytes)
+          : undefined!,
       tokenIdentifiers: tokenIdentifiers?.map((identifier) => {
         const { tokenIdentifier } = decodeBech32mTokenIdentifier(
           identifier as Bech32mTokenIdentifier,

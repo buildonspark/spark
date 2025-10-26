@@ -4677,7 +4677,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    * Retrieves token transaction history for specified tokens
    * Can optionally filter by specific transaction hashes.
    *
-   * @param ownerPublicKeys - Optional array of owner public keys to query transactions for
+   * @param sparkAddresses - Optional array of Spark addresses to query transactions for
+   * @param ownerPublicKeys - Optional array of owner public keys to query transactions for (deprecated, use sparkAddresses)
    * @param issuerPublicKeys - Optional array of issuer public keys to query transactions for
    * @param tokenTransactionHashes - Optional array of specific transaction hashes to filter by
    * @param tokenIdentifiers - Optional array of token identifiers to filter by
@@ -4689,6 +4690,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
    */
 
   public async queryTokenTransactions({
+    sparkAddresses,
     ownerPublicKeys,
     issuerPublicKeys,
     tokenTransactionHashes,
@@ -4698,6 +4700,10 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     pageSize,
     offset,
   }: {
+    sparkAddresses?: string[];
+    /**
+     * @deprecated Use sparkAddresses instead
+     */
     ownerPublicKeys?: string[];
     issuerPublicKeys?: string[];
     tokenTransactionHashes?: string[];
@@ -4708,6 +4714,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     offset?: number;
   }): Promise<QueryTokenTransactionsResponse> {
     return this.tokenTransactionService.queryTokenTransactions({
+      sparkAddresses,
       ownerPublicKeys,
       issuerPublicKeys,
       tokenTransactionHashes,

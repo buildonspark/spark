@@ -66,7 +66,7 @@ describe.each(TEST_CONFIGS)(
 
       const response = await issuerWallet.queryTokenTransactions({
         tokenIdentifiers: [tokenIdentifier!],
-        ownerPublicKeys: [issuerPublicKey],
+        sparkAddresses: [await issuerWallet.getSparkAddress()],
       });
       const transactions = response.tokenTransactionsWithStatus;
       expect(transactions.length).toBeGreaterThanOrEqual(2);
@@ -129,7 +129,7 @@ describe.each(TEST_CONFIGS)(
 
       const res = await issuerWallet.queryTokenTransactions({
         tokenIdentifiers: [tokenIdentifier!],
-        ownerPublicKeys: [issuerPublicKey],
+        sparkAddresses: [await issuerWallet.getSparkAddress()],
       });
       const transactions = res.tokenTransactionsWithStatus;
 

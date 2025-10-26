@@ -6,12 +6,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/utils"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
 )
+
+// encodeSparkAddress is a helper function to encode a public key as a spark address for testing
+func encodeSparkAddress(pubKey keys.Public, network common.Network) string {
+	address, err := common.EncodeSparkAddress(pubKey.Serialize(), network, nil)
+	if err != nil {
+		panic(err)
+	}
+	return address
+}
 
 // TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval tests the full coordinated flow with mint and transfer
 // This test also verifies that upon success that the expected outputs and transactions are retrievable.
@@ -482,6 +492,119 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 			},
 			expectedTxCount:       0,
 			shouldContainTxHashes: [][]byte{},
+		},
+		{
+			name: "filter by spark address - user output 1",
+			params: wallet.QueryTokenTransactionsParams{
+				SparkAddresses: []string{encodeSparkAddress(userOutput1PrivKey.Public(), config.Network)},
+				Limit:          10,
+			},
+			expectedTxCount:       2,
+			shouldContainTxHashes: [][]byte{mintTxHash1, transferTxHash},
+		},
+		{
+			name: "filter by spark address - user output 5 (transfer recipient)",
+			params: wallet.QueryTokenTransactionsParams{
+				SparkAddresses: []string{encodeSparkAddress(userOutput5PrivKey.Public(), config.Network)},
+				Limit:          10,
+			},
+			expectedTxCount:       1,
+			shouldContainTxHashes: [][]byte{transferTxHash},
+		},
+		{
+			name: "filter by spark address AND issuer public key",
+			params: wallet.QueryTokenTransactionsParams{
+				SparkAddresses:   []string{encodeSparkAddress(userOutput1PrivKey.Public(), config.Network)},
+				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+				Limit:            10,
+			},
+			expectedTxCount:       2,
+			shouldContainTxHashes: [][]byte{mintTxHash1, transferTxHash},
+		},
+		{
+			name: "filter by spark address AND token identifier - first token",
+			params: wallet.QueryTokenTransactionsParams{
+				SparkAddresses:   []string{encodeSparkAddress(userOutput5PrivKey.Public(), config.Network)},
+				TokenIdentifiers: [][]byte{tokenIdentifier},
+				Limit:            10,
+			},
+			expectedTxCount:       1,
+			shouldContainTxHashes: [][]byte{transferTxHash},
+		},
+		{
+			name: "filter by spark address AND token identifier - second token",
+			params: wallet.QueryTokenTransactionsParams{
+				SparkAddresses:   []string{encodeSparkAddress(userOutput6PrivKey.Public(), config.Network)},
+				TokenIdentifiers: [][]byte{tokenIdentifier2},
+				Limit:            10,
+			},
+			expectedTxCount:       1,
+			shouldContainTxHashes: [][]byte{mintTxHash3},
+		},
+		{
+			name: "filter by spark address AND token identifier - mismatched token",
+			params: wallet.QueryTokenTransactionsParams{
+				SparkAddresses:   []string{encodeSparkAddress(userOutput6PrivKey.Public(), config.Network)},
+				TokenIdentifiers: [][]byte{tokenIdentifier},
+				Limit:            10,
+			},
+			expectedTxCount:       0,
+			shouldContainTxHashes: [][]byte{},
+		},
+		{
+			name: "filter by spark address, issuer, and token identifier - all matching",
+			params: wallet.QueryTokenTransactionsParams{
+				SparkAddresses:   []string{encodeSparkAddress(userOutput1PrivKey.Public(), config.Network)},
+				IssuerPublicKeys: []keys.Public{issuerPrivKey.Public()},
+				TokenIdentifiers: [][]byte{tokenIdentifier},
+				Limit:            10,
+			},
+			expectedTxCount:       2,
+			shouldContainTxHashes: [][]byte{mintTxHash1, transferTxHash},
+		},
+		{
+			name: "filter by multiple spark addresses - same transaction",
+			params: wallet.QueryTokenTransactionsParams{
+				SparkAddresses: []string{
+					encodeSparkAddress(userOutput3PrivKey.Public(), config.Network),
+					encodeSparkAddress(userOutput4PrivKey.Public(), config.Network),
+				},
+				Limit: 10,
+			},
+			expectedTxCount:       1,
+			shouldContainTxHashes: [][]byte{mintTxHash2},
+		},
+		{
+			name: "filter by multiple spark addresses - mixed single and multiple transactions",
+			params: wallet.QueryTokenTransactionsParams{
+				SparkAddresses: []string{
+					encodeSparkAddress(userOutput1PrivKey.Public(), config.Network),
+					encodeSparkAddress(userOutput2PrivKey.Public(), config.Network),
+					encodeSparkAddress(userOutput3PrivKey.Public(), config.Network),
+				},
+				Limit: 10,
+			},
+			expectedTxCount:       3,
+			shouldContainTxHashes: [][]byte{mintTxHash1, mintTxHash2, transferTxHash},
+		},
+		{
+			name: "filter by non-existent spark address",
+			params: wallet.QueryTokenTransactionsParams{
+				SparkAddresses: []string{encodeSparkAddress(keys.GeneratePrivateKey().Public(), config.Network)},
+				Limit:          10,
+			},
+			expectedTxCount:       0,
+			shouldContainTxHashes: [][]byte{},
+		},
+		{
+			name: "filter by mixed spark addresses and owner public keys",
+			params: wallet.QueryTokenTransactionsParams{
+				SparkAddresses:  []string{encodeSparkAddress(userOutput1PrivKey.Public(), config.Network)},
+				OwnerPublicKeys: []keys.Public{userOutput2PrivKey.Public()},
+				Limit:           10,
+			},
+			expectedTxCount:       2,
+			shouldContainTxHashes: [][]byte{mintTxHash1, transferTxHash},
 		},
 	}
 

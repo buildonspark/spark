@@ -33,6 +33,7 @@ type OperatorSignatures map[string][]byte
 
 // QueryTokenTransactionsParams holds the parameters for QueryTokenTransactionsV2
 type QueryTokenTransactionsParams struct {
+	SparkAddresses    []string
 	IssuerPublicKeys  []keys.Public
 	OwnerPublicKeys   []keys.Public
 	TokenIdentifiers  [][]byte
@@ -712,8 +713,25 @@ func QueryTokenTransactionsV2(
 	tmpCtx := ContextWithToken(ctx, token)
 	tokenClient := tokenpb.NewSparkTokenServiceClient(sparkConn)
 
+	// Decode spark addresses to get owner public keys
+	var decodedOwnerPublicKeys []keys.Public
+	for _, address := range params.SparkAddresses {
+		decoded, err := common.DecodeSparkAddress(address)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode spark address: %w", err)
+		}
+		pubKey, err := keys.ParsePublicKey(decoded.SparkAddress.IdentityPublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse identity public key from spark address: %w", err)
+		}
+		decodedOwnerPublicKeys = append(decodedOwnerPublicKeys, pubKey)
+	}
+
+	// Combine decoded owner public keys with direct owner public keys
+	allOwnerPublicKeys := append(decodedOwnerPublicKeys, params.OwnerPublicKeys...)
+
 	request := &tokenpb.QueryTokenTransactionsRequest{
-		OwnerPublicKeys:        serializeAll(params.OwnerPublicKeys),
+		OwnerPublicKeys:        serializeAll(allOwnerPublicKeys),
 		IssuerPublicKeys:       serializeAll(params.IssuerPublicKeys), // Field name change: TokenPublicKeys -> IssuerPublicKeys
 		TokenIdentifiers:       params.TokenIdentifiers,
 		OutputIds:              params.OutputIDs,

@@ -375,13 +375,11 @@ interface CreateSparkInvoiceArgs {
 }
 
 interface QueryTokenTransactionsArgs {
-  ownerPublicKeys?: string[];
+  sparkAddresses?: string[];
   issuerPublicKeys?: string[];
   tokenTransactionHashes?: string[];
   tokenIdentifiers?: string[];
   outputIds?: string[];
-  useWalletIdentityKeyForOwner: boolean;
-  useWalletIdentityKeyForIssuer: boolean;
   pageSize?: number;
   offset?: number;
   sortOrder?: "asc" | "desc";
@@ -392,7 +390,7 @@ function showQueryTokenTransactionsHelp() {
   console.log("");
   console.log("Options:");
   console.log(
-    "  --ownerPublicKeys <keys>      Comma-separated list of owner public keys (default: wallet's identity key, use ',' for empty list, '~' for wallet)",
+    "  --sparkAddresses <addresses>  Comma-separated list of Spark addresses (default: wallet's Spark address, use ',' for empty list, '~' for wallet)",
   );
   console.log(
     "  --issuerPublicKeys <keys>     Comma-separated list of issuer public keys (default: empty, use ',' for empty list, '~' for wallet)",
@@ -413,17 +411,11 @@ function showQueryTokenTransactionsHelp() {
   console.log("");
   console.log("Examples:");
   console.log("  querytokentransactions");
-  console.log("  querytokentransactions --ownerPublicKeys 02abc123...");
+  console.log("  querytokentransactions --sparkAddresses spark1q...");
   console.log("  querytokentransactions --issuerPublicKeys 02abc123...");
   console.log("  querytokentransactions --tokenTransactionHashes abc123...");
   console.log(
-    "  querytokentransactions --ownerPublicKeys ~ --issuerPublicKeys 02abc123...",
-  );
-  console.log(
-    "  querytokentransactions --ownerPublicKeys key1,key2 --tokenIdentifiers id1,id2",
-  );
-  console.log(
-    "  querytokentransactions --ownerPublicKeys , --tokenIdentifiers def456...",
+    "  querytokentransactions --sparkAddresses addr1,addr2 --tokenIdentifiers id1,id2",
   );
   console.log("  querytokentransactions --pageSize 10 --offset 0");
   console.log("  querytokentransactions --sortOrder desc");
@@ -434,10 +426,9 @@ function parseQueryTokenTransactionsArgsWithYargs(
 ): QueryTokenTransactionsArgs | null {
   try {
     const parsed = yargs(args)
-      .option("ownerPublicKeys", {
+      .option("sparkAddresses", {
         type: "string",
-        description:
-          "Comma-separated list of owner public keys (default: wallet's identity key). Use ',' for empty list, '~' for wallet's identity key.",
+        description: "Comma-separated list of Spark addresses",
         coerce: (value: string) => {
           if (!value) return [];
           // If it's just a comma, return empty array (explicit empty list)
@@ -498,32 +489,12 @@ function parseQueryTokenTransactionsArgsWithYargs(
       return null;
     }
 
-    // Check if user explicitly specified empty keys with ','
-    const rawArgs = args.join(" ");
-    const explicitEmptyOwnerKeys =
-      /--ownerPublicKeys\s+,/.test(rawArgs) ||
-      /--ownerPublicKeys=,/.test(rawArgs);
-
-    // Check if user specified '~' for wallet identity key
-    const useWalletForOwner = parsed.ownerPublicKeys?.includes("~") || false;
-    const useWalletForIssuer = parsed.issuerPublicKeys?.includes("~") || false;
-
-    // Filter out '~' from the arrays
-    const ownerPublicKeys =
-      parsed.ownerPublicKeys?.filter((key) => key !== "~") || [];
-    const issuerPublicKeys =
-      parsed.issuerPublicKeys?.filter((key) => key !== "~") || [];
-
     return {
-      ownerPublicKeys,
-      issuerPublicKeys,
+      sparkAddresses: parsed.sparkAddresses,
+      issuerPublicKeys: parsed.issuerPublicKeys,
       tokenTransactionHashes: parsed.tokenTransactionHashes,
       tokenIdentifiers: parsed.tokenIdentifiers,
       outputIds: parsed.outputIds,
-      useWalletIdentityKeyForOwner:
-        !explicitEmptyOwnerKeys &&
-        (ownerPublicKeys.length === 0 || useWalletForOwner),
-      useWalletIdentityKeyForIssuer: useWalletForIssuer,
       pageSize: parsed.pageSize,
       offset: parsed.offset,
       sortOrder: parsed.sortOrder as "asc" | "desc",
@@ -1793,19 +1764,9 @@ async function runCLI() {
             break;
           }
 
-          let ownerPublicKeys = parsedArgs.ownerPublicKeys || [];
-          if (parsedArgs.useWalletIdentityKeyForOwner) {
-            ownerPublicKeys.push(await wallet.getIdentityPublicKey());
-          }
-
-          let issuerPublicKeys: string[] = parsedArgs.issuerPublicKeys || [];
-          if (parsedArgs.useWalletIdentityKeyForIssuer) {
-            issuerPublicKeys.push(await wallet.getIdentityPublicKey());
-          }
-
           const res = await wallet.queryTokenTransactions({
-            ownerPublicKeys,
-            issuerPublicKeys,
+            sparkAddresses: parsedArgs.sparkAddresses,
+            issuerPublicKeys: parsedArgs.issuerPublicKeys,
             tokenTransactionHashes: parsedArgs.tokenTransactionHashes,
             tokenIdentifiers: parsedArgs.tokenIdentifiers,
             outputIds: parsedArgs.outputIds,
