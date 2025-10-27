@@ -1,4 +1,5 @@
-import { CurrencyUnit } from "@lightsparkdev/core";
+import { CurrencyUnit, isObject } from "@lightsparkdev/core";
+import { hmac } from "@noble/hashes/hmac";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToHex,
@@ -149,6 +150,7 @@ import {
   encodeBech32mTokenIdentifier,
 } from "../utils/token-identifier.js";
 import type {
+  CreateHTLCParams,
   CreateLightningInvoiceParams,
   DepositParams,
   FulfillSparkInvoiceResponse,
@@ -3787,6 +3789,145 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     });
   }
 
+  // ***** HTLC Flow *****
+  /**
+   * Creates a HTLC.
+   *
+   * @param {Object} params - Parameters for creating a HTLC
+   * @param {string} params.receiverSparkAddress - The Spark address of the receiver
+   * @param {number} params.amountSats - The amount in sats to send
+   * @param {string} params.preimage - The preimage of the HTLC
+   * @param {number} params.expiryTimeMinutes - The expiry time in minutes
+   * @returns {Promise<Transfer>} The HTLC transfer details
+   */
+  public async createHTLC({
+    receiverSparkAddress,
+    amountSats,
+    preimage,
+    expiryTime,
+  }: CreateHTLCParams): Promise<Transfer> {
+    if (expiryTime.getTime() <= Date.now()) {
+      throw new ValidationError("Expiry time must be in the future", {
+        field: "expiryTime",
+        value: expiryTime,
+        expected: "greater than 0",
+      });
+    }
+
+    return await this.withLeaves(async () => {
+      const internalBalance = this.getInternalBalance();
+      if (amountSats > internalBalance) {
+        throw new ValidationError("Insufficient balance", {
+          field: "balance",
+          value: internalBalance,
+          expected: `${amountSats} sats`,
+        });
+      }
+      const selectedLeaves = (await this.selectLeaves([amountSats])).get(
+        amountSats,
+      )!;
+      let leaves = this.popOrThrow(
+        selectedLeaves,
+        `no leaves for ${amountSats}`,
+      );
+      leaves = await this.checkRenewLeaves(leaves);
+
+      const leavesToSend: LeafKeyTweak[] = await Promise.all(
+        leaves.map(async (leaf) => ({
+          leaf,
+          keyDerivation: {
+            type: KeyDerivationType.LEAF,
+            path: leaf.id,
+          },
+          newKeyDerivation: {
+            type: KeyDerivationType.RANDOM,
+          },
+        })),
+      );
+
+      const transferID = uuidv7();
+
+      if (!preimage) {
+        const preimageBytes = await this.getHTLCPreimage(transferID);
+        preimage = bytesToHex(preimageBytes);
+      }
+
+      const paymentHash = sha256(hexToBytes(preimage));
+
+      const receiverIdentityPubkey = decodeSparkAddress(
+        receiverSparkAddress,
+        this.config.getNetworkType(),
+      ).identityPublicKey;
+
+      const startTransferRequest =
+        await this.transferService.prepareTransferForLightning(
+          leavesToSend,
+          hexToBytes(receiverIdentityPubkey),
+          paymentHash,
+          expiryTime,
+          transferID,
+        );
+
+      const swapResponse = await this.lightningService.swapNodesForPreimage({
+        leaves: leavesToSend,
+        receiverIdentityPubkey: hexToBytes(receiverIdentityPubkey),
+        paymentHash,
+        isInboundPayment: false,
+        startTransferRequest,
+        expiryTime,
+        transferID,
+      });
+      if (!swapResponse.transfer) {
+        throw new Error("Failed to swap nodes for preimage");
+      }
+
+      const leavesToRemove = new Set(leavesToSend.map((leaf) => leaf.leaf.id));
+      this.leaves = this.leaves.filter((leaf) => !leavesToRemove.has(leaf.id));
+      return swapResponse.transfer;
+    });
+  }
+
+  public async getHTLCPreimage(transferID: string): Promise<Uint8Array> {
+    const cleanedTransferID = transferID
+      .trim()
+      .toLowerCase()
+      .replaceAll("-", "");
+    return await this.config.signer.htlcHMAC(cleanedTransferID);
+  }
+
+  /**
+   * Claims a HTLC.
+   *
+   * @param {string} preimage - the preimage of the HTLC
+   * @returns {Promise<Transfer>} The HTLC transfer details
+   */
+  public async claimHTLC(preimage: string): Promise<Transfer> {
+    const bytes = hexToBytes(preimage);
+    if (bytes.length !== 32) {
+      throw new ValidationError("Preimage must be 32 bytes", {
+        field: "preimage",
+        value: preimage,
+        expected: "32 bytes",
+      });
+    }
+    const transfer = await this.lightningService.providePreimage(bytes);
+    if (!transfer) {
+      throw new Error("Failed to provide preimage");
+    }
+    const receiverIdentityPublicKey = transfer.receiverIdentityPublicKey;
+    const isSelfClaim = equalBytes(
+      receiverIdentityPublicKey,
+      await this.config.signer.getIdentityPublicKey(),
+    );
+    if (isSelfClaim) {
+      await this.claimTransfer({
+        transfer: transfer,
+        emit: true,
+      });
+    }
+    return transfer;
+  }
+
   /**
    * Fulfills one or more Spark invoices.
    *
@@ -5421,6 +5562,9 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "claimStaticDeposit",
   "claimStaticDepositWithMaxFee",
   "cleanupConnections",
+  "createHTLC",
+  "getHTLCPreimage",
+  "claimHTLC",
   "createLightningInvoice",
   "createSatsInvoice",
   "createTokensInvoice",

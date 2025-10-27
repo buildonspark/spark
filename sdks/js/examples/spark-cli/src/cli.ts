@@ -324,6 +324,8 @@ const commands = [
   "createsparkinvoice",
   "createinvoice",
   "payinvoice",
+  "createhtlc",
+  "claimhtlc",
   "sendtransfer",
   "withdraw",
   "withdrawalfee",
@@ -637,6 +639,8 @@ async function runCLI() {
   createinvoice <amount> <memo> <includeSparkAddress> [receiverIdentityPubkey] [descriptionHash] - Create a new lightning invoice
   payinvoice <invoice> <maxFeeSats> <preferSpark> [amountSatsToSend]  - Pay a lightning invoice
   createsparkinvoice <asset("btc" | tokenIdentifier)> [amount] [memo] [senderPublicKey] [expiryTime] - Create a spark payment request. Amount is optional. Use _ for empty optional fields eg createsparkinvoice btc _ memo _ _
+  createhtlc <receiverSparkAddress> <amountSats> <expiryTimeMinutes> <preimage> - Create a HTLC
+  claimhtlc <preimage>                                                - Claim a HTLC
   sendtransfer <amount> <receiverSparkAddress>                        - Send a spark transfer
   withdraw <amount> <onchainAddress> <exitSpeed(FAST|MEDIUM|SLOW)> [deductFeeFromWithdrawalAmount(true|false)] - Withdraw funds to an L1 address
   withdrawalfee <amount> <withdrawalAddress>                          - Get a fee estimate for a withdrawal (cooperative exit)
@@ -1333,6 +1337,27 @@ async function runCLI() {
             });
           }
           console.log(sparkInvoice);
+          break;
+        case "createhtlc":
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          const createdHTLC = await wallet.createHTLC({
+            receiverSparkAddress: args[0],
+            amountSats: parseInt(args[1]),
+            expiryTime: new Date(Date.now() + parseInt(args[2]) * 60 * 1000),
+            preimage: args[3],
+          });
+          console.log(createdHTLC);
+          break;
+        case "claimhtlc":
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          const htlc = await wallet.claimHTLC(args[0]);
+          console.log(htlc);
           break;
         case "sendtransfer":
           if (!wallet) {

@@ -16,6 +16,8 @@ import { NetworkType } from "../../utils/network.js";
 import type { VerifiableSecretShare } from "../../utils/secret-sharing.js";
 import { walletTypes } from "../test-utils.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
+import { hmac } from "@noble/hashes/hmac";
+import { sha256 } from "@noble/hashes/sha2";
 
 describe.each(walletTypes)("wallet", ({ name, Signer }) => {
   it(`${name} - should initialize a wallet`, async () => {
@@ -96,15 +98,19 @@ describe.each(walletTypes)("wallet", ({ name, Signer }) => {
 class PreinitializedTestSigner implements SparkSigner {
   private readonly identityPrivateKey: Uint8Array;
   private readonly depositPrivateKey: Uint8Array;
+  private readonly htlcPreimagePrivateKey: Uint8Array;
 
   constructor(params?: {
     identityPrivateKey?: Uint8Array;
     depositPrivateKey?: Uint8Array;
+    htlcPreimagePrivateKey?: Uint8Array;
   }) {
     this.identityPrivateKey =
       params?.identityPrivateKey ?? secp256k1.utils.randomPrivateKey();
     this.depositPrivateKey =
       params?.depositPrivateKey ?? secp256k1.utils.randomPrivateKey();
+    this.htlcPreimagePrivateKey =
+      params?.htlcPreimagePrivateKey ?? secp256k1.utils.randomPrivateKey();
   }
 
   async getIdentityPublicKey(): Promise<Uint8Array> {
@@ -209,6 +215,10 @@ class PreinitializedTestSigner implements SparkSigner {
   ): void {
     // Not used in this test
     return;
+  }
+
+  async htlcHMAC(_transferID: string): Promise<Uint8Array> {
+    return hmac(sha256, this.htlcPreimagePrivateKey, _transferID);
   }
 
   async decryptEcies(_ciphertext: Uint8Array): Promise<Uint8Array> {

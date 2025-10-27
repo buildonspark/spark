@@ -1,4 +1,5 @@
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
+import { hmac } from "@noble/hashes/hmac";
 import {
   bytesToHex,
   bytesToNumberBE,
@@ -50,6 +51,7 @@ interface SparkKeysGenerator {
     signingHDKey: DerivedHDKey;
     depositKey: KeyPair;
     staticDepositHDKey: DerivedHDKey;
+    HTLCPreimageHDKey: DerivedHDKey;
   }>;
 }
 
@@ -64,6 +66,7 @@ class DefaultSparkKeysGenerator implements SparkKeysGenerator {
     signingHDKey: DerivedHDKey;
     depositKey: KeyPair;
     staticDepositHDKey: DerivedHDKey;
+    HTLCPreimageHDKey: DerivedHDKey;
   }> {
     const hdkey = HDKey.fromMasterSeed(seed);
 
@@ -78,7 +81,7 @@ class DefaultSparkKeysGenerator implements SparkKeysGenerator {
     const signingKey = hdkey.derive(`m/8797555'/${accountNumber}'/1'`);
     const depositKey = hdkey.derive(`m/8797555'/${accountNumber}'/2'`);
     const staticDepositKey = hdkey.derive(`m/8797555'/${accountNumber}'/3'`);
-
+    const htlcPreimageKey = hdkey.derive(`m/8797555'/${accountNumber}'/4'`);
     if (
       !identityKey.privateKey ||
       !depositKey.privateKey ||
@@ -87,7 +90,9 @@ class DefaultSparkKeysGenerator implements SparkKeysGenerator {
       !depositKey.publicKey ||
       !signingKey.publicKey ||
       !staticDepositKey.privateKey ||
-      !staticDepositKey.publicKey
+      !staticDepositKey.publicKey ||
+      !htlcPreimageKey.privateKey ||
+      !htlcPreimageKey.publicKey
     ) {
       throw new ValidationError(
         "Failed to derive all required keys from seed",
@@ -116,6 +121,11 @@ class DefaultSparkKeysGenerator implements SparkKeysGenerator {
         privateKey: staticDepositKey.privateKey,
         publicKey: staticDepositKey.publicKey,
       },
+      HTLCPreimageHDKey: {
+        hdKey: htlcPreimageKey,
+        privateKey: htlcPreimageKey.privateKey,
+        publicKey: htlcPreimageKey.publicKey,
+      },
     };
   }
 }
@@ -131,6 +141,7 @@ class DerivationPathKeysGenerator implements SparkKeysGenerator {
     signingHDKey: DerivedHDKey;
     depositKey: KeyPair;
     staticDepositHDKey: DerivedHDKey;
+    HTLCPreimageHDKey: DerivedHDKey;
   }> {
     const hdkey = HDKey.fromMasterSeed(seed);
 
@@ -150,7 +161,7 @@ class DerivationPathKeysGenerator implements SparkKeysGenerator {
     const signingKey = hdkey.derive(`${derivationPath}/1'`);
     const depositKey = hdkey.derive(`${derivationPath}/2'`);
     const staticDepositKey = hdkey.derive(`${derivationPath}/3'`);
-
+    const htlcPreimageKey = hdkey.derive(`${derivationPath}/4'`);
     if (
       !identityKey.privateKey ||
       !identityKey.publicKey ||
@@ -159,7 +170,9 @@ class DerivationPathKeysGenerator implements SparkKeysGenerator {
       !depositKey.privateKey ||
       !depositKey.publicKey ||
       !staticDepositKey.privateKey ||
-      !staticDepositKey.publicKey
+      !staticDepositKey.publicKey ||
+      !htlcPreimageKey.privateKey ||
+      !htlcPreimageKey.publicKey
     ) {
       throw new ValidationError(
         "Failed to derive all required keys from seed",
@@ -188,6 +201,11 @@ class DerivationPathKeysGenerator implements SparkKeysGenerator {
         privateKey: staticDepositKey.privateKey,
         publicKey: staticDepositKey.publicKey,
       },
+      HTLCPreimageHDKey: {
+        hdKey: htlcPreimageKey,
+        privateKey: htlcPreimageKey.privateKey,
+        publicKey: htlcPreimageKey.publicKey,
+      },
     };
   }
 }
@@ -197,6 +215,7 @@ interface SparkSigner {
   getDepositSigningKey(): Promise<Uint8Array>;
   getStaticDepositSigningKey(idx: number): Promise<Uint8Array>;
   getStaticDepositSecretKey(idx: number): Promise<Uint8Array>;
+
   generateMnemonic(): Promise<string>;
   mnemonicToSeed(mnemonic: string): Promise<Uint8Array>;
   signSchnorrWithIdentityKey(message: Uint8Array): Promise<Uint8Array>;
@@ -256,6 +275,8 @@ interface SparkSigner {
     index: number,
     publicKey: Uint8Array,
   ): void;
+
+  htlcHMAC(transferID: string): Promise<Uint8Array>;
 }
 
 type SparkSignerConstructorParams = {
@@ -267,6 +288,7 @@ class DefaultSparkSigner implements SparkSigner {
   private signingKey: HDKey | null = null;
   private depositKey: KeyPair | null = null;
   private staticDepositKey: HDKey | null = null;
+  private htlcPreimageKey: HDKey | null = null;
   private readonly keysGenerator: SparkKeysGenerator;
 
   protected commitmentToNonceMap: Map<SigningCommitment, SigningNonce> =
@@ -629,12 +651,14 @@ class DefaultSparkSigner implements SparkSigner {
       signingHDKey: signingKey,
       depositKey,
       staticDepositHDKey: staticDepositKey,
+      HTLCPreimageHDKey: htlcPreimageKey,
     } = await this.keysGenerator.deriveKeysFromSeed(seed, accountNumber ?? 0);
 
     this.identityKey = identityKey;
     this.depositKey = depositKey;
     this.signingKey = signingKey.hdKey;
     this.staticDepositKey = staticDepositKey.hdKey;
+    this.htlcPreimageKey = htlcPreimageKey.hdKey;
 
     return bytesToHex(identityKey.publicKey);
   }
@@ -721,6 +745,15 @@ class DefaultSparkSigner implements SparkSigner {
     }
 
     tx.signIdx(privateKey, index);
+  }
+
+  async htlcHMAC(transferID: string): Promise<Uint8Array> {
+    if (!this.htlcPreimageKey?.privateKey) {
+      throw new ConfigurationError("HTLC preimage key not initialized", {
+        configKey: "htlcPreimageKey",
+      });
+    }
+    return hmac(sha256, this.htlcPreimageKey.privateKey, transferID);
   }
 }
 

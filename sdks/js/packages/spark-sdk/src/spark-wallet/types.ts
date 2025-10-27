@@ -207,3 +207,10 @@ export interface SparkWalletEvents {
     error: string,
   ) => void;
 }
+
+export type CreateHTLCParams = {
+  receiverSparkAddress: string;
+  amountSats: number;
+  preimage?: string;
+  expiryTime: Date;
+};
