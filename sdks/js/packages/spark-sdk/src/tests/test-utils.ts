@@ -153,14 +153,7 @@ export const signerTypes = [
   },
 ];
 
-export const walletTypes = [
-  ...signerTypes,
-  {
-    name: "DefaultSparkSignerWithoutDirectTx",
-    Signer: UnsafeStatelessSparkSigner,
-    createTree: createNewTreeWithoutDirectTx,
-  },
-];
+export const walletTypes = [...signerTypes];
 
 export function createDeterministicKeys(seed: string) {
   const privateKey = sha256(new TextEncoder().encode(seed));
