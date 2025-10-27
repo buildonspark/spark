@@ -1277,11 +1277,19 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 		return response.PreimageShare, nil
 	})
 	if err != nil {
+		dbErr := ent.DbRollback(ctx)
+		if dbErr != nil {
+			logger.Error("Unable to rollback transaction after operator failed to initiate preimage swap", zap.Error(dbErr))
+		}
 		// At least one operator failed to initiate preimage swap, cancel the transfer.
 		baseHandler := NewBaseTransferHandler(h.config)
 		cancelErr := baseHandler.CreateCancelTransferGossipMessage(ctx, transfer.ID.String())
 		if cancelErr != nil {
 			logger.Error("InitiatePreimageSwap: unable to cancel own send transfer", zap.Error(cancelErr))
+		}
+		commitErr := ent.DbCommit(ctx)
+		if commitErr != nil {
+			logger.Error("Unable to commit transaction after canceling transfer", zap.Error(commitErr))
 		}
 		return nil, fmt.Errorf("unable to execute task with all operators: %w", err)
 	}
@@ -1325,6 +1333,11 @@ func (h *LightningHandler) initiatePreimageSwap(ctx context.Context, req *pb.Ini
 
 	hash := sha256.Sum256(secretBytes)
 	if !bytes.Equal(hash[:], req.PaymentHash) {
+		dbErr := ent.DbRollback(ctx)
+		if dbErr != nil {
+			logger.Error("Unable to rollback transaction after recovered preimage did not match payment hash", zap.Error(dbErr))
+		}
+
 		baseHandler := NewBaseTransferHandler(h.config)
 		err := baseHandler.CreateCancelTransferGossipMessage(ctx, transfer.ID.String())
 		if err != nil {
