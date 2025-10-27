@@ -262,9 +262,7 @@ func TestPrivate_Scan_InvalidInput_Errors(t *testing.T) {
 }
 
 func TestPrivate_Serialize_Empty_ReturnsEmpty(t *testing.T) {
-	pubKeyBytes := Private{}.Serialize()
-
-	assert.Empty(t, pubKeyBytes)
+	assert.Empty(t, Private{}.Serialize())
 }
 
 func TestPrivate_MarshalJSON(t *testing.T) {

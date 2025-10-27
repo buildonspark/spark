@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -382,9 +383,7 @@ func TestTokenMetadata_Validate(t *testing.T) {
 // Confirm that l1 token identifier computation continues to match for a live l1 spark token
 // and does not change in a future push.
 func TestActualProductionL1TokenIdentifier(t *testing.T) {
-	issuerPubKeyBytes, _ := hex.DecodeString("036898ed2b633947f0994b8952fa06da2cfc7d1ee003fcf2cc076752b9ad3b3691")
-	issuerPubKey, err := keys.ParsePublicKey(issuerPubKeyBytes)
-	require.NoError(t, err)
+	issuerPubKey := keys.MustParsePublicKeyHex("036898ed2b633947f0994b8952fa06da2cfc7d1ee003fcf2cc076752b9ad3b3691")
 	maxSupply, _ := hex.DecodeString("00000000000000000000000000009c3f")
 
 	// This is an actual token created in production servers on Regtest.
@@ -400,24 +399,18 @@ func TestActualProductionL1TokenIdentifier(t *testing.T) {
 	}
 
 	tokenIdentifier, err := tm.ComputeTokenIdentifierV1()
-	if err != nil {
-		t.Fatalf("Error computing token identifier: %v", err)
-	}
+	require.NoError(t, err)
 
 	// IMPORTANT: This expected value should never change!
 	expectedIdentifier, _ := hex.DecodeString("f1ca1e65691d0f65132ce24608594aaccd741e323056c97407a9f625b0ee4251")
-	if !bytes.Equal(tokenIdentifier, expectedIdentifier) {
-		t.Errorf("Token identifier mismatch. Got \\x%x, want \\x%x", tokenIdentifier, expectedIdentifier)
-	}
+	assert.EqualValues(t, expectedIdentifier, tokenIdentifier)
 }
 
 // Confirm that spark token identifier computation continues to match for a live l1 spark token
 // and does not change in a future push.
 func TestActualProductionSparkTokenIdentifier(t *testing.T) {
-	issuerPubKeyBytes, _ := hex.DecodeString("036898ed2b633947f0994b8952fa06da2cfc7d1ee003fcf2cc076752b9ad3b3691")
-	issuerPubKey, err := keys.ParsePublicKey(issuerPubKeyBytes)
-	require.NoError(t, err)
-	creationEntityPublicKey, _ := hex.DecodeString("0345b806679a5e63159584db91fec038cffd2ef59cee031abe92e2f30bf0642175")
+	issuerPubKey := keys.MustParsePublicKeyHex("036898ed2b633947f0994b8952fa06da2cfc7d1ee003fcf2cc076752b9ad3b3691")
+	creationEntityPublicKey := keys.MustParsePublicKeyHex("0345b806679a5e63159584db91fec038cffd2ef59cee031abe92e2f30bf0642175")
 	maxSupply, _ := hex.DecodeString("00000000000000000000000000009c3f")
 
 	// This is an actual token created in production servers on Regtest.
@@ -428,20 +421,16 @@ func TestActualProductionSparkTokenIdentifier(t *testing.T) {
 		Decimals:                10,
 		MaxSupply:               maxSupply,
 		IsFreezable:             false,
-		CreationEntityPublicKey: creationEntityPublicKey,
+		CreationEntityPublicKey: creationEntityPublicKey.Serialize(),
 		Network:                 Regtest,
 	}
 
 	tokenIdentifier, err := tm.ComputeTokenIdentifierV1()
-	if err != nil {
-		t.Fatalf("Error computing token identifier: %v", err)
-	}
+	require.NoError(t, err)
 
 	// IMPORTANT: This expected value should never change!
 	expectedIdentifier, _ := hex.DecodeString("8b5fde73c803f6ef5c819ae94ddd035f02bee63555a08fc94f6851e289b46a1b")
-	if !bytes.Equal(tokenIdentifier, expectedIdentifier) {
-		t.Errorf("Token identifier mismatch. Got \\x%x, want \\x%x", tokenIdentifier, expectedIdentifier)
-	}
+	assert.EqualValues(t, expectedIdentifier, tokenIdentifier)
 }
 
 func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
@@ -450,12 +439,8 @@ func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
 	t.Run("valid metadata produces hash", func(t *testing.T) {
 		tm := createValidTokenMetadata(rng)
 		hash, err := tm.ComputeTokenIdentifierV1()
-		if err != nil {
-			t.Errorf("expected no error for valid metadata, got: %v", err)
-		}
-		if len(hash) != 32 { // SHA256 produces 32-byte hash
-			t.Errorf("expected hash length 32, got %d", len(hash))
-		}
+		require.NoError(t, err)
+		assert.Len(t, hash, 32) // SHA256 produces 32-byte hash
 	})
 
 	// This test case handles invalid metadata and ensures it returns the expected error.
@@ -464,12 +449,7 @@ func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
 		tm.IssuerPublicKey = keys.Public{} // invalid length
 
 		_, err := tm.ComputeTokenIdentifierV1()
-		if err == nil {
-			t.Error("expected error for invalid metadata, got none")
-		}
-		if !errors.Is(err, ErrInvalidTokenMetadata) {
-			t.Errorf("expected error to be of type ErrInvalidTokenMetadata, got: %v", err)
-		}
+		require.ErrorIs(t, err, ErrInvalidTokenMetadata)
 	})
 
 	// These test cases compare the hashes of two metadata objects that are modified in some way.
@@ -584,15 +564,14 @@ func TestTokenMetadata_ComputeTokenIdentifier(t *testing.T) {
 			}
 
 			hash1, err1 := tm1.ComputeTokenIdentifierV1()
+			require.NoError(t, err1)
 			hash2, err2 := tm2.ComputeTokenIdentifierV1()
+			require.NoError(t, err2)
 
-			if err1 != nil || err2 != nil {
-				t.Fatalf("expected no errors, got: %v, %v", err1, err2)
-			}
-
-			areEqual := bytes.Equal(hash1, hash2)
-			if areEqual != tc.shouldBeEqual {
-				t.Errorf("expected hash equality to be %t, but it was %t", tc.shouldBeEqual, areEqual)
+			if tc.shouldBeEqual {
+				assert.Equal(t, hash1, hash2)
+			} else {
+				assert.NotEqual(t, hash1, hash2)
 			}
 		})
 	}

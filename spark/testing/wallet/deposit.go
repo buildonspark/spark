@@ -268,7 +268,7 @@ type preparedTxSigningArtifacts struct {
 	signingJob *pb.SigningJob
 }
 
-func prepareTxSigningArtifacts(tx *wire.MsgTx, prevTxOut *wire.TxOut, signingPublicKey []byte) (*preparedTxSigningArtifacts, error) {
+func prepareTxSigningArtifacts(tx *wire.MsgTx, prevTxOut *wire.TxOut, signingPublicKey keys.Public) (*preparedTxSigningArtifacts, error) {
 	var buf bytes.Buffer
 	if err := tx.Serialize(&buf); err != nil {
 		return nil, err
@@ -294,7 +294,7 @@ func prepareTxSigningArtifacts(tx *wire.MsgTx, prevTxOut *wire.TxOut, signingPub
 
 	job := &pb.SigningJob{
 		RawTx:                  buf.Bytes(),
-		SigningPublicKey:       signingPublicKey,
+		SigningPublicKey:       signingPublicKey.Serialize(),
 		SigningNonceCommitment: commitmentProto,
 	}
 
@@ -318,11 +318,10 @@ func CreateTreeRoot(
 	skipFinalizeSignatures bool,
 ) (*pb.FinalizeNodeSignaturesResponse, error) {
 	signingPubKey := signingPrivKey.Public()
-	signingPubKeyBytes := signingPubKey.Serialize()
 	// Create root tx
 	depositOutPoint := &wire.OutPoint{Hash: depositTx.TxHash(), Index: uint32(vout)}
 	rootTx := createRootTx(depositOutPoint, depositTx.TxOut[0])
-	rootPrepared, err := prepareTxSigningArtifacts(rootTx, depositTx.TxOut[0], signingPubKeyBytes)
+	rootPrepared, err := prepareTxSigningArtifacts(rootTx, depositTx.TxOut[0], signingPubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -348,7 +347,7 @@ func CreateTreeRoot(
 	if err != nil {
 		return nil, err
 	}
-	refundPrepared, err := prepareTxSigningArtifacts(cpfpRefundTx, rootTx.TxOut[0], signingPubKeyBytes)
+	refundPrepared, err := prepareTxSigningArtifacts(cpfpRefundTx, rootTx.TxOut[0], signingPubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +357,7 @@ func CreateTreeRoot(
 	directRootTx.AddTxIn(wire.NewTxIn(depositOutPoint, nil, nil))
 	directRootAmount := common.MaybeApplyFee(depositTx.TxOut[vout].Value)
 	directRootTx.AddTxOut(wire.NewTxOut(directRootAmount, depositTx.TxOut[vout].PkScript))
-	directRootPrepared, err := prepareTxSigningArtifacts(directRootTx, depositTx.TxOut[vout], signingPubKeyBytes)
+	directRootPrepared, err := prepareTxSigningArtifacts(directRootTx, depositTx.TxOut[vout], signingPubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -374,7 +373,7 @@ func CreateTreeRoot(
 	if err != nil {
 		return nil, err
 	}
-	directRefundPrepared, err := prepareTxSigningArtifacts(directRefundTx, directRootTx.TxOut[0], signingPubKeyBytes)
+	directRefundPrepared, err := prepareTxSigningArtifacts(directRefundTx, directRootTx.TxOut[0], signingPubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -390,7 +389,7 @@ func CreateTreeRoot(
 	if err != nil {
 		return nil, err
 	}
-	directFromCpfpRefundPrepared, err := prepareTxSigningArtifacts(directFromCpfpRefundTx, rootTx.TxOut[0], signingPubKeyBytes)
+	directFromCpfpRefundPrepared, err := prepareTxSigningArtifacts(directFromCpfpRefundTx, rootTx.TxOut[0], signingPubKey)
 	if err != nil {
 		return nil, err
 	}
@@ -509,7 +508,7 @@ func CreateTreeRoot(
 		VerifyingKey:       verifyingKey.Serialize(),
 		Commitments:        treeResponse.RootNodeSignatureShares.NodeTxSigningResult.SigningNonceCommitments,
 		UserCommitments:    rootPrepared.commitment,
-		UserPublicKey:      signingPubKeyBytes,
+		UserPublicKey:      signingPubKey.Serialize(),
 		UserSignatureShare: userSignatures.Results[nodeJobID].SignatureShare,
 	})
 	if err != nil {
@@ -523,7 +522,7 @@ func CreateTreeRoot(
 		VerifyingKey:       verifyingKey.Serialize(),
 		Commitments:        treeResponse.RootNodeSignatureShares.RefundTxSigningResult.SigningNonceCommitments,
 		UserCommitments:    refundPrepared.commitment,
-		UserPublicKey:      signingPubKeyBytes,
+		UserPublicKey:      signingPubKey.Serialize(),
 		UserSignatureShare: userSignatures.Results[refundJobID].SignatureShare,
 	})
 	if err != nil {
@@ -537,7 +536,7 @@ func CreateTreeRoot(
 		VerifyingKey:       verifyingKey.Serialize(),
 		Commitments:        treeResponse.RootNodeSignatureShares.DirectNodeTxSigningResult.SigningNonceCommitments,
 		UserCommitments:    directRootPrepared.commitment,
-		UserPublicKey:      signingPubKeyBytes,
+		UserPublicKey:      signingPubKey.Serialize(),
 		UserSignatureShare: userSignatures.Results[directRootJobID].SignatureShare,
 	})
 	if err != nil {
@@ -551,7 +550,7 @@ func CreateTreeRoot(
 		VerifyingKey:       verifyingKey.Serialize(),
 		Commitments:        treeResponse.RootNodeSignatureShares.DirectRefundTxSigningResult.SigningNonceCommitments,
 		UserCommitments:    directRefundPrepared.commitment,
-		UserPublicKey:      signingPubKeyBytes,
+		UserPublicKey:      signingPubKey.Serialize(),
 		UserSignatureShare: userSignatures.Results[directRefundJobID].SignatureShare,
 	})
 	if err != nil {
@@ -565,7 +564,7 @@ func CreateTreeRoot(
 		VerifyingKey:       verifyingKey.Serialize(),
 		Commitments:        treeResponse.RootNodeSignatureShares.DirectFromCpfpRefundTxSigningResult.SigningNonceCommitments,
 		UserCommitments:    directFromCpfpRefundPrepared.commitment,
-		UserPublicKey:      signingPubKeyBytes,
+		UserPublicKey:      signingPubKey.Serialize(),
 		UserSignatureShare: userSignatures.Results[directFromCpfpRefundJobID].SignatureShare,
 	})
 	if err != nil {

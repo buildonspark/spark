@@ -23,7 +23,6 @@ func TestCoordinatedBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T)
 			config.UseTokenTransactionSchnorrSignatures = tc.useSchnorrSignatures
 
 			tokenPrivKey := config.IdentityPrivateKey
-			tokenIdentityPubKeyBytes := tokenPrivKey.Public().Serialize()
 			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
@@ -55,7 +54,7 @@ func TestCoordinatedBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T)
 				TokenOutputs: []*tokenpb.TokenOutput{
 					{
 						OwnerPublicKey: userOutput1PrivKey.Public().Serialize(),
-						TokenPublicKey: tokenIdentityPubKeyBytes,
+						TokenPublicKey: tokenPrivKey.Public().Serialize(),
 						TokenAmount:    int64ToUint128Bytes(0, testTransferOutput1Amount),
 					},
 				},
@@ -301,16 +300,14 @@ func TestCoordinatedTokenMintAndTransferTokensWithTooManyInputsFails(t *testing.
 
 	consolidatedOutputPrivKey := keys.GeneratePrivateKey()
 
-	consolidatedOutputPubKeyBytes := consolidatedOutputPrivKey.Public().Serialize()
-
 	outputsToSpendTooMany := make([]*tokenpb.TokenOutputToSpend, 2*maxInputOrOutputTokenTransactionOutputsForTests)
-	for i := 0; i < maxInputOrOutputTokenTransactionOutputsForTests; i++ {
+	for i := range maxInputOrOutputTokenTransactionOutputsForTests {
 		outputsToSpendTooMany[i] = &tokenpb.TokenOutputToSpend{
 			PrevTokenTransactionHash: finalIssueTokenTransactionHashFirstBatch,
 			PrevTokenTransactionVout: uint32(i),
 		}
 	}
-	for i := 0; i < maxInputOrOutputTokenTransactionOutputsForTests; i++ {
+	for i := range maxInputOrOutputTokenTransactionOutputsForTests {
 		outputsToSpendTooMany[maxInputOrOutputTokenTransactionOutputsForTests+i] = &tokenpb.TokenOutputToSpend{
 			PrevTokenTransactionHash: finalIssueTokenTransactionHashSecondBatch,
 			PrevTokenTransactionVout: uint32(i),
@@ -325,7 +322,7 @@ func TestCoordinatedTokenMintAndTransferTokensWithTooManyInputsFails(t *testing.
 		},
 		TokenOutputs: []*tokenpb.TokenOutput{
 			{
-				OwnerPublicKey: consolidatedOutputPubKeyBytes,
+				OwnerPublicKey: consolidatedOutputPrivKey.Public().Serialize(),
 				TokenPublicKey: tokenPrivKey.Public().Serialize(),
 				TokenAmount:    int64ToUint128Bytes(0, uint64(testIssueMultiplePerOutputAmount)*uint64(manyOutputsCount)),
 			},
@@ -358,8 +355,6 @@ func TestCoordinatedTokenMintAndTransferMaxInputsSucceeds(t *testing.T) {
 	require.NoError(t, err, "failed to hash first issuance token transaction")
 
 	consolidatedOutputPrivKey := keys.GeneratePrivateKey()
-	consolidatedOutputPubKeyBytes := consolidatedOutputPrivKey.Public().Serialize()
-
 	outputsToSpend := make([]*tokenpb.TokenOutputToSpend, maxInputOrOutputTokenTransactionOutputsForTests)
 	for i := range outputsToSpend {
 		outputsToSpend[i] = &tokenpb.TokenOutputToSpend{
@@ -375,7 +370,7 @@ func TestCoordinatedTokenMintAndTransferMaxInputsSucceeds(t *testing.T) {
 		},
 		TokenOutputs: []*tokenpb.TokenOutput{
 			{
-				OwnerPublicKey: consolidatedOutputPubKeyBytes,
+				OwnerPublicKey: consolidatedOutputPrivKey.Public().Serialize(),
 				TokenPublicKey: tokenPrivKey.Public().Serialize(),
 				TokenAmount:    int64ToUint128Bytes(0, uint64(testIssueMultiplePerOutputAmount)*uint64(maxInputOrOutputTokenTransactionOutputsForTests)),
 			},

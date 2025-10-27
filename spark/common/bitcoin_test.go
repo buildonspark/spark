@@ -27,10 +27,7 @@ func TestP2TRAddressFromPublicKey(t *testing.T) {
 	}
 
 	for _, tv := range testVectors {
-		pubKeyBytes, err := hex.DecodeString(tv.pubKeyHex)
-		require.NoError(t, err)
-		pubKey, err := keys.ParsePublicKey(pubKeyBytes)
-		require.NoError(t, err)
+		pubKey := keys.MustParsePublicKeyHex(tv.pubKeyHex)
 
 		addr, err := P2TRAddressFromPublicKey(pubKey, tv.network)
 		require.NoError(t, err)

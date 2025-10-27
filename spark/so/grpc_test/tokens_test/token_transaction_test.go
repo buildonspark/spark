@@ -118,11 +118,7 @@ func createTestTokenMintTransaction(config *wallet.TestWalletConfig, tokenIdenti
 func createTestTokenMintTransactionWithParams(config *wallet.TestWalletConfig, issuerPublicKey keys.Public) (*pb.TokenTransaction, keys.Private, keys.Private, error) {
 	// Generate two user output key pairs
 	userOutput1PrivKey := keys.GeneratePrivateKey()
-	userOutput1PubKeyBytes := userOutput1PrivKey.Public().Serialize()
-
 	userOutput2PrivKey := keys.GeneratePrivateKey()
-	userOutput2PubKeyBytes := userOutput2PrivKey.Public().Serialize()
-
 	mintTokenTransaction := &pb.TokenTransaction{
 		TokenInputs: &pb.TokenTransaction_MintInput{
 			MintInput: &pb.TokenMintInput{
@@ -132,12 +128,12 @@ func createTestTokenMintTransactionWithParams(config *wallet.TestWalletConfig, i
 		},
 		TokenOutputs: []*pb.TokenOutput{
 			{
-				OwnerPublicKey: userOutput1PubKeyBytes,
+				OwnerPublicKey: userOutput1PrivKey.Public().Serialize(),
 				TokenPublicKey: issuerPublicKey.Serialize(),
 				TokenAmount:    int64ToUint128Bytes(0, testIssueOutput1Amount),
 			},
 			{
-				OwnerPublicKey: userOutput2PubKeyBytes,
+				OwnerPublicKey: userOutput2PrivKey.Public().Serialize(),
 				TokenPublicKey: issuerPublicKey.Serialize(),
 				TokenAmount:    int64ToUint128Bytes(0, testIssueOutput2Amount),
 			},
@@ -159,8 +155,6 @@ func createTestTokenTransferTransactionWithParams(
 	issuerPublicKey keys.Public,
 ) (*pb.TokenTransaction, keys.Private, error) {
 	userOutput3PrivKey := keys.GeneratePrivateKey()
-	userOutput3PubKeyBytes := userOutput3PrivKey.Public().Serialize()
-
 	transferTokenTransaction := &pb.TokenTransaction{
 		TokenInputs: &pb.TokenTransaction_TransferInput{
 			TransferInput: &pb.TokenTransferInput{
@@ -178,7 +172,7 @@ func createTestTokenTransferTransactionWithParams(
 		},
 		TokenOutputs: []*pb.TokenOutput{
 			{
-				OwnerPublicKey: userOutput3PubKeyBytes,
+				OwnerPublicKey: userOutput3PrivKey.Public().Serialize(),
 				TokenPublicKey: issuerPublicKey.Serialize(),
 				TokenAmount:    int64ToUint128Bytes(0, testTransferOutput1Amount),
 			},

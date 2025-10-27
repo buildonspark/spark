@@ -563,10 +563,10 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 
 // createInputTtxoSignatures creates the input TTXO signatures for a commit transaction request
 func createInputTtxoSignatures(t *testing.T, setup *testSetupCommon, finalTxHash []byte, inputCount int) []*tokenpb.InputTtxoSignaturesPerOperator {
-	createSignatureForOperator := func(operatorPubKey []byte, _ uint32) []byte {
+	createSignatureForOperator := func(operatorPubKey keys.Public, _ uint32) []byte {
 		payload := &sparkpb.OperatorSpecificTokenTransactionSignablePayload{
 			FinalTokenTransactionHash: finalTxHash,
-			OperatorIdentityPublicKey: operatorPubKey,
+			OperatorIdentityPublicKey: operatorPubKey.Serialize(),
 		}
 		payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(payload)
 		require.NoError(t, err)
@@ -575,14 +575,14 @@ func createInputTtxoSignatures(t *testing.T, setup *testSetupCommon, finalTxHash
 	coordinatorSigs := make([]*tokenpb.SignatureWithIndex, inputCount)
 	for i := range coordinatorSigs {
 		coordinatorSigs[i] = &tokenpb.SignatureWithIndex{
-			Signature:  createSignatureForOperator(setup.coordinatorPubKey.Serialize(), uint32(i)),
+			Signature:  createSignatureForOperator(setup.coordinatorPubKey, uint32(i)),
 			InputIndex: uint32(i),
 		}
 	}
 	mockOperatorSigs := make([]*tokenpb.SignatureWithIndex, inputCount)
 	for i := range mockOperatorSigs {
 		mockOperatorSigs[i] = &tokenpb.SignatureWithIndex{
-			Signature:  createSignatureForOperator(setup.mockOperatorPubKey.Serialize(), uint32(i)),
+			Signature:  createSignatureForOperator(setup.mockOperatorPubKey, uint32(i)),
 			InputIndex: uint32(i),
 		}
 	}

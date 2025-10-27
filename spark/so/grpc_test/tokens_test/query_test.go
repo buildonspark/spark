@@ -11,6 +11,7 @@ import (
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/utils"
 	"github.com/lightsparkdev/spark/testing/wallet"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -74,7 +75,7 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 	require.Len(t, transferTokenTransactionResponse.TokenOutputs, 1, "expected 1 created output in transfer transaction")
 	transferAmount := new(big.Int).SetBytes(transferTokenTransactionResponse.TokenOutputs[0].TokenAmount)
 	expectedTransferAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, testTransferOutput1Amount))
-	require.Equal(t, 0, transferAmount.Cmp(expectedTransferAmount), "transfer amount does not match expected")
+	assert.Equal(t, expectedTransferAmount, transferAmount)
 	require.Equal(t, userOutput3PubKeyBytes, transferTokenTransactionResponse.TokenOutputs[0].OwnerPublicKey, "transfer created output owner public key does not match expected")
 
 	tokenOutputsResponse, err := wallet.QueryTokenOutputsV2(
@@ -146,7 +147,7 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 	// Validate transfer transaction details
 	require.Len(t, transferTx.TokenOutputs, 1, "expected 1 created output in transfer transaction")
 	transferAmount = new(big.Int).SetBytes(transferTx.TokenOutputs[0].TokenAmount)
-	require.Equal(t, 0, transferAmount.Cmp(expectedTransferAmount), "transfer amount does not match expected")
+	require.Equal(t, expectedTransferAmount, transferAmount, "transfer amount does not match expected")
 	require.Equal(t, userOutput3PubKeyBytes, transferTx.TokenOutputs[0].OwnerPublicKey, "transfer created output owner public key does not match expected")
 
 	// Validate mint transaction details

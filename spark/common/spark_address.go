@@ -10,7 +10,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil/bech32"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -496,34 +495,25 @@ func VerifySparkAddressSignature(addr *pb.SparkAddress, network Network) error {
 	if len(sig) == 0 {
 		return fmt.Errorf("signature is required")
 	}
-	receiverPublicKey, err := keys.ParsePublicKey(addr.IdentityPublicKey)
+	pubKey, err := keys.ParsePublicKey(addr.GetIdentityPublicKey())
 	if err != nil {
 		return fmt.Errorf("failed to parse identity public key: %w", err)
 	}
-	hash, err := HashSparkInvoiceFields(addr.SparkInvoiceFields, network, receiverPublicKey)
+	hash, err := HashSparkInvoiceFields(addr.SparkInvoiceFields, network, pubKey)
 	if err != nil {
 		return fmt.Errorf("failed to hash spark invoice fields: %w", err)
-	}
-
-	pubKeyBytes := addr.GetIdentityPublicKey()
-	if len(pubKeyBytes) == 0 {
-		return fmt.Errorf("identity public key is required")
-	}
-	pubKey, err := secp256k1.ParsePubKey(pubKeyBytes)
-	if err != nil {
-		return fmt.Errorf("failed to parse identity public key: %w", err)
 	}
 
 	schnorrSig, err := schnorr.ParseSignature(sig)
 	if err != nil {
 		return fmt.Errorf("failed to parse schnorr signature: %w", err)
 	}
-	if !schnorrSig.Verify(hash, pubKey) {
-		return fmt.Errorf("invalid spark address signature with hash: %x, 	sparkinvoicefields: %v, network: %s, receiver public key: %x, sig: %x",
+	if !pubKey.Verify(schnorrSig, hash) {
+		return fmt.Errorf("invalid spark address signature with hash: %x, sparkinvoicefields: %v, network: %s, receiver public key: %s, sig: %x",
 			hash,
 			addr.SparkInvoiceFields,
 			network,
-			receiverPublicKey.Serialize(),
+			pubKey,
 			sig,
 		)
 	}

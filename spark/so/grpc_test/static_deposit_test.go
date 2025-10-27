@@ -727,10 +727,7 @@ func TestStaticDepositUserRefund(t *testing.T) {
 			Witness:          nil,
 			Sequence:         wire.MaxTxInSequenceNum,
 		})
-		pubkeyBytes, err := hex.DecodeString("0252f2cfa8d1f87718c0f3f61b581b7a3dce6bf9a14efd0a501d8969d6ace73a3d")
-		require.NoError(t, err)
-		withdrawalPubKey, err := keys.ParsePublicKey(pubkeyBytes)
-		require.NoError(t, err)
+		withdrawalPubKey := keys.MustParsePublicKeyHex("0252f2cfa8d1f87718c0f3f61b581b7a3dce6bf9a14efd0a501d8969d6ace73a3d")
 		spendPkScript2, err := common.P2TRScriptFromPubKey(withdrawalPubKey)
 		require.NoError(t, err)
 		spendTx2.AddTxOut(wire.NewTxOut(int64(quoteAmount), spendPkScript2))

@@ -9,6 +9,7 @@ import (
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so/utils"
 	"github.com/lightsparkdev/spark/testing/wallet"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -65,8 +66,6 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 				tokenPrivKey.Public(),
 			)
 			require.NoError(t, err, "failed to create test token transfer transaction")
-			userOutput3PubKeyBytes := userOutput3PrivKey.Public().Serialize()
-
 			transferTokenTransactionResponse, err := wallet.BroadcastCoordinatedTokenTransfer(
 				t.Context(), config, transferTokenTransaction, []keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 			)
@@ -75,8 +74,8 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 			require.Len(t, transferTokenTransactionResponse.TokenOutputs, 1, "expected 1 created output in transfer transaction")
 			transferAmount := new(big.Int).SetBytes(transferTokenTransactionResponse.TokenOutputs[0].TokenAmount)
 			expectedTransferAmount := new(big.Int).SetBytes(int64ToUint128Bytes(0, testTransferOutput1Amount))
-			require.Equal(t, 0, transferAmount.Cmp(expectedTransferAmount), "transfer amount does not match expected")
-			require.Equal(t, userOutput3PubKeyBytes, transferTokenTransactionResponse.TokenOutputs[0].OwnerPublicKey, "transfer created output owner public key does not match expected")
+			assert.Equal(t, expectedTransferAmount, transferAmount)
+			assert.Equal(t, userOutput3PrivKey.Public().Serialize(), transferTokenTransactionResponse.TokenOutputs[0].OwnerPublicKey, "transfer created output owner public key does not match expected")
 		})
 	}
 }

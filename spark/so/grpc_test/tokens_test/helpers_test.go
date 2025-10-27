@@ -12,6 +12,7 @@ import (
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so/utils"
 	"github.com/lightsparkdev/spark/testing/wallet"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -127,15 +128,18 @@ func createTestTokenMintTransactionTokenPbWithParams(t *testing.T, config *walle
 	tokenOutputs := make([]*tokenpb.TokenOutput, numOutputs)
 
 	for i := range numOutputs {
-		privKey := keys.GeneratePrivateKey()
-		userOutputPrivKeys[i] = privKey
-		pubKeyBytes := privKey.Public().Serialize()
+		var pubKey keys.Public
 		if params.MintToSelf {
-			pubKeyBytes = params.TokenIdentityPubKey.Serialize()
+			pubKey = params.TokenIdentityPubKey
 			userOutputPrivKeys[i] = config.IdentityPrivateKey
+		} else {
+			privKey := keys.GeneratePrivateKey()
+			userOutputPrivKeys[i] = privKey
+			pubKey = privKey.Public()
 		}
+
 		tokenOutputs[i] = &tokenpb.TokenOutput{
-			OwnerPublicKey: pubKeyBytes,
+			OwnerPublicKey: pubKey.Serialize(),
 			TokenPublicKey: params.TokenIdentityPubKey.Serialize(),
 			TokenAmount:    int64ToUint128Bytes(0, outputAmounts[i]),
 		}
@@ -201,8 +205,6 @@ func createTestTokenMintTransactionTokenPb(t *testing.T, config *wallet.TestWall
 // createTestTokenTransferTransactionTokenPbWithParams creates a test token transfer transaction with custom parameters
 func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *wallet.TestWalletConfig, params tokenTransactionParams) (*tokenpb.TokenTransaction, keys.Private, error) {
 	userOutput3PrivKey := keys.GeneratePrivateKey()
-	userOutput3PubKeyBytes := userOutput3PrivKey.Public().Serialize()
-
 	version := uint32(TokenTransactionVersion2)
 	if params.Version != 0 {
 		version = uint32(params.Version)
@@ -225,7 +227,7 @@ func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *w
 		},
 		TokenOutputs: []*tokenpb.TokenOutput{
 			{
-				OwnerPublicKey: userOutput3PubKeyBytes,
+				OwnerPublicKey: userOutput3PrivKey.Public().Serialize(),
 				TokenPublicKey: params.TokenIdentityPubKey.Serialize(),
 				TokenAmount:    int64ToUint128Bytes(0, testTransferOutput1Amount),
 			},
@@ -306,12 +308,11 @@ func testCoordinatedCreateNativeSparkTokenWithParams(t *testing.T, config *walle
 
 // createTestCoordinatedTokenCreateTransactionWithParams creates a token create transaction
 func createTestCoordinatedTokenCreateTransactionWithParams(config *wallet.TestWalletConfig, params sparkTokenCreationTestParams) (*tokenpb.TokenTransaction, error) {
-	issuerPubKeyBytes := params.issuerPrivateKey.Public().Serialize()
 	createTokenTransaction := &tokenpb.TokenTransaction{
 		Version: TokenTransactionVersion2,
 		TokenInputs: &tokenpb.TokenTransaction_CreateInput{
 			CreateInput: &tokenpb.TokenCreateInput{
-				IssuerPublicKey: issuerPubKeyBytes,
+				IssuerPublicKey: params.issuerPrivateKey.Public().Serialize(),
 				TokenName:       params.name,
 				TokenTicker:     params.ticker,
 				Decimals:        testTokenDecimals,
@@ -375,7 +376,7 @@ func queryAndVerifyTokenOutputs(t *testing.T, coordinatorIdentifiers []string, f
 		require.Len(t, outputs.OutputsWithPreviousTransactionData, len(expectedOutputs), "expected %d outputs from coordinator: %s", len(expectedOutputs), coordinatorIdentifier)
 
 		for j, expectedOutput := range expectedOutputs {
-			require.Equal(t, expectedOutput.Id, outputs.OutputsWithPreviousTransactionData[j].Output.Id, "expected the same output ID for output %d from coordinator: %s", j, coordinatorIdentifier)
+			assert.Equal(t, expectedOutput.Id, outputs.OutputsWithPreviousTransactionData[j].Output.Id, "expected the same output ID for output %d from coordinator: %s", j, coordinatorIdentifier)
 		}
 	}
 }
@@ -416,7 +417,7 @@ func verifyMultipleTokenIdentifiersQuery(t *testing.T, config *wallet.TestWallet
 	}
 
 	for i, tokenID := range tokenIdentifiers {
-		require.Contains(t, responseIdentifiers, string(tokenID), "token identifier %d should be present in response", i)
+		assert.Contains(t, responseIdentifiers, string(tokenID), "token identifier %d should be present in response", i)
 	}
 }
 

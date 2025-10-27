@@ -128,7 +128,6 @@ func (h *LightningHandler) validateNodeOwnership(ctx context.Context, nodes []*e
 	if err != nil {
 		return err
 	}
-	sessionIdentityPubkeyBytes := session.IdentityPublicKey().Serialize()
 
 	var mismatchedNodes []string
 	for _, node := range nodes {
@@ -140,9 +139,9 @@ func (h *LightningHandler) validateNodeOwnership(ctx context.Context, nodes []*e
 	if len(mismatchedNodes) > 0 {
 		return &authz.Error{
 			Code: authz.ErrorCodeIdentityMismatch,
-			Message: fmt.Sprintf("nodes [%s] are not owned by the authenticated identity public key %x",
+			Message: fmt.Sprintf("nodes [%s] are not owned by the authenticated identity public key %s",
 				strings.Join(mismatchedNodes, ", "),
-				sessionIdentityPubkeyBytes),
+				session.IdentityPublicKey()),
 			Cause: nil,
 		}
 	}
