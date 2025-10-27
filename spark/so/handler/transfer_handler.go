@@ -2652,11 +2652,15 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 	}
 	span.SetAttributes(transferTypeKey.String(string(transfer.Type)))
 
-	if transfer.Status == st.TransferStatusReceiverKeyTweakApplied || transfer.Status == st.TransferStatusCompleted {
+	switch transfer.Status {
+	case st.TransferStatusReceiverKeyTweakApplied, st.TransferStatusCompleted, st.TransferStatusReceiverRefundSigned:
 		// The receiver key tweak is already applied, return early.
 		return nil
+	case st.TransferStatusReceiverKeyTweakLocked, st.TransferStatusReceiverKeyTweaked:
+		// Do nothing
+	default:
+		return fmt.Errorf("transfer %s is in an invalid status %s to settle receiver key tweak", transfer.ID, transfer.Status)
 	}
-
 	switch req.Action {
 	case pbinternal.SettleKeyTweakAction_COMMIT:
 		leaves, err := transfer.QueryTransferLeaves().WithLeaf(func(tnq *ent.TreeNodeQuery) {
