@@ -746,7 +746,7 @@ func TestInitiatePreimageSwapEdgeCases_Invalid_Errors(t *testing.T) {
 // Ensure that only a node owner can initiate a preimage swap for that node.
 func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
-	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
 
 	// Valid 33-byte compressed secp256k1 public key for destination
 	validPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -900,7 +900,7 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 // Regression test for https://linear.app/lightsparkdev/issue/LIG-8086
 func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 	rng := rand.NewChaCha8([32]byte{1})
-	ctx, _ := db.NewTestSQLiteContext(t)
+	ctx, _ := db.ConnectToTestPostgres(t)
 
 	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
 	lightningHandler := NewLightningHandler(config)

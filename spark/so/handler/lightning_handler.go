@@ -34,6 +34,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
@@ -326,7 +327,7 @@ func (h *LightningHandler) validateGetPreimageRequestWithFrostServiceClientFacto
 			return fmt.Errorf("raw transaction too large: %d bytes, maximum allowed: %d bytes for leaf_id: %s", len(cpfpTransaction.RawTx), MaxTransactionSize, nodeID)
 		}
 
-		node, err := tx.TreeNode.Get(ctx, nodeID)
+		node, err := tx.TreeNode.Query().Where(treenode.IDEQ(nodeID)).ForUpdate().Only(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to get cpfpTransaction tree_node with id: %s: %w", nodeID, err)
 		}
@@ -629,7 +630,7 @@ func (h *LightningHandler) storeUserSignedTransactions(
 		if err != nil {
 			return nil, fmt.Errorf("unable to parse node id: %w", err)
 		}
-		node, err := tx.TreeNode.Get(ctx, nodeID)
+		node, err := tx.TreeNode.Query().Where(treenode.IDEQ(nodeID)).ForUpdate().Only(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get node: %w", err)
 		}
