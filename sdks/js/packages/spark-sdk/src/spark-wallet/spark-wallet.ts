@@ -43,12 +43,14 @@ import {
   QueryNodesRequest,
   QueryNodesResponse,
   QuerySparkInvoicesResponse,
+  QueryWalletSettingResponse,
   SigningJob,
   SubscribeToEventsResponse,
   Transfer,
   TransferStatus,
   TransferType,
   TreeNode,
+  UpdateWalletSettingResponse,
   UtxoSwapRequestType,
 } from "../proto/spark.js";
 import { QueryTokenTransactionsResponse } from "../proto/spark_token.js";
@@ -5171,6 +5173,26 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     }
   }
 
+  public async setPrivacyEnabled(
+    privacyEnabled: boolean,
+  ): Promise<UpdateWalletSettingResponse> {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+    const response = await sparkClient.update_wallet_setting({
+      privateEnabled: privacyEnabled,
+    });
+    return response;
+  }
+
+  public async getWalletSettings(): Promise<QueryWalletSettingResponse> {
+    const sparkClient = await this.connectionManager.createSparkClient(
+      this.config.getCoordinatorAddress(),
+    );
+    const response = await sparkClient.query_wallet_setting({});
+    return response;
+  }
+
   public async isOptimizationInProgress() {
     return this.optimizationInProgress;
   }
@@ -5297,6 +5319,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       "getLightningSendRequest",
       "getCoopExitRequest",
       "checkTimelock",
+      "setPrivacyEnabled",
+      "getWalletSettings",
     ] as const;
 
     methods.forEach((m) => this.wrapPublicSparkWalletMethodWithOtelSpan(m));
