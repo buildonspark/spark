@@ -151,9 +151,8 @@ func TestDBEvents(t *testing.T) {
 
 	// Due to a race condition, the notification may be sent before the listener is set up
 	// Send multiple notifications to cover the race condition
-	numAttempts := 5
 	received := false
-	for i := 0; i < numAttempts; i++ {
+	for range 5 {
 		_, err = connector.Pool().Exec(t.Context(), query)
 		require.NoError(t, err)
 
@@ -195,15 +194,24 @@ func TestDBEventsReconnect(t *testing.T) {
 	require.NoError(t, err)
 
 	query := fmt.Sprintf("NOTIFY test, '%s'", payloadJSON)
-	_, err = connector.Pool().Exec(t.Context(), query)
-	require.NoError(t, err)
 
-	select {
-	case receivedPayload := <-channel:
-		require.JSONEq(t, string(payloadJSON), receivedPayload.Payload)
-	case <-time.After(6 * time.Second):
-		t.Fatal("Timeout waiting for notification")
+	// Due to a race condition, the notification may be sent before the listener is set up
+	// Send multiple notifications to cover the race condition
+	received := false
+	for range 5 {
+		_, err = connector.Pool().Exec(t.Context(), query)
+		require.NoError(t, err)
+
+		select {
+		case receivedPayload := <-channel:
+			require.JSONEq(t, string(payloadJSON), receivedPayload.Payload)
+			received = true
+		case <-time.After(200 * time.Millisecond):
+			t.Logf("Failed to receive message after 200ms, retrying...")
+		}
 	}
+
+	require.True(t, received)
 }
 
 func TestMultipleListenersReceiveNotification(t *testing.T) {
