@@ -2065,12 +2065,6 @@ export interface ExitSingleNodeTreesResponse {
   signingResults: ExitSingleNodeTreeSigningResult[];
 }
 
-export interface InvestigateLeavesRequest {
-  leafIds: string[];
-  ownerIdentityPublicKey: Uint8Array;
-  transferId: string;
-}
-
 export interface QueryNodesDistributionRequest {
   ownerIdentityPublicKey: Uint8Array;
 }
@@ -2170,6 +2164,26 @@ export interface AdaptorPublicKeyPackage {
   adaptorPublicKey: Uint8Array;
   directAdaptorPublicKey: Uint8Array;
   directFromCpfpAdaptorPublicKey: Uint8Array;
+}
+
+export interface WalletSetting {
+  ownerIdentityPublicKey: Uint8Array;
+  privateEnabled: boolean;
+}
+
+export interface UpdateWalletSettingRequest {
+  privateEnabled?: boolean | undefined;
+}
+
+export interface UpdateWalletSettingResponse {
+  walletSetting: WalletSetting | undefined;
+}
+
+export interface QueryWalletSettingRequest {
+}
+
+export interface QueryWalletSettingResponse {
+  walletSetting: WalletSetting | undefined;
 }
 
 function createBaseSubscribeToEventsRequest(): SubscribeToEventsRequest {
@@ -19472,100 +19486,6 @@ export const ExitSingleNodeTreesResponse: MessageFns<ExitSingleNodeTreesResponse
   },
 };
 
-function createBaseInvestigateLeavesRequest(): InvestigateLeavesRequest {
-  return { leafIds: [], ownerIdentityPublicKey: new Uint8Array(0), transferId: "" };
-}
-
-export const InvestigateLeavesRequest: MessageFns<InvestigateLeavesRequest> = {
-  encode(message: InvestigateLeavesRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.leafIds) {
-      writer.uint32(10).string(v!);
-    }
-    if (message.ownerIdentityPublicKey.length !== 0) {
-      writer.uint32(18).bytes(message.ownerIdentityPublicKey);
-    }
-    if (message.transferId !== "") {
-      writer.uint32(26).string(message.transferId);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): InvestigateLeavesRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseInvestigateLeavesRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.leafIds.push(reader.string());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.ownerIdentityPublicKey = reader.bytes();
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.transferId = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): InvestigateLeavesRequest {
-    return {
-      leafIds: globalThis.Array.isArray(object?.leafIds) ? object.leafIds.map((e: any) => globalThis.String(e)) : [],
-      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
-        ? bytesFromBase64(object.ownerIdentityPublicKey)
-        : new Uint8Array(0),
-      transferId: isSet(object.transferId) ? globalThis.String(object.transferId) : "",
-    };
-  },
-
-  toJSON(message: InvestigateLeavesRequest): unknown {
-    const obj: any = {};
-    if (message.leafIds?.length) {
-      obj.leafIds = message.leafIds;
-    }
-    if (message.ownerIdentityPublicKey.length !== 0) {
-      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
-    }
-    if (message.transferId !== "") {
-      obj.transferId = message.transferId;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<InvestigateLeavesRequest>): InvestigateLeavesRequest {
-    return InvestigateLeavesRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<InvestigateLeavesRequest>): InvestigateLeavesRequest {
-    const message = createBaseInvestigateLeavesRequest();
-    message.leafIds = object.leafIds?.map((e) => e) || [];
-    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
-    message.transferId = object.transferId ?? "";
-    return message;
-  },
-};
-
 function createBaseQueryNodesDistributionRequest(): QueryNodesDistributionRequest {
   return { ownerIdentityPublicKey: new Uint8Array(0) };
 }
@@ -20964,6 +20884,305 @@ export const AdaptorPublicKeyPackage: MessageFns<AdaptorPublicKeyPackage> = {
   },
 };
 
+function createBaseWalletSetting(): WalletSetting {
+  return { ownerIdentityPublicKey: new Uint8Array(0), privateEnabled: false };
+}
+
+export const WalletSetting: MessageFns<WalletSetting> = {
+  encode(message: WalletSetting, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      writer.uint32(10).bytes(message.ownerIdentityPublicKey);
+    }
+    if (message.privateEnabled !== false) {
+      writer.uint32(16).bool(message.privateEnabled);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): WalletSetting {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseWalletSetting();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.ownerIdentityPublicKey = reader.bytes();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.privateEnabled = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): WalletSetting {
+    return {
+      ownerIdentityPublicKey: isSet(object.ownerIdentityPublicKey)
+        ? bytesFromBase64(object.ownerIdentityPublicKey)
+        : new Uint8Array(0),
+      privateEnabled: isSet(object.privateEnabled) ? globalThis.Boolean(object.privateEnabled) : false,
+    };
+  },
+
+  toJSON(message: WalletSetting): unknown {
+    const obj: any = {};
+    if (message.ownerIdentityPublicKey.length !== 0) {
+      obj.ownerIdentityPublicKey = base64FromBytes(message.ownerIdentityPublicKey);
+    }
+    if (message.privateEnabled !== false) {
+      obj.privateEnabled = message.privateEnabled;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<WalletSetting>): WalletSetting {
+    return WalletSetting.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<WalletSetting>): WalletSetting {
+    const message = createBaseWalletSetting();
+    message.ownerIdentityPublicKey = object.ownerIdentityPublicKey ?? new Uint8Array(0);
+    message.privateEnabled = object.privateEnabled ?? false;
+    return message;
+  },
+};
+
+function createBaseUpdateWalletSettingRequest(): UpdateWalletSettingRequest {
+  return { privateEnabled: undefined };
+}
+
+export const UpdateWalletSettingRequest: MessageFns<UpdateWalletSettingRequest> = {
+  encode(message: UpdateWalletSettingRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.privateEnabled !== undefined) {
+      writer.uint32(8).bool(message.privateEnabled);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateWalletSettingRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateWalletSettingRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.privateEnabled = reader.bool();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpdateWalletSettingRequest {
+    return { privateEnabled: isSet(object.privateEnabled) ? globalThis.Boolean(object.privateEnabled) : undefined };
+  },
+
+  toJSON(message: UpdateWalletSettingRequest): unknown {
+    const obj: any = {};
+    if (message.privateEnabled !== undefined) {
+      obj.privateEnabled = message.privateEnabled;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpdateWalletSettingRequest>): UpdateWalletSettingRequest {
+    return UpdateWalletSettingRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpdateWalletSettingRequest>): UpdateWalletSettingRequest {
+    const message = createBaseUpdateWalletSettingRequest();
+    message.privateEnabled = object.privateEnabled ?? undefined;
+    return message;
+  },
+};
+
+function createBaseUpdateWalletSettingResponse(): UpdateWalletSettingResponse {
+  return { walletSetting: undefined };
+}
+
+export const UpdateWalletSettingResponse: MessageFns<UpdateWalletSettingResponse> = {
+  encode(message: UpdateWalletSettingResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.walletSetting !== undefined) {
+      WalletSetting.encode(message.walletSetting, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdateWalletSettingResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateWalletSettingResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.walletSetting = WalletSetting.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpdateWalletSettingResponse {
+    return { walletSetting: isSet(object.walletSetting) ? WalletSetting.fromJSON(object.walletSetting) : undefined };
+  },
+
+  toJSON(message: UpdateWalletSettingResponse): unknown {
+    const obj: any = {};
+    if (message.walletSetting !== undefined) {
+      obj.walletSetting = WalletSetting.toJSON(message.walletSetting);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpdateWalletSettingResponse>): UpdateWalletSettingResponse {
+    return UpdateWalletSettingResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpdateWalletSettingResponse>): UpdateWalletSettingResponse {
+    const message = createBaseUpdateWalletSettingResponse();
+    message.walletSetting = (object.walletSetting !== undefined && object.walletSetting !== null)
+      ? WalletSetting.fromPartial(object.walletSetting)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseQueryWalletSettingRequest(): QueryWalletSettingRequest {
+  return {};
+}
+
+export const QueryWalletSettingRequest: MessageFns<QueryWalletSettingRequest> = {
+  encode(_: QueryWalletSettingRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryWalletSettingRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryWalletSettingRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): QueryWalletSettingRequest {
+    return {};
+  },
+
+  toJSON(_: QueryWalletSettingRequest): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryWalletSettingRequest>): QueryWalletSettingRequest {
+    return QueryWalletSettingRequest.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<QueryWalletSettingRequest>): QueryWalletSettingRequest {
+    const message = createBaseQueryWalletSettingRequest();
+    return message;
+  },
+};
+
+function createBaseQueryWalletSettingResponse(): QueryWalletSettingResponse {
+  return { walletSetting: undefined };
+}
+
+export const QueryWalletSettingResponse: MessageFns<QueryWalletSettingResponse> = {
+  encode(message: QueryWalletSettingResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.walletSetting !== undefined) {
+      WalletSetting.encode(message.walletSetting, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): QueryWalletSettingResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseQueryWalletSettingResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.walletSetting = WalletSetting.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): QueryWalletSettingResponse {
+    return { walletSetting: isSet(object.walletSetting) ? WalletSetting.fromJSON(object.walletSetting) : undefined };
+  },
+
+  toJSON(message: QueryWalletSettingResponse): unknown {
+    const obj: any = {};
+    if (message.walletSetting !== undefined) {
+      obj.walletSetting = WalletSetting.toJSON(message.walletSetting);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<QueryWalletSettingResponse>): QueryWalletSettingResponse {
+    return QueryWalletSettingResponse.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<QueryWalletSettingResponse>): QueryWalletSettingResponse {
+    const message = createBaseQueryWalletSettingResponse();
+    message.walletSetting = (object.walletSetting !== undefined && object.walletSetting !== null)
+      ? WalletSetting.fromPartial(object.walletSetting)
+      : undefined;
+    return message;
+  },
+};
+
 export type SparkServiceDefinition = typeof SparkServiceDefinition;
 export const SparkServiceDefinition = {
   name: "SparkService",
@@ -21484,6 +21703,22 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    update_wallet_setting: {
+      name: "update_wallet_setting",
+      requestType: UpdateWalletSettingRequest,
+      requestStream: false,
+      responseType: UpdateWalletSettingResponse,
+      responseStream: false,
+      options: {},
+    },
+    query_wallet_setting: {
+      name: "query_wallet_setting",
+      requestType: QueryWalletSettingRequest,
+      requestStream: false,
+      responseType: QueryWalletSettingResponse,
+      responseStream: false,
+      options: {},
+    },
   },
 } as const;
 
@@ -21769,6 +22004,14 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: InitiateSwapPrimaryTransferRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<InitiateSwapPrimaryTransferResponse>>;
+  update_wallet_setting(
+    request: UpdateWalletSettingRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<UpdateWalletSettingResponse>>;
+  query_wallet_setting(
+    request: QueryWalletSettingRequest,
+    context: CallContext & CallContextExt,
+  ): Promise<DeepPartial<QueryWalletSettingResponse>>;
 }
 
 export interface SparkServiceClient<CallOptionsExt = {}> {
@@ -22059,6 +22302,14 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<InitiateSwapPrimaryTransferRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<InitiateSwapPrimaryTransferResponse>;
+  update_wallet_setting(
+    request: DeepPartial<UpdateWalletSettingRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<UpdateWalletSettingResponse>;
+  query_wallet_setting(
+    request: DeepPartial<QueryWalletSettingRequest>,
+    options?: CallOptions & CallOptionsExt,
+  ): Promise<QueryWalletSettingResponse>;
 }
 
 function bytesFromBase64(b64: string): Uint8Array {
