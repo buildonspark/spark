@@ -296,6 +296,10 @@ func (h *BaseTransferHandler) createTransfer(
 		if err != nil {
 			return nil, nil, fmt.Errorf("Unable to find primary swap transfer id=%s", primaryTransferId.String())
 		}
+		// Check that the SO holds the correct refunds for the primary transfer.
+		if primaryTransfer.Status != st.TransferStatusSenderKeyTweakPending {
+			return nil, nil, fmt.Errorf("primary swap transfer %s is not in sender key tweak pending status, got %s", primaryTransferId.String(), primaryTransfer.Status)
+		}
 		transferCreate.SetPrimarySwapTransfer(primaryTransfer)
 	}
 
