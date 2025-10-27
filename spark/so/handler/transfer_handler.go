@@ -41,7 +41,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // TransferHandler is a helper struct to handle leaves transfer request.
@@ -2683,77 +2682,6 @@ func (h *TransferHandler) ResumeSendTransfer(ctx context.Context, transfer *ent.
 	// If there's an error, it means some SOs are not online. We can retry later.
 	logger.With(zap.Error(err)).Sugar().Warnf("Failed to settle sender key tweaks for transfer %s", transfer.ID)
 	return nil
-}
-
-func (h *TransferHandler) InvestigateLeaves(ctx context.Context, req *pb.InvestigateLeavesRequest) (*emptypb.Empty, error) {
-	reqOwnerIdentityPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("invalid identity public key: %w", err)
-	}
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIdentityPubKey); err != nil {
-		return nil, err
-	}
-
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
-	}
-
-	if len(req.TransferId) > 0 {
-		transfer, err := h.loadTransferNoUpdate(ctx, req.TransferId)
-		if err != nil {
-			return nil, fmt.Errorf("unable to load transfer %s: %w", req.GetTransferId(), err)
-		}
-		// validate that all leaves in this query belongs to the transfer
-		leaves, err := transfer.QueryTransferLeaves().QueryLeaf().All(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to find leaves for transfer %s: %w", req.GetTransferId(), err)
-		}
-		trasnferLeafMap := make(map[string]bool)
-		for _, leaf := range leaves {
-			trasnferLeafMap[leaf.ID.String()] = true
-		}
-		for _, leafID := range req.GetLeafIds() {
-			if !trasnferLeafMap[leafID] {
-				return nil, fmt.Errorf("leaf %s is not a leaf of transfer %s", leafID, req.GetTransferId())
-			}
-		}
-
-		err = h.CreateCancelTransferGossipMessage(ctx, req.GetTransferId())
-		if err != nil {
-			return nil, fmt.Errorf("unable to cancel transfer %s: %w", req.GetTransferId(), err)
-		}
-	}
-
-	leafIDs := make([]uuid.UUID, len(req.GetLeafIds()))
-	for i, leafID := range req.GetLeafIds() {
-		leafUUID, err := uuid.Parse(leafID)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse leaf id as a uuid %s: %w", leafID, err)
-		}
-		leafIDs[i] = leafUUID
-	}
-	nodes, err := db.TreeNode.Query().Where(enttreenode.IDIn(leafIDs...)).ForUpdate().All(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	logger := logging.GetLoggerFromContext(ctx)
-	for _, node := range nodes {
-		if node.Status != st.TreeNodeStatusAvailable {
-			return nil, fmt.Errorf("node %s is not available", node.ID)
-		}
-		if !node.OwnerIdentityPubkey.Equals(reqOwnerIdentityPubKey) {
-			return nil, fmt.Errorf("node %s is not owned by the identity public key %s", node.ID, reqOwnerIdentityPubKey)
-		}
-		_, err := node.Update().SetStatus(st.TreeNodeStatusInvestigation).Save(ctx)
-		logger.Sugar().Warnf("Tree Node %s is marked as investigation", node.ID)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &emptypb.Empty{}, nil
 }
 
 // setSoCoordinatorKeyTweaks sets the key tweaks for each transfer leaf based on the validated transfer package.

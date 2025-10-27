@@ -447,11 +447,6 @@ func (s *SparkServer) ExitSingleNodeTrees(ctx context.Context, req *pb.ExitSingl
 	return treeExitHandler.ExitSingleNodeTrees(ctx, req)
 }
 
-func (s *SparkServer) InvestigateLeaves(ctx context.Context, req *pb.InvestigateLeavesRequest) (*emptypb.Empty, error) {
-	transferHandler := handler.NewTransferHandler(s.config)
-	return transferHandler.InvestigateLeaves(ctx, req)
-}
-
 func (s *SparkServer) QueryNodesDistribution(ctx context.Context, req *pb.QueryNodesDistributionRequest) (*pb.QueryNodesDistributionResponse, error) {
 	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
 		return nil, err

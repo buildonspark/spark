@@ -1512,12 +1512,6 @@ message ExitSingleNodeTreesResponse {
     repeated ExitSingleNodeTreeSigningResult signing_results = 1;
 }
 
-message InvestigateLeavesRequest {
-    repeated string leaf_ids = 1;
-    bytes owner_identity_public_key = 2;
-    string transfer_id = 3;
-}
-
 message QueryNodesDistributionRequest {
     bytes owner_identity_public_key = 1;
 }
