@@ -215,6 +215,11 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 		return nil, fmt.Errorf("user signature validation failed: %w", err)
 	}
 
+	// A sanity check to ensure that the total amount is not greater than the utxo amount.
+	if totalAmount > targetUtxo.Amount {
+		return nil, fmt.Errorf("Static deposit claim total amount %d is greater than utxo amount %d for utxo %x:%d", totalAmount, targetUtxo.Amount, targetUtxo.Txid, targetUtxo.Vout)
+	}
+
 	logger.Sugar().Infof(
 		"Creating UTXO swap record (request type fixed, transfer id %s, receiver identity %s, txid %x, vout %d, network %s, credit amount %d)",
 		req.Transfer.TransferId,
