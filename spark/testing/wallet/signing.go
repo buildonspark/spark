@@ -164,10 +164,6 @@ func prepareFrostSigningJobsForUserSignedRefundWithType(
 			return nil, nil, nil, fmt.Errorf("failed to get next sequence: %w", err)
 		}
 
-		if !useCPFP {
-			nextSequence = nextSequence + spark.DirectTimelockOffset
-		}
-
 		amountSats := nodeTx.TxOut[0].Value
 
 		var refundTx *wire.MsgTx
