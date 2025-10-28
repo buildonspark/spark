@@ -466,9 +466,10 @@ export function isZeroTimelock(currSequence: number) {
 // transfer or renewal operation, as this risks interfering with watchtowers
 export function doesTxnNeedRenewed(currSequence: number) {
   const currentTimelock = getCurrentTimelock(currSequence);
-  const { nextSequence: nextTimelock, nextDirectSequence: _ } =
-    getNextTransactionSequence(currentTimelock);
-  return nextTimelock < 100;
+  // Refresh if current timelock is less than 200 blocks.
+  // This is to prevent the timelock from going below 100 blocks following a
+
+  return currentTimelock < 200;
 }
 
 export function doesLeafNeedRefresh(currSequence: number, isNodeTx?: boolean) {
