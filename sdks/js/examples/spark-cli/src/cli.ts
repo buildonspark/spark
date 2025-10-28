@@ -303,6 +303,8 @@ function hexToWif(hexPrivateKey: string): string {
 
 const commands = [
   "initwallet",
+  "setprivacyenabled",
+  "getwalletsettings",
   "getbalance",
   "getdepositaddress",
   "getstaticdepositaddress",
@@ -609,6 +611,8 @@ async function runCLI() {
   const helpMessage = `
   Available commands:
   initwallet [mnemonic | seed]                                        - Create a new wallet from a mnemonic or seed. If no mnemonic or seed is provided, a new mnemonic will be generated.
+  setprivacyenabled <true|false>                                      - Set the privacy enabled setting for the wallet
+  getwalletsettings                                                   - Get the wallet's settings
   getbalance                                                          - Get the wallet's balance
   getdepositaddress                                                   - Get an address to deposit funds from L1 to Spark
   getstaticdepositaddress                                             - Get a static address to deposit funds from L1 to Spark
@@ -671,7 +675,7 @@ async function runCLI() {
   unfreezetokens <sparkAddress>                                       - Unfreeze tokens for a specific address
   createtoken <tokenName> <tokenTicker> <decimals> <maxSupply> <isFreezable> - Create a new token
   decodetokenidentifier <tokenIdentifier>                             - Returns the raw token identifier as a hex string
-
+   
   enablelogging <true|false>                                          - Enable or disable logging
   setloggerlevel <trace|info>                                         - Set the logging level
   help                                                                - Show this help message
@@ -707,6 +711,21 @@ async function runCLI() {
           SparkSdkLogger.setAllLevels(
             args[0] === "trace" ? LoggingLevel.Trace : LoggingLevel.Info,
           );
+          break;
+        case "setprivacyenabled":
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          await wallet.setPrivacyEnabled(args[0] === "true");
+          break;
+        case "getwalletsettings":
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          const walletSettings = await wallet.getWalletSettings();
+          console.log(walletSettings);
           break;
         case "nontrustydeposit":
           if (process.env.NODE_ENV !== "development" || network !== "REGTEST") {

@@ -12,7 +12,22 @@ import {
   TransferStatus,
   TransferType,
   TreeNode,
+  WalletSetting,
 } from "../proto/spark.js";
+
+export interface WalletSettings {
+  ownerIdentityPublicKey: string;
+  privateEnabled: boolean;
+}
+
+export function mapSettingsProtoToWalletSettings(
+  proto: WalletSetting,
+): WalletSettings {
+  return {
+    ownerIdentityPublicKey: bytesToHex(proto.ownerIdentityPublicKey),
+    privateEnabled: proto.privateEnabled,
+  };
+}
 
 export interface WalletLeaf {
   id: string;

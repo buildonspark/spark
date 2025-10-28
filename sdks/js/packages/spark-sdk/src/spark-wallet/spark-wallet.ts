@@ -43,14 +43,12 @@ import {
   QueryNodesRequest,
   QueryNodesResponse,
   QuerySparkInvoicesResponse,
-  QueryWalletSettingResponse,
   SigningJob,
   SubscribeToEventsResponse,
   Transfer,
   TransferStatus,
   TransferType,
   TreeNode,
-  UpdateWalletSettingResponse,
   UtxoSwapRequestType,
 } from "../proto/spark.js";
 import { QueryTokenTransactionsResponse } from "../proto/spark_token.js";
@@ -115,10 +113,12 @@ import { DefaultSparkSigner, SparkSigner } from "../signer/signer.js";
 import { KeyDerivation, KeyDerivationType } from "../signer/types.js";
 import { BitcoinFaucet } from "../tests/utils/test-faucet.js";
 import {
+  mapSettingsProtoToWalletSettings,
   mapTransferToWalletTransfer,
   mapTreeNodeToWalletLeaf,
   UserRequestType,
   WalletLeaf,
+  WalletSettings,
   WalletTransfer,
 } from "../types/sdk-types.js";
 import {
@@ -5175,22 +5175,32 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
   public async setPrivacyEnabled(
     privacyEnabled: boolean,
-  ): Promise<UpdateWalletSettingResponse> {
+  ): Promise<WalletSettings | undefined> {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
     const response = await sparkClient.update_wallet_setting({
       privateEnabled: privacyEnabled,
     });
-    return response;
+
+    const walletSetting = response.walletSetting
+      ? mapSettingsProtoToWalletSettings(response.walletSetting)
+      : undefined;
+
+    return walletSetting;
   }
 
-  public async getWalletSettings(): Promise<QueryWalletSettingResponse> {
+  public async getWalletSettings(): Promise<WalletSettings | undefined> {
     const sparkClient = await this.connectionManager.createSparkClient(
       this.config.getCoordinatorAddress(),
     );
     const response = await sparkClient.query_wallet_setting({});
-    return response;
+
+    const walletSetting = response.walletSetting
+      ? mapSettingsProtoToWalletSettings(response.walletSetting)
+      : undefined;
+
+    return walletSetting;
   }
 
   public async isOptimizationInProgress() {
