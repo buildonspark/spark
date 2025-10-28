@@ -40,7 +40,6 @@ const (
 	SparkInternalService_InitiateTransfer_FullMethodName                   = "/spark_internal.SparkInternalService/initiate_transfer"
 	SparkInternalService_DeliverSenderKeyTweak_FullMethodName              = "/spark_internal.SparkInternalService/deliver_sender_key_tweak"
 	SparkInternalService_InitiateCooperativeExit_FullMethodName            = "/spark_internal.SparkInternalService/initiate_cooperative_exit"
-	SparkInternalService_ReturnLightningPayment_FullMethodName             = "/spark_internal.SparkInternalService/return_lightning_payment"
 	SparkInternalService_StartTokenTransactionInternal_FullMethodName      = "/spark_internal.SparkInternalService/start_token_transaction_internal"
 	SparkInternalService_QueryTokenOutputsInternal_FullMethodName          = "/spark_internal.SparkInternalService/query_token_outputs_internal"
 	SparkInternalService_InitiateSettleReceiverKeyTweak_FullMethodName     = "/spark_internal.SparkInternalService/initiate_settle_receiver_key_tweak"
@@ -83,7 +82,6 @@ type SparkInternalServiceClient interface {
 	InitiateTransfer(ctx context.Context, in *InitiateTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	DeliverSenderKeyTweak(ctx context.Context, in *DeliverSenderKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiateCooperativeExit(ctx context.Context, in *InitiateCooperativeExitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	ReturnLightningPayment(ctx context.Context, in *spark.ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	StartTokenTransactionInternal(ctx context.Context, in *StartTokenTransactionInternalRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	QueryTokenOutputsInternal(ctx context.Context, in *spark.QueryTokenOutputsRequest, opts ...grpc.CallOption) (*spark.QueryTokenOutputsResponse, error)
 	InitiateSettleReceiverKeyTweak(ctx context.Context, in *InitiateSettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -310,16 +308,6 @@ func (c *sparkInternalServiceClient) InitiateCooperativeExit(ctx context.Context
 	return out, nil
 }
 
-func (c *sparkInternalServiceClient) ReturnLightningPayment(ctx context.Context, in *spark.ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, SparkInternalService_ReturnLightningPayment_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *sparkInternalServiceClient) StartTokenTransactionInternal(ctx context.Context, in *StartTokenTransactionInternalRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -514,7 +502,6 @@ type SparkInternalServiceServer interface {
 	InitiateTransfer(context.Context, *InitiateTransferRequest) (*emptypb.Empty, error)
 	DeliverSenderKeyTweak(context.Context, *DeliverSenderKeyTweakRequest) (*emptypb.Empty, error)
 	InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error)
-	ReturnLightningPayment(context.Context, *spark.ReturnLightningPaymentRequest) (*emptypb.Empty, error)
 	StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*emptypb.Empty, error)
 	QueryTokenOutputsInternal(context.Context, *spark.QueryTokenOutputsRequest) (*spark.QueryTokenOutputsResponse, error)
 	InitiateSettleReceiverKeyTweak(context.Context, *InitiateSettleReceiverKeyTweakRequest) (*emptypb.Empty, error)
@@ -607,9 +594,6 @@ func (UnimplementedSparkInternalServiceServer) DeliverSenderKeyTweak(context.Con
 }
 func (UnimplementedSparkInternalServiceServer) InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InitiateCooperativeExit not implemented")
-}
-func (UnimplementedSparkInternalServiceServer) ReturnLightningPayment(context.Context, *spark.ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ReturnLightningPayment not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartTokenTransactionInternal not implemented")
@@ -1025,24 +1009,6 @@ func _SparkInternalService_InitiateCooperativeExit_Handler(srv interface{}, ctx 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkInternalService_ReturnLightningPayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(spark.ReturnLightningPaymentRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkInternalServiceServer).ReturnLightningPayment(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkInternalService_ReturnLightningPayment_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkInternalServiceServer).ReturnLightningPayment(ctx, req.(*spark.ReturnLightningPaymentRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SparkInternalService_StartTokenTransactionInternal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StartTokenTransactionInternalRequest)
 	if err := dec(in); err != nil {
@@ -1431,10 +1397,6 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "initiate_cooperative_exit",
 			Handler:    _SparkInternalService_InitiateCooperativeExit_Handler,
-		},
-		{
-			MethodName: "return_lightning_payment",
-			Handler:    _SparkInternalService_ReturnLightningPayment_Handler,
 		},
 		{
 			MethodName: "start_token_transaction_internal",

@@ -161,11 +161,6 @@ func (s *SparkInternalServer) ProvidePreimage(ctx context.Context, req *pb.Provi
 	return &emptypb.Empty{}, err
 }
 
-func (s *SparkInternalServer) ReturnLightningPayment(ctx context.Context, req *pbspark.ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
-	lightningHandler := handler.NewLightningHandler(s.config)
-	return lightningHandler.ReturnLightningPayment(ctx, req, true)
-}
-
 // StartTokenTransactionInternal validates a token transaction and saves it to the database.
 func (s *SparkInternalServer) StartTokenTransactionInternal(ctx context.Context, req *pb.StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
 	internalPrepareHandler := tokens.NewInternalPrepareTokenHandler(s.config)

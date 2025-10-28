@@ -39,8 +39,6 @@ service SparkInternalService {
 
     rpc initiate_cooperative_exit(InitiateCooperativeExitRequest) returns (google.protobuf.Empty) {}
 
-    rpc return_lightning_payment(spark.ReturnLightningPaymentRequest) returns (google.protobuf.Empty) {}
-
     rpc start_token_transaction_internal(StartTokenTransactionInternalRequest) returns (google.protobuf.Empty) {}
 
     rpc query_token_outputs_internal(spark.QueryTokenOutputsRequest) returns (spark.QueryTokenOutputsResponse) {}

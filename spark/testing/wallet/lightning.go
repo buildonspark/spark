@@ -177,34 +177,6 @@ func QueryHTLC(
 	return response, nil
 }
 
-func ReturnLightningPayment(
-	ctx context.Context,
-	config *TestWalletConfig,
-	paymentHash []byte,
-) error {
-	conn, err := config.NewCoordinatorGRPCConnection()
-	if err != nil {
-		return fmt.Errorf("failed to connect to coordinator: %w", err)
-	}
-	defer conn.Close()
-
-	token, err := AuthenticateWithConnection(ctx, config, conn)
-	if err != nil {
-		return err
-	}
-	tmpCtx := ContextWithToken(ctx, token)
-
-	client := pb.NewSparkServiceClient(conn)
-	_, err = client.ReturnLightningPayment(tmpCtx, &pb.ReturnLightningPaymentRequest{
-		PaymentHash:           paymentHash,
-		UserIdentityPublicKey: config.IdentityPublicKey().Serialize(),
-	})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 // SwapNodesForPreimage swaps a node for a preimage of a Lightning invoice.
 func SwapNodesForPreimageWithHTLC(
 	ctx context.Context,

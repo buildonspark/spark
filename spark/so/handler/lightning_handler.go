@@ -40,7 +40,6 @@ import (
 	decodepay "github.com/nbd-wtf/ln-decodepay"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -1789,108 +1788,4 @@ func (h *LightningHandler) ProvidePreimage(ctx context.Context, req *pb.ProvideP
 	}
 
 	return &pb.ProvidePreimageResponse{Transfer: transferProto}, nil
-}
-
-// TODO(LIG-8166): Remove this public facing func and use the internal func instead
-func (h *LightningHandler) ReturnLightningPayment(ctx context.Context, req *pb.ReturnLightningPaymentRequest, internal bool) (*emptypb.Empty, error) {
-	logger := logging.GetLoggerFromContext(ctx)
-	reqUserIdentityPubKey, err := keys.ParsePublicKey(req.GetUserIdentityPublicKey())
-	if err != nil {
-		return nil, fmt.Errorf("invalid identity public key: %w", err)
-	}
-	if !internal {
-		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqUserIdentityPubKey); err != nil {
-			return nil, err
-		}
-	}
-
-	preimageRequestStatuses := []st.PreimageRequestStatus{
-		st.PreimageRequestStatusWaitingForPreimage,
-		st.PreimageRequestStatusReturned,
-	}
-
-	tx, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
-	}
-	preimageRequest, err := tx.PreimageRequest.Query().Where(
-		preimagerequest.PaymentHashEQ(req.PaymentHash),
-		preimagerequest.ReceiverIdentityPubkeyEQ(reqUserIdentityPubKey),
-		preimagerequest.StatusIn(preimageRequestStatuses...),
-	).First(ctx)
-	if err != nil {
-		logger.With(zap.Error(err)).Sugar().Errorf(
-			"ReturnLightningPayment: unable to get preimage request for public key %x and payment hash %x",
-			req.UserIdentityPublicKey,
-			req.PaymentHash,
-		)
-		return nil, fmt.Errorf("ReturnLightningPayment: unable to get preimage request: %w", err)
-	}
-
-	if preimageRequest.Status == st.PreimageRequestStatusReturned {
-		logger.Info("preimage request is already in the returned status")
-		return &emptypb.Empty{}, nil
-	}
-
-	if preimageRequest.Status != st.PreimageRequestStatusWaitingForPreimage {
-		return nil, fmt.Errorf("preimage request is not in the waiting for preimage status")
-	}
-
-	err = preimageRequest.Update().SetStatus(st.PreimageRequestStatusReturned).Exec(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to update preimage request status: %w", err)
-	}
-
-	transfer, err := preimageRequest.QueryTransfers().Only(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get transfer: %w", err)
-	}
-
-	if !transfer.ReceiverIdentityPubkey.Equals(reqUserIdentityPubKey) {
-		return nil, fmt.Errorf("transfer receiver identity public key mismatch")
-	}
-
-	transfer, err = transfer.Update().SetStatus(st.TransferStatusReturned).Save(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to update transfer status: %w", err)
-	}
-
-	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to get transfer leaves: %w", err)
-	}
-
-	for _, leaf := range transferLeaves {
-		treeNode, err := leaf.QueryLeaf().Only(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get tree node: %w", err)
-		}
-		_, err = treeNode.Update().SetStatus(st.TreeNodeStatusAvailable).Save(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to update tree node status: %w", err)
-		}
-	}
-
-	if !internal {
-		operatorSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
-		_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
-			conn, err := operator.NewOperatorGRPCConnection()
-			if err != nil {
-				return nil, err
-			}
-			defer conn.Close()
-
-			client := pbinternal.NewSparkInternalServiceClient(conn)
-			_, err = client.ReturnLightningPayment(ctx, req)
-			if err != nil {
-				return nil, fmt.Errorf("unable to return lightning payment: %w", err)
-			}
-			return nil, nil
-		})
-		if err != nil {
-			return nil, fmt.Errorf("unable to execute task with all operators: %w", err)
-		}
-	}
-
-	return &emptypb.Empty{}, nil
 }

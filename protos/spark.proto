@@ -79,9 +79,6 @@ service SparkService {
     rpc query_token_outputs(QueryTokenOutputsRequest) returns (QueryTokenOutputsResponse) {}
     rpc query_token_transactions(QueryTokenTransactionsRequest) returns (QueryTokenTransactionsResponse) {}
 
-    rpc return_lightning_payment(ReturnLightningPaymentRequest) returns (google.protobuf.Empty) {}
-
-
     rpc query_unused_deposit_addresses(QueryUnusedDepositAddressesRequest) returns (QueryUnusedDepositAddressesResponse) {}
     rpc query_static_deposit_addresses(QueryStaticDepositAddressesRequest) returns (QueryStaticDepositAddressesResponse) {}
 
@@ -1314,12 +1311,6 @@ message ProvidePreimageRequest {
 message ProvidePreimageResponse {
     Transfer transfer = 1;
 }
-
-message ReturnLightningPaymentRequest {
-    bytes payment_hash = 1;
-    bytes user_identity_public_key = 2;
-}
-
 
 message TreeNodeIds {
     repeated string node_ids = 1;

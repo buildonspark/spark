@@ -295,14 +295,6 @@ func (s *SparkServer) ProvidePreimage(ctx context.Context, req *pb.ProvidePreima
 	return lightningHandler.ProvidePreimage(ctx, req)
 }
 
-func (s *SparkServer) ReturnLightningPayment(ctx context.Context, req *pb.ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	lightningHandler := handler.NewLightningHandler(s.config)
-	return lightningHandler.ReturnLightningPayment(ctx, req, false)
-}
-
 // StartTokenTransaction reserves revocation keyshares, and fills the revocation commitment (and other SO-derived fields) to create the final token transaction.
 func (s *SparkServer) StartTokenTransaction(ctx context.Context, req *pb.StartTokenTransactionRequest) (*pb.StartTokenTransactionResponse, error) {
 	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {

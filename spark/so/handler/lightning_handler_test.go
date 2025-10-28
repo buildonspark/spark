@@ -477,27 +477,6 @@ func TestValidatePreimage_InvalidPreimage_Errors(t *testing.T) {
 	}
 }
 
-func TestReturnLightningPayment(t *testing.T) {
-	ctx, _ := db.NewTestSQLiteContext(t)
-
-	rng := rand.NewChaCha8([32]byte{})
-	userIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-
-	config := &so.Config{FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{}}
-	lightningHandler := NewLightningHandler(config)
-
-	t.Run("non-existent payment hash", func(t *testing.T) {
-		req := &pb.ReturnLightningPaymentRequest{
-			PaymentHash:           []byte("non_existent_payment_hash_______"),
-			UserIdentityPublicKey: userIdentityPubKey.Serialize(),
-		}
-
-		resp, err := lightningHandler.ReturnLightningPayment(ctx, req, true) // internal=true to skip auth
-		require.ErrorContains(t, err, "unable to get preimage request")
-		assert.Nil(t, resp)
-	})
-}
-
 // Note: validateNodeOwnership and validateHasSession are private methods,
 // so we test them indirectly through GetSigningCommitments which calls validateHasSession
 func TestValidateGetPreimageRequestEdgeErrorCases(t *testing.T) {

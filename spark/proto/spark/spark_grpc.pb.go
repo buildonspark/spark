@@ -57,7 +57,6 @@ const (
 	SparkService_FreezeTokens_FullMethodName                        = "/spark.SparkService/freeze_tokens"
 	SparkService_QueryTokenOutputs_FullMethodName                   = "/spark.SparkService/query_token_outputs"
 	SparkService_QueryTokenTransactions_FullMethodName              = "/spark.SparkService/query_token_transactions"
-	SparkService_ReturnLightningPayment_FullMethodName              = "/spark.SparkService/return_lightning_payment"
 	SparkService_QueryUnusedDepositAddresses_FullMethodName         = "/spark.SparkService/query_unused_deposit_addresses"
 	SparkService_QueryStaticDepositAddresses_FullMethodName         = "/spark.SparkService/query_static_deposit_addresses"
 	SparkService_SubscribeToEvents_FullMethodName                   = "/spark.SparkService/subscribe_to_events"
@@ -141,7 +140,6 @@ type SparkServiceClient interface {
 	FreezeTokens(ctx context.Context, in *FreezeTokensRequest, opts ...grpc.CallOption) (*FreezeTokensResponse, error)
 	QueryTokenOutputs(ctx context.Context, in *QueryTokenOutputsRequest, opts ...grpc.CallOption) (*QueryTokenOutputsResponse, error)
 	QueryTokenTransactions(ctx context.Context, in *QueryTokenTransactionsRequest, opts ...grpc.CallOption) (*QueryTokenTransactionsResponse, error)
-	ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	QueryUnusedDepositAddresses(ctx context.Context, in *QueryUnusedDepositAddressesRequest, opts ...grpc.CallOption) (*QueryUnusedDepositAddressesResponse, error)
 	QueryStaticDepositAddresses(ctx context.Context, in *QueryStaticDepositAddressesRequest, opts ...grpc.CallOption) (*QueryStaticDepositAddressesResponse, error)
 	SubscribeToEvents(ctx context.Context, in *SubscribeToEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SubscribeToEventsResponse], error)
@@ -560,16 +558,6 @@ func (c *sparkServiceClient) QueryTokenTransactions(ctx context.Context, in *Que
 	return out, nil
 }
 
-func (c *sparkServiceClient) ReturnLightningPayment(ctx context.Context, in *ReturnLightningPaymentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, SparkService_ReturnLightningPayment_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *sparkServiceClient) QueryUnusedDepositAddresses(ctx context.Context, in *QueryUnusedDepositAddressesRequest, opts ...grpc.CallOption) (*QueryUnusedDepositAddressesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryUnusedDepositAddressesResponse)
@@ -850,7 +838,6 @@ type SparkServiceServer interface {
 	FreezeTokens(context.Context, *FreezeTokensRequest) (*FreezeTokensResponse, error)
 	QueryTokenOutputs(context.Context, *QueryTokenOutputsRequest) (*QueryTokenOutputsResponse, error)
 	QueryTokenTransactions(context.Context, *QueryTokenTransactionsRequest) (*QueryTokenTransactionsResponse, error)
-	ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error)
 	QueryUnusedDepositAddresses(context.Context, *QueryUnusedDepositAddressesRequest) (*QueryUnusedDepositAddressesResponse, error)
 	QueryStaticDepositAddresses(context.Context, *QueryStaticDepositAddressesRequest) (*QueryStaticDepositAddressesResponse, error)
 	SubscribeToEvents(*SubscribeToEventsRequest, grpc.ServerStreamingServer[SubscribeToEventsResponse]) error
@@ -1006,9 +993,6 @@ func (UnimplementedSparkServiceServer) QueryTokenOutputs(context.Context, *Query
 }
 func (UnimplementedSparkServiceServer) QueryTokenTransactions(context.Context, *QueryTokenTransactionsRequest) (*QueryTokenTransactionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryTokenTransactions not implemented")
-}
-func (UnimplementedSparkServiceServer) ReturnLightningPayment(context.Context, *ReturnLightningPaymentRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ReturnLightningPayment not implemented")
 }
 func (UnimplementedSparkServiceServer) QueryUnusedDepositAddresses(context.Context, *QueryUnusedDepositAddressesRequest) (*QueryUnusedDepositAddressesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryUnusedDepositAddresses not implemented")
@@ -1760,24 +1744,6 @@ func _SparkService_QueryTokenTransactions_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkService_ReturnLightningPayment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ReturnLightningPaymentRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkServiceServer).ReturnLightningPayment(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkService_ReturnLightningPayment_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).ReturnLightningPayment(ctx, req.(*ReturnLightningPaymentRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SparkService_QueryUnusedDepositAddresses_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(QueryUnusedDepositAddressesRequest)
 	if err := dec(in); err != nil {
@@ -2303,10 +2269,6 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "query_token_transactions",
 			Handler:    _SparkService_QueryTokenTransactions_Handler,
-		},
-		{
-			MethodName: "return_lightning_payment",
-			Handler:    _SparkService_ReturnLightningPayment_Handler,
 		},
 		{
 			MethodName: "query_unused_deposit_addresses",

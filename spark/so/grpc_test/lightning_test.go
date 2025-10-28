@@ -543,33 +543,6 @@ func TestSendLightningPaymentWithRejection(t *testing.T) {
 		totalValue += value
 	}
 	assert.Equal(t, totalValue, int64(12345+feeSats))
-
-	err = wallet.ReturnLightningPayment(t.Context(), sspConfig, paymentHash[:])
-	require.NoError(t, err)
-
-	userTransfers, _, err := wallet.QueryAllTransfers(t.Context(), userConfig, 2, 0)
-	require.NoError(t, err)
-	require.Len(t, userTransfers, 1)
-	require.Equal(t, spark.TransferStatus_TRANSFER_STATUS_RETURNED, userTransfers[0].Status)
-
-	sspTransfers, _, err := wallet.QueryAllTransfers(t.Context(), sspConfig, 2, 0)
-	require.NoError(t, err)
-	require.Len(t, sspTransfers, 1)
-	require.Equal(t, spark.TransferStatus_TRANSFER_STATUS_RETURNED, sspTransfers[0].Status)
-
-	// Test the invoice can be paid again
-	_, err = wallet.SwapNodesForPreimage(
-		t.Context(),
-		userConfig,
-		leaves,
-		sspConfig.IdentityPublicKey(),
-		paymentHash[:],
-		&invoice,
-		feeSats,
-		false,
-		amountSats,
-	)
-	require.NoError(t, err)
 }
 
 func TestReceiveLightningPaymentWithWrongPreimage(t *testing.T) {
