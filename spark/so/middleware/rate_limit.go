@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
 
@@ -99,13 +98,11 @@ type RateLimiterConfigProvider interface {
 }
 
 type RateLimiter struct {
-	config    *RateLimiterConfig
-	store     MemoryStore
-	clock     Clock
-	knobs     knobs.Knobs
-	configs   map[string]storeConfig
-	configsMu sync.RWMutex
-	tiers     []tier
+	config *RateLimiterConfig
+	store  MemoryStore
+	clock  Clock
+	knobs  knobs.Knobs
+	tiers  []tier
 
 	// Metrics fields
 	utilizationHistogram metric.Float64Histogram
@@ -148,11 +145,6 @@ type realMemoryStore struct {
 	// TODO: Update this to use the Redis store instead of the memory store.
 	// See https://linear.app/lightsparkdev/issue/LIG-8247
 	store limiter.Store
-}
-
-type storeConfig struct {
-	tokens uint64
-	window time.Duration
 }
 
 type tier struct {
@@ -244,10 +236,9 @@ func NewRateLimiter(configOrProvider any, opts ...RateLimiterOption) (*RateLimit
 	}
 
 	rateLimiter := &RateLimiter{
-		config:  config,
-		clock:   &realClock{},
-		knobs:   knobs.New(nil),
-		configs: make(map[string]storeConfig),
+		config: config,
+		clock:  &realClock{},
+		knobs:  knobs.New(nil),
 	}
 
 	for _, opt := range opts {
@@ -294,28 +285,6 @@ func NewRateLimiter(configOrProvider any, opts ...RateLimiterOption) (*RateLimit
 	return rateLimiter, nil
 }
 
-func (r *RateLimiter) getConfig(key string) (tokens uint64, window time.Duration, exists bool) {
-	r.configsMu.RLock()
-	defer r.configsMu.RUnlock()
-
-	config, exists := r.configs[key]
-	if !exists {
-		return 0, 0, false
-	}
-
-	return config.tokens, config.window, true
-}
-
-func (r *RateLimiter) setConfig(key string, tokens uint64, window time.Duration) {
-	r.configsMu.Lock()
-	defer r.configsMu.Unlock()
-
-	r.configs[key] = storeConfig{
-		tokens: tokens,
-		window: window,
-	}
-}
-
 // windowForSuffix returns the configured time window for a given tier suffix.
 func (r *RateLimiter) windowForSuffix(s string) time.Duration {
 	for _, t := range r.tiers {
@@ -330,21 +299,55 @@ func (r *RateLimiter) windowForSuffix(s string) time.Duration {
 // It ensures the store's bucket config matches the desired tokens/window
 // and attempts to take a token, returning an appropriate error on failure.
 func (r *RateLimiter) takeTokenForKey(ctx context.Context, key string, tokens uint64, window time.Duration, label string) (uint64, uint64, error) {
-	curTokens, curWindow, exists := r.getConfig(key)
-	hasChanged := !exists || curTokens != tokens || curWindow != window
-	if hasChanged {
-		_ = r.store.Set(ctx, key, tokens, window)
-		r.setConfig(key, tokens, window)
+	currentCapacity, remaining, err := r.store.Get(ctx, key)
+	if err != nil {
+		// If we can't even Get the state of the bucket, we must fail open.
+		logger := logging.GetLoggerFromContext(ctx)
+		logger.Error(fmt.Sprintf("Rate limit store failed on Get, failing open. key=%s, err=%v", sanitizeKey(key), err))
+		return tokens, tokens, nil
+	}
+	if currentCapacity != tokens {
+		logger := logging.GetLoggerFromContext(ctx)
+		logger.Info(fmt.Sprintf(
+			"Rate limit bucket capacity mismatch, resetting. key=%s, current=%d, expected=%d",
+			sanitizeKey(key), currentCapacity, tokens,
+		))
+		if err := r.store.Set(ctx, key, tokens, window); err != nil {
+			logger.Error(fmt.Sprintf("Failed to set rate limit bucket, failing open. key=%s, err=%v", key, err))
+			return tokens, tokens, nil
+		}
+		// After a reset, assume the bucket is now full.
+		remaining = tokens
 	}
 
-	tok, remaining, _, ok, err := r.store.Take(ctx, key)
+	if remaining == 0 {
+		return tokens, 0, errors.ResourceExhaustedRateLimitExceeded(fmt.Errorf("%s rate limit exceeded", label))
+	}
+
+	// We believe we have tokens, so now we attempt to take one.
+	_, _, _, ok, err := r.store.Take(ctx, key)
 	if err != nil {
-		return 0, 0, errors.UnavailableDataStore(fmt.Errorf("%s rate limit error: %w", label, err))
+		logger := logging.GetLoggerFromContext(ctx)
+		logger.Error(fmt.Sprintf(
+			"Rate limit store failed on Take, failing open. key=%s, err=%v",
+			sanitizeKey(key), err,
+		))
+		return tokens, tokens, nil
 	}
+
 	if !ok {
-		return 0, 0, errors.ResourceExhaustedRateLimitExceeded(fmt.Errorf("%s rate limit exceeded", label))
+		// This indicates a race condition where another request took the last token between our Get and Take.
+		// Don't rate limit this request to be maximally cautious in case of unexpected system behavior.
+		logger := logging.GetLoggerFromContext(ctx)
+		logger.Warn(fmt.Sprintf(
+			"Rate limit race condition: Get reported tokens, but Take failed. Allowing request. key=%s",
+			sanitizeKey(key),
+		))
+		return tokens, tokens, nil
 	}
-	return tok, remaining, nil
+
+	// Success. The Take operation decremented the token count.
+	return tokens, remaining - 1, nil
 }
 
 func (r *RateLimiter) observeUtilization(ctx context.Context, p rateLimitEnforcementParams, capacity uint64, remaining uint64) {

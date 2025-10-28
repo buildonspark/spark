@@ -57,13 +57,21 @@ func newTestMemoryStore(clock Clock) *testMemoryStore {
 }
 
 func (s *testMemoryStore) Get(ctx context.Context, key string) (tokens uint64, remaining uint64, err error) {
-	s.bucketsMu.RLock()
-	defer s.bucketsMu.RUnlock()
+	s.bucketsMu.Lock()
+	defer s.bucketsMu.Unlock()
 
 	bucket, exists := s.buckets[key]
 	if !exists {
 		return 0, 0, nil
 	}
+
+	// Check if current window has expired and we need to start a new window
+	now := s.clock.Now()
+	if elapsed := now.Sub(bucket.windowStart); elapsed >= bucket.window {
+		bucket.windowStart = now
+		bucket.remaining = bucket.tokens
+	}
+
 	return bucket.tokens, bucket.remaining, nil
 }
 
@@ -457,7 +465,7 @@ func TestRateLimiter(t *testing.T) {
 
 		// But if we dynamically update the knob value for this method, it
 		// should work again.
-		knobValues[knobs.KnobRateLimitLimit+"@/test.Service/Method1"] = 50
+		knobValues[knobs.KnobRateLimitLimit+"@/test.Service/Method1#1s"] = 50
 		clock.Time = clock.Time.Add(2 * time.Second)
 		resp, err := interceptor(ctx, "request", info1, handler)
 		require.NoError(t, err, "Method1 request should succeed after knob update")
@@ -999,7 +1007,8 @@ func TestRateLimiter(t *testing.T) {
 		clock.Time = clock.Time.Add(1 * time.Second)
 		_, err = interceptor(ctx, "request", info, handler)
 		require.NoError(t, err)
-		// At this point, within 1m window, total is 3 -> next should fail due to #1m tier
+
+		// At this point, total requests within the 1-minute window is 3. The next request should fail.
 		_, err = interceptor(ctx, "request", info, handler)
 		require.ErrorContains(t, err, "rate limit exceeded")
 	})
