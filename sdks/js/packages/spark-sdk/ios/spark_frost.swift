@@ -1101,6 +1101,17 @@ public func aggregateFrost(msg: Data, statechainCommitments: [String: SigningCom
     )
 })
 }
+public func constructDirectRefundTx(tx: Data, vout: UInt32, pubkey: Data, network: String, sequence: UInt32)throws  -> TransactionResult {
+    return try  FfiConverterTypeTransactionResult.lift(try rustCallWithError(FfiConverterTypeError.lift) {
+    uniffi_spark_frost_fn_func_construct_direct_refund_tx(
+        FfiConverterData.lower(tx),
+        FfiConverterUInt32.lower(vout),
+        FfiConverterData.lower(pubkey),
+        FfiConverterString.lower(network),
+        FfiConverterUInt32.lower(sequence),$0
+    )
+})
+}
 public func constructNodeTx(tx: Data, vout: UInt32, address: String, locktime: UInt16)throws  -> TransactionResult {
     return try  FfiConverterTypeTransactionResult.lift(try rustCallWithError(FfiConverterTypeError.lift) {
     uniffi_spark_frost_fn_func_construct_node_tx(
@@ -1111,14 +1122,14 @@ public func constructNodeTx(tx: Data, vout: UInt32, address: String, locktime: U
     )
 })
 }
-public func constructRefundTx(tx: Data, vout: UInt32, pubkey: Data, network: String, locktime: UInt16)throws  -> TransactionResult {
+public func constructRefundTx(tx: Data, vout: UInt32, pubkey: Data, network: String, sequence: UInt32)throws  -> TransactionResult {
     return try  FfiConverterTypeTransactionResult.lift(try rustCallWithError(FfiConverterTypeError.lift) {
     uniffi_spark_frost_fn_func_construct_refund_tx(
         FfiConverterData.lower(tx),
         FfiConverterUInt32.lower(vout),
         FfiConverterData.lower(pubkey),
         FfiConverterString.lower(network),
-        FfiConverterUInt16.lower(locktime),$0
+        FfiConverterUInt32.lower(sequence),$0
     )
 })
 }
@@ -1163,6 +1174,27 @@ public func frostNonce(keyPackage: KeyPackage)throws  -> NonceResult {
     )
 })
 }
+public func getPublicKeyBytes(privateKeyBytes: Data, compressed: Bool)throws  -> Data {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypeError.lift) {
+    uniffi_spark_frost_fn_func_get_public_key_bytes(
+        FfiConverterData.lower(privateKeyBytes),
+        FfiConverterBool.lower(compressed),$0
+    )
+})
+}
+public func getTaprootPubkey(verifyingPubkey: Data)throws  -> Data {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypeError.lift) {
+    uniffi_spark_frost_fn_func_get_taproot_pubkey(
+        FfiConverterData.lower(verifyingPubkey),$0
+    )
+})
+}
+public func randomSecretKeyBytes()throws  -> Data {
+    return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypeError.lift) {
+    uniffi_spark_frost_fn_func_random_secret_key_bytes($0
+    )
+})
+}
 public func signFrost(msg: Data, keyPackage: KeyPackage, nonce: SigningNonce, selfCommitment: SigningCommitment, statechainCommitments: [String: SigningCommitment], adaptorPublicKey: Data?)throws  -> Data {
     return try  FfiConverterData.lift(try rustCallWithError(FfiConverterTypeError.lift) {
     uniffi_spark_frost_fn_func_sign_frost(
@@ -1187,6 +1219,15 @@ public func validateSignatureShare(msg: Data, statechainCommitments: [String: Si
     )
 })
 }
+public func verifySignatureBytes(signature: Data, message: Data, pubkey: Data)throws  -> Bool {
+    return try  FfiConverterBool.lift(try rustCallWithError(FfiConverterTypeError.lift) {
+    uniffi_spark_frost_fn_func_verify_signature_bytes(
+        FfiConverterData.lower(signature),
+        FfiConverterData.lower(message),
+        FfiConverterData.lower(pubkey),$0
+    )
+})
+}
 
 private enum InitializationResult {
     case ok
@@ -1206,10 +1247,13 @@ private var initializationResult: InitializationResult = {
     if (uniffi_spark_frost_checksum_func_aggregate_frost() != 50841) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_spark_frost_checksum_func_construct_direct_refund_tx() != 36543) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_spark_frost_checksum_func_construct_node_tx() != 50549) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_spark_frost_checksum_func_construct_refund_tx() != 47425) {
+    if (uniffi_spark_frost_checksum_func_construct_refund_tx() != 31658) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_spark_frost_checksum_func_construct_split_tx() != 55511) {
@@ -1227,10 +1271,22 @@ private var initializationResult: InitializationResult = {
     if (uniffi_spark_frost_checksum_func_frost_nonce() != 5111) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_spark_frost_checksum_func_get_public_key_bytes() != 20406) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_spark_frost_checksum_func_get_taproot_pubkey() != 13153) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_spark_frost_checksum_func_random_secret_key_bytes() != 35662) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_spark_frost_checksum_func_sign_frost() != 4845) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_spark_frost_checksum_func_validate_signature_share() != 64132) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_spark_frost_checksum_func_verify_signature_bytes() != 29644) {
         return InitializationResult.apiChecksumMismatch
     }
 

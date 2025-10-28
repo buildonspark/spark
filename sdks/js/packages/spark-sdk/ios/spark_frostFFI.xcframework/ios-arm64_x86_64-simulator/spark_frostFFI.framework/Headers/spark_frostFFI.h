@@ -258,7 +258,7 @@ RustBuffer uniffi_spark_frost_fn_func_aggregate_frost(RustBuffer msg, RustBuffer
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_CONSTRUCT_DIRECT_REFUND_TX
 #define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_CONSTRUCT_DIRECT_REFUND_TX
-RustBuffer uniffi_spark_frost_fn_func_construct_direct_refund_tx(RustBuffer tx, uint32_t vout, RustBuffer pubkey, RustBuffer network, uint16_t locktime, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_spark_frost_fn_func_construct_direct_refund_tx(RustBuffer tx, uint32_t vout, RustBuffer pubkey, RustBuffer network, uint32_t sequence, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_CONSTRUCT_NODE_TX
@@ -268,7 +268,7 @@ RustBuffer uniffi_spark_frost_fn_func_construct_node_tx(RustBuffer tx, uint32_t 
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_CONSTRUCT_REFUND_TX
 #define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_CONSTRUCT_REFUND_TX
-RustBuffer uniffi_spark_frost_fn_func_construct_refund_tx(RustBuffer tx, uint32_t vout, RustBuffer pubkey, RustBuffer network, uint16_t locktime, RustCallStatus *_Nonnull out_status
+RustBuffer uniffi_spark_frost_fn_func_construct_refund_tx(RustBuffer tx, uint32_t vout, RustBuffer pubkey, RustBuffer network, uint32_t sequence, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_CONSTRUCT_SPLIT_TX
@@ -296,9 +296,20 @@ RustBuffer uniffi_spark_frost_fn_func_encrypt_ecies(RustBuffer msg, RustBuffer p
 RustBuffer uniffi_spark_frost_fn_func_frost_nonce(RustBuffer key_package, RustCallStatus *_Nonnull out_status
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_GET_PUBLIC_KEY_BYTES
+#define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_GET_PUBLIC_KEY_BYTES
+RustBuffer uniffi_spark_frost_fn_func_get_public_key_bytes(RustBuffer private_key_bytes, int8_t compressed, RustCallStatus *_Nonnull out_status
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_GET_TAPROOT_PUBKEY
 #define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_GET_TAPROOT_PUBKEY
 RustBuffer uniffi_spark_frost_fn_func_get_taproot_pubkey(RustBuffer verifying_pubkey, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_RANDOM_SECRET_KEY_BYTES
+#define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_RANDOM_SECRET_KEY_BYTES
+RustBuffer uniffi_spark_frost_fn_func_random_secret_key_bytes(RustCallStatus *_Nonnull out_status
+    
 );
 #endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_SIGN_FROST
@@ -309,6 +320,11 @@ RustBuffer uniffi_spark_frost_fn_func_sign_frost(RustBuffer msg, RustBuffer key_
 #ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_VALIDATE_SIGNATURE_SHARE
 #define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_VALIDATE_SIGNATURE_SHARE
 int8_t uniffi_spark_frost_fn_func_validate_signature_share(RustBuffer msg, RustBuffer statechain_commitments, RustBuffer self_commitment, RustBuffer signature_share, RustBuffer public_share, RustBuffer verifying_key, RustCallStatus *_Nonnull out_status
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_VERIFY_SIGNATURE_BYTES
+#define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_FN_FUNC_VERIFY_SIGNATURE_BYTES
+int8_t uniffi_spark_frost_fn_func_verify_signature_bytes(RustBuffer signature, RustBuffer message, RustBuffer pubkey, RustCallStatus *_Nonnull out_status
 );
 #endif
 #ifndef UNIFFI_FFIDEF_FFI_SPARK_FROST_RUSTBUFFER_ALLOC
@@ -645,9 +661,21 @@ uint16_t uniffi_spark_frost_checksum_func_frost_nonce(void
     
 );
 #endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_GET_PUBLIC_KEY_BYTES
+#define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_GET_PUBLIC_KEY_BYTES
+uint16_t uniffi_spark_frost_checksum_func_get_public_key_bytes(void
+    
+);
+#endif
 #ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_GET_TAPROOT_PUBKEY
 #define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_GET_TAPROOT_PUBKEY
 uint16_t uniffi_spark_frost_checksum_func_get_taproot_pubkey(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_RANDOM_SECRET_KEY_BYTES
+#define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_RANDOM_SECRET_KEY_BYTES
+uint16_t uniffi_spark_frost_checksum_func_random_secret_key_bytes(void
     
 );
 #endif
@@ -660,6 +688,12 @@ uint16_t uniffi_spark_frost_checksum_func_sign_frost(void
 #ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_VALIDATE_SIGNATURE_SHARE
 #define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_VALIDATE_SIGNATURE_SHARE
 uint16_t uniffi_spark_frost_checksum_func_validate_signature_share(void
+    
+);
+#endif
+#ifndef UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_VERIFY_SIGNATURE_BYTES
+#define UNIFFI_FFIDEF_UNIFFI_SPARK_FROST_CHECKSUM_FUNC_VERIFY_SIGNATURE_BYTES
+uint16_t uniffi_spark_frost_checksum_func_verify_signature_bytes(void
     
 );
 #endif

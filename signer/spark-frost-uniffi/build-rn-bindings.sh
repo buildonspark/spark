@@ -78,6 +78,7 @@ cp "$TARGET/x86_64-linux-android/release-smaller/libspark_frost.so" "$ANDROID_JN
 
 echo "Copying iOS files..."
 
+cp spark-frost-swift/spark_frost.swift "$IOS_DIR/spark_frost.swift"
 cp spark-frost-swift/spark_frostFFI.h spark-frost-swift/spark_frostFFI.xcframework/ios-arm64/spark_frostFFI.framework/Headers/spark_frostFFI.h
 cp spark-frost-swift/spark_frostFFI.h spark-frost-swift/spark_frostFFI.xcframework/ios-arm64_x86_64-simulator/spark_frostFFI.framework/Headers/spark_frostFFI.h
 cp spark-frost-swift/spark_frostFFI.h spark-frost-swift/spark_frostFFI.xcframework/macos-arm64_x86_64/spark_frostFFI.framework/Headers/spark_frostFFI.h
