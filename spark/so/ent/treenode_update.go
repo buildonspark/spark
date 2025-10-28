@@ -188,8 +188,16 @@ func (tnu *TreeNodeUpdate) ClearDirectFromCpfpRefundTx() *TreeNodeUpdate {
 }
 
 // SetRawTxid sets the "raw_txid" field.
-func (tnu *TreeNodeUpdate) SetRawTxid(b []byte) *TreeNodeUpdate {
-	tnu.mutation.SetRawTxid(b)
+func (tnu *TreeNodeUpdate) SetRawTxid(si schematype.TxID) *TreeNodeUpdate {
+	tnu.mutation.SetRawTxid(si)
+	return tnu
+}
+
+// SetNillableRawTxid sets the "raw_txid" field if the given value is not nil.
+func (tnu *TreeNodeUpdate) SetNillableRawTxid(si *schematype.TxID) *TreeNodeUpdate {
+	if si != nil {
+		tnu.SetRawTxid(*si)
+	}
 	return tnu
 }
 
@@ -200,8 +208,16 @@ func (tnu *TreeNodeUpdate) ClearRawTxid() *TreeNodeUpdate {
 }
 
 // SetDirectTxid sets the "direct_txid" field.
-func (tnu *TreeNodeUpdate) SetDirectTxid(b []byte) *TreeNodeUpdate {
-	tnu.mutation.SetDirectTxid(b)
+func (tnu *TreeNodeUpdate) SetDirectTxid(si schematype.TxID) *TreeNodeUpdate {
+	tnu.mutation.SetDirectTxid(si)
+	return tnu
+}
+
+// SetNillableDirectTxid sets the "direct_txid" field if the given value is not nil.
+func (tnu *TreeNodeUpdate) SetNillableDirectTxid(si *schematype.TxID) *TreeNodeUpdate {
+	if si != nil {
+		tnu.SetDirectTxid(*si)
+	}
 	return tnu
 }
 
@@ -212,8 +228,16 @@ func (tnu *TreeNodeUpdate) ClearDirectTxid() *TreeNodeUpdate {
 }
 
 // SetDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field.
-func (tnu *TreeNodeUpdate) SetDirectFromCpfpRefundTxid(b []byte) *TreeNodeUpdate {
-	tnu.mutation.SetDirectFromCpfpRefundTxid(b)
+func (tnu *TreeNodeUpdate) SetDirectFromCpfpRefundTxid(si schematype.TxID) *TreeNodeUpdate {
+	tnu.mutation.SetDirectFromCpfpRefundTxid(si)
+	return tnu
+}
+
+// SetNillableDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field if the given value is not nil.
+func (tnu *TreeNodeUpdate) SetNillableDirectFromCpfpRefundTxid(si *schematype.TxID) *TreeNodeUpdate {
+	if si != nil {
+		tnu.SetDirectFromCpfpRefundTxid(*si)
+	}
 	return tnu
 }
 
@@ -248,8 +272,16 @@ func (tnu *TreeNodeUpdate) ClearDirectRefundTx() *TreeNodeUpdate {
 }
 
 // SetRawRefundTxid sets the "raw_refund_txid" field.
-func (tnu *TreeNodeUpdate) SetRawRefundTxid(b []byte) *TreeNodeUpdate {
-	tnu.mutation.SetRawRefundTxid(b)
+func (tnu *TreeNodeUpdate) SetRawRefundTxid(si schematype.TxID) *TreeNodeUpdate {
+	tnu.mutation.SetRawRefundTxid(si)
+	return tnu
+}
+
+// SetNillableRawRefundTxid sets the "raw_refund_txid" field if the given value is not nil.
+func (tnu *TreeNodeUpdate) SetNillableRawRefundTxid(si *schematype.TxID) *TreeNodeUpdate {
+	if si != nil {
+		tnu.SetRawRefundTxid(*si)
+	}
 	return tnu
 }
 
@@ -260,8 +292,16 @@ func (tnu *TreeNodeUpdate) ClearRawRefundTxid() *TreeNodeUpdate {
 }
 
 // SetDirectRefundTxid sets the "direct_refund_txid" field.
-func (tnu *TreeNodeUpdate) SetDirectRefundTxid(b []byte) *TreeNodeUpdate {
-	tnu.mutation.SetDirectRefundTxid(b)
+func (tnu *TreeNodeUpdate) SetDirectRefundTxid(si schematype.TxID) *TreeNodeUpdate {
+	tnu.mutation.SetDirectRefundTxid(si)
+	return tnu
+}
+
+// SetNillableDirectRefundTxid sets the "direct_refund_txid" field if the given value is not nil.
+func (tnu *TreeNodeUpdate) SetNillableDirectRefundTxid(si *schematype.TxID) *TreeNodeUpdate {
+	if si != nil {
+		tnu.SetDirectRefundTxid(*si)
+	}
 	return tnu
 }
 
@@ -853,8 +893,16 @@ func (tnuo *TreeNodeUpdateOne) ClearDirectFromCpfpRefundTx() *TreeNodeUpdateOne 
 }
 
 // SetRawTxid sets the "raw_txid" field.
-func (tnuo *TreeNodeUpdateOne) SetRawTxid(b []byte) *TreeNodeUpdateOne {
-	tnuo.mutation.SetRawTxid(b)
+func (tnuo *TreeNodeUpdateOne) SetRawTxid(si schematype.TxID) *TreeNodeUpdateOne {
+	tnuo.mutation.SetRawTxid(si)
+	return tnuo
+}
+
+// SetNillableRawTxid sets the "raw_txid" field if the given value is not nil.
+func (tnuo *TreeNodeUpdateOne) SetNillableRawTxid(si *schematype.TxID) *TreeNodeUpdateOne {
+	if si != nil {
+		tnuo.SetRawTxid(*si)
+	}
 	return tnuo
 }
 
@@ -865,8 +913,16 @@ func (tnuo *TreeNodeUpdateOne) ClearRawTxid() *TreeNodeUpdateOne {
 }
 
 // SetDirectTxid sets the "direct_txid" field.
-func (tnuo *TreeNodeUpdateOne) SetDirectTxid(b []byte) *TreeNodeUpdateOne {
-	tnuo.mutation.SetDirectTxid(b)
+func (tnuo *TreeNodeUpdateOne) SetDirectTxid(si schematype.TxID) *TreeNodeUpdateOne {
+	tnuo.mutation.SetDirectTxid(si)
+	return tnuo
+}
+
+// SetNillableDirectTxid sets the "direct_txid" field if the given value is not nil.
+func (tnuo *TreeNodeUpdateOne) SetNillableDirectTxid(si *schematype.TxID) *TreeNodeUpdateOne {
+	if si != nil {
+		tnuo.SetDirectTxid(*si)
+	}
 	return tnuo
 }
 
@@ -877,8 +933,16 @@ func (tnuo *TreeNodeUpdateOne) ClearDirectTxid() *TreeNodeUpdateOne {
 }
 
 // SetDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field.
-func (tnuo *TreeNodeUpdateOne) SetDirectFromCpfpRefundTxid(b []byte) *TreeNodeUpdateOne {
-	tnuo.mutation.SetDirectFromCpfpRefundTxid(b)
+func (tnuo *TreeNodeUpdateOne) SetDirectFromCpfpRefundTxid(si schematype.TxID) *TreeNodeUpdateOne {
+	tnuo.mutation.SetDirectFromCpfpRefundTxid(si)
+	return tnuo
+}
+
+// SetNillableDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field if the given value is not nil.
+func (tnuo *TreeNodeUpdateOne) SetNillableDirectFromCpfpRefundTxid(si *schematype.TxID) *TreeNodeUpdateOne {
+	if si != nil {
+		tnuo.SetDirectFromCpfpRefundTxid(*si)
+	}
 	return tnuo
 }
 
@@ -913,8 +977,16 @@ func (tnuo *TreeNodeUpdateOne) ClearDirectRefundTx() *TreeNodeUpdateOne {
 }
 
 // SetRawRefundTxid sets the "raw_refund_txid" field.
-func (tnuo *TreeNodeUpdateOne) SetRawRefundTxid(b []byte) *TreeNodeUpdateOne {
-	tnuo.mutation.SetRawRefundTxid(b)
+func (tnuo *TreeNodeUpdateOne) SetRawRefundTxid(si schematype.TxID) *TreeNodeUpdateOne {
+	tnuo.mutation.SetRawRefundTxid(si)
+	return tnuo
+}
+
+// SetNillableRawRefundTxid sets the "raw_refund_txid" field if the given value is not nil.
+func (tnuo *TreeNodeUpdateOne) SetNillableRawRefundTxid(si *schematype.TxID) *TreeNodeUpdateOne {
+	if si != nil {
+		tnuo.SetRawRefundTxid(*si)
+	}
 	return tnuo
 }
 
@@ -925,8 +997,16 @@ func (tnuo *TreeNodeUpdateOne) ClearRawRefundTxid() *TreeNodeUpdateOne {
 }
 
 // SetDirectRefundTxid sets the "direct_refund_txid" field.
-func (tnuo *TreeNodeUpdateOne) SetDirectRefundTxid(b []byte) *TreeNodeUpdateOne {
-	tnuo.mutation.SetDirectRefundTxid(b)
+func (tnuo *TreeNodeUpdateOne) SetDirectRefundTxid(si schematype.TxID) *TreeNodeUpdateOne {
+	tnuo.mutation.SetDirectRefundTxid(si)
+	return tnuo
+}
+
+// SetNillableDirectRefundTxid sets the "direct_refund_txid" field if the given value is not nil.
+func (tnuo *TreeNodeUpdateOne) SetNillableDirectRefundTxid(si *schematype.TxID) *TreeNodeUpdateOne {
+	if si != nil {
+		tnuo.SetDirectRefundTxid(*si)
+	}
 	return tnuo
 }
 

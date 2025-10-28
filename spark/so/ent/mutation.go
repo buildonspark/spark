@@ -19331,9 +19331,9 @@ type TransferLeafMutation struct {
 	intermediate_refund_tx                           *[]byte
 	intermediate_direct_refund_tx                    *[]byte
 	intermediate_direct_from_cpfp_refund_tx          *[]byte
-	intermediate_refund_txid                         *[]byte
-	intermediate_direct_refund_txid                  *[]byte
-	intermediate_direct_from_cpfp_refund_txid        *[]byte
+	intermediate_refund_txid                         *schematype.TxID
+	intermediate_direct_refund_txid                  *schematype.TxID
+	intermediate_direct_from_cpfp_refund_txid        *schematype.TxID
 	intermediate_refund_timelock                     *uint64
 	addintermediate_refund_timelock                  *int64
 	intermediate_direct_refund_timelock              *uint64
@@ -19896,12 +19896,12 @@ func (m *TransferLeafMutation) ResetIntermediateDirectFromCpfpRefundTx() {
 }
 
 // SetIntermediateRefundTxid sets the "intermediate_refund_txid" field.
-func (m *TransferLeafMutation) SetIntermediateRefundTxid(b []byte) {
-	m.intermediate_refund_txid = &b
+func (m *TransferLeafMutation) SetIntermediateRefundTxid(si schematype.TxID) {
+	m.intermediate_refund_txid = &si
 }
 
 // IntermediateRefundTxid returns the value of the "intermediate_refund_txid" field in the mutation.
-func (m *TransferLeafMutation) IntermediateRefundTxid() (r []byte, exists bool) {
+func (m *TransferLeafMutation) IntermediateRefundTxid() (r schematype.TxID, exists bool) {
 	v := m.intermediate_refund_txid
 	if v == nil {
 		return
@@ -19912,7 +19912,7 @@ func (m *TransferLeafMutation) IntermediateRefundTxid() (r []byte, exists bool) 
 // OldIntermediateRefundTxid returns the old "intermediate_refund_txid" field's value of the TransferLeaf entity.
 // If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TransferLeafMutation) OldIntermediateRefundTxid(ctx context.Context) (v []byte, err error) {
+func (m *TransferLeafMutation) OldIntermediateRefundTxid(ctx context.Context) (v schematype.TxID, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldIntermediateRefundTxid is only allowed on UpdateOne operations")
 	}
@@ -19945,12 +19945,12 @@ func (m *TransferLeafMutation) ResetIntermediateRefundTxid() {
 }
 
 // SetIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field.
-func (m *TransferLeafMutation) SetIntermediateDirectRefundTxid(b []byte) {
-	m.intermediate_direct_refund_txid = &b
+func (m *TransferLeafMutation) SetIntermediateDirectRefundTxid(si schematype.TxID) {
+	m.intermediate_direct_refund_txid = &si
 }
 
 // IntermediateDirectRefundTxid returns the value of the "intermediate_direct_refund_txid" field in the mutation.
-func (m *TransferLeafMutation) IntermediateDirectRefundTxid() (r []byte, exists bool) {
+func (m *TransferLeafMutation) IntermediateDirectRefundTxid() (r schematype.TxID, exists bool) {
 	v := m.intermediate_direct_refund_txid
 	if v == nil {
 		return
@@ -19961,7 +19961,7 @@ func (m *TransferLeafMutation) IntermediateDirectRefundTxid() (r []byte, exists 
 // OldIntermediateDirectRefundTxid returns the old "intermediate_direct_refund_txid" field's value of the TransferLeaf entity.
 // If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TransferLeafMutation) OldIntermediateDirectRefundTxid(ctx context.Context) (v []byte, err error) {
+func (m *TransferLeafMutation) OldIntermediateDirectRefundTxid(ctx context.Context) (v schematype.TxID, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldIntermediateDirectRefundTxid is only allowed on UpdateOne operations")
 	}
@@ -19994,12 +19994,12 @@ func (m *TransferLeafMutation) ResetIntermediateDirectRefundTxid() {
 }
 
 // SetIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field.
-func (m *TransferLeafMutation) SetIntermediateDirectFromCpfpRefundTxid(b []byte) {
-	m.intermediate_direct_from_cpfp_refund_txid = &b
+func (m *TransferLeafMutation) SetIntermediateDirectFromCpfpRefundTxid(si schematype.TxID) {
+	m.intermediate_direct_from_cpfp_refund_txid = &si
 }
 
 // IntermediateDirectFromCpfpRefundTxid returns the value of the "intermediate_direct_from_cpfp_refund_txid" field in the mutation.
-func (m *TransferLeafMutation) IntermediateDirectFromCpfpRefundTxid() (r []byte, exists bool) {
+func (m *TransferLeafMutation) IntermediateDirectFromCpfpRefundTxid() (r schematype.TxID, exists bool) {
 	v := m.intermediate_direct_from_cpfp_refund_txid
 	if v == nil {
 		return
@@ -20010,7 +20010,7 @@ func (m *TransferLeafMutation) IntermediateDirectFromCpfpRefundTxid() (r []byte,
 // OldIntermediateDirectFromCpfpRefundTxid returns the old "intermediate_direct_from_cpfp_refund_txid" field's value of the TransferLeaf entity.
 // If the TransferLeaf object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TransferLeafMutation) OldIntermediateDirectFromCpfpRefundTxid(ctx context.Context) (v []byte, err error) {
+func (m *TransferLeafMutation) OldIntermediateDirectFromCpfpRefundTxid(ctx context.Context) (v schematype.TxID, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldIntermediateDirectFromCpfpRefundTxid is only allowed on UpdateOne operations")
 	}
@@ -20742,21 +20742,21 @@ func (m *TransferLeafMutation) SetField(name string, value ent.Value) error {
 		m.SetIntermediateDirectFromCpfpRefundTx(v)
 		return nil
 	case transferleaf.FieldIntermediateRefundTxid:
-		v, ok := value.([]byte)
+		v, ok := value.(schematype.TxID)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetIntermediateRefundTxid(v)
 		return nil
 	case transferleaf.FieldIntermediateDirectRefundTxid:
-		v, ok := value.([]byte)
+		v, ok := value.(schematype.TxID)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetIntermediateDirectRefundTxid(v)
 		return nil
 	case transferleaf.FieldIntermediateDirectFromCpfpRefundTxid:
-		v, ok := value.([]byte)
+		v, ok := value.(schematype.TxID)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -22064,13 +22064,13 @@ type TreeNodeMutation struct {
 	raw_tx                        *[]byte
 	direct_tx                     *[]byte
 	direct_from_cpfp_refund_tx    *[]byte
-	raw_txid                      *[]byte
-	direct_txid                   *[]byte
-	direct_from_cpfp_refund_txid  *[]byte
+	raw_txid                      *schematype.TxID
+	direct_txid                   *schematype.TxID
+	direct_from_cpfp_refund_txid  *schematype.TxID
 	raw_refund_tx                 *[]byte
 	direct_refund_tx              *[]byte
-	raw_refund_txid               *[]byte
-	direct_refund_txid            *[]byte
+	raw_refund_txid               *schematype.TxID
+	direct_refund_txid            *schematype.TxID
 	clearedFields                 map[string]struct{}
 	tree                          *uuid.UUID
 	clearedtree                   bool
@@ -22793,12 +22793,12 @@ func (m *TreeNodeMutation) ResetDirectFromCpfpRefundTx() {
 }
 
 // SetRawTxid sets the "raw_txid" field.
-func (m *TreeNodeMutation) SetRawTxid(b []byte) {
-	m.raw_txid = &b
+func (m *TreeNodeMutation) SetRawTxid(si schematype.TxID) {
+	m.raw_txid = &si
 }
 
 // RawTxid returns the value of the "raw_txid" field in the mutation.
-func (m *TreeNodeMutation) RawTxid() (r []byte, exists bool) {
+func (m *TreeNodeMutation) RawTxid() (r schematype.TxID, exists bool) {
 	v := m.raw_txid
 	if v == nil {
 		return
@@ -22809,7 +22809,7 @@ func (m *TreeNodeMutation) RawTxid() (r []byte, exists bool) {
 // OldRawTxid returns the old "raw_txid" field's value of the TreeNode entity.
 // If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldRawTxid(ctx context.Context) (v []byte, err error) {
+func (m *TreeNodeMutation) OldRawTxid(ctx context.Context) (v schematype.TxID, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldRawTxid is only allowed on UpdateOne operations")
 	}
@@ -22842,12 +22842,12 @@ func (m *TreeNodeMutation) ResetRawTxid() {
 }
 
 // SetDirectTxid sets the "direct_txid" field.
-func (m *TreeNodeMutation) SetDirectTxid(b []byte) {
-	m.direct_txid = &b
+func (m *TreeNodeMutation) SetDirectTxid(si schematype.TxID) {
+	m.direct_txid = &si
 }
 
 // DirectTxid returns the value of the "direct_txid" field in the mutation.
-func (m *TreeNodeMutation) DirectTxid() (r []byte, exists bool) {
+func (m *TreeNodeMutation) DirectTxid() (r schematype.TxID, exists bool) {
 	v := m.direct_txid
 	if v == nil {
 		return
@@ -22858,7 +22858,7 @@ func (m *TreeNodeMutation) DirectTxid() (r []byte, exists bool) {
 // OldDirectTxid returns the old "direct_txid" field's value of the TreeNode entity.
 // If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldDirectTxid(ctx context.Context) (v []byte, err error) {
+func (m *TreeNodeMutation) OldDirectTxid(ctx context.Context) (v schematype.TxID, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldDirectTxid is only allowed on UpdateOne operations")
 	}
@@ -22891,12 +22891,12 @@ func (m *TreeNodeMutation) ResetDirectTxid() {
 }
 
 // SetDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field.
-func (m *TreeNodeMutation) SetDirectFromCpfpRefundTxid(b []byte) {
-	m.direct_from_cpfp_refund_txid = &b
+func (m *TreeNodeMutation) SetDirectFromCpfpRefundTxid(si schematype.TxID) {
+	m.direct_from_cpfp_refund_txid = &si
 }
 
 // DirectFromCpfpRefundTxid returns the value of the "direct_from_cpfp_refund_txid" field in the mutation.
-func (m *TreeNodeMutation) DirectFromCpfpRefundTxid() (r []byte, exists bool) {
+func (m *TreeNodeMutation) DirectFromCpfpRefundTxid() (r schematype.TxID, exists bool) {
 	v := m.direct_from_cpfp_refund_txid
 	if v == nil {
 		return
@@ -22907,7 +22907,7 @@ func (m *TreeNodeMutation) DirectFromCpfpRefundTxid() (r []byte, exists bool) {
 // OldDirectFromCpfpRefundTxid returns the old "direct_from_cpfp_refund_txid" field's value of the TreeNode entity.
 // If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldDirectFromCpfpRefundTxid(ctx context.Context) (v []byte, err error) {
+func (m *TreeNodeMutation) OldDirectFromCpfpRefundTxid(ctx context.Context) (v schematype.TxID, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldDirectFromCpfpRefundTxid is only allowed on UpdateOne operations")
 	}
@@ -23038,12 +23038,12 @@ func (m *TreeNodeMutation) ResetDirectRefundTx() {
 }
 
 // SetRawRefundTxid sets the "raw_refund_txid" field.
-func (m *TreeNodeMutation) SetRawRefundTxid(b []byte) {
-	m.raw_refund_txid = &b
+func (m *TreeNodeMutation) SetRawRefundTxid(si schematype.TxID) {
+	m.raw_refund_txid = &si
 }
 
 // RawRefundTxid returns the value of the "raw_refund_txid" field in the mutation.
-func (m *TreeNodeMutation) RawRefundTxid() (r []byte, exists bool) {
+func (m *TreeNodeMutation) RawRefundTxid() (r schematype.TxID, exists bool) {
 	v := m.raw_refund_txid
 	if v == nil {
 		return
@@ -23054,7 +23054,7 @@ func (m *TreeNodeMutation) RawRefundTxid() (r []byte, exists bool) {
 // OldRawRefundTxid returns the old "raw_refund_txid" field's value of the TreeNode entity.
 // If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldRawRefundTxid(ctx context.Context) (v []byte, err error) {
+func (m *TreeNodeMutation) OldRawRefundTxid(ctx context.Context) (v schematype.TxID, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldRawRefundTxid is only allowed on UpdateOne operations")
 	}
@@ -23087,12 +23087,12 @@ func (m *TreeNodeMutation) ResetRawRefundTxid() {
 }
 
 // SetDirectRefundTxid sets the "direct_refund_txid" field.
-func (m *TreeNodeMutation) SetDirectRefundTxid(b []byte) {
-	m.direct_refund_txid = &b
+func (m *TreeNodeMutation) SetDirectRefundTxid(si schematype.TxID) {
+	m.direct_refund_txid = &si
 }
 
 // DirectRefundTxid returns the value of the "direct_refund_txid" field in the mutation.
-func (m *TreeNodeMutation) DirectRefundTxid() (r []byte, exists bool) {
+func (m *TreeNodeMutation) DirectRefundTxid() (r schematype.TxID, exists bool) {
 	v := m.direct_refund_txid
 	if v == nil {
 		return
@@ -23103,7 +23103,7 @@ func (m *TreeNodeMutation) DirectRefundTxid() (r []byte, exists bool) {
 // OldDirectRefundTxid returns the old "direct_refund_txid" field's value of the TreeNode entity.
 // If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *TreeNodeMutation) OldDirectRefundTxid(ctx context.Context) (v []byte, err error) {
+func (m *TreeNodeMutation) OldDirectRefundTxid(ctx context.Context) (v schematype.TxID, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldDirectRefundTxid is only allowed on UpdateOne operations")
 	}
@@ -23599,21 +23599,21 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 		m.SetDirectFromCpfpRefundTx(v)
 		return nil
 	case treenode.FieldRawTxid:
-		v, ok := value.([]byte)
+		v, ok := value.(schematype.TxID)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRawTxid(v)
 		return nil
 	case treenode.FieldDirectTxid:
-		v, ok := value.([]byte)
+		v, ok := value.(schematype.TxID)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetDirectTxid(v)
 		return nil
 	case treenode.FieldDirectFromCpfpRefundTxid:
-		v, ok := value.([]byte)
+		v, ok := value.(schematype.TxID)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
@@ -23634,14 +23634,14 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 		m.SetDirectRefundTx(v)
 		return nil
 	case treenode.FieldRawRefundTxid:
-		v, ok := value.([]byte)
+		v, ok := value.(schematype.TxID)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRawRefundTxid(v)
 		return nil
 	case treenode.FieldDirectRefundTxid:
-		v, ok := value.([]byte)
+		v, ok := value.(schematype.TxID)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}

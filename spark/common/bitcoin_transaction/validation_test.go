@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/ent"
+	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -74,9 +75,9 @@ func newTestLeafNode(t *testing.T) (*ent.TreeNode, keys.Public) {
 	return &ent.TreeNode{
 		ID:                     uuid.New(),
 		RawTx:                  serializeTx(t, nodeTx),
-		RawTxid:                nodeTxHash[:],
+		RawTxid:                st.NewTxID(nodeTxHash),
 		DirectTx:               serializeTx(t, directTx),
-		DirectTxid:             directTxHash[:],
+		DirectTxid:             st.NewTxID(directTxHash),
 		RawRefundTx:            serializeTx(t, cpfpRefundTx),
 		DirectRefundTx:         serializeTx(t, directRefundTx),
 		DirectFromCpfpRefundTx: serializeTx(t, directFromCpfpRefundTx),
@@ -114,7 +115,7 @@ func TestVerifyTransactionWithDatabase(t *testing.T) {
 			name:   "Happy Path - CPFP",
 			txType: RefundTxTypeCPFP,
 			clientRawTx: createClientTx(
-				chainhash.Hash(dbLeaf.RawTxid),
+				dbLeaf.RawTxid.Hash(),
 				expectedCpfpTimelock,
 				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
 				common.EphemeralAnchorOutput(),
@@ -127,7 +128,7 @@ func TestVerifyTransactionWithDatabase(t *testing.T) {
 			name:   "Happy Path - Direct",
 			txType: RefundTxTypeDirect,
 			clientRawTx: createClientTx(
-				chainhash.Hash(dbLeaf.DirectTxid),
+				dbLeaf.DirectTxid.Hash(),
 				expectedCpfpTimelock+50,
 				&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript},
 			),
@@ -139,7 +140,7 @@ func TestVerifyTransactionWithDatabase(t *testing.T) {
 			name:   "Happy Path - DirectFromCPFP",
 			txType: RefundTxTypeDirectFromCPFP,
 			clientRawTx: createClientTx(
-				chainhash.Hash(dbLeaf.RawTxid),
+				dbLeaf.RawTxid.Hash(),
 				expectedCpfpTimelock+50,
 				&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript},
 			),
@@ -185,7 +186,7 @@ func TestVerifyTransactionWithDatabase(t *testing.T) {
 			name:   "Error - Mismatched transaction",
 			txType: RefundTxTypeCPFP,
 			clientRawTx: createClientTx(
-				chainhash.Hash(dbLeaf.RawTxid),
+				dbLeaf.RawTxid.Hash(),
 				expectedCpfpTimelock,
 				&wire.TxOut{Value: testSourceValue - 1, PkScript: userScript},
 				common.EphemeralAnchorOutput(),
@@ -199,7 +200,7 @@ func TestVerifyTransactionWithDatabase(t *testing.T) {
 			name:   "Error - Sequence validation bit 31 set",
 			txType: RefundTxTypeCPFP,
 			clientRawTx: createClientTx(
-				chainhash.Hash(dbLeaf.RawTxid),
+				dbLeaf.RawTxid.Hash(),
 				expectedCpfpTimelock|(1<<31),
 				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
 				common.EphemeralAnchorOutput(),
@@ -213,7 +214,7 @@ func TestVerifyTransactionWithDatabase(t *testing.T) {
 			name:   "Error - Sequence validation bit 22 set",
 			txType: RefundTxTypeCPFP,
 			clientRawTx: createClientTx(
-				chainhash.Hash(dbLeaf.RawTxid),
+				dbLeaf.RawTxid.Hash(),
 				expectedCpfpTimelock|(1<<22),
 				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
 				common.EphemeralAnchorOutput(),
@@ -227,7 +228,7 @@ func TestVerifyTransactionWithDatabase(t *testing.T) {
 			name:   "Error - Timelock mismatch",
 			txType: RefundTxTypeCPFP,
 			clientRawTx: createClientTx(
-				chainhash.Hash(dbLeaf.RawTxid),
+				dbLeaf.RawTxid.Hash(),
 				expectedCpfpTimelock+spark.DirectTimelockOffset, // Wrong timelock
 				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
 				common.EphemeralAnchorOutput(),
@@ -241,7 +242,7 @@ func TestVerifyTransactionWithDatabase(t *testing.T) {
 			name:   "Error - Corrupted DB data",
 			txType: RefundTxTypeCPFP,
 			clientRawTx: createClientTx(
-				chainhash.Hash(dbLeaf.RawTxid),
+				dbLeaf.RawTxid.Hash(),
 				expectedCpfpTimelock,
 				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
 				common.EphemeralAnchorOutput(),
@@ -259,7 +260,7 @@ func TestVerifyTransactionWithDatabase(t *testing.T) {
 			name:   "Error - Insufficient timelock in DB",
 			txType: RefundTxTypeCPFP,
 			clientRawTx: createClientTx(
-				chainhash.Hash(dbLeaf.RawTxid),
+				dbLeaf.RawTxid.Hash(),
 				expectedCpfpTimelock,
 				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
 				common.EphemeralAnchorOutput(),
@@ -267,7 +268,7 @@ func TestVerifyTransactionWithDatabase(t *testing.T) {
 			dbLeaf: func() *ent.TreeNode {
 				badLeaf, key := newTestLeafNode(t)
 				pkScript, _ := common.P2TRScriptFromPubKey(key)
-				nodeTxHash := chainhash.Hash(badLeaf.RawTxid)
+				nodeTxHash := badLeaf.RawTxid.Hash()
 				// Create a refund tx with a timelock smaller than the interval
 				badRefundTx := newTestTx(testSourceValue, pkScript, spark.TimeLockInterval-1, &nodeTxHash)
 				badLeaf.RawRefundTx = serializeTx(t, badRefundTx)
@@ -281,7 +282,7 @@ func TestVerifyTransactionWithDatabase(t *testing.T) {
 			name:   "Error - Unknown tx type",
 			txType: RefundTxType(99),
 			clientRawTx: createClientTx(
-				chainhash.Hash(dbLeaf.RawTxid),
+				dbLeaf.RawTxid.Hash(),
 				expectedCpfpTimelock,
 				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
 				common.EphemeralAnchorOutput(),
@@ -445,7 +446,6 @@ func TestNextSequence(t *testing.T) {
 				"timelock calculation incorrect in nextSequence")
 			assert.Equal(t, expectedTimelock+spark.DirectTimelockOffset, nextDirectSeq&0xFFFF,
 				"timelock calculation incorrect in nextDirectSequence")
-
 		})
 	}
 }

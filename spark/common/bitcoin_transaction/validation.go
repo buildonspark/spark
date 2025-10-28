@@ -137,7 +137,7 @@ func constructRefundTransactionGeneric(
 // Format: 1 input (spending the leaf UTXO), 2 outputs (refund to user + ephemeral anchor)
 func constructCPFPRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey keys.Public, clientSequence uint32) (*wire.MsgTx, error) {
 	tx, err := constructRefundTransactionGeneric(
-		chainhash.Hash(dbLeaf.RawTxid),
+		dbLeaf.RawTxid.Hash(),
 		dbLeaf.RawTx,
 		refundDestPubkey,
 		clientSequence,
@@ -154,7 +154,7 @@ func constructCPFPRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey keys.
 // Format: 1 input (spending DirectTx), 1 output (refund to user)
 func constructDirectRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey keys.Public, clientSequence uint32) (*wire.MsgTx, error) {
 	tx, err := constructRefundTransactionGeneric(
-		chainhash.Hash(dbLeaf.DirectTxid),
+		dbLeaf.DirectTxid.Hash(),
 		dbLeaf.DirectTx,
 		refundDestPubkey,
 		clientSequence,
@@ -171,7 +171,7 @@ func constructDirectRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey key
 // Format: 1 input (spending from NodeTx), 1 output (refund to user)
 func constructDirectFromCPFPRefundTransaction(dbLeaf *ent.TreeNode, refundDestPubkey keys.Public, clientSequence uint32) (*wire.MsgTx, error) {
 	tx, err := constructRefundTransactionGeneric(
-		chainhash.Hash(dbLeaf.RawTxid),
+		dbLeaf.RawTxid.Hash(),
 		dbLeaf.RawTx,
 		refundDestPubkey,
 		clientSequence,

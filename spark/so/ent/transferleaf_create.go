@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
@@ -103,20 +104,44 @@ func (tlc *TransferLeafCreate) SetIntermediateDirectFromCpfpRefundTx(b []byte) *
 }
 
 // SetIntermediateRefundTxid sets the "intermediate_refund_txid" field.
-func (tlc *TransferLeafCreate) SetIntermediateRefundTxid(b []byte) *TransferLeafCreate {
-	tlc.mutation.SetIntermediateRefundTxid(b)
+func (tlc *TransferLeafCreate) SetIntermediateRefundTxid(si schematype.TxID) *TransferLeafCreate {
+	tlc.mutation.SetIntermediateRefundTxid(si)
+	return tlc
+}
+
+// SetNillableIntermediateRefundTxid sets the "intermediate_refund_txid" field if the given value is not nil.
+func (tlc *TransferLeafCreate) SetNillableIntermediateRefundTxid(si *schematype.TxID) *TransferLeafCreate {
+	if si != nil {
+		tlc.SetIntermediateRefundTxid(*si)
+	}
 	return tlc
 }
 
 // SetIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field.
-func (tlc *TransferLeafCreate) SetIntermediateDirectRefundTxid(b []byte) *TransferLeafCreate {
-	tlc.mutation.SetIntermediateDirectRefundTxid(b)
+func (tlc *TransferLeafCreate) SetIntermediateDirectRefundTxid(si schematype.TxID) *TransferLeafCreate {
+	tlc.mutation.SetIntermediateDirectRefundTxid(si)
+	return tlc
+}
+
+// SetNillableIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field if the given value is not nil.
+func (tlc *TransferLeafCreate) SetNillableIntermediateDirectRefundTxid(si *schematype.TxID) *TransferLeafCreate {
+	if si != nil {
+		tlc.SetIntermediateDirectRefundTxid(*si)
+	}
 	return tlc
 }
 
 // SetIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field.
-func (tlc *TransferLeafCreate) SetIntermediateDirectFromCpfpRefundTxid(b []byte) *TransferLeafCreate {
-	tlc.mutation.SetIntermediateDirectFromCpfpRefundTxid(b)
+func (tlc *TransferLeafCreate) SetIntermediateDirectFromCpfpRefundTxid(si schematype.TxID) *TransferLeafCreate {
+	tlc.mutation.SetIntermediateDirectFromCpfpRefundTxid(si)
+	return tlc
+}
+
+// SetNillableIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field if the given value is not nil.
+func (tlc *TransferLeafCreate) SetNillableIntermediateDirectFromCpfpRefundTxid(si *schematype.TxID) *TransferLeafCreate {
+	if si != nil {
+		tlc.SetIntermediateDirectFromCpfpRefundTxid(*si)
+	}
 	return tlc
 }
 
@@ -602,7 +627,7 @@ func (u *TransferLeafUpsert) ClearIntermediateDirectFromCpfpRefundTx() *Transfer
 }
 
 // SetIntermediateRefundTxid sets the "intermediate_refund_txid" field.
-func (u *TransferLeafUpsert) SetIntermediateRefundTxid(v []byte) *TransferLeafUpsert {
+func (u *TransferLeafUpsert) SetIntermediateRefundTxid(v schematype.TxID) *TransferLeafUpsert {
 	u.Set(transferleaf.FieldIntermediateRefundTxid, v)
 	return u
 }
@@ -620,7 +645,7 @@ func (u *TransferLeafUpsert) ClearIntermediateRefundTxid() *TransferLeafUpsert {
 }
 
 // SetIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field.
-func (u *TransferLeafUpsert) SetIntermediateDirectRefundTxid(v []byte) *TransferLeafUpsert {
+func (u *TransferLeafUpsert) SetIntermediateDirectRefundTxid(v schematype.TxID) *TransferLeafUpsert {
 	u.Set(transferleaf.FieldIntermediateDirectRefundTxid, v)
 	return u
 }
@@ -638,7 +663,7 @@ func (u *TransferLeafUpsert) ClearIntermediateDirectRefundTxid() *TransferLeafUp
 }
 
 // SetIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field.
-func (u *TransferLeafUpsert) SetIntermediateDirectFromCpfpRefundTxid(v []byte) *TransferLeafUpsert {
+func (u *TransferLeafUpsert) SetIntermediateDirectFromCpfpRefundTxid(v schematype.TxID) *TransferLeafUpsert {
 	u.Set(transferleaf.FieldIntermediateDirectFromCpfpRefundTxid, v)
 	return u
 }
@@ -954,7 +979,7 @@ func (u *TransferLeafUpsertOne) ClearIntermediateDirectFromCpfpRefundTx() *Trans
 }
 
 // SetIntermediateRefundTxid sets the "intermediate_refund_txid" field.
-func (u *TransferLeafUpsertOne) SetIntermediateRefundTxid(v []byte) *TransferLeafUpsertOne {
+func (u *TransferLeafUpsertOne) SetIntermediateRefundTxid(v schematype.TxID) *TransferLeafUpsertOne {
 	return u.Update(func(s *TransferLeafUpsert) {
 		s.SetIntermediateRefundTxid(v)
 	})
@@ -975,7 +1000,7 @@ func (u *TransferLeafUpsertOne) ClearIntermediateRefundTxid() *TransferLeafUpser
 }
 
 // SetIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field.
-func (u *TransferLeafUpsertOne) SetIntermediateDirectRefundTxid(v []byte) *TransferLeafUpsertOne {
+func (u *TransferLeafUpsertOne) SetIntermediateDirectRefundTxid(v schematype.TxID) *TransferLeafUpsertOne {
 	return u.Update(func(s *TransferLeafUpsert) {
 		s.SetIntermediateDirectRefundTxid(v)
 	})
@@ -996,7 +1021,7 @@ func (u *TransferLeafUpsertOne) ClearIntermediateDirectRefundTxid() *TransferLea
 }
 
 // SetIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field.
-func (u *TransferLeafUpsertOne) SetIntermediateDirectFromCpfpRefundTxid(v []byte) *TransferLeafUpsertOne {
+func (u *TransferLeafUpsertOne) SetIntermediateDirectFromCpfpRefundTxid(v schematype.TxID) *TransferLeafUpsertOne {
 	return u.Update(func(s *TransferLeafUpsert) {
 		s.SetIntermediateDirectFromCpfpRefundTxid(v)
 	})
@@ -1503,7 +1528,7 @@ func (u *TransferLeafUpsertBulk) ClearIntermediateDirectFromCpfpRefundTx() *Tran
 }
 
 // SetIntermediateRefundTxid sets the "intermediate_refund_txid" field.
-func (u *TransferLeafUpsertBulk) SetIntermediateRefundTxid(v []byte) *TransferLeafUpsertBulk {
+func (u *TransferLeafUpsertBulk) SetIntermediateRefundTxid(v schematype.TxID) *TransferLeafUpsertBulk {
 	return u.Update(func(s *TransferLeafUpsert) {
 		s.SetIntermediateRefundTxid(v)
 	})
@@ -1524,7 +1549,7 @@ func (u *TransferLeafUpsertBulk) ClearIntermediateRefundTxid() *TransferLeafUpse
 }
 
 // SetIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field.
-func (u *TransferLeafUpsertBulk) SetIntermediateDirectRefundTxid(v []byte) *TransferLeafUpsertBulk {
+func (u *TransferLeafUpsertBulk) SetIntermediateDirectRefundTxid(v schematype.TxID) *TransferLeafUpsertBulk {
 	return u.Update(func(s *TransferLeafUpsert) {
 		s.SetIntermediateDirectRefundTxid(v)
 	})
@@ -1545,7 +1570,7 @@ func (u *TransferLeafUpsertBulk) ClearIntermediateDirectRefundTxid() *TransferLe
 }
 
 // SetIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field.
-func (u *TransferLeafUpsertBulk) SetIntermediateDirectFromCpfpRefundTxid(v []byte) *TransferLeafUpsertBulk {
+func (u *TransferLeafUpsertBulk) SetIntermediateDirectFromCpfpRefundTxid(v schematype.TxID) *TransferLeafUpsertBulk {
 	return u.Update(func(s *TransferLeafUpsert) {
 		s.SetIntermediateDirectFromCpfpRefundTxid(v)
 	})

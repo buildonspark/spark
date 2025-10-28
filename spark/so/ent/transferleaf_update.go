@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
@@ -93,8 +94,16 @@ func (tlu *TransferLeafUpdate) ClearIntermediateDirectFromCpfpRefundTx() *Transf
 }
 
 // SetIntermediateRefundTxid sets the "intermediate_refund_txid" field.
-func (tlu *TransferLeafUpdate) SetIntermediateRefundTxid(b []byte) *TransferLeafUpdate {
-	tlu.mutation.SetIntermediateRefundTxid(b)
+func (tlu *TransferLeafUpdate) SetIntermediateRefundTxid(si schematype.TxID) *TransferLeafUpdate {
+	tlu.mutation.SetIntermediateRefundTxid(si)
+	return tlu
+}
+
+// SetNillableIntermediateRefundTxid sets the "intermediate_refund_txid" field if the given value is not nil.
+func (tlu *TransferLeafUpdate) SetNillableIntermediateRefundTxid(si *schematype.TxID) *TransferLeafUpdate {
+	if si != nil {
+		tlu.SetIntermediateRefundTxid(*si)
+	}
 	return tlu
 }
 
@@ -105,8 +114,16 @@ func (tlu *TransferLeafUpdate) ClearIntermediateRefundTxid() *TransferLeafUpdate
 }
 
 // SetIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field.
-func (tlu *TransferLeafUpdate) SetIntermediateDirectRefundTxid(b []byte) *TransferLeafUpdate {
-	tlu.mutation.SetIntermediateDirectRefundTxid(b)
+func (tlu *TransferLeafUpdate) SetIntermediateDirectRefundTxid(si schematype.TxID) *TransferLeafUpdate {
+	tlu.mutation.SetIntermediateDirectRefundTxid(si)
+	return tlu
+}
+
+// SetNillableIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field if the given value is not nil.
+func (tlu *TransferLeafUpdate) SetNillableIntermediateDirectRefundTxid(si *schematype.TxID) *TransferLeafUpdate {
+	if si != nil {
+		tlu.SetIntermediateDirectRefundTxid(*si)
+	}
 	return tlu
 }
 
@@ -117,8 +134,16 @@ func (tlu *TransferLeafUpdate) ClearIntermediateDirectRefundTxid() *TransferLeaf
 }
 
 // SetIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field.
-func (tlu *TransferLeafUpdate) SetIntermediateDirectFromCpfpRefundTxid(b []byte) *TransferLeafUpdate {
-	tlu.mutation.SetIntermediateDirectFromCpfpRefundTxid(b)
+func (tlu *TransferLeafUpdate) SetIntermediateDirectFromCpfpRefundTxid(si schematype.TxID) *TransferLeafUpdate {
+	tlu.mutation.SetIntermediateDirectFromCpfpRefundTxid(si)
+	return tlu
+}
+
+// SetNillableIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field if the given value is not nil.
+func (tlu *TransferLeafUpdate) SetNillableIntermediateDirectFromCpfpRefundTxid(si *schematype.TxID) *TransferLeafUpdate {
+	if si != nil {
+		tlu.SetIntermediateDirectFromCpfpRefundTxid(*si)
+	}
 	return tlu
 }
 
@@ -600,8 +625,16 @@ func (tluo *TransferLeafUpdateOne) ClearIntermediateDirectFromCpfpRefundTx() *Tr
 }
 
 // SetIntermediateRefundTxid sets the "intermediate_refund_txid" field.
-func (tluo *TransferLeafUpdateOne) SetIntermediateRefundTxid(b []byte) *TransferLeafUpdateOne {
-	tluo.mutation.SetIntermediateRefundTxid(b)
+func (tluo *TransferLeafUpdateOne) SetIntermediateRefundTxid(si schematype.TxID) *TransferLeafUpdateOne {
+	tluo.mutation.SetIntermediateRefundTxid(si)
+	return tluo
+}
+
+// SetNillableIntermediateRefundTxid sets the "intermediate_refund_txid" field if the given value is not nil.
+func (tluo *TransferLeafUpdateOne) SetNillableIntermediateRefundTxid(si *schematype.TxID) *TransferLeafUpdateOne {
+	if si != nil {
+		tluo.SetIntermediateRefundTxid(*si)
+	}
 	return tluo
 }
 
@@ -612,8 +645,16 @@ func (tluo *TransferLeafUpdateOne) ClearIntermediateRefundTxid() *TransferLeafUp
 }
 
 // SetIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field.
-func (tluo *TransferLeafUpdateOne) SetIntermediateDirectRefundTxid(b []byte) *TransferLeafUpdateOne {
-	tluo.mutation.SetIntermediateDirectRefundTxid(b)
+func (tluo *TransferLeafUpdateOne) SetIntermediateDirectRefundTxid(si schematype.TxID) *TransferLeafUpdateOne {
+	tluo.mutation.SetIntermediateDirectRefundTxid(si)
+	return tluo
+}
+
+// SetNillableIntermediateDirectRefundTxid sets the "intermediate_direct_refund_txid" field if the given value is not nil.
+func (tluo *TransferLeafUpdateOne) SetNillableIntermediateDirectRefundTxid(si *schematype.TxID) *TransferLeafUpdateOne {
+	if si != nil {
+		tluo.SetIntermediateDirectRefundTxid(*si)
+	}
 	return tluo
 }
 
@@ -624,8 +665,16 @@ func (tluo *TransferLeafUpdateOne) ClearIntermediateDirectRefundTxid() *Transfer
 }
 
 // SetIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field.
-func (tluo *TransferLeafUpdateOne) SetIntermediateDirectFromCpfpRefundTxid(b []byte) *TransferLeafUpdateOne {
-	tluo.mutation.SetIntermediateDirectFromCpfpRefundTxid(b)
+func (tluo *TransferLeafUpdateOne) SetIntermediateDirectFromCpfpRefundTxid(si schematype.TxID) *TransferLeafUpdateOne {
+	tluo.mutation.SetIntermediateDirectFromCpfpRefundTxid(si)
+	return tluo
+}
+
+// SetNillableIntermediateDirectFromCpfpRefundTxid sets the "intermediate_direct_from_cpfp_refund_txid" field if the given value is not nil.
+func (tluo *TransferLeafUpdateOne) SetNillableIntermediateDirectFromCpfpRefundTxid(si *schematype.TxID) *TransferLeafUpdateOne {
+	if si != nil {
+		tluo.SetIntermediateDirectFromCpfpRefundTxid(*si)
+	}
 	return tluo
 }
 

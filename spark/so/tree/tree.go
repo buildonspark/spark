@@ -17,9 +17,13 @@ import (
 func MarkExitingNodes(ctx context.Context, dbClient *ent.Client, confirmedTxHashSet map[[32]byte]bool, blockHeight int64) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
-	confirmedTxids := make([][]byte, 0, len(confirmedTxHashSet))
+	confirmedTxids := make([]st.TxID, 0, len(confirmedTxHashSet))
 	for txid := range confirmedTxHashSet {
-		confirmedTxids = append(confirmedTxids, txid[:])
+		txidObj, err := st.NewTxIDFromBytes(txid[:])
+		if err != nil {
+			return fmt.Errorf("failed to convert txid to TxID: %w", err)
+		}
+		confirmedTxids = append(confirmedTxids, txidObj)
 	}
 
 	// The state goes from OnChain to Exited, so we need to mark the nodes as OnChain first.

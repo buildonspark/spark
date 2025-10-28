@@ -139,20 +139,44 @@ func (tnc *TreeNodeCreate) SetDirectFromCpfpRefundTx(b []byte) *TreeNodeCreate {
 }
 
 // SetRawTxid sets the "raw_txid" field.
-func (tnc *TreeNodeCreate) SetRawTxid(b []byte) *TreeNodeCreate {
-	tnc.mutation.SetRawTxid(b)
+func (tnc *TreeNodeCreate) SetRawTxid(si schematype.TxID) *TreeNodeCreate {
+	tnc.mutation.SetRawTxid(si)
+	return tnc
+}
+
+// SetNillableRawTxid sets the "raw_txid" field if the given value is not nil.
+func (tnc *TreeNodeCreate) SetNillableRawTxid(si *schematype.TxID) *TreeNodeCreate {
+	if si != nil {
+		tnc.SetRawTxid(*si)
+	}
 	return tnc
 }
 
 // SetDirectTxid sets the "direct_txid" field.
-func (tnc *TreeNodeCreate) SetDirectTxid(b []byte) *TreeNodeCreate {
-	tnc.mutation.SetDirectTxid(b)
+func (tnc *TreeNodeCreate) SetDirectTxid(si schematype.TxID) *TreeNodeCreate {
+	tnc.mutation.SetDirectTxid(si)
+	return tnc
+}
+
+// SetNillableDirectTxid sets the "direct_txid" field if the given value is not nil.
+func (tnc *TreeNodeCreate) SetNillableDirectTxid(si *schematype.TxID) *TreeNodeCreate {
+	if si != nil {
+		tnc.SetDirectTxid(*si)
+	}
 	return tnc
 }
 
 // SetDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field.
-func (tnc *TreeNodeCreate) SetDirectFromCpfpRefundTxid(b []byte) *TreeNodeCreate {
-	tnc.mutation.SetDirectFromCpfpRefundTxid(b)
+func (tnc *TreeNodeCreate) SetDirectFromCpfpRefundTxid(si schematype.TxID) *TreeNodeCreate {
+	tnc.mutation.SetDirectFromCpfpRefundTxid(si)
+	return tnc
+}
+
+// SetNillableDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field if the given value is not nil.
+func (tnc *TreeNodeCreate) SetNillableDirectFromCpfpRefundTxid(si *schematype.TxID) *TreeNodeCreate {
+	if si != nil {
+		tnc.SetDirectFromCpfpRefundTxid(*si)
+	}
 	return tnc
 }
 
@@ -169,14 +193,30 @@ func (tnc *TreeNodeCreate) SetDirectRefundTx(b []byte) *TreeNodeCreate {
 }
 
 // SetRawRefundTxid sets the "raw_refund_txid" field.
-func (tnc *TreeNodeCreate) SetRawRefundTxid(b []byte) *TreeNodeCreate {
-	tnc.mutation.SetRawRefundTxid(b)
+func (tnc *TreeNodeCreate) SetRawRefundTxid(si schematype.TxID) *TreeNodeCreate {
+	tnc.mutation.SetRawRefundTxid(si)
+	return tnc
+}
+
+// SetNillableRawRefundTxid sets the "raw_refund_txid" field if the given value is not nil.
+func (tnc *TreeNodeCreate) SetNillableRawRefundTxid(si *schematype.TxID) *TreeNodeCreate {
+	if si != nil {
+		tnc.SetRawRefundTxid(*si)
+	}
 	return tnc
 }
 
 // SetDirectRefundTxid sets the "direct_refund_txid" field.
-func (tnc *TreeNodeCreate) SetDirectRefundTxid(b []byte) *TreeNodeCreate {
-	tnc.mutation.SetDirectRefundTxid(b)
+func (tnc *TreeNodeCreate) SetDirectRefundTxid(si schematype.TxID) *TreeNodeCreate {
+	tnc.mutation.SetDirectRefundTxid(si)
+	return tnc
+}
+
+// SetNillableDirectRefundTxid sets the "direct_refund_txid" field if the given value is not nil.
+func (tnc *TreeNodeCreate) SetNillableDirectRefundTxid(si *schematype.TxID) *TreeNodeCreate {
+	if si != nil {
+		tnc.SetDirectRefundTxid(*si)
+	}
 	return tnc
 }
 
@@ -754,7 +794,7 @@ func (u *TreeNodeUpsert) ClearDirectFromCpfpRefundTx() *TreeNodeUpsert {
 }
 
 // SetRawTxid sets the "raw_txid" field.
-func (u *TreeNodeUpsert) SetRawTxid(v []byte) *TreeNodeUpsert {
+func (u *TreeNodeUpsert) SetRawTxid(v schematype.TxID) *TreeNodeUpsert {
 	u.Set(treenode.FieldRawTxid, v)
 	return u
 }
@@ -772,7 +812,7 @@ func (u *TreeNodeUpsert) ClearRawTxid() *TreeNodeUpsert {
 }
 
 // SetDirectTxid sets the "direct_txid" field.
-func (u *TreeNodeUpsert) SetDirectTxid(v []byte) *TreeNodeUpsert {
+func (u *TreeNodeUpsert) SetDirectTxid(v schematype.TxID) *TreeNodeUpsert {
 	u.Set(treenode.FieldDirectTxid, v)
 	return u
 }
@@ -790,7 +830,7 @@ func (u *TreeNodeUpsert) ClearDirectTxid() *TreeNodeUpsert {
 }
 
 // SetDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field.
-func (u *TreeNodeUpsert) SetDirectFromCpfpRefundTxid(v []byte) *TreeNodeUpsert {
+func (u *TreeNodeUpsert) SetDirectFromCpfpRefundTxid(v schematype.TxID) *TreeNodeUpsert {
 	u.Set(treenode.FieldDirectFromCpfpRefundTxid, v)
 	return u
 }
@@ -844,7 +884,7 @@ func (u *TreeNodeUpsert) ClearDirectRefundTx() *TreeNodeUpsert {
 }
 
 // SetRawRefundTxid sets the "raw_refund_txid" field.
-func (u *TreeNodeUpsert) SetRawRefundTxid(v []byte) *TreeNodeUpsert {
+func (u *TreeNodeUpsert) SetRawRefundTxid(v schematype.TxID) *TreeNodeUpsert {
 	u.Set(treenode.FieldRawRefundTxid, v)
 	return u
 }
@@ -862,7 +902,7 @@ func (u *TreeNodeUpsert) ClearRawRefundTxid() *TreeNodeUpsert {
 }
 
 // SetDirectRefundTxid sets the "direct_refund_txid" field.
-func (u *TreeNodeUpsert) SetDirectRefundTxid(v []byte) *TreeNodeUpsert {
+func (u *TreeNodeUpsert) SetDirectRefundTxid(v schematype.TxID) *TreeNodeUpsert {
 	u.Set(treenode.FieldDirectRefundTxid, v)
 	return u
 }
@@ -1126,7 +1166,7 @@ func (u *TreeNodeUpsertOne) ClearDirectFromCpfpRefundTx() *TreeNodeUpsertOne {
 }
 
 // SetRawTxid sets the "raw_txid" field.
-func (u *TreeNodeUpsertOne) SetRawTxid(v []byte) *TreeNodeUpsertOne {
+func (u *TreeNodeUpsertOne) SetRawTxid(v schematype.TxID) *TreeNodeUpsertOne {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.SetRawTxid(v)
 	})
@@ -1147,7 +1187,7 @@ func (u *TreeNodeUpsertOne) ClearRawTxid() *TreeNodeUpsertOne {
 }
 
 // SetDirectTxid sets the "direct_txid" field.
-func (u *TreeNodeUpsertOne) SetDirectTxid(v []byte) *TreeNodeUpsertOne {
+func (u *TreeNodeUpsertOne) SetDirectTxid(v schematype.TxID) *TreeNodeUpsertOne {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.SetDirectTxid(v)
 	})
@@ -1168,7 +1208,7 @@ func (u *TreeNodeUpsertOne) ClearDirectTxid() *TreeNodeUpsertOne {
 }
 
 // SetDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field.
-func (u *TreeNodeUpsertOne) SetDirectFromCpfpRefundTxid(v []byte) *TreeNodeUpsertOne {
+func (u *TreeNodeUpsertOne) SetDirectFromCpfpRefundTxid(v schematype.TxID) *TreeNodeUpsertOne {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.SetDirectFromCpfpRefundTxid(v)
 	})
@@ -1231,7 +1271,7 @@ func (u *TreeNodeUpsertOne) ClearDirectRefundTx() *TreeNodeUpsertOne {
 }
 
 // SetRawRefundTxid sets the "raw_refund_txid" field.
-func (u *TreeNodeUpsertOne) SetRawRefundTxid(v []byte) *TreeNodeUpsertOne {
+func (u *TreeNodeUpsertOne) SetRawRefundTxid(v schematype.TxID) *TreeNodeUpsertOne {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.SetRawRefundTxid(v)
 	})
@@ -1252,7 +1292,7 @@ func (u *TreeNodeUpsertOne) ClearRawRefundTxid() *TreeNodeUpsertOne {
 }
 
 // SetDirectRefundTxid sets the "direct_refund_txid" field.
-func (u *TreeNodeUpsertOne) SetDirectRefundTxid(v []byte) *TreeNodeUpsertOne {
+func (u *TreeNodeUpsertOne) SetDirectRefundTxid(v schematype.TxID) *TreeNodeUpsertOne {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.SetDirectRefundTxid(v)
 	})
@@ -1686,7 +1726,7 @@ func (u *TreeNodeUpsertBulk) ClearDirectFromCpfpRefundTx() *TreeNodeUpsertBulk {
 }
 
 // SetRawTxid sets the "raw_txid" field.
-func (u *TreeNodeUpsertBulk) SetRawTxid(v []byte) *TreeNodeUpsertBulk {
+func (u *TreeNodeUpsertBulk) SetRawTxid(v schematype.TxID) *TreeNodeUpsertBulk {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.SetRawTxid(v)
 	})
@@ -1707,7 +1747,7 @@ func (u *TreeNodeUpsertBulk) ClearRawTxid() *TreeNodeUpsertBulk {
 }
 
 // SetDirectTxid sets the "direct_txid" field.
-func (u *TreeNodeUpsertBulk) SetDirectTxid(v []byte) *TreeNodeUpsertBulk {
+func (u *TreeNodeUpsertBulk) SetDirectTxid(v schematype.TxID) *TreeNodeUpsertBulk {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.SetDirectTxid(v)
 	})
@@ -1728,7 +1768,7 @@ func (u *TreeNodeUpsertBulk) ClearDirectTxid() *TreeNodeUpsertBulk {
 }
 
 // SetDirectFromCpfpRefundTxid sets the "direct_from_cpfp_refund_txid" field.
-func (u *TreeNodeUpsertBulk) SetDirectFromCpfpRefundTxid(v []byte) *TreeNodeUpsertBulk {
+func (u *TreeNodeUpsertBulk) SetDirectFromCpfpRefundTxid(v schematype.TxID) *TreeNodeUpsertBulk {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.SetDirectFromCpfpRefundTxid(v)
 	})
@@ -1791,7 +1831,7 @@ func (u *TreeNodeUpsertBulk) ClearDirectRefundTx() *TreeNodeUpsertBulk {
 }
 
 // SetRawRefundTxid sets the "raw_refund_txid" field.
-func (u *TreeNodeUpsertBulk) SetRawRefundTxid(v []byte) *TreeNodeUpsertBulk {
+func (u *TreeNodeUpsertBulk) SetRawRefundTxid(v schematype.TxID) *TreeNodeUpsertBulk {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.SetRawRefundTxid(v)
 	})
@@ -1812,7 +1852,7 @@ func (u *TreeNodeUpsertBulk) ClearRawRefundTxid() *TreeNodeUpsertBulk {
 }
 
 // SetDirectRefundTxid sets the "direct_refund_txid" field.
-func (u *TreeNodeUpsertBulk) SetDirectRefundTxid(v []byte) *TreeNodeUpsertBulk {
+func (u *TreeNodeUpsertBulk) SetDirectRefundTxid(v schematype.TxID) *TreeNodeUpsertBulk {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.SetDirectRefundTxid(v)
 	})

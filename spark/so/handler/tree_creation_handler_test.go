@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"bytes"
 	"math/rand/v2"
 	"testing"
 
@@ -1029,9 +1028,9 @@ func TestTreeNodeDbHooks(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
 	tx, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-	var nodeID = uuid.New()
-	var treeID = uuid.New()
-	var signingKeyshareID = uuid.New()
+	nodeID := uuid.New()
+	treeID := uuid.New()
+	signingKeyshareID := uuid.New()
 
 	rng := rand.NewChaCha8([32]byte{})
 	ownerIdentityPubkey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -1102,13 +1101,13 @@ func TestTreeNodeDbHooks(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, treeNode.RawTxid)
-	require.True(t, bytes.Equal(treeNode.RawTxid, nodeRawTxid[:]))
+	require.Equal(t, treeNode.RawTxid.Hash(), nodeRawTxid)
 	require.NotNil(t, treeNode.RawRefundTxid)
-	require.True(t, bytes.Equal(treeNode.RawRefundTxid, nodeRawRefundTxid[:]))
+	require.Equal(t, treeNode.RawRefundTxid.Hash(), nodeRawRefundTxid)
 	require.NotNil(t, treeNode.DirectRefundTxid)
-	require.True(t, bytes.Equal(treeNode.DirectRefundTxid, nodeDirectRefundTxid[:]))
+	require.Equal(t, treeNode.DirectRefundTxid.Hash(), nodeDirectRefundTxid)
 	require.NotNil(t, treeNode.DirectFromCpfpRefundTxid)
-	require.True(t, bytes.Equal(treeNode.DirectFromCpfpRefundTxid, nodeDirectFromCpfpRefundTxid[:]))
+	require.Equal(t, treeNode.DirectFromCpfpRefundTxid.Hash(), nodeDirectFromCpfpRefundTxid)
 
 	// OpUpdateOne
 	treeNode, err = tx.TreeNode.
@@ -1118,8 +1117,8 @@ func TestTreeNodeDbHooks(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, treeNode.RawTxid)
-	require.Nil(t, treeNode.RawRefundTxid)
-	require.Nil(t, treeNode.DirectRefundTxid)
+	require.Zero(t, treeNode.RawRefundTxid)
+	require.Zero(t, treeNode.DirectRefundTxid)
 	require.NotNil(t, treeNode.DirectFromCpfpRefundTxid)
 
 	nodeDirectRefundTxBytes2 := createTestTxBytesWithIndex(t, 1000, 0)
@@ -1138,12 +1137,16 @@ func TestTreeNodeDbHooks(t *testing.T) {
 		Only(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, treeNode.DirectRefundTxid)
-	require.True(t, bytes.Equal(treeNode.DirectRefundTxid, nodeDirectRefundTxid2[:]))
+	require.Equal(t, treeNode.DirectRefundTxid.Hash(), nodeDirectRefundTxid2)
 	require.NotNil(t, treeNode.DirectRefundTx)
 
+	dummyTxidBytes := make([]byte, 32)
+	copy(dummyTxidBytes, []byte{1, 2, 3})
+	dummyTxid, err := st.NewTxIDFromBytes(dummyTxidBytes)
+	require.NoError(t, err)
 	err = tx.TreeNode.Update().
 		Where(enttreenode.ID(treeNode.ID)).
-		SetDirectRefundTxid([]byte{1, 2, 3}).
+		SetDirectRefundTxid(dummyTxid).
 		Exec(ctx)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "direct_refund_txid is not allowed to be set directly")

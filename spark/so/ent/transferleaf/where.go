@@ -9,6 +9,7 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
 
 // ID filters vertices based on their ID field.
@@ -107,17 +108,17 @@ func IntermediateDirectFromCpfpRefundTx(v []byte) predicate.TransferLeaf {
 }
 
 // IntermediateRefundTxid applies equality check predicate on the "intermediate_refund_txid" field. It's identical to IntermediateRefundTxidEQ.
-func IntermediateRefundTxid(v []byte) predicate.TransferLeaf {
+func IntermediateRefundTxid(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateRefundTxid, v))
 }
 
 // IntermediateDirectRefundTxid applies equality check predicate on the "intermediate_direct_refund_txid" field. It's identical to IntermediateDirectRefundTxidEQ.
-func IntermediateDirectRefundTxid(v []byte) predicate.TransferLeaf {
+func IntermediateDirectRefundTxid(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateDirectRefundTxid, v))
 }
 
 // IntermediateDirectFromCpfpRefundTxid applies equality check predicate on the "intermediate_direct_from_cpfp_refund_txid" field. It's identical to IntermediateDirectFromCpfpRefundTxidEQ.
-func IntermediateDirectFromCpfpRefundTxid(v []byte) predicate.TransferLeaf {
+func IntermediateDirectFromCpfpRefundTxid(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateDirectFromCpfpRefundTxid, v))
 }
 
@@ -612,42 +613,42 @@ func IntermediateDirectFromCpfpRefundTxNotNil() predicate.TransferLeaf {
 }
 
 // IntermediateRefundTxidEQ applies the EQ predicate on the "intermediate_refund_txid" field.
-func IntermediateRefundTxidEQ(v []byte) predicate.TransferLeaf {
+func IntermediateRefundTxidEQ(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateRefundTxid, v))
 }
 
 // IntermediateRefundTxidNEQ applies the NEQ predicate on the "intermediate_refund_txid" field.
-func IntermediateRefundTxidNEQ(v []byte) predicate.TransferLeaf {
+func IntermediateRefundTxidNEQ(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldNEQ(FieldIntermediateRefundTxid, v))
 }
 
 // IntermediateRefundTxidIn applies the In predicate on the "intermediate_refund_txid" field.
-func IntermediateRefundTxidIn(vs ...[]byte) predicate.TransferLeaf {
+func IntermediateRefundTxidIn(vs ...schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldIn(FieldIntermediateRefundTxid, vs...))
 }
 
 // IntermediateRefundTxidNotIn applies the NotIn predicate on the "intermediate_refund_txid" field.
-func IntermediateRefundTxidNotIn(vs ...[]byte) predicate.TransferLeaf {
+func IntermediateRefundTxidNotIn(vs ...schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldNotIn(FieldIntermediateRefundTxid, vs...))
 }
 
 // IntermediateRefundTxidGT applies the GT predicate on the "intermediate_refund_txid" field.
-func IntermediateRefundTxidGT(v []byte) predicate.TransferLeaf {
+func IntermediateRefundTxidGT(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldGT(FieldIntermediateRefundTxid, v))
 }
 
 // IntermediateRefundTxidGTE applies the GTE predicate on the "intermediate_refund_txid" field.
-func IntermediateRefundTxidGTE(v []byte) predicate.TransferLeaf {
+func IntermediateRefundTxidGTE(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldGTE(FieldIntermediateRefundTxid, v))
 }
 
 // IntermediateRefundTxidLT applies the LT predicate on the "intermediate_refund_txid" field.
-func IntermediateRefundTxidLT(v []byte) predicate.TransferLeaf {
+func IntermediateRefundTxidLT(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldLT(FieldIntermediateRefundTxid, v))
 }
 
 // IntermediateRefundTxidLTE applies the LTE predicate on the "intermediate_refund_txid" field.
-func IntermediateRefundTxidLTE(v []byte) predicate.TransferLeaf {
+func IntermediateRefundTxidLTE(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldLTE(FieldIntermediateRefundTxid, v))
 }
 
@@ -662,42 +663,42 @@ func IntermediateRefundTxidNotNil() predicate.TransferLeaf {
 }
 
 // IntermediateDirectRefundTxidEQ applies the EQ predicate on the "intermediate_direct_refund_txid" field.
-func IntermediateDirectRefundTxidEQ(v []byte) predicate.TransferLeaf {
+func IntermediateDirectRefundTxidEQ(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateDirectRefundTxid, v))
 }
 
 // IntermediateDirectRefundTxidNEQ applies the NEQ predicate on the "intermediate_direct_refund_txid" field.
-func IntermediateDirectRefundTxidNEQ(v []byte) predicate.TransferLeaf {
+func IntermediateDirectRefundTxidNEQ(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldNEQ(FieldIntermediateDirectRefundTxid, v))
 }
 
 // IntermediateDirectRefundTxidIn applies the In predicate on the "intermediate_direct_refund_txid" field.
-func IntermediateDirectRefundTxidIn(vs ...[]byte) predicate.TransferLeaf {
+func IntermediateDirectRefundTxidIn(vs ...schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldIn(FieldIntermediateDirectRefundTxid, vs...))
 }
 
 // IntermediateDirectRefundTxidNotIn applies the NotIn predicate on the "intermediate_direct_refund_txid" field.
-func IntermediateDirectRefundTxidNotIn(vs ...[]byte) predicate.TransferLeaf {
+func IntermediateDirectRefundTxidNotIn(vs ...schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldNotIn(FieldIntermediateDirectRefundTxid, vs...))
 }
 
 // IntermediateDirectRefundTxidGT applies the GT predicate on the "intermediate_direct_refund_txid" field.
-func IntermediateDirectRefundTxidGT(v []byte) predicate.TransferLeaf {
+func IntermediateDirectRefundTxidGT(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldGT(FieldIntermediateDirectRefundTxid, v))
 }
 
 // IntermediateDirectRefundTxidGTE applies the GTE predicate on the "intermediate_direct_refund_txid" field.
-func IntermediateDirectRefundTxidGTE(v []byte) predicate.TransferLeaf {
+func IntermediateDirectRefundTxidGTE(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldGTE(FieldIntermediateDirectRefundTxid, v))
 }
 
 // IntermediateDirectRefundTxidLT applies the LT predicate on the "intermediate_direct_refund_txid" field.
-func IntermediateDirectRefundTxidLT(v []byte) predicate.TransferLeaf {
+func IntermediateDirectRefundTxidLT(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldLT(FieldIntermediateDirectRefundTxid, v))
 }
 
 // IntermediateDirectRefundTxidLTE applies the LTE predicate on the "intermediate_direct_refund_txid" field.
-func IntermediateDirectRefundTxidLTE(v []byte) predicate.TransferLeaf {
+func IntermediateDirectRefundTxidLTE(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldLTE(FieldIntermediateDirectRefundTxid, v))
 }
 
@@ -712,42 +713,42 @@ func IntermediateDirectRefundTxidNotNil() predicate.TransferLeaf {
 }
 
 // IntermediateDirectFromCpfpRefundTxidEQ applies the EQ predicate on the "intermediate_direct_from_cpfp_refund_txid" field.
-func IntermediateDirectFromCpfpRefundTxidEQ(v []byte) predicate.TransferLeaf {
+func IntermediateDirectFromCpfpRefundTxidEQ(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldEQ(FieldIntermediateDirectFromCpfpRefundTxid, v))
 }
 
 // IntermediateDirectFromCpfpRefundTxidNEQ applies the NEQ predicate on the "intermediate_direct_from_cpfp_refund_txid" field.
-func IntermediateDirectFromCpfpRefundTxidNEQ(v []byte) predicate.TransferLeaf {
+func IntermediateDirectFromCpfpRefundTxidNEQ(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldNEQ(FieldIntermediateDirectFromCpfpRefundTxid, v))
 }
 
 // IntermediateDirectFromCpfpRefundTxidIn applies the In predicate on the "intermediate_direct_from_cpfp_refund_txid" field.
-func IntermediateDirectFromCpfpRefundTxidIn(vs ...[]byte) predicate.TransferLeaf {
+func IntermediateDirectFromCpfpRefundTxidIn(vs ...schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldIn(FieldIntermediateDirectFromCpfpRefundTxid, vs...))
 }
 
 // IntermediateDirectFromCpfpRefundTxidNotIn applies the NotIn predicate on the "intermediate_direct_from_cpfp_refund_txid" field.
-func IntermediateDirectFromCpfpRefundTxidNotIn(vs ...[]byte) predicate.TransferLeaf {
+func IntermediateDirectFromCpfpRefundTxidNotIn(vs ...schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldNotIn(FieldIntermediateDirectFromCpfpRefundTxid, vs...))
 }
 
 // IntermediateDirectFromCpfpRefundTxidGT applies the GT predicate on the "intermediate_direct_from_cpfp_refund_txid" field.
-func IntermediateDirectFromCpfpRefundTxidGT(v []byte) predicate.TransferLeaf {
+func IntermediateDirectFromCpfpRefundTxidGT(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldGT(FieldIntermediateDirectFromCpfpRefundTxid, v))
 }
 
 // IntermediateDirectFromCpfpRefundTxidGTE applies the GTE predicate on the "intermediate_direct_from_cpfp_refund_txid" field.
-func IntermediateDirectFromCpfpRefundTxidGTE(v []byte) predicate.TransferLeaf {
+func IntermediateDirectFromCpfpRefundTxidGTE(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldGTE(FieldIntermediateDirectFromCpfpRefundTxid, v))
 }
 
 // IntermediateDirectFromCpfpRefundTxidLT applies the LT predicate on the "intermediate_direct_from_cpfp_refund_txid" field.
-func IntermediateDirectFromCpfpRefundTxidLT(v []byte) predicate.TransferLeaf {
+func IntermediateDirectFromCpfpRefundTxidLT(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldLT(FieldIntermediateDirectFromCpfpRefundTxid, v))
 }
 
 // IntermediateDirectFromCpfpRefundTxidLTE applies the LTE predicate on the "intermediate_direct_from_cpfp_refund_txid" field.
-func IntermediateDirectFromCpfpRefundTxidLTE(v []byte) predicate.TransferLeaf {
+func IntermediateDirectFromCpfpRefundTxidLTE(v schematype.TxID) predicate.TransferLeaf {
 	return predicate.TransferLeaf(sql.FieldLTE(FieldIntermediateDirectFromCpfpRefundTxid, v))
 }
 
