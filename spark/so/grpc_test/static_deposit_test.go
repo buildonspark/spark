@@ -1,7 +1,6 @@
 package grpctest
 
 import (
-	"encoding/hex"
 	"testing"
 	"time"
 
