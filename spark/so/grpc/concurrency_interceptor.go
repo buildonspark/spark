@@ -7,6 +7,7 @@ import (
 	"github.com/lightsparkdev/spark/so/grpcutil"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/noop"
 	"google.golang.org/grpc"
@@ -121,16 +122,33 @@ func init() {
 }
 
 // Creates a unary server interceptor that enforces a concurrency limit on incoming gRPC requests
-func ConcurrencyInterceptor(guard ResourceLimiter) grpc.UnaryServerInterceptor {
+func ConcurrencyInterceptor(guard ResourceLimiter, clientInfoProvider *GRPCClientInfoProvider, knobsService knobs.Knobs) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		if err := guard.TryAcquireMethod(info.FullMethod); err != nil {
-			return nil, err
+		// Check if the client IP is excluded from concurrency limiting.
+		bypassConcurrency := false
+		if clientInfoProvider != nil && knobsService != nil {
+			if ip, err := clientInfoProvider.GetClientIP(ctx); err == nil && ip != "" {
+				if knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyExcludeIps, &ip, 0) > 0 {
+					bypassConcurrency = true
+				}
+			}
 		}
-		defer guard.ReleaseMethod(info.FullMethod)
+		state := "enforced"
+		if bypassConcurrency {
+			state = "bypassed_ip"
+		}
+		attrs := append(grpcutil.ParseFullMethod(info.FullMethod), attribute.String("concurrency_limit_action", state))
+		if !bypassConcurrency {
+			// Only requests not excluded from concurrency limiting should count against the limit.
+			otelAttrs := metric.WithAttributes(attrs...)
+			methodConcurrencyGauge.Add(ctx, 1, otelAttrs)
+			defer methodConcurrencyGauge.Add(ctx, -1, otelAttrs)
 
-		otelAttrs := metric.WithAttributes(grpcutil.ParseFullMethod(info.FullMethod)...)
-		methodConcurrencyGauge.Add(ctx, 1, otelAttrs)
-		defer methodConcurrencyGauge.Add(ctx, -1, otelAttrs)
+			if err := guard.TryAcquireMethod(info.FullMethod); err != nil {
+				return nil, err
+			}
+			defer guard.ReleaseMethod(info.FullMethod)
+		}
 
 		return handler(ctx, req)
 	}

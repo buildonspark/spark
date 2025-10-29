@@ -30,6 +30,7 @@ const (
 	KnobGrpcServerUnaryHandlerTimeout = "spark.so.grpc.server.unary_handler_timeout"
 
 	KnobGrpcServerConcurrencyLimitLimit = "spark.so.grpc.server.concurrency_limit.limit"
+	KnobGrpcServerConcurrencyExcludeIps = "spark.so.grpc.server.concurrency_limit.exclude_ips"
 
 	KnobSoGenerateStaticDepositAddressV2 = "spark.so.generate_static_deposit_address_v2"
 	KnobSoMaxTransactionsPerRequest      = "spark.so.max_transactions_per_request"

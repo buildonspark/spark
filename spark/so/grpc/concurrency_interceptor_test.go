@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 )
 
@@ -241,7 +243,7 @@ func TestConcurrencyInterceptor(t *testing.T) {
 			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 1,
 		})
 		guard := NewConcurrencyGuard(mockKnobs)
-		interceptor := ConcurrencyInterceptor(guard)
+		interceptor := ConcurrencyInterceptor(guard, nil, nil)
 
 		called := false
 		handler := func(ctx context.Context, req any) (any, error) {
@@ -269,7 +271,7 @@ func TestConcurrencyInterceptor(t *testing.T) {
 			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 1,
 		})
 		guard := NewConcurrencyGuard(mockKnobs)
-		interceptor := ConcurrencyInterceptor(guard)
+		interceptor := ConcurrencyInterceptor(guard, nil, nil)
 
 		// First acquire the only slot
 		err := guard.TryAcquireMethod("/test.Service/TestMethod")
@@ -302,7 +304,7 @@ func TestConcurrencyInterceptor(t *testing.T) {
 			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 10,
 		})
 		guard := NewConcurrencyGuard(mockKnobs)
-		interceptor := ConcurrencyInterceptor(guard)
+		interceptor := ConcurrencyInterceptor(guard, nil, nil)
 
 		handler := func(ctx context.Context, req any) (any, error) {
 			panic("test panic")
@@ -328,7 +330,7 @@ func TestConcurrencyInterceptor(t *testing.T) {
 			fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyLimitLimit, "global"): 10,
 		})
 		guard := NewConcurrencyGuard(mockKnobs)
-		interceptor := ConcurrencyInterceptor(guard)
+		interceptor := ConcurrencyInterceptor(guard, nil, nil)
 
 		expectedErr := fmt.Errorf("handler error")
 		handler := func(ctx context.Context, req any) (any, error) {
@@ -352,7 +354,7 @@ func TestConcurrencyInterceptor(t *testing.T) {
 
 	t.Run("with noop limiter", func(t *testing.T) {
 		limiter := &NoopResourceLimiter{}
-		interceptor := ConcurrencyInterceptor(limiter)
+		interceptor := ConcurrencyInterceptor(limiter, nil, nil)
 
 		called := false
 		handler := func(ctx context.Context, req any) (any, error) {
@@ -370,6 +372,76 @@ func TestConcurrencyInterceptor(t *testing.T) {
 		assert.Equal(t, "success", resp)
 		assert.True(t, called)
 	})
+}
+
+type spyGuard struct {
+	tryCount     int
+	releaseCount int
+	failAcquire  bool
+}
+
+func (s *spyGuard) TryAcquireMethod(string) error {
+	s.tryCount++
+	if s.failAcquire {
+		return status.Errorf(codes.ResourceExhausted, "should not be called")
+	}
+	return nil
+}
+
+func (s *spyGuard) ReleaseMethod(string) {
+	s.releaseCount++
+}
+
+func TestConcurrencyInterceptor_ExcludedIP_BypassesGuard(t *testing.T) {
+	// Exclude this IP via knob
+	excludedIP := "203.0.113.10"
+	mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+		fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyExcludeIps, excludedIP): 1,
+	})
+	guard := &spyGuard{failAcquire: true}
+	provider := NewGRPCClientInfoProvider(0)
+	interceptor := ConcurrencyInterceptor(guard, provider, mockKnobs)
+
+	called := false
+	handler := func(ctx context.Context, req any) (any, error) {
+		called = true
+		return "ok", nil
+	}
+
+	info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/TestMethod"}
+	// Put the client IP in the peer context so provider can read it.
+	ctx := peer.NewContext(t.Context(), &peer.Peer{Addr: &net.TCPAddr{IP: net.ParseIP(excludedIP), Port: 12345}})
+
+	resp, err := interceptor(ctx, nil, info, handler)
+	require.NoError(t, err)
+	assert.Equal(t, "ok", resp)
+	assert.True(t, called)
+	// Ensure guard was not invoked
+	assert.Equal(t, 0, guard.tryCount)
+	assert.Equal(t, 0, guard.releaseCount)
+}
+
+func TestConcurrencyInterceptor_NonExcludedIP_EnforcesGuard(t *testing.T) {
+	// Non-excluded IP should enforce guard; no exclude knob set for this IP.
+	clientIP := "198.51.100.55"
+	mockKnobs := knobs.NewFixedKnobs(map[string]float64{})
+	guard := &spyGuard{}
+	provider := NewGRPCClientInfoProvider(0)
+	interceptor := ConcurrencyInterceptor(guard, provider, mockKnobs)
+
+	handler := func(ctx context.Context, req any) (any, error) {
+		return "ok", nil
+	}
+
+	info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/TestMethod"}
+	ctx := peer.NewContext(t.Context(), &peer.Peer{Addr: &net.TCPAddr{IP: net.ParseIP(clientIP), Port: 12345}})
+
+	resp, err := interceptor(ctx, nil, info, handler)
+	require.NoError(t, err)
+	assert.Equal(t, "ok", resp)
+	// Ensure guard was invoked and released once
+	assert.Equal(t, 1, guard.tryCount)
+	assert.Equal(t, 1, guard.releaseCount)
 }
 
 func TestConcurrencyGuard_AcquireAfterGlobalLimit(t *testing.T) {

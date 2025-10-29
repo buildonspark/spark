@@ -564,7 +564,7 @@ func main() {
 					return handler(ctx, req)
 				}
 			}(),
-			sparkgrpc.ConcurrencyInterceptor(concurrencyGuard),
+			sparkgrpc.ConcurrencyInterceptor(concurrencyGuard, clientInfoProvider, knobsService),
 			sparkgrpc.TimeoutInterceptor(knobsService, config.GRPC.ServerUnaryHandlerTimeout),
 			sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
 			sparkgrpc.DatabaseSessionMiddleware(
