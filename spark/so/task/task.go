@@ -278,12 +278,6 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 								transfer.ExpiryTimeLT(time.Now().Add(-24*time.Hour*16)),
 								transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
 							),
-							transfer.And(
-								transfer.StatusEQ(st.TransferStatusSenderKeyTweakPending),
-								transfer.TypeEQ(st.TransferTypeSwap),
-								transfer.ExpiryTimeLT(time.Now()),
-								transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
-							),
 						))
 
 					transfers, err := query.All(ctx)
