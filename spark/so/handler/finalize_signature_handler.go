@@ -133,6 +133,14 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 		}
 	}
 
+	var transfer *ent.Transfer
+	if req.Intent == pbcommon.SignatureIntent_TRANSFER {
+		transfer, err = o.verifyAndUpdateTransfer(ctx, req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to verify and update transfer for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
+		}
+	}
+
 	var nodes []*pb.TreeNode
 	var internalNodes []*pbinternal.TreeNode
 	for _, nodeSignatures := range req.NodeSignatures {
@@ -176,10 +184,6 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 		}
 
 	case pbcommon.SignatureIntent_TRANSFER:
-		transfer, err := o.verifyAndUpdateTransfer(ctx, req)
-		if err != nil {
-			return nil, fmt.Errorf("failed to verify and update transfer for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
-		}
 		transferID := transfer.ID.String()
 		completionTimestamp := timestamppb.New(*transfer.CompletionTime)
 
