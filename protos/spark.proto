@@ -51,8 +51,13 @@ service SparkService {
     // This is the exact same as start_leaf_swap, but signs with
     // an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
     rpc counter_leaf_swap(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {}
-    rpc refresh_timelock(RefreshTimelockRequest) returns (RefreshTimelockResponse) {}
-    rpc extend_leaf(ExtendLeafRequest) returns (ExtendLeafResponse) {}
+    rpc refresh_timelock(RefreshTimelockRequest) returns (RefreshTimelockResponse) {
+      option deprecated = true;
+    }
+    rpc extend_leaf(ExtendLeafRequest) returns (ExtendLeafResponse) {
+      option deprecated = true;
+    }
+
 
     // Resets the timelocks for a leaf's transactions. Can be used to reset the
     // refund transaction timelock for a leaf (when the node transaction
@@ -103,7 +108,10 @@ service SparkService {
     // The following endpoints enforce inclusion of Direct Transactions used
     // for unilateral exits
     rpc cooperative_exit_v2(CooperativeExitRequest) returns (CooperativeExitResponse) {}
-    rpc extend_leaf_v2(ExtendLeafRequest) returns (ExtendLeafResponse) {}
+    rpc extend_leaf_v2(ExtendLeafRequest) returns (ExtendLeafResponse) {
+      option deprecated = true;
+    }
+
     rpc claim_transfer_sign_refunds_v2(ClaimTransferSignRefundsRequest) returns (ClaimTransferSignRefundsResponse) {}
     rpc finalize_node_signatures_v2(FinalizeNodeSignaturesRequest) returns (FinalizeNodeSignaturesResponse) {}
     rpc initiate_preimage_swap_v2(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
@@ -111,7 +119,10 @@ service SparkService {
     rpc start_leaf_swap_v2(StartTransferRequest) returns (StartTransferResponse) {}
     rpc counter_leaf_swap_v2(CounterLeafSwapRequest) returns (CounterLeafSwapResponse) {}
     rpc start_transfer_v2(StartTransferRequest) returns (StartTransferResponse) {}
-    rpc refresh_timelock_v2(RefreshTimelockRequest) returns (RefreshTimelockResponse) {}
+    rpc refresh_timelock_v2(RefreshTimelockRequest) returns (RefreshTimelockResponse) {
+      option deprecated = true;
+    }
+
 
     rpc get_utxos_for_address(GetUtxosForAddressRequest) returns (GetUtxosForAddressResponse) {}
 

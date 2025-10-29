@@ -22,8 +22,8 @@ message GossipMessage {
         GossipMessageMarkTreesExited mark_trees_exited = 6;
         GossipMessageFinalizeTreeCreation finalize_tree_creation = 7;
         GossipMessageFinalizeTransfer finalize_transfer = 8;
-        GossipMessageFinalizeRefreshTimelock finalize_refresh_timelock = 9;
-        GossipMessageFinalizeExtendLeaf finalize_extend_leaf = 10;
+        GossipMessageFinalizeRefreshTimelock finalize_refresh_timelock = 9 [deprecated = true];
+        GossipMessageFinalizeExtendLeaf finalize_extend_leaf = 10 [deprecated = true];
         GossipMessageRollbackUtxoSwap rollback_utxo_swap = 11;
         GossipMessageDepositCleanup deposit_cleanup = 12;
         GossipMessagePreimage preimage = 13;

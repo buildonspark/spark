@@ -119,7 +119,9 @@ type SparkServiceClient interface {
 	// This is the exact same as start_leaf_swap, but signs with
 	// an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
 	CounterLeafSwap(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error)
+	// Deprecated: Do not use.
 	RefreshTimelock(ctx context.Context, in *RefreshTimelockRequest, opts ...grpc.CallOption) (*RefreshTimelockResponse, error)
+	// Deprecated: Do not use.
 	ExtendLeaf(ctx context.Context, in *ExtendLeafRequest, opts ...grpc.CallOption) (*ExtendLeafResponse, error)
 	// Resets the timelocks for a leaf's transactions. Can be used to reset the
 	// refund transaction timelock for a leaf (when the node transaction
@@ -158,6 +160,7 @@ type SparkServiceClient interface {
 	// The following endpoints enforce inclusion of Direct Transactions used
 	// for unilateral exits
 	CooperativeExitV2(ctx context.Context, in *CooperativeExitRequest, opts ...grpc.CallOption) (*CooperativeExitResponse, error)
+	// Deprecated: Do not use.
 	ExtendLeafV2(ctx context.Context, in *ExtendLeafRequest, opts ...grpc.CallOption) (*ExtendLeafResponse, error)
 	ClaimTransferSignRefundsV2(ctx context.Context, in *ClaimTransferSignRefundsRequest, opts ...grpc.CallOption) (*ClaimTransferSignRefundsResponse, error)
 	FinalizeNodeSignaturesV2(ctx context.Context, in *FinalizeNodeSignaturesRequest, opts ...grpc.CallOption) (*FinalizeNodeSignaturesResponse, error)
@@ -166,6 +169,7 @@ type SparkServiceClient interface {
 	StartLeafSwapV2(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error)
 	CounterLeafSwapV2(ctx context.Context, in *CounterLeafSwapRequest, opts ...grpc.CallOption) (*CounterLeafSwapResponse, error)
 	StartTransferV2(ctx context.Context, in *StartTransferRequest, opts ...grpc.CallOption) (*StartTransferResponse, error)
+	// Deprecated: Do not use.
 	RefreshTimelockV2(ctx context.Context, in *RefreshTimelockRequest, opts ...grpc.CallOption) (*RefreshTimelockResponse, error)
 	GetUtxosForAddress(ctx context.Context, in *GetUtxosForAddressRequest, opts ...grpc.CallOption) (*GetUtxosForAddressResponse, error)
 	QuerySparkInvoices(ctx context.Context, in *QuerySparkInvoicesRequest, opts ...grpc.CallOption) (*QuerySparkInvoicesResponse, error)
@@ -408,6 +412,7 @@ func (c *sparkServiceClient) CounterLeafSwap(ctx context.Context, in *CounterLea
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkServiceClient) RefreshTimelock(ctx context.Context, in *RefreshTimelockRequest, opts ...grpc.CallOption) (*RefreshTimelockResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RefreshTimelockResponse)
@@ -418,6 +423,7 @@ func (c *sparkServiceClient) RefreshTimelock(ctx context.Context, in *RefreshTim
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkServiceClient) ExtendLeaf(ctx context.Context, in *ExtendLeafRequest, opts ...grpc.CallOption) (*ExtendLeafResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ExtendLeafResponse)
@@ -638,6 +644,7 @@ func (c *sparkServiceClient) CooperativeExitV2(ctx context.Context, in *Cooperat
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkServiceClient) ExtendLeafV2(ctx context.Context, in *ExtendLeafRequest, opts ...grpc.CallOption) (*ExtendLeafResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ExtendLeafResponse)
@@ -718,6 +725,7 @@ func (c *sparkServiceClient) StartTransferV2(ctx context.Context, in *StartTrans
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkServiceClient) RefreshTimelockV2(ctx context.Context, in *RefreshTimelockRequest, opts ...grpc.CallOption) (*RefreshTimelockResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RefreshTimelockResponse)
@@ -817,7 +825,9 @@ type SparkServiceServer interface {
 	// This is the exact same as start_leaf_swap, but signs with
 	// an adaptor public key after a counterparty has begun the swap via start_leaf_swap.
 	CounterLeafSwap(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error)
+	// Deprecated: Do not use.
 	RefreshTimelock(context.Context, *RefreshTimelockRequest) (*RefreshTimelockResponse, error)
+	// Deprecated: Do not use.
 	ExtendLeaf(context.Context, *ExtendLeafRequest) (*ExtendLeafResponse, error)
 	// Resets the timelocks for a leaf's transactions. Can be used to reset the
 	// refund transaction timelock for a leaf (when the node transaction
@@ -856,6 +866,7 @@ type SparkServiceServer interface {
 	// The following endpoints enforce inclusion of Direct Transactions used
 	// for unilateral exits
 	CooperativeExitV2(context.Context, *CooperativeExitRequest) (*CooperativeExitResponse, error)
+	// Deprecated: Do not use.
 	ExtendLeafV2(context.Context, *ExtendLeafRequest) (*ExtendLeafResponse, error)
 	ClaimTransferSignRefundsV2(context.Context, *ClaimTransferSignRefundsRequest) (*ClaimTransferSignRefundsResponse, error)
 	FinalizeNodeSignaturesV2(context.Context, *FinalizeNodeSignaturesRequest) (*FinalizeNodeSignaturesResponse, error)
@@ -864,6 +875,7 @@ type SparkServiceServer interface {
 	StartLeafSwapV2(context.Context, *StartTransferRequest) (*StartTransferResponse, error)
 	CounterLeafSwapV2(context.Context, *CounterLeafSwapRequest) (*CounterLeafSwapResponse, error)
 	StartTransferV2(context.Context, *StartTransferRequest) (*StartTransferResponse, error)
+	// Deprecated: Do not use.
 	RefreshTimelockV2(context.Context, *RefreshTimelockRequest) (*RefreshTimelockResponse, error)
 	GetUtxosForAddress(context.Context, *GetUtxosForAddressRequest) (*GetUtxosForAddressResponse, error)
 	QuerySparkInvoices(context.Context, *QuerySparkInvoicesRequest) (*QuerySparkInvoicesResponse, error)

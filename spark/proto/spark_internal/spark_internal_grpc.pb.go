@@ -70,7 +70,9 @@ type SparkInternalServiceClient interface {
 	FrostRound1(ctx context.Context, in *FrostRound1Request, opts ...grpc.CallOption) (*FrostRound1Response, error)
 	FrostRound2(ctx context.Context, in *FrostRound2Request, opts ...grpc.CallOption) (*FrostRound2Response, error)
 	FinalizeTransfer(ctx context.Context, in *FinalizeTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Deprecated: Do not use.
 	FinalizeRefreshTimelock(ctx context.Context, in *FinalizeRefreshTimelockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// Deprecated: Do not use.
 	FinalizeExtendLeaf(ctx context.Context, in *FinalizeExtendLeafRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FinalizeRenewRefundTimelock(ctx context.Context, in *FinalizeRenewRefundTimelockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FinalizeRenewNodeTimelock(ctx context.Context, in *FinalizeRenewNodeTimelockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -188,6 +190,7 @@ func (c *sparkInternalServiceClient) FinalizeTransfer(ctx context.Context, in *F
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkInternalServiceClient) FinalizeRefreshTimelock(ctx context.Context, in *FinalizeRefreshTimelockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -198,6 +201,7 @@ func (c *sparkInternalServiceClient) FinalizeRefreshTimelock(ctx context.Context
 	return out, nil
 }
 
+// Deprecated: Do not use.
 func (c *sparkInternalServiceClient) FinalizeExtendLeaf(ctx context.Context, in *FinalizeExtendLeafRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -490,7 +494,9 @@ type SparkInternalServiceServer interface {
 	FrostRound1(context.Context, *FrostRound1Request) (*FrostRound1Response, error)
 	FrostRound2(context.Context, *FrostRound2Request) (*FrostRound2Response, error)
 	FinalizeTransfer(context.Context, *FinalizeTransferRequest) (*emptypb.Empty, error)
+	// Deprecated: Do not use.
 	FinalizeRefreshTimelock(context.Context, *FinalizeRefreshTimelockRequest) (*emptypb.Empty, error)
+	// Deprecated: Do not use.
 	FinalizeExtendLeaf(context.Context, *FinalizeExtendLeafRequest) (*emptypb.Empty, error)
 	FinalizeRenewRefundTimelock(context.Context, *FinalizeRenewRefundTimelockRequest) (*emptypb.Empty, error)
 	FinalizeRenewNodeTimelock(context.Context, *FinalizeRenewNodeTimelockRequest) (*emptypb.Empty, error)

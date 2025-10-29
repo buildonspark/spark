@@ -19,7 +19,6 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -540,84 +539,6 @@ func (w *SingleKeyTestWallet) CoopExit(ctx context.Context, targetAmountSats int
 
 	w.RemoveOwnedNodes(nodesToRemove)
 	return transfer, nil
-}
-
-func (w *SingleKeyTestWallet) RefreshTimelocks(ctx context.Context, nodeUUID *uuid.UUID) error {
-	var nodesToRefresh []*pb.TreeNode
-	var nodeIDs []string
-
-	if nodeUUID != nil {
-		for _, node := range w.OwnedNodes {
-			if node.Id == nodeUUID.String() {
-				nodesToRefresh = append(nodesToRefresh, node)
-				nodeIDs = append(nodeIDs, node.Id)
-				break
-			}
-		}
-		if len(nodesToRefresh) == 0 {
-			return fmt.Errorf("node %s not found", nodeUUID.String())
-		}
-	} else {
-		for _, node := range w.OwnedNodes {
-			refundTx, err := common.TxFromRawTxBytes(node.RefundTx)
-			if err != nil {
-				return fmt.Errorf("failed to parse refund tx: %w", err)
-			}
-			_, err = spark.NextSequence(refundTx.TxIn[0].Sequence)
-			needRefresh := err != nil
-			if needRefresh {
-				nodesToRefresh = append(nodesToRefresh, node)
-				nodeIDs = append(nodeIDs, node.Id)
-			}
-		}
-	}
-	//nolint:forbidigo
-	fmt.Printf("Refreshing %d nodes\n", len(nodesToRefresh))
-
-	authCtx, client, conn, err := w.grpcClient(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to create grpc client: %w", err)
-	}
-	defer conn.Close()
-	nodesResp, err := (*client).QueryNodes(authCtx, &pb.QueryNodesRequest{
-		Source: &pb.QueryNodesRequest_NodeIds{
-			NodeIds: &pb.TreeNodeIds{
-				NodeIds: nodeIDs,
-			},
-		},
-		IncludeParents: true,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to query nodes: %w", err)
-	}
-
-	nodesMap := make(map[string]*pb.TreeNode)
-	for _, node := range nodesResp.Nodes {
-		nodesMap[node.Id] = node
-	}
-
-	for _, node := range nodesToRefresh {
-		//nolint:forbidigo
-		fmt.Printf("Refreshing node %s\n", node.Id)
-		// Get the parent node
-		parentNode, ok := nodesMap[*node.ParentNodeId]
-		if !ok {
-			return fmt.Errorf("parent node %s not found", *node.ParentNodeId)
-		}
-		nodes, err := RefreshTimelockNodes(ctx, w.Config, []*pb.TreeNode{node}, parentNode, w.SigningPrivateKey)
-		if err != nil {
-			return fmt.Errorf("failed to refresh timelock nodes: %w", err)
-		}
-		// We only expect to refresh leaf nodes, not chains of nodes right now
-		if len(nodes) != 1 {
-			return fmt.Errorf("expected 1 nodes, got %d", len(nodes))
-		}
-		newNode := nodes[0]
-		w.RemoveOwnedNodes(map[string]bool{node.Id: true})
-		w.OwnedNodes = append(w.OwnedNodes, newNode)
-	}
-
-	return nil
 }
 
 // MintTokens mints tokens directly to the issuer wallet (owner == token_public_key).

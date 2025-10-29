@@ -238,36 +238,20 @@ func (s *SparkServer) CounterLeafSwapV2(ctx context.Context, req *pb.CounterLeaf
 
 // RefreshTimelock refreshes the timelocks of a leaf and its ancestors.
 func (s *SparkServer) RefreshTimelock(ctx context.Context, req *pb.RefreshTimelockRequest) (*pb.RefreshTimelockResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	timelockHandler := handler.NewRefreshTimelockHandler(s.config)
-	return timelockHandler.RefreshTimelock(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 // RefreshTimelockV2 is the same as RefreshTimelock, but requires the direct TX to be included.
 func (s *SparkServer) RefreshTimelockV2(ctx context.Context, req *pb.RefreshTimelockRequest) (*pb.RefreshTimelockResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	leafHandler := handler.NewRefreshTimelockHandler(s.config)
-	return leafHandler.RefreshTimelockV2(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 func (s *SparkServer) ExtendLeaf(ctx context.Context, req *pb.ExtendLeafRequest) (*pb.ExtendLeafResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	leafHandler := handler.NewExtendLeafHandler(s.config)
-	return leafHandler.ExtendLeaf(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 func (s *SparkServer) ExtendLeafV2(ctx context.Context, req *pb.ExtendLeafRequest) (*pb.ExtendLeafResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	leafHandler := handler.NewExtendLeafHandler(s.config)
-	return leafHandler.ExtendLeafV2(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 func (s *SparkServer) RenewLeaf(ctx context.Context, req *pb.RenewLeafRequest) (*pb.RenewLeafResponse, error) {

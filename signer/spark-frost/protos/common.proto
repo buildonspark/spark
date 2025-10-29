@@ -31,6 +31,6 @@ enum SignatureIntent {
     CREATION = 0;
     TRANSFER = 1;
     AGGREGATE = 2;
-    REFRESH = 3;
-    EXTEND = 4;
+    REFRESH = 3 [deprecated = true];
+    EXTEND = 4 [deprecated = true];
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/protoconverter"
 
 	"github.com/lightsparkdev/spark/so/handler/tokens"
@@ -94,13 +95,11 @@ func (s *SparkInternalServer) FinalizeTransfer(ctx context.Context, req *pb.Fina
 
 // FinalizeRefreshTimelock finalizes the refresh timelock.
 func (s *SparkInternalServer) FinalizeRefreshTimelock(ctx context.Context, req *pb.FinalizeRefreshTimelockRequest) (*emptypb.Empty, error) {
-	refreshTimelockHandler := handler.NewInternalRefreshTimelockHandler(s.config)
-	return &emptypb.Empty{}, refreshTimelockHandler.FinalizeRefreshTimelock(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 func (s *SparkInternalServer) FinalizeExtendLeaf(ctx context.Context, req *pb.FinalizeExtendLeafRequest) (*emptypb.Empty, error) {
-	extendLeafHandler := handler.NewInternalExtendLeafHandler(s.config)
-	return &emptypb.Empty{}, extendLeafHandler.FinalizeExtendLeaf(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 // InitiatePreimageSwap initiates a preimage swap for the given payment hash.

@@ -19,9 +19,12 @@ service SparkInternalService {
 
     rpc finalize_transfer(FinalizeTransferRequest) returns (google.protobuf.Empty) {}
 
-    rpc finalize_refresh_timelock(FinalizeRefreshTimelockRequest) returns (google.protobuf.Empty) {}
-
-    rpc finalize_extend_leaf(FinalizeExtendLeafRequest) returns (google.protobuf.Empty) {}
+    rpc finalize_refresh_timelock(FinalizeRefreshTimelockRequest) returns (google.protobuf.Empty) {
+        option deprecated = true;
+    }
+    rpc finalize_extend_leaf(FinalizeExtendLeafRequest) returns (google.protobuf.Empty) {
+        option deprecated = true;
+    }
 
    rpc finalize_renew_refund_timelock(FinalizeRenewRefundTimelockRequest) returns (google.protobuf.Empty) {}
    rpc finalize_renew_node_timelock(FinalizeRenewNodeTimelockRequest) returns (google.protobuf.Empty) {}

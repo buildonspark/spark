@@ -12547,7 +12547,7 @@ const file_spark_proto_rawDesc = "" +
 	"\x1bTREE_NODE_STATUS_AGGREGATED\x10\x06\x12\x1d\n" +
 	"\x19TREE_NODE_STATUS_ON_CHAIN\x10\a\x12#\n" +
 	"\x1fTREE_NODE_STATUS_AGGREGATE_LOCK\x10\b\x12\x1b\n" +
-	"\x17TREE_NODE_STATUS_EXITED\x10\t2\xa9+\n" +
+	"\x17TREE_NODE_STATUS_EXITED\x10\t2\xb5+\n" +
 	"\fSparkService\x12i\n" +
 	"\x18generate_deposit_address\x12$.spark.GenerateDepositAddressRequest\x1a%.spark.GenerateDepositAddressResponse\"\x00\x12|\n" +
 	"\x1fgenerate_static_deposit_address\x12*.spark.GenerateStaticDepositAddressRequest\x1a+.spark.GenerateStaticDepositAddressResponse\"\x00\x12p\n" +
@@ -12571,9 +12571,9 @@ const file_spark_proto_rawDesc = "" +
 	"query_htlc\x12\x17.spark.QueryHtlcRequest\x1a\x18.spark.QueryHtlcResponse\"\x00\x12N\n" +
 	"\x0fstart_leaf_swap\x12\x1b.spark.StartTransferRequest\x1a\x1c.spark.StartTransferResponse\"\x00\x12O\n" +
 	"\tleaf_swap\x12\x1d.spark.CounterLeafSwapRequest\x1a\x1e.spark.CounterLeafSwapResponse\"\x03\x88\x02\x01\x12T\n" +
-	"\x11counter_leaf_swap\x12\x1d.spark.CounterLeafSwapRequest\x1a\x1e.spark.CounterLeafSwapResponse\"\x00\x12S\n" +
-	"\x10refresh_timelock\x12\x1d.spark.RefreshTimelockRequest\x1a\x1e.spark.RefreshTimelockResponse\"\x00\x12D\n" +
-	"\vextend_leaf\x12\x18.spark.ExtendLeafRequest\x1a\x19.spark.ExtendLeafResponse\"\x00\x12A\n" +
+	"\x11counter_leaf_swap\x12\x1d.spark.CounterLeafSwapRequest\x1a\x1e.spark.CounterLeafSwapResponse\"\x00\x12V\n" +
+	"\x10refresh_timelock\x12\x1d.spark.RefreshTimelockRequest\x1a\x1e.spark.RefreshTimelockResponse\"\x03\x88\x02\x01\x12G\n" +
+	"\vextend_leaf\x12\x18.spark.ExtendLeafRequest\x1a\x19.spark.ExtendLeafResponse\"\x03\x88\x02\x01\x12A\n" +
 	"\n" +
 	"renew_leaf\x12\x17.spark.RenewLeafRequest\x1a\x18.spark.RenewLeafResponse\"\x00\x12\\\n" +
 	"\x19get_signing_operator_list\x12\x16.google.protobuf.Empty\x1a%.spark.GetSigningOperatorListResponse\"\x00\x12D\n" +
@@ -12594,16 +12594,16 @@ const file_spark_proto_rawDesc = "" +
 	"#initiate_static_deposit_utxo_refund\x12-.spark.InitiateStaticDepositUtxoRefundRequest\x1a..spark.InitiateStaticDepositUtxoRefundResponse\"\x00\x12Z\n" +
 	"\x12initiate_utxo_swap\x12\x1e.spark.InitiateUtxoSwapRequest\x1a\x1f.spark.InitiateUtxoSwapResponse\"\x03\x88\x02\x01\x12a\n" +
 	"\x16exit_single_node_trees\x12!.spark.ExitSingleNodeTreesRequest\x1a\".spark.ExitSingleNodeTreesResponse\"\x00\x12V\n" +
-	"\x13cooperative_exit_v2\x12\x1d.spark.CooperativeExitRequest\x1a\x1e.spark.CooperativeExitResponse\"\x00\x12G\n" +
-	"\x0eextend_leaf_v2\x12\x18.spark.ExtendLeafRequest\x1a\x19.spark.ExtendLeafResponse\"\x00\x12s\n" +
+	"\x13cooperative_exit_v2\x12\x1d.spark.CooperativeExitRequest\x1a\x1e.spark.CooperativeExitResponse\"\x00\x12J\n" +
+	"\x0eextend_leaf_v2\x12\x18.spark.ExtendLeafRequest\x1a\x19.spark.ExtendLeafResponse\"\x03\x88\x02\x01\x12s\n" +
 	"\x1eclaim_transfer_sign_refunds_v2\x12&.spark.ClaimTransferSignRefundsRequest\x1a'.spark.ClaimTransferSignRefundsResponse\"\x00\x12l\n" +
 	"\x1bfinalize_node_signatures_v2\x12$.spark.FinalizeNodeSignaturesRequest\x1a%.spark.FinalizeNodeSignaturesResponse\"\x00\x12f\n" +
 	"\x19initiate_preimage_swap_v2\x12\".spark.InitiatePreimageSwapRequest\x1a#.spark.InitiatePreimageSwapResponse\"\x00\x12f\n" +
 	"\x19initiate_preimage_swap_v3\x12\".spark.InitiatePreimageSwapRequest\x1a#.spark.InitiatePreimageSwapResponse\"\x00\x12Q\n" +
 	"\x12start_leaf_swap_v2\x12\x1b.spark.StartTransferRequest\x1a\x1c.spark.StartTransferResponse\"\x00\x12W\n" +
 	"\x14counter_leaf_swap_v2\x12\x1d.spark.CounterLeafSwapRequest\x1a\x1e.spark.CounterLeafSwapResponse\"\x00\x12P\n" +
-	"\x11start_transfer_v2\x12\x1b.spark.StartTransferRequest\x1a\x1c.spark.StartTransferResponse\"\x00\x12V\n" +
-	"\x13refresh_timelock_v2\x12\x1d.spark.RefreshTimelockRequest\x1a\x1e.spark.RefreshTimelockResponse\"\x00\x12^\n" +
+	"\x11start_transfer_v2\x12\x1b.spark.StartTransferRequest\x1a\x1c.spark.StartTransferResponse\"\x00\x12Y\n" +
+	"\x13refresh_timelock_v2\x12\x1d.spark.RefreshTimelockRequest\x1a\x1e.spark.RefreshTimelockResponse\"\x03\x88\x02\x01\x12^\n" +
 	"\x15get_utxos_for_address\x12 .spark.GetUtxosForAddressRequest\x1a!.spark.GetUtxosForAddressResponse\"\x00\x12]\n" +
 	"\x14query_spark_invoices\x12 .spark.QuerySparkInvoicesRequest\x1a!.spark.QuerySparkInvoicesResponse\"\x00\x12y\n" +
 	"\x1einitiate_swap_primary_transfer\x12).spark.InitiateSwapPrimaryTransferRequest\x1a*.spark.InitiateSwapPrimaryTransferResponse\"\x00\x12`\n" +

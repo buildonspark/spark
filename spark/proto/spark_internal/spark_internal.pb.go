@@ -3589,7 +3589,7 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x04NONE\x10\x00\x12\n" +
 	"\n" +
 	"\x06COMMIT\x10\x01\x12\f\n" +
-	"\bROLLBACK\x10\x022\xc2\x1e\n" +
+	"\bROLLBACK\x10\x022\xc8\x1e\n" +
 	"\x14SparkInternalService\x12^\n" +
 	"\x16mark_keyshares_as_used\x12*.spark_internal.MarkKeysharesAsUsedRequest\x1a\x16.google.protobuf.Empty\"\x00\x12\x92\x01\n" +
 	"!mark_keyshare_for_deposit_address\x124.spark_internal.MarkKeyshareForDepositAddressRequest\x1a5.spark_internal.MarkKeyshareForDepositAddressResponse\"\x00\x12^\n" +
@@ -3597,9 +3597,9 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\x16finalize_tree_creation\x12+.spark_internal.FinalizeTreeCreationRequest\x1a\x16.google.protobuf.Empty\"\x00\x12Y\n" +
 	"\ffrost_round1\x12\".spark_internal.FrostRound1Request\x1a#.spark_internal.FrostRound1Response\"\x00\x12Y\n" +
 	"\ffrost_round2\x12\".spark_internal.FrostRound2Request\x1a#.spark_internal.FrostRound2Response\"\x00\x12V\n" +
-	"\x11finalize_transfer\x12'.spark_internal.FinalizeTransferRequest\x1a\x16.google.protobuf.Empty\"\x00\x12e\n" +
-	"\x19finalize_refresh_timelock\x12..spark_internal.FinalizeRefreshTimelockRequest\x1a\x16.google.protobuf.Empty\"\x00\x12[\n" +
-	"\x14finalize_extend_leaf\x12).spark_internal.FinalizeExtendLeafRequest\x1a\x16.google.protobuf.Empty\"\x00\x12n\n" +
+	"\x11finalize_transfer\x12'.spark_internal.FinalizeTransferRequest\x1a\x16.google.protobuf.Empty\"\x00\x12h\n" +
+	"\x19finalize_refresh_timelock\x12..spark_internal.FinalizeRefreshTimelockRequest\x1a\x16.google.protobuf.Empty\"\x03\x88\x02\x01\x12^\n" +
+	"\x14finalize_extend_leaf\x12).spark_internal.FinalizeExtendLeafRequest\x1a\x16.google.protobuf.Empty\"\x03\x88\x02\x01\x12n\n" +
 	"\x1efinalize_renew_refund_timelock\x122.spark_internal.FinalizeRenewRefundTimelockRequest\x1a\x16.google.protobuf.Empty\"\x00\x12j\n" +
 	"\x1cfinalize_renew_node_timelock\x120.spark_internal.FinalizeRenewNodeTimelockRequest\x1a\x16.google.protobuf.Empty\"\x00\x12l\n" +
 	"\x16initiate_preimage_swap\x12\".spark.InitiatePreimageSwapRequest\x1a,.spark_internal.InitiatePreimageSwapResponse\"\x00\x12x\n" +

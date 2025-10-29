@@ -27,8 +27,10 @@ const (
 	SignatureIntent_CREATION  SignatureIntent = 0
 	SignatureIntent_TRANSFER  SignatureIntent = 1
 	SignatureIntent_AGGREGATE SignatureIntent = 2
-	SignatureIntent_REFRESH   SignatureIntent = 3
-	SignatureIntent_EXTEND    SignatureIntent = 4
+	// Deprecated: Marked as deprecated in common.proto.
+	SignatureIntent_REFRESH SignatureIntent = 3
+	// Deprecated: Marked as deprecated in common.proto.
+	SignatureIntent_EXTEND SignatureIntent = 4
 )
 
 // Enum value maps for SignatureIntent.
@@ -236,14 +238,13 @@ const file_common_proto_rawDesc = "" +
 	"\x06hiding\x18\x01 \x01(\fR\x06hiding\x12\x18\n" +
 	"\abinding\x18\x02 \x01(\fR\abinding\"8\n" +
 	"\rSigningResult\x12'\n" +
-	"\x0fsignature_share\x18\x01 \x01(\fR\x0esignatureShare*U\n" +
+	"\x0fsignature_share\x18\x01 \x01(\fR\x0esignatureShare*]\n" +
 	"\x0fSignatureIntent\x12\f\n" +
 	"\bCREATION\x10\x00\x12\f\n" +
 	"\bTRANSFER\x10\x01\x12\r\n" +
-	"\tAGGREGATE\x10\x02\x12\v\n" +
-	"\aREFRESH\x10\x03\x12\n" +
-	"\n" +
-	"\x06EXTEND\x10\x04B-Z+github.com/lightsparkdev/spark/proto/commonb\x06proto3"
+	"\tAGGREGATE\x10\x02\x12\x0f\n" +
+	"\aREFRESH\x10\x03\x1a\x02\b\x01\x12\x0e\n" +
+	"\x06EXTEND\x10\x04\x1a\x02\b\x01B-Z+github.com/lightsparkdev/spark/proto/commonb\x06proto3"
 
 var (
 	file_common_proto_rawDescOnce sync.Once

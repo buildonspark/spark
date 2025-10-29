@@ -52,6 +52,10 @@ func (o *FinalizeSignatureHandler) FinalizeNodeSignatures(ctx context.Context, r
 
 // FinalizeNodeSignatures verifies the node signatures and updates the node.
 func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, req *pb.FinalizeNodeSignaturesRequest, requireDirectTx bool) (*pb.FinalizeNodeSignaturesResponse, error) {
+	if req.Intent == pbcommon.SignatureIntent_REFRESH || req.Intent == pbcommon.SignatureIntent_EXTEND {
+		return nil, fmt.Errorf("operation has been deprecated: %s", req.Intent)
+	}
+
 	if len(req.NodeSignatures) == 0 {
 		return &pb.FinalizeNodeSignaturesResponse{Nodes: []*pb.TreeNode{}}, nil
 	}
@@ -201,39 +205,6 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 		if err != nil {
 			return nil, fmt.Errorf("unable to create and send gossip message: %w", err)
 		}
-
-	case pbcommon.SignatureIntent_REFRESH:
-		logger.Info("Sending finalize refresh timelock gossip message")
-
-		_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
-			Message: &pbgossip.GossipMessage_FinalizeRefreshTimelock{
-				FinalizeRefreshTimelock: &pbgossip.GossipMessageFinalizeRefreshTimelock{
-					InternalNodes: internalNodes,
-				},
-			},
-		}, participants)
-		if err != nil {
-			return nil, fmt.Errorf("unable to create and send gossip message: %w", err)
-		}
-
-	case pbcommon.SignatureIntent_EXTEND:
-		if len(internalNodes) == 0 {
-			return nil, fmt.Errorf("no nodes to extend")
-		}
-
-		logger.Info("Sending finalize extend leaf gossip message")
-
-		_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
-			Message: &pbgossip.GossipMessage_FinalizeExtendLeaf{
-				FinalizeExtendLeaf: &pbgossip.GossipMessageFinalizeExtendLeaf{
-					InternalNodes: internalNodes,
-				},
-			},
-		}, participants)
-		if err != nil {
-			return nil, fmt.Errorf("unable to create and send gossip message: %w", err)
-		}
-
 	default:
 		return nil, fmt.Errorf("invalid intent %s", req.Intent)
 	}
@@ -345,7 +316,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	var cpfpNodeTxBytes []byte
 	var directNodeTxBytes []byte
 
-	if intent == pbcommon.SignatureIntent_CREATION || ((intent == pbcommon.SignatureIntent_REFRESH || intent == pbcommon.SignatureIntent_EXTEND) && nodeSignatures.NodeTxSignature != nil) {
+	if intent == pbcommon.SignatureIntent_CREATION {
 		cpfpNodeTxBytes, err = common.UpdateTxWithSignature(node.RawTx, 0, nodeSignatures.NodeTxSignature)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to update cpfp tx with signature %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
@@ -469,9 +440,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		SetDirectTx(directNodeTxBytes).
 		SetDirectRefundTx(directRefundTxBytes).
 		SetDirectFromCpfpRefundTx(directFromCpfpRefundTxBytes)
-	if treeEnt.Status == st.TreeStatusAvailable && intent != pbcommon.SignatureIntent_REFRESH && tree.TreeNodeCanBecomeAvailable(node) {
-		// Existing refresh call won't lock the leaf status, so the leaves can be used in future operations.
-		// This is address by new renew_leaf but this cases leaves to be unlocked during transfer.
+	if treeEnt.Status == st.TreeStatusAvailable && tree.TreeNodeCanBecomeAvailable(node) {
 		if len(node.RawRefundTx) > 0 && len(node.Edges.Children) == 0 {
 			nodeMutator.SetStatus(st.TreeNodeStatusAvailable)
 		} else {

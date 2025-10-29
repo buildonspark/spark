@@ -50,12 +50,6 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 	case *pbgossip.GossipMessage_FinalizeTransfer:
 		finalizeTransfer := gossipMessage.GetFinalizeTransfer()
 		h.handleFinalizeTransferGossipMessage(ctx, finalizeTransfer, forCoordinator)
-	case *pbgossip.GossipMessage_FinalizeRefreshTimelock:
-		finalizeRefreshTimelock := gossipMessage.GetFinalizeRefreshTimelock()
-		h.handleFinalizeRefreshTimelockGossipMessage(ctx, finalizeRefreshTimelock, forCoordinator)
-	case *pbgossip.GossipMessage_FinalizeExtendLeaf:
-		finalizeExtendLeaf := gossipMessage.GetFinalizeExtendLeaf()
-		h.handleFinalizeExtendLeafGossipMessage(ctx, finalizeExtendLeaf, forCoordinator)
 	case *pbgossip.GossipMessage_FinalizeNodeTimelock:
 		finalizeRenewNodeTimelock := gossipMessage.GetFinalizeNodeTimelock()
 		h.handleFinalizeNodeTimelockGossipMessage(ctx, finalizeRenewNodeTimelock, forCoordinator)
@@ -77,6 +71,9 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 	case *pbgossip.GossipMessage_SettleSwapKeyTweak:
 		settleSwapKeyTweak := gossipMessage.GetSettleSwapKeyTweak()
 		h.handleSettleSwapKeyTweakGossipMessage(ctx, settleSwapKeyTweak)
+	case *pbgossip.GossipMessage_FinalizeRefreshTimelock:
+	case *pbgossip.GossipMessage_FinalizeExtendLeaf:
+		return fmt.Errorf("gossip message has been deprecated: %T", gossipMessage.Message)
 	default:
 		return fmt.Errorf("unsupported gossip message type: %T", gossipMessage.Message)
 	}
@@ -246,35 +243,6 @@ func (h *GossipHandler) handleFinalizeTransferGossipMessage(ctx context.Context,
 	err := transferHandler.FinalizeTransfer(ctx, &pbinternal.FinalizeTransferRequest{TransferId: finalizeNodeSignatures.TransferId, Nodes: finalizeNodeSignatures.InternalNodes, Timestamp: finalizeNodeSignatures.CompletionTimestamp})
 	if err != nil {
 		logger.Error("Failed to finalize transfer", zap.Error(err))
-	}
-}
-
-func (h *GossipHandler) handleFinalizeRefreshTimelockGossipMessage(ctx context.Context, finalizeNodeSignatures *pbgossip.GossipMessageFinalizeRefreshTimelock, forCoordinator bool) {
-	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("Handling finalize refresh timelock gossip message")
-
-	if forCoordinator {
-		return
-	}
-
-	refreshTimelockHandler := NewInternalRefreshTimelockHandler(h.config)
-	err := refreshTimelockHandler.FinalizeRefreshTimelock(ctx, &pbinternal.FinalizeRefreshTimelockRequest{Nodes: finalizeNodeSignatures.InternalNodes})
-	if err != nil {
-		logger.Error("Failed to finalize refresh timelock", zap.Error(err))
-	}
-}
-
-func (h *GossipHandler) handleFinalizeExtendLeafGossipMessage(ctx context.Context, finalizeNodeSignatures *pbgossip.GossipMessageFinalizeExtendLeaf, forCoordinator bool) {
-	logger := logging.GetLoggerFromContext(ctx)
-	logger.Info("Handling finalize extend leaf gossip message")
-
-	if forCoordinator {
-		return
-	}
-	extendLeafHandler := NewInternalExtendLeafHandler(h.config)
-	err := extendLeafHandler.FinalizeExtendLeaf(ctx, &pbinternal.FinalizeExtendLeafRequest{Node: finalizeNodeSignatures.InternalNodes[0]})
-	if err != nil {
-		logger.Error("Failed to finalize extend leaf", zap.Error(err))
 	}
 }
 

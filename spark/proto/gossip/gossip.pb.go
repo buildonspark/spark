@@ -149,6 +149,7 @@ func (x *GossipMessage) GetFinalizeTransfer() *GossipMessageFinalizeTransfer {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in gossip.proto.
 func (x *GossipMessage) GetFinalizeRefreshTimelock() *GossipMessageFinalizeRefreshTimelock {
 	if x != nil {
 		if x, ok := x.Message.(*GossipMessage_FinalizeRefreshTimelock); ok {
@@ -158,6 +159,7 @@ func (x *GossipMessage) GetFinalizeRefreshTimelock() *GossipMessageFinalizeRefre
 	return nil
 }
 
+// Deprecated: Marked as deprecated in gossip.proto.
 func (x *GossipMessage) GetFinalizeExtendLeaf() *GossipMessageFinalizeExtendLeaf {
 	if x != nil {
 		if x, ok := x.Message.(*GossipMessage_FinalizeExtendLeaf); ok {
@@ -259,10 +261,12 @@ type GossipMessage_FinalizeTransfer struct {
 }
 
 type GossipMessage_FinalizeRefreshTimelock struct {
+	// Deprecated: Marked as deprecated in gossip.proto.
 	FinalizeRefreshTimelock *GossipMessageFinalizeRefreshTimelock `protobuf:"bytes,9,opt,name=finalize_refresh_timelock,json=finalizeRefreshTimelock,proto3,oneof"`
 }
 
 type GossipMessage_FinalizeExtendLeaf struct {
+	// Deprecated: Marked as deprecated in gossip.proto.
 	FinalizeExtendLeaf *GossipMessageFinalizeExtendLeaf `protobuf:"bytes,10,opt,name=finalize_extend_leaf,json=finalizeExtendLeaf,proto3,oneof"`
 }
 
@@ -1074,7 +1078,7 @@ var File_gossip_proto protoreflect.FileDescriptor
 
 const file_gossip_proto_rawDesc = "" +
 	"\n" +
-	"\fgossip.proto\x12\x06gossip\x1a\vspark.proto\x1a\fcommon.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x14spark_internal.proto\x1a\x1bgoogle/protobuf/empty.proto\"\x97\v\n" +
+	"\fgossip.proto\x12\x06gossip\x1a\vspark.proto\x1a\fcommon.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x14spark_internal.proto\x1a\x1bgoogle/protobuf/empty.proto\"\x9f\v\n" +
 	"\rGossipMessage\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12N\n" +
@@ -1083,10 +1087,10 @@ const file_gossip_proto_rawDesc = "" +
 	"\x11rollback_transfer\x18\x05 \x01(\v2%.gossip.GossipMessageRollbackTransferH\x00R\x10rollbackTransfer\x12R\n" +
 	"\x11mark_trees_exited\x18\x06 \x01(\v2$.gossip.GossipMessageMarkTreesExitedH\x00R\x0fmarkTreesExited\x12a\n" +
 	"\x16finalize_tree_creation\x18\a \x01(\v2).gossip.GossipMessageFinalizeTreeCreationH\x00R\x14finalizeTreeCreation\x12T\n" +
-	"\x11finalize_transfer\x18\b \x01(\v2%.gossip.GossipMessageFinalizeTransferH\x00R\x10finalizeTransfer\x12j\n" +
-	"\x19finalize_refresh_timelock\x18\t \x01(\v2,.gossip.GossipMessageFinalizeRefreshTimelockH\x00R\x17finalizeRefreshTimelock\x12[\n" +
+	"\x11finalize_transfer\x18\b \x01(\v2%.gossip.GossipMessageFinalizeTransferH\x00R\x10finalizeTransfer\x12n\n" +
+	"\x19finalize_refresh_timelock\x18\t \x01(\v2,.gossip.GossipMessageFinalizeRefreshTimelockB\x02\x18\x01H\x00R\x17finalizeRefreshTimelock\x12_\n" +
 	"\x14finalize_extend_leaf\x18\n" +
-	" \x01(\v2'.gossip.GossipMessageFinalizeExtendLeafH\x00R\x12finalizeExtendLeaf\x12U\n" +
+	" \x01(\v2'.gossip.GossipMessageFinalizeExtendLeafB\x02\x18\x01H\x00R\x12finalizeExtendLeaf\x12U\n" +
 	"\x12rollback_utxo_swap\x18\v \x01(\v2%.gossip.GossipMessageRollbackUtxoSwapH\x00R\x10rollbackUtxoSwap\x12N\n" +
 	"\x0fdeposit_cleanup\x18\f \x01(\v2#.gossip.GossipMessageDepositCleanupH\x00R\x0edepositCleanup\x12;\n" +
 	"\bpreimage\x18\r \x01(\v2\x1d.gossip.GossipMessagePreimageH\x00R\bpreimage\x12l\n" +
