@@ -862,7 +862,7 @@ func (h *BaseTransferHandler) cancelTransferUnlockLeaves(ctx context.Context, tr
 	}
 
 	for _, leaf := range transferLeaves {
-		treeNode, err := leaf.QueryLeaf().Only(ctx)
+		treeNode, err := leaf.QueryLeaf().ForUpdate().Only(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to get tree node: %w", err)
 		}
@@ -1173,7 +1173,7 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 		if err != nil {
 			return nil, fmt.Errorf("unable to unmarshal key tweak: %w", err)
 		}
-		treeNode, err := leaf.QueryLeaf().Only(ctx)
+		treeNode, err := leaf.QueryLeaf().ForUpdate().Only(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get tree node: %w", err)
 		}
