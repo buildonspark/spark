@@ -214,6 +214,54 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
+			ExecutionInterval: 1 * time.Minute,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "cancel_expired_primary_transfers_swap_v3",
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					// Cancel primary transfers for Swap V3 before they started to settle the key tweaks
+
+					logger := logging.GetLoggerFromContext(ctx)
+					h := handler.NewTransferHandler(config)
+
+					tx, err := ent.GetDbFromContext(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get or create current tx for request: %w", err)
+					}
+
+					query := tx.Transfer.Query().Where(
+						transfer.And(
+							transfer.Or(
+								transfer.StatusEQ(st.TransferStatusSenderInitiatedCoordinator),
+								transfer.StatusEQ(st.TransferStatusSenderKeyTweakPending),
+							),
+							transfer.TypeEQ(st.TransferTypePrimarySwapV3),
+							transfer.ExpiryTimeLT(time.Now()),
+							transfer.ExpiryTimeNEQ(time.Unix(0, 0)),
+						),
+					)
+
+					transfers, err := query.All(ctx)
+					if err != nil {
+						return err
+					}
+
+					for _, dbTransfer := range transfers {
+						logger.Sugar().Infof("Cancelling transfer %s", dbTransfer.ID)
+						// Checking for an active counter transfer is not required since a counter
+						// transfer creation will move both transfer to a non-cancellable status
+						// `TransferStatusApplyingSenderKeyTweak`.
+						err := h.CancelTransferInternal(ctx, dbTransfer.ID.String())
+						if err != nil {
+							logger.With(zap.Error(err)).Sugar().Errorf("failed to cancel transfer %s", dbTransfer.ID)
+						}
+					}
+
+					return nil
+				},
+			},
+		},
+		{
 			ExecutionInterval: 1 * time.Hour,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "delete_stale_pending_trees",

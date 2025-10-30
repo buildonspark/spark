@@ -48,6 +48,19 @@ const (
 	MaxSecretShareSize      = 32                // Limit secret share size
 	MaxSignatureSize        = 73                // Reasonable limit for ECDSA secp256k1 signatures
 	MaxEstimatedMemoryUsage = 100 * 1024 * 1024 // 100MB limit for estimated memory usage
+
+	// Buffer to prevent primary transfer creation too close to expiry time. The
+	// buffer should allow enough time for a counter transfer to be created and
+	// switch both transfers to non-cancellable status.
+	//
+	// |<-- Primary transfer expiration time --->|
+	//                             |Safety buffer|
+	// A ----------- B ----------- C ----------- D ----------- E
+	// |             |             |             |             |
+	// Primary      Can create   Deadline       Deadline      Primary
+	// transfer     counter      for counter    for primary   transfer
+	// created      transfer     transfer       transfer      cancelled
+	PrimaryTransferExpiryTimeSafetyBuffer = 120 * time.Second
 )
 
 type TransferRole int
@@ -406,6 +419,12 @@ func (h *BaseTransferHandler) createTransfer(
 		return nil, nil, fmt.Errorf("invalid expiry_time %s: %w", expiryTime.String(), err)
 	}
 
+	if transferType == st.TransferTypePrimarySwapV3 {
+		if expiryTime.Before(time.Now().Add(PrimaryTransferExpiryTimeSafetyBuffer)) {
+			return nil, nil, fmt.Errorf("invalid expiry_time for primary swap transfer %s: less than safety buffer: %s", transferID, expiryTime.String())
+		}
+	}
+
 	var status st.TransferStatus
 	if len(leafTweakMap) > 0 {
 		if role == TransferRoleCoordinator {
@@ -443,7 +462,8 @@ func (h *BaseTransferHandler) createTransfer(
 		transferCreate = transferCreate.SetSparkInvoiceID(invoiceID)
 	}
 
-	if primaryTransferId != uuid.Nil {
+	// For counter swap v3, we need to validate the primary transfer is in the right status and has enough time left.
+	if transferType == st.TransferTypeCounterSwapV3 {
 		primaryTransfer, err := db.Transfer.Query().Where(enttransfer.IDEQ(primaryTransferId)).Only(ctx)
 		if err != nil {
 			return nil, nil, fmt.Errorf("Unable to find primary swap transfer id=%s", primaryTransferId.String())
@@ -451,6 +471,10 @@ func (h *BaseTransferHandler) createTransfer(
 		// Check that the SO holds the correct refunds for the primary transfer.
 		if primaryTransfer.Status != st.TransferStatusSenderKeyTweakPending && primaryTransfer.Status != st.TransferStatusSenderInitiatedCoordinator {
 			return nil, nil, fmt.Errorf("primary swap transfer %s is not in the right status, got %s", primaryTransferId.String(), primaryTransfer.Status)
+		}
+		// Add 30 second buffer to prevent counter transfer creation too close to expiry time
+		if primaryTransfer.ExpiryTime.Before(time.Now().Add(PrimaryTransferExpiryTimeSafetyBuffer)) {
+			return nil, nil, fmt.Errorf("primary swap transfer %s has expired or expires within 30 seconds, expiry time is %s", primaryTransferId.String(), primaryTransfer.ExpiryTime.String())
 		}
 		transferCreate.SetPrimarySwapTransfer(primaryTransfer)
 	}
