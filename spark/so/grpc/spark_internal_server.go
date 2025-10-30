@@ -4,17 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lightsparkdev/spark/so/errors"
-	"github.com/lightsparkdev/spark/so/protoconverter"
-
-	"github.com/lightsparkdev/spark/so/handler/tokens"
-
 	"github.com/google/uuid"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pb "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/handler"
 	"github.com/lightsparkdev/spark/so/handler/signing_handler"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -160,18 +156,6 @@ func (s *SparkInternalServer) ProvidePreimage(ctx context.Context, req *pb.Provi
 	return &emptypb.Empty{}, err
 }
 
-// StartTokenTransactionInternal validates a token transaction and saves it to the database.
-func (s *SparkInternalServer) StartTokenTransactionInternal(ctx context.Context, req *pb.StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
-	internalPrepareHandler := tokens.NewInternalPrepareTokenHandler(s.config)
-	prepareReq, err := protoconverter.TokenProtoPrepareTransactionRequestFromSpark(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert request into v1: %w", err)
-	}
-	_, err = internalPrepareHandler.PrepareTokenTransactionInternal(ctx, prepareReq)
-
-	return &emptypb.Empty{}, err
-}
-
 func (s *SparkInternalServer) InitiateSettleReceiverKeyTweak(ctx context.Context, req *pb.InitiateSettleReceiverKeyTweakRequest) (*emptypb.Empty, error) {
 	transferHandler := handler.NewTransferHandler(s.config)
 	return &emptypb.Empty{}, transferHandler.InitiateSettleReceiverKeyTweak(ctx, req)
@@ -201,11 +185,6 @@ func (s *SparkInternalServer) CreateStaticDepositUtxoSwap(ctx context.Context, r
 func (s *SparkInternalServer) CreateStaticDepositUtxoRefund(ctx context.Context, req *pb.CreateStaticDepositUtxoRefundRequest) (*pb.CreateStaticDepositUtxoRefundResponse, error) {
 	depositHandler := handler.NewStaticDepositInternalHandler(s.config)
 	return depositHandler.CreateStaticDepositUtxoRefund(ctx, s.config, req)
-}
-
-func (s *SparkInternalServer) QueryTokenOutputsInternal(ctx context.Context, req *pbspark.QueryTokenOutputsRequest) (*pbspark.QueryTokenOutputsResponse, error) {
-	queryTokenOutputsHandler := tokens.NewQueryTokenOutputsHandler(s.config)
-	return queryTokenOutputsHandler.QueryTokenOutputsSpark(ctx, req)
 }
 
 // Cancel a utxo swap in an SO after the creation of the swap failed

@@ -2,7 +2,6 @@ package tokens
 
 import (
 	"bytes"
-	"cmp"
 	"context"
 	"encoding/hex"
 	"fmt"
@@ -48,85 +47,6 @@ func NewSignTokenHandler(config *so.Config) *SignTokenHandler {
 	return &SignTokenHandler{
 		config: config,
 	}
-}
-
-// SignTokenTransaction signs the token transaction with the operators private key.
-// If it is a transfer it also fetches that operator's keyshare for each spent output and
-// returns it to the wallet so it can finalize the transaction.
-func (h *SignTokenHandler) SignTokenTransaction(
-	ctx context.Context,
-	req *sparkpb.SignTokenTransactionRequest,
-) (*sparkpb.SignTokenTransactionResponse, error) {
-	idPubKey, err := keys.ParsePublicKey(req.GetIdentityPublicKey())
-	if err != nil {
-		return nil, sparkerrors.InvalidArgumentMalformedKey(err)
-	}
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, idPubKey); err != nil {
-		return nil, err
-	}
-
-	tokenProtoTokenTransaction, err := protoconverter.TokenProtoFromSparkTokenTransaction(req.FinalTokenTransaction)
-	if err != nil {
-		return nil, sparkerrors.InternalTypeConversionError(err)
-	}
-	ctx, span := GetTracer().Start(ctx, "SignTokenHandler.SignTokenTransaction", GetProtoTokenTransactionTraceAttributes(ctx, tokenProtoTokenTransaction))
-	defer span.End()
-
-	finalTokenTransactionHash, err := utils.HashTokenTransaction(tokenProtoTokenTransaction, false)
-	if err != nil {
-		return nil, tokens.FormatErrorWithTransactionProto("failed to hash final token transaction", tokenProtoTokenTransaction, err)
-	}
-
-	tokenTransaction, err := ent.FetchAndLockTokenTransactionData(ctx, tokenProtoTokenTransaction)
-	if err != nil {
-		return nil, err
-	}
-
-	internalSignTokenHandler := NewInternalSignTokenHandler(h.config)
-	operatorSignature, err := internalSignTokenHandler.SignAndPersistTokenTransaction(ctx, tokenTransaction, finalTokenTransactionHash, req.OperatorSpecificSignatures)
-	if err != nil {
-		return nil, err
-	}
-
-	if tokenTransaction.Status == st.TokenTransactionStatusSigned {
-		revocationKeyshares, err := h.getRevocationKeysharesForTokenTransaction(ctx, tokenTransaction)
-		if err != nil {
-			return nil, sparkerrors.InternalDatabaseReadError(tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToGetRevocationKeyshares, tokenTransaction, err))
-		}
-		return &sparkpb.SignTokenTransactionResponse{
-			SparkOperatorSignature: operatorSignature,
-			RevocationKeyshares:    revocationKeyshares,
-		}, nil
-	}
-
-	keyshares := make([]*ent.SigningKeyshare, len(tokenTransaction.Edges.SpentOutput))
-	revocationKeyshares := make([]*sparkpb.KeyshareWithIndex, len(tokenTransaction.Edges.SpentOutput))
-	for _, output := range tokenTransaction.Edges.SpentOutput {
-		keyshare, err := output.QueryRevocationKeyshare().Only(ctx)
-		if err != nil {
-			return nil, sparkerrors.InternalDatabaseReadError(tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToGetKeyshareForOutput, tokenTransaction, err))
-		}
-		index := output.SpentTransactionInputVout
-		keyshares[index] = keyshare
-		revocationKeyshares[index] = &sparkpb.KeyshareWithIndex{
-			InputIndex: uint32(index),
-			Keyshare:   keyshare.SecretShare.Serialize(),
-		}
-
-		// Validate that the keyshare's public key is as expected.
-		withdrawRevocationCommitment, err := keys.ParsePublicKey(output.WithdrawRevocationCommitment)
-		if err != nil {
-			return nil, sparkerrors.InvalidArgumentMalformedKey(err)
-		}
-		if !keyshare.PublicKey.Equals(withdrawRevocationCommitment) {
-			return nil, sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf("keyshare public key %v does not match output revocation commitment %v", keyshare.PublicKey, withdrawRevocationCommitment))
-		}
-	}
-
-	return &sparkpb.SignTokenTransactionResponse{
-		SparkOperatorSignature: operatorSignature,
-		RevocationKeyshares:    revocationKeyshares,
-	}, nil
 }
 
 func (h *SignTokenHandler) CommitTransaction(ctx context.Context, req *tokenpb.CommitTransactionRequest) (*tokenpb.CommitTransactionResponse, error) {
@@ -543,39 +463,6 @@ func (h *SignTokenHandler) localSignAndCommitTransaction(
 	return &tokeninternalpb.SignTokenTransactionFromCoordinationResponse{
 		SparkOperatorSignature: sigBytes,
 	}, nil
-}
-
-// getRevocationKeysharesForTokenTransaction retrieves the revocation keyshares for a token transaction
-func (h *SignTokenHandler) getRevocationKeysharesForTokenTransaction(ctx context.Context, tokenTransaction *ent.TokenTransaction) ([]*sparkpb.KeyshareWithIndex, error) {
-	spentOutputs := tokenTransaction.Edges.SpentOutput
-	revocationKeyshares := make([]*sparkpb.KeyshareWithIndex, len(spentOutputs))
-	for i, output := range spentOutputs {
-		keyshare, err := output.QueryRevocationKeyshare().Only(ctx)
-		if err != nil {
-			return nil, sparkerrors.InternalDatabaseReadError(tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToGetKeyshareForOutput, tokenTransaction, err))
-		}
-		// Validate that the keyshare's public key is as expected.
-		withdrawRevocationCommitment, err := keys.ParsePublicKey(output.WithdrawRevocationCommitment)
-		if err != nil {
-			return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("failed to parse withdraw revocation commitment: %w", err))
-		}
-		if !keyshare.PublicKey.Equals(withdrawRevocationCommitment) {
-			return nil, sparkerrors.InternalKeyshareError(tokens.FormatErrorWithTransactionEnt(
-				fmt.Sprintf("%s: %v does not match %v", tokens.ErrRevocationKeyMismatch, keyshare.PublicKey, output.WithdrawRevocationCommitment),
-				tokenTransaction, nil))
-		}
-
-		revocationKeyshares[i] = &sparkpb.KeyshareWithIndex{
-			InputIndex: uint32(output.SpentTransactionInputVout),
-			Keyshare:   keyshare.SecretShare.Serialize(),
-		}
-	}
-	// Sort spent output keyshares by their index to ensure a consistent response
-	slices.SortFunc(revocationKeyshares, func(a, b *sparkpb.KeyshareWithIndex) int {
-		return cmp.Compare(a.InputIndex, b.InputIndex)
-	})
-
-	return revocationKeyshares, nil
 }
 
 // verifyOperatorSignatures verifies the signatures from each operator for a token transaction.

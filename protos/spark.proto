@@ -76,14 +76,6 @@ service SparkService {
 
     rpc query_user_signed_refunds(QueryUserSignedRefundsRequest) returns (QueryUserSignedRefundsResponse) {}
 
-    // Token RPCs
-    rpc start_token_transaction(StartTokenTransactionRequest) returns (StartTokenTransactionResponse) {}
-    rpc sign_token_transaction(SignTokenTransactionRequest) returns (SignTokenTransactionResponse) {}
-    rpc finalize_token_transaction(FinalizeTokenTransactionRequest) returns (google.protobuf.Empty) {}
-    rpc freeze_tokens(FreezeTokensRequest) returns (FreezeTokensResponse) {}
-    rpc query_token_outputs(QueryTokenOutputsRequest) returns (QueryTokenOutputsResponse) {}
-    rpc query_token_transactions(QueryTokenTransactionsRequest) returns (QueryTokenTransactionsResponse) {}
-
     rpc query_unused_deposit_addresses(QueryUnusedDepositAddressesRequest) returns (QueryUnusedDepositAddressesResponse) {}
     rpc query_static_deposit_addresses(QueryStaticDepositAddressesRequest) returns (QueryStaticDepositAddressesResponse) {}
 

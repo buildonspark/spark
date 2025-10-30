@@ -7,11 +7,7 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/lightsparkdev/spark/so/errors"
-	"github.com/lightsparkdev/spark/so/protoconverter"
 
-	"github.com/lightsparkdev/spark/so/handler/tokens"
-
-	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/handler"
@@ -279,93 +275,10 @@ func (s *SparkServer) ProvidePreimage(ctx context.Context, req *pb.ProvidePreima
 	return lightningHandler.ProvidePreimage(ctx, req)
 }
 
-// StartTokenTransaction reserves revocation keyshares, and fills the revocation commitment (and other SO-derived fields) to create the final token transaction.
-func (s *SparkServer) StartTokenTransaction(ctx context.Context, req *pb.StartTokenTransactionRequest) (*pb.StartTokenTransactionResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	tokenTransactionHandler := tokens.NewStartTokenTransactionHandler(s.config)
-
-	network, err := common.NetworkFromProtoNetwork(req.PartialTokenTransaction.Network)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse network: %w", err)
-	}
-	startTransaction, err := protoconverter.TokenProtoStartTransactionRequestFromSpark(req, s.config.Lrc20Configs[network.String()].TransactionExpiryDuration)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert request into v0: %w", err)
-	}
-
-	startTransactionResponse, err := tokenTransactionHandler.StartTokenTransaction(ctx, startTransaction)
-	if err != nil {
-		return nil, fmt.Errorf("failed to start token transaction: %w", err)
-	}
-
-	response, err := protoconverter.SparkStartTokenTransactionResponseFromTokenProto(startTransactionResponse)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert request into v0: %w", err)
-	}
-
-	return response, nil
-}
-
 // QueryNodes queries the details of nodes given either the owner identity public key or a list of node ids.
 func (s *SparkServer) QueryNodes(ctx context.Context, req *pb.QueryNodesRequest) (*pb.QueryNodesResponse, error) {
 	treeQueryHandler := handler.NewTreeQueryHandler(s.config)
 	return treeQueryHandler.QueryNodes(ctx, req, false)
-}
-
-// GetTokenTransactionRevocationKeyshares allows the wallet to retrieve the revocation keyshares from each individual SO to
-// allow the wallet to combine these shares into the fully resolved revocation secret necessary for transaction finalization.
-func (s *SparkServer) SignTokenTransaction(ctx context.Context, req *pb.SignTokenTransactionRequest) (*pb.SignTokenTransactionResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	signTokenHandler := tokens.NewSignTokenHandler(s.config)
-	return signTokenHandler.SignTokenTransaction(ctx, req)
-}
-
-// FinalizeTokenTransaction verifies the revocation secrets constructed by the wallet and passes these keys to the LRC20 Node
-// to finalize the transaction. This operation irreversibly spends the inputs associated with the transaction.
-func (s *SparkServer) FinalizeTokenTransaction(ctx context.Context, req *pb.FinalizeTokenTransactionRequest) (*emptypb.Empty, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	finalizeTokenHandler := tokens.NewFinalizeTokenHandler(s.config)
-	return finalizeTokenHandler.FinalizeTokenTransaction(ctx, req)
-}
-
-// FreezeTokens prevents transfer of all outputs owned now and in the future by the provided owner public key.
-// Unfreeze undos this operation and re-enables transfers.
-func (s *SparkServer) FreezeTokens(ctx context.Context, req *pb.FreezeTokensRequest) (*pb.FreezeTokensResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	tokenReq := protoconverter.TokenProtoFreezeTokensRequestFromSpark(req)
-	freezeTokenHandler := tokens.NewFreezeTokenHandler(s.config)
-
-	tokenRes, err := freezeTokenHandler.FreezeTokens(ctx, tokenReq)
-	if err != nil {
-		return nil, fmt.Errorf("failed to freeze tokens: %w", err)
-	}
-	return protoconverter.SparkFreezeTokensResponseFromTokenProto(tokenRes), nil
-}
-
-// QueryTokenTransactions returns the token transactions currently owned by the provided owner public key.
-func (s *SparkServer) QueryTokenTransactions(ctx context.Context, req *pb.QueryTokenTransactionsRequest) (*pb.QueryTokenTransactionsResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	queryTokenTransactionsHandler := tokens.NewQueryTokenTransactionsHandler(s.config)
-	return queryTokenTransactionsHandler.QueryTokenTransactionsSpark(ctx, req)
-}
-
-// QueryTokenOutputs returns the token outputs currently owned by the provided owner public key.
-func (s *SparkServer) QueryTokenOutputs(ctx context.Context, req *pb.QueryTokenOutputsRequest) (*pb.QueryTokenOutputsResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	queryTokenOutputsHandler := tokens.NewQueryTokenOutputsHandler(s.config)
-	return queryTokenOutputsHandler.QueryTokenOutputs(ctx, req)
 }
 
 func (s *SparkServer) QueryAllTransfers(ctx context.Context, req *pb.TransferFilter) (*pb.QueryTransfersResponse, error) {

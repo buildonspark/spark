@@ -37,21 +37,6 @@ func NewQueryTokenTransactionsHandler(config *so.Config) *QueryTokenTransactions
 	}
 }
 
-func (h *QueryTokenTransactionsHandler) QueryTokenTransactionsSpark(ctx context.Context, req *sparkpb.QueryTokenTransactionsRequest) (*sparkpb.QueryTokenTransactionsResponse, error) {
-	ctx, span := GetTracer().Start(ctx, "QueryTokenTransactionsHandler.QueryTokenTransactions")
-	defer span.End()
-	// Convert sparkpb request to tokenpb request
-	tokenReq := protoconverter.TokenProtoQueryTokenTransactionsRequestFromSpark(req)
-
-	tokenResp, err := h.QueryTokenTransactions(ctx, tokenReq)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert tokenpb response back to sparkpb response
-	return protoconverter.SparkQueryTokenTransactionsResponseFromTokenProto(tokenResp)
-}
-
 // QueryTokenTransactions returns SO provided data about specific token transactions along with their status.
 // Allows caller to specify data to be returned related to:
 // a) transactions associated with a particular set of output ids
@@ -255,10 +240,10 @@ func (h *QueryTokenTransactionsHandler) buildOptimizedQuery(req *tokenpb.QueryTo
 	// Build the CTE with all conditions combined with AND
 	cteWhere := strings.Join(whereConditions, " AND ")
 	cte := fmt.Sprintf(`filtered_outputs AS (
-		SELECT 
+		SELECT
 			tou.token_output_output_created_token_transaction,
-			tou.token_output_output_spent_token_transaction 
-		FROM token_outputs tou 
+			tou.token_output_output_spent_token_transaction
+		FROM token_outputs tou
 		WHERE %s
 	)`, cteWhere)
 

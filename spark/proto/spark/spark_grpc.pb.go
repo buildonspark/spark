@@ -51,12 +51,6 @@ const (
 	SparkService_QueryNodesByValue_FullMethodName                   = "/spark.SparkService/query_nodes_by_value"
 	SparkService_QueryBalance_FullMethodName                        = "/spark.SparkService/query_balance"
 	SparkService_QueryUserSignedRefunds_FullMethodName              = "/spark.SparkService/query_user_signed_refunds"
-	SparkService_StartTokenTransaction_FullMethodName               = "/spark.SparkService/start_token_transaction"
-	SparkService_SignTokenTransaction_FullMethodName                = "/spark.SparkService/sign_token_transaction"
-	SparkService_FinalizeTokenTransaction_FullMethodName            = "/spark.SparkService/finalize_token_transaction"
-	SparkService_FreezeTokens_FullMethodName                        = "/spark.SparkService/freeze_tokens"
-	SparkService_QueryTokenOutputs_FullMethodName                   = "/spark.SparkService/query_token_outputs"
-	SparkService_QueryTokenTransactions_FullMethodName              = "/spark.SparkService/query_token_transactions"
 	SparkService_QueryUnusedDepositAddresses_FullMethodName         = "/spark.SparkService/query_unused_deposit_addresses"
 	SparkService_QueryStaticDepositAddresses_FullMethodName         = "/spark.SparkService/query_static_deposit_addresses"
 	SparkService_SubscribeToEvents_FullMethodName                   = "/spark.SparkService/subscribe_to_events"
@@ -135,13 +129,6 @@ type SparkServiceClient interface {
 	QueryNodesByValue(ctx context.Context, in *QueryNodesByValueRequest, opts ...grpc.CallOption) (*QueryNodesByValueResponse, error)
 	QueryBalance(ctx context.Context, in *QueryBalanceRequest, opts ...grpc.CallOption) (*QueryBalanceResponse, error)
 	QueryUserSignedRefunds(ctx context.Context, in *QueryUserSignedRefundsRequest, opts ...grpc.CallOption) (*QueryUserSignedRefundsResponse, error)
-	// Token RPCs
-	StartTokenTransaction(ctx context.Context, in *StartTokenTransactionRequest, opts ...grpc.CallOption) (*StartTokenTransactionResponse, error)
-	SignTokenTransaction(ctx context.Context, in *SignTokenTransactionRequest, opts ...grpc.CallOption) (*SignTokenTransactionResponse, error)
-	FinalizeTokenTransaction(ctx context.Context, in *FinalizeTokenTransactionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	FreezeTokens(ctx context.Context, in *FreezeTokensRequest, opts ...grpc.CallOption) (*FreezeTokensResponse, error)
-	QueryTokenOutputs(ctx context.Context, in *QueryTokenOutputsRequest, opts ...grpc.CallOption) (*QueryTokenOutputsResponse, error)
-	QueryTokenTransactions(ctx context.Context, in *QueryTokenTransactionsRequest, opts ...grpc.CallOption) (*QueryTokenTransactionsResponse, error)
 	QueryUnusedDepositAddresses(ctx context.Context, in *QueryUnusedDepositAddressesRequest, opts ...grpc.CallOption) (*QueryUnusedDepositAddressesResponse, error)
 	QueryStaticDepositAddresses(ctx context.Context, in *QueryStaticDepositAddressesRequest, opts ...grpc.CallOption) (*QueryStaticDepositAddressesResponse, error)
 	SubscribeToEvents(ctx context.Context, in *SubscribeToEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SubscribeToEventsResponse], error)
@@ -504,66 +491,6 @@ func (c *sparkServiceClient) QueryUserSignedRefunds(ctx context.Context, in *Que
 	return out, nil
 }
 
-func (c *sparkServiceClient) StartTokenTransaction(ctx context.Context, in *StartTokenTransactionRequest, opts ...grpc.CallOption) (*StartTokenTransactionResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(StartTokenTransactionResponse)
-	err := c.cc.Invoke(ctx, SparkService_StartTokenTransaction_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *sparkServiceClient) SignTokenTransaction(ctx context.Context, in *SignTokenTransactionRequest, opts ...grpc.CallOption) (*SignTokenTransactionResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SignTokenTransactionResponse)
-	err := c.cc.Invoke(ctx, SparkService_SignTokenTransaction_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *sparkServiceClient) FinalizeTokenTransaction(ctx context.Context, in *FinalizeTokenTransactionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, SparkService_FinalizeTokenTransaction_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *sparkServiceClient) FreezeTokens(ctx context.Context, in *FreezeTokensRequest, opts ...grpc.CallOption) (*FreezeTokensResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(FreezeTokensResponse)
-	err := c.cc.Invoke(ctx, SparkService_FreezeTokens_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *sparkServiceClient) QueryTokenOutputs(ctx context.Context, in *QueryTokenOutputsRequest, opts ...grpc.CallOption) (*QueryTokenOutputsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(QueryTokenOutputsResponse)
-	err := c.cc.Invoke(ctx, SparkService_QueryTokenOutputs_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *sparkServiceClient) QueryTokenTransactions(ctx context.Context, in *QueryTokenTransactionsRequest, opts ...grpc.CallOption) (*QueryTokenTransactionsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(QueryTokenTransactionsResponse)
-	err := c.cc.Invoke(ctx, SparkService_QueryTokenTransactions_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *sparkServiceClient) QueryUnusedDepositAddresses(ctx context.Context, in *QueryUnusedDepositAddressesRequest, opts ...grpc.CallOption) (*QueryUnusedDepositAddressesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryUnusedDepositAddressesResponse)
@@ -841,13 +768,6 @@ type SparkServiceServer interface {
 	QueryNodesByValue(context.Context, *QueryNodesByValueRequest) (*QueryNodesByValueResponse, error)
 	QueryBalance(context.Context, *QueryBalanceRequest) (*QueryBalanceResponse, error)
 	QueryUserSignedRefunds(context.Context, *QueryUserSignedRefundsRequest) (*QueryUserSignedRefundsResponse, error)
-	// Token RPCs
-	StartTokenTransaction(context.Context, *StartTokenTransactionRequest) (*StartTokenTransactionResponse, error)
-	SignTokenTransaction(context.Context, *SignTokenTransactionRequest) (*SignTokenTransactionResponse, error)
-	FinalizeTokenTransaction(context.Context, *FinalizeTokenTransactionRequest) (*emptypb.Empty, error)
-	FreezeTokens(context.Context, *FreezeTokensRequest) (*FreezeTokensResponse, error)
-	QueryTokenOutputs(context.Context, *QueryTokenOutputsRequest) (*QueryTokenOutputsResponse, error)
-	QueryTokenTransactions(context.Context, *QueryTokenTransactionsRequest) (*QueryTokenTransactionsResponse, error)
 	QueryUnusedDepositAddresses(context.Context, *QueryUnusedDepositAddressesRequest) (*QueryUnusedDepositAddressesResponse, error)
 	QueryStaticDepositAddresses(context.Context, *QueryStaticDepositAddressesRequest) (*QueryStaticDepositAddressesResponse, error)
 	SubscribeToEvents(*SubscribeToEventsRequest, grpc.ServerStreamingServer[SubscribeToEventsResponse]) error
@@ -987,24 +907,6 @@ func (UnimplementedSparkServiceServer) QueryBalance(context.Context, *QueryBalan
 }
 func (UnimplementedSparkServiceServer) QueryUserSignedRefunds(context.Context, *QueryUserSignedRefundsRequest) (*QueryUserSignedRefundsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryUserSignedRefunds not implemented")
-}
-func (UnimplementedSparkServiceServer) StartTokenTransaction(context.Context, *StartTokenTransactionRequest) (*StartTokenTransactionResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StartTokenTransaction not implemented")
-}
-func (UnimplementedSparkServiceServer) SignTokenTransaction(context.Context, *SignTokenTransactionRequest) (*SignTokenTransactionResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SignTokenTransaction not implemented")
-}
-func (UnimplementedSparkServiceServer) FinalizeTokenTransaction(context.Context, *FinalizeTokenTransactionRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method FinalizeTokenTransaction not implemented")
-}
-func (UnimplementedSparkServiceServer) FreezeTokens(context.Context, *FreezeTokensRequest) (*FreezeTokensResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method FreezeTokens not implemented")
-}
-func (UnimplementedSparkServiceServer) QueryTokenOutputs(context.Context, *QueryTokenOutputsRequest) (*QueryTokenOutputsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method QueryTokenOutputs not implemented")
-}
-func (UnimplementedSparkServiceServer) QueryTokenTransactions(context.Context, *QueryTokenTransactionsRequest) (*QueryTokenTransactionsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method QueryTokenTransactions not implemented")
 }
 func (UnimplementedSparkServiceServer) QueryUnusedDepositAddresses(context.Context, *QueryUnusedDepositAddressesRequest) (*QueryUnusedDepositAddressesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryUnusedDepositAddresses not implemented")
@@ -1648,114 +1550,6 @@ func _SparkService_QueryUserSignedRefunds_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkService_StartTokenTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StartTokenTransactionRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkServiceServer).StartTokenTransaction(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkService_StartTokenTransaction_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).StartTokenTransaction(ctx, req.(*StartTokenTransactionRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _SparkService_SignTokenTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SignTokenTransactionRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkServiceServer).SignTokenTransaction(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkService_SignTokenTransaction_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).SignTokenTransaction(ctx, req.(*SignTokenTransactionRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _SparkService_FinalizeTokenTransaction_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(FinalizeTokenTransactionRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkServiceServer).FinalizeTokenTransaction(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkService_FinalizeTokenTransaction_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).FinalizeTokenTransaction(ctx, req.(*FinalizeTokenTransactionRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _SparkService_FreezeTokens_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(FreezeTokensRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkServiceServer).FreezeTokens(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkService_FreezeTokens_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).FreezeTokens(ctx, req.(*FreezeTokensRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _SparkService_QueryTokenOutputs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QueryTokenOutputsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkServiceServer).QueryTokenOutputs(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkService_QueryTokenOutputs_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).QueryTokenOutputs(ctx, req.(*QueryTokenOutputsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _SparkService_QueryTokenTransactions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QueryTokenTransactionsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkServiceServer).QueryTokenTransactions(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkService_QueryTokenTransactions_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkServiceServer).QueryTokenTransactions(ctx, req.(*QueryTokenTransactionsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SparkService_QueryUnusedDepositAddresses_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(QueryUnusedDepositAddressesRequest)
 	if err := dec(in); err != nil {
@@ -2257,30 +2051,6 @@ var SparkService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "query_user_signed_refunds",
 			Handler:    _SparkService_QueryUserSignedRefunds_Handler,
-		},
-		{
-			MethodName: "start_token_transaction",
-			Handler:    _SparkService_StartTokenTransaction_Handler,
-		},
-		{
-			MethodName: "sign_token_transaction",
-			Handler:    _SparkService_SignTokenTransaction_Handler,
-		},
-		{
-			MethodName: "finalize_token_transaction",
-			Handler:    _SparkService_FinalizeTokenTransaction_Handler,
-		},
-		{
-			MethodName: "freeze_tokens",
-			Handler:    _SparkService_FreezeTokens_Handler,
-		},
-		{
-			MethodName: "query_token_outputs",
-			Handler:    _SparkService_QueryTokenOutputs_Handler,
-		},
-		{
-			MethodName: "query_token_transactions",
-			Handler:    _SparkService_QueryTokenTransactions_Handler,
 		},
 		{
 			MethodName: "query_unused_deposit_addresses",
