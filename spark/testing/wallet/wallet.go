@@ -14,18 +14,18 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/testing/wallet/ssp_api/mutations"
 
-	"github.com/lightsparkdev/spark/so/protoconverter"
-
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/utils"
 	sspapi "github.com/lightsparkdev/spark/testing/wallet/ssp_api"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // SingleKeyTestWallet is a wallet that uses a single private key for all signing keys.
@@ -34,7 +34,7 @@ type SingleKeyTestWallet struct {
 	Config            *TestWalletConfig
 	SigningPrivateKey keys.Private
 	OwnedNodes        []*pb.TreeNode
-	OwnedTokenOutputs []*pb.OutputWithPreviousTransactionData
+	OwnedTokenOutputs []*tokenpb.OutputWithPreviousTransactionData
 }
 
 // NewSingleKeyTestWallet creates a new single key wallet.
@@ -556,28 +556,36 @@ func (w *SingleKeyTestWallet) MintTokens(ctx context.Context, amount uint64) err
 	ctx = ContextWithToken(ctx, token)
 
 	tokenIdentityPubKeyBytes := w.Config.IdentityPublicKey().Serialize()
-	mintTransaction := &pb.TokenTransaction{
-		TokenInputs: &pb.TokenTransaction_MintInput{
-			MintInput: &pb.TokenMintInput{
-				IssuerPublicKey:         tokenIdentityPubKeyBytes,
-				IssuerProvidedTimestamp: uint64(time.Now().UnixMilli()),
+
+	mintTransaction := &tokenpb.TokenTransaction{
+		Version: 2,
+		TokenInputs: &tokenpb.TokenTransaction_MintInput{
+			MintInput: &tokenpb.TokenMintInput{
+				IssuerPublicKey: tokenIdentityPubKeyBytes,
 			},
 		},
-		TokenOutputs: []*pb.TokenOutput{
+		TokenOutputs: []*tokenpb.TokenOutput{
 			{
 				OwnerPublicKey: tokenIdentityPubKeyBytes,
-				TokenPublicKey: tokenIdentityPubKeyBytes,       // Using user pubkey as token ID for this example
-				TokenAmount:    int64ToUint128Bytes(0, amount), // high bits = 0, low bits = 99999
+				TokenPublicKey: tokenIdentityPubKeyBytes, // Using user pubkey as token ID for this example
+				TokenAmount:    int64ToUint128Bytes(0, amount),
 			},
 		},
+		ClientCreatedTimestamp: timestamppb.New(time.Now()),
+		Network:                w.Config.ProtoNetwork(),
 	}
-	finalTokenTransaction, err := BroadcastTokenTransaction(ctx, w.Config, mintTransaction,
+
+	finalTokenTransaction, err := BroadcastCoordinatedTokenTransferWithExpiryDuration(
+		ctx,
+		w.Config,
+		mintTransaction,
+		180*time.Second,
 		[]keys.Private{w.Config.IdentityPrivateKey},
-		nil,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to broadcast mint transaction: %w", err)
 	}
+
 	newOwnedOutputs, err := getOwnedOutputsFromTokenTransaction(finalTokenTransaction, w.Config.IdentityPublicKey())
 	if err != nil {
 		return fmt.Errorf("failed to add owned outputs: %w", err)
@@ -610,11 +618,11 @@ func (w *SingleKeyTestWallet) TransferTokens(ctx context.Context, amount uint64,
 		return fmt.Errorf("failed to select token outputs: %w", err)
 	}
 
-	outputsToSpend := make([]*pb.TokenOutputToSpend, len(selectedOutputsWithPrevTxData))
+	outputsToSpend := make([]*tokenpb.TokenOutputToSpend, len(selectedOutputsWithPrevTxData))
 	revocationPublicKeys := make([]keys.Public, len(selectedOutputsWithPrevTxData))
 	outputsToSpendPrivateKeys := make([]keys.Private, len(selectedOutputsWithPrevTxData))
 	for i, output := range selectedOutputsWithPrevTxData {
-		outputsToSpend[i] = &pb.TokenOutputToSpend{
+		outputsToSpend[i] = &tokenpb.TokenOutputToSpend{
 			PrevTokenTransactionHash: output.GetPreviousTransactionHash(),
 			PrevTokenTransactionVout: output.GetPreviousTransactionVout(),
 		}
@@ -627,25 +635,28 @@ func (w *SingleKeyTestWallet) TransferTokens(ctx context.Context, amount uint64,
 		outputsToSpendPrivateKeys[i] = w.Config.IdentityPrivateKey
 	}
 
-	transferTransaction := &pb.TokenTransaction{
-		TokenInputs: &pb.TokenTransaction_TransferInput{
-			TransferInput: &pb.TokenTransferInput{
+	transferTransaction := &tokenpb.TokenTransaction{
+		Version: 2,
+		TokenInputs: &tokenpb.TokenTransaction_TransferInput{
+			TransferInput: &tokenpb.TokenTransferInput{
 				OutputsToSpend: outputsToSpend,
 			},
 		},
-		TokenOutputs: []*pb.TokenOutput{
+		TokenOutputs: []*tokenpb.TokenOutput{
 			{
 				OwnerPublicKey: receiverPubKey.Serialize(),
 				TokenPublicKey: tokenPublicKey.Serialize(),
 				TokenAmount:    int64ToUint128Bytes(0, amount),
 			},
 		},
+		ClientCreatedTimestamp: timestamppb.New(time.Now()),
+		Network:                w.Config.ProtoNetwork(),
 	}
 
 	// Send the remainder back to our wallet with an additional output if necessary.
 	if selectedOutputsAmount > amount {
 		remainder := selectedOutputsAmount - amount
-		changeOutput := &pb.TokenOutput{
+		changeOutput := &tokenpb.TokenOutput{
 			OwnerPublicKey: w.Config.IdentityPublicKey().Serialize(),
 			TokenPublicKey: tokenPublicKey.Serialize(),
 			TokenAmount:    int64ToUint128Bytes(0, remainder),
@@ -653,12 +664,17 @@ func (w *SingleKeyTestWallet) TransferTokens(ctx context.Context, amount uint64,
 		transferTransaction.TokenOutputs = append(transferTransaction.TokenOutputs, changeOutput)
 	}
 
-	finalTokenTransaction, err := BroadcastTokenTransaction(ctx, w.Config, transferTransaction, outputsToSpendPrivateKeys,
-		revocationPublicKeys,
+	finalTokenTransaction, err := BroadcastCoordinatedTokenTransferWithExpiryDuration(
+		ctx,
+		w.Config,
+		transferTransaction,
+		180*time.Second,
+		outputsToSpendPrivateKeys,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to broadcast transfer transaction: %w", err)
 	}
+
 	// Remove the spent outputs from the owned outputs list.
 	spentLeafMap := make(map[string]bool)
 	for _, output := range selectedOutputsWithPrevTxData {
@@ -701,10 +717,10 @@ func (w *SingleKeyTestWallet) GetAllTokenBalances(ctx context.Context) (map[stri
 		return nil, fmt.Errorf("failed to get token outputs: %w", err)
 	}
 
-	// Group outputs by token public key and calculate totals
+	// Group outputs by token identifier and calculate totals
 	balances := make(map[string]TokenBalance)
 	for _, output := range response.OutputsWithPreviousTransactionData {
-		tokenPubKeyHex := hex.EncodeToString(output.Output.TokenPublicKey)
+		tokenPubKeyHex := hex.EncodeToString(output.Output.TokenIdentifier)
 		balance := balances[tokenPubKeyHex]
 
 		_, amount, err := uint128BytesToInt64(output.Output.TokenAmount)
@@ -751,7 +767,7 @@ func (w *SingleKeyTestWallet) GetTokenBalance(ctx context.Context, tokenPublicKe
 	return len(response.OutputsWithPreviousTransactionData), totalAmount, nil
 }
 
-func selectTokenOutputs(ctx context.Context, config *TestWalletConfig, targetAmount uint64, tokenPublicKey keys.Public, ownerPublicKey keys.Public) ([]*pb.OutputWithPreviousTransactionData, uint64, error) {
+func selectTokenOutputs(ctx context.Context, config *TestWalletConfig, targetAmount uint64, tokenPublicKey keys.Public, ownerPublicKey keys.Public) ([]*tokenpb.OutputWithPreviousTransactionData, uint64, error) {
 	// Fetch owned token leaves
 	ownedOutputsResponse, err := QueryTokenOutputs(ctx, config, []keys.Public{ownerPublicKey}, []keys.Public{tokenPublicKey})
 	if err != nil {
@@ -760,14 +776,14 @@ func selectTokenOutputs(ctx context.Context, config *TestWalletConfig, targetAmo
 	outputsWithPrevTxData := ownedOutputsResponse.OutputsWithPreviousTransactionData
 
 	// Sort to spend smallest outputs first to proactively reduce withdrawal cost.
-	slices.SortFunc(outputsWithPrevTxData, func(a, b *pb.OutputWithPreviousTransactionData) int {
+	slices.SortFunc(outputsWithPrevTxData, func(a, b *tokenpb.OutputWithPreviousTransactionData) int {
 		_, aAmount, _ := uint128BytesToInt64(a.Output.TokenAmount)
 		_, bAmount, _ := uint128BytesToInt64(b.Output.TokenAmount)
 		return cmp.Compare(aAmount, bAmount)
 	})
 
 	selectedOutputsAmount := uint64(0)
-	selectedOutputs := make([]*pb.OutputWithPreviousTransactionData, len(outputsWithPrevTxData))
+	selectedOutputs := make([]*tokenpb.OutputWithPreviousTransactionData, len(outputsWithPrevTxData))
 	for i, output := range outputsWithPrevTxData {
 		_, outputTokenAmount, err := uint128BytesToInt64(output.Output.TokenAmount)
 		if err != nil {
@@ -802,28 +818,24 @@ func int64ToUint128Bytes(high, low uint64) []byte {
 	)
 }
 
-func getOwnedOutputsFromTokenTransaction(output *pb.TokenTransaction, walletPublicKey keys.Public) ([]*pb.OutputWithPreviousTransactionData, error) {
-	outputTokenProto, err := protoconverter.TokenProtoFromSparkTokenTransaction(output)
+func getOwnedOutputsFromTokenTransaction(tokenTransaction *tokenpb.TokenTransaction, walletPublicKey keys.Public) ([]*tokenpb.OutputWithPreviousTransactionData, error) {
+	finalTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, false)
 	if err != nil {
 		return nil, err
 	}
-
-	finalTokenTransactionHash, err := utils.HashTokenTransaction(outputTokenProto, false)
-	if err != nil {
-		return nil, err
-	}
-	var newOutputsToSpend []*pb.OutputWithPreviousTransactionData
-	for i, output := range output.TokenOutputs {
+	var newOutputsToSpend []*tokenpb.OutputWithPreviousTransactionData
+	for i, output := range tokenTransaction.TokenOutputs {
 		ownerPubKey, err := keys.ParsePublicKey(output.OwnerPublicKey)
 		if err != nil {
 			return nil, err
 		}
 		if ownerPubKey.Equals(walletPublicKey) {
-			outputWithPrevTxData := &pb.OutputWithPreviousTransactionData{
-				Output: &pb.TokenOutput{
+			outputWithPrevTxData := &tokenpb.OutputWithPreviousTransactionData{
+				Output: &tokenpb.TokenOutput{
 					OwnerPublicKey:       output.OwnerPublicKey,
 					RevocationCommitment: output.RevocationCommitment,
 					TokenPublicKey:       output.TokenPublicKey,
+					TokenIdentifier:      output.TokenIdentifier,
 					TokenAmount:          output.TokenAmount,
 				},
 				PreviousTransactionHash: finalTokenTransactionHash,
@@ -835,16 +847,14 @@ func getOwnedOutputsFromTokenTransaction(output *pb.TokenTransaction, walletPubl
 	return newOutputsToSpend, nil
 }
 
-func getLeafWithPrevTxKey(output *pb.OutputWithPreviousTransactionData) string {
+func getLeafWithPrevTxKey(output *tokenpb.OutputWithPreviousTransactionData) string {
 	txHashStr := hex.EncodeToString(output.GetPreviousTransactionHash())
 	return fmt.Sprintf("%s:%d", txHashStr, output.GetPreviousTransactionVout())
 }
 
 // FreezeTokens freezes all tokens owned by a specific owner public key.
-func (w *SingleKeyTestWallet) FreezeTokens(ctx context.Context, ownerPublicKey keys.Public) ([]string, uint64, error) {
-	// For simplicity, we're using the wallet's identity public key as the token public key
-	tokenPublicKey := w.Config.IdentityPublicKey()
-	response, err := FreezeTokens(ctx, w.Config, ownerPublicKey, tokenPublicKey, false)
+func (w *SingleKeyTestWallet) FreezeTokens(ctx context.Context, ownerPublicKey keys.Public, tokenIdentifier []byte) ([]string, uint64, error) {
+	response, err := FreezeTokens(ctx, w.Config, ownerPublicKey, tokenIdentifier, false)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to freeze tokens: %w", err)
 	}
@@ -859,10 +869,8 @@ func (w *SingleKeyTestWallet) FreezeTokens(ctx context.Context, ownerPublicKey k
 }
 
 // UnfreezeTokens unfreezes all tokens owned by a specific owner public key.
-func (w *SingleKeyTestWallet) UnfreezeTokens(ctx context.Context, ownerPublicKey keys.Public) ([]string, uint64, error) {
-	// For simplicity, we're using the wallet's identity public key as the token public key
-	tokenPublicKey := w.Config.IdentityPublicKey()
-	response, err := FreezeTokens(ctx, w.Config, ownerPublicKey, tokenPublicKey, true)
+func (w *SingleKeyTestWallet) UnfreezeTokens(ctx context.Context, ownerPublicKey keys.Public, tokenIdentifier []byte) ([]string, uint64, error) {
+	response, err := FreezeTokens(ctx, w.Config, ownerPublicKey, tokenIdentifier, true)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to unfreeze tokens: %w", err)
 	}

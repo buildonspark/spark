@@ -151,7 +151,7 @@ func TestCoordinatedQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t 
 
 			userOneConfig := wallet.NewTestWalletConfigWithIdentityKey(t, userOutput1PrivKey)
 
-			correctNetworkResponse, err := wallet.QueryTokenOutputsV2(
+			correctNetworkResponse, err := wallet.QueryTokenOutputs(
 				t.Context(),
 				userOneConfig,
 				[]keys.Public{userOutput1PrivKey.Public()},
@@ -163,7 +163,7 @@ func TestCoordinatedQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t 
 			wrongNetworkConfig := userOneConfig
 			wrongNetworkConfig.Network = common.Mainnet
 
-			wrongNetworkResponse, err := wallet.QueryTokenOutputsV2(
+			wrongNetworkResponse, err := wallet.QueryTokenOutputs(
 				t.Context(),
 				wrongNetworkConfig,
 				[]keys.Public{userOutput1PrivKey.Public()},
@@ -383,7 +383,7 @@ func TestCoordinatedTokenMintAndTransferMaxInputsSucceeds(t *testing.T) {
 	_, err = wallet.BroadcastCoordinatedTokenTransfer(t.Context(), config, consolidateTransaction, userOutputPrivKeys)
 	require.NoError(t, err, "failed to broadcast consolidation transaction")
 
-	tokenOutputsResponse, err := wallet.QueryTokenOutputsV2(
+	tokenOutputsResponse, err := wallet.QueryTokenOutputs(
 		t.Context(),
 		config,
 		[]keys.Public{consolidatedOutputPrivKey.Public()},

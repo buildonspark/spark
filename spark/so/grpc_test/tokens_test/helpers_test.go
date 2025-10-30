@@ -3,7 +3,9 @@ package tokens_test
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
+	"math/big"
 	"sort"
 	"testing"
 	"time"
@@ -26,7 +28,75 @@ const (
 	TokenTransactionVersion1      = 1
 	TokenTransactionVersion2      = 2
 	TokenTransactionVersion3      = 3
+
+	// Test token amounts for various operations
+	testIssueOutput1Amount                          = 11
+	testIssueOutput2Amount                          = 22
+	testTransferOutput1Amount                       = 33
+	withdrawalBondSatsInConfig                      = 10000
+	withdrawalRelativeBlockLocktimeInConfig         = 1000
+	testTokenName                                   = "TestToken"
+	testTokenTicker                                 = "TEST"
+	testTokenDecimals                               = 8
+	testTokenIsFreezable                            = true
+	testTokenMaxSupply                              = 0
+	testIssueMultiplePerOutputAmount                = 500
+	maxInputOrOutputTokenTransactionOutputsForTests = 48
+	manyOutputsCount                                = 10
 )
+
+// Predefined issuer key for tests
+type prederivedIdentityPrivateKeyFromMnemonic struct {
+	identityPrivateKeyHex string
+}
+
+func (k *prederivedIdentityPrivateKeyFromMnemonic) IdentityPrivateKey() keys.Private {
+	privKeyBytes, err := hex.DecodeString(k.identityPrivateKeyHex)
+	if err != nil {
+		panic("invalid issuer private key hex")
+	}
+	privKey, err := keys.ParsePrivateKey(privKeyBytes)
+	if err != nil {
+		panic("invalid issuer private key")
+	}
+	return privKey
+}
+
+var staticLocalIssuerKey = prederivedIdentityPrivateKeyFromMnemonic{
+	identityPrivateKeyHex: "515c86ccb09faa2235acd0e287381bf286b37002328a8cc3c3b89738ab59dc93",
+}
+
+// Helper functions for tests
+func int64ToUint128Bytes(high, low uint64) []byte {
+	result := make([]byte, 0, 16)
+	result = append(result, byte(high>>56), byte(high>>48), byte(high>>40), byte(high>>32), byte(high>>24), byte(high>>16), byte(high>>8), byte(high))
+	result = append(result, byte(low>>56), byte(low>>48), byte(low>>40), byte(low>>32), byte(low>>24), byte(low>>16), byte(low>>8), byte(low))
+	return result
+}
+
+func getRandomPrivateKey(t *testing.T) keys.Private {
+	return keys.GeneratePrivateKey()
+}
+
+func getSigningOperatorPublicKeyBytes(config *wallet.TestWalletConfig) [][]byte {
+	var operatorKeys [][]byte
+	for _, operator := range config.SigningOperators {
+		operatorKeys = append(operatorKeys, operator.IdentityPublicKey.Serialize())
+	}
+	return operatorKeys
+}
+
+func bytesToBigInt(value []byte) *big.Int {
+	return new(big.Int).SetBytes(value)
+}
+
+func uint64ToBigInt(value uint64) *big.Int {
+	return new(big.Int).SetBytes(int64ToUint128Bytes(0, value))
+}
+
+func getTokenMaxSupplyBytes(maxSupply uint64) []byte {
+	return int64ToUint128Bytes(0, maxSupply)
+}
 
 // Parameter structs for WithParams functions
 type tokenTransactionParams struct {
@@ -371,7 +441,7 @@ func queryAndVerifyTokenOutputs(t *testing.T, coordinatorIdentifiers []string, f
 		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 		config.CoordinatorIdentifier = coordinatorIdentifier
 
-		outputs, err := wallet.QueryTokenOutputsV2(t.Context(), config, []keys.Public{ownerPrivateKey.Public()}, nil)
+		outputs, err := wallet.QueryTokenOutputs(t.Context(), config, []keys.Public{ownerPrivateKey.Public()}, nil)
 		require.NoError(t, err, "failed to query token outputs from coordinator: %s", coordinatorIdentifier)
 		require.Len(t, outputs.OutputsWithPreviousTransactionData, len(expectedOutputs), "expected %d outputs from coordinator: %s", len(expectedOutputs), coordinatorIdentifier)
 
@@ -579,7 +649,7 @@ func verifyTokenBalance(
 	description string,
 ) {
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, ownerPrivKey)
-	outputs, err := wallet.QueryTokenOutputsV2(
+	outputs, err := wallet.QueryTokenOutputs(
 		t.Context(),
 		config,
 		[]keys.Public{ownerPrivKey.Public()},

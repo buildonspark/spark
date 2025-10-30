@@ -5,13 +5,12 @@ import (
 	"testing"
 
 	"github.com/lightsparkdev/spark/common/keys"
-	"github.com/lightsparkdev/spark/so/protoconverter"
 	"github.com/lightsparkdev/spark/so/utils"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/require"
 )
 
-func TestV1FreezeAndUnfreezeTokens(t *testing.T) {
+func TestFreezeAndUnfreezeTokens(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
 		t.Run(tc.name, func(t *testing.T) {
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
@@ -38,7 +37,7 @@ func TestV1FreezeAndUnfreezeTokens(t *testing.T) {
 
 			ownerPubKey, err := keys.ParsePublicKey(finalIssueTokenTransaction.TokenOutputs[0].OwnerPublicKey)
 			require.NoError(t, err)
-			freezeResponse, err := wallet.FreezeTokensV1(t.Context(), config, ownerPubKey, finalIssueTokenTransaction.TokenOutputs[0].TokenIdentifier, false)
+			freezeResponse, err := wallet.FreezeTokens(t.Context(), config, ownerPubKey, finalIssueTokenTransaction.TokenOutputs[0].TokenIdentifier, false)
 			require.NoError(t, err, "failed to freeze tokens")
 
 			frozenAmount := new(big.Int).SetBytes(freezeResponse.ImpactedTokenAmount)
@@ -55,20 +54,19 @@ func TestV1FreezeAndUnfreezeTokens(t *testing.T) {
 			finalIssueTokenTransactionHash, err := utils.HashTokenTransaction(finalIssueTokenTransaction, false)
 			require.NoError(t, err, "failed to hash final transfer token transaction")
 
-			transferTokenTransaction, _, err := createTestTokenTransferTransaction(config, finalIssueTokenTransactionHash, tokenPrivKey.Public())
+			transferTokenTransaction, _, err := createTestTokenTransferTransactionTokenPb(
+				t, config, finalIssueTokenTransactionHash, tokenPrivKey.Public(),
+			)
 			require.NoError(t, err, "failed to create test token transfer transaction")
 
-			tokenTransferTokenTransaction, err := protoconverter.TokenProtoFromSparkTokenTransaction(transferTokenTransaction)
-			require.NoError(t, err, "failed to convert transfer token transaction")
-
 			transferFrozenTokenTransactionResponse, err := wallet.BroadcastCoordinatedTokenTransfer(
-				t.Context(), config, tokenTransferTokenTransaction,
+				t.Context(), config, transferTokenTransaction,
 				[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 			)
 			require.Error(t, err, "expected error when transferring frozen tokens")
 			require.Nil(t, transferFrozenTokenTransactionResponse, "expected nil response when transferring frozen tokens")
 
-			unfreezeResponse, err := wallet.FreezeTokensV1(t.Context(), config, ownerPubKey, finalIssueTokenTransaction.TokenOutputs[0].TokenIdentifier, true)
+			unfreezeResponse, err := wallet.FreezeTokens(t.Context(), config, ownerPubKey, finalIssueTokenTransaction.TokenOutputs[0].TokenIdentifier, true)
 			require.NoError(t, err, "failed to unfreeze tokens")
 
 			thawedAmount := new(big.Int).SetBytes(unfreezeResponse.ImpactedTokenAmount)
@@ -80,7 +78,7 @@ func TestV1FreezeAndUnfreezeTokens(t *testing.T) {
 				"thawed output ID %s does not match expected output ID %s", unfreezeResponse.ImpactedOutputIds[0], *expectedOutputID)
 
 			transferTokenTransactionResponse, err := wallet.BroadcastCoordinatedTokenTransfer(
-				t.Context(), config, tokenTransferTokenTransaction,
+				t.Context(), config, transferTokenTransaction,
 				[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 			)
 			require.NoError(t, err, "failed to broadcast thawed token transaction")

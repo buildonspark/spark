@@ -464,7 +464,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 		Offset:            0,
 		Limit:             1,
 	}
-	tokenTransactionResponse, err := wallet.QueryTokenTransactionsV2(
+	tokenTransactionResponse, err := wallet.QueryTokenTransactions(
 		t.Context(),
 		config,
 		queryTokenTransactionParms,

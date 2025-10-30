@@ -78,7 +78,7 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 	assert.Equal(t, expectedTransferAmount, transferAmount)
 	require.Equal(t, userOutput3PubKeyBytes, transferTokenTransactionResponse.TokenOutputs[0].OwnerPublicKey, "transfer created output owner public key does not match expected")
 
-	tokenOutputsResponse, err := wallet.QueryTokenOutputsV2(
+	tokenOutputsResponse, err := wallet.QueryTokenOutputs(
 		t.Context(),
 		config,
 		[]keys.Public{userOutput3PrivKey.Public()},
@@ -97,7 +97,7 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 		Offset:            0,
 		Limit:             1,
 	}
-	tokenTransactionsPage1, err := wallet.QueryTokenTransactionsV2(
+	tokenTransactionsPage1, err := wallet.QueryTokenTransactions(
 		t.Context(),
 		config,
 		page1Params,
@@ -119,7 +119,7 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 		Offset:            tokenTransactionsPage1.Offset,
 		Limit:             1,
 	}
-	tokenTransactionsPage2, err := wallet.QueryTokenTransactionsV2(t.Context(), config, page2Params)
+	tokenTransactionsPage2, err := wallet.QueryTokenTransactions(t.Context(), config, page2Params)
 	require.NoError(t, err, "failed to query token transactions page 2")
 
 	require.Len(t, tokenTransactionsPage2.TokenTransactionsWithStatus, 1, "expected 1 token transaction in page 2")
@@ -138,7 +138,7 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 		Offset:            tokenTransactionsPage2.Offset,
 		Limit:             1,
 	}
-	tokenTransactionsPage3, err := wallet.QueryTokenTransactionsV2(t.Context(), config, page3Params)
+	tokenTransactionsPage3, err := wallet.QueryTokenTransactions(t.Context(), config, page3Params)
 	require.NoError(t, err, "failed to query token transactions page 3")
 
 	require.Empty(t, tokenTransactionsPage3.TokenTransactionsWithStatus, "expected 0 token transactions in page 3")
@@ -611,7 +611,7 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := wallet.QueryTokenTransactionsV2(
+			result, err := wallet.QueryTokenTransactions(
 				t.Context(),
 				config,
 				tc.params,
@@ -666,7 +666,7 @@ func TestQueryTokenOutputsWithStartTransaction(t *testing.T) {
 			_, _, err = wallet.StartTokenTransactionCoordinated(t.Context(), config, transferTx, []keys.Private{owner1PrivKey, owner2PrivKey}, 1*time.Second, nil)
 			require.NoError(t, err, "failed to start transfer transaction")
 
-			outputsResp, err := wallet.QueryTokenOutputsV2(
+			outputsResp, err := wallet.QueryTokenOutputs(
 				t.Context(),
 				config,
 				[]keys.Public{owner1PrivKey.Public()},
@@ -736,7 +736,7 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 	transactionHashes = append(transactionHashes, mintTxHash3)
 
 	t.Run("ascending order", func(t *testing.T) {
-		result, err := wallet.QueryTokenTransactionsV2(
+		result, err := wallet.QueryTokenTransactions(
 			t.Context(),
 			config,
 			wallet.QueryTokenTransactionsParams{
@@ -757,7 +757,7 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 	})
 
 	t.Run("descending order", func(t *testing.T) {
-		result, err := wallet.QueryTokenTransactionsV2(
+		result, err := wallet.QueryTokenTransactions(
 			t.Context(),
 			config,
 			wallet.QueryTokenTransactionsParams{

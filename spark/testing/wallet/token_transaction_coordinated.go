@@ -272,8 +272,8 @@ func SignTokenTransactionFromCoordination(
 	})
 }
 
-// FreezeTokensV1 sends a request to freeze (or unfreeze) all tokens owned by a specific owner public key.
-func FreezeTokensV1(
+// FreezeTokens sends a request to freeze (or unfreeze) all tokens owned by a specific owner public key.
+func FreezeTokens(
 	ctx context.Context,
 	config *TestWalletConfig,
 	ownerPublicKey keys.Public,

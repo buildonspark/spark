@@ -72,7 +72,7 @@ func testCoordinatedTransactionSigningScenarios(
 			Offset:            0,
 			Limit:             2,
 		}
-		txQueryResponse, err := wallet.QueryTokenTransactionsV2(
+		txQueryResponse, err := wallet.QueryTokenTransactions(
 			t.Context(),
 			config,
 			txQueryParams,
