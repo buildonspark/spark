@@ -7,6 +7,7 @@ import {
   TokenTransaction,
   TokenTransactionType,
 } from "../proto/spark_token.js";
+import { createProtoHasher } from "../spark-wallet/proto-hash.js";
 
 export function hashTokenTransaction(
   tokenTransaction: TokenTransaction,
@@ -1069,6 +1070,88 @@ export function hashTokenTransactionV2(
   }
   finalHashObj.update(concatenatedHashes);
   return finalHashObj.digest();
+}
+
+function inferTokenTransactionType(
+  tokenTransaction: TokenTransaction,
+): TokenTransactionType {
+  const hasCreateInput = tokenTransaction.tokenInputs?.$case === "createInput";
+  const hasMintInput = tokenTransaction.tokenInputs?.$case === "mintInput";
+
+  if (hasCreateInput) {
+    return TokenTransactionType.TOKEN_TRANSACTION_TYPE_CREATE;
+  } else if (hasMintInput) {
+    return TokenTransactionType.TOKEN_TRANSACTION_TYPE_MINT;
+  } else {
+    return TokenTransactionType.TOKEN_TRANSACTION_TYPE_TRANSFER;
+  }
+}
+
+export async function hashTokenTransactionV3(
+  tokenTransaction: TokenTransaction,
+  partialHash: boolean = false,
+): Promise<Uint8Array> {
+  if (!tokenTransaction) {
+    throw new ValidationError("token transaction cannot be nil", {
+      field: "tokenTransaction",
+    });
+  }
+
+  const hasher = createProtoHasher();
+
+  if (partialHash) {
+    const cloned: TokenTransaction = {
+      ...tokenTransaction,
+      expiryTime: undefined,
+      tokenInputs: tokenTransaction.tokenInputs,
+      tokenOutputs: tokenTransaction.tokenOutputs,
+    };
+
+    const inputType = inferTokenTransactionType(cloned);
+
+    switch (inputType) {
+      case TokenTransactionType.TOKEN_TRANSACTION_TYPE_CREATE:
+        if (cloned.tokenInputs?.$case === "createInput") {
+          cloned.tokenInputs = {
+            ...cloned.tokenInputs,
+            createInput: {
+              ...cloned.tokenInputs.createInput,
+              creationEntityPublicKey: undefined,
+            },
+          };
+        }
+        break;
+
+      case TokenTransactionType.TOKEN_TRANSACTION_TYPE_MINT:
+      case TokenTransactionType.TOKEN_TRANSACTION_TYPE_TRANSFER:
+        if (cloned.tokenOutputs) {
+          cloned.tokenOutputs = cloned.tokenOutputs.map((output) =>
+            output
+              ? {
+                  ...output,
+                  id: undefined,
+                  revocationCommitment: undefined,
+                  withdrawBondSats: undefined,
+                  withdrawRelativeBlockLocktime: undefined,
+                }
+              : output,
+          );
+        }
+        break;
+
+      default:
+        throw new ValidationError(
+          `unsupported token transaction type: ${inputType}`,
+          {
+            field: "tokenInputs",
+          },
+        );
+    }
+
+    return hasher.hashProto(cloned, "spark_token.TokenTransaction");
+  }
+
+  return hasher.hashProto(tokenTransaction, "spark_token.TokenTransaction");
 }
 
 export function hashOperatorSpecificTokenTransactionSignablePayload(

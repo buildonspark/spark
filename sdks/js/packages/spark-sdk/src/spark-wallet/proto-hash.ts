@@ -4,8 +4,8 @@
  * to ensure identical hashes for the same proto messages across Go and JavaScript.
  */
 
-import crypto from "crypto";
 import { getFieldNumbers, getFieldMeta } from "./proto-reflection.js";
+import { sha256 } from "@noble/hashes/sha2";
 
 // ObjectHash type identifiers - must match protoreflecthash constants
 const BOOL_IDENTIFIER = "b";
@@ -55,6 +55,8 @@ interface FieldHashEntry {
  * TypeScript implementation of protoreflecthash for cross-language compatibility
  */
 export class ProtoHasher {
+  private encoder = new TextEncoder();
+
   constructor() {}
 
   async hashProto(message: any, messageTypeName?: string): Promise<Uint8Array> {
@@ -185,7 +187,8 @@ export class ProtoHasher {
     fieldType: any,
     value: any,
   ): Promise<Uint8Array> {
-    if (Array.isArray(value)) {
+    // Handle repeated fields explicitly
+    if (fieldType?.type === "repeated" && Array.isArray(value)) {
       return this.hashList(fieldType.elementType || fieldType, value);
     }
 
@@ -378,26 +381,18 @@ export class ProtoHasher {
   }
 
   private hashUnicode(value: string): Uint8Array {
-    return this.hash(UNICODE_IDENTIFIER, new TextEncoder().encode(value));
+    return this.hash(UNICODE_IDENTIFIER, this.encoder.encode(value));
   }
 
-  private hashBytes(value: Uint8Array | ArrayBuffer | number[]): Uint8Array {
-    let bytes: Uint8Array;
-    if (value instanceof Uint8Array) {
-      bytes = value;
-    } else if (value instanceof ArrayBuffer) {
-      bytes = new Uint8Array(value);
-    } else {
-      bytes = new Uint8Array(value);
-    }
-    return this.hash(BYTE_IDENTIFIER, bytes);
+  private hashBytes(value: Uint8Array): Uint8Array {
+    return this.hash(BYTE_IDENTIFIER, value);
   }
 
   // Note: No NIL hashing in JS. Nil/undefined should never be hashed and will error.
 
   private hash(typeIdentifier: string, data: Uint8Array): Uint8Array {
-    const hasher = crypto.createHash("sha256");
-    hasher.update(typeIdentifier, "utf8");
+    const hasher = sha256.create();
+    hasher.update(this.encoder.encode(typeIdentifier));
     hasher.update(data);
     return new Uint8Array(hasher.digest());
   }
@@ -447,9 +442,8 @@ export class ProtoHasher {
           usedTags.add(actualFieldNumber);
 
           const snakeCase = camelToSnake(actualFieldName);
-          const nestedTypeName = (fieldMeta as any)[snakeCase]?.typeName as
-            | string
-            | undefined;
+          const meta = (fieldMeta as any)[snakeCase];
+          const nestedTypeName = meta?.typeName as string | undefined;
           const inferred = this.inferFieldType(actualValue);
           const typeWithHint = nestedTypeName
             ? { type: "message", typeName: nestedTypeName }
@@ -480,16 +474,29 @@ export class ProtoHasher {
 
       if (value !== undefined) {
         const snakeCase = camelToSnake(fieldName);
-        const nestedTypeName = (fieldMeta as any)[snakeCase]?.typeName as
-          | string
-          | undefined;
-        const inferred = this.inferFieldType(value);
-        const typeWithHint = nestedTypeName
-          ? { type: "message", typeName: nestedTypeName }
-          : inferred;
+        const meta = (fieldMeta as any)[snakeCase];
+        const isRepeated = meta?.repeated === true;
+        const fieldType = meta?.type as number | undefined;
+        const nestedTypeName = meta?.typeName as string | undefined;
+
+        // Build the field type descriptor
+        let typeDescriptor: any;
+        if (isRepeated && Array.isArray(value)) {
+          // For repeated fields, create a descriptor with element type info
+          const elementType = this.protoTypeToFieldType(
+            fieldType,
+            nestedTypeName,
+          );
+          typeDescriptor = { type: "repeated", elementType };
+        } else if (nestedTypeName) {
+          typeDescriptor = { type: "message", typeName: nestedTypeName };
+        } else {
+          typeDescriptor = this.inferFieldType(value);
+        }
+
         fields[fieldNumber] = {
           name: fieldName,
-          type: typeWithHint,
+          type: typeDescriptor,
           value,
         };
       }
@@ -511,6 +518,65 @@ export class ProtoHasher {
     }
 
     return fields;
+  }
+
+  private protoTypeToFieldType(protoType?: number, typeName?: string): any {
+    const TYPE_DOUBLE = 1;
+    const TYPE_FLOAT = 2;
+    const TYPE_INT64 = 3;
+    const TYPE_UINT64 = 4;
+    const TYPE_INT32 = 5;
+    const TYPE_FIXED64 = 6;
+    const TYPE_FIXED32 = 7;
+    const TYPE_BOOL = 8;
+    const TYPE_STRING = 9;
+    const TYPE_MESSAGE = 11;
+    const TYPE_BYTES = 12;
+    const TYPE_UINT32 = 13;
+    const TYPE_ENUM = 14;
+    const TYPE_SFIXED32 = 15;
+    const TYPE_SFIXED64 = 16;
+    const TYPE_SINT32 = 17;
+    const TYPE_SINT64 = 18;
+
+    switch (protoType) {
+      case TYPE_DOUBLE:
+        return "double";
+      case TYPE_FLOAT:
+        return "float";
+      case TYPE_INT64:
+        return "int64";
+      case TYPE_UINT64:
+        return "uint64";
+      case TYPE_INT32:
+        return "int32";
+      case TYPE_FIXED64:
+        return "fixed64";
+      case TYPE_FIXED32:
+        return "fixed32";
+      case TYPE_BOOL:
+        return "bool";
+      case TYPE_STRING:
+        return "string";
+      case TYPE_MESSAGE:
+        return typeName ? { type: "message", typeName } : "message";
+      case TYPE_BYTES:
+        return "bytes";
+      case TYPE_UINT32:
+        return "uint32";
+      case TYPE_ENUM:
+        return "int32"; // Enums are handled as int32
+      case TYPE_SFIXED32:
+        return "sfixed32";
+      case TYPE_SFIXED64:
+        return "sfixed64";
+      case TYPE_SINT32:
+        return "sint32";
+      case TYPE_SINT64:
+        return "sint64";
+      default:
+        return "unknown";
+    }
   }
 
   private isOneofField(value: any): boolean {

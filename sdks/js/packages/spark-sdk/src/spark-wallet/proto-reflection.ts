@@ -148,11 +148,19 @@ export function listMessageTypes(): string[] {
 /**
  * Return per-field metadata for a message type.
  * - Keys are snake_case field names as present in the proto descriptor
- * - Values include field number, oneof index if applicable, and nested type name for message fields
+ * - Values include field number, oneof index if applicable, nested type name for message fields,
+ *   whether the field is repeated, and the element type
  */
-export function getFieldMeta(
-  messageTypeName: string,
-): Record<string, { number: number; oneofIndex?: number; typeName?: string }> {
+export function getFieldMeta(messageTypeName: string): Record<
+  string,
+  {
+    number: number;
+    oneofIndex?: number;
+    typeName?: string;
+    repeated?: boolean;
+    type?: number;
+  }
+> {
   try {
     const registry = getRegistry();
     const descriptor = registry.messageMap.get(messageTypeName);
@@ -161,20 +169,41 @@ export function getFieldMeta(
     }
     const meta: Record<
       string,
-      { number: number; oneofIndex?: number; typeName?: string }
+      {
+        number: number;
+        oneofIndex?: number;
+        typeName?: string;
+        repeated?: boolean;
+        type?: number;
+      }
     > = {};
     const fields = descriptor.field || [];
+    const LABEL_REPEATED = 3; // google.protobuf.FieldDescriptorProto.Label.LABEL_REPEATED
+    const TYPE_MESSAGE = 11; // google.protobuf.FieldDescriptorProto.Type.TYPE_MESSAGE
+
     for (const f of fields) {
-      const entry: { number: number; oneofIndex?: number; typeName?: string } =
-        {
-          number: f.number,
-        };
+      const entry: {
+        number: number;
+        oneofIndex?: number;
+        typeName?: string;
+        repeated?: boolean;
+        type?: number;
+      } = {
+        number: f.number,
+      };
       if (typeof f.oneofIndex === "number") {
         entry.oneofIndex = f.oneofIndex;
       }
+      // Record if this is a repeated field
+      if (f.label === LABEL_REPEATED) {
+        entry.repeated = true;
+      }
+      // Record the field type
+      if (typeof f.type === "number") {
+        entry.type = f.type;
+      }
       // If this is a message-typed field, record fully qualified nested type name
       // f.typeName may be like ".spark.TokensPayment"; normalize by trimming leading dot
-      const TYPE_MESSAGE = 11; // google.protobuf.FieldDescriptorProto.Type.TYPE_MESSAGE
       if (
         f.type === TYPE_MESSAGE &&
         typeof f.typeName === "string" &&
