@@ -75,7 +75,7 @@ func TestExpiredOutputBeforeFinalization(t *testing.T) {
 	t.Run("return output after transaction has expired in signed state", func(t *testing.T) {
 		f := entfixtures.New(t, ctx, tx).WithRNG(rng)
 
-		tokenCreate := f.CreateTokenCreate(st.NetworkRegtest, nil)
+		tokenCreate := f.CreateTokenCreate(st.NetworkRegtest, nil, nil)
 
 		// Create a mint transaction that produces an output we will later spend
 		ownerKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -131,7 +131,7 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 	ownerKey := keys.MustGeneratePrivateKeyFromRand(rng)
 
 	f := entfixtures.New(t, ctx, tx).WithRNG(rng)
-	tokenCreate := f.CreateTokenCreate(st.NetworkRegtest, nil)
+	tokenCreate := f.CreateTokenCreate(st.NetworkRegtest, nil, nil)
 
 	createTestTokenOutputs(t, ctx, tx, 7, ownerKey.Public(), tokenCreate, rng)
 

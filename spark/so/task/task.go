@@ -838,7 +838,6 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						logger.Info("Backfill token output amounts is disabled, skipping")
 						return nil
 					}
-
 					tx, err := ent.GetDbFromContext(ctx)
 					if err != nil {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -852,7 +851,6 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					if err != nil {
 						return fmt.Errorf("failed to fetch outputs for backfill: %w", err)
 					}
-
 					// Process batch
 					for _, output := range outputs {
 						var u128Amount uint128.Uint128

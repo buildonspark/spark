@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 )
@@ -41,9 +42,12 @@ func OutputSpecsWithOwner(owner keys.Public, amounts ...*big.Int) []OutputSpec {
 }
 
 // CreateTokenCreate creates a test TokenCreate entity
-func (f *Fixtures) CreateTokenCreate(network st.Network, tokenIdentifier []byte) *ent.TokenCreate {
+func (f *Fixtures) CreateTokenCreate(network st.Network, tokenIdentifier []byte, maxSupply *big.Int) *ent.TokenCreate {
 	if tokenIdentifier == nil {
 		tokenIdentifier = f.RandomBytes(32)
+	}
+	if maxSupply == nil {
+		maxSupply = big.NewInt(1000000)
 	}
 
 	issuerKey := keys.GeneratePrivateKey()
@@ -54,7 +58,7 @@ func (f *Fixtures) CreateTokenCreate(network st.Network, tokenIdentifier []byte)
 		SetTokenName("Test Token").
 		SetTokenTicker("TST").
 		SetDecimals(8).
-		SetMaxSupply(big.NewInt(1000000).Bytes()).
+		SetMaxSupply(maxSupply.Bytes()).
 		SetIsFreezable(false).
 		SetNetwork(network).
 		SetTokenIdentifier(tokenIdentifier).
@@ -132,6 +136,11 @@ func (f *Fixtures) createOutputForTransactionWithOwner(tokenCreate *ent.TokenCre
 	default:
 		outputStatus = st.TokenOutputStatusCreatedStarted
 	}
+	amountBytes := make([]byte, 16)
+	amount.FillBytes(amountBytes)
+	u128Amount := uint128.Uint128{}
+	err := u128Amount.SafeSetBytes(amountBytes)
+	f.RequireNoError(err)
 
 	output, err := f.Tx.TokenOutput.Create().
 		SetStatus(outputStatus).
@@ -139,7 +148,8 @@ func (f *Fixtures) createOutputForTransactionWithOwner(tokenCreate *ent.TokenCre
 		SetWithdrawBondSats(testWithdrawBondSats).
 		SetWithdrawRelativeBlockLocktime(testWithdrawRelativeBlockLocktime).
 		SetWithdrawRevocationCommitment(f.RandomBytes(32)).
-		SetTokenAmount(amount.Bytes()).
+		SetTokenAmount(amountBytes).
+		SetAmount(u128Amount).
 		SetCreatedTransactionOutputVout(vout).
 		SetTokenIdentifier(tokenCreate.TokenIdentifier).
 		SetTokenCreate(tokenCreate).
@@ -148,7 +158,6 @@ func (f *Fixtures) createOutputForTransactionWithOwner(tokenCreate *ent.TokenCre
 		SetOutputCreatedTokenTransaction(tx).
 		Save(f.Ctx)
 	f.RequireNoError(err)
-
 	return output
 }
 
@@ -157,13 +166,20 @@ func (f *Fixtures) CreateStandaloneOutput(tokenCreate *ent.TokenCreate, amount *
 	ownerKey := keys.GeneratePrivateKey()
 	keyshare := f.CreateKeyshare()
 
+	amountBytes := make([]byte, 16)
+	amount.FillBytes(amountBytes)
+	u128Amount := uint128.Uint128{}
+	err := u128Amount.SafeSetBytes(amountBytes)
+	f.RequireNoError(err)
+
 	output, err := f.Tx.TokenOutput.Create().
 		SetStatus(status).
 		SetOwnerPublicKey(ownerKey.Public()).
 		SetWithdrawBondSats(testWithdrawBondSats).
 		SetWithdrawRelativeBlockLocktime(testWithdrawRelativeBlockLocktime).
 		SetWithdrawRevocationCommitment(f.RandomBytes(32)).
-		SetTokenAmount(amount.Bytes()).
+		SetTokenAmount(amountBytes).
+		SetAmount(u128Amount).
 		SetCreatedTransactionOutputVout(0).
 		SetTokenIdentifier(tokenCreate.TokenIdentifier).
 		SetTokenCreate(tokenCreate).

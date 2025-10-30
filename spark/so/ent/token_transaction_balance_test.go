@@ -37,7 +37,7 @@ func TestUnbalancedTransferFails(t *testing.T) {
 
 			f := entfixtures.New(t, ctx, entTx)
 
-			tokenCreate := f.CreateTokenCreate(st.NetworkMainnet, nil)
+			tokenCreate := f.CreateTokenCreate(st.NetworkMainnet, nil, nil)
 
 			inputAmount := big.NewInt(1000)
 			outputAmount := big.NewInt(500)
@@ -74,7 +74,7 @@ func TestOutputReassignmentFromRevealedFails(t *testing.T) {
 
 			f := entfixtures.New(t, ctx, entTx)
 
-			tokenCreate := f.CreateTokenCreate(st.NetworkMainnet, nil)
+			tokenCreate := f.CreateTokenCreate(st.NetworkMainnet, nil, nil)
 
 			amount := big.NewInt(1000)
 			input := f.CreateStandaloneOutput(tokenCreate, amount, st.TokenOutputStatusCreatedFinalized)
@@ -121,7 +121,7 @@ func TestOutputReassignmentValidatesNewTransaction(t *testing.T) {
 
 			f := entfixtures.New(t, ctx, entTx)
 
-			tokenCreate := f.CreateTokenCreate(st.NetworkMainnet, nil)
+			tokenCreate := f.CreateTokenCreate(st.NetworkMainnet, nil, nil)
 
 			amount := big.NewInt(1000)
 			input1 := f.CreateStandaloneOutput(tokenCreate, amount, st.TokenOutputStatusCreatedFinalized)

@@ -37,7 +37,7 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 	f := entfixtures.New(t, ctx, tx).WithRNG(seededRand)
 
 	keyshare := f.CreateKeyshare()
-	tokenCreate := f.CreateTokenCreate(st.NetworkRegtest, nil)
+	tokenCreate := f.CreateTokenCreate(st.NetworkRegtest, nil, nil)
 
 	tokenTx, err := tx.TokenTransaction.Create().
 		SetPartialTokenTransactionHash(f.RandomBytes(32)).
@@ -253,14 +253,12 @@ func runBackfillAmountTest(t *testing.T, ctx context.Context, tx *ent.Tx) {
 	tokenAmountBytes := f.RandomBytes(16)
 	tokenAmountBytes[15] |= 1 // force non zero random value
 
-	tokenCreate := f.CreateTokenCreate(st.NetworkRegtest, nil)
+	tokenCreate := f.CreateTokenCreate(st.NetworkRegtest, nil, nil)
 
 	_, outputs := f.CreateMintTransaction(tokenCreate,
 		entfixtures.OutputSpecs(new(big.Int).SetBytes(tokenAmountBytes)),
 		st.TokenTransactionStatusSigned)
 	require.Len(t, outputs, 1)
-	require.Equal(t, (uint128.Uint128{}), outputs[0].Amount) // Should be nil
-	require.NotEqual(t, tokenAmountBytes, outputs[0].Amount) // Should not equal the original value
 
 	require.NoError(t, backfillTask.Task(ctx, config, k))
 

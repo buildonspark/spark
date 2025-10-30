@@ -32,7 +32,7 @@ func (u *Uint128) Scan(src any) error {
 	case []byte:
 		val, ok := new(big.Int).SetString(string(srcType), 10)
 		if !ok {
-			return errors.InternalTypeConversionError(fmt.Errorf("invalid numeric: %q", string(srcType)))
+			return errors.InternalTypeConversionError(fmt.Errorf("invalid numeric when scanning bytes: %q", string(srcType)))
 		}
 		if val.Sign() < 0 || val.Cmp(MaxUint128) > 0 {
 			return errors.InvalidArgumentOutOfRange(fmt.Errorf("uint128 out of range"))
@@ -42,7 +42,7 @@ func (u *Uint128) Scan(src any) error {
 	case string:
 		val, ok := new(big.Int).SetString(srcType, 10)
 		if !ok {
-			return errors.InternalTypeConversionError(fmt.Errorf("invalid numeric: %q", srcType))
+			return errors.InternalTypeConversionError(fmt.Errorf("invalid numeric when scanning string: %q", srcType))
 		}
 		if val.Sign() < 0 || val.Cmp(MaxUint128) > 0 {
 			return errors.InvalidArgumentOutOfRange(fmt.Errorf("uint128 out of range"))
@@ -81,4 +81,11 @@ func (u Uint128) String() string {
 		return "0"
 	}
 	return u.value.String()
+}
+
+func (u Uint128) BigInt() *big.Int {
+	if u.value == nil {
+		return new(big.Int)
+	}
+	return new(big.Int).Set(u.value)
 }
