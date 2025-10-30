@@ -233,11 +233,8 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	var primaryTransferId uuid.UUID
 	tweakKeys := true
 
-	// Swap V3 flow: If skipping tweaks is enabled then set role to Participant to
-	// disable retry settling key tweaks in `resume_send_transfer` cron task.
 	if swapV3Package != nil {
 		if transferType == st.TransferTypePrimarySwapV3 {
-			role = TransferRoleParticipant
 			tweakKeys = false
 		} else {
 			primaryTransferId = swapV3Package.primaryTransferId
@@ -283,6 +280,15 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 			return nil, fmt.Errorf("unable to commit database transaction: %w while creating transfer: %w", err, originalErr)
 		}
 		return nil, fmt.Errorf("failed to create transfer for transfer %s: %w", req.TransferId, originalErr)
+	}
+
+	// If the SSP matched the user's primary transfer with a counter transfer, lock it from cancellation.
+	// If other SO fails to accept the key tweaks, this status will be rolled back.
+	if transferType == st.TransferTypeCounterSwapV3 {
+		err := updateSwapPrimaryTransferToStatus(ctx, transfer, st.TransferStatusApplyingSenderKeyTweak)
+		if err != nil {
+			return nil, fmt.Errorf("unable to update primary transfer for counter transfer %s status: %w ", req.TransferId, err)
+		}
 	}
 
 	var signingResults []*pb.LeafRefundTxSigningResult
@@ -384,7 +390,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		}
 		err = entTx.Commit()
 		if err != nil {
-			return nil, fmt.Errorf("unable to rollback database transaction: %w", err)
+			return nil, fmt.Errorf("unable to commit database transaction: %w", err)
 		}
 
 		return nil, fmt.Errorf("failed to sync transfer init for transfer %s: %w", req.TransferId, syncErr)
@@ -2662,28 +2668,66 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 	return nil
 }
 
+// Complete sending of a valid transfer. This function moves the transfer
+// to SenderKeyTweaked status, meaning it's fully submitted (awaiting recipient claim).
 func (h *TransferHandler) ResumeSendTransfer(ctx context.Context, transfer *ent.Transfer) error {
 	ctx, span := tracer.Start(ctx, "TransferHandler.ResumeSendTransfer")
 	defer span.End()
 
 	logger := logging.GetLoggerFromContext(ctx)
 
-	if transfer.Status != st.TransferStatusSenderInitiatedCoordinator {
-		// Noop
+	switch transfer.Status {
+	case st.TransferStatusSenderInitiatedCoordinator, st.TransferStatusApplyingSenderKeyTweak:
+		// Acceptable status
+	default:
 		return nil
 	}
 
-	err := h.settleSenderKeyTweaks(ctx, transfer.ID.String(), pbinternal.SettleKeyTweakAction_COMMIT)
-	if err == nil {
-		// If there's no error, it means all SOs have tweaked the key. The coordinator can tweak the key here.
-		transfer, err = h.commitSenderKeyTweaks(ctx, transfer)
-		if err != nil {
-			return err
+	switch transfer.Type {
+	case st.TransferTypePrimarySwapV3:
+		// Disable retry settling key tweaks in `resume_send_transfer` cron task if the transfer is a primary transfer.
+		return nil
+	case st.TransferTypeCounterSwapV3:
+		// Allow settling both primary and counter transfer key tweaks if the transfer is a counter transfer.
+		message := pbgossip.GossipMessage{
+			Message: &pbgossip.GossipMessage_SettleSwapKeyTweak{
+				SettleSwapKeyTweak: &pbgossip.GossipMessageSettleSwapKeyTweak{
+					CounterTransferId: transfer.ID.String(),
+				},
+			},
 		}
+
+		sendGossipHandler := NewSendGossipHandler(h.config)
+		selection := helper.OperatorSelection{
+			Option: helper.OperatorSelectionOptionExcludeSelf,
+		}
+		participants, err := selection.OperatorIdentifierList(h.config)
+		if err != nil {
+			return fmt.Errorf("unable to get operator list: %w", err)
+		}
+		_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, &message, participants)
+		if err != nil {
+			logger.With(zap.Error(err)).Sugar().Errorf(
+				"Failed to create and commit gossip message to retry settle swap v3 sender key tweaks for counter transfer %s",
+				transfer.ID,
+			)
+			return nil
+		}
+	default:
+		// All other transfers
+		err := h.settleSenderKeyTweaks(ctx, transfer.ID.String(), pbinternal.SettleKeyTweakAction_COMMIT)
+		if err == nil {
+			// If there's no error, it means all SOs have tweaked the key. The coordinator can tweak the key here.
+			transfer, err = h.commitSenderKeyTweaks(ctx, transfer)
+			if err != nil {
+				return err
+			}
+		}
+
+		// If there's an error, it means some SOs are not online. We can retry later.
+		logger.With(zap.Error(err)).Sugar().Warnf("Failed to settle sender key tweaks for transfer %s", transfer.ID)
 	}
 
-	// If there's an error, it means some SOs are not online. We can retry later.
-	logger.With(zap.Error(err)).Sugar().Warnf("Failed to settle sender key tweaks for transfer %s", transfer.ID)
 	return nil
 }
 
@@ -2715,6 +2759,26 @@ func (h *TransferHandler) setSoCoordinatorKeyTweaks(ctx context.Context, transfe
 				return fmt.Errorf("failed to set key tweak for transfer leaf %s: %w", transferLeaf.ID, err)
 			}
 		}
+	}
+	return nil
+}
+
+func updateSwapPrimaryTransferToStatus(ctx context.Context, counterTransfer *ent.Transfer, status st.TransferStatus) error {
+	if counterTransfer == nil {
+		return fmt.Errorf("Counter transfer is nil")
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get db before updating transfer status: %w", err)
+	}
+	primaryTransfer, err := db.Transfer.QueryPrimarySwapTransfer(counterTransfer).Only(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to load primary transfer: %w", err)
+	}
+	_, err = db.Transfer.UpdateOne(primaryTransfer).SetStatus(status).Save(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to update primary transfer for counter transfer %s status to applying sender key tweak: %w", counterTransfer.ID, err)
 	}
 	return nil
 }

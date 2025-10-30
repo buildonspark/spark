@@ -151,7 +151,7 @@ func NetworkValidator(n schematype.Network) error {
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schematype.TransferStatus) error {
 	switch s {
-	case "SENDER_INITIATED", "SENDER_INITIATED_COORDINATOR", "SENDER_KEY_TWEAK_PENDING", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED", "RETURNED", "RECEIVER_KEY_TWEAK_APPLIED":
+	case "SENDER_INITIATED", "SENDER_INITIATED_COORDINATOR", "SENDER_KEY_TWEAK_PENDING", "APPLYING_SENDER_KEY_TWEAK", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED", "RETURNED", "RECEIVER_KEY_TWEAK_APPLIED":
 		return nil
 	default:
 		return fmt.Errorf("transfer: invalid enum value for status field: %q", s)

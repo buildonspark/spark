@@ -63,6 +63,8 @@ func (t *Transfer) getProtoStatus() (*pb.TransferStatus, error) {
 		return pb.TransferStatus_TRANSFER_STATUS_SENDER_INITIATED.Enum(), nil
 	case st.TransferStatusSenderKeyTweakPending:
 		return pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING.Enum(), nil
+	case st.TransferStatusApplyingSenderKeyTweak:
+		return pb.TransferStatus_TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK.Enum(), nil
 	case st.TransferStatusSenderKeyTweaked:
 		return pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED.Enum(), nil
 	case st.TransferStatusReceiverKeyTweaked:
@@ -93,6 +95,8 @@ func TransferStatusSchema(transferStatusProto pb.TransferStatus) (st.TransferSta
 		return st.TransferStatusSenderInitiatedCoordinator, nil
 	case pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING:
 		return st.TransferStatusSenderKeyTweakPending, nil
+	case pb.TransferStatus_TRANSFER_STATUS_APPLYING_SENDER_KEY_TWEAK:
+		return st.TransferStatusApplyingSenderKeyTweak, nil
 	case pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED:
 		return st.TransferStatusSenderKeyTweaked, nil
 	case pb.TransferStatus_TRANSFER_STATUS_RECEIVER_KEY_TWEAKED:

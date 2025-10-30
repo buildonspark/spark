@@ -10,6 +10,11 @@ const (
 	TransferStatusSenderInitiatedCoordinator TransferStatus = "SENDER_INITIATED_COORDINATOR"
 	// TransferStatusSenderKeyTweakPending is the status of a transfer that has been initiated by sender but the key tweak is pending.
 	TransferStatusSenderKeyTweakPending TransferStatus = "SENDER_KEY_TWEAK_PENDING"
+
+	// This status is used to mark the transfer that is in the process of settling the sender key tweak and must not be cancelled.
+	// [TransferStatusSenderInitiatedCoordinator, TransferStatusSenderKeyTweakPending] -> TransferStatusApplyingSenderKeyTweak -> TransferStatusSenderKeyTweaked
+	TransferStatusApplyingSenderKeyTweak TransferStatus = "APPLYING_SENDER_KEY_TWEAK"
+
 	// TransferStatusSenderKeyTweaked is the status of a transfer that sender has tweaked the key.
 	TransferStatusSenderKeyTweaked TransferStatus = "SENDER_KEY_TWEAKED"
 	// TransferStatusReceiverKeyTweaked is the status of transfer where key has been tweaked.
@@ -34,6 +39,7 @@ func (TransferStatus) Values() []string {
 		string(TransferStatusSenderInitiated),
 		string(TransferStatusSenderInitiatedCoordinator),
 		string(TransferStatusSenderKeyTweakPending),
+		string(TransferStatusApplyingSenderKeyTweak),
 		string(TransferStatusSenderKeyTweaked),
 		string(TransferStatusReceiverKeyTweaked),
 		string(TransferStatusReceiverKeyTweakLocked),

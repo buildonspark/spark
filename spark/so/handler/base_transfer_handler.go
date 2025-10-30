@@ -449,8 +449,8 @@ func (h *BaseTransferHandler) createTransfer(
 			return nil, nil, fmt.Errorf("Unable to find primary swap transfer id=%s", primaryTransferId.String())
 		}
 		// Check that the SO holds the correct refunds for the primary transfer.
-		if primaryTransfer.Status != st.TransferStatusSenderKeyTweakPending {
-			return nil, nil, fmt.Errorf("primary swap transfer %s is not in sender key tweak pending status, got %s", primaryTransferId.String(), primaryTransfer.Status)
+		if primaryTransfer.Status != st.TransferStatusSenderKeyTweakPending && primaryTransfer.Status != st.TransferStatusSenderInitiatedCoordinator {
+			return nil, nil, fmt.Errorf("primary swap transfer %s is not in the right status, got %s", primaryTransferId.String(), primaryTransfer.Status)
 		}
 		transferCreate.SetPrimarySwapTransfer(primaryTransfer)
 	}
@@ -1336,8 +1336,8 @@ func (h *BaseTransferHandler) commitSenderKeyTweaks(ctx context.Context, transfe
 	if transfer.Status == st.TransferStatusSenderKeyTweaked {
 		return transfer, nil
 	}
-	if transfer.Status != st.TransferStatusSenderKeyTweakPending && transfer.Status != st.TransferStatusSenderInitiatedCoordinator {
-		return nil, fmt.Errorf("transfer %s is not in sender key tweak pending status", transfer.ID.String())
+	if transfer.Status != st.TransferStatusSenderKeyTweakPending && transfer.Status != st.TransferStatusSenderInitiatedCoordinator && transfer.Status != st.TransferStatusApplyingSenderKeyTweak {
+		return nil, fmt.Errorf("transfer %s is not in sender key tweak pending, sender initiated coordinator, or applying sender key tweak status", transfer.ID.String())
 	}
 	transferLeaves, err := transfer.QueryTransferLeaves().All(ctx)
 	if err != nil {
