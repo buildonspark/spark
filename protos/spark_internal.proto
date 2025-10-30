@@ -263,18 +263,6 @@ message UpdatePreimageRequestRequest {
     bytes identity_public_key = 3;
 }
 
-message StartTokenTransactionInternalRequest {
-    spark.TokenTransaction final_token_transaction = 1;
-    spark.TokenTransactionSignatures token_transaction_signatures = 2;
-    repeated string keyshare_ids = 3;
-    bytes coordinator_public_key = 10;
-}
-
-
-message StartTokenTransactionInternalResponse {
-    spark.TokenTransaction final_token_transaction = 1;
-}
-
 message InitiateSettleReceiverKeyTweakRequest {
     string transfer_id = 1;
     map<string, spark.SecretProof> key_tweak_proofs = 2;
@@ -359,10 +347,6 @@ message UtxoSwapCompletedRequest {
 }
 
 message UtxoSwapCompletedResponse {
-}
-
-message CancelOrFinalizeExpiredTokenTransactionRequest {
-    spark.TokenTransaction final_token_transaction = 1;
 }
 
 message QueryLeafSigningPubkeysRequest {
