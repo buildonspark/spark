@@ -13,7 +13,6 @@ import (
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/rpcclient"
-	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -160,13 +159,13 @@ func QueryNodesWithExpiredTimeLocks(ctx context.Context, dbTx *ent.Tx, blockHeig
 func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client, node *ent.TreeNode, blockHeight int64, network common.Network) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
-	if node.NodeConfirmationHeight == 0 {
-		nodeTx, err := common.TxFromRawTxBytes(node.RawTx)
+	if len(node.DirectTx) > 0 && node.NodeConfirmationHeight == 0 {
+		directTx, err := common.TxFromRawTxBytes(node.DirectTx)
 		if err != nil {
 			return fmt.Errorf("watchtower failed to parse node tx for node %s: %w", node.ID.String(), err)
 		}
-		// Check if node TX has a timelock and has parent
-		if nodeTx.TxIn[0].Sequence <= 0xFFFFFFFE {
+		// Check if direct TX has a timelock and has parent
+		if directTx.TxIn[0].Sequence <= 0xFFFFFFFE {
 			// Check if parent is confirmed and timelock has expired
 			parent, err := node.QueryParent().Only(ctx)
 			if ent.IsNotFound(err) {
@@ -176,8 +175,8 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 				return fmt.Errorf("watchtower failed to query parent for node %s: %w", node.ID.String(), err)
 			}
 			if parent.NodeConfirmationHeight > 0 {
-				timelockExpiryHeight := uint64(nodeTx.TxIn[0].Sequence&0xFFFF) + parent.NodeConfirmationHeight
-				if len(node.DirectTx) > 0 && timelockExpiryHeight+spark.WatchtowerTimeLockBuffer <= uint64(blockHeight) {
+				timelockExpiryHeight := uint64(directTx.TxIn[0].Sequence&0xFFFF) + parent.NodeConfirmationHeight
+				if timelockExpiryHeight <= uint64(blockHeight) {
 					if err := BroadcastTransaction(ctx, bitcoinClient, node.ID.String(), node.DirectTx); err != nil {
 						// Record node tx broadcast failure
 						if nodeTxBroadcastCounter != nil {
@@ -200,14 +199,14 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 				}
 			}
 		}
-	} else if len(node.RawRefundTx) > 0 && node.RefundConfirmationHeight == 0 {
-		refundTx, err := common.TxFromRawTxBytes(node.RawRefundTx)
+	} else if len(node.DirectRefundTx) > 0 && node.RefundConfirmationHeight == 0 {
+		directRefundTx, err := common.TxFromRawTxBytes(node.DirectRefundTx)
 		if err != nil {
-			return fmt.Errorf("watchtower failed to parse refund tx for node %s: %w", node.ID.String(), err)
+			return fmt.Errorf("watchtower failed to parse direct refund tx for node %s: %w", node.ID.String(), err)
 		}
 
-		timelockExpiryHeight := uint64(refundTx.TxIn[0].Sequence&0xFFFF) + node.NodeConfirmationHeight
-		if len(node.DirectRefundTx) > 0 && timelockExpiryHeight+spark.WatchtowerTimeLockBuffer <= uint64(blockHeight) {
+		timelockExpiryHeight := uint64(directRefundTx.TxIn[0].Sequence & 0xFFFF)
+		if timelockExpiryHeight <= uint64(blockHeight) {
 			if err := BroadcastTransaction(ctx, bitcoinClient, node.ID.String(), node.DirectRefundTx); err != nil {
 				// Try broadcasting the DirectFromCpfpRefundTx as a fallback
 				if len(node.DirectFromCpfpRefundTx) > 0 {
