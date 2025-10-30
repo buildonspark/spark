@@ -42,10 +42,6 @@ service SparkInternalService {
 
     rpc initiate_cooperative_exit(InitiateCooperativeExitRequest) returns (google.protobuf.Empty) {}
 
-    rpc start_token_transaction_internal(StartTokenTransactionInternalRequest) returns (google.protobuf.Empty) {}
-
-    rpc query_token_outputs_internal(spark.QueryTokenOutputsRequest) returns (spark.QueryTokenOutputsResponse) {}
-
     rpc initiate_settle_receiver_key_tweak(InitiateSettleReceiverKeyTweakRequest) returns (google.protobuf.Empty) {}
     rpc settle_receiver_key_tweak(SettleReceiverKeyTweakRequest) returns (google.protobuf.Empty) {}
     rpc settle_sender_key_tweak(SettleSenderKeyTweakRequest) returns (google.protobuf.Empty) {}
