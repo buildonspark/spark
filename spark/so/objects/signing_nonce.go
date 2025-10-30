@@ -3,7 +3,7 @@ package objects
 import (
 	"fmt"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 )
@@ -18,14 +18,8 @@ type SigningNonce struct {
 
 // RandomSigningNonce generates a random signing nonce.
 func RandomSigningNonce() (*SigningNonce, error) {
-	binding, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		return nil, err
-	}
-	hiding, err := secp256k1.GeneratePrivateKey()
-	if err != nil {
-		return nil, err
-	}
+	binding := keys.GeneratePrivateKey()
+	hiding := keys.GeneratePrivateKey()
 	return NewSigningNonce(binding.Serialize(), hiding.Serialize())
 }
 
@@ -39,9 +33,10 @@ func NewSigningNonce(binding, hiding []byte) (*SigningNonce, error) {
 
 // SigningCommitment returns the signing commitment for the nonce.
 func (n *SigningNonce) SigningCommitment() *SigningCommitment {
-	bindingPubKey := secp256k1.PrivKeyFromBytes(n.Binding).PubKey()
-	hidingPubKey := secp256k1.PrivKeyFromBytes(n.Hiding).PubKey()
-	return &SigningCommitment{Binding: bindingPubKey.SerializeCompressed(), Hiding: hidingPubKey.SerializeCompressed()}
+	bindingPriv, _ := keys.ParsePrivateKey(n.Binding)
+	hidingPriv, _ := keys.ParsePrivateKey(n.Hiding)
+
+	return &SigningCommitment{Binding: bindingPriv.Public().Serialize(), Hiding: hidingPriv.Public().Serialize()}
 }
 
 // MarshalBinary serializes the SigningNonce into a byte slice.

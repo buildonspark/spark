@@ -22,12 +22,10 @@ import (
 var (
 	// Static keys for deterministic testing
 	// P2TRAddress: bcrt1p2uy9zw5ltayucsuzl4tet6ckelzawp08qrtunacscsszflye907q62uqhl
-	staticFaucetKeyBytes, _ = hex.DecodeString("deadbeef1337cafe4242424242424242deadbeef1337cafe4242424242424242")
-	staticFaucetKey, _      = keys.ParsePrivateKey(staticFaucetKeyBytes)
+	staticFaucetKey = keys.MustParsePrivateKeyHex("deadbeef1337cafe4242424242424242deadbeef1337cafe4242424242424242")
 
 	// P2TRAddress: bcrt1pwr5k38p68ceyrnm2tvrp50dvmg3grh6uvayjl3urwtxejhd3dw4swz6p58
-	staticMiningKeyBytes, _ = hex.DecodeString("1337cafe4242deadbeef4242424242421337cafe4242deadbeef424242424242")
-	staticMiningKey, _      = keys.ParsePrivateKey(staticMiningKeyBytes)
+	staticMiningKey = keys.MustParsePrivateKeyHex("1337cafe4242deadbeef4242424242421337cafe4242deadbeef424242424242")
 
 	// Singleton instance
 	instance *Faucet

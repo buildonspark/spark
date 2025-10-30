@@ -73,16 +73,19 @@ linters:
       forbid:
         - pattern: "^(fmt\\.Print(|f|ln)|print|println)$"
           msg: "Do not commit print statements."
-        - pattern: '^.*\.Client\.ExecContext$'
+        - pattern: '^(?:secp256k1|btcec)\.(?:ParsePubKey|GeneratePrivateKey|PrivKeyFromBytes|NewPrivateKey|NewPublicKey)'
+          pkg: '^github.com/(?:decred/dcrd/dcrec/secp256k1|btcsuite/btcd/btcec)'
+          msg: 'Use keys.Public/keys.Private. If you need an secp256k1/btcec key, call .ToBTCEC.'
+        - pattern: '\.Client\.ExecContext$'
           pkg: '^github.com/lightsparkdev/spark/so/ent$'
           msg: 'Use of ent.Client.ExecContext is forbidden. Use ent query builders unless you know what you are doing!'
-        - pattern: '^.*\.Client\.QueryContext$'
+        - pattern: '\.Client\.QueryContext$'
           pkg: '^github.com/lightsparkdev/spark/so/ent$'
           msg: 'Use of ent.Client.QueryContext is forbidden. Use ent query builders unless you know what you are doing!'
-        - pattern: '^.*\.Tx\.ExecContext$'
+        - pattern: '\.Tx\.ExecContext$'
           pkg: '^github.com/lightsparkdev/spark/so/ent$'
           msg: 'Use of ent.Tx.ExecContext is forbidden. Use ent query builders unless you know what you are doing!'
-        - pattern: '^.*\.Tx\.QueryContext$'
+        - pattern: '\.Tx\.QueryContext$'
           pkg: '^github.com/lightsparkdev/spark/so/ent$'
           msg: 'Use of ent.Tx.QueryContext is forbidden. Use ent query builders unless you know what you are doing!'
       analyze-types: true

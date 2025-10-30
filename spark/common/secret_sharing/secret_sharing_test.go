@@ -2,7 +2,7 @@ package secretsharing_test
 
 import (
 	"crypto/rand"
-	mathrand "math/rand"
+	mathrand "math/rand/v2"
 	"testing"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -12,7 +12,7 @@ import (
 )
 
 func TestSecretSharing(t *testing.T) {
-	rng := mathrand.New(mathrand.NewSource(1))
+	rng := mathrand.NewChaCha8([32]byte{})
 
 	fieldModulus := secp256k1.S256().N
 	secret, err := rand.Int(rng, fieldModulus)
@@ -29,7 +29,7 @@ func TestSecretSharing(t *testing.T) {
 		recoveredSecret, err := secretsharing.RecoverSecret(shares[:threshold])
 		require.NoError(t, err)
 
-		assert.Zero(t, secret.Cmp(recoveredSecret), "secret %s does not match recovered secret %s", secret.String(), recoveredSecret.String())
+		assert.Equal(t, secret, recoveredSecret, "secret %s does not match recovered secret %s", secret, recoveredSecret)
 	})
 
 	// Check that only a threshold can reconstruct
@@ -40,7 +40,7 @@ func TestSecretSharing(t *testing.T) {
 }
 
 func TestVerifiableSecretSharing(t *testing.T) {
-	rng := mathrand.New(mathrand.NewSource(1))
+	rng := mathrand.NewChaCha8([32]byte{})
 
 	fieldModulus := secp256k1.S256().N
 	secret, err := rand.Int(rng, fieldModulus)
@@ -61,12 +61,12 @@ func TestVerifiableSecretSharing(t *testing.T) {
 	recoveredSecret, err := secretsharing.RecoverSecret(shares[:threshold])
 	require.NoError(t, err)
 
-	assert.Zero(t, secret.Cmp(recoveredSecret), "secret %s does not match recovered secret %s", secret.String(), recoveredSecret.String())
+	assert.Equal(t, secret, recoveredSecret, "secret %s does not match recovered secret %s", secret, recoveredSecret)
 
 	// Check that bad proof encodings are caught
 	t.Run("CatchBadProofEncoding", func(t *testing.T) {
 		shares[0].Proofs[0][0] ^= 255
-		err = secretsharing.ValidateShare(shares[0])
+		err := secretsharing.ValidateShare(shares[0])
 		require.Error(t, err, "failed to catch bad proof encoding")
 		shares[0].Proofs[0][0] ^= 255
 
@@ -79,13 +79,13 @@ func TestVerifiableSecretSharing(t *testing.T) {
 	// Check that a share that doesn't match its proofs is caught
 	t.Run("CatchWrongProof", func(t *testing.T) {
 		shares[2].Share = shares[3].Share
-		err = secretsharing.ValidateShare(shares[2])
+		err := secretsharing.ValidateShare(shares[2])
 		require.Error(t, err, "failed to catch share that doesn't match proofs")
 	})
 }
 
 func TestSecretSharingBadPubkeyLen(t *testing.T) {
-	rng := mathrand.New(mathrand.NewSource(1))
+	rng := mathrand.NewChaCha8([32]byte{})
 
 	fieldModulus := secp256k1.S256().N
 	secret, err := rand.Int(rng, fieldModulus)
@@ -102,12 +102,11 @@ func TestSecretSharingBadPubkeyLen(t *testing.T) {
 	share.Proofs[0] = share.Proofs[0][:32]
 
 	err = secretsharing.ValidateShare(share)
-	require.Error(t, err, "expected error")
-	assert.ErrorContains(t, err, "pubkeys must be 33 bytes")
+	require.ErrorContains(t, err, "malformed public key: invalid length: 32")
 }
 
 func TestMarshal(t *testing.T) {
-	rng := mathrand.New(mathrand.NewSource(1))
+	rng := mathrand.NewChaCha8([32]byte{})
 
 	fieldModulus := secp256k1.S256().N
 	secret, err := rand.Int(rng, fieldModulus)

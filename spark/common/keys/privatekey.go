@@ -1,6 +1,7 @@
 package keys
 
 import (
+	cryptorand "crypto/rand"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/hex"
@@ -20,21 +21,31 @@ type Private struct {
 
 // GeneratePrivateKey securely generates an secp256k1 private key.
 func GeneratePrivateKey() Private {
-	priv, err := secp256k1.GeneratePrivateKey()
+	priv, err := GeneratePrivateKeyFromRand(cryptorand.Reader) // This can't fail when using cryptorand.Reader.
 	if err != nil {
-		panic(fmt.Sprintf("failed to generate private key; this should be impossible: %v", err))
+		panic(fmt.Sprintf("this should be impossible: %v", err))
 	}
-	return Private{key: *priv}
+	return priv
+}
+
+// GeneratePrivateKeyFromRand generates an secp256k1 private key using reader. You should generally avoid this in favor
+// of [GeneratePrivateKey] or, in tests, [MustGeneratePrivateKeyFromRand].
+func GeneratePrivateKeyFromRand(reader io.Reader) (Private, error) {
+	priv, err := secp256k1.GeneratePrivateKeyFromRand(reader) //nolint:forbidigo // This is the implementation of keys.
+	if err != nil {
+		return Private{}, fmt.Errorf("failed to generate private key: %w", err)
+	}
+	return Private{key: *priv}, nil
 }
 
 // MustGeneratePrivateKeyFromRand generates an secp256k1 private key using reader.
 // Meant for testing, it panics if the key cannot be generated.
 func MustGeneratePrivateKeyFromRand(reader io.Reader) Private {
-	priv, err := secp256k1.GeneratePrivateKeyFromRand(reader)
+	priv, err := GeneratePrivateKeyFromRand(reader)
 	if err != nil {
 		panic(err)
 	}
-	return Private{key: *priv}
+	return priv
 }
 
 // ParsePrivateKey creates an secp256k1 private key from a byte slice. The byte slice must be 32 bytes.
@@ -44,20 +55,19 @@ func ParsePrivateKey(privKeyBytes []byte) (Private, error) {
 	if len(privKeyBytes) != 32 {
 		return Private{}, fmt.Errorf("private key must be 32 bytes")
 	}
-	pk := Private{key: *secp256k1.PrivKeyFromBytes(privKeyBytes)}
+	pk := Private{key: *secp256k1.PrivKeyFromBytes(privKeyBytes)} //nolint:forbidigo // This is the implementation of keys.
 	if pk.key.Key.IsZero() {
 		return Private{}, fmt.Errorf("private key must not be zero")
 	}
 	return pk, nil
 }
 
-// ParsePrivateKey creates an secp256k1 private key from a hex-encoded string.
+// ParsePrivateKeyHex creates an secp256k1 private key from a hex-encoded string.
 func ParsePrivateKeyHex(s string) (Private, error) {
 	bytes, err := hex.DecodeString(s)
 	if err != nil {
 		return Private{}, err
 	}
-
 	return ParsePrivateKey(bytes)
 }
 
@@ -82,7 +92,7 @@ func PrivateKeyFromBigInt(privKeyInt *big.Int) (Private, error) {
 
 	bytes := make([]byte, 32)
 	privKeyInt.FillBytes(bytes)
-	return Private{key: *secp256k1.PrivKeyFromBytes(bytes)}, nil
+	return Private{key: *secp256k1.PrivKeyFromBytes(bytes)}, nil //nolint:forbidigo // This is the implementation of keys.
 }
 
 // PrivateKeyFromScalar creates an secp256k1 private key from a scalar.
@@ -90,7 +100,7 @@ func PrivateKeyFromScalar(scalar *secp256k1.ModNScalar) (Private, error) {
 	if scalar == nil {
 		return Private{}, fmt.Errorf("private key must not be nil")
 	}
-	pk := Private{key: *secp256k1.NewPrivateKey(scalar)}
+	pk := Private{key: *secp256k1.NewPrivateKey(scalar)} //nolint:forbidigo // This is the implementation of keys.
 	if pk.key.Key.IsZero() {
 		return Private{}, fmt.Errorf("private key must not be zero")
 	}
@@ -111,14 +121,14 @@ func (p Private) Public() Public {
 func (p Private) Add(b Private) Private {
 	var sum secp256k1.ModNScalar
 	sum.Add2(&p.key.Key, &b.key.Key)
-	return Private{key: *secp256k1.NewPrivateKey(&sum)}
+	return Private{key: *secp256k1.NewPrivateKey(&sum)} //nolint:forbidigo // This is the implementation of keys.
 }
 
 // Sub subtracts two private keys using field subtraction.
 func (p Private) Sub(b Private) Private {
 	var sum secp256k1.ModNScalar
 	sum.Set(&b.key.Key).Negate().Add(&p.key.Key)
-	return Private{key: *secp256k1.NewPrivateKey(&sum)}
+	return Private{key: *secp256k1.NewPrivateKey(&sum)} //nolint:forbidigo // This is the implementation of keys.
 }
 
 // ToBTCEC converts this [Private] into a [secp256k1.PrivateKey].

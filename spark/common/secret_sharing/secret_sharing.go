@@ -6,6 +6,8 @@ import (
 	"math/big"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/secret_sharing/curve"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 )
 
@@ -131,20 +133,24 @@ func ComputeLagrangeCoefficients[T LagrangeInterpolatable](index *big.Int, point
 func generatePolynomialForSecretSharing(fieldModulus *big.Int, secret *big.Int, degree int) (*Polynomial, error) {
 	coefficients := make([]*big.Int, degree)
 	proofs := make([][]byte, degree)
-
 	coefficients[0] = secret
-	var secretScalar secp256k1.ModNScalar
-	secretScalar.SetByteSlice(secret.Bytes())
-	proofs[0] = secp256k1.NewPrivateKey(&secretScalar).PubKey().SerializeCompressed()
+
+	secretKey, err := keys.PrivateKeyFromBigInt(secret)
+	if err != nil {
+		return nil, err
+	}
+	proofs[0] = secretKey.Public().Serialize()
 	for i := 1; i < degree; i++ {
 		randomInt, err := rand.Int(rand.Reader, fieldModulus)
 		if err != nil {
 			return nil, err
 		}
 		coefficients[i] = randomInt
-		var coefScalar secp256k1.ModNScalar
-		coefScalar.SetByteSlice(randomInt.Bytes())
-		proofs[i] = secp256k1.NewPrivateKey(&coefScalar).PubKey().SerializeCompressed()
+		coefKey, err := keys.PrivateKeyFromBigInt(randomInt)
+		if err != nil {
+			return nil, err
+		}
+		proofs[i] = coefKey.Public().Serialize()
 	}
 	return &Polynomial{
 		FieldModulus: fieldModulus,
@@ -219,12 +225,12 @@ func RecoverSecret[T LagrangeInterpolatable](shares []T) (*big.Int, error) {
 
 // ValidateShare validates a share of a secret.
 func ValidateShare(share *VerifiableSecretShare) error {
-	targetPubkey := secp256k1.NewPrivateKey(IntToScalar(share.Share)).PubKey()
-	rawPubkey := share.Proofs[0]
-	if len(rawPubkey) != 33 {
-		return fmt.Errorf("pubkeys must be 33 bytes")
+	targetPrivKey, err := keys.PrivateKeyFromBigInt(share.Share)
+	if err != nil {
+		return fmt.Errorf("invalid secret share: %w", err)
 	}
-	resultPubkey, err := secp256k1.ParsePubKey(share.Proofs[0])
+	targetPubKey := targetPrivKey.Public()
+	resultPubKey, err := keys.ParsePublicKey(share.Proofs[0])
 	if err != nil {
 		return err
 	}
@@ -232,46 +238,22 @@ func ValidateShare(share *VerifiableSecretShare) error {
 		if i == 0 {
 			continue
 		}
-		pubkey, err := secp256k1.ParsePubKey(proof)
+		pubKey, err := keys.ParsePublicKey(proof)
 		if err != nil {
 			return err
 		}
 
-		value := new(big.Int).Exp(share.Index, big.NewInt(int64(i)), share.FieldModulus)
-		curve := secp256k1.S256()
-		resX, resY := curve.ScalarMult(pubkey.X(), pubkey.Y(), value.Bytes())
-
-		resPubkey := publicKeyFromInts(resX, resY)
-		resultPubkey = addPublicKeysRaw(resultPubkey, resPubkey)
+		exp := curve.ScalarFromBigInt(new(big.Int).Exp(share.Index, big.NewInt(int64(i)), share.FieldModulus))
+		res, err := curve.NewPointFromPublicKey(pubKey).ScalarMul(exp).ToPublicKey()
+		if err != nil {
+			return err
+		}
+		resultPubKey = resultPubKey.Add(res)
 	}
 
-	if resultPubkey.X().Cmp(targetPubkey.X()) != 0 || resultPubkey.Y().Cmp(targetPubkey.Y()) != 0 {
+	if !resultPubKey.Equals(targetPubKey) {
 		return fmt.Errorf("share is not valid")
 	}
 
 	return nil
-}
-
-// publicKeyFromInts creates a secp256k1 public key from x and y big integers.
-//
-// Deprecated: Use keys.Public
-func publicKeyFromInts(x, y *big.Int) *secp256k1.PublicKey {
-	xFieldVal := secp256k1.FieldVal{}
-	xFieldVal.SetByteSlice(x.Bytes())
-	yFieldVal := secp256k1.FieldVal{}
-	yFieldVal.SetByteSlice(y.Bytes())
-
-	// Normalize both values, because the cost is low, and having non-normalized values will break everything.
-	// See the comments on FieldVal for more information.
-	xFieldVal.Normalize()
-	yFieldVal.Normalize()
-	return secp256k1.NewPublicKey(&xFieldVal, &yFieldVal)
-}
-
-// AddPublicKeysRaw adds two secp256k1 public keys using group addition.
-// Deprecated: Use [github.com/lightsparkdev/spark/common/keys.Public.Add]
-func addPublicKeysRaw(a, b *secp256k1.PublicKey) *secp256k1.PublicKey {
-	curve := secp256k1.S256()
-	sumX, sumY := curve.Add(a.X(), a.Y(), b.X(), b.Y())
-	return publicKeyFromInts(sumX, sumY)
 }

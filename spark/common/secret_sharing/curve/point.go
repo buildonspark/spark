@@ -30,7 +30,6 @@ func ParsePoint(serial []byte) (Point, error) {
 	if len(serial) != PointBytesLen {
 		return Point{}, fmt.Errorf("point must be %d bytes", PointBytesLen)
 	}
-
 	serialDiscriminant := serial[0]
 	serialPubKey := serial[1:]
 
@@ -39,13 +38,13 @@ func ParsePoint(serial []byte) (Point, error) {
 		return IdentityPoint(), nil
 
 	case pointSerialDiscriminantNonIdentity:
-		pubKey, err := secp256k1.ParsePubKey(serialPubKey[:])
+		pubKey, err := keys.ParsePublicKey(serialPubKey)
 		if err != nil {
 			return Point{}, fmt.Errorf("invalid public key part: %w", err)
 		}
 
 		var parse Point
-		pubKey.AsJacobian(&parse.point)
+		pubKey.ToBTCEC().AsJacobian(&parse.point)
 
 		return parse, nil
 
@@ -88,6 +87,7 @@ func (p Point) ToPublicKey() (keys.Public, error) {
 	}
 
 	p.point.ToAffine()
+	//nolint:forbidigo // We have to use this since there's no other API for getting a keys.Public from points.
 	pubKey := secp256k1.NewPublicKey(&p.point.X, &p.point.Y)
 
 	return keys.PublicKeyFromKey(*pubKey), nil

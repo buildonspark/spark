@@ -20,7 +20,7 @@ type Public struct {
 // ParsePublicKey parses an secp256k1 public key encoded according to the format specified by ANSI X9.62-1998.
 // For more information, see secp256k1.ParsePubKey.
 func ParsePublicKey(bytes []byte) (Public, error) {
-	key, err := secp256k1.ParsePubKey(bytes)
+	key, err := secp256k1.ParsePubKey(bytes) //nolint:forbidigo // This is the implementation of keys.
 	if err != nil {
 		return Public{}, err
 	}
@@ -79,14 +79,14 @@ func ParsePublicKeys(asBytes [][]byte) ([]Public, error) {
 func publicKeyFromInts(x, y *big.Int) Public {
 	xFieldVal := secp256k1.FieldVal{}
 	if xFieldVal.SetByteSlice(x.Bytes()) {
-		xFieldVal.Normalize()
+		xFieldVal.Normalize() // Only normalize if there's overflow
 	}
 	yFieldVal := secp256k1.FieldVal{}
 	if yFieldVal.SetByteSlice(y.Bytes()) {
-		yFieldVal.Normalize()
+		yFieldVal.Normalize() // Only normalize if there's overflow
 	}
 
-	return Public{key: *secp256k1.NewPublicKey(&xFieldVal, &yFieldVal)}
+	return Public{key: *secp256k1.NewPublicKey(&xFieldVal, &yFieldVal)} //nolint:forbidigo // This is the implementation of keys.
 }
 
 // PublicKeyFromKey creates a Public from an [secp256k1.PublicKey].
@@ -108,15 +108,12 @@ func (p Public) AddTweak(tweak Private) Public {
 
 // Sub subtracts b from p using field subtraction.
 func (p Public) Sub(b Public) Public {
-	negBY := new(big.Int).Sub(secp256k1.S256().P, b.key.Y())
-	negB := publicKeyFromInts(b.key.X(), negBY)
-	return p.Add(negB)
+	return p.Add(b.Neg())
 }
 
 func (p Public) Neg() Public {
 	negY := new(big.Int).Sub(secp256k1.S256().P, p.key.Y())
-	neg := publicKeyFromInts(p.key.X(), negY)
-	return neg
+	return publicKeyFromInts(p.key.X(), negY)
 }
 
 // ToBTCEC converts this [Public] into a [*secp256k1.PublicKey].
@@ -206,7 +203,7 @@ func (p *Public) Scan(src any) error {
 
 	asBytes := make([]byte, len(value))
 	copy(asBytes, value)
-	pubKey, err := secp256k1.ParsePubKey(asBytes)
+	pubKey, err := secp256k1.ParsePubKey(asBytes) //nolint:forbidigo // This is the implementation of keys.
 	if err != nil {
 		return err
 	}

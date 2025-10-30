@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/lightsparkdev/spark/common/keys"
 )
 
 // Scalar is a secp256k1 scalar.
@@ -28,19 +30,25 @@ func ScalarFromInt(n uint32) Scalar {
 	return s
 }
 
+// ScalarFromBigInt creates a scalar that encodes the passed big integer. It panics if n cannot fit in a Scalar.
+func ScalarFromBigInt(n *big.Int) Scalar {
+	var asBytes [ScalarBytesLen]byte
+	n.FillBytes(asBytes[:])
+
+	var s Scalar
+	s.scalar.SetBytes(&asBytes)
+	return s
+}
+
 // generateScalar generates and returns a new scalar using the provided reader
 // as a source of entropy.
 func generateScalar(reader io.Reader) (Scalar, error) {
-	key, err := secp256k1.GeneratePrivateKeyFromRand(reader)
+	key, err := keys.GeneratePrivateKeyFromRand(reader)
 	if err != nil {
 		return Scalar{}, err
 	}
 
-	s := Scalar{
-		scalar: key.Key,
-	}
-
-	return s, nil
+	return Scalar{scalar: key.ToBTCEC().Key}, nil
 }
 
 // GenerateScalar generates and returns a new cryptographically secure scalar.
