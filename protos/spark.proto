@@ -590,62 +590,11 @@ message TokenTransaction {
     Network network = 10 [(validate.rules).enum = {not_in: [0]}];
 }
 
-enum TokenTransactionStatus {
-    TOKEN_TRANSACTION_STARTED = 0;
-    TOKEN_TRANSACTION_SIGNED = 1;
-    TOKEN_TRANSACTION_REVEALED = 5;
-    TOKEN_TRANSACTION_FINALIZED = 2;
-    TOKEN_TRANSACTION_STARTED_CANCELLED = 3;
-    TOKEN_TRANSACTION_SIGNED_CANCELLED = 4;
-
-    TOKEN_TRANSACTION_UNKNOWN = 10;
-}
-
-message SpentTokenOutputMetadata {
-    string output_id = 1;
-    bytes revocation_secret = 2;
-}
-
-message TokenTransactionConfirmationMetadata {
-    repeated SpentTokenOutputMetadata spent_token_outputs_metadata = 1;
-}
-
-message TokenTransactionWithStatus {
-    TokenTransaction token_transaction = 1;
-    TokenTransactionStatus status = 2;
-    TokenTransactionConfirmationMetadata confirmation_metadata = 3;
-    bytes token_transaction_hash = 4 [(validate.rules).bytes.len = 32];
-}
-
 message SignatureWithIndex {
     // This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
     bytes signature = 1 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
     // The index of the TTXO associated with this signature.
     uint32 input_index = 2;
-}
-
-message TokenTransactionSignatures {
-      // Filled by signing the partial token transaction hash with the owner/issuer private key.
-      // For mint transactions this will be one signature for the input token_public_key
-      // For transfer transactions this will be one for each output for the output owner_public_key
-      repeated SignatureWithIndex owner_signatures = 1;
-}
-
-message StartTokenTransactionRequest {
-    bytes identity_public_key = 1 [(validate.rules).bytes.len = 33];
-    TokenTransaction partial_token_transaction = 2;
-    // List of ecdsa signatures authorizing movement of tokens from the token input.
-    TokenTransactionSignatures token_transaction_signatures = 3;
-    string spark_payment_intent = 4;
-}
-
-message StartTokenTransactionResponse {
-    // This is the same token transaction sent by the wallet with output revocation public keys
-    // filled. This is the final transaction that is published and gossiped among LRC20 nodes.
-    TokenTransaction final_token_transaction = 1;
-    // Information for fetching and resolving the revocation keyshare on a transfer operation.
-    // Contains the threshold of keyshares needed and the SO owners of those keyshares.
-    SigningKeyshare keyshare_info = 2;
 }
 
 message OperatorSpecificTokenTransactionSignablePayload {
@@ -660,36 +609,10 @@ message OperatorSpecificOwnerSignature {
     OperatorSpecificTokenTransactionSignablePayload payload = 2;
 }
 
-message SignTokenTransactionRequest {
-    TokenTransaction final_token_transaction = 1;
-    repeated OperatorSpecificOwnerSignature operator_specific_signatures = 2;
-    bytes identity_public_key = 3 [(validate.rules).bytes.len = 33];
-}
-
-message KeyshareWithIndex {
-    // The index of the input TTXO associated with this keyshare.
-    uint32 input_index = 1;
-    bytes keyshare = 2 [(validate.rules).bytes.len = 32];
-}
-
-message SignTokenTransactionResponse {
-    bytes spark_operator_signature = 1 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
-    repeated KeyshareWithIndex revocation_keyshares = 2;
-}
-
 message RevocationSecretWithIndex {
     // The index of the input TTXO associated with this secret.
     uint32 input_index = 1;
     bytes revocation_secret = 2 [(validate.rules).bytes.len = 32];
-}
-
-message FinalizeTokenTransactionRequest {
-    TokenTransaction final_token_transaction = 1;
-    // List of ordered revocation secrets that map 1:1 with leaves being spent in the
-    // token transaction.
-    repeated RevocationSecretWithIndex revocation_secrets = 2;
-    bytes identity_public_key = 3 [(validate.rules).bytes.len = 33];
-    string spark_payment_intent = 4;
 }
 
 message FreezeTokensPayload {
@@ -711,45 +634,6 @@ message FreezeTokensRequest {
 message FreezeTokensResponse {
     repeated string impacted_output_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
     bytes impacted_token_amount = 2;  // Decoded uint128
-}
-
-message QueryTokenOutputsRequest {
-    repeated bytes owner_public_keys = 1 [(validate.rules).repeated.items.bytes.len = 33];
-    // Optionally provide token public keys. If not set return leaves for all tokens.
-    repeated bytes token_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
-    repeated bytes token_identifiers = 4 [(validate.rules).repeated.items.bytes.len = 32];
-    Network network = 3; // defaults to mainnet when no network is provided.
-}
-
-// Request constraints are combined using an AND relation.
-message QueryTokenTransactionsRequest {
-    // Returns transactions that have one of these output ids in the input or output.
-    repeated string output_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
-    // Returns transactions that have this owner public key as the sender or receiver in one or more of the input/output leaves.
-    repeated bytes owner_public_keys = 2 [(validate.rules).repeated.items.bytes.len = 33];
-    // Returns transactions that related to this token public key.
-    repeated bytes token_public_keys = 3 [(validate.rules).repeated.items.bytes.len = 33];
-    // Returns transactions that related to this token identifier.
-    repeated bytes token_identifiers = 7 [(validate.rules).repeated.items.bytes.len = 32];
-    // Returns transactions that match the provided transaction hashes.
-    repeated bytes token_transaction_hashes = 4 [(validate.rules).repeated.items.bytes.len = 32];
-    int64 limit = 5;
-    int64 offset = 6;
-}
-
-message QueryTokenTransactionsResponse {
-    repeated TokenTransactionWithStatus token_transactions_with_status = 1;
-    int64 offset = 2;
-}
-
-message OutputWithPreviousTransactionData {
-    TokenOutput output = 1;
-	bytes previous_transaction_hash = 2 [(validate.rules).bytes.len = 32];
-	uint32 previous_transaction_vout = 3;
-}
-
-message QueryTokenOutputsResponse {
-    repeated OutputWithPreviousTransactionData outputs_with_previous_transaction_data = 1;
 }
 
 /**
@@ -1284,10 +1168,10 @@ message PreimageRequestWithTransfer {
     bytes receiver_identity_pubkey = 2 [(validate.rules).bytes.len = 33];
     PreimageRequestStatus status = 3;
     google.protobuf.Timestamp created_time = 4;
-    
+
     // Associated transfer (if exists)
     optional Transfer transfer = 5;
-    
+
     // Preimage data (if available)
     optional bytes preimage = 6;
 }
@@ -1555,7 +1439,7 @@ message InvoiceResponse {
     string invoice = 1;
     InvoiceStatus status = 2;
     oneof transfer_type {
-        SatsTransfer sats_transfer = 3; 
+        SatsTransfer sats_transfer = 3;
         TokenTransfer token_transfer = 4;
     }
 }
