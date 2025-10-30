@@ -14,7 +14,8 @@ use tokio::{
     sync::mpsc,
 };
 use tonic::transport::Server;
-use tracing::Level;
+use tracing_subscriber::filter::LevelFilter;
+use tracing_subscriber::{prelude::*, EnvFilter};
 
 mod dkg;
 mod server;
@@ -61,15 +62,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok::<_, std::io::Error>(())
     });
 
-    tracing_subscriber::fmt()
+    let filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::DEBUG.into())
+        .from_env_lossy();
+
+    let layer = tracing_subscriber::fmt::layer()
         .with_target(false)
         .with_thread_ids(true)
         .with_level(true)
         .with_file(true)
         .with_line_number(true)
         .with_thread_names(true)
-        .with_max_level(Level::DEBUG)
-        .init();
+        .with_filter(filter);
+
+    tracing_subscriber::registry().with(layer).init();
 
     let frost_server = FrostServer::default();
 
