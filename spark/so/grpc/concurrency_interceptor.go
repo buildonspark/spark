@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 
+	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/grpcutil"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"go.opentelemetry.io/otel"
@@ -124,20 +125,32 @@ func init() {
 // Creates a unary server interceptor that enforces a concurrency limit on incoming gRPC requests
 func ConcurrencyInterceptor(guard ResourceLimiter, clientInfoProvider *GRPCClientInfoProvider, knobsService knobs.Knobs) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		// Check if the client IP is excluded from concurrency limiting.
+		// Check if the request should be excluded from concurrency limiting by pubkey or IP.
 		bypassConcurrency := false
-		if clientInfoProvider != nil && knobsService != nil {
-			if ip, err := clientInfoProvider.GetClientIP(ctx); err == nil && ip != "" {
-				if knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyExcludeIps, &ip, 0) > 0 {
-					bypassConcurrency = true
+		bypassState := "enforced"
+
+		if knobsService != nil {
+			if session, err := authn.GetSessionFromContext(ctx); err == nil && session != nil {
+				identityHex := session.IdentityPublicKey().ToHex()
+				if identityHex != "" {
+					if knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyExcludePubkeys, &identityHex, 0) > 0 {
+						bypassConcurrency = true
+						bypassState = "bypassed_pubkey"
+					}
+				}
+			}
+
+			if clientInfoProvider != nil {
+				if ip, err := clientInfoProvider.GetClientIP(ctx); err == nil && ip != "" {
+					if knobsService.GetValueTarget(knobs.KnobGrpcServerConcurrencyExcludeIps, &ip, 0) > 0 {
+						bypassConcurrency = true
+						bypassState = "bypassed_ip"
+					}
 				}
 			}
 		}
-		state := "enforced"
-		if bypassConcurrency {
-			state = "bypassed_ip"
-		}
-		attrs := append(grpcutil.ParseFullMethod(info.FullMethod), attribute.String("concurrency_limit_action", state))
+
+		attrs := append(grpcutil.ParseFullMethod(info.FullMethod), attribute.String("concurrency_limit_action", bypassState))
 		if !bypassConcurrency {
 			// Only requests not excluded from concurrency limiting should count against the limit.
 			otelAttrs := metric.WithAttributes(attrs...)

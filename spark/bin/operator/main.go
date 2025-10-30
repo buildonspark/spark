@@ -564,17 +564,12 @@ func main() {
 					return handler(ctx, req)
 				}
 			}(),
-			sparkgrpc.ConcurrencyInterceptor(concurrencyGuard, clientInfoProvider, knobsService),
 			sparkgrpc.TimeoutInterceptor(knobsService, config.GRPC.ServerUnaryHandlerTimeout),
 			sparkgrpc.PanicRecoveryInterceptor(config.ReturnDetailedPanicErrors),
-			sparkgrpc.DatabaseSessionMiddleware(
-				dbClient,
-				db.NewDefaultSessionFactory(dbClient),
-				config.Database.NewTxTimeout,
-			),
-			helper.SigningCommitmentInterceptor(config.SigningOperatorMap, knobsService),
 			authn.NewInterceptor(sessionTokenCreatorVerifier).AuthnInterceptor,
-			// Run rate limiter after authentication so pubkey dimension is available
+			// Concurrency and rate limiting after authentication so pubkey is available for rate limiting
+			// but before DB session.
+			sparkgrpc.ConcurrencyInterceptor(concurrencyGuard, clientInfoProvider, knobsService),
 			func() grpc.UnaryServerInterceptor {
 				if rateLimiter != nil {
 					return rateLimiter.UnaryServerInterceptor()
@@ -583,6 +578,12 @@ func main() {
 					return handler(ctx, req)
 				}
 			}(),
+			sparkgrpc.DatabaseSessionMiddleware(
+				dbClient,
+				db.NewDefaultSessionFactory(dbClient),
+				config.Database.NewTxTimeout,
+			),
+			helper.SigningCommitmentInterceptor(config.SigningOperatorMap, knobsService),
 			authz.NewAuthzInterceptor(authz.NewAuthzConfig(
 				authz.WithMode(config.ServiceAuthz.Mode),
 				authz.WithAllowedIPs(config.ServiceAuthz.IPAllowlist),

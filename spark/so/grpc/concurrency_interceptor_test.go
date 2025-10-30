@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -442,6 +444,36 @@ func TestConcurrencyInterceptor_NonExcludedIP_EnforcesGuard(t *testing.T) {
 	// Ensure guard was invoked and released once
 	assert.Equal(t, 1, guard.tryCount)
 	assert.Equal(t, 1, guard.releaseCount)
+}
+
+func TestConcurrencyInterceptor_ExcludedPubkey_BypassesGuard(t *testing.T) {
+	// Generate a test identity pubkey hex and exclude it via knob
+	priv := keys.GeneratePrivateKey()
+	identityHex := priv.Public().ToHex()
+
+	mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+		fmt.Sprintf("%s@%s", knobs.KnobGrpcServerConcurrencyExcludePubkeys, identityHex): 1,
+	})
+	guard := &spyGuard{failAcquire: true}
+	interceptor := ConcurrencyInterceptor(guard, nil, mockKnobs)
+
+	called := false
+	handler := func(ctx context.Context, req any) (any, error) {
+		called = true
+		return "ok", nil
+	}
+
+	info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/TestMethod"}
+	// Context with identity only
+	ctx := authn.InjectSessionForTests(t.Context(), identityHex, time.Now().Add(time.Hour).Unix())
+
+	resp, err := interceptor(ctx, nil, info, handler)
+	require.NoError(t, err)
+	assert.Equal(t, "ok", resp)
+	assert.True(t, called)
+	// Ensure guard was not invoked
+	assert.Equal(t, 0, guard.tryCount)
+	assert.Equal(t, 0, guard.releaseCount)
 }
 
 func TestConcurrencyGuard_AcquireAfterGlobalLimit(t *testing.T) {
