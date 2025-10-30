@@ -141,7 +141,7 @@ build_go_operator() {
 clone_electrs() {
     if [ ! -d "electrs.dev" ]; then
         echo "Cloning mempool/electrs git repo"
-        git clone git@github.com:mempool/electrs.git electrs.dev
+        git clone https://github.com/mempool/electrs.git electrs.dev
     fi
 }
 

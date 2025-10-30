@@ -1,0 +1,57 @@
+name: Build & Test Project
+
+on:
+  push:
+    branches:
+      - main
+      - 2025-10-29-compile-gh-action
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup mise and install tools (Automatically sets PATH)
+        uses: jdx/mise-action@v3 # Use the official action
+        with:
+          install: true # Runs `mise install` based on your .mise.toml
+          # The PATH is automatically set for all subsequent steps
+
+      - name: Install dependencies
+        run: |
+          mise doctor
+          mise ls
+          brew install pkgconf
+          brew install lefthook
+          brew install zeromq
+          brew install bitcoin
+          brew install postgresql
+          brew install tmux
+          brew install sqlx-cli # required for LRC20 Node
+          brew install rust # required for LRC20 Node
+          
+      - name: Init & start Postgres (temp data dir)
+        run: |
+          BREW_PREFIX="$(brew --prefix)"
+          export PGDATA="$RUNNER_TEMP/pgdata"
+          rm -rf "$PGDATA"
+
+          # initialize with trust for local and host (no password required)
+          "$BREW_PREFIX/opt/postgresql@14/bin/initdb" -D "$PGDATA" --username=postgres --auth-local=trust --auth-host=trust
+
+          # start server
+          "$BREW_PREFIX/opt/postgresql@14/bin/pg_ctl" -D "$PGDATA" -o "-p $PGPORT -h 127.0.0.1" -w start
+
+      - name: Build the project
+        run: |
+          make
+          ./run-everything.sh
