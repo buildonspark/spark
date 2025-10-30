@@ -6,11 +6,9 @@ import (
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/handler/tokens"
 
-	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
-	"github.com/lightsparkdev/spark/so/protoconverter"
 	sotokens "github.com/lightsparkdev/spark/so/tokens"
 )
 
@@ -44,20 +42,8 @@ func (s *SparkTokenInternalServer) SignTokenTransactionFromCoordination(
 		return nil, sotokens.FormatErrorWithTransactionProto("failed to fetch transaction", req.FinalTokenTransaction, err)
 	}
 
-	// Convert proto signatures to []*sparkpb.OperatorSpecificOwnerSignature
-	operatorSpecificSignatures := make([]*sparkpb.OperatorSpecificOwnerSignature, 0)
-	for _, sigWithIndex := range req.InputTtxoSignaturesPerOperator.TtxoSignatures {
-		operatorSpecificSignatures = append(operatorSpecificSignatures, &sparkpb.OperatorSpecificOwnerSignature{
-			OwnerSignature: protoconverter.SparkSignatureWithIndexFromTokenProto(sigWithIndex),
-			Payload: &sparkpb.OperatorSpecificTokenTransactionSignablePayload{
-				FinalTokenTransactionHash: req.FinalTokenTransactionHash,
-				OperatorIdentityPublicKey: req.InputTtxoSignaturesPerOperator.OperatorIdentityPublicKey,
-			},
-		})
-	}
-
 	internalSignTokenHandler := tokens.NewInternalSignTokenHandler(s.soConfig)
-	sigBytes, err := internalSignTokenHandler.SignAndPersistTokenTransaction(ctx, tx, req.FinalTokenTransactionHash, operatorSpecificSignatures)
+	sigBytes, err := internalSignTokenHandler.SignAndPersistTokenTransaction(ctx, tx, req.FinalTokenTransactionHash, req.InputTtxoSignaturesPerOperator.TtxoSignatures)
 	if err != nil {
 		return nil, err
 	}

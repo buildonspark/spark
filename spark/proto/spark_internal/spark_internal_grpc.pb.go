@@ -40,8 +40,6 @@ const (
 	SparkInternalService_InitiateTransfer_FullMethodName                   = "/spark_internal.SparkInternalService/initiate_transfer"
 	SparkInternalService_DeliverSenderKeyTweak_FullMethodName              = "/spark_internal.SparkInternalService/deliver_sender_key_tweak"
 	SparkInternalService_InitiateCooperativeExit_FullMethodName            = "/spark_internal.SparkInternalService/initiate_cooperative_exit"
-	SparkInternalService_StartTokenTransactionInternal_FullMethodName      = "/spark_internal.SparkInternalService/start_token_transaction_internal"
-	SparkInternalService_QueryTokenOutputsInternal_FullMethodName          = "/spark_internal.SparkInternalService/query_token_outputs_internal"
 	SparkInternalService_InitiateSettleReceiverKeyTweak_FullMethodName     = "/spark_internal.SparkInternalService/initiate_settle_receiver_key_tweak"
 	SparkInternalService_SettleReceiverKeyTweak_FullMethodName             = "/spark_internal.SparkInternalService/settle_receiver_key_tweak"
 	SparkInternalService_SettleSenderKeyTweak_FullMethodName               = "/spark_internal.SparkInternalService/settle_sender_key_tweak"
@@ -84,8 +82,6 @@ type SparkInternalServiceClient interface {
 	InitiateTransfer(ctx context.Context, in *InitiateTransferRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	DeliverSenderKeyTweak(ctx context.Context, in *DeliverSenderKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiateCooperativeExit(ctx context.Context, in *InitiateCooperativeExitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	StartTokenTransactionInternal(ctx context.Context, in *StartTokenTransactionInternalRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	QueryTokenOutputsInternal(ctx context.Context, in *spark.QueryTokenOutputsRequest, opts ...grpc.CallOption) (*spark.QueryTokenOutputsResponse, error)
 	InitiateSettleReceiverKeyTweak(ctx context.Context, in *InitiateSettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SettleReceiverKeyTweak(ctx context.Context, in *SettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	SettleSenderKeyTweak(ctx context.Context, in *SettleSenderKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -312,26 +308,6 @@ func (c *sparkInternalServiceClient) InitiateCooperativeExit(ctx context.Context
 	return out, nil
 }
 
-func (c *sparkInternalServiceClient) StartTokenTransactionInternal(ctx context.Context, in *StartTokenTransactionInternalRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, SparkInternalService_StartTokenTransactionInternal_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *sparkInternalServiceClient) QueryTokenOutputsInternal(ctx context.Context, in *spark.QueryTokenOutputsRequest, opts ...grpc.CallOption) (*spark.QueryTokenOutputsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(spark.QueryTokenOutputsResponse)
-	err := c.cc.Invoke(ctx, SparkInternalService_QueryTokenOutputsInternal_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *sparkInternalServiceClient) InitiateSettleReceiverKeyTweak(ctx context.Context, in *InitiateSettleReceiverKeyTweakRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -508,8 +484,6 @@ type SparkInternalServiceServer interface {
 	InitiateTransfer(context.Context, *InitiateTransferRequest) (*emptypb.Empty, error)
 	DeliverSenderKeyTweak(context.Context, *DeliverSenderKeyTweakRequest) (*emptypb.Empty, error)
 	InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error)
-	StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*emptypb.Empty, error)
-	QueryTokenOutputsInternal(context.Context, *spark.QueryTokenOutputsRequest) (*spark.QueryTokenOutputsResponse, error)
 	InitiateSettleReceiverKeyTweak(context.Context, *InitiateSettleReceiverKeyTweakRequest) (*emptypb.Empty, error)
 	SettleReceiverKeyTweak(context.Context, *SettleReceiverKeyTweakRequest) (*emptypb.Empty, error)
 	SettleSenderKeyTweak(context.Context, *SettleSenderKeyTweakRequest) (*emptypb.Empty, error)
@@ -600,12 +574,6 @@ func (UnimplementedSparkInternalServiceServer) DeliverSenderKeyTweak(context.Con
 }
 func (UnimplementedSparkInternalServiceServer) InitiateCooperativeExit(context.Context, *InitiateCooperativeExitRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InitiateCooperativeExit not implemented")
-}
-func (UnimplementedSparkInternalServiceServer) StartTokenTransactionInternal(context.Context, *StartTokenTransactionInternalRequest) (*emptypb.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StartTokenTransactionInternal not implemented")
-}
-func (UnimplementedSparkInternalServiceServer) QueryTokenOutputsInternal(context.Context, *spark.QueryTokenOutputsRequest) (*spark.QueryTokenOutputsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method QueryTokenOutputsInternal not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) InitiateSettleReceiverKeyTweak(context.Context, *InitiateSettleReceiverKeyTweakRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InitiateSettleReceiverKeyTweak not implemented")
@@ -1015,42 +983,6 @@ func _SparkInternalService_InitiateCooperativeExit_Handler(srv interface{}, ctx 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SparkInternalService_StartTokenTransactionInternal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StartTokenTransactionInternalRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkInternalServiceServer).StartTokenTransactionInternal(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkInternalService_StartTokenTransactionInternal_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkInternalServiceServer).StartTokenTransactionInternal(ctx, req.(*StartTokenTransactionInternalRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _SparkInternalService_QueryTokenOutputsInternal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(spark.QueryTokenOutputsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SparkInternalServiceServer).QueryTokenOutputsInternal(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SparkInternalService_QueryTokenOutputsInternal_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SparkInternalServiceServer).QueryTokenOutputsInternal(ctx, req.(*spark.QueryTokenOutputsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SparkInternalService_InitiateSettleReceiverKeyTweak_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(InitiateSettleReceiverKeyTweakRequest)
 	if err := dec(in); err != nil {
@@ -1403,14 +1335,6 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "initiate_cooperative_exit",
 			Handler:    _SparkInternalService_InitiateCooperativeExit_Handler,
-		},
-		{
-			MethodName: "start_token_transaction_internal",
-			Handler:    _SparkInternalService_StartTokenTransactionInternal_Handler,
-		},
-		{
-			MethodName: "query_token_outputs_internal",
-			Handler:    _SparkInternalService_QueryTokenOutputsInternal_Handler,
 		},
 		{
 			MethodName: "initiate_settle_receiver_key_tweak",

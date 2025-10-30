@@ -10,7 +10,6 @@ import (
 
 	"github.com/lightsparkdev/spark/common/keys"
 
-	pb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -348,11 +347,7 @@ func CreateOperatorSpecificSignatures(
 		var ttxoSignatures []*tokenpb.SignatureWithIndex
 
 		for i, privKey := range ownerPrivateKeys {
-			payload := &pb.OperatorSpecificTokenTransactionSignablePayload{
-				FinalTokenTransactionHash: finalTxHash,
-				OperatorIdentityPublicKey: operator.IdentityPublicKey.Serialize(),
-			}
-			payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(payload)
+			payloadHash, err := utils.HashOperatorSpecificPayload(finalTxHash, operator.IdentityPublicKey)
 			if err != nil {
 				return nil, fmt.Errorf("error while hashing operator-specific payload: %w", err)
 			}

@@ -564,11 +564,7 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 // createInputTtxoSignatures creates the input TTXO signatures for a commit transaction request
 func createInputTtxoSignatures(t *testing.T, setup *testSetupCommon, finalTxHash []byte, inputCount int) []*tokenpb.InputTtxoSignaturesPerOperator {
 	createSignatureForOperator := func(operatorPubKey keys.Public, _ uint32) []byte {
-		payload := &sparkpb.OperatorSpecificTokenTransactionSignablePayload{
-			FinalTokenTransactionHash: finalTxHash,
-			OperatorIdentityPublicKey: operatorPubKey.Serialize(),
-		}
-		payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(payload)
+		payloadHash, err := utils.HashOperatorSpecificPayload(finalTxHash, operatorPubKey)
 		require.NoError(t, err)
 		return ecdsa.Sign(setup.privKey.ToBTCEC(), payloadHash).Serialize()
 	}

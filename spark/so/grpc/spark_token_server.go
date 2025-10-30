@@ -29,7 +29,7 @@ func NewSparkTokenServer(authzConfig authz.Config, soConfig *so.Config, db *ent.
 
 func (s *SparkTokenServer) StartTransaction(ctx context.Context, req *tokenpb.StartTransactionRequest) (*tokenpb.StartTransactionResponse, error) {
 	ctx, _ = logging.WithRequestAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.PartialTokenTransaction)...)
-	tokenTransactionHandler := tokens.NewStartTokenTransactionHandlerWithPreemption(s.soConfig)
+	tokenTransactionHandler := tokens.NewStartTokenTransactionHandler(s.soConfig)
 	resp, err := tokenTransactionHandler.StartTokenTransaction(ctx, req)
 	return resp, err
 }

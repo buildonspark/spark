@@ -17,7 +17,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/lightsparkdev/spark/common/logging"
 	secretsharing "github.com/lightsparkdev/spark/common/secret_sharing"
-	pb "github.com/lightsparkdev/spark/proto/spark"
+	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	pbtkinternal "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -61,7 +61,7 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 	ctx context.Context,
 	tokenTransaction *ent.TokenTransaction,
 	finalTokenTransactionHash []byte,
-	operatorSpecificSignatures []*pb.OperatorSpecificOwnerSignature,
+	ownerSignatures []*tokenpb.SignatureWithIndex,
 ) ([]byte, error) {
 	ctx, span := GetTracer().Start(ctx, "InternalSignTokenHandler.SignAndPersistTokenTransaction", GetEntTokenTransactionTraceAttributes(ctx, tokenTransaction))
 	defer span.End()
@@ -80,23 +80,23 @@ func (h *InternalSignTokenHandler) SignAndPersistTokenTransaction(
 		return nil, tokens.FormatErrorWithTransactionEnt(err.Error(), tokenTransaction, err)
 	}
 
-	if err := validateOperatorSpecificSignatures(h.config.IdentityPublicKey(), operatorSpecificSignatures, tokenTransaction); err != nil {
+	if err := validateOperatorSpecificOwnerSignatures(h.config.IdentityPublicKey(), ownerSignatures, tokenTransaction, finalTokenTransactionHash); err != nil {
 		return nil, err
 	}
 
 	operatorSignature := ecdsa.Sign(h.config.IdentityPrivateKey.ToBTCEC(), finalTokenTransactionHash)
 
 	// Order the signatures according to their index before updating the DB.
-	operatorSpecificSignatureMap := make(map[int][]byte, len(operatorSpecificSignatures))
-	for _, sig := range operatorSpecificSignatures {
-		inputIndex := int(sig.OwnerSignature.InputIndex)
-		operatorSpecificSignatureMap[inputIndex] = sig.OwnerSignature.Signature
+	ownerSignatureMap := make(map[int][]byte, len(ownerSignatures))
+	for _, sig := range ownerSignatures {
+		inputIndex := int(sig.InputIndex)
+		ownerSignatureMap[inputIndex] = sig.Signature
 	}
-	operatorSpecificSignaturesArr := make([][]byte, len(operatorSpecificSignatureMap))
-	for i := 0; i < len(operatorSpecificSignatureMap); i++ {
-		operatorSpecificSignaturesArr[i] = operatorSpecificSignatureMap[i]
+	ownerSignaturesArr := make([][]byte, len(ownerSignatureMap))
+	for i := 0; i < len(ownerSignatureMap); i++ {
+		ownerSignaturesArr[i] = ownerSignatureMap[i]
 	}
-	if err := ent.UpdateSignedTransaction(ctx, tokenTransaction, operatorSpecificSignaturesArr, operatorSignature.Serialize()); err != nil {
+	if err := ent.UpdateSignedTransaction(ctx, tokenTransaction, ownerSignaturesArr, operatorSignature.Serialize()); err != nil {
 		return nil, tokens.FormatErrorWithTransactionEnt("failed to update outputs after signing", tokenTransaction, err)
 	}
 

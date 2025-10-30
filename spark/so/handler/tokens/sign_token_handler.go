@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
-	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -25,7 +24,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
-	"github.com/lightsparkdev/spark/so/protoconverter"
 	"github.com/lightsparkdev/spark/so/tokens"
 	"github.com/lightsparkdev/spark/so/utils"
 )
@@ -450,13 +448,8 @@ func (h *SignTokenHandler) localSignAndCommitTransaction(
 ) (*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, error) {
 	ctx, span := GetTracer().Start(ctx, "SignTokenHandler.localSignAndCommitTransaction", GetEntTokenTransactionTraceAttributes(ctx, tokenTransaction))
 	defer span.End()
-	operatorSpecificSignatures := convertTokenProtoSignaturesToOperatorSpecific(
-		foundOperatorSignatures.TtxoSignatures,
-		finalTokenTransactionHash,
-		h.config.IdentityPublicKey(),
-	)
 	internalSignTokenHandler := NewInternalSignTokenHandler(h.config)
-	sigBytes, err := internalSignTokenHandler.SignAndPersistTokenTransaction(ctx, tokenTransaction, finalTokenTransactionHash, operatorSpecificSignatures)
+	sigBytes, err := internalSignTokenHandler.SignAndPersistTokenTransaction(ctx, tokenTransaction, finalTokenTransactionHash, foundOperatorSignatures.TtxoSignatures)
 	if err != nil {
 		return nil, err
 	}
@@ -591,23 +584,4 @@ func (h *SignTokenHandler) getRevealCommitProgress(ctx context.Context, tokenTra
 		CommittedOperatorPublicKeys:   committedOperatorPublicKeys,
 		UncommittedOperatorPublicKeys: uncommittedOperatorPublicKeys,
 	}, nil
-}
-
-// convertTokenProtoSignaturesToOperatorSpecific converts token proto signatures to OperatorSpecificOwnerSignature format
-func convertTokenProtoSignaturesToOperatorSpecific(
-	ttxoSignatures []*tokenpb.SignatureWithIndex,
-	finalTokenTransactionHash []byte,
-	operatorIdentityPublicKey keys.Public,
-) []*sparkpb.OperatorSpecificOwnerSignature {
-	operatorSpecificSignatures := make([]*sparkpb.OperatorSpecificOwnerSignature, 0, len(ttxoSignatures))
-	for _, operatorSignatures := range ttxoSignatures {
-		operatorSpecificSignatures = append(operatorSpecificSignatures, &sparkpb.OperatorSpecificOwnerSignature{
-			OwnerSignature: protoconverter.SparkSignatureWithIndexFromTokenProto(operatorSignatures),
-			Payload: &sparkpb.OperatorSpecificTokenTransactionSignablePayload{
-				FinalTokenTransactionHash: finalTokenTransactionHash,
-				OperatorIdentityPublicKey: operatorIdentityPublicKey.Serialize(),
-			},
-		})
-	}
-	return operatorSpecificSignatures
 }

@@ -20,7 +20,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
-	sparkinternalpb "github.com/lightsparkdev/spark/proto/spark_internal"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authz"
@@ -28,32 +27,20 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
-	"github.com/lightsparkdev/spark/so/protoconverter"
 	"github.com/lightsparkdev/spark/so/tokens"
 	"github.com/lightsparkdev/spark/so/utils"
 )
 
 type StartTokenTransactionHandler struct {
-	config           *so.Config
-	enablePreemption bool
-	prepareHandler   *InternalPrepareTokenHandler
+	config         *so.Config
+	prepareHandler *InternalPrepareTokenHandler
 }
 
-// NewStartTokenTransactionHandler creates a new StartTokenTransactionHandler.
+// NewStartTokenTransactionHandler creates a new StartTokenTransactionHandler with pre-emption enabled.
 func NewStartTokenTransactionHandler(config *so.Config) *StartTokenTransactionHandler {
 	return &StartTokenTransactionHandler{
-		config:           config,
-		enablePreemption: false,
-		prepareHandler:   NewInternalPrepareTokenHandler(config),
-	}
-}
-
-// NewStartTokenTransactionHandlerWithPreemption creates a new StartTokenTransactionHandler with pre-emption enabled.
-func NewStartTokenTransactionHandlerWithPreemption(config *so.Config) *StartTokenTransactionHandler {
-	return &StartTokenTransactionHandler{
-		config:           config,
-		enablePreemption: true,
-		prepareHandler:   NewInternalPrepareTokenHandlerWithPreemption(config),
+		config:         config,
+		prepareHandler: NewInternalPrepareTokenHandlerWithPreemption(config),
 	}
 }
 
@@ -98,10 +85,8 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 		}
 	}
 
-	if h.enablePreemption {
-		if err := preemptOrRejectTransactions(ctx, req.PartialTokenTransaction); err != nil {
-			return nil, err
-		}
+	if err := preemptOrRejectTransactions(ctx, req.PartialTokenTransaction); err != nil {
+		return nil, err
 	}
 
 	if req.PartialTokenTransaction.Version >= 2 && len(req.PartialTokenTransaction.InvoiceAttachments) > 0 {
@@ -133,9 +118,6 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 			req.PartialTokenTransactionOwnerSignatures,
 			keyshareIDStrings,
 			h.config.IdentityPublicKey(),
-			// If pre-emption is enabled, we need to call spark_token_internal.PrepareTransaction;
-			// otherwise we call spark_internal.StartTokenTransactionInternal.
-			h.enablePreemption,
 		)
 	})
 	if err != nil {
@@ -171,7 +153,6 @@ func (h *StartTokenTransactionHandler) StartTokenTransaction(ctx context.Context
 func callPrepareTokenTransactionInternal(ctx context.Context, operator *so.SigningOperator,
 	finalTokenTransaction *tokenpb.TokenTransaction, signaturesWithIndex []*tokenpb.SignatureWithIndex,
 	keyshareIDStrings []string, coordinatorPublicKey keys.Public,
-	callSparkTokenInternal bool,
 ) error {
 	ctx, span := GetTracer().Start(ctx, "StartTokenTransactionHandler.callPrepareTokenTransactionInternal", GetProtoTokenTransactionTraceAttributes(ctx, finalTokenTransaction))
 	defer span.End()
@@ -187,18 +168,8 @@ func callPrepareTokenTransactionInternal(ctx context.Context, operator *so.Signi
 		TokenTransactionSignatures: signaturesWithIndex,
 		CoordinatorPublicKey:       coordinatorPublicKey.Serialize(),
 	}
-	if callSparkTokenInternal {
-		client := tokeninternalpb.NewSparkTokenInternalServiceClient(conn)
-		_, err = client.PrepareTransaction(ctx, tokenReq)
-	} else {
-		client := sparkinternalpb.NewSparkInternalServiceClient(conn)
-		var sparkReq *sparkinternalpb.StartTokenTransactionInternalRequest
-		sparkReq, err = protoconverter.SparkStartTokenTransactionInternalRequestFromTokenProto(tokenReq)
-		if err != nil {
-			return fmt.Errorf("%s: %w", fmt.Sprintf(tokens.ErrFailedToConvertTokenProto, "PrepareTransactionRequest", "StartTokenTransactionInternalRequest"), err)
-		}
-		_, err = client.StartTokenTransactionInternal(ctx, sparkReq)
-	}
+	client := tokeninternalpb.NewSparkTokenInternalServiceClient(conn)
+	_, err = client.PrepareTransaction(ctx, tokenReq)
 	if err != nil {
 		return tokens.FormatErrorWithTransactionProto(fmt.Sprintf(tokens.ErrFailedToExecuteWithOperator, operator.Identifier), finalTokenTransaction, err)
 	}

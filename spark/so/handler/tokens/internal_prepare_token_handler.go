@@ -242,28 +242,27 @@ func (h *InternalPrepareTokenHandler) validateAndReserveKeyshares(ctx context.Co
 	return expectedRevocationPublicKeys, nil
 }
 
-// validateOperatorSpecificSignatures validates the signatures in the request against the transaction hash
+// validateOperatorSpecificOwnerSignatures validates the operator-specific owner signatures in the request against the transaction
 // and verifies that the number of signatures matches the expected count based on transaction type
-func validateOperatorSpecificSignatures(identityPublicKey keys.Public, operatorSpecificSignatures []*sparkpb.OperatorSpecificOwnerSignature, tokenTransaction *ent.TokenTransaction) error {
+func validateOperatorSpecificOwnerSignatures(operatorIdentityPublicKey keys.Public, ownerSignatures []*tokenpb.SignatureWithIndex, tokenTransaction *ent.TokenTransaction, finalTokenTransactionHash []byte) error {
 	if len(tokenTransaction.Edges.SpentOutput) > 0 {
-		return validateTransferOperatorSpecificSignatures(identityPublicKey, operatorSpecificSignatures, tokenTransaction)
+		return validateTransferOwnerSignatures(operatorIdentityPublicKey, ownerSignatures, tokenTransaction, finalTokenTransactionHash)
 	}
-	return validateIssuerOperatorSpecificSignatures(identityPublicKey, operatorSpecificSignatures, tokenTransaction)
+	return validateIssuerOwnerSignatures(operatorIdentityPublicKey, ownerSignatures, tokenTransaction, finalTokenTransactionHash)
 }
 
-// validateTransferOperatorSpecificSignatures validates signatures for transfer transactions
-func validateTransferOperatorSpecificSignatures(identityPublicKey keys.Public, operatorSpecificSignatures []*sparkpb.OperatorSpecificOwnerSignature, tokenTransaction *ent.TokenTransaction) error {
-	if len(operatorSpecificSignatures) != len(tokenTransaction.Edges.SpentOutput) {
+func validateTransferOwnerSignatures(operatorIdentityPublicKey keys.Public, ownerSignatures []*tokenpb.SignatureWithIndex, tokenTransaction *ent.TokenTransaction, finalTokenTransactionHash []byte) error {
+	if len(ownerSignatures) != len(tokenTransaction.Edges.SpentOutput) {
 		return tokens.FormatErrorWithTransactionEnt(
 			"invalid number of signatures for transfer",
-			tokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected %d signatures for transfer (one per input), but got %d", len(tokenTransaction.Edges.SpentOutput), len(operatorSpecificSignatures))))
+			tokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected %d signatures for transfer (one per input), but got %d", len(tokenTransaction.Edges.SpentOutput), len(ownerSignatures))))
 	}
 	numInputs := len(tokenTransaction.Edges.SpentOutput)
-	signaturesByIndex := make([]*sparkpb.OperatorSpecificOwnerSignature, numInputs)
+	signaturesByIndex := make([]*tokenpb.SignatureWithIndex, numInputs)
 
 	// Sort signatures according to index position
-	for _, sig := range operatorSpecificSignatures {
-		index := int(sig.OwnerSignature.InputIndex)
+	for _, sig := range ownerSignatures {
+		index := int(sig.InputIndex)
 		if index < 0 || index >= numInputs {
 			return tokens.FormatErrorWithTransactionEnt(
 				fmt.Sprintf(tokens.ErrInputIndexOutOfRange, index, numInputs-1),
@@ -292,27 +291,15 @@ func validateTransferOperatorSpecificSignatures(identityPublicKey keys.Public, o
 		return cmp.Compare(a.SpentTransactionInputVout, b.SpentTransactionInputVout)
 	})
 
-	// Validate each signature against its corresponding output
+	// Validate each signature against the operator-specific payload hash
+	payloadHash, err := utils.HashOperatorSpecificPayload(finalTokenTransactionHash, operatorIdentityPublicKey)
+	if err != nil {
+		return tokens.FormatErrorWithTransactionEnt("failed to hash operator-specific payload", tokenTransaction, err)
+	}
+
 	for i, sig := range signaturesByIndex {
-		payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(sig.Payload)
-		if err != nil {
-			return sparkerrors.WrapErrorWithMessage(err, tokens.ErrFailedToHashRevocationKeyshares)
-		}
-
-		if !bytes.Equal(sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash) {
-			return sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf(tokens.ErrTransactionHashMismatch,
-				sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash))
-		}
-
-		payloadPubKey, err := keys.ParsePublicKey(sig.Payload.OperatorIdentityPublicKey)
-		if err != nil {
-			return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse signature payload operator identity public key: %w", err))
-		}
-		if !payloadPubKey.Equals(identityPublicKey) {
-			return sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf(tokens.ErrOperatorPublicKeyMismatch, payloadPubKey, identityPublicKey))
-		}
 		output := spentOutputs[i]
-		if err := utils.ValidateOwnershipSignature(sig.OwnerSignature.Signature, payloadHash, output.OwnerPublicKey); err != nil {
+		if err := utils.ValidateOwnershipSignature(sig.Signature, payloadHash, output.OwnerPublicKey); err != nil {
 			return tokens.FormatErrorWithTransactionEnt(tokens.ErrInvalidOwnerSignature, tokenTransaction, err)
 		}
 	}
@@ -320,12 +307,13 @@ func validateTransferOperatorSpecificSignatures(identityPublicKey keys.Public, o
 	return nil
 }
 
-// validateIssuerOperatorSpecificSignatures validates signatures for mint and create transactions
-func validateIssuerOperatorSpecificSignatures(identityPublicKey keys.Public, operatorSpecificSignatures []*sparkpb.OperatorSpecificOwnerSignature, tokenTransaction *ent.TokenTransaction) error {
-	if len(operatorSpecificSignatures) != 1 {
+// validateIssuerOwnerSignatures validates V2 owner signatures for mint and create transactions
+// In the coordinated flow, issuer signs an operator-specific payload (finalTxHash + operatorIdentity)
+func validateIssuerOwnerSignatures(operatorIdentityPublicKey keys.Public, ownerSignatures []*tokenpb.SignatureWithIndex, tokenTransaction *ent.TokenTransaction, finalTokenTransactionHash []byte) error {
+	if len(ownerSignatures) != 1 {
 		return tokens.FormatErrorWithTransactionEnt(
 			"invalid number of signatures",
-			tokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 signature for mint/create, but got %d", len(operatorSpecificSignatures))))
+			tokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("expected exactly 1 signature for mint/create, but got %d", len(ownerSignatures))))
 	}
 
 	var issuerPublicKey keys.Public
@@ -339,36 +327,17 @@ func validateIssuerOperatorSpecificSignatures(identityPublicKey keys.Public, ope
 			tokenTransaction, sparkerrors.NotFoundMissingEntity(fmt.Errorf("neither mint nor create record found in db, but expected one for this transaction")))
 	}
 
-	sig := operatorSpecificSignatures[0]
+	sig := ownerSignatures[0]
 
-	// Validate the signature payload
-	payloadHash, err := utils.HashOperatorSpecificTokenTransactionSignablePayload(sig.Payload)
+	// Compute the operator-specific payload hash
+	payloadHash, err := utils.HashOperatorSpecificPayload(finalTokenTransactionHash, operatorIdentityPublicKey)
 	if err != nil {
-		return tokens.FormatErrorWithTransactionEnt(tokens.ErrFailedToHashRevocationKeyshares, tokenTransaction, err)
+		return tokens.FormatErrorWithTransactionEnt("failed to hash operator-specific payload", tokenTransaction, err)
 	}
 
-	if !bytes.Equal(sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash) {
-		return sparkerrors.FailedPreconditionHashMismatch(fmt.Errorf(tokens.ErrTransactionHashMismatch,
-			sig.Payload.FinalTokenTransactionHash, tokenTransaction.FinalizedTokenTransactionHash))
-	}
-
-	if len(sig.Payload.OperatorIdentityPublicKey) > 0 {
-		payloadPubKey, err := keys.ParsePublicKey(sig.Payload.OperatorIdentityPublicKey)
-		if err != nil {
-			return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("unable to parse signature payload operator identity public key: %w", err))
-		}
-		if !payloadPubKey.Equals(identityPublicKey) {
-			return sparkerrors.InvalidArgumentPublicKeyMismatch(fmt.Errorf(tokens.ErrOperatorPublicKeyMismatch, payloadPubKey, identityPublicKey))
-		}
-	}
-
-	// Validate the signature using the issuer public key from the database
-	if err := utils.ValidateOwnershipSignature(sig.OwnerSignature.Signature, payloadHash, issuerPublicKey); err != nil {
-		errorMsg := tokens.ErrInvalidIssuerSignature
-		if tokenTransaction.Edges.Create != nil {
-			errorMsg = "invalid issuer signature for create transaction"
-		}
-		return tokens.FormatErrorWithTransactionEnt(errorMsg, tokenTransaction, err)
+	// Validate the issuer signature against the payload hash
+	if err := utils.ValidateOwnershipSignature(sig.Signature, payloadHash, issuerPublicKey); err != nil {
+		return tokens.FormatErrorWithTransactionEnt(tokens.ErrInvalidIssuerSignature, tokenTransaction, err)
 	}
 
 	return nil

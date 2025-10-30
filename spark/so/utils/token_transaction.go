@@ -789,11 +789,11 @@ func hashNetwork(h hash.Hash, network pb.Network) []byte {
 	return h.Sum(nil)
 }
 
-// HashOperatorSpecificTokenTransactionSignablePayload generates a hash of the operator-specific payload
-// by concatenating hashes of the transaction hash and operator public key.
-func HashOperatorSpecificTokenTransactionSignablePayload(payload *sparkpb.OperatorSpecificTokenTransactionSignablePayload) ([]byte, error) {
-	if payload == nil {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("operator specific token transaction signable payload cannot be nil"))
+// HashOperatorSpecificPayload computes the hash for an operator-specific token transaction payload
+// This is used in the coordinated flow where owners sign: hash(hash(finalTxHash) + hash(operatorPubKey))
+func HashOperatorSpecificPayload(finalTxHash []byte, operatorIdentityPublicKey keys.Public) ([]byte, error) {
+	if len(finalTxHash) != 32 {
+		return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid final transaction hash length: expected 32 bytes, got %d", len(finalTxHash)))
 	}
 
 	h := sha256.New()
@@ -801,22 +801,12 @@ func HashOperatorSpecificTokenTransactionSignablePayload(payload *sparkpb.Operat
 
 	// Hash final_token_transaction_hash
 	h.Reset()
-	if txHash := payload.GetFinalTokenTransactionHash(); txHash != nil {
-		if len(txHash) != 32 {
-			return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("invalid final transaction hash length: expected 32 bytes, got %d", len(txHash)))
-		}
-		h.Write(txHash)
-	}
-
+	h.Write(finalTxHash)
 	allHashes = append(allHashes, h.Sum(nil)...)
 
 	// Hash operator_identity_public_key
 	h.Reset()
-	pubKey := payload.GetOperatorIdentityPublicKey()
-	if len(pubKey) == 0 {
-		return nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("operator identity public key cannot be empty"))
-	}
-	h.Write(pubKey)
+	h.Write(operatorIdentityPublicKey.Serialize())
 	allHashes = append(allHashes, h.Sum(nil)...)
 
 	// Final hash of all concatenated hashes

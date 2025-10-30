@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
-	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so/utils"
 	"github.com/lightsparkdev/spark/testing/wallet"
@@ -94,11 +93,7 @@ func testCoordinatedTransactionSigningScenarios(
 	for _, operator := range config.SigningOperators {
 		var ttxoSigs []*tokenpb.SignatureWithIndex
 		for idx, privKey := range commitOwnerPrivateKeys {
-			payload := &sparkpb.OperatorSpecificTokenTransactionSignablePayload{
-				FinalTokenTransactionHash: finalTxHash,
-				OperatorIdentityPublicKey: operator.IdentityPublicKey.Serialize(),
-			}
-			payloadHash, hashErr := utils.HashOperatorSpecificTokenTransactionSignablePayload(payload)
+			payloadHash, hashErr := utils.HashOperatorSpecificPayload(finalTxHash, operator.IdentityPublicKey)
 			require.NoError(t, hashErr, "failed to hash operator-specific payload")
 
 			sigBytes, sigErr := wallet.SignHashSlice(config, privKey, payloadHash)
