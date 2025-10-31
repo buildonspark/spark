@@ -6,25 +6,25 @@ import {
   hashTokenTransactionV2,
 } from "../utils/token-hashing.js";
 
-// Test constants for consistent test data across all hash tests
+// Test constants for consistent test data across all hash tests - matching Go test data
 const TEST_TOKEN_PUBLIC_KEY = new Uint8Array([
-  242, 155, 208, 90, 72, 211, 120, 244, 69, 99, 28, 101, 149, 222, 123, 50, 252,
-  63, 99, 54, 137, 226, 7, 224, 163, 122, 93, 248, 42, 159, 173, 45,
+  0x02, 242, 155, 208, 90, 72, 211, 120, 244, 69, 99, 28, 101, 149, 222, 123,
+  50, 252, 63, 99, 54, 137, 226, 7, 224, 163, 122, 93, 248, 42, 159, 173, 45,
 ]);
 
 const TEST_IDENTITY_PUB_KEY = new Uint8Array([
-  25, 155, 208, 90, 72, 211, 120, 244, 69, 99, 28, 101, 149, 222, 123, 50, 252,
-  63, 99, 54, 137, 226, 7, 224, 163, 122, 93, 248, 42, 159, 173, 46,
+  0x02, 25, 155, 208, 90, 72, 211, 120, 244, 69, 99, 28, 101, 149, 222, 123, 50,
+  252, 63, 99, 54, 137, 226, 7, 224, 163, 122, 93, 248, 42, 159, 173, 46,
 ]);
 
 const TEST_REVOCATION_PUB_KEY = new Uint8Array([
-  100, 155, 208, 90, 72, 211, 120, 244, 69, 99, 28, 101, 149, 222, 123, 50, 252,
-  63, 99, 54, 137, 226, 7, 224, 163, 122, 93, 248, 42, 159, 173, 46,
+  0x02, 100, 155, 208, 90, 72, 211, 120, 244, 69, 99, 28, 101, 149, 222, 123,
+  50, 252, 63, 99, 54, 137, 226, 7, 224, 163, 122, 93, 248, 42, 159, 173, 46,
 ]);
 
 const TEST_OPERATOR_PUB_KEY = new Uint8Array([
-  200, 155, 208, 90, 72, 211, 120, 244, 69, 99, 28, 101, 149, 222, 123, 50, 252,
-  63, 99, 54, 137, 226, 7, 224, 163, 122, 93, 248, 42, 159, 173, 46,
+  0x02, 200, 155, 208, 90, 72, 211, 120, 244, 69, 99, 28, 101, 149, 222, 123,
+  50, 252, 63, 99, 54, 137, 226, 7, 224, 163, 122, 93, 248, 42, 159, 173, 46,
 ]);
 
 const TEST_INVOICE_ATTACHMENTS = [
@@ -39,20 +39,16 @@ const TEST_INVOICE_ATTACHMENTS = [
 ];
 
 const TEST_LEAF_ID = "db1a4e48-0fc5-4f6c-8a80-d9d6c561a436";
-const TEST_BOND_SATS = 10000;
-const TEST_LOCKTIME = 100;
 const TEST_TOKEN_AMOUNT: bigint = 1000n;
-const TEST_MAX_SUPPLY = new Uint8Array([
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 232,
-]); // 1000 in BE format
+const TEST_MAX_SUPPLY = numberToBytesBE(1000n, 16);
 const TEST_TOKEN_NAME = "TestToken";
 const TEST_TOKEN_TICKER = "TEST";
 const TEST_DECIMALS = 8;
 const TEST_ISSUER_TIMESTAMP = 100;
 const TEST_CLIENT_TIMESTAMP = 100;
 const TEST_EXPIRY_TIME = 0;
-const TEST_WITHDRAW_BOND_SATS = 10000;
-const TEST_WITHDRAW_RELATIVE_BLOCK_LOCKTIME = 100;
+const TEST_BOND_SATS = 10000;
+const TEST_LOCKTIME = 100;
 const TEST_TOKEN_IDENTIFIER = new Uint8Array(32).fill(0x07);
 
 // Precompute previous transaction hash to match Go test data
@@ -60,9 +56,9 @@ const PREV_TX_HASH = Uint8Array.from(
   sha256(new TextEncoder().encode("previous transaction")),
 );
 
-describe("hash token transaction", () => {
+describe("Hash Token Transaction V1", () => {
   it("should produce the exact same hash for mint v1", () => {
-    const tokenTransaction = {
+    const partialTokenTransaction = {
       version: 1,
       tokenInputs: {
         $case: "mintInput" as const,
@@ -75,8 +71,119 @@ describe("hash token transaction", () => {
         {
           id: TEST_LEAF_ID,
           ownerPublicKey: TEST_IDENTITY_PUB_KEY,
-          withdrawBondSats: TEST_WITHDRAW_BOND_SATS,
-          withdrawRelativeBlockLocktime: TEST_WITHDRAW_RELATIVE_BLOCK_LOCKTIME,
+          tokenPublicKey: TEST_TOKEN_PUBLIC_KEY,
+          tokenAmount: numberToBytesBE(TEST_TOKEN_AMOUNT, 16),
+          revocationCommitment: TEST_REVOCATION_PUB_KEY,
+          withdrawBondSats: TEST_BOND_SATS,
+          withdrawRelativeBlockLocktime: TEST_LOCKTIME,
+        },
+      ],
+      sparkOperatorIdentityPublicKeys: [TEST_OPERATOR_PUB_KEY],
+      network: Network.REGTEST,
+      expiryTime: new Date(TEST_EXPIRY_TIME),
+      clientCreatedTimestamp: new Date(TEST_CLIENT_TIMESTAMP),
+      invoiceAttachments: [],
+    };
+
+    const hash = hashTokenTransactionV1(partialTokenTransaction, false);
+
+    expect(Array.from(hash)).toEqual([
+      0xfe, 0x93, 0x8b, 0x12, 0xbf, 0xed, 0x51, 0x79, 0xff, 0x29, 0x8d, 0x2e,
+      0xd9, 0x66, 0x2b, 0x4a, 0xf6, 0xf8, 0x35, 0x18, 0x8f, 0x4e, 0xa4, 0xb1,
+      0xb3, 0x3b, 0x61, 0x23, 0x14, 0x49, 0xdc, 0x81,
+    ]);
+  });
+
+  it("should produce the exact same hash for create v1", () => {
+    const createTransaction = {
+      version: 1,
+      tokenInputs: {
+        $case: "createInput" as const,
+        createInput: {
+          issuerPublicKey: TEST_TOKEN_PUBLIC_KEY,
+          tokenName: TEST_TOKEN_NAME,
+          tokenTicker: TEST_TOKEN_TICKER,
+          decimals: TEST_DECIMALS,
+          maxSupply: TEST_MAX_SUPPLY,
+          isFreezable: false,
+        },
+      },
+      tokenOutputs: [],
+      sparkOperatorIdentityPublicKeys: [TEST_OPERATOR_PUB_KEY],
+      network: Network.REGTEST,
+      expiryTime: new Date(TEST_EXPIRY_TIME),
+      clientCreatedTimestamp: new Date(TEST_CLIENT_TIMESTAMP),
+      invoiceAttachments: [],
+    };
+
+    const hash = hashTokenTransactionV1(createTransaction, false);
+
+    expect(Array.from(hash)).toEqual([
+      0x04, 0x8a, 0xa2, 0xa0, 0x85, 0xab, 0xb9, 0xba, 0x96, 0x9c, 0x70, 0x7c,
+      0x5f, 0xc7, 0xb3, 0xf2, 0x14, 0x8c, 0x89, 0x18, 0x5e, 0x0f, 0x7b, 0x16,
+      0x17, 0xf8, 0xe8, 0x0d, 0x9e, 0x91, 0x48, 0x18,
+    ]);
+  });
+
+  it("should produce the exact same hash for transfer v1", () => {
+    const transferTransaction = {
+      version: 1,
+      tokenInputs: {
+        $case: "transferInput" as const,
+        transferInput: {
+          outputsToSpend: [
+            {
+              prevTokenTransactionHash: PREV_TX_HASH,
+              prevTokenTransactionVout: 0,
+            },
+          ],
+        },
+      },
+      tokenOutputs: [
+        {
+          id: TEST_LEAF_ID,
+          ownerPublicKey: TEST_IDENTITY_PUB_KEY,
+          tokenPublicKey: TEST_TOKEN_PUBLIC_KEY,
+          tokenAmount: numberToBytesBE(TEST_TOKEN_AMOUNT, 16),
+          revocationCommitment: TEST_REVOCATION_PUB_KEY,
+          withdrawBondSats: TEST_BOND_SATS,
+          withdrawRelativeBlockLocktime: TEST_LOCKTIME,
+        },
+      ],
+      sparkOperatorIdentityPublicKeys: [TEST_OPERATOR_PUB_KEY],
+      network: Network.REGTEST,
+      expiryTime: new Date(TEST_EXPIRY_TIME),
+      clientCreatedTimestamp: new Date(TEST_CLIENT_TIMESTAMP),
+      invoiceAttachments: [],
+    };
+
+    const hash = hashTokenTransactionV1(transferTransaction, false);
+
+    expect(Array.from(hash)).toEqual([
+      0xa9, 0xfa, 0xe6, 0x24, 0x05, 0xbb, 0x08, 0xe8, 0xa1, 0xf1, 0x6f, 0x9d,
+      0xc8, 0xa5, 0x53, 0x03, 0xaf, 0x86, 0x6a, 0x67, 0x10, 0xb5, 0x50, 0x57,
+      0xca, 0x0c, 0x8d, 0x64, 0x70, 0x00, 0xa5, 0x8f,
+    ]);
+  });
+});
+
+describe("Hash Token Transaction V2", () => {
+  it("should produce the exact same hash for mint v2", () => {
+    const tokenTransaction = {
+      version: 2,
+      tokenInputs: {
+        $case: "mintInput" as const,
+        mintInput: {
+          issuerPublicKey: TEST_TOKEN_PUBLIC_KEY,
+          tokenIdentifier: TEST_TOKEN_IDENTIFIER,
+        },
+      },
+      tokenOutputs: [
+        {
+          id: TEST_LEAF_ID,
+          ownerPublicKey: TEST_IDENTITY_PUB_KEY,
+          withdrawBondSats: TEST_BOND_SATS,
+          withdrawRelativeBlockLocktime: TEST_LOCKTIME,
           tokenPublicKey: TEST_TOKEN_PUBLIC_KEY,
           tokenAmount: numberToBytesBE(TEST_TOKEN_AMOUNT, 16),
           revocationCommitment: TEST_REVOCATION_PUB_KEY,
@@ -92,8 +199,8 @@ describe("hash token transaction", () => {
     const hash = hashTokenTransactionV1(tokenTransaction, false);
 
     expect(Array.from(hash)).toEqual([
-      9, 162, 16, 177, 20, 91, 93, 148, 158, 249, 6, 42, 59, 136, 145, 184, 202,
-      35, 243, 228, 14, 231, 132, 201, 66, 137, 201, 76, 97, 186, 149, 172,
+      129, 201, 149, 176, 132, 80, 18, 162, 211, 46, 171, 206, 83, 81, 0, 39,
+      202, 90, 126, 100, 34, 60, 29, 219, 128, 93, 212, 58, 178, 181, 84, 183,
     ]);
   });
 
@@ -122,8 +229,9 @@ describe("hash token transaction", () => {
     const hash = hashTokenTransactionV1(tokenTransaction, false);
 
     expect(Array.from(hash)).toEqual([
-      92, 161, 134, 55, 164, 211, 69, 97, 149, 43, 29, 110, 94, 225, 55, 59,
-      178, 51, 203, 51, 189, 197, 203, 56, 6, 105, 55, 156, 106, 147, 155, 185,
+      209, 95, 96, 173, 113, 117, 99, 47, 242, 46, 135, 160, 99, 139, 26, 200,
+      167, 236, 101, 218, 138, 171, 98, 117, 114, 118, 183, 206, 12, 106, 90,
+      26,
     ]);
   });
 
@@ -162,13 +270,13 @@ describe("hash token transaction", () => {
     const hash = hashTokenTransactionV2(tokenTransaction, false);
 
     expect(Array.from(hash)).toEqual([
-      21, 226, 190, 223, 0, 62, 121, 223, 94, 193, 34, 62, 186, 68, 52, 197, 6,
-      189, 107, 37, 65, 141, 222, 109, 212, 128, 5, 40, 81, 247, 15, 249,
+      28, 151, 252, 16, 41, 53, 194, 50, 190, 167, 55, 2, 43, 179, 179, 255,
+      117, 150, 148, 29, 158, 203, 107, 193, 82, 1, 77, 95, 41, 168, 208, 179,
     ]);
   });
 
   it("should produce the exact same hash for transfer v2 with invoice attachments", () => {
-    const tokenTransaction = {
+    const transferTransaction = {
       version: 2,
       tokenInputs: {
         $case: "transferInput" as const,
@@ -199,11 +307,12 @@ describe("hash token transaction", () => {
       invoiceAttachments: TEST_INVOICE_ATTACHMENTS,
     };
 
-    const hash = hashTokenTransactionV2(tokenTransaction, false);
+    const hash = hashTokenTransactionV2(transferTransaction, false);
 
     expect(Array.from(hash)).toEqual([
-      19, 39, 37, 63, 91, 26, 243, 192, 252, 18, 74, 19, 59, 241, 142, 11, 20,
-      6, 129, 246, 162, 133, 158, 123, 133, 98, 169, 100, 172, 163, 231, 32,
+      0xb0, 0x98, 0xdc, 0x22, 0x8a, 0x0d, 0x82, 0x64, 0x25, 0x4a, 0x2d, 0xef,
+      0x34, 0x42, 0x5c, 0xab, 0xe2, 0x23, 0x0d, 0x4f, 0x7b, 0xa4, 0x3c, 0xf2,
+      0xa3, 0x2c, 0x27, 0xf0, 0x31, 0xae, 0x08, 0x83,
     ]);
   });
 });
