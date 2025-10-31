@@ -28,7 +28,13 @@ import {
   TokenTransactionStatus,
   TreeNode,
 } from "@buildonspark/spark-sdk/proto/spark";
-import { CoopExitFeeQuote, ExitSpeed } from "@buildonspark/spark-sdk/types";
+import {
+  BitcoinNetwork,
+  CoopExitFeeQuote,
+  ExitSpeed,
+  SparkUserRequestStatus,
+  SparkUserRequestType,
+} from "@buildonspark/spark-sdk/types";
 import { LoggingLevel } from "@lightsparkdev/core";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import { bytesToHex, bytesToNumberBE, hexToBytes } from "@noble/curves/utils";
@@ -346,6 +352,7 @@ const commands = [
   "gettransferfromssp",
   "gettransfer",
   "encodeaddress",
+  "getuserrequests",
 
   "unilateralexit",
   "generatefeebumppackagetobroadcast",
@@ -651,6 +658,7 @@ async function runCLI() {
   getleaves                                                           - Get all leaves owned by the wallet
   fulfillsparkinvoice <invoice1[:amount1]> <invoice2[:amount2]> ...   - Fulfill one or more Spark token invoices (append :amount if invoice has no preset amount)
   querysparkinvoices <invoice1> <invoice2> ...                          - Query Spark token invoices raw invoice strings
+  getuserrequests [--first <number>] [--after <cursor>] [--types <types>] [--statuses <statuses>] [--networks <networks>] - Get user requests for the wallet
 
   💡 Simplified Unilateral Exit Flow:
   'unilateralexit' for interactive exit flow (normal mode - timelocks must be naturally expired).
@@ -1613,6 +1621,97 @@ async function runCLI() {
           });
           console.log(withdrawal);
           break;
+        case "getuserrequests": {
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          try {
+            const parsed = await yargs(args)
+              .option("first", {
+                type: "number",
+                description: "Number of results to return",
+              })
+              .option("after", {
+                type: "string",
+                description: "Cursor for pagination",
+              })
+              .option("types", {
+                type: "string",
+                description:
+                  "Comma-separated list of request types: LIGHTNING_SEND, LIGHTNING_RECEIVE, COOP_EXIT, LEAVES_SWAP, CLAIM_STATIC_DEPOSIT",
+                coerce: (value: string) => {
+                  if (!value) return undefined;
+                  return value
+                    .split(",")
+                    .map(
+                      (type: string) =>
+                        type.toUpperCase() as SparkUserRequestType,
+                    );
+                },
+              })
+              .option("statuses", {
+                type: "string",
+                description:
+                  "Comma-separated list of statuses: CREATED, IN_PROGRESS, SUCCEEDED, FAILED, CANCELED",
+                coerce: (value: string) => {
+                  if (!value) return undefined;
+                  return value
+                    .split(",")
+                    .map(
+                      (status: string) =>
+                        status.toUpperCase() as SparkUserRequestStatus,
+                    );
+                },
+              })
+              .option("networks", {
+                type: "string",
+                description:
+                  "Comma-separated list of networks: MAINNET, TESTNET, SIGNET, REGTEST, LOCAL",
+                coerce: (value: string) => {
+                  if (!value) return undefined;
+                  return value
+                    .split(",")
+                    .map(
+                      (network: string) =>
+                        network.toUpperCase() as BitcoinNetwork,
+                    );
+                },
+              })
+              .help(false)
+              .parse();
+            const params: any = {};
+            if (parsed.first !== undefined) params.first = parsed.first;
+            if (parsed.after !== undefined) params.after = parsed.after;
+            if (parsed.types !== undefined) params.types = parsed.types;
+            if (parsed.statuses !== undefined)
+              params.statuses = parsed.statuses;
+            if (parsed.networks !== undefined)
+              params.networks = parsed.networks;
+
+            const userRequests = await wallet.getUserRequests(params);
+            console.log(userRequests);
+          } catch (error) {
+            console.log(
+              "Usage: getuserrequests [--first <number>] [--after <cursor>] [--types <types>] [--statuses <statuses>] [--networks <networks>]",
+            );
+            console.log(
+              "Types: LIGHTNING_SEND, LIGHTNING_RECEIVE, COOP_EXIT, LEAVES_SWAP, CLAIM_STATIC_DEPOSIT",
+            );
+            console.log(
+              "Statuses: CREATED, IN_PROGRESS, SUCCEEDED, FAILED, CANCELED",
+            );
+            console.log("Networks: MAINNET, TESTNET, SIGNET, REGTEST, LOCAL");
+            console.log("");
+            console.log("Examples:");
+            console.log("  getuserrequests --networks MAINNET");
+            console.log("  getuserrequests --first 10 --types LIGHTNING_SEND");
+            console.log(
+              "  getuserrequests --statuses SUCCEEDED,FAILED --networks TESTNET",
+            );
+          }
+          break;
+        }
         case "withdrawalfee": {
           if (!wallet) {
             console.log("Please initialize a wallet first");

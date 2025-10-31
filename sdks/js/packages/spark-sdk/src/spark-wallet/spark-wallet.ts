@@ -20,7 +20,10 @@ import {
   RPCError,
   ValidationError,
 } from "../errors/types.js";
-import SspClient, { TransferWithUserRequest } from "../graphql/client.js";
+import SspClient, {
+  GetUserRequestsParams,
+  TransferWithUserRequest,
+} from "../graphql/client.js";
 import {
   BitcoinNetwork,
   ClaimStaticDepositOutput,
@@ -33,6 +36,7 @@ import {
   LightningSendFeeEstimateInput,
   LightningSendRequest,
   RequestCoopExitInput,
+  SparkWalletUserToUserRequestsConnection,
   StaticDepositQuoteOutput,
   UserLeafInput,
 } from "../graphql/objects/index.js";
@@ -5171,6 +5175,13 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
       offset += pageSize;
     }
+  }
+
+  public async getUserRequests(
+    params: GetUserRequestsParams = {},
+  ): Promise<SparkWalletUserToUserRequestsConnection | null> {
+    const sspClient = this.getSspClient();
+    return await sspClient.getUserRequests(params);
   }
 
   public async setPrivacyEnabled(

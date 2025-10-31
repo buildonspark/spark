@@ -47,6 +47,8 @@ import {
   RequestLeavesSwapInput,
   RequestLightningReceiveInput,
   RequestLightningSendInput,
+  SparkUserRequestStatus,
+  SparkUserRequestType,
   Transfer,
 } from "./objects/index.js";
 import { LeavesSwapFeeEstimateOutputFromJson } from "./objects/LeavesSwapFeeEstimateOutput.js";
@@ -60,6 +62,9 @@ import LightningSendFeeEstimateOutput, {
   LightningSendFeeEstimateOutputFromJson,
 } from "./objects/LightningSendFeeEstimateOutput.js";
 import { LightningSendRequestFromJson } from "./objects/LightningSendRequest.js";
+import SparkWalletUserToUserRequestsConnection, {
+  SparkWalletUserToUserRequestsConnectionFromJson,
+} from "./objects/SparkWalletUserToUserRequestsConnection.js";
 import StaticDepositQuoteInput from "./objects/StaticDepositQuoteInput.js";
 import StaticDepositQuoteOutput, {
   StaticDepositQuoteOutputFromJson,
@@ -69,6 +74,7 @@ import VerifyChallengeOutput, {
   VerifyChallengeOutputFromJson,
 } from "./objects/VerifyChallengeOutput.js";
 import { CoopExitFeeEstimate } from "./queries/CoopExitFeeEstimate.js";
+import { FetchCurrentUserToUserRequestsConnection } from "./queries/FetchCurrentUserToUserRequestsConnection.js";
 import { GetClaimDepositQuote } from "./queries/GetClaimDepositQuote.js";
 import { GetCoopExitFeeQuote } from "./queries/GetCoopExitFeeQuote.js";
 import { LeavesSwapFeeEstimate } from "./queries/LeavesSwapFeeEstimate.js";
@@ -92,6 +98,14 @@ export interface MayHaveSspClientOptions {
 
 export interface HasSspClientOptions {
   readonly sspClientOptions: SspClientOptions;
+}
+
+export interface GetUserRequestsParams {
+  first?: number;
+  after?: string;
+  types?: SparkUserRequestType[];
+  statuses?: SparkUserRequestStatus[];
+  networks?: BitcoinNetwork[];
 }
 
 export default class SspClient {
@@ -648,6 +662,33 @@ export default class SspClient {
       },
       constructObject: (response: { coop_exit_fee_quote: any }) => {
         return CoopExitFeeQuoteFromJson(response.coop_exit_fee_quote.quote);
+      },
+    });
+  }
+
+  async getUserRequests({
+    first,
+    after,
+    types,
+    statuses,
+    networks,
+  }: GetUserRequestsParams): Promise<SparkWalletUserToUserRequestsConnection | null> {
+    return await this.executeRawQuery({
+      queryPayload: FetchCurrentUserToUserRequestsConnection,
+      variables: {
+        first: first,
+        after: after,
+        types: types,
+        statuses: statuses,
+        networks: networks,
+      },
+      constructObject: (response: { current_user: any }) => {
+        if (!response.current_user?.user_requests) {
+          return null;
+        }
+        return SparkWalletUserToUserRequestsConnectionFromJson(
+          response.current_user?.user_requests,
+        );
       },
     });
   }
