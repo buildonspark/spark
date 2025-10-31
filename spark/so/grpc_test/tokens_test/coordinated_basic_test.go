@@ -83,7 +83,7 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 func TestCoordinatedTokenMintV3(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
 		t.Run(tc.name, func(t *testing.T) {
-			issuerPrivKey := getRandomPrivateKey(t)
+			issuerPrivKey := keys.GeneratePrivateKey()
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
 			err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
@@ -124,7 +124,7 @@ func TestCoordinatedTokenMintV3(t *testing.T) {
 func TestCoordinatedTokenTransferV3(t *testing.T) {
 	for _, tc := range signatureTypeTestCases {
 		t.Run(tc.name, func(t *testing.T) {
-			issuerPrivKey := getRandomPrivateKey(t)
+			issuerPrivKey := keys.GeneratePrivateKey()
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
 			err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{

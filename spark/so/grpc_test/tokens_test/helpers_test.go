@@ -3,7 +3,6 @@ package tokens_test
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"sort"
@@ -51,15 +50,7 @@ type prederivedIdentityPrivateKeyFromMnemonic struct {
 }
 
 func (k *prederivedIdentityPrivateKeyFromMnemonic) IdentityPrivateKey() keys.Private {
-	privKeyBytes, err := hex.DecodeString(k.identityPrivateKeyHex)
-	if err != nil {
-		panic("invalid issuer private key hex")
-	}
-	privKey, err := keys.ParsePrivateKey(privKeyBytes)
-	if err != nil {
-		panic("invalid issuer private key")
-	}
-	return privKey
+	return keys.MustParsePrivateKeyHex(k.identityPrivateKeyHex)
 }
 
 var staticLocalIssuerKey = prederivedIdentityPrivateKeyFromMnemonic{
@@ -72,10 +63,6 @@ func int64ToUint128Bytes(high, low uint64) []byte {
 	result = append(result, byte(high>>56), byte(high>>48), byte(high>>40), byte(high>>32), byte(high>>24), byte(high>>16), byte(high>>8), byte(high))
 	result = append(result, byte(low>>56), byte(low>>48), byte(low>>40), byte(low>>32), byte(low>>24), byte(low>>16), byte(low>>8), byte(low))
 	return result
-}
-
-func getRandomPrivateKey(t *testing.T) keys.Private {
-	return keys.GeneratePrivateKey()
 }
 
 func getSigningOperatorPublicKeyBytes(config *wallet.TestWalletConfig) [][]byte {
@@ -586,7 +573,7 @@ func setupNativeTokenWithMint(
 	maxSupply uint64,
 	mintOutputAmounts []uint64,
 ) (*tokenSetupResult, error) {
-	issuerPrivKey := getRandomPrivateKey(t)
+	issuerPrivKey := keys.GeneratePrivateKey()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
 	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{

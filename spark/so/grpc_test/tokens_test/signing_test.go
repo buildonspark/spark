@@ -259,17 +259,17 @@ func TestCoordinatedMintTransactionSigning(t *testing.T) {
 		{
 			name:                     "mint should succeed with native spark token without token identifier",
 			createNativeSparkToken:   true,
-			explicitWalletPrivateKey: getRandomPrivateKey(t),
+			explicitWalletPrivateKey: keys.GeneratePrivateKey(),
 		},
 		{
 			name:                     "mint should succeed with native spark token with token identifier",
 			createNativeSparkToken:   true,
 			useTokenIdentifier:       true,
-			explicitWalletPrivateKey: getRandomPrivateKey(t),
+			explicitWalletPrivateKey: keys.GeneratePrivateKey(),
 		},
 		{
 			name:                     "mint should fail with no associated token create",
-			explicitWalletPrivateKey: getRandomPrivateKey(t),
+			explicitWalletPrivateKey: keys.GeneratePrivateKey(),
 			expectedStartError:       true,
 		},
 		{
@@ -282,7 +282,7 @@ func TestCoordinatedMintTransactionSigning(t *testing.T) {
 		},
 		{
 			name:                   "mint should fail with incorrect issuer private key start step",
-			issuerStartPrivateKeys: []keys.Private{getRandomPrivateKey(t)},
+			issuerStartPrivateKeys: []keys.Private{keys.GeneratePrivateKey()},
 			expectedStartError:     true,
 		},
 		{
@@ -295,7 +295,7 @@ func TestCoordinatedMintTransactionSigning(t *testing.T) {
 		},
 		{
 			name:                    "mint should fail with incorrect issuer private key commit step",
-			issuerCommitPrivateKeys: []keys.Private{getRandomPrivateKey(t)},
+			issuerCommitPrivateKeys: []keys.Private{keys.GeneratePrivateKey()},
 			expectedCommitError:     true,
 		},
 		{
@@ -377,13 +377,13 @@ func TestCoordinatedTransferTransactionSigning(t *testing.T) {
 		{
 			name:                     "transfer should succeed with native spark token without token identifier",
 			createNativeSparkToken:   true,
-			explicitWalletPrivateKey: getRandomPrivateKey(t),
+			explicitWalletPrivateKey: keys.GeneratePrivateKey(),
 		},
 		{
 			name:                     "transfer should succeed with native spark token with token identifier",
 			createNativeSparkToken:   true,
 			useTokenIdentifier:       true,
-			explicitWalletPrivateKey: getRandomPrivateKey(t),
+			explicitWalletPrivateKey: keys.GeneratePrivateKey(),
 		},
 		{
 			name: "start should fail with reversing the owner signatures themselves",

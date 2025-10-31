@@ -27,7 +27,7 @@ func encodeSparkAddress(pubKey keys.Public, network common.Network) string {
 // TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval tests the full coordinated flow with mint and transfer
 // This test also verifies that upon success that the expected outputs and transactions are retrievable.
 func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.T) {
-	issuerPrivKey := getRandomPrivateKey(t)
+	issuerPrivKey := keys.GeneratePrivateKey()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
 	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
@@ -175,7 +175,7 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 
 // TestQueryTokenTransactionsWithMultipleFilters tests QueryTokenTransactions with various filter combinations
 func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
-	issuerPrivKey := getRandomPrivateKey(t)
+	issuerPrivKey := keys.GeneratePrivateKey()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
 	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
@@ -227,7 +227,7 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	require.NoError(t, err, "failed to get token identifier")
 
 	// Create a SECOND token with different identifier to test token identifier filtering
-	issuer2PrivKey := getRandomPrivateKey(t)
+	issuer2PrivKey := keys.GeneratePrivateKey()
 	config2 := wallet.NewTestWalletConfigWithIdentityKey(t, issuer2PrivKey)
 
 	err = testCoordinatedCreateNativeSparkTokenWithParams(t, config2, sparkTokenCreationTestParams{
@@ -682,7 +682,7 @@ func TestQueryTokenOutputsWithStartTransaction(t *testing.T) {
 
 // TestQueryTokenTransactionsOrdering tests that QueryTokenTransactions returns results in the correct order
 func TestQueryTokenTransactionsOrdering(t *testing.T) {
-	issuerPrivKey := getRandomPrivateKey(t)
+	issuerPrivKey := keys.GeneratePrivateKey()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
 	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{

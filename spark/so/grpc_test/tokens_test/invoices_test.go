@@ -133,7 +133,7 @@ func TestCoordinatedTransferTransactionWithSparkInvoices(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			issuerPrivateKey := getRandomPrivateKey(t)
+			issuerPrivateKey := keys.GeneratePrivateKey()
 			config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivateKey)
 
 			tokenPrivKey := config.IdentityPrivateKey

@@ -63,7 +63,7 @@ func TestQueryTokenMetadataL1Token(t *testing.T) {
 
 func TestQueryTokenMetadataNativeSparkToken(t *testing.T) {
 	nativeTokenParams := sparkTokenCreationTestParams{
-		issuerPrivateKey: getRandomPrivateKey(t),
+		issuerPrivateKey: keys.GeneratePrivateKey(),
 		name:             "Native Test Token",
 		ticker:           "NATIVE",
 		maxSupply:        5000000,
@@ -82,7 +82,7 @@ func TestQueryTokenMetadataMixedParams(t *testing.T) {
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 
 	nativeTokenParams := sparkTokenCreationTestParams{
-		issuerPrivateKey: getRandomPrivateKey(t),
+		issuerPrivateKey: keys.GeneratePrivateKey(),
 		name:             "Native Token",
 		ticker:           "NATIV",
 		maxSupply:        1000000,
@@ -126,7 +126,7 @@ func TestQueryTokenMetadataMixedParams(t *testing.T) {
 }
 
 func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
-	fixedRandomKey := getRandomPrivateKey(t)
+	fixedRandomKey := keys.GeneratePrivateKey()
 
 	testCases := []struct {
 		name              string
@@ -152,13 +152,13 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 		{
 			name: "create two tokens with same metadata but different random keys should succeed",
 			firstTokenParams: &sparkTokenCreationTestParams{
-				issuerPrivateKey: getRandomPrivateKey(t),
+				issuerPrivateKey: keys.GeneratePrivateKey(),
 				name:             testTokenName,
 				ticker:           testTokenTicker,
 				maxSupply:        testTokenMaxSupply,
 			},
 			secondTokenParams: &sparkTokenCreationTestParams{
-				issuerPrivateKey: getRandomPrivateKey(t),
+				issuerPrivateKey: keys.GeneratePrivateKey(),
 				name:             "Different Name",
 				ticker:           "DIFF",
 				maxSupply:        testTokenMaxSupply,
@@ -167,13 +167,13 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 		{
 			name: "create two tokens with different metadata and different random keys should succeed",
 			firstTokenParams: &sparkTokenCreationTestParams{
-				issuerPrivateKey: getRandomPrivateKey(t),
+				issuerPrivateKey: keys.GeneratePrivateKey(),
 				name:             testTokenName,
 				ticker:           testTokenTicker,
 				maxSupply:        testTokenMaxSupply,
 			},
 			secondTokenParams: &sparkTokenCreationTestParams{
-				issuerPrivateKey: getRandomPrivateKey(t),
+				issuerPrivateKey: keys.GeneratePrivateKey(),
 				name:             "Different Name",
 				ticker:           "DIFF",
 				maxSupply:        testTokenMaxSupply + 1000,
@@ -182,7 +182,7 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 		{
 			name: "create token with name longer than 20 characters should fail",
 			firstTokenParams: &sparkTokenCreationTestParams{
-				issuerPrivateKey: getRandomPrivateKey(t),
+				issuerPrivateKey: keys.GeneratePrivateKey(),
 				name:             "This Token Name Is Way Too Long For The System",
 				ticker:           testTokenTicker,
 				maxSupply:        testTokenMaxSupply,
@@ -192,7 +192,7 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 		{
 			name: "create token with empty name should fail",
 			firstTokenParams: &sparkTokenCreationTestParams{
-				issuerPrivateKey: getRandomPrivateKey(t),
+				issuerPrivateKey: keys.GeneratePrivateKey(),
 				name:             "",
 				ticker:           testTokenTicker,
 				maxSupply:        testTokenMaxSupply,
@@ -202,7 +202,7 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 		{
 			name: "create token with empty ticker should fail",
 			firstTokenParams: &sparkTokenCreationTestParams{
-				issuerPrivateKey: getRandomPrivateKey(t),
+				issuerPrivateKey: keys.GeneratePrivateKey(),
 				name:             testTokenName,
 				ticker:           "",
 				maxSupply:        testTokenMaxSupply,
@@ -212,7 +212,7 @@ func TestCoordinatedCreateNativeSparkTokenScenarios(t *testing.T) {
 		{
 			name: "create token with ticker longer than 5 characters should fail",
 			firstTokenParams: &sparkTokenCreationTestParams{
-				issuerPrivateKey: getRandomPrivateKey(t),
+				issuerPrivateKey: keys.GeneratePrivateKey(),
 				name:             testTokenName,
 				ticker:           "TOOLONG",
 				maxSupply:        testTokenMaxSupply,
@@ -310,7 +310,7 @@ func TestCoordinatedNativeTokenMaxSupplyEnforcement(t *testing.T) {
 	for _, tc := range testCases {
 		config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 
-		tokenPrivKey := getRandomPrivateKey(t)
+		tokenPrivKey := keys.GeneratePrivateKey()
 		err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
 			issuerPrivateKey: tokenPrivKey,
 			name:             "MaxTest",
