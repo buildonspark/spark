@@ -149,8 +149,6 @@ func (k *knobsK8ValuesProvider) fetchAndUpdate() error {
 }
 
 func (k *knobsK8ValuesProvider) handleConfigMap(configMap *corev1.ConfigMap) {
-	k.logger.Sugar().Debugf("Processing ConfigMap: %v", configMap.Data)
-
 	k.lock.Lock()
 	defer k.lock.Unlock()
 
@@ -161,6 +159,8 @@ func (k *knobsK8ValuesProvider) handleConfigMap(configMap *corev1.ConfigMap) {
 		k.logger.Info("No knobs found in ConfigMap")
 		return
 	}
+
+	k.logger.Sugar().Debugf("Processing ConfigMap: %v", configMap.Data)
 
 	for name, value := range configMap.Data {
 		var parsedFloat float64
