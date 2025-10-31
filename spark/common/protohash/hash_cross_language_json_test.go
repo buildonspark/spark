@@ -31,7 +31,7 @@ func TestSparkInvoiceFieldsJSONCases(t *testing.T) {
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
 	}
-	jsonPath := filepath.Join(wd, "..", "..", "testdata", "cross_language_hash_cases_proto.json")
+	jsonPath := filepath.Join(wd, "..", "..", "testdata", "invoice_hash_cases.json")
 
 	data, err := os.ReadFile(jsonPath)
 	if err != nil {

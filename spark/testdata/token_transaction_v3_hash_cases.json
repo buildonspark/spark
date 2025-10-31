@@ -1,0 +1,402 @@
+{
+  "description": "Cross-language hash cases in canonical Protobuf JSON for spark_token.TokenTransaction (version 3)",
+  "testCases": [
+    {
+      "name": "mint_v3_full",
+      "description": "Full mint transaction V3 with all fields including expiry time",
+      "expectedHash": "efec0369b7105fda210543a249640f895e7702dd1814015802800cf267c491d0",
+      "tokenTransaction": {
+        "version": 3,
+        "mintInput": {
+          "issuerPublicKey": "AvKb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60t",
+          "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
+        },
+        "tokenOutputs": [
+          {
+            "id": "db1a4e48-0fc5-4f6c-8a80-d9d6c561a436",
+            "ownerPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+            "tokenAmount": "AAAAAAAAAAAAAAAAAAAD6A==",
+            "revocationCommitment": "AmSb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "withdrawBondSats": "10000",
+            "withdrawRelativeBlockLocktime": "100"
+          }
+        ],
+        "sparkOperatorIdentityPublicKeys": [
+          "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        ],
+        "network": "REGTEST",
+        "expiryTime": "1970-01-01T00:00:00Z",
+        "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+        "invoiceAttachments": []
+      }
+    },
+    {
+      "name": "create_v3_full",
+      "description": "Full create transaction V3 with creation entity public key",
+      "expectedHash": "c1f432222fe523277d61d773a7b103d3303c4de5cf6b27da8bf1f18a85f0fa19",
+      "tokenTransaction": {
+        "version": 3,
+        "createInput": {
+          "issuerPublicKey": "AvKb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60t",
+          "tokenName": "TestToken",
+          "tokenTicker": "TEST",
+          "decimals": 8,
+          "maxSupply": "AAAAAAAAAAAAAAAAAAAD6A==",
+          "isFreezable": false,
+          "creationEntityPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        },
+        "tokenOutputs": [],
+        "sparkOperatorIdentityPublicKeys": [
+          "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        ],
+        "network": "REGTEST",
+        "expiryTime": "1970-01-01T00:00:00Z",
+        "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+        "invoiceAttachments": []
+      }
+    },
+    {
+      "name": "transfer_v3_full",
+      "description": "Full transfer transaction V3 without invoice attachments",
+      "expectedHash": "30b7cb674656ace8dc5e7c15eb2778c172e5f490120653eaad4c88690ea915b4",
+      "tokenTransaction": {
+        "version": 3,
+        "transferInput": {
+          "outputsToSpend": [
+            {
+              "prevTokenTransactionHash": "rTW2SK1e5YJWb2L7n/F/Wps1NBxuoFKOi+P+c5hshJQ=",
+              "prevTokenTransactionVout": 0
+            }
+          ]
+        },
+        "tokenOutputs": [
+          {
+            "id": "db1a4e48-0fc5-4f6c-8a80-d9d6c561a436",
+            "ownerPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+            "tokenAmount": "AAAAAAAAAAAAAAAAAAAD6A==",
+            "revocationCommitment": "AmSb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "withdrawBondSats": "10000",
+            "withdrawRelativeBlockLocktime": "100"
+          }
+        ],
+        "sparkOperatorIdentityPublicKeys": [
+          "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        ],
+        "network": "REGTEST",
+        "expiryTime": "1970-01-01T00:00:00Z",
+        "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+        "invoiceAttachments": []
+      }
+    },
+    {
+      "name": "transfer_v3_with_invoice_attachments",
+      "description": "Full transfer transaction V3 with invoice attachments",
+      "expectedHash": "580343da4873d5e8f2926803de022b1aac4bffd9c58bb4eba1b965db4a665be0",
+      "tokenTransaction": {
+        "version": 3,
+        "transferInput": {
+          "outputsToSpend": [
+            {
+              "prevTokenTransactionHash": "rTW2SK1e5YJWb2L7n/F/Wps1NBxuoFKOi+P+c5hshJQ=",
+              "prevTokenTransactionVout": 0
+            }
+          ]
+        },
+        "tokenOutputs": [
+          {
+            "id": "db1a4e48-0fc5-4f6c-8a80-d9d6c561a436",
+            "ownerPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+            "tokenAmount": "AAAAAAAAAAAAAAAAAAAD6A==",
+            "revocationCommitment": "AmSb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "withdrawBondSats": "10000",
+            "withdrawRelativeBlockLocktime": "100"
+          }
+        ],
+        "sparkOperatorIdentityPublicKeys": [
+          "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        ],
+        "network": "REGTEST",
+        "expiryTime": "1970-01-01T00:00:00Z",
+        "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+        "invoiceAttachments": [
+          {
+            "sparkInvoice": "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnzfmssqgjzqqejtaxmwj8ms9rn58574nvlq4j5zr5v4ehgnt9d4hnyggr2wgghtqfpwn5rhnpg7j5pfn92dcqdyg4jrunyjdjsg7muxraxgfn5rqgandgr3sxzrqdmew8qydzvz3qpylysylkgcaw9vpm2jzspls0qtr5kfmlwz244rvuk25w5w2sgc2pyqsraqdyp8tf57a6cn2egttaas9ms3whssenmjqt8wag3lgyvdzjskfeupt8xwwdx4agxdm9f0wefzj28jmdxqeudwcwdj9vfl9sdr65x06r0tasf5fwz2"
+          },
+          {
+            "sparkInvoice": "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnzfmqsqgjzqqejtavuhf8n5uh9a74zw66kqaz5zr5v4ehgnt9d4hnyggr2wgghtqfpwn5rhnpg7j5pfn92dcqdyg4jrunyjdjsg7muxraxgfn5zcglrwcr3sxzzqt3wrjrgnq5gqf8eyp8ajx8t3tqw65s5q0urczca9jwlmsj4dgm89j4r4rj5zxzsfqyqlgrfqw9ucldgmfzs5zmkekj90thwzmn6ps55gdjnz23aarjkf245608yg0v2x6xdpdrz6m8xjlhtru0kygcu4zhqwlth9duadfqpruuzx4tc7fdckn"
+          }
+        ]
+      }
+    },
+    {
+      "name": "partial_mint_v3",
+      "description": "Partial mint transaction V3 - no expiry time, no output ID/revocation/withdrawal fields",
+      "expectedHash": "8b0c13fd329040a6cac4f3e8efca8a00a5096445299ae84ebd1b3fb1e557cfd4",
+      "tokenTransaction": {
+        "version": 3,
+        "mintInput": {
+          "issuerPublicKey": "AvKb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60t",
+          "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
+        },
+        "tokenOutputs": [
+          {
+            "ownerPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+            "tokenAmount": "AAAAAAAAAAAAAAAAAAAD6A=="
+          }
+        ],
+        "sparkOperatorIdentityPublicKeys": [
+          "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        ],
+        "network": "REGTEST",
+        "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+        "invoiceAttachments": []
+      }
+    },
+    {
+      "name": "partial_create_v3",
+      "description": "Partial create transaction V3 - no expiry time, no creation entity public key",
+      "expectedHash": "ddeba6afaaebe9c6212eb71bdb6fd83c3ed01e2a212b32fceb55516bd3df6fb2",
+      "tokenTransaction": {
+        "version": 3,
+        "createInput": {
+          "issuerPublicKey": "AvKb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60t",
+          "tokenName": "TestToken",
+          "tokenTicker": "TEST",
+          "decimals": 8,
+          "maxSupply": "AAAAAAAAAAAAAAAAAAAD6A==",
+          "isFreezable": false
+        },
+        "tokenOutputs": [],
+        "sparkOperatorIdentityPublicKeys": [
+          "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        ],
+        "network": "REGTEST",
+        "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+        "invoiceAttachments": []
+      }
+    },
+    {
+      "name": "mint_v3_multiple_outputs",
+      "description": "Mint transaction with multiple token outputs",
+      "expectedHash": "629fe397530362605e64edcc09f6db691146fff030df30b6977fc4e1f58dda75",
+      "tokenTransaction": {
+        "version": 3,
+        "mintInput": {
+          "issuerPublicKey": "AvKb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60t",
+          "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
+        },
+        "tokenOutputs": [
+          {
+            "id": "db1a4e48-0fc5-4f6c-8a80-d9d6c561a436",
+            "ownerPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+            "tokenAmount": "AAAAAAAAAAAAAAAAAAAB9A==",
+            "revocationCommitment": "AmSb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "withdrawBondSats": "10000",
+            "withdrawRelativeBlockLocktime": "100"
+          },
+          {
+            "id": "a1b2c3d4-e5f6-4a5b-8c7d-9e0f1a2b3c4d",
+            "ownerPublicKey": "AvKb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60t",
+            "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+            "tokenAmount": "AAAAAAAAAAAAAAAAAAAB9A==",
+            "revocationCommitment": "AmSb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "withdrawBondSats": "5000",
+            "withdrawRelativeBlockLocktime": "50"
+          }
+        ],
+        "sparkOperatorIdentityPublicKeys": [
+          "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        ],
+        "network": "REGTEST",
+        "expiryTime": "1970-01-01T00:00:00Z",
+        "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+        "invoiceAttachments": []
+      }
+    },
+    {
+      "name": "transfer_v3_multiple_inputs",
+      "description": "Transfer transaction with multiple inputs to spend",
+      "expectedHash": "b5e5f91fa0b1de88c0998595fa23181b473edcb8413a286accdc9a3ce16df91e",
+      "tokenTransaction": {
+        "version": 3,
+        "transferInput": {
+          "outputsToSpend": [
+            {
+              "prevTokenTransactionHash": "rTW2SK1e5YJWb2L7n/F/Wps1NBxuoFKOi+P+c5hshJQ=",
+              "prevTokenTransactionVout": 0
+            },
+            {
+              "prevTokenTransactionHash": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+              "prevTokenTransactionVout": 1
+            }
+          ]
+        },
+        "tokenOutputs": [
+          {
+            "id": "db1a4e48-0fc5-4f6c-8a80-d9d6c561a436",
+            "ownerPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+            "tokenAmount": "AAAAAAAAAAAAAAAAAAAH0A==",
+            "revocationCommitment": "AmSb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "withdrawBondSats": "10000",
+            "withdrawRelativeBlockLocktime": "100"
+          }
+        ],
+        "sparkOperatorIdentityPublicKeys": [
+          "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        ],
+        "network": "REGTEST",
+        "expiryTime": "1970-01-01T00:00:00Z",
+        "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+        "invoiceAttachments": []
+      }
+    },
+    {
+      "name": "create_v3_with_max_supply_zero",
+      "description": "Create transaction with max supply set to zero (unlimited)",
+      "expectedHash": "d70a94ec7b8ff3ffe4e28dd7ee7697ddb1e5f912238c443bebd701ac7f0b99f4",
+      "tokenTransaction": {
+        "version": 3,
+        "createInput": {
+          "issuerPublicKey": "AvKb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60t",
+          "tokenName": "UnlimitedToken",
+          "tokenTicker": "UNLTD",
+          "decimals": 8,
+          "maxSupply": "AAAAAAAAAAAAAAAAAAAAAA==",
+          "isFreezable": false,
+          "creationEntityPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        },
+        "tokenOutputs": [],
+        "sparkOperatorIdentityPublicKeys": [
+          "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        ],
+        "network": "REGTEST",
+        "expiryTime": "1970-01-01T00:00:00Z",
+        "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+        "invoiceAttachments": []
+      }
+    },
+    {
+      "name": "create_v3_freezable",
+      "description": "Create transaction for a freezable token",
+      "expectedHash": "e1a90cab8ca39a36d1742c01223957d045caa1ad2cada50d5d8b6dcc60df1e7d",
+      "tokenTransaction": {
+        "version": 3,
+        "createInput": {
+          "issuerPublicKey": "AvKb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60t",
+          "tokenName": "FreezableToken",
+          "tokenTicker": "FREEZE",
+          "decimals": 8,
+          "maxSupply": "AAAAAAAAAAAAAAAAAAAD6A==",
+          "isFreezable": true,
+          "creationEntityPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        },
+        "tokenOutputs": [],
+        "sparkOperatorIdentityPublicKeys": [
+          "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        ],
+        "network": "REGTEST",
+        "expiryTime": "1970-01-01T00:00:00Z",
+        "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+        "invoiceAttachments": []
+      }
+    },
+    {
+      "name": "mint_v3_mainnet",
+      "description": "Mint transaction on MAINNET network",
+      "expectedHash": "2c1f7306d32256f5c29f32d2b41d394d75d262bcdf67beea10cc462acdc46088",
+      "tokenTransaction": {
+        "version": 3,
+        "mintInput": {
+          "issuerPublicKey": "AvKb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60t",
+          "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
+        },
+        "tokenOutputs": [
+          {
+            "id": "db1a4e48-0fc5-4f6c-8a80-d9d6c561a436",
+            "ownerPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+            "tokenAmount": "AAAAAAAAAAAAAAAAAAAD6A==",
+            "revocationCommitment": "AmSb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "withdrawBondSats": "10000",
+            "withdrawRelativeBlockLocktime": "100"
+          }
+        ],
+        "sparkOperatorIdentityPublicKeys": [
+          "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        ],
+        "network": "MAINNET",
+        "expiryTime": "1970-01-01T00:00:00Z",
+        "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+        "invoiceAttachments": []
+      }
+    },
+    {
+      "name": "mint_v3_testnet",
+      "description": "Mint transaction on TESTNET network",
+      "expectedHash": "c366ab4d5a15395a1682cb62df912b538e8187b0e78125b6344b5f1547e62b57",
+      "tokenTransaction": {
+        "version": 3,
+        "mintInput": {
+          "issuerPublicKey": "AvKb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60t",
+          "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
+        },
+        "tokenOutputs": [
+          {
+            "id": "db1a4e48-0fc5-4f6c-8a80-d9d6c561a436",
+            "ownerPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+            "tokenAmount": "AAAAAAAAAAAAAAAAAAAD6A==",
+            "revocationCommitment": "AmSb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "withdrawBondSats": "10000",
+            "withdrawRelativeBlockLocktime": "100"
+          }
+        ],
+        "sparkOperatorIdentityPublicKeys": [
+          "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        ],
+        "network": "TESTNET",
+        "expiryTime": "1970-01-01T00:00:00Z",
+        "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+        "invoiceAttachments": []
+      }
+    },
+    {
+      "name": "partial_mint_v3_with_invoice_attachments",
+      "description": "Partial mint transaction with invoice attachments (should be sorted)",
+      "expectedHash": "49fc6e5080623665ba8043b1bc144439b48368a0caf4f48d3d139db975d61491",
+      "tokenTransaction": {
+        "version": 3,
+        "mintInput": {
+          "issuerPublicKey": "AvKb0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60t",
+          "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
+        },
+        "tokenOutputs": [
+          {
+            "ownerPublicKey": "AhmbUFpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u",
+            "tokenIdentifier": "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=",
+            "tokenAmount": "AAAAAAAAAAAAAAAAAAAD6A=="
+          }
+        ],
+        "sparkOperatorIdentityPublicKeys": [
+          "AsiZ0FpI03j0RWMcZZXeewr8P2M2ieIH4KN6Xfgqn60u"
+        ],
+        "network": "REGTEST",
+        "clientCreatedTimestamp": "1970-01-01T00:00:00.100Z",
+        "invoiceAttachments": [
+          {
+            "sparkInvoice": "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnzfmssqgjzqqejtaxmwj8ms9rn58574nvlq4j5zr5v4ehgnt9d4hnyggr2wgghtqfpwn5rhnpg7j5pfn92dcqdyg4jrunyjdjsg7muxraxgfn5rqgandgr3sxzrqdmew8qydzvz3qpylysylkgcaw9vpm2jzspls0qtr5kfmlwz244rvuk25w5w2sgc2pyqsraqdyp8tf57a6cn2egttaas9ms3whssenmjqt8wag3lgyvdzjskfeupt8xwwdx4agxdm9f0wefzj28jmdxqeudwcwdj9vfl9sdr65x06r0tasf5fwz2"
+          },
+          {
+            "sparkInvoice": "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnzfmqsqgjzqqejtavuhf8n5uh9a74zw66kqaz5zr5v4ehgnt9d4hnyggr2wgghtqfpwn5rhnpg7j5pfn92dcqdyg4jrunyjdjsg7muxraxgfn5zcglrwcr3sxzzqt3wrjrgnq5gqf8eyp8ajx8t3tqw65s5q0urczca9jwlmsj4dgm89j4r4rj5zxzsfqyqlgrfqw9ucldgmfzs5zmkekj90thwzmn6ps55gdjnz23aarjkf245608yg0v2x6xdpdrz6m8xjlhtru0kygcu4zhqwlth9duadfqpruuzx4tc7fdckn"
+          }
+        ]
+      }
+    }
+  ]
+}

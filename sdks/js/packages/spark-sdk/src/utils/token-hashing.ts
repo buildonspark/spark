@@ -6,6 +6,7 @@ import { OperatorSpecificTokenTransactionSignablePayload } from "../proto/spark.
 import {
   TokenTransaction,
   TokenTransactionType,
+  InvoiceAttachment,
 } from "../proto/spark_token.js";
 import { createProtoHasher } from "../spark-wallet/proto-hash.js";
 
@@ -1087,6 +1088,70 @@ function inferTokenTransactionType(
   }
 }
 
+function sortInvoiceAttachments(
+  attachments: InvoiceAttachment[] | undefined,
+): InvoiceAttachment[] | undefined {
+  if (!attachments || attachments.length === 0) {
+    return attachments;
+  }
+
+  type Keyed = { id: Uint8Array; attachment: InvoiceAttachment };
+  const keyed: Keyed[] = [];
+
+  for (let i = 0; i < attachments.length; i++) {
+    const attachment = attachments[i];
+    if (!attachment) {
+      throw new ValidationError(
+        `invoice attachment at index ${i} cannot be null`,
+        {
+          field: `invoiceAttachments[${i}]`,
+          index: i,
+        },
+      );
+    }
+    const invoice = attachment.sparkInvoice;
+
+    let idBytes: Uint8Array | undefined;
+    try {
+      const decoded = bech32m.decode(invoice as any, 500);
+      const payload = SparkAddress.decode(bech32m.fromWords(decoded.words));
+      if (!payload.sparkInvoiceFields || !payload.sparkInvoiceFields.id) {
+        throw new Error("missing spark invoice fields or id");
+      }
+      idBytes = payload.sparkInvoiceFields.id;
+    } catch (err) {
+      throw new ValidationError(
+        `invalid invoice at ${i}`,
+        {
+          field: `invoiceAttachments[${i}].sparkInvoice`,
+          index: i,
+          value: invoice,
+        },
+        err as Error,
+      );
+    }
+    if (!idBytes || idBytes.length !== 16) {
+      throw new ValidationError(`invalid invoice id at ${i}`, {
+        field: `invoiceAttachments[${i}].sparkInvoice`,
+        index: i,
+      });
+    }
+    keyed.push({ id: idBytes, attachment });
+  }
+
+  // Sort by UUID bytes (lexicographically)
+  keyed.sort((a, b) => {
+    for (let j = 0; j < a.id.length && j < b.id.length; j++) {
+      const av = a.id[j] as number;
+      const bv = b.id[j] as number;
+      if (av !== bv) return av - bv;
+    }
+    return a.id.length - b.id.length;
+  });
+
+  return keyed.map((k) => k.attachment);
+}
+
 export async function hashTokenTransactionV3(
   tokenTransaction: TokenTransaction,
   partialHash: boolean = false,
@@ -1099,12 +1164,18 @@ export async function hashTokenTransactionV3(
 
   const hasher = createProtoHasher();
 
+  // Always sort invoice attachments for deterministic hashing
+  const sortedInvoices = sortInvoiceAttachments(
+    tokenTransaction.invoiceAttachments,
+  );
+
   if (partialHash) {
     const cloned: TokenTransaction = {
       ...tokenTransaction,
       expiryTime: undefined,
       tokenInputs: tokenTransaction.tokenInputs,
       tokenOutputs: tokenTransaction.tokenOutputs,
+      invoiceAttachments: sortedInvoices || [],
     };
 
     const inputType = inferTokenTransactionType(cloned);
@@ -1151,7 +1222,12 @@ export async function hashTokenTransactionV3(
     return hasher.hashProto(cloned, "spark_token.TokenTransaction");
   }
 
-  return hasher.hashProto(tokenTransaction, "spark_token.TokenTransaction");
+  const txWithSortedInvoices: TokenTransaction = {
+    ...tokenTransaction,
+    invoiceAttachments: sortedInvoices || [],
+  };
+
+  return hasher.hashProto(txWithSortedInvoices, "spark_token.TokenTransaction");
 }
 
 export function hashOperatorSpecificTokenTransactionSignablePayload(

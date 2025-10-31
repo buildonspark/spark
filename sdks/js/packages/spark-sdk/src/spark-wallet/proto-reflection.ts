@@ -120,7 +120,6 @@ export function getFieldNumbers(
       }
     }
 
-    console.log(`Field numbers for ${messageTypeName}:`, fieldNumbers);
     return fieldNumbers;
   } catch (error) {
     console.error(`Failed to get field numbers for ${messageTypeName}:`, error);

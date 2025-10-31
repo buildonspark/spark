@@ -4,7 +4,6 @@ import { Network } from "../proto/spark.js";
 import {
   hashTokenTransactionV1,
   hashTokenTransactionV2,
-  hashTokenTransactionV3,
 } from "../utils/token-hashing.js";
 
 // Test constants for consistent test data across all hash tests
