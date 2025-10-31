@@ -42,7 +42,7 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
-	finalIssueTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
@@ -67,7 +67,7 @@ func TestCoordinatedTokenMintAndTransferExpectedOutputAndTxRetrieval(t *testing.
 	require.NoError(t, err, "failed to create test token transfer transaction")
 	userOutput3PubKeyBytes := userOutput3PrivKey.Public().Serialize()
 
-	transferTokenTransactionResponse, err := wallet.BroadcastCoordinatedTokenTransfer(
+	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, transferTokenTransaction, []keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast transfer token transaction")
@@ -190,7 +190,7 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	mintTransaction1, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
 	require.NoError(t, err, "failed to create first mint transaction")
 
-	finalMintTx1, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalMintTx1, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, mintTransaction1, []keys.Private{issuerPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast first mint transaction")
@@ -202,7 +202,7 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	mintTransaction2, userOutput3PrivKey, userOutput4PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
 	require.NoError(t, err, "failed to create second mint transaction")
 
-	finalMintTx2, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalMintTx2, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, mintTransaction2, []keys.Private{issuerPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast second mint transaction")
@@ -214,7 +214,7 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	transferTx, userOutput5PrivKey, err := createTestTokenTransferTransactionTokenPb(t, config, mintTxHash1, issuerPrivKey.Public())
 	require.NoError(t, err, "failed to create transfer transaction")
 
-	finalTransferTx, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalTransferTx, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, transferTx,
 		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 	)
@@ -242,7 +242,7 @@ func TestQueryTokenTransactionsWithMultipleFilters(t *testing.T) {
 	mintTransaction3, userOutput6PrivKey, _, err := createTestTokenMintTransactionTokenPb(t, config2, issuer2PrivKey.Public())
 	require.NoError(t, err, "failed to create third mint transaction")
 
-	finalMintTx3, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalMintTx3, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config2, mintTransaction3, []keys.Private{issuer2PrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast third mint transaction")
@@ -647,7 +647,7 @@ func TestQueryTokenOutputsWithStartTransaction(t *testing.T) {
 			mintTx, owner1PrivKey, owner2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
 			require.NoError(t, err, "failed to create mint transaction")
 
-			finalTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+			finalTokenTransaction, err := wallet.BroadcastTokenTransfer(
 				t.Context(), config, mintTx, []keys.Private{issuerPrivKey},
 			)
 			require.NoError(t, err, "failed to broadcast mint transaction")
@@ -663,7 +663,7 @@ func TestQueryTokenOutputsWithStartTransaction(t *testing.T) {
 			})
 			require.NoError(t, err, "failed to create transfer transaction")
 
-			_, _, err = wallet.StartTokenTransactionCoordinated(t.Context(), config, transferTx, []keys.Private{owner1PrivKey, owner2PrivKey}, 1*time.Second, nil)
+			_, _, err = wallet.StartTokenTransaction(t.Context(), config, transferTx, []keys.Private{owner1PrivKey, owner2PrivKey}, 1*time.Second, nil)
 			require.NoError(t, err, "failed to start transfer transaction")
 
 			outputsResp, err := wallet.QueryTokenOutputs(
@@ -698,7 +698,7 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 	mintTx1, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
 	require.NoError(t, err, "failed to create first mint transaction")
 
-	finalMintTx1, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalMintTx1, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, mintTx1, []keys.Private{issuerPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast first mint transaction")
@@ -712,7 +712,7 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 	mintTx2, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
 	require.NoError(t, err, "failed to create second mint transaction")
 
-	finalMintTx2, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalMintTx2, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, mintTx2, []keys.Private{issuerPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast second mint transaction")
@@ -726,7 +726,7 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 	mintTx3, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
 	require.NoError(t, err, "failed to create third mint transaction")
 
-	finalMintTx3, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalMintTx3, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, mintTx3, []keys.Private{issuerPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast third mint transaction")

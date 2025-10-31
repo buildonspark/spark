@@ -575,7 +575,7 @@ func (w *SingleKeyTestWallet) MintTokens(ctx context.Context, amount uint64) err
 		Network:                w.Config.ProtoNetwork(),
 	}
 
-	finalTokenTransaction, err := BroadcastCoordinatedTokenTransferWithExpiryDuration(
+	finalTokenTransaction, err := BroadcastTokenTransferWithValidityDuration(
 		ctx,
 		w.Config,
 		mintTransaction,
@@ -664,7 +664,7 @@ func (w *SingleKeyTestWallet) TransferTokens(ctx context.Context, amount uint64,
 		transferTransaction.TokenOutputs = append(transferTransaction.TokenOutputs, changeOutput)
 	}
 
-	finalTokenTransaction, err := BroadcastCoordinatedTokenTransferWithExpiryDuration(
+	finalTokenTransaction, err := BroadcastTokenTransferWithValidityDuration(
 		ctx,
 		w.Config,
 		transferTransaction,

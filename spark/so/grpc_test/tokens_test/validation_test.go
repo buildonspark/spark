@@ -26,7 +26,7 @@ func TestCoordinatedBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T)
 			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
-			finalIssueTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
 				t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey},
 			)
 			require.NoError(t, err, "failed to broadcast issuance token transaction")
@@ -62,7 +62,7 @@ func TestCoordinatedBroadcastTokenTransactionWithInvalidPrevTxHash(t *testing.T)
 				SparkOperatorIdentityPublicKeys: getSigningOperatorPublicKeyBytes(config),
 			}
 
-			_, err = wallet.BroadcastCoordinatedTokenTransfer(
+			_, err = wallet.BroadcastTokenTransfer(
 				t.Context(), config, transferTokenTransaction,
 				[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 			)
@@ -83,7 +83,7 @@ func TestCoordinatedBroadcastTokenTransactionUnspecifiedNetwork(t *testing.T) {
 			require.NoError(t, err, "failed to create test token issuance transaction")
 			issueTokenTransaction.Network = sparkpb.Network_UNSPECIFIED
 
-			_, err = wallet.BroadcastCoordinatedTokenTransfer(
+			_, err = wallet.BroadcastTokenTransfer(
 				t.Context(), config, issueTokenTransaction,
 				[]keys.Private{tokenPrivKey},
 			)
@@ -104,7 +104,7 @@ func TestCoordinatedBroadcastTokenTransactionTooLongValidityDuration(t *testing.
 			require.NoError(t, err, "failed to create test token issuance transaction")
 			issueTokenTransaction.Network = sparkpb.Network_UNSPECIFIED
 
-			_, err = wallet.BroadcastCoordinatedTokenTransferWithExpiryDuration(
+			_, err = wallet.BroadcastTokenTransferWithValidityDuration(
 				t.Context(), config, issueTokenTransaction, TooLongValidityDurationSecs*time.Second,
 				[]keys.Private{tokenPrivKey},
 			)
@@ -125,7 +125,7 @@ func TestCoordinatedBroadcastTokenTransactionTooShortValidityDuration(t *testing
 			require.NoError(t, err, "failed to create test token issuance transaction")
 			issueTokenTransaction.Network = sparkpb.Network_UNSPECIFIED
 
-			_, err = wallet.BroadcastCoordinatedTokenTransferWithExpiryDuration(
+			_, err = wallet.BroadcastTokenTransferWithValidityDuration(
 				t.Context(), config, issueTokenTransaction, TooShortValidityDurationSecs*time.Second, []keys.Private{tokenPrivKey},
 			)
 
@@ -144,7 +144,7 @@ func TestCoordinatedQueryTokenOutputsByNetworkReturnsNoneForMismatchedNetwork(t 
 			issueTokenTransaction, userOutput1PrivKey, _, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
-			_, err = wallet.BroadcastCoordinatedTokenTransfer(
+			_, err = wallet.BroadcastTokenTransfer(
 				t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey},
 			)
 			require.NoError(t, err, "failed to broadcast issuance token transaction")
@@ -247,7 +247,7 @@ func TestPartialTransactionValidationErrors(t *testing.T) {
 			tokenTransaction, ownerPrivateKeys := tc.setupTx()
 			tc.modifyTx(tokenTransaction)
 
-			_, _, err := wallet.StartTokenTransactionCoordinated(
+			_, _, err := wallet.StartTokenTransaction(
 				t.Context(), config, tokenTransaction, ownerPrivateKeys, TestValidityDurationSecs*time.Second, nil,
 			)
 
@@ -264,7 +264,7 @@ func TestCoordinatedTokenMintAndTransferTokensTooManyOutputsFails(t *testing.T) 
 		tokenPrivKey.Public(), utils.MaxInputOrOutputTokenTransactionOutputs+1)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
-	_, err = wallet.BroadcastCoordinatedTokenTransfer(
+	_, err = wallet.BroadcastTokenTransfer(
 		t.Context(), config, tooBigIssuanceTransaction, []keys.Private{tokenPrivKey},
 	)
 	require.Error(t, err, "expected error when broadcasting issuance transaction with more than utils.MaxInputOrOutputTokenTransactionOutputs=%d outputs", utils.MaxInputOrOutputTokenTransactionOutputs)
@@ -277,7 +277,7 @@ func TestCoordinatedTokenMintAndTransferTokensWithTooManyInputsFails(t *testing.
 		tokenPrivKey.Public(), maxInputOrOutputTokenTransactionOutputsForTests)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
-	finalIssueTokenTransactionFirstBatch, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalIssueTokenTransactionFirstBatch, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, issueTokenTransactionFirstBatch, []keys.Private{tokenPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
@@ -287,7 +287,7 @@ func TestCoordinatedTokenMintAndTransferTokensWithTooManyInputsFails(t *testing.
 		tokenPrivKey.Public(), maxInputOrOutputTokenTransactionOutputsForTests)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
-	finalIssueTokenTransactionSecondBatch, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalIssueTokenTransactionSecondBatch, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, issueTokenTransactionSecondBatch, []keys.Private{tokenPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
@@ -333,7 +333,7 @@ func TestCoordinatedTokenMintAndTransferTokensWithTooManyInputsFails(t *testing.
 
 	allUserOutputPrivKeys := append(userOutputPrivKeysFirstBatch, userOutputPrivKeysSecondBatch...)
 
-	_, err = wallet.BroadcastCoordinatedTokenTransfer(t.Context(), config, tooManyTransaction, allUserOutputPrivKeys)
+	_, err = wallet.BroadcastTokenTransfer(t.Context(), config, tooManyTransaction, allUserOutputPrivKeys)
 	require.Error(t, err, "expected error when broadcasting transfer transaction with more than MaxInputOrOutputTokenTransactionOutputsForTests=%d inputs", maxInputOrOutputTokenTransactionOutputsForTests)
 }
 
@@ -346,7 +346,7 @@ func TestCoordinatedTokenMintAndTransferMaxInputsSucceeds(t *testing.T) {
 		tokenPrivKey.Public(), maxInputOrOutputTokenTransactionOutputsForTests)
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
-	finalIssueTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
@@ -380,7 +380,7 @@ func TestCoordinatedTokenMintAndTransferMaxInputsSucceeds(t *testing.T) {
 		ClientCreatedTimestamp:          timestamppb.New(time.Now()),
 	}
 
-	_, err = wallet.BroadcastCoordinatedTokenTransfer(t.Context(), config, consolidateTransaction, userOutputPrivKeys)
+	_, err = wallet.BroadcastTokenTransfer(t.Context(), config, consolidateTransaction, userOutputPrivKeys)
 	require.NoError(t, err, "failed to broadcast consolidation transaction")
 
 	tokenOutputsResponse, err := wallet.QueryTokenOutputs(

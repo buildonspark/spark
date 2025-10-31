@@ -154,7 +154,7 @@ func TestCoordinatedTransferTransactionWithSparkInvoices(t *testing.T) {
 				MintToSelf:          true,
 			})
 			require.NoError(t, err, "failed to create test token issuance transaction")
-			finalIssueTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
 				t.Context(), config, issueTokenTransaction,
 				[]keys.Private{tokenPrivKey},
 			)
@@ -331,7 +331,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 	}
 	transferTransaction.InvoiceAttachments = invoiceAttachments
 
-	startResp, finalTxHash, err := wallet.StartTokenTransactionCoordinated(
+	startResp, finalTxHash, err := wallet.StartTokenTransaction(
 		t.Context(),
 		config,
 		transferTransaction,
@@ -381,7 +381,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 			MintToSelf:          true,
 		})
 		require.NoError(t, err, "failed to create test token issuance transaction")
-		finalIssueTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+		finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
 			t.Context(), config, issueTokenTransaction,
 			[]keys.Private{config.IdentityPrivateKey},
 		)
@@ -429,7 +429,7 @@ func testCoordinatedTransferTransactionWithSparkInvoicesScenarios(t *testing.T, 
 		}
 		shouldFailTransfer.InvoiceAttachments = invoiceAttachments
 
-		_, _, err = wallet.StartTokenTransactionCoordinated(
+		_, _, err = wallet.StartTokenTransaction(
 			t.Context(),
 			config,
 			shouldFailTransfer,

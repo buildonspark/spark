@@ -367,7 +367,7 @@ func testCoordinatedCreateNativeSparkTokenWithParams(t *testing.T, config *walle
 	if err != nil {
 		return err
 	}
-	_, err = wallet.BroadcastCoordinatedTokenTransfer(
+	_, err = wallet.BroadcastTokenTransfer(
 		t.Context(),
 		config,
 		createTx,
@@ -555,7 +555,7 @@ func signAndCommitTransaction(t *testing.T, transactionResult *TransactionResult
 		OwnerIdentityPublicKey:         transactionResult.config.IdentityPublicKey().Serialize(),
 	}
 
-	return wallet.CommitTransactionCoordinated(t.Context(), transactionResult.config, commitReq)
+	return wallet.CommitTransaction(t.Context(), transactionResult.config, commitReq)
 }
 
 // sumUint64Slice sums a slice of uint64 values
@@ -616,7 +616,7 @@ func setupNativeTokenWithMint(
 	}
 
 	mintTxForBroadcast := proto.Clone(mintTxBeforeBroadcast).(*tokenpb.TokenTransaction)
-	finalMintTx, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalMintTx, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, mintTxForBroadcast,
 		[]keys.Private{issuerPrivKey},
 	)

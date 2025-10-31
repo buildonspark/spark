@@ -23,7 +23,7 @@ func TestCoordinatedL1TokenMint(t *testing.T) {
 			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
-			finalIssueTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
 				t.Context(), config, issueTokenTransaction,
 				[]keys.Private{tokenPrivKey},
 			)
@@ -46,7 +46,7 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
-			finalIssueTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey})
+			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey})
 			require.NoError(t, err, "failed to broadcast issuance token transaction")
 
 			for i, output := range finalIssueTokenTransaction.TokenOutputs {
@@ -66,7 +66,7 @@ func TestCoordinatedL1TokenMintAndTransfer(t *testing.T) {
 				tokenPrivKey.Public(),
 			)
 			require.NoError(t, err, "failed to create test token transfer transaction")
-			transferTokenTransactionResponse, err := wallet.BroadcastCoordinatedTokenTransfer(
+			transferTokenTransactionResponse, err := wallet.BroadcastTokenTransfer(
 				t.Context(), config, transferTokenTransaction, []keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 			)
 			require.NoError(t, err, "failed to broadcast transfer token transaction")
@@ -107,7 +107,7 @@ func TestCoordinatedTokenMintV3(t *testing.T) {
 			userOutput1PrivKey := userPrivKeys[0]
 			userOutput2PrivKey := userPrivKeys[1]
 
-			finalIssueTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
 				t.Context(), config, issueTokenTransaction,
 				[]keys.Private{issuerPrivKey},
 			)
@@ -148,7 +148,7 @@ func TestCoordinatedTokenTransferV3(t *testing.T) {
 			userOutput1PrivKey := userPrivKeys[0]
 			userOutput2PrivKey := userPrivKeys[1]
 
-			finalIssueTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
 				t.Context(), config, issueTokenTransaction,
 				[]keys.Private{issuerPrivKey},
 			)
@@ -167,7 +167,7 @@ func TestCoordinatedTokenTransferV3(t *testing.T) {
 
 			require.Equal(t, TokenTransactionVersion3, int(transferTokenTransaction.Version), "expected V3 version")
 
-			transferTokenTransactionResponse, err := wallet.BroadcastCoordinatedTokenTransfer(
+			transferTokenTransactionResponse, err := wallet.BroadcastTokenTransfer(
 				t.Context(), config, transferTokenTransaction,
 				[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 			)
@@ -200,7 +200,7 @@ func TestCoordinatedTokenTransferWithMultipleTokenTypes(t *testing.T) {
 
 			// Re-broadcast token 2's mint with the same user as owner for both tokens
 			token2.MintTxBeforeBroadcast.TokenOutputs[0].OwnerPublicKey = userPrivKey.Public().Serialize()
-			finalMintToken2, err := wallet.BroadcastCoordinatedTokenTransfer(
+			finalMintToken2, err := wallet.BroadcastTokenTransfer(
 				t.Context(), token2.Config, token2.MintTxBeforeBroadcast,
 				[]keys.Private{token2.IssuerPrivateKey},
 			)
@@ -255,7 +255,7 @@ func TestCoordinatedTokenTransferWithMultipleTokenTypes(t *testing.T) {
 				ClientCreatedTimestamp:          timestamppb.New(time.Now()),
 			}
 
-			finalTransferTx, err := wallet.BroadcastCoordinatedTokenTransfer(
+			finalTransferTx, err := wallet.BroadcastTokenTransfer(
 				t.Context(), config, multiTokenTransferTx,
 				[]keys.Private{userPrivKey, userPrivKey},
 			)

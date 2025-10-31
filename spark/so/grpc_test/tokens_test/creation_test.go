@@ -333,7 +333,7 @@ func TestCoordinatedNativeTokenMaxSupplyEnforcement(t *testing.T) {
 
 			if tc.startExtraMintBefore {
 				mintTransaction.ClientCreatedTimestamp = timestamppb.New(time.Now().Add(-time.Second))
-				_, _, err = wallet.StartTokenTransactionCoordinated(
+				_, _, err = wallet.StartTokenTransaction(
 					t.Context(),
 					config,
 					mintTransaction,
@@ -344,7 +344,7 @@ func TestCoordinatedNativeTokenMaxSupplyEnforcement(t *testing.T) {
 				require.NoError(t, err, "failed to start mint transaction before")
 			}
 
-			_, err = wallet.BroadcastCoordinatedTokenTransfer(
+			_, err = wallet.BroadcastTokenTransfer(
 				t.Context(), config, mintTransaction,
 				[]keys.Private{tokenPrivKey},
 			)

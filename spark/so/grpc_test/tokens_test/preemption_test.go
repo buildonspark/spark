@@ -89,7 +89,7 @@ func TestCoordinatedTokenTransferPreemption(t *testing.T) {
 			mintTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config1, tokenIdentityPubKey)
 			require.NoError(t, err, "failed to create mint transaction for transfer test")
 
-			finalMintTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+			finalMintTransaction, err := wallet.BroadcastTokenTransfer(
 				t.Context(), config1, mintTransaction,
 				[]keys.Private{tokenPrivKey},
 			)
@@ -116,7 +116,7 @@ func TestCoordinatedTokenTransferPreemption(t *testing.T) {
 				t1ExpiryDuration = time.Second
 			}
 
-			resp1, resp1Hash, err := wallet.StartTokenTransactionCoordinated(t.Context(), config1, transaction1, []keys.Private{userOutput1PrivKey, userOutput2PrivKey}, t1ExpiryDuration, nil)
+			resp1, resp1Hash, err := wallet.StartTokenTransaction(t.Context(), config1, transaction1, []keys.Private{userOutput1PrivKey, userOutput2PrivKey}, t1ExpiryDuration, nil)
 			require.NoError(t, err, "failed to start first transaction")
 			require.NotNil(t, resp1)
 
@@ -139,7 +139,7 @@ func TestCoordinatedTokenTransferPreemption(t *testing.T) {
 				time.Sleep(time.Second * 1)
 			}
 
-			resp2, resp2Hash, err := wallet.StartTokenTransactionCoordinated(t.Context(), config2, transaction2, []keys.Private{userOutput1PrivKey, userOutput2PrivKey}, 180*time.Second, nil)
+			resp2, resp2Hash, err := wallet.StartTokenTransaction(t.Context(), config2, transaction2, []keys.Private{userOutput1PrivKey, userOutput2PrivKey}, 180*time.Second, nil)
 			queryAndVerifyTokenOutputs(t, []string{config1.CoordinatorIdentifier, config2.CoordinatorIdentifier}, finalMintTransaction, userOutput1PrivKey)
 
 			winningResult, losingResult := determineWinningAndLosingTransactions(
@@ -177,7 +177,7 @@ func TestCoordinatedTokenTransferPreemptionPreventionRevealed(t *testing.T) {
 	mintTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenIdentityPubKey)
 	require.NoError(t, err, "failed to create mint transaction for transfer test")
 
-	finalMintTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalMintTransaction, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, mintTransaction,
 		[]keys.Private{tokenPrivKey},
 	)
@@ -189,7 +189,7 @@ func TestCoordinatedTokenTransferPreemptionPreventionRevealed(t *testing.T) {
 	transaction1, _, err := createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey)
 	require.NoError(t, err, "failed to create first transfer transaction")
 
-	finalTransferTransaction1, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalTransferTransaction1, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, transaction1,
 		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 	)
@@ -210,7 +210,7 @@ func TestCoordinatedTokenTransferPreemptionPreventionRevealed(t *testing.T) {
 	earlierTime := time.Now().Add(-1 * time.Hour)
 	transaction2.ClientCreatedTimestamp = timestamppb.New(earlierTime)
 
-	_, _, err = wallet.StartTokenTransactionCoordinated(
+	_, _, err = wallet.StartTokenTransaction(
 		t.Context(), config, transaction2,
 		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey}, TestValidityDurationSecs*time.Second, nil,
 	)
@@ -226,7 +226,7 @@ func TestCoordinatedTokenTransferPreemptionPreventionFinalized(t *testing.T) {
 	mintTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenIdentityPubKey)
 	require.NoError(t, err, "failed to create mint transaction for transfer test")
 
-	finalMintTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalMintTransaction, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, mintTransaction,
 		[]keys.Private{tokenPrivKey},
 	)
@@ -238,7 +238,7 @@ func TestCoordinatedTokenTransferPreemptionPreventionFinalized(t *testing.T) {
 	transaction1, _, err := createTestTokenTransferTransactionTokenPb(t, config, finalMintTransactionHash, tokenIdentityPubKey)
 	require.NoError(t, err, "failed to create first transfer transaction")
 
-	_, err = wallet.BroadcastCoordinatedTokenTransfer(
+	_, err = wallet.BroadcastTokenTransfer(
 		t.Context(), config, transaction1,
 		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 	)
@@ -250,7 +250,7 @@ func TestCoordinatedTokenTransferPreemptionPreventionFinalized(t *testing.T) {
 	earlierTime := time.Now().Add(-1 * time.Hour)
 	transaction2.ClientCreatedTimestamp = timestamppb.New(earlierTime)
 
-	_, _, err = wallet.StartTokenTransactionCoordinated(
+	_, _, err = wallet.StartTokenTransaction(
 		t.Context(), config, transaction2,
 		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey}, TestValidityDurationSecs*time.Second, nil,
 	)

@@ -252,7 +252,7 @@ func createTransferTokenTransactionForWallet(t *testing.T, ctx context.Context) 
 	issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
 	require.NoError(t, err, "failed to create test token issuance transaction")
 
-	finalIssueTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, issueTokenTransaction, []keys.Private{tokenPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast issuance token transaction")
@@ -267,7 +267,7 @@ func createTransferTokenTransactionForWallet(t *testing.T, ctx context.Context) 
 	)
 	require.NoError(t, err, "failed to create test token transfer transaction")
 
-	transferTokenTransactionResponse, err := wallet.BroadcastCoordinatedTokenTransfer(
+	transferTokenTransactionResponse, err := wallet.BroadcastTokenTransfer(
 		ctx, config, transferTokenTransaction,
 		[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 	)
@@ -510,7 +510,7 @@ func TestQueryTokenOutputsWithRevealedRevocationSecrets(t *testing.T) {
 	mintTx, owner1PrivKey, owner2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
 	require.NoError(t, err, "failed to create mint transaction")
 
-	finalTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+	finalTokenTransaction, err := wallet.BroadcastTokenTransfer(
 		t.Context(), config, mintTx, []keys.Private{issuerPrivKey},
 	)
 	require.NoError(t, err, "failed to broadcast mint transaction")
@@ -526,7 +526,7 @@ func TestQueryTokenOutputsWithRevealedRevocationSecrets(t *testing.T) {
 	})
 	require.NoError(t, err, "failed to create transfer transaction")
 
-	startResp, finalTxHash, err := wallet.StartTokenTransactionCoordinated(t.Context(), config, transferTx, []keys.Private{owner1PrivKey, owner2PrivKey}, 1*time.Second, nil)
+	startResp, finalTxHash, err := wallet.StartTokenTransaction(t.Context(), config, transferTx, []keys.Private{owner1PrivKey, owner2PrivKey}, 1*time.Second, nil)
 	require.NoError(t, err, "failed to start transfer transaction")
 	require.NotNil(t, startResp)
 

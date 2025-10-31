@@ -20,7 +20,7 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 			issueTokenTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, tokenPrivKey.Public())
 			require.NoError(t, err, "failed to create test token issuance transaction")
 
-			finalIssueTokenTransaction, err := wallet.BroadcastCoordinatedTokenTransfer(
+			finalIssueTokenTransaction, err := wallet.BroadcastTokenTransfer(
 				t.Context(), config, issueTokenTransaction,
 				[]keys.Private{tokenPrivKey},
 			)
@@ -59,7 +59,7 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 			)
 			require.NoError(t, err, "failed to create test token transfer transaction")
 
-			transferFrozenTokenTransactionResponse, err := wallet.BroadcastCoordinatedTokenTransfer(
+			transferFrozenTokenTransactionResponse, err := wallet.BroadcastTokenTransfer(
 				t.Context(), config, transferTokenTransaction,
 				[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 			)
@@ -77,7 +77,7 @@ func TestFreezeAndUnfreezeTokens(t *testing.T) {
 			require.Equal(t, *expectedOutputID, unfreezeResponse.ImpactedOutputIds[0],
 				"thawed output ID %s does not match expected output ID %s", unfreezeResponse.ImpactedOutputIds[0], *expectedOutputID)
 
-			transferTokenTransactionResponse, err := wallet.BroadcastCoordinatedTokenTransfer(
+			transferTokenTransactionResponse, err := wallet.BroadcastTokenTransfer(
 				t.Context(), config, transferTokenTransaction,
 				[]keys.Private{userOutput1PrivKey, userOutput2PrivKey},
 			)

@@ -30,7 +30,7 @@ func testCoordinatedTransactionSigningScenarios(
 	for i, key := range startOwnerPrivateKeys {
 		converted[i] = key
 	}
-	startResp, finalTxHash, startErr := wallet.StartTokenTransactionCoordinated(
+	startResp, finalTxHash, startErr := wallet.StartTokenTransaction(
 		t.Context(), config, tokenTransaction, converted, TestValidityDurationSecs*time.Second, nil,
 	)
 
@@ -42,7 +42,7 @@ func testCoordinatedTransactionSigningScenarios(
 	}
 
 	if doubleStartSameTx {
-		startResp2, finalTxHash2, startErr2 := wallet.StartTokenTransactionCoordinated(
+		startResp2, finalTxHash2, startErr2 := wallet.StartTokenTransaction(
 			t.Context(), config, tokenTransaction, converted, TestValidityDurationSecs*time.Second, nil,
 		)
 		require.NoError(t, startErr2, "unexpected error on second start")
@@ -54,7 +54,7 @@ func testCoordinatedTransactionSigningScenarios(
 
 	if doubleStartDifferentTx {
 		tokenTransaction.ClientCreatedTimestamp = timestamppb.New(tokenTransaction.ClientCreatedTimestamp.AsTime().Add(-time.Second * 1))
-		startResp2, finalTxHash2, startErr2 := wallet.StartTokenTransactionCoordinated(
+		startResp2, finalTxHash2, startErr2 := wallet.StartTokenTransaction(
 			t.Context(), config, tokenTransaction, converted, TestValidityDurationSecs*time.Second, nil,
 		)
 		require.NoError(t, startErr2, "unexpected error on second start")
@@ -117,7 +117,7 @@ func testCoordinatedTransactionSigningScenarios(
 		OwnerIdentityPublicKey:         config.IdentityPublicKey().Serialize(),
 	}
 
-	commitResp, commitErr := wallet.CommitTransactionCoordinated(t.Context(), config, commitReq)
+	commitResp, commitErr := wallet.CommitTransaction(t.Context(), config, commitReq)
 
 	if expectedCommitError {
 		require.Error(t, commitErr, "expected error during commit but none")
@@ -129,7 +129,7 @@ func testCoordinatedTransactionSigningScenarios(
 	require.Nil(t, commitResp.CommitProgress, "commit progress should be nil")
 
 	if doubleCommit {
-		commitResp2, commitErr2 := wallet.CommitTransactionCoordinated(t.Context(), config, commitReq)
+		commitResp2, commitErr2 := wallet.CommitTransaction(t.Context(), config, commitReq)
 		require.NoError(t, commitErr2, "unexpected error on second commit (double sign)")
 		require.Equal(t, tokenpb.CommitStatus_COMMIT_FINALIZED, commitResp2.CommitStatus)
 	}
