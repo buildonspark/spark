@@ -36,6 +36,7 @@ import {
   LightningSendFeeEstimateInput,
   LightningSendRequest,
   RequestCoopExitInput,
+  SparkLeavesSwapRequestStatus,
   SparkWalletUserToUserRequestsConnection,
   StaticDepositQuoteOutput,
   UserLeafInput,
@@ -1537,6 +1538,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       if (!request) {
         console.error("[processSwapBatch] Leave swap request returned null");
         throw new Error("Failed to request leaves swap. No response returned.");
+      }
+
+      if (
+        request.swapLeaves.length === 0 ||
+        request.status === SparkLeavesSwapRequestStatus.FAILED
+      ) {
+        console.error("[processSwapBatch] Leaves swap request failed", request);
+        throw new Error("Failed to request leaves swap. Request failed.");
       }
 
       const nodes = await this.queryNodes({
