@@ -57,20 +57,19 @@ func constructExpectedTransaction(dbLeaf *ent.TreeNode, txType RefundTxType, ref
 		return nil, fmt.Errorf("unknown transaction type: %d", txType)
 	}
 
-	// Validate the client's sequence against database transactions when possible
-	err := validateSequence(dbLeaf, txType, clientSequence)
+	// Build the server-side sequence (validate timelock and construct sequence bits)
+	serverSequence, err := validateSequence(dbLeaf, txType, clientSequence)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate client sequence: %w", err)
 	}
 
-	// Construct the expected transaction based on type
 	switch txType {
 	case RefundTxTypeCPFP:
-		return constructCPFPRefundTransaction(dbLeaf, refundDestPubkey, clientSequence)
+		return constructCPFPRefundTransaction(dbLeaf, refundDestPubkey, serverSequence)
 	case RefundTxTypeDirect:
-		return constructDirectRefundTransaction(dbLeaf, refundDestPubkey, clientSequence)
+		return constructDirectRefundTransaction(dbLeaf, refundDestPubkey, serverSequence)
 	case RefundTxTypeDirectFromCPFP:
-		return constructDirectFromCPFPRefundTransaction(dbLeaf, refundDestPubkey, clientSequence)
+		return constructDirectFromCPFPRefundTransaction(dbLeaf, refundDestPubkey, serverSequence)
 	default:
 		return nil, fmt.Errorf("unknown transaction type: %d", txType)
 	}
@@ -186,23 +185,22 @@ func constructDirectFromCPFPRefundTransaction(dbLeaf *ent.TreeNode, refundDestPu
 }
 
 // validateSequence validates the client's sequence number against existing database transactions
-func validateSequence(dbLeaf *ent.TreeNode, txType RefundTxType, clientSequence uint32) error {
-	// Parse the transaction
+func validateSequence(dbLeaf *ent.TreeNode, txType RefundTxType, clientSequence uint32) (uint32, error) {
 	rawRefundTx, err := common.TxFromRawTxBytes(dbLeaf.RawRefundTx)
 	if err != nil {
-		return fmt.Errorf("failed to parse CPFP refund transaction: %w", err)
+		return 0, fmt.Errorf("failed to parse CPFP refund transaction: %w", err)
 	}
 
 	if len(rawRefundTx.TxIn) == 0 {
-		return fmt.Errorf("CPFP refund transaction has no inputs")
+		return 0, fmt.Errorf("CPFP refund transaction has no inputs")
 	}
 
 	// Extract the current timelock from the transaction (bits 0-15)
-	cpfpRefundTxTimelock := rawRefundTx.TxIn[0].Sequence & 0xFFFF
+	cpfpRefundTxTimelock := GetTimelockFromSequence(rawRefundTx.TxIn[0].Sequence)
 
 	// Validate that the timelock is large enough to subtract TimeLockInterval
 	if cpfpRefundTxTimelock < spark.TimeLockInterval {
-		return fmt.Errorf("current timelock %d in CPFP refund transaction is too small to subtract TimeLockInterval %d",
+		return 0, fmt.Errorf("current timelock %d in CPFP refund transaction is too small to subtract TimeLockInterval %d",
 			cpfpRefundTxTimelock, spark.TimeLockInterval)
 	}
 
@@ -217,25 +215,32 @@ func validateSequence(dbLeaf *ent.TreeNode, txType RefundTxType, clientSequence 
 	case RefundTxTypeCPFP:
 		expectedTimelock = expectedCPFPRefundTxTimelock
 	default:
-		return fmt.Errorf("unknown transaction type: %d", txType)
+		return 0, fmt.Errorf("unknown transaction type: %d", txType)
+	}
+
+	providedTimelock := GetTimelockFromSequence(clientSequence)
+	if providedTimelock != expectedTimelock {
+		return 0, fmt.Errorf("provided timelock 0x%08X does not match expected timelock 0x%08X", providedTimelock, expectedTimelock)
 	}
 
 	// Validate that the client's timelock (bits 0-15) matches expected
 	err = ValidateSequenceTimelock(clientSequence, expectedTimelock)
 	if err != nil {
-		return fmt.Errorf("failed to validate client sequence timelock for tx type %d: %w", txType, err)
+		return 0, fmt.Errorf("failed to validate client sequence timelock for tx type %d: %w", txType, err)
 	}
 
-	return nil
+	return constructServerSequence(clientSequence, expectedTimelock), nil
+}
+
+func constructServerSequence(clientSequence uint32, expectedTimelock uint32) uint32 {
+	upperBits := clientSequence & 0xFFFF0000
+	maskClear := wire.SequenceLockTimeDisabled | wire.SequenceLockTimeIsSeconds
+	sanitizedUpper := upperBits &^ uint32(maskClear)
+	return sanitizedUpper | GetTimelockFromSequence(expectedTimelock)
 }
 
 func GetAndValidateUserSequence(rawTxBytes []byte) (uint32, error) {
 	// Validate that bit 31 (disable flag) and bit 22 (type flag) are NOT set
-	const (
-		disableBit = uint32(1 << 31) // Bit 31: disables BIP68 relative timelock
-		typeBit    = uint32(1 << 22) // Bit 22: 0=block height, 1=time-based
-	)
-
 	tx, err := common.TxFromRawTxBytes(rawTxBytes)
 	if err != nil {
 		return 0, err
@@ -246,18 +251,14 @@ func GetAndValidateUserSequence(rawTxBytes []byte) (uint32, error) {
 	}
 	userSequence := tx.TxIn[0].Sequence
 
-	if userSequence&disableBit != 0 {
+	if userSequence&wire.SequenceLockTimeDisabled != 0 {
 		return 0, fmt.Errorf("client sequence has bit 31 set (timelock disabled)")
 	}
-	if userSequence&typeBit != 0 {
+	if userSequence&wire.SequenceLockTimeIsSeconds != 0 {
 		return 0, fmt.Errorf("client sequence has bit 22 set (time-based timelock not supported)")
 	}
 
 	return userSequence, nil
-}
-
-func GetTimelockFromSequence(sequence uint32) uint32 {
-	return sequence & 0xFFFF
 }
 
 func GetAndValidateUserTimelock(rawTxBytes []byte) (uint32, error) {
@@ -276,10 +277,15 @@ func ValidateSequenceTimelock(sequence uint32, expectedTimelock uint32) error {
 	return nil
 }
 
+// GetTimelockFromSequence extracts the timelock from a sequence
+func GetTimelockFromSequence(sequence uint32) uint32 {
+	return sequence & wire.SequenceLockTimeMask
+}
+
 // Decrement the timelock in the provided sequence by one step, preserving any other bits that are set.
 // Use GetAndValidateUserSequence to get the valid currSequence for this function.
 func NextSequence(currSequence uint32) (nextSequence uint32, nextDirectSequence uint32, err error) {
-	currTimelock := currSequence & 0xFFFF
+	currTimelock := GetTimelockFromSequence(currSequence)
 	nextTimelock := int32(currTimelock) - spark.TimeLockInterval
 
 	if nextTimelock < 0 {
