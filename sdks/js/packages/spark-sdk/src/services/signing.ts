@@ -152,7 +152,7 @@ export class SigningService {
 
       cpfpLeafSigningJobs.push(...signingJobs);
 
-      const isZeroNode = getCurrentTimelock(nodeTx.getInput(0).sequence);
+      const isZeroNode = !getCurrentTimelock(nodeTx.getInput(0).sequence);
       if (directRefundTx && !isZeroNode) {
         if (!directNodeTx) {
           throw new ValidationError(
