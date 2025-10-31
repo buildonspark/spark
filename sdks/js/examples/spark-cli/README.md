@@ -6,7 +6,5 @@ This is an interactive CLI with commands for interacting with the Spark SDK.
 
 Install dependencies by running `yarn`.
 Run `yarn build` from sdks/js
-Then run `yarn cli` to access the CLI.
-
-To set the network set the `NETWORK` environment variable (ie.: `NETWORK=mainnet yarn cli`)
-Available values are `MAINNET`, `REGTEST`, and `LOCAL`.
+Then run `yarn cli` to access the CLI. This CLI defaults to REGTEST.
+For MAINNET: `yarn cli:mainnet`

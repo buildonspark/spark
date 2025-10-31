@@ -667,7 +667,7 @@ async function runCLI() {
   The advanced commands below are for specific use cases.
 
   Token Holder Commands:
-    transfertokens <tokenIdentifier> <receiverAddress> <amount>        - Transfer tokens
+    transfertokens <tokenIdentifier> <receiverAddress> <amount>        - Transfer tokens. If the token was created with 2 decimals, transfertokens _ _ 1 would transfer 0.01 tokens.
     batchtransfertokens <tokenIdentifier> <receiverAddress1:amount1> <receiverAddress2:amount2> ... - Transfer tokens with multiple outputs
     querytokentransactions [--ownerPublicKeys] [--issuerPublicKeys] [--tokenTransactionHashes] [--tokenIdentifiers] [--outputIds] [--sortOrder] - Query token transaction history
 
@@ -677,11 +677,11 @@ async function runCLI() {
   getissuertokenmetadata                                              - Get the issuer's token metadata
   getissuertokenidentifier                                            - Get the issuer's token identifier
   getissuertokenpublickey                                             - Get the issuer's token public key
-  minttokens <amount>                                                 - Mint new tokens
+  minttokens <amount>                                                 - Mint new tokens. If the token was created with 2 decimals, minttokens 1 would transfer 0.01 tokens.
   burntokens <amount>                                                 - Burn tokens
   freezetokens <sparkAddress>                                         - Freeze tokens for a specific address
   unfreezetokens <sparkAddress>                                       - Unfreeze tokens for a specific address
-  createtoken <tokenName> <tokenTicker> <decimals> <maxSupply> <isFreezable> - Create a new token
+  createtoken <tokenName> <tokenTicker> <decimals> <maxSupply> <isFreezable> - Create a new token.
   decodetokenidentifier <tokenIdentifier>                             - Returns the raw token identifier as a hex string
    
   enablelogging <true|false>                                          - Enable or disable logging
