@@ -600,7 +600,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					}
 					pendingSendTransfers, err := tx.PendingSendTransfer.Query().Where(
 						pendingsendtransfer.StatusEQ(st.PendingSendTransferStatusPending),
-						pendingsendtransfer.UpdateTimeLT(time.Now().Add(-10*time.Minute)),
+						pendingsendtransfer.UpdateTimeLT(time.Now().Add(-3*time.Minute)),
 					).Limit(100).ForUpdate().All(ctx)
 					if err != nil {
 						return err
