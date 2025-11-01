@@ -1,5 +1,14 @@
 # @buildonspark/spark-sdk
 
+## 0.4.3
+
+### Patch Changes
+
+- - Enable Spark invoices.
+  - Address APIs now return spark1 addresses.
+  - Lightning flow updated to v3 endpoint
+  - Improve leaf optimization
+
 ## 0.4.2
 
 ### Patch Changes

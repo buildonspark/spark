@@ -1,5 +1,13 @@
 # spark-node-express
 
+## 0.0.93
+
+### Patch Changes
+
+- Updated dependencies
+  - @buildonspark/spark-sdk@0.4.3
+  - @buildonspark/issuer-sdk@0.0.106
+
 ## 0.0.92
 
 ### Patch Changes
