@@ -11,6 +11,7 @@ import (
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/ent"
 	soerrors "github.com/lightsparkdev/spark/so/errors"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -119,11 +120,13 @@ type SessionFactory interface {
 // overloaded.
 type DefaultSessionFactory struct {
 	dbClient *ent.Client
+	knobs    knobs.Knobs
 }
 
-func NewDefaultSessionFactory(dbClient *ent.Client) *DefaultSessionFactory {
+func NewDefaultSessionFactory(dbClient *ent.Client, knobs knobs.Knobs) *DefaultSessionFactory {
 	return &DefaultSessionFactory{
 		dbClient: dbClient,
+		knobs:    knobs,
 	}
 }
 
@@ -163,7 +166,7 @@ func WithMetricAttributes(attrs []attribute.KeyValue) SessionOption {
 }
 
 func (f *DefaultSessionFactory) NewSession(ctx context.Context, opts ...SessionOption) *Session {
-	return NewSession(ctx, f.dbClient, opts...)
+	return NewSession(ctx, f.dbClient, f.knobs, opts...)
 }
 
 // A Session manages a transaction over the lifetime of a request or worker. It
@@ -179,6 +182,8 @@ type Session struct {
 	ctx context.Context
 	// The underlying ent.Client used to create new transactions and flush notifications.
 	dbClient *ent.Client
+	// Knobs for controlling session behavior.
+	knobs knobs.Knobs
 	// TxProvider is used to create a new transaction when needed.
 	provider ent.TxProvider
 	// Mutex for ensuring thread-safe access to `currentTx`.
@@ -190,13 +195,14 @@ type Session struct {
 	// transaction is committed, these notifications are flushed. If the transaction is rolled back,
 	// these notifications are discarded.
 	currentNotifications *ent.BufferedNotifier
-	// startTime is the time when the current transaction was started.
-	startTime time.Time
+	currentIsDirty       bool
+	// currentStartTime is the time when the current transaction was started.
+	currentStartTime time.Time
 }
 
 // NewSession creates a new Session with a new transactions provided
 // by an ent.ClientTxProvider wrapping the provided `ent.Client`.
-func NewSession(ctx context.Context, dbClient *ent.Client, opts ...SessionOption) *Session {
+func NewSession(ctx context.Context, dbClient *ent.Client, knobs knobs.Knobs, opts ...SessionOption) *Session {
 	sessionConfig := newSessionConfig(opts...)
 	provider := NewTxProviderWithTimeout(
 		ent.NewEntClientTxProvider(dbClient),
@@ -206,6 +212,7 @@ func NewSession(ctx context.Context, dbClient *ent.Client, opts ...SessionOption
 	return &Session{
 		sessionConfig: sessionConfig,
 		ctx:           ctx,
+		knobs:         knobs,
 		dbClient:      dbClient,
 		provider:      provider,
 		currentTx:     nil,
@@ -242,7 +249,7 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 
 		s.currentTx = tx
 		s.currentNotifications = &notifier
-		s.startTime = time.Now()
+		s.currentStartTime = time.Now()
 
 		addTraceEvent(ctx, "begin", 0, nil)
 
@@ -251,8 +258,14 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				s.mu.Lock()
 				defer s.mu.Unlock()
 
-				duration := time.Since(s.startTime).Seconds()
+				duration := time.Since(s.currentStartTime).Seconds()
 				durationMs := duration * 1000
+
+				if !s.currentIsDirty && s.knobs.RolloutRandom(knobs.KnobDatabaseOnlyCommitDirty, 0) {
+					// Assume we will clear the state when we do a rollback. We should maybe just rollback but
+					// this is the least disruptive for now.
+					return nil
+				}
 
 				err := fn.Commit(ctx, tx)
 				var attrs []attribute.KeyValue
@@ -289,7 +302,7 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				s.mu.Lock()
 				defer s.mu.Unlock()
 
-				duration := time.Since(s.startTime).Seconds()
+				duration := time.Since(s.currentStartTime).Seconds()
 
 				err := fn.Rollback(ctx, tx)
 				var attrs []attribute.KeyValue
@@ -312,6 +325,12 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 		})
 	}
 	return s.currentTx, nil
+}
+
+func (s *Session) MarkTxDirty(ctx context.Context, tx *ent.Tx) {
+	if s.currentTx != nil && s.currentTx == tx {
+		s.currentIsDirty = true
+	}
 }
 
 // GetTxIfExists retrieves the current transaction if it exists, without starting a new one. If

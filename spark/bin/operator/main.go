@@ -387,7 +387,29 @@ func main() {
 		dbClient = ent.NewClient(ent.Driver(dialectDriver))
 	}
 
+	// Add hook to track whether a transaction is dirty
 	dbClient.Intercept(ent.DatabaseStatsInterceptor(10 * time.Second))
+	dbClient.Use(func(next ent.Mutator) ent.Mutator {
+		return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+			v, err := next.Mutate(ctx, m)
+			if err != nil {
+				return v, err
+			}
+
+			// Figure out if we are in a transaction.
+			mx, ok := m.(interface {
+				Tx() *ent.Tx
+			})
+			if !ok {
+				return v, err
+			}
+
+			ent.MarkTxDirty(ctx, mx.Tx())
+
+			return v, err
+		})
+	})
+
 	defer dbClient.Close()
 
 	if dbDriver == "sqlite3" {
@@ -580,7 +602,7 @@ func main() {
 			}(),
 			sparkgrpc.DatabaseSessionMiddleware(
 				dbClient,
-				db.NewDefaultSessionFactory(dbClient),
+				db.NewDefaultSessionFactory(dbClient, knobsService),
 				config.Database.NewTxTimeout,
 			),
 			helper.SigningCommitmentInterceptor(config.SigningOperatorMap, knobsService),

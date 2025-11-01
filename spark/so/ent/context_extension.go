@@ -7,17 +7,23 @@ import (
 )
 
 // contextKey is a type for context keys.
-type txProviderContextKey string
-type notifierContextKey string
+type dbSessionContextKey string
+type dbNotifierContextKey string
 
-// txProviderKey is the context key for the transaction provider.
-const txProviderKey txProviderContextKey = "txProvider"
-const notifierKey notifierContextKey = "notifier"
+// dbSessionKey is the context key for the transaction provider.
+const dbSessionKey dbSessionContextKey = "dbsession"
+const dbNotifierKey dbNotifierContextKey = "dbnotifier"
 
 // A TxProvider is an interface that provides a method to either get an existing transaction,
 // or begin a new transaction if none exists.
 type TxProvider interface {
+	// Get the current transaction from the context, or begin a new one if none exists.
 	GetOrBeginTx(context.Context) (*Tx, error)
+}
+
+type Session interface {
+	TxProvider
+	MarkTxDirty(context.Context, *Tx)
 }
 
 // ClientTxProvider is a TxProvider that uses an underlying ent.Client to create new transactions. This always
@@ -40,17 +46,23 @@ func (e *ClientTxProvider) GetOrBeginTx(ctx context.Context) (*Tx, error) {
 
 // Inject the transaction provider into the context. This should ONLY be called from the start of
 // a request or worker context (e.g. in a top-level gRPC interceptor).
-func Inject(ctx context.Context, txProvider TxProvider) context.Context {
-	return context.WithValue(ctx, txProviderKey, txProvider)
+func Inject(ctx context.Context, session Session) context.Context {
+	return context.WithValue(ctx, dbSessionKey, session)
 }
 
 // GetDbFromContext returns the database transaction from the context.
 func GetDbFromContext(ctx context.Context) (*Tx, error) {
-	if txProvider, ok := ctx.Value(txProviderKey).(TxProvider); ok {
+	if txProvider, ok := ctx.Value(dbSessionKey).(TxProvider); ok {
 		return txProvider.GetOrBeginTx(ctx)
 	}
 
 	return nil, fmt.Errorf("no transaction provider found in context")
+}
+
+func MarkTxDirty(ctx context.Context, tx *Tx) {
+	if session, ok := ctx.Value(dbSessionKey).(Session); ok {
+		session.MarkTxDirty(ctx, tx)
+	}
 }
 
 // DbCommit gets the transaction from the context and commits it.
@@ -99,11 +111,11 @@ type Notifier interface {
 }
 
 func InjectNotifier(ctx context.Context, notifier Notifier) context.Context {
-	return context.WithValue(ctx, notifierKey, notifier)
+	return context.WithValue(ctx, dbNotifierKey, notifier)
 }
 
 func GetNotifierFromContext(ctx context.Context) (Notifier, error) {
-	if notifier, ok := ctx.Value(notifierKey).(Notifier); ok {
+	if notifier, ok := ctx.Value(dbNotifierKey).(Notifier); ok {
 		return notifier, nil
 	}
 

@@ -67,7 +67,7 @@ func NewTestContext(tb testing.TB, driver string, path string) (context.Context,
 	dbClient, err := ent.Open(driver, path)
 	require.NoError(tb, err, "failed to open database connection")
 
-	dbSession := NewDefaultSessionFactory(dbClient).NewSession(tb.Context())
+	dbSession := NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(tb.Context())
 	tc := &TestContext{t: tb, Client: dbClient, Session: dbSession, databasePath: path}
 	tb.Cleanup(tc.close)
 	return ent.Inject(tb.Context(), dbSession), tc
@@ -77,7 +77,7 @@ const sqlitePath = "file:ent?mode=memory&_fk=1"
 
 func NewTestSQLiteContext(tb testing.TB) (context.Context, *TestContext) {
 	dbClient := NewTestSQLiteClient(tb)
-	session := NewSession(tb.Context(), dbClient)
+	session := NewSession(tb.Context(), dbClient, knobs.NewEmptyFixedKnobs())
 	tc := &TestContext{t: tb, Client: dbClient, Session: session, databasePath: sqlitePath}
 	tb.Cleanup(tc.close)
 	return ent.Inject(tb.Context(), session), tc
@@ -169,7 +169,7 @@ func ConnectToTestPostgres(t testing.TB) (context.Context, *TestContext) {
 	require.NoError(t, err)
 
 	ctx := t.Context()
-	session := NewSession(ctx, client)
+	session := NewSession(ctx, client, knobs.NewEmptyFixedKnobs())
 	tc := &TestContext{t: t, Client: client, Session: session, databasePath: dbConn.URL()}
 	t.Cleanup(tc.close)
 	return ent.Inject(ctx, session), tc

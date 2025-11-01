@@ -14,6 +14,7 @@ import (
 const (
 	KnobDatabaseStatementTimeout      = "spark.database.statement_timeout"
 	KnobDatabaseLockTimeout           = "spark.database.lock_timeout"
+	KnobDatabaseOnlyCommitDirty       = "spark.database.only_commit_dirty"
 	KnobRateLimitLimit                = "spark.so.ratelimit.limit"
 	KnobRateLimitExcludeIps           = "spark.so.ratelimit.exclude_ips"
 	KnobRateLimitExcludePubkeys       = "spark.so.ratelimit.exclude_pubkeys"
@@ -245,6 +246,10 @@ func (k knobsImpl) RolloutUUID(knob string, id uuid.UUID, defaultValue float64) 
 
 type fixedKnobs struct {
 	values map[string]float64
+}
+
+func NewEmptyFixedKnobs() Knobs {
+	return &fixedKnobs{values: map[string]float64{}}
 }
 
 // NewFixedKnobs creates a new Knobs instance that simply maps fixed strings to

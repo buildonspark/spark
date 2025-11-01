@@ -1041,7 +1041,7 @@ func (t *BaseTaskSpec) getTimeout() time.Duration {
 func (t *BaseTaskSpec) RunOnce(ctx context.Context, config *so.Config, dbClient *ent.Client, knobsService knobs.Knobs) error {
 	wrappedTask := t.chainMiddleware(
 		LogMiddleware(),
-		DatabaseMiddleware(db.NewDefaultSessionFactory(dbClient), config.Database.NewTxTimeout),
+		DatabaseMiddleware(db.NewDefaultSessionFactory(dbClient, knobsService), config.Database.NewTxTimeout),
 		TimeoutMiddleware(),
 		PanicRecoveryMiddleware(),
 	)
@@ -1052,7 +1052,7 @@ func (t *BaseTaskSpec) RunOnce(ctx context.Context, config *so.Config, dbClient 
 func (t *ScheduledTaskSpec) Schedule(scheduler gocron.Scheduler, config *so.Config, dbClient *ent.Client, knobsService knobs.Knobs) error {
 	wrappedTask := t.chainMiddleware(
 		LogMiddleware(),
-		DatabaseMiddleware(db.NewDefaultSessionFactory(dbClient), config.Database.NewTxTimeout),
+		DatabaseMiddleware(db.NewDefaultSessionFactory(dbClient, knobsService), config.Database.NewTxTimeout),
 		TimeoutMiddleware(),
 		PanicRecoveryMiddleware(),
 	)
