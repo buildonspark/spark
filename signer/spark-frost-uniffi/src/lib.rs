@@ -387,9 +387,9 @@ pub fn construct_node_tx(
         script_pubkey: dest_address.script_pubkey(),
     };
 
-    // Construct the transaction with version 2 for Taproot support
+    // Construct the transaction with version 3
     let new_tx = Transaction {
-        version: Version::TWO,
+        version: Version::non_standard(3),
         lock_time: LockTime::ZERO,
         input: vec![input],
         output: vec![
@@ -473,9 +473,9 @@ pub fn construct_refund_tx(
         script_pubkey: p2tr_address.script_pubkey(),
     };
 
-    // Construct the transaction with version 2 for Taproot support
+    // Construct the transaction with version 3
     let new_tx = Transaction {
-        version: Version::TWO,
+        version: Version::non_standard(3),
         lock_time: LockTime::ZERO,
         input: vec![input],
         output: vec![
@@ -547,9 +547,9 @@ pub fn construct_split_tx(
         });
     }
 
-    // Construct the transaction with version 2 for Taproot support
+    // Construct the transaction with version 3
     let new_tx = Transaction {
-        version: Version::TWO,
+        version: Version::non_standard(3),
         lock_time: LockTime::ZERO,
         input: vec![input],
         output: outputs,
@@ -636,9 +636,9 @@ pub fn construct_direct_refund_tx(
         script_pubkey: p2tr_address.script_pubkey(),
     };
 
-    // Construct the transaction with version 2 for Taproot support
+    // Construct the transaction with version 3
     let new_tx = Transaction {
-        version: Version::TWO,
+        version: Version::non_standard(3),
         lock_time: LockTime::ZERO,
         input: vec![input],
         output: vec![output], // No ephemeral anchor output

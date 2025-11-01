@@ -48,7 +48,7 @@ pub fn create_dummy_tx(address: &str, amount_sats: u64) -> Result<DummyTx, Strin
     };
 
     let tx = Transaction {
-        version: Version::TWO,
+        version: Version::non_standard(3),
         lock_time: LockTime::ZERO,
         input: vec![input],
         output: vec![output],
