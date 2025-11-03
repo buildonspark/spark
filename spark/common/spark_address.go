@@ -10,6 +10,7 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/btcutil/bech32"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
@@ -364,115 +365,73 @@ func HashSparkInvoiceFields(f *pb.SparkInvoiceFields, network Network, receiverP
 	if f == nil {
 		return nil, fmt.Errorf("spark invoice fields cannot be nil")
 	}
-
-	h := sha256.New()
-	var all []byte
+	all := sha256.New()
 
 	// 1) version
-	h.Reset()
-	v := make([]byte, 4)
-	binary.BigEndian.PutUint32(v, f.GetVersion())
-	h.Write(v)
-	all = append(all, h.Sum(nil)...)
+	all.Write(chainhash.HashB(binary.BigEndian.AppendUint32(nil, f.GetVersion())))
 
 	// 2) id
-	h.Reset()
-	id := f.GetId()
-	if len(id) != 16 {
+	if id := f.GetId(); len(id) == 16 {
+		all.Write(chainhash.HashB(id))
+	} else {
 		return nil, fmt.Errorf("invoice id must be exactly 16 bytes")
 	}
-	h.Write(id)
-	all = append(all, h.Sum(nil)...)
 
 	// 3) Network (4 bytes)
-	h.Reset()
-	networkMagic, err := BitcoinNetworkIdentifierFromNetwork(network)
-	if err != nil {
+	if networkMagic, err := BitcoinNetworkIdentifierFromNetwork(network); err == nil {
+		all.Write(chainhash.HashB(chainhash.HashB(binary.BigEndian.AppendUint32(nil, networkMagic))))
+	} else {
 		return nil, fmt.Errorf("invalid network: %w", err)
 	}
-	h.Write(sha256Slice(binary.BigEndian.AppendUint32(nil, networkMagic)))
-	all = append(all, h.Sum(nil)...)
 
 	// 4) receiver_public_key
-	h.Reset()
-	h.Write(receiverPublicKey.Serialize())
-	all = append(all, h.Sum(nil)...)
+	all.Write(chainhash.HashB(receiverPublicKey.Serialize()))
 
 	switch pt := f.PaymentType.(type) {
 	case *pb.SparkInvoiceFields_TokensPayment:
-		h.Reset()
-		h.Write([]byte{1}) // tokens discriminator
-		all = append(all, h.Sum(nil)...)
+		all.Write(chainhash.HashB([]byte{1})) // tokens discriminator
 
-		h.Reset()
-		tokenIdentifier := pt.TokensPayment.GetTokenIdentifier()
-		if len(tokenIdentifier) == 0 {
-			h.Write(make([]byte, 32))
-		} else {
-			if len(tokenIdentifier) != 32 {
-				return nil, fmt.Errorf("token identifier must be exactly 32 bytes")
-			}
-			h.Write(tokenIdentifier)
+		switch tokenIdentifier := pt.TokensPayment.GetTokenIdentifier(); {
+		case len(tokenIdentifier) == 0:
+			all.Write(chainhash.HashB(make([]byte, 32)))
+		case len(tokenIdentifier) == 32:
+			all.Write(chainhash.HashB(tokenIdentifier))
+		default:
+			return nil, fmt.Errorf("token identifier must be exactly 32 bytes")
 		}
-		all = append(all, h.Sum(nil)...)
 
-		h.Reset()
-		amount := pt.TokensPayment.GetAmount()
-		if len(amount) > 16 {
+		if amount := pt.TokensPayment.GetAmount(); len(amount) > 16 {
 			return nil, fmt.Errorf("token amount exceeds 16 bytes")
+		} else {
+			all.Write(chainhash.HashB(amount))
 		}
-		if amount != nil {
-			h.Write(amount)
-		}
-		all = append(all, h.Sum(nil)...)
 
 	case *pb.SparkInvoiceFields_SatsPayment:
-		h.Reset()
-		h.Write([]byte{2}) // sats discriminator
-		all = append(all, h.Sum(nil)...)
-
-		h.Reset()
-		var sats uint64
-		if pt.SatsPayment != nil && pt.SatsPayment.GetAmount() != 0 {
-			sats = pt.SatsPayment.GetAmount()
-		}
-		b8 := make([]byte, 8)
-		binary.BigEndian.PutUint64(b8, sats)
-		h.Write(b8)
-		all = append(all, h.Sum(nil)...)
+		all.Write(chainhash.HashB([]byte{2})) // sats discriminator
+		sats := pt.SatsPayment.GetAmount()
+		all.Write(chainhash.HashB(binary.BigEndian.AppendUint64(nil, sats)))
 	default:
 		return nil, fmt.Errorf("unsupported or missing payment type")
 	}
 
-	h.Reset()
-	if f.Memo != nil {
-		h.Write([]byte(*f.Memo))
-	}
-	all = append(all, h.Sum(nil)...)
+	all.Write(chainhash.HashB([]byte(f.GetMemo())))
 
-	h.Reset()
-	spk := f.GetSenderPublicKey()
-	if len(spk) == 0 {
-		h.Write(make([]byte, 33))
-	} else {
-		if len(spk) != 33 {
-			return nil, fmt.Errorf("sender public key must be exactly 33 bytes")
-		}
-		h.Write(spk)
+	switch spk := f.GetSenderPublicKey(); len(spk) {
+	case 0:
+		all.Write(chainhash.HashB(make([]byte, 33)))
+	case 33:
+		all.Write(chainhash.HashB(spk))
+	default:
+		return nil, fmt.Errorf("sender public key must be exactly 33 bytes")
 	}
-	all = append(all, h.Sum(nil)...)
 
-	h.Reset()
 	expBytes := make([]byte, 8)
 	if ts := f.GetExpiryTime(); ts != nil {
 		binary.BigEndian.PutUint64(expBytes, uint64(ts.AsTime().Unix()))
 	}
-	h.Write(expBytes)
-	all = append(all, h.Sum(nil)...)
+	all.Write(chainhash.HashB(expBytes))
 
-	h.Reset()
-	h.Write(all)
-	return h.Sum(nil), nil
+	return all.Sum(nil), nil
 }
 
 // VerifySparkAddressSignature verifies that the optional signature included in a SparkAddress

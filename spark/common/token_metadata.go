@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"unicode/utf8"
 
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
@@ -59,9 +60,9 @@ type TokenMetadata struct {
 }
 
 var (
-	trueHash     = sha256Slice([]byte{1})
-	falseHash    = sha256Slice([]byte{0})
-	version1Hash = sha256Slice([]byte{1})
+	trueHash     = chainhash.HashB([]byte{1})
+	falseHash    = chainhash.HashB([]byte{0})
+	version1Hash = chainhash.HashB([]byte{1})
 )
 
 // NewTokenMetadataFromCreateInput creates a new TokenMetadata object from a
@@ -119,19 +120,19 @@ func (tm *TokenMetadata) ComputeTokenIdentifierV1() (TokenIdentifier, error) {
 	h.Write(version1Hash)
 
 	// Hash issuer public key (33 bytes)
-	h.Write(sha256Slice(tm.IssuerPublicKey.Serialize()))
+	h.Write(chainhash.HashB(tm.IssuerPublicKey.Serialize()))
 
 	// Hash token name (variable length)
-	h.Write(sha256Slice([]byte(tm.TokenName)))
+	h.Write(chainhash.HashB([]byte(tm.TokenName)))
 
 	// Hash token symbol/ticker (variable length)
-	h.Write(sha256Slice([]byte(tm.TokenTicker)))
+	h.Write(chainhash.HashB([]byte(tm.TokenTicker)))
 
 	// Hash decimals (1 byte)
-	h.Write(sha256Slice([]byte{tm.Decimals}))
+	h.Write(chainhash.HashB([]byte{tm.Decimals}))
 
 	// Hash max supply (16 bytes)
-	h.Write(sha256Slice(tm.MaxSupply))
+	h.Write(chainhash.HashB(tm.MaxSupply))
 
 	// Hash freezable flag (1 byte)
 	if tm.IsFreezable {
@@ -145,7 +146,7 @@ func (tm *TokenMetadata) ComputeTokenIdentifierV1() (TokenIdentifier, error) {
 	if err != nil {
 		return nil, sparkerrors.InternalObjectMalformedField(fmt.Errorf("invalid network: %w", err))
 	}
-	h.Write(sha256Slice(binary.BigEndian.AppendUint32(nil, networkMagic)))
+	h.Write(chainhash.HashB(binary.BigEndian.AppendUint32(nil, networkMagic)))
 
 	// If L1:
 	// Sha256(0 single byte) (not provided)
@@ -156,16 +157,11 @@ func (tm *TokenMetadata) ComputeTokenIdentifierV1() (TokenIdentifier, error) {
 		return nil, fmt.Errorf("failed to get token create layer: %w", err)
 	}
 	if tokenCreateLayer == TokenCreateLayerL1 {
-		h.Write(sha256Slice([]byte{byte(tokenCreateLayer)}))
+		h.Write(chainhash.HashB([]byte{byte(tokenCreateLayer)}))
 	} else {
-		h.Write(sha256Slice(append([]byte{byte(tokenCreateLayer)}, tm.CreationEntityPublicKey...)))
+		h.Write(chainhash.HashB(append([]byte{byte(tokenCreateLayer)}, tm.CreationEntityPublicKey...)))
 	}
 	return h.Sum(nil), nil
-}
-
-func sha256Slice(bytes []byte) []byte {
-	hash := sha256.Sum256(bytes)
-	return hash[:]
 }
 
 type TokenCreateLayer int
