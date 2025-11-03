@@ -54,6 +54,7 @@ import {
   TransferStatus,
   TransferType,
   TreeNode,
+  TreeNodeStatus,
   UtxoSwapRequestType,
 } from "../proto/spark.js";
 import { QueryTokenTransactionsResponse } from "../proto/spark_token.js";
@@ -464,6 +465,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
             },
             includeParents: false,
             network: NetworkToProto[this.config.getNetwork()],
+            statuses: [TreeNodeStatus.TREE_NODE_STATUS_AVAILABLE],
           },
           operator.address,
         );
@@ -1557,6 +1559,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
         },
         includeParents: false,
         network: NetworkToProto[this.config.getNetwork()],
+        statuses: [],
       });
 
       if (Object.values(nodes.nodes).length !== request.swapLeaves.length) {
@@ -3128,6 +3131,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       },
       includeParents: true,
       network: NetworkToProto[this.config.getNetwork()],
+      statuses: [],
     });
 
     const nodesMap = new Map<string, TreeNode>();
@@ -5149,7 +5153,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   }
 
   private async queryNodes(
-    baseRequest: Omit<QueryNodesRequest, "limit" | "offset" | "statuses">,
+    baseRequest: Omit<QueryNodesRequest, "limit" | "offset">,
     sparkClientAddress?: string,
     pageSize: number = 100,
   ): Promise<QueryNodesResponse> {
