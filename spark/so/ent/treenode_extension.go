@@ -14,26 +14,35 @@ import (
 )
 
 // MarshalSparkProto converts a TreeNode to a spark protobuf TreeNode.
+// MarshalSparkProto converts a TreeNode to a spark protobuf TreeNode.
 func (tn *TreeNode) MarshalSparkProto(ctx context.Context) (*pbspark.TreeNode, error) {
-	signingKeyshare, err := tn.QuerySigningKeyshare().Only(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to query signing keyshare for leaf %s: %w", tn.ID, err)
+	signingKeyshare := tn.Edges.SigningKeyshare
+	if signingKeyshare == nil {
+		var err error
+		signingKeyshare, err = tn.QuerySigningKeyshare().Only(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to query signing keyshare for leaf %s: %w", tn.ID, err)
+		}
 	}
-	tree, err := tn.QueryTree().Only(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to query tree for leaf %s: %w", tn.ID, err)
+
+	tree := tn.Edges.Tree
+	if tree == nil {
+		var err error
+		tree, err = tn.QueryTree().Only(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to query tree for leaf %s: %w", tn.ID, err)
+		}
 	}
+
 	networkProto, err := tree.Network.MarshalProto()
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal network of tree %s: %w", tree.ID, err)
 	}
-	treeID, err := tn.QueryTree().Only(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to query tree for leaf %s: %w", tn.ID, err)
-	}
+
+	treeIDStr := tree.ID.String()
 	return &pbspark.TreeNode{
 		Id:                     tn.ID.String(),
-		TreeId:                 treeID.ID.String(),
+		TreeId:                 treeIDStr,
 		Value:                  tn.Value,
 		ParentNodeId:           tn.getParentNodeID(ctx),
 		NodeTx:                 tn.RawTx,

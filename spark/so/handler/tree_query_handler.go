@@ -38,7 +38,11 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	query := db.TreeNode.Query()
+	query := db.TreeNode.
+		Query().
+		WithSigningKeyshare().
+		WithTree().
+		WithParent()
 	limit := int(req.GetLimit())
 	offset := int(req.GetOffset())
 
