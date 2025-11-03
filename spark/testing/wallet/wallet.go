@@ -13,6 +13,7 @@ import (
 
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/testing/wallet/ssp_api/mutations"
+	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
@@ -349,8 +350,7 @@ func (w *SingleKeyTestWallet) RequestLeavesSwap(ctx context.Context, targetAmoun
 		if cancelErr != nil {
 			return nil, fmt.Errorf("failed to cancel transfer: %w", cancelErr)
 		}
-		//nolint:forbidigo
-		fmt.Printf("cancelled transfer %s\n", transfer.Id)
+		zap.S().Infof("cancelled transfer %s\n", transfer.Id)
 		return nil, fmt.Errorf("failed to request leaves swap: %w", err)
 	}
 
@@ -534,8 +534,7 @@ func (w *SingleKeyTestWallet) CoopExit(ctx context.Context, targetAmountSats int
 	if err != nil {
 		return nil, fmt.Errorf("failed to complete coop exit: %w", err)
 	}
-	//nolint:forbidigo
-	fmt.Printf("Coop exit completed with id %s\n", completeID)
+	zap.S().Infof("Coop exit completed with id %s\n", completeID)
 
 	w.RemoveOwnedNodes(nodesToRemove)
 	return transfer, nil

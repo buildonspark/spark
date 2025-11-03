@@ -59,7 +59,7 @@ var (
 type Task func(context.Context, *so.Config) error
 
 // BaseTaskSpec is a task that is scheduled to run.
-type BaseTaskSpec struct { //nolint:revive
+type BaseTaskSpec struct {
 	// Name is the human-readable name of the task.
 	Name string
 	// Timeout is the maximum time the task is allowed to run before it will be cancelled.

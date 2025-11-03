@@ -196,16 +196,15 @@ func NewBufferedBody(bodyReader io.ReadCloser) *BufferedBody {
 
 func main() {
 	args, err := loadArgs()
+	// We have to use the package-level logger until we get the real one set up.
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to load args: %v\n", err)
-		os.Exit(1)
+		zap.S().Fatalf("Failed to load args: %v", err)
 	}
 
 	logConfig := zap.NewProductionConfig()
 	logLevel, err := zap.ParseAtomicLevel(args.LogLevel)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to parse log level: %v\n", err)
-		os.Exit(1)
+		zap.S().Fatalf("Failed to parse log level: %v", err)
 	}
 
 	logConfig.Level = logLevel
@@ -230,11 +229,11 @@ func main() {
 
 	logger, err := logConfig.Build()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to build logger: %v\n", err)
-		os.Exit(1)
+		zap.S().Fatalf("Failed to build logger: %v", err)
 	}
-	defer logger.Sync() //nolint:errcheck
+	defer func() { _ = logger.Sync() }()
 
+	// Now we can start using the logger itself.
 	logger = logger.WithOptions(zap.WrapCore(func(core zapcore.Core) zapcore.Core {
 		return &logging.SourceCore{Core: core}
 	}))
@@ -411,7 +410,7 @@ func main() {
 		})
 	})
 
-	defer dbClient.Close()
+	defer func() { _ = dbClient.Close() }()
 
 	if dbDriver == "sqlite3" {
 		sqliteDb, _ := sql.Open("sqlite3", config.DatabasePath)
@@ -421,7 +420,7 @@ func main() {
 		if _, err := sqliteDb.ExecContext(errCtx, "PRAGMA busy_timeout=5000;"); err != nil {
 			logger.Fatal("Failed to set busy_timeout", zap.Error(err))
 		}
-		sqliteDb.Close()
+		_ = sqliteDb.Close()
 	}
 
 	frostConnection, err := config.NewFrostGRPCConnection()
@@ -498,7 +497,7 @@ func main() {
 			}
 		}
 		scheduler.Start()
-		defer scheduler.Shutdown() //nolint:errcheck
+		defer func() { _ = scheduler.Shutdown() }()
 
 		// Run startup tasks
 		startupCtx, startupCancel := context.WithCancel(errCtx)

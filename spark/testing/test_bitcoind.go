@@ -3,11 +3,13 @@ package sparktesting
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"sync"
 
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/rpcclient"
+	"go.uber.org/zap"
 )
 
 var (
@@ -42,7 +44,7 @@ func newClient() (*rpcclient.Client, error) {
 	addr, exists := os.LookupEnv("BITCOIN_RPC_URL")
 	if !exists {
 		if minikubeIp, exists := os.LookupEnv("MINIKUBE_IP"); exists {
-			addr = fmt.Sprintf("%s:8332", minikubeIp)
+			addr = net.JoinHostPort(minikubeIp, "8332")
 		} else {
 			addr = "127.0.0.1:8332"
 		}
@@ -96,16 +98,13 @@ func SubmitPackage(client *rpcclient.Client, rawTxns []string) error {
 	}
 
 	var result submitPackageResult
-	err = json.Unmarshal(resBytes, &result)
-	if err != nil {
+	if err := json.Unmarshal(resBytes, &result); err != nil {
 		return err
 	}
 	if result.PackageMsg != "success" {
-		//nolint:forbidigo
-		fmt.Printf("failed to submit package with %d raw transactions\n", len(rawTxns))
+		zap.S().Infof("failed to submit package with %d raw transactions", len(rawTxns))
 		for _, rawTxn := range rawTxns {
-			//nolint:forbidigo
-			fmt.Printf("submitted raw transaction: %s\n", rawTxn)
+			zap.S().Infof("submitted raw transaction: %s", rawTxn)
 		}
 		return fmt.Errorf("package submission failed: %s", resBytes)
 	}

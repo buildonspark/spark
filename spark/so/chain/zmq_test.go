@@ -68,22 +68,22 @@ func (p *ZmqTestPublisher) Close() {
 func TestZmqSetupTeardown(t *testing.T) {
 	zmqPub, err := NewZmqTestPublisher(t, "tcp://127.0.0.1:5555")
 	require.NoError(t, err, "Failed to create ZMQ publisher")
-	defer zmqPub.Close() //nolint:errcheck
+	t.Cleanup(zmqPub.Close)
 
 	zmqSub, err := NewZmqSubscriber()
 	require.NoError(t, err, "Failed to create ZMQ subscriber")
 
-	zmqSub.Close() //nolint:errcheck
+	t.Cleanup(func() { _ = zmqSub.Close })
 }
 
 func TestZmqSubscribe(t *testing.T) {
 	zmqPub, err := NewZmqTestPublisher(t, "tcp://127.0.0.1:5555")
 	require.NoError(t, err, "Failed to create ZMQ publisher")
-	defer zmqPub.Close() //nolint:errcheck
+	t.Cleanup(zmqPub.Close)
 
 	zmqSub, err := NewZmqSubscriber()
 	require.NoError(t, err, "Failed to create ZMQ subscriber: %v")
-	defer zmqSub.Close() //nolint:errcheck
+	t.Cleanup(func() { _ = zmqSub.Close })
 
 	subscribeChan, errChan, err := zmqSub.Subscribe(t.Context(), "tcp://127.0.0.1:5555", "rawblock")
 	require.NoError(t, err, "Failed to subscribe to ZMQ subscriber")
@@ -106,11 +106,8 @@ func TestZmqSubscribe(t *testing.T) {
 		case <-time.After(200 * time.Millisecond):
 			t.Logf("Failed to receive message after 200ms, retrying...")
 		}
-
 		attempts++
 	}
 
-	if !received {
-		t.Fatal("Failed to receive ZMQ message after 5 attempts")
-	}
+	require.True(t, received, "Failed to receive ZMQ message after 5 attempts")
 }

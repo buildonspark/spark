@@ -5,11 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
 	"slices"
 	"sync"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"go.uber.org/zap"
 
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -255,7 +255,7 @@ func (f *Faucet) Refill() error {
 	numCoinsToCreate := min(int64(targetNumCoins), maxPossibleCoins)
 
 	if numCoinsToCreate < 1 {
-		log.Printf("Selected UTXO (%d sats) is too small to create even one faucet coin of %d sats", initialValueSats, coinAmountSats)
+		zap.S().Infof("Selected UTXO (%d sats) is too small to create even one faucet coin of %d sats", initialValueSats, coinAmountSats)
 		return nil
 	}
 
@@ -296,7 +296,7 @@ func (f *Faucet) Refill() error {
 		}
 		f.coins = append(f.coins, faucetCoin)
 	}
-	log.Printf("Refilled faucet with %d coins", len(f.coins))
+	zap.S().Infof("Refilled faucet with %d coins", len(f.coins))
 
 	return nil
 }

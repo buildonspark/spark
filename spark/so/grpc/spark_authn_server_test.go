@@ -136,7 +136,7 @@ func testVerifyChallenge_ValidToken(t *testing.T, sigAlg signingAlgorithm) {
 		"authorization", "Bearer "+verifyResp.SessionToken,
 	))
 	var capturedCtx context.Context
-	authnInterceptor.AuthnInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, func(ctx context.Context, _ any) (any, error) { //nolint:errcheck
+	_, _ = authnInterceptor.AuthnInterceptor(ctx, nil, &grpc.UnaryServerInfo{}, func(ctx context.Context, _ any) (any, error) {
 		capturedCtx = ctx
 		return nil, nil
 	})
