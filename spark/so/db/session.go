@@ -249,6 +249,7 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 
 		s.currentTx = tx
 		s.currentNotifications = &notifier
+		s.currentIsDirty = false
 		s.currentStartTime = time.Now()
 
 		addTraceEvent(ctx, "begin", 0, nil)
@@ -290,6 +291,7 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				if err == nil || errors.Is(err, sql.ErrTxDone) || errors.Is(err, context.Canceled) {
 					s.currentTx = nil
 					s.currentNotifications = nil
+					s.currentIsDirty = false
 				}
 
 				txCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
@@ -320,6 +322,7 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				txActiveGauge.Add(ctx, -1, metric.WithAttributes(s.getGaugeAttributes(attrOperationRollback)...))
 				s.currentTx = nil
 				s.currentNotifications = nil
+				s.currentIsDirty = false
 				return err
 			})
 		})
