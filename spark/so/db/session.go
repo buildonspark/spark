@@ -327,8 +327,11 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 	return s.currentTx, nil
 }
 
-func (s *Session) MarkTxDirty(ctx context.Context, tx *ent.Tx) {
-	if s.currentTx != nil && s.currentTx == tx {
+func (s *Session) MarkTxDirty(ctx context.Context) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.currentTx != nil {
 		s.currentIsDirty = true
 	}
 }

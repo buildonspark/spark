@@ -396,15 +396,16 @@ func main() {
 				return v, err
 			}
 
-			// Figure out if we are in a transaction.
 			mx, ok := m.(interface {
-				Tx() *ent.Tx
+				Tx() (*ent.Tx, error)
 			})
 			if !ok {
 				return v, err
 			}
 
-			ent.MarkTxDirty(ctx, mx.Tx())
+			if tx, _ := mx.Tx(); tx != nil {
+				ent.MarkTxDirty(ctx)
+			}
 
 			return v, err
 		})

@@ -23,7 +23,7 @@ type TxProvider interface {
 
 type Session interface {
 	TxProvider
-	MarkTxDirty(context.Context, *Tx)
+	MarkTxDirty(context.Context)
 }
 
 // ClientTxProvider is a TxProvider that uses an underlying ent.Client to create new transactions. This always
@@ -59,9 +59,9 @@ func GetDbFromContext(ctx context.Context) (*Tx, error) {
 	return nil, fmt.Errorf("no transaction provider found in context")
 }
 
-func MarkTxDirty(ctx context.Context, tx *Tx) {
+func MarkTxDirty(ctx context.Context) {
 	if session, ok := ctx.Value(dbSessionKey).(Session); ok {
-		session.MarkTxDirty(ctx, tx)
+		session.MarkTxDirty(ctx)
 	}
 }
 
