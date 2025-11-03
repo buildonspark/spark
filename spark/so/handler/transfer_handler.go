@@ -1729,6 +1729,10 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	ctx, span := tracer.Start(ctx, "TransferHandler.queryTransfers")
 	defer span.End()
 
+	if filter.GetParticipant() == nil && len(filter.TransferIds) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "must specify either filter.Participant or filter.TransferIds")
+	}
+
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)

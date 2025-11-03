@@ -472,32 +472,6 @@ func TestCoopExitFailureToSync(t *testing.T) {
 	require.NoError(t, err, "failed to authenticate sender")
 	tmpCtx := wallet.ContextWithToken(t.Context(), authToken)
 
-	// Collect existing transfer IDs across all operators before the test
-	existingTransferIDs := make(map[string]map[string]bool) // operator_id -> transfer_id -> exists
-	for id, op := range config.SigningOperators {
-		conn, err := op.NewOperatorGRPCConnection()
-		require.NoError(t, err, "connect to %s", id)
-		defer conn.Close()
-
-		token, err := wallet.AuthenticateWithServer(t.Context(), config)
-		require.NoError(t, err, "auth token for %s", id)
-
-		ctxWithToken := wallet.ContextWithToken(t.Context(), token)
-		client := pb.NewSparkServiceClient(conn)
-
-		resp, err := client.QueryAllTransfers(ctxWithToken, &pb.TransferFilter{
-			Network: pb.Network_REGTEST,
-			Types:   []pb.TransferType{pb.TransferType_COOPERATIVE_EXIT},
-		})
-		require.NoError(t, err, "query transfers on %s", id)
-
-		transferIDs := make(map[string]bool)
-		for _, tr := range resp.Transfers {
-			transferIDs[tr.Id] = true
-		}
-		existingTransferIDs[id] = transferIDs
-	}
-
 	// SSP creates transactions
 	withdrawPrivKey := keys.GeneratePrivateKey()
 	exitTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
@@ -533,7 +507,7 @@ func TestCoopExitFailureToSync(t *testing.T) {
 		require.NoError(t, err, "connect to %s", id)
 		defer conn.Close()
 
-		token, err := wallet.AuthenticateWithServer(t.Context(), config)
+		token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
 		require.NoError(t, err, "auth token for %s", id)
 
 		ctxWithToken := wallet.ContextWithToken(t.Context(), token)
@@ -541,17 +515,16 @@ func TestCoopExitFailureToSync(t *testing.T) {
 
 		resp, err := client.QueryAllTransfers(ctxWithToken, &pb.TransferFilter{
 			Network: pb.Network_REGTEST,
-			Types:   []pb.TransferType{pb.TransferType_COOPERATIVE_EXIT},
+			Participant: &pb.TransferFilter_SenderOrReceiverIdentityPublicKey{
+				SenderOrReceiverIdentityPublicKey: config.IdentityPublicKey().Serialize(),
+			},
+			Types: []pb.TransferType{pb.TransferType_COOPERATIVE_EXIT},
 		})
 		require.NoError(t, err, "query transfers on %s", id)
 
 		// Check only new transfers that weren't present before this test for their status
 		for _, tr := range resp.Transfers {
 			if tr.Type == pb.TransferType_COOPERATIVE_EXIT {
-				if existingTransferIDs[id][tr.Id] {
-					continue // Skip transfers that existed before this test
-				}
-
 				// This is a new transfer created during this test - it should have correct status
 				if tr.Status != pb.TransferStatus_TRANSFER_STATUS_RETURNED {
 					t.Fatalf("operator %s has new transfer %s with wrong status (want RETURNED/EXPIRED/COMPLETED) got %s", id, tr.Id, tr.Status)

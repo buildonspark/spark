@@ -1696,6 +1696,59 @@ func createSigningJobFromTx(t *testing.T, publicKey keys.Public, tx *wire.MsgTx)
 	}
 }
 
+func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
+	config := wallet.NewTestWalletConfig(t)
+	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	sparkClient := pb.NewSparkServiceClient(conn)
+
+	// Test that QueryPendingTransfers fails when both Participant and TransferIds are missing
+	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	require.NoError(t, err)
+	_, err = sparkClient.QueryPendingTransfers(ctx, &pb.TransferFilter{
+		Network: network,
+	})
+	require.Error(t, err, "Expected error when neither Participant nor TransferIds are specified")
+	require.Contains(t, err.Error(), "must specify either filter.Participant or filter.TransferIds")
+
+	// Test that QueryAllTransfers fails when both Participant and TransferIds are missing
+	network, err = common.ProtoNetworkFromNetwork(config.Network)
+	require.NoError(t, err)
+	_, err = sparkClient.QueryAllTransfers(ctx, &pb.TransferFilter{
+		Network: network,
+		Limit:   10,
+		Offset:  0,
+	})
+	require.Error(t, err, "Expected error when neither Participant nor TransferIds are specified")
+	require.Contains(t, err.Error(), "must specify either filter.Participant or filter.TransferIds")
+
+	// Test that providing Participant makes the query succeed (even if no transfers exist)
+	network, err = common.ProtoNetworkFromNetwork(config.Network)
+	require.NoError(t, err)
+	_, err = sparkClient.QueryPendingTransfers(ctx, &pb.TransferFilter{
+		Participant: &pb.TransferFilter_ReceiverIdentityPublicKey{
+			ReceiverIdentityPublicKey: config.IdentityPublicKey().Serialize(),
+		},
+		Network: network,
+	})
+	require.NoError(t, err, "Expected success when Participant is specified")
+
+	// Test that providing TransferIds makes the query succeed (even if no transfers exist)
+	network, err = common.ProtoNetworkFromNetwork(config.Network)
+	require.NoError(t, err)
+	_, err = sparkClient.QueryPendingTransfers(ctx, &pb.TransferFilter{
+		TransferIds: []string{uuid.NewString()},
+		Network:     network,
+	})
+	require.NoError(t, err, "Expected success when TransferIds are specified")
+}
+
 func deterministicSeedFromTestName(testName string) [32]byte {
 	hash := sha256.Sum256([]byte(testName))
 	return hash
