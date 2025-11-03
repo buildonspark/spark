@@ -437,7 +437,7 @@ func (t *TxProviderWithTimeout) GetOrBeginTx(ctx context.Context) (*ent.Tx, erro
 	case tx := <-txChan:
 		return tx, nil
 	case err := <-errChan:
-		return nil, fmt.Errorf("failed to start transaction: %w", err)
+		return nil, soerrors.UnavailableDataStore(err)
 	case <-timeoutCtx.Done():
 		if timeoutCtx.Err() == context.DeadlineExceeded {
 			return nil, ErrTxBeginTimeout
