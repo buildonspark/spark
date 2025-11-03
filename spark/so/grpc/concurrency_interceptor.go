@@ -152,15 +152,15 @@ func ConcurrencyInterceptor(guard ResourceLimiter, clientInfoProvider *GRPCClien
 
 		attrs := append(grpcutil.ParseFullMethod(info.FullMethod), attribute.String("concurrency_limit_action", bypassState))
 		if !bypassConcurrency {
-			// Only requests not excluded from concurrency limiting should count against the limit.
-			otelAttrs := metric.WithAttributes(attrs...)
-			methodConcurrencyGauge.Add(ctx, 1, otelAttrs)
-			defer methodConcurrencyGauge.Add(ctx, -1, otelAttrs)
-
 			if err := guard.TryAcquireMethod(info.FullMethod); err != nil {
 				return nil, err
 			}
 			defer guard.ReleaseMethod(info.FullMethod)
+
+			// Only requests not excluded from concurrency limiting should count against the limit.
+			otelAttrs := metric.WithAttributes(attrs...)
+			methodConcurrencyGauge.Add(ctx, 1, otelAttrs)
+			defer methodConcurrencyGauge.Add(ctx, -1, otelAttrs)
 		}
 
 		return handler(ctx, req)
