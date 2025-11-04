@@ -22,6 +22,7 @@
     "format:fix": "prettier . --write",
     "format": "prettier . --check",
     "package:checks": "yarn publint && yarn attw --pack . && echo \"\nPackage checks passed successfully!\"",
+    "prepublishOnly": "node scripts/ensure-prebuilds-present.js",
     "postversion": "yarn build"
   },
   "installConfig": {
