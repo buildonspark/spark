@@ -42,7 +42,7 @@ func DatabaseSessionMiddleware(dbClient *ent.Client, factory db.SessionFactory, 
 		// Use read-only session for query_nodes, regular session for everything else
 		knobsService := knobs.GetKnobsService(ctx)
 		var session ent.Session
-		if knobsService.GetValueTarget(knobs.KnobReadOnlyEndpoints, &info.FullMethod, 0) > 0 {
+		if knobsService.RolloutRandomTarget(knobs.KnobReadOnlyEndpoints, &info.FullMethod, 0) {
 			session = db.NewReadOnlySession(sessionCtx, dbClient, opts...)
 		} else {
 			session = factory.NewSession(sessionCtx, opts...)
