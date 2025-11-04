@@ -64,13 +64,7 @@
   "dependencies": {
     "@buildonspark/spark-frost-bare-addon": "0.0.3",
     "@buildonspark/spark-sdk": "0.4.3",
-    "bare-buffer": "^3.3.0",
-    "bare-encoding": "^1.0.0",
-    "bare-module": "^5.0.1",
-    "bare-process": "^4.2.1",
-    "bare-type": "^1.0.6",
-    "bare-utils": "^1.4.0",
-    "btoa": "^1.2.1"
+    "bare-node-runtime": "^1.1.4"
   },
   "engines": {
     "node": ">=18.0.0"

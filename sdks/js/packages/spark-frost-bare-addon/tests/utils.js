@@ -1,5 +1,3 @@
-const process = require("bare-process");
-
 function test(name, fn) {
   let assertionCount = 0;
 
@@ -56,9 +54,7 @@ function test(name, fn) {
 }
 
 const imports = {
-  with: {
-    imports: "./imports.json",
-  },
+  with: { imports: "bare-node-runtime/imports" },
 };
 
 module.exports = { test, imports };

@@ -1,6 +1,6 @@
 /* Template for making it easier to get started with the Spark SDK in a REPL environment by copy/pasting the contents */
 
-const { SparkWallet, BareSparkSigner } = require("@buildonspark/bare", { with: { imports: "./imports.json" } });
+const { SparkWallet, BareSparkSigner } = require("@buildonspark/bare");
 
 function log(prm) { prm.then((result) => { console.log("Result:", result); }).catch((error) => { console.error("Error:", error); }); }
 function assignToGlobal(prm, name) { prm.then((result) => { global[name] = result; }).catch((error) => { console.error("Error assigning result to global:", error); }); }

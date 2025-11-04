@@ -17,8 +17,10 @@ const commonConfig = {
 export default defineConfig([
   {
     ...commonConfig,
-    entry: ["src/index.ts"],
+    entry: ["src/entry.ts"],
     format: ["cjs", "esm"],
     outDir: "dist",
+    onSuccess:
+      "cp ./src/index.js ./dist/index.js && cp ./src/index.cjs ./dist/index.cjs && cp ./src/index.d.ts ./dist/index.d.ts && cp ./src/index.d.cts ./dist/index.d.cts",
   },
 ]);

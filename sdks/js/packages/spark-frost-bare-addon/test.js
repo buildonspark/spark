@@ -1,6 +1,6 @@
+require("bare-node-runtime/global");
 const fs = require("bare-fs");
 const path = require("bare-path");
-const process = require("bare-process");
 const { spawnSync } = require("bare-subprocess");
 
 const packageDir = __dirname;

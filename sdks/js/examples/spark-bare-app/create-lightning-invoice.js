@@ -1,7 +1,4 @@
-import {
-  SparkWallet,
-  BareSparkSigner,
-} from "@buildonspark/bare" with { imports: "./imports.json" };
+import { SparkWallet, BareSparkSigner } from "@buildonspark/bare";
 import process from "bare-process";
 import walletConfig from "./wallet-config.js";
 
