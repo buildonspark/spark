@@ -2977,7 +2977,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
 
       const tweaksByAmount = this.buildTweaksByAmount(selectLeavesToSendMap);
 
-      const idsToRemove = new Set<string>();
       const jobs = params.map((param) => {
         const { amountSats, receiverIdentityPubkey, sparkInvoice } = param;
         const leafKeyTweaks = this.popOrThrow(
@@ -2985,14 +2984,8 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           `no leaves key tweaks for ${amountSats}`,
         );
 
-        for (const tweak of leafKeyTweaks) {
-          idsToRemove.add(tweak.leaf.id);
-        }
         return { leafKeyTweaks, receiverIdentityPubkey, sparkInvoice, param };
       });
-      if (idsToRemove.size > 0) {
-        this.leaves = this.leaves.filter((leaf) => !idsToRemove.has(leaf.id));
-      }
 
       const signerIdentityPublicKey =
         await this.config.signer.getIdentityPublicKey();
@@ -3035,6 +3028,21 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           }
         }),
       );
+
+      const idsToRemove = new Set<string>();
+      for (const outcome of outcomes) {
+        if (outcome.ok) {
+          for (const leaf of outcome.transfer.leaves) {
+            if (leaf.leaf) {
+              idsToRemove.add(leaf.leaf.id);
+            }
+          }
+        }
+      }
+
+      if (idsToRemove.size > 0) {
+        this.leaves = this.leaves.filter((leaf) => !idsToRemove.has(leaf.id));
+      }
       return outcomes;
     });
   }
