@@ -13,7 +13,6 @@ import (
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	pbtoken "github.com/lightsparkdev/spark/proto/spark_token"
 	pbtokeninternal "github.com/lightsparkdev/spark/proto/spark_token_internal"
-	pbtree "github.com/lightsparkdev/spark/proto/spark_tree"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authninternal"
 	"github.com/lightsparkdev/spark/so/dkg"
@@ -66,10 +65,6 @@ func RegisterGrpcServers(
 	sparkTokenInternalServer := sparkgrpc.NewSparkTokenInternalServer(config, dbClient)
 	pbtokeninternal.RegisterSparkTokenInternalServiceServer(grpcServer, sparkTokenInternalServer)
 
-	// SSP receive private/internal endpoint
-	treeServer := sparkgrpc.NewSparkTreeServer(config, logger, dbClient)
-	pbtree.RegisterSparkTreeServiceServer(grpcServer, treeServer)
-
 	// Public ID challenge auth endpoint
 	authnServer, err := sparkgrpc.NewAuthnServer(sparkgrpc.AuthnServerConfig{
 		IdentityPrivateKey: config.IdentityPrivateKey,
@@ -91,7 +86,6 @@ func RegisterGrpcServers(
 
 func GetProtectedServices() []string {
 	return []string{
-		pbtree.SparkTreeService_ServiceDesc.ServiceName,
 		pbinternal.SparkInternalService_ServiceDesc.ServiceName,
 		pbtokeninternal.SparkTokenInternalService_ServiceDesc.ServiceName,
 		pbgossip.GossipService_ServiceDesc.ServiceName,
