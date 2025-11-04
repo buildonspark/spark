@@ -21,7 +21,6 @@ type SparkTreeServer struct {
 // NewSparkTreeServer creates a new SparkTreeServer.
 func NewSparkTreeServer(config *so.Config, logger *zap.Logger, dbClient *ent.Client) *SparkTreeServer {
 	scorer := tree.NewPolarityScorer(logger, dbClient)
-	go scorer.Start(context.Background())
 	return &SparkTreeServer{config: config, scorer: scorer}
 }
 
