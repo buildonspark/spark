@@ -266,12 +266,12 @@ func TestDatabaseMiddleware_TestTaskCanCommitTransaction(t *testing.T) {
 		Name:    "Test",
 		Timeout: nil,
 		Task: func(ctx context.Context, _ *so.Config, _ knobs.Knobs) error {
-			tx, err := ent.GetDbFromContext(ctx)
+			entTx, err := ent.GetTxFromContext(ctx)
 			if err != nil {
 				return err
 			}
 
-			return tx.Commit()
+			return entTx.Commit()
 		},
 	}
 

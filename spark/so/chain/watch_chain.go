@@ -358,7 +358,7 @@ func connectBlocks(
 		err = handleBlock(
 			ctx,
 			config,
-			dbTx,
+			dbTx.Client(),
 			bitcoinClient,
 			txs,
 			chainTip.Height,
@@ -445,7 +445,7 @@ func processTransactions(txs []wire.MsgTx, networkParams *chaincfg.Params) (map[
 func handleBlock(
 	ctx context.Context,
 	config *so.Config,
-	dbTx *ent.Tx,
+	dbClient *ent.Client,
 	bitcoinClient *rpcclient.Client,
 	txs []wire.MsgTx,
 	blockHeight int64,
@@ -456,14 +456,14 @@ func handleBlock(
 	logger.Sugar().Infof("Starting to handle block at height %d", blockHeight)
 
 	networkParams := common.NetworkParams(network)
-	_, err := dbTx.BlockHeight.Update().
+	_, err := dbClient.BlockHeight.Update().
 		SetHeight(blockHeight).
 		Where(blockheight.NetworkEQ(common.SchemaNetwork(network))).
 		Save(ctx)
 	if err != nil {
 		return err
 	}
-	handleTokenUpdatesForBlock(ctx, config, dbTx, txs, blockHeight, network)
+	handleTokenUpdatesForBlock(ctx, config, dbClient, txs, blockHeight, network)
 
 	confirmedTxHashSet, creditedAddresses, addressToUtxoMap, err := processTransactions(txs, networkParams)
 	if err != nil {
@@ -480,7 +480,7 @@ func handleBlock(
 	if processNodesForWatchtowers {
 		logger.Sugar().Infof("Started processing nodes for watchtowers at block height %d", blockHeight)
 		// Fetch only nodes that could have expired timelocks
-		nodes, err := watchtower.QueryNodesWithExpiredTimeLocks(ctx, dbTx, blockHeight, network)
+		nodes, err := watchtower.QueryNodesWithExpiredTimeLocks(ctx, dbClient, blockHeight, network)
 		if err != nil {
 			return fmt.Errorf("failed to query nodes: %w", err)
 		}
@@ -502,7 +502,7 @@ func handleBlock(
 	// but this should be done for a short period of time to avoid any potential double spends.
 	if knobs.GetKnobsService(ctx).GetValueTarget(knobs.KnobWatchChainMarkExitingNodesEnabled, &networkString, 1.0) > 0 {
 		logger.Sugar().Infof("Started processing confirmed transactions for exiting tree nodes at height %d", blockHeight)
-		err = tree.MarkExitingNodes(ctx, dbTx, confirmedTxHashSet, blockHeight)
+		err = tree.MarkExitingNodes(ctx, dbClient, confirmedTxHashSet, blockHeight)
 		if err != nil {
 			return fmt.Errorf("failed to mark exiting nodes: %w", err)
 		}
@@ -510,7 +510,7 @@ func handleBlock(
 
 	logger.Sugar().Infof("Started processing coop exits at block height %d", blockHeight)
 	// TODO: expire pending coop exits after some time so this doesn't become too large
-	pendingCoopExits, err := dbTx.CooperativeExit.Query().Where(cooperativeexit.ConfirmationHeightIsNil()).All(ctx)
+	pendingCoopExits, err := dbClient.CooperativeExit.Query().Where(cooperativeexit.ConfirmationHeightIsNil()).All(ctx)
 	if err != nil {
 		return err
 	}
@@ -543,13 +543,13 @@ func handleBlock(
 	}
 
 	logger.Sugar().Infof("Started processing static deposits at block height %d", blockHeight)
-	err = storeStaticDeposits(ctx, dbTx, creditedAddresses, addressToUtxoMap, network, blockHeight)
+	err = storeStaticDeposits(ctx, dbClient, creditedAddresses, addressToUtxoMap, network, blockHeight)
 	if err != nil {
 		return fmt.Errorf("failed to store static deposits: %w", err)
 	}
 
 	logger.Sugar().Infof("Started processing confirmed deposits at block height %d", blockHeight)
-	confirmedDeposits, err := dbTx.DepositAddress.Query().
+	confirmedDeposits, err := dbClient.DepositAddress.Query().
 		Where(depositaddress.ConfirmationHeightIsNil()).
 		Where(depositaddress.IsStaticEQ(false)).
 		Where(depositaddress.AddressIn(creditedAddresses...)).
@@ -568,7 +568,7 @@ func handleBlock(
 			logger.Sugar().Warnf("Multiple UTXOs found for a single use deposit address %s, picking the first one", deposit.Address)
 		}
 		utxo := utxos[0]
-		_, err = dbTx.DepositAddress.UpdateOne(deposit).
+		_, err = dbClient.DepositAddress.UpdateOne(deposit).
 			SetConfirmationHeight(blockHeight).
 			SetConfirmationTxid(utxo.tx.TxHash().String()).
 			Save(ctx)
@@ -579,7 +579,7 @@ func handleBlock(
 		if err != nil {
 			return err
 		}
-		treeNode, err := dbTx.TreeNode.Query().
+		treeNode, err := dbClient.TreeNode.Query().
 			Where(treenode.HasSigningKeyshareWith(signingkeyshare.ID(signingKeyShare.ID))).
 			// FIXME(mhr): Unblocking deployment. Is this what we should do if we encounter a tree node that
 			// has already been marked available (e.g. through `FinalizeNodeSignatures`)?
@@ -612,7 +612,7 @@ func handleBlock(
 			continue
 		}
 
-		_, err = dbTx.Tree.UpdateOne(tree).
+		_, err = dbClient.Tree.UpdateOne(tree).
 			SetStatus(st.TreeStatusAvailable).
 			Save(ctx)
 		if err != nil {
@@ -637,14 +637,14 @@ func handleBlock(
 					logger.Sugar().Debugf("Tree node %s has not been signed", treeNode.ID)
 					continue
 				}
-				treeNode, err = dbTx.TreeNode.UpdateOne(treeNode).
+				treeNode, err = dbClient.TreeNode.UpdateOne(treeNode).
 					SetStatus(st.TreeNodeStatusAvailable).
 					Save(ctx)
 				if err != nil {
 					return err
 				}
 			} else {
-				_, err = dbTx.TreeNode.UpdateOne(treeNode).
+				_, err = dbClient.TreeNode.UpdateOne(treeNode).
 					SetStatus(st.TreeNodeStatusSplitted).
 					Save(ctx)
 				if err != nil {
@@ -661,10 +661,10 @@ func handleBlock(
 	return nil
 }
 
-func storeStaticDeposits(ctx context.Context, dbTx *ent.Tx, creditedAddresses []string, addressToUtxoMap map[string][]AddressDepositUtxo, network common.Network, blockHeight int64) error {
+func storeStaticDeposits(ctx context.Context, dbClient *ent.Client, creditedAddresses []string, addressToUtxoMap map[string][]AddressDepositUtxo, network common.Network, blockHeight int64) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
-	staticDepositAddresses, err := dbTx.DepositAddress.Query().
+	staticDepositAddresses, err := dbClient.DepositAddress.Query().
 		Where(depositaddress.IsStaticEQ(true)).
 		Where(depositaddress.AddressIn(creditedAddresses...)).
 		All(ctx)
@@ -683,7 +683,7 @@ func storeStaticDeposits(ctx context.Context, dbTx *ent.Tx, creditedAddresses []
 				if err != nil {
 					return fmt.Errorf("unable to decode txid for a new utxo: %w", err)
 				}
-				err = dbTx.Utxo.Create().
+				err = dbClient.Utxo.Create().
 					SetTxid(txidStringBytes).
 					SetVout(utxo.idx).
 					SetAmount(utxo.amount).

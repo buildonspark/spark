@@ -11,13 +11,13 @@ import (
 )
 
 // ReserveSigningCommitments gets unused signing commitments from the database.
-// The caller must provide a new database transaction to use.
-// The caller must commit or rollback the transaction after using the returned commitments.
+// The caller must provide a database client (which may be backed by a transaction).
+// The caller must commit or rollback the transaction after using the returned commitments if needed.
 // This call is supposed to be used only in the SigningCommitmentInterceptor before any grpc flows.
-func ReserveSigningCommitments(ctx context.Context, dbTx *Tx, count uint32, operatorIndex uint) ([]*SigningCommitment, error) {
+func ReserveSigningCommitments(ctx context.Context, dbClient *Client, count uint32, operatorIndex uint) ([]*SigningCommitment, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Getting %d unused signing commitments for operator %d", count, operatorIndex)
-	commitments, err := dbTx.SigningCommitment.Query().Where(
+	commitments, err := dbClient.SigningCommitment.Query().Where(
 		signingcommitment.And(
 			signingcommitment.StatusEQ(st.SigningCommitmentStatusAvailable),
 			signingcommitment.OperatorIndex(operatorIndex),
@@ -36,7 +36,7 @@ func ReserveSigningCommitments(ctx context.Context, dbTx *Tx, count uint32, oper
 		commitmentIDs[i] = commitment.ID
 	}
 
-	if err := dbTx.SigningCommitment.Update().Where(signingcommitment.IDIn(commitmentIDs...)).SetStatus(st.SigningCommitmentStatusUsed).Exec(ctx); err != nil {
+	if err := dbClient.SigningCommitment.Update().Where(signingcommitment.IDIn(commitmentIDs...)).SetStatus(st.SigningCommitmentStatusUsed).Exec(ctx); err != nil {
 		return nil, err
 	}
 

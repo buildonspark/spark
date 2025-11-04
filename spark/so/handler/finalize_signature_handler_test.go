@@ -873,8 +873,9 @@ func TestFinalizeSignatureHandler_UpdateNode_TreeNodeExitingStatus(t *testing.T)
 	handler := NewFinalizeSignatureHandler(config)
 
 	for _, status := range []st.TreeNodeStatus{st.TreeNodeStatusOnChain, st.TreeNodeStatusExited, st.TreeNodeStatusParentExited} {
-		dbTx, err := ent.GetDbFromContext(ctx)
+		entTx, err := ent.GetTxFromContext(ctx)
 		require.NoError(t, err)
+		dbClient := entTx.Client()
 
 		_, treeNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusAvailable)
 
@@ -896,12 +897,12 @@ func TestFinalizeSignatureHandler_UpdateNode_TreeNodeExitingStatus(t *testing.T)
 		assert.NotNil(t, internalNode)
 
 		// Verify that the tree node status is not updated because it can not be updated to Available
-		updatedNode, err := dbTx.TreeNode.Get(ctx, treeNode.ID)
+		updatedNode, err := dbClient.TreeNode.Get(ctx, treeNode.ID)
 		require.NoError(t, err)
 		assert.Equal(t, status, updatedNode.Status)
 
 		// Clear test data
-		err = dbTx.Rollback()
+		err = entTx.Rollback()
 		require.NoError(t, err)
 	}
 }

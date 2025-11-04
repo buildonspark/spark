@@ -365,7 +365,7 @@ func (h *InternalSignTokenHandler) getSecretSharesNotInInput(ctx context.Context
 // getPartialRevocationSecretShares uses raw SQL for efficient exclusion
 func (h *InternalSignTokenHandler) getPartialRevocationSecretShares(
 	ctx context.Context,
-	db *ent.Tx,
+	db *ent.Client,
 	batchOutputIDs []uuid.UUID,
 	inputOperatorShareMap map[ShareKey]ShareValue,
 ) (map[uuid.UUID][]*ent.TokenPartialRevocationSecretShare, error) {

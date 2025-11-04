@@ -11,19 +11,19 @@ import (
 
 // Fixtures provides base helper functions for creating test data
 type Fixtures struct {
-	T   *testing.T
-	Ctx context.Context
-	Tx  *ent.Tx
-	rng *rand.ChaCha8
+	T      *testing.T
+	Ctx    context.Context
+	Client *ent.Client
+	rng    *rand.ChaCha8
 }
 
 // New creates a new Fixtures helper
-func New(t *testing.T, ctx context.Context, tx *ent.Tx) *Fixtures {
+func New(t *testing.T, ctx context.Context, client *ent.Client) *Fixtures {
 	return &Fixtures{
-		T:   t,
-		Ctx: ctx,
-		Tx:  tx,
-		rng: rand.NewChaCha8([32]byte{}),
+		T:      t,
+		Ctx:    ctx,
+		Client: client,
+		rng:    rand.NewChaCha8([32]byte{}),
 	}
 }
 

@@ -55,12 +55,12 @@ func (h *QueryTokenTransactionsHandler) QueryTokenTransactions(ctx context.Conte
 	// Check if we should use the optimized UNION query
 	useOptimizedQuery := h.shouldUseOptimizedQuery(req)
 	if useOptimizedQuery {
-		transactions, err = h.queryWithRawSql(ctx, req, db.Client())
+		transactions, err = h.queryWithRawSql(ctx, req, db)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query token transactions with raw sql: %w", err)
 		}
 	} else {
-		transactions, err = h.queryWithEnt(ctx, req, db.Client())
+		transactions, err = h.queryWithEnt(ctx, req, db)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query token transactions with ent: %w", err)
 		}

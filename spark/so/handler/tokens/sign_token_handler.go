@@ -278,10 +278,11 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 	}
 
 	// We are about to reveal our revocation secrets. Mark as revealed, then reveal.
-	tx, err := ent.GetDbFromContext(ctx)
+	entTx, err := ent.GetTxFromContext(ctx)
 	if err != nil {
 		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get or create current tx for request: %w", err))
 	}
+	tx := entTx.Client()
 	if _, err := tx.TokenTransaction.Update().
 		Where(
 			tokentransaction.StatusNEQ(st.TokenTransactionStatusFinalized),
@@ -291,7 +292,7 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 		Save(ctx); err != nil {
 		return nil, sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update token transaction status to Revealed: %w for token txHash: %x", err, tokenTransactionHash))
 	}
-	if err := tx.Commit(); err != nil {
+	if err := entTx.Commit(); err != nil {
 		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to commit and replace transaction after setting status to revealed: %w for token txHash: %x", err, tokenTransactionHash))
 	}
 

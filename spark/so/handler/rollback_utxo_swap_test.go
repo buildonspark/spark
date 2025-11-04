@@ -167,9 +167,9 @@ func TestRollbackUtxoSwap_NoErrorIfUtxoSwapCreated(t *testing.T) {
 	require.NoError(t, err)
 
 	// Commit tx before checking the result
-	tx, err := ent.GetDbFromContext(ctx)
+	entTx, err := ent.GetTxFromContext(ctx)
 	require.NoError(t, err)
-	require.NoError(t, tx.Commit())
+	require.NoError(t, entTx.Commit())
 
 	// Verify UtxoSwap is now cancelled (use fresh context)
 	updatedUtxoSwap, err := sessionCtx.Client.UtxoSwap.Get(t.Context(), utxoSwap.ID)

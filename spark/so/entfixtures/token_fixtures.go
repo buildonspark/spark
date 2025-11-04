@@ -53,7 +53,7 @@ func (f *Fixtures) CreateTokenCreate(network st.Network, tokenIdentifier []byte,
 	issuerKey := keys.GeneratePrivateKey()
 	creationEntityKey := keys.GeneratePrivateKey()
 
-	tokenCreate, err := f.Tx.TokenCreate.Create().
+	tokenCreate, err := f.Client.TokenCreate.Create().
 		SetIssuerPublicKey(issuerKey.Public()).
 		SetTokenName("Test Token").
 		SetTokenTicker("TST").
@@ -73,7 +73,7 @@ func (f *Fixtures) CreateKeyshare() *ent.SigningKeyshare {
 	keyshareKey := keys.GeneratePrivateKey()
 	operatorKey := keys.GeneratePrivateKey()
 
-	keyshare, err := f.Tx.SigningKeyshare.Create().
+	keyshare, err := f.Client.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
 		SetSecretShare(keys.GeneratePrivateKey()).
 		SetPublicShares(map[string]keys.Public{"operator1": operatorKey.Public()}).
@@ -87,7 +87,7 @@ func (f *Fixtures) CreateKeyshare() *ent.SigningKeyshare {
 
 // CreateMintTransaction creates a mint transaction with outputs
 func (f *Fixtures) CreateMintTransaction(tokenCreate *ent.TokenCreate, outputSpecs []OutputSpec, status st.TokenTransactionStatus) (*ent.TokenTransaction, []*ent.TokenOutput) {
-	mint, err := f.Tx.TokenMint.Create().
+	mint, err := f.Client.TokenMint.Create().
 		SetIssuerPublicKey(keys.GeneratePrivateKey().Public()).
 		SetTokenIdentifier(tokenCreate.TokenIdentifier).
 		SetWalletProvidedTimestamp(uint64(time.Now().UnixMilli())).
@@ -95,7 +95,7 @@ func (f *Fixtures) CreateMintTransaction(tokenCreate *ent.TokenCreate, outputSpe
 		Save(f.Ctx)
 	f.RequireNoError(err)
 
-	tx, err := f.Tx.TokenTransaction.Create().
+	tx, err := f.Client.TokenTransaction.Create().
 		SetPartialTokenTransactionHash(f.RandomBytes(32)).
 		SetFinalizedTokenTransactionHash(f.RandomBytes(32)).
 		SetStatus(status).
@@ -142,7 +142,7 @@ func (f *Fixtures) createOutputForTransactionWithOwner(tokenCreate *ent.TokenCre
 	err := u128Amount.SafeSetBytes(amountBytes)
 	f.RequireNoError(err)
 
-	output, err := f.Tx.TokenOutput.Create().
+	output, err := f.Client.TokenOutput.Create().
 		SetStatus(outputStatus).
 		SetOwnerPublicKey(owner).
 		SetWithdrawBondSats(testWithdrawBondSats).
@@ -172,7 +172,7 @@ func (f *Fixtures) CreateStandaloneOutput(tokenCreate *ent.TokenCreate, amount *
 	err := u128Amount.SafeSetBytes(amountBytes)
 	f.RequireNoError(err)
 
-	output, err := f.Tx.TokenOutput.Create().
+	output, err := f.Client.TokenOutput.Create().
 		SetStatus(status).
 		SetOwnerPublicKey(ownerKey.Public()).
 		SetWithdrawBondSats(testWithdrawBondSats).
@@ -198,7 +198,7 @@ func (f *Fixtures) CreateBalancedTransferTransaction(
 	outputSpecs []OutputSpec,
 	status st.TokenTransactionStatus,
 ) (*ent.TokenTransaction, []*ent.TokenOutput) {
-	tx, err := f.Tx.TokenTransaction.Create().
+	tx, err := f.Client.TokenTransaction.Create().
 		SetPartialTokenTransactionHash(f.RandomBytes(32)).
 		SetFinalizedTokenTransactionHash(f.RandomBytes(32)).
 		SetStatus(st.TokenTransactionStatusSigned).

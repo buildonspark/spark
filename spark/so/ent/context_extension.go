@@ -7,18 +7,24 @@ import (
 )
 
 // contextKey is a type for context keys.
-type dbSessionContextKey string
-type dbNotifierContextKey string
+type (
+	dbSessionContextKey  string
+	dbNotifierContextKey string
+)
 
 // dbSessionKey is the context key for the transaction provider.
-const dbSessionKey dbSessionContextKey = "dbsession"
-const dbNotifierKey dbNotifierContextKey = "dbnotifier"
+const (
+	dbSessionKey  dbSessionContextKey  = "dbsession"
+	dbNotifierKey dbNotifierContextKey = "dbnotifier"
+)
 
 // A TxProvider is an interface that provides a method to either get an existing transaction,
 // or begin a new transaction if none exists.
 type TxProvider interface {
 	// Get the current transaction from the context, or begin a new one if none exists.
 	GetOrBeginTx(context.Context) (*Tx, error)
+	// Get a client that may be backed by a transaction
+	GetClient(context.Context) (*Client, error)
 }
 
 type Session interface {
@@ -44,14 +50,32 @@ func (e *ClientTxProvider) GetOrBeginTx(ctx context.Context) (*Tx, error) {
 	return tx, nil
 }
 
+func (e *ClientTxProvider) GetClient(ctx context.Context) (*Client, error) {
+	tx, err := e.GetOrBeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return tx.Client(), nil
+}
+
 // Inject the transaction provider into the context. This should ONLY be called from the start of
 // a request or worker context (e.g. in a top-level gRPC interceptor).
 func Inject(ctx context.Context, session Session) context.Context {
 	return context.WithValue(ctx, dbSessionKey, session)
 }
 
-// GetDbFromContext returns the database transaction from the context.
-func GetDbFromContext(ctx context.Context) (*Tx, error) {
+// GetDbFromContext returns the database client from the context. The client may be backed by a transaction.
+func GetDbFromContext(ctx context.Context) (*Client, error) {
+	if txProvider, ok := ctx.Value(dbSessionKey).(TxProvider); ok {
+		return txProvider.GetClient(ctx)
+	}
+
+	return nil, fmt.Errorf("no transaction provider found in context")
+}
+
+// GetTxFromContext returns the underlying database transaction from the context.
+// This should only be used where explicit transaction commit/rollback is needed.
+func GetTxFromContext(ctx context.Context) (*Tx, error) {
 	if txProvider, ok := ctx.Value(dbSessionKey).(TxProvider); ok {
 		return txProvider.GetOrBeginTx(ctx)
 	}
@@ -67,7 +91,7 @@ func MarkTxDirty(ctx context.Context) {
 
 // DbCommit gets the transaction from the context and commits it.
 func DbCommit(ctx context.Context) error {
-	tx, err := GetDbFromContext(ctx)
+	tx, err := GetTxFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction from context: %w", err)
 	}
@@ -85,7 +109,7 @@ func DbCommit(ctx context.Context) error {
 
 // DbRollback gets the transaction from the context and rolls it back.
 func DbRollback(ctx context.Context) error {
-	tx, err := GetDbFromContext(ctx)
+	tx, err := GetTxFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction from context: %w", err)
 	}
@@ -153,7 +177,6 @@ func (b *BufferedNotifier) Flush(ctx context.Context) error {
 
 		// nolint:forbidigo
 		_, err = b.dbClient.ExecContext(ctx, fmt.Sprintf("NOTIFY %s, '%s'", n.Channel, string(jsonPayload)))
-
 		if err != nil {
 			return fmt.Errorf("failed to send notification: %w", err)
 		}

@@ -47,10 +47,10 @@ func setUpQueryTokenOutputsTestHandler(t *testing.T) *queryTokenOutputsTestFixtu
 
 // createTestTokenOutputs creates the specified number of token outputs with their required dependencies
 // for testing pagination functionality. Returns the created outputs.
-func createTestTokenOutputs(t *testing.T, ctx context.Context, tx *ent.Tx, count int, ownerKey keys.Public, tokenCreate *ent.TokenCreate, rng *rand.ChaCha8) []*ent.TokenOutput {
+func createTestTokenOutputs(t *testing.T, ctx context.Context, dbClient *ent.Client, count int, ownerKey keys.Public, tokenCreate *ent.TokenCreate, rng *rand.ChaCha8) []*ent.TokenOutput {
 	t.Helper()
 
-	f := entfixtures.New(t, ctx, tx).WithRNG(rng)
+	f := entfixtures.New(t, ctx, dbClient).WithRNG(rng)
 
 	outputSpecs := make([]entfixtures.OutputSpec, count)
 	for i := range outputSpecs {
@@ -124,16 +124,16 @@ func TestQueryTokenOutputsPagination(t *testing.T) {
 	handler := setup.Handler
 	ctx := setup.Ctx
 
-	tx, err := ent.GetDbFromContext(ctx)
+	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
 	rng := rand.NewChaCha8([32]byte{})
 	ownerKey := keys.MustGeneratePrivateKeyFromRand(rng)
 
-	f := entfixtures.New(t, ctx, tx).WithRNG(rng)
+	f := entfixtures.New(t, ctx, dbClient).WithRNG(rng)
 	tokenCreate := f.CreateTokenCreate(st.NetworkRegtest, nil, nil)
 
-	createTestTokenOutputs(t, ctx, tx, 7, ownerKey.Public(), tokenCreate, rng)
+	createTestTokenOutputs(t, ctx, dbClient, 7, ownerKey.Public(), tokenCreate, rng)
 
 	t.Run("forward pagination", func(t *testing.T) {
 		// Page size 3, expect 3 pages: 3,3,1

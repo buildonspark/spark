@@ -72,10 +72,11 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 		return nil, fmt.Errorf("unable to parse transfer receiver identity public key: %w", err)
 	}
 
-	db, err := ent.GetDbFromContext(ctx)
+	entTx, err := ent.GetTxFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get database transaction: %w", err)
 	}
+	db := entTx.Client()
 	transferUUID, err := uuid.Parse(req.Transfer.TransferId)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.Transfer.TransferId, err)
@@ -84,7 +85,7 @@ func (h *CooperativeExitHandler) cooperativeExit(ctx context.Context, req *pb.Co
 	if err != nil {
 		return nil, fmt.Errorf("unable to create pending send transfer: %w", err)
 	}
-	err = db.Commit()
+	err = entTx.Commit()
 	if err != nil {
 		return nil, fmt.Errorf("unable to commit database transaction: %w", err)
 	}

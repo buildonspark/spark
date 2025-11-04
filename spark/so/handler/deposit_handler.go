@@ -1598,7 +1598,7 @@ func NewValidatedTxID(b []byte) (validatedTxID, error) {
 }
 
 // Verifies that an UTXO is confirmed on the blockchain and has sufficient confirmations.
-func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Tx, schemaNetwork st.Network, txid validatedTxID, vout uint32) (*ent.Utxo, error) {
+func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Client, schemaNetwork st.Network, txid validatedTxID, vout uint32) (*ent.Utxo, error) {
 	blockHeight, err := db.BlockHeight.Query().Where(
 		blockheight.NetworkEQ(schemaNetwork),
 	).Only(ctx)

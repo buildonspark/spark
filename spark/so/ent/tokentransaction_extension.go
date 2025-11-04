@@ -633,10 +633,11 @@ func FinalizeCoordinatedTokenTransactionWithRevocationKeys(
 		revocationSecretMap[revocationSecret.OutputIndex] = revocationSecret.RevocationSecret
 	}
 
-	db, err := GetDbFromContext(ctx)
+	tx, err := GetTxFromContext(ctx)
 	if err != nil {
-		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
+		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get tx from context: %w", err))
 	}
+	db := tx.Client()
 
 	for _, outputToSpendEnt := range spentOutputs {
 		if outputToSpendEnt.SpentTransactionInputVout < 0 {
@@ -680,7 +681,7 @@ func FinalizeCoordinatedTokenTransactionWithRevocationKeys(
 	if err != nil {
 		return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update token transaction with finalized status for txHash %x: %w", txHash, err))
 	}
-	if err := db.Commit(); err != nil {
+	if err := tx.Commit(); err != nil {
 		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to commit and replace transaction after finalizing token transaction: %w", err))
 	}
 

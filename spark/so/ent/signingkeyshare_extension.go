@@ -71,12 +71,12 @@ func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareC
 
 	logger := logging.GetLoggerFromContext(ctx)
 
-	tx, err := GetDbFromContext(ctx)
+	tx, err := GetTxFromContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	signingKeyshares, err := getUnusedSigningKeysharesTx(ctx, tx, config, keyshareCount)
+	signingKeyshares, err := getUnusedSigningKeysharesTx(ctx, tx.Client(), config, keyshareCount)
 	if err != nil {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
 			logger.Error("Failed to rollback transaction", zap.Error(rollbackErr))
@@ -92,9 +92,9 @@ func GetUnusedSigningKeyshares(ctx context.Context, config *so.Config, keyshareC
 	return signingKeyshares, nil
 }
 
-// getUnusedSigningKeysharesTx runs inside an existing *ent.Tx.
-// Caller is responsible for committing/rolling-back the tx.
-func getUnusedSigningKeysharesTx(ctx context.Context, tx *Tx, cfg *so.Config, keyshareCount int) ([]*SigningKeyshare, error) {
+// getUnusedSigningKeysharesTx runs inside an existing database client (which may be backed by a transaction).
+// Caller is responsible for committing/rolling-back the transaction if needed.
+func getUnusedSigningKeysharesTx(ctx context.Context, client *Client, cfg *so.Config, keyshareCount int) ([]*SigningKeyshare, error) {
 	ctx, span := tracer.Start(ctx, "SigningKeyshare.getUnusedSigningKeysharesTx")
 	defer span.End()
 
@@ -111,7 +111,7 @@ func getUnusedSigningKeysharesTx(ctx context.Context, tx *Tx, cfg *so.Config, ke
 	// Setting these parameters to optimize the performance of the query below.
 
 	// nolint:forbidigo
-	_, err := tx.ExecContext(ctx, `
+	_, err := client.ExecContext(ctx, `
 		SET LOCAL seq_page_cost = 10.0;
 		SET LOCAL random_page_cost = 1.0;
 	`)
@@ -125,7 +125,7 @@ func getUnusedSigningKeysharesTx(ctx context.Context, tx *Tx, cfg *so.Config, ke
 	// skipping locked rows to avoid contention.
 
 	// nolint:forbidigo
-	rows, err := tx.QueryContext(ctx, `
+	rows, err := client.QueryContext(ctx, `
 		WITH selected_ids AS (
 			SELECT id FROM signing_keyshares
 			WHERE status = 'AVAILABLE' AND coordinator_index = $1

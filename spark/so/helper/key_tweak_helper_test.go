@@ -21,8 +21,9 @@ import (
 
 func TestTweakLeafKey(t *testing.T) {
 	ctx, client := db.NewTestSQLiteContext(t)
-	dbTx, err := ent.GetDbFromContext(ctx)
+	entTx, err := ent.GetTxFromContext(ctx)
 	require.NoError(t, err)
+	dbClient := entTx.Client()
 	rng := rand.NewChaCha8([32]byte{})
 
 	// Generate deterministic keys for the test
@@ -41,7 +42,7 @@ func TestTweakLeafKey(t *testing.T) {
 	tweakPub := tweakPriv.Public()
 	pubkeyShareTweakPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	tree, err := dbTx.Tree.Create().
+	tree, err := dbClient.Tree.Create().
 		SetOwnerIdentityPubkey(ownerPub).
 		SetStatus(schematype.TreeStatusAvailable).
 		SetNetwork(schematype.NetworkMainnet).
@@ -50,7 +51,7 @@ func TestTweakLeafKey(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	keyshare, err := dbTx.SigningKeyshare.Create().
+	keyshare, err := dbClient.SigningKeyshare.Create().
 		SetStatus(schematype.KeyshareStatusInUse).
 		SetSecretShare(keysharePriv).
 		SetPublicShares(map[string]keys.Public{"operator1": pubSharePub}).
@@ -60,7 +61,7 @@ func TestTweakLeafKey(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	leaf, err := dbTx.TreeNode.Create().
+	leaf, err := dbClient.TreeNode.Create().
 		SetTree(tree).
 		SetValue(1000).
 		SetStatus(schematype.TreeNodeStatusAvailable).
@@ -90,7 +91,7 @@ func TestTweakLeafKey(t *testing.T) {
 	err = treeNodeUpdate.Exec(ctx)
 	require.NoError(t, err)
 
-	err = dbTx.Commit()
+	err = entTx.Commit()
 	require.NoError(t, err)
 
 	updatedLeaf, err := client.Client.TreeNode.Get(ctx, leaf.ID)
@@ -120,7 +121,7 @@ func TestTweakLeafKey(t *testing.T) {
 
 func TestTweakLeafKey_EmptySecretShareTweakProofsList(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	dbTx, err := ent.GetDbFromContext(ctx)
+	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
 	rng := rand.NewChaCha8([32]byte{})
@@ -136,7 +137,7 @@ func TestTweakLeafKey_EmptySecretShareTweakProofsList(t *testing.T) {
 	tweakPriv := keys.MustGeneratePrivateKeyFromRand(rng)
 	pubkeyShareTweakPub := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	tree, err := dbTx.Tree.Create().
+	tree, err := dbClient.Tree.Create().
 		SetOwnerIdentityPubkey(ownerPub).
 		SetStatus(schematype.TreeStatusAvailable).
 		SetNetwork(schematype.NetworkMainnet).
@@ -145,7 +146,7 @@ func TestTweakLeafKey_EmptySecretShareTweakProofsList(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	keyshare, err := dbTx.SigningKeyshare.Create().
+	keyshare, err := dbClient.SigningKeyshare.Create().
 		SetStatus(schematype.KeyshareStatusInUse).
 		SetSecretShare(keysharePriv).
 		SetPublicShares(map[string]keys.Public{"operator1": pubSharePub}).
@@ -155,7 +156,7 @@ func TestTweakLeafKey_EmptySecretShareTweakProofsList(t *testing.T) {
 		Save(ctx)
 	require.NoError(t, err)
 
-	leaf, err := dbTx.TreeNode.Create().
+	leaf, err := dbClient.TreeNode.Create().
 		SetTree(tree).
 		SetValue(1000).
 		SetStatus(schematype.TreeNodeStatusAvailable).

@@ -26,23 +26,24 @@ import (
 	sparktesting "github.com/lightsparkdev/spark/testing"
 )
 
-func setUpInternalSignTokenTestHandler(t *testing.T) (*InternalSignTokenHandler, context.Context, *ent.Tx, func()) {
+func setUpInternalSignTokenTestHandler(t *testing.T) (*InternalSignTokenHandler, context.Context, *ent.Client, func()) {
 	t.Helper()
 
 	config := sparktesting.TestConfig(t)
 	ctx, _ := db.NewTestSQLiteContext(t)
-	tx, err := ent.GetDbFromContext(ctx)
+	entTx, err := ent.GetTxFromContext(ctx)
 	require.NoError(t, err)
+	dbClient := entTx.Client()
 
 	handler := &InternalSignTokenHandler{config: config}
 
 	cleanup := func() {
-		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+		if rollbackErr := entTx.Rollback(); rollbackErr != nil {
 			t.Errorf("rollback failed: %v", rollbackErr)
 		}
 	}
 
-	return handler, ctx, tx, cleanup
+	return handler, ctx, dbClient, cleanup
 }
 
 func makeFinalMintTxForTests() *tokenpb.TokenTransaction {

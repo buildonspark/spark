@@ -36,12 +36,12 @@ func GetEntityDkgKeyPublicKey(ctx context.Context, db *Client) (keys.Public, err
 // CreateEntityDkgKeyWithUnusedSigningKeyshare creates a new entity DKG key using an unused signing keyshare.
 // Returns the entity DKG key or an error if there's an error creating the entity DKG key or reserving the keyshare.
 func CreateEntityDkgKeyWithUnusedSigningKeyshare(ctx context.Context, config *so.Config) (*EntityDkgKey, error) {
-	tx, err := GetDbFromContext(ctx)
+	tx, err := GetTxFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get database connection: %w", err)
 	}
 
-	keyshares, err := getUnusedSigningKeysharesTx(ctx, tx, config, 1)
+	keyshares, err := getUnusedSigningKeysharesTx(ctx, tx.Client(), config, 1)
 	if err != nil {
 		if rollbackErr := tx.Rollback(); rollbackErr != nil {
 			return nil, fmt.Errorf("failed to rollback transaction after error: %w (original error: %w)", rollbackErr, err)
@@ -59,7 +59,7 @@ func CreateEntityDkgKeyWithUnusedSigningKeyshare(ctx context.Context, config *so
 	keyshare := keyshares[0]
 
 	// Create the entity DKG key
-	entityDkgKey, err := tx.EntityDkgKey.Create().
+	entityDkgKey, err := tx.Client().EntityDkgKey.Create().
 		SetSigningKeyshare(keyshare).
 		Save(ctx)
 	if err != nil {

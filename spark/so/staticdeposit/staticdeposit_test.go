@@ -16,11 +16,11 @@ import (
 )
 
 // Helper function to create test entities with required dependencies
-func createTestEntities(t *testing.T, ctx context.Context, rng io.Reader, tx *ent.Tx, utxoSwapStatus st.UtxoSwapStatus) (*ent.Utxo, *ent.UtxoSwap) {
+func createTestEntities(t *testing.T, ctx context.Context, rng io.Reader, db *ent.Client, utxoSwapStatus st.UtxoSwapStatus) (*ent.Utxo, *ent.UtxoSwap) {
 	secret := keys.MustGeneratePrivateKeyFromRand(rng)
 	pubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	// Create a SigningKeyshare (required for DepositAddress)
-	keyshare, err := tx.SigningKeyshare.Create().
+	keyshare, err := db.SigningKeyshare.Create().
 		SetStatus(st.KeyshareStatusAvailable).
 		SetSecretShare(secret).
 		SetPublicShares(map[string]keys.Public{"test": secret.Public()}).
@@ -33,7 +33,7 @@ func createTestEntities(t *testing.T, ctx context.Context, rng io.Reader, tx *en
 	// Create a DepositAddress (required for Utxo)
 	ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	depositAddress, err := tx.DepositAddress.Create().
+	depositAddress, err := db.DepositAddress.Create().
 		SetAddress("bc1ptest_static_deposit_address_for_testing").
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
 		SetOwnerSigningPubkey(ownerSigningPubKey).
@@ -43,7 +43,7 @@ func createTestEntities(t *testing.T, ctx context.Context, rng io.Reader, tx *en
 	require.NoError(t, err)
 
 	// Create a Utxo
-	utxo, err := tx.Utxo.Create().
+	utxo, err := db.Utxo.Create().
 		SetTxid([]byte("test_txid_123456789012345678901234")).
 		SetVout(0).
 		SetAmount(1000).
@@ -57,7 +57,7 @@ func createTestEntities(t *testing.T, ctx context.Context, rng io.Reader, tx *en
 	// Create a UtxoSwap if status is provided
 	if utxoSwapStatus != "" {
 		coordinatorIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-		utxoSwap, err := tx.UtxoSwap.Create().
+		utxoSwap, err := db.UtxoSwap.Create().
 			SetStatus(utxoSwapStatus).
 			SetRequestType(st.UtxoSwapRequestTypeFixedAmount).
 			SetCreditAmountSats(900).

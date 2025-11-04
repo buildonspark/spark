@@ -347,6 +347,17 @@ func (s *Session) GetTxIfExists() *ent.Tx {
 	return s.currentTx
 }
 
+// GetClient returns a client that may be backed by a transaction. This is the preferred method
+// for most database operations, as it allows the same code to work both inside and outside of
+// explicit transactions.
+func (s *Session) GetClient(ctx context.Context) (*ent.Client, error) {
+	tx, err := s.GetOrBeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return tx.Client(), nil
+}
+
 func (s *Session) Notify(ctx context.Context, n ent.Notification) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -381,6 +392,14 @@ func NewTxProviderWithTimeout(provider ent.TxProvider, timeout time.Duration) *T
 		wrapped: provider,
 		timeout: timeout,
 	}
+}
+
+func (t *TxProviderWithTimeout) GetClient(ctx context.Context) (*ent.Client, error) {
+	tx, err := t.GetOrBeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return tx.Client(), nil
 }
 
 func (t *TxProviderWithTimeout) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {

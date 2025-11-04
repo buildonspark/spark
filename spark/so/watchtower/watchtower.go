@@ -89,11 +89,11 @@ func alreadyBroadcasted(err error) bool {
 }
 
 // QueryNodesWithExpiredTimeLocks returns nodes that are eligible for broadcast.
-func QueryNodesWithExpiredTimeLocks(ctx context.Context, dbTx *ent.Tx, blockHeight int64, network common.Network) ([]*ent.TreeNode, error) {
+func QueryNodesWithExpiredTimeLocks(ctx context.Context, dbClient *ent.Client, blockHeight int64, network common.Network) ([]*ent.TreeNode, error) {
 	var rootNodes, childNodes, refundNodes []*ent.TreeNode
 
 	// 1. Root nodes needing confirmation
-	rootNodes, err := dbTx.TreeNode.Query().
+	rootNodes, err := dbClient.TreeNode.Query().
 		Where(
 			treenode.Not(treenode.HasParent()),
 			treenode.Or(
@@ -108,7 +108,7 @@ func QueryNodesWithExpiredTimeLocks(ctx context.Context, dbTx *ent.Tx, blockHeig
 	}
 
 	// 2. Child nodes whose parent is confirmed but the node itself is not.
-	childNodes, err = dbTx.TreeNode.Query().
+	childNodes, err = dbClient.TreeNode.Query().
 		Where(
 			treenode.HasParentWith(
 				treenode.And(
@@ -125,7 +125,7 @@ func QueryNodesWithExpiredTimeLocks(ctx context.Context, dbTx *ent.Tx, blockHeig
 	}
 
 	// 3. Nodes with confirmed node tx but unconfirmed refund tx.
-	refundNodes, err = dbTx.TreeNode.Query().
+	refundNodes, err = dbClient.TreeNode.Query().
 		Where(
 			treenode.NodeConfirmationHeightNotNil(),
 			treenode.RefundConfirmationHeightIsNil(),

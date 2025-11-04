@@ -70,7 +70,7 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 	if err != nil {
 		return nil, err
 	}
-	expectedCreationEntityPublicKey, err := ent.GetEntityDkgKeyPublicKey(ctx, db.Client())
+	expectedCreationEntityPublicKey, err := ent.GetEntityDkgKeyPublicKey(ctx, db)
 	if err != nil {
 		return nil, err
 	}

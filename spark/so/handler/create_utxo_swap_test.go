@@ -542,9 +542,9 @@ func TestCreateUtxoSwap_SuccessfulCallCreatesUtxoSwap(t *testing.T) {
 	assert.Equal(t, "bc1ptest_static_deposit_address_for_testing", resp.GetUtxoDepositAddress())
 
 	// Commit tx before checking the result
-	tx, err := ent.GetDbFromContext(ctx)
+	entTx, err := ent.GetTxFromContext(ctx)
 	require.NoError(t, err)
-	require.NoError(t, tx.Commit())
+	require.NoError(t, entTx.Commit())
 
 	// Verify UtxoSwap was created
 	utxoSwaps, err := sessionCtx.Client.UtxoSwap.Query().All(t.Context())

@@ -412,9 +412,9 @@ func TestInitiateStaticDepositUtxoRefund_CanRefundEvenWithPreviousFailedAttempts
 	assert.NotNil(t, resp.GetRefundTxSigningResult())
 
 	// Commit tx before checking the result
-	tx, err := ent.GetDbFromContext(ctx)
+	entTx, err := ent.GetTxFromContext(ctx)
 	require.NoError(t, err)
-	require.NoError(t, tx.Commit())
+	require.NoError(t, entTx.Commit())
 
 	// Verify previous failed swaps still exist with cancelled status in separate context
 	updatedRefundSwap, err := sessionCtx.Client.UtxoSwap.Get(t.Context(), previousRefundSwap.ID)
@@ -483,9 +483,9 @@ func TestInitiateStaticDepositUtxoRefund_SuccessfulRefundCreatesCompletedUtxoSwa
 	assert.NotEmpty(t, resp.DepositAddress)
 
 	// Commit tx before checking the result
-	tx, err := ent.GetDbFromContext(ctx)
+	entTx, err := ent.GetTxFromContext(ctx)
 	require.NoError(t, err)
-	require.NoError(t, tx.Commit())
+	require.NoError(t, entTx.Commit())
 
 	// Find the specific refund swap created for this UTXO
 	createdSwap, err := sessionCtx.Client.UtxoSwap.Query().

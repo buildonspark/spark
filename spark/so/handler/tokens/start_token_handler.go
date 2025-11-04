@@ -420,7 +420,7 @@ func (h *StartTokenTransactionHandler) constructFinalTokenTransaction(
 			return nil, nil, err
 		}
 		createInput := finalTokenTransaction.GetCreateInput()
-		creationEntityPublicKey, err := ent.GetEntityDkgKeyPublicKey(ctx, db.Client())
+		creationEntityPublicKey, err := ent.GetEntityDkgKeyPublicKey(ctx, db)
 		if err != nil {
 			return nil, nil, tokens.FormatErrorWithTransactionProto(tokens.ErrFailedToGetCreationEntityPublicKey, partialTokenTransaction, err)
 		}

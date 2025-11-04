@@ -21,6 +21,14 @@ func (p *NeverTxProvider) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 	return nil, ctx.Err()
 }
 
+func (p *NeverTxProvider) GetClient(ctx context.Context) (*ent.Client, error) {
+	tx, err := p.GetOrBeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return tx.Client(), nil
+}
+
 // A TxProvider that simulates a slow transaction provider that waits for an external trigger before
 // returning a transaction.
 type SlowTxProvider struct {
@@ -35,6 +43,14 @@ func (p *SlowTxProvider) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 	case <-p.trigger:
 		return p.tx, nil
 	}
+}
+
+func (p *SlowTxProvider) GetClient(ctx context.Context) (*ent.Client, error) {
+	tx, err := p.GetOrBeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return tx.Client(), nil
 }
 
 func TestSession_GetOrBeginTxReturnsSameTx(t *testing.T) {

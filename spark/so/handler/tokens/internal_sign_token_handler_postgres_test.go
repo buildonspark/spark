@@ -29,25 +29,25 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func setUpInternalSignTokenTestHandlerPostgres(t *testing.T) (*InternalSignTokenHandler, context.Context, *ent.Tx) {
+func setUpInternalSignTokenTestHandlerPostgres(t *testing.T) (*InternalSignTokenHandler, context.Context, *ent.Client) {
 	t.Helper()
 
 	config := sparktesting.TestConfig(t)
 	ctx, _ := db.ConnectToTestPostgres(t)
-	tx, err := ent.GetDbFromContext(ctx)
+	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	return &InternalSignTokenHandler{config: config}, ctx, tx
+	return &InternalSignTokenHandler{config: config}, ctx, dbClient
 }
 
 // createTestSpentOutputWithShares creates a spent output with one partial share and returns it.
-func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.Tx, handler *InternalSignTokenHandler, tokenCreateID uuid.UUID, secretPriv keys.Private, shares []*secretsharing.SecretShare, operatorIDs []string) *ent.TokenOutput {
+func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, dbClient *ent.Client, handler *InternalSignTokenHandler, tokenCreateID uuid.UUID, secretPriv keys.Private, shares []*secretsharing.SecretShare, operatorIDs []string) *ent.TokenOutput {
 	t.Helper()
 	coordinatorShare := shares[0] // index 1
 	secretShare, err := keys.PrivateKeyFromBigInt(coordinatorShare.Share)
 	require.NoError(t, err)
 
-	keyshare := tx.SigningKeyshare.Create().
+	keyshare := dbClient.SigningKeyshare.Create().
 		SetSecretShare(secretShare).
 		SetPublicKey(secretPriv.Public()).
 		SetStatus(st.KeyshareStatusInUse).
@@ -58,7 +58,7 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.
 
 	ownerPubKey := handler.config.IdentityPublicKey()
 
-	output := tx.TokenOutput.Create().
+	output := dbClient.TokenOutput.Create().
 		SetID(uuid.New()).
 		SetOwnerPublicKey(ownerPubKey).
 		SetTokenPublicKey(ownerPubKey).
@@ -79,7 +79,7 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.
 	opPub := handler.config.SigningOperatorMap[operatorIDs[1]].IdentityPublicKey
 	share1, err := keys.PrivateKeyFromBigInt(shares[1].Share)
 	require.NoError(t, err)
-	tx.TokenPartialRevocationSecretShare.Create().
+	dbClient.TokenPartialRevocationSecretShare.Create().
 		SetTokenOutput(output).
 		SetOperatorIdentityPublicKey(opPub).
 		SetSecretShare(share1).
@@ -89,7 +89,7 @@ func createTestSpentOutputWithShares(t *testing.T, ctx context.Context, tx *ent.
 }
 
 func TestGetSecretSharesNotInInput(t *testing.T) {
-	handler, ctx, tx := setUpInternalSignTokenTestHandlerPostgres(t)
+	handler, ctx, dbClient := setUpInternalSignTokenTestHandlerPostgres(t)
 	rng := rand.NewChaCha8([32]byte{})
 
 	aliceOperatorPubKey := handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000001"].IdentityPublicKey
@@ -97,7 +97,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 	carolOperatorPubKey := handler.config.SigningOperatorMap["0000000000000000000000000000000000000000000000000000000000000003"].IdentityPublicKey
 
 	aliceSecret := keys.MustGeneratePrivateKeyFromRand(rng)
-	aliceSigningKeyshare := tx.SigningKeyshare.Create().
+	aliceSigningKeyshare := dbClient.SigningKeyshare.Create().
 		SetSecretShare(aliceSecret).
 		SetPublicKey(aliceSecret.Public()).
 		SetStatus(st.KeyshareStatusInUse).
@@ -107,7 +107,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SaveX(ctx)
 
 	bobSecret := keys.MustGeneratePrivateKeyFromRand(rng)
-	bobSigningKeyshare := tx.SigningKeyshare.Create().
+	bobSigningKeyshare := dbClient.SigningKeyshare.Create().
 		SetSecretShare(bobSecret).
 		SetPublicKey(bobSecret.Public()).
 		SetStatus(st.KeyshareStatusInUse).
@@ -117,7 +117,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SaveX(ctx)
 
 	carolSecret := keys.MustGeneratePrivateKeyFromRand(rng)
-	carolSigningKeyshare := tx.SigningKeyshare.Create().
+	carolSigningKeyshare := dbClient.SigningKeyshare.Create().
 		SetSecretShare(carolSecret).
 		SetPublicKey(carolSecret.Public()).
 		SetStatus(st.KeyshareStatusInUse).
@@ -127,7 +127,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SaveX(ctx)
 
 	// Minimal TokenCreate required for TokenOutput and TokenTransaction relationships
-	tokenCreate := tx.TokenCreate.Create().
+	tokenCreate := dbClient.TokenCreate.Create().
 		SetIssuerPublicKey(handler.config.IdentityPublicKey()).
 		SetTokenName("test token").
 		SetTokenTicker("TTK").
@@ -140,7 +140,7 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SaveX(ctx)
 
 	withdrawRevocationCommitment := keys.MustGeneratePrivateKeyFromRand(rng).Public()
-	tokenOutputInDb := tx.TokenOutput.Create().
+	tokenOutputInDb := dbClient.TokenOutput.Create().
 		SetID(uuid.New()).
 		SetOwnerPublicKey(aliceOperatorPubKey).
 		SetTokenPublicKey(aliceOperatorPubKey).
@@ -156,13 +156,13 @@ func TestGetSecretSharesNotInInput(t *testing.T) {
 		SetTokenCreateID(tokenCreate.ID).
 		SaveX(ctx)
 
-	tx.TokenPartialRevocationSecretShare.Create().
+	dbClient.TokenPartialRevocationSecretShare.Create().
 		SetTokenOutput(tokenOutputInDb).
 		SetOperatorIdentityPublicKey(bobOperatorPubKey).
 		SetSecretShare(bobSigningKeyshare.SecretShare).
 		SaveX(ctx)
 
-	tx.TokenPartialRevocationSecretShare.Create().
+	dbClient.TokenPartialRevocationSecretShare.Create().
 		SetTokenOutput(tokenOutputInDb).
 		SetOperatorIdentityPublicKey(carolOperatorPubKey).
 		SetSecretShare(carolSigningKeyshare.SecretShare).
@@ -217,8 +217,9 @@ func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *te
 
 	handler := &InternalSignTokenHandler{config: cfg}
 	ctx, _ := db.ConnectToTestPostgres(t)
-	tx, err := ent.GetDbFromContext(ctx)
+	entTx, err := ent.GetTxFromContext(ctx)
 	require.NoError(t, err)
+	dbClient := entTx.Client()
 
 	// Configure 3 operators, threshold 2.
 	limitedOps := make(map[string]*so.SigningOperator)
@@ -236,7 +237,7 @@ func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *te
 	shares, err := secretsharing.SplitSecret(secretInt, secp256k1.S256().N, 2, 3)
 	require.NoError(t, err)
 
-	tokenCreate := tx.TokenCreate.Create().
+	tokenCreate := dbClient.TokenCreate.Create().
 		SetIssuerPublicKey(handler.config.IdentityPublicKey()).
 		SetTokenName("test token").
 		SetTokenTicker("TTK").
@@ -248,9 +249,9 @@ func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *te
 		SetCreationEntityPublicKey(handler.config.IdentityPublicKey()).
 		SaveX(ctx)
 
-	output := createTestSpentOutputWithShares(t, ctx, tx, handler, tokenCreate.ID, priv, shares, ids)
+	output := createTestSpentOutputWithShares(t, ctx, dbClient, handler, tokenCreate.ID, priv, shares, ids)
 	hash := bytes.Repeat([]byte{0x24}, 32)
-	_ = tx.TokenTransaction.Create().
+	_ = dbClient.TokenTransaction.Create().
 		SetCreateID(tokenCreate.ID).
 		SetPartialTokenTransactionHash(hash).
 		SetFinalizedTokenTransactionHash(hash).
@@ -259,7 +260,7 @@ func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *te
 		SaveX(ctx)
 
 	// Commit so data visible in new transaction.
-	require.NoError(t, tx.Commit())
+	require.NoError(t, entTx.Commit())
 	t.Run("flag false does not finalize when threshold requirement disabled", func(t *testing.T) {
 		handler.config.Token.RequireThresholdOperators = false
 		finalized, err := handler.recoverFullRevocationSecretsAndFinalize(ctx, hash)

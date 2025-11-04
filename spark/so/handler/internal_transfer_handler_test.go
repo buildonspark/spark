@@ -206,9 +206,9 @@ func TestFinalizeTransfer(t *testing.T) {
 		require.NoError(t, err)
 
 		// Commit the transaction to persist changes
-		tx, err := ent.GetDbFromContext(ctx)
+		entTx, err := ent.GetTxFromContext(ctx)
 		require.NoError(t, err)
-		err = tx.Commit()
+		err = entTx.Commit()
 		require.NoError(t, err)
 
 		// Verify the transfer status was updated
@@ -251,9 +251,9 @@ func TestFinalizeTransfer(t *testing.T) {
 		require.NoError(t, err)
 
 		// Commit the transaction to persist changes
-		tx, err = ent.GetDbFromContext(ctx)
+		entTx, err = ent.GetTxFromContext(ctx)
 		require.NoError(t, err)
-		err = tx.Commit()
+		err = entTx.Commit()
 		require.NoError(t, err)
 
 		// Verify the transfer status was updated

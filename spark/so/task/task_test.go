@@ -123,19 +123,19 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 
 func TestBackfillTokenOutputAmount_SQLite(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
-	tx, err := ent.GetDbFromContext(ctx)
+	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-	runBackfillAmountTest(t, ctx, tx)
+	runBackfillAmountTest(t, ctx, dbClient)
 }
 
 func TestBackfillTokenOutputAmount_Postgres(t *testing.T) {
 	ctx, _ := db.ConnectToTestPostgres(t)
-	tx, err := ent.GetDbFromContext(ctx)
+	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
-	runBackfillAmountTest(t, ctx, tx)
+	runBackfillAmountTest(t, ctx, dbClient)
 }
 
-func runBackfillAmountTest(t *testing.T, ctx context.Context, tx *ent.Tx) {
+func runBackfillAmountTest(t *testing.T, ctx context.Context, dbClient *ent.Client) {
 	t.Helper()
 
 	seededRand := rand.NewChaCha8([32]byte{})
@@ -154,7 +154,7 @@ func runBackfillAmountTest(t *testing.T, ctx context.Context, tx *ent.Tx) {
 
 	config := sparktesting.TestConfig(t)
 
-	f := entfixtures.New(t, ctx, tx).WithRNG(seededRand)
+	f := entfixtures.New(t, ctx, dbClient).WithRNG(seededRand)
 
 	tokenAmountBytes := f.RandomBytes(16)
 	tokenAmountBytes[15] |= 1 // force non zero random value
@@ -168,10 +168,10 @@ func runBackfillAmountTest(t *testing.T, ctx context.Context, tx *ent.Tx) {
 
 	require.NoError(t, backfillTask.Task(ctx, config, k))
 
-	tx, err := ent.GetDbFromContext(ctx)
+	db, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	out, err := tx.TokenOutput.Query().Where(tokenoutput.ID(outputs[0].ID)).Only(ctx)
+	out, err := db.TokenOutput.Query().Where(tokenoutput.ID(outputs[0].ID)).Only(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, out.Amount)
 

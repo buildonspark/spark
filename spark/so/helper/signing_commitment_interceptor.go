@@ -36,15 +36,16 @@ func SigningCommitmentInterceptor(operatorMap map[string]*so.SigningOperator, kn
 		if signingCommitmentsCount > 0 {
 			logger := logging.GetLoggerFromContext(ctx)
 			logger.Sugar().Infof("Counted %d signing commitments necessary for request", signingCommitmentsCount)
-			dbTx, err := ent.GetDbFromContext(ctx)
+			dbTx, err := ent.GetTxFromContext(ctx)
 			if err != nil {
 				return nil, err
 			}
+			dbClient := dbTx.Client()
 
 			commitmentsMap := make(map[uint][]*ent.SigningCommitment)
 			for _, operator := range operatorMap {
 				idx := uint(operator.ID)
-				commitments, err := ent.ReserveSigningCommitments(ctx, dbTx, uint32(signingCommitmentsCount), idx)
+				commitments, err := ent.ReserveSigningCommitments(ctx, dbClient, uint32(signingCommitmentsCount), idx)
 				if err != nil {
 					logger.Error("Failed to get unused signing commitments", zap.Error(err))
 					if rollbackErr := dbTx.Rollback(); rollbackErr != nil {

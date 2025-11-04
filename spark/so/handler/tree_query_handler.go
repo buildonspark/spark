@@ -217,7 +217,7 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 	}, nil
 }
 
-func getAncestorChain(ctx context.Context, db *ent.Tx, node *ent.TreeNode, nodeMap map[string]*pb.TreeNode, isSSP bool) error {
+func getAncestorChain(ctx context.Context, db *ent.Client, node *ent.TreeNode, nodeMap map[string]*pb.TreeNode, isSSP bool) error {
 	parent, err := node.QueryParent().Only(ctx)
 	if err != nil {
 		if !ent.IsNotFound(err) {

@@ -216,13 +216,13 @@ func readByte(buf *bytes.Buffer) (byte, error) {
 	return asByte, nil
 }
 
-func createL1TokenEntity(ctx context.Context, dbTx *ent.Tx, tokenMetadata *common.TokenMetadata, txid chainhash.Hash, tokenIdentifier []byte) (*ent.L1TokenCreate, error) {
+func createL1TokenEntity(ctx context.Context, dbClient *ent.Client, tokenMetadata *common.TokenMetadata, txid chainhash.Hash, tokenIdentifier []byte) (*ent.L1TokenCreate, error) {
 	schemaNetwork, err := common.SchemaNetworkFromNetwork(tokenMetadata.Network)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert network to schema network: %w", err)
 	}
 	// This entity represents the raw parsed L1 announcement data.
-	l1TokenCreate, err := dbTx.L1TokenCreate.Create().
+	l1TokenCreate, err := dbClient.L1TokenCreate.Create().
 		SetIssuerPublicKey(tokenMetadata.IssuerPublicKey).
 		SetTokenName(tokenMetadata.TokenName).
 		SetTokenTicker(tokenMetadata.TokenTicker).
@@ -239,8 +239,8 @@ func createL1TokenEntity(ctx context.Context, dbTx *ent.Tx, tokenMetadata *commo
 	return l1TokenCreate, nil
 }
 
-func createNativeSparkTokenEntity(ctx context.Context, dbTx *ent.Tx, tokenMetadata *common.TokenMetadata, l1TokenCreateID uuid.UUID) error {
-	entityDkgKeyPublicKey, err := ent.GetEntityDkgKeyPublicKey(ctx, dbTx.Client())
+func createNativeSparkTokenEntity(ctx context.Context, dbClient *ent.Client, tokenMetadata *common.TokenMetadata, l1TokenCreateID uuid.UUID) error {
+	entityDkgKeyPublicKey, err := ent.GetEntityDkgKeyPublicKey(ctx, dbClient)
 	if err != nil {
 		return fmt.Errorf("failed to get entity DKG key public key: %w", err)
 	}
@@ -259,7 +259,7 @@ func createNativeSparkTokenEntity(ctx context.Context, dbTx *ent.Tx, tokenMetada
 		return fmt.Errorf("failed to convert network to schema network: %w", err)
 	}
 
-	_, err = dbTx.TokenCreate.Create().
+	_, err = dbClient.TokenCreate.Create().
 		SetIssuerPublicKey(tokenMetadata.IssuerPublicKey).
 		SetTokenName(tokenMetadata.TokenName).
 		SetTokenTicker(tokenMetadata.TokenTicker).
@@ -278,7 +278,7 @@ func createNativeSparkTokenEntity(ctx context.Context, dbTx *ent.Tx, tokenMetada
 }
 
 // handleTokenAnnouncements processes any token announcements in the block
-func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbTx *ent.Tx, txs []wire.MsgTx, network common.Network) error {
+func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbClient *ent.Client, txs []wire.MsgTx, network common.Network) error {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	type parsedAnnouncement struct {
@@ -343,7 +343,7 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbTx *ent.
 			continue
 		}
 
-		isDuplicate, err := isDuplicateAnnouncement(ctx, dbTx, tokenIdentifier, tokenIdentifiersAnnouncedInBlock)
+		isDuplicate, err := isDuplicateAnnouncement(ctx, dbClient, tokenIdentifier, tokenIdentifiersAnnouncedInBlock)
 		if err != nil {
 			logger.With(zap.Error(err)).Sugar().Errorf("Failed to check for duplicate announcement (txid %s)", ann.txHash)
 			continue
@@ -355,7 +355,7 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbTx *ent.
 			continue
 		}
 
-		l1TokenCreate, err := createL1TokenEntity(ctx, dbTx, tokenMetadata, ann.txHash, tokenIdentifier)
+		l1TokenCreate, err := createL1TokenEntity(ctx, dbClient, tokenMetadata, ann.txHash, tokenIdentifier)
 		if err != nil {
 			logger.With(zap.Error(err)).Sugar().Errorf("Failed to create l1 token create entity (txid %s)", ann.txHash)
 			continue
@@ -371,7 +371,7 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbTx *ent.
 			)
 
 		if !config.Token.DisableSparkTokenCreationForL1TokenAnnouncements {
-			exists, err := issuerAlreadyHasSparkToken(ctx, dbTx, tokenMetadata.IssuerPublicKey, issuerPublicKeysAnnouncedInBlock)
+			exists, err := issuerAlreadyHasSparkToken(ctx, dbClient, tokenMetadata.IssuerPublicKey, issuerPublicKeysAnnouncedInBlock)
 			if err != nil {
 				logger.Error("Failed to check for existing spark token", zap.Error(err))
 				continue
@@ -381,7 +381,7 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbTx *ent.
 					Sugar().
 					Infof("Issuer already has a Spark token. Not creating a spark native token (txid %s).", ann.txHash)
 			} else {
-				if err := createNativeSparkTokenEntity(ctx, dbTx, tokenMetadata, l1TokenCreate.ID); err != nil {
+				if err := createNativeSparkTokenEntity(ctx, dbClient, tokenMetadata, l1TokenCreate.ID); err != nil {
 					logger.With(zap.Error(err)).Sugar().Errorf("Failed to create spark native token create entity (txid %s)", ann.txHash)
 				}
 			}
@@ -395,20 +395,20 @@ func handleTokenAnnouncements(ctx context.Context, config *so.Config, dbTx *ent.
 func handleTokenUpdatesForBlock(
 	ctx context.Context,
 	config *so.Config,
-	dbTx *ent.Tx,
+	dbClient *ent.Client,
 	txs []wire.MsgTx,
 	blockHeight int64,
 	network common.Network,
 ) {
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Checking for token announcements (block height %d)", blockHeight)
-	if err := handleTokenAnnouncements(ctx, config, dbTx, txs, network); err != nil {
+	if err := handleTokenAnnouncements(ctx, config, dbClient, txs, network); err != nil {
 		logger.With(zap.Error(err)).Sugar().Errorf("Failed to handle token announcements (block height %d)", blockHeight)
 	}
 }
 
-func isDuplicateAnnouncement(ctx context.Context, dbTx *ent.Tx, tokenIdentifier []byte, tokenIdentifiersAnnouncedInBlock map[string]struct{}) (bool, error) {
-	exists, err := dbTx.L1TokenCreate.Query().
+func isDuplicateAnnouncement(ctx context.Context, dbClient *ent.Client, tokenIdentifier []byte, tokenIdentifiersAnnouncedInBlock map[string]struct{}) (bool, error) {
+	exists, err := dbClient.L1TokenCreate.Query().
 		Where(l1tokencreate.TokenIdentifierEQ(tokenIdentifier)).
 		Exist(ctx)
 	if err != nil {
@@ -421,8 +421,8 @@ func isDuplicateAnnouncement(ctx context.Context, dbTx *ent.Tx, tokenIdentifier 
 	return ok, nil
 }
 
-func issuerAlreadyHasSparkToken(ctx context.Context, dbTx *ent.Tx, issuerPublicKey keys.Public, issuerPublicKeysAnnouncedInBlock map[keys.Public]struct{}) (bool, error) {
-	exists, err := dbTx.TokenCreate.Query().
+func issuerAlreadyHasSparkToken(ctx context.Context, dbClient *ent.Client, issuerPublicKey keys.Public, issuerPublicKeysAnnouncedInBlock map[keys.Public]struct{}) (bool, error) {
+	exists, err := dbClient.TokenCreate.Query().
 		Where(tokencreate.IssuerPublicKeyEQ(issuerPublicKey)).
 		Exist(ctx)
 	if err != nil {

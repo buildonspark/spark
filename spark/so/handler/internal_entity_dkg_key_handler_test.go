@@ -52,9 +52,9 @@ func TestReserveEntityDkgKey_Success(t *testing.T) {
 	require.NoError(t, err)
 
 	// Commit the transaction to persist changes
-	tx, err := ent.GetDbFromContext(ctx)
+	entTx, err := ent.GetTxFromContext(ctx)
 	require.NoError(t, err)
-	require.NoError(t, tx.Commit())
+	require.NoError(t, entTx.Commit())
 
 	// Verify entity DKG key was created
 	entityDkgKey, err := sessionCtx.Client.EntityDkgKey.Query().WithSigningKeyshare().Only(ctx)
@@ -87,9 +87,9 @@ func TestReserveEntityDkgKey_Idempotent(t *testing.T) {
 	require.NoError(t, err, "should not error on idempotent call")
 
 	// Commit the transaction to persist changes
-	tx, err := ent.GetDbFromContext(ctx)
+	entTx, err := ent.GetTxFromContext(ctx)
 	require.NoError(t, err)
-	require.NoError(t, tx.Commit())
+	require.NoError(t, entTx.Commit())
 
 	// Verify only one entity DKG key exists
 	count, err := sessionCtx.Client.EntityDkgKey.Query().Count(ctx)
@@ -114,9 +114,9 @@ func TestReserveEntityDkgKey_ConflictingKeyshareID(t *testing.T) {
 	require.NoError(t, err)
 
 	// Commit the first transaction to persist changes
-	tx, err := ent.GetDbFromContext(ctx)
+	entTx, err := ent.GetTxFromContext(ctx)
 	require.NoError(t, err)
-	err = tx.Commit()
+	err = entTx.Commit()
 	require.NoError(t, err)
 
 	// Second call - try to reserve with different keyshare ID

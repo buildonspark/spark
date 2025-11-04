@@ -10,8 +10,8 @@ import (
 )
 
 // Fetch a utxo swap that claimed a given utxo from the database.
-func GetRegisteredUtxoSwapForUtxo(ctx context.Context, dbTx *ent.Tx, targetUtxo *ent.Utxo) (*ent.UtxoSwap, error) {
-	utxoSwap, err := dbTx.UtxoSwap.Query().
+func GetRegisteredUtxoSwapForUtxo(ctx context.Context, dbClient *ent.Client, targetUtxo *ent.Utxo) (*ent.UtxoSwap, error) {
+	utxoSwap, err := dbClient.UtxoSwap.Query().
 		Where(utxoswap.HasUtxoWith(utxo.IDEQ(targetUtxo.ID))).
 		Where(utxoswap.StatusIn(st.UtxoSwapStatusCreated, st.UtxoSwapStatusCompleted)).
 		Only(ctx)

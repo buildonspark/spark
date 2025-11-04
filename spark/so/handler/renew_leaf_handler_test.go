@@ -160,7 +160,7 @@ func createTestRenewTree(t *testing.T, ctx context.Context, ownerIdentityPubKey 
 	return tree
 }
 
-func createTestRenewTreeNode(t *testing.T, ctx context.Context, rng io.Reader, tx *ent.Tx, tree *ent.Tree, keyshare *ent.SigningKeyshare, parent *ent.TreeNode, updateBits uint32) *ent.TreeNode {
+func createTestRenewTreeNode(t *testing.T, ctx context.Context, rng io.Reader, dbClient *ent.Client, tree *ent.Tree, keyshare *ent.SigningKeyshare, parent *ent.TreeNode, updateBits uint32) *ent.TreeNode {
 	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	ownerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	ownerSigningPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -178,7 +178,7 @@ func createTestRenewTreeNode(t *testing.T, ctx context.Context, rng io.Reader, t
 	refundTx, err := common.SerializeTx(refundTxMsg)
 	require.NoError(t, err)
 
-	nodeCreate := tx.TreeNode.Create().
+	nodeCreate := dbClient.TreeNode.Create().
 		SetStatus(st.TreeNodeStatusAvailable).
 		SetTree(tree).
 		SetSigningKeyshare(keyshare).
@@ -205,7 +205,7 @@ func createTestRenewTreeNode(t *testing.T, ctx context.Context, rng io.Reader, t
 func TestConstructRenewNodeTransactions(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
-	tx, err := ent.GetDbFromContext(ctx)
+	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -230,10 +230,10 @@ func TestConstructRenewNodeTransactions(t *testing.T) {
 			tree := createTestRenewTree(t, ctx, ownerPubKey)
 
 			// Create parent node
-			parentNode := createTestRenewTreeNode(t, ctx, rng, tx, tree, keyshare, nil, tt.updateBits)
+			parentNode := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, nil, tt.updateBits)
 
 			// Create leaf node with parent
-			leafNode := createTestRenewTreeNode(t, ctx, rng, tx, tree, keyshare, parentNode, tt.updateBits)
+			leafNode := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, parentNode, tt.updateBits)
 
 			// Get expected pk scripts
 			expectedVerifyingPkScript, err := common.P2TRScriptFromPubKey(leafNode.VerifyingPubkey)
@@ -338,7 +338,7 @@ func TestConstructRenewRefundTransactions(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
 	handler := createTestRenewLeafHandler()
-	tx, err := ent.GetDbFromContext(ctx)
+	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -363,10 +363,10 @@ func TestConstructRenewRefundTransactions(t *testing.T) {
 			tree := createTestRenewTree(t, ctx, ownerPubKey)
 
 			// Create parent node
-			parentNode := createTestRenewTreeNode(t, ctx, rng, tx, tree, keyshare, nil, tt.updateBits)
+			parentNode := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, nil, tt.updateBits)
 
 			// Create leaf node with parent
-			leafNode := createTestRenewTreeNode(t, ctx, rng, tx, tree, keyshare, parentNode, tt.updateBits)
+			leafNode := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, parentNode, tt.updateBits)
 
 			// Get expected pk scripts
 			expectedVerifyingPkScript, err := common.P2TRScriptFromPubKey(leafNode.VerifyingPubkey)
@@ -452,7 +452,7 @@ func TestConstructRenewZeroNodeTransactions(t *testing.T) {
 	ctx, _ := db.NewTestSQLiteContext(t)
 	rng := rand.NewChaCha8([32]byte{})
 	handler := createTestRenewLeafHandler()
-	tx, err := ent.GetDbFromContext(ctx)
+	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -478,7 +478,7 @@ func TestConstructRenewZeroNodeTransactions(t *testing.T) {
 			tree := createTestRenewTree(t, ctx, ownerPubKey)
 
 			// Create leaf node (no parent needed for zero timelock)
-			leafNode := createTestRenewTreeNode(t, ctx, rng, tx, tree, keyshare, nil, tt.updateBits)
+			leafNode := createTestRenewTreeNode(t, ctx, rng, dbClient, tree, keyshare, nil, tt.updateBits)
 
 			// Get expected pk scripts
 			expectedVerifyingPkScript, err := common.P2TRScriptFromPubKey(leafNode.VerifyingPubkey)
