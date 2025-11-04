@@ -18,6 +18,7 @@ package uniffi.spark_frost
 // helpers directly inline like we're doing here.
 
 import com.sun.jna.Callback
+import com.sun.jna.IntegerType
 import com.sun.jna.Library
 import com.sun.jna.Native
 import com.sun.jna.Pointer

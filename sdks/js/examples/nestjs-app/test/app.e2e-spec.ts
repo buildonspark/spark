@@ -41,7 +41,7 @@ describe("AppController (e2e)", () => {
       .get("/test-wasm")
       .expect(200)
       .expect(
-        "2ed5c588ed2a2999344b4c8d60869bcf02a0aa4f7cf0856fddf189f1ff927cdb",
+        "ddbf1a5b95c00e211344b1212ea3a836d7ddf6a64f9cdb0b08c5e50035dab33b",
       );
   });
 });
