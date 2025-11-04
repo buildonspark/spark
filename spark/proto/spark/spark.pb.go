@@ -2839,6 +2839,7 @@ func (x *StartDepositTreeCreationResponse) GetRootNodeSignatureShares() *NodeSig
 
 // This proto is constructed by the wallet to specify leaves it wants to spend as
 // part of the token transaction.
+// DEPRECATED: Use definitions in spark_token.proto instead
 type TokenOutputToSpend struct {
 	state                    protoimpl.MessageState `protogen:"open.v1"`
 	PrevTokenTransactionHash []byte                 `protobuf:"bytes,1,opt,name=prev_token_transaction_hash,json=prevTokenTransactionHash,proto3" json:"prev_token_transaction_hash,omitempty"`
@@ -2891,6 +2892,7 @@ func (x *TokenOutputToSpend) GetPrevTokenTransactionVout() uint32 {
 	return 0
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 type TokenTransferInput struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	OutputsToSpend []*TokenOutputToSpend  `protobuf:"bytes,1,rep,name=outputs_to_spend,json=outputsToSpend,proto3" json:"outputs_to_spend,omitempty"`
@@ -2935,6 +2937,7 @@ func (x *TokenTransferInput) GetOutputsToSpend() []*TokenOutputToSpend {
 	return nil
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 type TokenMintInput struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	IssuerPublicKey []byte                 `protobuf:"bytes,1,opt,name=issuer_public_key,json=issuerPublicKey,proto3" json:"issuer_public_key,omitempty"`
@@ -3002,6 +3005,7 @@ func (x *TokenMintInput) GetTokenIdentifier() []byte {
 	return nil
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 type TokenCreateInput struct {
 	state                   protoimpl.MessageState `protogen:"open.v1"`
 	IssuerPublicKey         []byte                 `protobuf:"bytes,1,opt,name=issuer_public_key,json=issuerPublicKey,proto3" json:"issuer_public_key,omitempty"`
@@ -3097,6 +3101,7 @@ func (x *TokenCreateInput) GetCreationEntityPublicKey() []byte {
 // This proto is constructed by the wallet to specify outputs it wants to create
 // as part of a token transaction. Output id and revocation public key should remain unfilled
 // so that the SE can fill them as part of the StartTokenTransaction() call.
+// DEPRECATED: Use definitions in spark_token.proto instead
 type TokenOutput struct {
 	state                         protoimpl.MessageState `protogen:"open.v1"`
 	Id                            *string                `protobuf:"bytes,1,opt,name=id,proto3,oneof" json:"id,omitempty"`
@@ -3200,6 +3205,7 @@ func (x *TokenOutput) GetTokenAmount() []byte {
 // This proto is constructed by the wallet and is the core transaction data structure.
 // This proto is deterministically hashed to generate the token_transaction_hash that
 // is cooperatively signed by the SO group to confirm a token transaction.
+// DEPRECATED: Use definitions in spark_token.proto instead
 type TokenTransaction struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to TokenInputs:
@@ -3322,6 +3328,7 @@ func (*TokenTransaction_TransferInput) isTokenTransaction_TokenInputs() {}
 
 func (*TokenTransaction_CreateInput) isTokenTransaction_TokenInputs() {}
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 type SignatureWithIndex struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
@@ -3376,6 +3383,7 @@ func (x *SignatureWithIndex) GetInputIndex() uint32 {
 	return 0
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 type OperatorSpecificTokenTransactionSignablePayload struct {
 	state                     protoimpl.MessageState `protogen:"open.v1"`
 	FinalTokenTransactionHash []byte                 `protobuf:"bytes,1,opt,name=final_token_transaction_hash,json=finalTokenTransactionHash,proto3" json:"final_token_transaction_hash,omitempty"`
@@ -3430,6 +3438,7 @@ func (x *OperatorSpecificTokenTransactionSignablePayload) GetOperatorIdentityPub
 
 // This message allows the sender of a output being spent to provide final evidence
 // that it owns a output to an SO when requesting signing and release of the  revocation keyshare.
+// DEPRECATED: Use definitions in spark_token.proto instead
 type OperatorSpecificOwnerSignature struct {
 	state          protoimpl.MessageState                           `protogen:"open.v1"`
 	OwnerSignature *SignatureWithIndex                              `protobuf:"bytes,1,opt,name=owner_signature,json=ownerSignature,proto3" json:"owner_signature,omitempty"`
@@ -3482,6 +3491,7 @@ func (x *OperatorSpecificOwnerSignature) GetPayload() *OperatorSpecificTokenTran
 	return nil
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 type RevocationSecretWithIndex struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The index of the input TTXO associated with this secret.
@@ -3535,6 +3545,7 @@ func (x *RevocationSecretWithIndex) GetRevocationSecret() []byte {
 	return nil
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 type FreezeTokensPayload struct {
 	state                     protoimpl.MessageState `protogen:"open.v1"`
 	OwnerPublicKey            []byte                 `protobuf:"bytes,1,opt,name=owner_public_key,json=ownerPublicKey,proto3" json:"owner_public_key,omitempty"`
@@ -3620,6 +3631,7 @@ func (x *FreezeTokensPayload) GetTokenIdentifier() []byte {
 	return nil
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 type FreezeTokensRequest struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	FreezeTokensPayload *FreezeTokensPayload   `protobuf:"bytes,1,opt,name=freeze_tokens_payload,json=freezeTokensPayload,proto3" json:"freeze_tokens_payload,omitempty"`
@@ -3673,6 +3685,7 @@ func (x *FreezeTokensRequest) GetIssuerSignature() []byte {
 	return nil
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 type FreezeTokensResponse struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	ImpactedOutputIds   []string               `protobuf:"bytes,1,rep,name=impacted_output_ids,json=impactedOutputIds,proto3" json:"impacted_output_ids,omitempty"`

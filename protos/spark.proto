@@ -530,15 +530,18 @@ message StartDepositTreeCreationResponse {
 
 // This proto is constructed by the wallet to specify leaves it wants to spend as
 // part of the token transaction.
+// DEPRECATED: Use definitions in spark_token.proto instead
 message TokenOutputToSpend {
     bytes prev_token_transaction_hash = 1 [(validate.rules).bytes.len = 32];
     uint32 prev_token_transaction_vout = 2;
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 message TokenTransferInput {
     repeated TokenOutputToSpend outputs_to_spend = 1;
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 message TokenMintInput {
     bytes issuer_public_key = 1 [(validate.rules).bytes.len = 33];
     // Issuer provided timestamp of when the transaction was signed/constructed.
@@ -552,6 +555,7 @@ message TokenMintInput {
     optional bytes token_identifier = 3 [(validate.rules).bytes.len = 32];
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 message TokenCreateInput {
     bytes issuer_public_key = 1 [(validate.rules).bytes.len = 33];
     string token_name = 2 [(validate.rules).string = {max_len: 20}]; // No minimum length because a single utf-8 character can be 3 bytes.
@@ -565,6 +569,7 @@ message TokenCreateInput {
 // This proto is constructed by the wallet to specify outputs it wants to create
 // as part of a token transaction. Output id and revocation public key should remain unfilled
 // so that the SE can fill them as part of the StartTokenTransaction() call.
+// DEPRECATED: Use definitions in spark_token.proto instead
 message TokenOutput {
     optional string id = 1 [(validate.rules).string.uuid = true];
     bytes owner_public_key = 2 [(validate.rules).bytes.len = 33];
@@ -579,6 +584,7 @@ message TokenOutput {
 // This proto is constructed by the wallet and is the core transaction data structure.
 // This proto is deterministically hashed to generate the token_transaction_hash that
 // is cooperatively signed by the SO group to confirm a token transaction.
+// DEPRECATED: Use definitions in spark_token.proto instead
 message TokenTransaction {
     oneof token_inputs {
         TokenMintInput mint_input = 1;
@@ -590,6 +596,7 @@ message TokenTransaction {
     Network network = 10 [(validate.rules).enum = {not_in: [0]}];
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 message SignatureWithIndex {
     // This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
     bytes signature = 1 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
@@ -597,6 +604,7 @@ message SignatureWithIndex {
     uint32 input_index = 2;
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 message OperatorSpecificTokenTransactionSignablePayload {
     bytes final_token_transaction_hash = 1 [(validate.rules).bytes.len = 32];
     bytes operator_identity_public_key = 2 [(validate.rules).bytes.len = 33];
@@ -604,17 +612,20 @@ message OperatorSpecificTokenTransactionSignablePayload {
 
 // This message allows the sender of a output being spent to provide final evidence
 // that it owns a output to an SO when requesting signing and release of the  revocation keyshare.
+// DEPRECATED: Use definitions in spark_token.proto instead
 message OperatorSpecificOwnerSignature {
     SignatureWithIndex owner_signature = 1;
     OperatorSpecificTokenTransactionSignablePayload payload = 2;
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 message RevocationSecretWithIndex {
     // The index of the input TTXO associated with this secret.
     uint32 input_index = 1;
     bytes revocation_secret = 2 [(validate.rules).bytes.len = 32];
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 message FreezeTokensPayload {
     bytes owner_public_key = 1 [(validate.rules).bytes.len = 33];
     bytes token_public_key = 2 [(validate.rules).bytes.len = 33];
@@ -625,12 +636,14 @@ message FreezeTokensPayload {
     optional bytes token_identifier = 6 [(validate.rules).bytes.len = 32];
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 message FreezeTokensRequest {
     FreezeTokensPayload freeze_tokens_payload = 1;
     // This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes.
     bytes issuer_signature = 2 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
 }
 
+// DEPRECATED: Use definitions in spark_token.proto instead
 message FreezeTokensResponse {
     repeated string impacted_output_ids = 1 [(validate.rules).repeated.items.string.uuid = true];
     bytes impacted_token_amount = 2;  // Decoded uint128
