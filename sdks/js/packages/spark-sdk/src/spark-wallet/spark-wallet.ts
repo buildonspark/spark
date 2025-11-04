@@ -1,6 +1,5 @@
 import { CurrencyUnit, isObject } from "@lightsparkdev/core";
-import { hmac } from "@noble/hashes/hmac";
-import { secp256k1 } from "@noble/curves/secp256k1";
+import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToHex,
   bytesToNumberBE,
@@ -10,7 +9,7 @@ import {
 } from "@noble/curves/utils";
 import { validateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
-import { Address, OutScript, Transaction } from "@scure/btc-signer";
+import { Address, OutScript, SigHash, Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { Mutex } from "async-mutex";
 import { uuidv7, uuidv7obj } from "uuidv7";
@@ -59,6 +58,10 @@ import {
   TreeNodeStatus,
   UtxoSwapRequestType,
 } from "../proto/spark.js";
+import {
+  createSenderSpendTx,
+  createReceiverSpendTx,
+} from "../utils/htlc-transactions.js";
 import {
   QueryTokenTransactionsResponse,
   OutputWithPreviousTransactionData,
@@ -3928,6 +3931,108 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
     return transfer;
   }
 
+  async createHTLCSenderSpendTx({
+    htlcTx,
+    hash,
+    hashLockDestinationPubkey,
+    sequenceLockDestinationPubkey,
+    satsPerVbyteFee,
+  }: {
+    htlcTx: string;
+    hash: string;
+    hashLockDestinationPubkey: string;
+    sequenceLockDestinationPubkey: string;
+    satsPerVbyteFee: number;
+  }): Promise<string> {
+    const fee =
+      satsPerVbyteFee * getTxEstimatedVbytesSizeByNumberOfInputsOutputs(1, 1);
+    const htlxTxFromHex = Transaction.fromRaw(hexToBytes(htlcTx));
+    const hashBytes = hexToBytes(hash);
+    const hashLockDestinationPubkeyBytes = hexToBytes(
+      hashLockDestinationPubkey,
+    );
+    const sequenceLockDestinationPubkeyBytes = hexToBytes(
+      sequenceLockDestinationPubkey,
+    );
+
+    const { senderSpendTx } = createSenderSpendTx({
+      htlcTx: htlxTxFromHex,
+      network: getNetwork(this.config.getNetwork()),
+      hash: hashBytes,
+      hashLockDestinationPubkey: hashLockDestinationPubkeyBytes,
+      sequenceLockDestinationPubkey: sequenceLockDestinationPubkeyBytes,
+      fee,
+    });
+
+    this.config.signer.signTransactionIndex(
+      senderSpendTx,
+      0,
+      await this.config.signer.getIdentityPublicKey(),
+    );
+
+    senderSpendTx.finalizeIdx(0);
+
+    return senderSpendTx.hex;
+  }
+
+  async createHTLCReceiverSpendTx({
+    htlcTx,
+    hash,
+    hashLockDestinationPubkey,
+    sequenceLockDestinationPubkey,
+    preimage,
+    satsPerVbyteFee,
+  }: {
+    htlcTx: string;
+    hash: string;
+    hashLockDestinationPubkey: string;
+    sequenceLockDestinationPubkey: string;
+    preimage: string;
+    satsPerVbyteFee: number;
+  }): Promise<string> {
+    const fee =
+      satsPerVbyteFee * getTxEstimatedVbytesSizeByNumberOfInputsOutputs(1, 1);
+    const htlxTxFromHex = Transaction.fromRaw(hexToBytes(htlcTx));
+    const hashBytes = hexToBytes(hash);
+    const hashLockDestinationPubkeyBytes = hexToBytes(
+      hashLockDestinationPubkey,
+    );
+    const sequenceLockDestinationPubkeyBytes = hexToBytes(
+      sequenceLockDestinationPubkey,
+    );
+
+    const { spendTx, controlBlockBytes, leafHash, hashLockScript } =
+      createReceiverSpendTx({
+        htlcTx: htlxTxFromHex,
+        network: getNetwork(this.config.getNetwork()),
+        hash: hashBytes,
+        hashLockDestinationPubkey: hashLockDestinationPubkeyBytes,
+        sequenceLockDestinationPubkey: sequenceLockDestinationPubkeyBytes,
+        fee,
+      });
+
+    this.config.signer.signTransactionIndex(
+      spendTx,
+      0,
+      await this.config.signer.getIdentityPublicKey(),
+    );
+
+    const sig = spendTx
+      .getInput(0)
+      .tapScriptSig!.find(([ref]) => equalBytes(ref.leafHash, leafHash))?.[1];
+
+    spendTx.updateInput(0, {
+      finalScriptWitness: [
+        sig!,
+        hexToBytes(preimage),
+        hashLockScript,
+        controlBlockBytes,
+      ],
+    });
+
+    return spendTx.hex;
+  }
+
   /**
    * Fulfills one or more Spark invoices.
    *
@@ -5565,6 +5670,8 @@ const PUBLIC_SPARK_WALLET_METHODS = [
   "createHTLC",
   "getHTLCPreimage",
   "claimHTLC",
+  "createHTLCSenderSpendTx",
+  "createHTLCReceiverSpendTx",
   "createLightningInvoice",
   "createSatsInvoice",
   "createTokensInvoice",

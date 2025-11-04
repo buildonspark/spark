@@ -326,6 +326,8 @@ const commands = [
   "payinvoice",
   "createhtlc",
   "claimhtlc",
+  "createhtlcsenderspendtx",
+  "createhtlcreceiverspendtx",
   "sendtransfer",
   "withdraw",
   "withdrawalfee",
@@ -641,6 +643,8 @@ async function runCLI() {
   createsparkinvoice <asset("btc" | tokenIdentifier)> [amount] [memo] [senderPublicKey] [expiryTime] - Create a spark payment request. Amount is optional. Use _ for empty optional fields eg createsparkinvoice btc _ memo _ _
   createhtlc <receiverSparkAddress> <amountSats> <expiryTimeMinutes> <preimage> - Create a HTLC
   claimhtlc <preimage>                                                - Claim a HTLC
+  createhtlcsenderspendtx <htlcTx> <sequence> <hash> <hashLockDestinationPubkey> <sequenceLockDestinationPubkey> <satsPerVbyteFee> - Create a sender spend transaction for a HTLC
+  createhtlcreceiverspendtx <htlcTx> <hash> <hashLockDestinationPubkey> <sequenceLockDestinationPubkey> <preimage> <satsPerVbyteFee> - Create a receiver spend transaction for a HTLC
   sendtransfer <amount> <receiverSparkAddress>                        - Send a spark transfer
   withdraw <amount> <onchainAddress> <exitSpeed(FAST|MEDIUM|SLOW)> [deductFeeFromWithdrawalAmount(true|false)] - Withdraw funds to an L1 address
   withdrawalfee <amount> <withdrawalAddress>                          - Get a fee estimate for a withdrawal (cooperative exit)
@@ -1358,6 +1362,35 @@ async function runCLI() {
           }
           const htlc = await wallet.claimHTLC(args[0]);
           console.log(htlc);
+          break;
+        case "createhtlcsenderspendtx":
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          const senderSpendTx = await wallet.createHTLCSenderSpendTx({
+            htlcTx: args[0],
+            hash: args[1],
+            hashLockDestinationPubkey: args[2],
+            sequenceLockDestinationPubkey: args[3],
+            satsPerVbyteFee: parseInt(args[4]),
+          });
+          console.log(senderSpendTx);
+          break;
+        case "createhtlcreceiverspendtx":
+          if (!wallet) {
+            console.log("Please initialize a wallet first");
+            break;
+          }
+          const receiverSpendTx = await wallet.createHTLCReceiverSpendTx({
+            htlcTx: args[0],
+            hash: args[1],
+            hashLockDestinationPubkey: args[2],
+            sequenceLockDestinationPubkey: args[3],
+            preimage: args[4],
+            satsPerVbyteFee: parseInt(args[5]),
+          });
+          console.log(receiverSpendTx);
           break;
         case "sendtransfer":
           if (!wallet) {
