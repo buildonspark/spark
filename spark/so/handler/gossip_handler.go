@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -373,15 +374,19 @@ func (h *GossipHandler) handleUpdateWalletSettingGossipMessage(ctx context.Conte
 		return nil
 	}
 
-	logger.Sugar().Infof("Handling wallet setting update gossip message for identity public key %x", updateWalletSetting.OwnerIdentityPublicKey)
+	ownerIdentityPubKey, err := keys.ParsePublicKey(updateWalletSetting.GetOwnerIdentityPublicKey())
+	if err != nil {
+		logger.Error("Failed to parse owner identity public key", zap.Error(err))
+	}
+	logger.Sugar().Infof("Handling wallet setting update gossip message for identity public key %s", ownerIdentityPubKey)
 
 	walletSettingHandler := NewWalletSettingHandler(h.config)
-	_, err := walletSettingHandler.UpdateWalletSettingInternal(ctx, updateWalletSetting.OwnerIdentityPublicKey, updateWalletSetting.PrivateEnabled)
+	_, err = walletSettingHandler.UpdateWalletSettingInternal(ctx, ownerIdentityPubKey, updateWalletSetting.GetPrivateEnabled())
 	if err != nil {
 		logger.Error("failed to update wallet setting from gossip message", zap.Error(err))
 		return err
 	}
 
-	logger.Sugar().Infof("Successfully updated wallet setting from gossip message for identity public key %x", updateWalletSetting.OwnerIdentityPublicKey)
+	logger.Sugar().Infof("Successfully updated wallet setting from gossip message for identity public key %x", ownerIdentityPubKey)
 	return nil
 }

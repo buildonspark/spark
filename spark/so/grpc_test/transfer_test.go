@@ -880,12 +880,7 @@ func TestValidSparkInvoiceTransfer(t *testing.T) {
 	require.NoError(t, err)
 	sigBytes := sig.Serialize()
 
-	invoice, err := common.EncodeSparkAddressWithSignature(
-		receiverPublicKey.Serialize(),
-		network,
-		invoiceFields,
-		sigBytes,
-	)
+	invoice, err := common.EncodeSparkAddressWithSignature(receiverPublicKey, network, invoiceFields, sigBytes)
 	require.NoError(t, err)
 
 	// Should succeed on first attempt.
@@ -924,12 +919,7 @@ func TestValidSparkInvoiceTransferEmptySenderPublicKey(t *testing.T) {
 	require.NoError(t, err)
 	sigBytes := sig.Serialize()
 
-	invoice, err := common.EncodeSparkAddressWithSignature(
-		receiverPublicKey.Serialize(),
-		network,
-		invoiceFields,
-		sigBytes,
-	)
+	invoice, err := common.EncodeSparkAddressWithSignature(receiverPublicKey, network, invoiceFields, sigBytes)
 	require.NoError(t, err)
 
 	// Should succeed on first attempt.
@@ -967,12 +957,7 @@ func TestValidSparkInvoiceTransferEmptyExpiry(t *testing.T) {
 	require.NoError(t, err)
 	sigBytes := sig.Serialize()
 
-	invoice, err := common.EncodeSparkAddressWithSignature(
-		receiverPublicKey.Serialize(),
-		network,
-		invoiceFields,
-		sigBytes,
-	)
+	invoice, err := common.EncodeSparkAddressWithSignature(receiverPublicKey, network, invoiceFields, sigBytes)
 	require.NoError(t, err)
 
 	// Should succeed on first attempt.
@@ -1010,12 +995,7 @@ func TestValidSparkInvoiceTransferEmptyMemo(t *testing.T) {
 	require.NoError(t, err)
 	sigBytes := sig.Serialize()
 
-	invoice, err := common.EncodeSparkAddressWithSignature(
-		receiverPublicKey.Serialize(),
-		network,
-		invoiceFields,
-		sigBytes,
-	)
+	invoice, err := common.EncodeSparkAddressWithSignature(receiverPublicKey, network, invoiceFields, sigBytes)
 	require.NoError(t, err)
 
 	// Should succeed on first attempt.
@@ -1053,12 +1033,7 @@ func TestValidSparkInvoiceTransferEmptyAmount(t *testing.T) {
 	require.NoError(t, err)
 	sigBytes := sig.Serialize()
 
-	invoice, err := common.EncodeSparkAddressWithSignature(
-		receiverPublicKey.Serialize(),
-		network,
-		invoiceFields,
-		sigBytes,
-	)
+	invoice, err := common.EncodeSparkAddressWithSignature(receiverPublicKey, network, invoiceFields, sigBytes)
 	require.NoError(t, err)
 
 	// Should succeed on first attempt.
@@ -1090,12 +1065,7 @@ func TestValidSparkInvoiceTransferEmptySignature(t *testing.T) {
 		&tenMinutesFromNow,
 	)
 
-	invoice, err := common.EncodeSparkAddressWithSignature(
-		receiverPublicKey.Serialize(),
-		network,
-		invoiceFields,
-		nil,
-	)
+	invoice, err := common.EncodeSparkAddressWithSignature(receiverPublicKey, network, invoiceFields, nil)
 	require.NoError(t, err)
 
 	// Should succeed on first attempt.
@@ -1112,8 +1082,11 @@ func TestNonCanonicalInvoiceShouldError(t *testing.T) {
 	rng := rand.NewChaCha8(deterministicSeedFromTestName(t.Name()))
 	decoded, err := common.DecodeSparkAddress(nonCanonicalInvoice)
 	require.NoError(t, err)
+	identityPublicKey, err := keys.ParsePublicKey(decoded.SparkAddress.IdentityPublicKey)
+	require.NoError(t, err)
+
 	reEncoded, err := common.EncodeSparkAddressWithSignature(
-		decoded.SparkAddress.IdentityPublicKey,
+		identityPublicKey,
 		decoded.Network,
 		decoded.SparkAddress.SparkInvoiceFields,
 		decoded.SparkAddress.Signature,
@@ -1154,12 +1127,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedSender(t *testing.T
 	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
 	require.NoError(t, err)
 
-	invoice, err := common.EncodeSparkAddressWithSignature(
-		receiverPublicKey.Serialize(),
-		network,
-		invoiceFields,
-		sig.Serialize(),
-	)
+	invoice, err := common.EncodeSparkAddressWithSignature(receiverPublicKey, network, invoiceFields, sig.Serialize())
 	require.NoError(t, err)
 
 	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
@@ -1195,7 +1163,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedReceiver(t *testing
 
 	mismatchedReceiver := keys.MustGeneratePrivateKeyFromRand(rng)
 	invoice, err := common.EncodeSparkAddressWithSignature(
-		mismatchedReceiver.Public().Serialize(),
+		mismatchedReceiver.Public(),
 		network,
 		invoiceFields,
 		sig.Serialize(),
@@ -1233,12 +1201,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithInvoiceAmountLessThanSentAmou
 	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
 	require.NoError(t, err)
 
-	invoice, err := common.EncodeSparkAddressWithSignature(
-		receiverPublicKey.Serialize(),
-		network,
-		invoiceFields,
-		sig.Serialize(),
-	)
+	invoice, err := common.EncodeSparkAddressWithSignature(receiverPublicKey, network, invoiceFields, sig.Serialize())
 	require.NoError(t, err)
 
 	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
@@ -1272,12 +1235,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithInvoiceAmountGreaterThanSentA
 	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
 	require.NoError(t, err)
 
-	invoice, err := common.EncodeSparkAddressWithSignature(
-		receiverPublicKey.Serialize(),
-		network,
-		invoiceFields,
-		sig.Serialize(),
-	)
+	invoice, err := common.EncodeSparkAddressWithSignature(receiverPublicKey, network, invoiceFields, sig.Serialize())
 	require.NoError(t, err)
 
 	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
@@ -1311,12 +1269,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithExpiredInvoice(t *testing.T) 
 	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
 	require.NoError(t, err)
 
-	invoice, err := common.EncodeSparkAddressWithSignature(
-		receiverPublicKey.Serialize(),
-		network,
-		invoiceFields,
-		sig.Serialize(),
-	)
+	invoice, err := common.EncodeSparkAddressWithSignature(receiverPublicKey, network, invoiceFields, sig.Serialize())
 	require.NoError(t, err)
 
 	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
@@ -1351,12 +1304,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithInvalidSignature(t *testing.T
 	sig, err := schnorr.Sign(senderPrivKey.ToBTCEC(), invoiceHash)
 	require.NoError(t, err)
 
-	invoice, err := common.EncodeSparkAddressWithSignature(
-		receiverPublicKey.Serialize(),
-		network,
-		invoiceFields,
-		sig.Serialize(),
-	)
+	invoice, err := common.EncodeSparkAddressWithSignature(receiverPublicKey, network, invoiceFields, sig.Serialize())
 	require.NoError(t, err)
 
 	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
@@ -1390,12 +1338,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithMismatchedNetwork(t *testing.
 	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
 	require.NoError(t, err)
 
-	invoice, err := common.EncodeSparkAddressWithSignature(
-		receiverPublicKey.Serialize(),
-		mismatchedNetwork,
-		invoiceFields,
-		sig.Serialize(),
-	)
+	invoice, err := common.EncodeSparkAddressWithSignature(receiverPublicKey, mismatchedNetwork, invoiceFields, sig.Serialize())
 	require.NoError(t, err)
 
 	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
@@ -1431,12 +1374,7 @@ func TestInvalidSparkInvoiceTransferShouldErrorWithTokensInvoice(t *testing.T) {
 	sig, err := schnorr.Sign(receiverPrivKey.ToBTCEC(), invoiceHash)
 	require.NoError(t, err)
 
-	invoice, err := common.EncodeSparkAddressWithSignature(
-		receiverPublicKey.Serialize(),
-		network,
-		invoiceFields,
-		sig.Serialize(),
-	)
+	invoice, err := common.EncodeSparkAddressWithSignature(receiverPublicKey, network, invoiceFields, sig.Serialize())
 	require.NoError(t, err)
 
 	_, _, _, err = sendTransferWithInvoice(t, invoice, senderPrivKey, receiverPrivKey)
@@ -1582,12 +1520,7 @@ func TestQuerySparkInvoicesForUnknownInvoiceReturnsNotFound(t *testing.T) {
 	require.NoError(t, err)
 	sigBytes := sig.Serialize()
 
-	invoice, err := common.EncodeSparkAddressWithSignature(
-		receiverPublicKey.Serialize(),
-		network,
-		invoiceFields,
-		sigBytes,
-	)
+	invoice, err := common.EncodeSparkAddressWithSignature(receiverPublicKey, network, invoiceFields, sigBytes)
 	require.NoError(t, err)
 
 	senderConfig := wallet.NewTestWalletConfig(t)
@@ -1750,6 +1683,5 @@ func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
 }
 
 func deterministicSeedFromTestName(testName string) [32]byte {
-	hash := sha256.Sum256([]byte(testName))
-	return hash
+	return sha256.Sum256([]byte(testName))
 }

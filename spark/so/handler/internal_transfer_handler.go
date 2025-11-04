@@ -170,15 +170,15 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 		return fmt.Errorf("failed to parse transfer type during initiate transfer for transfer id: %s with req.Type: %s and error: %w", req.TransferId, req.Type, err)
 	}
 
-	senderIDPubKey, err := keys.ParsePublicKey(req.SenderIdentityPublicKey)
+	senderIdentityPubKey, err := keys.ParsePublicKey(req.GetSenderIdentityPublicKey())
 	if err != nil {
-		return fmt.Errorf("failed to parse sender identity public key: %w", err)
+		return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse sender identity public key: %w", err))
 	}
-	receiverIDPubKey, err := keys.ParsePublicKey(req.ReceiverIdentityPublicKey)
+	receiverIdentityPubKey, err := keys.ParsePublicKey(req.GetReceiverIdentityPublicKey())
 	if err != nil {
-		return fmt.Errorf("failed to parse receiver identity public key: %w", err)
+		return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver identity public key: %w", err))
 	}
-	keyTweakMap, err := h.ValidateTransferPackage(ctx, req.TransferId, req.TransferPackage, senderIDPubKey)
+	keyTweakMap, err := h.ValidateTransferPackage(ctx, req.TransferId, req.TransferPackage, senderIdentityPubKey)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 			}
 			leafIDs[i] = leafID
 		}
-		err = validateSatsSparkInvoice(ctx, req.SparkInvoice, req.ReceiverIdentityPublicKey, req.SenderIdentityPublicKey, leafIDs, false)
+		err = validateSatsSparkInvoice(ctx, req.SparkInvoice, receiverIdentityPubKey, senderIdentityPubKey, leafIDs, false)
 		if err != nil {
 			return fmt.Errorf("failed to validate sats spark invoice: %s for transfer id: %s. error: %w", req.SparkInvoice, req.TransferId, err)
 		}
@@ -203,7 +203,7 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 	var primaryTransferId uuid.UUID
 	if req.GetPrimaryTransferId() != "" {
 		if primaryTransferId, err = uuid.Parse(req.GetPrimaryTransferId()); err != nil {
-			return fmt.Errorf("Unable to parse primary transfer uuid for transfer id %s: %w", req.TransferId, err)
+			return fmt.Errorf("unable to parse primary transfer uuid for transfer id %s: %w", req.TransferId, err)
 		}
 	}
 
@@ -269,8 +269,8 @@ func (h *InternalTransferHandler) InitiateTransfer(ctx context.Context, req *pbi
 		req.TransferId,
 		transferType,
 		req.ExpiryTime.AsTime(),
-		senderIDPubKey,
-		receiverIDPubKey,
+		senderIdentityPubKey,
+		receiverIdentityPubKey,
 		cpfpLeafRefundMap,
 		directLeafRefundMap,
 		directFromCpfpLeafRefundMap,
@@ -582,20 +582,12 @@ func compareTxs(rawTx1, rawTx2 []byte) (bool, error) {
 	return true, nil
 }
 
-func validateSatsSparkInvoice(ctx context.Context, invoice string, receiverIdentityPublicKey []byte, senderIdentityPublicKey []byte, leafIDsToSend []uuid.UUID, checkExpiry bool) error {
+func validateSatsSparkInvoice(ctx context.Context, invoice string, receiverPublicKey keys.Public, senderPublicKey keys.Public, leafIDsToSend []uuid.UUID, checkExpiry bool) error {
 	now := time.Now().UTC()
 	dedupLeafIDs := dedupUUIDs(leafIDsToSend)
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
-	}
-	receiverPublicKey, err := keys.ParsePublicKey(receiverIdentityPublicKey)
-	if err != nil {
-		return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver identity public key: %w", err))
-	}
-	senderPublicKey, err := keys.ParsePublicKey(senderIdentityPublicKey)
-	if err != nil {
-		return sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse sender identity public key: %w", err))
 	}
 
 	decodedInvoice, err := common.ParseSparkInvoice(invoice)

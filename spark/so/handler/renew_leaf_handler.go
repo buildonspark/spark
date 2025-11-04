@@ -190,98 +190,49 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 	}
 
 	// Create node transaction signing job (FIRST)
-	nodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.NodeTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		renewTxs.NodeTx,
-		renewTxs.SplitNodeTx.TxOut[0],
-	)
+	nodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.NodeTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, renewTxs.NodeTx, renewTxs.SplitNodeTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
 	signingJobs = append(signingJobs, nodeSigningJobHelper)
 
 	// Create refund transaction signing job (SECOND)
-	refundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.RefundTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		renewTxs.RefundTx,
-		renewTxs.NodeTx.TxOut[0],
-	)
+	refundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.RefundTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, renewTxs.RefundTx, renewTxs.NodeTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
 	signingJobs = append(signingJobs, refundSigningJobHelper)
 
 	// Create split node transaction signing job (THIRD) - for extend flow
-	splitNodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.SplitNodeTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		renewTxs.SplitNodeTx,
-		parentTx.TxOut[0],
-	)
+	splitNodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.SplitNodeTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, renewTxs.SplitNodeTx, parentTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
 	signingJobs = append(signingJobs, splitNodeSigningJobHelper)
 
 	// Create direct split node transaction signing job (FOURTH)
-	directSplitNodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.SplitNodeDirectTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		renewTxs.DirectSplitNodeTx,
-		parentTx.TxOut[0],
-	)
+	directSplitNodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.SplitNodeDirectTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, renewTxs.DirectSplitNodeTx, parentTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
 	signingJobs = append(signingJobs, directSplitNodeSigningJobHelper)
 
 	// Create direct node transaction signing job (FIFTH)
-	directNodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.DirectNodeTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		renewTxs.DirectNodeTx,
-		renewTxs.SplitNodeTx.TxOut[0],
-	)
+	directNodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.DirectNodeTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, renewTxs.DirectNodeTx, renewTxs.SplitNodeTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
 	signingJobs = append(signingJobs, directNodeSigningJobHelper)
 
 	// Create direct refund transaction signing job (SIXTH)
-	directRefundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.DirectRefundTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		renewTxs.DirectRefundTx,
-		renewTxs.DirectNodeTx.TxOut[0],
-	)
+	directRefundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.DirectRefundTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, renewTxs.DirectRefundTx, renewTxs.DirectNodeTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
 	signingJobs = append(signingJobs, directRefundSigningJobHelper)
 
 	// Create direct from CPFP refund transaction signing job (SEVENTH)
-	directFromCpfpRefundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.DirectFromCpfpRefundTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		renewTxs.DirectFromCpfpRefundTx,
-		renewTxs.NodeTx.TxOut[0],
-	)
+	directFromCpfpRefundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.DirectFromCpfpRefundTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, renewTxs.DirectFromCpfpRefundTx, renewTxs.NodeTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
@@ -523,70 +474,35 @@ func (h *RenewLeafHandler) renewRefundTimelock(ctx context.Context, signingJob *
 	}
 
 	// Create node transaction signing job (FIRST)
-	nodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.NodeTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		refundTxs.NodeTx,
-		parentTx.TxOut[0],
-	)
+	nodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.NodeTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, refundTxs.NodeTx, parentTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
 	signingJobs = append(signingJobs, nodeSigningJobHelper)
 
 	// Create refund transaction signing job (SECOND)
-	refundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.RefundTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		refundTxs.RefundTx,
-		refundTxs.NodeTx.TxOut[0],
-	)
+	refundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.RefundTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, refundTxs.RefundTx, refundTxs.NodeTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
 	signingJobs = append(signingJobs, refundSigningJobHelper)
 
 	// Create direct node transaction signing job (THIRD)
-	directNodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.DirectNodeTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		refundTxs.DirectNodeTx,
-		parentTx.TxOut[0],
-	)
+	directNodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.DirectNodeTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, refundTxs.DirectNodeTx, parentTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
 	signingJobs = append(signingJobs, directNodeSigningJobHelper)
 
 	// Create direct refund transaction signing job (FOURTH)
-	directRefundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.DirectRefundTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		refundTxs.DirectRefundTx,
-		refundTxs.DirectNodeTx.TxOut[0],
-	)
+	directRefundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.DirectRefundTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, refundTxs.DirectRefundTx, refundTxs.DirectNodeTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
 	signingJobs = append(signingJobs, directRefundSigningJobHelper)
 
 	// Create direct from CPFP refund transaction signing job (FIFTH)
-	directFromCpfpRefundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.DirectFromCpfpRefundTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		refundTxs.DirectFromCpfpRefundTx,
-		refundTxs.NodeTx.TxOut[0],
-	)
+	directFromCpfpRefundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.DirectFromCpfpRefundTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, refundTxs.DirectFromCpfpRefundTx, refundTxs.NodeTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
@@ -747,56 +663,28 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 	}
 
 	// Create node transaction signing job (FIRST)
-	nodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.NodeTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		zeroTxs.NodeTx,
-		originalTx.TxOut[0], // New node tx spends from original tx directly
-	)
+	nodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.NodeTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, zeroTxs.NodeTx, originalTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
 	signingJobs = append(signingJobs, nodeSigningJobHelper)
 
 	// Create refund transaction signing job (SECOND)
-	refundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.RefundTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		zeroTxs.RefundTx,
-		zeroTxs.NodeTx.TxOut[0],
-	)
+	refundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.RefundTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, zeroTxs.RefundTx, zeroTxs.NodeTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
 	signingJobs = append(signingJobs, refundSigningJobHelper)
 
 	// Create direct node transaction signing job (THIRD)
-	directNodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.DirectNodeTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		zeroTxs.DirectNodeTx,
-		originalTx.TxOut[0],
-	)
+	directNodeSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.DirectNodeTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, zeroTxs.DirectNodeTx, originalTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}
 	signingJobs = append(signingJobs, directNodeSigningJobHelper)
 
 	// Create direct from CPFP refund transaction signing job (FOURTH)
-	directFromCpfpRefundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(
-		ctx,
-		signingJob.DirectFromCpfpRefundTxSigningJob,
-		signingKeyshare,
-		leaf.VerifyingPubkey,
-		zeroTxs.DirectFromCpfpRefundTx,
-		zeroTxs.NodeTx.TxOut[0],
-	)
+	directFromCpfpRefundSigningJobHelper, err := helper.NewSigningJobWithPregeneratedNonce(signingJob.DirectFromCpfpRefundTxSigningJob, signingKeyshare, leaf.VerifyingPubkey, zeroTxs.DirectFromCpfpRefundTx, zeroTxs.NodeTx.TxOut[0])
 	if err != nil {
 		return nil, err
 	}

@@ -159,15 +159,15 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	))
 	defer span.End()
 
-	reqOwnerIDPubKey, err := keys.ParsePublicKey(req.OwnerIdentityPublicKey)
+	reqOwnerIdentityPubKey, err := keys.ParsePublicKey(req.GetOwnerIdentityPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("invalid identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse owner identity public key: %w", err))
 	}
-	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIDPubKey); err != nil {
+	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, reqOwnerIdentityPubKey); err != nil {
 		return nil, err
 	}
 
-	leafTweakMap, err := h.ValidateTransferPackage(ctx, req.TransferId, req.TransferPackage, reqOwnerIDPubKey)
+	leafTweakMap, err := h.ValidateTransferPackage(ctx, req.TransferId, req.TransferPackage, reqOwnerIdentityPubKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate transfer package for transfer %s: %w", req.TransferId, err)
 	}
@@ -191,9 +191,9 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	leafDirectRefundMap := h.loadDirectLeafRefundMap(req)
 	leafDirectFromCpfpRefundMap := h.loadDirectFromCpfpLeafRefundMap(req)
 
-	reqReceiverIDPubKey, err := keys.ParsePublicKey(req.ReceiverIdentityPublicKey)
+	receiverIdentityPubKey, err := keys.ParsePublicKey(req.GetReceiverIdentityPublicKey())
 	if err != nil {
-		return nil, fmt.Errorf("invalid receiver identity public key: %w", err)
+		return nil, sparkerrors.InvalidArgumentMalformedKey(fmt.Errorf("failed to parse receiver identity public key: %w", err))
 	}
 
 	if len(req.SparkInvoice) > 0 {
@@ -205,7 +205,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 			}
 			leafIDsToSend[i] = leafID
 		}
-		err = validateSatsSparkInvoice(ctx, req.SparkInvoice, req.ReceiverIdentityPublicKey, req.OwnerIdentityPublicKey, leafIDsToSend, true)
+		err = validateSatsSparkInvoice(ctx, req.SparkInvoice, receiverIdentityPubKey, reqOwnerIdentityPubKey, leafIDsToSend, true)
 		if err != nil {
 			return nil, fmt.Errorf("failed to validate sats spark invoice: %s for transfer id: %s. error: %w", req.SparkInvoice, req.TransferId, err)
 		}
@@ -247,8 +247,8 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 		req.TransferId,
 		transferType,
 		req.ExpiryTime.AsTime(),
-		reqOwnerIDPubKey,
-		reqReceiverIDPubKey,
+		reqOwnerIdentityPubKey,
+		receiverIdentityPubKey,
 		leafCpfpRefundMap,
 		leafDirectRefundMap,
 		leafDirectFromCpfpRefundMap,

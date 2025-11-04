@@ -514,26 +514,21 @@ type createSparkInvoiceParams struct {
 func createSparkInvoice(params createSparkInvoiceParams) (string, error) {
 	version := params.Version
 	receiverPublicKey := params.ReceiverPublicKey
-	senderPublicKeyPtr := params.SenderPublicKey
+	senderPublicKey := params.SenderPublicKey
 	amount := params.Amount
 	expiryTime := params.ExpiryTime
 	memo := params.Memo
 	tokenIdentifier := params.TokenIdentifier
 	network := params.Network
 	satsPayment := params.SatsPayment
+	id := uuid.New()
 
-	var senderPublicKey []byte
-	if senderPublicKeyPtr != (keys.Public{}) {
-		senderPublicKey = senderPublicKeyPtr.Serialize()
-	}
-
-	uuid := uuid.New()
 	sparkInvoiceFields := &sparkpb.SparkInvoiceFields{
 		Version:         version,
-		Id:              uuid[:],
+		Id:              id[:],
 		ExpiryTime:      expiryTime,
 		Memo:            memo,
-		SenderPublicKey: senderPublicKey,
+		SenderPublicKey: senderPublicKey.Serialize(),
 	}
 	if satsPayment {
 		sparkInvoiceFields.PaymentType = &sparkpb.SparkInvoiceFields_SatsPayment{
@@ -554,7 +549,7 @@ func createSparkInvoice(params createSparkInvoiceParams) (string, error) {
 		}
 	}
 	// If a signer key is provided, compute a signature and use the WithSignature helper
-	if params.SignerPrivKey != (keys.Private{}) {
+	if !params.SignerPrivKey.IsZero() {
 		hash, err := common.HashSparkInvoiceFields(sparkInvoiceFields, network, receiverPublicKey)
 		if err != nil {
 			return "", err
@@ -563,10 +558,10 @@ func createSparkInvoice(params createSparkInvoiceParams) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return common.EncodeSparkAddressWithSignature(receiverPublicKey.Serialize(), network, sparkInvoiceFields, sig.Serialize())
+		return common.EncodeSparkAddressWithSignature(receiverPublicKey, network, sparkInvoiceFields, sig.Serialize())
 	}
 
-	sparkAddress, err := common.EncodeSparkAddress(receiverPublicKey.Serialize(), network, sparkInvoiceFields)
+	sparkAddress, err := common.EncodeSparkAddress(receiverPublicKey, network, sparkInvoiceFields)
 	if err != nil {
 		return "", err
 	}

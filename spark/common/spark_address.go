@@ -19,14 +19,14 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func EncodeSparkAddress(identityPublicKey []byte, network Network, sparkInvoiceFields *pb.SparkInvoiceFields) (string, error) {
+func EncodeSparkAddress(identityPublicKey keys.Public, network Network, sparkInvoiceFields *pb.SparkInvoiceFields) (string, error) {
 	return EncodeSparkAddressWithSignature(identityPublicKey, network, sparkInvoiceFields, nil)
 }
 
 // EncodeSparkAddressWithSignature encodes a SparkAddress including optional signature bytes.
 // If signature is nil or empty, the resulting address will have no signature.
-func EncodeSparkAddressWithSignature(identityPublicKey []byte, network Network, sparkInvoiceFields *pb.SparkInvoiceFields, signature []byte) (string, error) {
-	if len(identityPublicKey) == 0 {
+func EncodeSparkAddressWithSignature(identityPublicKey keys.Public, network Network, sparkInvoiceFields *pb.SparkInvoiceFields, signature []byte) (string, error) {
+	if identityPublicKey.IsZero() {
 		return "", fmt.Errorf("identity public key is required")
 	}
 	if sparkInvoiceFields != nil {
@@ -61,7 +61,7 @@ func EncodeSparkAddressWithSignature(identityPublicKey []byte, network Network, 
 	}
 
 	sparkAddress := &pb.SparkAddress{
-		IdentityPublicKey:  identityPublicKey,
+		IdentityPublicKey:  identityPublicKey.Serialize(),
 		SparkInvoiceFields: sparkInvoiceFields,
 	}
 	if len(signature) > 0 {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -45,14 +46,14 @@ func (h *WalletSettingHandler) UpdateWalletSetting(ctx context.Context, request 
 		return nil, status.Error(codes.InvalidArgument, "at least one field must be provided for update")
 	}
 
-	walletSetting, err := h.UpdateWalletSettingInternal(ctx, identityPubKey.Serialize(), request.PrivateEnabled)
+	walletSetting, err := h.UpdateWalletSettingInternal(ctx, identityPubKey, request.GetPrivateEnabled())
 	if err != nil {
 		logger.Error("failed to update wallet setting", zap.Error(err))
 		return nil, fmt.Errorf("failed to update wallet setting: %w", err)
 	}
 
 	// Send gossip message to notify other operators
-	err = h.sendWalletSettingUpdateGossipMessage(ctx, identityPubKey.Serialize(), request.PrivateEnabled)
+	err = h.sendWalletSettingUpdateGossipMessage(ctx, identityPubKey, request.GetPrivateEnabled())
 	if err != nil {
 		logger.Error("failed to send wallet setting update gossip message", zap.Error(err))
 		return nil, fmt.Errorf("failed to send wallet setting update gossip message: %w", err)
@@ -66,18 +67,13 @@ func (h *WalletSettingHandler) UpdateWalletSetting(ctx context.Context, request 
 	return response, nil
 }
 
-func (h *WalletSettingHandler) UpdateWalletSettingInternal(ctx context.Context, ownerIdentityPublicKeyBytes []byte, privateEnabled *bool) (*ent.WalletSetting, error) {
+func (h *WalletSettingHandler) UpdateWalletSettingInternal(ctx context.Context, ownerIdentityPublicKey keys.Public, privateEnabled bool) (*ent.WalletSetting, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 
 	// Get current wallet setting from database
 	db, err := ent.GetDbFromContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get database from context: %w", err)
-	}
-
-	ownerIdentityPublicKey, err := keys.ParsePublicKey(ownerIdentityPublicKeyBytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
 	}
 
 	walletSetting, err := db.WalletSetting.
@@ -88,22 +84,19 @@ func (h *WalletSettingHandler) UpdateWalletSettingInternal(ctx context.Context, 
 
 	if err == nil {
 		// Update existing wallet setting
-		updateBuilder := walletSetting.Update()
-		if privateEnabled != nil {
-			updateBuilder.SetPrivateEnabled(*privateEnabled)
-		}
-		walletSetting, err = updateBuilder.Save(ctx)
+		walletSetting, err = walletSetting.Update().
+			SetPrivateEnabled(privateEnabled).
+			Save(ctx)
 		if err != nil {
 			logger.Error("failed to update wallet setting", zap.Error(err))
 			return nil, fmt.Errorf("failed to update wallet setting: %w", err)
 		}
 	} else if ent.IsNotFound(err) {
 		// Create new wallet setting
-		createBuilder := db.WalletSetting.Create().SetOwnerIdentityPublicKey(ownerIdentityPublicKey)
-		if privateEnabled != nil {
-			createBuilder.SetPrivateEnabled(*privateEnabled)
-		}
-		walletSetting, err = createBuilder.Save(ctx)
+		walletSetting, err = db.WalletSetting.Create().
+			SetOwnerIdentityPublicKey(ownerIdentityPublicKey).
+			SetPrivateEnabled(privateEnabled).
+			Save(ctx)
 		if err != nil {
 			logger.Error("failed to create wallet setting", zap.Error(err))
 			return nil, fmt.Errorf("failed to create wallet setting: %w", err)
@@ -116,7 +109,7 @@ func (h *WalletSettingHandler) UpdateWalletSettingInternal(ctx context.Context, 
 	return walletSetting, nil
 }
 
-func (h *WalletSettingHandler) sendWalletSettingUpdateGossipMessage(ctx context.Context, ownerIdentityPublicKey []byte, privateEnabled *bool) error {
+func (h *WalletSettingHandler) sendWalletSettingUpdateGossipMessage(ctx context.Context, ownerIdentityPublicKey keys.Public, privateEnabled bool) error {
 	// Get operator selection to exclude self
 	selection := helper.OperatorSelection{
 		Option: helper.OperatorSelectionOptionExcludeSelf,
@@ -131,8 +124,8 @@ func (h *WalletSettingHandler) sendWalletSettingUpdateGossipMessage(ctx context.
 	_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
 		Message: &pbgossip.GossipMessage_UpdateWalletSetting{
 			UpdateWalletSetting: &pbgossip.GossipMessageUpdateWalletSetting{
-				OwnerIdentityPublicKey: ownerIdentityPublicKey,
-				PrivateEnabled:         privateEnabled,
+				OwnerIdentityPublicKey: ownerIdentityPublicKey.Serialize(),
+				PrivateEnabled:         proto.Bool(privateEnabled),
 			},
 		},
 	}, participants)

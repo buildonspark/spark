@@ -79,12 +79,8 @@ func TestEncodeDecodeSparkInvoice(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			identityKey, err := hex.DecodeString("02ccb26ba79c63aaf60c9192fd874be3087ae8d8703275df0e558704a6d3a4f132")
-			require.NoError(t, err)
-			identityPublicKey, err := keys.ParsePublicKey(identityKey)
-			require.NoError(t, err)
-			senderPublicKey, err := keys.ParsePublicKey(identityKey)
-			require.NoError(t, err)
+			identityPublicKey := keys.MustParsePublicKeyHex("02ccb26ba79c63aaf60c9192fd874be3087ae8d8703275df0e558704a6d3a4f132")
+			senderPublicKey := identityPublicKey
 
 			testUUID, err := uuid.NewV7()
 			if err != nil {
@@ -154,14 +150,14 @@ func TestEncodeDecodeSparkInvoice(t *testing.T) {
 				satsInvoiceFields.PaymentType = nil
 			}
 
-			tokensInvoice, err := EncodeSparkAddress(identityPublicKey.Serialize(), Regtest, tokenInvoiceFields)
+			tokensInvoice, err := EncodeSparkAddress(identityPublicKey, Regtest, tokenInvoiceFields)
 			if tc.invalidPaymentType || tc.invalidVersion || tc.invalidId || tc.emptyIdentityPublicKey {
 				require.Error(t, err, "expected error")
 			} else {
 				require.NoError(t, err, "failed to encode spark address")
 			}
 
-			satsInvoice, err := EncodeSparkAddress(identityPublicKey.Serialize(), Regtest, satsInvoiceFields)
+			satsInvoice, err := EncodeSparkAddress(identityPublicKey, Regtest, satsInvoiceFields)
 			if tc.invalidPaymentType || tc.invalidVersion || tc.invalidId || tc.emptyIdentityPublicKey || tc.overMaxSatsAmount {
 				require.Error(t, err, "expected error")
 				return // Early return to avoid decoding the invalid invoices
@@ -315,8 +311,11 @@ func TestDecodeAndEncodeKnownSparkAddressProducesSameAddress(t *testing.T) {
 	expectedFromJs := "sparkrt1pgssx5us3wkqjza8g80xz3a9gznx25msq6g3ty8exfym9q3ahcv86vsnzffssqgjzqqejta89sa8su5f05g0vunfzzkj5zr5v4ehgnt9d4hnyggr2wgghtqfpwn5rhnpg7j5pfn92dcqdyg4jrunyjdjsg7muxraxgfn5zcgs8dcr3sxzrqdetshygps36q8rfqg49d0p0447trnpyxh9f76kt9cwrfx4342jym5emx049chkfsz6j9qc0z8cl7ymmsckx42k76c2qm5f5n5kfvyd26x78eyw0ygs502vg42n8ls"
 	dec, err := DecodeSparkAddress(expectedFromJs)
 	require.NoError(t, err)
+	identityPubKey, err := keys.ParsePublicKey(dec.SparkAddress.GetIdentityPublicKey())
+	require.NoError(t, err)
+
 	addr, err := EncodeSparkAddressWithSignature(
-		dec.SparkAddress.GetIdentityPublicKey(),
+		identityPubKey,
 		dec.Network,
 		dec.SparkAddress.GetSparkInvoiceFields(),
 		dec.SparkAddress.GetSignature(),

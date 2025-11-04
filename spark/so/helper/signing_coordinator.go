@@ -376,25 +376,16 @@ func NewSigningJob(keyshare *ent.SigningKeyshare, proto *pbspark.SigningJob, pre
 }
 
 // validateKeysMatch validates that the user and operator keys combine to match the verifying public key
-func validateKeysMatch(ctx context.Context, userSigningPublicKey []byte, operatorPublicKey []byte, verifyingPubKey keys.Public) error {
-	userPubkey, err := keys.ParsePublicKey(userSigningPublicKey)
-	if err != nil {
-		return fmt.Errorf("failed to parse user pubkey: %w", err)
-	}
-	operatorPubkey, err := keys.ParsePublicKey(operatorPublicKey)
-	if err != nil {
-		return fmt.Errorf("failed to parse operator pubkey: %w", err)
-	}
-	combinedKey := operatorPubkey.Add(userPubkey)
+func validateKeysMatch(userSigningPublicKey keys.Public, operatorPublicKey keys.Public, verifyingPubKey keys.Public) error {
+	combinedKey := operatorPublicKey.Add(userSigningPublicKey)
 	if !combinedKey.Equals(verifyingPubKey) {
-		return fmt.Errorf("user key %s and operator key %s combine to %s; expected %s", userPubkey.String(), operatorPubkey.String(), combinedKey.String(), verifyingPubKey.String())
+		return fmt.Errorf("user key %s and operator key %s combine to %s; expected %s", userSigningPublicKey, operatorPublicKey, combinedKey, verifyingPubKey)
 	}
 	return nil
 }
 
 // NewSigningJobWithPregeneratedNonce creates a new signing job with pregenerated nonce commitments.
 func NewSigningJobWithPregeneratedNonce(
-	ctx context.Context,
 	signingJobProto *pbspark.UserSignedTxSigningJob,
 	signingKeyshare *ent.SigningKeyshare,
 	verifyingPubKey keys.Public,
@@ -420,8 +411,12 @@ func NewSigningJobWithPregeneratedNonce(
 		return nil, fmt.Errorf("failed to create user nonce commitment: %w", err)
 	}
 
+	signingPubKey, err := keys.ParsePublicKey(signingJobProto.GetSigningPublicKey())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse signing public key: %w", err)
+	}
 	// Validate keys match
-	err = validateKeysMatch(ctx, signingJobProto.SigningPublicKey, signingKeyshare.PublicKey.Serialize(), verifyingPubKey)
+	err = validateKeysMatch(signingPubKey, signingKeyshare.PublicKey, verifyingPubKey)
 	if err != nil {
 		return nil, fmt.Errorf("transaction key validation failed: %w", err)
 	}

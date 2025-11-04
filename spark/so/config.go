@@ -3,7 +3,6 @@ package so
 import (
 	"context"
 	"database/sql/driver"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -296,11 +295,7 @@ func NewConfig(
 	if err != nil {
 		return nil, err
 	}
-	identityPrivateKeyBytes, err := hex.DecodeString(strings.TrimSpace(string(identityPrivateKeyHexStringBytes)))
-	if err != nil {
-		return nil, err
-	}
-	identityPrivateKey, err := keys.ParsePrivateKey(identityPrivateKeyBytes)
+	identityPrivateKey, err := keys.ParsePrivateKeyHex(strings.TrimSpace(string(identityPrivateKeyHexStringBytes)))
 	if err != nil {
 		return nil, err
 	}

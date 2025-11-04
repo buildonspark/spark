@@ -17,7 +17,7 @@ import (
 
 // encodeSparkAddress is a helper function to encode a public key as a spark address for testing
 func encodeSparkAddress(pubKey keys.Public, network common.Network) string {
-	address, err := common.EncodeSparkAddress(pubKey.Serialize(), network, nil)
+	address, err := common.EncodeSparkAddress(pubKey, network, nil)
 	if err != nil {
 		panic(err)
 	}
