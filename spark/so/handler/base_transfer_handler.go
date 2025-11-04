@@ -691,8 +691,6 @@ func (h *BaseTransferHandler) CancelTransfer(ctx context.Context, req *pbspark.C
 	}
 
 	if transfer.Status != st.TransferStatusSenderInitiated &&
-		transfer.Status != st.TransferStatusSenderKeyTweakPending &&
-		transfer.Status != st.TransferStatusSenderInitiatedCoordinator &&
 		transfer.Status != st.TransferStatusReturned {
 		return nil, fmt.Errorf("transfer %s is expected to be at status TransferStatusSenderInitiated, TransferStatusSenderKeyTweakPending or TransferStatusSenderInitiatedCoordinator or TransferStatusReturned but %s found", transfer.ID.String(), transfer.Status)
 	}

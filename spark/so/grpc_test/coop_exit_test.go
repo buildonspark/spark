@@ -321,39 +321,6 @@ func TestCoopExitCannotClaimBeforeConfirm(t *testing.T) {
 	assert.Equal(t, codes.FailedPrecondition, stat.Code())
 }
 
-// Start coop exit, SSP doesn't broadcast, should be able to cancel after expiry
-func TestCoopExitCancelNoBroadcast(t *testing.T) {
-	coin, err := faucet.Fund()
-	require.NoError(t, err)
-
-	amountSats := int64(100_000)
-	config, sspConfig, transferNode := setupUsers(t, amountSats)
-
-	withdrawPrivKey := keys.GeneratePrivateKey()
-	exitTx, connectorOutputs := createTestCoopExitAndConnectorOutputs(
-		t, sspConfig, 1, coin.OutPoint, withdrawPrivKey.Public(), amountSats,
-	)
-
-	exitTxID, err := hex.DecodeString(exitTx.TxID())
-	require.NoError(t, err)
-	expiryDelta := 1 * time.Second
-	senderTransfer, _, err := wallet.GetConnectorRefundSignatures(
-		t.Context(),
-		config,
-		[]wallet.LeafKeyTweak{transferNode},
-		exitTxID,
-		connectorOutputs,
-		sspConfig.IdentityPublicKey(),
-		time.Now().Add(expiryDelta),
-	)
-	require.NoError(t, err)
-
-	time.Sleep(expiryDelta)
-
-	_, err = wallet.CancelTransfer(t.Context(), config, senderTransfer)
-	require.NoError(t, err)
-}
-
 // Start coop exit, SSP broadcasts, should not be able to cancel after expiry
 func TestCoopExitCannotCancelAfterBroadcast(t *testing.T) {
 	client := sparktesting.GetBitcoinClient()
