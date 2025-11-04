@@ -125,6 +125,9 @@ func init() {
 // Creates a unary server interceptor that enforces a concurrency limit on incoming gRPC requests
 func ConcurrencyInterceptor(guard ResourceLimiter, clientInfoProvider *GRPCClientInfoProvider, knobsService knobs.Knobs) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		ctx, span := tracer.Start(ctx, "ConcurrencyInterceptor")
+		defer span.End()
+
 		// Check if the request should be excluded from concurrency limiting by pubkey or IP.
 		bypassConcurrency := false
 		bypassState := "enforced"

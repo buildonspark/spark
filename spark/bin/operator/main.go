@@ -577,6 +577,7 @@ func main() {
 	serverOpts = append(serverOpts,
 		grpc.UnaryInterceptor(grpcmiddleware.ChainUnaryServer(
 			sparkerrors.ErrorInterceptor(config.ReturnDetailedErrors),
+			sparkgrpc.TracingInterceptor(),
 			sparkgrpc.LogInterceptor(logger.With(zap.String("component", "grpc")), tableLogger),
 			sparkgrpc.SparkTokenMetricsInterceptor(),
 			// Inject knobs into context for unary requests
