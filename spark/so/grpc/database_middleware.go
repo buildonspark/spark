@@ -9,6 +9,7 @@ import (
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/grpcutil"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
@@ -38,11 +39,14 @@ func DatabaseSessionMiddleware(dbClient *ent.Client, factory db.SessionFactory, 
 		sessionCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		// Start a transaction or session
-		session := factory.NewSession(
-			sessionCtx,
-			opts...,
-		)
+		// Use read-only session for query_nodes, regular session for everything else
+		knobsService := knobs.GetKnobsService(ctx)
+		var session ent.Session
+		if knobsService.GetValueTarget(knobs.KnobReadOnlyEndpoints, &info.FullMethod, 0) > 0 {
+			session = db.NewReadOnlySession(sessionCtx, dbClient, opts...)
+		} else {
+			session = factory.NewSession(sessionCtx, opts...)
+		}
 
 		// Attach the transaction to the context
 		ctx = ent.Inject(ctx, session)

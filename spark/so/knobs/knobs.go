@@ -64,6 +64,8 @@ const (
 	KnobOctoberDeprecationEnabled = "spark.so.october_deprecation_enabled"
 
 	KnobPrivacyEnabled = "spark.so.privacy.enabled"
+
+	KnobReadOnlyEndpoints = "spark.so.ro_session"
 )
 
 type Config struct {

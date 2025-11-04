@@ -112,7 +112,7 @@ func DatabaseMiddleware(factory db.SessionFactory, beginTxTimeout *time.Duration
 			opts = append(opts, db.WithTxBeginTimeout(*beginTxTimeout))
 		}
 
-		session := factory.NewSession(
+		var session ent.Session = factory.NewSession(
 			sessionCtx,
 			opts...,
 		)

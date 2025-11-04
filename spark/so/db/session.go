@@ -111,7 +111,7 @@ func getTraceAttributes(operation string, duration float64, err error) []attribu
 
 // SessionFactory is an interface for creating a new Session.
 type SessionFactory interface {
-	NewSession(ctx context.Context, opts ...SessionOption) *Session
+	NewSession(ctx context.Context, opts ...SessionOption) ent.Session
 }
 
 // DefaultSessionFactory is the default implementation of SessionFactory that creates sessions
@@ -165,7 +165,7 @@ func WithMetricAttributes(attrs []attribute.KeyValue) SessionOption {
 	}
 }
 
-func (f *DefaultSessionFactory) NewSession(ctx context.Context, opts ...SessionOption) *Session {
+func (f *DefaultSessionFactory) NewSession(ctx context.Context, opts ...SessionOption) ent.Session {
 	return NewSession(ctx, f.dbClient, f.knobs, opts...)
 }
 
@@ -379,6 +379,45 @@ func (s *Session) getOperationAttributes(operationAttr attribute.KeyValue, statu
 	attrs := []attribute.KeyValue{operationAttr, statusAttr}
 	attrs = append(attrs, s.metricAttrs...)
 	return attrs
+}
+
+// ReadOnlySession is a simplified session for read-only database operations.
+// It doesn't support transactions or notifications, making it lightweight and safe
+// for query-only endpoints.
+type ReadOnlySession struct {
+	dbClient *ent.Client
+}
+
+// NewReadOnlySession creates a new read-only session. SessionOptions are ignored.
+func NewReadOnlySession(ctx context.Context, dbClient *ent.Client, opts ...SessionOption) ent.Session {
+	return &ReadOnlySession{
+		dbClient: dbClient,
+	}
+}
+
+// GetOrBeginTx always returns an error for read-only sessions.
+func (r *ReadOnlySession) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
+	return nil, fmt.Errorf("read-only session does not support explicit transactions")
+}
+
+// GetClient returns the underlying database client directly without a transaction.
+func (r *ReadOnlySession) GetClient(ctx context.Context) (*ent.Client, error) {
+	return r.dbClient, nil
+}
+
+// MarkTxDirty is a no-op for read-only sessions.
+func (r *ReadOnlySession) MarkTxDirty(ctx context.Context) {
+	// No-op: read-only sessions don't have transactions
+}
+
+// GetTxIfExists always returns nil for read-only sessions.
+func (r *ReadOnlySession) GetTxIfExists() *ent.Tx {
+	return nil
+}
+
+// Notify always returns an error for read-only sessions.
+func (r *ReadOnlySession) Notify(ctx context.Context, n ent.Notification) error {
+	return fmt.Errorf("read-only session does not support notifications")
 }
 
 // A wrapper around a TxProvider that includes a timeout for if it takes to long to call `GetOrBeginTx`.

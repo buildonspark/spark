@@ -30,6 +30,11 @@ type TxProvider interface {
 type Session interface {
 	TxProvider
 	MarkTxDirty(context.Context)
+	// GetTxIfExists returns the current transaction if one exists, without starting a new one.
+	// Returns nil if no transaction is currently active.
+	GetTxIfExists() *Tx
+	// Notify buffers a notification to be sent when the current transaction commits.
+	Notify(context.Context, Notification) error
 }
 
 // ClientTxProvider is a TxProvider that uses an underlying ent.Client to create new transactions. This always

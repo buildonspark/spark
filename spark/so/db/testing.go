@@ -30,28 +30,28 @@ import (
 
 // TestSessionFactory is a SessionFactory for returning a specific Session, useful for testing.
 type TestSessionFactory struct {
-	Session *Session
+	Session ent.Session
 }
 
-func (t *TestSessionFactory) NewSession(_ context.Context, _ ...SessionOption) *Session {
+func (t *TestSessionFactory) NewSession(_ context.Context, _ ...SessionOption) ent.Session {
 	return t.Session
 }
 
 type TestContext struct {
 	t            testing.TB
 	Client       *ent.Client
-	Session      *Session
+	Session      ent.Session
 	databasePath string
 }
 
 func (tc *TestContext) close() {
-	if tc.Session.currentTx != nil {
+	if tx := tc.Session.GetTxIfExists(); tx != nil {
 		if tc.t.Failed() {
-			if err := tc.Session.currentTx.Rollback(); err != nil {
+			if err := tx.Rollback(); err != nil {
 				tc.t.Logf("failed to rollback transaction: %v", err)
 			}
 		} else {
-			if err := tc.Session.currentTx.Commit(); err != nil {
+			if err := tx.Commit(); err != nil {
 				tc.t.Logf("failed to commit transaction: %v", err)
 			}
 		}

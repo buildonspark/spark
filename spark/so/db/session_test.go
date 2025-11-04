@@ -336,3 +336,40 @@ func TestTxProviderWithTimeout_NoTimeout(t *testing.T) {
 		t.Fatal("Timed out waiting for the transaction to be returned.")
 	}
 }
+
+func TestReadOnlySession_GetClient(t *testing.T) {
+	dbClient := NewTestSQLiteClient(t)
+	defer dbClient.Close()
+
+	session := NewReadOnlySession(t.Context(), dbClient)
+
+	// GetClient should work fine
+	client, err := session.GetClient(t.Context())
+	require.NoError(t, err)
+	require.NotNil(t, client)
+	require.Equal(t, dbClient, client)
+}
+
+func TestReadOnlySession_GetOrBeginTxErrors(t *testing.T) {
+	dbClient := NewTestSQLiteClient(t)
+	defer dbClient.Close()
+
+	session := NewReadOnlySession(t.Context(), dbClient)
+
+	// GetOrBeginTx should return an error
+	tx, err := session.GetOrBeginTx(t.Context())
+	require.Error(t, err)
+	require.Nil(t, tx)
+	require.Contains(t, err.Error(), "read-only session does not support")
+}
+
+func TestReadOnlySession_GetTxIfExists(t *testing.T) {
+	dbClient := NewTestSQLiteClient(t)
+	defer dbClient.Close()
+
+	session := NewReadOnlySession(t.Context(), dbClient)
+
+	// GetTxIfExists should always return nil
+	tx := session.GetTxIfExists()
+	require.Nil(t, tx)
+}
