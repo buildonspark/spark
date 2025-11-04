@@ -93,6 +93,61 @@ run = """kubectl --context minikube -n bitcoin exec regtest-bitcoind-0 -- \
     sendrawtransaction {{arg(name="hex")}}
     """
 
+[tasks.testmempoolaccept-mk]
+description = "Test if a txn would be accepted <txn>"
+usage = '''
+arg "<txn>" "Transaction hex"
+'''
+run = """kubectl --context minikube -n bitcoin exec regtest-bitcoind-0 -- \
+  bitcoin-cli \
+    -conf=/etc/bitcoin/bitcoin.conf \
+    -datadir=/data \
+    testmempoolaccept {{arg(name="txn")}}
+    """
+
+[tasks.broadcast-pkg-mk]
+description = "Broadcast a package (array) of raw tx hex to regtest in minikube"
+usage = '''
+arg "<hexes_json>" "JSON array of raw tx hex strings, in dependency order (e.g. [\"hex1\",\"hex2\"])"
+'''
+run = """kubectl --context minikube -n bitcoin exec regtest-bitcoind-0 -- \
+  bitcoin-cli \
+    -conf=/etc/bitcoin/bitcoin.conf \
+    -datadir=/data \
+    submitpackage {{arg(name="hexes_json")}}
+    """
+
+[tasks.get-raw-transaction]
+description = "Return the raw transaction data."
+usage = '''
+arg "<txid>" "transaction id (hex)"
+'''
+run = """kubectl --context minikube -n bitcoin exec regtest-bitcoind-0 -- \
+  bitcoin-cli \
+    -conf=/etc/bitcoin/bitcoin.conf \
+    -datadir=/data \
+    getrawtransaction {{arg(name="txid")}} 1
+    """
+
+[tasks.check-tx-mk]
+description = "Check if a tx is in mempool or on-chain (regtest/minikube)"
+usage = '''
+arg "<txid>" "transaction id (hex)"
+'''
+run = """kubectl --context minikube -n bitcoin exec regtest-bitcoind-0 -- sh -lc '\
+CLI="bitcoin-cli -conf=/etc/bitcoin/bitcoin.conf -datadir=/data"; \
+TX="{{arg(name="txid")}}"; \
+if $CLI getmempoolentry "$TX" >/dev/null 2>&1; then \
+  echo "status=IN_MEMPOOL"; \
+  $CLI getmempoolentry "$TX"; \
+elif $CLI getrawtransaction "$TX" 1 >/dev/null 2>&1; then \
+  echo "status=SEEN_ON_CHAIN_OR_MEMPOOL"; \
+  $CLI getrawtransaction "$TX" 1; \
+else \
+  echo "status=UNKNOWN (not in mempool; not found via getrawtransaction)"; \
+  exit 2; \
+fi'"""
+
 [tasks.gen-ent]
 description = "Generate ent code for Spark schemas"
 dir = "{{config_root}}/spark"
