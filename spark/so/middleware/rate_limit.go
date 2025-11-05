@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -107,6 +108,10 @@ type RateLimiter struct {
 	// Metrics fields
 	utilizationHistogram metric.Float64Histogram
 	breachCounter        metric.Int64Counter
+
+	// appliedBucketConfigs tracks the last applied (capacity, window) per key so we only
+	// update the underlying store when the configured limit actually changes.
+	appliedBucketConfigs sync.Map // map[string]bucketConfig
 }
 
 type RateLimiterOption func(*RateLimiter)
@@ -149,6 +154,11 @@ type realMemoryStore struct {
 
 type tier struct {
 	suffix string
+	window time.Duration
+}
+
+type bucketConfig struct {
+	tokens uint64
 	window time.Duration
 }
 
@@ -299,50 +309,81 @@ func (r *RateLimiter) windowForSuffix(s string) time.Duration {
 // It ensures the store's bucket config matches the desired tokens/window
 // and attempts to take a token, returning an appropriate error on failure.
 func (r *RateLimiter) takeTokenForKey(ctx context.Context, key string, tokens uint64, window time.Duration, label string) (uint64, uint64, error) {
-	currentCapacity, remaining, err := r.store.Get(ctx, key)
-	if err != nil {
-		// If we can't even Get the state of the bucket, we must fail open.
-		logger := logging.GetLoggerFromContext(ctx)
-		logger.Error(fmt.Sprintf("Rate limit store failed on Get, failing open. key=%s, err=%v", sanitizeKey(key), err))
-		return tokens, tokens, nil
-	}
-	if currentCapacity != tokens {
-		logger := logging.GetLoggerFromContext(ctx)
-		logger.Info(fmt.Sprintf(
-			"Rate limit bucket capacity mismatch, resetting. key=%s, current=%d, expected=%d",
-			sanitizeKey(key), currentCapacity, tokens,
-		))
+	logger := logging.GetLoggerFromContext(ctx)
+
+	// Only apply capacity/window to the store when the configured values change for this key.
+	desired := bucketConfig{tokens: tokens, window: window}
+	var remaining uint64
+	if existingAny, ok := r.appliedBucketConfigs.Load(key); !ok {
+		// First time seeing this key: apply settings
 		if err := r.store.Set(ctx, key, tokens, window); err != nil {
-			logger.Error(fmt.Sprintf("Failed to set rate limit bucket, failing open. key=%s, err=%v", key, err))
+			if logger != nil {
+				logger.Error(fmt.Sprintf("Failed to set rate limit bucket, failing open. key=%s, err=%v", sanitizeKey(key), err))
+			}
 			return tokens, tokens, nil
 		}
-		// After a reset, assume the bucket is now full.
+		r.appliedBucketConfigs.Store(key, desired)
 		remaining = tokens
+	} else {
+		existing := existingAny.(bucketConfig)
+		if existing.tokens != desired.tokens || existing.window != desired.window {
+			if err := r.store.Set(ctx, key, tokens, window); err != nil {
+				if logger != nil {
+					logger.Error(fmt.Sprintf("Failed to set rate limit bucket, failing open. key=%s, err=%v", sanitizeKey(key), err))
+				}
+				return tokens, tokens, nil
+			}
+			r.appliedBucketConfigs.Store(key, desired)
+			remaining = tokens
+		} else {
+			// Config unchanged: query remaining from store
+			currentCapacity, rem, err := r.store.Get(ctx, key)
+			if err != nil {
+				// If we can't even Get the state of the bucket, we must fail open.
+				if logger != nil {
+					logger.Error(fmt.Sprintf("Rate limit store failed on Get, failing open. key=%s, err=%v", sanitizeKey(key), err))
+				}
+				return tokens, tokens, nil
+			}
+			// If store is uninitialized (e.g., eviction), re-apply settings once.
+			if currentCapacity == 0 && rem == 0 {
+				if err := r.store.Set(ctx, key, tokens, window); err != nil {
+					if logger != nil {
+						logger.Error(fmt.Sprintf("Failed to set rate limit bucket, failing open. key=%s, err=%v", sanitizeKey(key), err))
+					}
+					return tokens, tokens, nil
+				}
+				remaining = tokens
+			} else {
+				remaining = rem
+			}
+		}
 	}
 
 	if remaining == 0 {
 		return tokens, 0, errors.ResourceExhaustedRateLimitExceeded(fmt.Errorf("%s rate limit exceeded", label))
 	}
 
-	// We believe we have tokens, so now we attempt to take one.
+	// Attempt to take a token.
 	_, _, _, ok, err := r.store.Take(ctx, key)
 	if err != nil {
-		logger := logging.GetLoggerFromContext(ctx)
-		logger.Error(fmt.Sprintf(
-			"Rate limit store failed on Take, failing open. key=%s, err=%v",
-			sanitizeKey(key), err,
-		))
+		if logger != nil {
+			logger.Error(fmt.Sprintf(
+				"Rate limit store failed on Take, failing open. key=%s, err=%v",
+				sanitizeKey(key), err,
+			))
+		}
 		return tokens, tokens, nil
 	}
 
 	if !ok {
-		// This indicates a race condition where another request took the last token between our Get and Take.
-		// Don't rate limit this request to be maximally cautious in case of unexpected system behavior.
-		logger := logging.GetLoggerFromContext(ctx)
-		logger.Warn(fmt.Sprintf(
-			"Rate limit race condition: Get reported tokens, but Take failed. Allowing request. key=%s",
-			sanitizeKey(key),
-		))
+		// Race: another request took the last token between Get and Take. Allow the request to proceed.
+		if logger != nil {
+			logger.Warn(fmt.Sprintf(
+				"Rate limit race condition: Get reported tokens, but Take failed. Allowing request. key=%s",
+				sanitizeKey(key),
+			))
+		}
 		return tokens, tokens, nil
 	}
 

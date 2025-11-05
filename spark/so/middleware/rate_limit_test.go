@@ -2,10 +2,12 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/knobs"
@@ -117,6 +119,114 @@ func (s *testMemoryStore) Take(ctx context.Context, key string) (tokens uint64, 
 	}
 
 	return bucket.tokens, 0, uint64(nextReset.Unix()), false, nil
+}
+
+// Delete removes a bucket (used to simulate backend eviction in tests)
+func (s *testMemoryStore) Delete(key string) {
+	s.bucketsMu.Lock()
+	defer s.bucketsMu.Unlock()
+	delete(s.buckets, key)
+}
+
+type countingStore struct {
+	underlying MemoryStore
+	mu         sync.Mutex
+	setCount   int
+}
+
+func newCountingStore(under MemoryStore) *countingStore {
+	return &countingStore{underlying: under}
+}
+
+func (s *countingStore) Get(ctx context.Context, key string) (tokens uint64, remaining uint64, err error) {
+	return s.underlying.Get(ctx, key)
+}
+
+func (s *countingStore) Set(ctx context.Context, key string, tokens uint64, window time.Duration) error {
+	s.mu.Lock()
+	s.setCount++
+	s.mu.Unlock()
+	return s.underlying.Set(ctx, key, tokens, window)
+}
+
+func (s *countingStore) Take(ctx context.Context, key string) (tokens uint64, remaining uint64, reset uint64, ok bool, err error) {
+	return s.underlying.Take(ctx, key)
+}
+
+func (s *countingStore) SetCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.setCount
+}
+
+type mutableKnobs struct {
+	mu     sync.RWMutex
+	values map[string]float64
+}
+
+func newMutableKnobs(initial map[string]float64) *mutableKnobs {
+	cp := make(map[string]float64, len(initial))
+	for k, v := range initial {
+		cp[k] = v
+	}
+	return &mutableKnobs{values: cp}
+}
+
+func (m *mutableKnobs) keyString(knob string, target *string) string {
+	if target != nil {
+		return fmt.Sprintf("%s@%s", knob, *target)
+	}
+	return knob
+}
+
+func (m *mutableKnobs) Set(key string, value float64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.values[key] = value
+}
+
+func (m *mutableKnobs) GetValueTarget(knob string, target *string, defaultValue float64) float64 {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	key := m.keyString(knob, target)
+	if v, ok := m.values[key]; ok {
+		return v
+	}
+	return defaultValue
+}
+
+func (m *mutableKnobs) GetValue(knob string, defaultValue float64) float64 {
+	return m.GetValueTarget(knob, nil, defaultValue)
+}
+
+func (m *mutableKnobs) GetDurationTarget(knob string, target *string, defaultDuration time.Duration) time.Duration {
+	seconds := m.GetValueTarget(knob, target, defaultDuration.Seconds())
+	if seconds > 0 {
+		return time.Duration(seconds * float64(time.Second))
+	}
+	return defaultDuration
+}
+
+func (m *mutableKnobs) GetDuration(knob string, defaultDuration time.Duration) time.Duration {
+	return m.GetDurationTarget(knob, nil, defaultDuration)
+}
+
+func (m *mutableKnobs) RolloutRandomTarget(knob string, target *string, defaultValue float64) bool {
+	value := m.GetValueTarget(knob, target, defaultValue)
+	return value > 0
+}
+
+func (m *mutableKnobs) RolloutRandom(knob string, defaultValue float64) bool {
+	return m.RolloutRandomTarget(knob, nil, defaultValue)
+}
+
+func (m *mutableKnobs) RolloutUUIDTarget(knob string, _ uuid.UUID, target *string, defaultValue float64) bool {
+	value := m.GetValueTarget(knob, target, defaultValue)
+	return value > 0
+}
+
+func (m *mutableKnobs) RolloutUUID(knob string, _ uuid.UUID, defaultValue float64) bool {
+	return m.RolloutRandomTarget(knob, nil, defaultValue)
 }
 
 func TestRateLimiter(t *testing.T) {
@@ -1140,4 +1250,92 @@ func TestRateLimiter(t *testing.T) {
 		_, err = interceptor(ctx, "request", info, handler)
 		require.ErrorContains(t, err, "rate limit exceeded")
 	})
+}
+
+func TestRateLimiter_SetOnlyOnInitAndConfigChange(t *testing.T) {
+	clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+	baseStore := newTestMemoryStore(clock)
+	store := newCountingStore(baseStore)
+	config := &RateLimiterConfig{}
+	ip := "1.2.3.4"
+	method := "/test.Service/Method"
+	tier := "#1s"
+
+	key := knobs.KnobRateLimitLimit + "@" + method + ":ip" + tier
+	mk := newMutableKnobs(map[string]float64{key: 2})
+
+	rl, err := NewRateLimiter(config, WithKnobs(mk), WithStore(store), WithClock(clock))
+	require.NoError(t, err)
+
+	ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+		"x-forwarded-for": ip,
+	}))
+	interceptor := rl.UnaryServerInterceptor()
+	handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
+	info := &grpc.UnaryServerInfo{FullMethod: method}
+
+	// First request initializes bucket and consumes one token
+	_, err = interceptor(ctx, "request", info, handler)
+	require.NoError(t, err)
+	assert.Equal(t, 1, store.SetCount())
+
+	// Second request should not trigger Set again
+	_, err = interceptor(ctx, "request", info, handler)
+	require.NoError(t, err)
+	assert.Equal(t, 1, store.SetCount())
+
+	// Change configured limit; next request should re-apply once
+	mk.Set(key, 3)
+	_, err = interceptor(ctx, "request", info, handler)
+	require.NoError(t, err)
+	assert.Equal(t, 2, store.SetCount())
+
+	// Another request, no further Set
+	_, err = interceptor(ctx, "request", info, handler)
+	require.NoError(t, err)
+	assert.Equal(t, 2, store.SetCount())
+}
+
+func TestRateLimiter_ReapplyLimitsOnBackendEviction(t *testing.T) {
+	clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+	baseStore := newTestMemoryStore(clock)
+	store := newCountingStore(baseStore)
+	config := &RateLimiterConfig{}
+	ip := "9.9.9.9"
+	method := "/test.Service/Method"
+	tier := "#1s"
+	knobKey := knobs.KnobRateLimitLimit + "@" + method + ":ip" + tier
+	mk := newMutableKnobs(map[string]float64{knobKey: 2})
+
+	rl, err := NewRateLimiter(config, WithKnobs(mk), WithStore(store), WithClock(clock))
+	require.NoError(t, err)
+
+	ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+		"x-forwarded-for": ip,
+	}))
+	interceptor := rl.UnaryServerInterceptor()
+	handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
+	info := &grpc.UnaryServerInfo{FullMethod: method}
+
+	// Initialize
+	_, err = interceptor(ctx, "request", info, handler)
+	require.NoError(t, err)
+	assert.Equal(t, 1, store.SetCount())
+
+	// Simulate eviction: delete bucket from underlying store
+	bucketKey := fmt.Sprintf("rl:%s%s:%s:%s", method, tier, "ip", ip)
+	baseStore.Delete(bucketKey)
+
+	// Next request should re-apply once
+	_, err = interceptor(ctx, "request", info, handler)
+	require.NoError(t, err)
+	assert.Equal(t, 2, store.SetCount())
+
+	// And not repeatedly after
+	_, err = interceptor(ctx, "request", info, handler)
+	if err != nil {
+		// if rate limit hit due to small capacity and multiple calls, it is fine; we only check Set count
+		_ = err
+	}
+	assert.Equal(t, 2, store.SetCount())
 }
