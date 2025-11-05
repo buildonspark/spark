@@ -141,6 +141,8 @@ func QueryHTLC(
 	offset int64,
 	paymentHashes [][]byte,
 	status *pb.PreimageRequestStatus,
+	transferIds []string,
+	matchRole *pb.PreimageRequestRole,
 ) (*pb.QueryHtlcResponse, error) {
 	conn, err := config.NewCoordinatorGRPCConnection()
 	if err != nil {
@@ -162,8 +164,16 @@ func QueryHTLC(
 		Offset:            offset,
 	}
 
+	if matchRole != nil {
+		req.MatchRole = *matchRole
+	}
+
 	if len(paymentHashes) > 0 {
 		req.PaymentHashes = paymentHashes
+	}
+
+	if len(transferIds) > 0 {
+		req.TransferIds = transferIds
 	}
 
 	if status != nil {

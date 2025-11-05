@@ -34,6 +34,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	"github.com/lightsparkdev/spark/so/ent/preimageshare"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
@@ -1552,8 +1553,18 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pb.QueryHtlcReque
 		return nil, err
 	}
 
-	conditions := []predicate.PreimageRequest{
-		preimagerequest.ReceiverIdentityPubkeyEQ(reqIdentityPubKey),
+	conditions := []predicate.PreimageRequest{}
+
+	if len(req.TransferIds) > 0 {
+		transferUUIDs := make([]uuid.UUID, len(req.TransferIds))
+		for i, transferID := range req.TransferIds {
+			transferUUID, err := uuid.Parse(transferID)
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse transfer id as a uuid %s: %w", transferID, err)
+			}
+			transferUUIDs[i] = transferUUID
+		}
+		conditions = append(conditions, preimagerequest.HasTransfersWith(enttransfer.IDIn(transferUUIDs...)))
 	}
 
 	// Only add payment hash filter if payment hashes are provided
@@ -1569,6 +1580,13 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pb.QueryHtlcReque
 			return nil, fmt.Errorf("failed to unmarshal status: %w", err)
 		}
 		conditions = append(conditions, preimagerequest.StatusEQ(preimageRequestStatus))
+	}
+
+	// Default to receiver role if not provided
+	if req.MatchRole == pb.PreimageRequestRole_PREIMAGE_REQUEST_ROLE_SENDER {
+		conditions = append(conditions, preimagerequest.SenderIdentityPubkeyEQ(reqIdentityPubKey))
+	} else {
+		conditions = append(conditions, preimagerequest.ReceiverIdentityPubkeyEQ(reqIdentityPubKey))
 	}
 
 	// Add pagination
@@ -1604,6 +1622,7 @@ func (h *LightningHandler) QueryHTLC(ctx context.Context, req *pb.QueryHtlcReque
 		preimageRequests[i] = &pb.PreimageRequestWithTransfer{
 			PaymentHash:            current.PaymentHash,
 			ReceiverIdentityPubkey: current.ReceiverIdentityPubkey.Serialize(),
+			SenderIdentityPubkey:   current.SenderIdentityPubkey.Serialize(),
 			Status:                 status,
 			CreatedTime:            timestamppb.New(current.CreateTime),
 			Transfer:               transferProto,

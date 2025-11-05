@@ -16588,6 +16588,17 @@ func (m *PreimageRequestWithTransfer) validate(all bool) error {
 		}
 	}
 
+	if len(m.GetSenderIdentityPubkey()) != 33 {
+		err := PreimageRequestWithTransferValidationError{
+			field:  "SenderIdentityPubkey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
 	if m.Transfer != nil {
 
 		if all {
@@ -16728,11 +16739,22 @@ func (m *QueryHtlcRequest) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for IdentityPublicKey
+	if len(m.GetIdentityPublicKey()) != 33 {
+		err := QueryHtlcRequestValidationError{
+			field:  "IdentityPublicKey",
+			reason: "value length must be 33 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
 
 	// no validation rules for Limit
 
 	// no validation rules for Offset
+
+	// no validation rules for MatchRole
 
 	if m.Status != nil {
 		// no validation rules for Status

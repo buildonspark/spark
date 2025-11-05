@@ -1179,6 +1179,11 @@ enum PreimageRequestStatus {
     PREIMAGE_REQUEST_STATUS_RETURNED = 2;
 }
 
+enum PreimageRequestRole {
+    PREIMAGE_REQUEST_ROLE_RECEIVER = 0;
+    PREIMAGE_REQUEST_ROLE_SENDER = 1;
+}
+
 message PreimageRequestWithTransfer {
     // Preimage request data
     bytes payment_hash = 1 [(validate.rules).bytes.len = 32];
@@ -1191,14 +1196,17 @@ message PreimageRequestWithTransfer {
 
     // Preimage data (if available)
     optional bytes preimage = 6;
+    bytes sender_identity_pubkey = 7 [(validate.rules).bytes.len = 33];
 }
 
 message QueryHtlcRequest {
     repeated bytes payment_hashes = 1;
-    bytes identity_public_key = 2;
+    bytes identity_public_key = 2 [(validate.rules).bytes.len = 33];
     optional PreimageRequestStatus status = 3;
     int64 limit = 4; // defaults to 100 if not set.
     int64 offset = 5; // defaults to 0 if not set.
+    repeated string transfer_ids = 6;
+    PreimageRequestRole match_role = 7; // defaults to PREIMAGE_REQUEST_ROLE_RECEIVER if not set.
 }
 
 message QueryHtlcResponse {
