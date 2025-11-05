@@ -283,7 +283,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
-			ExecutionInterval: 5 * time.Minute,
+			ExecutionInterval: 1 * time.Minute,
 			BaseTaskSpec: BaseTaskSpec{
 				Name: "resume_send_transfer",
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
@@ -294,10 +294,11 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					if err != nil {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
 					}
+					resumeSendTransferLimit := knobsService.GetValue(knobs.KnobResumeSendTransferLimit, 100)
 					query := tx.Transfer.Query().Where(
 						transfer.StatusEQ(st.TransferStatusSenderInitiatedCoordinator),
 						transfer.TypeNEQ(st.TransferTypeCooperativeExit),
-					).Limit(1000)
+					).Limit(int(resumeSendTransferLimit))
 
 					transfers, err := query.All(ctx)
 					if err != nil {

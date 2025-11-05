@@ -62,7 +62,8 @@ const (
 
 	KnobReadOnlyEndpoints = "spark.so.ro_session"
 
-	KnobGossipLimit = "spark.so.gossip.limit"
+	KnobGossipLimit             = "spark.so.gossip.limit"
+	KnobResumeSendTransferLimit = "spark.so.resume_send_transfer.limit"
 )
 
 type Config struct {
