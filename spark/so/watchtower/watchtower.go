@@ -102,6 +102,7 @@ func QueryNodesWithExpiredTimeLocks(ctx context.Context, dbClient *ent.Client, b
 			),
 			treenode.HasTreeWith(tree.NetworkEQ(common.SchemaNetwork(network))),
 		).
+		WithParent().
 		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query root nodes: %w", err)
@@ -119,6 +120,7 @@ func QueryNodesWithExpiredTimeLocks(ctx context.Context, dbClient *ent.Client, b
 			treenode.NodeConfirmationHeightIsNil(),
 			treenode.HasTreeWith(tree.NetworkEQ(common.SchemaNetwork(network))),
 		).
+		WithParent().
 		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query broadcastable child nodes: %w", err)
@@ -131,6 +133,7 @@ func QueryNodesWithExpiredTimeLocks(ctx context.Context, dbClient *ent.Client, b
 			treenode.RefundConfirmationHeightIsNil(),
 			treenode.HasTreeWith(tree.NetworkEQ(common.SchemaNetwork(network))),
 		).
+		WithParent().
 		All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query refund-pending nodes: %w", err)
@@ -167,12 +170,18 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 		// Check if direct TX has a timelock and has parent
 		if directTx.TxIn[0].Sequence <= 0xFFFFFFFE {
 			// Check if parent is confirmed and timelock has expired
-			parent, err := node.QueryParent().Only(ctx)
-			if ent.IsNotFound(err) {
-				// Exit gracefully if the node is a root node and has no parent
-				return nil
-			} else if err != nil {
-				return fmt.Errorf("watchtower failed to query parent for node %s: %w", node.ID.String(), err)
+			var parent *ent.TreeNode
+			if node.Edges.Parent != nil {
+				parent = node.Edges.Parent
+			} else {
+				p, err := node.QueryParent().Only(ctx)
+				if ent.IsNotFound(err) {
+					// Exit gracefully if the node is a root node and has no parent
+					return nil
+				} else if err != nil {
+					return fmt.Errorf("watchtower failed to query parent for node %s: %w", node.ID.String(), err)
+				}
+				parent = p
 			}
 			if parent.NodeConfirmationHeight > 0 {
 				timelockExpiryHeight := uint64(directTx.TxIn[0].Sequence&0xFFFF) + parent.NodeConfirmationHeight

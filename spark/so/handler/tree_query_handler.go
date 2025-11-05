@@ -132,6 +132,11 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 		query = query.Where(treenode.StatusIn(statuses...))
 	}
 
+	// If parent chains are requested, eager-load parent of parent to reduce follow-up queries
+	if req.IncludeParents {
+		query = query.WithParent(func(q *ent.TreeNodeQuery) { q.WithParent() })
+	}
+
 	nodes, err := query.All(ctx)
 	if err != nil {
 		return nil, err
@@ -218,27 +223,36 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 }
 
 func getAncestorChain(ctx context.Context, db *ent.Client, node *ent.TreeNode, nodeMap map[string]*pb.TreeNode, isSSP bool) error {
-	parent, err := node.QueryParent().Only(ctx)
-	if err != nil {
-		if !ent.IsNotFound(err) {
-			return err
-		}
-		return nil
-	}
-
-	// skip root node to temporarily disable unilateral exit.
-	if !isSSP {
-		_, err = parent.QueryParent().Only(ctx)
+	var err error
+	// Prefer eager-loaded edge when available
+	var parent *ent.TreeNode
+	if node.Edges.Parent != nil {
+		parent = node.Edges.Parent
+	} else {
+		parent, err = node.QueryParent().Only(ctx)
 		if err != nil {
 			if !ent.IsNotFound(err) {
 				return err
 			}
-			tree, err := node.QueryTree().Only(ctx)
-			if err != nil {
-				return err
-			}
-			if tree.Network == st.NetworkMainnet {
-				return nil
+			return nil
+		}
+	}
+
+	// skip root node to temporarily disable unilateral exit.
+	if !isSSP {
+		// Check if parent's parent exists; prefer eager-loaded value
+		if parent.Edges.Parent == nil {
+			if _, err := parent.QueryParent().Only(ctx); err != nil {
+				if !ent.IsNotFound(err) {
+					return err
+				}
+				tree, err := node.QueryTree().Only(ctx)
+				if err != nil {
+					return err
+				}
+				if tree.Network == st.NetworkMainnet {
+					return nil
+				}
 			}
 		}
 	}

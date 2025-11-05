@@ -89,7 +89,7 @@ func BatchUpdateTransferLeafKeyTweaks(ctx context.Context, inputs []TransferLeaf
 
 // MarshalProto converts a TransferLeaf to a spark protobuf TransferLeaf.
 func (t *TransferLeaf) MarshalProto(ctx context.Context) (*pb.TransferLeaf, error) {
-	leaf, err := t.QueryLeaf().Only(ctx)
+	leaf, err := t.QueryLeaf().WithTree().WithSigningKeyshare().WithParent().Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to query leaf for transfer leaf %s: %w", t.ID, err)
 	}

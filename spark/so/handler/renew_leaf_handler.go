@@ -82,6 +82,7 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 		Query().
 		Where(enttreenode.ID(leafUUID)).
 		ForUpdate().
+		WithParent().
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -151,13 +152,19 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct from cpfp refund tx signing job is required"))
 	}
 
-	// Query the parent of the leaf to ensure it exists
-	parentLeaf, err := leaf.QueryParent().Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, errors.NotFoundMissingEntity(fmt.Errorf("parent node does not exist for leaf %s", leaf.ID.String()))
+	// Query the parent of the leaf to ensure it exists (use eager-loaded parent if available)
+	var parentLeaf *ent.TreeNode
+	if leaf.Edges.Parent != nil {
+		parentLeaf = leaf.Edges.Parent
+	} else {
+		var err error
+		parentLeaf, err = leaf.QueryParent().Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return nil, errors.NotFoundMissingEntity(fmt.Errorf("parent node does not exist for leaf %s", leaf.ID.String()))
+			}
+			return nil, fmt.Errorf("failed to query parent node: %w", err)
 		}
-		return nil, fmt.Errorf("failed to query parent node: %w", err)
 	}
 	if parentLeaf == nil {
 		return nil, errors.NotFoundMissingEntity(fmt.Errorf("parent node does not exist for leaf %s", leaf.ID.String()))
@@ -433,13 +440,19 @@ func (h *RenewLeafHandler) renewRefundTimelock(ctx context.Context, signingJob *
 		return nil, errors.InvalidArgumentMissingField(fmt.Errorf("direct from cpfp refund tx signing job is required"))
 	}
 
-	// Query the parentLeaf of the leaf to ensure it exists
-	parentLeaf, err := leaf.QueryParent().Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, errors.NotFoundMissingEntity(fmt.Errorf("parent node does not exist for leaf %s", leaf.ID.String()))
+	// Query the parentLeaf of the leaf to ensure it exists (use eager-loaded parent if available)
+	var parentLeaf *ent.TreeNode
+	if leaf.Edges.Parent != nil {
+		parentLeaf = leaf.Edges.Parent
+	} else {
+		var err error
+		parentLeaf, err = leaf.QueryParent().Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return nil, errors.NotFoundMissingEntity(fmt.Errorf("parent node does not exist for leaf %s", leaf.ID.String()))
+			}
+			return nil, fmt.Errorf("failed to query parent node: %w", err)
 		}
-		return nil, fmt.Errorf("failed to query parent node: %w", err)
 	}
 	if parentLeaf == nil {
 		return nil, errors.NotFoundMissingEntity(fmt.Errorf("parent node does not exist for leaf %s", leaf.ID.String()))

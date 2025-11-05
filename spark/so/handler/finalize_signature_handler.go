@@ -356,8 +356,16 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 			return nil, nil, fmt.Errorf("DirectNodeTxSignature is required. Please upgrade to the latest SDK version")
 		}
 		// Node may not have parent if it is the root node
-		nodeParent, err := node.QueryParent().Only(ctx)
-		if err == nil && nodeParent != nil {
+		var nodeParent *ent.TreeNode
+		if node.Edges.Parent != nil {
+			nodeParent = node.Edges.Parent
+		} else {
+			p, err := node.QueryParent().Only(ctx)
+			if err == nil {
+				nodeParent = p
+			}
+		}
+		if nodeParent != nil {
 			cpfpTreeNodeTx, err := common.TxFromRawTxBytes(cpfpNodeTxBytes)
 			if err != nil {
 				return nil, nil, fmt.Errorf("unable to deserialize node tx: %w", err)
