@@ -1815,8 +1815,8 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		}
 	}
 
-	if filter.TransferIds != nil {
-		transferUUIDs := make([]uuid.UUID, len(filter.TransferIds))
+	if len(filter.TransferIds) > 0 {
+		transferUUIDs := []uuid.UUID{}
 		for _, transferID := range filter.TransferIds {
 			transferUUID, err := uuid.Parse(transferID)
 			if err != nil {
