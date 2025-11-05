@@ -40,7 +40,6 @@ import (
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 
 	sparkgrpc "github.com/lightsparkdev/spark/so/grpc"
-	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/middleware"
 	events "github.com/lightsparkdev/spark/so/stream"
@@ -606,7 +605,6 @@ func main() {
 				db.NewDefaultSessionFactory(dbClient, knobsService),
 				config.Database.NewTxTimeout,
 			),
-			helper.SigningCommitmentInterceptor(config.SigningOperatorMap, knobsService),
 			authz.NewAuthzInterceptor(authz.NewAuthzConfig(
 				authz.WithMode(config.ServiceAuthz.Mode),
 				authz.WithAllowedIPs(config.ServiceAuthz.IPAllowlist),

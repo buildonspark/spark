@@ -8,15 +8,12 @@ import (
 	"slices"
 	"time"
 
-	"github.com/lightsparkdev/spark"
 	"go.uber.org/zap"
 
 	"github.com/lightsparkdev/spark/so/db"
-	"github.com/lightsparkdev/spark/so/handler/signing_handler"
 	"github.com/lightsparkdev/spark/so/handler/tokens"
 	"github.com/lightsparkdev/spark/so/helper"
 	"github.com/lightsparkdev/spark/so/knobs"
-	"github.com/lightsparkdev/spark/so/objects"
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/go-co-op/gocron/v2"
@@ -33,7 +30,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/ent/signingcommitment"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
@@ -172,81 +168,6 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						last := rows[len(rows)-1]
 						lastID = last.ID
 					}
-				},
-			},
-		},
-		{
-			ExecutionInterval: 1 * time.Minute,
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "generate_signing_commitments",
-				RunInTestEnv: false,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					dbTX, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
-					}
-
-					logger := logging.GetLoggerFromContext(ctx)
-					var entCommitments []*ent.SigningCommitmentCreate
-					for _, operator := range config.SigningOperatorMap {
-						count, err := dbTX.SigningCommitment.Query().Where(
-							signingcommitment.OperatorIndexEQ(uint(operator.ID)),
-							signingcommitment.StatusEQ(st.SigningCommitmentStatusAvailable),
-						).Count(ctx)
-						if err != nil {
-							logger.With(zap.Error(err)).Sugar().Errorf("failed to query signing commitments for operator %d", operator.ID)
-							continue
-						}
-
-						if count < spark.SigningCommitmentReserve {
-							var resp *pbinternal.FrostRound1Response
-							if operator.ID == config.Index {
-								signingHandler := signing_handler.NewFrostSigningHandler(config)
-								resp, err = signingHandler.GenerateRandomNonces(ctx, spark.SigningCommitmentBatchSize)
-								if err != nil {
-									return err
-								}
-							}
-
-							conn, err := operator.NewOperatorGRPCConnection()
-							if err != nil {
-								return err
-							}
-
-							client := pbinternal.NewSparkInternalServiceClient(conn)
-							resp, err = client.FrostRound1(ctx, &pbinternal.FrostRound1Request{
-								RandomNonceCount: spark.SigningCommitmentBatchSize,
-							})
-							if err != nil {
-								logger.With(zap.Error(err)).Sugar().Errorf("failed to generate signing commitments for operator %d", operator.ID)
-								continue
-							}
-
-							for _, pbCommitment := range resp.SigningCommitments {
-								commitments := objects.SigningCommitment{}
-								err := commitments.UnmarshalProto(pbCommitment)
-								if err != nil {
-									return err
-								}
-
-								commitmentBinary := commitments.MarshalBinary()
-
-								entCommitments = append(
-									entCommitments,
-									dbTX.SigningCommitment.Create().
-										SetOperatorIndex(uint(operator.ID)).
-										SetStatus(st.SigningCommitmentStatusAvailable).
-										SetNonceCommitment(commitmentBinary),
-								)
-							}
-						}
-					}
-
-					if err := dbTX.SigningCommitment.CreateBulk(entCommitments...).Exec(ctx); err != nil {
-						return err
-					}
-
-					return nil
 				},
 			},
 		},
