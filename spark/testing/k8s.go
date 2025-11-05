@@ -155,6 +155,9 @@ func (s *SparkOperatorController) enableOperator(ctx context.Context, operatorNu
 		return fmt.Errorf("operator %d is not disabled", operatorNum)
 	}
 
+	ctx, cancelFunc := context.WithTimeout(ctx, 30*time.Second)
+	defer cancelFunc()
+
 	// Get the current deployment
 	deployment, err := s.client.AppsV1().Deployments(namespace).Get(ctx, operator.deploymentName, metav1.GetOptions{})
 	if err != nil {
@@ -192,6 +195,9 @@ func (s *SparkOperatorController) disableOperator(ctx context.Context, operatorN
 	if operator.disabled {
 		return fmt.Errorf("operator %d is already disabled", operatorNum)
 	}
+
+	ctx, cancelFunc := context.WithTimeout(ctx, 30*time.Second)
+	defer cancelFunc()
 
 	// Get the current deployment
 	deployment, err := s.client.AppsV1().Deployments(namespace).Get(ctx, operator.deploymentName, metav1.GetOptions{})
