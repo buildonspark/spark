@@ -1,7 +1,6 @@
 package task
 
 import (
-	"context"
 	"math/big"
 	"math/rand/v2"
 	"testing"
@@ -10,11 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/lightsparkdev/spark/common/keys"
-	"github.com/lightsparkdev/spark/common/uint128"
 	"github.com/lightsparkdev/spark/so/db"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/entfixtures"
 	"github.com/lightsparkdev/spark/so/knobs"
 	sparktesting "github.com/lightsparkdev/spark/testing"
@@ -119,64 +116,4 @@ func TestBackfillSpentTokenTransactionHistory(t *testing.T) {
 	hasSpentTx, err = tokenOutput.QueryOutputSpentTokenTransaction().Exist(ctx)
 	require.NoError(t, err)
 	require.True(t, hasSpentTx, "Should still have single spent relationship")
-}
-
-func TestBackfillTokenOutputAmount_SQLite(t *testing.T) {
-	ctx, _ := db.NewTestSQLiteContext(t)
-	dbClient, err := ent.GetDbFromContext(ctx)
-	require.NoError(t, err)
-	runBackfillAmountTest(t, ctx, dbClient)
-}
-
-func TestBackfillTokenOutputAmount_Postgres(t *testing.T) {
-	ctx, _ := db.ConnectToTestPostgres(t)
-	dbClient, err := ent.GetDbFromContext(ctx)
-	require.NoError(t, err)
-	runBackfillAmountTest(t, ctx, dbClient)
-}
-
-func runBackfillAmountTest(t *testing.T, ctx context.Context, dbClient *ent.Client) {
-	t.Helper()
-
-	seededRand := rand.NewChaCha8([32]byte{})
-	k := knobs.NewFixedKnobs(map[string]float64{
-		knobs.KnobTasksEnableBackfillTokenOutputAmountBatchSize: 5000,
-	})
-
-	var backfillTask *ScheduledTaskSpec
-	for _, task := range AllScheduledTasks() {
-		if task.Name == "backfill_token_output_amounts" {
-			backfillTask = &task
-			break
-		}
-	}
-	require.NotNil(t, backfillTask, "Should find backfill task")
-
-	config := sparktesting.TestConfig(t)
-
-	f := entfixtures.New(t, ctx, dbClient).WithRNG(seededRand)
-
-	tokenAmountBytes := f.RandomBytes(16)
-	tokenAmountBytes[15] |= 1 // force non zero random value
-
-	tokenCreate := f.CreateTokenCreate(st.NetworkRegtest, nil, nil)
-
-	_, outputs := f.CreateMintTransaction(tokenCreate,
-		entfixtures.OutputSpecs(new(big.Int).SetBytes(tokenAmountBytes)),
-		st.TokenTransactionStatusSigned)
-	require.Len(t, outputs, 1)
-
-	require.NoError(t, backfillTask.Task(ctx, config, k))
-
-	db, err := ent.GetDbFromContext(ctx)
-	require.NoError(t, err)
-
-	out, err := db.TokenOutput.Query().Where(tokenoutput.ID(outputs[0].ID)).Only(ctx)
-	require.NoError(t, err)
-	require.NotNil(t, out.Amount)
-
-	u128Amount := uint128.Uint128{}
-	err = u128Amount.SafeSetBytes(tokenAmountBytes)
-	require.NoError(t, err)
-	require.Equal(t, u128Amount, out.Amount)
 }
