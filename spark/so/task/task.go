@@ -31,7 +31,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
-	"github.com/lightsparkdev/spark/so/ent/tokenoutput"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/tree"
@@ -46,7 +45,6 @@ var (
 	defaultTaskTimeout              = 1 * time.Minute
 	dkgTaskTimeout                  = 3 * time.Minute
 	deleteStaleTreeNodesTaskTimeout = 10 * time.Minute
-	backfillTokenOutputTimeout      = 10 * time.Minute
 )
 
 // Task contains common fields for all task types.
@@ -629,88 +627,6 @@ func AllStartupTasks() []StartupTaskSpec {
 					}
 
 					logger.Sugar().Infof("Successfully verified reserved entity DKG key %s in all operators", keyshare.ID)
-					return nil
-				},
-			},
-		},
-		{
-			BaseTaskSpec: BaseTaskSpec{
-				Name:         "backfill_spent_token_transaction_history",
-				Timeout:      &backfillTokenOutputTimeout,
-				RunInTestEnv: true,
-				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
-					logger := logging.GetLoggerFromContext(ctx)
-
-					if !config.Token.EnableBackfillSpentTokenTransactionHistoryTask {
-						logger.Info("Backfill spent token transaction history is disabled, skipping")
-						return nil
-					}
-
-					tx, err := ent.GetDbFromContext(ctx)
-					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
-					}
-
-					const batchSize = 1000
-					var processed int
-					start := time.Now()
-
-					logger.Info("Starting backfill of spent token transaction history")
-
-					for {
-						// Get next batch of outputs that have spent relationships but haven't been backfilled to M2M
-						outputs, err := tx.TokenOutput.Query().
-							Where(
-								tokenoutput.HasOutputSpentTokenTransaction(),                          // Has current spent relationship
-								tokenoutput.Not(tokenoutput.HasOutputSpentStartedTokenTransactions()), // Not yet backfilled to M2M
-							).
-							WithOutputSpentTokenTransaction().
-							Order(ent.Asc(tokenoutput.FieldID)).
-							Limit(batchSize).
-							All(ctx)
-						if err != nil {
-							return fmt.Errorf("failed to fetch outputs for backfill: %w", err)
-						}
-
-						if len(outputs) == 0 {
-							break // No more outputs to process
-						}
-
-						// Process batch
-						for _, output := range outputs {
-							if output.Edges.OutputSpentTokenTransaction != nil {
-								_, err := tx.TokenOutput.UpdateOne(output).
-									AddOutputSpentStartedTokenTransactions(output.Edges.OutputSpentTokenTransaction).
-									Save(ctx)
-								if err != nil {
-									return fmt.Errorf("failed to backfill output %s: %w", output.ID, err)
-								}
-							}
-						}
-
-						// Progress logging every 10k records
-						if processed%10000 == 0 {
-							elapsed := time.Since(start)
-							rate := float64(processed) / elapsed.Seconds()
-							logger.Sugar().Infof(
-								"Backfill progress: processed %d outputs, rate %.2f/sec, elapsed %s",
-								processed,
-								rate,
-								elapsed,
-							)
-						}
-
-						// Small pause to be nice to the database
-						time.Sleep(50 * time.Millisecond)
-					}
-
-					elapsed := time.Since(start)
-					logger.Sugar().Infof("Backfill completed: processed %d outputs, rate %.2f/sec, total time %s",
-						processed,
-						float64(processed)/elapsed.Seconds(),
-						elapsed,
-					)
-
 					return nil
 				},
 			},
