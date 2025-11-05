@@ -19,6 +19,8 @@ func CreateOrResetPendingSendTransfer(ctx context.Context, transferID uuid.UUID)
 	pendingTransfer, err := db.PendingSendTransfer.Query().Where(pendingsendtransfer.TransferID(transferID)).Only(ctx)
 	if IsNotFound(err) {
 		return db.PendingSendTransfer.Create().SetTransferID(transferID).SetStatus(st.PendingSendTransferStatusPending).Save(ctx)
+	} else if err != nil {
+		return nil, err
 	}
 
 	return pendingTransfer.Update().SetStatus(st.PendingSendTransferStatusPending).Save(ctx)
