@@ -1,11 +1,17 @@
 import { isError } from "@lightsparkdev/core";
 import { sha256 } from "@noble/hashes/sha2";
 import type { Channel } from "nice-grpc";
-import { ClientMiddlewareCall, Metadata } from "nice-grpc-common";
+import type { RetryOptions } from "nice-grpc-client-middleware-retry";
 import type { ClientMiddleware } from "nice-grpc-common";
+import {
+  ClientError,
+  ClientMiddlewareCall,
+  Metadata,
+  Status,
+} from "nice-grpc-common";
 import { type Channel as ChannelWeb } from "nice-grpc-web";
-import { AuthenticationError, NetworkError } from "../../errors/types.js";
-import { MockServiceClient, MockServiceDefinition } from "../../proto/mock.js";
+import { SparkSDKError } from "../../errors/base.js";
+import { AuthenticationError } from "../../errors/types.js";
 import {
   SparkServiceClient,
   SparkServiceDefinition,
@@ -21,8 +27,6 @@ import {
 } from "../../proto/spark_token.js";
 import { SparkCallOptions } from "../../types/grpc.js";
 import { WalletConfigService } from "../config.js";
-import { SparkSDKError } from "../../errors/base.js";
-import type { RetryOptions } from "nice-grpc-client-middleware-retry";
 
 // Module-level types used by shared caches
 type ChannelKey = string;
@@ -471,6 +475,10 @@ export abstract class ConnectionManager {
           ...options,
           metadata: metadata.set("Authorization", `Bearer ${newAuthToken}`),
         });
+      } else if (error instanceof ClientError) {
+        if (error.code === Status.RESOURCE_EXHAUSTED) {
+          throw new Error("Server is busy, please try again later.");
+        }
       }
     }
 
