@@ -808,12 +808,12 @@ var (
 				Columns: []*schema.Column{TransfersColumns[2]},
 			},
 			{
-				Name:    "idx_transfers_recv_status_update",
+				Name:    "idx_transfers_recv_status_create",
 				Unique:  false,
-				Columns: []*schema.Column{TransfersColumns[4], TransfersColumns[6], TransfersColumns[2]},
+				Columns: []*schema.Column{TransfersColumns[4], TransfersColumns[6], TransfersColumns[1]},
 				Annotation: &entsql.IndexAnnotation{
 					DescColumns: map[string]bool{
-						TransfersColumns[2].Name: true,
+						TransfersColumns[1].Name: true,
 					},
 				},
 			},
