@@ -1,5 +1,11 @@
 # @buildonspark/spark-sdk
 
+## 0.4.4
+
+### Patch Changes
+
+- - Regenerate bindings for transaction construction to use standard spark transaction v3 version.
+
 ## 0.4.3
 
 ### Patch Changes

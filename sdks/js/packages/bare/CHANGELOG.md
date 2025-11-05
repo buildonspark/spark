@@ -1,5 +1,15 @@
 # @buildonspark/bare
 
+## 0.0.25
+
+### Patch Changes
+
+- - Switch to bare-node-runtime for imports and globals for improved Bare compatibility.
+- Updated dependencies
+- Updated dependencies
+  - @buildonspark/spark-frost-bare-addon@0.0.4
+  - @buildonspark/spark-sdk@0.4.4
+
 ## 0.0.24
 
 ### Patch Changes
