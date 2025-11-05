@@ -1872,9 +1872,9 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 
 	var query *ent.TransferQuery
 	if filter.Order == pb.Order_ASCENDING {
-		query = baseQuery.Order(ent.Asc(enttransfer.FieldUpdateTime))
+		query = baseQuery.Order(ent.Asc(enttransfer.FieldCreateTime))
 	} else {
-		query = baseQuery.Order(ent.Desc(enttransfer.FieldUpdateTime))
+		query = baseQuery.Order(ent.Desc(enttransfer.FieldCreateTime))
 	}
 
 	if filter.Limit > 100 || filter.Limit == 0 {
