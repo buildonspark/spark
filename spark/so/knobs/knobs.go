@@ -61,6 +61,8 @@ const (
 	KnobPrivacyEnabled = "spark.so.privacy.enabled"
 
 	KnobReadOnlyEndpoints = "spark.so.ro_session"
+
+	KnobGossipLimit = "spark.so.gossip.limit"
 )
 
 type Config struct {

@@ -414,7 +414,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
-			ExecutionInterval: 1 * time.Minute,
+			ExecutionInterval: 45 * time.Second,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "send_gossip",
 				RunInTestEnv: true,
@@ -425,7 +425,8 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					if err != nil {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
 					}
-					query := tx.Gossip.Query().Where(gossip.StatusEQ(st.GossipStatusPending)).Limit(100)
+					gossipLimit := knobsService.GetValue(knobs.KnobGossipLimit, 50)
+					query := tx.Gossip.Query().Where(gossip.StatusEQ(st.GossipStatusPending)).Limit(int(gossipLimit))
 					gossips, err := query.ForUpdate().All(ctx)
 					if err != nil {
 						return err
