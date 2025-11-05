@@ -240,10 +240,20 @@ func (x *MarkKeyshareForDepositAddressResponse) GetAddressSignature() []byte {
 }
 
 type FrostRound1Request struct {
-	state       protoimpl.MessageState `protogen:"open.v1"`
-	KeyshareIds []string               `protobuf:"bytes,1,rep,name=keyshare_ids,json=keyshareIds,proto3" json:"keyshare_ids,omitempty"`
-	PublicKeys  map[string][]byte      `protobuf:"bytes,2,rep,name=public_keys,json=publicKeys,proto3" json:"public_keys,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Count       uint32                 `protobuf:"varint,3,opt,name=count,proto3" json:"count,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// DEPRECATED: This field is ignored when random_nonce_count is set.
+	// Prefer setting random_nonce_count directly.
+	//
+	// Deprecated: Marked as deprecated in spark_internal.proto.
+	KeyshareIds []string `protobuf:"bytes,1,rep,name=keyshare_ids,json=keyshareIds,proto3" json:"keyshare_ids,omitempty"`
+	// DEPRECATED: Not used by the handler. Commitments are independent of long-term public keys.
+	//
+	// Deprecated: Marked as deprecated in spark_internal.proto.
+	PublicKeys map[string][]byte `protobuf:"bytes,2,rep,name=public_keys,json=publicKeys,proto3" json:"public_keys,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// DEPRECATED: This field is ignored when random_nonce_count is set. Prefer random_nonce_count.
+	//
+	// Deprecated: Marked as deprecated in spark_internal.proto.
+	Count uint32 `protobuf:"varint,3,opt,name=count,proto3" json:"count,omitempty"`
 	// If this is set to non-zero, the keyshare_ids will be ignored and the random keys will be used.
 	RandomNonceCount uint32 `protobuf:"varint,4,opt,name=random_nonce_count,json=randomNonceCount,proto3" json:"random_nonce_count,omitempty"`
 	unknownFields    protoimpl.UnknownFields
@@ -280,6 +290,7 @@ func (*FrostRound1Request) Descriptor() ([]byte, []int) {
 	return file_spark_internal_proto_rawDescGZIP(), []int{3}
 }
 
+// Deprecated: Marked as deprecated in spark_internal.proto.
 func (x *FrostRound1Request) GetKeyshareIds() []string {
 	if x != nil {
 		return x.KeyshareIds
@@ -287,6 +298,7 @@ func (x *FrostRound1Request) GetKeyshareIds() []string {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in spark_internal.proto.
 func (x *FrostRound1Request) GetPublicKeys() map[string][]byte {
 	if x != nil {
 		return x.PublicKeys
@@ -294,6 +306,7 @@ func (x *FrostRound1Request) GetPublicKeys() map[string][]byte {
 	return nil
 }
 
+// Deprecated: Marked as deprecated in spark_internal.proto.
 func (x *FrostRound1Request) GetCount() uint32 {
 	if x != nil {
 		return x.Count
@@ -3169,12 +3182,12 @@ const file_spark_internal_proto_rawDesc = "" +
 	"\n" +
 	"_is_static\"T\n" +
 	"%MarkKeyshareForDepositAddressResponse\x12+\n" +
-	"\x11address_signature\x18\x01 \x01(\fR\x10addressSignature\"\x8f\x02\n" +
-	"\x12FrostRound1Request\x12!\n" +
-	"\fkeyshare_ids\x18\x01 \x03(\tR\vkeyshareIds\x12S\n" +
-	"\vpublic_keys\x18\x02 \x03(\v22.spark_internal.FrostRound1Request.PublicKeysEntryR\n" +
-	"publicKeys\x12\x14\n" +
-	"\x05count\x18\x03 \x01(\rR\x05count\x12,\n" +
+	"\x11address_signature\x18\x01 \x01(\fR\x10addressSignature\"\x9b\x02\n" +
+	"\x12FrostRound1Request\x12%\n" +
+	"\fkeyshare_ids\x18\x01 \x03(\tB\x02\x18\x01R\vkeyshareIds\x12W\n" +
+	"\vpublic_keys\x18\x02 \x03(\v22.spark_internal.FrostRound1Request.PublicKeysEntryB\x02\x18\x01R\n" +
+	"publicKeys\x12\x18\n" +
+	"\x05count\x18\x03 \x01(\rB\x02\x18\x01R\x05count\x12,\n" +
 	"\x12random_nonce_count\x18\x04 \x01(\rR\x10randomNonceCount\x1a=\n" +
 	"\x0fPublicKeysEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +

@@ -128,16 +128,9 @@ func isGripmock() bool {
 }
 
 // frostRound1 performs the first round of the Frost signing. It gathers the signing commitments from all operators.
-func frostRound1(ctx context.Context, config *so.Config, signingKeyshareIDs []uuid.UUID, operatorSelection *OperatorSelection, publicKeyMap map[string][]byte, count uint32, sparkServiceClientFactory SparkServiceFrostSignerFactory) (map[string][]objects.SigningCommitment, error) {
-	keyshareIDs := make([]string, len(signingKeyshareIDs))
-	for i, id := range signingKeyshareIDs {
-		keyshareIDs[i] = id.String()
-	}
-
+func frostRound1(ctx context.Context, config *so.Config, operatorSelection *OperatorSelection, totalCount uint32, sparkServiceClientFactory SparkServiceFrostSignerFactory) (map[string][]objects.SigningCommitment, error) {
 	request := &pbinternal.FrostRound1Request{
-		KeyshareIds: keyshareIDs,
-		PublicKeys:  publicKeyMap,
-		Count:       count,
+		RandomNonceCount: totalCount,
 	}
 
 	signer, err := sparkServiceClientFactory.NewFrostSigner(config)
@@ -149,6 +142,9 @@ func frostRound1(ctx context.Context, config *so.Config, signingKeyshareIDs []uu
 		resp, err := signer.CallFrostRound1(ctx, operator, request)
 		if err != nil {
 			return nil, err
+		}
+		if resp == nil {
+			return nil, fmt.Errorf("nil FrostRound1Response")
 		}
 		commitments := make([]objects.SigningCommitment, len(resp.SigningCommitments))
 		for i, c := range resp.SigningCommitments {
@@ -448,11 +444,7 @@ func SignFrostInternal(ctx context.Context, config *so.Config, jobs []*SigningJo
 		}
 	}
 
-	publicKeyMap := make(map[string][]byte)
-	for _, id := range signingKeyshareIDs {
-		publicKeyMap[id.String()] = signingKeyshares[id].PublicKey
-	}
-	round1, err := frostRound1(ctx, config, signingKeyshareIDs, &selection, publicKeyMap, 1, sparkServiceClientFactory)
+	round1, err := frostRound1(ctx, config, &selection, uint32(len(signingKeyshareIDs)), sparkServiceClientFactory)
 	if err != nil {
 		return nil, err
 	}
@@ -543,24 +535,17 @@ func prepareResults(
 
 // GetSigningCommitments gets the signing commitments for the given keyshare ids.
 func GetSigningCommitments(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID, count uint32) (map[string][]objects.SigningCommitment, error) {
-	return GetSigningCommitmentsInternal(ctx, config, keyshareIDs, ent.GetKeyPackages, count, &SparkServiceFrostSignerFactoryImpl{})
+	return GetSigningCommitmentsInternal(ctx, config, keyshareIDs, count, &SparkServiceFrostSignerFactoryImpl{})
 }
 
-func GetSigningCommitmentsInternal(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID, getKeyPackages KeyPackageProvider, count uint32, sparkServiceClientFactory SparkServiceFrostSignerFactory) (map[string][]objects.SigningCommitment, error) {
+func GetSigningCommitmentsInternal(ctx context.Context, config *so.Config, keyshareIDs []uuid.UUID, count uint32, sparkServiceClientFactory SparkServiceFrostSignerFactory) (map[string][]objects.SigningCommitment, error) {
 	if count == 0 {
 		return nil, errors.New("count cannot be 0")
 	}
 
 	selection := OperatorSelection{Option: OperatorSelectionOptionThreshold, Threshold: int(config.Threshold)}
-	signingKeyshares, err := getKeyPackages(ctx, config, keyshareIDs)
-	if err != nil {
-		return nil, err
-	}
-	publicKeyMap := make(map[string][]byte)
-	for _, id := range keyshareIDs {
-		publicKeyMap[id.String()] = signingKeyshares[id].PublicKey
-	}
-	round1, err := frostRound1(ctx, config, keyshareIDs, &selection, publicKeyMap, count, sparkServiceClientFactory)
+	total := count * uint32(len(keyshareIDs))
+	round1, err := frostRound1(ctx, config, &selection, total, sparkServiceClientFactory)
 	if err != nil {
 		return nil, err
 	}

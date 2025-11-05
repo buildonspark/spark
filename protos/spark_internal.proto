@@ -93,9 +93,15 @@ message MarkKeyshareForDepositAddressResponse {
 }
 
 message FrostRound1Request {
-    repeated string keyshare_ids = 1;
-    map<string, bytes> public_keys = 2;
-    uint32 count = 3;
+    // DEPRECATED: This field is ignored when random_nonce_count is set.
+    // Prefer setting random_nonce_count directly.
+    repeated string keyshare_ids = 1 [deprecated = true];
+
+    // DEPRECATED: Not used by the handler. Commitments are independent of long-term public keys.
+    map<string, bytes> public_keys = 2 [deprecated = true];
+
+    // DEPRECATED: This field is ignored when random_nonce_count is set. Prefer random_nonce_count.
+    uint32 count = 3 [deprecated = true];
 
     // If this is set to non-zero, the keyshare_ids will be ignored and the random keys will be used.
     uint32 random_nonce_count = 4;
