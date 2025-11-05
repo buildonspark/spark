@@ -305,12 +305,33 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	}
 
 	// Read the tree node
-	node, err := db.TreeNode.Query().Where(treenode.ID(nodeID)).Only(ctx)
+	node, err := db.TreeNode.Query().
+		Where(treenode.ID(nodeID)).
+		WithChildren().
+		WithTree().
+		WithSigningKeyshare().
+		Only(ctx)
+
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get node in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 	}
 	if node == nil {
 		return nil, nil, fmt.Errorf("node not found in %s", logging.FormatProto("node_signatures", nodeSignatures))
+	}
+
+	signingKeyshare := node.Edges.SigningKeyshare
+	if signingKeyshare == nil {
+		signingKeyshare, err = node.QuerySigningKeyshare().Only(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get signing keyshare for node %s: %w", node.ID, err)
+		}
+	}
+	treeEnt := node.Edges.Tree
+	if treeEnt == nil {
+		treeEnt, err = node.QueryTree().Only(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get tree for node %s: %w", node.ID, err)
+		}
 	}
 
 	hasChildren, err := node.QueryChildren().Exist(ctx)
@@ -433,11 +454,6 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		directFromCpfpRefundTxBytes = node.DirectFromCpfpRefundTx
 	}
 
-	treeEnt, err := node.QueryTree().Only(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get tree: %w", err)
-	}
-
 	// Update the tree node
 	nodeMutator := node.Update().
 		SetRawTx(cpfpNodeTxBytes).
@@ -456,6 +472,9 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to update node: %w", err)
 	}
+	// Preserve eagerly-loaded edges for downstream marshaling logic.
+	node.Edges.SigningKeyshare = signingKeyshare
+	node.Edges.Tree = treeEnt
 
 	nodeSparkProto, err := node.MarshalSparkProto(ctx)
 	if err != nil {

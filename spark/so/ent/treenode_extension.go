@@ -64,13 +64,21 @@ func (tn *TreeNode) MarshalSparkProto(ctx context.Context) (*pbspark.TreeNode, e
 
 // MarshalInternalProto converts a TreeNode to a spark internal protobuf TreeNode.
 func (tn *TreeNode) MarshalInternalProto(ctx context.Context) (*pbinternal.TreeNode, error) {
-	tree, err := tn.QueryTree().Only(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to query tree for leaf %s: %w", tn.ID, err)
+	tree := tn.Edges.Tree
+	if tree == nil {
+		var err error
+		tree, err = tn.QueryTree().Only(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to query tree for leaf %s: %w", tn.ID, err)
+		}
 	}
-	signingKeyshare, err := tn.QuerySigningKeyshare().Only(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("unable to query signing keyshare for leaf %s: %w", tn.ID, err)
+	signingKeyshare := tn.Edges.SigningKeyshare
+	if signingKeyshare == nil {
+		var err error
+		signingKeyshare, err = tn.QuerySigningKeyshare().Only(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to query signing keyshare for leaf %s: %w", tn.ID, err)
+		}
 	}
 	return &pbinternal.TreeNode{
 		Id:                     tn.ID.String(),
