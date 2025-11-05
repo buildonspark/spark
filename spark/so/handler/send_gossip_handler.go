@@ -70,7 +70,6 @@ func (h *SendGossipHandler) sendGossipMessageToParticipant(ctx context.Context, 
 		}
 
 		logger.With(zap.Error(err)).Sugar().Errorf("Gossip message sent to participant %s with error", participant)
-		return err
 	}
 
 	logger.Sugar().Infof("Gossip message sent to participant: %s", participant)
