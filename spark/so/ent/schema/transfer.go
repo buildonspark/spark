@@ -64,6 +64,11 @@ func (Transfer) Indexes() []ent.Index {
 		index.Fields("receiver_identity_pubkey"),
 		index.Fields("status"),
 		index.Fields("update_time"),
+
+		index.Fields("receiver_identity_pubkey", "status", "update_time").
+			Annotations(entsql.DescColumns("update_time")).
+			StorageKey("idx_transfers_recv_status_update"),
+
 		index.Fields("spark_invoice_id").
 			Unique().
 			Annotations(

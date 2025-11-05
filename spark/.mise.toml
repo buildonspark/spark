@@ -49,3 +49,4 @@ test-grpc-minikube-oss = """
     -- \
     -p 1
 """
+atlas-hash="atlas migrate hash --dir 'file://so/ent/migrate/migrations'"
