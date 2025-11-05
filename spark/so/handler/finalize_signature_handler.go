@@ -305,12 +305,17 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 	}
 
 	// Read the tree node
-	node, err := db.TreeNode.Query().Where(treenode.ID(nodeID)).WithChildren().Only(ctx)
+	node, err := db.TreeNode.Query().Where(treenode.ID(nodeID)).Only(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get node in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 	}
 	if node == nil {
 		return nil, nil, fmt.Errorf("node not found in %s", logging.FormatProto("node_signatures", nodeSignatures))
+	}
+
+	hasChildren, err := node.QueryChildren().Exist(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to check node children in %s: %w", logging.FormatProto("node_signatures", nodeSignatures), err)
 	}
 
 	var cpfpNodeTxBytes []byte
@@ -441,7 +446,7 @@ func (o *FinalizeSignatureHandler) updateNode(ctx context.Context, nodeSignature
 		SetDirectRefundTx(directRefundTxBytes).
 		SetDirectFromCpfpRefundTx(directFromCpfpRefundTxBytes)
 	if treeEnt.Status == st.TreeStatusAvailable && tree.TreeNodeCanBecomeAvailable(node) {
-		if len(node.RawRefundTx) > 0 && len(node.Edges.Children) == 0 {
+		if len(node.RawRefundTx) > 0 && !hasChildren {
 			nodeMutator.SetStatus(st.TreeNodeStatusAvailable)
 		} else {
 			nodeMutator.SetStatus(st.TreeNodeStatusSplitted)
