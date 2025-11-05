@@ -65,6 +65,8 @@ func (t *Monitor) RecordJobTimingWithStatus(startTime, endTime time.Time, id uui
 		switch {
 		case errors.Is(err, errTaskPanic):
 			jobStatus = "panic"
+		case errors.Is(err, errTaskTimeout):
+			jobStatus = "timeout"
 		case errors.Is(err, errTaskDisabled):
 			jobStatus = "disabled"
 		}
