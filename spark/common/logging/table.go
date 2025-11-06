@@ -177,6 +177,9 @@ func fillDbStats(ctx context.Context, result map[string]any) {
 		return
 	}
 
+	ctxDbStats.mu.Lock()
+	defer ctxDbStats.mu.Unlock()
+
 	totals := dbStats{}
 
 	for table, stats := range ctxDbStats.stats {
@@ -196,6 +199,9 @@ func fillServiceStats(ctx context.Context, result map[string]any) {
 	if !ok {
 		return
 	}
+
+	ctxServiceStats.mu.Lock()
+	defer ctxServiceStats.mu.Unlock()
 
 	totals := serviceStats{}
 
