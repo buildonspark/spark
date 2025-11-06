@@ -49,7 +49,8 @@ const (
 	KnobWatchChainMarkExitingNodesEnabled = "spark.so.watch_chain.mark_exiting_nodes.enabled"
 
 	// Tokens
-	KnobUseNumericAmountForCurrentTokenSupply = "spark.so.tokens.use_numeric_amount_for_current_token_supply"
+	KnobUseNumericAmountForCurrentTokenSupply   = "spark.so.tokens.use_numeric_amount_for_current_token_supply"
+	KnobReclaimRemappedOutputsIfRevealRequested = "spark.so.tokens.reclaim_remapped_outputs_if_reveal_requested"
 
 	// Tasks
 
