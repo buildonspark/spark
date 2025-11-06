@@ -30,37 +30,32 @@ func NewSparkTokenServer(authzConfig authz.Config, soConfig *so.Config, db *ent.
 func (s *SparkTokenServer) StartTransaction(ctx context.Context, req *tokenpb.StartTransactionRequest) (*tokenpb.StartTransactionResponse, error) {
 	ctx, _ = logging.WithRequestAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.PartialTokenTransaction)...)
 	tokenTransactionHandler := tokens.NewStartTokenTransactionHandler(s.soConfig)
-	resp, err := tokenTransactionHandler.StartTokenTransaction(ctx, req)
-	return resp, err
+	return tokenTransactionHandler.StartTokenTransaction(ctx, req)
 }
 
 // CommitTransaction is called by the client to initiate the coordinated signing process.
 func (s *SparkTokenServer) CommitTransaction(ctx context.Context, req *tokenpb.CommitTransactionRequest) (*tokenpb.CommitTransactionResponse, error) {
 	ctx, _ = logging.WithRequestAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
 	signTokenHandler := tokens.NewSignTokenHandler(s.soConfig)
-	resp, err := signTokenHandler.CommitTransaction(ctx, req)
-	return resp, err
+	return signTokenHandler.CommitTransaction(ctx, req)
 }
 
 // QueryTokenMetadata returns created token metadata associated with passed in token identifiers or issuer public keys.
 func (s *SparkTokenServer) QueryTokenMetadata(ctx context.Context, req *tokenpb.QueryTokenMetadataRequest) (*tokenpb.QueryTokenMetadataResponse, error) {
 	queryTokenMetadataHandler := tokens.NewQueryTokenMetadataHandler(s.soConfig)
-	resp, err := queryTokenMetadataHandler.QueryTokenMetadata(ctx, req)
-	return resp, err
+	return queryTokenMetadataHandler.QueryTokenMetadata(ctx, req)
 }
 
 // QueryTokenTransactions returns token transactions with status using native tokenpb protos.
 func (s *SparkTokenServer) QueryTokenTransactions(ctx context.Context, req *tokenpb.QueryTokenTransactionsRequest) (*tokenpb.QueryTokenTransactionsResponse, error) {
 	queryTokenTransactionsHandler := tokens.NewQueryTokenTransactionsHandler(s.soConfig)
-	resp, err := queryTokenTransactionsHandler.QueryTokenTransactions(ctx, req)
-	return resp, err
+	return queryTokenTransactionsHandler.QueryTokenTransactions(ctx, req)
 }
 
 // QueryTokenOutputs returns token outputs with previous transaction data using native tokenpb protos.
 func (s *SparkTokenServer) QueryTokenOutputs(ctx context.Context, req *tokenpb.QueryTokenOutputsRequest) (*tokenpb.QueryTokenOutputsResponse, error) {
 	queryTokenOutputsHandler := tokens.NewQueryTokenOutputsHandlerWithExpiredTransactions(s.soConfig)
-	resp, err := queryTokenOutputsHandler.QueryTokenOutputsToken(ctx, req)
-	return resp, err
+	return queryTokenOutputsHandler.QueryTokenOutputsToken(ctx, req)
 }
 
 // FreezeTokens prevents transfer of all outputs owned now and in the future by the provided owner public key.
@@ -70,9 +65,5 @@ func (s *SparkTokenServer) FreezeTokens(
 	req *tokenpb.FreezeTokensRequest,
 ) (*tokenpb.FreezeTokensResponse, error) {
 	freezeTokenHandler := tokens.NewFreezeTokenHandler(s.soConfig)
-	sparkRes, err := freezeTokenHandler.FreezeTokens(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-	return sparkRes, nil
+	return freezeTokenHandler.FreezeTokens(ctx, req)
 }

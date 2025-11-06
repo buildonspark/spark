@@ -9,10 +9,13 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
+	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so/utils"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 // encodeSparkAddress is a helper function to encode a public key as a spark address for testing
@@ -775,5 +778,208 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 			"second transaction should be mintTxHash2")
 		require.Equal(t, transactionHashes[0], result.TokenTransactionsWithStatus[2].TokenTransactionHash,
 			"third transaction should be mintTxHash1")
+	})
+}
+
+func TestQueryTokenOutputsDateHeader(t *testing.T) {
+	issuerPrivKey := keys.GeneratePrivateKey()
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+
+	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+		issuerPrivateKey: issuerPrivKey,
+		name:             "Date Header",
+		ticker:           "DATE",
+		maxSupply:        1000000,
+	})
+	require.NoError(t, err, "failed to create native spark token")
+
+	mintTransaction, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
+	require.NoError(t, err, "failed to create mint transaction")
+
+	finalMintTx, err := wallet.BroadcastTokenTransfer(
+		t.Context(), config, mintTransaction, []keys.Private{issuerPrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast mint transaction")
+
+	sparkConn, err := config.NewCoordinatorGRPCConnection()
+	require.NoError(t, err, "failed to establish gRPC connection")
+	defer sparkConn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), config, sparkConn)
+	require.NoError(t, err, "failed to authenticate")
+	tmpCtx := wallet.ContextWithToken(t.Context(), token)
+
+	var header metadata.MD
+	tokenClient := tokenpb.NewSparkTokenServiceClient(sparkConn)
+
+	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	require.NoError(t, err, "failed to convert network")
+
+	ownerPubKey := finalMintTx.TokenOutputs[0].OwnerPublicKey
+
+	response, err := tokenClient.QueryTokenOutputs(tmpCtx, &tokenpb.QueryTokenOutputsRequest{
+		OwnerPublicKeys:  [][]byte{ownerPubKey},
+		IssuerPublicKeys: [][]byte{issuerPrivKey.Public().Serialize()},
+		Network:          network,
+	}, grpc.Header(&header))
+
+	require.NoError(t, err, "failed to query token outputs")
+	require.NotNil(t, response, "response should not be nil")
+
+	dateHeaders := header.Get("date")
+	require.NotEmpty(t, dateHeaders, "date header should be present")
+	require.Len(t, dateHeaders, 1, "should have exactly one DATE header")
+
+	dateValue := dateHeaders[0]
+	require.NotEmpty(t, dateValue, "date header value should not be empty")
+
+	parsedTime, err := time.Parse(time.RFC1123, dateValue)
+	require.NoError(t, err, "date header should be in RFC1123 format")
+
+	now := time.Now()
+	timeDiff := now.Sub(parsedTime).Abs()
+	require.Less(t, timeDiff, 5*time.Second, "date header should be close to current time")
+
+	t.Logf("date header value: %s", dateValue)
+}
+
+func TestAllSparkTokenRPCsDateHeader(t *testing.T) {
+	issuerPrivKey := keys.GeneratePrivateKey()
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
+
+	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
+		issuerPrivateKey: issuerPrivKey,
+		name:             "All RPCs Test",
+		ticker:           "ARPC",
+		maxSupply:        1000000,
+	})
+	require.NoError(t, err, "failed to create native spark token")
+
+	mintTransaction, userOutput1PrivKey, userOutput2PrivKey, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
+	require.NoError(t, err, "failed to create mint transaction")
+
+	finalMintTx, err := wallet.BroadcastTokenTransfer(
+		t.Context(), config, mintTransaction, []keys.Private{issuerPrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast mint transaction")
+
+	sparkConn, err := config.NewCoordinatorGRPCConnection()
+	require.NoError(t, err, "failed to establish gRPC connection")
+	defer sparkConn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), config, sparkConn)
+	require.NoError(t, err, "failed to authenticate")
+	tmpCtx := wallet.ContextWithToken(t.Context(), token)
+
+	tokenClient := tokenpb.NewSparkTokenServiceClient(sparkConn)
+	network, err := common.ProtoNetworkFromNetwork(config.Network)
+	require.NoError(t, err, "failed to convert network")
+
+	mintTxHash, err := utils.HashTokenTransaction(finalMintTx, false)
+	require.NoError(t, err, "failed to hash mint transaction")
+
+	ownerPubKey := finalMintTx.TokenOutputs[0].OwnerPublicKey
+	issuerPubKey := issuerPrivKey.Public().Serialize()
+
+	verifyDateHeader := func(t *testing.T, header metadata.MD, rpcName string) {
+		dateHeaders := header.Get("date")
+		require.NotEmpty(t, dateHeaders, "%s: date header should be present", rpcName)
+		require.Len(t, dateHeaders, 1, "%s: should have exactly one date header", rpcName)
+
+		dateValue := dateHeaders[0]
+		require.NotEmpty(t, dateValue, "%s: date header value should not be empty", rpcName)
+
+		parsedTime, err := time.Parse(time.RFC1123, dateValue)
+		require.NoError(t, err, "%s: date header should be in RFC1123 format", rpcName)
+
+		now := time.Now()
+		timeDiff := now.Sub(parsedTime).Abs()
+		require.Less(t, timeDiff, 5*time.Second, "%s: date header should be close to current time", rpcName)
+
+		t.Logf("%s date header value: %s", rpcName, dateValue)
+	}
+
+	t.Run("StartTransaction", func(t *testing.T) {
+		var header metadata.MD
+		transferTransaction, _, err := createTestTokenTransferTransactionTokenPb(t, config, mintTxHash, issuerPrivKey.Public())
+		require.NoError(t, err, "failed to create transfer transaction")
+
+		ownerPrivateKeys := []keys.Private{userOutput1PrivKey, userOutput2PrivKey}
+		partialTokenTransactionHash, err := utils.HashTokenTransaction(transferTransaction, true)
+		require.NoError(t, err, "failed to hash partial token transaction")
+
+		var ownerSignaturesWithIndex []*tokenpb.SignatureWithIndex
+		for i, privKey := range ownerPrivateKeys {
+			sig, err := wallet.SignHashSlice(config, privKey, partialTokenTransactionHash)
+			require.NoError(t, err, "failed to create signature")
+			ownerSignaturesWithIndex = append(ownerSignaturesWithIndex, &tokenpb.SignatureWithIndex{
+				InputIndex: uint32(i),
+				Signature:  sig,
+			})
+		}
+
+		_, err = tokenClient.StartTransaction(tmpCtx, &tokenpb.StartTransactionRequest{
+			IdentityPublicKey:                      config.IdentityPublicKey().Serialize(),
+			PartialTokenTransaction:                transferTransaction,
+			PartialTokenTransactionOwnerSignatures: ownerSignaturesWithIndex,
+			ValidityDurationSeconds:                uint64(180),
+		}, grpc.Header(&header))
+		require.NoError(t, err, "StartTransaction should succeed")
+		verifyDateHeader(t, header, "StartTransaction")
+	})
+
+	t.Run("CommitTransaction", func(t *testing.T) {
+		var header metadata.MD
+		transferTransaction, _, err := createTestTokenTransferTransactionTokenPb(t, config, mintTxHash, issuerPrivKey.Public())
+		require.NoError(t, err, "failed to create transfer transaction")
+
+		ownerPrivateKeys := []keys.Private{userOutput1PrivKey, userOutput2PrivKey}
+		startResp, finalTxHash, err := wallet.StartTokenTransaction(
+			t.Context(), config, transferTransaction, ownerPrivateKeys, 180*time.Second, nil,
+		)
+		require.NoError(t, err, "failed to start token transaction")
+
+		operatorSignatures, err := wallet.CreateOperatorSpecificSignatures(
+			config, ownerPrivateKeys, finalTxHash,
+		)
+		require.NoError(t, err, "failed to create operator-specific signatures")
+
+		_, err = tokenClient.CommitTransaction(tmpCtx, &tokenpb.CommitTransactionRequest{
+			FinalTokenTransaction:          startResp.FinalTokenTransaction,
+			FinalTokenTransactionHash:      finalTxHash,
+			InputTtxoSignaturesPerOperator: operatorSignatures,
+			OwnerIdentityPublicKey:         config.IdentityPublicKey().Serialize(),
+		}, grpc.Header(&header))
+		require.NoError(t, err, "CommitTransaction should succeed")
+		verifyDateHeader(t, header, "CommitTransaction")
+	})
+
+	t.Run("QueryTokenMetadata", func(t *testing.T) {
+		var header metadata.MD
+		_, err := tokenClient.QueryTokenMetadata(tmpCtx, &tokenpb.QueryTokenMetadataRequest{
+			IssuerPublicKeys: [][]byte{issuerPubKey},
+		}, grpc.Header(&header))
+		require.NoError(t, err, "QueryTokenMetadata should succeed")
+		verifyDateHeader(t, header, "QueryTokenMetadata")
+	})
+
+	t.Run("QueryTokenTransactions", func(t *testing.T) {
+		var header metadata.MD
+		_, err := tokenClient.QueryTokenTransactions(tmpCtx, &tokenpb.QueryTokenTransactionsRequest{
+			IssuerPublicKeys: [][]byte{issuerPubKey},
+		}, grpc.Header(&header))
+		require.NoError(t, err, "QueryTokenTransactions should succeed")
+		verifyDateHeader(t, header, "QueryTokenTransactions")
+	})
+
+	t.Run("QueryTokenOutputs", func(t *testing.T) {
+		var header metadata.MD
+		_, err := tokenClient.QueryTokenOutputs(tmpCtx, &tokenpb.QueryTokenOutputsRequest{
+			OwnerPublicKeys:  [][]byte{ownerPubKey},
+			IssuerPublicKeys: [][]byte{issuerPubKey},
+			Network:          network,
+		}, grpc.Header(&header))
+		require.NoError(t, err, "QueryTokenOutputs should succeed")
+		verifyDateHeader(t, header, "QueryTokenOutputs")
 	})
 }
