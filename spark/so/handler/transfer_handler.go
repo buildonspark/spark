@@ -20,6 +20,7 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
+	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
@@ -1728,7 +1729,7 @@ func (h *TransferHandler) completeSendLeaf(ctx context.Context, transfer *ent.Tr
 	return nil
 }
 
-func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.TransferFilter, isPending bool, _ bool) (*pb.QueryTransfersResponse, error) {
+func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.TransferFilter, isPending bool, isSSP bool) (*pb.QueryTransfersResponse, error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.queryTransfers")
 	defer span.End()
 
@@ -1765,8 +1766,10 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		if err != nil {
 			return nil, fmt.Errorf("invalid receiver identity public key: %w", err)
 		}
-		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, receiverIDPubKey); err != nil {
-			return nil, err
+		if !isSSP {
+			if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, receiverIDPubKey); err != nil {
+				return nil, err
+			}
 		}
 		transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(receiverIDPubKey))
 		if isPending {
@@ -1777,8 +1780,10 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		if err != nil {
 			return nil, fmt.Errorf("invalid sender identity public key: %w", err)
 		}
-		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, senderIDPubKey); err != nil {
-			return nil, err
+		if !isSSP {
+			if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, senderIDPubKey); err != nil {
+				return nil, err
+			}
 		}
 		transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(senderIDPubKey))
 		if isPending {
@@ -1787,14 +1792,38 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 				enttransfer.ExpiryTimeLT(time.Now()),
 			)
 		}
-	case *pb.TransferFilter_SenderOrReceiverIdentityPublicKey:
-		identityPubKey, err := keys.ParsePublicKey(filter.GetSenderOrReceiverIdentityPublicKey())
-		if err != nil {
-			return nil, fmt.Errorf("invalid identity public key: %w", err)
+	default:
+		var identityPubKey keys.Public
+		if filter.Participant == nil {
+			if isSSP {
+				// SSP can query all pending transfers without participant filter
+				if isPending {
+					transferPredicate = append(
+						transferPredicate,
+						enttransfer.StatusIn(append(senderPendingStatuses, receiverPendingStatuses...)...),
+					)
+				}
+				break
+			}
+			// Non-SSP: force login - require session to get identity
+			session, err := authn.GetSessionFromContext(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get session from context: %w", err)
+			}
+			identityPubKey = session.IdentityPublicKey()
+		} else {
+			// Participant is set, extract and validate identity
+			identityPubKey, err = keys.ParsePublicKey(filter.GetSenderOrReceiverIdentityPublicKey())
+			if err != nil {
+				return nil, fmt.Errorf("invalid identity public key: %w", err)
+			}
+			if !isSSP {
+				if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, identityPubKey); err != nil {
+					return nil, err
+				}
+			}
 		}
-		if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, identityPubKey); err != nil {
-			return nil, err
-		}
+
 		if isPending {
 			transferPredicate = append(transferPredicate, enttransfer.Or(
 				enttransfer.And(
