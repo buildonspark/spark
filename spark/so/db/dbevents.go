@@ -168,7 +168,7 @@ func (e *DBEvents) AddListeners(subscriptions []Subscription) (chan EventData, f
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	channel := make(chan EventData, 16)
+	channel := make(chan EventData, 32)
 
 	for _, subscription := range subscriptions {
 		if _, exists := e.listeners[subscription.EventName]; !exists {
