@@ -6904,3 +6904,105 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = GenerateStaticDepositAddressProofsResponseValidationError{}
+
+// Validate checks the field values on SyncNodeRequest with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *SyncNodeRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SyncNodeRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SyncNodeRequestMultiError, or nil if none found.
+func (m *SyncNodeRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SyncNodeRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for OperatorId
+
+	if len(errors) > 0 {
+		return SyncNodeRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// SyncNodeRequestMultiError is an error wrapping multiple validation errors
+// returned by SyncNodeRequest.ValidateAll() if the designated constraints
+// aren't met.
+type SyncNodeRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SyncNodeRequestMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SyncNodeRequestMultiError) AllErrors() []error { return m }
+
+// SyncNodeRequestValidationError is the validation error returned by
+// SyncNodeRequest.Validate if the designated constraints aren't met.
+type SyncNodeRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SyncNodeRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SyncNodeRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SyncNodeRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SyncNodeRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SyncNodeRequestValidationError) ErrorName() string { return "SyncNodeRequestValidationError" }
+
+// Error satisfies the builtin error interface
+func (e SyncNodeRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSyncNodeRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SyncNodeRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SyncNodeRequestValidationError{}

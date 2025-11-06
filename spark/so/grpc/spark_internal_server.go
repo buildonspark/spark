@@ -238,3 +238,8 @@ func (s *SparkInternalServer) NodeAvailableForRenew(ctx context.Context, req *pb
 	renewHandler := handler.NewRenewLeafHandler(s.config)
 	return &emptypb.Empty{}, renewHandler.NodeAvailableForRenew(ctx, req)
 }
+
+func (s *SparkInternalServer) SyncNode(ctx context.Context, req *pb.SyncNodeRequest) (*emptypb.Empty, error) {
+	h := handler.NewSyncNodeHandler(s.config)
+	return &emptypb.Empty{}, h.SyncTreeNodes(ctx, req)
+}

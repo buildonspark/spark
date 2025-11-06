@@ -56,6 +56,7 @@ const (
 	SparkInternalService_FixKeyshareRound2_FullMethodName                  = "/spark_internal.SparkInternalService/fix_keyshare_round2"
 	SparkInternalService_GetTransfers_FullMethodName                       = "/spark_internal.SparkInternalService/get_transfers"
 	SparkInternalService_GenerateStaticDepositAddressProofs_FullMethodName = "/spark_internal.SparkInternalService/generate_static_deposit_address_proofs"
+	SparkInternalService_SyncNode_FullMethodName                           = "/spark_internal.SparkInternalService/sync_node"
 )
 
 // SparkInternalServiceClient is the client API for SparkInternalService service.
@@ -108,6 +109,9 @@ type SparkInternalServiceClient interface {
 	// The client can use them to validate that all SOs know about this address.
 	// The coordinator can use them to validate if an address was created correctly.
 	GenerateStaticDepositAddressProofs(ctx context.Context, in *GenerateStaticDepositAddressProofsRequest, opts ...grpc.CallOption) (*GenerateStaticDepositAddressProofsResponse, error)
+	// This method fixes bad leaves by querying a designated "good" SO for its
+	// leaves, and copying it over to this SO's DB.
+	SyncNode(ctx context.Context, in *SyncNodeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type sparkInternalServiceClient struct {
@@ -471,6 +475,16 @@ func (c *sparkInternalServiceClient) GenerateStaticDepositAddressProofs(ctx cont
 	return out, nil
 }
 
+func (c *sparkInternalServiceClient) SyncNode(ctx context.Context, in *SyncNodeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_SyncNode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SparkInternalServiceServer is the server API for SparkInternalService service.
 // All implementations must embed UnimplementedSparkInternalServiceServer
 // for forward compatibility.
@@ -521,6 +535,9 @@ type SparkInternalServiceServer interface {
 	// The client can use them to validate that all SOs know about this address.
 	// The coordinator can use them to validate if an address was created correctly.
 	GenerateStaticDepositAddressProofs(context.Context, *GenerateStaticDepositAddressProofsRequest) (*GenerateStaticDepositAddressProofsResponse, error)
+	// This method fixes bad leaves by querying a designated "good" SO for its
+	// leaves, and copying it over to this SO's DB.
+	SyncNode(context.Context, *SyncNodeRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedSparkInternalServiceServer()
 }
 
@@ -635,6 +652,9 @@ func (UnimplementedSparkInternalServiceServer) GetTransfers(context.Context, *Ge
 }
 func (UnimplementedSparkInternalServiceServer) GenerateStaticDepositAddressProofs(context.Context, *GenerateStaticDepositAddressProofsRequest) (*GenerateStaticDepositAddressProofsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateStaticDepositAddressProofs not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) SyncNode(context.Context, *SyncNodeRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SyncNode not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) mustEmbedUnimplementedSparkInternalServiceServer() {}
 func (UnimplementedSparkInternalServiceServer) testEmbeddedByValue()                              {}
@@ -1287,6 +1307,24 @@ func _SparkInternalService_GenerateStaticDepositAddressProofs_Handler(srv interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SparkInternalService_SyncNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncNodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).SyncNode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_SyncNode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).SyncNode(ctx, req.(*SyncNodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SparkInternalService_ServiceDesc is the grpc.ServiceDesc for SparkInternalService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1433,6 +1471,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "generate_static_deposit_address_proofs",
 			Handler:    _SparkInternalService_GenerateStaticDepositAddressProofs_Handler,
+		},
+		{
+			MethodName: "sync_node",
+			Handler:    _SparkInternalService_SyncNode_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

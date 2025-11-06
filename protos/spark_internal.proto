@@ -74,6 +74,10 @@ service SparkInternalService {
     // The client can use them to validate that all SOs know about this address.
     // The coordinator can use them to validate if an address was created correctly.
     rpc generate_static_deposit_address_proofs(GenerateStaticDepositAddressProofsRequest) returns (GenerateStaticDepositAddressProofsResponse) {}
+
+    // This method fixes bad leaves by querying a designated "good" SO for its
+    // leaves, and copying it over to this SO's DB.
+    rpc sync_node(SyncNodeRequest) returns (google.protobuf.Empty) {}
 }
 
 message MarkKeysharesAsUsedRequest {
@@ -430,3 +434,7 @@ message GenerateStaticDepositAddressProofsResponse {
     bytes address_signature = 1;
 }
 
+message SyncNodeRequest {
+    repeated string node_ids = 1;
+    string operator_id = 2;
+}
