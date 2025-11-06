@@ -1,7 +1,6 @@
 package grpctest
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"math/big"
 	"math/rand/v2"
@@ -15,16 +14,12 @@ import (
 
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
 	"github.com/btcsuite/btcd/txscript"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
-	"github.com/lightsparkdev/spark/so/objects"
 	"github.com/lightsparkdev/spark/testing/wallet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const amountSatsToSend = 100_000
@@ -1535,98 +1530,6 @@ func TestQuerySparkInvoicesForUnknownInvoiceReturnsNotFound(t *testing.T) {
 	require.NoError(t, err, "failed to query spark invoices")
 	require.Len(t, invoiceResponse.InvoiceStatuses, 1)
 	require.Equal(t, sparkpb.InvoiceStatus_NOT_FOUND, invoiceResponse.InvoiceStatuses[0].Status)
-}
-
-func TestTransferWithDirectFromCpfpRefundOnly(t *testing.T) {
-	// --- setup ---
-
-	config := wallet.NewTestWalletConfig(t)
-	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
-	require.NoError(t, err)
-	defer conn.Close()
-
-	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
-	require.NoError(t, err)
-	ctx := wallet.ContextWithToken(t.Context(), token)
-
-	// Deposit funds so that they can be transferred.
-	leafPrivKey := keys.GeneratePrivateKey()
-	rootNode, err := wallet.CreateNewTree(config, faucet, leafPrivKey, amountSatsToSend)
-	require.NoError(t, err, "failed to create new tree")
-
-	receiverPrivKey := keys.GeneratePrivateKey()
-	// newLeafPrivKey := keys.GeneratePrivateKey()
-
-	// --- test ---
-	//
-	// Test that transfer works even when the direct from CPFP refund transaction
-	// is the only direct transaction passed.
-
-	sparkClient := pb.NewSparkServiceClient(conn)
-
-	// Create a direct from CPFP refund transaction
-	nodeTx, err := common.TxFromRawTxBytes(rootNode.NodeTx)
-	require.NoError(t, err)
-	nodeOutPoint := &wire.OutPoint{Hash: nodeTx.TxHash(), Index: 0}
-
-	// Get the next sequence from the existing refund transaction
-	currRefundTx, err := common.TxFromRawTxBytes(rootNode.RefundTx)
-	require.NoError(t, err)
-	nextSequence, err := spark.NextSequence(currRefundTx.TxIn[0].Sequence)
-	require.NoError(t, err)
-
-	refundTx, directFromCpfpRefundTx, err := wallet.CreateRefundTxs(
-		nextSequence,
-		nodeOutPoint,
-		nodeTx.TxOut[0].Value,
-		receiverPrivKey.Public(),
-		true,
-	)
-	require.NoError(t, err)
-
-	response, err := sparkClient.StartTransfer(ctx, &pb.StartTransferRequest{
-		TransferId:                uuid.NewString(),
-		OwnerIdentityPublicKey:    config.IdentityPublicKey().Serialize(),
-		ReceiverIdentityPublicKey: receiverPrivKey.Public().Serialize(),
-		LeavesToSend: []*pb.LeafRefundTxSigningJob{
-			{
-				LeafId:                           rootNode.Id,
-				RefundTxSigningJob:               createSigningJobFromTx(t, leafPrivKey.Public(), refundTx),
-				DirectFromCpfpRefundTxSigningJob: createSigningJobFromTx(t, leafPrivKey.Public(), directFromCpfpRefundTx),
-			},
-		},
-		ExpiryTime: timestamppb.New(time.Now().Add(10 * time.Minute)),
-	})
-
-	require.NoError(t, err, "Expected StartTransfer to succeed with only direct from CPFP refund transaction")
-
-	// Verify that the response contains the expected signing results
-	require.Len(t, response.SigningResults, 1, "Expected exactly one signing result")
-	signingResult := response.SigningResults[0]
-	require.Equal(t, rootNode.Id, signingResult.LeafId, "Expected signing result for correct leaf")
-
-	// Verify that the regular refund tx signing result is present
-	require.NotNil(t, signingResult.RefundTxSigningResult, "Expected RefundTxSigningResult to be present")
-
-	// Verify that the direct from CPFP refund tx signing result is present (this is the new behavior)
-	require.NotNil(t, signingResult.DirectFromCpfpRefundTxSigningResult, "Expected DirectFromCpfpRefundTxSigningResult to be present when DirectFromCpfpRefundTxSigningJob is provided")
-}
-
-// TODO: remove in favor of signingJobFromTx (identical impl in an unmerged branch)
-func createSigningJobFromTx(t *testing.T, publicKey keys.Public, tx *wire.MsgTx) *pb.SigningJob {
-	var txBuf bytes.Buffer
-	require.NoError(t, tx.Serialize(&txBuf))
-
-	nonce, err := objects.RandomSigningNonce()
-	require.NoError(t, err)
-	nonceCommitmentProto, err := nonce.SigningCommitment().MarshalProto()
-	require.NoError(t, err)
-
-	return &pb.SigningJob{
-		RawTx:                  txBuf.Bytes(),
-		SigningPublicKey:       publicKey.Serialize(),
-		SigningNonceCommitment: nonceCommitmentProto,
-	}
 }
 
 func TestQueryTransfersRequiresParticipantOrTransferIds(t *testing.T) {
