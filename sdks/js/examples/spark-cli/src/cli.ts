@@ -23,11 +23,8 @@ import {
   validateSparkInvoiceSignature,
   WalletConfig,
 } from "@buildonspark/spark-sdk";
-import {
-  InvoiceStatus,
-  TokenTransactionStatus,
-  TreeNode,
-} from "@buildonspark/spark-sdk/proto/spark";
+import { InvoiceStatus, TreeNode } from "@buildonspark/spark-sdk/proto/spark";
+import { TokenTransactionStatus } from "@buildonspark/spark-sdk/proto/spark_token";
 import {
   BitcoinNetwork,
   CoopExitFeeQuote,
@@ -683,7 +680,7 @@ async function runCLI() {
   unfreezetokens <sparkAddress>                                       - Unfreeze tokens for a specific address
   createtoken <tokenName> <tokenTicker> <decimals> <maxSupply> <isFreezable> - Create a new token.
   decodetokenidentifier <tokenIdentifier>                             - Returns the raw token identifier as a hex string
-   
+
   enablelogging <true|false>                                          - Enable or disable logging
   setloggerlevel <trace|info>                                         - Set the logging level
   help                                                                - Show this help message

@@ -1,6 +1,6 @@
 import { numberToBytesBE, bytesToNumberBE } from "@noble/curves/utils";
 import { ValidationError } from "../errors/types.js";
-import { OutputWithPreviousTransactionData } from "../proto/spark.js";
+import { OutputWithPreviousTransactionData } from "../proto/spark_token.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection/connection.js";
 import { TokenTransactionService } from "../services/token-transactions.js";

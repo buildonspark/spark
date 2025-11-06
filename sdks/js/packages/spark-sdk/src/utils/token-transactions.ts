@@ -1,5 +1,5 @@
 import { bytesToNumberBE, equalBytes } from "@noble/curves/utils";
-import { OutputWithPreviousTransactionData } from "../proto/spark.js";
+import { OutputWithPreviousTransactionData } from "../proto/spark_token.js";
 import { TokenBalanceMap, TokenOutputsMap } from "../spark-wallet/types.js";
 import {
   Bech32mTokenIdentifier,

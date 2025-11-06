@@ -12,7 +12,7 @@ import {
   ValidationError,
   type ConfigOptions,
 } from "@buildonspark/spark-sdk";
-import { OutputWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark";
+import { OutputWithPreviousTransactionData } from "@buildonspark/spark-sdk/proto/spark_token";
 import { bytesToHex, bytesToNumberBE, hexToBytes } from "@noble/curves/utils";
 import { TokenFreezeService } from "../services/freeze.js";
 import { IssuerTokenTransactionService } from "../services/token-transactions.js";

@@ -9,11 +9,10 @@ import {
   Direction,
   OperatorSpecificTokenTransactionSignablePayload,
   Order,
-  OutputWithPreviousTransactionData,
-  RevocationSecretWithIndex,
 } from "../proto/spark.js";
 import {
   InputTtxoSignaturesPerOperator,
+  OutputWithPreviousTransactionData,
   QueryTokenTransactionsRequest as QueryTokenTransactionsRequestV1,
   QueryTokenTransactionsResponse,
   SignatureWithIndex,

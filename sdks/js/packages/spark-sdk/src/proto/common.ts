@@ -13,7 +13,9 @@ export enum SignatureIntent {
   CREATION = 0,
   TRANSFER = 1,
   AGGREGATE = 2,
+  /** @deprecated */
   REFRESH = 3,
+  /** @deprecated */
   EXTEND = 4,
   UNRECOGNIZED = -1,
 }

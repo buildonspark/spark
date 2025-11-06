@@ -44,7 +44,6 @@ import {
 import {
   ConnectedEvent,
   DepositAddressQueryResult,
-  OutputWithPreviousTransactionData,
   QueryNodesRequest,
   QueryNodesResponse,
   QuerySparkInvoicesResponse,
@@ -57,7 +56,10 @@ import {
   TreeNodeStatus,
   UtxoSwapRequestType,
 } from "../proto/spark.js";
-import { QueryTokenTransactionsResponse } from "../proto/spark_token.js";
+import {
+  OutputWithPreviousTransactionData,
+  QueryTokenTransactionsResponse,
+} from "../proto/spark_token.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManager } from "../services/connection/connection.js";
 import { CoopExitService } from "../services/coop-exit.js";

@@ -98,69 +98,6 @@ export function directionToJSON(object: Direction): string {
   }
 }
 
-export enum TokenTransactionStatus {
-  TOKEN_TRANSACTION_STARTED = 0,
-  TOKEN_TRANSACTION_SIGNED = 1,
-  TOKEN_TRANSACTION_REVEALED = 5,
-  TOKEN_TRANSACTION_FINALIZED = 2,
-  TOKEN_TRANSACTION_STARTED_CANCELLED = 3,
-  TOKEN_TRANSACTION_SIGNED_CANCELLED = 4,
-  TOKEN_TRANSACTION_UNKNOWN = 10,
-  UNRECOGNIZED = -1,
-}
-
-export function tokenTransactionStatusFromJSON(object: any): TokenTransactionStatus {
-  switch (object) {
-    case 0:
-    case "TOKEN_TRANSACTION_STARTED":
-      return TokenTransactionStatus.TOKEN_TRANSACTION_STARTED;
-    case 1:
-    case "TOKEN_TRANSACTION_SIGNED":
-      return TokenTransactionStatus.TOKEN_TRANSACTION_SIGNED;
-    case 5:
-    case "TOKEN_TRANSACTION_REVEALED":
-      return TokenTransactionStatus.TOKEN_TRANSACTION_REVEALED;
-    case 2:
-    case "TOKEN_TRANSACTION_FINALIZED":
-      return TokenTransactionStatus.TOKEN_TRANSACTION_FINALIZED;
-    case 3:
-    case "TOKEN_TRANSACTION_STARTED_CANCELLED":
-      return TokenTransactionStatus.TOKEN_TRANSACTION_STARTED_CANCELLED;
-    case 4:
-    case "TOKEN_TRANSACTION_SIGNED_CANCELLED":
-      return TokenTransactionStatus.TOKEN_TRANSACTION_SIGNED_CANCELLED;
-    case 10:
-    case "TOKEN_TRANSACTION_UNKNOWN":
-      return TokenTransactionStatus.TOKEN_TRANSACTION_UNKNOWN;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return TokenTransactionStatus.UNRECOGNIZED;
-  }
-}
-
-export function tokenTransactionStatusToJSON(object: TokenTransactionStatus): string {
-  switch (object) {
-    case TokenTransactionStatus.TOKEN_TRANSACTION_STARTED:
-      return "TOKEN_TRANSACTION_STARTED";
-    case TokenTransactionStatus.TOKEN_TRANSACTION_SIGNED:
-      return "TOKEN_TRANSACTION_SIGNED";
-    case TokenTransactionStatus.TOKEN_TRANSACTION_REVEALED:
-      return "TOKEN_TRANSACTION_REVEALED";
-    case TokenTransactionStatus.TOKEN_TRANSACTION_FINALIZED:
-      return "TOKEN_TRANSACTION_FINALIZED";
-    case TokenTransactionStatus.TOKEN_TRANSACTION_STARTED_CANCELLED:
-      return "TOKEN_TRANSACTION_STARTED_CANCELLED";
-    case TokenTransactionStatus.TOKEN_TRANSACTION_SIGNED_CANCELLED:
-      return "TOKEN_TRANSACTION_SIGNED_CANCELLED";
-    case TokenTransactionStatus.TOKEN_TRANSACTION_UNKNOWN:
-      return "TOKEN_TRANSACTION_UNKNOWN";
-    case TokenTransactionStatus.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
 export enum TransferStatus {
   TRANSFER_STATUS_SENDER_INITIATED = 0,
   TRANSFER_STATUS_SENDER_KEY_TWEAK_PENDING = 1,
@@ -986,16 +923,19 @@ export interface StartDepositTreeCreationResponse {
 /**
  * This proto is constructed by the wallet to specify leaves it wants to spend as
  * part of the token transaction.
+ * DEPRECATED: Use definitions in spark_token.proto instead
  */
 export interface TokenOutputToSpend {
   prevTokenTransactionHash: Uint8Array;
   prevTokenTransactionVout: number;
 }
 
+/** DEPRECATED: Use definitions in spark_token.proto instead */
 export interface TokenTransferInput {
   outputsToSpend: TokenOutputToSpend[];
 }
 
+/** DEPRECATED: Use definitions in spark_token.proto instead */
 export interface TokenMintInput {
   issuerPublicKey: Uint8Array;
   /**
@@ -1011,6 +951,7 @@ export interface TokenMintInput {
   tokenIdentifier?: Uint8Array | undefined;
 }
 
+/** DEPRECATED: Use definitions in spark_token.proto instead */
 export interface TokenCreateInput {
   issuerPublicKey: Uint8Array;
   /** No minimum length because a single utf-8 character can be 3 bytes. */
@@ -1028,6 +969,7 @@ export interface TokenCreateInput {
  * This proto is constructed by the wallet to specify outputs it wants to create
  * as part of a token transaction. Output id and revocation public key should remain unfilled
  * so that the SE can fill them as part of the StartTokenTransaction() call.
+ * DEPRECATED: Use definitions in spark_token.proto instead
  */
 export interface TokenOutput {
   id?: string | undefined;
@@ -1047,6 +989,7 @@ export interface TokenOutput {
  * This proto is constructed by the wallet and is the core transaction data structure.
  * This proto is deterministically hashed to generate the token_transaction_hash that
  * is cooperatively signed by the SO group to confirm a token transaction.
+ * DEPRECATED: Use definitions in spark_token.proto instead
  */
 export interface TokenTransaction {
   tokenInputs?:
@@ -1059,22 +1002,7 @@ export interface TokenTransaction {
   network: Network;
 }
 
-export interface SpentTokenOutputMetadata {
-  outputId: string;
-  revocationSecret: Uint8Array;
-}
-
-export interface TokenTransactionConfirmationMetadata {
-  spentTokenOutputsMetadata: SpentTokenOutputMetadata[];
-}
-
-export interface TokenTransactionWithStatus {
-  tokenTransaction: TokenTransaction | undefined;
-  status: TokenTransactionStatus;
-  confirmationMetadata: TokenTransactionConfirmationMetadata | undefined;
-  tokenTransactionHash: Uint8Array;
-}
-
+/** DEPRECATED: Use definitions in spark_token.proto instead */
 export interface SignatureWithIndex {
   /** This is a Schnorr or ECDSA DER signature which can be between 64 and 73 bytes. */
   signature: Uint8Array;
@@ -1082,40 +1010,7 @@ export interface SignatureWithIndex {
   inputIndex: number;
 }
 
-export interface TokenTransactionSignatures {
-  /**
-   * Filled by signing the partial token transaction hash with the owner/issuer private key.
-   * For mint transactions this will be one signature for the input token_public_key
-   * For transfer transactions this will be one for each output for the output owner_public_key
-   */
-  ownerSignatures: SignatureWithIndex[];
-}
-
-export interface StartTokenTransactionRequest {
-  identityPublicKey: Uint8Array;
-  partialTokenTransaction:
-    | TokenTransaction
-    | undefined;
-  /** List of ecdsa signatures authorizing movement of tokens from the token input. */
-  tokenTransactionSignatures: TokenTransactionSignatures | undefined;
-  sparkPaymentIntent: string;
-}
-
-export interface StartTokenTransactionResponse {
-  /**
-   * This is the same token transaction sent by the wallet with output revocation public keys
-   * filled. This is the final transaction that is published and gossiped among LRC20 nodes.
-   */
-  finalTokenTransaction:
-    | TokenTransaction
-    | undefined;
-  /**
-   * Information for fetching and resolving the revocation keyshare on a transfer operation.
-   * Contains the threshold of keyshares needed and the SO owners of those keyshares.
-   */
-  keyshareInfo: SigningKeyshare | undefined;
-}
-
+/** DEPRECATED: Use definitions in spark_token.proto instead */
 export interface OperatorSpecificTokenTransactionSignablePayload {
   finalTokenTransactionHash: Uint8Array;
   operatorIdentityPublicKey: Uint8Array;
@@ -1124,48 +1019,21 @@ export interface OperatorSpecificTokenTransactionSignablePayload {
 /**
  * This message allows the sender of a output being spent to provide final evidence
  * that it owns a output to an SO when requesting signing and release of the  revocation keyshare.
+ * DEPRECATED: Use definitions in spark_token.proto instead
  */
 export interface OperatorSpecificOwnerSignature {
   ownerSignature: SignatureWithIndex | undefined;
   payload: OperatorSpecificTokenTransactionSignablePayload | undefined;
 }
 
-export interface SignTokenTransactionRequest {
-  finalTokenTransaction: TokenTransaction | undefined;
-  operatorSpecificSignatures: OperatorSpecificOwnerSignature[];
-  identityPublicKey: Uint8Array;
-}
-
-export interface KeyshareWithIndex {
-  /** The index of the input TTXO associated with this keyshare. */
-  inputIndex: number;
-  keyshare: Uint8Array;
-}
-
-export interface SignTokenTransactionResponse {
-  sparkOperatorSignature: Uint8Array;
-  revocationKeyshares: KeyshareWithIndex[];
-}
-
+/** DEPRECATED: Use definitions in spark_token.proto instead */
 export interface RevocationSecretWithIndex {
   /** The index of the input TTXO associated with this secret. */
   inputIndex: number;
   revocationSecret: Uint8Array;
 }
 
-export interface FinalizeTokenTransactionRequest {
-  finalTokenTransaction:
-    | TokenTransaction
-    | undefined;
-  /**
-   * List of ordered revocation secrets that map 1:1 with leaves being spent in the
-   * token transaction.
-   */
-  revocationSecrets: RevocationSecretWithIndex[];
-  identityPublicKey: Uint8Array;
-  sparkPaymentIntent: string;
-}
-
+/** DEPRECATED: Use definitions in spark_token.proto instead */
 export interface FreezeTokensPayload {
   ownerPublicKey: Uint8Array;
   tokenPublicKey: Uint8Array;
@@ -1176,6 +1044,7 @@ export interface FreezeTokensPayload {
   tokenIdentifier?: Uint8Array | undefined;
 }
 
+/** DEPRECATED: Use definitions in spark_token.proto instead */
 export interface FreezeTokensRequest {
   freezeTokensPayload:
     | FreezeTokensPayload
@@ -1184,50 +1053,11 @@ export interface FreezeTokensRequest {
   issuerSignature: Uint8Array;
 }
 
+/** DEPRECATED: Use definitions in spark_token.proto instead */
 export interface FreezeTokensResponse {
   impactedOutputIds: string[];
   /** Decoded uint128 */
   impactedTokenAmount: Uint8Array;
-}
-
-export interface QueryTokenOutputsRequest {
-  ownerPublicKeys: Uint8Array[];
-  /** Optionally provide token public keys. If not set return leaves for all tokens. */
-  tokenPublicKeys: Uint8Array[];
-  tokenIdentifiers: Uint8Array[];
-  /** defaults to mainnet when no network is provided. */
-  network: Network;
-}
-
-/** Request constraints are combined using an AND relation. */
-export interface QueryTokenTransactionsRequest {
-  /** Returns transactions that have one of these output ids in the input or output. */
-  outputIds: string[];
-  /** Returns transactions that have this owner public key as the sender or receiver in one or more of the input/output leaves. */
-  ownerPublicKeys: Uint8Array[];
-  /** Returns transactions that related to this token public key. */
-  tokenPublicKeys: Uint8Array[];
-  /** Returns transactions that related to this token identifier. */
-  tokenIdentifiers: Uint8Array[];
-  /** Returns transactions that match the provided transaction hashes. */
-  tokenTransactionHashes: Uint8Array[];
-  limit: number;
-  offset: number;
-}
-
-export interface QueryTokenTransactionsResponse {
-  tokenTransactionsWithStatus: TokenTransactionWithStatus[];
-  offset: number;
-}
-
-export interface OutputWithPreviousTransactionData {
-  output: TokenOutput | undefined;
-  previousTransactionHash: Uint8Array;
-  previousTransactionVout: number;
-}
-
-export interface QueryTokenOutputsResponse {
-  outputsWithPreviousTransactionData: OutputWithPreviousTransactionData[];
 }
 
 /** TreeNode represents a node on the tree. */
@@ -1850,11 +1680,6 @@ export interface ProvidePreimageRequest {
 
 export interface ProvidePreimageResponse {
   transfer: Transfer | undefined;
-}
-
-export interface ReturnLightningPaymentRequest {
-  paymentHash: Uint8Array;
-  userIdentityPublicKey: Uint8Array;
 }
 
 export interface TreeNodeIds {
@@ -6956,266 +6781,6 @@ export const TokenTransaction: MessageFns<TokenTransaction> = {
   },
 };
 
-function createBaseSpentTokenOutputMetadata(): SpentTokenOutputMetadata {
-  return { outputId: "", revocationSecret: new Uint8Array(0) };
-}
-
-export const SpentTokenOutputMetadata: MessageFns<SpentTokenOutputMetadata> = {
-  encode(message: SpentTokenOutputMetadata, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.outputId !== "") {
-      writer.uint32(10).string(message.outputId);
-    }
-    if (message.revocationSecret.length !== 0) {
-      writer.uint32(18).bytes(message.revocationSecret);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SpentTokenOutputMetadata {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSpentTokenOutputMetadata();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.outputId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.revocationSecret = reader.bytes();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SpentTokenOutputMetadata {
-    return {
-      outputId: isSet(object.outputId) ? globalThis.String(object.outputId) : "",
-      revocationSecret: isSet(object.revocationSecret) ? bytesFromBase64(object.revocationSecret) : new Uint8Array(0),
-    };
-  },
-
-  toJSON(message: SpentTokenOutputMetadata): unknown {
-    const obj: any = {};
-    if (message.outputId !== "") {
-      obj.outputId = message.outputId;
-    }
-    if (message.revocationSecret.length !== 0) {
-      obj.revocationSecret = base64FromBytes(message.revocationSecret);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<SpentTokenOutputMetadata>): SpentTokenOutputMetadata {
-    return SpentTokenOutputMetadata.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<SpentTokenOutputMetadata>): SpentTokenOutputMetadata {
-    const message = createBaseSpentTokenOutputMetadata();
-    message.outputId = object.outputId ?? "";
-    message.revocationSecret = object.revocationSecret ?? new Uint8Array(0);
-    return message;
-  },
-};
-
-function createBaseTokenTransactionConfirmationMetadata(): TokenTransactionConfirmationMetadata {
-  return { spentTokenOutputsMetadata: [] };
-}
-
-export const TokenTransactionConfirmationMetadata: MessageFns<TokenTransactionConfirmationMetadata> = {
-  encode(message: TokenTransactionConfirmationMetadata, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.spentTokenOutputsMetadata) {
-      SpentTokenOutputMetadata.encode(v!, writer.uint32(10).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): TokenTransactionConfirmationMetadata {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseTokenTransactionConfirmationMetadata();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.spentTokenOutputsMetadata.push(SpentTokenOutputMetadata.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): TokenTransactionConfirmationMetadata {
-    return {
-      spentTokenOutputsMetadata: globalThis.Array.isArray(object?.spentTokenOutputsMetadata)
-        ? object.spentTokenOutputsMetadata.map((e: any) => SpentTokenOutputMetadata.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: TokenTransactionConfirmationMetadata): unknown {
-    const obj: any = {};
-    if (message.spentTokenOutputsMetadata?.length) {
-      obj.spentTokenOutputsMetadata = message.spentTokenOutputsMetadata.map((e) => SpentTokenOutputMetadata.toJSON(e));
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<TokenTransactionConfirmationMetadata>): TokenTransactionConfirmationMetadata {
-    return TokenTransactionConfirmationMetadata.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<TokenTransactionConfirmationMetadata>): TokenTransactionConfirmationMetadata {
-    const message = createBaseTokenTransactionConfirmationMetadata();
-    message.spentTokenOutputsMetadata =
-      object.spentTokenOutputsMetadata?.map((e) => SpentTokenOutputMetadata.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseTokenTransactionWithStatus(): TokenTransactionWithStatus {
-  return {
-    tokenTransaction: undefined,
-    status: 0,
-    confirmationMetadata: undefined,
-    tokenTransactionHash: new Uint8Array(0),
-  };
-}
-
-export const TokenTransactionWithStatus: MessageFns<TokenTransactionWithStatus> = {
-  encode(message: TokenTransactionWithStatus, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.tokenTransaction !== undefined) {
-      TokenTransaction.encode(message.tokenTransaction, writer.uint32(10).fork()).join();
-    }
-    if (message.status !== 0) {
-      writer.uint32(16).int32(message.status);
-    }
-    if (message.confirmationMetadata !== undefined) {
-      TokenTransactionConfirmationMetadata.encode(message.confirmationMetadata, writer.uint32(26).fork()).join();
-    }
-    if (message.tokenTransactionHash.length !== 0) {
-      writer.uint32(34).bytes(message.tokenTransactionHash);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): TokenTransactionWithStatus {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseTokenTransactionWithStatus();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.tokenTransaction = TokenTransaction.decode(reader, reader.uint32());
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.status = reader.int32() as any;
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.confirmationMetadata = TokenTransactionConfirmationMetadata.decode(reader, reader.uint32());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.tokenTransactionHash = reader.bytes();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): TokenTransactionWithStatus {
-    return {
-      tokenTransaction: isSet(object.tokenTransaction) ? TokenTransaction.fromJSON(object.tokenTransaction) : undefined,
-      status: isSet(object.status) ? tokenTransactionStatusFromJSON(object.status) : 0,
-      confirmationMetadata: isSet(object.confirmationMetadata)
-        ? TokenTransactionConfirmationMetadata.fromJSON(object.confirmationMetadata)
-        : undefined,
-      tokenTransactionHash: isSet(object.tokenTransactionHash)
-        ? bytesFromBase64(object.tokenTransactionHash)
-        : new Uint8Array(0),
-    };
-  },
-
-  toJSON(message: TokenTransactionWithStatus): unknown {
-    const obj: any = {};
-    if (message.tokenTransaction !== undefined) {
-      obj.tokenTransaction = TokenTransaction.toJSON(message.tokenTransaction);
-    }
-    if (message.status !== 0) {
-      obj.status = tokenTransactionStatusToJSON(message.status);
-    }
-    if (message.confirmationMetadata !== undefined) {
-      obj.confirmationMetadata = TokenTransactionConfirmationMetadata.toJSON(message.confirmationMetadata);
-    }
-    if (message.tokenTransactionHash.length !== 0) {
-      obj.tokenTransactionHash = base64FromBytes(message.tokenTransactionHash);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<TokenTransactionWithStatus>): TokenTransactionWithStatus {
-    return TokenTransactionWithStatus.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<TokenTransactionWithStatus>): TokenTransactionWithStatus {
-    const message = createBaseTokenTransactionWithStatus();
-    message.tokenTransaction = (object.tokenTransaction !== undefined && object.tokenTransaction !== null)
-      ? TokenTransaction.fromPartial(object.tokenTransaction)
-      : undefined;
-    message.status = object.status ?? 0;
-    message.confirmationMetadata = (object.confirmationMetadata !== undefined && object.confirmationMetadata !== null)
-      ? TokenTransactionConfirmationMetadata.fromPartial(object.confirmationMetadata)
-      : undefined;
-    message.tokenTransactionHash = object.tokenTransactionHash ?? new Uint8Array(0);
-    return message;
-  },
-};
-
 function createBaseSignatureWithIndex(): SignatureWithIndex {
   return { signature: new Uint8Array(0), inputIndex: 0 };
 }
@@ -7288,276 +6853,6 @@ export const SignatureWithIndex: MessageFns<SignatureWithIndex> = {
     const message = createBaseSignatureWithIndex();
     message.signature = object.signature ?? new Uint8Array(0);
     message.inputIndex = object.inputIndex ?? 0;
-    return message;
-  },
-};
-
-function createBaseTokenTransactionSignatures(): TokenTransactionSignatures {
-  return { ownerSignatures: [] };
-}
-
-export const TokenTransactionSignatures: MessageFns<TokenTransactionSignatures> = {
-  encode(message: TokenTransactionSignatures, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.ownerSignatures) {
-      SignatureWithIndex.encode(v!, writer.uint32(10).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): TokenTransactionSignatures {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseTokenTransactionSignatures();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.ownerSignatures.push(SignatureWithIndex.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): TokenTransactionSignatures {
-    return {
-      ownerSignatures: globalThis.Array.isArray(object?.ownerSignatures)
-        ? object.ownerSignatures.map((e: any) => SignatureWithIndex.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: TokenTransactionSignatures): unknown {
-    const obj: any = {};
-    if (message.ownerSignatures?.length) {
-      obj.ownerSignatures = message.ownerSignatures.map((e) => SignatureWithIndex.toJSON(e));
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<TokenTransactionSignatures>): TokenTransactionSignatures {
-    return TokenTransactionSignatures.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<TokenTransactionSignatures>): TokenTransactionSignatures {
-    const message = createBaseTokenTransactionSignatures();
-    message.ownerSignatures = object.ownerSignatures?.map((e) => SignatureWithIndex.fromPartial(e)) || [];
-    return message;
-  },
-};
-
-function createBaseStartTokenTransactionRequest(): StartTokenTransactionRequest {
-  return {
-    identityPublicKey: new Uint8Array(0),
-    partialTokenTransaction: undefined,
-    tokenTransactionSignatures: undefined,
-    sparkPaymentIntent: "",
-  };
-}
-
-export const StartTokenTransactionRequest: MessageFns<StartTokenTransactionRequest> = {
-  encode(message: StartTokenTransactionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.identityPublicKey.length !== 0) {
-      writer.uint32(10).bytes(message.identityPublicKey);
-    }
-    if (message.partialTokenTransaction !== undefined) {
-      TokenTransaction.encode(message.partialTokenTransaction, writer.uint32(18).fork()).join();
-    }
-    if (message.tokenTransactionSignatures !== undefined) {
-      TokenTransactionSignatures.encode(message.tokenTransactionSignatures, writer.uint32(26).fork()).join();
-    }
-    if (message.sparkPaymentIntent !== "") {
-      writer.uint32(34).string(message.sparkPaymentIntent);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): StartTokenTransactionRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStartTokenTransactionRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.identityPublicKey = reader.bytes();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.partialTokenTransaction = TokenTransaction.decode(reader, reader.uint32());
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.tokenTransactionSignatures = TokenTransactionSignatures.decode(reader, reader.uint32());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.sparkPaymentIntent = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): StartTokenTransactionRequest {
-    return {
-      identityPublicKey: isSet(object.identityPublicKey)
-        ? bytesFromBase64(object.identityPublicKey)
-        : new Uint8Array(0),
-      partialTokenTransaction: isSet(object.partialTokenTransaction)
-        ? TokenTransaction.fromJSON(object.partialTokenTransaction)
-        : undefined,
-      tokenTransactionSignatures: isSet(object.tokenTransactionSignatures)
-        ? TokenTransactionSignatures.fromJSON(object.tokenTransactionSignatures)
-        : undefined,
-      sparkPaymentIntent: isSet(object.sparkPaymentIntent) ? globalThis.String(object.sparkPaymentIntent) : "",
-    };
-  },
-
-  toJSON(message: StartTokenTransactionRequest): unknown {
-    const obj: any = {};
-    if (message.identityPublicKey.length !== 0) {
-      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
-    }
-    if (message.partialTokenTransaction !== undefined) {
-      obj.partialTokenTransaction = TokenTransaction.toJSON(message.partialTokenTransaction);
-    }
-    if (message.tokenTransactionSignatures !== undefined) {
-      obj.tokenTransactionSignatures = TokenTransactionSignatures.toJSON(message.tokenTransactionSignatures);
-    }
-    if (message.sparkPaymentIntent !== "") {
-      obj.sparkPaymentIntent = message.sparkPaymentIntent;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<StartTokenTransactionRequest>): StartTokenTransactionRequest {
-    return StartTokenTransactionRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<StartTokenTransactionRequest>): StartTokenTransactionRequest {
-    const message = createBaseStartTokenTransactionRequest();
-    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
-    message.partialTokenTransaction =
-      (object.partialTokenTransaction !== undefined && object.partialTokenTransaction !== null)
-        ? TokenTransaction.fromPartial(object.partialTokenTransaction)
-        : undefined;
-    message.tokenTransactionSignatures =
-      (object.tokenTransactionSignatures !== undefined && object.tokenTransactionSignatures !== null)
-        ? TokenTransactionSignatures.fromPartial(object.tokenTransactionSignatures)
-        : undefined;
-    message.sparkPaymentIntent = object.sparkPaymentIntent ?? "";
-    return message;
-  },
-};
-
-function createBaseStartTokenTransactionResponse(): StartTokenTransactionResponse {
-  return { finalTokenTransaction: undefined, keyshareInfo: undefined };
-}
-
-export const StartTokenTransactionResponse: MessageFns<StartTokenTransactionResponse> = {
-  encode(message: StartTokenTransactionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.finalTokenTransaction !== undefined) {
-      TokenTransaction.encode(message.finalTokenTransaction, writer.uint32(10).fork()).join();
-    }
-    if (message.keyshareInfo !== undefined) {
-      SigningKeyshare.encode(message.keyshareInfo, writer.uint32(18).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): StartTokenTransactionResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStartTokenTransactionResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.finalTokenTransaction = TokenTransaction.decode(reader, reader.uint32());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.keyshareInfo = SigningKeyshare.decode(reader, reader.uint32());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): StartTokenTransactionResponse {
-    return {
-      finalTokenTransaction: isSet(object.finalTokenTransaction)
-        ? TokenTransaction.fromJSON(object.finalTokenTransaction)
-        : undefined,
-      keyshareInfo: isSet(object.keyshareInfo) ? SigningKeyshare.fromJSON(object.keyshareInfo) : undefined,
-    };
-  },
-
-  toJSON(message: StartTokenTransactionResponse): unknown {
-    const obj: any = {};
-    if (message.finalTokenTransaction !== undefined) {
-      obj.finalTokenTransaction = TokenTransaction.toJSON(message.finalTokenTransaction);
-    }
-    if (message.keyshareInfo !== undefined) {
-      obj.keyshareInfo = SigningKeyshare.toJSON(message.keyshareInfo);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<StartTokenTransactionResponse>): StartTokenTransactionResponse {
-    return StartTokenTransactionResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<StartTokenTransactionResponse>): StartTokenTransactionResponse {
-    const message = createBaseStartTokenTransactionResponse();
-    message.finalTokenTransaction =
-      (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
-        ? TokenTransaction.fromPartial(object.finalTokenTransaction)
-        : undefined;
-    message.keyshareInfo = (object.keyshareInfo !== undefined && object.keyshareInfo !== null)
-      ? SigningKeyshare.fromPartial(object.keyshareInfo)
-      : undefined;
     return message;
   },
 };
@@ -7733,266 +7028,6 @@ export const OperatorSpecificOwnerSignature: MessageFns<OperatorSpecificOwnerSig
   },
 };
 
-function createBaseSignTokenTransactionRequest(): SignTokenTransactionRequest {
-  return { finalTokenTransaction: undefined, operatorSpecificSignatures: [], identityPublicKey: new Uint8Array(0) };
-}
-
-export const SignTokenTransactionRequest: MessageFns<SignTokenTransactionRequest> = {
-  encode(message: SignTokenTransactionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.finalTokenTransaction !== undefined) {
-      TokenTransaction.encode(message.finalTokenTransaction, writer.uint32(10).fork()).join();
-    }
-    for (const v of message.operatorSpecificSignatures) {
-      OperatorSpecificOwnerSignature.encode(v!, writer.uint32(18).fork()).join();
-    }
-    if (message.identityPublicKey.length !== 0) {
-      writer.uint32(26).bytes(message.identityPublicKey);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SignTokenTransactionRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSignTokenTransactionRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.finalTokenTransaction = TokenTransaction.decode(reader, reader.uint32());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.operatorSpecificSignatures.push(OperatorSpecificOwnerSignature.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.identityPublicKey = reader.bytes();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SignTokenTransactionRequest {
-    return {
-      finalTokenTransaction: isSet(object.finalTokenTransaction)
-        ? TokenTransaction.fromJSON(object.finalTokenTransaction)
-        : undefined,
-      operatorSpecificSignatures: globalThis.Array.isArray(object?.operatorSpecificSignatures)
-        ? object.operatorSpecificSignatures.map((e: any) => OperatorSpecificOwnerSignature.fromJSON(e))
-        : [],
-      identityPublicKey: isSet(object.identityPublicKey)
-        ? bytesFromBase64(object.identityPublicKey)
-        : new Uint8Array(0),
-    };
-  },
-
-  toJSON(message: SignTokenTransactionRequest): unknown {
-    const obj: any = {};
-    if (message.finalTokenTransaction !== undefined) {
-      obj.finalTokenTransaction = TokenTransaction.toJSON(message.finalTokenTransaction);
-    }
-    if (message.operatorSpecificSignatures?.length) {
-      obj.operatorSpecificSignatures = message.operatorSpecificSignatures.map((e) =>
-        OperatorSpecificOwnerSignature.toJSON(e)
-      );
-    }
-    if (message.identityPublicKey.length !== 0) {
-      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<SignTokenTransactionRequest>): SignTokenTransactionRequest {
-    return SignTokenTransactionRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<SignTokenTransactionRequest>): SignTokenTransactionRequest {
-    const message = createBaseSignTokenTransactionRequest();
-    message.finalTokenTransaction =
-      (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
-        ? TokenTransaction.fromPartial(object.finalTokenTransaction)
-        : undefined;
-    message.operatorSpecificSignatures =
-      object.operatorSpecificSignatures?.map((e) => OperatorSpecificOwnerSignature.fromPartial(e)) || [];
-    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
-    return message;
-  },
-};
-
-function createBaseKeyshareWithIndex(): KeyshareWithIndex {
-  return { inputIndex: 0, keyshare: new Uint8Array(0) };
-}
-
-export const KeyshareWithIndex: MessageFns<KeyshareWithIndex> = {
-  encode(message: KeyshareWithIndex, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.inputIndex !== 0) {
-      writer.uint32(8).uint32(message.inputIndex);
-    }
-    if (message.keyshare.length !== 0) {
-      writer.uint32(18).bytes(message.keyshare);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): KeyshareWithIndex {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseKeyshareWithIndex();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 8) {
-            break;
-          }
-
-          message.inputIndex = reader.uint32();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.keyshare = reader.bytes();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): KeyshareWithIndex {
-    return {
-      inputIndex: isSet(object.inputIndex) ? globalThis.Number(object.inputIndex) : 0,
-      keyshare: isSet(object.keyshare) ? bytesFromBase64(object.keyshare) : new Uint8Array(0),
-    };
-  },
-
-  toJSON(message: KeyshareWithIndex): unknown {
-    const obj: any = {};
-    if (message.inputIndex !== 0) {
-      obj.inputIndex = Math.round(message.inputIndex);
-    }
-    if (message.keyshare.length !== 0) {
-      obj.keyshare = base64FromBytes(message.keyshare);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<KeyshareWithIndex>): KeyshareWithIndex {
-    return KeyshareWithIndex.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<KeyshareWithIndex>): KeyshareWithIndex {
-    const message = createBaseKeyshareWithIndex();
-    message.inputIndex = object.inputIndex ?? 0;
-    message.keyshare = object.keyshare ?? new Uint8Array(0);
-    return message;
-  },
-};
-
-function createBaseSignTokenTransactionResponse(): SignTokenTransactionResponse {
-  return { sparkOperatorSignature: new Uint8Array(0), revocationKeyshares: [] };
-}
-
-export const SignTokenTransactionResponse: MessageFns<SignTokenTransactionResponse> = {
-  encode(message: SignTokenTransactionResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.sparkOperatorSignature.length !== 0) {
-      writer.uint32(10).bytes(message.sparkOperatorSignature);
-    }
-    for (const v of message.revocationKeyshares) {
-      KeyshareWithIndex.encode(v!, writer.uint32(18).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): SignTokenTransactionResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseSignTokenTransactionResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.sparkOperatorSignature = reader.bytes();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.revocationKeyshares.push(KeyshareWithIndex.decode(reader, reader.uint32()));
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): SignTokenTransactionResponse {
-    return {
-      sparkOperatorSignature: isSet(object.sparkOperatorSignature)
-        ? bytesFromBase64(object.sparkOperatorSignature)
-        : new Uint8Array(0),
-      revocationKeyshares: globalThis.Array.isArray(object?.revocationKeyshares)
-        ? object.revocationKeyshares.map((e: any) => KeyshareWithIndex.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: SignTokenTransactionResponse): unknown {
-    const obj: any = {};
-    if (message.sparkOperatorSignature.length !== 0) {
-      obj.sparkOperatorSignature = base64FromBytes(message.sparkOperatorSignature);
-    }
-    if (message.revocationKeyshares?.length) {
-      obj.revocationKeyshares = message.revocationKeyshares.map((e) => KeyshareWithIndex.toJSON(e));
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<SignTokenTransactionResponse>): SignTokenTransactionResponse {
-    return SignTokenTransactionResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<SignTokenTransactionResponse>): SignTokenTransactionResponse {
-    const message = createBaseSignTokenTransactionResponse();
-    message.sparkOperatorSignature = object.sparkOperatorSignature ?? new Uint8Array(0);
-    message.revocationKeyshares = object.revocationKeyshares?.map((e) => KeyshareWithIndex.fromPartial(e)) || [];
-    return message;
-  },
-};
-
 function createBaseRevocationSecretWithIndex(): RevocationSecretWithIndex {
   return { inputIndex: 0, revocationSecret: new Uint8Array(0) };
 }
@@ -8065,128 +7100,6 @@ export const RevocationSecretWithIndex: MessageFns<RevocationSecretWithIndex> = 
     const message = createBaseRevocationSecretWithIndex();
     message.inputIndex = object.inputIndex ?? 0;
     message.revocationSecret = object.revocationSecret ?? new Uint8Array(0);
-    return message;
-  },
-};
-
-function createBaseFinalizeTokenTransactionRequest(): FinalizeTokenTransactionRequest {
-  return {
-    finalTokenTransaction: undefined,
-    revocationSecrets: [],
-    identityPublicKey: new Uint8Array(0),
-    sparkPaymentIntent: "",
-  };
-}
-
-export const FinalizeTokenTransactionRequest: MessageFns<FinalizeTokenTransactionRequest> = {
-  encode(message: FinalizeTokenTransactionRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.finalTokenTransaction !== undefined) {
-      TokenTransaction.encode(message.finalTokenTransaction, writer.uint32(10).fork()).join();
-    }
-    for (const v of message.revocationSecrets) {
-      RevocationSecretWithIndex.encode(v!, writer.uint32(18).fork()).join();
-    }
-    if (message.identityPublicKey.length !== 0) {
-      writer.uint32(26).bytes(message.identityPublicKey);
-    }
-    if (message.sparkPaymentIntent !== "") {
-      writer.uint32(34).string(message.sparkPaymentIntent);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): FinalizeTokenTransactionRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseFinalizeTokenTransactionRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.finalTokenTransaction = TokenTransaction.decode(reader, reader.uint32());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.revocationSecrets.push(RevocationSecretWithIndex.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.identityPublicKey = reader.bytes();
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.sparkPaymentIntent = reader.string();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): FinalizeTokenTransactionRequest {
-    return {
-      finalTokenTransaction: isSet(object.finalTokenTransaction)
-        ? TokenTransaction.fromJSON(object.finalTokenTransaction)
-        : undefined,
-      revocationSecrets: globalThis.Array.isArray(object?.revocationSecrets)
-        ? object.revocationSecrets.map((e: any) => RevocationSecretWithIndex.fromJSON(e))
-        : [],
-      identityPublicKey: isSet(object.identityPublicKey)
-        ? bytesFromBase64(object.identityPublicKey)
-        : new Uint8Array(0),
-      sparkPaymentIntent: isSet(object.sparkPaymentIntent) ? globalThis.String(object.sparkPaymentIntent) : "",
-    };
-  },
-
-  toJSON(message: FinalizeTokenTransactionRequest): unknown {
-    const obj: any = {};
-    if (message.finalTokenTransaction !== undefined) {
-      obj.finalTokenTransaction = TokenTransaction.toJSON(message.finalTokenTransaction);
-    }
-    if (message.revocationSecrets?.length) {
-      obj.revocationSecrets = message.revocationSecrets.map((e) => RevocationSecretWithIndex.toJSON(e));
-    }
-    if (message.identityPublicKey.length !== 0) {
-      obj.identityPublicKey = base64FromBytes(message.identityPublicKey);
-    }
-    if (message.sparkPaymentIntent !== "") {
-      obj.sparkPaymentIntent = message.sparkPaymentIntent;
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<FinalizeTokenTransactionRequest>): FinalizeTokenTransactionRequest {
-    return FinalizeTokenTransactionRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<FinalizeTokenTransactionRequest>): FinalizeTokenTransactionRequest {
-    const message = createBaseFinalizeTokenTransactionRequest();
-    message.finalTokenTransaction =
-      (object.finalTokenTransaction !== undefined && object.finalTokenTransaction !== null)
-        ? TokenTransaction.fromPartial(object.finalTokenTransaction)
-        : undefined;
-    message.revocationSecrets = object.revocationSecrets?.map((e) => RevocationSecretWithIndex.fromPartial(e)) || [];
-    message.identityPublicKey = object.identityPublicKey ?? new Uint8Array(0);
-    message.sparkPaymentIntent = object.sparkPaymentIntent ?? "";
     return message;
   },
 };
@@ -8498,540 +7411,6 @@ export const FreezeTokensResponse: MessageFns<FreezeTokensResponse> = {
     const message = createBaseFreezeTokensResponse();
     message.impactedOutputIds = object.impactedOutputIds?.map((e) => e) || [];
     message.impactedTokenAmount = object.impactedTokenAmount ?? new Uint8Array(0);
-    return message;
-  },
-};
-
-function createBaseQueryTokenOutputsRequest(): QueryTokenOutputsRequest {
-  return { ownerPublicKeys: [], tokenPublicKeys: [], tokenIdentifiers: [], network: 0 };
-}
-
-export const QueryTokenOutputsRequest: MessageFns<QueryTokenOutputsRequest> = {
-  encode(message: QueryTokenOutputsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.ownerPublicKeys) {
-      writer.uint32(10).bytes(v!);
-    }
-    for (const v of message.tokenPublicKeys) {
-      writer.uint32(18).bytes(v!);
-    }
-    for (const v of message.tokenIdentifiers) {
-      writer.uint32(34).bytes(v!);
-    }
-    if (message.network !== 0) {
-      writer.uint32(24).int32(message.network);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): QueryTokenOutputsRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseQueryTokenOutputsRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.ownerPublicKeys.push(reader.bytes());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.tokenPublicKeys.push(reader.bytes());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.tokenIdentifiers.push(reader.bytes());
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.network = reader.int32() as any;
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): QueryTokenOutputsRequest {
-    return {
-      ownerPublicKeys: globalThis.Array.isArray(object?.ownerPublicKeys)
-        ? object.ownerPublicKeys.map((e: any) => bytesFromBase64(e))
-        : [],
-      tokenPublicKeys: globalThis.Array.isArray(object?.tokenPublicKeys)
-        ? object.tokenPublicKeys.map((e: any) => bytesFromBase64(e))
-        : [],
-      tokenIdentifiers: globalThis.Array.isArray(object?.tokenIdentifiers)
-        ? object.tokenIdentifiers.map((e: any) => bytesFromBase64(e))
-        : [],
-      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
-    };
-  },
-
-  toJSON(message: QueryTokenOutputsRequest): unknown {
-    const obj: any = {};
-    if (message.ownerPublicKeys?.length) {
-      obj.ownerPublicKeys = message.ownerPublicKeys.map((e) => base64FromBytes(e));
-    }
-    if (message.tokenPublicKeys?.length) {
-      obj.tokenPublicKeys = message.tokenPublicKeys.map((e) => base64FromBytes(e));
-    }
-    if (message.tokenIdentifiers?.length) {
-      obj.tokenIdentifiers = message.tokenIdentifiers.map((e) => base64FromBytes(e));
-    }
-    if (message.network !== 0) {
-      obj.network = networkToJSON(message.network);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<QueryTokenOutputsRequest>): QueryTokenOutputsRequest {
-    return QueryTokenOutputsRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<QueryTokenOutputsRequest>): QueryTokenOutputsRequest {
-    const message = createBaseQueryTokenOutputsRequest();
-    message.ownerPublicKeys = object.ownerPublicKeys?.map((e) => e) || [];
-    message.tokenPublicKeys = object.tokenPublicKeys?.map((e) => e) || [];
-    message.tokenIdentifiers = object.tokenIdentifiers?.map((e) => e) || [];
-    message.network = object.network ?? 0;
-    return message;
-  },
-};
-
-function createBaseQueryTokenTransactionsRequest(): QueryTokenTransactionsRequest {
-  return {
-    outputIds: [],
-    ownerPublicKeys: [],
-    tokenPublicKeys: [],
-    tokenIdentifiers: [],
-    tokenTransactionHashes: [],
-    limit: 0,
-    offset: 0,
-  };
-}
-
-export const QueryTokenTransactionsRequest: MessageFns<QueryTokenTransactionsRequest> = {
-  encode(message: QueryTokenTransactionsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.outputIds) {
-      writer.uint32(10).string(v!);
-    }
-    for (const v of message.ownerPublicKeys) {
-      writer.uint32(18).bytes(v!);
-    }
-    for (const v of message.tokenPublicKeys) {
-      writer.uint32(26).bytes(v!);
-    }
-    for (const v of message.tokenIdentifiers) {
-      writer.uint32(58).bytes(v!);
-    }
-    for (const v of message.tokenTransactionHashes) {
-      writer.uint32(34).bytes(v!);
-    }
-    if (message.limit !== 0) {
-      writer.uint32(40).int64(message.limit);
-    }
-    if (message.offset !== 0) {
-      writer.uint32(48).int64(message.offset);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): QueryTokenTransactionsRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseQueryTokenTransactionsRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.outputIds.push(reader.string());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.ownerPublicKeys.push(reader.bytes());
-          continue;
-        }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.tokenPublicKeys.push(reader.bytes());
-          continue;
-        }
-        case 7: {
-          if (tag !== 58) {
-            break;
-          }
-
-          message.tokenIdentifiers.push(reader.bytes());
-          continue;
-        }
-        case 4: {
-          if (tag !== 34) {
-            break;
-          }
-
-          message.tokenTransactionHashes.push(reader.bytes());
-          continue;
-        }
-        case 5: {
-          if (tag !== 40) {
-            break;
-          }
-
-          message.limit = longToNumber(reader.int64());
-          continue;
-        }
-        case 6: {
-          if (tag !== 48) {
-            break;
-          }
-
-          message.offset = longToNumber(reader.int64());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): QueryTokenTransactionsRequest {
-    return {
-      outputIds: globalThis.Array.isArray(object?.outputIds)
-        ? object.outputIds.map((e: any) => globalThis.String(e))
-        : [],
-      ownerPublicKeys: globalThis.Array.isArray(object?.ownerPublicKeys)
-        ? object.ownerPublicKeys.map((e: any) => bytesFromBase64(e))
-        : [],
-      tokenPublicKeys: globalThis.Array.isArray(object?.tokenPublicKeys)
-        ? object.tokenPublicKeys.map((e: any) => bytesFromBase64(e))
-        : [],
-      tokenIdentifiers: globalThis.Array.isArray(object?.tokenIdentifiers)
-        ? object.tokenIdentifiers.map((e: any) => bytesFromBase64(e))
-        : [],
-      tokenTransactionHashes: globalThis.Array.isArray(object?.tokenTransactionHashes)
-        ? object.tokenTransactionHashes.map((e: any) => bytesFromBase64(e))
-        : [],
-      limit: isSet(object.limit) ? globalThis.Number(object.limit) : 0,
-      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
-    };
-  },
-
-  toJSON(message: QueryTokenTransactionsRequest): unknown {
-    const obj: any = {};
-    if (message.outputIds?.length) {
-      obj.outputIds = message.outputIds;
-    }
-    if (message.ownerPublicKeys?.length) {
-      obj.ownerPublicKeys = message.ownerPublicKeys.map((e) => base64FromBytes(e));
-    }
-    if (message.tokenPublicKeys?.length) {
-      obj.tokenPublicKeys = message.tokenPublicKeys.map((e) => base64FromBytes(e));
-    }
-    if (message.tokenIdentifiers?.length) {
-      obj.tokenIdentifiers = message.tokenIdentifiers.map((e) => base64FromBytes(e));
-    }
-    if (message.tokenTransactionHashes?.length) {
-      obj.tokenTransactionHashes = message.tokenTransactionHashes.map((e) => base64FromBytes(e));
-    }
-    if (message.limit !== 0) {
-      obj.limit = Math.round(message.limit);
-    }
-    if (message.offset !== 0) {
-      obj.offset = Math.round(message.offset);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<QueryTokenTransactionsRequest>): QueryTokenTransactionsRequest {
-    return QueryTokenTransactionsRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<QueryTokenTransactionsRequest>): QueryTokenTransactionsRequest {
-    const message = createBaseQueryTokenTransactionsRequest();
-    message.outputIds = object.outputIds?.map((e) => e) || [];
-    message.ownerPublicKeys = object.ownerPublicKeys?.map((e) => e) || [];
-    message.tokenPublicKeys = object.tokenPublicKeys?.map((e) => e) || [];
-    message.tokenIdentifiers = object.tokenIdentifiers?.map((e) => e) || [];
-    message.tokenTransactionHashes = object.tokenTransactionHashes?.map((e) => e) || [];
-    message.limit = object.limit ?? 0;
-    message.offset = object.offset ?? 0;
-    return message;
-  },
-};
-
-function createBaseQueryTokenTransactionsResponse(): QueryTokenTransactionsResponse {
-  return { tokenTransactionsWithStatus: [], offset: 0 };
-}
-
-export const QueryTokenTransactionsResponse: MessageFns<QueryTokenTransactionsResponse> = {
-  encode(message: QueryTokenTransactionsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.tokenTransactionsWithStatus) {
-      TokenTransactionWithStatus.encode(v!, writer.uint32(10).fork()).join();
-    }
-    if (message.offset !== 0) {
-      writer.uint32(16).int64(message.offset);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): QueryTokenTransactionsResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseQueryTokenTransactionsResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.tokenTransactionsWithStatus.push(TokenTransactionWithStatus.decode(reader, reader.uint32()));
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.offset = longToNumber(reader.int64());
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): QueryTokenTransactionsResponse {
-    return {
-      tokenTransactionsWithStatus: globalThis.Array.isArray(object?.tokenTransactionsWithStatus)
-        ? object.tokenTransactionsWithStatus.map((e: any) => TokenTransactionWithStatus.fromJSON(e))
-        : [],
-      offset: isSet(object.offset) ? globalThis.Number(object.offset) : 0,
-    };
-  },
-
-  toJSON(message: QueryTokenTransactionsResponse): unknown {
-    const obj: any = {};
-    if (message.tokenTransactionsWithStatus?.length) {
-      obj.tokenTransactionsWithStatus = message.tokenTransactionsWithStatus.map((e) =>
-        TokenTransactionWithStatus.toJSON(e)
-      );
-    }
-    if (message.offset !== 0) {
-      obj.offset = Math.round(message.offset);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<QueryTokenTransactionsResponse>): QueryTokenTransactionsResponse {
-    return QueryTokenTransactionsResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<QueryTokenTransactionsResponse>): QueryTokenTransactionsResponse {
-    const message = createBaseQueryTokenTransactionsResponse();
-    message.tokenTransactionsWithStatus =
-      object.tokenTransactionsWithStatus?.map((e) => TokenTransactionWithStatus.fromPartial(e)) || [];
-    message.offset = object.offset ?? 0;
-    return message;
-  },
-};
-
-function createBaseOutputWithPreviousTransactionData(): OutputWithPreviousTransactionData {
-  return { output: undefined, previousTransactionHash: new Uint8Array(0), previousTransactionVout: 0 };
-}
-
-export const OutputWithPreviousTransactionData: MessageFns<OutputWithPreviousTransactionData> = {
-  encode(message: OutputWithPreviousTransactionData, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.output !== undefined) {
-      TokenOutput.encode(message.output, writer.uint32(10).fork()).join();
-    }
-    if (message.previousTransactionHash.length !== 0) {
-      writer.uint32(18).bytes(message.previousTransactionHash);
-    }
-    if (message.previousTransactionVout !== 0) {
-      writer.uint32(24).uint32(message.previousTransactionVout);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): OutputWithPreviousTransactionData {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseOutputWithPreviousTransactionData();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.output = TokenOutput.decode(reader, reader.uint32());
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.previousTransactionHash = reader.bytes();
-          continue;
-        }
-        case 3: {
-          if (tag !== 24) {
-            break;
-          }
-
-          message.previousTransactionVout = reader.uint32();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): OutputWithPreviousTransactionData {
-    return {
-      output: isSet(object.output) ? TokenOutput.fromJSON(object.output) : undefined,
-      previousTransactionHash: isSet(object.previousTransactionHash)
-        ? bytesFromBase64(object.previousTransactionHash)
-        : new Uint8Array(0),
-      previousTransactionVout: isSet(object.previousTransactionVout)
-        ? globalThis.Number(object.previousTransactionVout)
-        : 0,
-    };
-  },
-
-  toJSON(message: OutputWithPreviousTransactionData): unknown {
-    const obj: any = {};
-    if (message.output !== undefined) {
-      obj.output = TokenOutput.toJSON(message.output);
-    }
-    if (message.previousTransactionHash.length !== 0) {
-      obj.previousTransactionHash = base64FromBytes(message.previousTransactionHash);
-    }
-    if (message.previousTransactionVout !== 0) {
-      obj.previousTransactionVout = Math.round(message.previousTransactionVout);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<OutputWithPreviousTransactionData>): OutputWithPreviousTransactionData {
-    return OutputWithPreviousTransactionData.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<OutputWithPreviousTransactionData>): OutputWithPreviousTransactionData {
-    const message = createBaseOutputWithPreviousTransactionData();
-    message.output = (object.output !== undefined && object.output !== null)
-      ? TokenOutput.fromPartial(object.output)
-      : undefined;
-    message.previousTransactionHash = object.previousTransactionHash ?? new Uint8Array(0);
-    message.previousTransactionVout = object.previousTransactionVout ?? 0;
-    return message;
-  },
-};
-
-function createBaseQueryTokenOutputsResponse(): QueryTokenOutputsResponse {
-  return { outputsWithPreviousTransactionData: [] };
-}
-
-export const QueryTokenOutputsResponse: MessageFns<QueryTokenOutputsResponse> = {
-  encode(message: QueryTokenOutputsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    for (const v of message.outputsWithPreviousTransactionData) {
-      OutputWithPreviousTransactionData.encode(v!, writer.uint32(10).fork()).join();
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): QueryTokenOutputsResponse {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseQueryTokenOutputsResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.outputsWithPreviousTransactionData.push(
-            OutputWithPreviousTransactionData.decode(reader, reader.uint32()),
-          );
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): QueryTokenOutputsResponse {
-    return {
-      outputsWithPreviousTransactionData: globalThis.Array.isArray(object?.outputsWithPreviousTransactionData)
-        ? object.outputsWithPreviousTransactionData.map((e: any) => OutputWithPreviousTransactionData.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: QueryTokenOutputsResponse): unknown {
-    const obj: any = {};
-    if (message.outputsWithPreviousTransactionData?.length) {
-      obj.outputsWithPreviousTransactionData = message.outputsWithPreviousTransactionData.map((e) =>
-        OutputWithPreviousTransactionData.toJSON(e)
-      );
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<QueryTokenOutputsResponse>): QueryTokenOutputsResponse {
-    return QueryTokenOutputsResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<QueryTokenOutputsResponse>): QueryTokenOutputsResponse {
-    const message = createBaseQueryTokenOutputsResponse();
-    message.outputsWithPreviousTransactionData =
-      object.outputsWithPreviousTransactionData?.map((e) => OutputWithPreviousTransactionData.fromPartial(e)) || [];
     return message;
   },
 };
@@ -16737,84 +15116,6 @@ export const ProvidePreimageResponse: MessageFns<ProvidePreimageResponse> = {
   },
 };
 
-function createBaseReturnLightningPaymentRequest(): ReturnLightningPaymentRequest {
-  return { paymentHash: new Uint8Array(0), userIdentityPublicKey: new Uint8Array(0) };
-}
-
-export const ReturnLightningPaymentRequest: MessageFns<ReturnLightningPaymentRequest> = {
-  encode(message: ReturnLightningPaymentRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.paymentHash.length !== 0) {
-      writer.uint32(10).bytes(message.paymentHash);
-    }
-    if (message.userIdentityPublicKey.length !== 0) {
-      writer.uint32(18).bytes(message.userIdentityPublicKey);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): ReturnLightningPaymentRequest {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseReturnLightningPaymentRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.paymentHash = reader.bytes();
-          continue;
-        }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.userIdentityPublicKey = reader.bytes();
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ReturnLightningPaymentRequest {
-    return {
-      paymentHash: isSet(object.paymentHash) ? bytesFromBase64(object.paymentHash) : new Uint8Array(0),
-      userIdentityPublicKey: isSet(object.userIdentityPublicKey)
-        ? bytesFromBase64(object.userIdentityPublicKey)
-        : new Uint8Array(0),
-    };
-  },
-
-  toJSON(message: ReturnLightningPaymentRequest): unknown {
-    const obj: any = {};
-    if (message.paymentHash.length !== 0) {
-      obj.paymentHash = base64FromBytes(message.paymentHash);
-    }
-    if (message.userIdentityPublicKey.length !== 0) {
-      obj.userIdentityPublicKey = base64FromBytes(message.userIdentityPublicKey);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ReturnLightningPaymentRequest>): ReturnLightningPaymentRequest {
-    return ReturnLightningPaymentRequest.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ReturnLightningPaymentRequest>): ReturnLightningPaymentRequest {
-    const message = createBaseReturnLightningPaymentRequest();
-    message.paymentHash = object.paymentHash ?? new Uint8Array(0);
-    message.userIdentityPublicKey = object.userIdentityPublicKey ?? new Uint8Array(0);
-    return message;
-  },
-};
-
 function createBaseTreeNodeIds(): TreeNodeIds {
   return { nodeIds: [] };
 }
@@ -21392,6 +19693,7 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** @deprecated */
     refresh_timelock: {
       name: "refresh_timelock",
       requestType: RefreshTimelockRequest,
@@ -21400,6 +19702,7 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** @deprecated */
     extend_leaf: {
       name: "extend_leaf",
       requestType: ExtendLeafRequest,
@@ -21468,63 +19771,6 @@ export const SparkServiceDefinition = {
       requestType: QueryUserSignedRefundsRequest,
       requestStream: false,
       responseType: QueryUserSignedRefundsResponse,
-      responseStream: false,
-      options: {},
-    },
-    /** Token RPCs */
-    start_token_transaction: {
-      name: "start_token_transaction",
-      requestType: StartTokenTransactionRequest,
-      requestStream: false,
-      responseType: StartTokenTransactionResponse,
-      responseStream: false,
-      options: {},
-    },
-    sign_token_transaction: {
-      name: "sign_token_transaction",
-      requestType: SignTokenTransactionRequest,
-      requestStream: false,
-      responseType: SignTokenTransactionResponse,
-      responseStream: false,
-      options: {},
-    },
-    finalize_token_transaction: {
-      name: "finalize_token_transaction",
-      requestType: FinalizeTokenTransactionRequest,
-      requestStream: false,
-      responseType: Empty,
-      responseStream: false,
-      options: {},
-    },
-    freeze_tokens: {
-      name: "freeze_tokens",
-      requestType: FreezeTokensRequest,
-      requestStream: false,
-      responseType: FreezeTokensResponse,
-      responseStream: false,
-      options: {},
-    },
-    query_token_outputs: {
-      name: "query_token_outputs",
-      requestType: QueryTokenOutputsRequest,
-      requestStream: false,
-      responseType: QueryTokenOutputsResponse,
-      responseStream: false,
-      options: {},
-    },
-    query_token_transactions: {
-      name: "query_token_transactions",
-      requestType: QueryTokenTransactionsRequest,
-      requestStream: false,
-      responseType: QueryTokenTransactionsResponse,
-      responseStream: false,
-      options: {},
-    },
-    return_lightning_payment: {
-      name: "return_lightning_payment",
-      requestType: ReturnLightningPaymentRequest,
-      requestStream: false,
-      responseType: Empty,
       responseStream: false,
       options: {},
     },
@@ -21602,6 +19848,7 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** @deprecated */
     extend_leaf_v2: {
       name: "extend_leaf_v2",
       requestType: ExtendLeafRequest,
@@ -21666,6 +19913,7 @@ export const SparkServiceDefinition = {
       responseStream: false,
       options: {},
     },
+    /** @deprecated */
     refresh_timelock_v2: {
       name: "refresh_timelock_v2",
       requestType: RefreshTimelockRequest,
@@ -21836,10 +20084,12 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: CounterLeafSwapRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<CounterLeafSwapResponse>>;
+  /** @deprecated */
   refresh_timelock(
     request: RefreshTimelockRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<RefreshTimelockResponse>>;
+  /** @deprecated */
   extend_leaf(
     request: ExtendLeafRequest,
     context: CallContext & CallContextExt,
@@ -21876,35 +20126,6 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: QueryUserSignedRefundsRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<QueryUserSignedRefundsResponse>>;
-  /** Token RPCs */
-  start_token_transaction(
-    request: StartTokenTransactionRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<StartTokenTransactionResponse>>;
-  sign_token_transaction(
-    request: SignTokenTransactionRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<SignTokenTransactionResponse>>;
-  finalize_token_transaction(
-    request: FinalizeTokenTransactionRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<Empty>>;
-  freeze_tokens(
-    request: FreezeTokensRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<FreezeTokensResponse>>;
-  query_token_outputs(
-    request: QueryTokenOutputsRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<QueryTokenOutputsResponse>>;
-  query_token_transactions(
-    request: QueryTokenTransactionsRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<QueryTokenTransactionsResponse>>;
-  return_lightning_payment(
-    request: ReturnLightningPaymentRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<Empty>>;
   query_unused_deposit_addresses(
     request: QueryUnusedDepositAddressesRequest,
     context: CallContext & CallContextExt,
@@ -21951,6 +20172,7 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: CooperativeExitRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<CooperativeExitResponse>>;
+  /** @deprecated */
   extend_leaf_v2(
     request: ExtendLeafRequest,
     context: CallContext & CallContextExt,
@@ -21983,6 +20205,7 @@ export interface SparkServiceImplementation<CallContextExt = {}> {
     request: StartTransferRequest,
     context: CallContext & CallContextExt,
   ): Promise<DeepPartial<StartTransferResponse>>;
+  /** @deprecated */
   refresh_timelock_v2(
     request: RefreshTimelockRequest,
     context: CallContext & CallContextExt,
@@ -22131,10 +20354,12 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<CounterLeafSwapRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<CounterLeafSwapResponse>;
+  /** @deprecated */
   refresh_timelock(
     request: DeepPartial<RefreshTimelockRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<RefreshTimelockResponse>;
+  /** @deprecated */
   extend_leaf(
     request: DeepPartial<ExtendLeafRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -22174,35 +20399,6 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<QueryUserSignedRefundsRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<QueryUserSignedRefundsResponse>;
-  /** Token RPCs */
-  start_token_transaction(
-    request: DeepPartial<StartTokenTransactionRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<StartTokenTransactionResponse>;
-  sign_token_transaction(
-    request: DeepPartial<SignTokenTransactionRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<SignTokenTransactionResponse>;
-  finalize_token_transaction(
-    request: DeepPartial<FinalizeTokenTransactionRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<Empty>;
-  freeze_tokens(
-    request: DeepPartial<FreezeTokensRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<FreezeTokensResponse>;
-  query_token_outputs(
-    request: DeepPartial<QueryTokenOutputsRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<QueryTokenOutputsResponse>;
-  query_token_transactions(
-    request: DeepPartial<QueryTokenTransactionsRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<QueryTokenTransactionsResponse>;
-  return_lightning_payment(
-    request: DeepPartial<ReturnLightningPaymentRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<Empty>;
   query_unused_deposit_addresses(
     request: DeepPartial<QueryUnusedDepositAddressesRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -22249,6 +20445,7 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<CooperativeExitRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<CooperativeExitResponse>;
+  /** @deprecated */
   extend_leaf_v2(
     request: DeepPartial<ExtendLeafRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -22281,6 +20478,7 @@ export interface SparkServiceClient<CallOptionsExt = {}> {
     request: DeepPartial<StartTransferRequest>,
     options?: CallOptions & CallOptionsExt,
   ): Promise<StartTransferResponse>;
+  /** @deprecated */
   refresh_timelock_v2(
     request: DeepPartial<RefreshTimelockRequest>,
     options?: CallOptions & CallOptionsExt,
