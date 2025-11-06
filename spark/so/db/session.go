@@ -448,8 +448,12 @@ func (t *TxProviderWithTimeout) GetOrBeginTx(ctx context.Context) (*ent.Tx, erro
 		return t.wrapped.GetOrBeginTx(ctx)
 	}
 
-	txChan := make(chan *ent.Tx)
-	errChan := make(chan error)
+	type result struct {
+		tx  *ent.Tx
+		err error
+	}
+
+	resultChan := make(chan result)
 
 	logger := logging.GetLoggerFromContext(ctx)
 
@@ -467,22 +471,20 @@ func (t *TxProviderWithTimeout) GetOrBeginTx(ctx context.Context) (*ent.Tx, erro
 	// If (3) happens, this function will return an error AND the caller needs to cancel the context in
 	// order to stop the transaction process.
 	go func() {
-		defer close(txChan)
-		defer close(errChan)
+		defer close(resultChan)
 
 		tx, err := t.wrapped.GetOrBeginTx(ctx)
 		if err != nil {
 			select {
-			case errChan <- err:
+			case resultChan <- result{tx: nil, err: err}:
 			case <-timeoutCtx.Done():
 				logger.Warn("Failed to start transaction within timeout", zap.Error(err))
 				return
 			}
-			return
 		}
 
 		select {
-		case txChan <- tx:
+		case resultChan <- result{tx: tx, err: nil}:
 		case <-timeoutCtx.Done():
 			// If the timeout context is done, there are no receivers for the transaction, so we need to
 			// rollback the transaction so that we aren't just leaving it idle.
@@ -495,14 +497,16 @@ func (t *TxProviderWithTimeout) GetOrBeginTx(ctx context.Context) (*ent.Tx, erro
 	}()
 
 	select {
-	case tx := <-txChan:
-		return tx, nil
-	case err := <-errChan:
-		return nil, soerrors.UnavailableDataStore(err)
-	case <-timeoutCtx.Done():
-		if timeoutCtx.Err() == context.DeadlineExceeded {
-			return nil, ErrTxBeginTimeout
+	case res, ok := <-resultChan:
+		if ok {
+			return res.tx, res.err
 		}
-		return nil, timeoutCtx.Err()
+	case <-timeoutCtx.Done():
 	}
+
+	if timeoutCtx.Err() == context.DeadlineExceeded {
+		return nil, ErrTxBeginTimeout
+	}
+
+	return nil, fmt.Errorf("failed to create database transaction %w", timeoutCtx.Err())
 }
