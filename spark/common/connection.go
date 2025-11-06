@@ -85,6 +85,7 @@ func BasicClientOptions(address string, retryPolicy *RetryPolicyConfig, clientTi
 	clientOpts := []grpc.DialOption{
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler(
 			otelgrpc.WithMetricAttributes(attribute.String("server.address", address)),
+			otelgrpc.WithSpanAttributes(attribute.String("server.address", address)),
 		)),
 	}
 
