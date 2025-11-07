@@ -13,6 +13,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.59
 	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.5.9
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.14
+	github.com/bradfitz/gomemcache v0.0.0-20250403215159-8d39553ac7cf
 	github.com/btcsuite/btcd/btcec/v2 v2.3.5
 	github.com/btcsuite/btcd/btcutil v1.1.6
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0

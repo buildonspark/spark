@@ -91,13 +91,13 @@ func (s *testMemoryStore) Set(ctx context.Context, key string, tokens uint64, wi
 	return nil
 }
 
-func (s *testMemoryStore) Take(ctx context.Context, key string) (tokens uint64, remaining uint64, reset uint64, ok bool, err error) {
+func (s *testMemoryStore) Take(ctx context.Context, key string) (ok bool, err error) {
 	s.bucketsMu.Lock()
 	defer s.bucketsMu.Unlock()
 
 	bucket, exists := s.buckets[key]
 	if !exists {
-		return 0, 0, 0, false, nil
+		return false, nil
 	}
 
 	now := s.clock.Now()
@@ -110,15 +110,12 @@ func (s *testMemoryStore) Take(ctx context.Context, key string) (tokens uint64, 
 		bucket.remaining = bucket.tokens
 	}
 
-	// Calculate when next reset will happen
-	nextReset := bucket.windowStart.Add(bucket.window)
-
 	if bucket.remaining > 0 {
 		bucket.remaining--
-		return bucket.tokens, bucket.remaining, uint64(nextReset.Unix()), true, nil
+		return true, nil
 	}
 
-	return bucket.tokens, 0, uint64(nextReset.Unix()), false, nil
+	return false, nil
 }
 
 // Delete removes a bucket (used to simulate backend eviction in tests)
@@ -149,7 +146,7 @@ func (s *countingStore) Set(ctx context.Context, key string, tokens uint64, wind
 	return s.underlying.Set(ctx, key, tokens, window)
 }
 
-func (s *countingStore) Take(ctx context.Context, key string) (tokens uint64, remaining uint64, reset uint64, ok bool, err error) {
+func (s *countingStore) Take(ctx context.Context, key string) (ok bool, err error) {
 	return s.underlying.Take(ctx, key)
 }
 
@@ -1338,4 +1335,106 @@ func TestRateLimiter_ReapplyLimitsOnBackendEviction(t *testing.T) {
 		_ = err
 	}
 	assert.Equal(t, 2, store.SetCount())
+}
+
+// Fail-open tests: when the underlying store errors, requests should be allowed.
+
+type flakyStore struct {
+	underlying *testMemoryStore
+	failSet    bool
+	failGet    bool
+	failTake   bool
+}
+
+func (s *flakyStore) Get(ctx context.Context, key string) (uint64, uint64, error) {
+	if s.failGet {
+		return 0, 0, fmt.Errorf("store get error")
+	}
+	return s.underlying.Get(ctx, key)
+}
+
+func (s *flakyStore) Set(ctx context.Context, key string, tokens uint64, window time.Duration) error {
+	if s.failSet {
+		return fmt.Errorf("store set error")
+	}
+	return s.underlying.Set(ctx, key, tokens, window)
+}
+
+func (s *flakyStore) Take(ctx context.Context, key string) (bool, error) {
+	if s.failTake {
+		return false, fmt.Errorf("store take error")
+	}
+	return s.underlying.Take(ctx, key)
+}
+
+func TestRateLimiter_FailOpen_OnSetError(t *testing.T) {
+	clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+	store := &flakyStore{underlying: newTestMemoryStore(clock), failSet: true}
+	config := &RateLimiterConfig{}
+	mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobRateLimitLimit + "@/svc.M/Op:ip#1s": 1,
+	})
+
+	rl, err := NewRateLimiter(config, WithKnobs(mockKnobs), WithStore(store), WithClock(clock))
+	require.NoError(t, err)
+	interceptor := rl.UnaryServerInterceptor()
+	handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
+	info := &grpc.UnaryServerInfo{FullMethod: "/svc.M/Op"}
+	ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": "1.2.3.4"}))
+
+	// Should allow (fail open) even though initial Set fails
+	_, err = interceptor(ctx, "req", info, handler)
+	require.NoError(t, err)
+}
+
+func TestRateLimiter_FailOpen_OnGetError(t *testing.T) {
+	clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+	base := newTestMemoryStore(clock)
+	store := &flakyStore{underlying: base}
+	config := &RateLimiterConfig{}
+	mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobRateLimitLimit + "@/svc.M/Op:ip#1s": 2,
+	})
+
+	rl, err := NewRateLimiter(config, WithKnobs(mockKnobs), WithStore(store), WithClock(clock))
+	require.NoError(t, err)
+	interceptor := rl.UnaryServerInterceptor()
+	handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
+	info := &grpc.UnaryServerInfo{FullMethod: "/svc.M/Op"}
+	ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": "1.2.3.4"}))
+
+	// First call initializes successfully
+	_, err = interceptor(ctx, "req", info, handler)
+	require.NoError(t, err)
+
+	// Now force Get error; should still allow (fail open)
+	store.failGet = true
+	_, err = interceptor(ctx, "req", info, handler)
+	require.NoError(t, err)
+}
+
+func TestRateLimiter_FailOpen_OnTakeError(t *testing.T) {
+	clock := &testClock{Time: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}
+	base := newTestMemoryStore(clock)
+	store := &flakyStore{underlying: base}
+	config := &RateLimiterConfig{}
+	mockKnobs := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobRateLimitLimit + "@/svc.M/Op:ip#1s": 2,
+	})
+
+	rl, err := NewRateLimiter(config, WithKnobs(mockKnobs), WithStore(store), WithClock(clock))
+	require.NoError(t, err)
+	interceptor := rl.UnaryServerInterceptor()
+	handler := func(_ context.Context, _ any) (any, error) { return "ok", nil }
+	info := &grpc.UnaryServerInfo{FullMethod: "/svc.M/Op"}
+	ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{"x-forwarded-for": "1.2.3.4"}))
+
+	// Initialize normally
+	_, err = interceptor(ctx, "req", info, handler)
+	require.NoError(t, err)
+
+	// Force Take error; should still allow (fail open)
+	store.failTake = true
+	_, err = interceptor(ctx, "req", info, handler)
+	require.NoError(t, err)
 }

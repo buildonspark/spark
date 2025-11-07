@@ -12,12 +12,14 @@ import (
 )
 
 const (
-	KnobDatabaseStatementTimeout      = "spark.database.statement_timeout"
-	KnobDatabaseLockTimeout           = "spark.database.lock_timeout"
-	KnobDatabaseOnlyCommitDirty       = "spark.database.only_commit_dirty"
-	KnobRateLimitLimit                = "spark.so.ratelimit.limit"
-	KnobRateLimitExcludeIps           = "spark.so.ratelimit.exclude_ips"
-	KnobRateLimitExcludePubkeys       = "spark.so.ratelimit.exclude_pubkeys"
+	KnobDatabaseStatementTimeout = "spark.database.statement_timeout"
+	KnobDatabaseLockTimeout      = "spark.database.lock_timeout"
+	KnobDatabaseOnlyCommitDirty  = "spark.database.only_commit_dirty"
+	KnobRateLimitLimit           = "spark.so.ratelimit.limit"
+	KnobRateLimitExcludeIps      = "spark.so.ratelimit.exclude_ips"
+	KnobRateLimitExcludePubkeys  = "spark.so.ratelimit.exclude_pubkeys"
+	// Enable Memcached-backed store for rate limiter when > 0
+	KnobRateLimitMemcacheEnabled      = "spark.so.ratelimit.memcache.enabled"
 	KnobSoRollbackUtxoSwapUsingGossip = "spark.so.rollback_utxo_swap_using_gossip"
 	KnobSoTransferLimit               = "spark.so.transfer_limit"
 

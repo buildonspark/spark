@@ -119,6 +119,8 @@ type Config struct {
 	FrostGRPCConnectionFactory frost.FrostGRPCConnectionFactory
 	// GRPC contains configuration for gRPC server behavior
 	GRPC GRPCConfig
+	// CacheURI is an optional URI specifying external cache endpoints (e.g., memcaches://host:11212[,host2:11212])
+	CacheURI string
 }
 
 // DatabaseDriver returns the database driver based on the database path.
@@ -156,6 +158,8 @@ type OperatorConfig struct {
 	Bitcoind map[string]BitcoindConfig `yaml:"bitcoind"`
 	// Lrc20 is a map of addresses of lrc20 nodes per network
 	Lrc20 map[string]Lrc20Config `yaml:"lrc20"`
+	// CacheURI optionally specifies external cache endpoints (e.g., memcaches://host:11212[,host2:11212])
+	CacheURI string `yaml:"cache_uri"`
 	// Tracing is the configuration for tracing
 	Tracing common.TracingConfig `yaml:"tracing"`
 	// Database is the configuration for the database
@@ -386,6 +390,7 @@ func NewConfig(
 		Knobs:                      operatorConfig.Knobs,
 		FrostGRPCConnectionFactory: frost.NewFrostGRPCConnectionFactorySecure(),
 		GRPC:                       operatorConfig.GRPC,
+		CacheURI:                   operatorConfig.CacheURI,
 	}
 
 	conf.buildIdentityPubkeyMap()

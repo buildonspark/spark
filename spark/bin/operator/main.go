@@ -528,7 +528,18 @@ func main() {
 	)
 	if config.RateLimiter.Enabled {
 		var err error
-		rateLimiter, err = createRateLimiter(config, middleware.WithKnobs(knobsService))
+		rlOpts := []middleware.RateLimiterOption{middleware.WithKnobs(knobsService)}
+		memcachedURI := strings.TrimSpace(config.CacheURI)
+		if knobsService.RolloutRandom(knobs.KnobRateLimitMemcacheEnabled, 0) && memcachedURI != "" {
+			store, sErr := middleware.NewMemcacheStore(memcachedURI)
+			if sErr != nil {
+				logger.Warn("Memcached rate limiter store unavailable, falling back to in-memory", zap.Error(sErr))
+			} else {
+				rlOpts = append(rlOpts, middleware.WithStore(store))
+				logger.Info(fmt.Sprintf("Rate limiter using Memcached store. memcached_addr=%s", memcachedURI))
+			}
+		}
+		rateLimiter, err = createRateLimiter(config, rlOpts...)
 		if err != nil {
 			logger.Fatal("Failed to create rate limiter", zap.Error(err))
 		}

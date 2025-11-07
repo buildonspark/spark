@@ -143,7 +143,7 @@ func (c *realClock) Now() time.Time {
 type MemoryStore interface {
 	Get(ctx context.Context, key string) (tokens uint64, remaining uint64, err error)
 	Set(ctx context.Context, key string, tokens uint64, window time.Duration) error
-	Take(ctx context.Context, key string) (tokens uint64, remaining uint64, reset uint64, ok bool, err error)
+	Take(ctx context.Context, key string) (ok bool, err error)
 }
 
 type realMemoryStore struct {
@@ -230,8 +230,9 @@ func (s *realMemoryStore) Set(ctx context.Context, key string, tokens uint64, wi
 	return s.store.Set(ctx, key, tokens, window)
 }
 
-func (s *realMemoryStore) Take(ctx context.Context, key string) (tokens uint64, remaining uint64, reset uint64, ok bool, err error) {
-	return s.store.Take(ctx, key)
+func (s *realMemoryStore) Take(ctx context.Context, key string) (ok bool, err error) {
+	_, _, _, ok, err = s.store.Take(ctx, key)
+	return ok, err
 }
 
 func NewRateLimiter(configOrProvider any, opts ...RateLimiterOption) (*RateLimiter, error) {
@@ -365,7 +366,7 @@ func (r *RateLimiter) takeTokenForKey(ctx context.Context, key string, tokens ui
 	}
 
 	// Attempt to take a token.
-	_, _, _, ok, err := r.store.Take(ctx, key)
+	ok, err := r.store.Take(ctx, key)
 	if err != nil {
 		if logger != nil {
 			logger.Error(fmt.Sprintf(
