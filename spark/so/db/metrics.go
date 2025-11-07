@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
@@ -26,12 +27,9 @@ var (
 	attrOperationBegin    = attribute.String("operation", "begin")
 	attrStatusSuccess     = attribute.String("status", "success")
 	attrStatusError       = attribute.String("status", "error")
-
-	// Initialize metrics
-	_ = initMetrics()
 )
 
-func initMetrics() error {
+func init() {
 	meter := otel.GetMeterProvider().Meter("spark.db")
 
 	var err error
@@ -46,7 +44,10 @@ func initMetrics() error {
 		),
 	)
 	if err != nil {
-		return err
+		otel.Handle(err)
+		if txDurationHistogram == nil {
+			txDurationHistogram = noop.Float64Histogram{}
+		}
 	}
 
 	txCounter, err = meter.Int64Counter(
@@ -54,7 +55,10 @@ func initMetrics() error {
 		metric.WithDescription("Total number of database transactions"),
 	)
 	if err != nil {
-		return err
+		otel.Handle(err)
+		if txCounter == nil {
+			txCounter = noop.Int64Counter{}
+		}
 	}
 
 	txActiveGauge, err = meter.Int64UpDownCounter(
@@ -62,10 +66,11 @@ func initMetrics() error {
 		metric.WithDescription("Number of currently active database transactions"),
 	)
 	if err != nil {
-		return err
+		otel.Handle(err)
+		if txActiveGauge == nil {
+			txActiveGauge = noop.Int64UpDownCounter{}
+		}
 	}
-
-	return nil
 }
 
 // addTraceEvent adds a trace event if a span is available
@@ -105,8 +110,6 @@ func getTraceAttributes(operation string, duration float64, err error) []attribu
 type MetricsTxProvider struct {
 	wrapped     ent.TxProvider
 	metricAttrs []attribute.KeyValue
-	mu          sync.Mutex
-	startTime   time.Time
 }
 
 // NewMetricsTxProvider creates a new MetricsTxProvider that wraps the given TxProvider.
@@ -118,9 +121,6 @@ func NewMetricsTxProvider(provider ent.TxProvider, metricAttrs []attribute.KeyVa
 }
 
 func (m *MetricsTxProvider) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
 	logger := logging.GetLoggerFromContext(ctx)
 
 	// Record transaction begin
@@ -135,16 +135,16 @@ func (m *MetricsTxProvider) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 		return nil, err
 	}
 
-	m.startTime = time.Now()
+	startTime := time.Now()
+	metricsOnce := sync.Once{}
+
 	addTraceEvent(ctx, "begin", 0, nil)
 
 	// Wrap commit hook
 	tx.OnCommit(func(fn ent.Committer) ent.Committer {
 		return ent.CommitFunc(func(ctx context.Context, tx *ent.Tx) error {
-			m.mu.Lock()
-			duration := time.Since(m.startTime).Seconds()
+			duration := time.Since(startTime).Seconds()
 			durationMs := duration * 1000
-			m.mu.Unlock()
 
 			err := fn.Commit(ctx, tx)
 			var attrs []attribute.KeyValue
@@ -154,12 +154,13 @@ func (m *MetricsTxProvider) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				addTraceEvent(ctx, "commit", duration, err)
 			} else {
 				attrs = m.getOperationAttributes(attrOperationCommit, attrStatusSuccess)
-				txDurationHistogram.Record(ctx, durationMs, metric.WithAttributes(attrs...))
-				txActiveGauge.Add(ctx, -1, metric.WithAttributes(m.getGaugeAttributes(attrOperationCommit)...))
+				metricsOnce.Do(func() {
+					txDurationHistogram.Record(ctx, durationMs, metric.WithAttributes(attrs...))
+					txActiveGauge.Add(ctx, -1, metric.WithAttributes(m.getGaugeAttributes(attrOperationCommit)...))
+					txCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
+				})
 				addTraceEvent(ctx, "commit", duration, nil)
 			}
-
-			txCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
 
 			return err
 		})
@@ -168,10 +169,8 @@ func (m *MetricsTxProvider) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 	// Wrap rollback hook
 	tx.OnRollback(func(fn ent.Rollbacker) ent.Rollbacker {
 		return ent.RollbackFunc(func(ctx context.Context, tx *ent.Tx) error {
-			m.mu.Lock()
-			duration := time.Since(m.startTime).Seconds()
+			duration := time.Since(startTime).Seconds()
 			durationMs := duration * 1000
-			m.mu.Unlock()
 
 			err := fn.Rollback(ctx, tx)
 			var attrs []attribute.KeyValue
@@ -184,9 +183,11 @@ func (m *MetricsTxProvider) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				addTraceEvent(ctx, "rollback", duration, nil)
 			}
 
-			txDurationHistogram.Record(ctx, durationMs, metric.WithAttributes(attrs...))
-			txCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
-			txActiveGauge.Add(ctx, -1, metric.WithAttributes(m.getGaugeAttributes(attrOperationRollback)...))
+			metricsOnce.Do(func() {
+				txDurationHistogram.Record(ctx, durationMs, metric.WithAttributes(attrs...))
+				txCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
+				txActiveGauge.Add(ctx, -1, metric.WithAttributes(m.getGaugeAttributes(attrOperationRollback)...))
+			})
 
 			return err
 		})
