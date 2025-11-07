@@ -60,6 +60,192 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealed(t *testing.T) {
 	}
 }
 
+func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsAvailableToSpend(t *testing.T) {
+	testCases := []struct {
+		name                          string
+		nonCoordinatorInitialTxStatus st.TokenTransactionStatus
+		nonCoordinatorRemapTxStatus   st.TokenTransactionStatus
+	}{
+		{
+			name:                          "Successfully finalizes REVEALED/SIGNED/FINALIZED when the remapped transaction on the non-coordinator is SIGNED",
+			nonCoordinatorInitialTxStatus: st.TokenTransactionStatusSigned,
+			nonCoordinatorRemapTxStatus:   st.TokenTransactionStatusSigned,
+		},
+		{
+			name:                          "Successfully finalizes REVEALED/SIGNED/FINALIZED when the remapped transaction on the non-coordinator is STARTED",
+			nonCoordinatorInitialTxStatus: st.TokenTransactionStatusSigned,
+			nonCoordinatorRemapTxStatus:   st.TokenTransactionStatusStarted,
+		},
+		{
+			name:                          "Successfully finalizes REVEALED/STARTED/FINALIZED when the remapped transaction on the non-coordinator is SIGNED",
+			nonCoordinatorInitialTxStatus: st.TokenTransactionStatusStarted,
+			nonCoordinatorRemapTxStatus:   st.TokenTransactionStatusSigned,
+		},
+		{
+			name:                          "Successfully finalizes REVEALED/STARTED/FINALIZED when the remapped transaction on the non-coordinator is STARTED",
+			nonCoordinatorInitialTxStatus: st.TokenTransactionStatusStarted,
+			nonCoordinatorRemapTxStatus:   st.TokenTransactionStatusStarted,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			config, initalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+			require.NoError(t, err, "failed to create transfer token transaction")
+
+			_, remappedFinalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+			require.NoError(t, err, "failed to create transfer token transaction")
+
+			coordinatorEntClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
+			defer coordinatorEntClient.Close()
+
+			nonCoordOperatorConfig := sparktesting.SpecificOperatorTestConfig(t, 1)
+			nonCoordEntClient := db.NewPostgresEntClientForIntegrationTest(t, nonCoordOperatorConfig.DatabasePath)
+			defer nonCoordEntClient.Close()
+
+			setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t, ctx, coordinatorEntClient, initalTransferTokenTransactionHash)
+
+			setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOperator(
+				t, ctx,
+				coordinatorEntClient,
+				nonCoordEntClient,
+				initalTransferTokenTransactionHash,
+				remappedFinalTransferTokenTransactionHash,
+				tc.nonCoordinatorInitialTxStatus,
+				tc.nonCoordinatorRemapTxStatus,
+				true,
+			)
+
+			conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000001"].NewOperatorGRPCConnection()
+			require.NoError(t, err)
+			mockClient := pbmock.NewMockServiceClient(conn)
+			_, err = mockClient.TriggerTask(t.Context(), &pbmock.TriggerTaskRequest{TaskName: "finalize_revealed_token_transactions"})
+			require.NoError(t, err)
+			conn.Close()
+
+			tokenTransactionAfterFinalizeRevealedTransactions, err := coordinatorEntClient.TokenTransaction.Query().
+				Where(tokentransaction.FinalizedTokenTransactionHashEQ(initalTransferTokenTransactionHash)).
+				WithPeerSignatures().
+				WithSpentOutput(func(to *ent.TokenOutputQuery) { to.WithTokenPartialRevocationSecretShares() }).
+				WithCreatedOutput().
+				Only(ctx)
+			require.NoError(t, err)
+			require.Equal(t, st.TokenTransactionStatusFinalized, tokenTransactionAfterFinalizeRevealedTransactions.Status)
+
+			nonCoordinatorTokenTransaction, err := nonCoordEntClient.TokenTransaction.Query().
+				Where(tokentransaction.FinalizedTokenTransactionHashEQ(initalTransferTokenTransactionHash)).
+				WithSpentOutput().
+				WithCreatedOutput().
+				Only(ctx)
+
+			for _, tokenOutput := range tokenTransactionAfterFinalizeRevealedTransactions.Edges.SpentOutput {
+				require.Equal(t, len(tokenOutput.Edges.TokenPartialRevocationSecretShares), len(config.SigningOperators)-1, "should have exactly numOperators-1 secret shares")
+				require.Equal(t, st.TokenOutputStatusSpentFinalized, tokenOutput.Status)
+			}
+			for _, tokenOutput := range tokenTransactionAfterFinalizeRevealedTransactions.Edges.CreatedOutput {
+				require.Equal(t, st.TokenOutputStatusCreatedFinalized, tokenOutput.Status)
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, st.TokenTransactionStatusFinalized, nonCoordinatorTokenTransaction.Status)
+			require.Len(t, nonCoordinatorTokenTransaction.Edges.SpentOutput, len(tokenTransactionAfterFinalizeRevealedTransactions.Edges.SpentOutput), "should have the same number of spent outputs")
+			for _, tokenOutput := range nonCoordinatorTokenTransaction.Edges.SpentOutput {
+				require.Equal(t, st.TokenOutputStatusSpentFinalized, tokenOutput.Status)
+			}
+			require.Len(t, nonCoordinatorTokenTransaction.Edges.CreatedOutput, len(tokenTransactionAfterFinalizeRevealedTransactions.Edges.CreatedOutput), "should have the same number of created outputs")
+			for _, tokenOutput := range nonCoordinatorTokenTransaction.Edges.CreatedOutput {
+				require.Equal(t, st.TokenOutputStatusCreatedFinalized, tokenOutput.Status)
+			}
+		})
+	}
+}
+
+func TestRevocationExchangeCronJobFailsToReclaimOutputsIfRemappedTransactionHasNotExpired(t *testing.T) {
+	testCases := []struct {
+		name                          string
+		nonCoordinatorInitialTxStatus st.TokenTransactionStatus
+		nonCoordinatorRemapTxStatus   st.TokenTransactionStatus
+	}{
+		{
+			name:                          "Fails to finalize REVEALED/SIGNED/FINALIZED when the remapped transaction on the non-coordinator is SIGNED",
+			nonCoordinatorInitialTxStatus: st.TokenTransactionStatusSigned,
+			nonCoordinatorRemapTxStatus:   st.TokenTransactionStatusSigned,
+		},
+		{
+			name:                          "Fails to finalize REVEALED/SIGNED/FINALIZED when the remapped transaction on the non-coordinator is SIGNED",
+			nonCoordinatorInitialTxStatus: st.TokenTransactionStatusSigned,
+			nonCoordinatorRemapTxStatus:   st.TokenTransactionStatusStarted,
+		},
+		{
+			name:                          "Fails to finalize REVEALED/STARTED/FINALIZED when the remapped transaction on the non-coordinator is SIGNED",
+			nonCoordinatorInitialTxStatus: st.TokenTransactionStatusStarted,
+			nonCoordinatorRemapTxStatus:   st.TokenTransactionStatusSigned,
+		},
+		{
+			name:                          "Fails to finalize REVEALED/STARTED/FINALIZED when the remapped transaction on the non-coordinator is STARTED",
+			nonCoordinatorInitialTxStatus: st.TokenTransactionStatusStarted,
+			nonCoordinatorRemapTxStatus:   st.TokenTransactionStatusStarted,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+			_, remappedFinalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+			require.NoError(t, err, "failed to create transfer token transaction")
+
+			config, initalFinalTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+			require.NoError(t, err, "failed to create transfer token transaction")
+
+			coordinatorEntClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
+			defer coordinatorEntClient.Close()
+
+			nonCoordOperatorConfig := sparktesting.SpecificOperatorTestConfig(t, 1)
+			nonCoordEntClient := db.NewPostgresEntClientForIntegrationTest(t, nonCoordOperatorConfig.DatabasePath)
+			defer nonCoordEntClient.Close()
+
+			setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t, ctx, coordinatorEntClient, initalFinalTokenTransactionHash)
+
+			setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOperator(t, ctx,
+				coordinatorEntClient,
+				nonCoordEntClient,
+				initalFinalTokenTransactionHash,
+				remappedFinalTransferTokenTransactionHash,
+				tc.nonCoordinatorInitialTxStatus,
+				tc.nonCoordinatorRemapTxStatus,
+				false,
+			)
+
+			conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000001"].NewOperatorGRPCConnection()
+			require.NoError(t, err)
+			mockClient := pbmock.NewMockServiceClient(conn)
+			_, err = mockClient.TriggerTask(t.Context(), &pbmock.TriggerTaskRequest{TaskName: "finalize_revealed_token_transactions"})
+			require.Error(t, err)
+			conn.Close()
+
+			coordinatorInitialTransaction, err := coordinatorEntClient.TokenTransaction.Query().
+				Where(tokentransaction.FinalizedTokenTransactionHashEQ(initalFinalTokenTransactionHash)).
+				Only(ctx)
+			require.NoError(t, err)
+			require.Equal(t, st.TokenTransactionStatusRevealed, coordinatorInitialTransaction.Status)
+
+			nonCoordinatorInitialTransaction, err := nonCoordEntClient.TokenTransaction.Query().
+				Where(tokentransaction.FinalizedTokenTransactionHashEQ(initalFinalTokenTransactionHash)).
+				WithSpentOutput().
+				Only(ctx)
+			require.NoError(t, err)
+			require.Equal(t, tc.nonCoordinatorInitialTxStatus, nonCoordinatorInitialTransaction.Status)
+
+			for _, tokenOutput := range coordinatorInitialTransaction.Edges.SpentOutput {
+				require.Equal(t, st.TokenOutputStatusSpentFinalized, tokenOutput.Status)
+			}
+			require.Empty(t, nonCoordinatorInitialTransaction.Edges.SpentOutput, "should have no spent outputs")
+		})
+	}
+}
+
 func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealedWithAllFieldsButStatusRevealed(t *testing.T) {
 	ctx := t.Context()
 	config, finalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
@@ -603,4 +789,232 @@ func TestQueryTokenOutputsWithRevealedRevocationSecrets(t *testing.T) {
 		}
 	}
 	queryAndVerifyTokenOutputs(t, unexchangedOperatorIdentifiers, finalTokenTransaction, owner1PrivKey)
+}
+
+// This function takes two successful tokentransactions and remaps the spent outputs on the non-coordinator
+// from the "initial" transaction to the "remap" transaction.
+// It also sets the statuses on both to the provided status.
+// The goal is to test transactions in different states across the coordinator and non-coordinator
+// can be properly finalized by the finalize_revealed_token_transactions cron job.
+func setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOperator(
+	t *testing.T,
+	ctx context.Context,
+	coordinatorEntClient *ent.Client,
+	nonCoordinatorEntClient *ent.Client,
+	initialFinalTokenTransactionHash []byte,
+	remappedFinalTransferTokenTransactionHash []byte,
+	nonCoordinatorInitialTxStatus st.TokenTransactionStatus,
+	nonCoordinatorRemapTxStatus st.TokenTransactionStatus,
+	availableToRemap bool,
+) {
+	coordinatorTx, err := coordinatorEntClient.Tx(ctx)
+	require.NoError(t, err)
+
+	tokenTransaction, err := coordinatorTx.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(initialFinalTokenTransactionHash)).
+		WithSpentOutput().
+		WithCreatedOutput().
+		Only(ctx)
+	require.NoError(t, err)
+	initialTxCoordinatorCreatedOutputIDs := make([]uuid.UUID, 0, len(tokenTransaction.Edges.CreatedOutput))
+	for _, o := range tokenTransaction.Edges.CreatedOutput {
+		initialTxCoordinatorCreatedOutputIDs = append(initialTxCoordinatorCreatedOutputIDs, o.ID)
+	}
+
+	initialTxCoordinatorSpentOutputIDs := make([]uuid.UUID, 0, len(tokenTransaction.Edges.SpentOutput))
+	for _, o := range tokenTransaction.Edges.SpentOutput {
+		initialTxCoordinatorSpentOutputIDs = append(initialTxCoordinatorSpentOutputIDs, o.ID)
+	}
+
+	// Set the coordinator's initial transaction to REVEALED.
+	err = coordinatorTx.TokenOutput.
+		Update().
+		Where(tokenoutput.IDIn(initialTxCoordinatorCreatedOutputIDs...)).
+		SetStatus(st.TokenOutputStatusCreatedSigned).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	err = coordinatorTx.TokenOutput.
+		Update().
+		Where(tokenoutput.IDIn(initialTxCoordinatorSpentOutputIDs...)).
+		SetStatus(st.TokenOutputStatusSpentSigned).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	_, err = coordinatorTx.TokenPartialRevocationSecretShare.
+		Delete().
+		Where(tokenpartialrevocationsecretshare.HasTokenOutputWith(
+			tokenoutput.IDIn(initialTxCoordinatorSpentOutputIDs...),
+		)).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	err = coordinatorTx.TokenTransaction.Update().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(initialFinalTokenTransactionHash)).
+		SetStatus(st.TokenTransactionStatusRevealed).
+		SetUpdateTime(time.Now().Add(-25 * time.Minute).UTC()).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	err = coordinatorTx.Commit()
+	require.NoError(t, err)
+
+	tokenTransaction, err = coordinatorEntClient.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(initialFinalTokenTransactionHash)).
+		WithPeerSignatures().
+		WithSpentOutput(
+			func(to *ent.TokenOutputQuery) {
+				to.WithTokenPartialRevocationSecretShares()
+			},
+		).
+		WithCreatedOutput().
+		Only(ctx)
+	require.NoError(t, err)
+
+	require.Equal(t, st.TokenTransactionStatusRevealed, tokenTransaction.Status, "token transaction status should be revealed")
+	require.Greater(t, time.Now().In(time.UTC).Sub(tokenTransaction.UpdateTime.In(time.UTC)), 5*time.Minute, "update time should be more than 5 minutes before now")
+	for _, output := range tokenTransaction.Edges.CreatedOutput {
+		require.Equal(t, st.TokenOutputStatusCreatedSigned, output.Status, "created output %s should be started", output.ID)
+	}
+
+	// ==== non-coordinator set up ====
+	// =================================
+	// The initial transaction will have its spent outputs remapped to the remap transaction.
+	// Set up both transactions to the provided status.
+	nonCoordinatorTx, err := nonCoordinatorEntClient.Tx(ctx)
+	require.NoError(t, err)
+	now := time.Now().UTC()
+	expirationTime := now.Add(20 * time.Minute)
+	if availableToRemap {
+		expirationTime = now.Add(-25 * time.Minute)
+	}
+
+	err = nonCoordinatorTx.TokenTransaction.Update().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(remappedFinalTransferTokenTransactionHash)).
+		SetClientCreatedTimestamp(now.Add(100 * time.Hour)). // force this tx to lose preemptOrReject check.
+		SetStatus(nonCoordinatorRemapTxStatus).
+		SetUpdateTime(time.Now().Add(-25 * time.Minute).UTC()).
+		ClearSpentOutput().
+		Exec(ctx)
+	require.NoError(t, err)
+
+	// Expire the remapped transaction. This makes its spent outputs available to be reclaimed.
+	// nolint:forbidigo
+	_, err = nonCoordinatorTx.ExecContext(ctx,
+		"UPDATE token_transactions SET expiry_time = $1 WHERE finalized_token_transaction_hash = $2",
+		expirationTime,
+		remappedFinalTransferTokenTransactionHash,
+	)
+	require.NoError(t, err)
+
+	remapTx, err := nonCoordinatorTx.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(remappedFinalTransferTokenTransactionHash)).
+		WithCreatedOutput().
+		Only(ctx)
+	require.NoError(t, err)
+	require.WithinDuration(t, expirationTime, remapTx.ExpiryTime.In(time.UTC), time.Microsecond, "expiry time should be set")
+
+	nonCoordinatorRemapTxCreatedOutputIDs := make([]uuid.UUID, 0, len(remapTx.Edges.CreatedOutput))
+	for _, o := range remapTx.Edges.CreatedOutput {
+		nonCoordinatorRemapTxCreatedOutputIDs = append(nonCoordinatorRemapTxCreatedOutputIDs, o.ID)
+	}
+
+	var createdOutputStatus st.TokenOutputStatus
+	switch nonCoordinatorRemapTxStatus {
+	case st.TokenTransactionStatusStarted:
+		createdOutputStatus = st.TokenOutputStatusCreatedStarted
+	case st.TokenTransactionStatusSigned:
+		createdOutputStatus = st.TokenOutputStatusCreatedSigned
+	default:
+		t.Fatalf("Unsupported token transaction status: %s", nonCoordinatorRemapTxStatus)
+	}
+
+	// Set the remapped transaction's created outputs to the provided status.
+	err = nonCoordinatorTx.TokenOutput.
+		Update().
+		Where(tokenoutput.IDIn(nonCoordinatorRemapTxCreatedOutputIDs...)).
+		SetStatus(createdOutputStatus).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	initialTxNonCoordinator, err := nonCoordinatorTx.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(initialFinalTokenTransactionHash)).
+		WithSpentOutput().
+		WithCreatedOutput().
+		Only(ctx)
+	require.NoError(t, err)
+
+	initialTxNonCoordinatorSpentOutputs := make([]uuid.UUID, 0, len(initialTxNonCoordinator.Edges.SpentOutput))
+	for _, o := range initialTxNonCoordinator.Edges.SpentOutput {
+		initialTxNonCoordinatorSpentOutputs = append(initialTxNonCoordinatorSpentOutputs, o.ID)
+	}
+	initialTxNonCoordinatorCreatedOutputs := make([]uuid.UUID, 0, len(initialTxNonCoordinator.Edges.CreatedOutput))
+	for _, o := range initialTxNonCoordinator.Edges.CreatedOutput {
+		initialTxNonCoordinatorCreatedOutputs = append(initialTxNonCoordinatorCreatedOutputs, o.ID)
+	}
+
+	var nonCoordinatorInitialTxCreatedOutputStatus st.TokenOutputStatus
+	switch nonCoordinatorInitialTxStatus {
+	case st.TokenTransactionStatusStarted:
+		nonCoordinatorInitialTxCreatedOutputStatus = st.TokenOutputStatusCreatedStarted
+	case st.TokenTransactionStatusSigned:
+		nonCoordinatorInitialTxCreatedOutputStatus = st.TokenOutputStatusCreatedSigned
+	default:
+		t.Fatalf("Unsupported token transaction status: %s", nonCoordinatorInitialTxStatus)
+	}
+
+	// Set the initial transaction's created outputs to the provided status.
+	err = nonCoordinatorTx.TokenOutput.
+		Update().
+		Where(tokenoutput.IDIn(initialTxNonCoordinatorCreatedOutputs...)).
+		SetStatus(nonCoordinatorInitialTxCreatedOutputStatus).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	var nonCoordinatorRemapTxSpentOutputStatus st.TokenOutputStatus
+	switch nonCoordinatorRemapTxStatus {
+	case st.TokenTransactionStatusStarted:
+		nonCoordinatorRemapTxSpentOutputStatus = st.TokenOutputStatusSpentStarted
+	case st.TokenTransactionStatusSigned:
+		nonCoordinatorRemapTxSpentOutputStatus = st.TokenOutputStatusSpentSigned
+	default:
+		t.Fatalf("Unsupported token transaction status: %s", nonCoordinatorRemapTxStatus)
+	}
+
+	// Remap the initial transaction's spent outputs to the remapped transaction.
+	err = nonCoordinatorTx.TokenOutput.
+		Update().
+		Where(tokenoutput.IDIn(initialTxNonCoordinatorSpentOutputs...)).
+		SetStatus(nonCoordinatorRemapTxSpentOutputStatus).
+		SetOutputSpentTokenTransaction(remapTx).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	_, err = nonCoordinatorTx.TokenPartialRevocationSecretShare.
+		Delete().
+		Where(tokenpartialrevocationsecretshare.HasTokenOutputWith(
+			tokenoutput.IDIn(initialTxNonCoordinatorSpentOutputs...),
+		)).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	// Set the initial transaction to the provided status.
+	err = nonCoordinatorTx.TokenTransaction.Update().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(initialFinalTokenTransactionHash)).
+		SetStatus(nonCoordinatorInitialTxStatus).
+		SetUpdateTime(time.Now().Add(-25 * time.Minute).UTC()).
+		Exec(ctx)
+	require.NoError(t, err)
+
+	initialTxNonCoordinator, err = nonCoordinatorTx.TokenTransaction.Query().
+		Where(tokentransaction.FinalizedTokenTransactionHashEQ(initialFinalTokenTransactionHash)).
+		WithSpentOutput().
+		WithCreatedOutput().
+		Only(ctx)
+	require.NoError(t, err)
+	require.Equal(t, nonCoordinatorInitialTxStatus, initialTxNonCoordinator.Status, "token transaction status should be signed")
+	require.Empty(t, initialTxNonCoordinator.Edges.SpentOutput, "should have no spent outputs")
+
+	err = nonCoordinatorTx.Commit()
+	require.NoError(t, err)
 }

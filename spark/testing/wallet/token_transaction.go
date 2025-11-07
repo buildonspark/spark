@@ -403,6 +403,34 @@ func ExchangeRevocationSecretsManually(
 		})
 	}
 
+	entClient, err := ent.Open("postgres", config.CoordinatorDatabaseURI)
+	if err != nil {
+		return fmt.Errorf("failed to connect to coordinator database: %w", err)
+	}
+	defer entClient.Close()
+	dbCtx := ent.NewContext(ctx, entClient)
+
+	var outputsToSpend []*tokeninternalpb.OutputToSpend
+	for _, outputToSpend := range exchangeParams.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend() {
+		output, err := entClient.TokenOutput.Query().
+			Where(tokenoutput.CreatedTransactionOutputVout(int32(outputToSpend.GetPrevTokenTransactionVout())),
+				tokenoutput.HasOutputCreatedTokenTransactionWith(
+					tokentransaction.FinalizedTokenTransactionHashEQ(outputToSpend.GetPrevTokenTransactionHash()),
+				),
+			).
+			WithOutputCreatedTokenTransaction().
+			Only(dbCtx)
+		if err != nil {
+			return fmt.Errorf("failed to query token output: %w", err)
+		}
+		outputsToSpend = append(outputsToSpend, &tokeninternalpb.OutputToSpend{
+			CreatedTokenTransactionHash: output.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash,
+			CreatedTokenTransactionVout: uint32(output.CreatedTransactionOutputVout),
+			SpentTokenTransactionVout:   uint32(output.SpentTransactionInputVout),
+			SpentOwnershipSignature:     output.SpentOwnershipSignature,
+		})
+	}
+
 	conn, err := exchangeParams.TargetOperator.NewOperatorGRPCConnection()
 	if err != nil {
 		return fmt.Errorf("failed to connect to operator %s: %w", exchangeParams.TargetOperator.Identifier, err)
@@ -417,6 +445,7 @@ func ExchangeRevocationSecretsManually(
 		OperatorTransactionSignatures: allOperatorSignaturesPackage,
 		OperatorShares:                exchangeParams.RevocationShares,
 		OperatorIdentityPublicKey:     config.IdentityPublicKey().Serialize(),
+		OutputsToSpend:                outputsToSpend,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to exchange revocation secrets with operator %s: %w", exchangeParams.TargetOperator.Identifier, err)

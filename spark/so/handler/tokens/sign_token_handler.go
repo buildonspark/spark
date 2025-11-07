@@ -296,6 +296,11 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 		return nil, sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to commit and replace transaction after setting status to revealed: %w for token txHash: %x", err, tokenTransactionHash))
 	}
 
+	outputsToSpend, err := h.getOutputsToSpendForExchange(ctx, tokenTransactionHash)
+	if err != nil {
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to get outputs to spend for exchange: %w for token txHash: %x", err, tokenTransactionHash))
+	}
+
 	// exchange the revocation secret shares with all other operators
 	opSelection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
 	response, errorExchangingWithAllOperators := helper.ExecuteTaskWithAllOperators(ctx, h.config, &opSelection, func(ctx context.Context, operator *so.SigningOperator) (*tokeninternalpb.ExchangeRevocationSecretsSharesResponse, error) {
@@ -311,6 +316,7 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 			OperatorTransactionSignatures: allOperatorSignaturesPackage,
 			OperatorShares:                revocationSecretShares,
 			OperatorIdentityPublicKey:     h.config.IdentityPublicKey().Serialize(),
+			OutputsToSpend:                outputsToSpend,
 		})
 	})
 	// If there was an error exchanging with all operators, we will roll back to the revealed status.
@@ -319,6 +325,26 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 	}
 
 	return response, nil
+}
+
+func (h *SignTokenHandler) getOutputsToSpendForExchange(ctx context.Context, tokenTransactionHash []byte) ([]*tokeninternalpb.OutputToSpend, error) {
+	revealedTokenTransaction, err := ent.FetchTokenTransactionDataByHashForRead(ctx, tokenTransactionHash)
+	if err != nil {
+		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch token transaction after setting status to revealed: %w for token txHash: %x", err, tokenTransactionHash))
+	}
+	outputsToSpend := make([]*tokeninternalpb.OutputToSpend, 0, len(revealedTokenTransaction.Edges.SpentOutput))
+	for _, outputToSpend := range revealedTokenTransaction.Edges.SpentOutput {
+		if outputToSpend == nil {
+			continue
+		}
+		outputsToSpend = append(outputsToSpend, &tokeninternalpb.OutputToSpend{
+			CreatedTokenTransactionHash: outputToSpend.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash,
+			CreatedTokenTransactionVout: uint32(outputToSpend.CreatedTransactionOutputVout),
+			SpentTokenTransactionVout:   uint32(outputToSpend.SpentTransactionInputVout),
+			SpentOwnershipSignature:     outputToSpend.SpentOwnershipSignature,
+		})
+	}
+	return outputsToSpend, nil
 }
 
 func (h *SignTokenHandler) prepareRevocationSecretSharesForExchange(ctx context.Context, tokenTransaction *tokenpb.TokenTransaction) ([]*tokeninternalpb.OperatorRevocationShares, error) {

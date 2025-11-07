@@ -406,6 +406,7 @@ type ExchangeRevocationSecretsSharesRequest struct {
 	// The revocation secret shares this SO is revealing, grouped by operator
 	OperatorShares            []*OperatorRevocationShares `protobuf:"bytes,4,rep,name=operator_shares,json=operatorShares,proto3" json:"operator_shares,omitempty"`
 	OperatorIdentityPublicKey []byte                      `protobuf:"bytes,5,opt,name=operator_identity_public_key,json=operatorIdentityPublicKey,proto3" json:"operator_identity_public_key,omitempty"`
+	OutputsToSpend            []*OutputToSpend            `protobuf:"bytes,6,rep,name=outputs_to_spend,json=outputsToSpend,proto3" json:"outputs_to_spend,omitempty"`
 	unknownFields             protoimpl.UnknownFields
 	sizeCache                 protoimpl.SizeCache
 }
@@ -475,6 +476,13 @@ func (x *ExchangeRevocationSecretsSharesRequest) GetOperatorIdentityPublicKey() 
 	return nil
 }
 
+func (x *ExchangeRevocationSecretsSharesRequest) GetOutputsToSpend() []*OutputToSpend {
+	if x != nil {
+		return x.OutputsToSpend
+	}
+	return nil
+}
+
 type ExchangeRevocationSecretsSharesResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The revocation secret shares from other SOs, grouped by operator
@@ -520,6 +528,74 @@ func (x *ExchangeRevocationSecretsSharesResponse) GetReceivedOperatorShares() []
 	return nil
 }
 
+type OutputToSpend struct {
+	state                       protoimpl.MessageState `protogen:"open.v1"`
+	CreatedTokenTransactionHash []byte                 `protobuf:"bytes,1,opt,name=created_token_transaction_hash,json=createdTokenTransactionHash,proto3" json:"created_token_transaction_hash,omitempty"`
+	CreatedTokenTransactionVout uint32                 `protobuf:"varint,2,opt,name=created_token_transaction_vout,json=createdTokenTransactionVout,proto3" json:"created_token_transaction_vout,omitempty"`
+	SpentTokenTransactionVout   uint32                 `protobuf:"varint,3,opt,name=spent_token_transaction_vout,json=spentTokenTransactionVout,proto3" json:"spent_token_transaction_vout,omitempty"`
+	SpentOwnershipSignature     []byte                 `protobuf:"bytes,4,opt,name=spent_ownership_signature,json=spentOwnershipSignature,proto3" json:"spent_ownership_signature,omitempty"`
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
+}
+
+func (x *OutputToSpend) Reset() {
+	*x = OutputToSpend{}
+	mi := &file_spark_token_internal_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OutputToSpend) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OutputToSpend) ProtoMessage() {}
+
+func (x *OutputToSpend) ProtoReflect() protoreflect.Message {
+	mi := &file_spark_token_internal_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OutputToSpend.ProtoReflect.Descriptor instead.
+func (*OutputToSpend) Descriptor() ([]byte, []int) {
+	return file_spark_token_internal_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *OutputToSpend) GetCreatedTokenTransactionHash() []byte {
+	if x != nil {
+		return x.CreatedTokenTransactionHash
+	}
+	return nil
+}
+
+func (x *OutputToSpend) GetCreatedTokenTransactionVout() uint32 {
+	if x != nil {
+		return x.CreatedTokenTransactionVout
+	}
+	return 0
+}
+
+func (x *OutputToSpend) GetSpentTokenTransactionVout() uint32 {
+	if x != nil {
+		return x.SpentTokenTransactionVout
+	}
+	return 0
+}
+
+func (x *OutputToSpend) GetSpentOwnershipSignature() []byte {
+	if x != nil {
+		return x.SpentOwnershipSignature
+	}
+	return nil
+}
+
 var File_spark_token_internal_proto protoreflect.FileDescriptor
 
 const file_spark_token_internal_proto_rawDesc = "" +
@@ -546,15 +622,21 @@ const file_spark_token_internal_proto_rawDesc = "" +
 	"\fsecret_share\x18\x02 \x01(\fR\vsecretShare\"\xa0\x01\n" +
 	"\x18OperatorRevocationShares\x12H\n" +
 	"\x1coperator_identity_public_key\x18\x01 \x01(\fB\a\xfaB\x04z\x02h!R\x19operatorIdentityPublicKey\x12:\n" +
-	"\x06shares\x18\x02 \x03(\v2\".spark_token.RevocationSecretShareR\x06shares\"\xd6\x03\n" +
+	"\x06shares\x18\x02 \x03(\v2\".spark_token.RevocationSecretShareR\x06shares\"\x9c\x04\n" +
 	"&ExchangeRevocationSecretsSharesRequest\x12U\n" +
 	"\x17final_token_transaction\x18\x01 \x01(\v2\x1d.spark_token.TokenTransactionR\x15finalTokenTransaction\x12H\n" +
 	"\x1cfinal_token_transaction_hash\x18\x02 \x01(\fB\a\xfaB\x04z\x02h R\x19finalTokenTransactionHash\x12q\n" +
 	"\x1foperator_transaction_signatures\x18\x03 \x03(\v2).spark_token.OperatorTransactionSignatureR\x1doperatorTransactionSignatures\x12N\n" +
 	"\x0foperator_shares\x18\x04 \x03(\v2%.spark_token.OperatorRevocationSharesR\x0eoperatorShares\x12H\n" +
-	"\x1coperator_identity_public_key\x18\x05 \x01(\fB\a\xfaB\x04z\x02h!R\x19operatorIdentityPublicKey\"\x8a\x01\n" +
+	"\x1coperator_identity_public_key\x18\x05 \x01(\fB\a\xfaB\x04z\x02h!R\x19operatorIdentityPublicKey\x12D\n" +
+	"\x10outputs_to_spend\x18\x06 \x03(\v2\x1a.spark_token.OutputToSpendR\x0eoutputsToSpend\"\x8a\x01\n" +
 	"'ExchangeRevocationSecretsSharesResponse\x12_\n" +
-	"\x18received_operator_shares\x18\x01 \x03(\v2%.spark_token.OperatorRevocationSharesR\x16receivedOperatorShares2\xbd\x03\n" +
+	"\x18received_operator_shares\x18\x01 \x03(\v2%.spark_token.OperatorRevocationSharesR\x16receivedOperatorShares\"\xaa\x02\n" +
+	"\rOutputToSpend\x12L\n" +
+	"\x1ecreated_token_transaction_hash\x18\x01 \x01(\fB\a\xfaB\x04z\x02h R\x1bcreatedTokenTransactionHash\x12C\n" +
+	"\x1ecreated_token_transaction_vout\x18\x02 \x01(\rR\x1bcreatedTokenTransactionVout\x12?\n" +
+	"\x1cspent_token_transaction_vout\x18\x03 \x01(\rR\x19spentTokenTransactionVout\x12E\n" +
+	"\x19spent_ownership_signature\x18\x04 \x01(\fB\t\xfaB\x06z\x04\x10@\x18IR\x17spentOwnershipSignature2\xbd\x03\n" +
 	"\x19SparkTokenInternalService\x12h\n" +
 	"\x13prepare_transaction\x12&.spark_token.PrepareTransactionRequest\x1a'.spark_token.PrepareTransactionResponse\"\x00\x12\xa1\x01\n" +
 	"(sign_token_transaction_from_coordination\x128.spark_token.SignTokenTransactionFromCoordinationRequest\x1a9.spark_token.SignTokenTransactionFromCoordinationResponse\"\x00\x12\x91\x01\n" +
@@ -572,7 +654,7 @@ func file_spark_token_internal_proto_rawDescGZIP() []byte {
 	return file_spark_token_internal_proto_rawDescData
 }
 
-var file_spark_token_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_spark_token_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_spark_token_internal_proto_goTypes = []any{
 	(*PrepareTransactionRequest)(nil),                    // 0: spark_token.PrepareTransactionRequest
 	(*PrepareTransactionResponse)(nil),                   // 1: spark_token.PrepareTransactionResponse
@@ -583,31 +665,33 @@ var file_spark_token_internal_proto_goTypes = []any{
 	(*OperatorRevocationShares)(nil),                     // 6: spark_token.OperatorRevocationShares
 	(*ExchangeRevocationSecretsSharesRequest)(nil),       // 7: spark_token.ExchangeRevocationSecretsSharesRequest
 	(*ExchangeRevocationSecretsSharesResponse)(nil),      // 8: spark_token.ExchangeRevocationSecretsSharesResponse
-	(*spark_token.TokenTransaction)(nil),                 // 9: spark_token.TokenTransaction
-	(*spark_token.SignatureWithIndex)(nil),               // 10: spark_token.SignatureWithIndex
-	(*spark_token.InputTtxoSignaturesPerOperator)(nil),   // 11: spark_token.InputTtxoSignaturesPerOperator
+	(*OutputToSpend)(nil),                                // 9: spark_token.OutputToSpend
+	(*spark_token.TokenTransaction)(nil),                 // 10: spark_token.TokenTransaction
+	(*spark_token.SignatureWithIndex)(nil),               // 11: spark_token.SignatureWithIndex
+	(*spark_token.InputTtxoSignaturesPerOperator)(nil),   // 12: spark_token.InputTtxoSignaturesPerOperator
 }
 var file_spark_token_internal_proto_depIdxs = []int32{
-	9,  // 0: spark_token.PrepareTransactionRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
-	10, // 1: spark_token.PrepareTransactionRequest.token_transaction_signatures:type_name -> spark_token.SignatureWithIndex
-	9,  // 2: spark_token.SignTokenTransactionFromCoordinationRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
-	11, // 3: spark_token.SignTokenTransactionFromCoordinationRequest.input_ttxo_signatures_per_operator:type_name -> spark_token.InputTtxoSignaturesPerOperator
+	10, // 0: spark_token.PrepareTransactionRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
+	11, // 1: spark_token.PrepareTransactionRequest.token_transaction_signatures:type_name -> spark_token.SignatureWithIndex
+	10, // 2: spark_token.SignTokenTransactionFromCoordinationRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
+	12, // 3: spark_token.SignTokenTransactionFromCoordinationRequest.input_ttxo_signatures_per_operator:type_name -> spark_token.InputTtxoSignaturesPerOperator
 	5,  // 4: spark_token.OperatorRevocationShares.shares:type_name -> spark_token.RevocationSecretShare
-	9,  // 5: spark_token.ExchangeRevocationSecretsSharesRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
+	10, // 5: spark_token.ExchangeRevocationSecretsSharesRequest.final_token_transaction:type_name -> spark_token.TokenTransaction
 	4,  // 6: spark_token.ExchangeRevocationSecretsSharesRequest.operator_transaction_signatures:type_name -> spark_token.OperatorTransactionSignature
 	6,  // 7: spark_token.ExchangeRevocationSecretsSharesRequest.operator_shares:type_name -> spark_token.OperatorRevocationShares
-	6,  // 8: spark_token.ExchangeRevocationSecretsSharesResponse.received_operator_shares:type_name -> spark_token.OperatorRevocationShares
-	0,  // 9: spark_token.SparkTokenInternalService.prepare_transaction:input_type -> spark_token.PrepareTransactionRequest
-	2,  // 10: spark_token.SparkTokenInternalService.sign_token_transaction_from_coordination:input_type -> spark_token.SignTokenTransactionFromCoordinationRequest
-	7,  // 11: spark_token.SparkTokenInternalService.exchange_revocation_secrets_shares:input_type -> spark_token.ExchangeRevocationSecretsSharesRequest
-	1,  // 12: spark_token.SparkTokenInternalService.prepare_transaction:output_type -> spark_token.PrepareTransactionResponse
-	3,  // 13: spark_token.SparkTokenInternalService.sign_token_transaction_from_coordination:output_type -> spark_token.SignTokenTransactionFromCoordinationResponse
-	8,  // 14: spark_token.SparkTokenInternalService.exchange_revocation_secrets_shares:output_type -> spark_token.ExchangeRevocationSecretsSharesResponse
-	12, // [12:15] is the sub-list for method output_type
-	9,  // [9:12] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	9,  // 8: spark_token.ExchangeRevocationSecretsSharesRequest.outputs_to_spend:type_name -> spark_token.OutputToSpend
+	6,  // 9: spark_token.ExchangeRevocationSecretsSharesResponse.received_operator_shares:type_name -> spark_token.OperatorRevocationShares
+	0,  // 10: spark_token.SparkTokenInternalService.prepare_transaction:input_type -> spark_token.PrepareTransactionRequest
+	2,  // 11: spark_token.SparkTokenInternalService.sign_token_transaction_from_coordination:input_type -> spark_token.SignTokenTransactionFromCoordinationRequest
+	7,  // 12: spark_token.SparkTokenInternalService.exchange_revocation_secrets_shares:input_type -> spark_token.ExchangeRevocationSecretsSharesRequest
+	1,  // 13: spark_token.SparkTokenInternalService.prepare_transaction:output_type -> spark_token.PrepareTransactionResponse
+	3,  // 14: spark_token.SparkTokenInternalService.sign_token_transaction_from_coordination:output_type -> spark_token.SignTokenTransactionFromCoordinationResponse
+	8,  // 15: spark_token.SparkTokenInternalService.exchange_revocation_secrets_shares:output_type -> spark_token.ExchangeRevocationSecretsSharesResponse
+	13, // [13:16] is the sub-list for method output_type
+	10, // [10:13] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_spark_token_internal_proto_init() }
@@ -621,7 +705,7 @@ func file_spark_token_internal_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_spark_token_internal_proto_rawDesc), len(file_spark_token_internal_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

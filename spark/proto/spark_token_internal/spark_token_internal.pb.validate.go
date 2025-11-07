@@ -1129,6 +1129,40 @@ func (m *ExchangeRevocationSecretsSharesRequest) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	for idx, item := range m.GetOutputsToSpend() {
+		_, _ = idx, item
+
+		if all {
+			switch v := interface{}(item).(type) {
+			case interface{ ValidateAll() error }:
+				if err := v.ValidateAll(); err != nil {
+					errors = append(errors, ExchangeRevocationSecretsSharesRequestValidationError{
+						field:  fmt.Sprintf("OutputsToSpend[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			case interface{ Validate() error }:
+				if err := v.Validate(); err != nil {
+					errors = append(errors, ExchangeRevocationSecretsSharesRequestValidationError{
+						field:  fmt.Sprintf("OutputsToSpend[%v]", idx),
+						reason: "embedded message failed validation",
+						cause:  err,
+					})
+				}
+			}
+		} else if v, ok := interface{}(item).(interface{ Validate() error }); ok {
+			if err := v.Validate(); err != nil {
+				return ExchangeRevocationSecretsSharesRequestValidationError{
+					field:  fmt.Sprintf("OutputsToSpend[%v]", idx),
+					reason: "embedded message failed validation",
+					cause:  err,
+				}
+			}
+		}
+
+	}
+
 	if len(errors) > 0 {
 		return ExchangeRevocationSecretsSharesRequestMultiError(errors)
 	}
@@ -1350,3 +1384,129 @@ var _ interface {
 	Cause() error
 	ErrorName() string
 } = ExchangeRevocationSecretsSharesResponseValidationError{}
+
+// Validate checks the field values on OutputToSpend with the rules defined in
+// the proto definition for this message. If any rules are violated, the first
+// error encountered is returned, or nil if there are no violations.
+func (m *OutputToSpend) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on OutputToSpend with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// result is a list of violation errors wrapped in OutputToSpendMultiError, or
+// nil if none found.
+func (m *OutputToSpend) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *OutputToSpend) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(m.GetCreatedTokenTransactionHash()) != 32 {
+		err := OutputToSpendValidationError{
+			field:  "CreatedTokenTransactionHash",
+			reason: "value length must be 32 bytes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for CreatedTokenTransactionVout
+
+	// no validation rules for SpentTokenTransactionVout
+
+	if l := len(m.GetSpentOwnershipSignature()); l < 64 || l > 73 {
+		err := OutputToSpendValidationError{
+			field:  "SpentOwnershipSignature",
+			reason: "value length must be between 64 and 73 bytes, inclusive",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return OutputToSpendMultiError(errors)
+	}
+
+	return nil
+}
+
+// OutputToSpendMultiError is an error wrapping multiple validation errors
+// returned by OutputToSpend.ValidateAll() if the designated constraints
+// aren't met.
+type OutputToSpendMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m OutputToSpendMultiError) Error() string {
+	msgs := make([]string, 0, len(m))
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m OutputToSpendMultiError) AllErrors() []error { return m }
+
+// OutputToSpendValidationError is the validation error returned by
+// OutputToSpend.Validate if the designated constraints aren't met.
+type OutputToSpendValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e OutputToSpendValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e OutputToSpendValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e OutputToSpendValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e OutputToSpendValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e OutputToSpendValidationError) ErrorName() string { return "OutputToSpendValidationError" }
+
+// Error satisfies the builtin error interface
+func (e OutputToSpendValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sOutputToSpend.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = OutputToSpendValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = OutputToSpendValidationError{}

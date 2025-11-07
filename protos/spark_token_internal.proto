@@ -78,9 +78,20 @@ message ExchangeRevocationSecretsSharesRequest {
     // The revocation secret shares this SO is revealing, grouped by operator
     repeated OperatorRevocationShares operator_shares = 4;
     bytes operator_identity_public_key = 5 [(validate.rules).bytes.len = 33];
+    repeated OutputToSpend outputs_to_spend = 6;
 }
 
 message ExchangeRevocationSecretsSharesResponse {
     // The revocation secret shares from other SOs, grouped by operator
     repeated OperatorRevocationShares received_operator_shares = 1;
+}
+
+message OutputToSpend {
+    bytes created_token_transaction_hash = 1 [(validate.rules).bytes.len = 32];
+    uint32 created_token_transaction_vout = 2;
+    uint32 spent_token_transaction_vout = 3;
+    bytes spent_ownership_signature = 4 [
+        (validate.rules).bytes.min_len = 64,
+        (validate.rules).bytes.max_len = 73
+    ];
 }
