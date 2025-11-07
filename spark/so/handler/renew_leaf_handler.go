@@ -1494,7 +1494,7 @@ func (h *RenewLeafHandler) sendFinalizeNodeTimelockGossipMessage(ctx context.Con
 	}
 	// Create and send gossip message
 	sendGossipHandler := NewSendGossipHandler(h.config)
-	_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
+	_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
 		Message: &pbgossip.GossipMessage_FinalizeNodeTimelock{
 			FinalizeNodeTimelock: &pbgossip.GossipMessageFinalizeRenewNodeTimelock{
 				SplitNode: splitNodeInternal,

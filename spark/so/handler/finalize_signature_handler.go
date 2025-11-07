@@ -175,7 +175,7 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 		}
 
 		logger.Info("Sending finalize tree creation gossip message")
-		_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
+		_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
 			Message: &pbgossip.GossipMessage_FinalizeTreeCreation{
 				FinalizeTreeCreation: &pbgossip.GossipMessageFinalizeTreeCreation{
 					InternalNodes: internalNodes,
@@ -193,7 +193,7 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 
 		logger.Info("Sending finalize transfer gossip message")
 
-		_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
+		_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
 			Message: &pbgossip.GossipMessage_FinalizeTransfer{
 				FinalizeTransfer: &pbgossip.GossipMessageFinalizeTransfer{
 					TransferId:          transferID,

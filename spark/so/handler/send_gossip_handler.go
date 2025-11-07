@@ -97,6 +97,39 @@ func (h *SendGossipHandler) CreateAndSendGossipMessage(ctx context.Context, goss
 	return gossip, nil
 }
 
+func (h *SendGossipHandler) CreateCommitAndSendGossipMessage(ctx context.Context, gossipMsg *pbgossip.GossipMessage, participants []string) (*ent.Gossip, error) {
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+	}
+	messageBytes, err := proto.Marshal(gossipMsg)
+	if err != nil {
+		return nil, err
+	}
+	receipts := common.NewBitMap(len(participants)).Bytes()
+	gossip, err := db.Gossip.Create().SetMessage(messageBytes).SetParticipants(participants).SetReceipts(receipts).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = ent.DbCommit(ctx)
+	if err != nil {
+		return nil, err
+	}
+	db, err = ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
+	}
+	gossip, err = db.Gossip.Get(ctx, gossip.ID)
+	if err != nil {
+		return nil, err
+	}
+	gossip, err = h.SendGossipMessage(ctx, gossip)
+	if err != nil {
+		return nil, err
+	}
+	return gossip, nil
+}
+
 func (h *SendGossipHandler) SendGossipMessage(ctx context.Context, gossip *ent.Gossip) (*ent.Gossip, error) {
 	logger := logging.GetLoggerFromContext(ctx)
 	logger.Sugar().Infof("Sending gossip message %s", gossip.ID.String())
