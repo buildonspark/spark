@@ -216,6 +216,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	if err != nil {
 		return nil, fmt.Errorf("unable to get database transaction: %w", err)
 	}
+	db := entTx.Client()
 	transferUUID, err := uuid.Parse(req.TransferId)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse transfer_id as a uuid %s: %w", req.TransferId, err)
@@ -459,7 +460,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 			return nil, fmt.Errorf("unable to load transfer: %w", err)
 		}
 
-		db, err := ent.GetDbFromContext(ctx)
+		db, err = ent.GetDbFromContext(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to get database transaction: %w", err)
 		}
@@ -2044,7 +2045,6 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	}
 
 	// Store key tweaks
-	updates := make(map[uuid.UUID][]byte, len(req.LeavesToReceive))
 	for _, leafTweak := range req.LeavesToReceive {
 		leaf, exists := leafMap[leafTweak.LeafId]
 		if !exists {
@@ -2054,10 +2054,10 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		if err != nil {
 			return fmt.Errorf("unable to marshal leaf tweak: %w", err)
 		}
-		updates[leaf.ID] = leafTweakBytes
-	}
-	if _, err := ent.BatchSetTransferLeafKeyTweaks(ctx, updates); err != nil {
-		return fmt.Errorf("unable to batch update leaf tweaks: %w", err)
+		_, err = leaf.Update().SetKeyTweak(leafTweakBytes).Save(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to update leaf %s: %w", leafTweak.LeafId, err)
+		}
 	}
 
 	// Update transfer status
@@ -2201,18 +2201,10 @@ func (h *TransferHandler) revertClaimTransfer(ctx context.Context, transfer *ent
 	if err != nil {
 		return fmt.Errorf("unable to update transfer status %v: %w", transfer.ID, err)
 	}
-	// Batch clear key_tweak for all transfer leaves in a single UPDATE.
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return fmt.Errorf("unable to get db: %w", err)
-	}
-	ids := make([]uuid.UUID, 0, len(transferLeaves))
-	for _, tl := range transferLeaves {
-		ids = append(ids, tl.ID)
-	}
-	if len(ids) > 0 {
-		if _, err := db.TransferLeaf.Update().Where(enttransferleaf.IDIn(ids...)).ClearKeyTweak().Save(ctx); err != nil {
-			return fmt.Errorf("unable to batch clear key tweak for transfer leaves: %w", err)
+	for _, leaf := range transferLeaves {
+		_, err := leaf.Update().SetKeyTweak(nil).Save(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to update leaf %v: %w", leaf.ID, err)
 		}
 	}
 	return nil
@@ -2316,21 +2308,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		return nil, fmt.Errorf("cannot claim transfer %s, receiver identity public key mismatch", req.TransferId)
 	}
 
-	// For cooperative exit flows, ensure the exit transaction is sufficiently confirmed
-	// before proceeding from the pending state to signing refunds.
-	if transfer.Type == st.TransferTypeCooperativeExit && transfer.Status == st.TransferStatusSenderKeyTweakPending {
-		db, err := ent.GetDbFromContext(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
-		}
-		if err := checkCoopExitTxBroadcasted(ctx, db, transfer); err != nil {
-			return nil, err
-		}
-	}
-
 	switch transfer.Status {
-	case st.TransferStatusSenderKeyTweakPending:
-		// Allow starting from pending; we'll settle the receiver key tweak below
 	case st.TransferStatusReceiverKeyTweaked:
 	case st.TransferStatusReceiverRefundSigned:
 	case st.TransferStatusReceiverKeyTweakLocked:
@@ -2673,8 +2651,6 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 		if err != nil {
 			return fmt.Errorf("unable to get leaves from transfer %s: %w", req.TransferId, err)
 		}
-		// Track successful leaf IDs to clear key_tweak in a single batch.
-		clearedIDs := make([]uuid.UUID, 0, len(leaves))
 		for _, leaf := range leaves {
 			treeNode := leaf.Edges.Leaf
 			if treeNode == nil {
@@ -2690,16 +2666,8 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			if err := h.claimLeafTweakKey(ctx, treeNode, keyTweakProto, transfer.ReceiverIdentityPubkey); err != nil {
 				return fmt.Errorf("unable to claim leaf tweak key for leaf %v: %w", leaf.ID, err)
 			}
-			clearedIDs = append(clearedIDs, leaf.ID)
-		}
-		// Batch clear key_tweak for all successfully processed leaves.
-		db, err := ent.GetDbFromContext(ctx)
-		if err != nil {
-			return fmt.Errorf("unable to get db: %w", err)
-		}
-		if len(clearedIDs) > 0 {
-			if _, err := db.TransferLeaf.Update().Where(enttransferleaf.IDIn(clearedIDs...)).ClearKeyTweak().Save(ctx); err != nil {
-				return fmt.Errorf("unable to batch clear leaf key tweaks: %w", err)
+			if _, err := leaf.Update().SetKeyTweak(nil).Save(ctx); err != nil {
+				return fmt.Errorf("unable to update leaf key tweak %v: %w", leaf.ID, err)
 			}
 		}
 		_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweakApplied).Save(ctx)
@@ -2766,7 +2734,6 @@ func (h *TransferHandler) setSoCoordinatorKeyTweaks(ctx context.Context, transfe
 		return fmt.Errorf("failed to query transfer leaves: %w", err)
 	}
 	// For each transfer leaf, set its key tweak if there's a matching entry in the key tweak map
-	inputs := make([]ent.TransferLeafKeyTweakUpdateInput, 0, len(transferLeaves))
 	for _, transferLeaf := range transferLeaves {
 		leaf, err := transferLeaf.QueryLeaf().Only(ctx)
 		if err != nil {
@@ -2777,17 +2744,10 @@ func (h *TransferHandler) setSoCoordinatorKeyTweaks(ctx context.Context, transfe
 			if err != nil {
 				return fmt.Errorf("failed to marshal key tweak for leaf %s: %w", leaf.ID, err)
 			}
-			inputs = append(inputs, ent.TransferLeafKeyTweakUpdateInput{
-				ID:           transferLeaf.ID,
-				KeyTweak:     keyTweakBinary,
-				Signature:    keyTweak.Signature,
-				SecretCipher: keyTweak.SecretCipher,
-			})
-		}
-	}
-	if len(inputs) > 0 {
-		if _, err := ent.BatchUpdateTransferLeafKeyTweaks(ctx, inputs); err != nil {
-			return fmt.Errorf("failed to batch set key tweaks for transfer leaves: %w", err)
+			_, err = transferLeaf.Update().SetKeyTweak(keyTweakBinary).SetSecretCipher(keyTweak.SecretCipher).SetSignature(keyTweak.Signature).Save(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to set key tweak for transfer leaf %s: %w", transferLeaf.ID, err)
+			}
 		}
 	}
 	return nil

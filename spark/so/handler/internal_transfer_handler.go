@@ -315,7 +315,6 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 	if transfer.Status != st.TransferStatusSenderInitiated {
 		return fmt.Errorf("transfer %s is in state %s; expected sender initiated status", req.TransferId, transfer.Status)
 	}
-	inputs := make([]ent.TransferLeafKeyTweakUpdateInput, 0, len(leaves))
 	for _, leaf := range leaves {
 		transferLeaf, err := transfer.QueryTransferLeaves().Where(
 			enttransferleaf.HasLeafWith(treenode.IDEQ(leaf.ID))).WithTransfer().Only(ctx)
@@ -327,17 +326,10 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 			if err != nil {
 				return fmt.Errorf("unable to marshal leaf tweak for leaf %s: %w", leaf.ID.String(), err)
 			}
-			inputs = append(inputs, ent.TransferLeafKeyTweakUpdateInput{
-				ID:           transferLeaf.ID,
-				KeyTweak:     leafTweakBinary,
-				Signature:    leafTweak.Signature,
-				SecretCipher: leafTweak.SecretCipher,
-			})
-		}
-	}
-	if len(inputs) > 0 {
-		if _, err := ent.BatchUpdateTransferLeafKeyTweaks(ctx, inputs); err != nil {
-			return fmt.Errorf("unable to batch update transfer leaves key tweaks: %w", err)
+			_, err = transferLeaf.Update().SetKeyTweak(leafTweakBinary).SetSignature(leafTweak.Signature).SetSecretCipher(leafTweak.SecretCipher).Save(ctx)
+			if err != nil {
+				return fmt.Errorf("unable to update transfer leaf %s for leaf %s: %w", transferLeaf.ID.String(), leaf.ID.String(), err)
+			}
 		}
 	}
 	_, err = transfer.Update().SetStatus(st.TransferStatusSenderKeyTweakPending).Save(ctx)
