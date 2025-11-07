@@ -25,8 +25,14 @@ type dbStatsMap struct {
 }
 
 type dbStats struct {
-	queryCount    int
-	queryDuration time.Duration
+	queryCount     int
+	queryDuration  time.Duration
+	insertCount    int
+	insertDuration time.Duration
+	updateCount    int
+	updateDuration time.Duration
+	deleteCount    int
+	deleteDuration time.Duration
 }
 
 type serviceStatsMap struct {
@@ -64,6 +70,55 @@ func ObserveQuery(ctx context.Context, table string, duration time.Duration) {
 
 	statsMap.stats[table].queryCount++
 	statsMap.stats[table].queryDuration += duration
+}
+
+func ObserveInsert(ctx context.Context, table string, duration time.Duration) {
+	statsMap, ok := ctx.Value(dbStatsKey).(*dbStatsMap)
+	if !ok {
+		return
+	}
+	statsMap.mu.Lock()
+	defer statsMap.mu.Unlock()
+
+	if _, exists := statsMap.stats[table]; !exists {
+		statsMap.stats[table] = new(dbStats)
+	}
+
+	statsMap.stats[table].insertCount++
+	statsMap.stats[table].insertDuration += duration
+
+}
+
+func ObserveUpdate(ctx context.Context, table string, duration time.Duration) {
+	statsMap, ok := ctx.Value(dbStatsKey).(*dbStatsMap)
+	if !ok {
+		return
+	}
+	statsMap.mu.Lock()
+	defer statsMap.mu.Unlock()
+
+	if _, exists := statsMap.stats[table]; !exists {
+		statsMap.stats[table] = new(dbStats)
+	}
+
+	statsMap.stats[table].updateCount++
+	statsMap.stats[table].updateDuration += duration
+}
+
+func ObserveDelete(ctx context.Context, table string, duration time.Duration) {
+	statsMap, ok := ctx.Value(dbStatsKey).(*dbStatsMap)
+	if !ok {
+		return
+	}
+	statsMap.mu.Lock()
+	defer statsMap.mu.Unlock()
+
+	if _, exists := statsMap.stats[table]; !exists {
+		statsMap.stats[table] = new(dbStats)
+	}
+
+	statsMap.stats[table].deleteCount++
+	statsMap.stats[table].deleteDuration += duration
 }
 
 func ObserveServiceCall(ctx context.Context, method string, duration time.Duration) {

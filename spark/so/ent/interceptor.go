@@ -102,7 +102,9 @@ func DatabaseStatsInterceptor(threshold time.Duration) ent.Interceptor {
 func DatabaseOperationsHook() ent.Hook {
 	return func(next ent.Mutator) ent.Mutator {
 		return ent.MutateFunc(func(ctx context.Context, mutation ent.Mutation) (ent.Value, error) {
+			start := time.Now()
 			result, err := next.Mutate(ctx, mutation)
+			duration := time.Since(start)
 
 			// Track mutation metrics
 			tableName := extractTableName(mutation.Type())
@@ -114,10 +116,13 @@ func DatabaseOperationsHook() ent.Hook {
 			op := mutation.Op()
 			switch op {
 			case OpCreate:
+				logging.ObserveInsert(ctx, tableName, duration)
 				entInsertCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
 			case OpUpdate, OpUpdateOne:
+				logging.ObserveUpdate(ctx, tableName, duration)
 				entUpdateCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
 			case OpDelete, OpDeleteOne:
+				logging.ObserveDelete(ctx, tableName, duration)
 				entDeleteCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
 			}
 
