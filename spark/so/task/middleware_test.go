@@ -121,7 +121,7 @@ func TestDatabaseMiddleware_TestCommitWhenTaskSuccessful(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 
 	dbClient := db.NewTestSQLiteClient(t)
-	dbSession := db.NewSession(t.Context(), dbClient, knobs.NewEmptyFixedKnobs())
+	dbSession := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
 
 	// Seed a transaction in the session that we can verify is committed.
 	dbTx, err := dbSession.GetOrBeginTx(t.Context())
@@ -191,7 +191,7 @@ func TestDatabaseMiddleware_TestRollbackWhenTaskUnsuccessful(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 
 	dbClient := db.NewTestSQLiteClient(t)
-	dbSession := db.NewSession(t.Context(), dbClient, knobs.NewEmptyFixedKnobs())
+	dbSession := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
 
 	// Seed a transaction in the session that we can verify is committed.
 	dbTx, err := dbSession.GetOrBeginTx(t.Context())
@@ -260,7 +260,7 @@ func TestDatabaseMiddleware_TestTaskCanCommitTransaction(t *testing.T) {
 	config := sparktesting.TestConfig(t)
 
 	dbClient := db.NewTestSQLiteClient(t)
-	dbSession := db.NewSession(t.Context(), dbClient, knobs.NewEmptyFixedKnobs())
+	dbSession := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs()).NewSession(t.Context())
 
 	task := BaseTaskSpec{
 		Name:    "Test",

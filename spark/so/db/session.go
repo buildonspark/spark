@@ -12,10 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	soerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/knobs"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric"
-	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
 
@@ -23,91 +20,6 @@ var (
 	ErrTxBeginTimeout   = soerrors.UnavailableDatabaseTimeout(fmt.Errorf("the service is currently unavailable, please try again later"))
 	DefaultNewTxTimeout = 15 * time.Second
 )
-
-var (
-	// Metrics
-	txDurationHistogram metric.Float64Histogram
-	txCounter           metric.Int64Counter
-	txActiveGauge       metric.Int64UpDownCounter
-
-	// Common attribute values
-	attrOperationCommit   = attribute.String("operation", "commit")
-	attrOperationRollback = attribute.String("operation", "rollback")
-	attrOperationBegin    = attribute.String("operation", "begin")
-	attrStatusSuccess     = attribute.String("status", "success")
-	attrStatusError       = attribute.String("status", "error")
-
-	// Initialize metrics
-	_ = initMetrics()
-)
-
-func initMetrics() error {
-	meter := otel.GetMeterProvider().Meter("spark.db")
-
-	var err error
-	txDurationHistogram, err = meter.Float64Histogram(
-		"db_transaction_duration",
-		metric.WithDescription("Database transaction duration in milliseconds"),
-		metric.WithUnit("ms"),
-		metric.WithExplicitBucketBoundaries(
-			0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1,
-			5, 10, 25, 50, 100, 250, 500,
-			1000, 2500, 5000, 10000, 25000, 50000, 100000,
-		),
-	)
-	if err != nil {
-		return err
-	}
-
-	txCounter, err = meter.Int64Counter(
-		"db_transactions_total",
-		metric.WithDescription("Total number of database transactions"),
-	)
-	if err != nil {
-		return err
-	}
-
-	txActiveGauge, err = meter.Int64UpDownCounter(
-		"db_transactions_active",
-		metric.WithDescription("Number of currently active database transactions"),
-	)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// addTraceEvent adds a trace event if a span is available
-func addTraceEvent(ctx context.Context, operation string, duration float64, err error) {
-	span := trace.SpanFromContext(ctx)
-	if span != nil {
-		eventName := "db.transaction." + operation
-		span.AddEvent(eventName, trace.WithAttributes(
-			getTraceAttributes(operation, duration, err)...,
-		))
-	}
-}
-
-// getTraceAttributes returns the attributes for trace events
-// operation: the operation type (begin, commit, rollback)
-// duration: duration in seconds (0 for operations without duration)
-// err: error if the operation failed - optional (status is inferred from this)
-func getTraceAttributes(operation string, duration float64, err error) []attribute.KeyValue {
-	attrs := []attribute.KeyValue{
-		attribute.String("db.transaction.operation", operation),
-	}
-	if duration > 0 {
-		attrs = append(attrs, attribute.Float64("db.transaction.duration_seconds", duration))
-	}
-
-	if err != nil {
-		attrs = append(attrs, attrStatusError, attribute.String("error", err.Error()))
-	}
-	attrs = append(attrs, attrStatusSuccess)
-
-	return attrs
-}
 
 // SessionFactory is an interface for creating a new Session.
 type SessionFactory interface {
@@ -166,7 +78,19 @@ func WithMetricAttributes(attrs []attribute.KeyValue) SessionOption {
 }
 
 func (f *DefaultSessionFactory) NewSession(ctx context.Context, opts ...SessionOption) ent.Session {
-	return NewSession(ctx, f.dbClient, f.knobs, opts...)
+	sessionConfig := newSessionConfig(opts...)
+	baseProvider := ent.NewEntClientTxProvider(f.dbClient)
+	metricsProvider := NewMetricsTxProvider(baseProvider, sessionConfig.metricAttrs)
+	provider := NewTxProviderWithTimeout(metricsProvider, sessionConfig.txBeginTimeout)
+
+	return &Session{
+		ctx:       ctx,
+		knobs:     f.knobs,
+		dbClient:  f.dbClient,
+		provider:  provider,
+		currentTx: nil,
+		mu:        sync.Mutex{},
+	}
 }
 
 // A Session manages a transaction over the lifetime of a request or worker. It
@@ -174,8 +98,6 @@ func (f *DefaultSessionFactory) NewSession(ctx context.Context, opts ...SessionO
 // subsequent requests until the transaction is committed or rolled back. Once the transaction
 // is finished, it is cleared so a new one can begin the next time `GetOrBeginTx` is called.
 type Session struct {
-	sessionConfig
-
 	// ctx is the context for this session. It is used to for creating new transactions within the
 	// session to ensure that the session can clean those transactions up even if the context in which
 	// the caller is operating is cancelled.
@@ -196,28 +118,6 @@ type Session struct {
 	// these notifications are discarded.
 	currentNotifications *ent.BufferedNotifier
 	currentIsDirty       bool
-	// currentStartTime is the time when the current transaction was started.
-	currentStartTime time.Time
-}
-
-// NewSession creates a new Session with a new transactions provided
-// by an ent.ClientTxProvider wrapping the provided `ent.Client`.
-func NewSession(ctx context.Context, dbClient *ent.Client, knobs knobs.Knobs, opts ...SessionOption) *Session {
-	sessionConfig := newSessionConfig(opts...)
-	provider := NewTxProviderWithTimeout(
-		ent.NewEntClientTxProvider(dbClient),
-		sessionConfig.txBeginTimeout,
-	)
-
-	return &Session{
-		sessionConfig: sessionConfig,
-		ctx:           ctx,
-		knobs:         knobs,
-		dbClient:      dbClient,
-		provider:      provider,
-		currentTx:     nil,
-		mu:            sync.Mutex{},
-	}
 }
 
 // GetOrBeginTx retrieves the current transaction if it exists, otherwise it begins a new one.
@@ -230,18 +130,11 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 	if s.currentTx == nil {
 		logger := logging.GetLoggerFromContext(ctx)
 
-		txActiveGauge.Add(ctx, 1, metric.WithAttributes(s.getGaugeAttributes(attrOperationBegin)...))
-
 		// Important! We need to use the context from the session, not the one passed in, because we want
 		// to ensure the transaction can be cleaned up even if the context passed in is cancelled.
 		tx, err := s.provider.GetOrBeginTx(s.ctx)
 		if err != nil {
 			logger.Error("Failed to create new transaction", zap.Error(err))
-			// Decrement on error
-			txActiveGauge.Add(ctx, -1, metric.WithAttributes(s.getGaugeAttributes(attrOperationBegin)...))
-
-			addTraceEvent(ctx, "begin", 0, err)
-
 			return nil, err
 		}
 
@@ -250,17 +143,11 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 		s.currentTx = tx
 		s.currentNotifications = &notifier
 		s.currentIsDirty = false
-		s.currentStartTime = time.Now()
-
-		addTraceEvent(ctx, "begin", 0, nil)
 
 		tx.OnCommit(func(fn ent.Committer) ent.Committer {
 			return ent.CommitFunc(func(ctx context.Context, tx *ent.Tx) error {
 				s.mu.Lock()
 				defer s.mu.Unlock()
-
-				duration := time.Since(s.currentStartTime).Seconds()
-				durationMs := duration * 1000
 
 				if !s.currentIsDirty && s.knobs.RolloutRandom(knobs.KnobDatabaseOnlyCommitDirty, 0) {
 					// Assume we will clear the state when we do a rollback. We should maybe just rollback but
@@ -269,21 +156,12 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				}
 
 				err := fn.Commit(ctx, tx)
-				var attrs []attribute.KeyValue
 				if err != nil {
 					logger.Error("Failed to commit transaction", zap.Error(err))
-					attrs = s.getOperationAttributes(attrOperationCommit, attrStatusError)
-					addTraceEvent(ctx, "commit", duration, err)
 				} else {
 					if s.currentNotifications.Flush(ctx) != nil {
 						logger.Error("Failed to flush notifications after commit", zap.Error(err))
 					}
-
-					attrs = s.getOperationAttributes(attrOperationCommit, attrStatusSuccess)
-					txDurationHistogram.Record(ctx, durationMs, metric.WithAttributes(attrs...))
-					txActiveGauge.Add(ctx, -1, metric.WithAttributes(s.getGaugeAttributes(attrOperationCommit)...))
-
-					addTraceEvent(ctx, "commit", duration, nil)
 				}
 
 				// Only set the current tx to nil if the transaction was committed successfully.
@@ -294,8 +172,6 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 					s.currentIsDirty = false
 				}
 
-				txCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
-
 				return err
 			})
 		})
@@ -304,22 +180,11 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				s.mu.Lock()
 				defer s.mu.Unlock()
 
-				duration := time.Since(s.currentStartTime).Seconds()
-
 				err := fn.Rollback(ctx, tx)
-				var attrs []attribute.KeyValue
 				if err != nil {
 					logger.Error("Failed to rollback transaction", zap.Error(err))
-					attrs = s.getOperationAttributes(attrOperationRollback, attrStatusError)
-					addTraceEvent(ctx, "rollback", duration, err)
-				} else {
-					attrs = s.getOperationAttributes(attrOperationRollback, attrStatusSuccess)
-					addTraceEvent(ctx, "rollback", duration, nil)
 				}
 
-				txDurationHistogram.Record(ctx, duration, metric.WithAttributes(attrs...))
-				txCounter.Add(ctx, 1, metric.WithAttributes(attrs...))
-				txActiveGauge.Add(ctx, -1, metric.WithAttributes(s.getGaugeAttributes(attrOperationRollback)...))
 				s.currentTx = nil
 				s.currentNotifications = nil
 				s.currentIsDirty = false
@@ -367,18 +232,6 @@ func (s *Session) Notify(ctx context.Context, n ent.Notification) error {
 	}
 
 	return s.currentNotifications.Notify(ctx, n)
-}
-
-// getGaugeAttributes returns the attributes for gauge operations
-func (s *Session) getGaugeAttributes(operationAttr attribute.KeyValue) []attribute.KeyValue {
-	return append([]attribute.KeyValue{operationAttr}, s.metricAttrs...)
-}
-
-// getOperationAttributes returns the attributes for a specific operation
-func (s *Session) getOperationAttributes(operationAttr attribute.KeyValue, statusAttr attribute.KeyValue) []attribute.KeyValue {
-	attrs := []attribute.KeyValue{operationAttr, statusAttr}
-	attrs = append(attrs, s.metricAttrs...)
-	return attrs
 }
 
 // ReadOnlySession is a simplified session for read-only database operations.
