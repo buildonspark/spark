@@ -2299,7 +2299,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		return nil, err
 	}
 
-	transfer, err := h.loadTransferNoUpdate(ctx, req.TransferId)
+	transfer, err := h.loadTransferForUpdate(ctx, req.TransferId)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load transfer %s: %w", req.TransferId, err)
 	}
