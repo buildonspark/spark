@@ -2,6 +2,7 @@ package tokens_test
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 	"testing"
 	"time"
@@ -781,69 +782,7 @@ func TestQueryTokenTransactionsOrdering(t *testing.T) {
 	})
 }
 
-func TestQueryTokenOutputsDateHeader(t *testing.T) {
-	issuerPrivKey := keys.GeneratePrivateKey()
-	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
-
-	err := testCoordinatedCreateNativeSparkTokenWithParams(t, config, sparkTokenCreationTestParams{
-		issuerPrivateKey: issuerPrivKey,
-		name:             "Date Header",
-		ticker:           "DATE",
-		maxSupply:        1000000,
-	})
-	require.NoError(t, err, "failed to create native spark token")
-
-	mintTransaction, _, _, err := createTestTokenMintTransactionTokenPb(t, config, issuerPrivKey.Public())
-	require.NoError(t, err, "failed to create mint transaction")
-
-	finalMintTx, err := wallet.BroadcastTokenTransfer(
-		t.Context(), config, mintTransaction, []keys.Private{issuerPrivKey},
-	)
-	require.NoError(t, err, "failed to broadcast mint transaction")
-
-	sparkConn, err := config.NewCoordinatorGRPCConnection()
-	require.NoError(t, err, "failed to establish gRPC connection")
-	defer sparkConn.Close()
-
-	token, err := wallet.AuthenticateWithConnection(t.Context(), config, sparkConn)
-	require.NoError(t, err, "failed to authenticate")
-	tmpCtx := wallet.ContextWithToken(t.Context(), token)
-
-	var header metadata.MD
-	tokenClient := tokenpb.NewSparkTokenServiceClient(sparkConn)
-
-	network, err := common.ProtoNetworkFromNetwork(config.Network)
-	require.NoError(t, err, "failed to convert network")
-
-	ownerPubKey := finalMintTx.TokenOutputs[0].OwnerPublicKey
-
-	response, err := tokenClient.QueryTokenOutputs(tmpCtx, &tokenpb.QueryTokenOutputsRequest{
-		OwnerPublicKeys:  [][]byte{ownerPubKey},
-		IssuerPublicKeys: [][]byte{issuerPrivKey.Public().Serialize()},
-		Network:          network,
-	}, grpc.Header(&header))
-
-	require.NoError(t, err, "failed to query token outputs")
-	require.NotNil(t, response, "response should not be nil")
-
-	dateHeaders := header.Get("date")
-	require.NotEmpty(t, dateHeaders, "date header should be present")
-	require.Len(t, dateHeaders, 1, "should have exactly one DATE header")
-
-	dateValue := dateHeaders[0]
-	require.NotEmpty(t, dateValue, "date header value should not be empty")
-
-	parsedTime, err := time.Parse(time.RFC1123, dateValue)
-	require.NoError(t, err, "date header should be in RFC1123 format")
-
-	now := time.Now()
-	timeDiff := now.Sub(parsedTime).Abs()
-	require.Less(t, timeDiff, 5*time.Second, "date header should be close to current time")
-
-	t.Logf("date header value: %s", dateValue)
-}
-
-func TestAllSparkTokenRPCsDateHeader(t *testing.T) {
+func TestAllSparkTokenRPCsTimestampHeaders(t *testing.T) {
 	issuerPrivKey := keys.GeneratePrivateKey()
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, issuerPrivKey)
 
@@ -881,7 +820,7 @@ func TestAllSparkTokenRPCsDateHeader(t *testing.T) {
 	ownerPubKey := finalMintTx.TokenOutputs[0].OwnerPublicKey
 	issuerPubKey := issuerPrivKey.Public().Serialize()
 
-	verifyDateHeader := func(t *testing.T, header metadata.MD, rpcName string) {
+	verifyTimestampHeaders := func(t *testing.T, header metadata.MD, rpcName string) {
 		dateHeaders := header.Get("date")
 		require.NotEmpty(t, dateHeaders, "%s: date header should be present", rpcName)
 		require.Len(t, dateHeaders, 1, "%s: should have exactly one date header", rpcName)
@@ -897,6 +836,19 @@ func TestAllSparkTokenRPCsDateHeader(t *testing.T) {
 		require.Less(t, timeDiff, 5*time.Second, "%s: date header should be close to current time", rpcName)
 
 		t.Logf("%s date header value: %s", rpcName, dateValue)
+
+		processingTimeHeaders := header.Get("x-processing-time-ms")
+		require.NotEmpty(t, processingTimeHeaders, "%s: x-processing-time-ms header should be present", rpcName)
+		require.Len(t, processingTimeHeaders, 1, "%s: should have exactly one x-processing-time-ms header", rpcName)
+
+		processingTimeValue := processingTimeHeaders[0]
+		require.NotEmpty(t, processingTimeValue, "%s: x-processing-time-ms header value should not be empty", rpcName)
+
+		var processingTimeMs int64
+		_, err = fmt.Sscanf(processingTimeValue, "%d", &processingTimeMs)
+		require.NoError(t, err, "%s: x-processing-time-ms header should be a valid integer", rpcName)
+		require.GreaterOrEqual(t, processingTimeMs, int64(0), "%s: processing time should be non-negative", rpcName)
+		require.Less(t, processingTimeMs, int64(10000), "%s: processing time should be reasonable (< 10 seconds)", rpcName)
 	}
 
 	t.Run("StartTransaction", func(t *testing.T) {
@@ -925,7 +877,7 @@ func TestAllSparkTokenRPCsDateHeader(t *testing.T) {
 			ValidityDurationSeconds:                uint64(180),
 		}, grpc.Header(&header))
 		require.NoError(t, err, "StartTransaction should succeed")
-		verifyDateHeader(t, header, "StartTransaction")
+		verifyTimestampHeaders(t, header, "StartTransaction")
 	})
 
 	t.Run("CommitTransaction", func(t *testing.T) {
@@ -951,7 +903,7 @@ func TestAllSparkTokenRPCsDateHeader(t *testing.T) {
 			OwnerIdentityPublicKey:         config.IdentityPublicKey().Serialize(),
 		}, grpc.Header(&header))
 		require.NoError(t, err, "CommitTransaction should succeed")
-		verifyDateHeader(t, header, "CommitTransaction")
+		verifyTimestampHeaders(t, header, "CommitTransaction")
 	})
 
 	t.Run("QueryTokenMetadata", func(t *testing.T) {
@@ -960,7 +912,7 @@ func TestAllSparkTokenRPCsDateHeader(t *testing.T) {
 			IssuerPublicKeys: [][]byte{issuerPubKey},
 		}, grpc.Header(&header))
 		require.NoError(t, err, "QueryTokenMetadata should succeed")
-		verifyDateHeader(t, header, "QueryTokenMetadata")
+		verifyTimestampHeaders(t, header, "QueryTokenMetadata")
 	})
 
 	t.Run("QueryTokenTransactions", func(t *testing.T) {
@@ -969,7 +921,7 @@ func TestAllSparkTokenRPCsDateHeader(t *testing.T) {
 			IssuerPublicKeys: [][]byte{issuerPubKey},
 		}, grpc.Header(&header))
 		require.NoError(t, err, "QueryTokenTransactions should succeed")
-		verifyDateHeader(t, header, "QueryTokenTransactions")
+		verifyTimestampHeaders(t, header, "QueryTokenTransactions")
 	})
 
 	t.Run("QueryTokenOutputs", func(t *testing.T) {
@@ -980,6 +932,6 @@ func TestAllSparkTokenRPCsDateHeader(t *testing.T) {
 			Network:          network,
 		}, grpc.Header(&header))
 		require.NoError(t, err, "QueryTokenOutputs should succeed")
-		verifyDateHeader(t, header, "QueryTokenOutputs")
+		verifyTimestampHeaders(t, header, "QueryTokenOutputs")
 	})
 }

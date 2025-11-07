@@ -591,7 +591,7 @@ func main() {
 	// and streaming RPCs.
 	serverOpts = append(serverOpts,
 		grpc.UnaryInterceptor(grpcmiddleware.ChainUnaryServer(
-			sparkgrpc.DateHeaderInterceptor(),
+			sparkgrpc.TimestampHeaderInterceptor(),
 			sparkerrors.ErrorInterceptor(config.ReturnDetailedErrors),
 			sparkgrpc.TracingInterceptor(),
 			sparkgrpc.LogInterceptor(logger.With(zap.String("component", "grpc")), tableLogger),
