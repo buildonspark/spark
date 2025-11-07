@@ -385,8 +385,13 @@ func main() {
 		dbClient = ent.NewClient(ent.Driver(dialectDriver))
 	}
 
-	// Add hook to track whether a transaction is dirty
+	// Add interceptor for query stats and read operation metrics
 	dbClient.Intercept(ent.DatabaseStatsInterceptor(10 * time.Second))
+
+	// Add hook for mutation operation metrics (insert, update, delete)
+	dbClient.Use(ent.DatabaseOperationsHook())
+
+	// Add hook to track whether a transaction is dirty
 	dbClient.Use(func(next ent.Mutator) ent.Mutator {
 		return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
 			v, err := next.Mutate(ctx, m)
