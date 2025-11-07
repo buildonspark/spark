@@ -191,7 +191,7 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 		transferID := transfer.ID.String()
 		completionTimestamp := timestamppb.New(*transfer.CompletionTime)
 
-		logger.Info("Sending finalize transfer gossip message")
+		logger.Sugar().Infof("Sending finalize transfer gossip message for transfer %s", transferID)
 
 		_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
 			Message: &pbgossip.GossipMessage_FinalizeTransfer{
