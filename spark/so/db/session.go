@@ -341,9 +341,14 @@ func (t *TxProviderWithTimeout) GetOrBeginTx(ctx context.Context) (*ent.Tx, erro
 		case <-timeoutCtx.Done():
 			// If the timeout context is done, there are no receivers for the transaction, so we need to
 			// rollback the transaction so that we aren't just leaving it idle.
-			err := tx.Rollback()
-			if err != nil {
-				logger.Warn("Failed to rollback transaction after timeout", zap.Error(err))
+			// Only rollback if tx is not nil (it could be nil if GetOrBeginTx failed)
+			if tx == nil {
+				logger.Warn("Wanted to rollback transaction after timeout, but tx is nil", zap.Error(err))
+			} else {
+				err := tx.Rollback()
+				if err != nil {
+					logger.Warn("Failed to rollback transaction after timeout", zap.Error(err))
+				}
 			}
 			return
 		}
