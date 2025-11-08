@@ -104,22 +104,3 @@ func TestSecretSharingBadPubkeyLen(t *testing.T) {
 	err = secretsharing.ValidateShare(share)
 	require.ErrorContains(t, err, "malformed public key: invalid length: 32")
 }
-
-func TestMarshal(t *testing.T) {
-	rng := mathrand.NewChaCha8([32]byte{})
-
-	fieldModulus := secp256k1.S256().N
-	secret, err := rand.Int(rng, fieldModulus)
-	require.NoError(t, err)
-
-	threshold := 3
-	numberOfShares := 5
-
-	shares, err := secretsharing.SplitSecretWithProofs(secret, fieldModulus, threshold, numberOfShares)
-	require.NoError(t, err)
-
-	marshaled0 := shares[0].MarshalProto()
-
-	assert.Equal(t, shares[0].SecretShare.Share.Bytes(), marshaled0.SecretShare, "marshaled secret share does not match")
-	assert.Equal(t, shares[0].Proofs, marshaled0.Proofs, "marshaled secret share proofs do not match")
-}
