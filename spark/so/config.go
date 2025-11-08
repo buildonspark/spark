@@ -37,11 +37,12 @@ import (
 )
 
 var (
-	defaultPoolMinConns          = 4
-	defaultPoolMaxConns          = 64
-	defaultPoolMaxConnLifetime   = 5 * time.Minute
-	defaultPoolMaxConnIdleTime   = 30 * time.Second
-	defaultPoolHealthCheckPeriod = 15 * time.Second
+	defaultPoolMinConns              = 4
+	defaultPoolMaxConns              = 256
+	defaultPoolMaxConnLifetime       = 30 * time.Minute
+	defaultPoolMaxConnLifetimeJitter = 0 * time.Second
+	defaultPoolMaxConnIdleTime       = 5 * time.Minute
+	defaultPoolHealthCheckPeriod     = 30 * time.Second
 	// Defaults for gRPC server behavior
 	defaultGRPCServerConnectionTimeout   = 5 * time.Second
 	defaultGRPCServerKeepaliveTime       = 300 * time.Second
@@ -248,14 +249,8 @@ type GRPCConfig struct {
 }
 
 type DatabaseConfig struct {
-	PoolMinConns              *int           `yaml:"pool_min_conns"`
-	PoolMaxConns              *int           `yaml:"pool_max_conns"`
-	PoolMaxConnLifetime       *time.Duration `yaml:"pool_max_conn_lifetime"`
-	PoolMaxConnIdleTime       *time.Duration `yaml:"pool_max_conn_idle_time"`
-	PoolHealthCheckPeriod     *time.Duration `yaml:"pool_health_check_period"`
-	PoolMaxConnLifetimeJitter *time.Duration `yaml:"pool_max_conn_lifetime_jitter"`
-	NewTxTimeout              *time.Duration `yaml:"new_tx_timeout"`
-	DBEventsEnabled           *bool          `yaml:"dbevents_enabled"`
+	NewTxTimeout    *time.Duration `yaml:"new_tx_timeout"`
+	DBEventsEnabled *bool          `yaml:"dbevents_enabled"`
 }
 
 // RateLimiterConfig is the configuration for the rate limiter
@@ -494,34 +489,24 @@ func NewDBConnector(ctx context.Context, soConfig *Config, knobsService knobs.Kn
 		}
 		conf.ConnConfig.Tracer = otelpgx.NewTracer()
 
-		conf.MinConns = int32(defaultPoolMinConns)
-		if soConfig.Database.PoolMinConns != nil {
-			conf.MinConns = int32(*soConfig.Database.PoolMinConns)
-		}
-
-		conf.MaxConns = int32(defaultPoolMaxConns)
-		if soConfig.Database.PoolMaxConns != nil {
-			conf.MaxConns = int32(*soConfig.Database.PoolMaxConns)
-		}
-
-		conf.MaxConnLifetime = defaultPoolMaxConnLifetime
-		if soConfig.Database.PoolMaxConnLifetime != nil {
-			conf.MaxConnLifetime = *soConfig.Database.PoolMaxConnLifetime
-		}
-
-		conf.MaxConnIdleTime = defaultPoolMaxConnIdleTime
-		if soConfig.Database.PoolMaxConnIdleTime != nil {
-			conf.MaxConnIdleTime = *soConfig.Database.PoolMaxConnIdleTime
-		}
-
-		conf.HealthCheckPeriod = defaultPoolHealthCheckPeriod
-		if soConfig.Database.PoolHealthCheckPeriod != nil {
-			conf.HealthCheckPeriod = *soConfig.Database.PoolHealthCheckPeriod
-		}
-
-		if soConfig.Database.PoolMaxConnLifetimeJitter != nil {
-			conf.MaxConnLifetimeJitter = *soConfig.Database.PoolMaxConnLifetimeJitter
-		}
+		conf.MinConns = int32(knobsService.GetValue(knobs.KnobDatabasePoolMinConns, float64(defaultPoolMinConns)))
+		conf.MaxConns = int32(knobsService.GetValue(knobs.KnobDatabasePoolMaxConns, float64(defaultPoolMaxConns)))
+		conf.MaxConnLifetime = knobsService.GetDuration(
+			knobs.KnobDatabasePoolMaxConnLifetime,
+			defaultPoolMaxConnLifetime,
+		)
+		conf.MaxConnIdleTime = knobsService.GetDuration(
+			knobs.KnobDatabasePoolMaxConnIdleTime,
+			defaultPoolMaxConnIdleTime,
+		)
+		conf.HealthCheckPeriod = knobsService.GetDuration(
+			knobs.KnobDatabasePoolHealthCheckPeriod,
+			defaultPoolHealthCheckPeriod,
+		)
+		conf.MaxConnLifetimeJitter = knobsService.GetDuration(
+			knobs.KnobDatabasePoolMaxConnLifetimeJitter,
+			defaultPoolMaxConnLifetimeJitter,
+		)
 
 		if soConfig.IsRDS {
 			conf.BeforeConnect = func(ctx context.Context, cfg *pgx.ConnConfig) error {

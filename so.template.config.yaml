@@ -9,12 +9,6 @@ bitcoind:
     zmqpubrawblock: tcp://127.0.0.1:28332
 token:
   disconnect_lrc20_node: true
-database:
-  pool_min_conns: 4
-  pool_max_conns: 32
-  pool_max_conn_lifetime: 5m
-  pool_max_conn_idle_time: 30s
-  pool_health_check_period: 15s
 
 grpc:
   # Timeout for establishing incoming connections
