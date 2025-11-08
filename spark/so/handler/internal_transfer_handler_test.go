@@ -542,3 +542,130 @@ func getTxOutpoint(t *testing.T, txBytes []byte, vout uint32) (wire.OutPoint, []
 	require.Less(t, int(vout), len(tx.TxOut))
 	return wire.OutPoint{Hash: tx.TxHash(), Index: vout}, tx.TxOut[vout].PkScript, tx.TxOut[vout].Value
 }
+
+func TestUpdateTransferLeavesSignatures(t *testing.T) {
+	t.Parallel()
+
+	t.Run("clears optional fields when signatures not provided", func(t *testing.T) {
+		ctx, dbCtx := db.NewTestSQLiteContext(t)
+		rng := rand.NewChaCha8([32]byte{})
+
+		config := &so.Config{
+			BitcoindConfigs: map[string]so.BitcoindConfig{
+				"regtest": {
+					DepositConfirmationThreshold: 1,
+				},
+			},
+			FrostGRPCConnectionFactory: &sparktesting.TestGRPCConnectionFactory{},
+		}
+
+		key := keys.GeneratePrivateKey()
+		rawTx, outpoint, pkScript, prevAmt, tweakedPriv, err := makeP2TRFundingTx(1000, key)
+		require.NoError(t, err)
+
+		destScript := pkScript
+		rawRefundTx, err := makeP2TRSpendTx(outpoint, pkScript, prevAmt, tweakedPriv, 900, destScript)
+		require.NoError(t, err)
+
+		dest1 := pkScript
+		directTx, err := makeP2TRSpendTx(outpoint, pkScript, prevAmt, tweakedPriv, 880, dest1)
+		require.NoError(t, err)
+
+		out1, pk1, amt1 := getTxOutpoint(t, directTx, 0)
+		dest2 := pkScript
+		directRefundTx, err := makeP2TRSpendTx(out1, pk1, amt1, tweakedPriv, 860, dest2)
+		require.NoError(t, err)
+
+		// Create test signing keyshare
+		secret := keys.MustGeneratePrivateKeyFromRand(rng)
+		pubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		signingKeyshare, err := dbCtx.Client.SigningKeyshare.Create().
+			SetStatus(st.KeyshareStatusAvailable).
+			SetSecretShare(secret).
+			SetPublicShares(map[string]keys.Public{"test": secret.Public()}).
+			SetPublicKey(pubKey).
+			SetMinSigners(2).
+			SetCoordinatorIndex(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		ownerIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		tree, err := dbCtx.Client.Tree.Create().
+			SetStatus(st.TreeStatusAvailable).
+			SetNetwork(st.NetworkRegtest).
+			SetOwnerIdentityPubkey(ownerIdentityPubKey).
+			SetBaseTxid([]byte("test_base_txid")).
+			SetVout(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		verifyingPubKey := key.Public()
+		leaf, err := dbCtx.Client.TreeNode.Create().
+			SetStatus(st.TreeNodeStatusAvailable).
+			SetTree(tree).
+			SetSigningKeyshare(signingKeyshare).
+			SetValue(1000).
+			SetVerifyingPubkey(verifyingPubKey).
+			SetOwnerIdentityPubkey(key.Public()).
+			SetOwnerSigningPubkey(key.Public()).
+			SetRawTx(rawTx).
+			SetRawRefundTx(rawRefundTx).
+			SetDirectTx(directTx).
+			SetDirectRefundTx(directRefundTx).
+			SetVout(0).
+			Save(ctx)
+		require.NoError(t, err)
+
+		receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		transfer, err := dbCtx.Client.Transfer.Create().
+			SetStatus(st.TransferStatusReceiverRefundSigned).
+			SetType(st.TransferTypeTransfer).
+			SetSenderIdentityPubkey(key.Public()).
+			SetReceiverIdentityPubkey(receiverIdentityPubKey).
+			SetTotalValue(900).
+			SetExpiryTime(time.Now().Add(24 * time.Hour)).
+			SetCompletionTime(time.Now()).
+			Save(ctx)
+		require.NoError(t, err)
+
+		intermediateRefundTx := createTestTxBytes(t, 2001)
+		intermediateDirectRefundTx := createTestTxBytes(t, 3001)
+		intermediateDirectFromCpfpRefundTx := createTestTxBytes(t, 4001)
+
+		transferLeaf, err := dbCtx.Client.TransferLeaf.Create().
+			SetLeaf(leaf).
+			SetTransfer(transfer).
+			SetPreviousRefundTx(createTestTxBytes(t, 2000)).
+			SetIntermediateRefundTx(intermediateRefundTx).
+			SetIntermediateDirectRefundTx(intermediateDirectRefundTx).
+			SetIntermediateDirectFromCpfpRefundTx(intermediateDirectFromCpfpRefundTx).
+			Save(ctx)
+		require.NoError(t, err)
+
+		handler := NewTransferHandler(config)
+
+		// Sign the transactions
+		cpfpSignature := getTxOutputSignature(t, rawTx, intermediateRefundTx, tweakedPriv)
+
+		// Call with only cpfp signature (no direct signatures)
+		cpfpSignatureMap := map[string][]byte{leaf.ID.String(): cpfpSignature}
+		emptyDirectSignatureMap := map[string][]byte{}
+		emptyDirectFromCpfpSignatureMap := map[string][]byte{}
+
+		err = handler.UpdateTransferLeavesSignatures(ctx, transfer, cpfpSignatureMap, emptyDirectSignatureMap, emptyDirectFromCpfpSignatureMap)
+		require.NoError(t, err)
+
+		// Commit the transaction to persist changes
+		entTx, err := ent.GetTxFromContext(ctx)
+		require.NoError(t, err)
+		err = entTx.Commit()
+		require.NoError(t, err)
+
+		// Verify optional fields were cleared (set to NULL)
+		updated, err := dbCtx.Client.TransferLeaf.Get(t.Context(), transferLeaf.ID)
+		require.NoError(t, err)
+		assert.NotEqual(t, intermediateRefundTx, updated.IntermediateRefundTx, "cpfp refund tx should be updated")
+		assert.Nil(t, updated.IntermediateDirectRefundTx, "direct refund tx should be cleared when no signature provided")
+		assert.Nil(t, updated.IntermediateDirectFromCpfpRefundTx, "direct from cpfp refund tx should be cleared when no signature provided")
+	})
+}

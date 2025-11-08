@@ -483,6 +483,15 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 	if err != nil {
 		return fmt.Errorf("unable to get transfer leaves: %w", err)
 	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get db from context: %w", err)
+	}
+
+	// Collect all updates to batch them and avoid N+1 queries
+	builders := make([]*ent.TransferLeafCreate, 0, len(transferLeaves))
+
 	for _, leaf := range transferLeaves {
 
 		nodeTx, err := common.TxFromRawTxBytes(leaf.Edges.Leaf.RawTx)
@@ -503,8 +512,8 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 			return fmt.Errorf("unable to verify leaf cpfp refund tx signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
 
-		leafUpdate := leaf.Update().SetIntermediateRefundTx(updatedCpfpRefundTxBytes)
-
+		// Compute final values for each field (nil = clear)
+		var intermediateDirectFromCpfpRefundTx []byte
 		if len(leaf.Edges.Leaf.DirectFromCpfpRefundTx) > 0 && len(directFromCpfpSignatureMap[leaf.Edges.Leaf.ID.String()]) > 0 {
 			updatedDirectFromCpfpRefundTxBytes, err := common.UpdateTxWithSignature(leaf.IntermediateDirectFromCpfpRefundTx, 0, directFromCpfpSignatureMap[leaf.Edges.Leaf.ID.String()])
 			if err != nil {
@@ -519,11 +528,11 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 				return fmt.Errorf("unable to verify leaf direct from cpfp refund tx signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
 
-			leafUpdate.SetIntermediateDirectFromCpfpRefundTx(updatedDirectFromCpfpRefundTxBytes)
-		} else {
-			leafUpdate.ClearIntermediateDirectFromCpfpRefundTx()
+			intermediateDirectFromCpfpRefundTx = updatedDirectFromCpfpRefundTxBytes
 		}
+		// else: stays nil, which will clear the field
 
+		var intermediateDirectRefundTx []byte
 		if len(leaf.Edges.Leaf.DirectTx) > 0 && len(directSignatureMap[leaf.Edges.Leaf.ID.String()]) > 0 {
 			directNodeTx, err := common.TxFromRawTxBytes(leaf.Edges.Leaf.DirectTx)
 			if err != nil {
@@ -544,15 +553,49 @@ func (h *TransferHandler) UpdateTransferLeavesSignatures(ctx context.Context, tr
 				return fmt.Errorf("unable to verify leaf signature for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 			}
 
-			leafUpdate.SetIntermediateDirectRefundTx(updatedDirectRefundTxBytes)
-		} else {
-			leafUpdate.ClearIntermediateDirectRefundTx()
+			intermediateDirectRefundTx = updatedDirectRefundTxBytes
 		}
-		_, err = leafUpdate.Save(ctx)
+
+		// Build upsert for batch update. Since records always exist (queried above),
+		// OnConflict will always UPDATE, never INSERT. We set ID (for matching), all required fields, and the fields we want to update.
+		// Note: Setting byte fields to nil will clear them (set to NULL) on conflict.
+		builders = append(builders,
+			db.TransferLeaf.Create().
+				SetID(leaf.ID).
+				SetLeaf(leaf.Edges.Leaf).
+				SetTransferID(transfer.ID).
+				SetPreviousRefundTx(leaf.PreviousRefundTx).
+				SetIntermediateRefundTx(updatedCpfpRefundTxBytes).
+				SetIntermediateDirectRefundTx(intermediateDirectRefundTx).
+				SetIntermediateDirectFromCpfpRefundTx(intermediateDirectFromCpfpRefundTx),
+		)
+	}
+
+	// Execute all updates in batch to avoid N+1 queries.
+	// We use CreateBulk with OnConflict as a workaround since Ent doesn't have native bulk UPDATE support.
+	// Since all records exist (queried above), OnConflict will always UPDATE, never INSERT.
+	// Batch in chunks to avoid PostgreSQL parameter limit (65535).
+	const maxBatchSize = 1000
+	for i := 0; i < len(builders); i += maxBatchSize {
+		end := i + maxBatchSize
+		if end > len(builders) {
+			end = len(builders)
+		}
+		chunk := builders[i:end]
+
+		err = db.TransferLeaf.CreateBulk(chunk...).
+			OnConflictColumns(enttransferleaf.FieldID).
+			Update(func(u *ent.TransferLeafUpsert) {
+				u.UpdateIntermediateRefundTx()
+				u.UpdateIntermediateDirectRefundTx()
+				u.UpdateIntermediateDirectFromCpfpRefundTx()
+			}).
+			Exec(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to save leaf for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
+			return fmt.Errorf("unable to batch update transfer leaf refund txs: %w", err)
 		}
 	}
+
 	return nil
 }
 
@@ -563,6 +606,14 @@ func (h *TransferHandler) UpdateTransferLeavesSignaturesForRefundTxOnly(ctx cont
 	if err != nil {
 		return fmt.Errorf("unable to get transfer leaves: %w", err)
 	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to get db from context: %w", err)
+	}
+
+	builders := make([]*ent.TransferLeafCreate, 0, len(transferLeaves))
+
 	for _, leaf := range transferLeaves {
 		nodeTx, err := common.TxFromRawTxBytes(leaf.Edges.Leaf.RawTx)
 		if err != nil {
@@ -574,12 +625,41 @@ func (h *TransferHandler) UpdateTransferLeavesSignaturesForRefundTxOnly(ctx cont
 			return fmt.Errorf("unable to apply signature to tx and verify for leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
 		}
 
-		// Store the updated intermediate refund transaction in the transfer leaf.
-		_, err = leaf.Update().SetIntermediateRefundTx(updatedTx).Save(ctx)
+		// Build upsert for batch update. Since records always exist (queried above),
+		// OnConflict will always UPDATE, never INSERT. We set ID (for matching), all required fields, and the fields we want to update.
+		builders = append(builders,
+			db.TransferLeaf.Create().
+				SetID(leaf.ID).
+				SetLeaf(leaf.Edges.Leaf).
+				SetTransferID(transfer.ID).
+				SetPreviousRefundTx(leaf.PreviousRefundTx).
+				SetIntermediateRefundTx(updatedTx),
+		)
+	}
+
+	// Execute all updates in batch to avoid N+1 queries.
+	// We use CreateBulk with OnConflict as a workaround since Ent doesn't have native bulk UPDATE support.
+	// Since all records exist (queried above), OnConflict will always UPDATE, never INSERT.
+	// Batch in chunks to avoid PostgreSQL parameter limit (65535).
+	const maxBatchSize = 1000
+	for i := 0; i < len(builders); i += maxBatchSize {
+		end := i + maxBatchSize
+		if end > len(builders) {
+			end = len(builders)
+		}
+		chunk := builders[i:end]
+
+		err = db.TransferLeaf.CreateBulk(chunk...).
+			OnConflictColumns(enttransferleaf.FieldID).
+			Update(func(u *ent.TransferLeafUpsert) {
+				u.UpdateIntermediateRefundTx()
+			}).
+			Exec(ctx)
 		if err != nil {
-			return fmt.Errorf("unable to save leaf %s: %w", leaf.Edges.Leaf.ID.String(), err)
+			return fmt.Errorf("unable to batch update transfer leaf refund txs: %w", err)
 		}
 	}
+
 	return nil
 }
 
