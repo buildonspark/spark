@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/keys"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -176,4 +177,11 @@ func TreeNodeStatusSchema(status pbspark.TreeNodeStatus) (st.TreeNodeStatus, err
 	default:
 		return "", fmt.Errorf("unknown tree node status: %s", status)
 	}
+}
+
+// TreeNodeKeyUpdateInput represents per-node key updates.
+type TreeNodeKeyUpdateInput struct {
+	ID                  uuid.UUID
+	OwnerIdentityPubkey keys.Public
+	OwnerSigningPubkey  keys.Public
 }

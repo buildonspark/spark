@@ -2069,15 +2069,15 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 	return nil
 }
 
-func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeNode, req *pb.ClaimLeafKeyTweak, ownerIdentityPubKey keys.Public) error {
+func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeNode, req *pb.ClaimLeafKeyTweak, ownerIdentityPubKey keys.Public) (*ent.TreeNodeKeyUpdateInput, error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.claimLeafTweakKey")
 	defer span.End()
 
 	if req.SecretShareTweak == nil {
-		return fmt.Errorf("secret share tweak is required")
+		return nil, fmt.Errorf("secret share tweak is required")
 	}
 	if len(req.SecretShareTweak.SecretShare) == 0 {
-		return fmt.Errorf("secret share is required")
+		return nil, fmt.Errorf("secret share is required")
 	}
 	err := secretsharing.ValidateShare(
 		&secretsharing.VerifiableSecretShare{
@@ -2091,7 +2091,7 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("unable to validate share: %w", err)
+		return nil, fmt.Errorf("unable to validate share: %w", err)
 	}
 
 	logger := logging.GetLoggerFromContext(ctx)
@@ -2107,36 +2107,32 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 	// Tweak keyshare
 	keyshare, err := leaf.QuerySigningKeyshare().First(ctx)
 	if err != nil {
-		return fmt.Errorf("unable to load keyshare for leaf %s: %w", leaf.ID.String(), err)
+		return nil, fmt.Errorf("unable to load keyshare for leaf %s: %w", leaf.ID.String(), err)
 	}
 
 	secretShare, err := keys.ParsePrivateKey(req.SecretShareTweak.SecretShare)
 	if err != nil {
-		return fmt.Errorf("unable to parse secret share: %w", err)
+		return nil, fmt.Errorf("unable to parse secret share: %w", err)
 	}
 	pubKeyTweak, err := keys.ParsePublicKey(req.SecretShareTweak.Proofs[0])
 	if err != nil {
-		return fmt.Errorf("unable to parse public key: %w", err)
+		return nil, fmt.Errorf("unable to parse public key: %w", err)
 	}
 	pubKeySharesTweak, err := keys.ParsePublicKeyMap(req.PubkeySharesTweak)
 	if err != nil {
-		return fmt.Errorf("unable to parse public key shares tweaks: %w", err)
+		return nil, fmt.Errorf("unable to parse public key shares tweaks: %w", err)
 	}
 	tweakedKeyshare, err := keyshare.TweakKeyShare(ctx, secretShare, pubKeyTweak, pubKeySharesTweak)
 	if err != nil {
-		return fmt.Errorf("unable to tweak keyshare %v for leaf %v: %w", keyshare.ID, leaf.ID, err)
+		return nil, fmt.Errorf("unable to tweak keyshare %v for leaf %v: %w", keyshare.ID, leaf.ID, err)
 	}
 
 	signingPubKey := leaf.VerifyingPubkey.Sub(tweakedKeyshare.PublicKey)
-	_, err = leaf.
-		Update().
-		SetOwnerIdentityPubkey(ownerIdentityPubKey).
-		SetOwnerSigningPubkey(signingPubKey).
-		Save(ctx)
-	if err != nil {
-		return fmt.Errorf("unable to update leaf %s: %w", req.LeafId, err)
-	}
-	return nil
+	return &ent.TreeNodeKeyUpdateInput{
+		ID:                  leaf.ID,
+		OwnerIdentityPubkey: ownerIdentityPubKey,
+		OwnerSigningPubkey:  signingPubKey,
+	}, nil
 }
 
 func (h *TransferHandler) getLeavesFromTransfer(ctx context.Context, transfer *ent.Transfer) (map[string]*ent.TreeNode, error) {
@@ -2145,7 +2141,9 @@ func (h *TransferHandler) getLeavesFromTransfer(ctx context.Context, transfer *e
 	))
 	defer span.End()
 
-	transferLeaves, err := transfer.QueryTransferLeaves().WithLeaf().All(ctx)
+	transferLeaves, err := transfer.QueryTransferLeaves().WithLeaf(func(tnq *ent.TreeNodeQuery) {
+		tnq.WithTree().WithSigningKeyshare()
+	}).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get leaves for transfer %s: %w", transfer.ID.String(), err)
 	}
@@ -2382,6 +2380,14 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		return nil, err
 	}
 
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get db from context: %w", err)
+	}
+
+	// Collect all TreeNode updates to batch them and avoid N+1 queries
+	builders := make([]*ent.TreeNodeCreate, 0, len(req.SigningJobs))
+
 	var signingJobs []*helper.SigningJob
 	jobToLeafMap := make(map[string]uuid.UUID)
 	isDirectSigningJob := make(map[string]bool)
@@ -2415,14 +2421,25 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		}
 
 		leafID := leaf.ID.String()
-		leaf, err := leaf.Update().
-			SetRawRefundTx(job.RefundTxSigningJob.RawTx).
-			SetDirectRefundTx(directRefundTx).
-			SetDirectFromCpfpRefundTx(directFromCpfpRefundTx).
-			Save(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("unable to update leaf refund tx %s: %w", leafID, err)
-		}
+
+		// Build upsert for batch update. Since records always exist (queried above),
+		// OnConflict will always UPDATE, never INSERT. We set ID (for matching), all required fields, and the fields we want to update.
+		builders = append(builders,
+			db.TreeNode.Create().
+				SetID(leaf.ID).
+				SetTree(leaf.Edges.Tree).
+				SetSigningKeyshare(leaf.Edges.SigningKeyshare).
+				SetValue(leaf.Value).
+				SetVerifyingPubkey(leaf.VerifyingPubkey).
+				SetOwnerIdentityPubkey(leaf.OwnerIdentityPubkey).
+				SetOwnerSigningPubkey(leaf.OwnerSigningPubkey).
+				SetRawTx(leaf.RawTx).
+				SetVout(leaf.Vout).
+				SetStatus(leaf.Status).
+				SetRawRefundTx(job.RefundTxSigningJob.RawTx).
+				SetDirectRefundTx(directRefundTx).
+				SetDirectFromCpfpRefundTx(directFromCpfpRefundTx),
+		)
 
 		cpfpSigningJob, directSigningJob, directFromCpfpSigningJob, err := h.getRefundTxSigningJobs(ctx, leaf, job.RefundTxSigningJob, job.DirectRefundTxSigningJob, job.DirectFromCpfpRefundTxSigningJob)
 		if err != nil {
@@ -2441,6 +2458,31 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 			signingJobs = append(signingJobs, directFromCpfpSigningJob)
 			jobToLeafMap[directFromCpfpSigningJob.JobID] = leaf.ID
 			isDirectFromCpfpSigningJob[directFromCpfpSigningJob.JobID] = true
+		}
+	}
+
+	// Execute all TreeNode updates in batch to avoid N+1 queries.
+	// We use CreateBulk with OnConflict as a workaround since Ent doesn't have native bulk UPDATE support.
+	// Since all records exist (queried above), OnConflict will always UPDATE, never INSERT.
+	// Batch in chunks to avoid PostgreSQL parameter limit (65535).
+	const maxBatchSize = 1000
+	for i := 0; i < len(builders); i += maxBatchSize {
+		end := i + maxBatchSize
+		if end > len(builders) {
+			end = len(builders)
+		}
+		chunk := builders[i:end]
+
+		err = db.TreeNode.CreateBulk(chunk...).
+			OnConflictColumns(enttreenode.FieldID).
+			Update(func(u *ent.TreeNodeUpsert) {
+				u.UpdateRawRefundTx()
+				u.UpdateDirectRefundTx()
+				u.UpdateDirectFromCpfpRefundTx()
+			}).
+			Exec(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("unable to batch update tree node refund txs: %w", err)
 		}
 	}
 
@@ -2653,10 +2695,21 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 
 	switch req.Action {
 	case pbinternal.SettleKeyTweakAction_COMMIT:
-		leaves, err := transfer.QueryTransferLeaves().WithLeaf().All(ctx)
+		leaves, err := transfer.QueryTransferLeaves().WithLeaf(func(tnq *ent.TreeNodeQuery) {
+			tnq.WithTree().WithSigningKeyshare()
+		}).All(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to get leaves from transfer %s: %w", req.TransferId, err)
 		}
+
+		db, err := ent.GetDbFromContext(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to get db: %w", err)
+		}
+
+		// Track successful leaf IDs to clear key_tweak in a single batch.
+		clearedIDs := make([]uuid.UUID, 0, len(leaves))
+		builders := make([]*ent.TreeNodeCreate, 0, len(leaves))
 		for _, leaf := range leaves {
 			treeNode := leaf.Edges.Leaf
 			if treeNode == nil {
@@ -2669,11 +2722,56 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 			if err := proto.Unmarshal(leaf.KeyTweak, keyTweakProto); err != nil {
 				return fmt.Errorf("unable to unmarshal key tweak for leaf %v: %w", leaf.ID, err)
 			}
-			if err := h.claimLeafTweakKey(ctx, treeNode, keyTweakProto, transfer.ReceiverIdentityPubkey); err != nil {
+			// claimLeafTweakKey now returns the key update instead of mutating the leaf
+			keyUpdate, err := h.claimLeafTweakKey(ctx, treeNode, keyTweakProto, transfer.ReceiverIdentityPubkey)
+			if err != nil {
 				return fmt.Errorf("unable to claim leaf tweak key for leaf %v: %w", leaf.ID, err)
 			}
-			if _, err := leaf.Update().SetKeyTweak(nil).Save(ctx); err != nil {
-				return fmt.Errorf("unable to update leaf key tweak %v: %w", leaf.ID, err)
+
+			// Build upsert for batch update. Since records always exist (queried above),
+			// OnConflict will always UPDATE, never INSERT. We set ID (for matching), all required fields, and the fields we want to update.
+			builders = append(builders,
+				db.TreeNode.Create().
+					SetID(treeNode.ID).
+					SetTree(treeNode.Edges.Tree).
+					SetSigningKeyshare(treeNode.Edges.SigningKeyshare).
+					SetValue(treeNode.Value).
+					SetVerifyingPubkey(treeNode.VerifyingPubkey).
+					SetOwnerIdentityPubkey(keyUpdate.OwnerIdentityPubkey).
+					SetOwnerSigningPubkey(keyUpdate.OwnerSigningPubkey).
+					SetRawTx(treeNode.RawTx).
+					SetVout(treeNode.Vout).
+					SetStatus(treeNode.Status),
+			)
+			clearedIDs = append(clearedIDs, leaf.ID)
+		}
+
+		// Execute all TreeNode updates in batch to avoid N+1 queries.
+		// We use CreateBulk with OnConflict as a workaround since Ent doesn't have native bulk UPDATE support.
+		// Since all records exist (queried above), OnConflict will always UPDATE, never INSERT.
+		// Batch in chunks to avoid PostgreSQL parameter limit (65535).
+		const maxBatchSize = 1000
+		for i := 0; i < len(builders); i += maxBatchSize {
+			end := i + maxBatchSize
+			if end > len(builders) {
+				end = len(builders)
+			}
+			chunk := builders[i:end]
+
+			err = db.TreeNode.CreateBulk(chunk...).
+				OnConflictColumns(enttreenode.FieldID).
+				Update(func(u *ent.TreeNodeUpsert) {
+					u.UpdateOwnerIdentityPubkey()
+					u.UpdateOwnerSigningPubkey()
+				}).
+				Exec(ctx)
+			if err != nil {
+				return fmt.Errorf("unable to batch update tree node keys: %w", err)
+			}
+		}
+		if len(clearedIDs) > 0 {
+			if _, err := db.TransferLeaf.Update().Where(enttransferleaf.IDIn(clearedIDs...)).ClearKeyTweak().Save(ctx); err != nil {
+				return fmt.Errorf("unable to batch clear leaf key tweaks: %w", err)
 			}
 		}
 		_, err = transfer.Update().SetStatus(st.TransferStatusReceiverKeyTweakApplied).Save(ctx)
