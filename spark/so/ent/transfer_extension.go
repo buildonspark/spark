@@ -123,6 +123,10 @@ func TransferTypeProto(transferType st.TransferType) (*pb.TransferType, error) {
 		return pb.TransferType_COUNTER_SWAP.Enum(), nil
 	case st.TransferTypeUtxoSwap:
 		return pb.TransferType_UTXO_SWAP.Enum(), nil
+	case st.TransferTypePrimarySwapV3:
+		return pb.TransferType_PRIMARY_SWAP_V3.Enum(), nil
+	case st.TransferTypeCounterSwapV3:
+		return pb.TransferType_COUNTER_SWAP_V3.Enum(), nil
 	}
 	return nil, fmt.Errorf("unknown transfer type %s", transferType)
 }
@@ -141,6 +145,10 @@ func TransferTypeSchema(transferType pb.TransferType) (st.TransferType, error) {
 		return st.TransferTypeCounterSwap, nil
 	case pb.TransferType_UTXO_SWAP:
 		return st.TransferTypeUtxoSwap, nil
+	case pb.TransferType_PRIMARY_SWAP_V3:
+		return st.TransferTypePrimarySwapV3, nil
+	case pb.TransferType_COUNTER_SWAP_V3:
+		return st.TransferTypeCounterSwapV3, nil
 	}
 	return "", fmt.Errorf("unknown transfer type %s", transferType)
 }

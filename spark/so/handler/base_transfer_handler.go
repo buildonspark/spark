@@ -326,6 +326,8 @@ func (h *BaseTransferHandler) createTransfer(
 		err = h.validateUtxoSwapLeaves(ctx, transfer, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey, requireDirectTx)
 	case st.TransferTypePreimageSwap:
 		err = h.validatePreimageSwapLeaves(ctx, transfer, leaves, leafCpfpRefundMap, leafDirectRefundMap, leafDirectFromCpfpRefundMap, receiverIdentityPubKey, requireDirectTx)
+	case st.TransferTypePrimarySwapV3, st.TransferTypeCounterSwapV3:
+		err = h.validateSwapV3Leaves(ctx, transfer, leaves, leafCpfpRefundMap, receiverIdentityPubKey)
 	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to validate transfer leaves: %w", err)
@@ -538,6 +540,31 @@ func (h *BaseTransferHandler) validateTransferLeaves(
 ) error {
 	for _, leaf := range leaves {
 		// TODO(LIG-7719) reinstate direct tx validation once sync_transfer_refunds job has been added.
+		rawRefundTx, exist := leafCpfpRefundMap[leaf.ID.String()]
+		if !exist {
+			return fmt.Errorf("leaf %s not found in cpfp refund map", leaf.ID)
+		}
+
+		err := validateSendLeafRefundTxs(leaf, rawRefundTx, nil, nil, receiverIdentityPublicKey, 1, false)
+		if err != nil {
+			return fmt.Errorf("unable to validate refund tx for leaf %s: %w", leaf.ID, err)
+		}
+		err = h.LeafAvailableToTransfer(ctx, leaf, transfer)
+		if err != nil {
+			return fmt.Errorf("unable to validate leaf %s: %w", leaf.ID, err)
+		}
+	}
+	return nil
+}
+
+func (h *BaseTransferHandler) validateSwapV3Leaves(
+	ctx context.Context,
+	transfer *ent.Transfer,
+	leaves []*ent.TreeNode,
+	leafCpfpRefundMap map[string][]byte,
+	receiverIdentityPublicKey keys.Public,
+) error {
+	for _, leaf := range leaves {
 		rawRefundTx, exist := leafCpfpRefundMap[leaf.ID.String()]
 		if !exist {
 			return fmt.Errorf("leaf %s not found in cpfp refund map", leaf.ID)

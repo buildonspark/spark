@@ -210,6 +210,8 @@ const (
 	TransferType_UTXO_SWAP        TransferType = 3
 	TransferType_SWAP             TransferType = 30
 	TransferType_COUNTER_SWAP     TransferType = 40
+	TransferType_PRIMARY_SWAP_V3  TransferType = 4
+	TransferType_COUNTER_SWAP_V3  TransferType = 5
 )
 
 // Enum value maps for TransferType.
@@ -221,6 +223,8 @@ var (
 		3:  "UTXO_SWAP",
 		30: "SWAP",
 		40: "COUNTER_SWAP",
+		4:  "PRIMARY_SWAP_V3",
+		5:  "COUNTER_SWAP_V3",
 	}
 	TransferType_value = map[string]int32{
 		"PREIMAGE_SWAP":    0,
@@ -229,6 +233,8 @@ var (
 		"UTXO_SWAP":        3,
 		"SWAP":             30,
 		"COUNTER_SWAP":     40,
+		"PRIMARY_SWAP_V3":  4,
+		"COUNTER_SWAP_V3":  5,
 	}
 )
 
@@ -11499,14 +11505,16 @@ const file_spark_proto_rawDesc = "" +
 	",TRANSFER_STATUS_SENDER_INITIATED_COORDINATOR\x10\b\x12-\n" +
 	")TRANSFER_STATUS_RECEIVER_KEY_TWEAK_LOCKED\x10\t\x12.\n" +
 	"*TRANSFER_STATUS_RECEIVER_KEY_TWEAK_APPLIED\x10\n" +
-	"*p\n" +
+	"*\x9a\x01\n" +
 	"\fTransferType\x12\x11\n" +
 	"\rPREIMAGE_SWAP\x10\x00\x12\x14\n" +
 	"\x10COOPERATIVE_EXIT\x10\x01\x12\f\n" +
 	"\bTRANSFER\x10\x02\x12\r\n" +
 	"\tUTXO_SWAP\x10\x03\x12\b\n" +
 	"\x04SWAP\x10\x1e\x12\x10\n" +
-	"\fCOUNTER_SWAP\x10(*&\n" +
+	"\fCOUNTER_SWAP\x10(\x12\x13\n" +
+	"\x0fPRIMARY_SWAP_V3\x10\x04\x12\x13\n" +
+	"\x0fCOUNTER_SWAP_V3\x10\x05*&\n" +
 	"\x05Order\x12\x0e\n" +
 	"\n" +
 	"DESCENDING\x10\x00\x12\r\n" +

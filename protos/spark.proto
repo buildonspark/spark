@@ -863,6 +863,8 @@ enum TransferType {
     UTXO_SWAP = 3;
     SWAP = 30;
     COUNTER_SWAP = 40;
+    PRIMARY_SWAP_V3 = 4;
+    COUNTER_SWAP_V3 = 5;
 }
 
 enum Order {

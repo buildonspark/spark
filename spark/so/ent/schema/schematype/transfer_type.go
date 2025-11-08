@@ -16,6 +16,10 @@ const (
 	TransferTypeCounterSwap TransferType = "COUNTER_SWAP"
 	// TransferTypeUtxoSwap is the type of transfer that is a swap of an utxos for leaves.
 	TransferTypeUtxoSwap TransferType = "UTXO_SWAP"
+	// Primary side of a Swap V3 protocol, sent by the User to the SE.
+	TransferTypePrimarySwapV3 TransferType = "PRIMARY_SWAP_V3"
+	// Counter side of a Swap V3 protocol, sent by the SSP to the SE.
+	TransferTypeCounterSwapV3 TransferType = "COUNTER_SWAP_V3"
 )
 
 // Values returns the values of the transfer type.
@@ -27,5 +31,7 @@ func (TransferType) Values() []string {
 		string(TransferTypeSwap),
 		string(TransferTypeCounterSwap),
 		string(TransferTypeUtxoSwap),
+		string(TransferTypePrimarySwapV3),
+		string(TransferTypeCounterSwapV3),
 	}
 }
