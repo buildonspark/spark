@@ -2094,8 +2094,14 @@ func (h *TransferHandler) claimLeafTweakKey(ctx context.Context, leaf *ent.TreeN
 		return fmt.Errorf("unable to validate share: %w", err)
 	}
 
+	logger := logging.GetLoggerFromContext(ctx)
+
 	if leaf.Status != st.TreeNodeStatusTransferLocked {
-		return fmt.Errorf("unable to transfer leaf %s", leaf.ID.String())
+		// This should be safe to continue because SO holds the transfer and this should be a
+		// self healing process if something when in between transfers and forcibly set the leaf to
+		// available.
+		// TODO: Revisit this to make sure this won't cause problems.
+		logger.Sugar().Warnf("Leaf %s is not in transfer locked status, status: %s", leaf.ID.String(), leaf.Status)
 	}
 
 	// Tweak keyshare
