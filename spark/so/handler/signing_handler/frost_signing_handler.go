@@ -17,6 +17,7 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/frost"
 	"github.com/lightsparkdev/spark/so/objects"
 )
 
@@ -100,9 +101,9 @@ func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRoun
 	}
 
 	// Fetch nonces in one call.
-	commitments := make([]objects.SigningCommitment, len(req.SigningJobs))
+	commitments := make([]frost.SigningCommitment, len(req.SigningJobs))
 	for i, job := range req.SigningJobs {
-		commitments[i] = objects.SigningCommitment{}
+		commitments[i] = frost.SigningCommitment{}
 		err = commitments[i].UnmarshalProto(job.Commitments[h.config.Identifier])
 		if err != nil {
 			return nil, err
@@ -114,18 +115,16 @@ func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRoun
 	}
 
 	var signingJobProtos []*pbfrost.FrostSigningJob
+	bulkUpdates := make(map[frost.SigningCommitment][]byte)
 
+	// First pass: validate all nonces and collect updates
 	for _, job := range req.SigningJobs {
-		keyshareID, err := uuid.Parse(job.KeyshareId)
-		if err != nil {
-			return nil, err
-		}
-		commitment := objects.SigningCommitment{}
+		commitment := frost.SigningCommitment{}
 		err = commitment.UnmarshalProto(job.Commitments[h.config.Identifier])
 		if err != nil {
 			return nil, err
 		}
-		nonceEnt := nonces[commitment.Key()]
+		nonceEnt := nonces[commitment]
 		// TODO(zhenlu): Add a test for this (LIG-7596).
 		jobRetryFingerprint := retryFingerprint(job)
 		if len(nonceEnt.RetryFingerprint) > 0 {
@@ -138,11 +137,31 @@ func (h *FrostSigningHandler) FrostRound2(ctx context.Context, req *pb.FrostRoun
 				return nil, fmt.Errorf("this signing nonce is already used for a different message %s, cannot use it for this message %s", hex.EncodeToString(nonceEnt.Message), hex.EncodeToString(job.Message))
 			}
 		} else {
-			_, err = nonceEnt.Update().SetRetryFingerprint(jobRetryFingerprint).Save(ctx)
-			if err != nil {
-				return nil, err
-			}
+			// Collect this nonce for bulk update
+			bulkUpdates[commitment] = jobRetryFingerprint
 		}
+	}
+
+	// Batch update all nonces that need retry fingerprints
+	if len(bulkUpdates) > 0 {
+		err = ent.BulkUpdateRetryFingerprints(ctx, nonces, bulkUpdates)
+		if err != nil {
+			return nil, fmt.Errorf("failed to batch update retry fingerprints: %w", err)
+		}
+	}
+
+	// Second pass: build signing job protos
+	for _, job := range req.SigningJobs {
+		keyshareID, err := uuid.Parse(job.KeyshareId)
+		if err != nil {
+			return nil, err
+		}
+		commitment := frost.SigningCommitment{}
+		err = commitment.UnmarshalProto(job.Commitments[h.config.Identifier])
+		if err != nil {
+			return nil, err
+		}
+		nonceEnt := nonces[commitment]
 		nonceObject := objects.SigningNonce{}
 		err = nonceObject.UnmarshalBinary(nonceEnt.Nonce)
 		if err != nil {
