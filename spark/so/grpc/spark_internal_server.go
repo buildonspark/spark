@@ -233,3 +233,8 @@ func (s *SparkInternalServer) GetTransfers(ctx context.Context, req *pb.GetTrans
 	transferHandler := handler.NewInternalTransferHandler(s.config)
 	return transferHandler.GetTransfers(ctx, req)
 }
+
+func (s *SparkInternalServer) NodeAvailableForRenew(ctx context.Context, req *pb.NodeAvailableForRenewRequest) (*emptypb.Empty, error) {
+	renewHandler := handler.NewRenewLeafHandler(s.config)
+	return &emptypb.Empty{}, renewHandler.NodeAvailableForRenew(ctx, req)
+}

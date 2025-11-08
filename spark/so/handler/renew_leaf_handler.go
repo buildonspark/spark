@@ -12,6 +12,7 @@ import (
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
 	pbgossip "github.com/lightsparkdev/spark/proto/gossip"
 	pb "github.com/lightsparkdev/spark/proto/spark"
+	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -61,6 +62,35 @@ func NewRenewLeafHandler(config *so.Config) *RenewLeafHandler {
 	}
 }
 
+func (h *RenewLeafHandler) NodeAvailableForRenew(ctx context.Context, req *pbinternal.NodeAvailableForRenewRequest) error {
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get database from context: %w", err)
+	}
+
+	uuid, err := uuid.Parse(req.NodeId)
+	if err != nil {
+		return fmt.Errorf("failed to parse leaf id: %w", err)
+	}
+
+	leaf, err := db.TreeNode.
+		Query().
+		Where(enttreenode.ID(uuid)).
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return errors.NotFoundMissingEntity(fmt.Errorf("leaf with id %s not found", req.NodeId))
+		}
+		return fmt.Errorf("failed to get leaf node: %w", err)
+	}
+
+	if leaf.Status != st.TreeNodeStatusAvailable {
+		return errors.FailedPreconditionInvalidState(fmt.Errorf("leaf node is not available for renewal, current status: %s", leaf.Status))
+	}
+
+	return nil
+}
+
 /**
  *	RenewLeaf manages timelocks of nodes. This function will validate user
  * 	sent signing jobs, sign them, aggregate them, and then update internal
@@ -97,6 +127,20 @@ func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafReque
 
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, leaf.OwnerIdentityPubkey); err != nil {
 		return nil, err
+	}
+
+	selection := helper.OperatorSelection{Option: helper.OperatorSelectionOptionExcludeSelf}
+	_, err = helper.ExecuteTaskWithAllOperators(ctx, h.config, &selection, func(ctx context.Context, operator *so.SigningOperator) (any, error) {
+		conn, err := operator.NewOperatorGRPCConnection()
+		if err != nil {
+			return nil, err
+		}
+		defer conn.Close()
+		client := pbinternal.NewSparkInternalServiceClient(conn)
+		return client.NodeAvailableForRenew(ctx, &pbinternal.NodeAvailableForRenewRequest{NodeId: leaf.ID.String()})
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if node is available for renew: %w", err)
 	}
 
 	// Determine operation type and delegate to appropriate handler

@@ -32,6 +32,7 @@ const (
 	SparkInternalService_FinalizeExtendLeaf_FullMethodName                 = "/spark_internal.SparkInternalService/finalize_extend_leaf"
 	SparkInternalService_FinalizeRenewRefundTimelock_FullMethodName        = "/spark_internal.SparkInternalService/finalize_renew_refund_timelock"
 	SparkInternalService_FinalizeRenewNodeTimelock_FullMethodName          = "/spark_internal.SparkInternalService/finalize_renew_node_timelock"
+	SparkInternalService_NodeAvailableForRenew_FullMethodName              = "/spark_internal.SparkInternalService/node_available_for_renew"
 	SparkInternalService_InitiatePreimageSwap_FullMethodName               = "/spark_internal.SparkInternalService/initiate_preimage_swap"
 	SparkInternalService_InitiatePreimageSwapV2_FullMethodName             = "/spark_internal.SparkInternalService/initiate_preimage_swap_v2"
 	SparkInternalService_ProvidePreimage_FullMethodName                    = "/spark_internal.SparkInternalService/provide_preimage"
@@ -74,6 +75,7 @@ type SparkInternalServiceClient interface {
 	FinalizeExtendLeaf(ctx context.Context, in *FinalizeExtendLeafRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FinalizeRenewRefundTimelock(ctx context.Context, in *FinalizeRenewRefundTimelockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	FinalizeRenewNodeTimelock(ctx context.Context, in *FinalizeRenewNodeTimelockRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	NodeAvailableForRenew(ctx context.Context, in *NodeAvailableForRenewRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiatePreimageSwap(ctx context.Context, in *spark.InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	InitiatePreimageSwapV2(ctx context.Context, in *InitiatePreimageSwapRequest, opts ...grpc.CallOption) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(ctx context.Context, in *ProvidePreimageRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -222,6 +224,16 @@ func (c *sparkInternalServiceClient) FinalizeRenewNodeTimelock(ctx context.Conte
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, SparkInternalService_FinalizeRenewNodeTimelock_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sparkInternalServiceClient) NodeAvailableForRenew(ctx context.Context, in *NodeAvailableForRenewRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SparkInternalService_NodeAvailableForRenew_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -476,6 +488,7 @@ type SparkInternalServiceServer interface {
 	FinalizeExtendLeaf(context.Context, *FinalizeExtendLeafRequest) (*emptypb.Empty, error)
 	FinalizeRenewRefundTimelock(context.Context, *FinalizeRenewRefundTimelockRequest) (*emptypb.Empty, error)
 	FinalizeRenewNodeTimelock(context.Context, *FinalizeRenewNodeTimelockRequest) (*emptypb.Empty, error)
+	NodeAvailableForRenew(context.Context, *NodeAvailableForRenewRequest) (*emptypb.Empty, error)
 	InitiatePreimageSwap(context.Context, *spark.InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	InitiatePreimageSwapV2(context.Context, *InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error)
 	ProvidePreimage(context.Context, *ProvidePreimageRequest) (*emptypb.Empty, error)
@@ -550,6 +563,9 @@ func (UnimplementedSparkInternalServiceServer) FinalizeRenewRefundTimelock(conte
 }
 func (UnimplementedSparkInternalServiceServer) FinalizeRenewNodeTimelock(context.Context, *FinalizeRenewNodeTimelockRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FinalizeRenewNodeTimelock not implemented")
+}
+func (UnimplementedSparkInternalServiceServer) NodeAvailableForRenew(context.Context, *NodeAvailableForRenewRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NodeAvailableForRenew not implemented")
 }
 func (UnimplementedSparkInternalServiceServer) InitiatePreimageSwap(context.Context, *spark.InitiatePreimageSwapRequest) (*InitiatePreimageSwapResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method InitiatePreimageSwap not implemented")
@@ -835,6 +851,24 @@ func _SparkInternalService_FinalizeRenewNodeTimelock_Handler(srv interface{}, ct
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SparkInternalServiceServer).FinalizeRenewNodeTimelock(ctx, req.(*FinalizeRenewNodeTimelockRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SparkInternalService_NodeAvailableForRenew_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NodeAvailableForRenewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SparkInternalServiceServer).NodeAvailableForRenew(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SparkInternalService_NodeAvailableForRenew_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SparkInternalServiceServer).NodeAvailableForRenew(ctx, req.(*NodeAvailableForRenewRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1303,6 +1337,10 @@ var SparkInternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "finalize_renew_node_timelock",
 			Handler:    _SparkInternalService_FinalizeRenewNodeTimelock_Handler,
+		},
+		{
+			MethodName: "node_available_for_renew",
+			Handler:    _SparkInternalService_NodeAvailableForRenew_Handler,
 		},
 		{
 			MethodName: "initiate_preimage_swap",

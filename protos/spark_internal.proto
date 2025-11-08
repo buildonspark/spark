@@ -28,6 +28,7 @@ service SparkInternalService {
 
    rpc finalize_renew_refund_timelock(FinalizeRenewRefundTimelockRequest) returns (google.protobuf.Empty) {}
    rpc finalize_renew_node_timelock(FinalizeRenewNodeTimelockRequest) returns (google.protobuf.Empty) {}
+   rpc node_available_for_renew(NodeAvailableForRenewRequest) returns (google.protobuf.Empty) {}
 
     rpc initiate_preimage_swap(spark.InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
     rpc initiate_preimage_swap_v2(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
@@ -168,6 +169,10 @@ message FinalizeRenewRefundTimelockRequest {
 message FinalizeRenewNodeTimelockRequest {
     TreeNode split_node = 1;
     TreeNode node = 2;
+}
+
+message NodeAvailableForRenewRequest {
+    string node_id = 1;
 }
 
 message TreeNode {
