@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -91,6 +92,14 @@ func toGRPCError(err error) error {
 			return nil
 		}
 		return err
+	}
+
+	// Map standard context errors to their appropriate gRPC codes.
+	if errors.Is(err, context.Canceled) {
+		return &grpcError{Code: codes.Canceled, Cause: err, Reason: ""}
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return &grpcError{Code: codes.DeadlineExceeded, Cause: err, Reason: ""}
 	}
 
 	// Default to Internal error with no reason.

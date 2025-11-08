@@ -253,6 +253,30 @@ func TestToGRPCError(t *testing.T) {
 			wantErrCode: codes.Unimplemented,
 			wantMessage: "service unavailable",
 		},
+		{
+			name:        "context.Canceled returns canceled code",
+			err:         context.Canceled,
+			wantErrCode: codes.Canceled,
+			wantMessage: "context canceled",
+		},
+		{
+			name:        "wrapped context.Canceled returns canceled code",
+			err:         fmt.Errorf("operation failed: %w", context.Canceled),
+			wantErrCode: codes.Canceled,
+			wantMessage: "operation failed: context canceled",
+		},
+		{
+			name:        "context.DeadlineExceeded returns deadline exceeded code",
+			err:         context.DeadlineExceeded,
+			wantErrCode: codes.DeadlineExceeded,
+			wantMessage: "context deadline exceeded",
+		},
+		{
+			name:        "wrapped context.DeadlineExceeded returns deadline exceeded code",
+			err:         fmt.Errorf("timeout during request: %w", context.DeadlineExceeded),
+			wantErrCode: codes.DeadlineExceeded,
+			wantMessage: "timeout during request: context deadline exceeded",
+		},
 	}
 
 	for _, tt := range tests {
