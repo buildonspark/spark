@@ -116,6 +116,7 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsAvailableT
 				tc.nonCoordinatorInitialTxStatus,
 				tc.nonCoordinatorRemapTxStatus,
 				true,
+				false,
 			)
 
 			conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000001"].NewOperatorGRPCConnection()
@@ -162,7 +163,116 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsAvailableT
 	}
 }
 
-func TestRevocationExchangeCronJobFailsToReclaimOutputsIfRemappedTransactionHasNotExpired(t *testing.T) {
+// REVEALED txA has its outputs remapped to a new tx, txB on a different operator.
+// txB is not yet expired - fallback to preemption check.
+// If txA wins the preemption check vs txB, finalize successfully.
+func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsIfRemapTxHasNotExpiredButIsNotInitialTxNotPreemptedByRemapTx(t *testing.T) {
+	testCases := []struct {
+		name                          string
+		nonCoordinatorInitialTxStatus st.TokenTransactionStatus
+		nonCoordinatorRemapTxStatus   st.TokenTransactionStatus
+	}{
+		{
+			name:                          "Successfully finalizes REVEALED/SIGNED/FINALIZED when the remapped transaction on the non-coordinator is SIGNED",
+			nonCoordinatorInitialTxStatus: st.TokenTransactionStatusSigned,
+			nonCoordinatorRemapTxStatus:   st.TokenTransactionStatusSigned,
+		},
+		{
+			name:                          "Successfully finalizes REVEALED/SIGNED/FINALIZED when the remapped transaction on the non-coordinator is STARTED",
+			nonCoordinatorInitialTxStatus: st.TokenTransactionStatusSigned,
+			nonCoordinatorRemapTxStatus:   st.TokenTransactionStatusStarted,
+		},
+		{
+			name:                          "Successfully finalizes REVEALED/STARTED/FINALIZED when the remapped transaction on the non-coordinator is SIGNED",
+			nonCoordinatorInitialTxStatus: st.TokenTransactionStatusStarted,
+			nonCoordinatorRemapTxStatus:   st.TokenTransactionStatusSigned,
+		},
+		{
+			name:                          "Successfully finalizes REVEALED/STARTED/FINALIZED when the remapped transaction on the non-coordinator is STARTED",
+			nonCoordinatorInitialTxStatus: st.TokenTransactionStatusStarted,
+			nonCoordinatorRemapTxStatus:   st.TokenTransactionStatusStarted,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			config, initalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+			require.NoError(t, err, "failed to create transfer token transaction")
+
+			_, remappedFinalTransferTokenTransactionHash, err := createTransferTokenTransactionForWallet(t, ctx)
+			require.NoError(t, err, "failed to create transfer token transaction")
+
+			coordinatorEntClient := db.NewPostgresEntClientForIntegrationTest(t, config.CoordinatorDatabaseURI)
+			defer coordinatorEntClient.Close()
+
+			nonCoordOperatorConfig := sparktesting.SpecificOperatorTestConfig(t, 1)
+			nonCoordEntClient := db.NewPostgresEntClientForIntegrationTest(t, nonCoordOperatorConfig.DatabasePath)
+			defer nonCoordEntClient.Close()
+
+			setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t, ctx, coordinatorEntClient, initalTransferTokenTransactionHash)
+
+			setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOperator(
+				t, ctx,
+				coordinatorEntClient,
+				nonCoordEntClient,
+				initalTransferTokenTransactionHash,
+				remappedFinalTransferTokenTransactionHash,
+				tc.nonCoordinatorInitialTxStatus,
+				tc.nonCoordinatorRemapTxStatus,
+				false,
+				false,
+			)
+
+			conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000001"].NewOperatorGRPCConnection()
+			require.NoError(t, err)
+			mockClient := pbmock.NewMockServiceClient(conn)
+			_, err = mockClient.TriggerTask(t.Context(), &pbmock.TriggerTaskRequest{TaskName: "finalize_revealed_token_transactions"})
+			require.NoError(t, err)
+			conn.Close()
+
+			tokenTransactionAfterFinalizeRevealedTransactions, err := coordinatorEntClient.TokenTransaction.Query().
+				Where(tokentransaction.FinalizedTokenTransactionHashEQ(initalTransferTokenTransactionHash)).
+				WithPeerSignatures().
+				WithSpentOutput(func(to *ent.TokenOutputQuery) { to.WithTokenPartialRevocationSecretShares() }).
+				WithCreatedOutput().
+				Only(ctx)
+			require.NoError(t, err)
+			require.Equal(t, st.TokenTransactionStatusFinalized, tokenTransactionAfterFinalizeRevealedTransactions.Status)
+
+			nonCoordinatorTokenTransaction, err := nonCoordEntClient.TokenTransaction.Query().
+				Where(tokentransaction.FinalizedTokenTransactionHashEQ(initalTransferTokenTransactionHash)).
+				WithSpentOutput().
+				WithCreatedOutput().
+				Only(ctx)
+
+			for _, tokenOutput := range tokenTransactionAfterFinalizeRevealedTransactions.Edges.SpentOutput {
+				require.Equal(t, len(tokenOutput.Edges.TokenPartialRevocationSecretShares), len(config.SigningOperators)-1, "should have exactly numOperators-1 secret shares")
+				require.Equal(t, st.TokenOutputStatusSpentFinalized, tokenOutput.Status)
+			}
+			for _, tokenOutput := range tokenTransactionAfterFinalizeRevealedTransactions.Edges.CreatedOutput {
+				require.Equal(t, st.TokenOutputStatusCreatedFinalized, tokenOutput.Status)
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, st.TokenTransactionStatusFinalized, nonCoordinatorTokenTransaction.Status)
+			require.Len(t, nonCoordinatorTokenTransaction.Edges.SpentOutput, len(tokenTransactionAfterFinalizeRevealedTransactions.Edges.SpentOutput), "should have the same number of spent outputs")
+			for _, tokenOutput := range nonCoordinatorTokenTransaction.Edges.SpentOutput {
+				require.Equal(t, st.TokenOutputStatusSpentFinalized, tokenOutput.Status)
+			}
+			require.Len(t, nonCoordinatorTokenTransaction.Edges.CreatedOutput, len(tokenTransactionAfterFinalizeRevealedTransactions.Edges.CreatedOutput), "should have the same number of created outputs")
+			for _, tokenOutput := range nonCoordinatorTokenTransaction.Edges.CreatedOutput {
+				require.Equal(t, st.TokenOutputStatusCreatedFinalized, tokenOutput.Status)
+			}
+		})
+	}
+}
+
+// REVEALED txA has its outputs remapped to a new tx, txB on a different operator.
+// txB is not yet expired - fallback to preemption check.
+// If txA loses the preemption check vs txB, fail to finalize.
+func TestRevocationExchangeCronJobFailsToReclaimOutputsIfRemappedTransactionHasNotExpiredAndIsPreemptedByRemapTx(t *testing.T) {
 	testCases := []struct {
 		name                          string
 		nonCoordinatorInitialTxStatus st.TokenTransactionStatus
@@ -216,6 +326,7 @@ func TestRevocationExchangeCronJobFailsToReclaimOutputsIfRemappedTransactionHasN
 				tc.nonCoordinatorInitialTxStatus,
 				tc.nonCoordinatorRemapTxStatus,
 				false,
+				true,
 			)
 
 			conn, err := config.SigningOperators["0000000000000000000000000000000000000000000000000000000000000001"].NewOperatorGRPCConnection()
@@ -805,7 +916,8 @@ func setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOper
 	remappedFinalTransferTokenTransactionHash []byte,
 	nonCoordinatorInitialTxStatus st.TokenTransactionStatus,
 	nonCoordinatorRemapTxStatus st.TokenTransactionStatus,
-	availableToRemap bool,
+	expiredRemapTx bool,
+	preemptedByRemap bool,
 ) {
 	coordinatorTx, err := coordinatorEntClient.Tx(ctx)
 	require.NoError(t, err)
@@ -885,13 +997,19 @@ func setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOper
 	require.NoError(t, err)
 	now := time.Now().UTC()
 	expirationTime := now.Add(20 * time.Minute)
-	if availableToRemap {
+	if expiredRemapTx {
 		expirationTime = now.Add(-25 * time.Minute)
+	}
+	var clientCreatedTimestamp time.Time
+	if preemptedByRemap {
+		clientCreatedTimestamp = now.Add(-100 * time.Hour)
+	} else {
+		clientCreatedTimestamp = now.Add(100 * time.Hour)
 	}
 
 	err = nonCoordinatorTx.TokenTransaction.Update().
 		Where(tokentransaction.FinalizedTokenTransactionHashEQ(remappedFinalTransferTokenTransactionHash)).
-		SetClientCreatedTimestamp(now.Add(100 * time.Hour)). // force this tx to lose preemptOrReject check.
+		SetClientCreatedTimestamp(clientCreatedTimestamp).
 		SetStatus(nonCoordinatorRemapTxStatus).
 		SetUpdateTime(time.Now().Add(-25 * time.Minute).UTC()).
 		ClearSpentOutput().

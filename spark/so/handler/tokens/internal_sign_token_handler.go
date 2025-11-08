@@ -419,15 +419,16 @@ func (h *InternalSignTokenHandler) reclaimOutputsSpentOnDifferentStartedTransact
 
 			now := time.Now().UTC()
 			remappedOutputExpirationTime := remappedOutput.Edges.OutputSpentTokenTransaction.ExpiryTime.UTC()
-			if !remappedOutputExpirationTime.IsZero() && now.Before(remappedOutputExpirationTime) {
-				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("Failed to reclaim token output because its transaction: %x has not expired yet. Expiration time: %s, current time: %s",
-					remappedOutput.Edges.OutputSpentTokenTransaction.FinalizedTokenTransactionHash,
-					remappedOutputExpirationTime.Format(time.RFC3339),
-					now.Format(time.RFC3339)))
-			}
 
-			if err := preemptOrRejectTransaction(ctx, req.FinalTokenTransaction, remappedOutput.Edges.OutputSpentTokenTransaction); err != nil {
-				return err
+			// Only allow a transaction to reclaim if the remapped tx is:
+			// 1. expired
+			// 2. unexpired but not preempted.
+			if !remappedOutputExpirationTime.IsZero() && now.Before(remappedOutputExpirationTime) {
+				if err := preemptOrRejectTransaction(ctx, req.FinalTokenTransaction, remappedOutput.Edges.OutputSpentTokenTransaction); err != nil {
+					return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("failed to reclaim token output from unexpired transaction: %x because it was preempted: %w",
+						remappedOutput.Edges.OutputSpentTokenTransaction.FinalizedTokenTransactionHash,
+						err))
+				}
 			}
 
 			var updateOutputStatus st.TokenOutputStatus
