@@ -2096,7 +2096,7 @@ func (h *TransferHandler) ClaimTransferTweakKeys(ctx context.Context, req *pb.Cl
 		return err
 	}
 
-	transfer, err := h.loadTransferForUpdate(ctx, req.TransferId)
+	transfer, err := h.loadTransferForUpdate(ctx, req.TransferId, sql.WithLockAction(sql.NoWait))
 	if err != nil {
 		return fmt.Errorf("unable to load transfer %s: %w", req.TransferId, err)
 	}
@@ -2397,7 +2397,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		return nil, err
 	}
 
-	transfer, err := h.loadTransferForUpdate(ctx, req.TransferId)
+	transfer, err := h.loadTransferForUpdate(ctx, req.TransferId, sql.WithLockAction(sql.NoWait))
 	if err != nil {
 		return nil, fmt.Errorf("unable to load transfer %s: %w", req.TransferId, err)
 	}
