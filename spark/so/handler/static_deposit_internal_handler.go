@@ -199,7 +199,7 @@ func (h *StaticDepositInternalHandler) CreateStaticDepositUtxoSwap(ctx context.C
 	}
 
 	// Validate user signature, receiver identitypubkey and amount in transfer
-	leaves, err := loadLeavesWithLock(ctx, db, leafRefundMap)
+	leaves, _, err := loadLeavesWithLock(ctx, db, leafRefundMap)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load leaves: %w", err)
 	}

@@ -303,18 +303,18 @@ func (h *BaseTransferHandler) createTransfer(
 		transferCreate.SetPrimarySwapTransfer(primaryTransfer)
 	}
 
-	transfer, err := transferCreate.Save(ctx)
+	leaves, network, err := loadLeavesWithLock(ctx, db, leafCpfpRefundMap)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to load leaves: %w", err)
+	}
+
+	transfer, err := transferCreate.SetNetwork(*network).Save(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to create transfer: %w", err)
 	}
 
 	if len(leafCpfpRefundMap) == 0 {
 		return nil, nil, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("must provide at least one leaf for transfer"))
-	}
-
-	leaves, err := loadLeavesWithLock(ctx, db, leafCpfpRefundMap)
-	if err != nil {
-		return nil, nil, fmt.Errorf("unable to load leaves: %w", err)
 	}
 
 	switch transferType {
@@ -416,12 +416,12 @@ func createAndLockSparkInvoice(ctx context.Context, sparkInvoice string) (uuid.U
 	return storedInvoice.ID, nil
 }
 
-func loadLeavesWithLock(ctx context.Context, db *ent.Client, leafRefundMap map[string][]byte) ([]*ent.TreeNode, error) {
+func loadLeavesWithLock(ctx context.Context, db *ent.Client, leafRefundMap map[string][]byte) ([]*ent.TreeNode, *st.Network, error) {
 	leafUUIDs := make([]uuid.UUID, 0, len(leafRefundMap))
 	for leafID := range leafRefundMap {
 		leafUUID, err := uuid.Parse(leafID)
 		if err != nil {
-			return nil, fmt.Errorf("unable to parse leaf_id %s: %w", leafID, err)
+			return nil, nil, fmt.Errorf("unable to parse leaf_id %s: %w", leafID, err)
 		}
 		leafUUIDs = append(leafUUIDs, leafUUID)
 	}
@@ -432,26 +432,26 @@ func loadLeavesWithLock(ctx context.Context, db *ent.Client, leafRefundMap map[s
 		ForUpdate().
 		All(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("unable to find leaves: %w", err)
+		return nil, nil, fmt.Errorf("unable to find leaves: %w", err)
 	}
 	if len(leaves) != len(leafRefundMap) {
-		return nil, fmt.Errorf("some leaves not found")
+		return nil, nil, fmt.Errorf("some leaves not found")
 	}
 
 	var network *st.Network
 	for _, leaf := range leaves {
 		tree := leaf.Edges.Tree
 		if tree == nil {
-			return nil, fmt.Errorf("unable to find tree for leaf %s", leaf.ID)
+			return nil, nil, fmt.Errorf("unable to find tree for leaf %s", leaf.ID)
 		}
 		if network == nil {
 			network = &tree.Network
 		} else if tree.Network != *network {
-			return nil, fmt.Errorf("leaves sent for transfer must be on the same network")
+			return nil, nil, fmt.Errorf("leaves sent for transfer must be on the same network")
 		}
 	}
 
-	return leaves, nil
+	return leaves, network, nil
 }
 
 func (h *BaseTransferHandler) validateCooperativeExitLeaves(ctx context.Context, transfer *ent.Transfer, leaves []*ent.TreeNode, leafCpfpRefundMap map[string][]byte, leafDirectRefundMap map[string][]byte, leafDirectFromCpfpRefundMap map[string][]byte, receiverIdentityPublicKey keys.Public, requireDirectTx bool) error {

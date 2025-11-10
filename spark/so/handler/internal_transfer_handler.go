@@ -308,7 +308,7 @@ func (h *InternalTransferHandler) DeliverSenderKeyTweak(ctx context.Context, req
 	if err != nil {
 		return fmt.Errorf("unable to find transfer %s: %w", req.TransferId, err)
 	}
-	leaves, err := loadLeavesWithLock(ctx, db, leafRefundMap)
+	leaves, _, err := loadLeavesWithLock(ctx, db, leafRefundMap)
 	if err != nil {
 		return fmt.Errorf("unable to load leaves for transfer %s: %w", req.TransferId, err)
 	}
