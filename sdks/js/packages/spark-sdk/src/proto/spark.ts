@@ -192,6 +192,8 @@ export enum TransferType {
   UTXO_SWAP = 3,
   SWAP = 30,
   COUNTER_SWAP = 40,
+  PRIMARY_SWAP_V3 = 4,
+  COUNTER_SWAP_V3 = 5,
   UNRECOGNIZED = -1,
 }
 
@@ -215,6 +217,12 @@ export function transferTypeFromJSON(object: any): TransferType {
     case 40:
     case "COUNTER_SWAP":
       return TransferType.COUNTER_SWAP;
+    case 4:
+    case "PRIMARY_SWAP_V3":
+      return TransferType.PRIMARY_SWAP_V3;
+    case 5:
+    case "COUNTER_SWAP_V3":
+      return TransferType.COUNTER_SWAP_V3;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -236,6 +244,10 @@ export function transferTypeToJSON(object: TransferType): string {
       return "SWAP";
     case TransferType.COUNTER_SWAP:
       return "COUNTER_SWAP";
+    case TransferType.PRIMARY_SWAP_V3:
+      return "PRIMARY_SWAP_V3";
+    case TransferType.COUNTER_SWAP_V3:
+      return "COUNTER_SWAP_V3";
     case TransferType.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
