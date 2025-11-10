@@ -1,24 +1,27 @@
-import { ConnectionManager } from "./connection.js";
+import fs from "fs";
 import {
-  createClient,
-  createChannel,
-  createClientFactory,
   ChannelCredentials,
+  createChannel,
+  createClient,
+  createClientFactory,
   type Channel,
 } from "nice-grpc";
-import { ClientMiddlewareCall, Metadata } from "nice-grpc-common";
+import {
+  retryMiddleware,
+  RetryOptions,
+} from "nice-grpc-client-middleware-retry";
 import type { ClientMiddleware } from "nice-grpc-common";
-import { RetryOptions, SparkCallOptions } from "../../types/grpc.js";
+import { ClientMiddlewareCall, Metadata, Status } from "nice-grpc-common";
+import { openTelemetryClientMiddleware } from "nice-grpc-opentelemetry";
+import { clientEnv } from "../../constants.js";
+import { NetworkError } from "../../errors/types.js";
 import { MockServiceClient, MockServiceDefinition } from "../../proto/mock.js";
 import { SparkServiceDefinition } from "../../proto/spark.js";
 import { SparkAuthnServiceDefinition } from "../../proto/spark_authn.js";
 import { SparkTokenServiceDefinition } from "../../proto/spark_token.js";
-import { openTelemetryClientMiddleware } from "nice-grpc-opentelemetry";
-import { retryMiddleware } from "nice-grpc-client-middleware-retry";
+import { SparkCallOptions } from "../../types/grpc.js";
 import { WalletConfigService } from "../config.js";
-import { NetworkError } from "../../errors/types.js";
-import { clientEnv } from "../../constants.js";
-import fs from "fs";
+import { ConnectionManager } from "./connection.js";
 
 export class ConnectionManagerNodeJS extends ConnectionManager {
   private certPath: string | null = null;
@@ -148,9 +151,12 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
     middleware?: ClientMiddleware<RetryOptions, {}>,
     channelKey?: string,
   ) {
-    const retryOptions = {
+    const retryOptions: RetryOptions = {
       retry: true,
       retryMaxAttempts: 3,
+      retryBaseDelayMs: 1000,
+      retryMaxDelayMs: 10000,
+      retryableStatuses: [Status.UNAVAILABLE, Status.CANCELLED],
     };
     let options: RetryOptions = {};
 

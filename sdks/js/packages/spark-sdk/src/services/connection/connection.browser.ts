@@ -1,21 +1,24 @@
-import { ConnectionManager } from "./connection.js";
+import {
+  retryMiddleware,
+  RetryOptions,
+} from "nice-grpc-client-middleware-retry";
+import type { ClientMiddleware } from "nice-grpc-common";
+import { ClientMiddlewareCall, Metadata, Status } from "nice-grpc-common";
 import {
   createChannel,
-  FetchTransport,
   createClientFactory,
+  FetchTransport,
   type Channel as ChannelWeb,
   type ClientFactory as ClientFactoryWeb,
 } from "nice-grpc-web";
-import { ClientMiddlewareCall, Metadata } from "nice-grpc-common";
-import type { ClientMiddleware } from "nice-grpc-common";
-import { retryMiddleware } from "nice-grpc-client-middleware-retry";
-import { RetryOptions, SparkCallOptions } from "../../types/grpc.js";
-import { WalletConfigService } from "../config.js";
 import { clientEnv } from "../../constants.js";
 import { NetworkError } from "../../errors/types.js";
-import type { SparkAuthnServiceDefinition } from "../../proto/spark_authn.js";
 import type { SparkServiceDefinition } from "../../proto/spark.js";
+import type { SparkAuthnServiceDefinition } from "../../proto/spark_authn.js";
 import type { SparkTokenServiceDefinition } from "../../proto/spark_token.js";
+import { SparkCallOptions } from "../../types/grpc.js";
+import { WalletConfigService } from "../config.js";
+import { ConnectionManager } from "./connection.js";
 
 export type Transport = NonNullable<Parameters<typeof createChannel>[1]>;
 
@@ -114,6 +117,9 @@ export class ConnectionManagerBrowser extends ConnectionManager {
     const retryOptions = {
       retry: true,
       retryMaxAttempts: 3,
+      retryBaseDelayMs: 1000,
+      retryMaxDelayMs: 10000,
+      retryableStatuses: [Status.UNAVAILABLE, Status.CANCELLED],
     };
     let options: RetryOptions = {};
 
