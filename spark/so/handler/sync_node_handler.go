@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/ent/treenode"
 )
 
 type SyncNodeHandler struct {
@@ -27,6 +28,23 @@ func NewSyncNodeHandler(soConfig *so.Config) SyncNodeHandler {
 func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeRequest) error {
 	if len(req.NodeIds) == 0 || len(req.NodeIds) > 100 {
 		return fmt.Errorf("invalid node ids: %v", req.NodeIds)
+	}
+
+	db, err := ent.GetDbFromContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get or create current tx for request: %w", err)
+	}
+	nodeUuids := []uuid.UUID{}
+	for _, nodeId := range req.NodeIds {
+		nodeUuid, err := uuid.Parse(nodeId)
+		if err != nil {
+			return fmt.Errorf("unable to parse node id %s: %w", nodeId, err)
+		}
+		nodeUuids = append(nodeUuids, nodeUuid)
+	}
+	nodes, err := db.TreeNode.Query().Where(treenode.IDIn(nodeUuids...)).ForUpdate().All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to lock tree nodes %v: %w", nodeUuids, err)
 	}
 
 	conn, err := h.config.SigningOperatorMap[req.OperatorId].NewOperatorGRPCConnection()
@@ -57,42 +75,22 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 		nodeIDMap[node.Id] = node
 	}
 
-	db, err := ent.GetDbFromContext(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get or create current tx for request: %w", err)
+	// Create a map of existing node UUIDs for quick lookup
+	existingNodeMap := make(map[uuid.UUID]*ent.TreeNode)
+	for _, node := range nodes {
+		existingNodeMap[node.ID] = node
 	}
 
-	for _, nodeID := range req.NodeIds {
-		node, ok := nodeIDMap[nodeID]
+	for _, nodeUUID := range nodeUuids {
+		node, ok := nodeIDMap[nodeUUID.String()]
 		if !ok {
-			return fmt.Errorf("node %s not found", nodeID)
+			return fmt.Errorf("node %s not found in response", nodeUUID.String())
 		}
 
-		nodeUUID, err := uuid.Parse(node.Id)
-		if err != nil {
-			return fmt.Errorf("unable to parse node id %s: %w", node.Id, err)
-		}
-
-		// Check if the node exists locally
-		existingNode, err := db.TreeNode.Get(ctx, nodeUUID)
-		if err != nil && !ent.IsNotFound(err) {
-			return fmt.Errorf("unable to query node %s: %w", node.Id, err)
-		}
-
-		if existingNode == nil {
-			// Validate status before creating
-			if node.Status != "SPLITTED" && node.Status != "SPLIT_LOCKED" {
-				return fmt.Errorf("cannot create node %s with status %s: only SPLITTED or SPLIT_LOCKED nodes can be created during sync", node.Id, node.Status)
-			}
-
-			// Node doesn't exist locally - create it
-			err = h.createMissingSplitNode(ctx, db, node, nodeUUID)
-			if err != nil {
-				return err
-			}
-		} else {
+		existingNode, exists := existingNodeMap[nodeUUID]
+		if exists {
 			// Node exists - update transaction fields
-			mut := db.TreeNode.UpdateOneID(nodeUUID).
+			mut := existingNode.Update().
 				SetRawTx(node.NodeTx).
 				SetRawRefundTx(node.RefundTx).
 				SetDirectTx(node.DirectTx).
@@ -107,9 +105,20 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 				mut.SetParentID(parentUUID)
 			}
 
-			err = mut.Exec(ctx)
+			_, err = mut.Save(ctx)
 			if err != nil {
-				return fmt.Errorf("unable to update node %s: %w", node.Id, err)
+				return fmt.Errorf("unable to update node %s: %w", nodeUUID.String(), err)
+			}
+		} else {
+			// Validate status before creating
+			if node.Status != "SPLITTED" && node.Status != "SPLIT_LOCKED" {
+				return fmt.Errorf("cannot create node %s with status %s: only SPLITTED or SPLIT_LOCKED nodes can be created during sync", node.Id, node.Status)
+			}
+
+			// Node doesn't exist locally - create it
+			err = h.createMissingSplitNode(ctx, db, node, nodeUUID)
+			if err != nil {
+				return err
 			}
 		}
 	}
