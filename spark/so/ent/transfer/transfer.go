@@ -26,6 +26,8 @@ const (
 	FieldSenderIdentityPubkey = "sender_identity_pubkey"
 	// FieldReceiverIdentityPubkey holds the string denoting the receiver_identity_pubkey field in the database.
 	FieldReceiverIdentityPubkey = "receiver_identity_pubkey"
+	// FieldNetwork holds the string denoting the network field in the database.
+	FieldNetwork = "network"
 	// FieldTotalValue holds the string denoting the total_value field in the database.
 	FieldTotalValue = "total_value"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -88,6 +90,7 @@ var Columns = []string{
 	FieldUpdateTime,
 	FieldSenderIdentityPubkey,
 	FieldReceiverIdentityPubkey,
+	FieldNetwork,
 	FieldTotalValue,
 	FieldStatus,
 	FieldType,
@@ -135,6 +138,16 @@ var (
 	DefaultID func() uuid.UUID
 )
 
+// NetworkValidator is a validator for the "network" field enum values. It is called by the builders before save.
+func NetworkValidator(n schematype.Network) error {
+	switch n {
+	case "UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET":
+		return nil
+	default:
+		return fmt.Errorf("transfer: invalid enum value for network field: %q", n)
+	}
+}
+
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schematype.TransferStatus) error {
 	switch s {
@@ -171,6 +184,11 @@ func ByCreateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdateTime orders the results by the update_time field.
 func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdateTime, opts...).ToFunc()
+}
+
+// ByNetwork orders the results by the network field.
+func ByNetwork(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNetwork, opts...).ToFunc()
 }
 
 // ByTotalValue orders the results by the total_value field.

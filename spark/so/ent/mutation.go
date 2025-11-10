@@ -18090,6 +18090,7 @@ type TransferMutation struct {
 	update_time                  *time.Time
 	sender_identity_pubkey       *keys.Public
 	receiver_identity_pubkey     *keys.Public
+	network                      *schematype.Network
 	total_value                  *uint64
 	addtotal_value               *int64
 	status                       *schematype.TransferStatus
@@ -18360,6 +18361,55 @@ func (m *TransferMutation) OldReceiverIdentityPubkey(ctx context.Context) (v key
 // ResetReceiverIdentityPubkey resets all changes to the "receiver_identity_pubkey" field.
 func (m *TransferMutation) ResetReceiverIdentityPubkey() {
 	m.receiver_identity_pubkey = nil
+}
+
+// SetNetwork sets the "network" field.
+func (m *TransferMutation) SetNetwork(s schematype.Network) {
+	m.network = &s
+}
+
+// Network returns the value of the "network" field in the mutation.
+func (m *TransferMutation) Network() (r schematype.Network, exists bool) {
+	v := m.network
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNetwork returns the old "network" field's value of the Transfer entity.
+// If the Transfer object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TransferMutation) OldNetwork(ctx context.Context) (v schematype.Network, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNetwork requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNetwork: %w", err)
+	}
+	return oldValue.Network, nil
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (m *TransferMutation) ClearNetwork() {
+	m.network = nil
+	m.clearedFields[transfer.FieldNetwork] = struct{}{}
+}
+
+// NetworkCleared returns if the "network" field was cleared in this mutation.
+func (m *TransferMutation) NetworkCleared() bool {
+	_, ok := m.clearedFields[transfer.FieldNetwork]
+	return ok
+}
+
+// ResetNetwork resets all changes to the "network" field.
+func (m *TransferMutation) ResetNetwork() {
+	m.network = nil
+	delete(m.clearedFields, transfer.FieldNetwork)
 }
 
 // SetTotalValue sets the "total_value" field.
@@ -18871,7 +18921,7 @@ func (m *TransferMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TransferMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 11)
 	if m.create_time != nil {
 		fields = append(fields, transfer.FieldCreateTime)
 	}
@@ -18883,6 +18933,9 @@ func (m *TransferMutation) Fields() []string {
 	}
 	if m.receiver_identity_pubkey != nil {
 		fields = append(fields, transfer.FieldReceiverIdentityPubkey)
+	}
+	if m.network != nil {
+		fields = append(fields, transfer.FieldNetwork)
 	}
 	if m.total_value != nil {
 		fields = append(fields, transfer.FieldTotalValue)
@@ -18918,6 +18971,8 @@ func (m *TransferMutation) Field(name string) (ent.Value, bool) {
 		return m.SenderIdentityPubkey()
 	case transfer.FieldReceiverIdentityPubkey:
 		return m.ReceiverIdentityPubkey()
+	case transfer.FieldNetwork:
+		return m.Network()
 	case transfer.FieldTotalValue:
 		return m.TotalValue()
 	case transfer.FieldStatus:
@@ -18947,6 +19002,8 @@ func (m *TransferMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldSenderIdentityPubkey(ctx)
 	case transfer.FieldReceiverIdentityPubkey:
 		return m.OldReceiverIdentityPubkey(ctx)
+	case transfer.FieldNetwork:
+		return m.OldNetwork(ctx)
 	case transfer.FieldTotalValue:
 		return m.OldTotalValue(ctx)
 	case transfer.FieldStatus:
@@ -18995,6 +19052,13 @@ func (m *TransferMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetReceiverIdentityPubkey(v)
+		return nil
+	case transfer.FieldNetwork:
+		v, ok := value.(schematype.Network)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNetwork(v)
 		return nil
 	case transfer.FieldTotalValue:
 		v, ok := value.(uint64)
@@ -19083,6 +19147,9 @@ func (m *TransferMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *TransferMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(transfer.FieldNetwork) {
+		fields = append(fields, transfer.FieldNetwork)
+	}
 	if m.FieldCleared(transfer.FieldCompletionTime) {
 		fields = append(fields, transfer.FieldCompletionTime)
 	}
@@ -19103,6 +19170,9 @@ func (m *TransferMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *TransferMutation) ClearField(name string) error {
 	switch name {
+	case transfer.FieldNetwork:
+		m.ClearNetwork()
+		return nil
 	case transfer.FieldCompletionTime:
 		m.ClearCompletionTime()
 		return nil
@@ -19128,6 +19198,9 @@ func (m *TransferMutation) ResetField(name string) error {
 		return nil
 	case transfer.FieldReceiverIdentityPubkey:
 		m.ResetReceiverIdentityPubkey()
+		return nil
+	case transfer.FieldNetwork:
+		m.ResetNetwork()
 		return nil
 	case transfer.FieldTotalValue:
 		m.ResetTotalValue()

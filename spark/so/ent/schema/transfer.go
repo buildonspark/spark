@@ -32,6 +32,8 @@ func (Transfer) Fields() []ent.Field {
 			GoType(keys.Public{}).
 			Comment("The identity public key of the sender of the transfer."),
 		field.Bytes("receiver_identity_pubkey").Immutable().GoType(keys.Public{}),
+		// TODO(mhr): Make this non-null after backfilling existing data.
+		field.Enum("network").GoType(st.Network("")).Optional(),
 		field.Uint64("total_value"),
 		field.Enum("status").GoType(st.TransferStatus("")),
 		field.Enum("type").GoType(st.TransferType("")),

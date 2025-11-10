@@ -258,6 +258,46 @@ func ReceiverIdentityPubkeyLTE(v keys.Public) predicate.Transfer {
 	return predicate.Transfer(sql.FieldLTE(FieldReceiverIdentityPubkey, v))
 }
 
+// NetworkEQ applies the EQ predicate on the "network" field.
+func NetworkEQ(v schematype.Network) predicate.Transfer {
+	vc := v
+	return predicate.Transfer(sql.FieldEQ(FieldNetwork, vc))
+}
+
+// NetworkNEQ applies the NEQ predicate on the "network" field.
+func NetworkNEQ(v schematype.Network) predicate.Transfer {
+	vc := v
+	return predicate.Transfer(sql.FieldNEQ(FieldNetwork, vc))
+}
+
+// NetworkIn applies the In predicate on the "network" field.
+func NetworkIn(vs ...schematype.Network) predicate.Transfer {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.Transfer(sql.FieldIn(FieldNetwork, v...))
+}
+
+// NetworkNotIn applies the NotIn predicate on the "network" field.
+func NetworkNotIn(vs ...schematype.Network) predicate.Transfer {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.Transfer(sql.FieldNotIn(FieldNetwork, v...))
+}
+
+// NetworkIsNil applies the IsNil predicate on the "network" field.
+func NetworkIsNil() predicate.Transfer {
+	return predicate.Transfer(sql.FieldIsNull(FieldNetwork))
+}
+
+// NetworkNotNil applies the NotNil predicate on the "network" field.
+func NetworkNotNil() predicate.Transfer {
+	return predicate.Transfer(sql.FieldNotNull(FieldNetwork))
+}
+
 // TotalValueEQ applies the EQ predicate on the "total_value" field.
 func TotalValueEQ(v uint64) predicate.Transfer {
 	return predicate.Transfer(sql.FieldEQ(FieldTotalValue, v))

@@ -752,6 +752,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "sender_identity_pubkey", Type: field.TypeBytes},
 		{Name: "receiver_identity_pubkey", Type: field.TypeBytes},
+		{Name: "network", Type: field.TypeEnum, Nullable: true, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
 		{Name: "total_value", Type: field.TypeUint64},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"SENDER_INITIATED", "SENDER_INITIATED_COORDINATOR", "SENDER_KEY_TWEAK_PENDING", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED", "RETURNED", "RECEIVER_KEY_TWEAK_APPLIED"}},
 		{Name: "type", Type: field.TypeEnum, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP", "UTXO_SWAP"}},
@@ -769,19 +770,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "transfers_payment_intents_payment_intent",
-				Columns:    []*schema.Column{TransfersColumns[10]},
+				Columns:    []*schema.Column{TransfersColumns[11]},
 				RefColumns: []*schema.Column{PaymentIntentsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "transfers_spark_invoices_spark_invoice",
-				Columns:    []*schema.Column{TransfersColumns[11]},
+				Columns:    []*schema.Column{TransfersColumns[12]},
 				RefColumns: []*schema.Column{SparkInvoicesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "transfers_transfers_counter_swap_transfer",
-				Columns:    []*schema.Column{TransfersColumns[12]},
+				Columns:    []*schema.Column{TransfersColumns[13]},
 				RefColumns: []*schema.Column{TransfersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -800,7 +801,7 @@ var (
 			{
 				Name:    "transfer_status",
 				Unique:  false,
-				Columns: []*schema.Column{TransfersColumns[6]},
+				Columns: []*schema.Column{TransfersColumns[7]},
 			},
 			{
 				Name:    "transfer_update_time",
@@ -810,7 +811,7 @@ var (
 			{
 				Name:    "idx_transfers_recv_status_create",
 				Unique:  false,
-				Columns: []*schema.Column{TransfersColumns[4], TransfersColumns[6], TransfersColumns[1]},
+				Columns: []*schema.Column{TransfersColumns[4], TransfersColumns[7], TransfersColumns[1]},
 				Annotation: &entsql.IndexAnnotation{
 					DescColumns: map[string]bool{
 						TransfersColumns[1].Name: true,
@@ -820,7 +821,7 @@ var (
 			{
 				Name:    "idx_transfers_spark_invoice_pending",
 				Unique:  true,
-				Columns: []*schema.Column{TransfersColumns[11]},
+				Columns: []*schema.Column{TransfersColumns[12]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "CAST(status AS TEXT) IN ('SENDER_KEY_TWEAK_PENDING', 'SENDER_INITIATED_COORDINATOR')",
 				},
@@ -828,7 +829,7 @@ var (
 			{
 				Name:    "idx_transfers_spark_invoice_completed",
 				Unique:  true,
-				Columns: []*schema.Column{TransfersColumns[11]},
+				Columns: []*schema.Column{TransfersColumns[12]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "CAST(status AS TEXT) IN ('SENDER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAKED', 'RECEIVER_KEY_TWEAK_LOCKED', 'RECEIVER_KEY_TWEAK_APPLIED', 'RECEIVER_REFUND_SIGNED', 'COMPLETED')",
 				},

@@ -30,6 +30,8 @@ type Transfer struct {
 	SenderIdentityPubkey keys.Public `json:"sender_identity_pubkey,omitempty"`
 	// ReceiverIdentityPubkey holds the value of the "receiver_identity_pubkey" field.
 	ReceiverIdentityPubkey keys.Public `json:"receiver_identity_pubkey,omitempty"`
+	// Network holds the value of the "network" field.
+	Network schematype.Network `json:"network,omitempty"`
 	// TotalValue holds the value of the "total_value" field.
 	TotalValue uint64 `json:"total_value,omitempty"`
 	// Status holds the value of the "status" field.
@@ -127,7 +129,7 @@ func (*Transfer) scanValues(columns []string) ([]any, error) {
 			values[i] = new(keys.Public)
 		case transfer.FieldTotalValue:
 			values[i] = new(sql.NullInt64)
-		case transfer.FieldStatus, transfer.FieldType:
+		case transfer.FieldNetwork, transfer.FieldStatus, transfer.FieldType:
 			values[i] = new(sql.NullString)
 		case transfer.FieldCreateTime, transfer.FieldUpdateTime, transfer.FieldExpiryTime, transfer.FieldCompletionTime:
 			values[i] = new(sql.NullTime)
@@ -181,6 +183,12 @@ func (t *Transfer) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field receiver_identity_pubkey", values[i])
 			} else if value != nil {
 				t.ReceiverIdentityPubkey = *value
+			}
+		case transfer.FieldNetwork:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field network", values[i])
+			} else if value.Valid {
+				t.Network = schematype.Network(value.String)
 			}
 		case transfer.FieldTotalValue:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -305,6 +313,9 @@ func (t *Transfer) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("receiver_identity_pubkey=")
 	builder.WriteString(fmt.Sprintf("%v", t.ReceiverIdentityPubkey))
+	builder.WriteString(", ")
+	builder.WriteString("network=")
+	builder.WriteString(fmt.Sprintf("%v", t.Network))
 	builder.WriteString(", ")
 	builder.WriteString("total_value=")
 	builder.WriteString(fmt.Sprintf("%v", t.TotalValue))
