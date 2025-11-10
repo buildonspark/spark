@@ -24,6 +24,8 @@ const (
 	FieldUpdateTime = "update_time"
 	// FieldValue holds the string denoting the value field in the database.
 	FieldValue = "value"
+	// FieldNetwork holds the string denoting the network field in the database.
+	FieldNetwork = "network"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldVerifyingPubkey holds the string denoting the verifying_pubkey field in the database.
@@ -98,6 +100,7 @@ var Columns = []string{
 	FieldCreateTime,
 	FieldUpdateTime,
 	FieldValue,
+	FieldNetwork,
 	FieldStatus,
 	FieldVerifyingPubkey,
 	FieldOwnerIdentityPubkey,
@@ -159,6 +162,16 @@ var (
 	DefaultID func() uuid.UUID
 )
 
+// NetworkValidator is a validator for the "network" field enum values. It is called by the builders before save.
+func NetworkValidator(n schematype.Network) error {
+	switch n {
+	case "UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET":
+		return nil
+	default:
+		return fmt.Errorf("treenode: invalid enum value for network field: %q", n)
+	}
+}
+
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s schematype.TreeNodeStatus) error {
 	switch s {
@@ -190,6 +203,11 @@ func ByUpdateTime(opts ...sql.OrderTermOption) OrderOption {
 // ByValue orders the results by the value field.
 func ByValue(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldValue, opts...).ToFunc()
+}
+
+// ByNetwork orders the results by the network field.
+func ByNetwork(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNetwork, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

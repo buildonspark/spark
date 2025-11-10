@@ -62,6 +62,20 @@ func (tnc *TreeNodeCreate) SetValue(u uint64) *TreeNodeCreate {
 	return tnc
 }
 
+// SetNetwork sets the "network" field.
+func (tnc *TreeNodeCreate) SetNetwork(s schematype.Network) *TreeNodeCreate {
+	tnc.mutation.SetNetwork(s)
+	return tnc
+}
+
+// SetNillableNetwork sets the "network" field if the given value is not nil.
+func (tnc *TreeNodeCreate) SetNillableNetwork(s *schematype.Network) *TreeNodeCreate {
+	if s != nil {
+		tnc.SetNetwork(*s)
+	}
+	return tnc
+}
+
 // SetStatus sets the "status" field.
 func (tnc *TreeNodeCreate) SetStatus(sns schematype.TreeNodeStatus) *TreeNodeCreate {
 	tnc.mutation.SetStatus(sns)
@@ -362,6 +376,11 @@ func (tnc *TreeNodeCreate) check() error {
 	if _, ok := tnc.mutation.Value(); !ok {
 		return &ValidationError{Name: "value", err: errors.New(`ent: missing required field "TreeNode.value"`)}
 	}
+	if v, ok := tnc.mutation.Network(); ok {
+		if err := treenode.NetworkValidator(v); err != nil {
+			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "TreeNode.network": %w`, err)}
+		}
+	}
 	if _, ok := tnc.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "TreeNode.status"`)}
 	}
@@ -443,6 +462,10 @@ func (tnc *TreeNodeCreate) createSpec() (*TreeNode, *sqlgraph.CreateSpec) {
 	if value, ok := tnc.mutation.Value(); ok {
 		_spec.SetField(treenode.FieldValue, field.TypeUint64, value)
 		_node.Value = value
+	}
+	if value, ok := tnc.mutation.Network(); ok {
+		_spec.SetField(treenode.FieldNetwork, field.TypeEnum, value)
+		_node.Network = value
 	}
 	if value, ok := tnc.mutation.Status(); ok {
 		_spec.SetField(treenode.FieldStatus, field.TypeEnum, value)
@@ -640,6 +663,24 @@ func (u *TreeNodeUpsert) SetUpdateTime(v time.Time) *TreeNodeUpsert {
 // UpdateUpdateTime sets the "update_time" field to the value that was provided on create.
 func (u *TreeNodeUpsert) UpdateUpdateTime() *TreeNodeUpsert {
 	u.SetExcluded(treenode.FieldUpdateTime)
+	return u
+}
+
+// SetNetwork sets the "network" field.
+func (u *TreeNodeUpsert) SetNetwork(v schematype.Network) *TreeNodeUpsert {
+	u.Set(treenode.FieldNetwork, v)
+	return u
+}
+
+// UpdateNetwork sets the "network" field to the value that was provided on create.
+func (u *TreeNodeUpsert) UpdateNetwork() *TreeNodeUpsert {
+	u.SetExcluded(treenode.FieldNetwork)
+	return u
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (u *TreeNodeUpsert) ClearNetwork() *TreeNodeUpsert {
+	u.SetNull(treenode.FieldNetwork)
 	return u
 }
 
@@ -987,6 +1028,27 @@ func (u *TreeNodeUpsertOne) SetUpdateTime(v time.Time) *TreeNodeUpsertOne {
 func (u *TreeNodeUpsertOne) UpdateUpdateTime() *TreeNodeUpsertOne {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.UpdateUpdateTime()
+	})
+}
+
+// SetNetwork sets the "network" field.
+func (u *TreeNodeUpsertOne) SetNetwork(v schematype.Network) *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetNetwork(v)
+	})
+}
+
+// UpdateNetwork sets the "network" field to the value that was provided on create.
+func (u *TreeNodeUpsertOne) UpdateNetwork() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateNetwork()
+	})
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (u *TreeNodeUpsertOne) ClearNetwork() *TreeNodeUpsertOne {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearNetwork()
 	})
 }
 
@@ -1547,6 +1609,27 @@ func (u *TreeNodeUpsertBulk) SetUpdateTime(v time.Time) *TreeNodeUpsertBulk {
 func (u *TreeNodeUpsertBulk) UpdateUpdateTime() *TreeNodeUpsertBulk {
 	return u.Update(func(s *TreeNodeUpsert) {
 		s.UpdateUpdateTime()
+	})
+}
+
+// SetNetwork sets the "network" field.
+func (u *TreeNodeUpsertBulk) SetNetwork(v schematype.Network) *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.SetNetwork(v)
+	})
+}
+
+// UpdateNetwork sets the "network" field to the value that was provided on create.
+func (u *TreeNodeUpsertBulk) UpdateNetwork() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.UpdateNetwork()
+	})
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (u *TreeNodeUpsertBulk) ClearNetwork() *TreeNodeUpsertBulk {
+	return u.Update(func(s *TreeNodeUpsert) {
+		s.ClearNetwork()
 	})
 }
 

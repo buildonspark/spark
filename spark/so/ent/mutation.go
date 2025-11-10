@@ -22124,6 +22124,7 @@ type TreeNodeMutation struct {
 	update_time                   *time.Time
 	value                         *uint64
 	addvalue                      *int64
+	network                       *schematype.Network
 	status                        *schematype.TreeNodeStatus
 	verifying_pubkey              *keys.Public
 	owner_identity_pubkey         *keys.Public
@@ -22389,6 +22390,55 @@ func (m *TreeNodeMutation) AddedValue() (r int64, exists bool) {
 func (m *TreeNodeMutation) ResetValue() {
 	m.value = nil
 	m.addvalue = nil
+}
+
+// SetNetwork sets the "network" field.
+func (m *TreeNodeMutation) SetNetwork(s schematype.Network) {
+	m.network = &s
+}
+
+// Network returns the value of the "network" field in the mutation.
+func (m *TreeNodeMutation) Network() (r schematype.Network, exists bool) {
+	v := m.network
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNetwork returns the old "network" field's value of the TreeNode entity.
+// If the TreeNode object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *TreeNodeMutation) OldNetwork(ctx context.Context) (v schematype.Network, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNetwork is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNetwork requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNetwork: %w", err)
+	}
+	return oldValue.Network, nil
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (m *TreeNodeMutation) ClearNetwork() {
+	m.network = nil
+	m.clearedFields[treenode.FieldNetwork] = struct{}{}
+}
+
+// NetworkCleared returns if the "network" field was cleared in this mutation.
+func (m *TreeNodeMutation) NetworkCleared() bool {
+	_, ok := m.clearedFields[treenode.FieldNetwork]
+	return ok
+}
+
+// ResetNetwork resets all changes to the "network" field.
+func (m *TreeNodeMutation) ResetNetwork() {
+	m.network = nil
+	delete(m.clearedFields, treenode.FieldNetwork)
 }
 
 // SetStatus sets the "status" field.
@@ -23413,7 +23463,7 @@ func (m *TreeNodeMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *TreeNodeMutation) Fields() []string {
-	fields := make([]string, 0, 20)
+	fields := make([]string, 0, 21)
 	if m.create_time != nil {
 		fields = append(fields, treenode.FieldCreateTime)
 	}
@@ -23422,6 +23472,9 @@ func (m *TreeNodeMutation) Fields() []string {
 	}
 	if m.value != nil {
 		fields = append(fields, treenode.FieldValue)
+	}
+	if m.network != nil {
+		fields = append(fields, treenode.FieldNetwork)
 	}
 	if m.status != nil {
 		fields = append(fields, treenode.FieldStatus)
@@ -23488,6 +23541,8 @@ func (m *TreeNodeMutation) Field(name string) (ent.Value, bool) {
 		return m.UpdateTime()
 	case treenode.FieldValue:
 		return m.Value()
+	case treenode.FieldNetwork:
+		return m.Network()
 	case treenode.FieldStatus:
 		return m.Status()
 	case treenode.FieldVerifyingPubkey:
@@ -23537,6 +23592,8 @@ func (m *TreeNodeMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldUpdateTime(ctx)
 	case treenode.FieldValue:
 		return m.OldValue(ctx)
+	case treenode.FieldNetwork:
+		return m.OldNetwork(ctx)
 	case treenode.FieldStatus:
 		return m.OldStatus(ctx)
 	case treenode.FieldVerifyingPubkey:
@@ -23600,6 +23657,13 @@ func (m *TreeNodeMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetValue(v)
+		return nil
+	case treenode.FieldNetwork:
+		v, ok := value.(schematype.Network)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNetwork(v)
 		return nil
 	case treenode.FieldStatus:
 		v, ok := value.(schematype.TreeNodeStatus)
@@ -23801,6 +23865,9 @@ func (m *TreeNodeMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *TreeNodeMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(treenode.FieldNetwork) {
+		fields = append(fields, treenode.FieldNetwork)
+	}
 	if m.FieldCleared(treenode.FieldNodeConfirmationHeight) {
 		fields = append(fields, treenode.FieldNodeConfirmationHeight)
 	}
@@ -23848,6 +23915,9 @@ func (m *TreeNodeMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *TreeNodeMutation) ClearField(name string) error {
 	switch name {
+	case treenode.FieldNetwork:
+		m.ClearNetwork()
+		return nil
 	case treenode.FieldNodeConfirmationHeight:
 		m.ClearNodeConfirmationHeight()
 		return nil
@@ -23897,6 +23967,9 @@ func (m *TreeNodeMutation) ResetField(name string) error {
 		return nil
 	case treenode.FieldValue:
 		m.ResetValue()
+		return nil
+	case treenode.FieldNetwork:
+		m.ResetNetwork()
 		return nil
 	case treenode.FieldStatus:
 		m.ResetStatus()

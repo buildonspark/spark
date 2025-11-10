@@ -28,6 +28,8 @@ type TreeNode struct {
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// Value holds the value of the "value" field.
 	Value uint64 `json:"value,omitempty"`
+	// Network holds the value of the "network" field.
+	Network schematype.Network `json:"network,omitempty"`
 	// Status holds the value of the "status" field.
 	Status schematype.TreeNodeStatus `json:"status,omitempty"`
 	// VerifyingPubkey holds the value of the "verifying_pubkey" field.
@@ -141,7 +143,7 @@ func (*TreeNode) scanValues(columns []string) ([]any, error) {
 			values[i] = new(schematype.TxID)
 		case treenode.FieldValue, treenode.FieldVout, treenode.FieldNodeConfirmationHeight, treenode.FieldRefundConfirmationHeight:
 			values[i] = new(sql.NullInt64)
-		case treenode.FieldStatus:
+		case treenode.FieldNetwork, treenode.FieldStatus:
 			values[i] = new(sql.NullString)
 		case treenode.FieldCreateTime, treenode.FieldUpdateTime:
 			values[i] = new(sql.NullTime)
@@ -191,6 +193,12 @@ func (tn *TreeNode) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field value", values[i])
 			} else if value.Valid {
 				tn.Value = uint64(value.Int64)
+			}
+		case treenode.FieldNetwork:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field network", values[i])
+			} else if value.Valid {
+				tn.Network = schematype.Network(value.String)
 			}
 		case treenode.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -379,6 +387,9 @@ func (tn *TreeNode) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("value=")
 	builder.WriteString(fmt.Sprintf("%v", tn.Value))
+	builder.WriteString(", ")
+	builder.WriteString("network=")
+	builder.WriteString(fmt.Sprintf("%v", tn.Network))
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", tn.Status))

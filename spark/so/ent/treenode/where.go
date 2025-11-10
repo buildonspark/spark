@@ -273,6 +273,46 @@ func ValueLTE(v uint64) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldLTE(FieldValue, v))
 }
 
+// NetworkEQ applies the EQ predicate on the "network" field.
+func NetworkEQ(v schematype.Network) predicate.TreeNode {
+	vc := v
+	return predicate.TreeNode(sql.FieldEQ(FieldNetwork, vc))
+}
+
+// NetworkNEQ applies the NEQ predicate on the "network" field.
+func NetworkNEQ(v schematype.Network) predicate.TreeNode {
+	vc := v
+	return predicate.TreeNode(sql.FieldNEQ(FieldNetwork, vc))
+}
+
+// NetworkIn applies the In predicate on the "network" field.
+func NetworkIn(vs ...schematype.Network) predicate.TreeNode {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.TreeNode(sql.FieldIn(FieldNetwork, v...))
+}
+
+// NetworkNotIn applies the NotIn predicate on the "network" field.
+func NetworkNotIn(vs ...schematype.Network) predicate.TreeNode {
+	v := make([]any, len(vs))
+	for i := range v {
+		v[i] = vs[i]
+	}
+	return predicate.TreeNode(sql.FieldNotIn(FieldNetwork, v...))
+}
+
+// NetworkIsNil applies the IsNil predicate on the "network" field.
+func NetworkIsNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldIsNull(FieldNetwork))
+}
+
+// NetworkNotNil applies the NotNil predicate on the "network" field.
+func NetworkNotNil() predicate.TreeNode {
+	return predicate.TreeNode(sql.FieldNotNull(FieldNetwork))
+}
+
 // StatusEQ applies the EQ predicate on the "status" field.
 func StatusEQ(v schematype.TreeNodeStatus) predicate.TreeNode {
 	vc := v

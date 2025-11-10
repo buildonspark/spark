@@ -665,7 +665,7 @@ func init() {
 	// treenode.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
 	treenode.UpdateDefaultUpdateTime = treenodeDescUpdateTime.UpdateDefault.(func() time.Time)
 	// treenodeDescRawTx is the schema descriptor for raw_tx field.
-	treenodeDescRawTx := treenodeFields[8].Descriptor()
+	treenodeDescRawTx := treenodeFields[9].Descriptor()
 	// treenode.RawTxValidator is a validator for the "raw_tx" field. It is called by the builders before save.
 	treenode.RawTxValidator = treenodeDescRawTx.Validators[0].(func([]byte) error)
 	// treenodeDescID is the schema descriptor for id field.

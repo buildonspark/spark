@@ -40,6 +40,26 @@ func (tnu *TreeNodeUpdate) SetUpdateTime(t time.Time) *TreeNodeUpdate {
 	return tnu
 }
 
+// SetNetwork sets the "network" field.
+func (tnu *TreeNodeUpdate) SetNetwork(s schematype.Network) *TreeNodeUpdate {
+	tnu.mutation.SetNetwork(s)
+	return tnu
+}
+
+// SetNillableNetwork sets the "network" field if the given value is not nil.
+func (tnu *TreeNodeUpdate) SetNillableNetwork(s *schematype.Network) *TreeNodeUpdate {
+	if s != nil {
+		tnu.SetNetwork(*s)
+	}
+	return tnu
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (tnu *TreeNodeUpdate) ClearNetwork() *TreeNodeUpdate {
+	tnu.mutation.ClearNetwork()
+	return tnu
+}
+
 // SetStatus sets the "status" field.
 func (tnu *TreeNodeUpdate) SetStatus(sns schematype.TreeNodeStatus) *TreeNodeUpdate {
 	tnu.mutation.SetStatus(sns)
@@ -455,6 +475,11 @@ func (tnu *TreeNodeUpdate) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (tnu *TreeNodeUpdate) check() error {
+	if v, ok := tnu.mutation.Network(); ok {
+		if err := treenode.NetworkValidator(v); err != nil {
+			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "TreeNode.network": %w`, err)}
+		}
+	}
 	if v, ok := tnu.mutation.Status(); ok {
 		if err := treenode.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TreeNode.status": %w`, err)}
@@ -494,6 +519,12 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tnu.mutation.UpdateTime(); ok {
 		_spec.SetField(treenode.FieldUpdateTime, field.TypeTime, value)
+	}
+	if value, ok := tnu.mutation.Network(); ok {
+		_spec.SetField(treenode.FieldNetwork, field.TypeEnum, value)
+	}
+	if tnu.mutation.NetworkCleared() {
+		_spec.ClearField(treenode.FieldNetwork, field.TypeEnum)
 	}
 	if value, ok := tnu.mutation.Status(); ok {
 		_spec.SetField(treenode.FieldStatus, field.TypeEnum, value)
@@ -742,6 +773,26 @@ type TreeNodeUpdateOne struct {
 // SetUpdateTime sets the "update_time" field.
 func (tnuo *TreeNodeUpdateOne) SetUpdateTime(t time.Time) *TreeNodeUpdateOne {
 	tnuo.mutation.SetUpdateTime(t)
+	return tnuo
+}
+
+// SetNetwork sets the "network" field.
+func (tnuo *TreeNodeUpdateOne) SetNetwork(s schematype.Network) *TreeNodeUpdateOne {
+	tnuo.mutation.SetNetwork(s)
+	return tnuo
+}
+
+// SetNillableNetwork sets the "network" field if the given value is not nil.
+func (tnuo *TreeNodeUpdateOne) SetNillableNetwork(s *schematype.Network) *TreeNodeUpdateOne {
+	if s != nil {
+		tnuo.SetNetwork(*s)
+	}
+	return tnuo
+}
+
+// ClearNetwork clears the value of the "network" field.
+func (tnuo *TreeNodeUpdateOne) ClearNetwork() *TreeNodeUpdateOne {
+	tnuo.mutation.ClearNetwork()
 	return tnuo
 }
 
@@ -1173,6 +1224,11 @@ func (tnuo *TreeNodeUpdateOne) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (tnuo *TreeNodeUpdateOne) check() error {
+	if v, ok := tnuo.mutation.Network(); ok {
+		if err := treenode.NetworkValidator(v); err != nil {
+			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "TreeNode.network": %w`, err)}
+		}
+	}
 	if v, ok := tnuo.mutation.Status(); ok {
 		if err := treenode.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TreeNode.status": %w`, err)}
@@ -1229,6 +1285,12 @@ func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, er
 	}
 	if value, ok := tnuo.mutation.UpdateTime(); ok {
 		_spec.SetField(treenode.FieldUpdateTime, field.TypeTime, value)
+	}
+	if value, ok := tnuo.mutation.Network(); ok {
+		_spec.SetField(treenode.FieldNetwork, field.TypeEnum, value)
+	}
+	if tnuo.mutation.NetworkCleared() {
+		_spec.ClearField(treenode.FieldNetwork, field.TypeEnum)
 	}
 	if value, ok := tnuo.mutation.Status(); ok {
 		_spec.SetField(treenode.FieldStatus, field.TypeEnum, value)

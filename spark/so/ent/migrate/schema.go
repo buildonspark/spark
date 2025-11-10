@@ -997,6 +997,7 @@ var (
 		{Name: "create_time", Type: field.TypeTime},
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "value", Type: field.TypeUint64},
+		{Name: "network", Type: field.TypeEnum, Nullable: true, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"CREATING", "AVAILABLE", "FROZEN_BY_ISSUER", "TRANSFER_LOCKED", "SPLIT_LOCKED", "SPLITTED", "AGGREGATED", "ON_CHAIN", "AGGREGATE_LOCK", "EXITED", "INVESTIGATION", "LOST", "REIMBURSED", "PARENT_EXITED"}},
 		{Name: "verifying_pubkey", Type: field.TypeBytes},
 		{Name: "owner_identity_pubkey", Type: field.TypeBytes},
@@ -1026,19 +1027,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "tree_nodes_trees_tree",
-				Columns:    []*schema.Column{TreeNodesColumns[21]},
+				Columns:    []*schema.Column{TreeNodesColumns[22]},
 				RefColumns: []*schema.Column{TreesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "tree_nodes_tree_nodes_parent",
-				Columns:    []*schema.Column{TreeNodesColumns[22]},
+				Columns:    []*schema.Column{TreeNodesColumns[23]},
 				RefColumns: []*schema.Column{TreeNodesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "tree_nodes_signing_keyshares_signing_keyshare",
-				Columns:    []*schema.Column{TreeNodesColumns[23]},
+				Columns:    []*schema.Column{TreeNodesColumns[24]},
 				RefColumns: []*schema.Column{SigningKeysharesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1047,37 +1048,37 @@ var (
 			{
 				Name:    "treenode_tree_node_parent",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[22]},
+				Columns: []*schema.Column{TreeNodesColumns[23]},
 			},
 			{
 				Name:    "treenode_tree_node_tree",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[21]},
+				Columns: []*schema.Column{TreeNodesColumns[22]},
 			},
 			{
 				Name:    "treenode_tree_node_signing_keyshare",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[23]},
+				Columns: []*schema.Column{TreeNodesColumns[24]},
 			},
 			{
 				Name:    "treenode_owner_identity_pubkey",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[6]},
+				Columns: []*schema.Column{TreeNodesColumns[7]},
 			},
 			{
 				Name:    "treenode_owner_identity_pubkey_status",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[6], TreeNodesColumns[4]},
+				Columns: []*schema.Column{TreeNodesColumns[7], TreeNodesColumns[5]},
 			},
 			{
 				Name:    "treenode_node_confirmation_height",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[9]},
+				Columns: []*schema.Column{TreeNodesColumns[10]},
 			},
 			{
 				Name:    "treenode_refund_confirmation_height",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[10]},
+				Columns: []*schema.Column{TreeNodesColumns[11]},
 			},
 			{
 				Name:    "treenode_update_time",
@@ -1087,7 +1088,7 @@ var (
 			{
 				Name:    "treenode_raw_txid",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[14]},
+				Columns: []*schema.Column{TreeNodesColumns[15]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "raw_txid is not null",
 				},
@@ -1095,7 +1096,7 @@ var (
 			{
 				Name:    "treenode_direct_txid",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[15]},
+				Columns: []*schema.Column{TreeNodesColumns[16]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "direct_txid is not null",
 				},
@@ -1103,7 +1104,7 @@ var (
 			{
 				Name:    "treenode_direct_from_cpfp_refund_txid",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[16]},
+				Columns: []*schema.Column{TreeNodesColumns[17]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "direct_from_cpfp_refund_txid is not null",
 				},
@@ -1111,7 +1112,7 @@ var (
 			{
 				Name:    "treenode_raw_refund_txid",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[19]},
+				Columns: []*schema.Column{TreeNodesColumns[20]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "raw_refund_txid is not null",
 				},
@@ -1119,7 +1120,7 @@ var (
 			{
 				Name:    "treenode_direct_refund_txid",
 				Unique:  false,
-				Columns: []*schema.Column{TreeNodesColumns[20]},
+				Columns: []*schema.Column{TreeNodesColumns[21]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "direct_refund_txid is not null",
 				},
