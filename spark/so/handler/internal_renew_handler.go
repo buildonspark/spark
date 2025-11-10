@@ -11,6 +11,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/ent"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"go.uber.org/zap"
 )
@@ -86,10 +87,17 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 		return fmt.Errorf("failed to parse verifying pubkey: %w", err)
 	}
 
+	// TODO(mhr): Remove this when the transfer proto has Network and it has been backfilled.
+	tree, err := db.Tree.Query().Where(tree.IDEQ(splitTreeID)).Only(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to query tree %s: %w", splitTreeID, err)
+	}
+
 	// Create the split node
 	splitNodeMut := db.TreeNode.Create().
 		SetID(splitNodeID).
 		SetTreeID(splitTreeID).
+		SetNetwork(tree.Network).
 		SetStatus(st.TreeNodeStatusSplitLocked).
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
 		SetOwnerSigningPubkey(ownerSigningPubKey).

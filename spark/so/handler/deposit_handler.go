@@ -852,6 +852,7 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	root, err := db.TreeNode.
 		Create().
 		SetTree(entTree).
+		SetNetwork(entTree.Network).
 		SetStatus(st.TreeNodeStatusCreating).
 		SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
 		SetOwnerSigningPubkey(depositAddress.OwnerSigningPubkey).
@@ -1254,6 +1255,7 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 		treeNodeMutator := db.TreeNode.
 			Create().
 			SetTree(entTree).
+			SetNetwork(entTree.Network).
 			SetStatus(st.TreeNodeStatusCreating).
 			SetOwnerIdentityPubkey(depositAddress.OwnerIdentityPubkey).
 			SetOwnerSigningPubkey(depositAddress.OwnerSigningPubkey).

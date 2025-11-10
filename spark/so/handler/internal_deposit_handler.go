@@ -287,6 +287,7 @@ func (h *InternalDepositHandler) FinalizeTreeCreation(ctx context.Context, req *
 			Create().
 			SetID(nodeID).
 			SetTree(tree).
+			SetNetwork(tree.Network).
 			SetOwnerIdentityPubkey(ownerIdentityPubKey).
 			SetOwnerSigningPubkey(ownerSigningPubKey).
 			SetValue(node.Value).

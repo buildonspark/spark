@@ -379,7 +379,7 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 	}
 
 	// Create new tree node and split the old one
-	treeID, err := leaf.QueryTree().Only(ctx)
+	tree, err := leaf.QueryTree().Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tree id: %w", err)
 	}
@@ -394,7 +394,8 @@ func (h *RenewLeafHandler) renewNodeTimelock(ctx context.Context, signingJob *pb
 	mut := db.
 		TreeNode.
 		Create().
-		SetTreeID(treeID.ID).
+		SetTreeID(tree.ID).
+		SetNetwork(tree.Network).
 		SetStatus(st.TreeNodeStatusSplitLocked).
 		SetOwnerIdentityPubkey(leaf.OwnerIdentityPubkey).
 		SetOwnerSigningPubkey(leaf.OwnerSigningPubkey).
@@ -803,7 +804,7 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 
 	// For zero timelock renewal, we need to create a new split node and update the leaf
 	// This is similar to the renewNodeTimelock flow but uses the existing node as the split
-	treeID, err := leaf.QueryTree().Only(ctx)
+	tree, err := leaf.QueryTree().Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tree id: %w", err)
 	}
@@ -818,7 +819,8 @@ func (h *RenewLeafHandler) renewNodeZeroTimelock(ctx context.Context, signingJob
 	mut := db.
 		TreeNode.
 		Create().
-		SetTreeID(treeID.ID).
+		SetTreeID(tree.ID).
+		SetNetwork(tree.Network).
 		SetStatus(st.TreeNodeStatusSplitLocked).
 		SetOwnerIdentityPubkey(leaf.OwnerIdentityPubkey).
 		SetOwnerSigningPubkey(leaf.OwnerSigningPubkey).

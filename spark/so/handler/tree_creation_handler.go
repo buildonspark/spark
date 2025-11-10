@@ -17,6 +17,7 @@ import (
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
+	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
@@ -440,6 +441,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 	var parentNode *ent.TreeNode
 	var vout uint32
 	var network common.Network
+	var schemaNetwork schematype.Network
 	switch req.Source.(type) {
 	case *pb.CreateTreeRequest_ParentNodeOutput:
 		outputID, err := uuid.Parse(req.GetParentNodeOutput().NodeId)
@@ -459,10 +461,15 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 		if err != nil {
 			return nil, nil, err
 		}
+		schemaNetwork = parentTree.Network
 	case *pb.CreateTreeRequest_OnChainUtxo:
 		parentNode = nil
 		vout = req.GetOnChainUtxo().Vout
 		network, err = common.NetworkFromProtoNetwork(req.GetOnChainUtxo().Network)
+		if err != nil {
+			return nil, nil, err
+		}
+		schemaNetwork, err = common.SchemaNetworkFromNetwork(network)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -547,10 +554,6 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 			if depositAddress.Edges.Tree != nil {
 				return nil, nil, errors.New("deposit address already has a tree")
 			}
-			schemaNetwork, err := common.SchemaNetworkFromNetwork(network)
-			if err != nil {
-				return nil, nil, err
-			}
 			if req.GetOnChainUtxo() == nil {
 				return nil, nil, errors.New("onchain utxo is required for new tree")
 			}
@@ -613,6 +616,7 @@ func (h *TreeCreationHandler) prepareSigningJobs(ctx context.Context, req *pb.Cr
 
 		createNode := db.TreeNode.Create().
 			SetTree(savedTree).
+			SetNetwork(schemaNetwork).
 			SetStatus(st.TreeNodeStatusCreating).
 			SetOwnerIdentityPubkey(userIDPubKey).
 			SetOwnerSigningPubkey(currentElement.userPubKey).
