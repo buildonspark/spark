@@ -113,12 +113,11 @@ type TransferAdaptorPublicKeys struct {
 // A helper function to call startTransferInternal from the SSP handler for Swap V3 counter swap initiation.
 // Will pass adaptor pubkeys and enable key tweak for both transfers of the swap.
 func (h *TransferHandler) StartCounterTransferInternal(ctx context.Context, req *pb.StartTransferRequest, adaptorPublicKeys TransferAdaptorPublicKeys, primaryTransferId uuid.UUID) (*pb.StartTransferResponse, error) {
-	return h.startTransferInternal(ctx, req, st.TransferTypeCounterSwap, adaptorPublicKeys.cpfpAdaptorPubKey, adaptorPublicKeys.directAdaptorPubKey, adaptorPublicKeys.directFromCpfpAdaptorPubKey, false, &SwapV3Package{transferType: st.TransferTypeCounterSwap, primaryTransferId: primaryTransferId})
+	return h.startTransferInternal(ctx, req, st.TransferTypeCounterSwapV3, adaptorPublicKeys.cpfpAdaptorPubKey, adaptorPublicKeys.directAdaptorPubKey, adaptorPublicKeys.directFromCpfpAdaptorPubKey, false, &SwapV3Package{primaryTransferId: primaryTransferId})
 }
 
 // If this package is provided then the handler should execute SwapV3 logic.
 type SwapV3Package struct {
-	transferType      st.TransferType
 	primaryTransferId uuid.UUID
 }
 
@@ -238,7 +237,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 	// Swap V3 flow: If skipping tweaks is enabled then set role to Participant to
 	// disable retry settling key tweaks in `resume_send_transfer` cron task.
 	if swapV3Package != nil {
-		if swapV3Package.transferType == st.TransferTypeSwap {
+		if transferType == st.TransferTypePrimarySwapV3 {
 			role = TransferRoleParticipant
 			tweakKeys = false
 		} else {
@@ -410,7 +409,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 			// Swap V3 requires both primary and counter transfer tweaks settled at the same time,
 			// so there is a special handler for this case.
 			// primaryTransferId is only passed in for swap v3.
-			if transferType == st.TransferTypeCounterSwap && primaryTransferId != uuid.Nil {
+			if transferType == st.TransferTypeCounterSwapV3 && primaryTransferId != uuid.Nil {
 				message = pbgossip.GossipMessage{
 					Message: &pbgossip.GossipMessage_SettleSwapKeyTweak{
 						SettleSwapKeyTweak: &pbgossip.GossipMessageSettleSwapKeyTweak{
@@ -716,7 +715,7 @@ func (h *TransferHandler) InitiateSwapPrimaryTransfer(ctx context.Context, req *
 		return nil, fmt.Errorf("direct transactions should not be provided for primary transfer %s", req.Transfer.TransferId)
 	}
 
-	return h.startTransferInternal(ctx, req.GetTransfer(), st.TransferTypeSwap, adaptorPublicKey, keys.Public{}, keys.Public{}, true, &SwapV3Package{transferType: st.TransferTypeSwap, primaryTransferId: uuid.Nil})
+	return h.startTransferInternal(ctx, req.GetTransfer(), st.TransferTypePrimarySwapV3, adaptorPublicKey, keys.Public{}, keys.Public{}, true, &SwapV3Package{primaryTransferId: uuid.Nil})
 }
 
 // CounterLeafSwap initiates a leaf swap for the other side, signing refunds with an adaptor public key.
@@ -818,7 +817,7 @@ func (h *TransferHandler) syncTransferInit(
 			DirectAdaptorPublicKey:         directAdaptorPubKey.Serialize(),
 			DirectFromCpfpAdaptorPublicKey: directFromCpfpAdaptorPubKey.Serialize(),
 		}
-		if swapV3Package.transferType == st.TransferTypeCounterSwap {
+		if transferType == st.TransferTypeCounterSwapV3 {
 			primaryTransferId = swapV3Package.primaryTransferId
 		}
 	}
