@@ -52,11 +52,7 @@ func (s *SparkServer) StartDepositTreeCreation(ctx context.Context, req *pb.Star
 // StartTreeCreation is deprecated.
 // Deprecated: Use StartDepositTreeCreation instead
 func (s *SparkServer) StartTreeCreation(ctx context.Context, req *pb.StartTreeCreationRequest) (*pb.StartTreeCreationResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	depositHandler := handler.NewDepositHandler(s.config)
-	return depositHandler.StartTreeCreation(ctx, s.config, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 // FinalizeNodeSignatures verifies the node signatures and updates the node.
@@ -91,11 +87,7 @@ func (s *SparkServer) StartTransferV2(ctx context.Context, req *pb.StartTransfer
 
 // FinalizeTransfer completes a transfer from sender.
 func (s *SparkServer) FinalizeTransfer(ctx context.Context, req *pb.FinalizeTransferRequest) (*pb.FinalizeTransferResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.FinalizeTransfer(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 func (s *SparkServer) FinalizeTransferWithTransferPackage(ctx context.Context, req *pb.FinalizeTransferWithTransferPackageRequest) (*pb.FinalizeTransferResponse, error) {
@@ -207,11 +199,7 @@ func (s *SparkServer) StartLeafSwapV2(ctx context.Context, req *pb.StartTransfer
 // This is deprecated but remains for backwards compatibility,
 // CounterLeafSwap should be used instead.
 func (s *SparkServer) LeafSwap(ctx context.Context, req *pb.CounterLeafSwapRequest) (*pb.CounterLeafSwapResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	transferHander := handler.NewTransferHandler(s.config)
-	return transferHander.CounterLeafSwap(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 // CounterLeafSwap starts the reverse side of a swap of leaves between two users.
@@ -316,11 +304,7 @@ func (s *SparkServer) SubscribeToEvents(req *pb.SubscribeToEventsRequest, st pb.
 
 // InitiateUtxoSwap swaps a Spark tree node in exchange for a UTXO.
 func (s *SparkServer) InitiateUtxoSwap(ctx context.Context, req *pb.InitiateUtxoSwapRequest) (*pb.InitiateUtxoSwapResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	depositHandler := handler.NewDepositHandler(s.config)
-	return depositHandler.InitiateUtxoSwap(ctx, s.config, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 func (s *SparkServer) InitiateStaticDepositUtxoRefund(ctx context.Context, req *pb.InitiateStaticDepositUtxoRefundRequest) (*pb.InitiateStaticDepositUtxoRefundResponse, error) {
@@ -329,27 +313,15 @@ func (s *SparkServer) InitiateStaticDepositUtxoRefund(ctx context.Context, req *
 }
 
 func (s *SparkServer) ExitSingleNodeTrees(ctx context.Context, req *pb.ExitSingleNodeTreesRequest) (*pb.ExitSingleNodeTreesResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	treeExitHandler := handler.NewTreeExitHandler(s.config)
-	return treeExitHandler.ExitSingleNodeTrees(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 func (s *SparkServer) QueryNodesDistribution(ctx context.Context, req *pb.QueryNodesDistributionRequest) (*pb.QueryNodesDistributionResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	treeQueryHandler := handler.NewTreeQueryHandler(s.config)
-	return treeQueryHandler.QueryNodesDistribution(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 func (s *SparkServer) QueryNodesByValue(ctx context.Context, req *pb.QueryNodesByValueRequest) (*pb.QueryNodesByValueResponse, error) {
-	if err := errIfOctoberDeprecationEnabled(ctx); err != nil {
-		return nil, err
-	}
-	treeQueryHandler := handler.NewTreeQueryHandler(s.config)
-	return treeQueryHandler.QueryNodesByValue(ctx, req)
+	return nil, errors.UnimplementedMethodDisabled(fmt.Errorf("Endpoint has been deprecated"))
 }
 
 func (s *SparkServer) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxosForAddressRequest) (*pb.GetUtxosForAddressResponse, error) {
