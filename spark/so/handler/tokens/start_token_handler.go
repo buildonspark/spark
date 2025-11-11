@@ -40,7 +40,7 @@ type StartTokenTransactionHandler struct {
 func NewStartTokenTransactionHandler(config *so.Config) *StartTokenTransactionHandler {
 	return &StartTokenTransactionHandler{
 		config:         config,
-		prepareHandler: NewInternalPrepareTokenHandlerWithPreemption(config),
+		prepareHandler: NewInternalPrepareTokenHandler(config),
 	}
 }
 

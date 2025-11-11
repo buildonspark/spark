@@ -26,7 +26,7 @@ func NewSparkTokenInternalServer(soConfig *so.Config, db *ent.Client) *SparkToke
 }
 
 func (s *SparkTokenInternalServer) PrepareTransaction(ctx context.Context, req *tokeninternalpb.PrepareTransactionRequest) (*tokeninternalpb.PrepareTransactionResponse, error) {
-	prepareHandler := tokens.NewInternalPrepareTokenHandlerWithPreemption(s.soConfig)
+	prepareHandler := tokens.NewInternalPrepareTokenHandler(s.soConfig)
 	ctx, _ = logging.WithRequestAttrs(ctx, sotokens.GetProtoTokenTransactionZapAttrs(ctx, req.FinalTokenTransaction)...)
 	resp, err := prepareHandler.PrepareTokenTransactionInternal(ctx, req)
 	return resp, err

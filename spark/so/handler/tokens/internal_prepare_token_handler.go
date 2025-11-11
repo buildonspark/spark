@@ -36,21 +36,12 @@ import (
 )
 
 type InternalPrepareTokenHandler struct {
-	config           *so.Config
-	enablePreemption bool
+	config *so.Config
 }
 
 func NewInternalPrepareTokenHandler(config *so.Config) *InternalPrepareTokenHandler {
 	return &InternalPrepareTokenHandler{
-		config:           config,
-		enablePreemption: false,
-	}
-}
-
-func NewInternalPrepareTokenHandlerWithPreemption(config *so.Config) *InternalPrepareTokenHandler {
-	return &InternalPrepareTokenHandler{
-		config:           config,
-		enablePreemption: true,
+		config: config,
 	}
 }
 
@@ -155,11 +146,11 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 				sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to fetch all leaves to spend: got %d leaves, expected %d", len(inputTtxos), len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()))))
 		}
 
-		err = validateTransferTokenTransactionUsingPreviousTransactionData(ctx, h.enablePreemption, finalTokenTX, req.GetTokenTransactionSignatures(), inputTtxos, h.config.Lrc20Configs[finalTokenTX.Network.String()].TransactionExpiryDuration)
+		err = validateTransferTokenTransactionUsingPreviousTransactionData(ctx, finalTokenTX, req.GetTokenTransactionSignatures(), inputTtxos, h.config.Lrc20Configs[finalTokenTX.Network.String()].TransactionExpiryDuration)
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("error validating transfer using previous output data", req.FinalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("error validating transfer using previous output data: %w", err)))
 		}
-		if h.enablePreemption && anyTtxosHaveSpentTransactions(inputTtxos) {
+		if anyTtxosHaveSpentTransactions(inputTtxos) {
 			if err := preemptOrRejectTransactionsWithInputEnts(ctx, finalTokenTX, inputTtxos); err != nil {
 				return nil, err
 			}
@@ -361,7 +352,6 @@ func validateIssuerSignature(
 
 func validateTransferTokenTransactionUsingPreviousTransactionData(
 	ctx context.Context,
-	enablePreemption bool,
 	tokenTransaction *tokenpb.TokenTransaction,
 	signaturesWithIndex []*tokenpb.SignatureWithIndex,
 	outputToSpendEnts []*ent.TokenOutput,
@@ -495,7 +485,7 @@ func validateTransferTokenTransactionUsingPreviousTransactionData(
 		if err := utils.ValidateOwnershipSignature(ownershipSignature.Signature, partialTokenTransactionHash, outputEnt.OwnerPublicKey); err != nil {
 			return tokens.FormatErrorWithTransactionProto("invalid ownership signature", tokenTransaction, fmt.Errorf("invalid ownership signature for output %d: %w", i, err))
 		}
-		if err := validateOutputIsSpendable(ctx, enablePreemption, i, outputEnt, tokenTransaction, v0DefaultTransactionExpiryDuration); err != nil {
+		if err := validateOutputIsSpendable(ctx, i, outputEnt, tokenTransaction, v0DefaultTransactionExpiryDuration); err != nil {
 			return err
 		}
 	}
@@ -506,7 +496,7 @@ func validateTransferTokenTransactionUsingPreviousTransactionData(
 // validateOutputIsSpendable checks if a output is eligible to be spent by verifying:
 // 1. The output has an appropriate status (Created+Finalized or already marked as SpentStarted) OR was spent from an expired or pre-emptable transaction
 // 2. The output hasn't been withdrawn already
-func validateOutputIsSpendable(ctx context.Context, enablePreemption bool, index int, output *ent.TokenOutput, tokenTransaction *tokenpb.TokenTransaction, v0DefaultTransactionExpiryDuration time.Duration) error {
+func validateOutputIsSpendable(ctx context.Context, index int, output *ent.TokenOutput, tokenTransaction *tokenpb.TokenTransaction, v0DefaultTransactionExpiryDuration time.Duration) error {
 	if !isSpendableOutputStatus(output.Status) {
 		spentTx := output.Edges.OutputSpentTokenTransaction
 		if spentTx == nil {
@@ -516,10 +506,8 @@ func validateOutputIsSpendable(ctx context.Context, enablePreemption bool, index
 		if !spentTx.IsExpired(time.Now(), v0DefaultTransactionExpiryDuration) {
 			canPreemptSpentTx := false
 			var cannotPreemptErr error
-			if enablePreemption {
-				cannotPreemptErr = preemptOrRejectTransaction(ctx, tokenTransaction, spentTx)
-				canPreemptSpentTx = cannotPreemptErr == nil
-			}
+			cannotPreemptErr = preemptOrRejectTransaction(ctx, tokenTransaction, spentTx)
+			canPreemptSpentTx = cannotPreemptErr == nil
 			if !canPreemptSpentTx {
 				return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d cannot be spent: status must be %s or %s (was %s), or have been spent by an expired or pre-emptable transaction (transaction was not expired or pre-emptable, id: %s, final_hash: %s, error: %w)",
 					index, st.TokenOutputStatusCreatedFinalized, st.TokenOutputStatusSpentStarted, output.Status, spentTx.ID, hex.EncodeToString(spentTx.FinalizedTokenTransactionHash), cannotPreemptErr))
