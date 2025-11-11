@@ -48,6 +48,8 @@ const (
 	KnobSoMaxKeysharesPerRequest         = "spark.so.max_keyshares_per_request"
 	KnobGRPCClientTimeout                = "spark.so.grpc.client.timeout"
 
+	KnobRequireDirectFromCPFPRefund = "spark.so.require_direct_from_cpfp_refund"
+
 	// Task / gocron related knobs.
 	KnobSoTaskEnabled = "spark.so.task.enabled"
 	KnobSoTaskTimeout = "spark.so.task.timeout"

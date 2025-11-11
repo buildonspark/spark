@@ -688,8 +688,11 @@ func (o *DepositHandler) StartTreeCreation(ctx context.Context, config *so.Confi
 	directRefundTxSigningJob := req.GetDirectRefundTxSigningJob()
 	directFromCpfpRefundTxSigningJob := req.GetDirectFromCpfpRefundTxSigningJob()
 
-	// Always process direct from cpfp refund tx if provided
-	if directFromCpfpRefundTxSigningJob != nil {
+	if directFromCpfpRefundTxSigningJob == nil {
+		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobRequireDirectFromCPFPRefund, 0) > 0 {
+			return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
+		}
+	} else {
 		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(req.DirectFromCpfpRefundTxSigningJob.RawTx)
 		if err != nil {
 			return nil, err
@@ -1023,8 +1026,11 @@ func (o *DepositHandler) StartDepositTreeCreation(ctx context.Context, config *s
 	directRefundTxSigningJob := req.GetDirectRefundTxSigningJob()
 	directFromCpfpRefundTxSigningJob := req.GetDirectFromCpfpRefundTxSigningJob()
 
-	// Always process direct from cpfp refund tx if provided
-	if directFromCpfpRefundTxSigningJob != nil {
+	if directFromCpfpRefundTxSigningJob == nil {
+		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobRequireDirectFromCPFPRefund, 0) > 0 {
+			return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
+		}
+	} else {
 		directFromCpfpRefundTx, err := common.TxFromRawTxBytes(req.DirectFromCpfpRefundTxSigningJob.RawTx)
 		if err != nil {
 			return nil, err

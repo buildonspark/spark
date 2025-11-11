@@ -1122,6 +1122,90 @@ func TestStartDepositTreeCreationWithDirectFromCpfpRefundAlongsideRegularRefund(
 	require.NoError(t, err, "Expected StartDepositTreeCreation to succeed with direct from CPFP refund transaction alongside regular refund transaction")
 }
 
+func TestStartDepositTreeCreationDirectTxValidation(t *testing.T) {
+	t.Skip("the feature being tested is disabled by a knob, so this test wouldn't pass")
+
+	// Setup
+	config := wallet.NewTestWalletConfig(t)
+	conn, err := sparktesting.DangerousNewGRPCConnectionWithoutVerifyTLS(config.CoordinatorAddress(), nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	token, err := wallet.AuthenticateWithConnection(t.Context(), config, conn)
+	require.NoError(t, err)
+	ctx := wallet.ContextWithToken(t.Context(), token)
+
+	privKey := keys.GeneratePrivateKey()
+	leafID := uuid.NewString()
+	depositResp, err := wallet.GenerateDepositAddress(ctx, config, privKey.Public(), &leafID, false)
+	require.NoError(t, err)
+
+	client := sparktesting.GetBitcoinClient()
+	coin, err := faucet.Fund()
+	require.NoError(t, err)
+
+	depositTx, err := sparktesting.CreateTestDepositTransaction(coin.OutPoint, depositResp.DepositAddress.Address, 100_000)
+	require.NoError(t, err)
+	vout := 0
+	var depositTxSerial bytes.Buffer
+	err = depositTx.Serialize(&depositTxSerial)
+	require.NoError(t, err)
+
+	// Generate a block to ensure the deposit tx is confirmed
+	randomKey := keys.GeneratePrivateKey()
+	randomAddress, err := common.P2TRRawAddressFromPublicKey(randomKey.Public(), common.Regtest)
+	require.NoError(t, err)
+	_, err = client.GenerateToAddress(1, randomAddress, nil)
+	require.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
+
+	// Create test transactions
+	rootTx := wire.NewMsgTx(3)
+	rootTx.AddTxIn(wire.NewTxIn(&wire.OutPoint{Hash: depositTx.TxHash(), Index: uint32(vout)}, nil, nil))
+	rootTx.AddTxOut(wire.NewTxOut(depositTx.TxOut[0].Value, depositTx.TxOut[0].PkScript))
+
+	refundTx, directFromCpfpRefundTx, err := wallet.CreateRefundTxs(
+		spark.InitialSequence(),
+		&wire.OutPoint{Hash: rootTx.TxHash(), Index: 0},
+		rootTx.TxOut[0].Value,
+		privKey.Public(),
+		true,
+	)
+	require.NoError(t, err)
+
+	// Each test case uses a variation of this base request
+	baseRequest := &pb.StartDepositTreeCreationRequest{
+		IdentityPublicKey: config.IdentityPublicKey().Serialize(),
+		OnChainUtxo: &pb.UTXO{
+			Vout:    uint32(vout),
+			RawTx:   depositTxSerial.Bytes(),
+			Network: config.ProtoNetwork(),
+		},
+		RootTxSigningJob:                 signingJobFromTx(t, privKey.Public(), rootTx),
+		RefundTxSigningJob:               signingJobFromTx(t, privKey.Public(), refundTx),
+		DirectFromCpfpRefundTxSigningJob: signingJobFromTx(t, privKey.Public(), directFromCpfpRefundTx),
+	}
+
+	sparkClient := pb.NewSparkServiceClient(conn)
+
+	t.Run("all_direct_txs_present", func(t *testing.T) {
+		request := baseRequest
+
+		_, err := sparkClient.StartDepositTreeCreation(ctx, request)
+		require.NoError(t, err, "Expected StartDepositTreeCreation to succeed when all direct transactions are provided")
+	})
+
+	t.Run("missing_directFromCpfpRefundTx", func(t *testing.T) {
+		request := baseRequest
+		request.DirectFromCpfpRefundTxSigningJob = nil
+
+		_, err := sparkClient.StartDepositTreeCreation(ctx, request)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
+	})
+}
+
 func signingJobFromTx(t *testing.T, publicKey keys.Public, tx *wire.MsgTx) *pb.SigningJob {
 	var txBuf bytes.Buffer
 	require.NoError(t, tx.Serialize(&txBuf))
