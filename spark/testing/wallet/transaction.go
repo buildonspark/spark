@@ -56,6 +56,28 @@ func CreateRefundTxs(
 	receivingPubkey keys.Public,
 	shouldCalculateFee bool,
 ) (*wire.MsgTx, *wire.MsgTx, error) {
+	cpfpRefundTx, directFromCpfpRefundTx, _, err := CreateAllRefundTxs(sequence, nodeOutPoint, amountSats, nil, 0, receivingPubkey, shouldCalculateFee)
+	return cpfpRefundTx, directFromCpfpRefundTx, err
+}
+
+// CreateAllRefundTxs creates all three refund transaction types:
+// 1. cpfpRefundTx: Spends from nodeOutPoint, has ephemeral anchor, no fee
+// 2. directFromCpfpRefundTx: Spends from nodeOutPoint, has fee, no anchor
+// 3. directRefundTx: Spends from directNodeOutPoint (if provided), has fee, no anchor
+func CreateAllRefundTxs(
+	sequence uint32,
+	nodeOutPoint *wire.OutPoint,
+	nodeAmountSats int64,
+	directNodeOutPoint *wire.OutPoint, // nil if no DirectNodeTx exists
+	directNodeAmountSats int64, // 0 if no DirectNodeTx
+	receivingPubkey keys.Public,
+	shouldCalculateFee bool,
+) (*wire.MsgTx, *wire.MsgTx, *wire.MsgTx, error) {
+	refundPkScript, err := common.P2TRScriptFromPubKey(receivingPubkey)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create refund pkscript: %w", err)
+	}
+
 	// Create CPFP-friendly refund tx (with ephemeral anchor, no fee)
 	cpfpRefundTx := wire.NewMsgTx(3)
 	cpfpRefundTx.AddTxIn(&wire.TxIn{
@@ -64,30 +86,41 @@ func CreateRefundTxs(
 		Witness:          nil,
 		Sequence:         sequence,
 	})
-
-	refundPkScript, err := common.P2TRScriptFromPubKey(receivingPubkey)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create refund pkscript: %w", err)
-	}
-	cpfpRefundTx.AddTxOut(wire.NewTxOut(amountSats, refundPkScript))
+	cpfpRefundTx.AddTxOut(wire.NewTxOut(nodeAmountSats, refundPkScript))
 	cpfpRefundTx.AddTxOut(common.EphemeralAnchorOutput())
 
-	// Create direct refund tx (with fee, no anchor)
-	directRefundTx := wire.NewMsgTx(3)
-	directRefundTx.AddTxIn(&wire.TxIn{
+	// Create DirectFromCpfpRefundTx (spending from NodeTx/CPFP, with fee, no anchor)
+	directFromCpfpRefundTx := wire.NewMsgTx(3)
+	directFromCpfpRefundTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: *nodeOutPoint,
 		SignatureScript:  nil,
 		Witness:          nil,
 		Sequence:         sequence + spark.DirectTimelockOffset,
 	})
-
-	outputAmount := amountSats
+	outputAmount := nodeAmountSats
 	if shouldCalculateFee {
-		outputAmount = common.MaybeApplyFee(amountSats)
+		outputAmount = common.MaybeApplyFee(nodeAmountSats)
 	}
-	directRefundTx.AddTxOut(wire.NewTxOut(outputAmount, refundPkScript))
+	directFromCpfpRefundTx.AddTxOut(wire.NewTxOut(outputAmount, refundPkScript))
 
-	return cpfpRefundTx, directRefundTx, nil
+	// Create DirectRefundTx (spending from DirectNodeTx, with fee, no anchor)
+	var directRefundTx *wire.MsgTx
+	if directNodeOutPoint != nil {
+		directRefundTx = wire.NewMsgTx(3)
+		directRefundTx.AddTxIn(&wire.TxIn{
+			PreviousOutPoint: *directNodeOutPoint,
+			SignatureScript:  nil,
+			Witness:          nil,
+			Sequence:         sequence + spark.DirectTimelockOffset,
+		})
+		directOutputAmount := directNodeAmountSats
+		if shouldCalculateFee {
+			directOutputAmount = common.MaybeApplyFee(directNodeAmountSats)
+		}
+		directRefundTx.AddTxOut(wire.NewTxOut(directOutputAmount, refundPkScript))
+	}
+
+	return cpfpRefundTx, directFromCpfpRefundTx, directRefundTx, nil
 }
 
 func createConnectorRefundTransaction(

@@ -2,11 +2,13 @@ package wallet
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/btcsuite/btcd/wire"
+	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	bitcointransaction "github.com/lightsparkdev/spark/common/bitcoin_transaction"
@@ -376,4 +378,103 @@ func prepareLeafSigningJobs(
 		})
 	}
 	return leafSigningJobs, nil
+}
+
+// CreateSigningJobFromTx creates a SigningJob from a transaction and signing private key,
+// generating a new signing nonce and appending it to the provided signingNonces slice.
+func CreateSigningJobFromTx(
+	tx *wire.MsgTx,
+	signingPrivateKey keys.Private,
+	signingNonces []*objects.SigningNonce,
+) (*pb.SigningJob, []*objects.SigningNonce, error) {
+	var txBuf bytes.Buffer
+	if err := tx.Serialize(&txBuf); err != nil {
+		return nil, signingNonces, err
+	}
+
+	signingNonce, err := objects.RandomSigningNonce()
+	if err != nil {
+		return nil, signingNonces, err
+	}
+
+	signingNonceCommitment, err := signingNonce.SigningCommitment().MarshalProto()
+	if err != nil {
+		return nil, signingNonces, err
+	}
+
+	signingNonces = append(signingNonces, signingNonce)
+	signingJob := &pb.SigningJob{
+		SigningPublicKey:       signingPrivateKey.Public().Serialize(),
+		RawTx:                  txBuf.Bytes(),
+		SigningNonceCommitment: signingNonceCommitment,
+	}
+
+	return signingJob, signingNonces, nil
+}
+
+// SignTransactionWithFrost signs a transaction using FROST, returning the aggregated signature.
+func SignTransactionWithFrost(
+	ctx context.Context,
+	frostClient pbfrost.FrostServiceClient,
+	rawTxBytes []byte,
+	prevTxOut *wire.TxOut,
+	signingNonce *objects.SigningNonce,
+	signingPrivateKey keys.Private,
+	verificationKey keys.Public,
+	signingResult *pb.SigningResult,
+) ([]byte, error) {
+	tx, err := common.TxFromRawTxBytes(rawTxBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	sighash, err := common.SigHashFromTx(tx, 0, prevTxOut)
+	if err != nil {
+		return nil, err
+	}
+
+	signingNonceCommitment, err := signingNonce.SigningCommitment().MarshalProto()
+	if err != nil {
+		return nil, err
+	}
+
+	signingNonceProto, err := signingNonce.MarshalProto()
+	if err != nil {
+		return nil, err
+	}
+
+	keyPackage := CreateUserKeyPackage(signingPrivateKey)
+	signingJob := &pbfrost.FrostSigningJob{
+		JobId:           uuid.NewString(),
+		Message:         sighash,
+		KeyPackage:      keyPackage,
+		VerifyingKey:    verificationKey.Serialize(),
+		Nonce:           signingNonceProto,
+		Commitments:     signingResult.SigningNonceCommitments,
+		UserCommitments: signingNonceCommitment,
+	}
+
+	response, err := frostClient.SignFrost(ctx, &pbfrost.SignFrostRequest{
+		SigningJobs: []*pbfrost.FrostSigningJob{signingJob},
+		Role:        pbfrost.SigningRole_USER,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	aggResponse, err := frostClient.AggregateFrost(ctx, &pbfrost.AggregateFrostRequest{
+		Message:            sighash,
+		SignatureShares:    signingResult.SignatureShares,
+		PublicShares:       signingResult.PublicKeys,
+		VerifyingKey:       verificationKey.Serialize(),
+		Commitments:        signingResult.SigningNonceCommitments,
+		UserCommitments:    signingNonceCommitment,
+		UserPublicKey:      verificationKey.Serialize(),
+		UserSignatureShare: response.Results[signingJob.JobId].SignatureShare,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return aggResponse.Signature, nil
 }
