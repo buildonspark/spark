@@ -478,9 +478,9 @@ func handleBlock(
 		}
 	}
 	if processNodesForWatchtowers {
-		logger.Sugar().Infof("Started processing nodes for watchtowers at block height %d", blockHeight)
+		logger.Sugar().Infof("Started processing nodes & transfer leaves for watchtowers at block height %d", blockHeight)
 		// Fetch only nodes that could have expired timelocks
-		nodes, err := watchtower.QueryNodesWithExpiredTimeLocks(ctx, dbClient, blockHeight, network)
+		nodes, err := watchtower.QueryBroadcastableNodes(ctx, dbClient, blockHeight, network)
 		if err != nil {
 			return fmt.Errorf("failed to query nodes: %w", err)
 		}
@@ -493,6 +493,17 @@ func handleBlock(
 		for _, node := range nodes {
 			if err := watchtower.CheckExpiredTimeLocks(ctx, bitcoinClient, node, blockHeight, network); err != nil {
 				logger.Sugar().Errorf("Failed to check expired time locks for node %s: %v", node.ID, err)
+			}
+		}
+
+		// Process transfer leaves for watchtower
+		transferLeaves, err := watchtower.QueryBroadcastableTransferLeaves(ctx, dbClient, network)
+		if err != nil {
+			return fmt.Errorf("failed to query transfer leaves: %w", err)
+		}
+		for _, transferLeaf := range transferLeaves {
+			if err := watchtower.BroadcastTransferLeafRefund(ctx, bitcoinClient, transferLeaf, network, blockHeight); err != nil {
+				logger.Sugar().Errorf("Failed to broadcast intermediate refund for transfer leaf %s: %v", transferLeaf.ID, err)
 			}
 		}
 	}

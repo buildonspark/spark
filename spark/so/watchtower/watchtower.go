@@ -16,6 +16,9 @@ import (
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/so/ent"
+	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
+	"github.com/lightsparkdev/spark/so/ent/transfer"
+	"github.com/lightsparkdev/spark/so/ent/transferleaf"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"go.opentelemetry.io/otel"
@@ -88,8 +91,8 @@ func alreadyBroadcasted(err error) bool {
 	return errors.As(err, &rpcErr) && rpcErr.Code == btcjson.ErrRPCVerifyAlreadyInChain
 }
 
-// QueryNodesWithExpiredTimeLocks returns nodes that are eligible for broadcast.
-func QueryNodesWithExpiredTimeLocks(ctx context.Context, dbClient *ent.Client, blockHeight int64, network common.Network) ([]*ent.TreeNode, error) {
+// QueryBroadcastableNodes returns nodes that are eligible for broadcast.
+func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHeight int64, network common.Network) ([]*ent.TreeNode, error) {
 	var rootNodes, childNodes, refundNodes []*ent.TreeNode
 
 	// 1. Root nodes needing confirmation
@@ -156,6 +159,42 @@ func QueryNodesWithExpiredTimeLocks(ctx context.Context, dbClient *ent.Client, b
 	}
 
 	return uniqueNodes, nil
+}
+
+// QueryBroadcastableTransferLeaves returns transfer leaves that are eligible for broadcast.
+func QueryBroadcastableTransferLeaves(ctx context.Context, dbClient *ent.Client, network common.Network) ([]*ent.TransferLeaf, error) {
+	eligibleNodeIDs, err := dbClient.TreeNode.Query().
+		Where(
+			treenode.NodeConfirmationHeightNotNil(),
+			treenode.RefundConfirmationHeightIsNil(),
+			treenode.HasTreeWith(tree.NetworkEQ(common.SchemaNetwork(network))),
+		).
+		IDs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query eligible tree nodes: %w", err)
+	}
+
+	if len(eligibleNodeIDs) == 0 {
+		return []*ent.TransferLeaf{}, nil
+	}
+
+	excludedStatuses := []st.TransferStatus{
+		st.TransferStatusCompleted,
+		st.TransferStatusReturned,
+		st.TransferStatusExpired,
+	}
+
+	transferLeaves, err := dbClient.TransferLeaf.Query().
+		Where(
+			transferleaf.HasLeafWith(treenode.IDIn(eligibleNodeIDs...)),
+			transferleaf.HasTransferWith(transfer.StatusNotIn(excludedStatuses...)),
+		).
+		All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query transfer leaves for eligible nodes: %w", err)
+	}
+
+	return transferLeaves, nil
 }
 
 // CheckExpiredTimeLocks checks for TXs with expired time locks and broadcasts them if needed.
@@ -264,4 +303,55 @@ func CheckExpiredTimeLocks(ctx context.Context, bitcoinClient *rpcclient.Client,
 	}
 
 	return nil
+}
+
+// BroadcastTransferLeafRefund attempts to broadcast the refund transactions for a transfer leaf.
+func BroadcastTransferLeafRefund(ctx context.Context, bitcoinClient *rpcclient.Client, transferLeaf *ent.TransferLeaf, network common.Network, blockHeight int64) error {
+	logger := logging.GetLoggerFromContext(ctx)
+
+	directRefundTimelockExpired := transferLeaf.IntermediateDirectRefundTimelock > 0 && transferLeaf.IntermediateDirectRefundTimelock <= uint64(blockHeight)
+	directFromCpfpRefundTimelockExpired := transferLeaf.IntermediateDirectFromCpfpRefundTimelock > 0 && transferLeaf.IntermediateDirectFromCpfpRefundTimelock <= uint64(blockHeight)
+
+	// If neither timelock is expired, return early
+	if !directRefundTimelockExpired && !directFromCpfpRefundTimelockExpired {
+		return nil
+	}
+
+	var broadcastErr error
+
+	if directRefundTimelockExpired && len(transferLeaf.IntermediateDirectRefundTx) > 0 {
+		broadcastErr = BroadcastTransaction(ctx, bitcoinClient, transferLeaf.ID.String(), transferLeaf.IntermediateDirectRefundTx)
+		if broadcastErr == nil {
+			if refundTxBroadcastCounter != nil {
+				refundTxBroadcastCounter.Add(ctx, 1, metric.WithAttributes(
+					attribute.String("network", network.String()),
+					attribute.String("result", "success"),
+				))
+			}
+			return nil
+		}
+		logger.With(zap.Error(broadcastErr)).Sugar().Infof("Failed to broadcast intermediate direct refund tx for transfer leaf %s, trying fallback", transferLeaf.ID)
+	}
+
+	if directFromCpfpRefundTimelockExpired && len(transferLeaf.IntermediateDirectFromCpfpRefundTx) > 0 {
+		broadcastErr = BroadcastTransaction(ctx, bitcoinClient, transferLeaf.ID.String(), transferLeaf.IntermediateDirectFromCpfpRefundTx)
+		if broadcastErr == nil {
+			if refundTxBroadcastCounter != nil {
+				refundTxBroadcastCounter.Add(ctx, 1, metric.WithAttributes(
+					attribute.String("network", network.String()),
+					attribute.String("result", "success"),
+				))
+			}
+			return nil
+		}
+	}
+
+	if refundTxBroadcastCounter != nil {
+		refundTxBroadcastCounter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("network", network.String()),
+			attribute.String("result", "failure"),
+		))
+	}
+	logger.With(zap.Error(broadcastErr)).Sugar().Infof("Failed to broadcast refund txs for transfer leaf %s", transferLeaf.ID)
+	return fmt.Errorf("watchtower failed to broadcast refund txs for transfer leaf %s: %w", transferLeaf.ID.String(), broadcastErr)
 }
