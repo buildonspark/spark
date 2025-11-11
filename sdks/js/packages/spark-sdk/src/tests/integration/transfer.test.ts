@@ -4,11 +4,8 @@ import { generateMnemonic } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { uuidv7 } from "uuidv7";
 import { RPCError } from "../../errors/types.js";
-import {
-  KeyDerivation,
-  KeyDerivationType,
-  SparkWalletEvent,
-} from "../../index.js";
+import { KeyDerivation, KeyDerivationType } from "../../signer/types.js";
+import { SparkWalletEvent } from "../../spark-wallet/types.js";
 import { InvoiceStatus, TransferStatus } from "../../proto/spark.js";
 import type { LeafKeyTweak } from "../../services/transfer.js";
 import {

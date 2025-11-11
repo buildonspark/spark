@@ -9,10 +9,10 @@ import {
   SigningNonce,
   wasm_aggregate_frost,
   wasm_sign_frost,
-} from "../wasm/spark_bindings.js";
+} from "./wasm/wasm-nodejs.js";
 import {
-  AggregateFrostBindingParams,
-  SignFrostBindingParams,
+  type AggregateFrostBindingParams,
+  type SignFrostBindingParams,
   type IKeyPackage,
   type ISigningCommitment,
   type ISigningNonce,
@@ -37,7 +37,7 @@ function createSigningCommitment(
   return new SigningCommitment(params.hiding, params.binding);
 }
 
-class SparkFrostBrowser extends SparkFrostBase {
+class SparkFrostNodeJS extends SparkFrostBase {
   async signFrost({
     message,
     keyPackage,
@@ -98,4 +98,4 @@ class SparkFrostBrowser extends SparkFrostBase {
   }
 }
 
-export { type DummyTx, SparkFrostBrowser as SparkFrost };
+export { type DummyTx, SparkFrostNodeJS as SparkFrost };

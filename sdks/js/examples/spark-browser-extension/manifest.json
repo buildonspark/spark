@@ -4,15 +4,16 @@
   "description": "Example extension demonstrating SparkWallet in background and content scripts.",
   "version": "0.1.0",
   "background": {
-    "service_worker": "background.js",
     "type": "module"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "run_at": "document_idle",
-      "type": "module"
+      "run_at": "document_idle"
     }
   ],
   "permissions": ["storage", "scripting"],

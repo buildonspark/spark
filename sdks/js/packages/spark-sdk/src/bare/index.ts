@@ -34,7 +34,6 @@ setCrypto(webcrypto);
 setFetch(sparkBareFetch, Headers);
 
 export * from "../errors/index.js";
-/* Use Browser otel wrapper for now (more compatible with bare-fetch): */
 export { SparkWallet } from "../spark-wallet/spark-wallet.bare.js";
 export { getLatestDepositTxId } from "../utils/mempool.js";
 export * from "../utils/index.js";
@@ -43,8 +42,8 @@ export {
   UnsafeStatelessSparkSigner,
   type SparkSigner,
 } from "../signer/signer.js";
-export { type IKeyPackage } from "../spark_bindings/types.js";
-export { SparkFrostBase } from "../spark_bindings/spark-bindings.js";
+export { type IKeyPackage } from "../spark-bindings/types.js";
+export { SparkFrostBase } from "../spark-bindings/spark-bindings.js";
 export {
   type SignFrostParams,
   type AggregateFrostParams,
@@ -52,8 +51,8 @@ export {
 export {
   setSparkFrostOnce,
   getSparkFrost,
-} from "../spark_bindings/spark-bindings.js";
+} from "../spark-bindings/spark-bindings.js";
 export {
   type SignFrostBindingParams,
   type AggregateFrostBindingParams,
-} from "../spark_bindings/types.js";
+} from "../spark-bindings/types.js";

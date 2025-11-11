@@ -1,12 +1,19 @@
 "use client";
 
+import * as spark from "@buildonspark/spark-sdk";
 import {
   SparkWallet,
   getSparkFrost,
   type DummyTx,
 } from "@buildonspark/spark-sdk";
-import Image from "next/image";
 import { useEffect, useState } from "react";
+import Image from "next/image";
+
+interface SparkWindow extends Window {
+  s: typeof spark;
+}
+
+declare let window: SparkWindow;
 
 export default function Home() {
   const [sparkWallet, setSparkWallet] = useState<SparkWallet | null>(null);
@@ -59,6 +66,8 @@ export default function Home() {
   };
 
   useEffect(() => {
+    /* For debugging purposes only, not required: */
+    window.s = spark;
     (async () => {
       const sparkFrost = getSparkFrost();
       const dummyTx = await sparkFrost.createDummyTx(

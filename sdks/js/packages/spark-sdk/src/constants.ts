@@ -8,6 +8,10 @@ export const isBun = "Bun" in globalThis;
 export const isWebExtension =
   /* globalThis.chrome actually exists in extension contexts for all browsers for legacy reasons: */
   "chrome" in globalThis && globalThis.chrome.runtime?.id;
+export const isWebExtensionContentScript =
+  isWebExtension && "window" in globalThis;
+export const isWebExtensionBackgroundScript =
+  isWebExtension && !isWebExtensionContentScript;
 
 /* navigator.userAgent exists in browsers and extension contexts: */
 const userAgent =
@@ -39,8 +43,9 @@ if (isBun) {
   /* Protocol may contain additional information about where the
      extension is running, e.g. chrome-extension: or moz-extension: */
   const protocol = "location" in globalThis ? globalThis.location.protocol : "";
-  const extScriptType =
-    "window" in globalThis ? "content-script" : "background-script";
+  const extScriptType = isWebExtensionContentScript
+    ? "content-script"
+    : "background-script";
   baseEnvStr = `web-extension/${protocol.replace(":", "")}/${extScriptType}/${userAgent}`;
 } else {
   baseEnvStr = `browser/${userAgent}`;

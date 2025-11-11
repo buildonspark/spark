@@ -1,9 +1,9 @@
+import * as spark from "@buildonspark/spark-sdk";
 import {
   SparkWallet,
   getSparkFrost,
   type DummyTx,
 } from "@buildonspark/spark-sdk";
-import "@buildonspark/spark-sdk/debug";
 import { useEffect, useState } from "react";
 
 function App() {
@@ -79,3 +79,12 @@ function App() {
 }
 
 export default App;
+
+interface SparkWindow extends Window {
+  s: typeof spark;
+}
+
+declare let window: SparkWindow;
+
+/* For debugging purposes only, not required: */
+window.s = spark;

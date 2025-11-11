@@ -16,7 +16,7 @@ import {
   IKeyPackage,
   AggregateFrostBindingParams,
   SignFrostBindingParams,
-} from "../spark_bindings/types.js";
+} from "../spark-bindings/types.js";
 import { subtractPrivateKeys } from "../utils/keys.js";
 import {
   splitSecretWithProofs,
@@ -43,7 +43,7 @@ import {
 import {
   getSparkFrost,
   type SparkFrostBase,
-} from "../spark_bindings/spark-bindings.js";
+} from "../spark-bindings/spark-bindings.js";
 
 interface SparkKeysGenerator {
   deriveKeysFromSeed(

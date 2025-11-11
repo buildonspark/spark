@@ -4,9 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "yarn tsc && rm -rf dist && yarn build:chrome",
+    "build": "yarn tsc && rm -rf dist && yarn build:all",
+    "build:all": "node build.mjs --all",
     "build:chrome": "node build.mjs",
+    "build:firefox": "node build.mjs --firefox",
+    "watch": "node build.mjs --all --watch",
+    "watch:all": "node build.mjs --all --watch",
     "watch:chrome": "node build.mjs --watch",
+    "watch:firefox": "node build.mjs --firefox --watch",
     "format:fix": "prettier . --write",
     "format": "prettier . --check"
   },

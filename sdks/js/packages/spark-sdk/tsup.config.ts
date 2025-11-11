@@ -12,18 +12,27 @@ const commonConfig = {
   define: {
     __PACKAGE_VERSION__: JSON.stringify(pkg.version),
   },
+  esbuildOptions(options) {
+    /* Turn import.meta warnings into errors for CJS builds to catch browser bindings imports */
+    options.logOverride = {
+      "empty-import-meta": "error",
+    };
+    // Ensure esbuild treats .wasm imports as file assets for bundlers
+    options.loader = {
+      ...options.loader,
+      ".wasm": "binary",
+    };
+  },
 };
 
 export default defineConfig([
   {
     ...commonConfig,
     entry: [
-      "src/index.ts",
       "src/index.node.ts",
       /* Entrypoints other than index should be static only, i.e. modules that never depend
          on the state of other modules. Everything else should be exported from index. */
       "src/tests/test-utils.ts",
-      "src/debug.ts",
       "src/proto/spark.ts",
       "src/proto/spark_token.ts",
       "src/graphql/objects/index.ts",
@@ -32,6 +41,15 @@ export default defineConfig([
     inject: ["./buffer.js"],
     format: ["cjs", "esm"],
     outDir: "dist",
+  },
+  {
+    ...commonConfig,
+    entry: ["src/index.browser.ts"],
+    inject: ["./buffer.js"],
+    /* Only ESM format is supported for browser builds */
+    format: ["esm"],
+    outDir: "dist",
+    onSuccess: "node scripts/on-build-success.js",
   },
   {
     ...commonConfig,

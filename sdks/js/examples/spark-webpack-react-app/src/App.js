@@ -1,3 +1,4 @@
+import * as spark from "@buildonspark/spark-sdk";
 import { SparkWallet, getSparkFrost } from "@buildonspark/spark-sdk";
 import React, { useState, useEffect } from "react";
 
@@ -74,3 +75,6 @@ function App() {
 }
 
 export default App;
+
+/* For debugging purposes only, not required: */
+window.s = spark;

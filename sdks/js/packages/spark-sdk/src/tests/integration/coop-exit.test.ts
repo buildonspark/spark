@@ -22,8 +22,7 @@ import { getNetwork, Network } from "../../utils/network.js";
 import { walletTypes } from "../test-utils.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
-
-import { KeyDerivation, KeyDerivationType } from "../../index.js";
+import { KeyDerivation, KeyDerivationType } from "../../signer/types.js";
 import { TransferStatus } from "../../proto/spark.js";
 
 describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {

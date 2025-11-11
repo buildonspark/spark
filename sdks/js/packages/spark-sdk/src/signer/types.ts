@@ -1,5 +1,5 @@
 import type { HDKey } from "@scure/bip32";
-import type { ISigningCommitment } from "../spark_bindings/types.js";
+import type { ISigningCommitment } from "../spark-bindings/types.js";
 import { type VerifiableSecretShare } from "../utils/secret-sharing.js";
 
 export type SigningCommitmentWithOptionalNonce = {

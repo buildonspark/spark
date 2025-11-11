@@ -1,5 +1,5 @@
 import { SparkWalletTesting } from "./spark-testing-wallet.js";
-import { SparkWalletEvent } from "../../index.js";
+import { SparkWalletEvent } from "../../spark-wallet/types.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

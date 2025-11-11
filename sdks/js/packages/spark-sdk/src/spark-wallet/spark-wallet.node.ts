@@ -1,16 +1,7 @@
 import { SparkWallet as BaseSparkWallet } from "./spark-wallet.js";
-import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
-import { W3CTraceContextPropagator } from "@opentelemetry/core";
-import { registerInstrumentations } from "@opentelemetry/instrumentation";
-import { UndiciInstrumentation } from "@opentelemetry/instrumentation-undici";
 import { ConnectionManagerNodeJS } from "../services/connection/connection.node.js";
 import { WalletConfigService } from "../services/config.js";
-import { DefaultSparkSigner } from "../signer/signer.js";
-
-// FIXME: Global flag to ensure instrumentations are only registered once
-// Remove when problem fixed
-let instrumentationsRegistered = false;
+import { initializeTracerEnvNodeJS } from "../otel/initializeTracerEnv.node.js";
 
 export class SparkWalletNodeJS extends BaseSparkWallet {
   protected buildConnectionManager(config: WalletConfigService) {
@@ -25,42 +16,4 @@ export class SparkWalletNodeJS extends BaseSparkWallet {
   }
 }
 
-export function initializeTracerEnvNodeJS({
-  spanProcessors,
-  traceUrls,
-}: Parameters<BaseSparkWallet["initializeTracerEnv"]>[0]) {
-  const provider = new NodeTracerProvider({ spanProcessors });
-  provider.register({
-    contextManager: new AsyncLocalStorageContextManager(),
-    propagator: new W3CTraceContextPropagator(),
-  });
-
-  /* FIXME: Only register instrumentations once globally to avoid duplicate headers
-  This is a workaround for a bug that causes duplicate headers to be added to requests.
-  */
-  if (!instrumentationsRegistered) {
-    registerInstrumentations({
-      instrumentations: [
-        new UndiciInstrumentation({
-          ignoreRequestHook: (request) => {
-            /* Since we're wrapping global fetch we should be careful to avoid
-                 adding headers or causing errors for unrelated requests */
-            try {
-              return !traceUrls.some((prefix) =>
-                request.origin.startsWith(prefix),
-              );
-            } catch {
-              return true;
-            }
-          },
-        }),
-      ],
-    });
-    instrumentationsRegistered = true;
-  }
-}
-
-export {
-  SparkWalletNodeJS as SparkWallet,
-  initializeTracerEnvNodeJS as initializeTracerEnv,
-};
+export { SparkWalletNodeJS as SparkWallet };

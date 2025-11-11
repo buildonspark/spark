@@ -2,8 +2,9 @@
    used in both browser and nodejs. See https://bit.ly/4iGErRo. */
 
 import { readFile, writeFile } from "node:fs/promises";
+import fs from "node:fs";
 
-const name = "spark_bindings_nodejs";
+const name = "wasm_nodejs";
 const generatedDir = "./wasm/nodejs";
 
 const content = await readFile(`${generatedDir}/${name}.js`, "utf8");
@@ -48,8 +49,16 @@ const wasmBytes = __toBinary(${JSON.stringify(
 `,
   );
 
-await writeFile(`./src/wasm/spark_bindings.js`, patched);
-await writeFile(
-  `./src/wasm/spark_bindings.d.ts`,
-  await readFile(`${generatedDir}/${name}.d.ts`, "utf8"),
+await writeFile(`./src/spark-bindings/wasm/wasm-nodejs.js`, patched);
+fs.copyFileSync(
+  `${generatedDir}/${name}.d.ts`,
+  `./src/spark-bindings/wasm/wasm-nodejs.d.ts`,
+);
+fs.copyFileSync(
+  `${generatedDir}/${name}_bg.wasm`,
+  `./src/spark-bindings/wasm/wasm-nodejs-bg.wasm`,
+);
+fs.copyFileSync(
+  `${generatedDir}/${name}_bg.wasm.d.ts`,
+  `./src/spark-bindings/wasm/wasm-nodejs-bg.wasm.d.ts`,
 );
