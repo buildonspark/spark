@@ -1,12 +1,11 @@
 // Example Bare script using Spark SDK and Frost addon
-import { SparkWallet, BareSparkSigner } from "@buildonspark/bare";
+import { SparkWallet } from "@buildonspark/bare";
 import process from "bare-process";
 import walletConfig from "./wallet-config.js";
 
 async function getWalletDetails(mnemonicInit) {
   let { wallet, mnemonic } = await SparkWallet.initialize({
     mnemonicOrSeed: mnemonicInit,
-    signer: new BareSparkSigner(),
     options: {
       network: "REGTEST",
     },

@@ -19,25 +19,25 @@ export interface DummyTx {
   txid: string;
 }
 
-export type SignFrostParams = {
+export type SignFrostBindingParams = {
   message: Uint8Array;
   keyPackage: IKeyPackage;
   nonce: ISigningNonce;
   selfCommitment: ISigningCommitment;
   statechainCommitments: { [key: string]: ISigningCommitment } | undefined;
-  adaptorPubKey?: Uint8Array;
+  adaptorPubKey: Uint8Array | undefined;
 };
 
-export type AggregateFrostParams = {
+export type AggregateFrostBindingParams = {
   message: Uint8Array;
+  statechainSignatures: { [key: string]: Uint8Array } | undefined;
+  statechainPublicKeys: { [key: string]: Uint8Array } | undefined;
+  verifyingKey: Uint8Array;
   statechainCommitments: { [key: string]: ISigningCommitment } | undefined;
   selfCommitment: ISigningCommitment;
-  statechainSignatures: { [key: string]: Uint8Array } | undefined;
-  selfSignature: Uint8Array;
-  statechainPublicKeys: { [key: string]: Uint8Array } | undefined;
   selfPublicKey: Uint8Array;
-  verifyingKey: Uint8Array;
-  adaptorPubKey?: Uint8Array;
+  selfSignature: Uint8Array;
+  adaptorPubKey?: Uint8Array | undefined;
 };
 
 export type ConstructNodeTxParams = {

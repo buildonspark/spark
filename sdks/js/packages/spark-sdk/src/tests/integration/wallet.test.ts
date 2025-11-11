@@ -9,6 +9,7 @@ import type {
   KeyDerivation,
   SignFrostParams,
   SigningCommitmentWithOptionalNonce,
+  SigningNonce,
   SplitSecretWithProofsParams,
 } from "../../signer/types.js";
 import { NetworkType } from "../../utils/network.js";
@@ -175,6 +176,11 @@ class PreinitializedTestSigner implements SparkSigner {
     throw new Error("Not implemented in PreinitializedTestSigner");
   }
   async aggregateFrost(_params: AggregateFrostParams): Promise<Uint8Array> {
+    throw new Error("Not implemented in PreinitializedTestSigner");
+  }
+  getNonceForSelfCommitment(
+    _selfCommitment: SigningCommitmentWithOptionalNonce,
+  ): SigningNonce | undefined {
     throw new Error("Not implemented in PreinitializedTestSigner");
   }
 

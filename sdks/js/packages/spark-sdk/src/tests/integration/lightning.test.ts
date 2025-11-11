@@ -3,7 +3,6 @@ import { bytesToHex, hexToBytes } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import { equalBytes } from "@scure/btc-signer/utils";
 import { uuidv7 } from "uuidv7";
-import { getTxFromRawTxBytes, KeyDerivationType } from "../../index.js";
 import {
   BitcoinNetwork,
   CurrencyUnit,
@@ -13,6 +12,8 @@ import {
 } from "../../types/index.js";
 import { BitcoinFaucet, walletTypes } from "../test-utils.js";
 import { SparkWalletTestingIntegration } from "../utils/spark-testing-wallet.js";
+import { getTxFromRawTxBytes } from "../../utils/bitcoin.js";
+import { KeyDerivationType } from "../../signer/types.js";
 
 const { TransferStatus } = SparkProto;
 

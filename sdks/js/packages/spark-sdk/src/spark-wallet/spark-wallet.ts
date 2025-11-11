@@ -223,7 +223,7 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
   constructor(options?: ConfigOptions, signerArg?: SparkSigner) {
     super();
 
-    const signer = signerArg || this.buildSigner();
+    const signer = signerArg || new DefaultSparkSigner();
     this.config = new WalletConfigService(options, signer);
     const events = this.config.getEvents();
     if (Object.keys(events).length > 0) {
@@ -304,10 +304,6 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       });
     }
     return this.sspClient;
-  }
-
-  protected buildSigner() {
-    return new DefaultSparkSigner();
   }
 
   private async handleStreamEvent({ event }: SubscribeToEventsResponse) {

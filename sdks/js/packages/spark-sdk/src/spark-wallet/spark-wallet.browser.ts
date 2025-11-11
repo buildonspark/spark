@@ -11,6 +11,7 @@ import {
 import { SparkSigner } from "../signer/signer.js";
 import { ConfigOptions } from "../services/wallet-config.js";
 import { WalletConfigService } from "../services/config.js";
+import { DefaultSparkSigner } from "../signer/signer.js";
 
 export class SparkWalletBrowser extends BaseSparkWallet {
   protected buildConnectionManager(config: WalletConfigService) {

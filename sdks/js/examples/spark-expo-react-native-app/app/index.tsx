@@ -1,9 +1,8 @@
 import {
-  ReactNativeSparkSigner,
   SparkWallet,
   SparkWalletEvent,
+  getSparkFrost,
 } from "@buildonspark/spark-sdk/native";
-import { createDummyTx } from "@buildonspark/spark-sdk/native/spark-frost";
 import { useEffect, useState } from "react";
 import { Button, Text, View } from "react-native";
 
@@ -85,7 +84,8 @@ export default function Index() {
 
   useEffect(() => {
     (async () => {
-      const dummyTx = await createDummyTx(
+      const sparkFrost = getSparkFrost();
+      const dummyTx = await sparkFrost.createDummyTx(
         "bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te",
         65536n,
       );
@@ -102,7 +102,6 @@ export default function Index() {
         options: {
           network: "REGTEST",
         },
-        signer: new ReactNativeSparkSigner(),
       });
       const balance = await wallet.wallet.getBalance();
       console.log("Balance from wallet:", balance);
@@ -117,7 +116,6 @@ export default function Index() {
         options: {
           network: "REGTEST",
         },
-        signer: new ReactNativeSparkSigner(),
       });
 
       const balance1 = await wallet1.wallet.getBalance();

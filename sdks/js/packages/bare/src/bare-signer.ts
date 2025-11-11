@@ -1,17 +1,17 @@
 import { bytesToHex, hexToBytes } from "@noble/hashes/utils";
 import {
-  createDummyTx,
-  signFrost,
-  aggregateFrost,
-} from "@buildonspark/spark-frost-bare-addon";
-import {
   DefaultSparkSigner,
   ValidationError,
+  getSparkFrost,
   type SignFrostParams,
   type AggregateFrostParams,
   type IKeyPackage,
 } from "@buildonspark/spark-sdk/bare";
 
+/**
+ * @deprecated It's no longer necessary to provide BareSparkSigner when
+ * initializing a SparkWallet and it will be removed in a future release.
+ */
 export class BareSparkSigner extends DefaultSparkSigner {
   async signFrost({
     message,
@@ -45,18 +45,15 @@ export class BareSparkSigner extends DefaultSparkSigner {
       verifyingKey: verifyingKey,
     };
 
-    const statechainCommitmentsArr = statechainCommitments
-      ? Object.entries(statechainCommitments)
-      : [];
-
-    const result = signFrost(
+    const sparkFrost = getSparkFrost();
+    const result = sparkFrost.signFrost({
       message,
       keyPackage,
       nonce,
-      selfCommitment.commitment,
-      statechainCommitmentsArr,
-      adaptorPubKey || null,
-    );
+      selfCommitment: selfCommitment.commitment,
+      statechainCommitments,
+      adaptorPubKey,
+    });
 
     return result;
   }
@@ -72,29 +69,18 @@ export class BareSparkSigner extends DefaultSparkSigner {
     verifyingKey,
     adaptorPubKey,
   }: AggregateFrostParams): Promise<Uint8Array> {
-    const statechainCommitmentsArr = statechainCommitments
-      ? Object.entries(statechainCommitments)
-      : [];
-    const statechainSignaturesArr = statechainSignatures
-      ? Object.entries(statechainSignatures)
-      : [];
-    const statechainPublicKeysArr = statechainPublicKeys
-      ? Object.entries(statechainPublicKeys)
-      : [];
-
-    // msg, statechainCommitments, selfCommitment, statechainSignatures, selfSignature, statechainPublicKeys, selfPublicKey, verifyingKey, adaptorPublicKey
-    const result = aggregateFrost(
+    const sparkFrost = getSparkFrost();
+    const result = sparkFrost.aggregateFrost({
       message,
-      statechainCommitmentsArr,
-      selfCommitment.commitment,
-      statechainSignaturesArr,
+      statechainCommitments,
+      selfCommitment: selfCommitment.commitment,
+      statechainSignatures,
       selfSignature,
-      statechainPublicKeysArr,
-      publicKey,
+      statechainPublicKeys,
+      selfPublicKey: publicKey,
       verifyingKey,
-      adaptorPubKey || null,
-    );
-
+      adaptorPubKey,
+    });
     return result;
   }
 }

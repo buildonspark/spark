@@ -80,14 +80,6 @@
       "import": "./dist/native/index.react-native.js",
       "require": "./dist/native/index.react-native.cjs"
     },
-    "./native/spark-frost": {
-      "import": "./dist/spark_bindings/native/index.js",
-      "require": "./dist/spark_bindings/native/index.cjs"
-    },
-    "./spark-frost": {
-      "import": "./dist/spark_bindings/wasm/index.js",
-      "require": "./dist/spark_bindings/wasm/index.cjs"
-    },
     "./bare": {
       "import": "./dist/bare/index.js",
       "require": "./dist/bare/index.cjs"
@@ -137,7 +129,6 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
-    "@bitcoinerlab/secp256k1": "^1.1.1",
     "@bufbuild/protobuf": "^2.2.5",
     "@lightsparkdev/core": "^1.4.4",
     "@noble/curves": "^1.8.0",

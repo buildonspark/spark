@@ -40,13 +40,20 @@ export { getLatestDepositTxId } from "../utils/mempool.js";
 export * from "../utils/index.js";
 export {
   DefaultSparkSigner,
-  TaprootOutputKeysGenerator,
-  TaprootSparkSigner,
   UnsafeStatelessSparkSigner,
   type SparkSigner,
 } from "../signer/signer.js";
 export { type IKeyPackage } from "../spark_bindings/types.js";
+export { SparkFrostBase } from "../spark_bindings/spark-bindings.js";
 export {
   type SignFrostParams,
   type AggregateFrostParams,
 } from "../signer/types.js";
+export {
+  setSparkFrostOnce,
+  getSparkFrost,
+} from "../spark_bindings/spark-bindings.js";
+export {
+  type SignFrostBindingParams,
+  type AggregateFrostBindingParams,
+} from "../spark_bindings/types.js";

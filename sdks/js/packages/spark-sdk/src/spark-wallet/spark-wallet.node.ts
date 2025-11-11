@@ -6,6 +6,7 @@ import { registerInstrumentations } from "@opentelemetry/instrumentation";
 import { UndiciInstrumentation } from "@opentelemetry/instrumentation-undici";
 import { ConnectionManagerNodeJS } from "../services/connection/connection.node.js";
 import { WalletConfigService } from "../services/config.js";
+import { DefaultSparkSigner } from "../signer/signer.js";
 
 // FIXME: Global flag to ensure instrumentations are only registered once
 // Remove when problem fixed

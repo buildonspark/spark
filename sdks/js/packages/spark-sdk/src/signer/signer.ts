@@ -1,4 +1,3 @@
-import { privateNegate } from "@bitcoinerlab/secp256k1";
 import { schnorr, secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToHex,
@@ -11,15 +10,17 @@ import { HDKey } from "@scure/bip32";
 import { generateMnemonic, mnemonicToSeed } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { Transaction } from "@scure/btc-signer";
-import { taprootTweakPrivKey } from "@scure/btc-signer/utils";
 import * as ecies from "eciesjs";
-import { isReactNative } from "../constants.js";
 import { ConfigurationError, ValidationError } from "../errors/types.js";
-import { IKeyPackage } from "../spark_bindings/types.js";
+import {
+  IKeyPackage,
+  AggregateFrostBindingParams,
+  SignFrostBindingParams,
+} from "../spark_bindings/types.js";
 import { subtractPrivateKeys } from "../utils/keys.js";
 import {
   splitSecretWithProofs,
-  VerifiableSecretShare,
+  type VerifiableSecretShare,
 } from "../utils/secret-sharing.js";
 import {
   getRandomSigningNonce,
@@ -36,19 +37,13 @@ import {
   type SigningCommitment,
   type SigningNonce,
   type SplitSecretWithProofsParams,
+  type SubtractSplitAndEncryptParams,
+  type SubtractSplitAndEncryptResult,
 } from "./types.js";
-
-let sparkFrostModule: any = undefined;
-const getSparkFrostModule = async () => {
-  if (isReactNative) {
-    return undefined;
-  }
-  if (!sparkFrostModule) {
-    // Use dynamic import
-    sparkFrostModule = await import("../spark_bindings/wasm/index.js");
-  }
-  return sparkFrostModule;
-};
+import {
+  getSparkFrost,
+  type SparkFrostBase,
+} from "../spark_bindings/spark-bindings.js";
 
 interface SparkKeysGenerator {
   deriveKeysFromSeed(
@@ -201,98 +196,23 @@ class DerivationPathKeysGenerator implements SparkKeysGenerator {
   }
 }
 
-class TaprootOutputKeysGenerator implements SparkKeysGenerator {
-  constructor(private readonly useAddressIndex: boolean = false) {}
-
-  async deriveKeysFromSeed(
-    seed: Uint8Array,
-    accountNumber: number,
-  ): Promise<{
-    identityKey: KeyPair;
-    signingHDKey: DerivedHDKey;
-    depositKey: KeyPair;
-    staticDepositHDKey: DerivedHDKey;
-  }> {
-    const hdkey = HDKey.fromMasterSeed(seed);
-
-    if (!hdkey.privateKey || !hdkey.publicKey) {
-      throw new ValidationError("Failed to derive keys from seed", {
-        field: "hdkey",
-        value: seed,
-      });
-    }
-
-    const derivationPath = this.useAddressIndex
-      ? `m/86'/0'/0'/0/${accountNumber}`
-      : `m/86'/0'/${accountNumber}'/0/0`;
-
-    const taprootInternalKey = hdkey.derive(derivationPath);
-
-    let tweakedPrivateKey = taprootTweakPrivKey(taprootInternalKey.privateKey!);
-    let tweakedPublicKey = secp256k1.getPublicKey(tweakedPrivateKey);
-
-    // always use the even key
-    if (tweakedPublicKey[0] === 3) {
-      tweakedPrivateKey = privateNegate(tweakedPrivateKey);
-      tweakedPublicKey = secp256k1.getPublicKey(tweakedPrivateKey);
-    }
-
-    const identityKey = {
-      publicKey: tweakedPublicKey,
-      privateKey: tweakedPrivateKey,
-    };
-
-    const signingKey = hdkey.derive(`${derivationPath}/1'`);
-    const depositKey = hdkey.derive(`${derivationPath}/2'`);
-    const staticDepositKey = hdkey.derive(`${derivationPath}/3'`);
-
-    if (
-      !signingKey.privateKey ||
-      !signingKey.publicKey ||
-      !depositKey.privateKey ||
-      !depositKey.publicKey ||
-      !staticDepositKey.privateKey ||
-      !staticDepositKey.publicKey
-    ) {
-      throw new ValidationError(
-        "Failed to derive all required keys from seed",
-        {
-          field: "derivedKeys",
-        },
-      );
-    }
-
-    return {
-      identityKey: {
-        privateKey: identityKey.privateKey,
-        publicKey: identityKey.publicKey,
-      },
-      signingHDKey: {
-        hdKey: signingKey,
-        privateKey: signingKey.privateKey,
-        publicKey: signingKey.publicKey,
-      },
-      depositKey: {
-        privateKey: depositKey.privateKey,
-        publicKey: depositKey.publicKey,
-      },
-      staticDepositHDKey: {
-        hdKey: staticDepositKey,
-        privateKey: staticDepositKey.privateKey,
-        publicKey: staticDepositKey.publicKey,
-      },
-    };
-  }
-}
-
 interface SparkSigner {
   getIdentityPublicKey(): Promise<Uint8Array>;
   getDepositSigningKey(): Promise<Uint8Array>;
   getStaticDepositSigningKey(idx: number): Promise<Uint8Array>;
   getStaticDepositSecretKey(idx: number): Promise<Uint8Array>;
-
   generateMnemonic(): Promise<string>;
   mnemonicToSeed(mnemonic: string): Promise<Uint8Array>;
+  signSchnorrWithIdentityKey(message: Uint8Array): Promise<Uint8Array>;
+  signFrost(params: SignFrostParams): Promise<Uint8Array>;
+  aggregateFrost(params: AggregateFrostParams): Promise<Uint8Array>;
+  decryptEcies(ciphertext: Uint8Array): Promise<Uint8Array>;
+  getRandomSigningCommitment(): Promise<SigningCommitmentWithOptionalNonce>;
+  getDepositSigningKey(): Promise<Uint8Array>;
+
+  getNonceForSelfCommitment(
+    selfCommitment: SigningCommitmentWithOptionalNonce,
+  ): SigningNonce | undefined;
 
   createSparkWalletFromSeed(
     seed: Uint8Array | string,
@@ -302,8 +222,6 @@ interface SparkSigner {
   getPublicKeyFromDerivation(
     keyDerivation?: KeyDerivation,
   ): Promise<Uint8Array>;
-
-  signSchnorrWithIdentityKey(message: Uint8Array): Promise<Uint8Array>;
 
   subtractPrivateKeysGivenDerivationPaths(
     first: string,
@@ -318,28 +236,20 @@ interface SparkSigner {
   ): Promise<VerifiableSecretShare[]>;
 
   subtractSplitAndEncrypt(
-    params: Omit<SplitSecretWithProofsParams, "secret"> & {
-      first: KeyDerivation;
-      second: KeyDerivation;
-      receiverPublicKey: Uint8Array;
-    },
-  ): Promise<{
-    shares: VerifiableSecretShare[];
-    secretCipher: Uint8Array;
-  }>;
+    params: SubtractSplitAndEncryptParams,
+  ): Promise<SubtractSplitAndEncryptResult>;
 
   splitSecretWithProofs(
     params: SplitSecretWithProofsParams,
   ): Promise<VerifiableSecretShare[]>;
 
-  signFrost(params: SignFrostParams): Promise<Uint8Array>;
-  aggregateFrost(params: AggregateFrostParams): Promise<Uint8Array>;
-
-  // If compact is true, the signature should be in ecdsa compact format else it should be in DER format
   signMessageWithIdentityKey(
     message: Uint8Array,
+    /* If compact is true, the signature should be in
+       ecdsa compact format else it should be in DER format */
     compact?: boolean,
   ): Promise<Uint8Array>;
+
   validateMessageWithIdentityKey(
     message: Uint8Array,
     signature: Uint8Array,
@@ -350,28 +260,23 @@ interface SparkSigner {
     index: number,
     publicKey: Uint8Array,
   ): void;
-
-  decryptEcies(ciphertext: Uint8Array): Promise<Uint8Array>;
-
-  getRandomSigningCommitment(): Promise<SigningCommitmentWithOptionalNonce>;
-
-  getDepositSigningKey(): Promise<Uint8Array>;
 }
+
+type SparkSignerConstructorParams = {
+  sparkKeysGenerator?: SparkKeysGenerator;
+};
 
 class DefaultSparkSigner implements SparkSigner {
   private identityKey: KeyPair | null = null;
   private signingKey: HDKey | null = null;
   private depositKey: KeyPair | null = null;
   private staticDepositKey: HDKey | null = null;
+  private readonly keysGenerator: SparkKeysGenerator;
 
   protected commitmentToNonceMap: Map<SigningCommitment, SigningNonce> =
     new Map();
 
-  private readonly keysGenerator: SparkKeysGenerator;
-
-  constructor({
-    sparkKeysGenerator,
-  }: { sparkKeysGenerator?: SparkKeysGenerator } = {}) {
+  constructor({ sparkKeysGenerator }: SparkSignerConstructorParams = {}) {
     this.keysGenerator = sparkKeysGenerator ?? new DefaultSparkKeysGenerator();
   }
 
@@ -558,10 +463,7 @@ class DefaultSparkSigner implements SparkSigner {
     first: KeyDerivation;
     second: KeyDerivation;
     receiverPublicKey: Uint8Array;
-  }): Promise<{
-    shares: VerifiableSecretShare[];
-    secretCipher: Uint8Array;
-  }> {
+  }): Promise<SubtractSplitAndEncryptResult> {
     const firstPrivateKey =
       await this.getSigningPrivateKeyFromDerivation(first);
     const secondPrivateKey =
@@ -593,7 +495,14 @@ class DefaultSparkSigner implements SparkSigner {
     return splitSecretWithProofs(secretAsInt, curveOrder, threshold, numShares);
   }
 
-  async signFrost({
+  getNonceForSelfCommitment(
+    selfCommitment: SigningCommitmentWithOptionalNonce,
+  ) {
+    const nonce = this.commitmentToNonceMap.get(selfCommitment.commitment);
+    return nonce;
+  }
+
+  async buildSignFrostParams({
     message,
     keyDerivation,
     publicKey,
@@ -601,14 +510,7 @@ class DefaultSparkSigner implements SparkSigner {
     selfCommitment,
     statechainCommitments,
     adaptorPubKey,
-  }: SignFrostParams): Promise<Uint8Array> {
-    const SparkFrost = await getSparkFrostModule();
-    if (!SparkFrost) {
-      throw new ValidationError("SparkFrost module not found", {
-        field: "SparkFrost",
-      });
-    }
-
+  }: SignFrostParams): Promise<SignFrostBindingParams> {
     const signingPrivateKey =
       await this.getSigningPrivateKeyFromDerivation(keyDerivation);
 
@@ -618,8 +520,7 @@ class DefaultSparkSigner implements SparkSigner {
       });
     }
 
-    const commitment = selfCommitment.commitment;
-    const nonce = this.commitmentToNonceMap.get(commitment);
+    const nonce = this.getNonceForSelfCommitment(selfCommitment);
     if (!nonce) {
       throw new ValidationError("Nonce not found for commitment", {
         field: "nonce",
@@ -632,18 +533,60 @@ class DefaultSparkSigner implements SparkSigner {
       verifyingKey: verifyingKey,
     };
 
-    const logMessage = bytesToHex(message);
-
-    const result = await SparkFrost.signFrost({
+    return {
       message,
       keyPackage,
       nonce,
-      selfCommitment: commitment,
+      selfCommitment: selfCommitment.commitment,
+      statechainCommitments,
+      adaptorPubKey,
+    };
+  }
+
+  async buildAggregateFrostParams({
+    message,
+    publicKey,
+    verifyingKey,
+    selfCommitment,
+    statechainCommitments,
+    adaptorPubKey,
+    selfSignature,
+    statechainSignatures,
+    statechainPublicKeys,
+  }: AggregateFrostParams): Promise<AggregateFrostBindingParams> {
+    return {
+      message,
+      statechainSignatures,
+      statechainPublicKeys,
+      verifyingKey,
+      statechainCommitments,
+      selfCommitment: selfCommitment.commitment,
+      selfPublicKey: publicKey,
+      selfSignature,
+      adaptorPubKey,
+    };
+  }
+
+  async signFrost({
+    message,
+    keyDerivation,
+    publicKey,
+    verifyingKey,
+    selfCommitment,
+    statechainCommitments,
+    adaptorPubKey,
+  }: SignFrostParams): Promise<Uint8Array> {
+    const signFrostParams = await this.buildSignFrostParams({
+      message,
+      keyDerivation,
+      publicKey,
+      verifyingKey,
+      selfCommitment,
       statechainCommitments,
       adaptorPubKey,
     });
-
-    return result;
+    const sparkFrost = getSparkFrost();
+    return sparkFrost.signFrost(signFrostParams);
   }
 
   async aggregateFrost({
@@ -657,23 +600,19 @@ class DefaultSparkSigner implements SparkSigner {
     statechainSignatures,
     statechainPublicKeys,
   }: AggregateFrostParams): Promise<Uint8Array> {
-    const SparkFrost = await getSparkFrostModule();
-    if (!SparkFrost) {
-      throw new ValidationError("SparkFrost module not found", {
-        field: "SparkFrost",
-      });
-    }
-    return SparkFrost.aggregateFrost({
+    const aggregateFrostParams = await this.buildAggregateFrostParams({
       message,
+      publicKey,
+      verifyingKey,
+      selfCommitment,
+      statechainCommitments,
+      adaptorPubKey,
+      selfSignature,
       statechainSignatures,
       statechainPublicKeys,
-      verifyingKey,
-      statechainCommitments,
-      selfCommitment: selfCommitment.commitment,
-      selfPublicKey: publicKey,
-      selfSignature,
-      adaptorPubKey,
     });
+    const sparkFrost = getSparkFrost();
+    return sparkFrost.aggregateFrost(aggregateFrostParams);
   }
 
   async createSparkWalletFromSeed(
@@ -790,12 +729,10 @@ class DefaultSparkSigner implements SparkSigner {
  * @extends DefaultSparkSigner
  */
 class UnsafeStatelessSparkSigner extends DefaultSparkSigner {
-  constructor({
-    sparkKeysGenerator,
-  }: { sparkKeysGenerator?: SparkKeysGenerator } = {}) {
-    super({
-      sparkKeysGenerator,
-    });
+  getNonceForSelfCommitment(
+    selfCommitment: SigningCommitmentWithOptionalNonce,
+  ): SigningNonce | undefined {
+    return selfCommitment.nonce;
   }
 
   async getRandomSigningCommitment(): Promise<SigningCommitmentWithOptionalNonce> {
@@ -806,101 +743,6 @@ class UnsafeStatelessSparkSigner extends DefaultSparkSigner {
       nonce,
     };
   }
-
-  async signFrost({
-    message,
-    keyDerivation,
-    publicKey,
-    verifyingKey,
-    selfCommitment,
-    statechainCommitments,
-    adaptorPubKey,
-  }: SignFrostParams): Promise<Uint8Array> {
-    const SparkFrost = await getSparkFrostModule();
-    if (!SparkFrost) {
-      throw new ValidationError("SparkFrost module not found", {
-        field: "SparkFrost",
-      });
-    }
-
-    const signingPrivateKey =
-      await this.getSigningPrivateKeyFromDerivation(keyDerivation);
-
-    if (!signingPrivateKey) {
-      throw new ValidationError("Private key not found for public key", {
-        field: "privateKey",
-      });
-    }
-
-    const { commitment, nonce } = selfCommitment;
-    if (!nonce) {
-      throw new ValidationError("Nonce not found for commitment", {
-        field: "nonce",
-      });
-    }
-
-    const keyPackage: IKeyPackage = {
-      secretKey: signingPrivateKey,
-      publicKey: publicKey,
-      verifyingKey: verifyingKey,
-    };
-
-    return SparkFrost.signFrost({
-      message,
-      keyPackage,
-      nonce,
-      selfCommitment: commitment,
-      statechainCommitments,
-      adaptorPubKey,
-    });
-  }
 }
 
-class TaprootSparkSigner extends DefaultSparkSigner {
-  constructor(useAddressIndex = false) {
-    super({
-      sparkKeysGenerator: new TaprootOutputKeysGenerator(useAddressIndex),
-    });
-  }
-}
-
-class NativeSegwitSparkSigner extends DefaultSparkSigner {
-  constructor(useAddressIndex = false) {
-    super({
-      sparkKeysGenerator: new DerivationPathKeysGenerator(
-        useAddressIndex ? "m/84'/0'/0'/0/?" : "m/84'/0'/?'/0/0",
-      ),
-    });
-  }
-}
-
-class WrappedSegwitSparkSigner extends DefaultSparkSigner {
-  constructor(useAddressIndex = false) {
-    super({
-      sparkKeysGenerator: new DerivationPathKeysGenerator(
-        useAddressIndex ? "m/49'/0'/0'/0/?" : "m/49'/0'/?'/0/0",
-      ),
-    });
-  }
-}
-
-class LegacyBitcoinSparkSigner extends DefaultSparkSigner {
-  constructor(useAddressIndex = false) {
-    super({
-      sparkKeysGenerator: new DerivationPathKeysGenerator(
-        useAddressIndex ? "m/44'/0'/0'/0/?" : "m/44'/0'/?'/0/0",
-      ),
-    });
-  }
-}
-
-export {
-  DefaultSparkSigner,
-  LegacyBitcoinSparkSigner,
-  NativeSegwitSparkSigner,
-  TaprootOutputKeysGenerator,
-  TaprootSparkSigner,
-  UnsafeStatelessSparkSigner,
-  WrappedSegwitSparkSigner,
-  type SparkSigner,
-};
+export { DefaultSparkSigner, UnsafeStatelessSparkSigner, type SparkSigner };

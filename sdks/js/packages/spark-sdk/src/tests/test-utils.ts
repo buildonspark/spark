@@ -1,11 +1,6 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
 import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { RPCError } from "../errors/types.js";
-import {
-  DefaultSparkSigner,
-  KeyDerivationType,
-  UnsafeStatelessSparkSigner,
-} from "../index.js";
 import { FinalizeNodeSignaturesResponse, TreeNode } from "../proto/spark.js";
 import { WalletConfigService } from "../services/config.js";
 import { ConnectionManagerNodeJS } from "../services/connection/connection.node.js";
@@ -16,6 +11,11 @@ import { getNetwork, Network } from "../utils/network.js";
 import { SparkWalletTesting } from "./utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "./utils/test-faucet.js";
 import { sha256 } from "@noble/hashes/sha2";
+import {
+  DefaultSparkSigner,
+  UnsafeStatelessSparkSigner,
+} from "../signer/signer.js";
+import { KeyDerivationType } from "../signer/types.js";
 
 export { BitcoinFaucet, SparkWalletTesting };
 

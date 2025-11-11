@@ -28,8 +28,6 @@ export default defineConfig([
       "src/proto/spark_token.ts",
       "src/graphql/objects/index.ts",
       "src/types/index.ts",
-      "src/spark_bindings/wasm/index.ts",
-      "src/spark_bindings/native/index.ts",
     ],
     inject: ["./buffer.js"],
     format: ["cjs", "esm"],

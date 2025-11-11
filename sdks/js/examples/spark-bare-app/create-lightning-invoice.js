@@ -1,11 +1,10 @@
-import { SparkWallet, BareSparkSigner } from "@buildonspark/bare";
+import { SparkWallet } from "@buildonspark/bare";
 import process from "bare-process";
 import walletConfig from "./wallet-config.js";
 
 async function createLightningInvoice(mnemonicInit, amountSats) {
   const { wallet } = await SparkWallet.initialize({
     mnemonicOrSeed: mnemonicInit,
-    signer: new BareSparkSigner(),
     options: {
       network: "REGTEST",
     },

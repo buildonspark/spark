@@ -25,6 +25,7 @@ import { BitcoinFaucet } from "../utils/test-faucet.js";
 
 import { KeyDerivation, KeyDerivationType } from "../../index.js";
 import { TransferStatus } from "../../proto/spark.js";
+
 describe.each(walletTypes)("coop exit", ({ name, Signer, createTree }) => {
   it(`${name} - test coop exit`, async () => {
     const faucet = BitcoinFaucet.getInstance();

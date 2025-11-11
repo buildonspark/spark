@@ -1,19 +1,19 @@
+import { SparkFrostBase } from "./spark-bindings.js";
 import type {
-  AggregateFrostParams,
+  AggregateFrostBindingParams,
   DummyTx,
-  SignFrostParams,
-} from "../types.js";
+  SignFrostBindingParams,
+} from "./types.js";
+// Get SparkFrostModule from React Native if available
+import { NativeModules } from "react-native";
+const { SparkFrostModule } = NativeModules;
 
 // Helper functions for converting between Uint8Array and number[]
 const toNumberArray = (arr: Uint8Array): number[] => Array.from(arr);
 const toUint8Array = (arr: number[]): Uint8Array => new Uint8Array(arr);
 
-// Get SparkFrostModule from React Native if available
-import { NativeModules } from "react-native";
-const { SparkFrostModule } = NativeModules;
-
-export class NativeSparkFrost {
-  static async signFrost(params: SignFrostParams): Promise<Uint8Array> {
+class SparkFrostReactNative extends SparkFrostBase {
+  async signFrost(params: SignFrostBindingParams) {
     if (!SparkFrostModule) {
       throw new Error("NativeSparkFrost is not available in this environment");
     }
@@ -50,9 +50,7 @@ export class NativeSparkFrost {
     return toUint8Array(result);
   }
 
-  static async aggregateFrost(
-    params: AggregateFrostParams,
-  ): Promise<Uint8Array> {
+  async aggregateFrost(params: AggregateFrostBindingParams) {
     const nativeParams = {
       msg: toNumberArray(params.message),
       statechainCommitments: Object.fromEntries(
@@ -92,10 +90,7 @@ export class NativeSparkFrost {
     return toUint8Array(result);
   }
 
-  static async createDummyTx(
-    address: string,
-    amountSats: bigint,
-  ): Promise<DummyTx> {
+  async createDummyTx(address: string, amountSats: bigint): Promise<DummyTx> {
     if (!SparkFrostModule) {
       console.error("NativeSparkFrost.ts: SparkFrostModule is not available.");
       throw new Error("SparkFrostModule is not available");
@@ -134,7 +129,7 @@ export class NativeSparkFrost {
     }
   }
 
-  static async encryptEcies(
+  async encryptEcies(
     msg: Uint8Array,
     publicKey: Uint8Array,
   ): Promise<Uint8Array> {
@@ -145,7 +140,7 @@ export class NativeSparkFrost {
     return toUint8Array(result);
   }
 
-  static async decryptEcies(
+  async decryptEcies(
     encryptedMsg: Uint8Array,
     privateKey: Uint8Array,
   ): Promise<Uint8Array> {
@@ -157,23 +152,4 @@ export class NativeSparkFrost {
   }
 }
 
-export async function createDummyTx(
-  address: string,
-  amountSats: bigint,
-): Promise<DummyTx> {
-  return NativeSparkFrost.createDummyTx(address, amountSats);
-}
-
-export async function encryptEcies(
-  msg: Uint8Array,
-  publicKey: Uint8Array,
-): Promise<Uint8Array> {
-  return NativeSparkFrost.encryptEcies(msg, publicKey);
-}
-
-export async function decryptEcies(
-  encryptedMsg: Uint8Array,
-  privateKey: Uint8Array,
-): Promise<Uint8Array> {
-  return NativeSparkFrost.decryptEcies(encryptedMsg, privateKey);
-}
+export { type DummyTx, SparkFrostReactNative as SparkFrost };

@@ -1,14 +1,18 @@
 "use client";
 
-import { SparkWallet } from "@buildonspark/spark-sdk";
-import { createDummyTx } from "@buildonspark/spark-sdk/spark-frost";
+import {
+  SparkWallet,
+  getSparkFrost,
+  type DummyTx,
+} from "@buildonspark/spark-sdk";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function Home() {
   const [sparkWallet, setSparkWallet] = useState<SparkWallet | null>(null);
   const [invoice, setInvoice] = useState<string | null>(null);
   const [balance, setBalance] = useState<number>(0);
+  const [dummyTx, setDummyTx] = useState<DummyTx | null>(null);
 
   const initializeSpark = async () => {
     try {
@@ -54,14 +58,16 @@ export default function Home() {
     }
   };
 
-  // It's better to call createDummyTx either in a useEffect or an event handler
-  // if it has side effects or if its value might change.
-  // For now, to mirror, we call it directly.
-  const dummyTx = createDummyTx({
-    address: "bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te", // Example address
-    amountSats: 65536n, // Example amount
-  });
-  // const dummyTx = null;
+  useEffect(() => {
+    (async () => {
+      const sparkFrost = getSparkFrost();
+      const dummyTx = await sparkFrost.createDummyTx(
+        "bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te",
+        65536n,
+      );
+      setDummyTx(dummyTx);
+    })();
+  }, []);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-start p-12">
@@ -71,7 +77,7 @@ export default function Home() {
         <div className="mb-6">
           <h2 className="text-2xl font-semibold mb-2">Dummy Transaction</h2>
           <p className="text-sm break-all">
-            Test Transaction ID: {dummyTx.txid}
+            Test Transaction ID: {dummyTx ? dummyTx.txid : "Loading..."}
           </p>
         </div>
 

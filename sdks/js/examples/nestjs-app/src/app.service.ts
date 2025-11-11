@@ -1,6 +1,5 @@
-import { SparkWallet } from "@buildonspark/spark-sdk";
+import { SparkWallet, getSparkFrost } from "@buildonspark/spark-sdk";
 import { Injectable } from "@nestjs/common";
-const { createDummyTx } = require("@buildonspark/spark-sdk/spark-frost");
 
 @Injectable()
 export class AppService {
@@ -22,10 +21,11 @@ export class AppService {
   }
 
   async testWasm(): Promise<string> {
-    const dummyTx = createDummyTx({
-      address: "bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te",
-      amountSats: 65536n,
-    });
+    const sparkFrost = getSparkFrost();
+    const dummyTx = await sparkFrost.createDummyTx(
+      "bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te",
+      65536n,
+    );
 
     return dummyTx.txid;
   }

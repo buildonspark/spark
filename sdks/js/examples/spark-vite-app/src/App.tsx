@@ -1,12 +1,16 @@
-import { SparkWallet } from "@buildonspark/spark-sdk";
+import {
+  SparkWallet,
+  getSparkFrost,
+  type DummyTx,
+} from "@buildonspark/spark-sdk";
 import "@buildonspark/spark-sdk/debug";
-import { createDummyTx } from "@buildonspark/spark-sdk/spark-frost";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function App() {
   const [sparkWallet, setSparkWallet] = useState<SparkWallet | null>(null);
   const [invoice, setInvoice] = useState<string | null>(null);
   const [balance, setBalance] = useState<number>(0);
+  const [dummyTx, setDummyTx] = useState<DummyTx | null>(null);
 
   const initializeSpark = async () => {
     try {
@@ -42,17 +46,23 @@ function App() {
     setBalance(Number(balance.balance));
   };
 
-  const dummyTx = createDummyTx({
-    address: "bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te",
-    amountSats: 65536n,
-  });
+  useEffect(() => {
+    (async () => {
+      const sparkFrost = getSparkFrost();
+      const dummyTx = await sparkFrost.createDummyTx(
+        "bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te",
+        65536n,
+      );
+      setDummyTx(dummyTx);
+    })();
+  }, []);
 
   return (
     <div className="App">
       <h1>Vite + React + Spark SDK</h1>
       <div className="card">
         <p>Test transaction ID</p>
-        <p>{dummyTx.txid}</p>
+        <p>{dummyTx ? dummyTx.txid : "Loading..."}</p>
         <button onClick={initializeSpark}>Initialize Spark Client</button>
         <p>
           {sparkWallet

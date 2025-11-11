@@ -3,22 +3,26 @@
 import nodeCrypto from "crypto";
 
 import { setCrypto } from "./utils/crypto.js";
+import { setSparkFrostOnce } from "./spark_bindings/spark-bindings.js";
+import { SparkFrost } from "./spark_bindings/spark-bindings.node.js";
 
 const cryptoImpl =
   typeof global !== "undefined" && global.crypto ? global.crypto : nodeCrypto;
 
 setCrypto(cryptoImpl);
+setSparkFrostOnce(new SparkFrost());
+
+export { getSparkFrost } from "./spark_bindings/spark-bindings.js";
+export { type DummyTx } from "./spark_bindings/types.js";
 
 export * from "./errors/index.js";
 export * from "./utils/index.js";
 
 export {
   DefaultSparkSigner,
-  TaprootOutputKeysGenerator,
-  TaprootSparkSigner,
   UnsafeStatelessSparkSigner,
-  type SparkSigner,
 } from "./signer/signer.js";
+export { type SparkSigner } from "./signer/signer.js";
 export * from "./signer/types.js";
 export { type IKeyPackage } from "./spark_bindings/types.js";
 

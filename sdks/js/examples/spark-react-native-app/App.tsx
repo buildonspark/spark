@@ -6,7 +6,7 @@
  */
 
 import { IssuerSparkWallet } from '@buildonspark/issuer-sdk';
-import { createDummyTx } from '@buildonspark/spark-sdk/native/spark-frost';
+import { getSparkFrost } from '@buildonspark/spark-sdk';
 import { Fragment, useState } from 'react';
 import {
   Button,
@@ -79,7 +79,8 @@ function App() {
   const testBindings = async () => {
     try {
       setIsTestingBindings(true);
-      const dummyTx = await createDummyTx(
+      const sparkFrost = getSparkFrost();
+      const dummyTx = await sparkFrost.createDummyTx(
         'bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te',
         65536n,
       );

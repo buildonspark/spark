@@ -1,5 +1,13 @@
+import * as spark from "@buildonspark/spark-sdk";
 import { SparkWallet } from "@buildonspark/spark-sdk";
-// import { createDummyTx } from "@buildonspark/spark-sdk/spark-frost";
+
+interface SparkGlobalThis {
+  s: typeof spark;
+}
+
+declare const globalThis: SparkGlobalThis;
+
+globalThis.s = spark;
 
 let wallet: SparkWallet | null = null;
 SparkWallet.initialize({}).then(({ wallet: initializedWallet }) => {
@@ -9,11 +17,6 @@ SparkWallet.initialize({}).then(({ wallet: initializedWallet }) => {
   );
   wallet = initializedWallet;
 });
-
-globalThis.s = {
-  SparkWallet,
-  // createDummyTx,
-};
 
 console.log("[spark-extension] SparkWallet initialized in background", wallet);
 

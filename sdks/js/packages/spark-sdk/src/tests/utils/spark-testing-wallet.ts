@@ -4,11 +4,10 @@ import { SparkSigner } from "../../signer/signer.js";
 import type { SparkWalletProps } from "../../spark-wallet/types.js";
 import { BitcoinFaucet } from "./test-faucet.js";
 import { Transaction } from "@scure/btc-signer";
-import { NetworkType } from "../../index.node.js";
-import { SparkWalletNodeJS } from "../../spark-wallet/spark-wallet.node.js";
+import { SparkWallet, NetworkType } from "../../index.node.js";
 import type { ConnectionManagerNodeJS } from "../../services/connection/connection.node.js";
 
-export class SparkWalletTesting extends SparkWalletNodeJS {
+export class SparkWalletTesting extends SparkWallet {
   protected override async setupBackgroundStream() {
     // Background stream is disabled by default, use SparkWalletTestingWithStream to enable it
     return;

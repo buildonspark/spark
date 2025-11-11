@@ -1,5 +1,6 @@
 import type { HDKey } from "@scure/bip32";
 import type { ISigningCommitment } from "../spark_bindings/types.js";
+import { type VerifiableSecretShare } from "../utils/secret-sharing.js";
 
 export type SigningCommitmentWithOptionalNonce = {
   commitment: SigningCommitment;
@@ -64,4 +65,18 @@ export type DerivedHDKey = {
 export type KeyPair = {
   privateKey: Uint8Array;
   publicKey: Uint8Array;
+};
+
+export type SubtractSplitAndEncryptParams = Omit<
+  SplitSecretWithProofsParams,
+  "secret"
+> & {
+  first: KeyDerivation;
+  second: KeyDerivation;
+  receiverPublicKey: Uint8Array;
+};
+
+export type SubtractSplitAndEncryptResult = {
+  shares: VerifiableSecretShare[];
+  secretCipher: Uint8Array;
 };

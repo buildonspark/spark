@@ -1,11 +1,11 @@
-import { SparkWallet } from "@buildonspark/spark-sdk";
-import { createDummyTx } from "@buildonspark/spark-sdk/spark-frost";
-import React, { useState } from "react";
+import { SparkWallet, getSparkFrost } from "@buildonspark/spark-sdk";
+import React, { useState, useEffect } from "react";
 
 function App() {
   const [sparkWallet, setSparkWallet] = useState(null);
   const [invoice, setInvoice] = useState(null);
   const [balance, setBalance] = useState(0);
+  const [dummyTx, setDummyTx] = useState(null);
 
   const initializeSpark = async () => {
     try {
@@ -41,17 +41,23 @@ function App() {
     setBalance(Number(balance.balance));
   };
 
-  const dummyTx = createDummyTx({
-    address: "bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te",
-    amountSats: 65536n,
-  });
+  useEffect(() => {
+    (async () => {
+      const sparkFrost = getSparkFrost();
+      const dummyTx = await sparkFrost.createDummyTx(
+        "bcrt1qnuyejmm2l4kavspq0jqaw0fv07lg6zv3z9z3te",
+        65536n,
+      );
+      setDummyTx(dummyTx);
+    })();
+  }, []);
 
   return (
     <div className="App">
       <h1>Webpack + React + Spark SDK</h1>
       <div className="card">
         <p>Test transaction ID</p>
-        <p>{dummyTx.txid}</p>
+        <p>{dummyTx ? dummyTx.txid : "Loading..."}</p>
         <button onClick={initializeSpark}>Initialize Spark Client</button>
         <p>
           {sparkWallet

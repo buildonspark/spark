@@ -3476,7 +3476,6 @@ __metadata:
   resolution: "@buildonspark/spark-sdk@workspace:packages/spark-sdk"
   dependencies:
     "@arethetypeswrong/cli": "npm:^0.17.4"
-    "@bitcoinerlab/secp256k1": "npm:^1.1.1"
     "@bufbuild/protobuf": "npm:^2.2.5"
     "@jest/globals": "npm:^29.7.0"
     "@lightsparkdev/core": "npm:^1.4.4"

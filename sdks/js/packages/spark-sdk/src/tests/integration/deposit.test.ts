@@ -6,6 +6,7 @@ import { getNetwork, Network } from "../../utils/network.js";
 import { walletTypes } from "../test-utils.js";
 import { SparkWalletTesting } from "../utils/spark-testing-wallet.js";
 import { BitcoinFaucet } from "../utils/test-faucet.js";
+import { DefaultSparkSigner } from "../../signer/signer.js";
 
 describe.each(walletTypes)("deposit", ({ name, Signer, createTree }) => {
   it(`${name} - should generate a deposit address`, async () => {
@@ -241,7 +242,7 @@ describe.each(walletTypes)("deposit", ({ name, Signer, createTree }) => {
   }, 30000);
 });
 
-describe.each(walletTypes)("refund static deposit", ({ name, Signer }) => {
+describe.each(walletTypes)("refund static deposit", ({ name }) => {
   it(`${name} - should refund a static deposit`, async () => {
     const faucet = BitcoinFaucet.getInstance();
 
@@ -251,7 +252,7 @@ describe.each(walletTypes)("refund static deposit", ({ name, Signer }) => {
       options: {
         network: "LOCAL",
       },
-      signer: new Signer(),
+      signer: new DefaultSparkSigner(),
     });
 
     const depositAddress = await sdk.getStaticDepositAddress();
