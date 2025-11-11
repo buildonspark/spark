@@ -101,17 +101,11 @@ fragment ClaimStaticDepositFragment on ClaimStaticDeposit {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
-        currency_amount_preferred_currency_unit: preferred_currency_unit
-        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
     claim_static_deposit_max_fee: max_fee {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
-        currency_amount_preferred_currency_unit: preferred_currency_unit
-        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
     claim_static_deposit_status: status
     claim_static_deposit_transaction_id: transaction_id

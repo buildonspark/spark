@@ -1,38 +1,24 @@
-
 // Copyright ©, 2023-present, Lightspark Group, Inc. - All Rights Reserved
-
-
-import { Query, isObject } from '@lightsparkdev/core';
 
 /** This interface is used by all the entities in the Lightspark system. It defines a few core fields that are available everywhere. Any object that implements this interface can be queried using the `entity` query and its ID. **/
 interface Entity {
+  /**
+   * The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque
+   * string.
+   **/
+  id: string;
 
+  /** The date and time when the entity was first created. **/
+  createdAt: string;
 
-    /**
- * The unique identifier of this entity across all Lightspark systems. Should be treated as an opaque
- * string.
-**/
-id: string;
+  /** The date and time when the entity was last updated. **/
+  updatedAt: string;
 
-    /** The date and time when the entity was first created. **/
-createdAt: string;
-
-    /** The date and time when the entity was last updated. **/
-updatedAt: string;
-
-    /** The typename of the object **/
-typename: string;
-
-
-
-
+  /** The typename of the object **/
+  typename: string;
 }
 
-
-
-
-
-    export const FRAGMENT = `
+export const FRAGMENT = `
 fragment EntityFragment on Entity {
     __typename
     ... on ClaimStaticDeposit {
@@ -45,17 +31,11 @@ fragment EntityFragment on Entity {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         claim_static_deposit_max_fee: max_fee {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         claim_static_deposit_status: status
         claim_static_deposit_transaction_id: transaction_id
@@ -73,57 +53,36 @@ fragment EntityFragment on Entity {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         coop_exit_fee_quote_user_fee_fast: user_fee_fast {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         coop_exit_fee_quote_user_fee_medium: user_fee_medium {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         coop_exit_fee_quote_user_fee_slow: user_fee_slow {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         coop_exit_fee_quote_l1_broadcast_fee_fast: l1_broadcast_fee_fast {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         coop_exit_fee_quote_l1_broadcast_fee_medium: l1_broadcast_fee_medium {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         coop_exit_fee_quote_l1_broadcast_fee_slow: l1_broadcast_fee_slow {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         coop_exit_fee_quote_expires_at: expires_at
     }
@@ -137,17 +96,11 @@ fragment EntityFragment on Entity {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         coop_exit_request_l1_broadcast_fee: l1_broadcast_fee {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         coop_exit_request_fee_quote: fee_quote {
             id
@@ -164,9 +117,6 @@ fragment EntityFragment on Entity {
                 __typename
                 currency_amount_original_value: original_value
                 currency_amount_original_unit: original_unit
-                currency_amount_preferred_currency_unit: preferred_currency_unit
-                currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-                currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
             }
             transfer_spark_id: spark_id
             transfer_user_request: user_request {
@@ -185,25 +135,16 @@ fragment EntityFragment on Entity {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         leaves_swap_request_target_amount: target_amount {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         leaves_swap_request_fee: fee {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         leaves_swap_request_inbound_transfer: inbound_transfer {
             __typename
@@ -211,9 +152,6 @@ fragment EntityFragment on Entity {
                 __typename
                 currency_amount_original_value: original_value
                 currency_amount_original_unit: original_unit
-                currency_amount_preferred_currency_unit: preferred_currency_unit
-                currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-                currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
             }
             transfer_spark_id: spark_id
             transfer_user_request: user_request {
@@ -226,9 +164,6 @@ fragment EntityFragment on Entity {
                 __typename
                 currency_amount_original_value: original_value
                 currency_amount_original_unit: original_unit
-                currency_amount_preferred_currency_unit: preferred_currency_unit
-                currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-                currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
             }
             transfer_spark_id: spark_id
             transfer_user_request: user_request {
@@ -258,9 +193,6 @@ fragment EntityFragment on Entity {
                 __typename
                 currency_amount_original_value: original_value
                 currency_amount_original_unit: original_unit
-                currency_amount_preferred_currency_unit: preferred_currency_unit
-                currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-                currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
             }
             invoice_created_at: created_at
             invoice_expires_at: expires_at
@@ -273,9 +205,6 @@ fragment EntityFragment on Entity {
                 __typename
                 currency_amount_original_value: original_value
                 currency_amount_original_unit: original_unit
-                currency_amount_preferred_currency_unit: preferred_currency_unit
-                currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-                currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
             }
             transfer_spark_id: spark_id
             transfer_user_request: user_request {
@@ -296,9 +225,6 @@ fragment EntityFragment on Entity {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         lightning_send_request_idempotency_key: idempotency_key
         lightning_send_request_status: status
@@ -308,9 +234,6 @@ fragment EntityFragment on Entity {
                 __typename
                 currency_amount_original_value: original_value
                 currency_amount_original_unit: original_unit
-                currency_amount_preferred_currency_unit: preferred_currency_unit
-                currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-                currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
             }
             transfer_spark_id: spark_id
             transfer_user_request: user_request {
@@ -327,8 +250,5 @@ fragment EntityFragment on Entity {
         spark_wallet_user_identity_public_key: identity_public_key
     }
 }`;
-
-
-
 
 export default Entity;

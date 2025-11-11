@@ -119,25 +119,16 @@ fragment LeavesSwapRequestFragment on LeavesSwapRequest {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
-        currency_amount_preferred_currency_unit: preferred_currency_unit
-        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
     leaves_swap_request_target_amount: target_amount {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
-        currency_amount_preferred_currency_unit: preferred_currency_unit
-        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
     leaves_swap_request_fee: fee {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
-        currency_amount_preferred_currency_unit: preferred_currency_unit
-        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
     leaves_swap_request_inbound_transfer: inbound_transfer {
         __typename
@@ -145,9 +136,6 @@ fragment LeavesSwapRequestFragment on LeavesSwapRequest {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         transfer_spark_id: spark_id
         transfer_user_request: user_request {
@@ -160,9 +148,6 @@ fragment LeavesSwapRequestFragment on LeavesSwapRequest {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         transfer_spark_id: spark_id
         transfer_user_request: user_request {

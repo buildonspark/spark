@@ -49,9 +49,6 @@ query FetchSparkTransferToLeavesConnection($entity_id: ID!, $first: Int, $after:
                         __typename
                         currency_amount_original_value: original_value
                         currency_amount_original_unit: original_unit
-                        currency_amount_preferred_currency_unit: preferred_currency_unit
-                        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-                        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
                     }
                     leaf_spark_node_id: spark_node_id
                 }
@@ -92,9 +89,6 @@ fragment TransferFragment on Transfer {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
-        currency_amount_preferred_currency_unit: preferred_currency_unit
-        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
     transfer_spark_id: spark_id
     transfer_user_request: user_request {

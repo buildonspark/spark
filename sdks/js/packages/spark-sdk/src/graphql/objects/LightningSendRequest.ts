@@ -100,9 +100,6 @@ fragment LightningSendRequestFragment on LightningSendRequest {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
-        currency_amount_preferred_currency_unit: preferred_currency_unit
-        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
     lightning_send_request_idempotency_key: idempotency_key
     lightning_send_request_status: status
@@ -112,9 +109,6 @@ fragment LightningSendRequestFragment on LightningSendRequest {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         transfer_spark_id: spark_id
         transfer_user_request: user_request {

@@ -121,57 +121,36 @@ fragment CoopExitFeeQuoteFragment on CoopExitFeeQuote {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
-        currency_amount_preferred_currency_unit: preferred_currency_unit
-        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
     coop_exit_fee_quote_user_fee_fast: user_fee_fast {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
-        currency_amount_preferred_currency_unit: preferred_currency_unit
-        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
     coop_exit_fee_quote_user_fee_medium: user_fee_medium {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
-        currency_amount_preferred_currency_unit: preferred_currency_unit
-        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
     coop_exit_fee_quote_user_fee_slow: user_fee_slow {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
-        currency_amount_preferred_currency_unit: preferred_currency_unit
-        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
     coop_exit_fee_quote_l1_broadcast_fee_fast: l1_broadcast_fee_fast {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
-        currency_amount_preferred_currency_unit: preferred_currency_unit
-        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
     coop_exit_fee_quote_l1_broadcast_fee_medium: l1_broadcast_fee_medium {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
-        currency_amount_preferred_currency_unit: preferred_currency_unit
-        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
     coop_exit_fee_quote_l1_broadcast_fee_slow: l1_broadcast_fee_slow {
         __typename
         currency_amount_original_value: original_value
         currency_amount_original_unit: original_unit
-        currency_amount_preferred_currency_unit: preferred_currency_unit
-        currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-        currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
     }
     coop_exit_fee_quote_expires_at: expires_at
 }`;

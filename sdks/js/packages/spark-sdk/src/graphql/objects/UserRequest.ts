@@ -316,17 +316,11 @@ fragment UserRequestFragment on UserRequest {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         claim_static_deposit_max_fee: max_fee {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         claim_static_deposit_status: status
         claim_static_deposit_transaction_id: transaction_id
@@ -344,17 +338,11 @@ fragment UserRequestFragment on UserRequest {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         coop_exit_request_l1_broadcast_fee: l1_broadcast_fee {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         coop_exit_request_fee_quote: fee_quote {
             id
@@ -371,9 +359,6 @@ fragment UserRequestFragment on UserRequest {
                 __typename
                 currency_amount_original_value: original_value
                 currency_amount_original_unit: original_unit
-                currency_amount_preferred_currency_unit: preferred_currency_unit
-                currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-                currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
             }
             transfer_spark_id: spark_id
             transfer_user_request: user_request {
@@ -392,25 +377,16 @@ fragment UserRequestFragment on UserRequest {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         leaves_swap_request_target_amount: target_amount {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         leaves_swap_request_fee: fee {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         leaves_swap_request_inbound_transfer: inbound_transfer {
             __typename
@@ -418,9 +394,6 @@ fragment UserRequestFragment on UserRequest {
                 __typename
                 currency_amount_original_value: original_value
                 currency_amount_original_unit: original_unit
-                currency_amount_preferred_currency_unit: preferred_currency_unit
-                currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-                currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
             }
             transfer_spark_id: spark_id
             transfer_user_request: user_request {
@@ -433,9 +406,6 @@ fragment UserRequestFragment on UserRequest {
                 __typename
                 currency_amount_original_value: original_value
                 currency_amount_original_unit: original_unit
-                currency_amount_preferred_currency_unit: preferred_currency_unit
-                currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-                currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
             }
             transfer_spark_id: spark_id
             transfer_user_request: user_request {
@@ -469,9 +439,6 @@ fragment UserRequestFragment on UserRequest {
                 __typename
                 currency_amount_original_value: original_value
                 currency_amount_original_unit: original_unit
-                currency_amount_preferred_currency_unit: preferred_currency_unit
-                currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-                currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
             }
             invoice_created_at: created_at
             invoice_expires_at: expires_at
@@ -484,9 +451,6 @@ fragment UserRequestFragment on UserRequest {
                 __typename
                 currency_amount_original_value: original_value
                 currency_amount_original_unit: original_unit
-                currency_amount_preferred_currency_unit: preferred_currency_unit
-                currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-                currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
             }
             transfer_spark_id: spark_id
             transfer_user_request: user_request {
@@ -507,9 +471,6 @@ fragment UserRequestFragment on UserRequest {
             __typename
             currency_amount_original_value: original_value
             currency_amount_original_unit: original_unit
-            currency_amount_preferred_currency_unit: preferred_currency_unit
-            currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-            currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
         }
         lightning_send_request_idempotency_key: idempotency_key
         lightning_send_request_status: status
@@ -519,9 +480,6 @@ fragment UserRequestFragment on UserRequest {
                 __typename
                 currency_amount_original_value: original_value
                 currency_amount_original_unit: original_unit
-                currency_amount_preferred_currency_unit: preferred_currency_unit
-                currency_amount_preferred_currency_value_rounded: preferred_currency_value_rounded
-                currency_amount_preferred_currency_value_approx: preferred_currency_value_approx
             }
             transfer_spark_id: spark_id
             transfer_user_request: user_request {

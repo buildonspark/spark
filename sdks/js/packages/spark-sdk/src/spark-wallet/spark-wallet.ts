@@ -1,4 +1,4 @@
-import { isObject, mapCurrencyAmount } from "@lightsparkdev/core";
+import { CurrencyUnit, isObject } from "@lightsparkdev/core";
 import { secp256k1 } from "@noble/curves/secp256k1";
 import {
   bytesToHex,
@@ -4137,11 +4137,15 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
       amountSats,
     );
 
-    if (!feeEstimate) {
+    if (
+      !feeEstimate ||
+      feeEstimate.feeEstimate.originalUnit !== CurrencyUnit.Millisatoshi
+    ) {
       throw new Error("Failed to get lightning send fee estimate");
     }
-    const satsFeeEstimate = mapCurrencyAmount(feeEstimate.feeEstimate);
-    return Math.ceil(satsFeeEstimate.sats);
+
+    const satsFeeEstimate = feeEstimate.feeEstimate.originalValue / 1000;
+    return Math.ceil(satsFeeEstimate);
   }
 
   // ***** Cooperative Exit Flow *****

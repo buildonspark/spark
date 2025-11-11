@@ -7,9 +7,9 @@ import { getTxFromRawTxBytes, KeyDerivationType } from "../../index.js";
 import {
   BitcoinNetwork,
   CurrencyUnit,
-  SparkProto,
   LightningReceiveRequest,
   LightningReceiveRequestStatus,
+  SparkProto,
 } from "../../types/index.js";
 import { BitcoinFaucet, walletTypes } from "../test-utils.js";
 import { SparkWalletTestingIntegration } from "../utils/spark-testing-wallet.js";
@@ -39,9 +39,6 @@ const fakeInvoiceCreator = async (): Promise<LightningReceiveRequest> => {
       amount: {
         originalValue: 100000,
         originalUnit: CurrencyUnit.MILLISATOSHI,
-        preferredCurrencyUnit: CurrencyUnit.USD,
-        preferredCurrencyValueRounded: 11,
-        preferredCurrencyValueApprox: 11.45475372279496,
       },
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
