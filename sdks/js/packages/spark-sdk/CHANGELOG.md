@@ -1,5 +1,15 @@
 # @buildonspark/spark-sdk
 
+## 0.4.5
+
+### Patch Changes
+
+- - Display more readable error client side when concurrency limit is reached
+  - Update retryable gRPC statuses
+  - Remove unnecessary fields from GQL operations (preferred currency options)
+  - Use web optimized bindings in web and browser extension contexts
+  - Add additional info to top level error messages
+
 ## 0.4.4
 
 ### Patch Changes
