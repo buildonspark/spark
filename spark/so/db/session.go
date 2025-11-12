@@ -181,7 +181,7 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				defer s.mu.Unlock()
 
 				err := fn.Rollback(ctx, tx)
-				if err != nil {
+				if err != nil && !errors.Is(err, sql.ErrTxDone) {
 					logger.Error("Failed to rollback transaction", zap.Error(err))
 				}
 
