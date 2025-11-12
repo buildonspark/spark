@@ -326,7 +326,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
-			ExecutionInterval: 10 * time.Minute,
+			ExecutionInterval: 5 * time.Minute,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "finalize_revealed_token_transactions",
 				RunInTestEnv: true,
