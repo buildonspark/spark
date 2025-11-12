@@ -1572,7 +1572,7 @@ func (h *RenewLeafHandler) sendFinalizeRefundTimelockGossipMessage(ctx context.C
 
 	// Create and send gossip message
 	sendGossipHandler := NewSendGossipHandler(h.config)
-	_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
+	_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, &pbgossip.GossipMessage{
 		Message: &pbgossip.GossipMessage_FinalizeRefundTimelock{
 			FinalizeRefundTimelock: &pbgossip.GossipMessageFinalizeRenewRefundTimelock{
 				Node: nodeInternal,
