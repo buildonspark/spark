@@ -333,7 +333,7 @@ func main() {
 	}
 
 	dbDriver := config.DatabaseDriver()
-	connector, err := so.NewDBConnector(errCtx, config, knobsService)
+	connector, err := so.NewDBConnector(context.Background(), config, knobsService)
 	if err != nil {
 		logger.Fatal("Failed to create db connector", zap.Error(err))
 	}
