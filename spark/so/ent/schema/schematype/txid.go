@@ -36,6 +36,9 @@ func NewTxIDFromBytes(b []byte) (TxID, error) {
 
 // NewTxIDFromString creates a new TxID from a hex-encoded string.
 func NewTxIDFromString(s string) (TxID, error) {
+	if len(s) != chainhash.HashSize*2 {
+		return TxID{}, fmt.Errorf("invalid txid hex length: expected %d hex chars, got %d", chainhash.HashSize*2, len(s))
+	}
 	hash, err := chainhash.NewHashFromStr(s)
 	if err != nil {
 		return TxID{}, fmt.Errorf("failed to parse txid string: %w", err)
@@ -53,14 +56,14 @@ func (t TxID) Bytes() []byte {
 	return t.hash.CloneBytes()
 }
 
-// String returns the hex-encoded string representation of the transaction ID.
+// String returns the byte-reversed hex-encoded string representation of the transaction ID.
 func (t TxID) String() string {
 	return t.hash.String()
 }
 
 // IsZero returns true if this TxID is the zero value.
 func (t TxID) IsZero() bool {
-	return t.hash == chainhash.Hash{}
+	return t == TxID{}
 }
 
 // Value implements the driver.Valuer interface for database serialization.
@@ -68,7 +71,7 @@ func (t TxID) Value() (driver.Value, error) {
 	if t.IsZero() {
 		return nil, nil
 	}
-	return t.hash.CloneBytes(), nil
+	return t.hash[:], nil
 }
 
 // Scan implements the sql.Scanner interface for database deserialization.
@@ -86,8 +89,7 @@ func (t *TxID) Scan(src any) error {
 		t.hash = *hash
 		return nil
 	case string:
-		err := chainhash.Decode(&t.hash, v)
-		if err != nil {
+		if err := chainhash.Decode(&t.hash, v); err != nil {
 			return fmt.Errorf("failed to deserialize txid string %s: %w", v, err)
 		}
 		return nil
@@ -95,6 +97,14 @@ func (t *TxID) Scan(src any) error {
 		t.hash = chainhash.Hash{}
 		return nil
 	case *sql.Null[[]byte]:
+		if v != nil && v.Valid && len(v.V) > 0 {
+			hash, err := chainhash.NewHash(v.V)
+			if err != nil {
+				return fmt.Errorf("failed to deserialize txid bytes %x: %w", v.V, err)
+			}
+			t.hash = *hash
+			return nil
+		}
 		t.hash = chainhash.Hash{}
 		return nil
 	default:
