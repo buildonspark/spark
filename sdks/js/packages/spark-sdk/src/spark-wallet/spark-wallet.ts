@@ -13,6 +13,7 @@ import { Address, OutScript, Transaction } from "@scure/btc-signer";
 import { TransactionInput } from "@scure/btc-signer/psbt";
 import { Mutex } from "async-mutex";
 import { uuidv7, uuidv7obj } from "uuidv7";
+import { clientEnv, isReactNative } from "../constants.js";
 import {
   ConfigurationError,
   InternalValidationError,
@@ -109,7 +110,6 @@ import {
 } from "@opentelemetry/sdk-trace-base";
 import { EventEmitter } from "eventemitter3";
 import { ClientError, Status } from "nice-grpc-common";
-import { isReactNative } from "../constants.js";
 import { Network as NetworkProto, networkToJSON } from "../proto/spark.js";
 import {
   decodeInvoice,
@@ -5295,7 +5295,14 @@ export abstract class SparkWallet extends EventEmitter<SparkWalletEvents> {
           return result;
         } catch (error) {
           if (error instanceof Error) {
-            error.message += ` [traceId: ${traceId}]`;
+            try {
+              const identityPublicKey = bytesToHex(
+                await this.config.signer.getIdentityPublicKey(),
+              );
+              error.message += ` [traceId: ${traceId}] [idPubKey: ${identityPublicKey}] [${clientEnv}]`;
+            } catch (keyError) {
+              error.message += ` [traceId: ${traceId}] [${clientEnv}]`;
+            }
           } else if (isObject(error)) {
             error["traceId"] = traceId;
           }

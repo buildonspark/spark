@@ -150,6 +150,7 @@
     "nice-grpc-opentelemetry": "^0.1.18",
     "nice-grpc-web": "^3.3.7",
     "ts-proto": "^2.6.1",
+    "ua-parser-js": "^2.0.6",
     "uuidv7": "^1.0.2"
   },
   "peerDependencies": {

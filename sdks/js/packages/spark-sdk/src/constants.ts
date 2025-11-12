@@ -1,4 +1,5 @@
 import { isNode, isBare } from "@lightsparkdev/core";
+import { UAParser } from "ua-parser-js";
 
 export const isReactNative =
   "navigator" in globalThis && navigator.product === "ReactNative";
@@ -16,7 +17,7 @@ export const isWebExtensionBackgroundScript =
 /* navigator.userAgent exists in browsers and extension contexts: */
 const userAgent =
   "navigator" in globalThis
-    ? globalThis.navigator.userAgent || "unknown-user-agent"
+    ? parseUserAgent(globalThis.navigator.userAgent) || "unknown-user-agent"
     : undefined;
 
 declare const __PACKAGE_VERSION__: string;
@@ -49,6 +50,21 @@ if (isBun) {
   baseEnvStr = `web-extension/${protocol.replace(":", "")}/${extScriptType}/${userAgent}`;
 } else {
   baseEnvStr = `browser/${userAgent}`;
+}
+
+function parseUserAgent(userAgent: string) {
+  const parser = UAParser(userAgent);
+  const browserName = parser.browser.name
+    ? parser.browser.name.toLowerCase().replaceAll(" ", "-")
+    : "unknown-browser";
+  const browserVersion = parser.browser.version
+    ? parser.browser.version
+    : "unknown-version";
+  const osName = parser.os.name
+    ? parser.os.name.toLowerCase().replaceAll(" ", "-")
+    : "unknown-os";
+  const osVersion = parser.os.version ? parser.os.version : "unknown-version";
+  return `${browserName}-${browserVersion}/${osName}-${osVersion}`;
 }
 
 export const clientEnv = `js-spark-sdk/${packageVersion} ${baseEnvStr}`;
