@@ -68,7 +68,8 @@ func (h *SendGossipHandler) sendGossipMessageToParticipant(ctx context.Context, 
 	if err != nil {
 		if status.Code(err) == codes.Unavailable ||
 			status.Code(err) == codes.Canceled ||
-			strings.Contains(err.Error(), "context canceled") {
+			strings.Contains(err.Error(), "context canceled") ||
+			strings.Contains(err.Error(), "unexpected HTTP status code") {
 			return err
 		}
 
