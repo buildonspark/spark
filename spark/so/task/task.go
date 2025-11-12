@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
-	"slices"
 	"time"
 
 	"go.uber.org/zap"
@@ -332,7 +330,6 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 				RunInTestEnv: true,
 				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
 					logger := logging.GetLoggerFromContext(ctx)
-					logger.Info("[cron] Finalizing revealed token transactions")
 					dbTX, err := ent.GetDbFromContext(ctx)
 					if err != nil {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
@@ -364,6 +361,8 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					}
 					logger.Info(fmt.Sprintf("[cron] Found %d token transactions to finalize", len(tokenTransactions)))
 					internalSignTokenHandler := tokens.NewInternalSignTokenHandler(config)
+
+					var errs []error
 					for _, tokenTransaction := range tokenTransactions {
 						ctx, logger = logging.WithAttrs(ctx, tokenslogging.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
 
@@ -398,17 +397,15 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							return fmt.Errorf("failed to marshal token transaction: %w", err)
 						}
 
-						logger.Sugar().Infof("[cron] Finalizing token transaction with operators %+q (signatures: %d)", slices.Collect(maps.Keys(signaturesPackage)), len(signaturesPackage))
 						signTokenHandler := tokens.NewSignTokenHandler(config)
-						commitTransactionResponse, err := signTokenHandler.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, tokenPb, signaturesPackage, tokenTransaction.FinalizedTokenTransactionHash)
+						_, err = signTokenHandler.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, tokenPb, signaturesPackage, tokenTransaction.FinalizedTokenTransactionHash)
 						if err != nil {
-							return fmt.Errorf("cron job failed to exchange revocation secrets and finalize if possible: %w", err)
-						} else {
-							logger.Sugar().
-								Infof("Successfully exchanged revocation secrets and finalized if possible for token tx. Commit response: %v", commitTransactionResponse)
+							wrappedErr := fmt.Errorf("cron job failed to exchange revocation secrets and finalize if possible for token transaction %s: %w", tokenTransaction.ID, err)
+							logger.Error(wrappedErr.Error())
+							errs = append(errs, wrappedErr)
 						}
 					}
-					return nil
+					return errors.Join(errs...)
 				},
 			},
 		},
