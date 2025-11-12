@@ -2241,8 +2241,14 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 		}
 		if job.DirectFromCpfpRefundTxSigningJob != nil {
 			directFromCpfpRefundTxSigningJob = job.DirectFromCpfpRefundTxSigningJob
-		} else if !isSwap && requireDirectTx && len(leaf.DirectTx) > 0 {
-			return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
+		} else if !isSwap && requireDirectTx {
+			if knobs.GetKnobsService(ctx).GetValue(knobs.KnobRequireDirectFromCPFPRefund, 0) > 0 {
+				return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
+			} else {
+				if len(leaf.DirectTx) > 0 {
+					return nil, fmt.Errorf("DirectFromCpfpRefundTxSigningJob is required. Please upgrade to the latest SDK version")
+				}
+			}
 		}
 		var directRefundTx []byte
 		var directFromCpfpRefundTx []byte

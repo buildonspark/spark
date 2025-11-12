@@ -193,10 +193,18 @@ func validateSendLeafDirectRefundTxs(leaf *ent.TreeNode, directTx []byte, direct
 	return nil
 }
 
-func validateSendLeafRefundTxs(leaf *ent.TreeNode, rawTx []byte, directTx []byte, directFromCpfpRefundTx []byte, receiverIdentityPubKey keys.Public, expectedInputCount uint32, requireDirectTx bool) error {
+func validateSendLeafRefundTxs(ctx context.Context, leaf *ent.TreeNode, rawTx []byte, directTx []byte, directFromCpfpRefundTx []byte, receiverIdentityPubKey keys.Public, expectedInputCount uint32, requireDirectTx bool) error {
 	newCpfpRefundTx, err := parseRefundTx(rawTx)
 	if err != nil {
 		return fmt.Errorf("unable to load new cpfp refund tx: %w", err)
+	}
+
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobRequireDirectFromCPFPRefund, 0) > 0 {
+		if requireDirectTx {
+			if len(directFromCpfpRefundTx) == 0 {
+				return fmt.Errorf("DirectFromCpfpRefundTx is required. Please upgrade to the latest SDK version")
+			}
+		}
 	}
 
 	leafIsWatchtowerReady := len(leaf.DirectTx) > 0
@@ -466,7 +474,7 @@ func (h *BaseTransferHandler) validateCooperativeExitLeaves(ctx context.Context,
 			return fmt.Errorf("leaf %s not found in cpfp refund map", leaf.ID)
 		}
 
-		err := validateSendLeafRefundTxs(leaf, rawRefundTx, directRefundTx, intermediateDirectFromCpfpRefundTx, receiverIdentityPublicKey, 2, requireDirectTx)
+		err := validateSendLeafRefundTxs(ctx, leaf, rawRefundTx, directRefundTx, intermediateDirectFromCpfpRefundTx, receiverIdentityPublicKey, 2, requireDirectTx)
 		if err != nil {
 			return fmt.Errorf("unable to validate refund tx for leaf %s: %w", leaf.ID, err)
 		}
@@ -516,7 +524,7 @@ func (h *BaseTransferHandler) validateUtxoSwapLeaves(
 			return fmt.Errorf("leaf %s not found in cpfp refund map", leaf.ID)
 		}
 
-		err := validateSendLeafRefundTxs(leaf, rawRefundTx, directRefundTx, intermediateDirectFromCpfpRefundTx, receiverIdentityPublicKey, 1, requireDirectTx)
+		err := validateSendLeafRefundTxs(ctx, leaf, rawRefundTx, directRefundTx, intermediateDirectFromCpfpRefundTx, receiverIdentityPublicKey, 1, requireDirectTx)
 		if err != nil {
 			return fmt.Errorf("unable to validate refund tx for leaf %s: %w", leaf.ID, err)
 		}
@@ -545,7 +553,7 @@ func (h *BaseTransferHandler) validateTransferLeaves(
 			return fmt.Errorf("leaf %s not found in cpfp refund map", leaf.ID)
 		}
 
-		err := validateSendLeafRefundTxs(leaf, rawRefundTx, nil, nil, receiverIdentityPublicKey, 1, false)
+		err := validateSendLeafRefundTxs(ctx, leaf, rawRefundTx, nil, nil, receiverIdentityPublicKey, 1, false)
 		if err != nil {
 			return fmt.Errorf("unable to validate refund tx for leaf %s: %w", leaf.ID, err)
 		}
@@ -570,7 +578,7 @@ func (h *BaseTransferHandler) validateSwapV3Leaves(
 			return fmt.Errorf("leaf %s not found in cpfp refund map", leaf.ID)
 		}
 
-		err := validateSendLeafRefundTxs(leaf, rawRefundTx, nil, nil, receiverIdentityPublicKey, 1, false)
+		err := validateSendLeafRefundTxs(ctx, leaf, rawRefundTx, nil, nil, receiverIdentityPublicKey, 1, false)
 		if err != nil {
 			return fmt.Errorf("unable to validate refund tx for leaf %s: %w", leaf.ID, err)
 		}
