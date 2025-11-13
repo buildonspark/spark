@@ -446,7 +446,7 @@ func (h *TransferHandler) startTransferInternal(ctx context.Context, req *pb.Sta
 			if err != nil {
 				return nil, fmt.Errorf("unable to get operator list: %w", err)
 			}
-			_, err = sendGossipHandler.CreateAndSendGossipMessage(ctx, &message, participants)
+			_, err = sendGossipHandler.CreateCommitAndSendGossipMessage(ctx, &message, participants)
 			if err != nil {
 				logger.With(zap.Error(err)).Sugar().Errorf(
 					"Failed to create and send gossip message to settle sender key tweak for transfer %s",
