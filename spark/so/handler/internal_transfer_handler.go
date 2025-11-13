@@ -347,6 +347,29 @@ func applySignaturesToTransactionsAndVerify(ctx context.Context, leafRefundMap m
 	if err != nil {
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
+
+	// Collect all leaf UUIDs for batch query
+	leafUUIDs := make([]uuid.UUID, 0, len(refundSignatures))
+	for leafID := range refundSignatures {
+		leafUUID, err := uuid.Parse(leafID)
+		if err != nil {
+			return nil, fmt.Errorf("unable to parse leaf id: %w", err)
+		}
+		leafUUIDs = append(leafUUIDs, leafUUID)
+	}
+
+	// Batch query to fetch all tree nodes at once
+	leaves, err := db.TreeNode.Query().Where(treenode.IDIn(leafUUIDs...)).All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get tree nodes: %w", err)
+	}
+
+	// Create a map for quick leaf lookup by ID
+	leafMap := make(map[string]*ent.TreeNode, len(leaves))
+	for _, leaf := range leaves {
+		leafMap[leaf.ID.String()] = leaf
+	}
+
 	resultMap := make(map[string][]byte)
 	for leafID, signature := range refundSignatures {
 		leafRefund, exists := leafRefundMap[leafID]
@@ -354,13 +377,9 @@ func applySignaturesToTransactionsAndVerify(ctx context.Context, leafRefundMap m
 			return nil, fmt.Errorf("no leaf refund found for leaf id: %s", leafID)
 		}
 
-		leafUUID, err := uuid.Parse(leafID)
-		if err != nil {
-			return nil, fmt.Errorf("unable to parse leaf id: %w", err)
-		}
-		leaf, err := db.TreeNode.Get(ctx, leafUUID)
-		if err != nil {
-			return nil, fmt.Errorf("unable to get tree node %s: %w", leafUUID.String(), err)
+		leaf, exists := leafMap[leafID]
+		if !exists {
+			return nil, fmt.Errorf("unable to get tree node %s", leafID)
 		}
 
 		var nodeTx *wire.MsgTx

@@ -17,8 +17,9 @@ import (
 )
 
 var (
-	ErrTxBeginTimeout   = soerrors.UnavailableDatabaseTimeout(fmt.Errorf("the service is currently unavailable, please try again later"))
-	DefaultNewTxTimeout = 15 * time.Second
+	ErrTxBeginTimeout               = soerrors.UnavailableDatabaseTimeout(fmt.Errorf("the service is currently unavailable, please try again later"))
+	DefaultNewTxTimeout             = 15 * time.Second
+	DefaultNotificationFlushTimeout = 5 * time.Second
 )
 
 // SessionFactory is an interface for creating a new Session.
@@ -159,9 +160,16 @@ func (s *Session) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 				if err != nil {
 					logger.Error("Failed to commit transaction", zap.Error(err))
 				} else {
-					if s.currentNotifications.Flush(ctx) != nil {
-						logger.Error("Failed to flush notifications after commit", zap.Error(err))
-					}
+					// Send notifications asynchronously to avoid blocking the request.
+					// We need to capture the notifier and flush it with a bounded context.
+					notifier := s.currentNotifications
+					go func() {
+						ctx, cancel := context.WithTimeout(context.Background(), DefaultNotificationFlushTimeout)
+						defer cancel()
+						if flushErr := notifier.Flush(ctx); flushErr != nil {
+							logger.Error("Failed to flush notifications after commit", zap.Error(flushErr))
+						}
+					}()
 				}
 
 				// Only set the current tx to nil if the transaction was committed successfully.
