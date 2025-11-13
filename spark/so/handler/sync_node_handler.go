@@ -36,21 +36,21 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 	if err != nil {
 		return fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
-	nodeUuids := []uuid.UUID{}
+	nodeUuidsToFix := []uuid.UUID{}
 	for _, nodeId := range req.NodeIds {
 		nodeUuid, err := uuid.Parse(nodeId)
 		if err != nil {
 			return fmt.Errorf("unable to parse node id %s: %w", nodeId, err)
 		}
-		nodeUuids = append(nodeUuids, nodeUuid)
+		nodeUuidsToFix = append(nodeUuidsToFix, nodeUuid)
 	}
-	nodes, err := db.TreeNode.Query().
-		Where(treenode.IDIn(nodeUuids...)).
+	localNodes, err := db.TreeNode.Query().
+		Where(treenode.IDIn(nodeUuidsToFix...)).
 		WithParent().
 		ForUpdate().
 		All(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to lock tree nodes %v: %w", nodeUuids, err)
+		return fmt.Errorf("failed to lock tree nodes %v: %w", nodeUuidsToFix, err)
 	}
 
 	conn, err := h.config.SigningOperatorMap[req.OperatorId].NewOperatorGRPCConnection()
@@ -76,30 +76,27 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 		return fmt.Errorf("expected %d nodes, got %d", len(req.NodeIds), len(resp.Nodes))
 	}
 
-	nodeIDMap := make(map[string]*pb.TreeNode)
+	goodNodeIDMap := make(map[string]*pb.TreeNode)
 	for _, node := range resp.Nodes {
-		nodeIDMap[node.Id] = node
+		goodNodeIDMap[node.Id] = node
 	}
 
 	// Create a map of existing node UUIDs for quick lookup
 	existingNodeMap := make(map[uuid.UUID]*ent.TreeNode)
-	for _, node := range nodes {
+	for _, node := range localNodes {
 		existingNodeMap[node.ID] = node
 	}
 
-	for _, nodeUUID := range nodeUuids {
-		node, ok := nodeIDMap[nodeUUID.String()]
+	// Phase 1: Create missing split nodes first
+	// This ensures parent nodes exist before we try to update references to them
+	for _, nodeUUID := range nodeUuidsToFix {
+		node, ok := goodNodeIDMap[nodeUUID.String()]
 		if !ok {
 			return fmt.Errorf("node %s not found in response", nodeUUID.String())
 		}
 
-		existingNode, exists := existingNodeMap[nodeUUID]
-		if exists {
-			err = h.updateExistingNode(ctx, existingNode, node, nodeUUID)
-			if err != nil {
-				return err
-			}
-		} else {
+		_, exists := existingNodeMap[nodeUUID]
+		if !exists {
 			// Validate status before creating
 			if node.Status != "SPLITTED" && node.Status != "SPLIT_LOCKED" {
 				return fmt.Errorf("cannot create node %s with status %s: only SPLITTED or SPLIT_LOCKED nodes can be created during sync", node.Id, node.Status)
@@ -110,6 +107,20 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 			if err != nil {
 				return err
 			}
+		}
+	}
+
+	// Phase 2: Update existing nodes
+	// Now that all missing nodes are created, we can safely update parent references
+	for existingNodeId, existingNode := range existingNodeMap {
+		node, ok := goodNodeIDMap[existingNodeId.String()]
+		if !ok {
+			return fmt.Errorf("node %s not found in response", existingNodeId.String())
+		}
+
+		err = h.updateExistingNode(ctx, existingNode, node, existingNodeId)
+		if err != nil {
+			return err
 		}
 	}
 
