@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // contextKey is a type for context keys.
@@ -50,7 +53,7 @@ func NewEntClientTxProvider(dbClient *Client) *ClientTxProvider {
 func (e *ClientTxProvider) GetOrBeginTx(ctx context.Context) (*Tx, error) {
 	tx, err := e.dbClient.Tx(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+		return nil, status.Errorf(codes.Unavailable, "failed to begin transaction: %v", err)
 	}
 	return tx, nil
 }
