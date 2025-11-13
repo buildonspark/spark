@@ -325,7 +325,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
-			ExecutionInterval: 10 * time.Minute,
+			ExecutionInterval: 5 * time.Minute,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "finalize_revealed_token_transactions",
 				RunInTestEnv: true,
@@ -343,14 +343,11 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							tokentransaction.UpdateTimeLT(
 								time.Now().Add(-5*time.Minute).UTC(),
 							),
-							tokentransaction.HasSpentStartedOutput(),
+							tokentransaction.HasSpentOutput(),
 						).
 						WithPeerSignatures().
-						WithSpentStartedOutput(func(q *ent.TokenOutputQuery) {
-							// Needed for marshalling inputs in MarshalProto
-							q.WithOutputCreatedTokenTransaction()
-						}).
 						WithSpentOutput(func(q *ent.TokenOutputQuery) {
+							q.WithOutputCreatedTokenTransaction()
 							q.WithTokenPartialRevocationSecretShares()
 							q.WithRevocationKeyshare()
 							q.ForUpdate()

@@ -27,20 +27,20 @@ import (
 // TokenTransactionQuery is the builder for querying TokenTransaction entities.
 type TokenTransactionQuery struct {
 	config
-	ctx                    *QueryContext
-	order                  []tokentransaction.OrderOption
-	inters                 []Interceptor
-	predicates             []predicate.TokenTransaction
-	withSpentOutput        *TokenOutputQuery
-	withSpentStartedOutput *TokenOutputQuery
-	withCreatedOutput      *TokenOutputQuery
-	withMint               *TokenMintQuery
-	withCreate             *TokenCreateQuery
-	withPaymentIntent      *PaymentIntentQuery
-	withPeerSignatures     *TokenTransactionPeerSignatureQuery
-	withSparkInvoice       *SparkInvoiceQuery
-	withFKs                bool
-	modifiers              []func(*sql.Selector)
+	ctx                *QueryContext
+	order              []tokentransaction.OrderOption
+	inters             []Interceptor
+	predicates         []predicate.TokenTransaction
+	withSpentOutput    *TokenOutputQuery
+	withSpentOutputV2  *TokenOutputQuery
+	withCreatedOutput  *TokenOutputQuery
+	withMint           *TokenMintQuery
+	withCreate         *TokenCreateQuery
+	withPaymentIntent  *PaymentIntentQuery
+	withPeerSignatures *TokenTransactionPeerSignatureQuery
+	withSparkInvoice   *SparkInvoiceQuery
+	withFKs            bool
+	modifiers          []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -99,8 +99,8 @@ func (ttq *TokenTransactionQuery) QuerySpentOutput() *TokenOutputQuery {
 	return query
 }
 
-// QuerySpentStartedOutput chains the current query on the "spent_started_output" edge.
-func (ttq *TokenTransactionQuery) QuerySpentStartedOutput() *TokenOutputQuery {
+// QuerySpentOutputV2 chains the current query on the "spent_output_v2" edge.
+func (ttq *TokenTransactionQuery) QuerySpentOutputV2() *TokenOutputQuery {
 	query := (&TokenOutputClient{config: ttq.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
 		if err := ttq.prepareQuery(ctx); err != nil {
@@ -113,7 +113,7 @@ func (ttq *TokenTransactionQuery) QuerySpentStartedOutput() *TokenOutputQuery {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(tokentransaction.Table, tokentransaction.FieldID, selector),
 			sqlgraph.To(tokenoutput.Table, tokenoutput.FieldID),
-			sqlgraph.Edge(sqlgraph.M2M, true, tokentransaction.SpentStartedOutputTable, tokentransaction.SpentStartedOutputPrimaryKey...),
+			sqlgraph.Edge(sqlgraph.M2M, true, tokentransaction.SpentOutputV2Table, tokentransaction.SpentOutputV2PrimaryKey...),
 		)
 		fromU = sqlgraph.SetNeighbors(ttq.driver.Dialect(), step)
 		return fromU, nil
@@ -440,19 +440,19 @@ func (ttq *TokenTransactionQuery) Clone() *TokenTransactionQuery {
 		return nil
 	}
 	return &TokenTransactionQuery{
-		config:                 ttq.config,
-		ctx:                    ttq.ctx.Clone(),
-		order:                  append([]tokentransaction.OrderOption{}, ttq.order...),
-		inters:                 append([]Interceptor{}, ttq.inters...),
-		predicates:             append([]predicate.TokenTransaction{}, ttq.predicates...),
-		withSpentOutput:        ttq.withSpentOutput.Clone(),
-		withSpentStartedOutput: ttq.withSpentStartedOutput.Clone(),
-		withCreatedOutput:      ttq.withCreatedOutput.Clone(),
-		withMint:               ttq.withMint.Clone(),
-		withCreate:             ttq.withCreate.Clone(),
-		withPaymentIntent:      ttq.withPaymentIntent.Clone(),
-		withPeerSignatures:     ttq.withPeerSignatures.Clone(),
-		withSparkInvoice:       ttq.withSparkInvoice.Clone(),
+		config:             ttq.config,
+		ctx:                ttq.ctx.Clone(),
+		order:              append([]tokentransaction.OrderOption{}, ttq.order...),
+		inters:             append([]Interceptor{}, ttq.inters...),
+		predicates:         append([]predicate.TokenTransaction{}, ttq.predicates...),
+		withSpentOutput:    ttq.withSpentOutput.Clone(),
+		withSpentOutputV2:  ttq.withSpentOutputV2.Clone(),
+		withCreatedOutput:  ttq.withCreatedOutput.Clone(),
+		withMint:           ttq.withMint.Clone(),
+		withCreate:         ttq.withCreate.Clone(),
+		withPaymentIntent:  ttq.withPaymentIntent.Clone(),
+		withPeerSignatures: ttq.withPeerSignatures.Clone(),
+		withSparkInvoice:   ttq.withSparkInvoice.Clone(),
 		// clone intermediate query.
 		sql:       ttq.sql.Clone(),
 		path:      ttq.path,
@@ -471,14 +471,14 @@ func (ttq *TokenTransactionQuery) WithSpentOutput(opts ...func(*TokenOutputQuery
 	return ttq
 }
 
-// WithSpentStartedOutput tells the query-builder to eager-load the nodes that are connected to
-// the "spent_started_output" edge. The optional arguments are used to configure the query builder of the edge.
-func (ttq *TokenTransactionQuery) WithSpentStartedOutput(opts ...func(*TokenOutputQuery)) *TokenTransactionQuery {
+// WithSpentOutputV2 tells the query-builder to eager-load the nodes that are connected to
+// the "spent_output_v2" edge. The optional arguments are used to configure the query builder of the edge.
+func (ttq *TokenTransactionQuery) WithSpentOutputV2(opts ...func(*TokenOutputQuery)) *TokenTransactionQuery {
 	query := (&TokenOutputClient{config: ttq.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
-	ttq.withSpentStartedOutput = query
+	ttq.withSpentOutputV2 = query
 	return ttq
 }
 
@@ -629,7 +629,7 @@ func (ttq *TokenTransactionQuery) sqlAll(ctx context.Context, hooks ...queryHook
 		_spec       = ttq.querySpec()
 		loadedTypes = [8]bool{
 			ttq.withSpentOutput != nil,
-			ttq.withSpentStartedOutput != nil,
+			ttq.withSpentOutputV2 != nil,
 			ttq.withCreatedOutput != nil,
 			ttq.withMint != nil,
 			ttq.withCreate != nil,
@@ -672,12 +672,10 @@ func (ttq *TokenTransactionQuery) sqlAll(ctx context.Context, hooks ...queryHook
 			return nil, err
 		}
 	}
-	if query := ttq.withSpentStartedOutput; query != nil {
-		if err := ttq.loadSpentStartedOutput(ctx, query, nodes,
-			func(n *TokenTransaction) { n.Edges.SpentStartedOutput = []*TokenOutput{} },
-			func(n *TokenTransaction, e *TokenOutput) {
-				n.Edges.SpentStartedOutput = append(n.Edges.SpentStartedOutput, e)
-			}); err != nil {
+	if query := ttq.withSpentOutputV2; query != nil {
+		if err := ttq.loadSpentOutputV2(ctx, query, nodes,
+			func(n *TokenTransaction) { n.Edges.SpentOutputV2 = []*TokenOutput{} },
+			func(n *TokenTransaction, e *TokenOutput) { n.Edges.SpentOutputV2 = append(n.Edges.SpentOutputV2, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -756,7 +754,7 @@ func (ttq *TokenTransactionQuery) loadSpentOutput(ctx context.Context, query *To
 	}
 	return nil
 }
-func (ttq *TokenTransactionQuery) loadSpentStartedOutput(ctx context.Context, query *TokenOutputQuery, nodes []*TokenTransaction, init func(*TokenTransaction), assign func(*TokenTransaction, *TokenOutput)) error {
+func (ttq *TokenTransactionQuery) loadSpentOutputV2(ctx context.Context, query *TokenOutputQuery, nodes []*TokenTransaction, init func(*TokenTransaction), assign func(*TokenTransaction, *TokenOutput)) error {
 	edgeIDs := make([]driver.Value, len(nodes))
 	byID := make(map[uuid.UUID]*TokenTransaction)
 	nids := make(map[uuid.UUID]map[*TokenTransaction]struct{})
@@ -768,11 +766,11 @@ func (ttq *TokenTransactionQuery) loadSpentStartedOutput(ctx context.Context, qu
 		}
 	}
 	query.Where(func(s *sql.Selector) {
-		joinT := sql.Table(tokentransaction.SpentStartedOutputTable)
-		s.Join(joinT).On(s.C(tokenoutput.FieldID), joinT.C(tokentransaction.SpentStartedOutputPrimaryKey[0]))
-		s.Where(sql.InValues(joinT.C(tokentransaction.SpentStartedOutputPrimaryKey[1]), edgeIDs...))
+		joinT := sql.Table(tokentransaction.SpentOutputV2Table)
+		s.Join(joinT).On(s.C(tokenoutput.FieldID), joinT.C(tokentransaction.SpentOutputV2PrimaryKey[0]))
+		s.Where(sql.InValues(joinT.C(tokentransaction.SpentOutputV2PrimaryKey[1]), edgeIDs...))
 		columns := s.SelectedColumns()
-		s.Select(joinT.C(tokentransaction.SpentStartedOutputPrimaryKey[1]))
+		s.Select(joinT.C(tokentransaction.SpentOutputV2PrimaryKey[1]))
 		s.AppendSelect(columns...)
 		s.SetDistinct(false)
 	})
@@ -809,7 +807,7 @@ func (ttq *TokenTransactionQuery) loadSpentStartedOutput(ctx context.Context, qu
 	for _, n := range neighbors {
 		nodes, ok := nids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected "spent_started_output" node returned %v`, n.ID)
+			return fmt.Errorf(`unexpected "spent_output_v2" node returned %v`, n.ID)
 		}
 		for kn := range nodes {
 			assign(kn, n)

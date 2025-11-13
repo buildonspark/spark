@@ -3530,15 +3530,15 @@ func (c *TokenTransactionClient) QuerySpentOutput(tt *TokenTransaction) *TokenOu
 	return query
 }
 
-// QuerySpentStartedOutput queries the spent_started_output edge of a TokenTransaction.
-func (c *TokenTransactionClient) QuerySpentStartedOutput(tt *TokenTransaction) *TokenOutputQuery {
+// QuerySpentOutputV2 queries the spent_output_v2 edge of a TokenTransaction.
+func (c *TokenTransactionClient) QuerySpentOutputV2(tt *TokenTransaction) *TokenOutputQuery {
 	query := (&TokenOutputClient{config: c.config}).Query()
 	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
 		id := tt.ID
 		step := sqlgraph.NewStep(
 			sqlgraph.From(tokentransaction.Table, tokentransaction.FieldID, id),
 			sqlgraph.To(tokenoutput.Table, tokenoutput.FieldID),
-			sqlgraph.Edge(sqlgraph.M2M, true, tokentransaction.SpentStartedOutputTable, tokentransaction.SpentStartedOutputPrimaryKey...),
+			sqlgraph.Edge(sqlgraph.M2M, true, tokentransaction.SpentOutputV2Table, tokentransaction.SpentOutputV2PrimaryKey...),
 		)
 		fromV = sqlgraph.Neighbors(tt.driver.Dialect(), step)
 		return fromV, nil

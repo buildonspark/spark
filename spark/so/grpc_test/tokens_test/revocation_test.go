@@ -42,9 +42,6 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRevealed(t *testing.T) {
 	tokenTransactionAfterFinalizeRevealedTransactions, err := entClient.TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)).
 		WithPeerSignatures().
-		WithSpentStartedOutput(func(to *ent.TokenOutputQuery) {
-			to.WithOutputCreatedTokenTransaction()
-		}).
 		WithSpentOutput(
 			func(to *ent.TokenOutputQuery) {
 				to.WithTokenPartialRevocationSecretShares()
@@ -132,9 +129,6 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsAvailableT
 			tokenTransactionAfterFinalizeRevealedTransactions, err := coordinatorEntClient.TokenTransaction.Query().
 				Where(tokentransaction.FinalizedTokenTransactionHashEQ(initalTransferTokenTransactionHash)).
 				WithPeerSignatures().
-				WithSpentStartedOutput(func(to *ent.TokenOutputQuery) {
-					to.WithOutputCreatedTokenTransaction()
-				}).
 				WithSpentOutput(func(to *ent.TokenOutputQuery) { to.WithTokenPartialRevocationSecretShares() }).
 				WithCreatedOutput().
 				Only(ctx)
@@ -143,9 +137,6 @@ func TestRevocationExchangeCronJobSuccessfullyFinalizesRemappedOutputsAvailableT
 
 			nonCoordinatorTokenTransaction, err := nonCoordEntClient.TokenTransaction.Query().
 				Where(tokentransaction.FinalizedTokenTransactionHashEQ(initalTransferTokenTransactionHash)).
-				WithSpentStartedOutput(func(to *ent.TokenOutputQuery) {
-					to.WithOutputCreatedTokenTransaction()
-				}).
 				WithSpentOutput().
 				WithCreatedOutput().
 				Only(ctx)
@@ -590,9 +581,6 @@ func setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t *testing.T,
 
 	tokenTransaction, err := tx.TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)).
-		WithSpentStartedOutput(func(to *ent.TokenOutputQuery) {
-			to.WithOutputCreatedTokenTransaction()
-		}).
 		WithSpentOutput().
 		WithCreatedOutput().
 		Only(ctx)
@@ -643,9 +631,6 @@ func setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t *testing.T,
 	tokenTransaction, err = entClient.TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHashEQ(finalTransferTokenTransactionHash)).
 		WithPeerSignatures().
-		WithSpentStartedOutput(func(to *ent.TokenOutputQuery) {
-			to.WithOutputCreatedTokenTransaction()
-		}).
 		WithSpentOutput(
 			func(to *ent.TokenOutputQuery) {
 				to.WithTokenPartialRevocationSecretShares()
@@ -939,9 +924,6 @@ func setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOper
 
 	tokenTransaction, err := coordinatorTx.TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHashEQ(initialFinalTokenTransactionHash)).
-		WithSpentStartedOutput(func(to *ent.TokenOutputQuery) {
-			to.WithOutputCreatedTokenTransaction()
-		}).
 		WithSpentOutput().
 		WithCreatedOutput().
 		Only(ctx)
@@ -992,9 +974,6 @@ func setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOper
 	tokenTransaction, err = coordinatorEntClient.TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHashEQ(initialFinalTokenTransactionHash)).
 		WithPeerSignatures().
-		WithSpentStartedOutput(func(to *ent.TokenOutputQuery) {
-			to.WithOutputCreatedTokenTransaction()
-		}).
 		WithSpentOutput(
 			func(to *ent.TokenOutputQuery) {
 				to.WithTokenPartialRevocationSecretShares()
@@ -1078,9 +1057,6 @@ func setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOper
 
 	initialTxNonCoordinator, err := nonCoordinatorTx.TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHashEQ(initialFinalTokenTransactionHash)).
-		WithSpentStartedOutput(func(to *ent.TokenOutputQuery) {
-			to.WithOutputCreatedTokenTransaction()
-		}).
 		WithSpentOutput().
 		WithCreatedOutput().
 		Only(ctx)
@@ -1150,9 +1126,6 @@ func setAndValidateSuccessfulTokenTransactionToStatusAndRemapSpentOutputsForOper
 
 	initialTxNonCoordinator, err = nonCoordinatorTx.TokenTransaction.Query().
 		Where(tokentransaction.FinalizedTokenTransactionHashEQ(initialFinalTokenTransactionHash)).
-		WithSpentStartedOutput(func(to *ent.TokenOutputQuery) {
-			to.WithOutputCreatedTokenTransaction()
-		}).
 		WithSpentOutput().
 		WithCreatedOutput().
 		Only(ctx)

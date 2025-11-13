@@ -134,7 +134,7 @@ func (h *QueryTokenTransactionsHandler) queryWithRawSql(ctx context.Context, req
 		allTransactions, err := db.TokenTransaction.Query().
 			Where(tokentransaction.IDIn(transactionIDs...)).
 			WithCreatedOutput().
-			WithSpentStartedOutput(func(slq *ent.TokenOutputQuery) {
+			WithSpentOutput(func(slq *ent.TokenOutputQuery) {
 				slq.WithOutputCreatedTokenTransaction()
 			}).
 			WithCreate().
@@ -329,7 +329,7 @@ func (h *QueryTokenTransactionsHandler) queryWithEnt(ctx context.Context, req *t
 
 	query = query.
 		WithCreatedOutput().
-		WithSpentStartedOutput(func(slq *ent.TokenOutputQuery) {
+		WithSpentOutput(func(slq *ent.TokenOutputQuery) {
 			slq.WithOutputCreatedTokenTransaction()
 		}).
 		WithCreate().
@@ -365,9 +365,9 @@ func (h *QueryTokenTransactionsHandler) convertTransactionsToResponse(ctx contex
 		}
 
 		if status == tokenpb.TokenTransactionStatus_TOKEN_TRANSACTION_FINALIZED {
-			spentTokenOutputsMetadata := make([]*tokenpb.SpentTokenOutputMetadata, len(transaction.Edges.SpentStartedOutput))
+			spentTokenOutputsMetadata := make([]*tokenpb.SpentTokenOutputMetadata, len(transaction.Edges.SpentOutput))
 
-			for i, spentOutput := range transaction.Edges.SpentStartedOutput {
+			for i, spentOutput := range transaction.Edges.SpentOutput {
 				spentTokenOutputsMetadata[i] = &tokenpb.SpentTokenOutputMetadata{
 					OutputId:         spentOutput.ID.String(),
 					RevocationSecret: spentOutput.SpentRevocationSecret.Serialize(),

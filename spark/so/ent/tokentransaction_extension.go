@@ -697,8 +697,7 @@ func FetchPartialTokenTransactionData(ctx context.Context, partialTokenTransacti
 	tokenTransaction, err := db.TokenTransaction.Query().
 		Where(tokentransaction.PartialTokenTransactionHash(partialTokenTransactionHash)).
 		WithCreatedOutput().
-		WithSpentOutput().
-		WithSpentStartedOutput(func(q *TokenOutputQuery) {
+		WithSpentOutput(func(q *TokenOutputQuery) {
 			// Needed to enable marshalling of the token transaction proto.
 			q.WithOutputCreatedTokenTransaction()
 		}).
@@ -791,12 +790,10 @@ func FetchAndLockTokenTransactionDataByHash(ctx context.Context, tokenTransactio
 			// Don't lock because revocation keyshares are append-only.
 			q.WithRevocationKeyshare().
 				WithTokenPartialRevocationSecretShares().
+				// Needed to enable marshalling of the token transaction proto.
+				// Don't lock because data for prior token transactions is immutable.
+				WithOutputCreatedTokenTransaction().
 				ForUpdate()
-		}).
-		WithSpentStartedOutput(func(q *TokenOutputQuery) {
-			// Needed to enable marshalling of the token transaction proto.
-			// Don't lock because data for prior token transactions is immutable.
-			q.WithOutputCreatedTokenTransaction()
 		}).
 		// Don't lock because peer signatures are append-only.
 		WithPeerSignatures().
@@ -836,11 +833,9 @@ func FetchTokenTransactionDataByHashForRead(ctx context.Context, tokenTransactio
 		WithSpentOutput(func(q *TokenOutputQuery) {
 			// Needed to enable computation of the progress of a transaction commit.
 			q.WithRevocationKeyshare().
-				WithTokenPartialRevocationSecretShares()
-		}).
-		WithSpentStartedOutput(func(q *TokenOutputQuery) {
-			// Needed to enable marshalling of the token transaction proto.
-			q.WithOutputCreatedTokenTransaction()
+				WithTokenPartialRevocationSecretShares().
+				// Needed to enable marshalling of the token transaction proto.
+				WithOutputCreatedTokenTransaction()
 		}).
 		WithPeerSignatures().
 		WithMint().
@@ -949,14 +944,14 @@ func (t *TokenTransaction) MarshalProto(ctx context.Context, config *so.Config) 
 				TokenIdentifier: t.Edges.Mint.TokenIdentifier,
 			},
 		}
-	} else if len(t.Edges.SpentStartedOutput) > 0 {
+	} else if len(t.Edges.SpentOutput) > 0 {
 		// This is a transfer transaction
 		transferInput := &tokenpb.TokenTransferInput{
-			OutputsToSpend: make([]*tokenpb.TokenOutputToSpend, len(t.Edges.SpentStartedOutput)),
+			OutputsToSpend: make([]*tokenpb.TokenOutputToSpend, len(t.Edges.SpentOutput)),
 		}
 
 		// Sort outputs to match the original token transaction using SpentTransactionInputVout
-		sortedSpentOutputs := slices.SortedFunc(slices.Values(t.Edges.SpentStartedOutput), func(a, b *TokenOutput) int {
+		sortedSpentOutputs := slices.SortedFunc(slices.Values(t.Edges.SpentOutput), func(a, b *TokenOutput) int {
 			return cmp.Compare(a.SpentTransactionInputVout, b.SpentTransactionInputVout)
 		})
 

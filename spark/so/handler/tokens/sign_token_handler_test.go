@@ -549,14 +549,12 @@ func setupDBTransferTokenTransactionInternalSignFailedScenario(t *testing.T, set
 	require.NoError(t, err)
 	_, err = transferData.prevTokenOutput1.Update().
 		SetOutputSpentTokenTransaction(dbTx).
-		AddOutputSpentStartedTokenTransactions(dbTx).
 		SetStatus(schematype.TokenOutputStatusSpentSigned).
 		SetSpentTransactionInputVout(0).
 		Save(setup.ctx)
 	require.NoError(t, err)
 	_, err = transferData.prevTokenOutput2.Update().
 		SetOutputSpentTokenTransaction(dbTx).
-		AddOutputSpentStartedTokenTransactions(dbTx).
 		SetStatus(schematype.TokenOutputStatusSpentSigned).
 		SetSpentTransactionInputVout(1).
 		Save(setup.ctx)
@@ -825,7 +823,6 @@ func TestCommitTransaction_TransferTransactionSimulateRace_TestFailsWhenInputRem
 
 		_, err = transferData.prevTokenOutput1.Update().
 			SetOutputSpentTokenTransaction(otherTx).
-			AddOutputSpentStartedTokenTransactions(otherTx).
 			SetStatus(schematype.TokenOutputStatusSpentStarted).
 			Save(setup.ctx)
 		assert.NoError(t, err)

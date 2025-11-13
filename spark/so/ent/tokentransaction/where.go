@@ -581,21 +581,21 @@ func HasSpentOutputWith(preds ...predicate.TokenOutput) predicate.TokenTransacti
 	})
 }
 
-// HasSpentStartedOutput applies the HasEdge predicate on the "spent_started_output" edge.
-func HasSpentStartedOutput() predicate.TokenTransaction {
+// HasSpentOutputV2 applies the HasEdge predicate on the "spent_output_v2" edge.
+func HasSpentOutputV2() predicate.TokenTransaction {
 	return predicate.TokenTransaction(func(s *sql.Selector) {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2M, true, SpentStartedOutputTable, SpentStartedOutputPrimaryKey...),
+			sqlgraph.Edge(sqlgraph.M2M, true, SpentOutputV2Table, SpentOutputV2PrimaryKey...),
 		)
 		sqlgraph.HasNeighbors(s, step)
 	})
 }
 
-// HasSpentStartedOutputWith applies the HasEdge predicate on the "spent_started_output" edge with a given conditions (other predicates).
-func HasSpentStartedOutputWith(preds ...predicate.TokenOutput) predicate.TokenTransaction {
+// HasSpentOutputV2With applies the HasEdge predicate on the "spent_output_v2" edge with a given conditions (other predicates).
+func HasSpentOutputV2With(preds ...predicate.TokenOutput) predicate.TokenTransaction {
 	return predicate.TokenTransaction(func(s *sql.Selector) {
-		step := newSpentStartedOutputStep()
+		step := newSpentOutputV2Step()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

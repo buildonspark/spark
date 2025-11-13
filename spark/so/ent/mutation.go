@@ -15986,9 +15986,9 @@ type TokenTransactionMutation struct {
 	spent_output                     map[uuid.UUID]struct{}
 	removedspent_output              map[uuid.UUID]struct{}
 	clearedspent_output              bool
-	spent_started_output             map[uuid.UUID]struct{}
-	removedspent_started_output      map[uuid.UUID]struct{}
-	clearedspent_started_output      bool
+	spent_output_v2                  map[uuid.UUID]struct{}
+	removedspent_output_v2           map[uuid.UUID]struct{}
+	clearedspent_output_v2           bool
 	created_output                   map[uuid.UUID]struct{}
 	removedcreated_output            map[uuid.UUID]struct{}
 	clearedcreated_output            bool
@@ -16612,58 +16612,58 @@ func (m *TokenTransactionMutation) ResetSpentOutput() {
 	m.removedspent_output = nil
 }
 
-// AddSpentStartedOutputIDs adds the "spent_started_output" edge to the TokenOutput entity by ids.
-func (m *TokenTransactionMutation) AddSpentStartedOutputIDs(ids ...uuid.UUID) {
-	if m.spent_started_output == nil {
-		m.spent_started_output = make(map[uuid.UUID]struct{})
+// AddSpentOutputV2IDs adds the "spent_output_v2" edge to the TokenOutput entity by ids.
+func (m *TokenTransactionMutation) AddSpentOutputV2IDs(ids ...uuid.UUID) {
+	if m.spent_output_v2 == nil {
+		m.spent_output_v2 = make(map[uuid.UUID]struct{})
 	}
 	for i := range ids {
-		m.spent_started_output[ids[i]] = struct{}{}
+		m.spent_output_v2[ids[i]] = struct{}{}
 	}
 }
 
-// ClearSpentStartedOutput clears the "spent_started_output" edge to the TokenOutput entity.
-func (m *TokenTransactionMutation) ClearSpentStartedOutput() {
-	m.clearedspent_started_output = true
+// ClearSpentOutputV2 clears the "spent_output_v2" edge to the TokenOutput entity.
+func (m *TokenTransactionMutation) ClearSpentOutputV2() {
+	m.clearedspent_output_v2 = true
 }
 
-// SpentStartedOutputCleared reports if the "spent_started_output" edge to the TokenOutput entity was cleared.
-func (m *TokenTransactionMutation) SpentStartedOutputCleared() bool {
-	return m.clearedspent_started_output
+// SpentOutputV2Cleared reports if the "spent_output_v2" edge to the TokenOutput entity was cleared.
+func (m *TokenTransactionMutation) SpentOutputV2Cleared() bool {
+	return m.clearedspent_output_v2
 }
 
-// RemoveSpentStartedOutputIDs removes the "spent_started_output" edge to the TokenOutput entity by IDs.
-func (m *TokenTransactionMutation) RemoveSpentStartedOutputIDs(ids ...uuid.UUID) {
-	if m.removedspent_started_output == nil {
-		m.removedspent_started_output = make(map[uuid.UUID]struct{})
+// RemoveSpentOutputV2IDs removes the "spent_output_v2" edge to the TokenOutput entity by IDs.
+func (m *TokenTransactionMutation) RemoveSpentOutputV2IDs(ids ...uuid.UUID) {
+	if m.removedspent_output_v2 == nil {
+		m.removedspent_output_v2 = make(map[uuid.UUID]struct{})
 	}
 	for i := range ids {
-		delete(m.spent_started_output, ids[i])
-		m.removedspent_started_output[ids[i]] = struct{}{}
+		delete(m.spent_output_v2, ids[i])
+		m.removedspent_output_v2[ids[i]] = struct{}{}
 	}
 }
 
-// RemovedSpentStartedOutput returns the removed IDs of the "spent_started_output" edge to the TokenOutput entity.
-func (m *TokenTransactionMutation) RemovedSpentStartedOutputIDs() (ids []uuid.UUID) {
-	for id := range m.removedspent_started_output {
+// RemovedSpentOutputV2 returns the removed IDs of the "spent_output_v2" edge to the TokenOutput entity.
+func (m *TokenTransactionMutation) RemovedSpentOutputV2IDs() (ids []uuid.UUID) {
+	for id := range m.removedspent_output_v2 {
 		ids = append(ids, id)
 	}
 	return
 }
 
-// SpentStartedOutputIDs returns the "spent_started_output" edge IDs in the mutation.
-func (m *TokenTransactionMutation) SpentStartedOutputIDs() (ids []uuid.UUID) {
-	for id := range m.spent_started_output {
+// SpentOutputV2IDs returns the "spent_output_v2" edge IDs in the mutation.
+func (m *TokenTransactionMutation) SpentOutputV2IDs() (ids []uuid.UUID) {
+	for id := range m.spent_output_v2 {
 		ids = append(ids, id)
 	}
 	return
 }
 
-// ResetSpentStartedOutput resets all changes to the "spent_started_output" edge.
-func (m *TokenTransactionMutation) ResetSpentStartedOutput() {
-	m.spent_started_output = nil
-	m.clearedspent_started_output = false
-	m.removedspent_started_output = nil
+// ResetSpentOutputV2 resets all changes to the "spent_output_v2" edge.
+func (m *TokenTransactionMutation) ResetSpentOutputV2() {
+	m.spent_output_v2 = nil
+	m.clearedspent_output_v2 = false
+	m.removedspent_output_v2 = nil
 }
 
 // AddCreatedOutputIDs adds the "created_output" edge to the TokenOutput entity by ids.
@@ -17283,8 +17283,8 @@ func (m *TokenTransactionMutation) AddedEdges() []string {
 	if m.spent_output != nil {
 		edges = append(edges, tokentransaction.EdgeSpentOutput)
 	}
-	if m.spent_started_output != nil {
-		edges = append(edges, tokentransaction.EdgeSpentStartedOutput)
+	if m.spent_output_v2 != nil {
+		edges = append(edges, tokentransaction.EdgeSpentOutputV2)
 	}
 	if m.created_output != nil {
 		edges = append(edges, tokentransaction.EdgeCreatedOutput)
@@ -17317,9 +17317,9 @@ func (m *TokenTransactionMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
-	case tokentransaction.EdgeSpentStartedOutput:
-		ids := make([]ent.Value, 0, len(m.spent_started_output))
-		for id := range m.spent_started_output {
+	case tokentransaction.EdgeSpentOutputV2:
+		ids := make([]ent.Value, 0, len(m.spent_output_v2))
+		for id := range m.spent_output_v2 {
 			ids = append(ids, id)
 		}
 		return ids
@@ -17363,8 +17363,8 @@ func (m *TokenTransactionMutation) RemovedEdges() []string {
 	if m.removedspent_output != nil {
 		edges = append(edges, tokentransaction.EdgeSpentOutput)
 	}
-	if m.removedspent_started_output != nil {
-		edges = append(edges, tokentransaction.EdgeSpentStartedOutput)
+	if m.removedspent_output_v2 != nil {
+		edges = append(edges, tokentransaction.EdgeSpentOutputV2)
 	}
 	if m.removedcreated_output != nil {
 		edges = append(edges, tokentransaction.EdgeCreatedOutput)
@@ -17388,9 +17388,9 @@ func (m *TokenTransactionMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
-	case tokentransaction.EdgeSpentStartedOutput:
-		ids := make([]ent.Value, 0, len(m.removedspent_started_output))
-		for id := range m.removedspent_started_output {
+	case tokentransaction.EdgeSpentOutputV2:
+		ids := make([]ent.Value, 0, len(m.removedspent_output_v2))
+		for id := range m.removedspent_output_v2 {
 			ids = append(ids, id)
 		}
 		return ids
@@ -17422,8 +17422,8 @@ func (m *TokenTransactionMutation) ClearedEdges() []string {
 	if m.clearedspent_output {
 		edges = append(edges, tokentransaction.EdgeSpentOutput)
 	}
-	if m.clearedspent_started_output {
-		edges = append(edges, tokentransaction.EdgeSpentStartedOutput)
+	if m.clearedspent_output_v2 {
+		edges = append(edges, tokentransaction.EdgeSpentOutputV2)
 	}
 	if m.clearedcreated_output {
 		edges = append(edges, tokentransaction.EdgeCreatedOutput)
@@ -17452,8 +17452,8 @@ func (m *TokenTransactionMutation) EdgeCleared(name string) bool {
 	switch name {
 	case tokentransaction.EdgeSpentOutput:
 		return m.clearedspent_output
-	case tokentransaction.EdgeSpentStartedOutput:
-		return m.clearedspent_started_output
+	case tokentransaction.EdgeSpentOutputV2:
+		return m.clearedspent_output_v2
 	case tokentransaction.EdgeCreatedOutput:
 		return m.clearedcreated_output
 	case tokentransaction.EdgeMint:
@@ -17494,8 +17494,8 @@ func (m *TokenTransactionMutation) ResetEdge(name string) error {
 	case tokentransaction.EdgeSpentOutput:
 		m.ResetSpentOutput()
 		return nil
-	case tokentransaction.EdgeSpentStartedOutput:
-		m.ResetSpentStartedOutput()
+	case tokentransaction.EdgeSpentOutputV2:
+		m.ResetSpentOutputV2()
 		return nil
 	case tokentransaction.EdgeCreatedOutput:
 		m.ResetCreatedOutput()
