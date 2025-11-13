@@ -416,7 +416,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
-			ExecutionInterval: 45 * time.Second,
+			ExecutionInterval: 20 * time.Second,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "send_gossip",
 				RunInTestEnv: true,
@@ -429,7 +429,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					}
 					gossipLimit := knobsService.GetValue(knobs.KnobGossipLimit, 50)
 					query := tx.Gossip.Query().Where(gossip.StatusEQ(st.GossipStatusPending)).Limit(int(gossipLimit))
-					gossips, err := query.ForUpdate().All(ctx)
+					gossips, err := query.ForUpdate(sql.WithLockAction(sql.SkipLocked)).All(ctx)
 					if err != nil {
 						return err
 					}
@@ -523,7 +523,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					pendingSendTransfers, err := tx.PendingSendTransfer.Query().Where(
 						pendingsendtransfer.StatusEQ(st.PendingSendTransferStatusPending),
 						pendingsendtransfer.UpdateTimeLT(time.Now().Add(-3*time.Minute)),
-					).Limit(100).ForUpdate().All(ctx)
+					).Limit(100).ForUpdate(sql.WithLockAction(sql.SkipLocked)).All(ctx)
 					if err != nil {
 						return err
 					}
