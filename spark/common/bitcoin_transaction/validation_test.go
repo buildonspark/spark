@@ -84,247 +84,238 @@ func newTestLeafNode(t *testing.T) (*ent.TreeNode, keys.Public) {
 	}, pubKey
 }
 
-func TestVerifyTransactionWithDatabase(t *testing.T) {
+// createClientTx is a helper to construct a raw transaction for tests.
+func createClientTx(t *testing.T, prevTxHash chainhash.Hash, sequence uint32, outputs ...*wire.TxOut) []byte {
+	tx := wire.NewMsgTx(defaultVersion)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: prevTxHash, Index: 0},
+		Sequence:         sequence,
+	})
+	for _, out := range outputs {
+		tx.AddTxOut(out)
+	}
+	return serializeTx(t, tx)
+}
+
+// Verifies CPFP refund transaction matches expected construction.
+func TestVerifyTransactionWithDatabase_Success_CPFP(t *testing.T) {
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
 	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
 	require.NoError(t, err)
 
-	// Helper to create a client transaction
-	createClientTx := func(prevTxHash chainhash.Hash, sequence uint32, outputs ...*wire.TxOut) []byte {
-		tx := wire.NewMsgTx(defaultVersion)
-		tx.AddTxIn(&wire.TxIn{
-			PreviousOutPoint: wire.OutPoint{Hash: prevTxHash, Index: 0},
-			Sequence:         sequence,
-		})
-		for _, out := range outputs {
-			tx.AddTxOut(out)
-		}
-		return serializeTx(t, tx)
-	}
+	clientRawTx := createClientTx(t,
+		dbLeaf.RawTxid.Hash(),
+		expectedCpfpTimelock,
+		&wire.TxOut{Value: testSourceValue, PkScript: userScript},
+		common.EphemeralAnchorOutput(),
+	)
 
-	testCases := []struct {
-		name          string
-		clientRawTx   []byte
-		txType        RefundTxType
-		dbLeaf        *ent.TreeNode
-		refundDestKey keys.Public
-		expectErr     bool
-		errContains   string
-	}{
-		{
-			name:   "Happy Path - CPFP",
-			txType: RefundTxTypeCPFP,
-			clientRawTx: createClientTx(
-				dbLeaf.RawTxid.Hash(),
-				expectedCpfpTimelock,
-				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
-				common.EphemeralAnchorOutput(),
-			),
-			dbLeaf:        dbLeaf,
-			refundDestKey: refundDestPubkey,
-			expectErr:     false,
-		},
-		{
-			name:   "Happy Path - Direct",
-			txType: RefundTxTypeDirect,
-			clientRawTx: createClientTx(
-				dbLeaf.DirectTxid.Hash(),
-				expectedCpfpTimelock+50,
-				&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript},
-			),
-			dbLeaf:        dbLeaf,
-			refundDestKey: refundDestPubkey,
-			expectErr:     false,
-		},
-		{
-			name:   "Happy Path - DirectFromCPFP",
-			txType: RefundTxTypeDirectFromCPFP,
-			clientRawTx: createClientTx(
-				dbLeaf.RawTxid.Hash(),
-				expectedCpfpTimelock+50,
-				&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript},
-			),
-			dbLeaf:        dbLeaf,
-			refundDestKey: refundDestPubkey,
-			expectErr:     false,
-		},
-		{
-			name:          "Error - Invalid client tx bytes",
-			txType:        RefundTxTypeCPFP,
-			clientRawTx:   []byte("invalid tx"),
-			dbLeaf:        dbLeaf,
-			refundDestKey: refundDestPubkey,
-			expectErr:     true,
-			errContains:   "failed to parse client tx",
-		},
-		{
-			name:   "Error - Client tx no inputs",
-			txType: RefundTxTypeCPFP,
-			clientRawTx: func() []byte {
-				tx := wire.NewMsgTx(defaultVersion)
-				tx.AddTxIn(&wire.TxIn{
-					PreviousOutPoint: wire.OutPoint{
-						Hash:  chainhash.Hash{},
-						Index: 0,
-					},
-					Sequence: 0,
-				})
-				tx.AddTxOut(&wire.TxOut{
-					Value:    testSourceValue,
-					PkScript: userScript,
-				})
-				// Remove the input to create a transaction with no inputs
-				tx.TxIn = tx.TxIn[:0]
-				return serializeTx(t, tx)
-			}(),
-			dbLeaf:        dbLeaf,
-			refundDestKey: refundDestPubkey,
-			expectErr:     true,
-			errContains:   "failed to parse client tx",
-		},
-		{
-			name:   "Error - Mismatched transaction",
-			txType: RefundTxTypeCPFP,
-			clientRawTx: createClientTx(
-				dbLeaf.RawTxid.Hash(),
-				expectedCpfpTimelock,
-				&wire.TxOut{Value: testSourceValue - 1, PkScript: userScript},
-				common.EphemeralAnchorOutput(),
-			),
-			dbLeaf:        dbLeaf,
-			refundDestKey: refundDestPubkey,
-			expectErr:     true,
-			errContains:   "transaction does not match expected construction",
-		},
-		{
-			name:   "Error - Sequence validation bit 31 set",
-			txType: RefundTxTypeCPFP,
-			clientRawTx: createClientTx(
-				dbLeaf.RawTxid.Hash(),
-				expectedCpfpTimelock|(1<<31),
-				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
-				common.EphemeralAnchorOutput(),
-			),
-			dbLeaf:        dbLeaf,
-			refundDestKey: refundDestPubkey,
-			expectErr:     true,
-			errContains:   "client sequence has bit 31 set",
-		},
-		{
-			name:   "Error - Sequence validation bit 22 set",
-			txType: RefundTxTypeCPFP,
-			clientRawTx: createClientTx(
-				dbLeaf.RawTxid.Hash(),
-				expectedCpfpTimelock|(1<<22),
-				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
-				common.EphemeralAnchorOutput(),
-			),
-			dbLeaf:        dbLeaf,
-			refundDestKey: refundDestPubkey,
-			expectErr:     true,
-			errContains:   "client sequence has bit 22 set",
-		},
-		{
-			name:   "Error - Timelock mismatch",
-			txType: RefundTxTypeCPFP,
-			clientRawTx: createClientTx(
-				dbLeaf.RawTxid.Hash(),
-				expectedCpfpTimelock+spark.DirectTimelockOffset, // Wrong timelock
-				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
-				common.EphemeralAnchorOutput(),
-			),
-			dbLeaf:        dbLeaf,
-			refundDestKey: refundDestPubkey,
-			expectErr:     true,
-			errContains:   "does not match expected timelock",
-		},
-		{
-			name:   "Error - Corrupted DB data",
-			txType: RefundTxTypeCPFP,
-			clientRawTx: createClientTx(
-				dbLeaf.RawTxid.Hash(),
-				expectedCpfpTimelock,
-				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
-				common.EphemeralAnchorOutput(),
-			),
-			dbLeaf: func() *ent.TreeNode {
-				badLeaf, _ := newTestLeafNode(t)
-				badLeaf.RawTx = []byte("bad raw tx")
-				return badLeaf
-			}(),
-			refundDestKey: refundDestPubkey,
-			expectErr:     true,
-			errContains:   "failed to parse node tx",
-		},
-		{
-			name:   "Error - Insufficient timelock in DB",
-			txType: RefundTxTypeCPFP,
-			clientRawTx: createClientTx(
-				dbLeaf.RawTxid.Hash(),
-				expectedCpfpTimelock,
-				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
-				common.EphemeralAnchorOutput(),
-			),
-			dbLeaf: func() *ent.TreeNode {
-				badLeaf, key := newTestLeafNode(t)
-				pkScript, _ := common.P2TRScriptFromPubKey(key)
-				nodeTxHash := badLeaf.RawTxid.Hash()
-				// Create a refund tx with a timelock smaller than the interval
-				badRefundTx := newTestTx(testSourceValue, pkScript, spark.TimeLockInterval-1, &nodeTxHash)
-				badLeaf.RawRefundTx = serializeTx(t, badRefundTx)
-				return badLeaf
-			}(),
-			refundDestKey: refundDestPubkey,
-			expectErr:     true,
-			errContains:   "is too small to subtract TimeLockInterval",
-		},
-		{
-			name:   "Error - Unknown tx type",
-			txType: RefundTxType(99),
-			clientRawTx: createClientTx(
-				dbLeaf.RawTxid.Hash(),
-				expectedCpfpTimelock,
-				&wire.TxOut{Value: testSourceValue, PkScript: userScript},
-				common.EphemeralAnchorOutput(),
-			),
-			dbLeaf:        dbLeaf,
-			refundDestKey: refundDestPubkey,
-			expectErr:     true,
-			errContains:   "unknown transaction type: 99",
-		},
-	}
+	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey))
+}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			err := VerifyTransactionWithDatabase(tc.clientRawTx, tc.dbLeaf, tc.txType, tc.refundDestKey)
-			if tc.expectErr {
-				require.ErrorContains(t, err, tc.errContains)
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
+// Verifies Direct refund transaction matches expected construction.
+func TestVerifyTransactionWithDatabase_Success_Direct(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	clientRawTx := createClientTx(t,
+		dbLeaf.DirectTxid.Hash(),
+		expectedCpfpTimelock+50,
+		&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript},
+	)
+
+	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeDirect, refundDestPubkey))
+}
+
+// Verifies Direct-from-CPFP refund transaction matches expected construction.
+func TestVerifyTransactionWithDatabase_Success_DirectFromCPFP(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	clientRawTx := createClientTx(t,
+		dbLeaf.RawTxid.Hash(),
+		expectedCpfpTimelock+50,
+		&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript},
+	)
+
+	require.NoError(t, VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeDirectFromCPFP, refundDestPubkey))
+}
+
+// Errors on invalid client transaction bytes.
+func TestVerifyTransactionWithDatabase_Error_InvalidClientTxBytes(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	err := VerifyTransactionWithDatabase([]byte("invalid tx"), dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "failed to parse client tx")
+}
+
+// Errors when the client transaction has no inputs.
+func TestVerifyTransactionWithDatabase_Error_ClientTxNoInputs(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	tx := wire.NewMsgTx(defaultVersion)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: chainhash.Hash{}, Index: 0},
+		Sequence:         0,
+	})
+	tx.AddTxOut(&wire.TxOut{Value: testSourceValue, PkScript: userScript})
+	// Remove the input to create a transaction with no inputs
+	tx.TxIn = nil
+	clientRawTx := serializeTx(t, tx)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "failed to parse client tx")
+}
+
+// Errors when client transaction outputs/values don't match expected.
+func TestVerifyTransactionWithDatabase_Error_MismatchedTransaction(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	clientRawTx := createClientTx(t,
+		dbLeaf.RawTxid.Hash(),
+		expectedCpfpTimelock,
+		&wire.TxOut{Value: testSourceValue - 1, PkScript: userScript},
+		common.EphemeralAnchorOutput(),
+	)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "transaction does not match expected construction")
+}
+
+// Errors when client sequence bit 31 is set.
+func TestVerifyTransactionWithDatabase_Error_SequenceValidationBit31Set(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	clientRawTx := createClientTx(t,
+		dbLeaf.RawTxid.Hash(),
+		expectedCpfpTimelock|(1<<31),
+		&wire.TxOut{Value: testSourceValue, PkScript: userScript},
+		common.EphemeralAnchorOutput(),
+	)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "client sequence has bit 31 set")
+}
+
+// Errors when client sequence bit 22 is set.
+func TestVerifyTransactionWithDatabase_Error_SequenceValidationBit22Set(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	clientRawTx := createClientTx(t,
+		dbLeaf.RawTxid.Hash(),
+		expectedCpfpTimelock|(1<<22),
+		&wire.TxOut{Value: testSourceValue, PkScript: userScript},
+		common.EphemeralAnchorOutput(),
+	)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "client sequence has bit 22 set")
+}
+
+// Errors when client timelock does not match expected.
+func TestVerifyTransactionWithDatabase_Error_TimelockMismatch(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	clientRawTx := createClientTx(t,
+		dbLeaf.RawTxid.Hash(),
+		expectedCpfpTimelock+spark.DirectTimelockOffset, // Wrong timelock
+		&wire.TxOut{Value: testSourceValue, PkScript: userScript},
+		common.EphemeralAnchorOutput(),
+	)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "does not match expected timelock")
+}
+
+// Errors when DB-stored node transaction data is corrupt.
+func TestVerifyTransactionWithDatabase_Error_CorruptedDBData(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	clientRawTx := createClientTx(t,
+		dbLeaf.RawTxid.Hash(),
+		expectedCpfpTimelock,
+		&wire.TxOut{Value: testSourceValue, PkScript: userScript},
+		common.EphemeralAnchorOutput(),
+	)
+
+	badLeaf, _ := newTestLeafNode(t)
+	badLeaf.RawTx = []byte("bad raw tx")
+
+	err = VerifyTransactionWithDatabase(clientRawTx, badLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "failed to parse node tx")
+}
+
+// Errors when DB refund timelock is too small to subtract interval.
+func TestVerifyTransactionWithDatabase_Error_InsufficientTimelockInDB(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	clientRawTx := createClientTx(t,
+		dbLeaf.RawTxid.Hash(),
+		expectedCpfpTimelock,
+		&wire.TxOut{Value: testSourceValue, PkScript: userScript},
+		common.EphemeralAnchorOutput(),
+	)
+
+	badLeaf, key := newTestLeafNode(t)
+	pkScript, _ := common.P2TRScriptFromPubKey(key)
+	nodeTxHash := badLeaf.RawTxid.Hash()
+	// Create a refund tx with a timelock smaller than the interval
+	badRefundTx := newTestTx(testSourceValue, pkScript, spark.TimeLockInterval-1, &nodeTxHash)
+	badLeaf.RawRefundTx = serializeTx(t, badRefundTx)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, badLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "is too small to subtract TimeLockInterval")
+}
+
+// Errors on unknown refund transaction type.
+func TestVerifyTransactionWithDatabase_Error_UnknownTxType(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	clientRawTx := createClientTx(t,
+		dbLeaf.RawTxid.Hash(),
+		expectedCpfpTimelock,
+		&wire.TxOut{Value: testSourceValue, PkScript: userScript},
+		common.EphemeralAnchorOutput(),
+	)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxType(99), refundDestPubkey)
+	require.ErrorContains(t, err, "unknown transaction type: 99")
 }
 
 // TestConstructExpectedTransaction covers the sub-flows of constructing transactions.
-func TestConstructExpectedTransaction(t *testing.T) {
+func TestConstructExpectedTransaction_UnknownTransactionType(t *testing.T) {
+	// Errors when constructing expected transaction with unknown type.
 	dbLeaf, refundDestPubkey := newTestLeafNode(t)
-
-	// Test case for unknown transaction type
-	t.Run("Unknown transaction type", func(t *testing.T) {
-		_, err := constructExpectedTransaction(dbLeaf, RefundTxType(99), refundDestPubkey, 0)
-		require.ErrorContains(t, err, "unknown transaction type: 99")
-	})
-
-	// Test case for failure in P2TR script creation
-	t.Run("P2TR script creation failure", func(t *testing.T) {
-		var invalidPubKey keys.Public
-		_, err := constructExpectedTransaction(dbLeaf, RefundTxTypeCPFP, invalidPubKey, expectedCpfpTimelock)
-		require.ErrorContains(t, err, "public key is zero")
-	})
+	_, err := constructExpectedTransaction(dbLeaf, RefundTxType(99), refundDestPubkey, 0)
+	require.ErrorContains(t, err, "unknown transaction type: 99")
 }
 
-// TestP2TRScriptFromPubKey tests the P2TR script creation from a public key.
+func TestConstructExpectedTransaction_P2TRScriptCreationFailure(t *testing.T) {
+	// Errors when constructing expected transaction with a zero public key.
+	dbLeaf, _ := newTestLeafNode(t)
+	var invalidPubKey keys.Public
+	_, err := constructExpectedTransaction(dbLeaf, RefundTxTypeCPFP, invalidPubKey, expectedCpfpTimelock)
+	require.ErrorContains(t, err, "public key is zero")
+}
+
+// Creates a valid P2TR script from a public key.
 func TestP2TRScriptFromPubKey(t *testing.T) {
 	pubKey := keys.GeneratePrivateKey().Public()
 
@@ -339,100 +330,28 @@ func TestP2TRScriptFromPubKey(t *testing.T) {
 }
 
 func TestNextSequence(t *testing.T) {
-	testCases := []struct {
-		name                   string
-		currSequence           uint32
-		expectErr              bool
-		errContains            string
-		expectedNextSequence   uint32
-		expectedDirectSequence uint32
+	tests := []struct {
+		name          string
+		currSeq       uint32
+		wantSeq       uint32
+		wantDirectSeq uint32
 	}{
-		{
-			name:                   "Valid sequence - basic case",
-			currSequence:           1000, // timelock = 1000, higher bits = 0
-			expectErr:              false,
-			expectedNextSequence:   900, // 1000 - 100
-			expectedDirectSequence: 950, // 900 + 50
-		},
-		{
-			name:                   "Valid sequence - with higher order bits",
-			currSequence:           (1<<30 | 1000), // bit 30 set, timelock = 1000
-			expectErr:              false,
-			expectedNextSequence:   (1<<30 | 900), // preserve bit 30, timelock = 900
-			expectedDirectSequence: (1<<30 | 950), // preserve bit 30, timelock = 950
-		},
-		{
-			name:                   "Valid sequence - multiple higher bits",
-			currSequence:           (1<<30 | 1<<29 | 1<<16 | 2000), // multiple bits set, timelock = 2000
-			expectErr:              false,
-			expectedNextSequence:   (1<<30 | 1<<29 | 1<<16 | 1900), // preserve higher bits, timelock = 1900
-			expectedDirectSequence: (1<<30 | 1<<29 | 1<<16 | 1950), // preserve higher bits, timelock = 1950
-		},
-		{
-			name:                   "Boundary case - exactly TimeLockInterval",
-			currSequence:           100, // timelock = 100 (spark.TimeLockInterval)
-			expectErr:              false,
-			expectedNextSequence:   0,  // 100 - 100 = 0
-			expectedDirectSequence: 50, // 0 + 50
-		},
-		{
-			name:                   "Large timelock value",
-			currSequence:           65535, // maximum 16-bit value for timelock
-			expectErr:              false,
-			expectedNextSequence:   65435, // 65535 - 100
-			expectedDirectSequence: 65485, // 65435 + 50
-		},
-		{
-			name:         "Error case - timelock less than TimeLockInterval",
-			currSequence: 99, // timelock = 99 < TimeLockInterval (100)
-			expectErr:    true,
-			errContains:  "next timelock interval is less than 0",
-		},
-		{
-			name:         "Error case - zero timelock",
-			currSequence: 0,
-			expectErr:    true,
-			errContains:  "next timelock interval is less than 0",
-		},
-		{
-			name:         "Error case - timelock = 50 with higher bits",
-			currSequence: (1<<30 | 50), // bit 30 set, timelock = 50 < TimeLockInterval
-			expectErr:    true,
-			errContains:  "next timelock interval is less than 0",
-		},
-		{
-			name:                   "Bit pattern test - alternating bits in upper word",
-			currSequence:           0xAAAA0500, // alternating pattern in upper 16 bits, timelock = 0x0500 (1280)
-			expectErr:              false,
-			expectedNextSequence:   0xAAAA049C, // preserve pattern, timelock = 0x049C (1180)
-			expectedDirectSequence: 0xAAAA04CE, // preserve pattern, timelock = 0x04CE (1230)
-		},
+		{name: "basic", currSeq: 1000, wantSeq: 900, wantDirectSeq: 950},
+		{name: "mixed upper-word pattern", currSeq: 0xAAAA0500, wantSeq: 0xAAAA049C, wantDirectSeq: 0xAAAA04CE},
+		{name: "large timelock value", currSeq: 65535, wantSeq: 65435, wantDirectSeq: 65485},
+		{name: "boundary at exactly one TimeLockInterval", currSeq: 100, wantSeq: 0, wantDirectSeq: 50},
+		{name: "multiple higher-order bits", currSeq: 1<<30 | 1<<29 | 1<<16 | 2000, wantSeq: 1<<30 | 1<<29 | 1<<16 | 1900, wantDirectSeq: 1<<30 | 1<<29 | 1<<16 | 1950},
+		{name: "preserves higher-order bits", currSeq: 1<<30 | 1000, wantSeq: 1<<30 | 900, wantDirectSeq: 1<<30 | 950},
 	}
-
-	for _, tc := range testCases {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			nextSeq, nextDirectSeq, err := NextSequence(tc.currSequence)
-
-			if tc.expectErr {
-				require.Error(t, err)
-				require.ErrorContains(t, err, tc.errContains)
-				// When error occurs, both sequences should be 0
-				assert.Equal(t, uint32(0), nextSeq)
-				assert.Equal(t, uint32(0), nextDirectSeq)
-				return
-			}
-
+			nextSeq, nextDirectSeq, err := NextSequence(tc.currSeq)
 			require.NoError(t, err)
-			assert.Equal(t, tc.expectedNextSequence, nextSeq,
-				"nextSequence mismatch - input: 0x%x, expected: 0x%x, got: 0x%x",
-				tc.currSequence, tc.expectedNextSequence, nextSeq)
-			assert.Equal(t, tc.expectedDirectSequence, nextDirectSeq,
-				"nextDirectSequence mismatch - input: 0x%x, expected: 0x%x, got: 0x%x",
-				tc.currSequence, tc.expectedDirectSequence, nextDirectSeq)
+			assert.Equal(t, tc.wantSeq, nextSeq)
+			assert.Equal(t, tc.wantDirectSeq, nextDirectSeq)
 
-			// Verify timelock extraction and bit preservation
-			inputTimelock := tc.currSequence & 0xFFFF
-			inputUpperBits := tc.currSequence & 0xFFFF0000
+			inputTimelock := tc.currSeq & 0xFFFF
+			inputUpperBits := tc.currSeq & 0xFFFF0000
 			expectedTimelock := inputTimelock - spark.TimeLockInterval
 
 			// Check that upper bits are preserved
@@ -448,4 +367,300 @@ func TestNextSequence(t *testing.T) {
 				"timelock calculation incorrect in nextDirectSequence")
 		})
 	}
+}
+
+// Errors when timelock minus interval would be negative.
+func TestNextSequence_ErrorTimelockTooSmall(t *testing.T) {
+	cases := []struct {
+		name         string
+		currSequence uint32
+	}{
+		{"zero timelock", 0},
+		{"less than interval", 99},
+		{"less than interval with higher bits", 1<<30 | 50},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			nextSeq, nextDirectSeq, err := NextSequence(tc.currSequence)
+			require.ErrorContains(t, err, "next timelock interval is less than 0")
+			assert.Zero(t, nextSeq)
+			assert.Zero(t, nextDirectSeq)
+		})
+	}
+}
+
+// Ensure the server constructs the sequence from the client's provided sequence by:
+// - Clearing forbidden upper bits (31 and 22)
+// - Forcing the lower 16 bits (timelock) to the expected value based on tx type
+func TestValidateSequence_ServerSequenceConstruction(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+
+	rawRefundTx, err := common.TxFromRawTxBytes(dbLeaf.RawRefundTx)
+	require.NoError(t, err)
+	currTimelock := rawRefundTx.TxIn[0].Sequence & 0xFFFF
+	expectedCpfp := currTimelock - spark.TimeLockInterval
+
+	testCases := []struct {
+		name             string
+		txType           RefundTxType
+		expectedTimelock uint32
+	}{
+		{name: "CPFP", txType: RefundTxTypeCPFP, expectedTimelock: expectedCpfp},
+		{name: "Direct", txType: RefundTxTypeDirect, expectedTimelock: expectedCpfp + spark.DirectTimelockOffset},
+		{name: "DirectFromCPFP", txType: RefundTxTypeDirectFromCPFP, expectedTimelock: expectedCpfp + spark.DirectTimelockOffset},
+	}
+
+	const (
+		disableBit = uint32(1 << 31)
+		typeBit    = uint32(1 << 22)
+	)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Provide a client sequence where forbidden bits are set and lower 16 bits match expected
+			upperWithForbidden := uint32(0xAAAA0000) | disableBit | typeBit
+			clientSeq := upperWithForbidden | (tc.expectedTimelock & 0xFFFF)
+
+			// validateSequence should clear the forbidden bits and keep the expected timelock
+			serverSeq, err := validateSequence(dbLeaf, tc.txType, clientSeq)
+			require.NoError(t, err)
+
+			sanitizedUpper := (upperWithForbidden & 0xFFFF0000) &^ (disableBit | typeBit)
+			expectedServerSeq := sanitizedUpper | (tc.expectedTimelock & 0xFFFF)
+			assert.Equal(t, expectedServerSeq, serverSeq)
+
+			// The constructed transaction should use exactly the server-generated sequence
+			tx, err := constructExpectedTransaction(dbLeaf, tc.txType, refundDestPubkey, clientSeq)
+			require.NoError(t, err)
+			require.Len(t, tx.TxIn, 1)
+			assert.Equal(t, expectedServerSeq, tx.TxIn[0].Sequence)
+		})
+	}
+}
+
+// Ensure a mismatch in client-provided timelock is surfaced clearly
+func TestValidateSequence_TimelockMismatchErrorContains(t *testing.T) {
+	dbLeaf, _ := newTestLeafNode(t)
+
+	rawRefundTx, err := common.TxFromRawTxBytes(dbLeaf.RawRefundTx)
+	require.NoError(t, err)
+	currTimelock := rawRefundTx.TxIn[0].Sequence & 0xFFFF
+	expectedCpfp := currTimelock - spark.TimeLockInterval
+
+	// For CPFP, expected is expectedCpfp. Provide an off-by-one timelock.
+	const (
+		disableBit = uint32(1 << 31)
+		typeBit    = uint32(1 << 22)
+	)
+	upperWithForbidden := uint32(0x12340000) | disableBit | typeBit
+	mismatchedClientSeq := upperWithForbidden | ((expectedCpfp + 1) & 0xFFFF)
+
+	_, err = validateSequence(dbLeaf, RefundTxTypeCPFP, mismatchedClientSeq)
+	require.ErrorContains(t, err, "does not match expected timelock")
+}
+
+// Errors when the client tx version does not match expected.
+func TestVerifyTransactionWithDatabase_Error_MismatchedVersion(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	// Build a client tx identical to expected CPFP tx, except with a different version.
+	tx := wire.NewMsgTx(defaultVersion - 2) // expected is version 2 or 3
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: dbLeaf.RawTxid.Hash(), Index: 0},
+		Sequence:         expectedCpfpTimelock,
+	})
+	tx.AddTxOut(&wire.TxOut{Value: testSourceValue, PkScript: userScript})
+	tx.AddTxOut(common.EphemeralAnchorOutput())
+	clientRawTx := serializeTx(t, tx)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "expected version")
+}
+
+// Errors when the client tx has a different number of inputs than expected.
+func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_CPFP(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	tx := wire.NewMsgTx(defaultVersion)
+	// Expected single input spending node tx, add two inputs instead.
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: dbLeaf.RawTxid.Hash(), Index: 0},
+		Sequence:         expectedCpfpTimelock,
+	})
+	// Extra input to trigger mismatch
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: chainhash.Hash{}, Index: 1},
+		Sequence:         expectedCpfpTimelock,
+	})
+	tx.AddTxOut(&wire.TxOut{Value: testSourceValue, PkScript: userScript})
+	tx.AddTxOut(common.EphemeralAnchorOutput())
+	clientRawTx := serializeTx(t, tx)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "transaction does not match expected construction")
+	require.ErrorContains(t, err, "expected 1 inputs, got 2")
+}
+
+// Errors when the client tx has a different number of outputs than expected.
+func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_CPFP(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	tx := wire.NewMsgTx(defaultVersion)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: dbLeaf.RawTxid.Hash(), Index: 0},
+		Sequence:         expectedCpfpTimelock,
+	})
+	// Only add the refund output; omit anchor to trigger mismatch (expected 2 outputs).
+	tx.AddTxOut(&wire.TxOut{Value: testSourceValue, PkScript: userScript})
+	clientRawTx := serializeTx(t, tx)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "transaction does not match expected construction")
+	require.ErrorContains(t, err, "expected 2 outputs, got 1")
+}
+
+// Errors when the client tx spends the wrong previous outpoint (TxID/index).
+func TestVerifyTransactionWithDatabase_Error_MismatchedPrevTxID(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	tx := wire.NewMsgTx(defaultVersion)
+	// Intentionally use a wrong previous outpoint (wrong index) to ensure mismatch.
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: chainhash.Hash{}, Index: 0},
+		Sequence:         expectedCpfpTimelock,
+	})
+	tx.AddTxOut(&wire.TxOut{Value: testSourceValue, PkScript: userScript})
+	tx.AddTxOut(common.EphemeralAnchorOutput())
+	clientRawTx := serializeTx(t, tx)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "transaction does not match expected construction")
+	require.ErrorContains(t, err, "expected previous outpoint")
+}
+
+// Errors when the client tx locktime does not match expected.
+func TestVerifyTransactionWithDatabase_Error_MismatchedLocktime(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	tx := wire.NewMsgTx(defaultVersion)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: dbLeaf.RawTxid.Hash(), Index: 0},
+		Sequence:         expectedCpfpTimelock,
+	})
+	tx.AddTxOut(&wire.TxOut{Value: testSourceValue, PkScript: userScript})
+	tx.AddTxOut(common.EphemeralAnchorOutput())
+	// Set a non-zero locktime; expected is 0.
+	tx.LockTime = 12345
+	clientRawTx := serializeTx(t, tx)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "transaction does not match expected construction")
+	require.ErrorContains(t, err, "expected locktime 0, got 12345")
+}
+
+// Errors when the client tx (Direct) has a different number of inputs than expected.
+func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_Direct(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	tx := wire.NewMsgTx(defaultVersion)
+	// Expected single input spending direct tx, add two inputs instead.
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: dbLeaf.DirectTxid.Hash(), Index: 0},
+		Sequence:         expectedCpfpTimelock + spark.DirectTimelockOffset,
+	})
+	// Extra input to trigger mismatch
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: chainhash.Hash{}, Index: 1},
+		Sequence:         expectedCpfpTimelock + spark.DirectTimelockOffset,
+	})
+	// Direct refunds have a single output with fee applied.
+	tx.AddTxOut(&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript})
+	clientRawTx := serializeTx(t, tx)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeDirect, refundDestPubkey)
+	require.ErrorContains(t, err, "transaction does not match expected construction")
+	require.ErrorContains(t, err, "expected 1 inputs, got 2")
+}
+
+// Errors when the client tx (Direct) has a different number of outputs than expected.
+func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_Direct(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	tx := wire.NewMsgTx(defaultVersion)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: dbLeaf.DirectTxid.Hash(), Index: 0},
+		Sequence:         expectedCpfpTimelock + spark.DirectTimelockOffset,
+	})
+	// Add refund output (expected) plus an extra output to trigger mismatch.
+	tx.AddTxOut(&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript})
+	// Add an extra anchor-like output to cause length mismatch.
+	tx.AddTxOut(common.EphemeralAnchorOutput())
+	clientRawTx := serializeTx(t, tx)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeDirect, refundDestPubkey)
+	require.ErrorContains(t, err, "transaction does not match expected construction")
+	require.ErrorContains(t, err, "expected 1 outputs, got 2")
+}
+
+// Errors when the client tx (DirectFromCPFP) has a different number of inputs than expected.
+func TestVerifyTransactionWithDatabase_Error_MismatchedNumInputs_DirectFromCPFP(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	tx := wire.NewMsgTx(defaultVersion)
+	// Expected single input spending node tx, add two inputs instead.
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: dbLeaf.RawTxid.Hash(), Index: 0},
+		Sequence:         expectedCpfpTimelock + spark.DirectTimelockOffset,
+	})
+	// Extra input to trigger mismatch
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: chainhash.Hash{}, Index: 1},
+		Sequence:         expectedCpfpTimelock + spark.DirectTimelockOffset,
+	})
+	// Direct-from-CPFP refunds have a single output with fee applied.
+	tx.AddTxOut(&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript})
+	clientRawTx := serializeTx(t, tx)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeDirectFromCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "transaction does not match expected construction")
+	require.ErrorContains(t, err, "expected 1 inputs, got 2")
+}
+
+// Errors when the client tx (DirectFromCPFP) has a different number of outputs than expected.
+func TestVerifyTransactionWithDatabase_Error_MismatchedNumOutputs_DirectFromCPFP(t *testing.T) {
+	dbLeaf, refundDestPubkey := newTestLeafNode(t)
+	userScript, err := common.P2TRScriptFromPubKey(refundDestPubkey)
+	require.NoError(t, err)
+
+	tx := wire.NewMsgTx(defaultVersion)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{Hash: dbLeaf.RawTxid.Hash(), Index: 0},
+		Sequence:         expectedCpfpTimelock + spark.DirectTimelockOffset,
+	})
+	// Add refund output (expected) plus an extra output to trigger mismatch.
+	tx.AddTxOut(&wire.TxOut{Value: common.MaybeApplyFee(testSourceValue), PkScript: userScript})
+	// Add an extra anchor-like output to cause length mismatch.
+	tx.AddTxOut(common.EphemeralAnchorOutput())
+	clientRawTx := serializeTx(t, tx)
+
+	err = VerifyTransactionWithDatabase(clientRawTx, dbLeaf, RefundTxTypeDirectFromCPFP, refundDestPubkey)
+	require.ErrorContains(t, err, "transaction does not match expected construction")
+	require.ErrorContains(t, err, "expected 1 outputs, got 2")
 }
