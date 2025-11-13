@@ -185,7 +185,7 @@ func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx co
 	if err != nil {
 		return nil, tokens.FormatErrorWithTransactionProto("failed to build input operator share map", tokenTransactionProto, err)
 	}
-	logger.Sugar().Infof("Length of inputOperatorShareMap: %d", len(inputOperatorShareMap))
+	logger.Sugar().Infof("Length of inputOperatorShareMap built from first exchange response: %d", len(inputOperatorShareMap))
 	// Persist the secret shares from all operators.
 	internalHandler := NewInternalSignTokenHandler(h.config)
 	finalized, err := internalHandler.persistPartialRevocationSecretShares(ctx, inputOperatorShareMap, tokenTransactionHash)
@@ -194,6 +194,7 @@ func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx co
 	}
 
 	if finalized {
+		logger.Sugar().Infof("Operator %s has finalized token transaction %s, exchanging full revocation secret shares with all operators", h.config.Identifier, hex.EncodeToString(tokenTransactionHash))
 		_, err := h.exchangeRevocationSecretShares(ctx, allOperatorSignatures, tokenTransactionProto, tokenTransactionHash)
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("failed to exchange revocation secret shares after finalization", tokenTransactionProto, err)
@@ -263,6 +264,7 @@ func (h *SignTokenHandler) checkShouldReturnEarlyWithoutProcessing(
 func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, allOperatorSignaturesResponse map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse, tokenTransaction *tokenpb.TokenTransaction, tokenTransactionHash []byte) (map[string]*tokeninternalpb.ExchangeRevocationSecretsSharesResponse, error) {
 	ctx, span := GetTracer().Start(ctx, "SignTokenHandler.exchangeRevocationSecretShares", GetProtoTokenTransactionTraceAttributes(ctx, tokenTransaction))
 	defer span.End()
+	logger := logging.GetLoggerFromContext(ctx)
 	// prepare the operator signatures package
 	allOperatorSignaturesPackage := make([]*tokeninternalpb.OperatorTransactionSignature, 0, len(allOperatorSignaturesResponse))
 	for identifier, sig := range allOperatorSignaturesResponse {
@@ -310,6 +312,8 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 		}
 		defer conn.Close()
 		client := tokeninternalpb.NewSparkTokenInternalServiceClient(conn)
+
+		logger.Sugar().Infof("Operator %s is exchanging revocation secret shares with operator %s for token txHash: %s", h.config.Identifier, operator.Identifier, hex.EncodeToString(tokenTransactionHash))
 		return client.ExchangeRevocationSecretsShares(ctx, &tokeninternalpb.ExchangeRevocationSecretsSharesRequest{
 			FinalTokenTransaction:         tokenTransaction,
 			FinalTokenTransactionHash:     tokenTransactionHash,
@@ -319,6 +323,24 @@ func (h *SignTokenHandler) exchangeRevocationSecretShares(ctx context.Context, a
 			OutputsToSpend:                outputsToSpend,
 		})
 	})
+
+	for identifier, resp := range response {
+		for _, operatorShares := range resp.ReceivedOperatorShares {
+			reqPubKey, err := keys.ParsePublicKey(operatorShares.OperatorIdentityPublicKey)
+			if err != nil {
+				return nil, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("unable to parse request operator identity public key: %w", err))
+			}
+			reqOperatorIdentifier := h.config.GetOperatorIdentifierFromIdentityPublicKey(reqPubKey)
+			logger.Sugar().Infof("Operator %s received from operator %s, %d secret shares originating from operator %s for token txHash: %s",
+				h.config.Identifier,
+				identifier,
+				len(operatorShares.Shares),
+				reqOperatorIdentifier,
+				hex.EncodeToString(tokenTransactionHash),
+			)
+		}
+	}
+
 	// If there was an error exchanging with all operators, we will roll back to the revealed status.
 	if errorExchangingWithAllOperators != nil {
 		return nil, sparkerrors.WrapErrorWithMessage(errorExchangingWithAllOperators, fmt.Sprintf("failed to exchange revocation secret shares for token txHash: %x", tokenTransactionHash))

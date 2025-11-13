@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -399,6 +400,8 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						if err != nil {
 							return fmt.Errorf("failed to marshal token transaction: %w", err)
 						}
+
+						logger.Sugar().Infof("[cron] exchanging revocation secrets and finalizing if possible for token transaction %s with txHash: %s", tokenTransaction.ID, hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash))
 
 						signTokenHandler := tokens.NewSignTokenHandler(config)
 						_, err = signTokenHandler.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, tokenPb, signaturesPackage, tokenTransaction.FinalizedTokenTransactionHash)

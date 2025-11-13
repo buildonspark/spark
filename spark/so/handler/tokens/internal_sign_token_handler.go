@@ -3,6 +3,7 @@ package tokens
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	stderrors "errors"
 	"fmt"
 	"math/big"
@@ -176,7 +177,7 @@ func (h *InternalSignTokenHandler) ExchangeRevocationSecretsShares(ctx context.C
 	}
 
 	reqOperatorIdentifier := h.config.GetOperatorIdentifierFromIdentityPublicKey(reqPubKey)
-	logger.Sugar().Infof("exchanging revocation secret shares with operator %s", reqOperatorIdentifier)
+	logger.Sugar().Infof("Received request to exchange revocation secret shares with operator %s for token txHash: %s", reqOperatorIdentifier, hex.EncodeToString(req.FinalTokenTransactionHash))
 
 	// Verify the incoming operator signatures package
 	operatorSignatures := make(operatorSignaturesMap)
