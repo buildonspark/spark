@@ -2,6 +2,8 @@ package db
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"sync"
 	"time"
 
@@ -149,7 +151,6 @@ func (m *MetricsTxProvider) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 			err := fn.Commit(ctx, tx)
 			var attrs []attribute.KeyValue
 			if err != nil {
-				logger.Error("Failed to commit transaction", zap.Error(err))
 				attrs = m.getOperationAttributes(attrOperationCommit, attrStatusError)
 				addTraceEvent(ctx, "commit", duration, err)
 			} else {
@@ -174,8 +175,7 @@ func (m *MetricsTxProvider) GetOrBeginTx(ctx context.Context) (*ent.Tx, error) {
 
 			err := fn.Rollback(ctx, tx)
 			var attrs []attribute.KeyValue
-			if err != nil {
-				logger.Error("Failed to rollback transaction", zap.Error(err))
+			if err != nil && !errors.Is(err, sql.ErrTxDone) {
 				attrs = m.getOperationAttributes(attrOperationRollback, attrStatusError)
 				addTraceEvent(ctx, "rollback", duration, err)
 			} else {
