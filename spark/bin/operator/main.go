@@ -414,7 +414,19 @@ func main() {
 		})
 	})
 
-	defer func() { _ = dbClient.Close() }()
+	defer func() {
+		_ = dbClient.Close()
+	}()
+
+	readinessLogger := logger.With(zap.String("component", "db_readiness"))
+	if err := waitForDatabaseReady(errCtx, dbClient, readinessLogger); err != nil {
+		if errCtx.Err() != nil {
+			readinessLogger.Info("Context canceled before database became ready")
+			return
+		}
+		logger.Fatal("Database readiness check failed", zap.Error(err))
+	}
+	readinessLogger.Info("Database connection verified")
 
 	if dbDriver == "sqlite3" {
 		sqliteDb, _ := sql.Open("sqlite3", config.DatabasePath)
