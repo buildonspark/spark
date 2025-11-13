@@ -44,7 +44,11 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 		}
 		nodeUuids = append(nodeUuids, nodeUuid)
 	}
-	nodes, err := db.TreeNode.Query().Where(treenode.IDIn(nodeUuids...)).ForUpdate().All(ctx)
+	nodes, err := db.TreeNode.Query().
+		Where(treenode.IDIn(nodeUuids...)).
+		WithParent().
+		ForUpdate().
+		All(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to lock tree nodes %v: %w", nodeUuids, err)
 	}
@@ -152,7 +156,7 @@ func (h *SyncNodeHandler) updateExistingNode(ctx context.Context, existingNode *
 		if err != nil {
 			return fmt.Errorf("unable to parse parent node id %s: %w", *node.ParentNodeId, err)
 		}
-		if existingNode.Edges.Parent.ID != parentUUID {
+		if existingNode.Edges.Parent == nil || existingNode.Edges.Parent.ID != parentUUID {
 			mut.SetParentID(parentUUID)
 			logger.Info("updated field ParentID", zap.String("node_id", nodeUUID.String()))
 		}
