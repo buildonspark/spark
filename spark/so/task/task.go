@@ -425,7 +425,11 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						return fmt.Errorf("failed to get or create current tx for request: %w", err)
 					}
 					gossipLimit := knobsService.GetValue(knobs.KnobGossipLimit, 50)
-					query := tx.Gossip.Query().Where(gossip.StatusEQ(st.GossipStatusPending)).Limit(int(gossipLimit))
+					boundaryUUID := common.UUIDv7FromTime(time.Now().Add(-20 * time.Second))
+					query := tx.Gossip.Query().Where(
+						gossip.StatusEQ(st.GossipStatusPending),
+						gossip.IDLT(boundaryUUID),
+					).Limit(int(gossipLimit))
 					gossips, err := query.ForUpdate(sql.WithLockAction(sql.SkipLocked)).All(ctx)
 					if err != nil {
 						return err
