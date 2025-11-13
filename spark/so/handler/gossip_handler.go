@@ -19,8 +19,6 @@ import (
 	enttree "github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"go.uber.org/zap"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type GossipHandler struct {
@@ -83,13 +81,9 @@ func (h *GossipHandler) HandleGossipMessage(ctx context.Context, gossipMessage *
 		return fmt.Errorf("unsupported gossip message type: %T", gossipMessage.Message)
 	}
 
-	// Check if the error is of status code unavailable
 	if err != nil {
-		if st, ok := status.FromError(err); ok {
-			if st.Code() == codes.Unavailable {
-				return err
-			}
-		}
+		logger.With(zap.Error(err)).Sugar().Errorf("Handling for gossip message ID %s failed with error: %v", gossipMessage.MessageId, err)
+		return err
 	}
 	return nil
 }

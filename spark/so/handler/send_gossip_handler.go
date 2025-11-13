@@ -32,6 +32,7 @@ func (h *SendGossipHandler) postSendingGossipMessage(
 	gossip *ent.Gossip,
 	bitMap *common.BitMap,
 ) (*ent.Gossip, error) {
+	logger := logging.GetLoggerFromContext(ctx)
 	newStatus := st.GossipStatusPending
 	if bitMap.IsAllSet() {
 		newStatus = st.GossipStatusDelivered
@@ -45,7 +46,13 @@ func (h *SendGossipHandler) postSendingGossipMessage(
 		handler := NewGossipHandler(h.config)
 		err = handler.HandleGossipMessage(ctx, message, true)
 		if err != nil {
-			return nil, err
+			logger.With(zap.Error(err)).Sugar().Errorf("Handling for gossip message ID %s after full delivery failed with error: %v", message.MessageId, err)
+			if status.Code(err) == codes.Unavailable ||
+				status.Code(err) == codes.Canceled ||
+				strings.Contains(err.Error(), "context canceled") ||
+				strings.Contains(err.Error(), "unexpected HTTP status code") {
+				return nil, err
+			}
 		}
 	}
 	return gossip, nil
