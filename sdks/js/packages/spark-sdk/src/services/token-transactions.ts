@@ -258,7 +258,7 @@ export class TokenTransactionService {
       tokenOutputs,
       sparkOperatorIdentityPublicKeys: this.collectOperatorIdentityPublicKeys(),
       expiryTime: undefined,
-      clientCreatedTimestamp: new Date(),
+      clientCreatedTimestamp: this.connectionManager.getCurrentServerTime(),
       invoiceAttachments: sparkInvoices
         ? sparkInvoices.map((invoice) => ({ sparkInvoice: invoice }))
         : [],

@@ -1,7 +1,6 @@
 import { isError } from "@lightsparkdev/core";
 import { sha256 } from "@noble/hashes/sha2";
 import type { Channel } from "nice-grpc";
-import type { RetryOptions } from "nice-grpc-client-middleware-retry";
 import type { ClientMiddleware } from "nice-grpc-common";
 import {
   ClientError,
@@ -10,7 +9,6 @@ import {
   Status,
 } from "nice-grpc-common";
 import { type Channel as ChannelWeb } from "nice-grpc-web";
-import { SparkSDKError } from "../../errors/base.js";
 import { AuthenticationError } from "../../errors/types.js";
 import {
   SparkServiceClient,
@@ -27,6 +25,9 @@ import {
 } from "../../proto/spark_token.js";
 import { SparkCallOptions } from "../../types/grpc.js";
 import { WalletConfigService } from "../config.js";
+import { SparkSDKError } from "../../errors/base.js";
+import type { RetryOptions } from "nice-grpc-client-middleware-retry";
+import { ServerTimeSync, getMonotonicTime } from "../time-sync.js";
 
 // Module-level types used by shared caches
 type ChannelKey = string;
@@ -50,6 +51,9 @@ export type SparkClientType = "spark" | "stream" | "tokens";
 type Address = string;
 
 export abstract class ConnectionManager {
+  protected static readonly DATE_HEADER = "date";
+  protected static readonly PROCESSING_TIME_HEADER = "x-processing-time-ms";
+
   // Static caches shared across all instances
   private static channelCache: Map<
     ChannelKey,
@@ -183,6 +187,7 @@ export abstract class ConnectionManager {
   ): Promise<T & { close?: () => void }>;
 
   private config: WalletConfigService;
+  private timeSync: ServerTimeSync;
 
   // Note clientsByType is a per instance cache whereas channelCache is static and shared by all instances
   private clientsByType: Map<
@@ -198,6 +203,24 @@ export abstract class ConnectionManager {
 
   constructor(config: WalletConfigService) {
     this.config = config;
+    this.timeSync = new ServerTimeSync();
+  }
+
+  public getCurrentServerTime(): Date {
+    const serverTime = this.timeSync.getCurrentServerTime();
+    if (!serverTime) {
+      console.log(
+        "Server time not yet synchronized, falling back to local time. " +
+          "This may result in unpredictable behavior.",
+      );
+      return new Date();
+    }
+
+    return serverTime;
+  }
+
+  protected getMonotonicTime(): number {
+    return getMonotonicTime();
   }
 
   // When initializing wallet, go ahead and instantiate all clients
@@ -417,13 +440,69 @@ export abstract class ConnectionManager {
     }
   }
 
+  protected prepareMetadata(metadata: Metadata): Metadata {
+    return metadata;
+  }
+
+  protected recordTimeSync(
+    dateHeader: string,
+    serverProcessingTimeMs: number,
+    sendTime: number,
+    receiveTime: number,
+  ) {
+    this.timeSync.recordSync(
+      dateHeader,
+      serverProcessingTimeMs,
+      sendTime,
+      receiveTime,
+    );
+  }
+
+  private processResponseForTimeSync(
+    result: IteratorResult<any, any>,
+    firstResponse: boolean,
+    sendTime: number,
+  ): boolean {
+    if (!firstResponse) return false;
+
+    const receiveTime = this.getMonotonicTime();
+
+    if (typeof result.value === "object" && result.value !== null) {
+      const responseObj = result.value as any;
+      if (responseObj.header && responseObj.header instanceof Metadata) {
+        const dateHeader = responseObj.header.get(
+          ConnectionManager.DATE_HEADER,
+        )?.[0];
+        const processingTimeHeader = responseObj.header.get(
+          ConnectionManager.PROCESSING_TIME_HEADER,
+        )?.[0];
+
+        if (dateHeader && processingTimeHeader) {
+          const serverProcessingTimeMs = parseFloat(processingTimeHeader);
+          this.recordTimeSync(
+            dateHeader,
+            serverProcessingTimeMs,
+            sendTime,
+            receiveTime,
+          );
+        }
+      }
+    }
+
+    return true;
+  }
+
   protected createAuthnMiddleware() {
     return async function* <Req, Res>(
       this: ConnectionManager,
       call: ClientMiddlewareCall<Req, Res>,
       options: SparkCallOptions,
     ) {
-      return yield* call.next(call.request, options);
+      const metadata = this.prepareMetadata(Metadata(options.metadata));
+      return yield* call.next(call.request as Req, {
+        ...options,
+        metadata,
+      });
     }.bind(this) as <Req, Res>(
       call: ClientMiddlewareCall<Req, Res>,
       options: SparkCallOptions,
@@ -436,13 +515,38 @@ export abstract class ConnectionManager {
       call: ClientMiddlewareCall<Req, Res>,
       options: SparkCallOptions,
     ) {
-      const metadata = Metadata(options.metadata);
+      const metadata = this.prepareMetadata(Metadata(options.metadata));
       const authToken = await this.authenticate(address);
+      const sendTime = this.getMonotonicTime();
+
       try {
-        return yield* call.next(call.request as Req, {
+        const generator = call.next(call.request as Req, {
           ...options,
           metadata: metadata.set("Authorization", `Bearer ${authToken}`),
         });
+
+        let firstResponse = true;
+        let result = await generator.next();
+
+        while (!result.done) {
+          if (firstResponse) {
+            firstResponse = this.processResponseForTimeSync(
+              result,
+              firstResponse,
+              sendTime,
+            );
+          }
+
+          yield result.value;
+          result = await generator.next();
+        }
+
+        if (result.value !== undefined) {
+          if (firstResponse) {
+            this.processResponseForTimeSync(result, firstResponse, sendTime);
+          }
+          return result.value;
+        }
       } catch (error: unknown) {
         return yield* this.handleMiddlewareError(
           error,

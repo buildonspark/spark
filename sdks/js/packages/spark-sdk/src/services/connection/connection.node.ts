@@ -11,7 +11,7 @@ import {
   RetryOptions,
 } from "nice-grpc-client-middleware-retry";
 import type { ClientMiddleware } from "nice-grpc-common";
-import { ClientMiddlewareCall, Metadata, Status } from "nice-grpc-common";
+import { Metadata, Status } from "nice-grpc-common";
 import { openTelemetryClientMiddleware } from "nice-grpc-opentelemetry";
 import { clientEnv } from "../../constants.js";
 import { NetworkError } from "../../errors/types.js";
@@ -19,8 +19,8 @@ import { MockServiceClient, MockServiceDefinition } from "../../proto/mock.js";
 import { SparkServiceDefinition } from "../../proto/spark.js";
 import { SparkAuthnServiceDefinition } from "../../proto/spark_authn.js";
 import { SparkTokenServiceDefinition } from "../../proto/spark_token.js";
-import { SparkCallOptions } from "../../types/grpc.js";
 import { WalletConfigService } from "../config.js";
+import { getMonotonicTime } from "../time-sync.js";
 import { ConnectionManager } from "./connection.js";
 
 export class ConnectionManagerNodeJS extends ConnectionManager {
@@ -28,6 +28,14 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
 
   constructor(config: WalletConfigService) {
     super(config);
+  }
+
+  protected getMonotonicTime(): number {
+    return getMonotonicTime();
+  }
+
+  protected prepareMetadata(metadata: Metadata): Metadata {
+    return metadata.set("X-Client-Env", clientEnv);
   }
 
   public async createMockClient(address: string): Promise<
@@ -57,7 +65,6 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
           return createChannel(address, ChannelCredentials.createSsl(cert));
         } catch (error) {
           console.error("Error reading certificate:", error);
-          // Fallback to insecure for development
           return createChannel(
             address,
             ChannelCredentials.createSsl(null, null, null, {
@@ -66,7 +73,6 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
           );
         }
       } else {
-        // No cert provided, use insecure SSL for development
         const ch = createChannel(
           address,
           ChannelCredentials.createSsl(null, null, null, {
@@ -88,57 +94,6 @@ export class ConnectionManagerNodeJS extends ConnectionManager {
         error as Error,
       );
     }
-  }
-
-  protected createAuthnMiddleware() {
-    return async function* <Req, Res>(
-      this: ConnectionManagerNodeJS,
-      call: ClientMiddlewareCall<Req, Res>,
-      options: SparkCallOptions,
-    ) {
-      const metadata = Metadata(options.metadata).set(
-        "X-Client-Env",
-        clientEnv,
-      );
-      return yield* call.next(call.request as Req, {
-        ...options,
-        metadata,
-      });
-    }.bind(this) as <Req, Res>(
-      call: ClientMiddlewareCall<Req, Res>,
-      options: SparkCallOptions,
-    ) => AsyncGenerator<Res, Res | void, undefined>;
-  }
-
-  protected createMiddleware(address: string) {
-    return async function* <Req, Res>(
-      this: ConnectionManagerNodeJS,
-      call: ClientMiddlewareCall<Req, Res>,
-      options: SparkCallOptions,
-    ) {
-      const metadata = Metadata(options.metadata).set(
-        "X-Client-Env",
-        clientEnv,
-      );
-      try {
-        const token = await this.authenticate(address);
-        return yield* call.next(call.request as Req, {
-          ...options,
-          metadata: metadata.set("Authorization", `Bearer ${token}`),
-        });
-      } catch (error: unknown) {
-        return yield* this.handleMiddlewareError(
-          error,
-          address,
-          call,
-          metadata,
-          options,
-        );
-      }
-    }.bind(this) as <Req, Res>(
-      call: ClientMiddlewareCall<Req, Res>,
-      options: SparkCallOptions,
-    ) => AsyncGenerator<Res, Res | void, undefined>;
   }
 
   protected async createGrpcClient<T>(

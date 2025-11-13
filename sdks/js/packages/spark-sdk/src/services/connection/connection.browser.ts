@@ -3,7 +3,7 @@ import {
   RetryOptions,
 } from "nice-grpc-client-middleware-retry";
 import type { ClientMiddleware } from "nice-grpc-common";
-import { ClientMiddlewareCall, Metadata, Status } from "nice-grpc-common";
+import { Metadata, Status } from "nice-grpc-common";
 import {
   createChannel,
   createClientFactory,
@@ -16,7 +16,7 @@ import { NetworkError } from "../../errors/types.js";
 import type { SparkServiceDefinition } from "../../proto/spark.js";
 import type { SparkAuthnServiceDefinition } from "../../proto/spark_authn.js";
 import type { SparkTokenServiceDefinition } from "../../proto/spark_token.js";
-import { SparkCallOptions } from "../../types/grpc.js";
+import { getMonotonicTime } from "../time-sync.js";
 import { WalletConfigService } from "../config.js";
 import { ConnectionManager } from "./connection.js";
 
@@ -28,6 +28,18 @@ export class ConnectionManagerBrowser extends ConnectionManager {
   constructor(config: WalletConfigService, transport = FetchTransport()) {
     super(config);
     this.transport = transport;
+  }
+
+  protected getMonotonicTime(): number {
+    return getMonotonicTime();
+  }
+
+  protected prepareMetadata(metadata: Metadata): Metadata {
+    return metadata
+      .set("X-Requested-With", "XMLHttpRequest")
+      .set("X-Grpc-Web", "1")
+      .set("X-Client-Env", clientEnv)
+      .set("Content-Type", "application/grpc-web+proto");
   }
 
   protected async createChannelWithTLS(address: string) {
@@ -46,60 +58,6 @@ export class ConnectionManagerBrowser extends ConnectionManager {
         error as Error,
       );
     }
-  }
-
-  protected createAuthnMiddleware() {
-    return async function* <Req, Res>(
-      this: ConnectionManagerBrowser,
-      call: ClientMiddlewareCall<Req, Res>,
-      options: SparkCallOptions,
-    ) {
-      const metadata = Metadata(options.metadata)
-        .set("X-Requested-With", "XMLHttpRequest")
-        .set("X-Grpc-Web", "1")
-        .set("X-Client-Env", clientEnv)
-        .set("Content-Type", "application/grpc-web+proto");
-      return yield* call.next(call.request as Req, {
-        ...options,
-        metadata,
-      });
-    }.bind(this) as <Req, Res>(
-      call: ClientMiddlewareCall<Req, Res>,
-      options: SparkCallOptions,
-    ) => AsyncGenerator<Res, Res | void, undefined>;
-  }
-
-  protected createMiddleware(address: string) {
-    return async function* <Req, Res>(
-      this: ConnectionManagerBrowser,
-      call: ClientMiddlewareCall<Req, Res>,
-      options: SparkCallOptions,
-    ) {
-      const metadata = Metadata(options.metadata)
-        .set("X-Requested-With", "XMLHttpRequest")
-        .set("X-Grpc-Web", "1")
-        .set("X-Client-Env", clientEnv)
-        .set("Content-Type", "application/grpc-web+proto");
-
-      try {
-        const token = await this.authenticate(address);
-        return yield* call.next(call.request as Req, {
-          ...options,
-          metadata: metadata.set("Authorization", `Bearer ${token}`),
-        });
-      } catch (error: unknown) {
-        return yield* this.handleMiddlewareError(
-          error,
-          address,
-          call,
-          metadata,
-          options,
-        );
-      }
-    }.bind(this) as <Req, Res>(
-      call: ClientMiddlewareCall<Req, Res>,
-      options: SparkCallOptions,
-    ) => AsyncGenerator<Res, Res | void, undefined>;
   }
 
   protected async createGrpcClient<T>(
