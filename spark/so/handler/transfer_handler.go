@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -2070,6 +2071,13 @@ func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *
 	})
 	logger := logging.GetLoggerFromContext(ctx)
 	if err != nil {
+		if status.Code(err) == codes.Unavailable ||
+			status.Code(err) == codes.Canceled ||
+			strings.Contains(err.Error(), "context canceled") ||
+			strings.Contains(err.Error(), "unexpected HTTP status code") {
+			logger.Sugar().Error("Unable to settle receiver key tweak due to operator unavailability, please try again later", zap.Error(err))
+			return fmt.Errorf("unable to settle receiver key tweak due to operator unavailability: %w, please try again later", err)
+		}
 		logger.Error("Unable to settle receiver key tweak, you might have a race condition in your implementation", zap.Error(err))
 		action = pbinternal.SettleKeyTweakAction_ROLLBACK
 	}
