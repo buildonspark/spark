@@ -1,10 +1,12 @@
 package bitcointransaction
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/google/go-cmp/cmp"
 	"github.com/lightsparkdev/spark"
 	"github.com/lightsparkdev/spark/common"
 	"github.com/lightsparkdev/spark/common/keys"
@@ -42,9 +44,21 @@ func VerifyTransactionWithDatabase(clientRawTxBytes []byte, dbLeaf *ent.TreeNode
 		return fmt.Errorf("failed to construct expected transaction for leaf %s: %w", dbLeaf.ID, err)
 	}
 
+	// Compare the expected and client transactions with CompareTransactions first to return a more helpful error message
 	err = common.CompareTransactions(expectedTx, clientTx)
 	if err != nil {
 		return fmt.Errorf("transaction does not match expected construction for leaf %s: %w", dbLeaf.ID, err)
+	}
+
+	// Serialize the expected and client transactions to compare the raw bytes for more extensive validation
+	expectedTxBytes, err := common.SerializeTx(expectedTx)
+	if err != nil {
+		return fmt.Errorf("failed to serialize expected transaction for leaf %s: %w", dbLeaf.ID, err)
+	}
+
+	if !bytes.Equal(expectedTxBytes, clientRawTxBytes) {
+		diff := cmp.Diff(expectedTxBytes, clientRawTxBytes)
+		return fmt.Errorf("transaction does not match expected construction for leaf %s: %s", dbLeaf.ID, diff)
 	}
 
 	return nil
