@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/common/logging"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbin "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
@@ -13,6 +14,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
+	"go.uber.org/zap"
 )
 
 type SyncNodeHandler struct {
@@ -89,25 +91,9 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 
 		existingNode, exists := existingNodeMap[nodeUUID]
 		if exists {
-			// Node exists - update transaction fields
-			mut := existingNode.Update().
-				SetRawTx(node.NodeTx).
-				SetRawRefundTx(node.RefundTx).
-				SetDirectTx(node.DirectTx).
-				SetDirectRefundTx(node.DirectRefundTx).
-				SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx)
-
-			if node.ParentNodeId != nil {
-				parentUUID, err := uuid.Parse(*node.ParentNodeId)
-				if err != nil {
-					return fmt.Errorf("unable to parse parent node id %s: %w", *node.ParentNodeId, err)
-				}
-				mut.SetParentID(parentUUID)
-			}
-
-			_, err = mut.Save(ctx)
+			err = h.updateExistingNode(ctx, existingNode, node, nodeUUID)
 			if err != nil {
-				return fmt.Errorf("unable to update node %s: %w", nodeUUID.String(), err)
+				return err
 			}
 		} else {
 			// Validate status before creating
@@ -121,6 +107,60 @@ func (h *SyncNodeHandler) SyncTreeNodes(ctx context.Context, req *pbin.SyncNodeR
 				return err
 			}
 		}
+	}
+
+	return nil
+}
+
+func (h *SyncNodeHandler) updateExistingNode(ctx context.Context, existingNode *ent.TreeNode, node *pb.TreeNode, nodeUUID uuid.UUID) error {
+	logger := logging.GetLoggerFromContext(ctx)
+	mut := existingNode.Update()
+
+	// Check and update RawTx if changed
+	if string(existingNode.RawTx) != string(node.NodeTx) {
+		mut.SetRawTx(node.NodeTx)
+		logger.Info("updated field RawTx", zap.String("node_id", nodeUUID.String()))
+	}
+
+	// Check and update RawRefundTx if changed
+	if string(existingNode.RawRefundTx) != string(node.RefundTx) {
+		mut.SetRawRefundTx(node.RefundTx)
+		logger.Info("updated field RawRefundTx", zap.String("node_id", nodeUUID.String()))
+	}
+
+	// Check and update DirectTx if changed
+	if string(existingNode.DirectTx) != string(node.DirectTx) {
+		mut.SetDirectTx(node.DirectTx)
+		logger.Info("updated field DirectTx", zap.String("node_id", nodeUUID.String()))
+	}
+
+	// Check and update DirectRefundTx if changed
+	if string(existingNode.DirectRefundTx) != string(node.DirectRefundTx) {
+		mut.SetDirectRefundTx(node.DirectRefundTx)
+		logger.Info("updated field DirectRefundTx", zap.String("node_id", nodeUUID.String()))
+	}
+
+	// Check and update DirectFromCpfpRefundTx if changed
+	if string(existingNode.DirectFromCpfpRefundTx) != string(node.DirectFromCpfpRefundTx) {
+		mut.SetDirectFromCpfpRefundTx(node.DirectFromCpfpRefundTx)
+		logger.Info("updated field DirectFromCpfpRefundTx", zap.String("node_id", nodeUUID.String()))
+	}
+
+	// Check and update ParentID if changed
+	if node.ParentNodeId != nil {
+		parentUUID, err := uuid.Parse(*node.ParentNodeId)
+		if err != nil {
+			return fmt.Errorf("unable to parse parent node id %s: %w", *node.ParentNodeId, err)
+		}
+		if existingNode.Edges.Parent.ID != parentUUID {
+			mut.SetParentID(parentUUID)
+			logger.Info("updated field ParentID", zap.String("node_id", nodeUUID.String()))
+		}
+	}
+
+	_, err := mut.Save(ctx)
+	if err != nil {
+		return fmt.Errorf("unable to update node %s: %w", nodeUUID.String(), err)
 	}
 
 	return nil
@@ -202,6 +242,9 @@ func (h *SyncNodeHandler) createMissingSplitNode(ctx context.Context, db *ent.Cl
 	if err != nil {
 		return fmt.Errorf("unable to create node %s: %w", node.Id, err)
 	}
+
+	logger := logging.GetLoggerFromContext(ctx)
+	logger.Info("Created missing split node %d", zap.String("nodeId", nodeUUID.String()))
 
 	return nil
 }
