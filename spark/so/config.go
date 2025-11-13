@@ -40,7 +40,7 @@ var (
 	defaultPoolMinConns              = 4
 	defaultPoolMaxConns              = 256
 	defaultPoolMaxConnLifetime       = 30 * time.Minute
-	defaultPoolMaxConnLifetimeJitter = 0 * time.Second
+	defaultPoolMaxConnLifetimeJitter = 5 * time.Minute
 	defaultPoolMaxConnIdleTime       = 5 * time.Minute
 	defaultPoolHealthCheckPeriod     = 30 * time.Second
 	// Defaults for gRPC server behavior
