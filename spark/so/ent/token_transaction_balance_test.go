@@ -49,6 +49,7 @@ func TestUnbalancedTransferFails(t *testing.T) {
 				SetFinalizedTokenTransactionHash([]byte("finalized_hash_2")).
 				SetStatus(st.TokenTransactionStatusStarted).
 				AddSpentOutput(input).
+				AddSpentStartedOutput(input).
 				Save(ctx)
 			require.NoError(t, err)
 
@@ -84,6 +85,7 @@ func TestOutputReassignmentFromRevealedFails(t *testing.T) {
 				SetFinalizedTokenTransactionHash([]byte("finalized_hash_3")).
 				SetStatus(st.TokenTransactionStatusStarted).
 				AddSpentOutput(input).
+				AddSpentStartedOutput(input).
 				Save(ctx)
 			require.NoError(t, err)
 
@@ -132,6 +134,7 @@ func TestOutputReassignmentValidatesNewTransaction(t *testing.T) {
 				SetFinalizedTokenTransactionHash([]byte("finalized_hash_7")).
 				SetStatus(st.TokenTransactionStatusStarted).
 				AddSpentOutput(input1).
+				AddSpentStartedOutput(input1).
 				Save(ctx)
 			require.NoError(t, err)
 
@@ -147,6 +150,7 @@ func TestOutputReassignmentValidatesNewTransaction(t *testing.T) {
 				SetFinalizedTokenTransactionHash([]byte("finalized_hash_8")).
 				SetStatus(st.TokenTransactionStatusStarted).
 				AddSpentOutput(input2).
+				AddSpentStartedOutput(input2).
 				Save(ctx)
 			require.NoError(t, err)
 

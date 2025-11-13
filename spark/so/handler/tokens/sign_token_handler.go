@@ -332,10 +332,18 @@ func (h *SignTokenHandler) getOutputsToSpendForExchange(ctx context.Context, tok
 	if err != nil {
 		return nil, sparkerrors.InternalDatabaseReadError(fmt.Errorf("failed to fetch token transaction after setting status to revealed: %w for token txHash: %x", err, tokenTransactionHash))
 	}
-	outputsToSpend := make([]*tokeninternalpb.OutputToSpend, 0, len(revealedTokenTransaction.Edges.SpentOutput))
-	for _, outputToSpend := range revealedTokenTransaction.Edges.SpentOutput {
+	// Use spent started outputs which are already joined with the creating transactions of that output (spent outputs aren't)
+	if len(revealedTokenTransaction.Edges.SpentStartedOutput) != len(revealedTokenTransaction.Edges.SpentOutput) {
+		return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("when getting outputs to spend for exchange, spent started outputs and spent outputs do not match for token txHash: %x", tokenTransactionHash))
+	}
+
+	outputsToSpend := make([]*tokeninternalpb.OutputToSpend, 0, len(revealedTokenTransaction.Edges.SpentStartedOutput))
+	for _, outputToSpend := range revealedTokenTransaction.Edges.SpentStartedOutput {
 		if outputToSpend == nil {
 			continue
+		}
+		if outputToSpend.Edges.OutputCreatedTokenTransaction == nil {
+			return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("missing created transaction edge for spent output in token txHash: %x", tokenTransactionHash))
 		}
 		outputsToSpend = append(outputsToSpend, &tokeninternalpb.OutputToSpend{
 			CreatedTokenTransactionHash: outputToSpend.Edges.OutputCreatedTokenTransaction.FinalizedTokenTransactionHash,
@@ -559,6 +567,7 @@ func (h *SignTokenHandler) getRevealCommitProgress(ctx context.Context, tokenTra
 	operatorSharesPerOutput := make(map[int]map[keys.Public]struct{}) // output_index -> operator_key -> has_share
 	coordinatorKey := h.config.IdentityPublicKey()
 
+	// Use SpentOutput here because these edges eager-load revocation shares used to compute progress.
 	outputsToCheck := tokenTransaction.Edges.SpentOutput
 	if len(outputsToCheck) == 0 {
 		return nil, sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no spent outputs found for transfer token transaction %x", tokenTransaction.FinalizedTokenTransactionHash))

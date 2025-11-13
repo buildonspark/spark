@@ -257,6 +257,7 @@ func TestRecoverFullRevocationSecretsAndFinalize_RequireThresholdOperators(t *te
 		SetFinalizedTokenTransactionHash(hash).
 		SetStatus(st.TokenTransactionStatusSigned).
 		AddSpentOutput(output).
+		AddSpentStartedOutput(output).
 		SaveX(ctx)
 
 	// Commit so data visible in new transaction.

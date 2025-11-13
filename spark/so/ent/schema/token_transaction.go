@@ -49,10 +49,15 @@ func (TokenTransaction) Edges() []ent.Edge {
 	// a) one or more created outputs representing new withdrawable token holdings.
 	// b) one or more spent outputs (for transfers) or a single mint.
 	return []ent.Edge{
+		// These edges are used to track the outputs that have been spent on this transaction.
+		// spent_started_output is an immutable edge that points to all outputs initially attached to this transaction.
+		// spent_output is a mutable edge that will be erased if a spent output is remapped to a newer transaction.
+		// Use spent_started_output for read only queries and use spent_output for business logic & validation.
 		edge.From("spent_output", TokenOutput.Type).
 			Ref("output_spent_token_transaction"),
-		edge.From("spent_output_v2", TokenOutput.Type).
-			Ref("output_spent_started_token_transactions"),
+		edge.From("spent_started_output", TokenOutput.Type).
+			Ref("output_spent_started_token_transactions").
+			Immutable(),
 		edge.From("created_output", TokenOutput.Type).
 			Ref("output_created_token_transaction"),
 		edge.To("mint", TokenMint.Type).

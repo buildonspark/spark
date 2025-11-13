@@ -56,8 +56,8 @@ type TokenTransaction struct {
 type TokenTransactionEdges struct {
 	// SpentOutput holds the value of the spent_output edge.
 	SpentOutput []*TokenOutput `json:"spent_output,omitempty"`
-	// SpentOutputV2 holds the value of the spent_output_v2 edge.
-	SpentOutputV2 []*TokenOutput `json:"spent_output_v2,omitempty"`
+	// SpentStartedOutput holds the value of the spent_started_output edge.
+	SpentStartedOutput []*TokenOutput `json:"spent_started_output,omitempty"`
 	// CreatedOutput holds the value of the created_output edge.
 	CreatedOutput []*TokenOutput `json:"created_output,omitempty"`
 	// Mint holds the value of the mint edge.
@@ -84,13 +84,13 @@ func (e TokenTransactionEdges) SpentOutputOrErr() ([]*TokenOutput, error) {
 	return nil, &NotLoadedError{edge: "spent_output"}
 }
 
-// SpentOutputV2OrErr returns the SpentOutputV2 value or an error if the edge
+// SpentStartedOutputOrErr returns the SpentStartedOutput value or an error if the edge
 // was not loaded in eager-loading.
-func (e TokenTransactionEdges) SpentOutputV2OrErr() ([]*TokenOutput, error) {
+func (e TokenTransactionEdges) SpentStartedOutputOrErr() ([]*TokenOutput, error) {
 	if e.loadedTypes[1] {
-		return e.SpentOutputV2, nil
+		return e.SpentStartedOutput, nil
 	}
-	return nil, &NotLoadedError{edge: "spent_output_v2"}
+	return nil, &NotLoadedError{edge: "spent_started_output"}
 }
 
 // CreatedOutputOrErr returns the CreatedOutput value or an error if the edge
@@ -296,9 +296,9 @@ func (tt *TokenTransaction) QuerySpentOutput() *TokenOutputQuery {
 	return NewTokenTransactionClient(tt.config).QuerySpentOutput(tt)
 }
 
-// QuerySpentOutputV2 queries the "spent_output_v2" edge of the TokenTransaction entity.
-func (tt *TokenTransaction) QuerySpentOutputV2() *TokenOutputQuery {
-	return NewTokenTransactionClient(tt.config).QuerySpentOutputV2(tt)
+// QuerySpentStartedOutput queries the "spent_started_output" edge of the TokenTransaction entity.
+func (tt *TokenTransaction) QuerySpentStartedOutput() *TokenOutputQuery {
+	return NewTokenTransactionClient(tt.config).QuerySpentStartedOutput(tt)
 }
 
 // QueryCreatedOutput queries the "created_output" edge of the TokenTransaction entity.
