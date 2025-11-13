@@ -69,7 +69,6 @@ func BroadcastTransaction(ctx context.Context, btcClient bitcoinClient, nodeID s
 	if err != nil {
 		return fmt.Errorf("watchtower failed to parse transaction for node %s: %w", nodeID, err)
 	}
-	// TODO: Broadcast Direct Refund TX.
 	logger.Sugar().Infof("Attempting to broadcast transaction with txid %s for node %s", tx.TxID(), nodeID)
 	txHash, err := btcClient.SendRawTransaction(tx, false)
 	if err != nil {
@@ -95,24 +94,8 @@ func alreadyBroadcasted(err error) bool {
 func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHeight int64, network common.Network) ([]*ent.TreeNode, error) {
 	var rootNodes, childNodes, refundNodes []*ent.TreeNode
 
-	// 1. Root nodes needing confirmation
-	rootNodes, err := dbClient.TreeNode.Query().
-		Where(
-			treenode.Not(treenode.HasParent()),
-			treenode.Or(
-				treenode.NodeConfirmationHeightIsNil(),
-				treenode.RefundConfirmationHeightIsNil(),
-			),
-			treenode.HasTreeWith(tree.NetworkEQ(common.SchemaNetwork(network))),
-		).
-		WithParent().
-		All(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query root nodes: %w", err)
-	}
-
-	// 2. Child nodes whose parent is confirmed but the node itself is not.
-	childNodes, err = dbClient.TreeNode.Query().
+	//1. Child nodes whose parent is confirmed but the node itself is not.
+	childNodes, err := dbClient.TreeNode.Query().
 		Where(
 			treenode.HasParentWith(
 				treenode.And(
@@ -129,7 +112,7 @@ func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHei
 		return nil, fmt.Errorf("failed to query broadcastable child nodes: %w", err)
 	}
 
-	// 3. Nodes with confirmed node tx but unconfirmed refund tx.
+	// 2. Nodes with confirmed node tx but unconfirmed refund tx.
 	refundNodes, err = dbClient.TreeNode.Query().
 		Where(
 			treenode.NodeConfirmationHeightNotNil(),
