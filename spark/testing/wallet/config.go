@@ -51,7 +51,7 @@ func (c *TestWalletConfig) ProtoNetwork() pb.Network {
 	return network
 }
 
-func (c *TestWalletConfig) NewCoordinatorGRPCConnection() (*grpc.ClientConn, error) {
+func (c *TestWalletConfig) NewCoordinatorGRPCConnection() (so.OperatorClientConn, error) {
 	return c.SigningOperators[c.CoordinatorIdentifier].NewOperatorGRPCConnection()
 }
 

@@ -14,12 +14,11 @@ import (
 	sogrpc "github.com/lightsparkdev/spark/common/grpc"
 	"github.com/lightsparkdev/spark/common/logging"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
-
-	"go.opentelemetry.io/otel/attribute"
 )
 
 // RetryPolicyConfig represents configuration for gRPC retry policy
@@ -110,11 +109,22 @@ func BasicClientOptions(address string, retryPolicy *RetryPolicyConfig, clientTi
 // address as a Unix domain socket (which is a secure connection). If address is not a Unix domain socket, it will
 // return an error.
 func NewGRPCConnection(address string, certPath string, retryPolicy *RetryPolicyConfig, clientTimeoutConfig *ClientTimeoutConfig) (*grpc.ClientConn, error) {
+	return newGRPCConnection(address, certPath, retryPolicy, clientTimeoutConfig, nil)
+}
+
+func NewGRPCConnectionWithOptions(address string, certPath string, retryPolicy *RetryPolicyConfig, clientTimeoutConfig *ClientTimeoutConfig, extra ...grpc.DialOption) (*grpc.ClientConn, error) {
+	return newGRPCConnection(address, certPath, retryPolicy, clientTimeoutConfig, extra)
+}
+
+func newGRPCConnection(address string, certPath string, retryPolicy *RetryPolicyConfig, clientTimeoutConfig *ClientTimeoutConfig, extra []grpc.DialOption) (*grpc.ClientConn, error) {
 	if len(certPath) == 0 {
-		return NewGRPCConnectionUnixDomainSocket(address, retryPolicy, clientTimeoutConfig)
+		return newGRPCConnectionUnixDomainSocket(address, retryPolicy, clientTimeoutConfig, extra)
 	}
 
 	clientOpts := BasicClientOptions(address, retryPolicy, clientTimeoutConfig)
+	if len(extra) > 0 {
+		clientOpts = append(clientOpts, extra...)
+	}
 
 	certPool := x509.NewCertPool()
 	serverCert, err := os.ReadFile(certPath)
@@ -150,6 +160,10 @@ func NewGRPCConnection(address string, certPath string, retryPolicy *RetryPolicy
 // Will only attempt to connect to a unix domain socket address. If the address
 // is not prefixed explicitly with "unix://", it will be prepended.
 func NewGRPCConnectionUnixDomainSocket(address string, retryPolicy *RetryPolicyConfig, clientTimeoutConfig *ClientTimeoutConfig) (*grpc.ClientConn, error) {
+	return newGRPCConnectionUnixDomainSocket(address, retryPolicy, clientTimeoutConfig, nil)
+}
+
+func newGRPCConnectionUnixDomainSocket(address string, retryPolicy *RetryPolicyConfig, clientTimeoutConfig *ClientTimeoutConfig, extra []grpc.DialOption) (*grpc.ClientConn, error) {
 	// Unix domain sockets always have a prefix of unix:// or unix: followed by
 	// a path. So in practice, we need to accept either unix:///path/to/socket
 	// or unix:/path/to/socket.
@@ -158,6 +172,9 @@ func NewGRPCConnectionUnixDomainSocket(address string, retryPolicy *RetryPolicyC
 	}
 
 	clientOpts := BasicClientOptions(address, retryPolicy, clientTimeoutConfig)
+	if len(extra) > 0 {
+		clientOpts = append(clientOpts, extra...)
+	}
 	// This is safe because we verified above that we are only connecting to a
 	// unix domain socket, which are always secure, local connections.
 	clientOpts = append(clientOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))

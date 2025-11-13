@@ -88,6 +88,8 @@ type args struct {
 	EntDebug                   bool
 }
 
+const operatorPoolKnobRefreshInterval = time.Minute
+
 func (a *args) SupportedNetworksList() []common.Network {
 	var networks []common.Network
 	if strings.Contains(a.SupportedNetworks, "mainnet") || a.SupportedNetworks == "" {
@@ -364,7 +366,24 @@ func main() {
 
 	for _, op := range config.SigningOperatorMap {
 		op.SetTimeoutProvider(knobs.NewKnobsTimeoutProvider(knobsService, config.GRPC.ClientTimeout))
+		op.SetConnectionPoolConfig(operatorPoolConfigFromKnobs(knobsService, op.Identifier))
 	}
+
+	errGrp.Go(func() error {
+		ticker := time.NewTicker(operatorPoolKnobRefreshInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-errCtx.Done():
+				return nil
+			case <-ticker.C:
+				for _, op := range config.SigningOperatorMap {
+					op.SetConnectionPoolConfig(operatorPoolConfigFromKnobs(knobsService, op.Identifier))
+				}
+			}
+		}
+	})
 
 	config.FrostGRPCConnectionFactory.SetTimeoutProvider(
 		knobs.NewKnobsTimeoutProvider(knobsService, config.GRPC.ClientTimeout))
@@ -779,5 +798,24 @@ func main() {
 
 	if err := errGrp.Wait(); err != nil {
 		logger.Error("Shutdown due to error", zap.Error(err))
+	}
+}
+
+func operatorPoolConfigFromKnobs(knobsService knobs.Knobs, operatorID string) so.OperatorConnectionPoolConfig {
+	target := operatorID
+	defaults := so.DefaultOperatorConnPoolConfig()
+
+	// Helper to get int value from knob
+	getInt := func(knob string, defaultVal int) int {
+		return int(knobsService.GetValueTarget(knob, &target, float64(defaultVal)))
+	}
+
+	return so.OperatorConnectionPoolConfig{
+		MinConnections:        getInt(knobs.KnobGrpcClientPoolMinConnections, defaults.MinConnections),
+		MaxConnections:        getInt(knobs.KnobGrpcClientPoolMaxConnections, defaults.MaxConnections),
+		IdleTimeout:           knobsService.GetDurationTarget(knobs.KnobGrpcClientPoolIdleTimeoutSeconds, &target, defaults.IdleTimeout),
+		MaxLifetime:           knobsService.GetDurationTarget(knobs.KnobGrpcClientPoolMaxLifetimeSeconds, &target, defaults.MaxLifetime),
+		UsersPerConnectionCap: getInt(knobs.KnobGrpcClientPoolUsersPerConnectionCap, defaults.UsersPerConnectionCap),
+		ScaleConcurrency:      getInt(knobs.KnobGrpcClientPoolScaleConcurrency, defaults.ScaleConcurrency),
 	}
 }

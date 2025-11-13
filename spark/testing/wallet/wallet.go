@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
+	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/testing/wallet/ssp_api/mutations"
 	"go.uber.org/zap"
 
@@ -25,7 +26,6 @@ import (
 	"github.com/lightsparkdev/spark/so/utils"
 	sspapi "github.com/lightsparkdev/spark/testing/wallet/ssp_api"
 	decodepay "github.com/nbd-wtf/ln-decodepay"
-	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -216,7 +216,7 @@ func (w *SingleKeyTestWallet) PayInvoice(ctx context.Context, invoice string) (s
 	return requestID, nil
 }
 
-func (w *SingleKeyTestWallet) grpcClient(ctx context.Context) (context.Context, *pb.SparkServiceClient, *grpc.ClientConn, error) {
+func (w *SingleKeyTestWallet) grpcClient(ctx context.Context) (context.Context, *pb.SparkServiceClient, so.OperatorClientConn, error) {
 	conn, err := w.Config.NewCoordinatorGRPCConnection()
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to connect to operator: %w", err)

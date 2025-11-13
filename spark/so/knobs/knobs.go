@@ -43,10 +43,16 @@ const (
 	KnobGrpcServerConcurrencyExcludeIps     = "spark.so.grpc.server.concurrency_limit.exclude_ips"
 	KnobGrpcServerConcurrencyExcludePubkeys = "spark.so.grpc.server.concurrency_limit.exclude_pubkeys"
 
-	KnobSoGenerateStaticDepositAddressV2 = "spark.so.generate_static_deposit_address_v2"
-	KnobSoMaxTransactionsPerRequest      = "spark.so.max_transactions_per_request"
-	KnobSoMaxKeysharesPerRequest         = "spark.so.max_keyshares_per_request"
-	KnobGRPCClientTimeout                = "spark.so.grpc.client.timeout"
+	KnobSoGenerateStaticDepositAddressV2    = "spark.so.generate_static_deposit_address_v2"
+	KnobSoMaxTransactionsPerRequest         = "spark.so.max_transactions_per_request"
+	KnobSoMaxKeysharesPerRequest            = "spark.so.max_keyshares_per_request"
+	KnobGRPCClientTimeout                   = "spark.so.grpc.client.timeout"
+	KnobGrpcClientPoolMinConnections        = "spark.so.grpc.client.pool.min_connections"
+	KnobGrpcClientPoolMaxConnections        = "spark.so.grpc.client.pool.max_connections"
+	KnobGrpcClientPoolIdleTimeoutSeconds    = "spark.so.grpc.client.pool.idle_timeout_seconds"
+	KnobGrpcClientPoolMaxLifetimeSeconds    = "spark.so.grpc.client.pool.max_lifetime_seconds"
+	KnobGrpcClientPoolUsersPerConnectionCap = "spark.so.grpc.client.pool.users_per_connection_cap"
+	KnobGrpcClientPoolScaleConcurrency      = "spark.so.grpc.client.pool.scale_concurrency"
 
 	KnobRequireDirectFromCPFPRefund = "spark.so.require_direct_from_cpfp_refund"
 

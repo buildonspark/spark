@@ -23,7 +23,7 @@ func AuthenticateWithServer(ctx context.Context, config *TestWalletConfig) (stri
 }
 
 // AuthenticateWithConnection authenticates to the server using an existing GRPC connection.
-func AuthenticateWithConnection(ctx context.Context, config *TestWalletConfig, conn *grpc.ClientConn) (string, error) {
+func AuthenticateWithConnection(ctx context.Context, config *TestWalletConfig, conn grpc.ClientConnInterface) (string, error) {
 	client := pbauthn.NewSparkAuthnServiceClient(conn)
 
 	challengeResp, err := client.GetChallenge(ctx, &pbauthn.GetChallengeRequest{

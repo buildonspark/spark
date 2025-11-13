@@ -69,6 +69,7 @@ linters:
         - (*google.golang.org/grpc.ClientConn).Close
         - (*database/sql.DB).Close
         - (*github.com/lightsparkdev/spark/so/ent.Client).Close
+        - (github.com/lightsparkdev/spark/so.OperatorClientConn).Close
     forbidigo:
       forbid:
         - pattern: "^(fmt\\.Print(|f|ln)|print|println)$"

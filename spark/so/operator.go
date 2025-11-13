@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
 
@@ -12,8 +14,15 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so/utils"
 
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
+
+type OperatorClientConn interface {
+	grpc.ClientConnInterface
+	Close() error
+}
 
 // SigningOperator is the information about a signing operator.
 type SigningOperator struct {
@@ -38,6 +47,14 @@ type SigningOperator struct {
 	OperatorConnectionFactory OperatorConnectionFactory
 	// ClientTimeoutConfig is the configuration for the client timeout's knob service and defaulttimeout length
 	ClientTimeoutConfig common.ClientTimeoutConfig
+	// Logger is used for logging connection pool events. If nil, a no-op logger is used.
+	Logger *zap.Logger
+	// connPoolConfig holds the pool configuration for outbound gRPC connections.
+	connPoolConfig OperatorConnectionPoolConfig
+	// connPools caches pools per gRPC target address (RPC vs DKG).
+	connPools map[string]*operatorConnPool
+	// connPoolsMu guards connPools access.
+	connPoolsMu sync.Mutex
 }
 
 type OperatorConnectionFactory interface {
@@ -49,7 +66,22 @@ type operatorConnectionFactorySecure struct {
 }
 
 func (o *operatorConnectionFactorySecure) NewGRPCConnection(address string, retryPolicy *common.RetryPolicyConfig, clientTimeoutConfig *common.ClientTimeoutConfig) (*grpc.ClientConn, error) {
-	return common.NewGRPCConnection(address, o.operator.CertPath, retryPolicy, clientTimeoutConfig)
+	extraOpts := []grpc.DialOption{
+		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
+		// Spec-compliant client pings; server currently has no enforcement policy.
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                30 * time.Second,
+			Timeout:             10 * time.Second,
+			PermitWithoutStream: true,
+		}),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(10*1024*1024),
+			grpc.MaxCallSendMsgSize(10*1024*1024),
+		),
+		grpc.WithInitialWindowSize(1 << 20),      // 1 MB
+		grpc.WithInitialConnWindowSize(16 << 20), // 16 MB
+	}
+	return common.NewGRPCConnectionWithOptions(address, o.operator.CertPath, retryPolicy, clientTimeoutConfig, extraOpts...)
 }
 
 func NewOperatorConnectionFactorySecure(operator *SigningOperator) OperatorConnectionFactory {
@@ -95,6 +127,7 @@ func (s *SigningOperator) UnmarshalJSON(data []byte) error {
 	s.CertPath = js.CertPath
 	s.ExternalAddress = js.ExternalAddress
 	s.OperatorConnectionFactory = NewOperatorConnectionFactorySecure(s)
+	s.connPoolConfig = DefaultOperatorConnPoolConfig()
 	return nil
 }
 
@@ -108,22 +141,49 @@ func (s *SigningOperator) MarshalProto() *pb.SigningOperatorInfo {
 	}
 }
 
-func (s *SigningOperator) newGrpcConnection(address string) (*grpc.ClientConn, error) {
-	var ocf OperatorConnectionFactory
-	ocf = &operatorConnectionFactorySecure{operator: s}
-	if s.OperatorConnectionFactory != nil {
-		ocf = s.OperatorConnectionFactory
+func (s *SigningOperator) newGrpcConnection(address string) (OperatorClientConn, error) {
+	pool, err := s.getOrCreateConnectionPool(address)
+	if err != nil {
+		return nil, err
 	}
-
-	return ocf.NewGRPCConnection(address, nil, &s.ClientTimeoutConfig)
+	return pool.getConnection()
 }
 
-func (s *SigningOperator) NewOperatorGRPCConnection() (*grpc.ClientConn, error) {
+func (s *SigningOperator) getOrCreateConnectionPool(address string) (*operatorConnPool, error) {
+	s.connPoolsMu.Lock()
+	defer s.connPoolsMu.Unlock()
+
+	if s.connPools == nil {
+		s.connPools = make(map[string]*operatorConnPool)
+	}
+
+	if pool, ok := s.connPools[address]; ok {
+		return pool, nil
+	}
+
+	ocf := s.OperatorConnectionFactory
+	if ocf == nil {
+		ocf = &operatorConnectionFactorySecure{operator: s}
+	}
+
+	factory := func() (*grpc.ClientConn, error) {
+		return ocf.NewGRPCConnection(address, nil, &s.ClientTimeoutConfig)
+	}
+
+	pool := newOperatorConnPool(factory, s.connPoolConfig, s.Logger)
+	s.connPools[address] = pool
+	return pool, nil
+}
+
+// NewOperatorGRPCConnection returns a pooled gRPC connection to the operator's RPC endpoint.
+// Callers MUST close the returned connection to release it back to the pool.
+func (s *SigningOperator) NewOperatorGRPCConnection() (OperatorClientConn, error) {
 	return s.newGrpcConnection(s.AddressRpc)
 }
 
 // NewOperatorGRPCConnectionForDKG creates a DKG connection to the AddressDkg endpoint.
-func (s *SigningOperator) NewOperatorGRPCConnectionForDKG() (*grpc.ClientConn, error) {
+// Callers MUST close the returned connection to release it back to the pool.
+func (s *SigningOperator) NewOperatorGRPCConnectionForDKG() (OperatorClientConn, error) {
 	return s.newGrpcConnection(s.AddressDkg)
 }
 
@@ -131,5 +191,36 @@ func (s *SigningOperator) NewOperatorGRPCConnectionForDKG() (*grpc.ClientConn, e
 func (s *SigningOperator) SetTimeoutProvider(timeoutProvider sparkgrpc.TimeoutProvider) {
 	s.ClientTimeoutConfig = common.ClientTimeoutConfig{
 		TimeoutProvider: timeoutProvider,
+	}
+}
+
+// SetConnectionPoolLimits configures the min/max connection counts for this operator.
+func (s *SigningOperator) SetConnectionPoolLimits(minConnections, maxConnections int) {
+	cfg := OperatorConnectionPoolConfig{
+		MinConnections:        minConnections,
+		MaxConnections:        maxConnections,
+		IdleTimeout:           s.connPoolConfig.IdleTimeout,
+		MaxLifetime:           s.connPoolConfig.MaxLifetime,
+		UsersPerConnectionCap: s.connPoolConfig.UsersPerConnectionCap,
+		ScaleConcurrency:      s.connPoolConfig.ScaleConcurrency,
+	}
+	s.SetConnectionPoolConfig(cfg)
+}
+
+// SetConnectionPoolConfig updates the current pool configuration without dropping existing connections.
+func (s *SigningOperator) SetConnectionPoolConfig(cfg OperatorConnectionPoolConfig) {
+	cfg = cfg.WithDefaults()
+	if s.connPoolConfig.Equal(cfg) {
+		return
+	}
+
+	s.connPoolConfig = cfg
+
+	s.connPoolsMu.Lock()
+	defer s.connPoolsMu.Unlock()
+	for _, pool := range s.connPools {
+		if pool != nil {
+			pool.updateConfig(cfg)
+		}
 	}
 }
