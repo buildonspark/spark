@@ -3,9 +3,9 @@ package tokens
 import (
 	"fmt"
 
-	"github.com/lightsparkdev/spark/common/logging"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
+	"github.com/lightsparkdev/spark/so/utils"
 
 	"github.com/lightsparkdev/spark/so/ent"
 )
@@ -81,8 +81,30 @@ func FormatErrorWithTransactionEnt(msg string, tokenTransaction *ent.TokenTransa
 		err)
 }
 
+func formatTokenTransactionHashes(tokenTransaction *tokenpb.TokenTransaction) string {
+	if tokenTransaction == nil {
+		return "transaction: <nil>"
+	}
+
+	partialHash, err := utils.HashTokenTransaction(tokenTransaction, true)
+	if err != nil {
+		return fmt.Sprintf("transaction (hash_error: %v)", err)
+	}
+
+	if !utils.IsFinalTokenTransaction(tokenTransaction) {
+		return fmt.Sprintf("transaction (partial_hash: %x)", partialHash)
+	}
+
+	finalHash, err := utils.HashTokenTransaction(tokenTransaction, false)
+	if err != nil {
+		return fmt.Sprintf("transaction (partial_hash: %x, final_hash_error: %v)", partialHash, err)
+	}
+
+	return fmt.Sprintf("transaction (partial_hash: %x, final_hash: %x)", partialHash, finalHash)
+}
+
 func FormatErrorWithTransactionProto(msg string, tokenTransaction *tokenpb.TokenTransaction, err error) error {
-	formatted := logging.FormatProto("transaction", tokenTransaction)
+	formatted := formatTokenTransactionHashes(tokenTransaction)
 	if err != nil {
 		return fmt.Errorf("%s %s: %w", msg, formatted, err)
 	}
@@ -90,7 +112,7 @@ func FormatErrorWithTransactionProto(msg string, tokenTransaction *tokenpb.Token
 }
 
 func FormatErrorWithTransactionProtoAndSparkInvoice(msg string, tokenTransaction *tokenpb.TokenTransaction, sparkInvoice string, err error) error {
-	formatted := logging.FormatProto("transaction", tokenTransaction)
+	formatted := formatTokenTransactionHashes(tokenTransaction)
 	if err != nil {
 		return fmt.Errorf("%s %s, spark invoice: %s: %w", msg, formatted, sparkInvoice, err)
 	}
