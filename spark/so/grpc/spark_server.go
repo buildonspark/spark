@@ -298,7 +298,7 @@ func (s *SparkServer) SubscribeToEvents(req *pb.SubscribeToEventsRequest, st pb.
 
 	if err := authz.EnforceSessionIdentityPublicKeyMatches(st.Context(), s.config, idPubKey); err != nil {
 		return err
-	} 
+	}
 
 	if s.eventsRouter == nil {
 		return nil
