@@ -23,7 +23,12 @@ func skipConnectedEvent(t *testing.T, stream pb.SparkService_SubscribeToEventsCl
 func TestEventHandlerTransferNotification(t *testing.T) {
 	senderConfig := wallet.NewTestWalletConfig(t)
 	receiverConfig := wallet.NewTestWalletConfig(t)
-	stream, err := wallet.SubscribeToEvents(t.Context(), receiverConfig)
+
+	authToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
+	require.NoError(t, err, "failed to authenticate receiver")
+	receiverCtx := wallet.ContextWithToken(t.Context(), authToken)
+
+	stream, err := wallet.SubscribeToEvents(receiverCtx, receiverConfig)
 	require.NoError(t, err)
 
 	numTransfers := 5
@@ -98,7 +103,11 @@ func TestEventHandlerTransferNotification(t *testing.T) {
 
 func TestEventHandlerDepositNotification(t *testing.T) {
 	config := wallet.NewTestWalletConfig(t)
-	stream, err := wallet.SubscribeToEvents(t.Context(), config)
+	authToken, err := wallet.AuthenticateWithServer(t.Context(), config)
+	require.NoError(t, err, "failed to authenticate receiver")
+	receiverCtx := wallet.ContextWithToken(t.Context(), authToken)
+
+	stream, err := wallet.SubscribeToEvents(receiverCtx, config)
 	require.NoError(t, err)
 
 	skipConnectedEvent(t, stream)
@@ -136,7 +145,10 @@ func TestEventHandlerDepositNotification(t *testing.T) {
 func TestMultipleSubscriptions(t *testing.T) {
 	senderConfig := wallet.NewTestWalletConfig(t)
 	receiverConfig := wallet.NewTestWalletConfig(t)
-	stream1, err := wallet.SubscribeToEvents(t.Context(), receiverConfig)
+	authToken, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
+	require.NoError(t, err, "failed to authenticate receiver")
+	receiverCtx := wallet.ContextWithToken(t.Context(), authToken)
+	stream1, err := wallet.SubscribeToEvents(receiverCtx, receiverConfig)
 	require.NoError(t, err)
 
 	events1 := make(chan *pb.SubscribeToEventsResponse)
@@ -163,7 +175,10 @@ func TestMultipleSubscriptions(t *testing.T) {
 		t.Fatal("stream1 timed out waiting for connected event")
 	}
 
-	stream2, err := wallet.SubscribeToEvents(t.Context(), receiverConfig)
+	authToken2, err := wallet.AuthenticateWithServer(t.Context(), receiverConfig)
+	require.NoError(t, err, "failed to authenticate receiver")
+	receiverCtx2 := wallet.ContextWithToken(t.Context(), authToken2)
+	stream2, err := wallet.SubscribeToEvents(receiverCtx2, receiverConfig)
 	require.NoError(t, err)
 
 	events2 := make(chan *pb.SubscribeToEventsResponse)
