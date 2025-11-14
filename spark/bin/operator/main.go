@@ -777,7 +777,7 @@ func main() {
 	grpcServer.GracefulStop()
 	logger.Info("gRPC server stopped")
 
-	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownRelease()
 
 	logger.Info("Stopping HTTP server...")
