@@ -66,6 +66,8 @@ func (Transfer) Indexes() []ent.Index {
 		index.Fields("receiver_identity_pubkey"),
 		index.Fields("status"),
 		index.Fields("update_time"),
+		// TODO(mhr): This is mostly for the backfill and can probably be removed later.
+		index.Fields("network"),
 
 		index.Fields("receiver_identity_pubkey", "status", "create_time").
 			Annotations(entsql.DescColumns("create_time")).

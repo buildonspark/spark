@@ -830,6 +830,11 @@ var (
 				Columns: []*schema.Column{TransfersColumns[2]},
 			},
 			{
+				Name:    "transfer_network",
+				Unique:  false,
+				Columns: []*schema.Column{TransfersColumns[5]},
+			},
+			{
 				Name:    "idx_transfers_recv_status_create",
 				Unique:  false,
 				Columns: []*schema.Column{TransfersColumns[4], TransfersColumns[7], TransfersColumns[1]},
@@ -1105,6 +1110,11 @@ var (
 				Name:    "treenode_update_time",
 				Unique:  false,
 				Columns: []*schema.Column{TreeNodesColumns[2]},
+			},
+			{
+				Name:    "treenode_network",
+				Unique:  false,
+				Columns: []*schema.Column{TreeNodesColumns[4]},
 			},
 			{
 				Name:    "treenode_raw_txid",

@@ -85,6 +85,8 @@ func (TreeNode) Indexes() []ent.Index {
 		index.Fields("node_confirmation_height"),
 		index.Fields("refund_confirmation_height"),
 		index.Fields("update_time"),
+		// TODO(mhr): This is mostly for the backfill and can probably be removed later.
+		index.Fields("network"),
 
 		index.Fields("raw_txid").Annotations(
 			entsql.IndexWhere("raw_txid is not null"),
