@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/lightsparkdev/spark/common/keys"
@@ -54,6 +55,11 @@ var (
 	// > 0 means enable timeouts with the specified value
 	defaultGRPCClientTimeout = -1 * time.Second
 	defaultDBEventsEnabled   = true
+)
+
+const (
+	rdsAuthTokenTTL         = 15 * time.Minute
+	rdsAuthTokenRefreshSkew = 1 * time.Minute
 )
 
 // Config is the configuration for the signing operator.
@@ -444,6 +450,45 @@ func NewRDSAuthToken(ctx context.Context, uri *url.URL) (string, error) {
 	return token, nil
 }
 
+type cachedRDSTokenProvider struct {
+	uri *url.URL
+
+	mu          sync.Mutex
+	cachedToken string
+	refreshAt   time.Time
+}
+
+func newCachedRDSTokenProvider(uri *url.URL) *cachedRDSTokenProvider {
+	uriCopy := *uri
+	return &cachedRDSTokenProvider{
+		uri: &uriCopy,
+	}
+}
+
+func (p *cachedRDSTokenProvider) Token(ctx context.Context) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	now := time.Now()
+	if p.cachedToken != "" && now.Before(p.refreshAt) {
+		return p.cachedToken, nil
+	}
+
+	token, err := NewRDSAuthToken(ctx, p.uri)
+	if err != nil {
+		return "", err
+	}
+
+	validityWindow := rdsAuthTokenTTL - rdsAuthTokenRefreshSkew
+	if validityWindow <= 0 {
+		validityWindow = rdsAuthTokenTTL
+	}
+
+	p.cachedToken = token
+	p.refreshAt = now.Add(validityWindow)
+	return token, nil
+}
+
 var OtelSQLSpanOptions = otelsql.SpanOptions{
 	OmitConnResetSession: true,
 	OmitConnPrepare:      true,
@@ -454,6 +499,8 @@ type DBConnector struct {
 	isRDS  bool
 	driver driver.Driver
 	pool   *pgxpool.Pool
+
+	rdsTokenProvider *cachedRDSTokenProvider
 }
 
 func getDatabaseStatementTimeoutMs(k knobs.Knobs) uint64 {
@@ -475,10 +522,16 @@ func NewDBConnector(ctx context.Context, soConfig *Config, knobsService knobs.Kn
 		otelsql.WithSpanOptions(OtelSQLSpanOptions),
 	)
 
+	var tokenProvider *cachedRDSTokenProvider
+	if soConfig.IsRDS {
+		tokenProvider = newCachedRDSTokenProvider(uri)
+	}
+
 	connector := &DBConnector{
-		uri:    uri,
-		isRDS:  soConfig.IsRDS,
-		driver: otelWrappedDriver,
+		uri:              uri,
+		isRDS:            soConfig.IsRDS,
+		driver:           otelWrappedDriver,
+		rdsTokenProvider: tokenProvider,
 	}
 
 	// Only create pool for PostgreSQL
@@ -510,7 +563,7 @@ func NewDBConnector(ctx context.Context, soConfig *Config, knobsService knobs.Kn
 
 		if soConfig.IsRDS {
 			conf.BeforeConnect = func(ctx context.Context, cfg *pgx.ConnConfig) error {
-				token, err := NewRDSAuthToken(ctx, uri)
+				token, err := tokenProvider.Token(ctx)
 				if err != nil {
 					return fmt.Errorf("failed to get RDS auth token: %w", err)
 				}
@@ -558,13 +611,23 @@ func (c *DBConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	if !c.isRDS {
 		return c.driver.Open(c.uri.String())
 	}
-	uri := c.uri
-	token, err := NewRDSAuthToken(ctx, c.uri)
+	token, err := c.getRDSAuthToken(ctx)
 	if err != nil {
 		return nil, err
 	}
-	uri.User = url.UserPassword(uri.User.Username(), token)
-	return c.driver.Open(uri.String())
+	uriCopy := *c.uri
+	if uriCopy.User == nil {
+		return nil, fmt.Errorf("database URI missing user info for RDS authentication")
+	}
+	uriCopy.User = url.UserPassword(uriCopy.User.Username(), token)
+	return c.driver.Open(uriCopy.String())
+}
+
+func (c *DBConnector) getRDSAuthToken(ctx context.Context) (string, error) {
+	if c.rdsTokenProvider != nil {
+		return c.rdsTokenProvider.Token(ctx)
+	}
+	return NewRDSAuthToken(ctx, c.uri)
 }
 
 func (c *DBConnector) Driver() driver.Driver {
