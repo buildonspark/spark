@@ -27,6 +27,7 @@ const (
 	KnobRateLimitExcludePubkeys = "spark.so.ratelimit.exclude_pubkeys"
 	// Enable Memcached-backed store for rate limiter when > 0
 	KnobRateLimitMemcacheEnabled      = "spark.so.ratelimit.memcache.enabled"
+	KnobRateLimitMemcacheMaxIdleConns = "spark.so.ratelimit.memcache.max_idle_conns"
 	KnobSoRollbackUtxoSwapUsingGossip = "spark.so.rollback_utxo_swap_using_gossip"
 	KnobSoTransferLimit               = "spark.so.transfer_limit"
 

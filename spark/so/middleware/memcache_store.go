@@ -28,7 +28,7 @@ type memcacheStore struct {
 	client memcacheClient
 }
 
-func NewMemcacheStore(addrs ...string) (MemoryStore, error) {
+func NewMemcacheStore(maxIdleConns int, addrs ...string) (MemoryStore, error) {
 	trimmed := make([]string, 0, len(addrs))
 	for _, a := range addrs {
 		a = strings.TrimSpace(a)
@@ -39,6 +39,12 @@ func NewMemcacheStore(addrs ...string) (MemoryStore, error) {
 		}
 	}
 	c := memcache.New(trimmed...)
+	if maxIdleConns > 0 {
+		// We expect relatively high parallel traffic to memcache from the rate
+		// limiter. Use a configurable MaxIdleConns so we can tune connection
+		// reuse and avoid excessive connection churn and connect timeouts.
+		c.MaxIdleConns = maxIdleConns
+	}
 	return &memcacheStore{client: c}, nil
 }
 

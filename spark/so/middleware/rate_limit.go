@@ -318,9 +318,7 @@ func (r *RateLimiter) takeTokenForKey(ctx context.Context, key string, tokens ui
 	if existingAny, ok := r.appliedBucketConfigs.Load(key); !ok {
 		// First time seeing this key: apply settings
 		if err := r.store.Set(ctx, key, tokens, window); err != nil {
-			if logger != nil {
-				logger.Error(fmt.Sprintf("Failed to set rate limit bucket, failing open. key=%s, err=%v", sanitizeKey(key), err))
-			}
+			logger.Error(fmt.Sprintf("Failed to set rate limit bucket, failing open. key=%s, err=%v", sanitizeKey(key), err))
 			return tokens, tokens, nil
 		}
 		r.appliedBucketConfigs.Store(key, desired)
@@ -329,9 +327,7 @@ func (r *RateLimiter) takeTokenForKey(ctx context.Context, key string, tokens ui
 		existing := existingAny.(bucketConfig)
 		if existing.tokens != desired.tokens || existing.window != desired.window {
 			if err := r.store.Set(ctx, key, tokens, window); err != nil {
-				if logger != nil {
-					logger.Error(fmt.Sprintf("Failed to set rate limit bucket, failing open. key=%s, err=%v", sanitizeKey(key), err))
-				}
+				logger.Error(fmt.Sprintf("Failed to set rate limit bucket, failing open. key=%s, err=%v", sanitizeKey(key), err))
 				return tokens, tokens, nil
 			}
 			r.appliedBucketConfigs.Store(key, desired)
@@ -341,17 +337,13 @@ func (r *RateLimiter) takeTokenForKey(ctx context.Context, key string, tokens ui
 			currentCapacity, rem, err := r.store.Get(ctx, key)
 			if err != nil {
 				// If we can't even Get the state of the bucket, we must fail open.
-				if logger != nil {
-					logger.Error(fmt.Sprintf("Rate limit store failed on Get, failing open. key=%s, err=%v", sanitizeKey(key), err))
-				}
+				logger.Error(fmt.Sprintf("Rate limit store failed on Get, failing open. key=%s, err=%v", sanitizeKey(key), err))
 				return tokens, tokens, nil
 			}
 			// If store is uninitialized (e.g., eviction), re-apply settings once.
 			if currentCapacity == 0 && rem == 0 {
 				if err := r.store.Set(ctx, key, tokens, window); err != nil {
-					if logger != nil {
-						logger.Error(fmt.Sprintf("Failed to set rate limit bucket, failing open. key=%s, err=%v", sanitizeKey(key), err))
-					}
+					logger.Error(fmt.Sprintf("Failed to set rate limit bucket, failing open. key=%s, err=%v", sanitizeKey(key), err))
 					return tokens, tokens, nil
 				}
 				remaining = tokens
@@ -368,23 +360,23 @@ func (r *RateLimiter) takeTokenForKey(ctx context.Context, key string, tokens ui
 	// Attempt to take a token.
 	ok, err := r.store.Take(ctx, key)
 	if err != nil {
-		if logger != nil {
-			logger.Error(fmt.Sprintf(
-				"Rate limit store failed on Take, failing open. key=%s, err=%v",
-				sanitizeKey(key), err,
-			))
-		}
+		logger.Error(fmt.Sprintf(
+			"Rate limit store failed on Take, failing open. key=%s, err=%v",
+			sanitizeKey(key), err,
+		))
 		return tokens, tokens, nil
 	}
 
 	if !ok {
-		// Race: another request took the last token between Get and Take. Allow the request to proceed.
-		if logger != nil {
-			logger.Warn(fmt.Sprintf(
-				"Rate limit race condition: Get reported tokens, but Take failed. Allowing request. key=%s",
-				sanitizeKey(key),
-			))
-		}
+		// Allow the request to proceed. Either:
+		// 1) another request took the last token between Get and Take or
+		// 2) the bucket was evicted in between Get and Take.
+		// This can be relatively frequent under high concurrency; log at debug level to avoid
+		// overwhelming production logs while still retaining visibility when needed.
+		logger.Debug(fmt.Sprintf(
+			"Rate limit race condition: Get reported tokens, but Take failed. Allowing request. key=%s",
+			sanitizeKey(key),
+		))
 		return tokens, tokens, nil
 	}
 
@@ -644,12 +636,10 @@ func (r *RateLimiter) enforceAndObserve(ctx context.Context, p rateLimitEnforcem
 			r.incrementBreachMetric(ctx, attrs)
 			// Log breach with bucket identity
 			logger := logging.GetLoggerFromContext(ctx)
-			if logger != nil {
-				logger.Warn(fmt.Sprintf(
-					"rate limit exceeded: scope=%s tier=%s dimension=%s bucket=%s",
-					p.Scope, p.TierSuffix, p.Dimension, p.Bucket,
-				))
-			}
+			logger.Warn(fmt.Sprintf(
+				"rate limit exceeded: scope=%s tier=%s dimension=%s bucket=%s",
+				p.Scope, p.TierSuffix, p.Dimension, p.Bucket,
+			))
 		}
 		return err
 	}

@@ -263,6 +263,10 @@ type DatabaseConfig struct {
 type RateLimiterConfig struct {
 	// Enabled determines if rate limiting is enabled
 	Enabled bool `yaml:"enabled"`
+	// MemcacheMaxIdleConns controls the maximum number of idle Memcached
+	// connections per address used by the rate limiter cache store. If
+	// unset or zero, a sensible default is applied.
+	MemcacheMaxIdleConns int `yaml:"memcache_max_idle_conns"`
 }
 
 // The authzEnabled field currently gates authorization enforcement for client

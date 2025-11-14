@@ -562,7 +562,12 @@ func main() {
 		rlOpts := []middleware.RateLimiterOption{middleware.WithKnobs(knobsService)}
 		memcachedURI := strings.TrimSpace(config.CacheURI)
 		if knobsService.RolloutRandom(knobs.KnobRateLimitMemcacheEnabled, 0) && memcachedURI != "" {
-			store, sErr := middleware.NewMemcacheStore(memcachedURI)
+			baseMaxIdleConns := 32
+			maxIdleConns := int(knobsService.GetValue(
+				knobs.KnobRateLimitMemcacheMaxIdleConns,
+				float64(baseMaxIdleConns),
+			))
+			store, sErr := middleware.NewMemcacheStore(maxIdleConns, memcachedURI)
 			if sErr != nil {
 				logger.Warn("Memcached rate limiter store unavailable, falling back to in-memory", zap.Error(sErr))
 			} else {
