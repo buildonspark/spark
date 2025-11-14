@@ -50,7 +50,8 @@ func (h *SendGossipHandler) postSendingGossipMessage(
 			if status.Code(err) == codes.Unavailable ||
 				status.Code(err) == codes.Canceled ||
 				strings.Contains(err.Error(), "context canceled") ||
-				strings.Contains(err.Error(), "unexpected HTTP status code") {
+				strings.Contains(err.Error(), "unexpected HTTP status code") ||
+				strings.Contains(err.Error(), "SQLSTATE") {
 				return nil, err
 			}
 		}
@@ -76,7 +77,8 @@ func (h *SendGossipHandler) sendGossipMessageToParticipant(ctx context.Context, 
 		if status.Code(err) == codes.Unavailable ||
 			status.Code(err) == codes.Canceled ||
 			strings.Contains(err.Error(), "context canceled") ||
-			strings.Contains(err.Error(), "unexpected HTTP status code") {
+			strings.Contains(err.Error(), "unexpected HTTP status code") ||
+			strings.Contains(err.Error(), "SQLSTATE") {
 			return err
 		}
 

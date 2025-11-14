@@ -2074,7 +2074,8 @@ func (h *TransferHandler) settleReceiverKeyTweak(ctx context.Context, transfer *
 		if status.Code(err) == codes.Unavailable ||
 			status.Code(err) == codes.Canceled ||
 			strings.Contains(err.Error(), "context canceled") ||
-			strings.Contains(err.Error(), "unexpected HTTP status code") {
+			strings.Contains(err.Error(), "unexpected HTTP status code") ||
+			strings.Contains(err.Error(), "SQLSTATE") {
 			logger.Sugar().Error("Unable to settle receiver key tweak due to operator unavailability, please try again later", zap.Error(err))
 			return fmt.Errorf("unable to settle receiver key tweak due to operator unavailability: %w, please try again later", err)
 		}
