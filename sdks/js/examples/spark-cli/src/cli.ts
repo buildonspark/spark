@@ -978,6 +978,11 @@ async function runCLI() {
             accountNumber = parseInt(args[args.length - 1]);
           } else if (args.length == 12) {
             mnemonicOrSeed = args.join(" ");
+          } else if (args.length == 2) {
+            mnemonicOrSeed = args[0];
+            accountNumber = parseInt(args[1]);
+          } else if (args.length == 1) {
+            mnemonicOrSeed = args[0];
           } else if (args.length !== 0) {
             console.log(
               "Invalid number of arguments - usage: initwallet [mnemonic | seed] [accountNumber (optional)]",
