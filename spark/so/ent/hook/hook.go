@@ -57,6 +57,18 @@ func (f EntityDkgKeyFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EntityDkgKeyMutation", m)
 }
 
+// The EventMessageFunc type is an adapter to allow the use of ordinary
+// function as EventMessage mutator.
+type EventMessageFunc func(context.Context, *ent.EventMessageMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f EventMessageFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.EventMessageMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.EventMessageMutation", m)
+}
+
 // The GossipFunc type is an adapter to allow the use of ordinary
 // function as Gossip mutator.
 type GossipFunc func(context.Context, *ent.GossipMutation) (ent.Value, error)

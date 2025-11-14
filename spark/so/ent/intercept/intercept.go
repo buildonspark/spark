@@ -12,6 +12,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
+	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
@@ -202,6 +203,33 @@ func (f TraverseEntityDkgKey) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.EntityDkgKeyQuery", q)
+}
+
+// The EventMessageFunc type is an adapter to allow the use of ordinary function as a Querier.
+type EventMessageFunc func(context.Context, *ent.EventMessageQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f EventMessageFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.EventMessageQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.EventMessageQuery", q)
+}
+
+// The TraverseEventMessage type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseEventMessage func(context.Context, *ent.EventMessageQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseEventMessage) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseEventMessage) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.EventMessageQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.EventMessageQuery", q)
 }
 
 // The GossipFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -890,6 +918,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.DepositAddressQuery, predicate.DepositAddress, depositaddress.OrderOption]{typ: ent.TypeDepositAddress, tq: q}, nil
 	case *ent.EntityDkgKeyQuery:
 		return &query[*ent.EntityDkgKeyQuery, predicate.EntityDkgKey, entitydkgkey.OrderOption]{typ: ent.TypeEntityDkgKey, tq: q}, nil
+	case *ent.EventMessageQuery:
+		return &query[*ent.EventMessageQuery, predicate.EventMessage, eventmessage.OrderOption]{typ: ent.TypeEventMessage, tq: q}, nil
 	case *ent.GossipQuery:
 		return &query[*ent.GossipQuery, predicate.Gossip, gossip.OrderOption]{typ: ent.TypeGossip, tq: q}, nil
 	case *ent.L1TokenCreateQuery:

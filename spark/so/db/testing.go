@@ -244,8 +244,11 @@ func SetUpDBEventsTestContext(t *testing.T) (*TestContext, *so.DBConnector, *DBE
 	require.NoError(t, err)
 
 	logger := zaptest.NewLogger(t).With(zap.String("component", "dbevents"))
-	dbEvents, err := NewDBEvents(t.Context(), connector, logger)
+	dbEvents, err := NewDBEvents(t.Context(), sessionCtx.Client, logger)
 	require.NoError(t, err)
+
+	// Speed up tests so we don't wait on the default poll interval.
+	dbEvents.pollInterval = 5 * time.Millisecond
 
 	go func() {
 		if err := dbEvents.Start(); err != nil {

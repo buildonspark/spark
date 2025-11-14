@@ -18,6 +18,9 @@ type DepositAddress func(*sql.Selector)
 // EntityDkgKey is the predicate function for entitydkgkey builders.
 type EntityDkgKey func(*sql.Selector)
 
+// EventMessage is the predicate function for eventmessage builders.
+type EventMessage func(*sql.Selector)
+
 // Gossip is the predicate function for gossip builders.
 type Gossip func(*sql.Selector)
 

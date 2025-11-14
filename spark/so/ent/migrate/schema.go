@@ -144,6 +144,27 @@ var (
 			},
 		},
 	}
+	// EventMessagesColumns holds the columns for the "event_messages" table.
+	EventMessagesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "create_time", Type: field.TypeTime},
+		{Name: "update_time", Type: field.TypeTime},
+		{Name: "channel", Type: field.TypeString, Size: 2147483647},
+		{Name: "payload", Type: field.TypeString, Size: 2147483647},
+	}
+	// EventMessagesTable holds the schema information for the "event_messages" table.
+	EventMessagesTable = &schema.Table{
+		Name:       "event_messages",
+		Columns:    EventMessagesColumns,
+		PrimaryKey: []*schema.Column{EventMessagesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "event_messages_channel_create_time_id",
+				Unique:  false,
+				Columns: []*schema.Column{EventMessagesColumns[3], EventMessagesColumns[1], EventMessagesColumns[0]},
+			},
+		},
+	}
 	// GossipsColumns holds the columns for the "gossips" table.
 	GossipsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1326,6 +1347,7 @@ var (
 		CooperativeExitsTable,
 		DepositAddressesTable,
 		EntityDkgKeysTable,
+		EventMessagesTable,
 		GossipsTable,
 		L1tokenCreatesTable,
 		PaymentIntentsTable,

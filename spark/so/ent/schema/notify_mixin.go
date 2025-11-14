@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"entgo.io/ent/schema/mixin"
 	"github.com/lightsparkdev/spark/common/logging"
@@ -75,12 +76,14 @@ func (n NotifyMixin) sendNotification(ctx context.Context, m ent.Mutation, v ent
 		return fmt.Errorf("no notifier found in context: %w", err)
 	}
 
+	channel := strings.ToLower(m.Type())
+
 	notification := ent.Notification{
-		Channel: m.Type(),
+		Channel: channel,
 		Payload: payload,
 	}
 
-	globalNotifyCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("channel", notification.Channel)))
+	globalNotifyCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("channel", channel)))
 
 	return notifier.Notify(ctx, notification)
 }

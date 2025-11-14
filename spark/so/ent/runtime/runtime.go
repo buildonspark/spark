@@ -10,6 +10,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
+	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
@@ -137,6 +138,33 @@ func init() {
 	entitydkgkeyDescID := entitydkgkeyMixinFields0[0].Descriptor()
 	// entitydkgkey.DefaultID holds the default value on creation for the id field.
 	entitydkgkey.DefaultID = entitydkgkeyDescID.Default.(func() uuid.UUID)
+	eventmessageMixin := schema.EventMessage{}.Mixin()
+	eventmessageMixinFields0 := eventmessageMixin[0].Fields()
+	_ = eventmessageMixinFields0
+	eventmessageFields := schema.EventMessage{}.Fields()
+	_ = eventmessageFields
+	// eventmessageDescCreateTime is the schema descriptor for create_time field.
+	eventmessageDescCreateTime := eventmessageMixinFields0[1].Descriptor()
+	// eventmessage.DefaultCreateTime holds the default value on creation for the create_time field.
+	eventmessage.DefaultCreateTime = eventmessageDescCreateTime.Default.(func() time.Time)
+	// eventmessageDescUpdateTime is the schema descriptor for update_time field.
+	eventmessageDescUpdateTime := eventmessageMixinFields0[2].Descriptor()
+	// eventmessage.DefaultUpdateTime holds the default value on creation for the update_time field.
+	eventmessage.DefaultUpdateTime = eventmessageDescUpdateTime.Default.(func() time.Time)
+	// eventmessage.UpdateDefaultUpdateTime holds the default value on update for the update_time field.
+	eventmessage.UpdateDefaultUpdateTime = eventmessageDescUpdateTime.UpdateDefault.(func() time.Time)
+	// eventmessageDescChannel is the schema descriptor for channel field.
+	eventmessageDescChannel := eventmessageFields[0].Descriptor()
+	// eventmessage.ChannelValidator is a validator for the "channel" field. It is called by the builders before save.
+	eventmessage.ChannelValidator = eventmessageDescChannel.Validators[0].(func(string) error)
+	// eventmessageDescPayload is the schema descriptor for payload field.
+	eventmessageDescPayload := eventmessageFields[1].Descriptor()
+	// eventmessage.PayloadValidator is a validator for the "payload" field. It is called by the builders before save.
+	eventmessage.PayloadValidator = eventmessageDescPayload.Validators[0].(func(string) error)
+	// eventmessageDescID is the schema descriptor for id field.
+	eventmessageDescID := eventmessageMixinFields0[0].Descriptor()
+	// eventmessage.DefaultID holds the default value on creation for the id field.
+	eventmessage.DefaultID = eventmessageDescID.Default.(func() uuid.UUID)
 	gossipMixin := schema.Gossip{}.Mixin()
 	gossipMixinFields0 := gossipMixin[0].Fields()
 	_ = gossipMixinFields0

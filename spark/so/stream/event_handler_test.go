@@ -10,6 +10,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/so/db"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/eventmessage"
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
@@ -223,4 +226,88 @@ func TestMultipleListenersReceiveNotification(t *testing.T) {
 
 	require.NoError(t, stream1Err, "Stream1 should not have errored")
 	require.NoError(t, stream2Err, "Stream2 should not have errored")
+}
+
+func TestEventRouterTransferNotification(t *testing.T) {
+	ctx, _, dbEvents := db.SetUpDBEventsTestContext(t)
+	dbClient := ctx.Client
+
+	logger := zaptest.NewLogger(t).With(zap.String("component", "events_router"))
+	router := NewEventRouter(dbClient, dbEvents, logger)
+	rng := rand.NewChaCha8([32]byte{})
+
+	receiverKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	senderKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	streamCtx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	stream := &mockStream{ctx: streamCtx}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- router.SubscribeToEvents(receiverKey, stream)
+	}()
+
+	// Give the router some time to register the listener.
+	time.Sleep(200 * time.Millisecond)
+
+	expiry := time.Now().Add(5 * time.Minute)
+	sessionFactory := db.NewDefaultSessionFactory(dbClient, knobs.NewEmptyFixedKnobs())
+	session := sessionFactory.NewSession(t.Context())
+	mutationCtx := ent.InjectNotifier(ent.Inject(t.Context(), session), session)
+	tx, err := session.GetOrBeginTx(mutationCtx)
+	require.NoError(t, err)
+	transfer, err := tx.Transfer.Create().
+		SetSenderIdentityPubkey(senderKey).
+		SetReceiverIdentityPubkey(receiverKey).
+		SetStatus(schematype.TransferStatusSenderKeyTweaked).
+		SetType(schematype.TransferTypeTransfer).
+		SetExpiryTime(expiry).
+		SetTotalValue(100).
+		Save(mutationCtx)
+	require.NoError(t, err)
+	ent.MarkTxDirty(mutationCtx)
+
+	require.NoError(t, tx.Commit())
+
+	require.Eventually(t, func() bool {
+		count, err := dbClient.EventMessage.Query().
+			Where(eventmessage.Channel("transfer")).
+			Count(t.Context())
+		require.NoError(t, err)
+		return count > 0
+	}, time.Second, 50*time.Millisecond, "expected outbox entry")
+
+	require.Eventually(t, func() bool {
+		stream.mu.Lock()
+		defer stream.mu.Unlock()
+		for _, msg := range stream.messages {
+			if msg.GetTransfer() != nil {
+				return true
+			}
+		}
+		return false
+	}, 5*time.Second, 100*time.Millisecond, "expected transfer notification")
+
+	stream.mu.Lock()
+	defer stream.mu.Unlock()
+	var transferEvent *pb.SubscribeToEventsResponse
+	for _, msg := range stream.messages {
+		if msg.GetTransfer() != nil {
+			transferEvent = msg
+			break
+		}
+	}
+	require.NotNil(t, transferEvent, "expected transfer event")
+
+	receivedTransfer := transferEvent.GetTransfer().GetTransfer()
+	require.Equal(t, transfer.ID.String(), receivedTransfer.GetId())
+	require.Equal(t, pb.TransferStatus_TRANSFER_STATUS_SENDER_KEY_TWEAKED, receivedTransfer.GetStatus())
+
+	cancel()
+	select {
+	case <-errCh:
+	case <-time.After(time.Second):
+		t.Fatal("router did not exit after cancel")
+	}
 }

@@ -22,6 +22,8 @@ type Tx struct {
 	DepositAddress *DepositAddressClient
 	// EntityDkgKey is the client for interacting with the EntityDkgKey builders.
 	EntityDkgKey *EntityDkgKeyClient
+	// EventMessage is the client for interacting with the EventMessage builders.
+	EventMessage *EventMessageClient
 	// Gossip is the client for interacting with the Gossip builders.
 	Gossip *GossipClient
 	// L1TokenCreate is the client for interacting with the L1TokenCreate builders.
@@ -207,6 +209,7 @@ func (tx *Tx) init() {
 	tx.CooperativeExit = NewCooperativeExitClient(tx.config)
 	tx.DepositAddress = NewDepositAddressClient(tx.config)
 	tx.EntityDkgKey = NewEntityDkgKeyClient(tx.config)
+	tx.EventMessage = NewEventMessageClient(tx.config)
 	tx.Gossip = NewGossipClient(tx.config)
 	tx.L1TokenCreate = NewL1TokenCreateClient(tx.config)
 	tx.PaymentIntent = NewPaymentIntentClient(tx.config)

@@ -16,6 +16,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
+	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
@@ -105,6 +106,7 @@ func checkColumn(table, column string) error {
 			cooperativeexit.Table:                   cooperativeexit.ValidColumn,
 			depositaddress.Table:                    depositaddress.ValidColumn,
 			entitydkgkey.Table:                      entitydkgkey.ValidColumn,
+			eventmessage.Table:                      eventmessage.ValidColumn,
 			gossip.Table:                            gossip.ValidColumn,
 			l1tokencreate.Table:                     l1tokencreate.ValidColumn,
 			paymentintent.Table:                     paymentintent.ValidColumn,

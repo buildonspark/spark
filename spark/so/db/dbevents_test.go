@@ -130,7 +130,7 @@ func TestCleaningUpListeners(t *testing.T) {
 
 func TestDBEvents(t *testing.T) {
 	t.Parallel()
-	_, connector, dbEvents := SetUpDBEventsTestContext(t)
+	ctx, _, dbEvents := SetUpDBEventsTestContext(t)
 
 	channel, _ := dbEvents.AddListeners([]Subscription{
 		{
@@ -147,75 +147,27 @@ func TestDBEvents(t *testing.T) {
 	payloadJSON, err := json.Marshal(testPayload)
 	require.NoError(t, err)
 
-	query := fmt.Sprintf("NOTIFY test, '%s'", payloadJSON)
-
-	// Due to a race condition, the notification may be sent before the listener is set up
-	// Send multiple notifications to cover the race condition
-	received := false
 	for range 5 {
-		_, err = connector.Pool().Exec(t.Context(), query)
+		_, err = ctx.Client.EventMessage.Create().
+			SetChannel("test").
+			SetPayload(string(payloadJSON)).
+			Save(t.Context())
 		require.NoError(t, err)
 
 		select {
 		case receivedPayload := <-channel:
 			require.JSONEq(t, string(payloadJSON), receivedPayload.Payload)
-			received = true
+			return
 		case <-time.After(200 * time.Millisecond):
 			t.Logf("Failed to receive message after 200ms, retrying...")
 		}
 	}
 
-	require.True(t, received)
-}
-
-func TestDBEventsReconnect(t *testing.T) {
-	_, connector, dbEvents := SetUpDBEventsTestContext(t)
-
-	channel, _ := dbEvents.AddListeners([]Subscription{
-		{
-			EventName: "test",
-			Field:     "id",
-			Value:     "test_id",
-		},
-	})
-
-	err := dbEvents.conn.Close(t.Context())
-	require.NoError(t, err)
-
-	require.Eventually(t, func() bool {
-		return !dbEvents.conn.IsClosed()
-	}, 5*time.Second, 100*time.Millisecond, "Connection should be reestablished")
-
-	testPayload := map[string]any{
-		"id": "test_id",
-	}
-
-	payloadJSON, err := json.Marshal(testPayload)
-	require.NoError(t, err)
-
-	query := fmt.Sprintf("NOTIFY test, '%s'", payloadJSON)
-
-	// Due to a race condition, the notification may be sent before the listener is set up
-	// Send multiple notifications to cover the race condition
-	received := false
-	for range 5 {
-		_, err = connector.Pool().Exec(t.Context(), query)
-		require.NoError(t, err)
-
-		select {
-		case receivedPayload := <-channel:
-			require.JSONEq(t, string(payloadJSON), receivedPayload.Payload)
-			received = true
-		case <-time.After(200 * time.Millisecond):
-			t.Logf("Failed to receive message after 200ms, retrying...")
-		}
-	}
-
-	require.True(t, received)
+	t.Fatal("failed to receive notification")
 }
 
 func TestMultipleListenersReceiveNotification(t *testing.T) {
-	_, connector, dbEvents := SetUpDBEventsTestContext(t)
+	ctx, _, dbEvents := SetUpDBEventsTestContext(t)
 
 	channel1, cleanupListener := dbEvents.AddListeners([]Subscription{
 		{
@@ -235,8 +187,6 @@ func TestMultipleListenersReceiveNotification(t *testing.T) {
 	})
 	defer cleanupListener2()
 
-	time.Sleep(100 * time.Millisecond)
-
 	testPayload := map[string]any{
 		"id": "test_id",
 	}
@@ -244,8 +194,10 @@ func TestMultipleListenersReceiveNotification(t *testing.T) {
 	payloadJSON, err := json.Marshal(testPayload)
 	require.NoError(t, err)
 
-	query := fmt.Sprintf("NOTIFY test, '%s'", payloadJSON)
-	_, err = connector.Pool().Exec(t.Context(), query)
+	_, err = ctx.Client.EventMessage.Create().
+		SetChannel("test").
+		SetPayload(string(payloadJSON)).
+		Save(t.Context())
 	require.NoError(t, err)
 
 	var received1, received2 bool
@@ -262,5 +214,134 @@ func TestMultipleListenersReceiveNotification(t *testing.T) {
 		case <-timeout:
 			t.Fatalf("Timeout waiting for notification. received1: %v, received2: %v", received1, received2)
 		}
+	}
+}
+
+func TestListenerCleanupRemovesEntries(t *testing.T) {
+	_, _, dbEvents := SetUpDBEventsTestContext(t)
+
+	subscription := Subscription{
+		EventName: "test",
+		Field:     "id",
+		Value:     "test_id",
+	}
+
+	_, cleanup := dbEvents.AddListeners([]Subscription{subscription})
+
+	dbEvents.mu.RLock()
+	require.NotEmpty(t, dbEvents.listeners)
+	dbEvents.mu.RUnlock()
+
+	cleanup()
+
+	dbEvents.mu.RLock()
+	defer dbEvents.mu.RUnlock()
+	_, exists := dbEvents.listeners[subscription.EventName]
+	require.False(t, exists, "listener map should be cleaned up")
+}
+
+func TestDBEventsDoesNotRedeliverMessages(t *testing.T) {
+	ctx, _, dbEvents := SetUpDBEventsTestContext(t)
+
+	channel, cleanup := dbEvents.AddListeners([]Subscription{
+		{
+			EventName: "test",
+			Field:     "id",
+			Value:     "test_id",
+		},
+	})
+	defer cleanup()
+
+	payload := `{"id":"test_id"}`
+
+	_, err := ctx.Client.EventMessage.Create().
+		SetChannel("test").
+		SetPayload(payload).
+		Save(t.Context())
+	require.NoError(t, err)
+
+	select {
+	case receivedPayload := <-channel:
+		require.JSONEq(t, payload, receivedPayload.Payload)
+	case <-time.After(time.Second):
+		t.Fatal("expected to receive initial notification")
+	}
+
+	select {
+	case <-channel:
+		t.Fatal("unexpected duplicate message")
+	case <-time.After(300 * time.Millisecond):
+		// no-op; ensured we didn't redeliver
+	}
+}
+
+func TestDBEventsProcessesBatchesAcrossCursor(t *testing.T) {
+	ctx, _, dbEvents := SetUpDBEventsTestContext(t)
+	dbEvents.batchSize = 3
+
+	const (
+		channelName       = "test_batch"
+		subscriptionField = "status"
+		subscriptionValue = "batch"
+	)
+
+	channel, cleanup := dbEvents.AddListeners([]Subscription{
+		{
+			EventName: channelName,
+			Field:     subscriptionField,
+			Value:     subscriptionValue,
+		},
+	})
+	defer cleanup()
+
+	createEvents := func(start, count int) []string {
+		ids := make([]string, 0, count)
+		for i := 0; i < count; i++ {
+			id := fmt.Sprintf("event-%d", start+i)
+			payload := map[string]any{
+				"id":              id,
+				subscriptionField: subscriptionValue,
+			}
+			payloadJSON, err := json.Marshal(payload)
+			require.NoError(t, err)
+
+			_, err = ctx.Client.EventMessage.Create().
+				SetChannel(channelName).
+				SetPayload(string(payloadJSON)).
+				Save(t.Context())
+			require.NoError(t, err)
+			ids = append(ids, id)
+		}
+		return ids
+	}
+
+	receiveEventIDs := func(expected int) []string {
+		ids := make([]string, 0, expected)
+		timeout := time.After(5 * time.Second)
+		for len(ids) < expected {
+			select {
+			case evt := <-channel:
+				var payload map[string]any
+				require.NoError(t, json.Unmarshal([]byte(evt.Payload), &payload))
+				id, ok := payload["id"].(string)
+				require.True(t, ok)
+				ids = append(ids, id)
+			case <-timeout:
+				t.Fatalf("Timeout waiting for events. received=%d expected=%d", len(ids), expected)
+			}
+		}
+		return ids
+	}
+
+	firstBatch := createEvents(0, 12)
+	require.ElementsMatch(t, firstBatch, receiveEventIDs(len(firstBatch)))
+
+	secondBatch := createEvents(12, 5)
+	require.ElementsMatch(t, secondBatch, receiveEventIDs(len(secondBatch)))
+
+	select {
+	case evt := <-channel:
+		t.Fatalf("received unexpected extra event: %v", evt)
+	case <-time.After(200 * time.Millisecond):
 	}
 }

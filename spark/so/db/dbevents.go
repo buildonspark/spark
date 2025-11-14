@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/puddle/v2"
-	"github.com/lightsparkdev/spark/so"
+	entsql "entgo.io/ent/dialect/sql"
+	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -23,31 +23,37 @@ type listenerKey struct {
 	Value any
 }
 
-type channelChange struct {
-	channel   string
-	operation string
-}
-
 type EventData struct {
 	Channel string
 	Payload string
 }
 
-type DBEvents struct {
-	ctx context.Context
-
-	connector *so.DBConnector
-	conn      *pgx.Conn
-
-	waitForNotificationCancel context.CancelFunc
-	mu                        sync.RWMutex
-
-	listeners      map[string]map[listenerKey][]chan EventData
-	channelChanges []channelChange
-
-	logger  *zap.Logger
-	metrics DBEventMetrics
+type eventCursor struct {
+	createTime time.Time
+	id         uuid.UUID
+	valid      bool
 }
+
+type DBEvents struct {
+	ctx    context.Context
+	client *ent.Client
+
+	mu        sync.RWMutex
+	listeners map[string]map[listenerKey][]chan EventData
+
+	logger       *zap.Logger
+	metrics      DBEventMetrics
+	pollInterval time.Duration
+	batchSize    int
+	wakeup       chan struct{}
+
+	lastCursor eventCursor
+}
+
+const (
+	defaultPollInterval = 200 * time.Millisecond
+	defaultBatchSize    = 512
+)
 
 type DBEventMetrics struct {
 	listenCount  metric.Int64Counter
@@ -87,75 +93,43 @@ func NewDBEventMetrics() DBEventMetrics {
 	}
 }
 
-func NewDBEvents(ctx context.Context, connector *so.DBConnector, logger *zap.Logger) (*DBEvents, error) {
-	conn, err := connector.Pool().Acquire(ctx)
+func NewDBEvents(ctx context.Context, client *ent.Client, logger *zap.Logger) (*DBEvents, error) {
+	cursor, err := latestCursor(ctx, client)
 	if err != nil {
 		return nil, err
 	}
 
-	rawConn := conn.Hijack()
-
 	events := &DBEvents{
-		ctx:            ctx,
-		connector:      connector,
-		listeners:      make(map[string]map[listenerKey][]chan EventData),
-		conn:           rawConn,
-		channelChanges: []channelChange{},
-		logger:         logger,
-		metrics:        NewDBEventMetrics(),
+		ctx:          ctx,
+		client:       client,
+		listeners:    make(map[string]map[listenerKey][]chan EventData),
+		logger:       logger,
+		metrics:      NewDBEventMetrics(),
+		pollInterval: defaultPollInterval,
+		batchSize:    defaultBatchSize,
+		wakeup:       make(chan struct{}, 1),
+		lastCursor:   cursor,
 	}
+
+	events.signalWakeup()
 
 	return events, nil
 }
 
 func (e *DBEvents) Start() error {
-	return e.listenForEvents()
-}
+	ticker := time.NewTicker(e.pollInterval)
+	defer ticker.Stop()
 
-func (e *DBEvents) listenForEvents() error {
 	for {
-		err := e.waitForNotification()
-		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				// We have two different contexts, one that can be cancelled when adding or removing listeners,
-				// and the main context for the entire DBEvents. We only want to return if the latter is cancelled.
-				if errors.Is(e.ctx.Err(), context.Canceled) {
-					return nil
-				}
-			} else {
-				e.logger.With(zap.Error(err)).Error("error waiting for notification")
-
-				if e.conn.PgConn().IsClosed() {
-					if err := e.reconnect(); err != nil {
-						if errors.Is(err, context.Canceled) || errors.Is(err, puddle.ErrClosedPool) {
-							return nil
-						}
-						e.logger.With(zap.Error(err)).Error("error reconnecting")
-					}
-				}
-			}
+		select {
+		case <-e.ctx.Done():
+			return nil
+		case <-ticker.C:
+			e.pollOnce()
+		case <-e.wakeup:
+			e.pollOnce()
 		}
 	}
-}
-
-func (e *DBEvents) waitForNotification() error {
-	e.processChannelChanges()
-
-	ctx, cancel := context.WithCancel(e.ctx)
-	defer cancel()
-
-	e.mu.Lock()
-	e.waitForNotificationCancel = cancel
-	e.mu.Unlock()
-
-	notification, err := e.conn.WaitForNotification(ctx)
-	if err != nil {
-		return err
-	}
-
-	e.processNotification(notification)
-
-	return nil
 }
 
 type Subscription struct {
@@ -173,10 +147,6 @@ func (e *DBEvents) AddListeners(subscriptions []Subscription) (chan EventData, f
 	for _, subscription := range subscriptions {
 		if _, exists := e.listeners[subscription.EventName]; !exists {
 			e.listeners[subscription.EventName] = make(map[listenerKey][]chan EventData)
-			e.channelChanges = append(e.channelChanges, channelChange{
-				channel:   subscription.EventName,
-				operation: "listen",
-			})
 		}
 
 		key := listenerKey{
@@ -184,11 +154,7 @@ func (e *DBEvents) AddListeners(subscriptions []Subscription) (chan EventData, f
 			Value: subscription.Value,
 		}
 
-		if existingChannels, exists := e.listeners[subscription.EventName][key]; exists {
-			e.listeners[subscription.EventName][key] = append(existingChannels, channel)
-		} else {
-			e.listeners[subscription.EventName][key] = []chan EventData{channel}
-		}
+		e.listeners[subscription.EventName][key] = append(e.listeners[subscription.EventName][key], channel)
 	}
 
 	cleanup := func() {
@@ -196,186 +162,187 @@ func (e *DBEvents) AddListeners(subscriptions []Subscription) (chan EventData, f
 		defer e.mu.Unlock()
 
 		for _, subscription := range subscriptions {
-			if channels, exists := e.listeners[subscription.EventName]; exists {
-				key := listenerKey{
-					Field: subscription.Field,
-					Value: subscription.Value,
-				}
-
-				if channelSlice, exists := channels[key]; exists {
-					for i, ch := range channelSlice {
-						if ch == channel {
-							channelSlice = append(channelSlice[:i], channelSlice[i+1:]...)
-
-							if len(channelSlice) == 0 {
-								delete(channels, key)
-
-								if len(channels) == 0 {
-									delete(e.listeners, subscription.EventName)
-									e.channelChanges = append(e.channelChanges, channelChange{
-										channel:   subscription.EventName,
-										operation: "unlisten",
-									})
-								}
-							} else {
-								channels[key] = channelSlice
-							}
-							break
-						}
-					}
-				}
-			}
+			e.removeListenerLocked(subscription, channel)
 		}
 
 		close(channel)
-
-		if len(e.channelChanges) > 0 && e.waitForNotificationCancel != nil {
-			e.waitForNotificationCancel()
-		}
 	}
 
-	if len(e.channelChanges) > 0 && e.waitForNotificationCancel != nil {
-		e.waitForNotificationCancel()
-	}
+	e.signalWakeup()
 
 	return channel, cleanup
 }
 
-func (e *DBEvents) processNotification(notification *pgconn.Notification) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	e.metrics.listenCount.Add(e.ctx, 1, metric.WithAttributes(attribute.String("channel", notification.Channel)))
-
-	if c, exists := e.listeners[notification.Channel]; exists {
-		var payload map[string]any
-		if err := json.Unmarshal([]byte(notification.Payload), &payload); err != nil {
-			return
-		}
-
-		for field, value := range payload {
-			key := listenerKey{Field: field, Value: value}
-			if listeners, exists := c[key]; exists {
-				eventData := EventData{
-					Channel: notification.Channel,
-					Payload: notification.Payload,
-				}
-				for _, channel := range listeners {
-					select {
-					case channel <- eventData:
-						e.metrics.forwardCount.Add(
-							e.ctx,
-							1,
-							metric.WithAttributes(
-								attribute.String("channel", notification.Channel),
-								attribute.String("result", "success"),
-							),
-						)
-					default:
-						e.logger.Sugar().Warnf("Listener channel is full (field: %s, value: %s)", field, value)
-						e.metrics.forwardCount.Add(
-							e.ctx,
-							1,
-							metric.WithAttributes(
-								attribute.String("channel", notification.Channel),
-								attribute.String("result", "failure"),
-							),
-						)
-					}
-				}
-			}
-		}
-	} else {
-		e.channelChanges = append(e.channelChanges, channelChange{
-			channel:   notification.Channel,
-			operation: "unlisten",
-		})
-		if e.waitForNotificationCancel != nil {
-			e.waitForNotificationCancel()
-		}
+func (e *DBEvents) removeListenerLocked(subscription Subscription, channel chan EventData) {
+	channels, exists := e.listeners[subscription.EventName]
+	if !exists {
+		return
 	}
-}
 
-func (e *DBEvents) processChannelChanges() {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	for _, channelChange := range e.channelChanges {
-		switch channelChange.operation {
-		case "listen":
-			err := e.startListening(channelChange.channel)
-			if err != nil {
-				e.logger.With(zap.Error(err)).Sugar().Errorf("error listening for channel %s", channelChange.channel)
-			}
-		case "unlisten":
-			err := e.stopListening(channelChange.channel)
-			if err != nil {
-				e.logger.With(zap.Error(err)).Sugar().Errorf("error unlistening for channel %s", channelChange.channel)
-			}
-			delete(e.listeners, channelChange.channel)
-		default:
-			e.logger.Sugar().Errorf("invalid channel change operation %s", channelChange.operation)
-		}
+	key := listenerKey{
+		Field: subscription.Field,
+		Value: subscription.Value,
 	}
-	e.channelChanges = []channelChange{}
-}
 
-func (e *DBEvents) startListening(channel string) error {
-	_, err := e.conn.Exec(e.ctx, "LISTEN "+channel)
-	return err
-}
+	channelSlice, exists := channels[key]
+	if !exists {
+		return
+	}
 
-func (e *DBEvents) stopListening(channel string) error {
-	_, err := e.conn.Exec(e.ctx, "UNLISTEN "+channel)
-	return err
-}
-
-func (e *DBEvents) reconnect() error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	backoff := 100 * time.Millisecond
-	const maxBackoff = time.Minute
-
-	for {
-		if e.conn != nil {
-			if err := e.conn.Close(e.ctx); err != nil {
-				e.logger.With(zap.Error(err)).Error("error closing connection")
-				return err
-			}
-		}
-
-		conn, err := e.connector.Pool().Acquire(e.ctx)
-		if err == nil {
-			e.conn = conn.Hijack()
+	for i, ch := range channelSlice {
+		if ch == channel {
+			channelSlice = append(channelSlice[:i], channelSlice[i+1:]...)
 			break
-		} else if errors.Is(err, context.Canceled) || errors.Is(err, puddle.ErrClosedPool) {
-			return err
-		}
-
-		e.logger.With(zap.Error(err)).Error("reconnect failed, retrying")
-
-		select {
-		case <-e.ctx.Done():
-			return e.ctx.Err()
-		case <-time.After(backoff):
-		}
-
-		backoff *= 2
-		if backoff > maxBackoff {
-			backoff = maxBackoff
 		}
 	}
 
-	return e.reestablishListeners()
+	if len(channelSlice) == 0 {
+		delete(channels, key)
+	} else {
+		channels[key] = channelSlice
+	}
+
+	if len(channels) == 0 {
+		delete(e.listeners, subscription.EventName)
+	}
 }
 
-func (e *DBEvents) reestablishListeners() error {
-	for eventName := range e.listeners {
-		if err := e.startListening(eventName); err != nil {
-			return err
-		}
+func (e *DBEvents) pollOnce() {
+	channels := e.activeChannels()
+	if len(channels) == 0 {
+		return
 	}
 
-	return nil
+	messages, err := e.fetchEvents(channels)
+	if err != nil {
+		if !errors.Is(err, context.Canceled) {
+			e.logger.With(zap.Error(err)).Error("error polling event messages")
+		}
+		return
+	}
+
+	if len(messages) == 0 {
+		return
+	}
+
+	e.handleMessages(messages)
+
+	if len(messages) == e.batchSize {
+		e.signalWakeup()
+	}
+}
+
+func (e *DBEvents) activeChannels() []string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	channels := make([]string, 0, len(e.listeners))
+	for name := range e.listeners {
+		channels = append(channels, name)
+	}
+	return channels
+}
+
+func (e *DBEvents) fetchEvents(channels []string) ([]*ent.EventMessage, error) {
+	query := e.client.EventMessage.
+		Query().
+		Where(eventmessage.ChannelIn(channels...)).
+		Order(eventmessage.ByCreateTime(), eventmessage.ByID()).
+		Limit(e.batchSize)
+
+	if e.lastCursor.valid {
+		query = query.Where(eventmessage.GreaterThanCursor(e.lastCursor.createTime, e.lastCursor.id))
+	}
+
+	return query.All(e.ctx)
+}
+
+func (e *DBEvents) handleMessages(messages []*ent.EventMessage) {
+	for _, msg := range messages {
+		e.processMessage(msg)
+		e.lastCursor = eventCursor{
+			createTime: msg.CreateTime,
+			id:         msg.ID,
+			valid:      true,
+		}
+	}
+}
+
+func (e *DBEvents) processMessage(msg *ent.EventMessage) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.metrics.listenCount.Add(e.ctx, 1, metric.WithAttributes(attribute.String("channel", msg.Channel)))
+
+	c, exists := e.listeners[msg.Channel]
+	if !exists {
+		return
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(msg.Payload), &payload); err != nil {
+		return
+	}
+
+	for field, value := range payload {
+		key := listenerKey{Field: field, Value: value}
+		if listeners, found := c[key]; found {
+			eventData := EventData{
+				Channel: msg.Channel,
+				Payload: msg.Payload,
+			}
+			for _, ch := range listeners {
+				select {
+				case ch <- eventData:
+					e.metrics.forwardCount.Add(
+						e.ctx,
+						1,
+						metric.WithAttributes(
+							attribute.String("channel", msg.Channel),
+							attribute.String("result", "success"),
+						),
+					)
+				default:
+					e.logger.Sugar().Warnf("Listener channel is full (field: %s, value: %s)", field, value)
+					e.metrics.forwardCount.Add(
+						e.ctx,
+						1,
+						metric.WithAttributes(
+							attribute.String("channel", msg.Channel),
+							attribute.String("result", "failure"),
+						),
+					)
+				}
+			}
+		}
+	}
+}
+
+func (e *DBEvents) signalWakeup() {
+	select {
+	case e.wakeup <- struct{}{}:
+	default:
+	}
+}
+
+func latestCursor(ctx context.Context, client *ent.Client) (eventCursor, error) {
+	msg, err := client.EventMessage.
+		Query().
+		Order(
+			eventmessage.ByCreateTime(entsql.OrderDesc()),
+			eventmessage.ByID(entsql.OrderDesc()),
+		).
+		First(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return eventCursor{}, nil
+		}
+		return eventCursor{}, err
+	}
+
+	return eventCursor{
+		createTime: msg.CreateTime,
+		id:         msg.ID,
+		valid:      true,
+	}, nil
 }

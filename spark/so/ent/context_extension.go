@@ -176,6 +176,7 @@ func (b *BufferedNotifier) Flush(ctx context.Context) error {
 		return nil
 	}
 
+	bulk := make([]*EventMessageCreate, 0, len(b.notifications))
 	for _, n := range b.notifications {
 		// Serialize as JSON before sending to Postgres
 		jsonPayload, err := json.Marshal(n.Payload)
@@ -183,12 +184,16 @@ func (b *BufferedNotifier) Flush(ctx context.Context) error {
 			return fmt.Errorf("failed to marshal notification payload: %w", err)
 		}
 
-		// nolint:forbidigo
-		_, err = b.dbClient.ExecContext(ctx, fmt.Sprintf("NOTIFY %s, '%s'", n.Channel, string(jsonPayload)))
-		if err != nil {
-			return fmt.Errorf("failed to send notification: %w", err)
-		}
+		bulk = append(bulk, b.dbClient.EventMessage.Create().
+			SetChannel(n.Channel).
+			SetPayload(string(jsonPayload)))
 	}
+
+	if err := b.dbClient.EventMessage.CreateBulk(bulk...).Exec(ctx); err != nil {
+		return fmt.Errorf("failed to persist notification: %w", err)
+	}
+
+	b.notifications = b.notifications[:0]
 
 	return nil
 }

@@ -341,29 +341,6 @@ func main() {
 	}
 	defer connector.Close()
 
-	dbEvents, err := db.NewDBEvents(errCtx, connector, logger.With(zap.String("component", "dbevents")))
-	if err != nil {
-		logger.Fatal("Failed to create db events", zap.Error(err))
-	}
-
-	if config.Database.DBEventsEnabled != nil && *config.Database.DBEventsEnabled {
-		errGrp.Go(func() error {
-			err = dbEvents.Start()
-			if err != nil {
-				logger.Error("Error in dbevents", zap.Error(err))
-				return err
-			}
-
-			if errCtx.Err() == nil {
-				// This technically isn't an error, but raise it as one because dbevents should never
-				// stop unless we explicitly tell it to when shutting down!
-				return fmt.Errorf("dbevents stopped unexpectedly")
-			}
-
-			return nil
-		})
-	}
-
 	for _, op := range config.SigningOperatorMap {
 		op.SetTimeoutProvider(knobs.NewKnobsTimeoutProvider(knobsService, config.GRPC.ClientTimeout))
 		op.SetConnectionPoolConfig(operatorPoolConfigFromKnobs(knobsService, op.Identifier))
@@ -432,6 +409,28 @@ func main() {
 			return v, err
 		})
 	})
+
+	dbEvents, err := db.NewDBEvents(errCtx, dbClient, logger.With(zap.String("component", "dbevents")))
+	if err != nil {
+		logger.Fatal("Failed to create db events", zap.Error(err))
+	}
+
+	if config.Database.DBEventsEnabled != nil && *config.Database.DBEventsEnabled {
+		errGrp.Go(func() error {
+			if err := dbEvents.Start(); err != nil {
+				logger.Error("Error in dbevents", zap.Error(err))
+				return err
+			}
+
+			if errCtx.Err() == nil {
+				// This technically isn't an error, but raise it as one because dbevents should never
+				// stop unless we explicitly tell it to when shutting down!
+				return fmt.Errorf("dbevents stopped unexpectedly")
+			}
+
+			return nil
+		})
+	}
 
 	defer func() {
 		_ = dbClient.Close()

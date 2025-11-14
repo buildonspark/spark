@@ -151,6 +151,7 @@ func SpecificOperatorTestConfig(tb testing.TB, operatorIndex int) *so.Config {
 	identifier := signingOperatorPrefix + strconv.Itoa(operatorIndex+1)
 	opCount := len(signingOperators)
 	threshold := (opCount + 2) / 2 // 1/1, 2/2, 2/3, 3/4, 3/5
+	dbEventsEnabled := true
 	config := so.Config{
 		Index:                      uint64(operatorIndex),
 		Identifier:                 identifier,
@@ -162,6 +163,7 @@ func SpecificOperatorTestConfig(tb testing.TB, operatorIndex int) *so.Config {
 		FrostGRPCConnectionFactory: &TestGRPCConnectionFactory{},
 		SupportedNetworks:          []common.Network{common.Regtest, common.Mainnet},
 	}
+	config.Database.DBEventsEnabled = &dbEventsEnabled
 
 	return &config
 }

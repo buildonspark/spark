@@ -20,6 +20,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/cooperativeexit"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	"github.com/lightsparkdev/spark/so/ent/entitydkgkey"
+	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/l1tokencreate"
 	"github.com/lightsparkdev/spark/so/ent/paymentintent"
@@ -62,6 +63,8 @@ type Client struct {
 	DepositAddress *DepositAddressClient
 	// EntityDkgKey is the client for interacting with the EntityDkgKey builders.
 	EntityDkgKey *EntityDkgKeyClient
+	// EventMessage is the client for interacting with the EventMessage builders.
+	EventMessage *EventMessageClient
 	// Gossip is the client for interacting with the Gossip builders.
 	Gossip *GossipClient
 	// L1TokenCreate is the client for interacting with the L1TokenCreate builders.
@@ -127,6 +130,7 @@ func (c *Client) init() {
 	c.CooperativeExit = NewCooperativeExitClient(c.config)
 	c.DepositAddress = NewDepositAddressClient(c.config)
 	c.EntityDkgKey = NewEntityDkgKeyClient(c.config)
+	c.EventMessage = NewEventMessageClient(c.config)
 	c.Gossip = NewGossipClient(c.config)
 	c.L1TokenCreate = NewL1TokenCreateClient(c.config)
 	c.PaymentIntent = NewPaymentIntentClient(c.config)
@@ -248,6 +252,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		CooperativeExit:                   NewCooperativeExitClient(cfg),
 		DepositAddress:                    NewDepositAddressClient(cfg),
 		EntityDkgKey:                      NewEntityDkgKeyClient(cfg),
+		EventMessage:                      NewEventMessageClient(cfg),
 		Gossip:                            NewGossipClient(cfg),
 		L1TokenCreate:                     NewL1TokenCreateClient(cfg),
 		PaymentIntent:                     NewPaymentIntentClient(cfg),
@@ -296,6 +301,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		CooperativeExit:                   NewCooperativeExitClient(cfg),
 		DepositAddress:                    NewDepositAddressClient(cfg),
 		EntityDkgKey:                      NewEntityDkgKeyClient(cfg),
+		EventMessage:                      NewEventMessageClient(cfg),
 		Gossip:                            NewGossipClient(cfg),
 		L1TokenCreate:                     NewL1TokenCreateClient(cfg),
 		PaymentIntent:                     NewPaymentIntentClient(cfg),
@@ -350,13 +356,14 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey, c.Gossip,
-		c.L1TokenCreate, c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest,
-		c.PreimageShare, c.SigningCommitment, c.SigningKeyshare, c.SigningNonce,
-		c.SparkInvoice, c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
-		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
-		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.Tree,
-		c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
+		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey,
+		c.EventMessage, c.Gossip, c.L1TokenCreate, c.PaymentIntent,
+		c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare, c.SigningCommitment,
+		c.SigningKeyshare, c.SigningNonce, c.SparkInvoice, c.TokenCreate,
+		c.TokenFreeze, c.TokenMint, c.TokenOutput, c.TokenPartialRevocationSecretShare,
+		c.TokenTransaction, c.TokenTransactionPeerSignature, c.Transfer,
+		c.TransferLeaf, c.Tree, c.TreeNode, c.UserSignedTransaction, c.Utxo,
+		c.UtxoSwap, c.WalletSetting,
 	} {
 		n.Use(hooks...)
 	}
@@ -366,13 +373,14 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey, c.Gossip,
-		c.L1TokenCreate, c.PaymentIntent, c.PendingSendTransfer, c.PreimageRequest,
-		c.PreimageShare, c.SigningCommitment, c.SigningKeyshare, c.SigningNonce,
-		c.SparkInvoice, c.TokenCreate, c.TokenFreeze, c.TokenMint, c.TokenOutput,
-		c.TokenPartialRevocationSecretShare, c.TokenTransaction,
-		c.TokenTransactionPeerSignature, c.Transfer, c.TransferLeaf, c.Tree,
-		c.TreeNode, c.UserSignedTransaction, c.Utxo, c.UtxoSwap, c.WalletSetting,
+		c.BlockHeight, c.CooperativeExit, c.DepositAddress, c.EntityDkgKey,
+		c.EventMessage, c.Gossip, c.L1TokenCreate, c.PaymentIntent,
+		c.PendingSendTransfer, c.PreimageRequest, c.PreimageShare, c.SigningCommitment,
+		c.SigningKeyshare, c.SigningNonce, c.SparkInvoice, c.TokenCreate,
+		c.TokenFreeze, c.TokenMint, c.TokenOutput, c.TokenPartialRevocationSecretShare,
+		c.TokenTransaction, c.TokenTransactionPeerSignature, c.Transfer,
+		c.TransferLeaf, c.Tree, c.TreeNode, c.UserSignedTransaction, c.Utxo,
+		c.UtxoSwap, c.WalletSetting,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -389,6 +397,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.DepositAddress.mutate(ctx, m)
 	case *EntityDkgKeyMutation:
 		return c.EntityDkgKey.mutate(ctx, m)
+	case *EventMessageMutation:
+		return c.EventMessage.mutate(ctx, m)
 	case *GossipMutation:
 		return c.Gossip.mutate(ctx, m)
 	case *L1TokenCreateMutation:
@@ -1070,6 +1080,139 @@ func (c *EntityDkgKeyClient) mutate(ctx context.Context, m *EntityDkgKeyMutation
 		return (&EntityDkgKeyDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown EntityDkgKey mutation op: %q", m.Op())
+	}
+}
+
+// EventMessageClient is a client for the EventMessage schema.
+type EventMessageClient struct {
+	config
+}
+
+// NewEventMessageClient returns a client for the EventMessage from the given config.
+func NewEventMessageClient(c config) *EventMessageClient {
+	return &EventMessageClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `eventmessage.Hooks(f(g(h())))`.
+func (c *EventMessageClient) Use(hooks ...Hook) {
+	c.hooks.EventMessage = append(c.hooks.EventMessage, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `eventmessage.Intercept(f(g(h())))`.
+func (c *EventMessageClient) Intercept(interceptors ...Interceptor) {
+	c.inters.EventMessage = append(c.inters.EventMessage, interceptors...)
+}
+
+// Create returns a builder for creating a EventMessage entity.
+func (c *EventMessageClient) Create() *EventMessageCreate {
+	mutation := newEventMessageMutation(c.config, OpCreate)
+	return &EventMessageCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of EventMessage entities.
+func (c *EventMessageClient) CreateBulk(builders ...*EventMessageCreate) *EventMessageCreateBulk {
+	return &EventMessageCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *EventMessageClient) MapCreateBulk(slice any, setFunc func(*EventMessageCreate, int)) *EventMessageCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &EventMessageCreateBulk{err: fmt.Errorf("calling to EventMessageClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*EventMessageCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &EventMessageCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for EventMessage.
+func (c *EventMessageClient) Update() *EventMessageUpdate {
+	mutation := newEventMessageMutation(c.config, OpUpdate)
+	return &EventMessageUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *EventMessageClient) UpdateOne(em *EventMessage) *EventMessageUpdateOne {
+	mutation := newEventMessageMutation(c.config, OpUpdateOne, withEventMessage(em))
+	return &EventMessageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *EventMessageClient) UpdateOneID(id uuid.UUID) *EventMessageUpdateOne {
+	mutation := newEventMessageMutation(c.config, OpUpdateOne, withEventMessageID(id))
+	return &EventMessageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for EventMessage.
+func (c *EventMessageClient) Delete() *EventMessageDelete {
+	mutation := newEventMessageMutation(c.config, OpDelete)
+	return &EventMessageDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *EventMessageClient) DeleteOne(em *EventMessage) *EventMessageDeleteOne {
+	return c.DeleteOneID(em.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *EventMessageClient) DeleteOneID(id uuid.UUID) *EventMessageDeleteOne {
+	builder := c.Delete().Where(eventmessage.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &EventMessageDeleteOne{builder}
+}
+
+// Query returns a query builder for EventMessage.
+func (c *EventMessageClient) Query() *EventMessageQuery {
+	return &EventMessageQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeEventMessage},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a EventMessage entity by its id.
+func (c *EventMessageClient) Get(ctx context.Context, id uuid.UUID) (*EventMessage, error) {
+	return c.Query().Where(eventmessage.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *EventMessageClient) GetX(ctx context.Context, id uuid.UUID) *EventMessage {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *EventMessageClient) Hooks() []Hook {
+	return c.hooks.EventMessage
+}
+
+// Interceptors returns the client interceptors.
+func (c *EventMessageClient) Interceptors() []Interceptor {
+	return c.inters.EventMessage
+}
+
+func (c *EventMessageClient) mutate(ctx context.Context, m *EventMessageMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&EventMessageCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&EventMessageUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&EventMessageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&EventMessageDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown EventMessage mutation op: %q", m.Op())
 	}
 }
 
@@ -5191,8 +5334,8 @@ func (c *WalletSettingClient) mutate(ctx context.Context, m *WalletSettingMutati
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, Gossip,
-		L1TokenCreate, PaymentIntent, PendingSendTransfer, PreimageRequest,
+		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, EventMessage,
+		Gossip, L1TokenCreate, PaymentIntent, PendingSendTransfer, PreimageRequest,
 		PreimageShare, SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice,
 		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
 		TokenPartialRevocationSecretShare, TokenTransaction,
@@ -5200,8 +5343,8 @@ type (
 		UserSignedTransaction, Utxo, UtxoSwap, WalletSetting []ent.Hook
 	}
 	inters struct {
-		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, Gossip,
-		L1TokenCreate, PaymentIntent, PendingSendTransfer, PreimageRequest,
+		BlockHeight, CooperativeExit, DepositAddress, EntityDkgKey, EventMessage,
+		Gossip, L1TokenCreate, PaymentIntent, PendingSendTransfer, PreimageRequest,
 		PreimageShare, SigningCommitment, SigningKeyshare, SigningNonce, SparkInvoice,
 		TokenCreate, TokenFreeze, TokenMint, TokenOutput,
 		TokenPartialRevocationSecretShare, TokenTransaction,
