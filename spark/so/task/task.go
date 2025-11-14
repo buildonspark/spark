@@ -367,18 +367,21 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					for _, tokenTransaction := range tokenTransactions {
 						ctx, logger = logging.WithAttrs(ctx, tokenslogging.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
 
-						signaturesPackage := make(map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse)
+						// Try to self-finalize
 						finalized, err := internalSignTokenHandler.RecoverFullRevocationSecretsAndFinalize(ctx, tokenTransaction)
 						if err != nil {
-							logger.Error("failed to recover full revocation secrets and finalize token transaction",
-								zap.Error(err),
-							)
+							wrappedErr := fmt.Errorf("failed to recover full revocation secrets and finalize token transaction %s: %w", tokenTransaction.ID, err)
+							logger.Error(wrappedErr.Error())
+							errs = append(errs, wrappedErr)
 							continue
 						}
 						if finalized {
 							logger.Info("Successfully finalized token transaction")
 							continue
 						}
+
+						// If cannot self-finalize, exchange revocation secrets and finalize with peers.
+						signaturesPackage := make(map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse)
 						if tokenTransaction.Edges.PeerSignatures != nil {
 							for _, signature := range tokenTransaction.Edges.PeerSignatures {
 								identifier := config.GetOperatorIdentifierFromIdentityPublicKey(signature.OperatorIdentityPublicKey)
@@ -395,7 +398,10 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 
 						tokenPb, err := tokenTransaction.MarshalProto(ctx, config)
 						if err != nil {
-							return fmt.Errorf("failed to marshal token transaction: %w", err)
+							wrappedErr := fmt.Errorf("failed to marshal token transaction: %w", err)
+							logger.Error(wrappedErr.Error())
+							errs = append(errs, wrappedErr)
+							continue
 						}
 
 						logger.Sugar().Infof("[cron] exchanging revocation secrets and finalizing if possible for token transaction %s with txHash: %s", tokenTransaction.ID, hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash))
