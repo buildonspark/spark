@@ -209,10 +209,6 @@ export abstract class ConnectionManager {
   public getCurrentServerTime(): Date {
     const serverTime = this.timeSync.getCurrentServerTime();
     if (!serverTime) {
-      console.log(
-        "Server time not yet synchronized, falling back to local time. " +
-          "This may result in unpredictable behavior.",
-      );
       return new Date();
     }
 
