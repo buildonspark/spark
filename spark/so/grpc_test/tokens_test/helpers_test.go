@@ -93,6 +93,7 @@ type tokenTransactionParams struct {
 	FinalIssueTokenTransactionHash []byte   // Only used for transfers, nil for mints
 	NumOutputs                     int      // Number of outputs to create (defaults to 2 for backward compatibility)
 	OutputAmounts                  []uint64 // Exact amounts for each output (must match NumOutputs length)
+	NumOutputsToSpend              int      // Number of outputs to spend (defaults to 2 for backward compatibility)
 	MintToSelf                     bool
 	InvoiceAttachments             []*tokenpb.InvoiceAttachment
 	Version                        int // Optional explicit token transaction version (defaults to V2 if 0)
@@ -266,20 +267,25 @@ func createTestTokenTransferTransactionTokenPbWithParams(t *testing.T, config *w
 	if params.Version != 0 {
 		version = uint32(params.Version)
 	}
+
+	numOutputsToSpend := params.NumOutputsToSpend
+	if numOutputsToSpend == 0 {
+		numOutputsToSpend = 2
+	}
+
+	outputsToSpend := make([]*tokenpb.TokenOutputToSpend, numOutputsToSpend)
+	for i := range outputsToSpend {
+		outputsToSpend[i] = &tokenpb.TokenOutputToSpend{
+			PrevTokenTransactionHash: params.FinalIssueTokenTransactionHash,
+			PrevTokenTransactionVout: uint32(i),
+		}
+	}
+
 	transferTokenTransaction := &tokenpb.TokenTransaction{
 		Version: version,
 		TokenInputs: &tokenpb.TokenTransaction_TransferInput{
 			TransferInput: &tokenpb.TokenTransferInput{
-				OutputsToSpend: []*tokenpb.TokenOutputToSpend{
-					{
-						PrevTokenTransactionHash: params.FinalIssueTokenTransactionHash,
-						PrevTokenTransactionVout: 0,
-					},
-					{
-						PrevTokenTransactionHash: params.FinalIssueTokenTransactionHash,
-						PrevTokenTransactionVout: 1,
-					},
-				},
+				OutputsToSpend: outputsToSpend,
 			},
 		},
 		TokenOutputs: []*tokenpb.TokenOutput{

@@ -14,11 +14,13 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
 
 	sparkpb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 
+	"github.com/lightsparkdev/spark/so/knobs"
 	"github.com/lightsparkdev/spark/so/tokens"
 
 	"github.com/google/uuid"
@@ -146,7 +148,7 @@ func (h *InternalPrepareTokenHandler) PrepareTokenTransactionInternal(ctx contex
 				sparkerrors.NotFoundMissingEntity(fmt.Errorf("failed to fetch all leaves to spend: got %d leaves, expected %d", len(inputTtxos), len(req.FinalTokenTransaction.GetTransferInput().GetOutputsToSpend()))))
 		}
 
-		err = validateTransferTokenTransactionUsingPreviousTransactionData(ctx, finalTokenTX, req.GetTokenTransactionSignatures(), inputTtxos, h.config.Lrc20Configs[finalTokenTX.Network.String()].TransactionExpiryDuration)
+		err = h.validateTransferTokenTransactionUsingPreviousTransactionDataAndFinalizeCreatedSignedOutputsIfPossible(ctx, finalTokenTX, req.GetTokenTransactionSignatures(), inputTtxos, h.config.Lrc20Configs[finalTokenTX.Network.String()].TransactionExpiryDuration)
 		if err != nil {
 			return nil, tokens.FormatErrorWithTransactionProto("error validating transfer using previous output data", req.FinalTokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("error validating transfer using previous output data: %w", err)))
 		}
@@ -334,6 +336,11 @@ func validateIssuerOwnerSignatures(operatorIdentityPublicKey keys.Public, ownerS
 	return nil
 }
 
+type potentiallySpendableOutput struct {
+	Output *ent.TokenOutput
+	Err    error
+}
+
 func validateIssuerSignature(
 	tokenTransaction *tokenpb.TokenTransaction,
 	signaturesWithIndex []*tokenpb.SignatureWithIndex,
@@ -350,7 +357,7 @@ func validateIssuerSignature(
 	return nil
 }
 
-func validateTransferTokenTransactionUsingPreviousTransactionData(
+func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPreviousTransactionDataAndFinalizeCreatedSignedOutputsIfPossible(
 	ctx context.Context,
 	tokenTransaction *tokenpb.TokenTransaction,
 	signaturesWithIndex []*tokenpb.SignatureWithIndex,
@@ -404,8 +411,7 @@ func validateTransferTokenTransactionUsingPreviousTransactionData(
 		if useTokenIdentifier {
 			tokenKey, found = tokenIdentifierToCreateID[hex.EncodeToString(output.GetTokenIdentifier())]
 			if !found {
-				return tokens.FormatErrorWithTransactionProto("token not found in inputs", tokenTransaction,
-					sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output token identifier %x does not match any input", output.GetTokenIdentifier())))
+				return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("output token identifier %x does not match any input", output.GetTokenIdentifier()))
 			}
 		} else {
 			tokenKey, found = tokenPublicKeyToCreateID[hex.EncodeToString(output.TokenPublicKey)]
@@ -428,13 +434,11 @@ func validateTransferTokenTransactionUsingPreviousTransactionData(
 
 	for tokenKey, balance := range tokenBalances {
 		if !balance.hasInputs {
-			return tokens.FormatErrorWithTransactionProto("token has outputs but no inputs", tokenTransaction,
-				sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token %s has outputs but no corresponding inputs", tokenKey)))
+			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token %s has outputs but no corresponding inputs", tokenKey))
 		}
 		if balance.inputSum.Cmp(balance.outputSum) != 0 {
-			return tokens.FormatErrorWithTransactionProto("token amount mismatch", tokenTransaction,
-				sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token %s: input amount %s does not match output amount %s",
-					tokenKey, balance.inputSum.String(), balance.outputSum.String())))
+			return sparkerrors.FailedPreconditionTokenRulesViolation(fmt.Errorf("token %s: input amount %s does not match output amount %s",
+				tokenKey, balance.inputSum.String(), balance.outputSum.String()))
 		}
 	}
 
@@ -443,10 +447,10 @@ func validateTransferTokenTransactionUsingPreviousTransactionData(
 		if outputEnt.Network != "" {
 			entNetwork, err := outputEnt.Network.MarshalProto()
 			if err != nil {
-				return tokens.FormatErrorWithTransactionProto("failed to marshal network", tokenTransaction, sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to marshal network: %w", err)))
+				return sparkerrors.InternalTypeConversionError(fmt.Errorf("failed to marshal network: %w", err))
 			}
 			if entNetwork != tokenTransaction.Network {
-				return tokens.FormatErrorWithTransactionProto("network mismatch", tokenTransaction, sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d: %d != %d", i, entNetwork, tokenTransaction.Network)))
+				return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d: %d != %d", i, entNetwork, tokenTransaction.Network))
 			}
 		}
 	}
@@ -455,39 +459,119 @@ func validateTransferTokenTransactionUsingPreviousTransactionData(
 	// Although this token transaction is final we pass in 'true' to generate the partial hash.
 	partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
 	if err != nil {
-		return tokens.FormatErrorWithTransactionProto("failed to hash token transaction", tokenTransaction, err)
+		return fmt.Errorf("failed to hash token transaction: %w", err)
 	}
 
 	ownerSignaturesByIndex := make(map[uint32]*tokenpb.SignatureWithIndex)
 	for _, sig := range signaturesWithIndex {
 		if sig == nil {
-			return tokens.FormatErrorWithTransactionProto("invalid signature", tokenTransaction, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("ownership signature cannot be nil")))
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("ownership signature cannot be nil"))
 		}
 		ownerSignaturesByIndex[sig.InputIndex] = sig
 	}
 
 	if len(signaturesWithIndex) != len(tokenTransaction.GetTransferInput().GetOutputsToSpend()) {
-		return tokens.FormatErrorWithTransactionProto("signature count mismatch", tokenTransaction, sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("number of signatures must match number of outputs to spend")))
+		return sparkerrors.InvalidArgumentMalformedField(fmt.Errorf("number of signatures must match number of outputs to spend"))
 	}
 
+	potentiallySpendableOutputs := make([]potentiallySpendableOutput, 0)
 	for i := range tokenTransaction.GetTransferInput().GetOutputsToSpend() {
 		index := uint32(i)
 		ownershipSignature, exists := ownerSignaturesByIndex[index]
 		if !exists {
-			return tokens.FormatErrorWithTransactionProto("missing signature", tokenTransaction, sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing owner signature for input index %d, indexes must be contiguous", index)))
+			return sparkerrors.InvalidArgumentMissingField(fmt.Errorf("missing owner signature for input index %d, indexes must be contiguous", index))
 		}
 
 		// Get the corresponding output entity (they are ordered outside of this block when they are fetched)
 		outputEnt := outputToSpendEnts[i]
 		if outputEnt == nil {
-			return tokens.FormatErrorWithTransactionProto("missing output entity", tokenTransaction, sparkerrors.NotFoundMissingEntity(fmt.Errorf("could not find output entity for output to spend at index %d", i)))
+			return sparkerrors.NotFoundMissingEntity(fmt.Errorf("could not find output entity for output to spend at index %d", i))
 		}
 		if err := utils.ValidateOwnershipSignature(ownershipSignature.Signature, partialTokenTransactionHash, outputEnt.OwnerPublicKey); err != nil {
-			return tokens.FormatErrorWithTransactionProto("invalid ownership signature", tokenTransaction, fmt.Errorf("invalid ownership signature for output %d: %w", i, err))
+			return sparkerrors.FailedPreconditionBadSignature(fmt.Errorf("invalid ownership signature for output %d: %w", i, err))
 		}
 		if err := validateOutputIsSpendable(ctx, i, outputEnt, tokenTransaction, v0DefaultTransactionExpiryDuration); err != nil {
+			if outputEnt.Status == st.TokenOutputStatusCreatedSigned {
+				// Collect potentially spendable outputs for just in time self-healing during transfer
+				potentiallySpendableOutputs = append(potentiallySpendableOutputs, potentiallySpendableOutput{
+					Output: outputEnt,
+					Err:    err,
+				})
+				continue
+			}
 			return err
 		}
+	}
+
+	if len(potentiallySpendableOutputs) > 0 {
+		if knobs.GetKnobsService(ctx).GetValue(knobs.KnobFinalizeCreatedSignedOutputsJustInTime, 0) == 0 {
+			logger := logging.GetLoggerFromContext(ctx)
+			errs := make([]error, len(potentiallySpendableOutputs))
+			for i, output := range potentiallySpendableOutputs {
+				errs[i] = output.Err
+			}
+			partialTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, true)
+			if err != nil {
+				return fmt.Errorf("failed to hash token transaction: %w", err)
+			}
+			finalTokenTransactionHash, err := utils.HashTokenTransaction(tokenTransaction, false)
+			if err != nil {
+				return fmt.Errorf("failed to hash token transaction: %w", err)
+			}
+			logger.Info(
+				"Just in time finalization is disabled for transaction",
+				zap.String("partial_transaction_hash", hex.EncodeToString(partialTokenTransactionHash)),
+				zap.String("final_transaction_hash", hex.EncodeToString(finalTokenTransactionHash)),
+				zap.Int("potentially_spendable_outputs", len(potentiallySpendableOutputs)),
+				zap.Errors("errors", errs),
+			)
+			return sparkerrors.FailedPreconditionInvalidState(
+				fmt.Errorf(
+					"just in time finalization is disabled, %d potentially spendable outputs. first spendable output error: %w",
+					len(potentiallySpendableOutputs),
+					potentiallySpendableOutputs[0].Err,
+				),
+			)
+		}
+
+		for _, outputResult := range potentiallySpendableOutputs {
+			output := outputResult.Output
+			outputErr := outputResult.Err
+			if err := tryfinalizeCreatedSignedOutput(ctx, h.config, output); err != nil {
+				return fmt.Errorf("%w: failed just in time finalization of created signed output %s: %w", outputErr, output.ID, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func tryfinalizeCreatedSignedOutput(ctx context.Context, config *so.Config, output *ent.TokenOutput) error {
+	outputCreatedTx, err := output.QueryOutputCreatedTokenTransaction().
+		Where(
+			tokentransaction.StatusEQ(st.TokenTransactionStatusRevealed),
+			tokentransaction.HasSpentOutput(),
+		).
+		WithPeerSignatures().
+		WithSpentOutput(func(q *ent.TokenOutputQuery) {
+			q.WithOutputCreatedTokenTransaction()
+			q.WithTokenPartialRevocationSecretShares()
+			q.WithRevocationKeyshare()
+			q.ForUpdate()
+		}).
+		WithCreatedOutput(func(q *ent.TokenOutputQuery) {
+			q.ForUpdate()
+		}).
+		ForUpdate().
+		Only(ctx)
+	if err != nil {
+		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get parent transaction: %w", err))
+	}
+
+	signTokenHandler := NewSignTokenHandler(config)
+	err = signTokenHandler.TryFinalizeRevealedTokenTransaction(ctx, outputCreatedTx)
+	if err != nil {
+		return fmt.Errorf("failed to finalize revealed token transaction %s: %w", outputCreatedTx.ID, err)
 	}
 
 	return nil
@@ -509,7 +593,7 @@ func validateOutputIsSpendable(ctx context.Context, index int, output *ent.Token
 			cannotPreemptErr = preemptOrRejectTransaction(ctx, tokenTransaction, spentTx)
 			canPreemptSpentTx = cannotPreemptErr == nil
 			if !canPreemptSpentTx {
-				return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d cannot be spent: status must be %s or %s (was %s), or have been spent by an expired or pre-emptable transaction (transaction was not expired or pre-emptable, id: %s, final_hash: %s, error: %w)",
+				return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf("output %d cannot be spent: status must be %s or %s (was %s) , or have been spent by an expired or pre-emptable transaction (transaction was not expired or pre-emptable, id: %s, final_hash: %s, error: %w)",
 					index, st.TokenOutputStatusCreatedFinalized, st.TokenOutputStatusSpentStarted, output.Status, spentTx.ID, hex.EncodeToString(spentTx.FinalizedTokenTransactionHash), cannotPreemptErr))
 			}
 		}

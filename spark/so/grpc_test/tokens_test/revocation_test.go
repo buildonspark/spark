@@ -542,6 +542,74 @@ func TestRevocationExchangeCronJobSkipsRevealedWithNoSpentOutputs(t *testing.T) 
 	require.Equal(t, st.TokenTransactionStatusRevealed, tokenTransactionAfterFinalizeRevealedTransactions.Status)
 }
 
+func TestJustInTimeFinalizationOfCreatedSignedOutputOnNonCoordinator(t *testing.T) {
+	ctx := t.Context()
+	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
+	tokenIdentityPubKey := config.IdentityPrivateKey.Public()
+
+	// Mint a token to the issuer
+	mintTx, _, err := createTestTokenMintTransactionTokenPbWithParams(t, config, tokenTransactionParams{
+		TokenIdentityPubKey: tokenIdentityPubKey,
+		IsNativeSparkToken:  false,
+		UseTokenIdentifier:  true,
+		NumOutputs:          2,
+		OutputAmounts:       []uint64{uint64(testIssueOutput1Amount), uint64(testIssueOutput2Amount)},
+		MintToSelf:          true,
+	})
+	require.NoError(t, err, "failed to create test token mint transaction")
+	mintTxResponse, err := wallet.BroadcastTokenTransfer(
+		ctx, config, mintTx,
+		[]keys.Private{config.IdentityPrivateKey},
+	)
+	require.NoError(t, err, "failed to broadcast mint transaction")
+
+	mintTxHash, err := utils.HashTokenTransaction(mintTxResponse, false)
+	require.NoError(t, err, "failed to hash mint transaction")
+
+	// Issuer transfers the output to Alice
+	transferToAlice, alicePrivKey, err := createTestTokenTransferTransactionTokenPb(t,
+		config,
+		mintTxHash,
+		tokenIdentityPubKey,
+	)
+	require.NoError(t, err, "failed to create test token transfer transaction")
+	transferToAliceResponse, err := wallet.BroadcastTokenTransfer(
+		ctx, config, transferToAlice,
+		[]keys.Private{config.IdentityPrivateKey, config.IdentityPrivateKey},
+	)
+	require.NoError(t, err, "failed to broadcast transfer token transaction")
+
+	transferToAliceHash, err := utils.HashTokenTransaction(transferToAliceResponse, false)
+	require.NoError(t, err, "failed to hash transfer token transaction")
+
+	nonCoordOperatorConfig := sparktesting.SpecificOperatorTestConfig(t, 1)
+	nonCoordEntClient := db.NewPostgresEntClientForIntegrationTest(t, nonCoordOperatorConfig.DatabasePath)
+	defer nonCoordEntClient.Close()
+
+	// Set the issuer transfer to Alice as REVEALED on a non-coordinator
+	setAndValidateSuccessfulTokenTransactionToRevealedForOperator(t, ctx, nonCoordEntClient, transferToAliceHash)
+
+	// Alice attempts a transfer to Bob
+	aliceWalletConfig := wallet.NewTestWalletConfigWithIdentityKey(t, alicePrivKey)
+	aliceTransferToBob, _, err := createTestTokenTransferTransactionTokenPbWithParams(t, aliceWalletConfig, tokenTransactionParams{
+		TokenIdentityPubKey:            tokenIdentityPubKey,
+		IsNativeSparkToken:             true,
+		UseTokenIdentifier:             true,
+		FinalIssueTokenTransactionHash: transferToAliceHash,
+		NumOutputs:                     1,
+		OutputAmounts:                  []uint64{uint64(testTransferOutput1Amount)},
+		NumOutputsToSpend:              1,
+	})
+	require.NoError(t, err, "failed to create test token transfer transaction")
+
+	// If Alice successfully transfers to Bob, just-in-time finalization of CREATED_SIGNED outputs was successful
+	_, err = wallet.BroadcastTokenTransfer(
+		ctx, aliceWalletConfig, aliceTransferToBob,
+		[]keys.Private{alicePrivKey},
+	)
+	require.NoError(t, err, "failed to broadcast transfer token transaction")
+}
+
 func createTransferTokenTransactionForWallet(t *testing.T, ctx context.Context) (*wallet.TestWalletConfig, []byte, error) {
 	config := wallet.NewTestWalletConfigWithIdentityKey(t, staticLocalIssuerKey.IdentityPrivateKey())
 

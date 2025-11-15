@@ -2,7 +2,6 @@ package task
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -21,7 +20,6 @@ import (
 	"github.com/lightsparkdev/spark/common/logging"
 	pbspark "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
-	tokeninternalpb "github.com/lightsparkdev/spark/proto/spark_token_internal"
 	"github.com/lightsparkdev/spark/so"
 	sodkg "github.com/lightsparkdev/spark/so/dkg"
 	"github.com/lightsparkdev/spark/so/ent"
@@ -333,7 +331,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					logger := logging.GetLoggerFromContext(ctx)
 					dbTX, err := ent.GetDbFromContext(ctx)
 					if err != nil {
-						return fmt.Errorf("failed to get or create current tx for request: %w", err)
+						return fmt.Errorf("[cron] failed to get or create current tx for request: %w", err)
 					}
 					tokenTransactions, err := dbTX.TokenTransaction.Query().
 						Where(
@@ -361,57 +359,15 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 						return err
 					}
 					logger.Info(fmt.Sprintf("[cron] Found %d token transactions to finalize", len(tokenTransactions)))
-					internalSignTokenHandler := tokens.NewInternalSignTokenHandler(config)
 
 					var errs []error
+					signTokenHandler := tokens.NewSignTokenHandler(config)
+
 					for _, tokenTransaction := range tokenTransactions {
 						ctx, logger = logging.WithAttrs(ctx, tokenslogging.GetEntTokenTransactionZapAttrs(ctx, tokenTransaction)...)
-
-						// Try to self-finalize
-						finalized, err := internalSignTokenHandler.RecoverFullRevocationSecretsAndFinalize(ctx, tokenTransaction)
+						err := signTokenHandler.TryFinalizeRevealedTokenTransaction(ctx, tokenTransaction)
 						if err != nil {
-							wrappedErr := fmt.Errorf("failed to recover full revocation secrets and finalize token transaction %s: %w", tokenTransaction.ID, err)
-							logger.Error(wrappedErr.Error())
-							errs = append(errs, wrappedErr)
-							continue
-						}
-						if finalized {
-							logger.Info("Successfully finalized token transaction")
-							continue
-						}
-
-						// If cannot self-finalize, exchange revocation secrets and finalize with peers.
-						signaturesPackage := make(map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse)
-						if tokenTransaction.Edges.PeerSignatures != nil {
-							for _, signature := range tokenTransaction.Edges.PeerSignatures {
-								identifier := config.GetOperatorIdentifierFromIdentityPublicKey(signature.OperatorIdentityPublicKey)
-								signaturesPackage[identifier] = &tokeninternalpb.SignTokenTransactionFromCoordinationResponse{
-									SparkOperatorSignature: signature.Signature,
-								}
-							}
-						}
-						if tokenTransaction.OperatorSignature != nil {
-							signaturesPackage[config.Identifier] = &tokeninternalpb.SignTokenTransactionFromCoordinationResponse{
-								SparkOperatorSignature: tokenTransaction.OperatorSignature,
-							}
-						}
-
-						tokenPb, err := tokenTransaction.MarshalProto(ctx, config)
-						if err != nil {
-							wrappedErr := fmt.Errorf("failed to marshal token transaction: %w", err)
-							logger.Error(wrappedErr.Error())
-							errs = append(errs, wrappedErr)
-							continue
-						}
-
-						logger.Sugar().Infof("[cron] exchanging revocation secrets and finalizing if possible for token transaction %s with txHash: %s", tokenTransaction.ID, hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash))
-
-						signTokenHandler := tokens.NewSignTokenHandler(config)
-						_, err = signTokenHandler.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, tokenPb, signaturesPackage, tokenTransaction.FinalizedTokenTransactionHash)
-						if err != nil {
-							wrappedErr := fmt.Errorf("cron job failed to exchange revocation secrets and finalize if possible for token transaction %s: %w", tokenTransaction.ID, err)
-							logger.Error(wrappedErr.Error())
-							errs = append(errs, wrappedErr)
+							errs = append(errs, fmt.Errorf("[cron] failed to finalize revealed token transaction %s: %w", tokenTransaction.ID, err))
 						}
 					}
 					return errors.Join(errs...)

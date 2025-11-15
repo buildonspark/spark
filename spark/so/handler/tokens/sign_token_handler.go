@@ -219,6 +219,55 @@ func (h *SignTokenHandler) ExchangeRevocationSecretsAndFinalizeIfPossible(ctx co
 	}
 }
 
+func (h *SignTokenHandler) TryFinalizeRevealedTokenTransaction(ctx context.Context, tokenTransaction *ent.TokenTransaction) error {
+	logger := logging.GetLoggerFromContext(ctx)
+
+	if tokenTransaction.Status != st.TokenTransactionStatusRevealed {
+		return sparkerrors.FailedPreconditionInvalidState(fmt.Errorf(
+			"Failed to finalize revealed token transaction: must be %s (was: %s), txHash: %s, ", st.TokenTransactionStatusRevealed, tokenTransaction.Status, hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash)))
+	}
+
+	// attempt to internally finalize the transaciton
+	internalSignTokenHandler := NewInternalSignTokenHandler(h.config)
+	finalized, err := internalSignTokenHandler.RecoverFullRevocationSecretsAndFinalize(ctx, tokenTransaction)
+	if err != nil {
+		return fmt.Errorf("Failed to internally recover full revocation secrets and finalize token transaction: %w", err)
+	}
+	if finalized {
+		logger.Sugar().Infof("Successfully finalized token transaction %s", tokenTransaction.ID)
+		return nil
+	}
+
+	// if the transaction was not finalized internally, attempt to finalize with all operators
+	signaturesPackage := make(map[string]*tokeninternalpb.SignTokenTransactionFromCoordinationResponse)
+	if tokenTransaction.Edges.PeerSignatures != nil {
+		for _, signature := range tokenTransaction.Edges.PeerSignatures {
+			identifier := h.config.GetOperatorIdentifierFromIdentityPublicKey(signature.OperatorIdentityPublicKey)
+			signaturesPackage[identifier] = &tokeninternalpb.SignTokenTransactionFromCoordinationResponse{
+				SparkOperatorSignature: signature.Signature,
+			}
+		}
+	}
+	if tokenTransaction.OperatorSignature != nil {
+		signaturesPackage[h.config.Identifier] = &tokeninternalpb.SignTokenTransactionFromCoordinationResponse{
+			SparkOperatorSignature: tokenTransaction.OperatorSignature,
+		}
+	}
+
+	tokenPb, err := tokenTransaction.MarshalProto(ctx, h.config)
+	if err != nil {
+		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to marshal parent transaction: %w", err))
+	}
+	logger.Sugar().Infof("Exchanging revocation secrets and finalizing if possible for token transaction %s with txHash: %s", tokenTransaction.ID, hex.EncodeToString(tokenTransaction.FinalizedTokenTransactionHash))
+
+	_, err = h.ExchangeRevocationSecretsAndFinalizeIfPossible(ctx, tokenPb, signaturesPackage, tokenTransaction.FinalizedTokenTransactionHash)
+	if err != nil {
+		return fmt.Errorf("Failed to exchange revocation secrets and finalize %s: %w", tokenTransaction.ID, err)
+	}
+
+	return nil
+}
+
 // checkShouldReturnEarlyWithoutProcessing determines if the transaction should return early based on the signatures
 // and/or revocation keyshares already retrieved by this SO (which may have happened if this is a duplicate call or retry).
 func (h *SignTokenHandler) checkShouldReturnEarlyWithoutProcessing(
