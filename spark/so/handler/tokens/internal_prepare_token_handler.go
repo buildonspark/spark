@@ -537,7 +537,7 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 		for _, outputResult := range potentiallySpendableOutputs {
 			output := outputResult.Output
 			outputErr := outputResult.Err
-			if err := tryfinalizeCreatedSignedOutput(ctx, h.config, output); err != nil {
+			if err := tryFinalizeCreatedSignedOutput(ctx, h.config, output); err != nil {
 				return fmt.Errorf("%w: failed just in time finalization of created signed output %s: %w", outputErr, output.ID, err)
 			}
 		}
@@ -546,7 +546,7 @@ func (h *InternalPrepareTokenHandler) validateTransferTokenTransactionUsingPrevi
 	return nil
 }
 
-func tryfinalizeCreatedSignedOutput(ctx context.Context, config *so.Config, output *ent.TokenOutput) error {
+func tryFinalizeCreatedSignedOutput(ctx context.Context, config *so.Config, output *ent.TokenOutput) error {
 	outputCreatedTx, err := output.QueryOutputCreatedTokenTransaction().
 		Where(
 			tokentransaction.StatusEQ(st.TokenTransactionStatusRevealed),
