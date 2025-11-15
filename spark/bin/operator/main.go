@@ -587,7 +587,9 @@ func main() {
 	}
 
 	serverOpts := []grpc.ServerOption{
-		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		grpc.StatsHandler(
+			sparkgrpc.NewInstrumentedStatsHandler(otelgrpc.NewServerHandler()),
+		),
 	}
 
 	// Establish base values from config, then allow runtime knobs to override
