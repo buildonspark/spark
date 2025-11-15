@@ -481,9 +481,6 @@ func (r *RateLimiter) resolveScopeLimits(baseKey string, suffix string) (ipLimit
 
 func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-		ctx, span := tracer.Start(ctx, "RateLimiterInterceptor")
-		defer span.End()
-
 		// Check if the method is enabled.
 		methodEnabled := r.knobs.RolloutRandomTarget(knobs.KnobGrpcServerMethodEnabled, &info.FullMethod, 100)
 		if !methodEnabled {

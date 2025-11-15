@@ -22,9 +22,6 @@ func DatabaseSessionMiddleware(dbClient *ent.Client, factory db.SessionFactory, 
 			return handler(ctx, req)
 		}
 
-		ctx, span := tracer.Start(ctx, "DatabaseSessionMiddleware")
-		defer span.End()
-
 		logger := logging.GetLoggerFromContext(ctx)
 
 		opts := []db.SessionOption{}
