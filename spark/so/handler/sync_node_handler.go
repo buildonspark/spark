@@ -231,6 +231,7 @@ func (h *SyncNodeHandler) createMissingSplitNode(ctx context.Context, db *ent.Cl
 	createBuilder := db.TreeNode.Create().
 		SetID(nodeUUID).
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetStatus(status).
 		SetValue(node.Value).
 		SetVerifyingPubkey(verifyingPubkey).

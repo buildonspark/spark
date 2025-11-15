@@ -181,6 +181,7 @@ func createTestRenewTreeNode(t *testing.T, ctx context.Context, rng io.Reader, d
 	nodeCreate := dbClient.TreeNode.Create().
 		SetStatus(st.TreeNodeStatusAvailable).
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetSigningKeyshare(keyshare).
 		SetValue(100000).
 		SetVerifyingPubkey(verifyingPubKey).
@@ -625,6 +626,7 @@ func TestValidateRenewNodeTimelocks(t *testing.T) {
 			leafNode := tx.TreeNode.Create().
 				SetStatus(st.TreeNodeStatusAvailable).
 				SetTree(tree).
+				SetNetwork(tree.Network).
 				SetSigningKeyshare(keyshare).
 				SetValue(100000).
 				SetVerifyingPubkey(verifyingPubKey).
@@ -726,6 +728,7 @@ func TestValidateRenewRefundTimelock(t *testing.T) {
 			leafNode := tx.TreeNode.Create().
 				SetStatus(st.TreeNodeStatusAvailable).
 				SetTree(tree).
+				SetNetwork(tree.Network).
 				SetSigningKeyshare(keyshare).
 				SetValue(100000).
 				SetVerifyingPubkey(verifyingPubKey).
@@ -834,6 +837,7 @@ func TestValidateRenewNodeZeroTimelock(t *testing.T) {
 			leafNode := tx.TreeNode.Create().
 				SetStatus(st.TreeNodeStatusAvailable).
 				SetTree(tree).
+				SetNetwork(tree.Network).
 				SetSigningKeyshare(keyshare).
 				SetValue(100000).
 				SetVerifyingPubkey(verifyingPubKey).

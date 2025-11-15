@@ -207,6 +207,7 @@ func TestQueryNodes_StatusField(t *testing.T) {
 	for _, tt := range statusTests {
 		node, err := tx.TreeNode.Create().
 			SetTree(tree).
+			SetNetwork(tree.Network).
 			SetStatus(tt.status).
 			SetOwnerIdentityPubkey(identityPubKey).
 			SetOwnerSigningPubkey(signingPubKey).
@@ -390,6 +391,7 @@ func createPrivacyTestData(t *testing.T, privacyEnabled bool, sameRequesterAndOw
 	// Create tree node
 	node, err := tx.TreeNode.Create().
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetStatus(st.TreeNodeStatusAvailable).
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
 		SetOwnerSigningPubkey(signingPubKey).

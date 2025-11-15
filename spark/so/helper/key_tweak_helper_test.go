@@ -63,6 +63,7 @@ func TestTweakLeafKey(t *testing.T) {
 
 	leaf, err := dbClient.TreeNode.Create().
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetValue(1000).
 		SetStatus(schematype.TreeNodeStatusAvailable).
 		SetVerifyingPubkey(verifyingPub).
@@ -158,6 +159,7 @@ func TestTweakLeafKey_EmptySecretShareTweakProofsList(t *testing.T) {
 
 	leaf, err := dbClient.TreeNode.Create().
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetValue(1000).
 		SetStatus(schematype.TreeNodeStatusAvailable).
 		SetVerifyingPubkey(verifyingPub).

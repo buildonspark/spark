@@ -134,6 +134,7 @@ func createTestTreeNode(t *testing.T, ctx context.Context, rng io.Reader, client
 	leaf, err := client.TreeNode.Create().
 		SetStatus(st.TreeNodeStatusTransferLocked).
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetSigningKeyshare(keyshare).
 		SetValue(uint64(leafAmount)).
 		SetVerifyingPubkey(verifyingPubKey).

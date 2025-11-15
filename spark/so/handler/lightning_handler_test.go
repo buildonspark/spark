@@ -840,6 +840,7 @@ func TestPreimageSwapAuthorizationBugRegression(t *testing.T) {
 
 		_, err = tx.TreeNode.Create().
 			SetTree(tree).
+			SetNetwork(tree.Network).
 			SetID(nodeID). // Use the specific ID from the test
 			SetValue(1000).
 			SetStatus(st.TreeNodeStatusAvailable).
@@ -943,6 +944,7 @@ func TestValidateGetPreimageRequestMismatchedAmounts(t *testing.T) {
 
 	_, err = tx.TreeNode.Create().
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetID(nodeID).
 		SetValue(500). // This is the value in the tree node, but RawTx will also have 500 sats
 		SetStatus(st.TreeNodeStatusAvailable).

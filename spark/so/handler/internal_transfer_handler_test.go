@@ -139,6 +139,7 @@ func TestFinalizeTransfer(t *testing.T) {
 		leaf, err := dbCtx.Client.TreeNode.Create().
 			SetStatus(st.TreeNodeStatusAvailable).
 			SetTree(tree).
+			SetNetwork(tree.Network).
 			SetSigningKeyshare(signingKeyshare).
 			SetValue(1000).
 			SetVerifyingPubkey(verifyingPrivKey.Public()).
@@ -332,6 +333,7 @@ func TestApplySignatures(t *testing.T) {
 	leaf, err := dbCtx.Client.TreeNode.Create().
 		SetStatus(st.TreeNodeStatusAvailable).
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetSigningKeyshare(signingKeyshare).
 		SetValue(1000).
 		SetVerifyingPubkey(verifyingPubKey).
@@ -603,6 +605,7 @@ func TestUpdateTransferLeavesSignatures(t *testing.T) {
 		leaf, err := dbCtx.Client.TreeNode.Create().
 			SetStatus(st.TreeNodeStatusAvailable).
 			SetTree(tree).
+			SetNetwork(tree.Network).
 			SetSigningKeyshare(signingKeyshare).
 			SetValue(1000).
 			SetVerifyingPubkey(verifyingPubKey).

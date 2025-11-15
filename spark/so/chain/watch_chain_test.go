@@ -240,6 +240,7 @@ func TestHandleBlock_MixedTransactions(t *testing.T) {
 		SetOwnerIdentityPubkey(ownerIDPubKey).
 		SetRawTx(rawNodeTx).
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetValue(1000).
 		SetVerifyingPubkey(verifyingPubKey).
 		SetOwnerSigningPubkey(ownerIDPubKey).
@@ -453,6 +454,7 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 		SetOwnerIdentityPubkey(ownerIDPubKey).
 		SetRawTx(rawParentNodeTx).
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetValue(10000).
 		SetVerifyingPubkey(verifyingPubKey).
 		SetOwnerSigningPubkey(ownerIDPubKey).
@@ -471,6 +473,7 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 		SetOwnerIdentityPubkey(ownerIDPubKey).
 		SetRawTx(rawChildNodeTx1).
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetParent(parentNode).
 		SetValue(5000).
 		SetVerifyingPubkey(verifyingPubKey).
@@ -489,6 +492,7 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 		SetOwnerIdentityPubkey(ownerIDPubKey).
 		SetRawTx(rawChildNodeTx2).
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetParent(parentNode).
 		SetValue(4500).
 		SetVerifyingPubkey(verifyingPubKey).

@@ -223,6 +223,7 @@ func createTestTree(t *testing.T, ctx context.Context, network st.Network, statu
 	node, err := dbTX.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetSigningKeyshare(keyshare).
 		SetValue(1000).
 		SetVerifyingPubkey(verifyingPrivKey.Public()).
@@ -340,6 +341,7 @@ func TestFinalizeSignatureHandler_UpdateNode_NodeWithChildrenStatus(t *testing.T
 	childNode, err := dbTx.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetSigningKeyshare(keyshare).
 		SetParent(parentNode).
 		SetValue(500).
@@ -451,6 +453,7 @@ func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testi
 	child1, err := dbTx.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetSigningKeyshare(keyshare).
 		SetParent(parentNode).
 		SetValue(250).
@@ -472,6 +475,7 @@ func TestFinalizeSignatureHandler_UpdateNode_LoadsChildrenRelationships(t *testi
 	child2, err := dbTx.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetSigningKeyshare(keyshare).
 		SetParent(parentNode).
 		SetValue(250).
@@ -584,6 +588,7 @@ func TestConfirmTreeWithNonRootConfirmation(t *testing.T) {
 	childNode, err := dbTX.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetSigningKeyshare(keyshare).
 		SetValue(65536).
 		SetVerifyingPubkey(childVerifyingKey.Public()).
@@ -694,6 +699,7 @@ func TestFinalizeTreeWithInsufficientConfirmations(t *testing.T) {
 	childNode, err := dbTX.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetSigningKeyshare(keyshare).
 		SetValue(65536).
 		SetVerifyingPubkey(childVerifyingKey.Public()).
@@ -805,6 +811,7 @@ func TestFinalizeTreeWithNoBlockHeight(t *testing.T) {
 	childNode, err := dbTX.TreeNode.Create().
 		SetID(uuid.New()).
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetSigningKeyshare(keyshare).
 		SetValue(65536).
 		SetVerifyingPubkey(childVerifyingKey.Public()).

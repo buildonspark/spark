@@ -2276,6 +2276,7 @@ func (h *TransferHandler) claimTransferSignRefunds(ctx context.Context, req *pb.
 			db.TreeNode.Create().
 				SetID(leaf.ID).
 				SetTree(leaf.Edges.Tree).
+				SetNetwork(leaf.Edges.Tree.Network).
 				SetSigningKeyshare(leaf.Edges.SigningKeyshare).
 				SetValue(leaf.Value).
 				SetVerifyingPubkey(leaf.VerifyingPubkey).
@@ -2582,6 +2583,7 @@ func (h *TransferHandler) SettleReceiverKeyTweak(ctx context.Context, req *pbint
 				db.TreeNode.Create().
 					SetID(treeNode.ID).
 					SetTree(treeNode.Edges.Tree).
+					SetNetwork(treeNode.Edges.Tree.Network).
 					SetSigningKeyshare(treeNode.Edges.SigningKeyshare).
 					SetValue(treeNode.Value).
 					SetVerifyingPubkey(treeNode.VerifyingPubkey).

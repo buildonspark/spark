@@ -185,6 +185,7 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 	// Create a tree node
 	node, err := dbTX.TreeNode.Create().
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetStatus(st.TreeNodeStatusAvailable).
 		SetOwnerIdentityPubkey(identityPrivKey.Public()).
 		SetOwnerSigningPubkey(signingPrivKey.Public()).
@@ -256,6 +257,7 @@ func TestFindParentOutputFromNodeOutput(t *testing.T) {
 				// Create a child node to trigger "already exists" error
 				_, err = dbTX.TreeNode.Create().
 					SetTree(tree).
+					SetNetwork(tree.Network).
 					SetStatus(st.TreeNodeStatusAvailable).
 					SetOwnerIdentityPubkey(ownerIdentityPubKey).
 					SetOwnerSigningPubkey(ownerSigningPubKey).
@@ -584,6 +586,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	rawTx := createTestTxBytesWithIndex(t, 100000, 0)
 	availableNode, err := dbTX.TreeNode.Create().
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetStatus(st.TreeNodeStatusAvailable).
 		SetOwnerIdentityPubkey(identityPrivKey.Public()).
 		SetOwnerSigningPubkey(signingPrivKey.Public()).
@@ -599,6 +602,7 @@ func TestUpdateParentNodeStatus(t *testing.T) {
 	rawTx2 := createTestTxBytesWithIndex(t, 100000, 1)
 	creatingNode, err := dbTX.TreeNode.Create().
 		SetTree(tree).
+		SetNetwork(tree.Network).
 		SetStatus(st.TreeNodeStatusCreating).
 		SetOwnerIdentityPubkey(identityPrivKey.Public()).
 		SetOwnerSigningPubkey(signingPrivKey.Public()).
@@ -1086,6 +1090,7 @@ func TestTreeNodeDbHooks(t *testing.T) {
 		Create().
 		SetID(nodeID).
 		SetTreeID(treeID).
+		SetNetwork(st.NetworkRegtest).
 		SetStatus(st.TreeNodeStatusAvailable).
 		SetOwnerIdentityPubkey(ownerIdentityPubkey).
 		SetOwnerSigningPubkey(ownerSigningPubkey).
