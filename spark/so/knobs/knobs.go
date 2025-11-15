@@ -82,6 +82,8 @@ const (
 
 	KnobGossipLimit             = "spark.so.gossip.limit"
 	KnobResumeSendTransferLimit = "spark.so.resume_send_transfer.limit"
+
+	KnobTransferBackfillBatchSize = "spark.so.transfer_backfill.batch_size"
 )
 
 type Config struct {
