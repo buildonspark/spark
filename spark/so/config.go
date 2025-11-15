@@ -38,7 +38,7 @@ import (
 )
 
 var (
-	defaultPoolMinConns              = 4
+	defaultPoolMinConns              = 16
 	defaultPoolMaxConns              = 256
 	defaultPoolMaxConnLifetime       = 30 * time.Minute
 	defaultPoolMaxConnLifetimeJitter = 5 * time.Minute
