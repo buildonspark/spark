@@ -68,6 +68,8 @@ func TimeoutMiddleware() TaskMiddleware {
 		ctx, cancel := context.WithTimeoutCause(ctx, timeout, errTaskTimeout)
 		defer cancel()
 
+		ctx = knobs.InjectKnobsService(ctx, knobsService)
+
 		done := make(chan error)
 
 		go func() {

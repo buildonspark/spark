@@ -465,8 +465,10 @@ func RunDKG(ctx context.Context, config *so.Config) error {
 	defer connection.Close()
 	client := pbdkg.NewDKGServiceClient(connection)
 
+	count := int32(knobs.GetKnobsService(ctx).GetValue(knobs.KnobSoDkgBatchSize, spark.DKGKeyCount))
+
 	_, err = client.StartDkg(ctx, &pbdkg.StartDkgRequest{
-		Count: spark.DKGKeyCount,
+		Count: count,
 	})
 	if err != nil {
 		logger.Error("Failed to start DKG", zap.Error(err))

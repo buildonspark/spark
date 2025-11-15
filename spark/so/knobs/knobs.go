@@ -55,6 +55,8 @@ const (
 	KnobGrpcClientPoolUsersPerConnectionCap = "spark.so.grpc.client.pool.users_per_connection_cap"
 	KnobGrpcClientPoolScaleConcurrency      = "spark.so.grpc.client.pool.scale_concurrency"
 
+	KnobSoDkgBatchSize = "spark.so.dkg.batch_size"
+
 	KnobRequireDirectFromCPFPRefund = "spark.so.require_direct_from_cpfp_refund"
 
 	// Task / gocron related knobs.
