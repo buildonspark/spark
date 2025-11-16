@@ -1680,8 +1680,12 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 
 	if len(filter.Types) > 0 {
 		transferTypes := make([]st.TransferType, len(filter.Types))
-		for i, transferType := range filter.Types {
-			transferTypes[i] = st.TransferType(transferType.String())
+		for i, protoType := range filter.Types {
+			schemaType, err := st.TransferTypeFromProto(protoType.String())
+			if err != nil {
+				return nil, status.Errorf(codes.InvalidArgument, "invalid transfer type: %s", protoType.String())
+			}
+			transferTypes[i] = schemaType
 		}
 		transferPredicate = append(transferPredicate, enttransfer.TypeIn(transferTypes...))
 	}

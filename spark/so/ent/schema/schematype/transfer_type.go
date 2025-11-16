@@ -1,5 +1,7 @@
 package schematype
 
+import "fmt"
+
 // TransferType is the type of transfer
 type TransferType string
 
@@ -33,5 +35,24 @@ func (TransferType) Values() []string {
 		string(TransferTypeUtxoSwap),
 		string(TransferTypePrimarySwapV3),
 		string(TransferTypeCounterSwapV3),
+	}
+}
+
+// TransferTypeFromProto converts a proto transfer type string to a TransferType and validates it.
+// Returns an error if the string does not represent a valid TransferType.
+func TransferTypeFromProto(s string) (TransferType, error) {
+	t := TransferType(s)
+	switch t {
+	case TransferTypePreimageSwap,
+		TransferTypeCooperativeExit,
+		TransferTypeTransfer,
+		TransferTypeSwap,
+		TransferTypeCounterSwap,
+		TransferTypeUtxoSwap,
+		TransferTypePrimarySwapV3,
+		TransferTypeCounterSwapV3:
+		return t, nil
+	default:
+		return "", fmt.Errorf("invalid transfer type: %s", s)
 	}
 }
