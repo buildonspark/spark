@@ -29,6 +29,10 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 	if err != nil {
 		return nil, err
 	}
+	network, err := t.Network.MarshalProto()
+	if err != nil {
+		return nil, err
+	}
 	transferType, err := TransferTypeProto(t.Type)
 	if err != nil {
 		return nil, err
@@ -49,6 +53,7 @@ func (t *Transfer) MarshalProto(ctx context.Context) (*pb.Transfer, error) {
 		UpdatedTime:               timestamppb.New(t.UpdateTime),
 		Type:                      *transferType,
 		SparkInvoice:              invoice,
+		Network:                   network,
 	}, nil
 }
 

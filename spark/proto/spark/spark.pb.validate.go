@@ -10182,6 +10182,8 @@ func (m *Transfer) validate(all bool) error {
 
 	// no validation rules for SparkInvoice
 
+	// no validation rules for Network
+
 	if len(errors) > 0 {
 		return TransferMultiError(errors)
 	}

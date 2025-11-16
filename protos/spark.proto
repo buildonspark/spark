@@ -884,6 +884,7 @@ message Transfer {
     google.protobuf.Timestamp updated_time = 9;
     TransferType type = 10;
     string spark_invoice = 11;
+    Network network = 12;
 }
 
 message TransferLeaf {
