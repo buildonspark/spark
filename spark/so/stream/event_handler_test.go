@@ -258,6 +258,7 @@ func TestEventRouterTransferNotification(t *testing.T) {
 	tx, err := session.GetOrBeginTx(mutationCtx)
 	require.NoError(t, err)
 	transfer, err := tx.Transfer.Create().
+		SetNetwork(schematype.NetworkRegtest).
 		SetSenderIdentityPubkey(senderKey).
 		SetReceiverIdentityPubkey(receiverKey).
 		SetStatus(schematype.TransferStatusSenderKeyTweaked).

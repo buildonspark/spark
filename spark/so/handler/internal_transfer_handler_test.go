@@ -156,6 +156,7 @@ func TestFinalizeTransfer(t *testing.T) {
 
 		// Create test transfer
 		transfer, err := dbCtx.Client.Transfer.Create().
+			SetNetwork(tree.Network).
 			SetStatus(st.TransferStatusReceiverRefundSigned).
 			SetType(st.TransferTypeTransfer).
 			SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
@@ -349,6 +350,7 @@ func TestApplySignatures(t *testing.T) {
 
 	receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	transfer, err := dbCtx.Client.Transfer.Create().
+		SetNetwork(tree.Network).
 		SetStatus(st.TransferStatusReceiverRefundSigned).
 		SetType(st.TransferTypeTransfer).
 		SetSenderIdentityPubkey(key.Public()).
@@ -621,6 +623,7 @@ func TestUpdateTransferLeavesSignatures(t *testing.T) {
 
 		receiverIdentityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 		transfer, err := dbCtx.Client.Transfer.Create().
+			SetNetwork(tree.Network).
 			SetStatus(st.TransferStatusReceiverRefundSigned).
 			SetType(st.TransferTypeTransfer).
 			SetSenderIdentityPubkey(key.Public()).

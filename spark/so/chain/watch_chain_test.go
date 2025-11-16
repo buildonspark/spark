@@ -506,6 +506,7 @@ func TestHandleBlock_NodeTransactionMarkingTreeNodeStatus(t *testing.T) {
 	senderIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	receiverIdentityPrivKey := keys.MustGeneratePrivateKeyFromRand(rng)
 	transfer, err := dbTx.Transfer.Create().
+		SetNetwork(tree.Network).
 		SetStatus(schematype.TransferStatusSenderInitiated).
 		SetType(schematype.TransferTypeTransfer).
 		SetSenderIdentityPubkey(senderIdentityPrivKey.Public()).
