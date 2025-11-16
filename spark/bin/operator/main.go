@@ -410,28 +410,6 @@ func main() {
 		})
 	})
 
-	dbEvents, err := db.NewDBEvents(errCtx, dbClient, logger.With(zap.String("component", "dbevents")))
-	if err != nil {
-		logger.Fatal("Failed to create db events", zap.Error(err))
-	}
-
-	if config.Database.DBEventsEnabled != nil && *config.Database.DBEventsEnabled {
-		errGrp.Go(func() error {
-			if err := dbEvents.Start(); err != nil {
-				logger.Error("Error in dbevents", zap.Error(err))
-				return err
-			}
-
-			if errCtx.Err() == nil {
-				// This technically isn't an error, but raise it as one because dbevents should never
-				// stop unless we explicitly tell it to when shutting down!
-				return fmt.Errorf("dbevents stopped unexpectedly")
-			}
-
-			return nil
-		})
-	}
-
 	defer func() {
 		_ = dbClient.Close()
 	}()
@@ -455,6 +433,28 @@ func main() {
 			logger.Fatal("Failed to set busy_timeout", zap.Error(err))
 		}
 		_ = sqliteDb.Close()
+	}
+
+	dbEvents, err := db.NewDBEvents(errCtx, dbClient, logger.With(zap.String("component", "dbevents")))
+	if err != nil {
+		logger.Fatal("Failed to create db events", zap.Error(err))
+	}
+
+	if config.Database.DBEventsEnabled != nil && *config.Database.DBEventsEnabled {
+		errGrp.Go(func() error {
+			if err := dbEvents.Start(); err != nil {
+				logger.Error("Error in dbevents", zap.Error(err))
+				return err
+			}
+
+			if errCtx.Err() == nil {
+				// This technically isn't an error, but raise it as one because dbevents should never
+				// stop unless we explicitly tell it to when shutting down!
+				return fmt.Errorf("dbevents stopped unexpectedly")
+			}
+
+			return nil
+		})
 	}
 
 	frostConnection, err := config.NewFrostGRPCConnection()
