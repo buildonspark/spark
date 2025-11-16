@@ -22919,22 +22919,9 @@ func (m *TreeNodeMutation) OldNetwork(ctx context.Context) (v schematype.Network
 	return oldValue.Network, nil
 }
 
-// ClearNetwork clears the value of the "network" field.
-func (m *TreeNodeMutation) ClearNetwork() {
-	m.network = nil
-	m.clearedFields[treenode.FieldNetwork] = struct{}{}
-}
-
-// NetworkCleared returns if the "network" field was cleared in this mutation.
-func (m *TreeNodeMutation) NetworkCleared() bool {
-	_, ok := m.clearedFields[treenode.FieldNetwork]
-	return ok
-}
-
 // ResetNetwork resets all changes to the "network" field.
 func (m *TreeNodeMutation) ResetNetwork() {
 	m.network = nil
-	delete(m.clearedFields, treenode.FieldNetwork)
 }
 
 // SetStatus sets the "status" field.
@@ -24361,9 +24348,6 @@ func (m *TreeNodeMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *TreeNodeMutation) ClearedFields() []string {
 	var fields []string
-	if m.FieldCleared(treenode.FieldNetwork) {
-		fields = append(fields, treenode.FieldNetwork)
-	}
 	if m.FieldCleared(treenode.FieldNodeConfirmationHeight) {
 		fields = append(fields, treenode.FieldNodeConfirmationHeight)
 	}
@@ -24411,9 +24395,6 @@ func (m *TreeNodeMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *TreeNodeMutation) ClearField(name string) error {
 	switch name {
-	case treenode.FieldNetwork:
-		m.ClearNetwork()
-		return nil
 	case treenode.FieldNodeConfirmationHeight:
 		m.ClearNodeConfirmationHeight()
 		return nil

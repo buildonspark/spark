@@ -32,8 +32,7 @@ func (TreeNode) Mixin() []ent.Mixin {
 func (TreeNode) Fields() []ent.Field {
 	return []ent.Field{
 		field.Uint64("value").Immutable(),
-		// TODO(mhr): Make this non-null after backfilling existing data.
-		field.Enum("network").GoType(st.Network("")).Optional(),
+		field.Enum("network").GoType(st.Network("")).Immutable(),
 		field.Enum("status").GoType(st.TreeNodeStatus("")),
 		field.Bytes("verifying_pubkey").Immutable().GoType(keys.Public{}),
 		field.Bytes("owner_identity_pubkey").GoType(keys.Public{}),
@@ -64,7 +63,8 @@ func (TreeNode) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("tree", Tree.Type).
 			Unique().
-			Required(),
+			Required().
+			Immutable(),
 		edge.To("parent", TreeNode.Type).
 			Unique(),
 		edge.To("signing_keyshare", SigningKeyshare.Type).

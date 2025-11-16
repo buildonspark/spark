@@ -303,16 +303,6 @@ func NetworkNotIn(vs ...schematype.Network) predicate.TreeNode {
 	return predicate.TreeNode(sql.FieldNotIn(FieldNetwork, v...))
 }
 
-// NetworkIsNil applies the IsNil predicate on the "network" field.
-func NetworkIsNil() predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldIsNull(FieldNetwork))
-}
-
-// NetworkNotNil applies the NotNil predicate on the "network" field.
-func NetworkNotNil() predicate.TreeNode {
-	return predicate.TreeNode(sql.FieldNotNull(FieldNetwork))
-}
-
 // StatusEQ applies the EQ predicate on the "status" field.
 func StatusEQ(v schematype.TreeNodeStatus) predicate.TreeNode {
 	vc := v

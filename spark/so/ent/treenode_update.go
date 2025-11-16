@@ -16,7 +16,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
-	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 )
 
@@ -37,26 +36,6 @@ func (tnu *TreeNodeUpdate) Where(ps ...predicate.TreeNode) *TreeNodeUpdate {
 // SetUpdateTime sets the "update_time" field.
 func (tnu *TreeNodeUpdate) SetUpdateTime(t time.Time) *TreeNodeUpdate {
 	tnu.mutation.SetUpdateTime(t)
-	return tnu
-}
-
-// SetNetwork sets the "network" field.
-func (tnu *TreeNodeUpdate) SetNetwork(s schematype.Network) *TreeNodeUpdate {
-	tnu.mutation.SetNetwork(s)
-	return tnu
-}
-
-// SetNillableNetwork sets the "network" field if the given value is not nil.
-func (tnu *TreeNodeUpdate) SetNillableNetwork(s *schematype.Network) *TreeNodeUpdate {
-	if s != nil {
-		tnu.SetNetwork(*s)
-	}
-	return tnu
-}
-
-// ClearNetwork clears the value of the "network" field.
-func (tnu *TreeNodeUpdate) ClearNetwork() *TreeNodeUpdate {
-	tnu.mutation.ClearNetwork()
 	return tnu
 }
 
@@ -331,17 +310,6 @@ func (tnu *TreeNodeUpdate) ClearDirectRefundTxid() *TreeNodeUpdate {
 	return tnu
 }
 
-// SetTreeID sets the "tree" edge to the Tree entity by ID.
-func (tnu *TreeNodeUpdate) SetTreeID(id uuid.UUID) *TreeNodeUpdate {
-	tnu.mutation.SetTreeID(id)
-	return tnu
-}
-
-// SetTree sets the "tree" edge to the Tree entity.
-func (tnu *TreeNodeUpdate) SetTree(t *Tree) *TreeNodeUpdate {
-	return tnu.SetTreeID(t.ID)
-}
-
 // SetParentID sets the "parent" edge to the TreeNode entity by ID.
 func (tnu *TreeNodeUpdate) SetParentID(id uuid.UUID) *TreeNodeUpdate {
 	tnu.mutation.SetParentID(id)
@@ -390,12 +358,6 @@ func (tnu *TreeNodeUpdate) AddChildren(t ...*TreeNode) *TreeNodeUpdate {
 // Mutation returns the TreeNodeMutation object of the builder.
 func (tnu *TreeNodeUpdate) Mutation() *TreeNodeMutation {
 	return tnu.mutation
-}
-
-// ClearTree clears the "tree" edge to the Tree entity.
-func (tnu *TreeNodeUpdate) ClearTree() *TreeNodeUpdate {
-	tnu.mutation.ClearTree()
-	return tnu
 }
 
 // ClearParent clears the "parent" edge to the TreeNode entity.
@@ -475,11 +437,6 @@ func (tnu *TreeNodeUpdate) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (tnu *TreeNodeUpdate) check() error {
-	if v, ok := tnu.mutation.Network(); ok {
-		if err := treenode.NetworkValidator(v); err != nil {
-			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "TreeNode.network": %w`, err)}
-		}
-	}
 	if v, ok := tnu.mutation.Status(); ok {
 		if err := treenode.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TreeNode.status": %w`, err)}
@@ -519,12 +476,6 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tnu.mutation.UpdateTime(); ok {
 		_spec.SetField(treenode.FieldUpdateTime, field.TypeTime, value)
-	}
-	if value, ok := tnu.mutation.Network(); ok {
-		_spec.SetField(treenode.FieldNetwork, field.TypeEnum, value)
-	}
-	if tnu.mutation.NetworkCleared() {
-		_spec.ClearField(treenode.FieldNetwork, field.TypeEnum)
 	}
 	if value, ok := tnu.mutation.Status(); ok {
 		_spec.SetField(treenode.FieldStatus, field.TypeEnum, value)
@@ -615,35 +566,6 @@ func (tnu *TreeNodeUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if tnu.mutation.DirectRefundTxidCleared() {
 		_spec.ClearField(treenode.FieldDirectRefundTxid, field.TypeBytes)
-	}
-	if tnu.mutation.TreeCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   treenode.TreeTable,
-			Columns: []string{treenode.TreeColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tree.FieldID, field.TypeUUID),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := tnu.mutation.TreeIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   treenode.TreeTable,
-			Columns: []string{treenode.TreeColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tree.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if tnu.mutation.ParentCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -773,26 +695,6 @@ type TreeNodeUpdateOne struct {
 // SetUpdateTime sets the "update_time" field.
 func (tnuo *TreeNodeUpdateOne) SetUpdateTime(t time.Time) *TreeNodeUpdateOne {
 	tnuo.mutation.SetUpdateTime(t)
-	return tnuo
-}
-
-// SetNetwork sets the "network" field.
-func (tnuo *TreeNodeUpdateOne) SetNetwork(s schematype.Network) *TreeNodeUpdateOne {
-	tnuo.mutation.SetNetwork(s)
-	return tnuo
-}
-
-// SetNillableNetwork sets the "network" field if the given value is not nil.
-func (tnuo *TreeNodeUpdateOne) SetNillableNetwork(s *schematype.Network) *TreeNodeUpdateOne {
-	if s != nil {
-		tnuo.SetNetwork(*s)
-	}
-	return tnuo
-}
-
-// ClearNetwork clears the value of the "network" field.
-func (tnuo *TreeNodeUpdateOne) ClearNetwork() *TreeNodeUpdateOne {
-	tnuo.mutation.ClearNetwork()
 	return tnuo
 }
 
@@ -1067,17 +969,6 @@ func (tnuo *TreeNodeUpdateOne) ClearDirectRefundTxid() *TreeNodeUpdateOne {
 	return tnuo
 }
 
-// SetTreeID sets the "tree" edge to the Tree entity by ID.
-func (tnuo *TreeNodeUpdateOne) SetTreeID(id uuid.UUID) *TreeNodeUpdateOne {
-	tnuo.mutation.SetTreeID(id)
-	return tnuo
-}
-
-// SetTree sets the "tree" edge to the Tree entity.
-func (tnuo *TreeNodeUpdateOne) SetTree(t *Tree) *TreeNodeUpdateOne {
-	return tnuo.SetTreeID(t.ID)
-}
-
 // SetParentID sets the "parent" edge to the TreeNode entity by ID.
 func (tnuo *TreeNodeUpdateOne) SetParentID(id uuid.UUID) *TreeNodeUpdateOne {
 	tnuo.mutation.SetParentID(id)
@@ -1126,12 +1017,6 @@ func (tnuo *TreeNodeUpdateOne) AddChildren(t ...*TreeNode) *TreeNodeUpdateOne {
 // Mutation returns the TreeNodeMutation object of the builder.
 func (tnuo *TreeNodeUpdateOne) Mutation() *TreeNodeMutation {
 	return tnuo.mutation
-}
-
-// ClearTree clears the "tree" edge to the Tree entity.
-func (tnuo *TreeNodeUpdateOne) ClearTree() *TreeNodeUpdateOne {
-	tnuo.mutation.ClearTree()
-	return tnuo
 }
 
 // ClearParent clears the "parent" edge to the TreeNode entity.
@@ -1224,11 +1109,6 @@ func (tnuo *TreeNodeUpdateOne) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (tnuo *TreeNodeUpdateOne) check() error {
-	if v, ok := tnuo.mutation.Network(); ok {
-		if err := treenode.NetworkValidator(v); err != nil {
-			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "TreeNode.network": %w`, err)}
-		}
-	}
 	if v, ok := tnuo.mutation.Status(); ok {
 		if err := treenode.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "TreeNode.status": %w`, err)}
@@ -1285,12 +1165,6 @@ func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, er
 	}
 	if value, ok := tnuo.mutation.UpdateTime(); ok {
 		_spec.SetField(treenode.FieldUpdateTime, field.TypeTime, value)
-	}
-	if value, ok := tnuo.mutation.Network(); ok {
-		_spec.SetField(treenode.FieldNetwork, field.TypeEnum, value)
-	}
-	if tnuo.mutation.NetworkCleared() {
-		_spec.ClearField(treenode.FieldNetwork, field.TypeEnum)
 	}
 	if value, ok := tnuo.mutation.Status(); ok {
 		_spec.SetField(treenode.FieldStatus, field.TypeEnum, value)
@@ -1381,35 +1255,6 @@ func (tnuo *TreeNodeUpdateOne) sqlSave(ctx context.Context) (_node *TreeNode, er
 	}
 	if tnuo.mutation.DirectRefundTxidCleared() {
 		_spec.ClearField(treenode.FieldDirectRefundTxid, field.TypeBytes)
-	}
-	if tnuo.mutation.TreeCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   treenode.TreeTable,
-			Columns: []string{treenode.TreeColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tree.FieldID, field.TypeUUID),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := tnuo.mutation.TreeIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   treenode.TreeTable,
-			Columns: []string{treenode.TreeColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(tree.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if tnuo.mutation.ParentCleared() {
 		edge := &sqlgraph.EdgeSpec{
