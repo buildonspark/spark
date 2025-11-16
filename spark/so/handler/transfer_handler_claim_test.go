@@ -156,6 +156,7 @@ func createTestTransfer(t *testing.T, ctx context.Context, rng io.Reader, client
 	receiverPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	transfer, err := client.Transfer.Create().
+		SetNetwork(st.NetworkRegtest).
 		SetStatus(status).
 		SetType(st.TransferTypeTransfer).
 		SetSenderIdentityPubkey(senderPubKey).

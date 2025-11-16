@@ -54,12 +54,6 @@ func (tu *TransferUpdate) SetNillableNetwork(s *schematype.Network) *TransferUpd
 	return tu
 }
 
-// ClearNetwork clears the value of the "network" field.
-func (tu *TransferUpdate) ClearNetwork() *TransferUpdate {
-	tu.mutation.ClearNetwork()
-	return tu
-}
-
 // SetTotalValue sets the "total_value" field.
 func (tu *TransferUpdate) SetTotalValue(u uint64) *TransferUpdate {
 	tu.mutation.ResetTotalValue()
@@ -373,9 +367,6 @@ func (tu *TransferUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	if value, ok := tu.mutation.Network(); ok {
 		_spec.SetField(transfer.FieldNetwork, field.TypeEnum, value)
 	}
-	if tu.mutation.NetworkCleared() {
-		_spec.ClearField(transfer.FieldNetwork, field.TypeEnum)
-	}
 	if value, ok := tu.mutation.TotalValue(); ok {
 		_spec.SetField(transfer.FieldTotalValue, field.TypeUint64, value)
 	}
@@ -610,12 +601,6 @@ func (tuo *TransferUpdateOne) SetNillableNetwork(s *schematype.Network) *Transfe
 	if s != nil {
 		tuo.SetNetwork(*s)
 	}
-	return tuo
-}
-
-// ClearNetwork clears the value of the "network" field.
-func (tuo *TransferUpdateOne) ClearNetwork() *TransferUpdateOne {
-	tuo.mutation.ClearNetwork()
 	return tuo
 }
 
@@ -961,9 +946,6 @@ func (tuo *TransferUpdateOne) sqlSave(ctx context.Context) (_node *Transfer, err
 	}
 	if value, ok := tuo.mutation.Network(); ok {
 		_spec.SetField(transfer.FieldNetwork, field.TypeEnum, value)
-	}
-	if tuo.mutation.NetworkCleared() {
-		_spec.ClearField(transfer.FieldNetwork, field.TypeEnum)
 	}
 	if value, ok := tuo.mutation.TotalValue(); ok {
 		_spec.SetField(transfer.FieldTotalValue, field.TypeUint64, value)

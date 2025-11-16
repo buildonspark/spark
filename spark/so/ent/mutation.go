@@ -18890,22 +18890,9 @@ func (m *TransferMutation) OldNetwork(ctx context.Context) (v schematype.Network
 	return oldValue.Network, nil
 }
 
-// ClearNetwork clears the value of the "network" field.
-func (m *TransferMutation) ClearNetwork() {
-	m.network = nil
-	m.clearedFields[transfer.FieldNetwork] = struct{}{}
-}
-
-// NetworkCleared returns if the "network" field was cleared in this mutation.
-func (m *TransferMutation) NetworkCleared() bool {
-	_, ok := m.clearedFields[transfer.FieldNetwork]
-	return ok
-}
-
 // ResetNetwork resets all changes to the "network" field.
 func (m *TransferMutation) ResetNetwork() {
 	m.network = nil
-	delete(m.clearedFields, transfer.FieldNetwork)
 }
 
 // SetTotalValue sets the "total_value" field.
@@ -19643,9 +19630,6 @@ func (m *TransferMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *TransferMutation) ClearedFields() []string {
 	var fields []string
-	if m.FieldCleared(transfer.FieldNetwork) {
-		fields = append(fields, transfer.FieldNetwork)
-	}
 	if m.FieldCleared(transfer.FieldCompletionTime) {
 		fields = append(fields, transfer.FieldCompletionTime)
 	}
@@ -19666,9 +19650,6 @@ func (m *TransferMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *TransferMutation) ClearField(name string) error {
 	switch name {
-	case transfer.FieldNetwork:
-		m.ClearNetwork()
-		return nil
 	case transfer.FieldCompletionTime:
 		m.ClearCompletionTime()
 		return nil

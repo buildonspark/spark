@@ -75,14 +75,6 @@ func (tc *TransferCreate) SetNetwork(s schematype.Network) *TransferCreate {
 	return tc
 }
 
-// SetNillableNetwork sets the "network" field if the given value is not nil.
-func (tc *TransferCreate) SetNillableNetwork(s *schematype.Network) *TransferCreate {
-	if s != nil {
-		tc.SetNetwork(*s)
-	}
-	return tc
-}
-
 // SetTotalValue sets the "total_value" field.
 func (tc *TransferCreate) SetTotalValue(u uint64) *TransferCreate {
 	tc.mutation.SetTotalValue(u)
@@ -296,6 +288,9 @@ func (tc *TransferCreate) check() error {
 	}
 	if _, ok := tc.mutation.ReceiverIdentityPubkey(); !ok {
 		return &ValidationError{Name: "receiver_identity_pubkey", err: errors.New(`ent: missing required field "Transfer.receiver_identity_pubkey"`)}
+	}
+	if _, ok := tc.mutation.Network(); !ok {
+		return &ValidationError{Name: "network", err: errors.New(`ent: missing required field "Transfer.network"`)}
 	}
 	if v, ok := tc.mutation.Network(); ok {
 		if err := transfer.NetworkValidator(v); err != nil {
@@ -559,12 +554,6 @@ func (u *TransferUpsert) UpdateNetwork() *TransferUpsert {
 	return u
 }
 
-// ClearNetwork clears the value of the "network" field.
-func (u *TransferUpsert) ClearNetwork() *TransferUpsert {
-	u.SetNull(transfer.FieldNetwork)
-	return u
-}
-
 // SetTotalValue sets the "total_value" field.
 func (u *TransferUpsert) SetTotalValue(v uint64) *TransferUpsert {
 	u.Set(transfer.FieldTotalValue, v)
@@ -728,13 +717,6 @@ func (u *TransferUpsertOne) SetNetwork(v schematype.Network) *TransferUpsertOne 
 func (u *TransferUpsertOne) UpdateNetwork() *TransferUpsertOne {
 	return u.Update(func(s *TransferUpsert) {
 		s.UpdateNetwork()
-	})
-}
-
-// ClearNetwork clears the value of the "network" field.
-func (u *TransferUpsertOne) ClearNetwork() *TransferUpsertOne {
-	return u.Update(func(s *TransferUpsert) {
-		s.ClearNetwork()
 	})
 }
 
@@ -1081,13 +1063,6 @@ func (u *TransferUpsertBulk) SetNetwork(v schematype.Network) *TransferUpsertBul
 func (u *TransferUpsertBulk) UpdateNetwork() *TransferUpsertBulk {
 	return u.Update(func(s *TransferUpsert) {
 		s.UpdateNetwork()
-	})
-}
-
-// ClearNetwork clears the value of the "network" field.
-func (u *TransferUpsertBulk) ClearNetwork() *TransferUpsertBulk {
-	return u.Update(func(s *TransferUpsert) {
-		s.ClearNetwork()
 	})
 }
 

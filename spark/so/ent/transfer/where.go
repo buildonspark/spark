@@ -288,16 +288,6 @@ func NetworkNotIn(vs ...schematype.Network) predicate.Transfer {
 	return predicate.Transfer(sql.FieldNotIn(FieldNetwork, v...))
 }
 
-// NetworkIsNil applies the IsNil predicate on the "network" field.
-func NetworkIsNil() predicate.Transfer {
-	return predicate.Transfer(sql.FieldIsNull(FieldNetwork))
-}
-
-// NetworkNotNil applies the NotNil predicate on the "network" field.
-func NetworkNotNil() predicate.Transfer {
-	return predicate.Transfer(sql.FieldNotNull(FieldNetwork))
-}
-
 // TotalValueEQ applies the EQ predicate on the "total_value" field.
 func TotalValueEQ(v uint64) predicate.Transfer {
 	return predicate.Transfer(sql.FieldEQ(FieldTotalValue, v))

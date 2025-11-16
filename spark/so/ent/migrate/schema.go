@@ -773,7 +773,7 @@ var (
 		{Name: "update_time", Type: field.TypeTime},
 		{Name: "sender_identity_pubkey", Type: field.TypeBytes},
 		{Name: "receiver_identity_pubkey", Type: field.TypeBytes},
-		{Name: "network", Type: field.TypeEnum, Nullable: true, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
+		{Name: "network", Type: field.TypeEnum, Enums: []string{"UNSPECIFIED", "MAINNET", "REGTEST", "TESTNET", "SIGNET"}},
 		{Name: "total_value", Type: field.TypeUint64},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"SENDER_INITIATED", "SENDER_INITIATED_COORDINATOR", "SENDER_KEY_TWEAK_PENDING", "SENDER_KEY_TWEAKED", "RECEIVER_KEY_TWEAKED", "RECEIVER_KEY_TWEAK_LOCKED", "RECEIVER_REFUND_SIGNED", "COMPLETED", "EXPIRED", "RETURNED", "RECEIVER_KEY_TWEAK_APPLIED"}},
 		{Name: "type", Type: field.TypeEnum, Enums: []string{"PREIMAGE_SWAP", "COOPERATIVE_EXIT", "TRANSFER", "SWAP", "COUNTER_SWAP", "UTXO_SWAP", "PRIMARY_SWAP_V3", "COUNTER_SWAP_V3"}},
