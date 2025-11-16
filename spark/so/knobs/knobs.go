@@ -22,9 +22,11 @@ const (
 	KnobDatabasePoolMaxConnIdleTime       = "spark.database.pool.max_conn_idle_time"
 	KnobDatabasePoolHealthCheckPeriod     = "spark.database.pool.health_check_period"
 
-	KnobRateLimitLimit          = "spark.so.ratelimit.limit"
-	KnobRateLimitExcludeIps     = "spark.so.ratelimit.exclude_ips"
-	KnobRateLimitExcludePubkeys = "spark.so.ratelimit.exclude_pubkeys"
+	KnobRateLimitLimit              = "spark.so.ratelimit.limit"
+	KnobRateLimitExcludeIps         = "spark.so.ratelimit.exclude_ips"
+	KnobRateLimitExcludePubkeys     = "spark.so.ratelimit.exclude_pubkeys"
+	KnobRateLimitExcludeIpsOnly     = "spark.so.ratelimit.exclude_ips_only"
+	KnobRateLimitExcludePubkeysOnly = "spark.so.ratelimit.exclude_pubkeys_only"
 	// Enable Memcached-backed store for rate limiter when > 0
 	KnobRateLimitMemcacheEnabled      = "spark.so.ratelimit.memcache.enabled"
 	KnobRateLimitMemcacheMaxIdleConns = "spark.so.ratelimit.memcache.max_idle_conns"

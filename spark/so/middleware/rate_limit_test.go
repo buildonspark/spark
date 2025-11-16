@@ -1195,6 +1195,188 @@ func TestRateLimiter(t *testing.T) {
 		}
 	})
 
+	t.Run("IP address excluded via dimension-only exclusion", func(t *testing.T) {
+		config := &RateLimiterConfig{}
+		identityHex := newIdentityHex(t)
+
+		mockKnobsMap := map[string]float64{
+			knobs.KnobRateLimitExcludeIpsOnly + "@1.2.3.4":                   1,
+			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod#1s":        2,
+			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod:ip#1s":     2,
+			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod:pubkey#1s": 2,
+		}
+		mockKnobs := knobs.NewFixedKnobs(mockKnobsMap)
+
+		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs))
+		require.NoError(t, err)
+
+		interceptor := rateLimiter.UnaryServerInterceptor()
+		handler := func(_ context.Context, _ any) (any, error) {
+			return "ok", nil
+		}
+		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/TestMethod"}
+
+		// Build context with both IP and pubkey
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "1.2.3.4",
+		}))
+		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+
+		// IP is excluded from IP-based rate limiting, but pubkey limits should still apply
+		// Make 2 requests that should succeed (within pubkey limit of 2)
+		resp, err := interceptor(ctx, "request", info, handler)
+		require.NoError(t, err)
+		assert.Equal(t, "ok", resp)
+
+		resp, err = interceptor(ctx, "request", info, handler)
+		require.NoError(t, err)
+		assert.Equal(t, "ok", resp)
+
+		// Third request should fail due to pubkey rate limit (IP exclusion doesn't bypass pubkey limits)
+		_, err = interceptor(ctx, "request", info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+	})
+
+	t.Run("Pubkey excluded via dimension-only exclusion", func(t *testing.T) {
+		config := &RateLimiterConfig{}
+		identityHex := newIdentityHex(t)
+
+		mockKnobsMap := map[string]float64{
+			knobs.KnobRateLimitExcludePubkeysOnly + "@" + identityHex:        1,
+			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod#1s":        2,
+			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod:ip#1s":     2,
+			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod:pubkey#1s": 2,
+		}
+		mockKnobs := knobs.NewFixedKnobs(mockKnobsMap)
+
+		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs))
+		require.NoError(t, err)
+
+		interceptor := rateLimiter.UnaryServerInterceptor()
+		handler := func(_ context.Context, _ any) (any, error) {
+			return "ok", nil
+		}
+		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/TestMethod"}
+
+		// Build context with both IP and pubkey
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "1.2.3.4",
+		}))
+		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+
+		// Pubkey is excluded from pubkey-based rate limiting, but IP limits should still apply
+		// Make 2 requests that should succeed (within IP limit of 2)
+		resp, err := interceptor(ctx, "request", info, handler)
+		require.NoError(t, err)
+		assert.Equal(t, "ok", resp)
+
+		resp, err = interceptor(ctx, "request", info, handler)
+		require.NoError(t, err)
+		assert.Equal(t, "ok", resp)
+
+		// Third request should fail due to IP rate limit (pubkey exclusion doesn't bypass IP limits)
+		_, err = interceptor(ctx, "request", info, handler)
+		require.ErrorContains(t, err, "rate limit exceeded")
+		require.Equal(t, codes.ResourceExhausted, status.Code(err))
+	})
+
+	t.Run("IP dimension-only exclusion with only IP present", func(t *testing.T) {
+		config := &RateLimiterConfig{}
+
+		mockKnobsMap := map[string]float64{
+			knobs.KnobRateLimitExcludeIpsOnly + "@1.2.3.4":            1,
+			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod#1s": 2,
+		}
+		mockKnobs := knobs.NewFixedKnobs(mockKnobsMap)
+
+		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs))
+		require.NoError(t, err)
+
+		interceptor := rateLimiter.UnaryServerInterceptor()
+		handler := func(_ context.Context, _ any) (any, error) {
+			return "ok", nil
+		}
+		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/TestMethod"}
+
+		// Build context with only IP (no pubkey)
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "1.2.3.4",
+		}))
+
+		// IP is excluded, and no pubkey is present, so rate limiting should be bypassed
+		for i := 0; i < 5; i++ {
+			resp, err := interceptor(ctx, "request", info, handler)
+			require.NoError(t, err)
+			assert.Equal(t, "ok", resp)
+		}
+	})
+
+	t.Run("Pubkey dimension-only exclusion with only pubkey present", func(t *testing.T) {
+		config := &RateLimiterConfig{}
+		identityHex := newIdentityHex(t)
+
+		mockKnobsMap := map[string]float64{
+			knobs.KnobRateLimitExcludePubkeysOnly + "@" + identityHex: 1,
+			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod#1s": 2,
+		}
+		mockKnobs := knobs.NewFixedKnobs(mockKnobsMap)
+
+		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs))
+		require.NoError(t, err)
+
+		interceptor := rateLimiter.UnaryServerInterceptor()
+		handler := func(_ context.Context, _ any) (any, error) {
+			return "ok", nil
+		}
+		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/TestMethod"}
+
+		// Build context with only pubkey (no IP)
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{}))
+		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+
+		// Pubkey is excluded, and no IP is present, so rate limiting should be bypassed
+		for i := 0; i < 5; i++ {
+			resp, err := interceptor(ctx, "request", info, handler)
+			require.NoError(t, err)
+			assert.Equal(t, "ok", resp)
+		}
+	})
+
+	t.Run("Full exclusion takes precedence over dimension-only exclusion", func(t *testing.T) {
+		config := &RateLimiterConfig{}
+		identityHex := newIdentityHex(t)
+
+		mockKnobsMap := map[string]float64{
+			knobs.KnobRateLimitExcludeIps + "@1.2.3.4":                1, // Full exclusion
+			knobs.KnobRateLimitExcludeIpsOnly + "@1.2.3.4":            1, // Dimension-only exclusion
+			knobs.KnobRateLimitLimit + "@/test.Service/TestMethod#1s": 2,
+		}
+		mockKnobs := knobs.NewFixedKnobs(mockKnobsMap)
+
+		rateLimiter, err := NewRateLimiter(config, WithKnobs(mockKnobs))
+		require.NoError(t, err)
+
+		interceptor := rateLimiter.UnaryServerInterceptor()
+		handler := func(_ context.Context, _ any) (any, error) {
+			return "ok", nil
+		}
+		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/TestMethod"}
+
+		// Build context with both IP and pubkey
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
+			"x-forwarded-for": "1.2.3.4",
+		}))
+		ctx = authn.InjectSessionForTests(ctx, identityHex, time.Now().Add(time.Hour).Unix())
+
+		// Full exclusion should bypass all rate limiting, even if dimension-only exclusion is also set
+		for i := 0; i < 5; i++ {
+			resp, err := interceptor(ctx, "request", info, handler)
+			require.NoError(t, err)
+			assert.Equal(t, "ok", resp)
+		}
+	})
+
 	// Method-name prefix: longest match should be chosen
 	t.Run("method-name prefix chooses longest match", func(t *testing.T) {
 		config := &RateLimiterConfig{}

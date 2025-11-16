@@ -64,8 +64,10 @@ Enforcement in-memory keys (per-dimension)
 - Global scope key: rl:global#<tier>:<dimension>
 
 Other knobs
-- Exclude an IP from rate limiting: spark.so.ratelimit.exclude_ips@<ip> = 1
-- Exclude a pubkey from rate limiting: spark.so.ratelimit.exclude_pubkeys@<hex_pubkey> = 1
+- Exclude an IP from rate limiting (bypasses all rate limiting): spark.so.ratelimit.exclude_ips@<ip> = 1
+- Exclude a pubkey from rate limiting (bypasses all rate limiting): spark.so.ratelimit.exclude_pubkeys@<hex_pubkey> = 1
+- Exclude an IP from IP-based rate limiting only (pubkey limits still apply): spark.so.ratelimit.exclude_ips_only@<ip> = 1
+- Exclude a pubkey from pubkey-based rate limiting only (IP limits still apply): spark.so.ratelimit.exclude_pubkeys_only@<hex_pubkey> = 1
 - Kill switch for a method (independent of rate limiting): spark.so.grpc.server.method.enabled@/pkg.Service/Method = 0.
 */
 
@@ -501,20 +503,32 @@ func (r *RateLimiter) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
 			clientIP = v
 		}
 
-		// If either IP or pubkey is excluded, bypass all rate limiting entirely.
+		// Check for full exclusions first - these bypass all rate limiting entirely.
 		if identityHex != "" {
 			if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludePubkeys, &identityHex, 0) > 0 {
 				return handler(ctx, req)
 			}
-			pubkeyBucket = identityHex
-			havePubkey = true
 		}
 		if clientIP != "" {
 			if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludeIps, &clientIP, 0) > 0 {
 				return handler(ctx, req)
 			}
-			ipBucket = clientIP
-			haveIP = true
+		}
+
+		// Check for dimension-only exclusions - these only exclude the specific dimension.
+		if identityHex != "" {
+			// Only add pubkey dimension if not excluded via dimension-only exclusion
+			if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludePubkeysOnly, &identityHex, 0) == 0 {
+				pubkeyBucket = identityHex
+				havePubkey = true
+			}
+		}
+		if clientIP != "" {
+			// Only add IP dimension if not excluded via dimension-only exclusion
+			if r.knobs.GetValueTarget(knobs.KnobRateLimitExcludeIpsOnly, &clientIP, 0) == 0 {
+				ipBucket = clientIP
+				haveIP = true
+			}
 		}
 
 		if !havePubkey && !haveIP {
