@@ -33,7 +33,6 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
-	enttree "github.com/lightsparkdev/spark/so/ent/tree"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
@@ -1700,6 +1699,7 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 			return nil, fmt.Errorf("failed to convert proto network to schema network: %w", err)
 		}
 	}
+	transferPredicate = append(transferPredicate, enttransfer.NetworkEQ(network))
 
 	if len(filter.Statuses) > 0 {
 		statuses := make([]st.TransferStatus, len(filter.Statuses))
@@ -1713,30 +1713,10 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		transferPredicate = append(transferPredicate, enttransfer.StatusIn(statuses...))
 	}
 
-	// Ensure uniqueness since we JOIN across O2M relations for network filtering.
-	// This mirrors the original EXISTS-based semantics which never produced duplicates.
-	baseQuery := db.Transfer.Query().WithSparkInvoice().Unique(true)
+	baseQuery := db.Transfer.Query().WithSparkInvoice()
 	if len(transferPredicate) > 0 {
 		baseQuery = baseQuery.Where(enttransfer.And(transferPredicate...))
 	}
-
-	// Use JOIN instead of EXISTS for network filtering (60x faster)
-	// Join: transfers -> transfer_leafs -> tree_nodes -> trees, filter by network
-	baseQuery = baseQuery.Where(predicate.Transfer(func(s *sql.Selector) {
-		transferLeafsTable := sql.Table(enttransferleaf.Table)
-		treeNodesTable := sql.Table(enttreenode.Table)
-		treesTable := sql.Table(enttree.Table)
-
-		s.Join(transferLeafsTable).
-			On(s.C(enttransfer.FieldID), transferLeafsTable.C(enttransferleaf.TransferColumn))
-		s.Join(treeNodesTable).
-			On(transferLeafsTable.C(enttransferleaf.LeafColumn), treeNodesTable.C(enttreenode.FieldID))
-		s.Join(treesTable).
-			On(treeNodesTable.C(enttreenode.TreeColumn), treesTable.C(enttree.FieldID))
-
-		// Filter by network
-		s.Where(sql.EQ(treesTable.C(enttree.FieldNetwork), string(network)))
-	}))
 
 	var query *ent.TransferQuery
 	if filter.Order == pb.Order_ASCENDING {
