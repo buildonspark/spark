@@ -524,7 +524,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
-			ExecutionInterval: 30 * time.Second,
+			ExecutionInterval: 5 * time.Second,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "backfill_transfer_network",
 				RunInTestEnv: false,
