@@ -14,7 +14,6 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
-	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	enttreenode "github.com/lightsparkdev/spark/so/ent/treenode"
 	"github.com/lightsparkdev/spark/so/errors"
@@ -91,7 +90,7 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 
 		query = query.
 			Where(treenode.StatusNotIn(st.TreeNodeStatusInvestigation, st.TreeNodeStatusLost, st.TreeNodeStatusReimbursed)).
-			Where(treenode.HasTreeWith(tree.NetworkEQ(network))).
+			Where(treenode.NetworkEQ(network)).
 			Where(treenode.OwnerIdentityPubkey(ownerIdentityPubKey)).
 			Order(ent.Desc(enttreenode.FieldID))
 
@@ -201,7 +200,7 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 	}
 
 	nodes, err := db.TreeNode.Query().
-		Where(treenode.HasTreeWith(tree.NetworkEQ(network))).
+		Where(treenode.NetworkEQ(network)).
 		Where(treenode.StatusEQ(st.TreeNodeStatusAvailable)).
 		Where(treenode.OwnerIdentityPubkey(identityPubKey)).
 		All(ctx)

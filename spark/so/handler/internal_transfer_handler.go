@@ -20,7 +20,6 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	enttransfer "github.com/lightsparkdev/spark/so/ent/transfer"
 	enttransferleaf "github.com/lightsparkdev/spark/so/ent/transferleaf"
-	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	sparkerrors "github.com/lightsparkdev/spark/so/errors"
 	"google.golang.org/protobuf/proto"
@@ -649,9 +648,7 @@ func validateSatsSparkInvoice(ctx context.Context, invoice string, receiverPubli
 	err = db.TreeNode.
 		Query().
 		Where(treenode.IDIn(dedupLeafIDs...)).
-		Where(treenode.HasTreeWith(
-			tree.NetworkEQ(schemaNetwork),
-		)).
+		Where(treenode.NetworkEQ(schemaNetwork)).
 		Aggregate(
 			ent.As(ent.Count(), "count"),
 			ent.As(ent.Sum(treenode.FieldValue), "sum"),

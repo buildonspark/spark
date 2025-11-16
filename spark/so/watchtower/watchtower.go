@@ -19,7 +19,6 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
-	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -104,7 +103,7 @@ func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHei
 				),
 			),
 			treenode.NodeConfirmationHeightIsNil(),
-			treenode.HasTreeWith(tree.NetworkEQ(common.SchemaNetwork(network))),
+			treenode.NetworkEQ(common.SchemaNetwork(network)),
 		).
 		WithParent().
 		All(ctx)
@@ -117,7 +116,7 @@ func QueryBroadcastableNodes(ctx context.Context, dbClient *ent.Client, blockHei
 		Where(
 			treenode.NodeConfirmationHeightNotNil(),
 			treenode.RefundConfirmationHeightIsNil(),
-			treenode.HasTreeWith(tree.NetworkEQ(common.SchemaNetwork(network))),
+			treenode.NetworkEQ(common.SchemaNetwork(network)),
 		).
 		WithParent().
 		All(ctx)
@@ -150,7 +149,7 @@ func QueryBroadcastableTransferLeaves(ctx context.Context, dbClient *ent.Client,
 		Where(
 			treenode.NodeConfirmationHeightNotNil(),
 			treenode.RefundConfirmationHeightIsNil(),
-			treenode.HasTreeWith(tree.NetworkEQ(common.SchemaNetwork(network))),
+			treenode.NetworkEQ(common.SchemaNetwork(network)),
 		).
 		IDs(ctx)
 	if err != nil {
