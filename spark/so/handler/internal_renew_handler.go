@@ -88,7 +88,7 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 	}
 
 	// TODO(mhr): Remove this when the transfer proto has Network and it has been backfilled.
-	tree, err := db.Tree.Query().Where(tree.IDEQ(splitTreeID)).Only(ctx)
+	treeEnt, err := db.Tree.Query().Where(tree.IDEQ(splitTreeID)).Only(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to query tree %s: %w", splitTreeID, err)
 	}
@@ -97,7 +97,7 @@ func (h *InternalRenewLeafHandler) FinalizeRenewNodeTimelock(ctx context.Context
 	splitNodeMut := db.TreeNode.Create().
 		SetID(splitNodeID).
 		SetTreeID(splitTreeID).
-		SetNetwork(tree.Network).
+		SetNetwork(treeEnt.Network).
 		SetStatus(st.TreeNodeStatusSplitLocked).
 		SetOwnerIdentityPubkey(ownerIdentityPubKey).
 		SetOwnerSigningPubkey(ownerSigningPubKey).

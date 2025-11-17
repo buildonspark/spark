@@ -868,48 +868,45 @@ func TestFinalizeTreeWithNoBlockHeight(t *testing.T) {
 	}
 
 	_, err = handler.FinalizeNodeSignatures(ctx, req)
-	require.Error(t, err, "should fail with no block height")
-	assert.ErrorContains(t, err, "no block height present in db")
+	require.ErrorContains(t, err, "no block height present in db")
 }
 
 // Test edge case: Tree node in exiting status should not trigger status logic
 func TestFinalizeSignatureHandler_UpdateNode_TreeNodeExitingStatus(t *testing.T) {
-	ctx, _ := db.NewTestSQLiteContext(t)
+	for _, nodeStatus := range []st.TreeNodeStatus{st.TreeNodeStatusOnChain, st.TreeNodeStatusExited, st.TreeNodeStatusParentExited} {
+		t.Run(string(nodeStatus), func(t *testing.T) {
+			ctx, _ := db.NewTestSQLiteContext(t)
 
-	config := &so.Config{}
-	handler := NewFinalizeSignatureHandler(config)
+			config := &so.Config{}
+			handler := NewFinalizeSignatureHandler(config)
 
-	for _, status := range []st.TreeNodeStatus{st.TreeNodeStatusOnChain, st.TreeNodeStatusExited, st.TreeNodeStatusParentExited} {
-		entTx, err := ent.GetTxFromContext(ctx)
-		require.NoError(t, err)
-		dbClient := entTx.Client()
+			entTx, err := ent.GetTxFromContext(ctx)
+			require.NoError(t, err)
+			dbClient := entTx.Client()
 
-		_, treeNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusAvailable)
+			_, treeNode := createTestTree(t, ctx, st.NetworkRegtest, st.TreeStatusAvailable)
 
-		// Set the tree node to a final status
-		treeNode, err = treeNode.Update().
-			SetStatus(status).
-			Save(ctx)
-		require.NoError(t, err)
+			// Set the tree node to a final status
+			treeNode, err = treeNode.Update().
+				SetStatus(nodeStatus).
+				Save(ctx)
+			require.NoError(t, err)
 
-		// Test: Node without refund tx should be set to Splitted
-		nodeSignatures := &pb.NodeSignatures{
-			NodeId: treeNode.ID.String(),
-			// No RefundTxSignature provided
-		}
+			// Test: Node without refund tx should be set to Splitted
+			nodeSignatures := &pb.NodeSignatures{
+				NodeId: treeNode.ID.String(),
+				// No RefundTxSignature provided
+			}
 
-		sparkNode, internalNode, err := handler.updateNode(ctx, nodeSignatures, pbcommon.SignatureIntent_TRANSFER, false)
-		require.NoError(t, err)
-		assert.NotNil(t, sparkNode)
-		assert.NotNil(t, internalNode)
+			sparkNode, internalNode, err := handler.updateNode(ctx, nodeSignatures, pbcommon.SignatureIntent_TRANSFER, false)
+			require.NoError(t, err)
+			assert.NotNil(t, sparkNode)
+			assert.NotNil(t, internalNode)
 
-		// Verify that the tree node status is not updated because it can not be updated to Available
-		updatedNode, err := dbClient.TreeNode.Get(ctx, treeNode.ID)
-		require.NoError(t, err)
-		assert.Equal(t, status, updatedNode.Status)
-
-		// Clear test data
-		err = entTx.Rollback()
-		require.NoError(t, err)
+			// Verify that the tree node status is not updated because it can not be updated to Available
+			updatedNode, err := dbClient.TreeNode.Get(ctx, treeNode.ID)
+			require.NoError(t, err)
+			assert.Equal(t, nodeStatus, updatedNode.Status)
+		})
 	}
 }

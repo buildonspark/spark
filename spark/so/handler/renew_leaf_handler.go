@@ -68,14 +68,14 @@ func (h *RenewLeafHandler) NodeAvailableForRenew(ctx context.Context, req *pbint
 		return fmt.Errorf("failed to get database from context: %w", err)
 	}
 
-	uuid, err := uuid.Parse(req.NodeId)
+	id, err := uuid.Parse(req.NodeId)
 	if err != nil {
 		return fmt.Errorf("failed to parse leaf id: %w", err)
 	}
 
 	leaf, err := db.TreeNode.
 		Query().
-		Where(enttreenode.ID(uuid)).
+		Where(enttreenode.ID(id)).
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -91,11 +91,8 @@ func (h *RenewLeafHandler) NodeAvailableForRenew(ctx context.Context, req *pbint
 	return nil
 }
 
-/**
- *	RenewLeaf manages timelocks of nodes. This function will validate user
- * 	sent signing jobs, sign them, aggregate them, and then update internal
- * 	data model with the signed transactions.
- */
+// RenewLeaf manages timelocks of nodes. This function validates user-sent signing jobs, signs them, aggregates them,
+// and then updates internal data model with the signed transactions.
 func (h *RenewLeafHandler) RenewLeaf(ctx context.Context, req *pb.RenewLeafRequest) (*pb.RenewLeafResponse, error) {
 	// Get the leaf from the database
 	leafUUID, err := uuid.Parse(req.LeafId)

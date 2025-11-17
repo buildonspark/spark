@@ -245,11 +245,11 @@ func getAncestorChain(ctx context.Context, db *ent.Client, node *ent.TreeNode, n
 				if !ent.IsNotFound(err) {
 					return err
 				}
-				tree, err := node.QueryTree().Only(ctx)
+				nodeTree, err := node.QueryTree().Only(ctx)
 				if err != nil {
 					return err
 				}
-				if tree.Network == st.NetworkMainnet {
+				if nodeTree.Network == st.NetworkMainnet {
 					return nil
 				}
 			}

@@ -129,8 +129,8 @@ func createOldBitcoinTxBytes(t *testing.T, receiverPubKey keys.Public) []byte {
 		scriptLen +
 		hex.EncodeToString(p2trScript) +
 		"000000000000000000000000000000000000000000"
-	bytes, _ := hex.DecodeString(hexStr)
-	return bytes
+	asBytes, _ := hex.DecodeString(hexStr)
+	return asBytes
 }
 
 func createValidUserSignatureForTest(

@@ -300,9 +300,9 @@ func buildQueryResponseForStatus(transferResponses []*ent.Transfer, invoiceRespo
 	invoiceResponseMap = make(map[uuid.UUID]*sparkpb.InvoiceResponse)
 	notFoundSatsInvoiceMap := mapSliceToSet(queriedSatsInvoiceIDs)
 	notFoundTokenInvoiceMap := mapSliceToSet(queriedTokensInvoiceIDs)
-	for _, transfer := range transferResponses {
-		delete(notFoundSatsInvoiceMap, transfer.Edges.SparkInvoice.ID)
-		invoiceResponseMap[transfer.Edges.SparkInvoice.ID], err = buildSatsInvoiceResponse(transfer, status)
+	for _, response := range transferResponses {
+		delete(notFoundSatsInvoiceMap, response.Edges.SparkInvoice.ID)
+		invoiceResponseMap[response.Edges.SparkInvoice.ID], err = buildSatsInvoiceResponse(response, status)
 		if err != nil {
 			return nil, nil, nil, err
 		}

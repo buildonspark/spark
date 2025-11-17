@@ -231,10 +231,10 @@ func createPendingKeyshares(t *testing.T, ctx context.Context, client *ent.Clien
 func verifyKeysharesStatus(t *testing.T, ctx context.Context, keyIDs []uuid.UUID, expectedStatus schematype.SigningKeyshareStatus) {
 	t.Helper()
 
-	db, err := ent.GetDbFromContext(ctx)
+	dbClient, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	keyshares, err := db.SigningKeyshare.Query().
+	keyshares, err := dbClient.SigningKeyshare.Query().
 		Where(signingkeyshare.IDIn(keyIDs...)).
 		All(ctx)
 	require.NoError(t, err)

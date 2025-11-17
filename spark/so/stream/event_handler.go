@@ -122,9 +122,9 @@ func (s *EventRouter) processNotification(ctx context.Context, eventData db.Even
 	var notification *pb.SubscribeToEventsResponse
 	switch eventData.Channel {
 	case eventNameDepositAddress:
-		notification = s.processDepositNotification(ctx, event, identityPublicKey)
+		notification = s.processDepositNotification(ctx, event)
 	case eventNameTransfer:
-		notification = s.processTransferNotification(ctx, event, identityPublicKey)
+		notification = s.processTransferNotification(ctx, event)
 	default:
 		return nil, fmt.Errorf("unknown event type: %s", eventData.Channel)
 	}
@@ -132,14 +132,14 @@ func (s *EventRouter) processNotification(ctx context.Context, eventData db.Even
 	return notification, nil
 }
 
-func (s *EventRouter) processDepositNotification(ctx context.Context, event processEventPayload, identityPublicKey keys.Public) *pb.SubscribeToEventsResponse {
+func (s *EventRouter) processDepositNotification(ctx context.Context, event processEventPayload) *pb.SubscribeToEventsResponse {
 	if _, exists := event.Fields["confirmation_txid"]; exists {
-		depositaddress, err := s.dbClient.DepositAddress.Query().Where(depositaddress.ID(event.ID)).Only(ctx)
+		depositAddress, err := s.dbClient.DepositAddress.Query().Where(depositaddress.ID(event.ID)).Only(ctx)
 		if err != nil {
 			return nil
 		}
 
-		treeNode, err := s.dbClient.TreeNode.Query().Where(treenode.ID(depositaddress.NodeID)).Only(ctx)
+		treeNode, err := s.dbClient.TreeNode.Query().Where(treenode.ID(depositAddress.NodeID)).Only(ctx)
 		if err != nil {
 			// TODO: Fine to silently ignore this
 			// If tree node doesn't exist maybe we can inform client that they can claim the deposit?
@@ -162,17 +162,17 @@ func (s *EventRouter) processDepositNotification(ctx context.Context, event proc
 	return nil
 }
 
-func (s *EventRouter) processTransferNotification(ctx context.Context, event processEventPayload, identityPublicKey keys.Public) *pb.SubscribeToEventsResponse {
+func (s *EventRouter) processTransferNotification(ctx context.Context, event processEventPayload) *pb.SubscribeToEventsResponse {
 	if statusStr, exists := event.Fields["status"]; exists {
 		status := schematype.TransferStatus(statusStr.(string))
 
 		if status == schematype.TransferStatusSenderKeyTweaked {
-			transfer, err := s.dbClient.Transfer.Query().Where(transfer.ID(event.ID)).Only(ctx)
+			transferEnt, err := s.dbClient.Transfer.Query().Where(transfer.ID(event.ID)).Only(ctx)
 			if err != nil {
 				return nil
 			}
 
-			transferProto, err := transfer.MarshalProto(ctx)
+			transferProto, err := transferEnt.MarshalProto(ctx)
 			if err != nil {
 				return nil
 			}

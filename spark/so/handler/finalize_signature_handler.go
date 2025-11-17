@@ -77,16 +77,16 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 	if err != nil {
 		return nil, fmt.Errorf("failed to get first node for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 	}
-	tree, err := firstNode.QueryTree().Only(ctx)
+	nodeTree, err := firstNode.QueryTree().Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tree for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 	}
-	network, err := common.NetworkFromSchemaNetwork(tree.Network)
+	network, err := common.NetworkFromSchemaNetwork(nodeTree.Network)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get network for request %s: %w", logging.FormatProto("finalize_node_signatures_request", req), err)
 	}
 
-	if tree.Status != st.TreeStatusAvailable {
+	if nodeTree.Status != st.TreeStatusAvailable {
 		for _, nodeSignatures := range req.NodeSignatures {
 			nodeID, err := uuid.Parse(nodeSignatures.NodeId)
 			if err != nil {
@@ -123,12 +123,12 @@ func (o *FinalizeSignatureHandler) finalizeNodeSignatures(ctx context.Context, r
 				if len(address.ConfirmationTxid) > 0 {
 					var baseHash chainhash.Hash
 					// Convert the tree.BaseTxid back to chainhash so it matches the format of address.ConfirmationTxid
-					copy(baseHash[:], tree.BaseTxid)
+					copy(baseHash[:], nodeTree.BaseTxid)
 					if address.ConfirmationTxid != baseHash.String() {
 						return nil, fmt.Errorf("confirmation txid does not match tree base txid")
 					}
 				}
-				_, err = tree.Update().SetStatus(st.TreeStatusAvailable).Save(ctx)
+				_, err = nodeTree.Update().SetStatus(st.TreeStatusAvailable).Save(ctx)
 				if err != nil {
 					return nil, fmt.Errorf("failed to update tree: %w", err)
 				}

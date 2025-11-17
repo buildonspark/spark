@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common/keys"
-	protohash "github.com/lightsparkdev/spark/common/protohash"
+	"github.com/lightsparkdev/spark/common/protohash"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/btcsuite/btcd/btcec/v2/ecdsa"
@@ -133,17 +133,17 @@ func HashTokenTransactionV3(tokenTransaction *tokenpb.TokenTransaction, partialH
 			return nil, sparkerrors.InvalidArgumentOutOfRange(fmt.Errorf("unsupported token transaction type: %s", inputType))
 		}
 
-		hash, err := protohash.Hash(cloned)
+		txHash, err := protohash.Hash(cloned)
 		if err != nil {
 			return nil, sparkerrors.InternalUnhandledError(fmt.Errorf("failed to hash partial token transaction: %w", err))
 		}
-		return hash, nil
+		return txHash, nil
 	} else {
-		hash, err := protohash.Hash(tokenTransaction)
+		txHash, err := protohash.Hash(tokenTransaction)
 		if err != nil {
 			return nil, sparkerrors.InternalUnhandledError(fmt.Errorf("failed to hash final token transaction: %w", err))
 		}
-		return hash, nil
+		return txHash, nil
 	}
 }
 

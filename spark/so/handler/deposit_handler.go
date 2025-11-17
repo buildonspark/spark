@@ -25,7 +25,7 @@ import (
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/tree"
 	"github.com/lightsparkdev/spark/so/ent/treenode"
-	"github.com/lightsparkdev/spark/so/ent/utxo"
+	entutxo "github.com/lightsparkdev/spark/so/ent/utxo"
 	"github.com/lightsparkdev/spark/so/ent/utxoswap"
 	"github.com/lightsparkdev/spark/so/errors"
 	"github.com/lightsparkdev/spark/so/helper"
@@ -1394,9 +1394,9 @@ func VerifiedTargetUtxo(ctx context.Context, config *so.Config, db *ent.Client, 
 		return nil, fmt.Errorf("failed to find block height: %w", err)
 	}
 	targetUtxo, err := db.Utxo.Query().
-		Where(utxo.NetworkEQ(schemaNetwork)).
-		Where(utxo.Txid(txid[:])).
-		Where(utxo.Vout(vout)).
+		Where(entutxo.NetworkEQ(schemaNetwork)).
+		Where(entutxo.Txid(txid[:])).
+		Where(entutxo.Vout(vout)).
 		Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -1589,17 +1589,17 @@ func (o *DepositHandler) GetUtxosForAddress(ctx context.Context, req *pb.GetUtxo
 			req.Limit = 100
 		}
 		query := depositAddress.QueryUtxo().
-			Where(utxo.BlockHeightLTE(currentBlockHeight.Height - int64(threshold))).
+			Where(entutxo.BlockHeightLTE(currentBlockHeight.Height - int64(threshold))).
 			Offset(int(req.Offset)).
 			Limit(int(req.Limit)).
-			Order(utxo.ByBlockHeight(sql.OrderDesc()))
+			Order(entutxo.ByBlockHeight(sql.OrderDesc()))
 		if req.ExcludeClaimed {
 			query = query.Where(func(s *sql.Selector) {
 				// Exclude UTXOs that have non-cancelled UTXO swaps
 				subquery := sql.Select(utxoswap.UtxoColumn).
 					From(sql.Table(utxoswap.Table)).
 					Where(sql.NEQ(utxoswap.FieldStatus, string(st.UtxoSwapStatusCancelled)))
-				s.Where(sql.NotIn(s.C(utxo.FieldID), subquery))
+				s.Where(sql.NotIn(s.C(entutxo.FieldID), subquery))
 			})
 		}
 		utxos, err := query.All(ctx)

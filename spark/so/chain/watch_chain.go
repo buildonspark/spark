@@ -607,30 +607,30 @@ func handleBlock(
 		if treeNode.Status != st.TreeNodeStatusCreating {
 			logger.Sugar().Infof("Expected tree node status to be creating (was: %s)", treeNode.Status)
 		}
-		tree, err := treeNode.QueryTree().Only(ctx)
+		nodeTree, err := treeNode.QueryTree().Only(ctx)
 		if err != nil {
 			return err
 		}
-		if tree.Status != st.TreeStatusPending {
-			logger.Sugar().Infof("Expected tree status to be pending (was: %s)", tree.Status)
+		if nodeTree.Status != st.TreeStatusPending {
+			logger.Sugar().Infof("Expected tree status to be pending (was: %s)", nodeTree.Status)
 			continue
 		}
-		if _, ok := confirmedTxHashSet[[32]byte(tree.BaseTxid)]; !ok {
-			logger.Sugar().Debugf("Base txid %s not found in confirmed txids", chainhash.Hash(tree.BaseTxid).String())
+		if _, ok := confirmedTxHashSet[[32]byte(nodeTree.BaseTxid)]; !ok {
+			logger.Sugar().Debugf("Base txid %s not found in confirmed txids", chainhash.Hash(nodeTree.BaseTxid).String())
 			for txid := range confirmedTxHashSet {
 				logger.Sugar().Debugf("Found confirmed txid %s", chainhash.Hash(txid).String())
 			}
 			continue
 		}
 
-		_, err = dbClient.Tree.UpdateOne(tree).
+		_, err = dbClient.Tree.UpdateOne(nodeTree).
 			SetStatus(st.TreeStatusAvailable).
 			Save(ctx)
 		if err != nil {
 			return err
 		}
 
-		treeNodes, err := tree.QueryNodes().All(ctx)
+		treeNodes, err := nodeTree.QueryNodes().All(ctx)
 		if err != nil {
 			return err
 		}

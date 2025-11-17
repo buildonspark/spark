@@ -563,12 +563,12 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					}
 					for _, pendingSendTransfer := range pendingSendTransfers {
 						logger.Sugar().Infof("Pending send transfer %s is still pending", pendingSendTransfer.ID)
-						transfer, err := tx.Transfer.Query().Where(transfer.IDEQ(pendingSendTransfer.TransferID)).Only(ctx)
+						transferEnt, err := tx.Transfer.Query().Where(transfer.IDEQ(pendingSendTransfer.TransferID)).Only(ctx)
 						if err != nil && !ent.IsNotFound(err) {
 							logger.Sugar().Errorw("failed to get transfer", zap.Error(err))
 							continue
 						}
-						shouldCancel := ent.IsNotFound(err) || transfer.Status == st.TransferStatusReturned
+						shouldCancel := ent.IsNotFound(err) || transferEnt.Status == st.TransferStatusReturned
 						if shouldCancel {
 							logger.Sugar().Infof("Cancelling transfer %s", pendingSendTransfer.TransferID)
 							transferHandler := handler.NewTransferHandler(config)

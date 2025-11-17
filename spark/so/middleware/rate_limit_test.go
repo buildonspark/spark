@@ -874,14 +874,12 @@ func TestRateLimiter(t *testing.T) {
 		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/TestMethod"}
 
 		// Create metadata with multiple x-forwarded-for headers
-		md := metadata.New(map[string]string{
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
 			"x-forwarded-for": "1.2.3.4, 5.6.7.8, 9.10.11.12",
-		})
-		md2 := metadata.New(map[string]string{
+		}))
+		ctx2 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
 			"x-forwarded-for": "1.2.3.4, 5.6.7.8, 9.10.11.13",
-		})
-		ctx := metadata.NewIncomingContext(t.Context(), md)
-		ctx2 := metadata.NewIncomingContext(t.Context(), md2)
+		}))
 
 		// Should use the last IP (9.10.11.12) for rate limiting, so exhaust the
 		// resources with the first two requests, but then make sure the third
@@ -916,13 +914,12 @@ func TestRateLimiter(t *testing.T) {
 		info := &grpc.UnaryServerInfo{FullMethod: "/test.Service/TestMethod"}
 
 		// Create metadata with only x-real-ip (no x-forwarded-for)
-		md := metadata.New(map[string]string{
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
 			"x-real-ip": "1.2.3.4",
-		})
-		ctx := metadata.NewIncomingContext(t.Context(), md)
+		}))
 
 		// Should not rate limit since x-real-ip is ignored
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			resp, err := interceptor(ctx, "request", info, handler)
 			require.NoError(t, err)
 			assert.Equal(t, "ok", resp)
@@ -946,10 +943,9 @@ func TestRateLimiter(t *testing.T) {
 
 		// Create metadata with multiple x-forwarded-for headers
 		// Format: "client,proxy1,proxy2" - using position 1 should use "proxy1"
-		md := metadata.New(map[string]string{
+		ctx := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
 			"x-forwarded-for": "192.168.1.100, 10.0.0.1, 172.16.0.1",
-		})
-		ctx := metadata.NewIncomingContext(t.Context(), md)
+		}))
 
 		// Should use "10.0.0.1" (second-to-last) for rate limiting
 		resp, err := interceptor(ctx, "request", info, handler)
@@ -967,10 +963,9 @@ func TestRateLimiter(t *testing.T) {
 		// Test just switching the second-to-last IP to ensure it isn't rate
 		// limited initially even though the prior IP in that position was
 		// limited, but then it is rate limited after the limit is exceeded.
-		md2 := metadata.New(map[string]string{
+		ctx2 := metadata.NewIncomingContext(t.Context(), metadata.New(map[string]string{
 			"x-forwarded-for": "192.168.1.100, 10.0.0.2, 172.16.0.1",
-		})
-		ctx2 := metadata.NewIncomingContext(t.Context(), md2)
+		}))
 
 		resp, err = interceptor(ctx2, "request", info, handler)
 		require.NoError(t, err)

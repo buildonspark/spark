@@ -241,10 +241,10 @@ func TestQueryWalletSetting_Existing(t *testing.T) {
 	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
 	// Create existing wallet setting
-	db, err := ent.GetDbFromContext(ctx)
+	client, err := ent.GetDbFromContext(ctx)
 	require.NoError(t, err)
 
-	existingSetting, err := db.WalletSetting.
+	existingSetting, err := client.WalletSetting.
 		Create().
 		SetOwnerIdentityPublicKey(identityPubKey).
 		SetPrivateEnabled(true).
