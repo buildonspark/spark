@@ -1299,6 +1299,7 @@ export interface Transfer {
   updatedTime: Date | undefined;
   type: TransferType;
   sparkInvoice: string;
+  network: Network;
 }
 
 export interface TransferLeaf {
@@ -9778,6 +9779,7 @@ function createBaseTransfer(): Transfer {
     updatedTime: undefined,
     type: 0,
     sparkInvoice: "",
+    network: 0,
   };
 }
 
@@ -9815,6 +9817,9 @@ export const Transfer: MessageFns<Transfer> = {
     }
     if (message.sparkInvoice !== "") {
       writer.uint32(90).string(message.sparkInvoice);
+    }
+    if (message.network !== 0) {
+      writer.uint32(96).int32(message.network);
     }
     return writer;
   },
@@ -9914,6 +9919,14 @@ export const Transfer: MessageFns<Transfer> = {
           message.sparkInvoice = reader.string();
           continue;
         }
+        case 12: {
+          if (tag !== 96) {
+            break;
+          }
+
+          message.network = reader.int32() as any;
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -9940,6 +9953,7 @@ export const Transfer: MessageFns<Transfer> = {
       updatedTime: isSet(object.updatedTime) ? fromJsonTimestamp(object.updatedTime) : undefined,
       type: isSet(object.type) ? transferTypeFromJSON(object.type) : 0,
       sparkInvoice: isSet(object.sparkInvoice) ? globalThis.String(object.sparkInvoice) : "",
+      network: isSet(object.network) ? networkFromJSON(object.network) : 0,
     };
   },
 
@@ -9978,6 +9992,9 @@ export const Transfer: MessageFns<Transfer> = {
     if (message.sparkInvoice !== "") {
       obj.sparkInvoice = message.sparkInvoice;
     }
+    if (message.network !== 0) {
+      obj.network = networkToJSON(message.network);
+    }
     return obj;
   },
 
@@ -9997,6 +10014,7 @@ export const Transfer: MessageFns<Transfer> = {
     message.updatedTime = object.updatedTime ?? undefined;
     message.type = object.type ?? 0;
     message.sparkInvoice = object.sparkInvoice ?? "";
+    message.network = object.network ?? 0;
     return message;
   },
 };
