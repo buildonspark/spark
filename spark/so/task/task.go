@@ -29,6 +29,7 @@ import (
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
 	"github.com/lightsparkdev/spark/so/ent/signingkeyshare"
+	"github.com/lightsparkdev/spark/so/ent/signingnonce"
 	"github.com/lightsparkdev/spark/so/ent/tokentransaction"
 	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/tree"
@@ -501,6 +502,41 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							Exec(ctx)
 						if err != nil {
 							return fmt.Errorf("failed to purge gossip messages: %w", err)
+						}
+					}
+					return nil
+				},
+			},
+		},
+		{
+			ExecutionInterval: 3 * time.Second,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "purge_signing_nonces",
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					db, err := ent.GetDbFromContext(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get or create current tx for request: %w", err)
+					}
+					cutOffUUID := common.UUIDv7FromTime(time.Now().Add(-24 * time.Hour))
+					// First query for IDs to delete (with limit), then delete those IDs.
+					// Use ForUpdate with SkipLocked to prevent race conditions when multiple
+					// operators run this task concurrently - each operator will lock and delete
+					// a different set of rows.
+					idsToDelete, err := db.SigningNonce.Query().
+						Where(signingnonce.IDLT(cutOffUUID)).
+						Limit(60000).
+						ForUpdate(sql.WithLockAction(sql.SkipLocked)).
+						IDs(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to query signing nonces to purge: %w", err)
+					}
+					if len(idsToDelete) > 0 {
+						_, err = db.SigningNonce.Delete().
+							Where(signingnonce.IDIn(idsToDelete...)).
+							Exec(ctx)
+						if err != nil {
+							return fmt.Errorf("failed to purge signing nonces: %w", err)
 						}
 					}
 					return nil
