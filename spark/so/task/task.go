@@ -488,7 +488,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					// a different set of rows.
 					idsToDelete, err := db.Gossip.Query().
 						Where(gossip.StatusEQ(st.GossipStatusDelivered)).
-						Limit(100000).
+						Limit(60000).
 						ForUpdate(sql.WithLockAction(sql.SkipLocked)).
 						IDs(ctx)
 					if err != nil {
