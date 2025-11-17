@@ -473,6 +473,40 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
+			ExecutionInterval: 30 * time.Second,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "purge_gossip_messages",
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					db, err := ent.GetDbFromContext(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get or create current tx for request: %w", err)
+					}
+					// First query for IDs to delete (with limit), then delete those IDs.
+					// Use ForUpdate with SkipLocked to prevent race conditions when multiple
+					// operators run this task concurrently - each operator will lock and delete
+					// a different set of rows.
+					idsToDelete, err := db.Gossip.Query().
+						Where(gossip.StatusEQ(st.GossipStatusDelivered)).
+						Limit(10000).
+						ForUpdate(sql.WithLockAction(sql.SkipLocked)).
+						IDs(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to query gossip messages to purge: %w", err)
+					}
+					if len(idsToDelete) > 0 {
+						_, err = db.Gossip.Delete().
+							Where(gossip.IDIn(idsToDelete...)).
+							Exec(ctx)
+						if err != nil {
+							return fmt.Errorf("failed to purge gossip messages: %w", err)
+						}
+					}
+					return nil
+				},
+			},
+		},
+		{
 			ExecutionInterval: 1 * time.Minute,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "monitor_pending_send_transfers",
