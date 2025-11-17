@@ -475,7 +475,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
-			ExecutionInterval: 3 * time.Second,
+			ExecutionInterval: 30 * time.Minute,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "purge_gossip_messages",
 				RunInTestEnv: true,
