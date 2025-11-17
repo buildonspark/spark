@@ -23,6 +23,7 @@ import (
 	"github.com/lightsparkdev/spark/so"
 	sodkg "github.com/lightsparkdev/spark/so/dkg"
 	"github.com/lightsparkdev/spark/so/ent"
+	"github.com/lightsparkdev/spark/so/ent/eventmessage"
 	"github.com/lightsparkdev/spark/so/ent/gossip"
 	"github.com/lightsparkdev/spark/so/ent/pendingsendtransfer"
 	"github.com/lightsparkdev/spark/so/ent/preimagerequest"
@@ -553,6 +554,35 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 							}
 						}
 					}
+					return nil
+				},
+			},
+		},
+		{
+			ExecutionInterval: 1 * time.Hour,
+			BaseTaskSpec: BaseTaskSpec{
+				Name:         "purge_event_messages",
+				RunInTestEnv: true,
+				Task: func(ctx context.Context, config *so.Config, knobsService knobs.Knobs) error {
+					logger := logging.GetLoggerFromContext(ctx)
+					tx, err := ent.GetDbFromContext(ctx)
+					if err != nil {
+						return fmt.Errorf("failed to get or create current tx for request: %w", err)
+					}
+
+					cutoffTime := time.Now().Add(-1 * time.Hour)
+					numDeleted, err := tx.EventMessage.Delete().
+						Where(eventmessage.CreateTimeLT(cutoffTime)).
+						Exec(ctx)
+					if err != nil {
+						logger.Error("Failed to purge old event messages", zap.Error(err))
+						return err
+					}
+
+					if numDeleted > 0 {
+						logger.Sugar().Infof("Purged %d event messages older than %s", numDeleted, cutoffTime)
+					}
+
 					return nil
 				},
 			},
