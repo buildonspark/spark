@@ -473,7 +473,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
-			ExecutionInterval: 30 * time.Second,
+			ExecutionInterval: 3 * time.Second,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "purge_gossip_messages",
 				RunInTestEnv: true,
@@ -488,7 +488,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 					// a different set of rows.
 					idsToDelete, err := db.Gossip.Query().
 						Where(gossip.StatusEQ(st.GossipStatusDelivered)).
-						Limit(10000).
+						Limit(100000).
 						ForUpdate(sql.WithLockAction(sql.SkipLocked)).
 						IDs(ctx)
 					if err != nil {
