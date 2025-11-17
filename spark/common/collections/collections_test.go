@@ -1,4 +1,4 @@
-package common
+package collections
 
 import (
 	"testing"

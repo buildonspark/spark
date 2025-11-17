@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 
+	"github.com/lightsparkdev/spark/common/collections"
 	"github.com/lightsparkdev/spark/common/keys"
 
 	"github.com/btcsuite/btcd/wire"
@@ -49,7 +50,7 @@ type SigningResult struct {
 
 // MarshalProto marshals the signing result to a proto.
 func (s *SigningResult) MarshalProto() (*pbspark.SigningResult, error) {
-	signingCommitments, err := common.ConvertObjectMapToProtoMap(s.SigningCommitments)
+	signingCommitments, err := collections.ConvertObjectMapToProtoMap(s.SigningCommitments)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +172,7 @@ func frostRound2(
 	sparkServiceClientFactory SparkServiceFrostSignerFactory,
 ) (map[string]map[string][]byte, error) {
 	operatorResult, err := ExecuteTaskWithAllOperators(ctx, config, operatorSelection, func(ctx context.Context, operator *so.SigningOperator) (map[string][]byte, error) {
-		commitmentsArray := common.MapOfArrayToArrayOfMap(round1)
+		commitmentsArray := collections.MapOfArrayToArrayOfMap(round1)
 
 		signingJobs := make([]*pbinternal.SigningJob, len(jobs))
 		for i, job := range jobs {
@@ -230,7 +231,7 @@ func frostRound2(
 		return nil, err
 	}
 
-	result := common.SwapMapKeys(operatorResult)
+	result := collections.SwapMapKeys(operatorResult)
 	return result, nil
 }
 
@@ -454,7 +455,7 @@ func SignFrostInternal(ctx context.Context, config *so.Config, jobs []*SigningJo
 		return nil, err
 	}
 
-	round1Array := common.MapOfArrayToArrayOfMap(round1)
+	round1Array := collections.MapOfArrayToArrayOfMap(round1)
 	return prepareResults(config, &selection, jobs, signingKeyshares, round1Array, round2)
 }
 
@@ -477,7 +478,7 @@ func SignFrostWithPregeneratedNonceInternal(ctx context.Context, config *so.Conf
 	for i, job := range jobs {
 		round1Array[i] = job.Round1Packages
 	}
-	round1 := common.ArrayOfMapToMapOfArray(round1Array)
+	round1 := collections.ArrayOfMapToMapOfArray(round1Array)
 
 	operatorIDs := make([]string, 0, len(round1))
 	for operatorID := range round1 {

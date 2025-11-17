@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/collections"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
 	"github.com/lightsparkdev/spark/so/authn"
@@ -136,12 +136,12 @@ func (h *SigningHandler) GetSigningCommitments(ctx context.Context, req *pb.GetS
 		return nil, fmt.Errorf("unable to get signing commitments: %w", err)
 	}
 
-	commitmentsArray := common.MapOfArrayToArrayOfMap(commitments)
+	commitmentsArray := collections.MapOfArrayToArrayOfMap(commitments)
 
 	requestedCommitments := make([]*pb.RequestedSigningCommitments, len(commitmentsArray))
 
 	for i, commitment := range commitmentsArray {
-		commitmentMapProto, err := common.ConvertObjectMapToProtoMap(commitment)
+		commitmentMapProto, err := collections.ConvertObjectMapToProtoMap(commitment)
 		if err != nil {
 			return nil, fmt.Errorf("unable to convert signing commitment to proto: %w", err)
 		}

@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/collections"
 	"github.com/lightsparkdev/spark/common/keys"
 	pbcommon "github.com/lightsparkdev/spark/proto/common"
 	pbfrost "github.com/lightsparkdev/spark/proto/frost"
@@ -429,7 +430,7 @@ func TestFrostSigningWithPregeneratedNonce(t *testing.T) {
 	// Step 6: Generate operator side of nonce.
 	operatorNonceCommitments, err := helper.GetSigningCommitments(ctx, config, []uuid.UUID{operatorKeyShare.ID}, 1)
 	require.NoError(t, err)
-	operatorNonceCommitmentArray := common.MapOfArrayToArrayOfMap(operatorNonceCommitments)
+	operatorNonceCommitmentArray := collections.MapOfArrayToArrayOfMap(operatorNonceCommitments)
 	operatorCommitmentsProto := make(map[string]*pbcommon.SigningCommitment)
 	for id, commitment := range operatorNonceCommitmentArray[0] {
 		commitmentProto, err := commitment.MarshalProto()

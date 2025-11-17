@@ -1,7 +1,8 @@
-package common
+package collections
 
 import (
 	"github.com/google/uuid"
+	"github.com/lightsparkdev/spark/common"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -64,7 +65,7 @@ func SwapMapKeys[K1 comparable, K2 comparable, V any](m map[K1]map[K2]V) map[K2]
 }
 
 // ConvertObjectMapToProtoMap converts a map of V to a map of T, where V is a ProtoConvertable[T].
-func ConvertObjectMapToProtoMap[K comparable, V ProtoConvertable[T], T proto.Message](m map[K]V) (map[K]T, error) {
+func ConvertObjectMapToProtoMap[K comparable, V common.ProtoConvertable[T], T proto.Message](m map[K]V) (map[K]T, error) {
 	results := make(map[K]T, len(m))
 	for k, v := range m {
 		marshalled, err := v.MarshalProto()

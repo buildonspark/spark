@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lightsparkdev/spark/common"
+	"github.com/lightsparkdev/spark/common/collections"
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
@@ -130,7 +130,7 @@ func (h *InvestigationHandler) QueryLeafSigningPubkeys(ctx context.Context, req 
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	leafIDs, err := common.StringUUIDArrayToUUIDArray(req.LeafIds)
+	leafIDs, err := collections.StringUUIDArrayToUUIDArray(req.LeafIds)
 	if err != nil {
 		return nil, err
 	}
@@ -154,12 +154,12 @@ func (h *InvestigationHandler) ResolveLeafInvestigation(ctx context.Context, req
 		return nil, fmt.Errorf("failed to get or create current tx for request: %w", err)
 	}
 
-	lostLeafIDs, err := common.StringUUIDArrayToUUIDArray(req.LostLeafIds)
+	lostLeafIDs, err := collections.StringUUIDArrayToUUIDArray(req.LostLeafIds)
 	if err != nil {
 		return nil, err
 	}
 
-	availableLeafIDs, err := common.StringUUIDArrayToUUIDArray(req.AvailableLeafIds)
+	availableLeafIDs, err := collections.StringUUIDArrayToUUIDArray(req.AvailableLeafIds)
 	if err != nil {
 		return nil, err
 	}
