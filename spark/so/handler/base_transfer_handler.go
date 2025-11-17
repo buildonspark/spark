@@ -104,7 +104,142 @@ func parseRefundTx(refundBytes []byte) (*wire.MsgTx, error) {
 	return refundTx, nil
 }
 
-func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, expectedOutPoint *wire.OutPoint, expectedInputCount uint32, forDirectTx bool) error {
+// validateLeafRefundTxInputExact replaces the non "exact" variant in all instances except one, where it's not clear how to replace it.
+func validateLeafRefundTxInputExact(refundTx *wire.MsgTx, expectedSequence uint32, expectedOutPoint *wire.OutPoint, expectedInputCount uint32) error {
+	if refundTx.TxIn[0].Sequence != expectedSequence {
+		return fmt.Errorf("wrong sequence number (timelock), expected %d, got %d", expectedSequence, refundTx.TxIn[0].Sequence)
+	}
+
+	if len(refundTx.TxIn) != int(expectedInputCount) {
+		return fmt.Errorf("refund tx should have %d inputs, but has %d", expectedInputCount, len(refundTx.TxIn))
+	}
+
+	if refundTx.TxIn[0].PreviousOutPoint != *expectedOutPoint {
+		return fmt.Errorf("unexpected input in refund tx")
+	}
+
+	return nil
+}
+
+// validateLeafRefundTxInputNew is meant to be replaced by the "exact" variant.
+// That checks that time locks have an exact value
+// while this only checks that time locks lie in a range, which is too lenient.
+// Ideally, this function would be replaced and removed,
+// but it's not clear how to replace one of its call sites, so that is deferred.
+func validateLeafRefundTxInputNew(refundTx *wire.MsgTx, oldSequence uint32, expectedOutPoint *wire.OutPoint, expectedInputCount uint32) error {
+	if refundTx.TxIn[0].Sequence&(1<<31) != 0 {
+		return fmt.Errorf("refund tx input 0 sequence must have bit 31 clear to enable relative locktime, got %d", refundTx.TxIn[0].Sequence)
+	}
+	if oldSequence&(1<<22) != 0 {
+		return fmt.Errorf("old sequence must have bit 22 clear to enable block-based relative locktime, got %d", oldSequence)
+	}
+	if refundTx.TxIn[0].Sequence&(1<<22) != 0 {
+		return fmt.Errorf("refund tx input 0 sequence must have bit 22 clear to enable block-based relative locktime, got %d", refundTx.TxIn[0].Sequence)
+	}
+
+	newTimeLock := refundTx.TxIn[0].Sequence & 0xFFFF
+	oldTimeLock := oldSequence & 0xFFFF
+	if newTimeLock+spark.TimeLockInterval > oldTimeLock {
+		return fmt.Errorf("time lock on the new refund tx %d must be less than the old one %d", newTimeLock, oldTimeLock)
+	}
+	if len(refundTx.TxIn) != int(expectedInputCount) {
+		return fmt.Errorf("refund tx should have %d inputs, but has %d", expectedInputCount, len(refundTx.TxIn))
+	}
+	if refundTx.TxIn[0].PreviousOutPoint != *expectedOutPoint {
+		return fmt.Errorf("unexpected input in refund tx")
+	}
+	return nil
+}
+
+func validateSendLeafDirectRefundTxsNew(senderLeaf *ent.TreeNode, receiverDirectRefundTxBytes []byte, receiverDirectFromCpfpRefundTxBytes []byte, receiverIdentityPubKey keys.Public, expectedInputCount uint32) error {
+	senderDirectTx, err := parseRefundTx(senderLeaf.DirectTx)
+	if err != nil {
+		return fmt.Errorf("bad sender direct tx: %w", err)
+	}
+
+	senderRefundTx, err := parseRefundTx(senderLeaf.RawRefundTx)
+	if err != nil {
+		return fmt.Errorf("bad sender refund tx: %w", err)
+	}
+
+	receiverDirectRefundTx, err := parseRefundTx(receiverDirectRefundTxBytes)
+	if err != nil {
+		return fmt.Errorf("bad receiver direct refund tx: %w", err)
+	}
+
+	receiverDirectFromCpfpRefundTx, err := parseRefundTx(receiverDirectFromCpfpRefundTxBytes)
+	if err != nil {
+		return fmt.Errorf("bad receiver direct from cpfp refund tx: %w", err)
+	}
+
+	expectedReceiverDirectRefundOutPoint := wire.OutPoint{
+		Hash:  senderDirectTx.TxHash(),
+		Index: 0,
+	}
+	expectedReceiverDirectFromCpfpRefundOutPoint := senderRefundTx.TxIn[0].PreviousOutPoint
+
+	receiverRefundTxSequence := senderRefundTx.TxIn[0].Sequence - spark.TimeLockInterval
+
+	seq := receiverRefundTxSequence + spark.DirectTimelockOffset
+	expectedReceiverDirectRefundTxSequence := seq
+	expectedReceiverDirectFromCpfpRefundTxSequence := seq
+
+	if err := validateLeafRefundTxInputExact(receiverDirectRefundTx, expectedReceiverDirectRefundTxSequence, &expectedReceiverDirectRefundOutPoint, expectedInputCount); err != nil {
+		return fmt.Errorf("unable to validate direct refund tx inputs: %w", err)
+	}
+	if err := validateLeafRefundTxInputExact(receiverDirectFromCpfpRefundTx, expectedReceiverDirectFromCpfpRefundTxSequence, &expectedReceiverDirectFromCpfpRefundOutPoint, expectedInputCount); err != nil {
+		return fmt.Errorf("unable to validate direct from cpfp refund tx inputs: %w", err)
+	}
+
+	if err := validateLeafRefundTxOutput(receiverDirectRefundTx, receiverIdentityPubKey); err != nil {
+		return fmt.Errorf("unable to validate direct refund tx output: %w", err)
+	}
+	if err := validateLeafRefundTxOutput(receiverDirectFromCpfpRefundTx, receiverIdentityPubKey); err != nil {
+		return fmt.Errorf("unable to validate direct from cpfp refund tx output: %w", err)
+	}
+
+	return nil
+}
+
+func validateSendLeafRefundTxsNew(leaf *ent.TreeNode, rawRefundTx []byte, directRefundTx []byte, directFromCpfpRefundTx []byte, receiverIdentityPubKey keys.Public, expectedInputCount uint32, requireDirectTx bool) error {
+	leafIsWatchtowerReady := len(leaf.DirectTx) > 0
+	if leafIsWatchtowerReady {
+		receivedDirectTxs := len(directRefundTx) > 0 && len(directFromCpfpRefundTx) > 0
+		if receivedDirectTxs {
+			if err := validateSendLeafDirectRefundTxsNew(leaf, directRefundTx, directFromCpfpRefundTx, receiverIdentityPubKey, expectedInputCount); err != nil {
+				return err
+			}
+		} else if requireDirectTx {
+			return fmt.Errorf("DirectNodeTxSignature is required. Please upgrade to the latest SDK version")
+		}
+	}
+
+	newCpfpRefundTx, err := parseRefundTx(rawRefundTx)
+	if err != nil {
+		return fmt.Errorf("unable to load new cpfp refund tx: %w", err)
+	}
+
+	oldCpfpRefundTx, err := parseRefundTx(leaf.RawRefundTx)
+	if err != nil {
+		return fmt.Errorf("unable to load old cpfp refund tx: %w", err)
+	}
+	oldCpfpRefundTxIn := oldCpfpRefundTx.TxIn[0]
+	expectedOutPoint := oldCpfpRefundTxIn.PreviousOutPoint
+	// expectedNewCpfpRefundSequence := oldCpfpRefundTxIn.Sequence - spark.TimeLockInterval
+
+	if err := validateLeafRefundTxInputNew(newCpfpRefundTx, oldCpfpRefundTxIn.Sequence, &expectedOutPoint, expectedInputCount); err != nil {
+		return fmt.Errorf("unable to validate cpfp refund tx inputs: %w", err)
+	}
+
+	if err := validateLeafRefundTxOutput(newCpfpRefundTx, receiverIdentityPubKey); err != nil {
+		return fmt.Errorf("unable to validate cpfp refund tx output: %w", err)
+	}
+
+	return nil
+}
+
+// Deprecated: validateLeafRefundTxInputDeprecated is deprecated. Use the "new" or "exact" variant instead.
+func validateLeafRefundTxInputDeprecated(refundTx *wire.MsgTx, oldSequence uint32, expectedOutPoint *wire.OutPoint, expectedInputCount uint32, forDirectTx bool) error {
 	if refundTx.TxIn[0].Sequence&(1<<31) != 0 {
 		return fmt.Errorf("refund tx input 0 sequence must have bit 31 clear to enable relative locktime, got %d", refundTx.TxIn[0].Sequence)
 	}
@@ -133,7 +268,8 @@ func validateLeafRefundTxInput(refundTx *wire.MsgTx, oldSequence uint32, expecte
 	return nil
 }
 
-func validateSendLeafDirectRefundTxs(leaf *ent.TreeNode, directTx []byte, directFromCpfpRefundTx []byte, receiverIdentityPubKey keys.Public, expectedInputCount uint32) error {
+// Deprecated: validateSendLeafDirectRefundTxsDeprecated is deprecated. Use the "new" variant instead. Use the "new" variant instead.
+func validateSendLeafDirectRefundTxsDeprecated(leaf *ent.TreeNode, directTx []byte, directFromCpfpRefundTx []byte, receiverIdentityPubKey keys.Public, expectedInputCount uint32) error {
 	var oldDirectRefundTxSequence uint32
 	var oldDirectFromCpfpRefundTxSequence uint32
 
@@ -176,10 +312,10 @@ func validateSendLeafDirectRefundTxs(leaf *ent.TreeNode, directTx []byte, direct
 		leafDirectFromCpfpOutPoint = newDirectFromCpfpRefundTx.TxIn[0].PreviousOutPoint
 	}
 
-	if err := validateLeafRefundTxInput(newDirectRefundTx, oldDirectRefundTxSequence, &leafDirectOutPoint, expectedInputCount, true); err != nil {
+	if err := validateLeafRefundTxInputDeprecated(newDirectRefundTx, oldDirectRefundTxSequence, &leafDirectOutPoint, expectedInputCount, true); err != nil {
 		return fmt.Errorf("unable to validate direct refund tx inputs: %w", err)
 	}
-	if err := validateLeafRefundTxInput(newDirectFromCpfpRefundTx, oldDirectFromCpfpRefundTxSequence, &leafDirectFromCpfpOutPoint, expectedInputCount, true); err != nil {
+	if err := validateLeafRefundTxInputDeprecated(newDirectFromCpfpRefundTx, oldDirectFromCpfpRefundTxSequence, &leafDirectFromCpfpOutPoint, expectedInputCount, true); err != nil {
 		return fmt.Errorf("unable to validate direct from cpfp refund tx inputs: %w", err)
 	}
 	if err := validateLeafRefundTxOutput(newDirectRefundTx, receiverIdentityPubKey); err != nil {
@@ -192,7 +328,8 @@ func validateSendLeafDirectRefundTxs(leaf *ent.TreeNode, directTx []byte, direct
 	return nil
 }
 
-func validateSendLeafRefundTxs(ctx context.Context, leaf *ent.TreeNode, rawTx []byte, directTx []byte, directFromCpfpRefundTx []byte, receiverIdentityPubKey keys.Public, expectedInputCount uint32, requireDirectTx bool) error {
+// Deprecated: validateSendLeafRefundTxsDeprecated is deprecated. Use the "new" variant instead.
+func validateSendLeafRefundTxsDeprecated(ctx context.Context, leaf *ent.TreeNode, rawTx []byte, directTx []byte, directFromCpfpRefundTx []byte, receiverIdentityPubKey keys.Public, expectedInputCount uint32, requireDirectTx bool) error {
 	newCpfpRefundTx, err := parseRefundTx(rawTx)
 	if err != nil {
 		return fmt.Errorf("unable to load new cpfp refund tx: %w", err)
@@ -210,7 +347,7 @@ func validateSendLeafRefundTxs(ctx context.Context, leaf *ent.TreeNode, rawTx []
 	if leafIsWatchtowerReady {
 		receivedDirectTxs := len(directTx) > 0 && len(directFromCpfpRefundTx) > 0
 		if receivedDirectTxs {
-			if err := validateSendLeafDirectRefundTxs(leaf, directTx, directFromCpfpRefundTx, receiverIdentityPubKey, expectedInputCount); err != nil {
+			if err := validateSendLeafDirectRefundTxsDeprecated(leaf, directTx, directFromCpfpRefundTx, receiverIdentityPubKey, expectedInputCount); err != nil {
 				return err
 			}
 		} else if requireDirectTx {
@@ -225,7 +362,7 @@ func validateSendLeafRefundTxs(ctx context.Context, leaf *ent.TreeNode, rawTx []
 	oldCpfpRefundTxIn := oldCpfpRefundTx.TxIn[0]
 	expectedOutPoint := oldCpfpRefundTxIn.PreviousOutPoint
 
-	if err := validateLeafRefundTxInput(newCpfpRefundTx, oldCpfpRefundTxIn.Sequence, &expectedOutPoint, expectedInputCount, false); err != nil {
+	if err := validateLeafRefundTxInputDeprecated(newCpfpRefundTx, oldCpfpRefundTxIn.Sequence, &expectedOutPoint, expectedInputCount, false); err != nil {
 		return fmt.Errorf("unable to validate cpfp refund tx inputs: %w", err)
 	}
 
@@ -234,6 +371,14 @@ func validateSendLeafRefundTxs(ctx context.Context, leaf *ent.TreeNode, rawTx []
 	}
 
 	return nil
+}
+
+func validateSendLeafRefundTxs(ctx context.Context, leaf *ent.TreeNode, rawRefundTx []byte, directRefundTx []byte, directFromCpfpRefundTx []byte, receiverIdentityPubKey keys.Public, expectedInputCount uint32, requireDirectTx bool) error {
+	if knobs.GetKnobsService(ctx).GetValue(knobs.KnobBaseDirectTimelockOnNonDirect, 0) > 0 {
+		return validateSendLeafRefundTxsNew(leaf, rawRefundTx, directRefundTx, directFromCpfpRefundTx, receiverIdentityPubKey, expectedInputCount, requireDirectTx)
+	} else {
+		return validateSendLeafRefundTxsDeprecated(ctx, leaf, rawRefundTx, directRefundTx, directFromCpfpRefundTx, receiverIdentityPubKey, expectedInputCount, requireDirectTx)
+	}
 }
 
 func (h *BaseTransferHandler) createTransfer(
