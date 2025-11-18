@@ -10,11 +10,11 @@ import { HDKey } from "@scure/bip32";
 import { generateMnemonic, mnemonicToSeed } from "@scure/bip39";
 import { wordlist } from "@scure/bip39/wordlists/english";
 import { Transaction } from "@scure/btc-signer";
-import * as ecies from "eciesjs";
 import { ConfigurationError, ValidationError } from "../errors/types.js";
+import { getSparkFrost } from "../spark-bindings/spark-bindings.js";
 import {
-  IKeyPackage,
   AggregateFrostBindingParams,
+  IKeyPackage,
   SignFrostBindingParams,
 } from "../spark-bindings/types.js";
 import { subtractPrivateKeys } from "../utils/keys.js";
@@ -40,10 +40,6 @@ import {
   type SubtractSplitAndEncryptParams,
   type SubtractSplitAndEncryptResult,
 } from "./types.js";
-import {
-  getSparkFrost,
-  type SparkFrostBase,
-} from "../spark-bindings/spark-bindings.js";
 
 interface SparkKeysGenerator {
   deriveKeysFromSeed(
@@ -310,10 +306,11 @@ class DefaultSparkSigner implements SparkSigner {
         configKey: "identityKey",
       });
     }
-    const receiverEciesPrivKey = ecies.PrivateKey.fromHex(
-      bytesToHex(this.identityKey.privateKey),
+    const sparkFrost = getSparkFrost();
+    const privateKey = await sparkFrost.decryptEcies(
+      ciphertext,
+      this.identityKey.privateKey,
     );
-    const privateKey = ecies.decrypt(receiverEciesPrivKey.toHex(), ciphertext);
 
     return privateKey;
   }
@@ -474,6 +471,7 @@ class DefaultSparkSigner implements SparkSigner {
       secondPrivateKey,
     );
 
+    const sparkFrost = getSparkFrost();
     return {
       shares: await this.splitSecretWithProofs({
         secret: resultPrivKey,
@@ -481,7 +479,10 @@ class DefaultSparkSigner implements SparkSigner {
         threshold,
         numShares,
       }),
-      secretCipher: ecies.encrypt(receiverPublicKey, secondPrivateKey),
+      secretCipher: await sparkFrost.encryptEcies(
+        secondPrivateKey,
+        receiverPublicKey,
+      ),
     };
   }
 
@@ -663,10 +664,11 @@ class DefaultSparkSigner implements SparkSigner {
         configKey: "identityKey",
       });
     }
-    const receiverEciesPrivKey = ecies.PrivateKey.fromHex(
-      bytesToHex(this.identityKey.privateKey),
+    const sparkFrost = getSparkFrost();
+    const privateKey = await sparkFrost.decryptEcies(
+      ciphertext,
+      this.identityKey.privateKey,
     );
-    const privateKey = ecies.decrypt(receiverEciesPrivKey.toHex(), ciphertext);
     const publicKey = secp256k1.getPublicKey(privateKey);
 
     return publicKey;

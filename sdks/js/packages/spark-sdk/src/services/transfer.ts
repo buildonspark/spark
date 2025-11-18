@@ -1,9 +1,8 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { bytesToHex, equalBytes, numberToBytesBE } from "@noble/curves/utils";
+import { equalBytes, hexToBytes, numberToBytesBE } from "@noble/curves/utils";
 import { sha256 } from "@noble/hashes/sha2";
 import { Transaction } from "@scure/btc-signer";
 import { TransactionOutput } from "@scure/btc-signer/psbt";
-import * as ecies from "eciesjs";
 import { uuidv7 } from "uuidv7";
 import {
   NetworkError,
@@ -39,6 +38,7 @@ import {
   KeyDerivationType,
   SigningCommitmentWithOptionalNonce,
 } from "../signer/types.js";
+import { getSparkFrost } from "../spark-bindings/spark-bindings.js";
 import { SparkAddressFormat } from "../utils/address.js";
 import { getSigHashFromTx, getTxFromRawTxBytes } from "../utils/bitcoin.js";
 import { NetworkToProto } from "../utils/network.js";
@@ -304,6 +304,7 @@ export class BaseTransferService {
       signingCommitments.signingCommitments.slice(2 * leaves.length),
     );
 
+    const sparkFrost = getSparkFrost();
     const encryptedKeyTweaks: { [key: string]: Uint8Array } = {};
     for (const [key, value] of keyTweakInputMap) {
       const protoToEncrypt: SendLeafKeyTweaks = {
@@ -318,11 +319,9 @@ export class BaseTransferService {
         throw new ValidationError("Operator not found");
       }
 
-      const soPublicKey = ecies.PublicKey.fromHex(operator.identityPublicKey);
-
-      const encryptedProto = ecies.encrypt(
-        soPublicKey.toBytes(),
+      const encryptedProto = await sparkFrost.encryptEcies(
         protoToEncryptBinary,
+        hexToBytes(operator.identityPublicKey),
       );
       encryptedKeyTweaks[key] = Uint8Array.from(encryptedProto);
     }
@@ -384,6 +383,7 @@ export class BaseTransferService {
       paymentHash,
     );
 
+    const sparkFrost = getSparkFrost();
     const encryptedKeyTweaks: { [key: string]: Uint8Array } = {};
     for (const [key, value] of keyTweakInputMap) {
       const protoToEncrypt: SendLeafKeyTweaks = {
@@ -398,11 +398,9 @@ export class BaseTransferService {
         throw new ValidationError("Operator not found");
       }
 
-      const soPublicKey = ecies.PublicKey.fromHex(operator.identityPublicKey);
-
-      const encryptedProto = ecies.encrypt(
-        soPublicKey.toBytes(),
+      const encryptedProto = await sparkFrost.encryptEcies(
         protoToEncryptBinary,
+        hexToBytes(operator.identityPublicKey),
       );
       encryptedKeyTweaks[key] = Uint8Array.from(encryptedProto);
     }
@@ -589,10 +587,6 @@ export class BaseTransferService {
     directRefundSignatureMap: Map<string, Uint8Array>,
     directFromCpfpRefundSignatureMap: Map<string, Uint8Array>,
   ): Promise<Map<string, SendLeafKeyTweak[]>> {
-    const receiverEciesPubKey = ecies.PublicKey.fromHex(
-      bytesToHex(receiverIdentityPubkey),
-    );
-
     const leavesTweaksMap = new Map<string, SendLeafKeyTweak[]>();
 
     for (const leaf of leaves) {
@@ -604,7 +598,7 @@ export class BaseTransferService {
       const leafTweaksMap = await this.prepareSingleSendTransferKeyTweak(
         transferID,
         leaf,
-        receiverEciesPubKey,
+        receiverIdentityPubkey,
         cpfpRefundSignature,
         directRefundSignature,
         directFromCpfpRefundSignature,
@@ -623,7 +617,7 @@ export class BaseTransferService {
   private async prepareSingleSendTransferKeyTweak(
     transferID: string,
     leaf: LeafKeyTweak,
-    receiverEciesPubKey: ecies.PublicKey,
+    receiverPubkey: Uint8Array,
     cpfpRefundSignature?: Uint8Array,
     directRefundSignature?: Uint8Array,
     directFromCpfpRefundSignature?: Uint8Array,
@@ -634,7 +628,7 @@ export class BaseTransferService {
       await this.config.signer.subtractSplitAndEncrypt({
         first: leaf.keyDerivation,
         second: leaf.newKeyDerivation,
-        receiverPublicKey: receiverEciesPubKey.toBytes(),
+        receiverPublicKey: receiverPubkey,
         curveOrder: secp256k1.CURVE.n,
         threshold: this.config.getThreshold(),
         numShares: Object.keys(signingOperators).length,

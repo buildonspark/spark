@@ -1,7 +1,8 @@
+import { secp256k1 } from "@noble/curves/secp256k1";
 import type {
-  SignFrostBindingParams,
   AggregateFrostBindingParams,
   DummyTx,
+  SignFrostBindingParams,
 } from "./types.js";
 
 export abstract class SparkFrostBase {
@@ -18,6 +19,14 @@ export abstract class SparkFrostBase {
     encryptedMsg: Uint8Array,
     privateKey: Uint8Array,
   ): Promise<Uint8Array>;
+
+  // These will be moved to bindings in the future
+  getPublicKeyBytes(privateKey: Uint8Array): Uint8Array {
+    return secp256k1.getPublicKey(privateKey, true);
+  }
+  batchGetPublicKeyBytes(privateKeys: Uint8Array[]): Uint8Array[] {
+    return privateKeys.map((privateKey) => this.getPublicKeyBytes(privateKey));
+  }
 }
 
 let sparkFrost: SparkFrostBase | null = null;

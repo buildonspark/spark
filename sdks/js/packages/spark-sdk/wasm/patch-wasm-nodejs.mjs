@@ -1,8 +1,8 @@
 /* Convert nodejs wasm module output to ESM and inline wasm so that it can be
    used in both browser and nodejs. See https://bit.ly/4iGErRo. */
 
-import { readFile, writeFile } from "node:fs/promises";
 import fs from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 
 const name = "wasm_nodejs";
 const generatedDir = "./wasm/nodejs";
@@ -14,7 +14,7 @@ const patched = content
   .replace("require(`util`)", "globalThis")
   // handle class exports (https://bit.ly/421kbmk):
   .replace(/\nclass (.*?) \{/g, "\nclass $1Src {")
-  .replace(/\.prototype/g, "Src.prototype")
+  .replace(/\b(?!Uint8Array)(\w+)\.prototype/g, "$1Src.prototype")
   .replace(/\nexports\.(.*?) = \1;/g, "\nexport const $1 = imports.$1 = $1Src ")
   // attach to `imports` instead of exports
   .replace("= exports", "= imports")
