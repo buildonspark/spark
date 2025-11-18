@@ -23,7 +23,6 @@ import (
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	pbinternal "github.com/lightsparkdev/spark/proto/spark_internal"
 	"github.com/lightsparkdev/spark/so"
-	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/authz"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/blockheight"
@@ -1546,6 +1545,41 @@ func (h *TransferHandler) FinalizeTransferWithTransferPackage(ctx context.Contex
 	return &pb.FinalizeTransferResponse{Transfer: transferProto}, err
 }
 
+// checkTransferAccess checks if the viewer has read access to either the sender or receiver wallet.
+// It updates the accessMap cache to avoid redundant database queries.
+// Returns true if the viewer has access, false otherwise, and an error if the check fails.
+func (h *TransferHandler) checkTransferAccess(
+	ctx context.Context,
+	transfer *ent.Transfer,
+	accessMap map[keys.Public]bool,
+) (bool, error) {
+	// Check sender access first
+	hasReadAccess, exists := accessMap[transfer.SenderIdentityPubkey]
+	if !exists {
+		var err error
+		hasReadAccess, err = NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, transfer.SenderIdentityPubkey)
+		if err != nil {
+			return false, fmt.Errorf("failed to check if viewer has read access to transfer %s: %w", transfer.ID.String(), err)
+		}
+		accessMap[transfer.SenderIdentityPubkey] = hasReadAccess
+	}
+	if hasReadAccess {
+		return true, nil
+	}
+
+	// If sender doesn't have access, check receiver access
+	hasReadAccess, exists = accessMap[transfer.ReceiverIdentityPubkey]
+	if !exists {
+		var err error
+		hasReadAccess, err = NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, transfer.ReceiverIdentityPubkey)
+		if err != nil {
+			return false, fmt.Errorf("failed to check if viewer has read access to transfer %s: %w", transfer.ID.String(), err)
+		}
+		accessMap[transfer.ReceiverIdentityPubkey] = hasReadAccess
+	}
+	return hasReadAccess, nil
+}
+
 func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.TransferFilter, isPending bool, isSSP bool) (*pb.QueryTransfersResponse, error) {
 	ctx, span := tracer.Start(ctx, "TransferHandler.queryTransfers")
 	defer span.End()
@@ -1577,30 +1611,22 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 		st.TransferStatusSenderInitiated,
 	}
 
+	var walletIdentityPubkey *keys.Public
 	switch filter.Participant.(type) {
 	case *pb.TransferFilter_ReceiverIdentityPublicKey:
 		receiverIDPubKey, err := keys.ParsePublicKey(filter.GetReceiverIdentityPublicKey())
 		if err != nil {
 			return nil, fmt.Errorf("invalid receiver identity public key: %w", err)
 		}
-		if !isSSP {
-			if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, receiverIDPubKey); err != nil {
-				return nil, err
-			}
-		}
 		transferPredicate = append(transferPredicate, enttransfer.ReceiverIdentityPubkeyEQ(receiverIDPubKey))
 		if isPending {
 			transferPredicate = append(transferPredicate, enttransfer.StatusIn(receiverPendingStatuses...))
 		}
+		walletIdentityPubkey = &receiverIDPubKey
 	case *pb.TransferFilter_SenderIdentityPublicKey:
 		senderIDPubKey, err := keys.ParsePublicKey(filter.GetSenderIdentityPublicKey())
 		if err != nil {
 			return nil, fmt.Errorf("invalid sender identity public key: %w", err)
-		}
-		if !isSSP {
-			if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, senderIDPubKey); err != nil {
-				return nil, err
-			}
 		}
 		transferPredicate = append(transferPredicate, enttransfer.SenderIdentityPubkeyEQ(senderIDPubKey))
 		if isPending {
@@ -1609,38 +1635,12 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 				enttransfer.ExpiryTimeLT(time.Now()),
 			)
 		}
-	default:
-		var identityPubKey keys.Public
-		if filter.Participant == nil {
-			if isSSP {
-				// SSP can query all pending transfers without participant filter
-				if isPending {
-					transferPredicate = append(
-						transferPredicate,
-						enttransfer.StatusIn(append(senderPendingStatuses, receiverPendingStatuses...)...),
-					)
-				}
-				break
-			}
-			// Non-SSP: force login - require session to get identity
-			session, err := authn.GetSessionFromContext(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get session from context: %w", err)
-			}
-			identityPubKey = session.IdentityPublicKey()
-		} else {
-			// Participant is set, extract and validate identity
-			identityPubKey, err = keys.ParsePublicKey(filter.GetSenderOrReceiverIdentityPublicKey())
-			if err != nil {
-				return nil, fmt.Errorf("invalid identity public key: %w", err)
-			}
-			if !isSSP {
-				if err := authz.EnforceSessionIdentityPublicKeyMatches(ctx, h.config, identityPubKey); err != nil {
-					return nil, err
-				}
-			}
+		walletIdentityPubkey = &senderIDPubKey
+	case *pb.TransferFilter_SenderOrReceiverIdentityPublicKey:
+		identityPubKey, err := keys.ParsePublicKey(filter.GetSenderOrReceiverIdentityPublicKey())
+		if err != nil {
+			return nil, fmt.Errorf("invalid sender or receiver identity public key: %w", err)
 		}
-
 		if isPending {
 			transferPredicate = append(transferPredicate, enttransfer.Or(
 				enttransfer.And(
@@ -1658,6 +1658,26 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 				enttransfer.ReceiverIdentityPubkeyEQ(identityPubKey),
 				enttransfer.SenderIdentityPubkeyEQ(identityPubKey),
 			))
+		}
+		walletIdentityPubkey = &identityPubKey
+	default:
+		if isPending {
+			transferPredicate = append(
+				transferPredicate,
+				enttransfer.StatusIn(append(senderPendingStatuses, receiverPendingStatuses...)...),
+			)
+		}
+	}
+
+	if !isSSP && walletIdentityPubkey != nil {
+		hasReadAccess, err := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, *walletIdentityPubkey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check if viewer has read access to wallet %s: %w", walletIdentityPubkey.String(), err)
+		}
+		if !hasReadAccess {
+			return &pb.QueryTransfersResponse{
+				Offset: -1,
+			}, nil
 		}
 	}
 
@@ -1736,7 +1756,19 @@ func (h *TransferHandler) queryTransfers(ctx context.Context, filter *pb.Transfe
 	}
 
 	var transferProtos []*pb.Transfer
+	accessMap := make(map[keys.Public]bool)
 	for _, transfer := range transfers {
+		if walletIdentityPubkey == nil && !isSSP {
+			// If no participant is set and not SSP, we need to check if the viewer has read access to either the sender or receiver
+			hasReadAccess, err := h.checkTransferAccess(ctx, transfer, accessMap)
+			if err != nil {
+				return nil, err
+			}
+			if !hasReadAccess {
+				continue
+			}
+		}
+
 		transferProto, err := transfer.MarshalProto(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("unable to marshal transfer: %w", err)

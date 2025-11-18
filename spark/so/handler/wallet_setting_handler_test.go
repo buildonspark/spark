@@ -170,66 +170,194 @@ func createTestContextWithKnobsBypassed(t *testing.T) (context.Context, *so.Conf
 
 	return ctx, cfg
 }
-func TestIsPrivacyEnabled_NoWalletSetting(t *testing.T) {
+
+func TestHasReadAccessToWallet_NoWalletSetting(t *testing.T) {
 	ctx, cfg := createTestContextWithKnobsBypassed(t)
 	rng := rand.NewChaCha8([32]byte{})
 
-	// Generate test identity public key
-	identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	// Generate test identity public key for wallet owner
+	walletOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Generate test identity public key for session user (different from owner)
+	sessionUserPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Set up session context
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(sessionUserPubKey.Serialize()), 9999999999)
 
 	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
 
-	// Test when no wallet setting exists - should return false (default)
-	isEnabled, err := walletSettingHandler.IsPrivacyEnabled(ctx, identityPubKey)
+	// Test when no wallet setting exists - should return true (default: no privacy, everyone has access)
+	hasAccess, err := walletSettingHandler.HasReadAccessToWallet(ctx, walletOwnerPubKey)
 	require.NoError(t, err)
-	assert.False(t, isEnabled)
+	assert.True(t, hasAccess)
 }
 
-func TestIsPrivacyEnabled_WithWalletSetting(t *testing.T) {
+func TestHasReadAccessToWallet_PrivacyDisabled(t *testing.T) {
 	ctx, cfg := createTestContextWithKnobsBypassed(t)
 	rng := rand.NewChaCha8([32]byte{})
 
-	testCases := []struct {
-		name           string
-		privateEnabled bool
-		expectedResult bool
-	}{
-		{
-			name:           "privacy_disabled",
-			privateEnabled: false,
-			expectedResult: false,
-		},
-		{
-			name:           "privacy_enabled",
-			privateEnabled: true,
-			expectedResult: true,
-		},
-	}
+	// Generate test identity public key for wallet owner
+	walletOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			// Generate test identity public key for this test case
-			identityPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	// Generate test identity public key for session user (different from owner)
+	sessionUserPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 
-			// Create wallet setting with the test case's privacy setting
-			database, err := ent.GetDbFromContext(ctx)
-			require.NoError(t, err)
+	// Set up session context
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(sessionUserPubKey.Serialize()), 9999999999)
 
-			_, err = database.WalletSetting.
-				Create().
-				SetOwnerIdentityPublicKey(identityPubKey).
-				SetPrivateEnabled(tc.privateEnabled).
-				Save(ctx)
-			require.NoError(t, err)
+	// Create wallet setting with privacy disabled
+	database, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
 
-			walletSettingHandler := handler.NewWalletSettingHandler(cfg)
+	_, err = database.WalletSetting.
+		Create().
+		SetOwnerIdentityPublicKey(walletOwnerPubKey).
+		SetPrivateEnabled(false).
+		Save(ctx)
+	require.NoError(t, err)
 
-			// Test the IsPrivacyEnabled function
-			isEnabled, err := walletSettingHandler.IsPrivacyEnabled(ctx, identityPubKey)
-			require.NoError(t, err)
-			assert.Equal(t, tc.expectedResult, isEnabled)
-		})
-	}
+	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
+
+	// Test when privacy is disabled - should return true (everyone has access)
+	hasAccess, err := walletSettingHandler.HasReadAccessToWallet(ctx, walletOwnerPubKey)
+	require.NoError(t, err)
+	assert.True(t, hasAccess)
+}
+
+func TestHasReadAccessToWallet_PrivacyEnabled_OwnerAccess(t *testing.T) {
+	ctx, cfg := createTestContextWithKnobsBypassed(t)
+	rng := rand.NewChaCha8([32]byte{})
+
+	// Generate test identity public key for wallet owner
+	walletOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Set up session context as the owner
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(walletOwnerPubKey.Serialize()), 9999999999)
+
+	// Create wallet setting with privacy enabled
+	database, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	_, err = database.WalletSetting.
+		Create().
+		SetOwnerIdentityPublicKey(walletOwnerPubKey).
+		SetPrivateEnabled(true).
+		Save(ctx)
+	require.NoError(t, err)
+
+	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
+
+	// Test when privacy is enabled and user is the owner - should return true
+	hasAccess, err := walletSettingHandler.HasReadAccessToWallet(ctx, walletOwnerPubKey)
+	require.NoError(t, err)
+	assert.True(t, hasAccess)
+}
+
+func TestHasReadAccessToWallet_PrivacyEnabled_MasterAccess(t *testing.T) {
+	ctx, cfg := createTestContextWithKnobsBypassed(t)
+	rng := rand.NewChaCha8([32]byte{})
+
+	// Generate test identity public key for wallet owner
+	walletOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Generate test identity public key for master
+	masterPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Generate test identity public key for session user (different from owner, but matches master)
+	sessionUserPubKey := masterPubKey
+
+	// Set up session context as the master
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(sessionUserPubKey.Serialize()), 9999999999)
+
+	// Create wallet setting with privacy enabled and master set
+	database, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	_, err = database.WalletSetting.
+		Create().
+		SetOwnerIdentityPublicKey(walletOwnerPubKey).
+		SetPrivateEnabled(true).
+		SetMasterIdentityPublicKey(masterPubKey).
+		Save(ctx)
+	require.NoError(t, err)
+
+	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
+
+	// Test when privacy is enabled and user is the master - should return true
+	hasAccess, err := walletSettingHandler.HasReadAccessToWallet(ctx, walletOwnerPubKey)
+	require.NoError(t, err)
+	assert.True(t, hasAccess)
+}
+
+func TestHasReadAccessToWallet_PrivacyEnabled_NoAccess(t *testing.T) {
+	ctx, cfg := createTestContextWithKnobsBypassed(t)
+	rng := rand.NewChaCha8([32]byte{})
+
+	// Generate test identity public key for wallet owner
+	walletOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Generate test identity public key for session user (different from owner and not master)
+	sessionUserPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Set up session context
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(sessionUserPubKey.Serialize()), 9999999999)
+
+	// Create wallet setting with privacy enabled
+	database, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	_, err = database.WalletSetting.
+		Create().
+		SetOwnerIdentityPublicKey(walletOwnerPubKey).
+		SetPrivateEnabled(true).
+		Save(ctx)
+	require.NoError(t, err)
+
+	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
+
+	// Test when privacy is enabled and user is neither owner nor master - should return false
+	hasAccess, err := walletSettingHandler.HasReadAccessToWallet(ctx, walletOwnerPubKey)
+	require.NoError(t, err)
+	assert.False(t, hasAccess)
+}
+
+func TestHasReadAccessToWallet_KnobDisabled(t *testing.T) {
+	ctx, _ := db.NewTestSQLiteContext(t)
+	cfg := sparktesting.TestConfig(t)
+	rng := rand.NewChaCha8([32]byte{})
+
+	// Generate test identity public key for wallet owner
+	walletOwnerPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Generate test identity public key for session user (different from owner)
+	sessionUserPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+
+	// Set up session context
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(sessionUserPubKey.Serialize()), 9999999999)
+
+	// Create fixed knobs that disable privacy (0% rollout)
+	fixedKnobs := knobs.NewFixedKnobs(map[string]float64{
+		knobs.KnobPrivacyEnabled: 0, // 0% rollout = disabled
+	})
+	ctx = knobs.InjectKnobsService(ctx, fixedKnobs)
+
+	// Create wallet setting with privacy enabled
+	database, err := ent.GetDbFromContext(ctx)
+	require.NoError(t, err)
+
+	_, err = database.WalletSetting.
+		Create().
+		SetOwnerIdentityPublicKey(walletOwnerPubKey).
+		SetPrivateEnabled(true).
+		Save(ctx)
+	require.NoError(t, err)
+
+	walletSettingHandler := handler.NewWalletSettingHandler(cfg)
+
+	// Test when privacy knob is disabled - should return true (everyone has access)
+	hasAccess, err := walletSettingHandler.HasReadAccessToWallet(ctx, walletOwnerPubKey)
+	require.NoError(t, err)
+	assert.True(t, hasAccess)
 }
 
 func TestQueryWalletSetting_Existing(t *testing.T) {

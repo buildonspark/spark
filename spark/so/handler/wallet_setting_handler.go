@@ -136,13 +136,11 @@ func (h *WalletSettingHandler) sendWalletSettingUpdateGossipMessage(ctx context.
 	return nil
 }
 
-// IsPrivacyEnabled checks if privacy is enabled for the given identity public key.
-// Returns the stored privacy_enabled value if wallet setting exists, otherwise returns false (default).
-func (h *WalletSettingHandler) IsPrivacyEnabled(ctx context.Context, identityPublicKey keys.Public) (bool, error) {
+func (h *WalletSettingHandler) HasReadAccessToWallet(ctx context.Context, walletIdentityPublicKey keys.Public) (bool, error) {
 	knobService := knobs.GetKnobsService(ctx)
 	if knobService != nil {
 		if !knobService.RolloutRandom(knobs.KnobPrivacyEnabled, 0) {
-			return false, nil
+			return true, nil
 		}
 	}
 
@@ -153,18 +151,29 @@ func (h *WalletSettingHandler) IsPrivacyEnabled(ctx context.Context, identityPub
 
 	walletSetting, err := db.WalletSetting.
 		Query().
-		Where(walletsetting.OwnerIdentityPublicKey(identityPublicKey)).
+		Where(walletsetting.OwnerIdentityPublicKey(walletIdentityPublicKey)).
 		Only(ctx)
 
 	if err != nil {
 		if ent.IsNotFound(err) {
-			// No wallet setting exists, return default value (false)
-			return false, nil
+			// No wallet setting exists, return default value (true)
+			return true, nil
 		}
 		return false, fmt.Errorf("failed to query wallet setting: %w", err)
 	}
 
-	return walletSetting.PrivateEnabled, nil
+	if walletSetting.PrivateEnabled == false {
+		return true, nil
+	}
+
+	session, err := authn.GetSessionFromContext(ctx)
+	if err != nil {
+		// If there's no session, return false (no access) without error
+		// This allows callers to handle "no access" gracefully vs actual errors
+		return false, nil
+	}
+
+	return session.IdentityPublicKey().Equals(walletSetting.OwnerIdentityPublicKey) || (walletSetting.MasterIdentityPublicKey != nil && session.IdentityPublicKey().Equals(*walletSetting.MasterIdentityPublicKey)), nil
 }
 
 // marshalWalletSettingToProto converts a WalletSetting to a spark protobuf WalletSetting.

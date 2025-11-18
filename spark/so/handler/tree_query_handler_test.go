@@ -337,12 +337,13 @@ func createTestContextWithKnobsBypassed(t *testing.T) (context.Context, *so.Conf
 type PrivacyTestData struct {
 	OwnerIdentityPubKey     keys.Public
 	RequesterIdentityPubKey keys.Public
+	MasterIdentityPubKey    *keys.Public
 	Node                    *ent.TreeNode
 	WalletSetting           *ent.WalletSetting
 }
 
 // createPrivacyTestData creates all the necessary test data for privacy tests
-func createPrivacyTestData(t *testing.T, privacyEnabled bool, sameRequesterAndOwner bool, injectSession bool) (context.Context, *so.Config, *PrivacyTestData) {
+func createPrivacyTestData(t *testing.T, privacyEnabled bool, sameRequesterAndOwner bool, injectSession bool, setMasterKey bool) (context.Context, *so.Config, *PrivacyTestData) {
 	// Create test context and config
 	ctx, cfg := createTestContextWithKnobsBypassed(t)
 	tx, err := ent.GetDbFromContext(ctx)
@@ -358,6 +359,11 @@ func createPrivacyTestData(t *testing.T, privacyEnabled bool, sameRequesterAndOw
 		requesterIdentityPubKey = ownerIdentityPubKey
 	} else {
 		requesterIdentityPubKey = keys.MustGeneratePrivateKeyFromRand(rng).Public()
+	}
+	var masterIdentityPubKey *keys.Public
+	if setMasterKey {
+		masterKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
+		masterIdentityPubKey = &masterKey
 	}
 	signingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
 	verifyingPubKey := keys.MustGeneratePrivateKeyFromRand(rng).Public()
@@ -408,11 +414,14 @@ func createPrivacyTestData(t *testing.T, privacyEnabled bool, sameRequesterAndOw
 	require.NoError(t, err)
 
 	// Create wallet setting
-	walletSetting, err := tx.WalletSetting.
+	walletSettingCreate := tx.WalletSetting.
 		Create().
 		SetOwnerIdentityPublicKey(ownerIdentityPubKey).
-		SetPrivateEnabled(privacyEnabled).
-		Save(ctx)
+		SetPrivateEnabled(privacyEnabled)
+	if masterIdentityPubKey != nil {
+		walletSettingCreate = walletSettingCreate.SetMasterIdentityPublicKey(*masterIdentityPubKey)
+	}
+	walletSetting, err := walletSettingCreate.Save(ctx)
 	require.NoError(t, err)
 
 	// Set up session context for the requester if requested
@@ -423,6 +432,7 @@ func createPrivacyTestData(t *testing.T, privacyEnabled bool, sameRequesterAndOw
 	return ctx, cfg, &PrivacyTestData{
 		OwnerIdentityPubKey:     ownerIdentityPubKey,
 		RequesterIdentityPubKey: requesterIdentityPubKey,
+		MasterIdentityPubKey:    masterIdentityPubKey,
 		Node:                    node,
 		WalletSetting:           walletSetting,
 	}
@@ -430,12 +440,12 @@ func createPrivacyTestData(t *testing.T, privacyEnabled bool, sameRequesterAndOw
 
 func TestQueryNodes_PrivacyEnabled_OwnerIdentityPubkey(t *testing.T) {
 	// Create test data with privacy enabled and different requester/owner
-	ctx, cfg, testData := createPrivacyTestData(t, true, false, true)
+	ctx, cfg, testData := createPrivacyTestData(t, true, false, true, false)
 
 	// Create handler
 	handler := NewTreeQueryHandler(cfg)
 
-	// Test QueryNodes with owner identity pubkey - should return empty results
+	// Test QueryNodes with owner identity pubkey - should return empty results when requester doesn't have access
 	req := &pb.QueryNodesRequest{
 		Source: &pb.QueryNodesRequest_OwnerIdentityPubkey{
 			OwnerIdentityPubkey: testData.OwnerIdentityPubKey.Serialize(),
@@ -446,17 +456,17 @@ func TestQueryNodes_PrivacyEnabled_OwnerIdentityPubkey(t *testing.T) {
 
 	resp, err := handler.QueryNodes(ctx, req, false)
 	require.NoError(t, err)
-	assert.Empty(t, resp.Nodes, "Should return empty results when owner has privacy enabled and requester is different")
+	assert.Empty(t, resp.Nodes, "Should return empty results when owner has privacy enabled and requester doesn't have read access")
 }
 
 func TestQueryNodes_PrivacyDisabled_OwnerIdentityPubkey(t *testing.T) {
 	// Create test data with privacy disabled and different requester/owner
-	ctx, cfg, testData := createPrivacyTestData(t, false, false, true)
+	ctx, cfg, testData := createPrivacyTestData(t, false, false, true, false)
 
 	// Create handler
 	handler := NewTreeQueryHandler(cfg)
 
-	// Test QueryNodes with owner identity pubkey - should return nodes
+	// Test QueryNodes with owner identity pubkey - should return nodes when privacy is disabled
 	req := &pb.QueryNodesRequest{
 		Source: &pb.QueryNodesRequest_OwnerIdentityPubkey{
 			OwnerIdentityPubkey: testData.OwnerIdentityPubKey.Serialize(),
@@ -467,13 +477,13 @@ func TestQueryNodes_PrivacyDisabled_OwnerIdentityPubkey(t *testing.T) {
 
 	resp, err := handler.QueryNodes(ctx, req, false)
 	require.NoError(t, err)
-	assert.Len(t, resp.Nodes, 1, "Should return nodes when owner has privacy disabled")
+	assert.Len(t, resp.Nodes, 1, "Should return nodes when owner has privacy disabled (everyone has access)")
 	assert.Equal(t, testData.Node.ID.String(), resp.Nodes[testData.Node.ID.String()].Id)
 }
 
 func TestQueryNodes_OwnerCanSeeOwnNodes(t *testing.T) {
 	// Create test data with privacy enabled and same requester/owner
-	ctx, cfg, testData := createPrivacyTestData(t, true, true, true)
+	ctx, cfg, testData := createPrivacyTestData(t, true, true, true, false)
 
 	// Create handler
 	handler := NewTreeQueryHandler(cfg)
@@ -493,14 +503,39 @@ func TestQueryNodes_OwnerCanSeeOwnNodes(t *testing.T) {
 	assert.Equal(t, testData.Node.ID.String(), resp.Nodes[testData.Node.ID.String()].Id)
 }
 
-func TestQueryNodes_SSPBypassPrivacy(t *testing.T) {
-	// Create test data with privacy enabled and different requester/owner
-	ctx, cfg, testData := createPrivacyTestData(t, true, false, false)
+func TestQueryNodes_MasterCanSeeNodes(t *testing.T) {
+	// Create test data with privacy enabled, different requester/owner, but requester is master
+	ctx, cfg, testData := createPrivacyTestData(t, true, false, true, true)
+
+	// Set up session context as the master (not the owner)
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(testData.MasterIdentityPubKey.Serialize()), 9999999999)
 
 	// Create handler
 	handler := NewTreeQueryHandler(cfg)
 
-	// Test QueryNodes with isSSP=true - should bypass privacy and return nodes
+	// Test QueryNodes with owner identity pubkey - should return nodes when requester is master
+	req := &pb.QueryNodesRequest{
+		Source: &pb.QueryNodesRequest_OwnerIdentityPubkey{
+			OwnerIdentityPubkey: testData.OwnerIdentityPubKey.Serialize(),
+		},
+		Network: pb.Network_REGTEST,
+		Limit:   100,
+	}
+
+	resp, err := handler.QueryNodes(ctx, req, false)
+	require.NoError(t, err)
+	assert.Len(t, resp.Nodes, 1, "Master should be able to see nodes even when privacy is enabled")
+	assert.Equal(t, testData.Node.ID.String(), resp.Nodes[testData.Node.ID.String()].Id)
+}
+
+func TestQueryNodes_SSPBypassPrivacy(t *testing.T) {
+	// Create test data with privacy enabled and different requester/owner
+	ctx, cfg, testData := createPrivacyTestData(t, true, false, false, false)
+
+	// Create handler
+	handler := NewTreeQueryHandler(cfg)
+
+	// Test QueryNodes with isSSP=true - should bypass privacy check and return nodes
 	req := &pb.QueryNodesRequest{
 		Source: &pb.QueryNodesRequest_OwnerIdentityPubkey{
 			OwnerIdentityPubkey: testData.OwnerIdentityPubKey.Serialize(),
@@ -517,12 +552,12 @@ func TestQueryNodes_SSPBypassPrivacy(t *testing.T) {
 
 func TestQueryBalance_PrivacyEnabled_DifferentRequester(t *testing.T) {
 	// Create test data with privacy enabled and different requester/owner
-	ctx, cfg, testData := createPrivacyTestData(t, true, false, true)
+	ctx, cfg, testData := createPrivacyTestData(t, true, false, true, false)
 
 	// Create handler
 	handler := NewTreeQueryHandler(cfg)
 
-	// Test QueryBalance with different requester - should return empty balance
+	// Test QueryBalance with different requester - should return empty balance when requester doesn't have access
 	req := &pb.QueryBalanceRequest{
 		IdentityPublicKey: testData.OwnerIdentityPubKey.Serialize(),
 		Network:           pb.Network_REGTEST,
@@ -530,18 +565,18 @@ func TestQueryBalance_PrivacyEnabled_DifferentRequester(t *testing.T) {
 
 	resp, err := handler.QueryBalance(ctx, req)
 	require.NoError(t, err)
-	assert.Equal(t, uint64(0), resp.Balance, "Balance should be 0 when privacy is enabled and requester is not the owner")
-	assert.Empty(t, resp.NodeBalances, "NodeBalances should be empty when privacy is enabled and requester is not the owner")
+	assert.Equal(t, uint64(0), resp.Balance, "Balance should be 0 when privacy is enabled and requester doesn't have read access")
+	assert.Empty(t, resp.NodeBalances, "NodeBalances should be empty when privacy is enabled and requester doesn't have read access")
 }
 
 func TestQueryBalance_PrivacyDisabled_DifferentRequester(t *testing.T) {
 	// Create test data with privacy disabled and different requester/owner
-	ctx, cfg, testData := createPrivacyTestData(t, false, false, true)
+	ctx, cfg, testData := createPrivacyTestData(t, false, false, true, false)
 
 	// Create handler
 	handler := NewTreeQueryHandler(cfg)
 
-	// Test QueryBalance with different requester - should return actual balance
+	// Test QueryBalance with different requester - should return actual balance when privacy is disabled
 	req := &pb.QueryBalanceRequest{
 		IdentityPublicKey: testData.OwnerIdentityPubKey.Serialize(),
 		Network:           pb.Network_REGTEST,
@@ -549,14 +584,14 @@ func TestQueryBalance_PrivacyDisabled_DifferentRequester(t *testing.T) {
 
 	resp, err := handler.QueryBalance(ctx, req)
 	require.NoError(t, err)
-	assert.Equal(t, testData.Node.Value, resp.Balance, "Balance should be returned when privacy is disabled")
+	assert.Equal(t, testData.Node.Value, resp.Balance, "Balance should be returned when privacy is disabled (everyone has access)")
 	assert.Len(t, resp.NodeBalances, 1, "NodeBalances should contain the node when privacy is disabled")
 	assert.Equal(t, testData.Node.Value, resp.NodeBalances[testData.Node.ID.String()])
 }
 
 func TestQueryBalance_PrivacyEnabled_OwnerCanSeeOwnBalance(t *testing.T) {
 	// Create test data with privacy enabled and same requester/owner
-	ctx, cfg, testData := createPrivacyTestData(t, true, true, true)
+	ctx, cfg, testData := createPrivacyTestData(t, true, true, true, false)
 
 	// Create handler
 	handler := NewTreeQueryHandler(cfg)
@@ -574,9 +609,32 @@ func TestQueryBalance_PrivacyEnabled_OwnerCanSeeOwnBalance(t *testing.T) {
 	assert.Equal(t, testData.Node.Value, resp.NodeBalances[testData.Node.ID.String()])
 }
 
+func TestQueryBalance_MasterCanSeeBalance(t *testing.T) {
+	// Create test data with privacy enabled, different requester/owner, but requester is master
+	ctx, cfg, testData := createPrivacyTestData(t, true, false, true, true)
+
+	// Set up session context as the master (not the owner)
+	ctx = authn.InjectSessionForTests(ctx, hex.EncodeToString(testData.MasterIdentityPubKey.Serialize()), 9999999999)
+
+	// Create handler
+	handler := NewTreeQueryHandler(cfg)
+
+	// Test QueryBalance with master as requester - should return actual balance
+	req := &pb.QueryBalanceRequest{
+		IdentityPublicKey: testData.OwnerIdentityPubKey.Serialize(),
+		Network:           pb.Network_REGTEST,
+	}
+
+	resp, err := handler.QueryBalance(ctx, req)
+	require.NoError(t, err)
+	assert.Equal(t, testData.Node.Value, resp.Balance, "Master should be able to see balance even when privacy is enabled")
+	assert.Len(t, resp.NodeBalances, 1, "Master should be able to see node balances even when privacy is enabled")
+	assert.Equal(t, testData.Node.Value, resp.NodeBalances[testData.Node.ID.String()])
+}
+
 func TestQueryBalance_NoSession(t *testing.T) {
 	// Create test data with privacy enabled but no session injected
-	ctx, cfg, testData := createPrivacyTestData(t, true, false, false)
+	ctx, cfg, testData := createPrivacyTestData(t, true, false, false, false)
 
 	// Create handler
 	handler := NewTreeQueryHandler(cfg)

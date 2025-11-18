@@ -9,7 +9,6 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	pb "github.com/lightsparkdev/spark/proto/spark"
 	"github.com/lightsparkdev/spark/so"
-	"github.com/lightsparkdev/spark/so/authn"
 	"github.com/lightsparkdev/spark/so/ent"
 	"github.com/lightsparkdev/spark/so/ent/depositaddress"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -66,21 +65,15 @@ func (h *TreeQueryHandler) QueryNodes(ctx context.Context, req *pb.QueryNodesReq
 			return nil, fmt.Errorf("failed to parse owner identity public key: %w", err)
 		}
 		if !isSSP {
-			session, err := authn.GetSessionFromContext(ctx)
+			hasReadAccess, err := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, ownerIdentityPubKey)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to check if privacy is enabled for owner: %w", err)
 			}
-			if !session.IdentityPublicKey().Equals(ownerIdentityPubKey) {
-				privacyEnabled, err := NewWalletSettingHandler(h.config).IsPrivacyEnabled(ctx, ownerIdentityPubKey)
-				if err != nil {
-					return nil, fmt.Errorf("failed to check if privacy is enabled for owner: %w", err)
-				}
-				if privacyEnabled {
-					return &pb.QueryNodesResponse{
-						Nodes:  make(map[string]*pb.TreeNode),
-						Offset: -1,
-					}, nil
-				}
+			if !hasReadAccess {
+				return &pb.QueryNodesResponse{
+					Nodes:  make(map[string]*pb.TreeNode),
+					Offset: -1,
+				}, nil
 			}
 		}
 
@@ -188,15 +181,12 @@ func (h *TreeQueryHandler) QueryBalance(ctx context.Context, req *pb.QueryBalanc
 		return nil, fmt.Errorf("failed to parse identity public key: %w", err)
 	}
 
-	privacyEnabled, err := NewWalletSettingHandler(h.config).IsPrivacyEnabled(ctx, identityPubKey)
+	hasReadAccess, err := NewWalletSettingHandler(h.config).HasReadAccessToWallet(ctx, identityPubKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if privacy is enabled for owner: %w", err)
 	}
-	if privacyEnabled {
-		session, err := authn.GetSessionFromContext(ctx)
-		if err != nil || !session.IdentityPublicKey().Equals(identityPubKey) {
-			return &pb.QueryBalanceResponse{}, nil
-		}
+	if !hasReadAccess {
+		return &pb.QueryBalanceResponse{}, nil
 	}
 
 	nodes, err := db.TreeNode.Query().
