@@ -28,19 +28,19 @@ type Transfer struct {
 	UpdateTime time.Time `json:"update_time,omitempty"`
 	// The identity public key of the sender of the transfer.
 	SenderIdentityPubkey keys.Public `json:"sender_identity_pubkey,omitempty"`
-	// ReceiverIdentityPubkey holds the value of the "receiver_identity_pubkey" field.
+	// The identity public key of the receiver of the transfer.
 	ReceiverIdentityPubkey keys.Public `json:"receiver_identity_pubkey,omitempty"`
-	// Network holds the value of the "network" field.
+	// The network on which the transfer is taking place.
 	Network schematype.Network `json:"network,omitempty"`
-	// TotalValue holds the value of the "total_value" field.
+	// The total value of the transfer in satoshis.
 	TotalValue uint64 `json:"total_value,omitempty"`
-	// Status holds the value of the "status" field.
+	// The status of the transfer.
 	Status schematype.TransferStatus `json:"status,omitempty"`
-	// Type holds the value of the "type" field.
+	// The type of the transfer.
 	Type schematype.TransferType `json:"type,omitempty"`
-	// ExpiryTime holds the value of the "expiry_time" field.
+	// The time when the transfer expires. If the transfer doesn't expire, this will be set to unix epoch.
 	ExpiryTime time.Time `json:"expiry_time,omitempty"`
-	// CompletionTime holds the value of the "completion_time" field.
+	// The time when the transfer was completed, if it is in a completed state.
 	CompletionTime *time.Time `json:"completion_time,omitempty"`
 	// Foreign key to spark_invoice
 	SparkInvoiceID uuid.UUID `json:"spark_invoice_id,omitempty"`

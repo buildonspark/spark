@@ -31,14 +31,29 @@ func (Transfer) Fields() []ent.Field {
 			Immutable().
 			GoType(keys.Public{}).
 			Comment("The identity public key of the sender of the transfer."),
-		field.Bytes("receiver_identity_pubkey").Immutable().GoType(keys.Public{}),
-		// TODO(mhr): Make this non-null after backfilling existing data.
-		field.Enum("network").GoType(st.Network("")),
-		field.Uint64("total_value"),
-		field.Enum("status").GoType(st.TransferStatus("")),
-		field.Enum("type").GoType(st.TransferType("")),
-		field.Time("expiry_time").Immutable(),
-		field.Time("completion_time").Optional().Nillable(),
+		field.Bytes("receiver_identity_pubkey").
+			Immutable().
+			GoType(keys.Public{}).
+			Comment("The identity public key of the receiver of the transfer."),
+		field.Enum("network").
+			Immutable().
+			GoType(st.Network("")).
+			Comment("The network on which the transfer is taking place."),
+		field.Uint64("total_value").
+			Comment("The total value of the transfer in satoshis."),
+		field.Enum("status").
+			GoType(st.TransferStatus("")).
+			Comment("The status of the transfer."),
+		field.Enum("type").
+			GoType(st.TransferType("")).
+			Comment("The type of the transfer."),
+		field.Time("expiry_time").
+			Immutable().
+			Comment("The time when the transfer expires. If the transfer doesn't expire, this will be set to unix epoch."),
+		field.Time("completion_time").
+			Optional().
+			Nillable().
+			Comment("The time when the transfer was completed, if it is in a completed state."),
 		field.UUID("spark_invoice_id", uuid.UUID{}).
 			Optional().
 			Comment("Foreign key to spark_invoice"),

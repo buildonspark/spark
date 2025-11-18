@@ -40,20 +40,6 @@ func (tu *TransferUpdate) SetUpdateTime(t time.Time) *TransferUpdate {
 	return tu
 }
 
-// SetNetwork sets the "network" field.
-func (tu *TransferUpdate) SetNetwork(s schematype.Network) *TransferUpdate {
-	tu.mutation.SetNetwork(s)
-	return tu
-}
-
-// SetNillableNetwork sets the "network" field if the given value is not nil.
-func (tu *TransferUpdate) SetNillableNetwork(s *schematype.Network) *TransferUpdate {
-	if s != nil {
-		tu.SetNetwork(*s)
-	}
-	return tu
-}
-
 // SetTotalValue sets the "total_value" field.
 func (tu *TransferUpdate) SetTotalValue(u uint64) *TransferUpdate {
 	tu.mutation.ResetTotalValue()
@@ -325,11 +311,6 @@ func (tu *TransferUpdate) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (tu *TransferUpdate) check() error {
-	if v, ok := tu.mutation.Network(); ok {
-		if err := transfer.NetworkValidator(v); err != nil {
-			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "Transfer.network": %w`, err)}
-		}
-	}
 	if v, ok := tu.mutation.Status(); ok {
 		if err := transfer.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Transfer.status": %w`, err)}
@@ -363,9 +344,6 @@ func (tu *TransferUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if value, ok := tu.mutation.UpdateTime(); ok {
 		_spec.SetField(transfer.FieldUpdateTime, field.TypeTime, value)
-	}
-	if value, ok := tu.mutation.Network(); ok {
-		_spec.SetField(transfer.FieldNetwork, field.TypeEnum, value)
 	}
 	if value, ok := tu.mutation.TotalValue(); ok {
 		_spec.SetField(transfer.FieldTotalValue, field.TypeUint64, value)
@@ -587,20 +565,6 @@ type TransferUpdateOne struct {
 // SetUpdateTime sets the "update_time" field.
 func (tuo *TransferUpdateOne) SetUpdateTime(t time.Time) *TransferUpdateOne {
 	tuo.mutation.SetUpdateTime(t)
-	return tuo
-}
-
-// SetNetwork sets the "network" field.
-func (tuo *TransferUpdateOne) SetNetwork(s schematype.Network) *TransferUpdateOne {
-	tuo.mutation.SetNetwork(s)
-	return tuo
-}
-
-// SetNillableNetwork sets the "network" field if the given value is not nil.
-func (tuo *TransferUpdateOne) SetNillableNetwork(s *schematype.Network) *TransferUpdateOne {
-	if s != nil {
-		tuo.SetNetwork(*s)
-	}
 	return tuo
 }
 
@@ -888,11 +852,6 @@ func (tuo *TransferUpdateOne) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (tuo *TransferUpdateOne) check() error {
-	if v, ok := tuo.mutation.Network(); ok {
-		if err := transfer.NetworkValidator(v); err != nil {
-			return &ValidationError{Name: "network", err: fmt.Errorf(`ent: validator failed for field "Transfer.network": %w`, err)}
-		}
-	}
 	if v, ok := tuo.mutation.Status(); ok {
 		if err := transfer.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Transfer.status": %w`, err)}
@@ -943,9 +902,6 @@ func (tuo *TransferUpdateOne) sqlSave(ctx context.Context) (_node *Transfer, err
 	}
 	if value, ok := tuo.mutation.UpdateTime(); ok {
 		_spec.SetField(transfer.FieldUpdateTime, field.TypeTime, value)
-	}
-	if value, ok := tuo.mutation.Network(); ok {
-		_spec.SetField(transfer.FieldNetwork, field.TypeEnum, value)
 	}
 	if value, ok := tuo.mutation.TotalValue(); ok {
 		_spec.SetField(transfer.FieldTotalValue, field.TypeUint64, value)

@@ -542,18 +542,6 @@ func (u *TransferUpsert) UpdateUpdateTime() *TransferUpsert {
 	return u
 }
 
-// SetNetwork sets the "network" field.
-func (u *TransferUpsert) SetNetwork(v schematype.Network) *TransferUpsert {
-	u.Set(transfer.FieldNetwork, v)
-	return u
-}
-
-// UpdateNetwork sets the "network" field to the value that was provided on create.
-func (u *TransferUpsert) UpdateNetwork() *TransferUpsert {
-	u.SetExcluded(transfer.FieldNetwork)
-	return u
-}
-
 // SetTotalValue sets the "total_value" field.
 func (u *TransferUpsert) SetTotalValue(v uint64) *TransferUpsert {
 	u.Set(transfer.FieldTotalValue, v)
@@ -658,6 +646,9 @@ func (u *TransferUpsertOne) UpdateNewValues() *TransferUpsertOne {
 		if _, exists := u.create.mutation.ReceiverIdentityPubkey(); exists {
 			s.SetIgnore(transfer.FieldReceiverIdentityPubkey)
 		}
+		if _, exists := u.create.mutation.Network(); exists {
+			s.SetIgnore(transfer.FieldNetwork)
+		}
 		if _, exists := u.create.mutation.ExpiryTime(); exists {
 			s.SetIgnore(transfer.FieldExpiryTime)
 		}
@@ -703,20 +694,6 @@ func (u *TransferUpsertOne) SetUpdateTime(v time.Time) *TransferUpsertOne {
 func (u *TransferUpsertOne) UpdateUpdateTime() *TransferUpsertOne {
 	return u.Update(func(s *TransferUpsert) {
 		s.UpdateUpdateTime()
-	})
-}
-
-// SetNetwork sets the "network" field.
-func (u *TransferUpsertOne) SetNetwork(v schematype.Network) *TransferUpsertOne {
-	return u.Update(func(s *TransferUpsert) {
-		s.SetNetwork(v)
-	})
-}
-
-// UpdateNetwork sets the "network" field to the value that was provided on create.
-func (u *TransferUpsertOne) UpdateNetwork() *TransferUpsertOne {
-	return u.Update(func(s *TransferUpsert) {
-		s.UpdateNetwork()
 	})
 }
 
@@ -1003,6 +980,9 @@ func (u *TransferUpsertBulk) UpdateNewValues() *TransferUpsertBulk {
 			if _, exists := b.mutation.ReceiverIdentityPubkey(); exists {
 				s.SetIgnore(transfer.FieldReceiverIdentityPubkey)
 			}
+			if _, exists := b.mutation.Network(); exists {
+				s.SetIgnore(transfer.FieldNetwork)
+			}
 			if _, exists := b.mutation.ExpiryTime(); exists {
 				s.SetIgnore(transfer.FieldExpiryTime)
 			}
@@ -1049,20 +1029,6 @@ func (u *TransferUpsertBulk) SetUpdateTime(v time.Time) *TransferUpsertBulk {
 func (u *TransferUpsertBulk) UpdateUpdateTime() *TransferUpsertBulk {
 	return u.Update(func(s *TransferUpsert) {
 		s.UpdateUpdateTime()
-	})
-}
-
-// SetNetwork sets the "network" field.
-func (u *TransferUpsertBulk) SetNetwork(v schematype.Network) *TransferUpsertBulk {
-	return u.Update(func(s *TransferUpsert) {
-		s.SetNetwork(v)
-	})
-}
-
-// UpdateNetwork sets the "network" field to the value that was provided on create.
-func (u *TransferUpsertBulk) UpdateNetwork() *TransferUpsertBulk {
-	return u.Update(func(s *TransferUpsert) {
-		s.UpdateNetwork()
 	})
 }
 
