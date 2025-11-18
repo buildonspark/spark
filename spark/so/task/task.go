@@ -509,7 +509,7 @@ func AllScheduledTasks() []ScheduledTaskSpec {
 			},
 		},
 		{
-			ExecutionInterval: 3 * time.Second,
+			ExecutionInterval: 20 * time.Second,
 			BaseTaskSpec: BaseTaskSpec{
 				Name:         "purge_signing_nonces",
 				RunInTestEnv: true,
