@@ -16,7 +16,6 @@ import (
 	"github.com/lightsparkdev/spark/common/keys"
 	"github.com/lightsparkdev/spark/common/logging"
 	"github.com/lightsparkdev/spark/common/uint128"
-	pb "github.com/lightsparkdev/spark/proto/spark"
 	tokenpb "github.com/lightsparkdev/spark/proto/spark_token"
 	"github.com/lightsparkdev/spark/so"
 	st "github.com/lightsparkdev/spark/so/ent/schema/schematype"
@@ -420,9 +419,11 @@ func UpdateSignedTransaction(
 		return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update token transaction with operator signature and status: %w", err))
 	}
 
+	txType := tokenTransactionEnt.InferTokenTransactionTypeEnt()
+
 	newInputStatus := st.TokenOutputStatusSpentSigned
 	newOutputLeafStatus := st.TokenOutputStatusCreatedSigned
-	if tokenTransactionEnt.Edges.Mint != nil {
+	if txType == utils.TokenTransactionTypeMint {
 		// If this is a mint, update status straight to finalized because a follow up Finalize() call
 		// is not necessary for mint.
 		newInputStatus = st.TokenOutputStatusSpentFinalized
@@ -443,22 +444,20 @@ func UpdateSignedTransaction(
 	}
 
 	// Update inputs.
-	if tokenTransactionEnt.Edges.SpentOutput != nil {
+	if txType == utils.TokenTransactionTypeTransfer {
+		spentOutputs := tokenTransactionEnt.Edges.SpentOutput
+		if len(spentOutputs) == 0 {
+			return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no spent outputs found for transfer transaction. cannot sign"))
+		}
+		// Validate that we have the right number of spent outputs.
+		if len(operatorSpecificOwnershipSignatures) != len(spentOutputs) {
+			return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf(
+				"number of operator specific ownership signatures (%d) does not match number of spent outputs (%d)",
+				len(operatorSpecificOwnershipSignatures),
+				len(spentOutputs),
+			))
+		}
 		for _, outputToSpendEnt := range tokenTransactionEnt.Edges.SpentOutput {
-			spentLeaves := tokenTransactionEnt.Edges.SpentOutput
-			if len(spentLeaves) == 0 {
-				return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no spent outputs found for transaction. cannot finalize"))
-			}
-
-			// Validate that we have the right number of revocation keys.
-			if len(operatorSpecificOwnershipSignatures) != len(spentLeaves) {
-				return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf(
-					"number of operator specific ownership signatures (%d) does not match number of spent outputs (%d)",
-					len(operatorSpecificOwnershipSignatures),
-					len(spentLeaves),
-				))
-			}
-
 			inputIndex := outputToSpendEnt.SpentTransactionInputVout
 			_, err := db.TokenOutput.UpdateOne(outputToSpendEnt).
 				SetStatus(newInputStatus).
@@ -510,8 +509,13 @@ func UpdateSignedTransferTransactionWithoutOperatorSpecificOwnershipSignatures(
 		return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update token transaction with operator signature and status: %w", err))
 	}
 
+	txType := tokenTransactionEnt.InferTokenTransactionTypeEnt()
+
 	// Update inputs.
-	if tokenTransactionEnt.Edges.SpentOutput != nil {
+	if txType == utils.TokenTransactionTypeTransfer {
+		if len(tokenTransactionEnt.Edges.SpentOutput) == 0 {
+			return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no spent outputs found for transfer transaction. cannot sign"))
+		}
 		outputIDs := make([]uuid.UUID, len(tokenTransactionEnt.Edges.SpentOutput))
 		for i, output := range tokenTransactionEnt.Edges.SpentOutput {
 			outputIDs[i] = output.ID
@@ -540,67 +544,6 @@ func UpdateSignedTransferTransactionWithoutOperatorSpecificOwnershipSignatures(
 		}
 	}
 
-	return nil
-}
-
-// UpdateFinalizedTransaction updates the status and ownership signatures of the finalized input + output outputs.
-func UpdateFinalizedTransaction(
-	ctx context.Context,
-	tokenTransactionEnt *TokenTransaction,
-	revocationSecrets []*pb.RevocationSecretWithIndex,
-) error {
-	db, err := GetDbFromContext(ctx)
-	if err != nil {
-		return sparkerrors.InternalDatabaseTransactionLifecycleError(fmt.Errorf("failed to get db from context: %w", err))
-	}
-
-	// Update the token transaction with the operator signature and new status
-	_, err = db.TokenTransaction.UpdateOne(tokenTransactionEnt).
-		SetStatus(st.TokenTransactionStatusFinalized).
-		Save(ctx)
-	if err != nil {
-		return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update token transaction with finalized status: %w", err))
-	}
-
-	spentLeaves := tokenTransactionEnt.Edges.SpentOutput
-	if len(spentLeaves) == 0 {
-		return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf("no spent outputs found for transaction. cannot finalize"))
-	}
-	if len(revocationSecrets) != len(spentLeaves) {
-		return sparkerrors.InternalDatabaseMissingEdge(fmt.Errorf(
-			"number of revocation keys (%d) does not match number of spent outputs (%d)",
-			len(revocationSecrets),
-			len(spentLeaves),
-		))
-	}
-	// Update inputs.
-	for _, outputToSpendEnt := range tokenTransactionEnt.Edges.SpentOutput {
-		inputIndex := outputToSpendEnt.SpentTransactionInputVout
-		secret, err := keys.ParsePrivateKey(revocationSecrets[inputIndex].GetRevocationSecret())
-		if err != nil {
-			return fmt.Errorf("failed to parse revocation secret: %w", err)
-		}
-		_, err = db.TokenOutput.UpdateOne(outputToSpendEnt).
-			SetStatus(st.TokenOutputStatusSpentFinalized).
-			SetSpentRevocationSecret(secret).
-			Save(ctx)
-		if err != nil {
-			return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to update spent output to signed: %w", err))
-		}
-	}
-
-	// Update outputs.
-	outputIDs := make([]uuid.UUID, len(tokenTransactionEnt.Edges.CreatedOutput))
-	for i, output := range tokenTransactionEnt.Edges.CreatedOutput {
-		outputIDs[i] = output.ID
-	}
-	_, err = db.TokenOutput.Update().
-		Where(tokenoutput.IDIn(outputIDs...)).
-		SetStatus(st.TokenOutputStatusCreatedFinalized).
-		Save(ctx)
-	if err != nil {
-		return sparkerrors.InternalDatabaseWriteError(fmt.Errorf("failed to bulk update output status to finalized: %w", err))
-	}
 	return nil
 }
 
