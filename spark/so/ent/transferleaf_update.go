@@ -11,12 +11,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/google/uuid"
 	"github.com/lightsparkdev/spark/so/ent/predicate"
 	"github.com/lightsparkdev/spark/so/ent/schema/schematype"
-	"github.com/lightsparkdev/spark/so/ent/transfer"
 	"github.com/lightsparkdev/spark/so/ent/transferleaf"
-	"github.com/lightsparkdev/spark/so/ent/treenode"
 )
 
 // TransferLeafUpdate is the builder for updating TransferLeaf entities.
@@ -270,43 +267,9 @@ func (tlu *TransferLeafUpdate) ClearReceiverKeyTweak() *TransferLeafUpdate {
 	return tlu
 }
 
-// SetTransferID sets the "transfer" edge to the Transfer entity by ID.
-func (tlu *TransferLeafUpdate) SetTransferID(id uuid.UUID) *TransferLeafUpdate {
-	tlu.mutation.SetTransferID(id)
-	return tlu
-}
-
-// SetTransfer sets the "transfer" edge to the Transfer entity.
-func (tlu *TransferLeafUpdate) SetTransfer(t *Transfer) *TransferLeafUpdate {
-	return tlu.SetTransferID(t.ID)
-}
-
-// SetLeafID sets the "leaf" edge to the TreeNode entity by ID.
-func (tlu *TransferLeafUpdate) SetLeafID(id uuid.UUID) *TransferLeafUpdate {
-	tlu.mutation.SetLeafID(id)
-	return tlu
-}
-
-// SetLeaf sets the "leaf" edge to the TreeNode entity.
-func (tlu *TransferLeafUpdate) SetLeaf(t *TreeNode) *TransferLeafUpdate {
-	return tlu.SetLeafID(t.ID)
-}
-
 // Mutation returns the TransferLeafMutation object of the builder.
 func (tlu *TransferLeafUpdate) Mutation() *TransferLeafMutation {
 	return tlu.mutation
-}
-
-// ClearTransfer clears the "transfer" edge to the Transfer entity.
-func (tlu *TransferLeafUpdate) ClearTransfer() *TransferLeafUpdate {
-	tlu.mutation.ClearTransfer()
-	return tlu
-}
-
-// ClearLeaf clears the "leaf" edge to the TreeNode entity.
-func (tlu *TransferLeafUpdate) ClearLeaf() *TransferLeafUpdate {
-	tlu.mutation.ClearLeaf()
-	return tlu
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -483,64 +446,6 @@ func (tlu *TransferLeafUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	}
 	if tlu.mutation.ReceiverKeyTweakCleared() {
 		_spec.ClearField(transferleaf.FieldReceiverKeyTweak, field.TypeBytes)
-	}
-	if tlu.mutation.TransferCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   transferleaf.TransferTable,
-			Columns: []string{transferleaf.TransferColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := tlu.mutation.TransferIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   transferleaf.TransferTable,
-			Columns: []string{transferleaf.TransferColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if tlu.mutation.LeafCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   transferleaf.LeafTable,
-			Columns: []string{transferleaf.LeafColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := tlu.mutation.LeafIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   transferleaf.LeafTable,
-			Columns: []string{transferleaf.LeafColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_spec.AddModifiers(tlu.modifiers...)
 	if n, err = sqlgraph.UpdateNodes(ctx, tlu.driver, _spec); err != nil {
@@ -801,43 +706,9 @@ func (tluo *TransferLeafUpdateOne) ClearReceiverKeyTweak() *TransferLeafUpdateOn
 	return tluo
 }
 
-// SetTransferID sets the "transfer" edge to the Transfer entity by ID.
-func (tluo *TransferLeafUpdateOne) SetTransferID(id uuid.UUID) *TransferLeafUpdateOne {
-	tluo.mutation.SetTransferID(id)
-	return tluo
-}
-
-// SetTransfer sets the "transfer" edge to the Transfer entity.
-func (tluo *TransferLeafUpdateOne) SetTransfer(t *Transfer) *TransferLeafUpdateOne {
-	return tluo.SetTransferID(t.ID)
-}
-
-// SetLeafID sets the "leaf" edge to the TreeNode entity by ID.
-func (tluo *TransferLeafUpdateOne) SetLeafID(id uuid.UUID) *TransferLeafUpdateOne {
-	tluo.mutation.SetLeafID(id)
-	return tluo
-}
-
-// SetLeaf sets the "leaf" edge to the TreeNode entity.
-func (tluo *TransferLeafUpdateOne) SetLeaf(t *TreeNode) *TransferLeafUpdateOne {
-	return tluo.SetLeafID(t.ID)
-}
-
 // Mutation returns the TransferLeafMutation object of the builder.
 func (tluo *TransferLeafUpdateOne) Mutation() *TransferLeafMutation {
 	return tluo.mutation
-}
-
-// ClearTransfer clears the "transfer" edge to the Transfer entity.
-func (tluo *TransferLeafUpdateOne) ClearTransfer() *TransferLeafUpdateOne {
-	tluo.mutation.ClearTransfer()
-	return tluo
-}
-
-// ClearLeaf clears the "leaf" edge to the TreeNode entity.
-func (tluo *TransferLeafUpdateOne) ClearLeaf() *TransferLeafUpdateOne {
-	tluo.mutation.ClearLeaf()
-	return tluo
 }
 
 // Where appends a list predicates to the TransferLeafUpdate builder.
@@ -1044,64 +915,6 @@ func (tluo *TransferLeafUpdateOne) sqlSave(ctx context.Context) (_node *Transfer
 	}
 	if tluo.mutation.ReceiverKeyTweakCleared() {
 		_spec.ClearField(transferleaf.FieldReceiverKeyTweak, field.TypeBytes)
-	}
-	if tluo.mutation.TransferCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   transferleaf.TransferTable,
-			Columns: []string{transferleaf.TransferColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := tluo.mutation.TransferIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   transferleaf.TransferTable,
-			Columns: []string{transferleaf.TransferColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(transfer.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if tluo.mutation.LeafCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   transferleaf.LeafTable,
-			Columns: []string{transferleaf.LeafColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := tluo.mutation.LeafIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   transferleaf.LeafTable,
-			Columns: []string{transferleaf.LeafColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(treenode.FieldID, field.TypeUUID),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_spec.AddModifiers(tluo.modifiers...)
 	_node = &TransferLeaf{config: tluo.config}

@@ -56,9 +56,11 @@ func (TransferLeaf) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("transfer", Transfer.Type).
 			Unique().
+			Immutable().
 			Required(),
 		edge.To("leaf", TreeNode.Type).
 			Unique().
+			Immutable().
 			Required(),
 	}
 }
